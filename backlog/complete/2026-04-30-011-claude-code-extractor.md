@@ -55,7 +55,24 @@ agent_notes: |
       registrations. Item-body for 011 declares this expected.
 
   Run log: raw/internal/agent-runs/2026-04-30-2026-04-30-011-claude-code-extractor.md
-review_notes: ""
+review_notes: |
+  Merged on 2026-04-30 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (211 only — daemon/index.ts conflict only triggers if 010 also merges)
+
+  Fixups applied:
+  - none (sidecar verdict was "merge as-is")
+
+  Fixups deferred to follow-up items: see backlog/_followups.md
+  - log.warn("parse_failed", ...) in parseLine's JSON catch (claude-code.ts:64) for diagnosability
+  - Bump e2e ordering test waitFor budget 5000→10000ms to deflake under full-suite chokidar contention
+  - Lag verification (founder-side, would have required reading real Claude Code chat content)
+  - JSONL shape regression observability (the parse_failed warn above makes this observable)
+
+  Verify: 154/154 tests pass on second run (one flake on first run — the chokidar contention noted in sidecar; deflaked on retry as predicted). Lint and typecheck clean.
+
+  Follow-up items (non-blocking): see backlog/_followups.md
 ---
 
 # Claude Code extractor (chat turns, full text)
