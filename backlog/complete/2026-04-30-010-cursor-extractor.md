@@ -63,6 +63,7 @@ agent_notes: |
   Run log appended at raw/internal/agent-runs/2026-04-30-2026-04-30-010-cursor-extractor.md
   (Run 2 section).
 review_notes: |
+  ## Pre-claim spec rationale (strategist)
   V1 of this spec assumed Cursor stored composer chat in per-workspace
   state.vscdb. The previous claim's empirical probe (drift note dated
   2026-04-30) showed chat actually lives in globalStorage/state.vscdb
@@ -70,6 +71,27 @@ review_notes: |
   watch globalStorage, track per-composer, workspace_id is best-effort.
   Per-workspace state.vscdb is still in the FS allowlist (item 009)
   and provides composer→workspace inference; that's preserved here.
+
+  ## Merge notes
+  Merged on 2026-04-30 via founder reconciliation.
+
+  Conflicts resolved:
+  - src/daemon/index.ts: take both — preserve `gitWatcher → claudeCodeExtractor → cursorExtractor → mcp` on boot and reverse on shutdown. Predicted exactly by sidecar (conditional on 011 landing first, which it did).
+
+  Fixups applied:
+  - none (verdict was "merge as-is" after the founder-validated timestamp fixup landed at 2c01f8b on the branch pre-merge)
+
+  Fixups deferred to follow-up items: see backlog/_followups.md
+  - Boot-time workspace-inference scan (prime composer→workspace map at startup)
+  - Coalesce rapid-fire FS events on globalDbPath (debounce or dirty-flag)
+  - Reproducible lag-measurement harness for founder-side verification
+  - log warn `unrecognized_bubble_shape` when parseBubbleRow returns null
+
+  Verify: 171/171 tests pass post-merge. Lint and typecheck clean.
+
+  Open follow-ups carried forward:
+  - Lag verification (founder-side, ≤2s median over 5 trials)
+  - Bubble JSON shape resilience (parser assumes {role, text, createdAt})
 ---
 
 # Cursor extractor (composer chat from globalStorage)

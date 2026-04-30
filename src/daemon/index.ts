@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startClaudeCodeExtractor } from '../capture/extractors/claude-code.js';
+import { startCursorExtractor } from '../capture/extractors/cursor.js';
 import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
@@ -42,6 +43,7 @@ const { storage, backend, dispose } = createStorage();
 const fsWatcher = await startFsWatcher(CAPTURED_SOURCES.fs_paths, storage);
 const gitWatcher = await startGitWatcher(CAPTURED_SOURCES.git_repos, storage);
 const claudeCodeExtractor = await startClaudeCodeExtractor(storage);
+const cursorExtractor = await startCursorExtractor(storage);
 const mcp = await startMcpServer(storage, { port: resolveMcpPort() });
 
 await startLifecycle({
@@ -50,6 +52,7 @@ await startLifecycle({
   extraPayload: { mcp_port: mcp.port, mcp_url: mcp.url },
   onShutdown: async () => {
     await mcp.stop();
+    await cursorExtractor.stop();
     await claudeCodeExtractor.stop();
     await gitWatcher.stop();
     await fsWatcher.stop();
