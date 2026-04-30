@@ -1,5 +1,7 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { CAPTURED_SOURCES } from '../capture/sources.js';
+import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import type { Storage } from '../storage/interface.js';
 import { MemoryStorage } from '../storage/memory.js';
 import { SqliteStorage } from '../storage/sqlite.js';
@@ -19,10 +21,13 @@ const useMemory = process.env['ECHO_STORAGE'] === 'memory';
 const sqliteStore = useMemory ? null : new SqliteStorage(resolveDbPath());
 const storage: Storage = useMemory ? new MemoryStorage() : sqliteStore!;
 
+const fsWatcher = await startFsWatcher(CAPTURED_SOURCES.fs_paths, storage);
+
 await startLifecycle({
   storage,
   storageBackend: useMemory ? 'memory' : 'sqlite',
-  onShutdown: () => {
+  onShutdown: async () => {
+    await fsWatcher.stop();
     if (sqliteStore !== null) sqliteStore.close();
   },
 });

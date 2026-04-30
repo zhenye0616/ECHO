@@ -4,7 +4,7 @@ import { isNonEmptyString } from '../guards.js';
 export const CAPTURED_SOURCES = {
   apps: {},
   domains: {},
-  fs_paths: [],
+  fs_paths: ['~/Library/Application Support/Cursor/User/workspaceStorage/', '~/.claude/projects/'],
   apis: [],
 } as const;
 

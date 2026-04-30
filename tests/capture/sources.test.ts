@@ -15,11 +15,17 @@ import {
 const malformed: unknown[] = [null, undefined, 42, '', {}, [], true, false];
 
 describe('CAPTURED_SOURCES', () => {
-  it('initializes empty for all four categories', () => {
+  it('initializes empty for apps/domains/apis (no source-additions yet)', () => {
     expect(Object.keys(CAPTURED_SOURCES.apps)).toHaveLength(0);
     expect(Object.keys(CAPTURED_SOURCES.domains)).toHaveLength(0);
-    expect(CAPTURED_SOURCES.fs_paths).toEqual([]);
     expect(CAPTURED_SOURCES.apis).toEqual([]);
+  });
+
+  it('declares the two FS prefixes for Cursor and Claude Code', () => {
+    expect(CAPTURED_SOURCES.fs_paths).toEqual([
+      '~/Library/Application Support/Cursor/User/workspaceStorage/',
+      '~/.claude/projects/',
+    ]);
   });
 });
 

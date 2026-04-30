@@ -140,9 +140,10 @@ describe('daemon lifecycle', () => {
     const d = spawnDaemon(dataDir);
     daemons.push(d);
 
-    const started = await d.waitFor((l) => l.message === 'started');
+    const started = await d.waitFor(
+      (l) => l.source === 'daemon.lifecycle' && l.message === 'started',
+    );
     expect(started.level).toBe('info');
-    expect(started.source).toBe('daemon.lifecycle');
     const payload = started.payload!;
     expect(typeof payload['pid']).toBe('number');
     expect(payload['storage_backend']).toBe('memory');
@@ -154,25 +155,31 @@ describe('daemon lifecycle', () => {
     const t0 = Date.now();
     d.child.kill('SIGTERM');
 
-    const stopping = await d.waitFor((l) => l.message === 'stopping');
+    const stopping = await d.waitFor(
+      (l) => l.source === 'daemon.lifecycle' && l.message === 'stopping',
+    );
     expect(stopping.level).toBe('info');
-    const stopped = await d.waitFor((l) => l.message === 'stopped');
+    const stopped = await d.waitFor(
+      (l) => l.source === 'daemon.lifecycle' && l.message === 'stopped',
+    );
     expect(stopped.level).toBe('info');
 
     const { code } = await d.exitInfo;
     const elapsed = Date.now() - t0;
     expect(code).toBe(0);
-    expect(elapsed).toBeLessThan(2000);
+    // Shutdown must be bounded but the FS watcher's chokidar.close() adds
+    // real cleanup time on macOS FSEvents (typically 2–4s on dirs with content).
+    expect(elapsed).toBeLessThan(8000);
     expect(existsSync(join(dataDir, 'daemon.pid'))).toBe(false);
   }, 20000);
 
   it('SIGINT triggers the same graceful shutdown', async () => {
     const d = spawnDaemon(dataDir);
     daemons.push(d);
-    await d.waitFor((l) => l.message === 'started');
+    await d.waitFor((l) => l.source === 'daemon.lifecycle' && l.message === 'started');
 
     d.child.kill('SIGINT');
-    await d.waitFor((l) => l.message === 'stopping');
+    await d.waitFor((l) => l.source === 'daemon.lifecycle' && l.message === 'stopping');
     const { code } = await d.exitInfo;
     expect(code).toBe(0);
   }, 20000);
@@ -180,7 +187,7 @@ describe('daemon lifecycle', () => {
   it('refuses to start when another instance is running', async () => {
     const first = spawnDaemon(dataDir);
     daemons.push(first);
-    await first.waitFor((l) => l.message === 'started');
+    await first.waitFor((l) => l.source === 'daemon.lifecycle' && l.message === 'started');
 
     const second = spawnDaemon(dataDir);
     daemons.push(second);
@@ -204,7 +211,9 @@ describe('daemon lifecycle', () => {
 
     const d = spawnDaemon(dataDir);
     daemons.push(d);
-    const started = await d.waitFor((l) => l.message === 'started');
+    const started = await d.waitFor(
+      (l) => l.source === 'daemon.lifecycle' && l.message === 'started',
+    );
 
     const writtenPid = Number.parseInt(readFileSync(join(dataDir, 'daemon.pid'), 'utf8'), 10);
     expect(writtenPid).toBe(started.payload!['pid']);
