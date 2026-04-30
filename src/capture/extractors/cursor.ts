@@ -22,6 +22,7 @@ export interface CursorTurn {
   workspace_id?: string;
   user_message: string;
   assistant_message: string;
+  assistant_created_at: number;
   mtime: number;
 }
 
@@ -168,13 +169,14 @@ export async function extractCursorTurns(
         assistant_bubble_id: next.bubble_id,
         user_message: cur.text,
         assistant_message: next.text,
+        assistant_created_at: next.createdAt,
         mtime,
       });
       i += 2;
     }
   }
 
-  turns.sort((a, b) => a.mtime - b.mtime);
+  turns.sort((a, b) => a.assistant_created_at - b.assistant_created_at);
   return turns;
 }
 
@@ -298,7 +300,7 @@ export async function startCursorExtractor(
       if (ws !== undefined) metadata['workspace_id'] = ws;
       const candidate = {
         source: `fs:${globalDbPath}`,
-        timestamp: new Date(turn.mtime).toISOString(),
+        timestamp: new Date(turn.assistant_created_at).toISOString(),
         content: `USER: ${turn.user_message}\n\nASSISTANT: ${turn.assistant_message}`,
         metadata,
       };

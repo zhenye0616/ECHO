@@ -230,12 +230,31 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     const evt = events[0]!;
     expect(evt.source).toBe(`fs:${globalDbPath}`);
     expect(evt.content).toBe('USER: q1\n\nASSISTANT: a1');
+    expect(evt.timestamp).toBe(new Date(200).toISOString());
     expect(evt.metadata).toMatchObject({
       composer_id: 'c1',
       user_bubble_id: 'b1',
       assistant_bubble_id: 'b2',
     });
     expect(evt.metadata).not.toHaveProperty('workspace_id');
+  });
+
+  it('emits distinct timestamps for multiple turns flushed in a single FS event', async () => {
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    createGlobalStorageFixture(globalDbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
+      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b3', role: 'user', text: 'q2', createdAt: 300 },
+      { composer_id: 'c1', bubble_id: 'b4', role: 'assistant', text: 'a2', createdAt: 400 },
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 2);
+    const events = await storage.query();
+    expect(events).toHaveLength(2);
+    const timestamps = events.map((e) => e.timestamp);
+    expect(new Set(timestamps).size).toBe(2);
+    expect(timestamps).toEqual([new Date(200).toISOString(), new Date(400).toISOString()]);
   });
 
   it('populates workspace_id when the per-workspace inference index has the composer', async () => {
