@@ -47,7 +47,12 @@ else
   RESUMING=0
   # Fresh claim: pick highest priority + oldest creation date from ready/
   # (use your own logic to pick the right file; it must be from backlog/ready/)
-  ITEM_FILE_NAME="<chosen-item-filename>.md"   # e.g., 2026-04-30-001-capture-gate.md
+  # Selection rules:
+  #   - Filter to UNBLOCKED candidates: blocked_by is empty OR every blocked_by ID
+  #     has a corresponding file in backlog/complete/
+  #   - From unblocked candidates, pick HIGH > MED > LOW priority, oldest creation date
+  #   - If no unblocked candidates exist: STOP without claiming, log "no claimable work"
+  ITEM_FILE_NAME="<chosen-item-filename>.md"   # e.g., 2026-04-30-001-repo-bootstrap.md
   ITEM_ID="${ITEM_FILE_NAME%.md}"
   SLUG="${ITEM_ID#????-??-??-???-}"
 

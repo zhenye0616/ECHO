@@ -243,8 +243,9 @@ status: ready                     # ready | claimed | pending_review | complete
 priority: HIGH                    # HIGH | MED | LOW
 estimate: 0.5d
 created: 2026-04-30
-spec_refs:                        # files to read before working
+spec_refs:                        # files to read before working (in addition to the four mandatory reads)
   - (other backlog items, raw decision notes, or wiki pages that already exist)
+blocked_by: []                    # other item IDs that must be in backlog/complete/ before this can be claimed
 acceptance:                       # specific, testable criteria
   - All capture data flows through one chokepoint function
   - Non-allowlisted sources rejected; rejections are logged
@@ -297,7 +298,9 @@ When an agent runs, it must:
 
    The entire `echo-wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
 2. **Pull latest `main`** in the main repo
-3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found, else atomically claim a new item
+3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found, else atomically claim a new item from the unblocked candidates
+   - **Unblocked candidate** = item in `backlog/ready/` whose `blocked_by` list is either empty OR every entry has a corresponding file in `backlog/complete/`
+   - If no candidates are unblocked, STOP without claiming — log "no claimable work" and exit cleanly
 4. **Create-or-reuse the worktree** on `agent/<slug>` (idempotent — see Idempotency Guarantees)
 5. **Read all `spec_refs`** in the item before writing any code
 6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)

@@ -16,11 +16,15 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-*(empty — add items as they emerge from strategic conversations)*
+The first foundation set — five items establishing the substrate skeleton. Item 001 is the only initially-claimable item; 002 / 003 / 005 unblock when 001 lands; 004 unblocks when 002 + 003 + 005 all land.
 
-| Priority | ID | Title | Spec Refs |
+| Priority | ID | Title | Blocked By |
 |---|---|---|---|
-| | | | |
+| HIGH | [2026-04-30-001](./backlog/ready/2026-04-30-001-repo-bootstrap.md) | Repo bootstrap (TS/Node + Vitest + ESLint + Prettier) | — |
+| HIGH | [2026-04-30-002](./backlog/ready/2026-04-30-002-logger.md) | Logger module (structured, source-attributed) | 001 |
+| HIGH | [2026-04-30-003](./backlog/ready/2026-04-30-003-capture-allowlist.md) | Capture allowlist (sources.ts) | 001 |
+| HIGH | [2026-04-30-004](./backlog/ready/2026-04-30-004-capture-gate.md) | Capture gate (chokepoint pure function) | 002, 003, 005 |
+| HIGH | [2026-04-30-005](./backlog/ready/2026-04-30-005-storage-interface.md) | Storage interface + in-memory impl | 001 |
 
 ---
 

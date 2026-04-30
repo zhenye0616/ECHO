@@ -33,7 +33,9 @@ The **entire `echo-wiki/` folder is your global context** — read-only, but rea
        grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md
        — if found: RESUME (skip step 4–5, go to step 6 with worktree-reuse)
        — if not:   continue to fresh claim
- 4. List backlog/ready/, pick highest priority + oldest creation date
+ 4. List backlog/ready/, filter to UNBLOCKED candidates, pick highest priority + oldest creation date
+       — UNBLOCKED = blocked_by frontmatter is empty OR every blocked_by ID has a file in backlog/complete/
+       — if no unblocked candidates: STOP without claiming, log "no claimable work"
  5. Atomic claim:
        (in main repo on main)
        git mv backlog/ready/X.md backlog/claimed/X.md
