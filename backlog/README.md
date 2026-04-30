@@ -380,3 +380,14 @@ When authoring a bootstrap or scaffolding item for a new language/runtime, inclu
 ### Probe before you spec — for any item that depends on a third-party app's storage layout
 
 When the spec depends on the layout of an external app's data files (Cursor's SQLite tables, Claude Code's JSONL shape, a SaaS API response shape, etc.), run a **privacy-respecting empirical probe** before writing the spec, not during implementation. Schema-only probes (table names, key prefixes, value lengths — no content reads) are cheap, take 10 minutes, and prevent rebuilding a 100-line spec mid-flight when the agent discovers reality doesn't match. The agent that catches the mismatch during work will escalate correctly per drift rule 3, but the strategist that wrote the wrong spec is the one who created that escalation. Ten minutes of probing during the strategic conversation > one round-trip of agent escalation + spec rewrite + re-claim. *(Source: 2026-04-30 010-cursor-extractor escalation; spec assumed Cursor stored chat in per-workspace `state.vscdb`, actual location is `globalStorage/state.vscdb` under `cursorDiskKV`. Drift note: `raw/internal/decisions/2026-04-30-DRIFT-cursor-chat-storage-location.md`.)*
+
+## Followup Queue
+
+`backlog/_followups.md` is a flat-file queue populated by `/merge-and-cleanup`'s C10 step. It accumulates two kinds of entries:
+
+- **Pre-merge fixups deferred during merge** — when the founder reviews a fixup and chooses `defer-as-followup` rather than applying it inline. The fixup's description goes here so it's not forgotten.
+- **Non-blocking follow-up items from the review sidecar** — things the code-reviewer subagent flagged but didn't consider merge-blocking (e.g., "consider adding a comment explaining the chokidar polling fallback rationale").
+
+The queue is consumed during the next strategist conversation: each entry is either turned into a proper `backlog/ready/` item (with full spec, blocked_by, etc.), rolled into an existing item's scope, or dropped with a one-line rationale.
+
+The underscore prefix (`_followups.md`) sorts it first alphabetically inside `backlog/` so the founder sees it on every `ls`. It is not a backlog item — it does not have an id, does not pass through the kanban stages, and is not validated by `tools/blocked.py`. It's a working-memory queue, processed and emptied by the strategist as items are promoted.
