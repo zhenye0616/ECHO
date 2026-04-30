@@ -31,7 +31,12 @@ interface DaemonProcess {
 function spawnDaemon(dataDir: string): DaemonProcess {
   const child = spawn(VITE_NODE_BIN, [ENTRY], {
     cwd: REPO_ROOT,
-    env: { ...process.env, ECHO_DATA_DIR: dataDir, ECHO_LOG_LEVEL: 'info' },
+    env: {
+      ...process.env,
+      ECHO_DATA_DIR: dataDir,
+      ECHO_LOG_LEVEL: 'info',
+      ECHO_STORAGE: 'memory',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 

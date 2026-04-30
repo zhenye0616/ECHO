@@ -8,12 +8,11 @@ import type { Storage } from '../storage/interface.js';
 
 const log = createLogger('daemon.lifecycle');
 
-const STORAGE_BACKEND = 'memory';
-
 let shuttingDown = false;
 let pidLockPath: string | null = null;
 let signalsBound = false;
 let keepAlive: NodeJS.Timeout | null = null;
+let onShutdownHook: (() => void | Promise<void>) | null = null;
 
 function resolveDataDir(): string {
   const env = process.env['ECHO_DATA_DIR'];
@@ -62,10 +61,17 @@ function releasePidLock(): void {
   pidLockPath = null;
 }
 
-function shutdown(signal: NodeJS.Signals): void {
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info('stopping', { signal });
+  if (onShutdownHook !== null) {
+    try {
+      await onShutdownHook();
+    } catch (err) {
+      log.error('shutdown_hook_failed', { message: (err as Error).message });
+    }
+  }
   releasePidLock();
   if (keepAlive !== null) {
     clearInterval(keepAlive);
@@ -74,16 +80,24 @@ function shutdown(signal: NodeJS.Signals): void {
   log.info('stopped', {});
 }
 
+export interface LifecycleOptions {
+  storage?: Storage;
+  storageBackend?: string;
+  onShutdown?: () => void | Promise<void>;
+}
+
 export interface LifecycleHandle {
   storage: Storage;
   dataDir: string;
 }
 
-export async function startLifecycle(): Promise<LifecycleHandle> {
+export async function startLifecycle(options: LifecycleOptions = {}): Promise<LifecycleHandle> {
   const dataDir = resolveDataDir();
   pidLockPath = acquirePidLock(dataDir);
 
-  const storage: Storage = new MemoryStorage();
+  const storage: Storage = options.storage ?? new MemoryStorage();
+  const storageBackend = options.storageBackend ?? 'memory';
+  onShutdownHook = options.onShutdown ?? null;
 
   if (keepAlive === null) {
     keepAlive = setInterval(() => {
@@ -94,13 +108,13 @@ export async function startLifecycle(): Promise<LifecycleHandle> {
   log.info('started', {
     pid: process.pid,
     version: readVersion(),
-    storage_backend: STORAGE_BACKEND,
+    storage_backend: storageBackend,
     data_dir: dataDir,
   });
 
   if (!signalsBound) {
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+    process.on('SIGINT', () => void shutdown('SIGINT'));
     signalsBound = true;
   }
 
