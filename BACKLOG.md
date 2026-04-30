@@ -16,14 +16,11 @@
 
 ## 🔨 Ready (specced, agent can pick up)
 
+*(empty — add items as they emerge from strategic conversations)*
+
 | Priority | ID | Title | Spec Refs |
 |---|---|---|---|
-| HIGH | [001](./backlog/ready/2026-04-30-001-storage-architecture.md) | Storage architecture (append-only ledger) | [[local-daemon]] · [[v1-spec]] |
-| HIGH | [002](./backlog/ready/2026-04-30-002-mcp-server-skeleton.md) | MCP server skeleton | [[mcp-server]] · [[v1-spec]] |
-| HIGH | [003](./backlog/ready/2026-04-30-003-hotkey-overlay-scaffold.md) | Hotkey overlay scaffold (native macOS) | [[hotkey-overlay]] · [[clipboard-and-launch]] |
-| MED  | [004](./backlog/ready/2026-04-30-004-landing-page.md) | Landing page + paid waitlist | [[validation-experiments]] · [[brand-promise]] |
-| MED  | [005](./backlog/ready/2026-04-30-005-extension-onboarding-question.md) | Extension onboarding question | [[browser-extension]] · [[extension-funnel-logic]] |
-| MED  | [006](./backlog/ready/2026-04-30-006-extension-v1-banner.md) | Extension V1 awareness banner | [[browser-extension]] · [[extension-funnel-logic]] |
+| | | | |
 
 ---
 
