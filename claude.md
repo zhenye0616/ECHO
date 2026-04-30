@@ -8,14 +8,18 @@ ECHO is the cross-platform context layer for AI-era knowledge work. The product 
 
 ## How to Use This Repo
 
-This is a **decision and reasoning archive**, not a codebase. Every strategic call, scoping decision, form-factor commitment, and architectural principle gets captured here as a source/concept/entity/analysis page so future-you (and future contributors, and future LLMs) can reconstruct the *why* behind every choice.
+This is both a **decision archive** (the wiki) and a **build coordination system** (the backlog + agent runs). Two important rules govern how the two halves stay honest:
+
+- **The product wiki (`echo-wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its `backlog/ready/<id>.md` item.
+- **Operating-model files** (this file, `AGENT_INSTRUCTIONS.md`, `backlog/README.md`, `.claude/commands/process-backlog.md`) update *immediately* when the operating model changes. They have no shipping milestone and are not product decisions.
 
 ### When making strategic decisions
 
-1. **Search the wiki first.** Existing concepts (`echo-wiki/concepts/`) often already capture the principle. Reuse before creating.
+1. **Search existing wiki + backlog first.** A shipped wiki page (`echo-wiki/concepts/`, `sources/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
 2. **Cite cross-project wisdom.** The `yc-wiki` (`~/Desktop/yc/yc-wiki/`) is the authoritative source for startup strategy frameworks. Reference its concept pages by `[[link]]` when applying them.
-3. **Capture new decisions as source pages.** Anything substantive — pricing, scope, form factor, branding, sequencing — becomes a `sources/` page with the reasoning, alternatives considered, and final call.
-4. **Update the manifest.** Every new file goes into `.manifest.json` so the index stays consistent.
+3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — lives inside `backlog/ready/<id>.md`. The strategist does **not** write to `echo-wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
+4. **Background reasoning** that doesn't correspond to an actionable build item lands in `raw/internal/decisions/`.
+5. **The manifest** is updated only when (and only when) a wiki page is actually created post-shipment.
 
 ### When researching precedents
 
@@ -80,40 +84,54 @@ Working name: **ECHO**. Hard rename deadline: before public Show HN launch (week
 
 ## Operating Mode: Coordination System
 
-This repo is a coordination system across three roles:
+This repo coordinates three roles. **Multiple builder agents may run in parallel** — each works inside its own git worktree on its own feature branch.
 
-1. **Strategist (Claude in conversation with founder)** — produces design decisions; updates `echo-wiki/` with canonical decisions; produces `backlog/ready/` items as actionable work emerges
-2. **Builder agent (autonomous, overnight)** — picks items from `backlog/ready/`, implements them, logs work, moves through pipeline
-3. **Founder (morning review)** — reviews `backlog/needs_review/` items, approves to `done/` or sends back to `ready/`
+1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `echo-wiki/` until items ship
+2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline
+3. **Founder (morning review)** — reviews `backlog/pending_review/`, merges branches (handling conflicts manually), moves items to `complete/`, then asks the strategist to update the wiki
+
+### Pipeline
+
+```
+backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlog/complete/
+                                                                         │
+                                                                         ▼
+                                                            strategist updates echo-wiki/
+```
 
 ### Strategist Responsibilities (this Claude conversation)
 
 After any strategic conversation that lands an actionable decision:
 
-1. **Update `echo-wiki/`** — canonical decision lives here (sources/, concepts/, entities/, analyses/). Update manifest + index.
-2. **Add backlog items to `backlog/ready/`** — implementation work derived from the decision. Use the standard item format (frontmatter + body).
-3. **Update `BACKLOG.md`** — add row to the Ready table with link to item.
+1. **Create a `backlog/ready/<id>.md` item** — full spec lives here (this is the authoritative spec until the item ships). Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
+2. **Add a row to `BACKLOG.md`'s Ready table.**
+3. **Do NOT touch `echo-wiki/`.** Wiki edits happen only after items land in `complete/`.
 
-The wiki is for *what was decided*. The backlog is for *what will be built*. They connect via `spec_refs`.
+When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `echo-wiki/` (sources/, concepts/, entities/, analyses/, manifest, index).
 
 ### Builder Agent Responsibilities
 
-When picking up a backlog item:
+When a builder agent runs:
 
-1. **Read all `spec_refs` first** — load wiki context before writing any code
-2. **Move item from `ready/` to `in_progress/`** — atomic, one item at a time
-3. **Implement to acceptance criteria** — no scope expansion (per [[drift-prevention]])
-4. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md` with what was implemented, decisions made, files modified, test results, open questions
-5. **If uncertainty arises** that requires founder input — STOP, move item to `needs_review/` with question in `agent_notes`. Do not guess.
-6. **When acceptance criteria pass** — move item to `needs_review/`, fill `agent_notes` with summary
+1. **Pull `main`**, then **atomically claim** an item: a single commit on `main` that moves the file `ready/ → claimed/` and sets `claimed_by`, `claimed_at`, `branch` in frontmatter. Push immediately. If push is rejected, another agent won — pick the next ready item.
+2. **Create the worktree** at `~/Desktop/echo_wiki--<slug>/` on a fresh `agent/<slug>` branch.
+3. **Read all `spec_refs`** in the item before writing code.
+4. **Implement to acceptance criteria only.** No scope expansion (per `drift-prevention` rules).
+5. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md`.
+6. **If uncertainty arises that requires founder input** — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
+7. **When acceptance criteria pass** — push the feature branch, then in the main repo on `main` move the item to `pending_review/` with `agent_notes` summary, `head_sha`, and (if applicable) `pr_url`.
+8. **One item per run.** Do not pick up a second.
 
-### Drift Prevention Applies to Agent Too
+The agent operates across **two directories**: backlog state changes happen in the main repo on `main` (so all agents share consistent backlog state); code work happens inside the worktree on the feature branch. The slash command handles directory switching.
 
-The agent is more dangerous than the founder for drift, because it doesn't have the founder's gut. Two safeguards built in:
+### Drift Prevention Applies to Agents Too
 
-1. Every backlog item has explicit "Out of Scope (Don't Drift)" section
-2. Agent must read `spec_refs` (which include drift-prevention concept) before acting
+Agents are more dangerous than the founder for drift, because they don't have the founder's gut. Three safeguards:
 
-If the agent finds itself wanting to do something not in acceptance criteria: STOP, log the temptation in `raw/internal/decisions/` with type `drift-event`, leave item in `in_progress/` with question for founder.
+1. Every backlog item has an explicit "Out of Scope (Don't Drift)" section
+2. Agents must read `spec_refs` before any code is written
+3. Sandbox is enforced in code (capture-gate pattern), not by policy
 
-See [`backlog/README.md`](./backlog/README.md) for the full system documentation.
+If an agent finds itself wanting to do something not in acceptance criteria: STOP, log the temptation in `raw/internal/decisions/` as a drift-event, fill `agent_notes` with the question, push branch, move item to `pending_review/`.
+
+See [`backlog/README.md`](./backlog/README.md) for the full system documentation including atomic-claim and worktree mechanics.
