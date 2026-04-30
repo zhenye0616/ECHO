@@ -18,3 +18,9 @@
 # Sensitive interview data (uncomment if needed)
 # raw/internal/interviews/
 .claude/settings.local.json # if you want to ignore it
+
+# Node / TypeScript
+node_modules/
+dist/
+coverage/
+*.log
