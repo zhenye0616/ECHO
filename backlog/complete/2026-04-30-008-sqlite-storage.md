@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-008-sqlite-storage
 title: SQLite Storage implementation (better-sqlite3)
-status: ready
+status: complete
 priority: HIGH
 estimate: 1d
 created: 2026-04-30
@@ -39,7 +39,13 @@ head_sha: "6c1a2f9d0be0c375c9872bbc97c5edce00c7848c"
 pr_url: ""
 agent_notes: |
   Shipped. SqliteStorage on better-sqlite3 (WAL mode, prepared statements, idempotent close); home-rolled migration runner using PRAGMA user_version; daemon now defaults to SQLite at ~/Library/Application Support/ECHO/echo.db with ECHO_STORAGE=memory opt-out and ECHO_DB_PATH override. Lifecycle.ts gained a LifecycleOptions parameter ({storage, storageBackend, onShutdown}) so index.ts owns storage instantiation and the close hook; backwards-compatible default behavior preserved. 19 new sqlite tests + 1 file edit to lifecycle.test.ts (added ECHO_STORAGE=memory to spawn env — necessary downstream consequence of the daemon-default change). 107/107 tests passing; lint/typecheck/format clean. End-to-end smoke run with real SQLite verified: WAL files appear during runtime, single echo.db remains after shutdown. Note: only files touched beyond files_to_modify were tests/daemon/lifecycle.test.ts (justification in run log).
-review_notes: ""
+review_notes: |
+  Approved 2026-04-30. Merged via --no-ff. 107/107 tests pass; lint+typecheck clean; better-sqlite3 native build verified on macOS.
+  Escalation cleanly resolved: lifecycle.ts parameterized exactly as authorized (LifecycleOptions { storage?, storageBackend?, onShutdown? }) with back-compat defaults; onShutdownHook runs before pid release with try/catch so close() failures don't strand the lock.
+  One out-of-scope edit (tests/daemon/lifecycle.test.ts gained ECHO_STORAGE=memory in spawn env) — flagged + justified in agent_notes; the right call (keeps lifecycle tests focused on lifecycle, not storage).
+  Bonus safety: migration runner validates contiguous NNNN sequence on load.
+  Embedding type: agent honored interface (number[]) over the spec's "Float32Array" line, per the "don't modify Storage interface" out-of-scope rule. On-disk format is still Float32 bytes. Follow-up item if we want public type to be Float32Array.
+  Spec authoring lessons (for backlog/README): (1) runtime deps in dependencies, type packages in devDependencies — agent followed correctly; (2) when changing a module's behavior, files_to_modify should anticipate test files of dependent modules, not just the module itself; (3) when spec contradicts the interface, fix one before claiming.
 ---
 
 # SQLite Storage implementation (better-sqlite3)
