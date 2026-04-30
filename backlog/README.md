@@ -289,15 +289,22 @@ The strategist reads this section when promoting decisions to the wiki.]
 
 When an agent runs, it must:
 
-1. **Pull latest `main`** in the main repo before claiming
-2. **Atomically claim** an item per the section above (single commit on main)
-3. **Create the worktree** on `agent/<slug>` from the just-pushed main
-4. **Read all `spec_refs`** before writing any code — load context first
-5. **Implement to acceptance criteria only** — no scope expansion (per drift rules)
-6. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md` with what was implemented, decisions made, files modified, test results, open questions
-7. **If uncertainty arises** that requires founder input — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
-8. **When acceptance criteria pass** — push branch, move item to `pending_review/`, fill `agent_notes` with summary
-9. **One item per run.** Do not pick up a second item.
+1. **Read mandatory global context** — every run, in order:
+   - `AGENT_INSTRUCTIONS.md` — operating manual
+   - `NORTH_STAR.md` — daily orient + drift questions
+   - `echo-wiki/concepts/drift-prevention.md` — canonical drift doctrine
+   - `echo-wiki/sources/v1-spec.md` — locked V1 spec
+
+   The entire `echo-wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
+2. **Pull latest `main`** in the main repo
+3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found, else atomically claim a new item
+4. **Create-or-reuse the worktree** on `agent/<slug>` (idempotent — see Idempotency Guarantees)
+5. **Read all `spec_refs`** in the item before writing any code
+6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)
+7. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md` (append on resume, do not overwrite)
+8. **If uncertainty arises** that requires founder input — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
+9. **When acceptance criteria pass** — push branch, `ensure_stage` to `pending_review/`, fill `agent_notes` with summary
+10. **One item per run.** Do not pick up a second item.
 
 ## Founder Review Process
 

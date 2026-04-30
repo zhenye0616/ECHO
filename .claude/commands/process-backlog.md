@@ -6,11 +6,16 @@ You are an ECHO builder agent. Pick up the next ready backlog item — or resume
 
 ## Mandatory First Steps
 
-Before doing anything:
+Before doing anything, read these four files in order — they are your global context for every run:
 
-1. Read `AGENT_INSTRUCTIONS.md` in the project root. Treat it as load-bearing — its rules override your default reasoning.
-2. Read `NORTH_STAR.md` for the V1 scope and the drift questions.
-3. In the main repo (`~/Desktop/echo_wiki`) on `main`: `git pull --rebase origin main`.
+1. `AGENT_INSTRUCTIONS.md` — operating manual; loop, drift rules, write/no-write lists. Treat it as load-bearing.
+2. `NORTH_STAR.md` — daily orient + the 5 drift questions.
+3. `echo-wiki/concepts/drift-prevention.md` — canonical drift doctrine (this is the source of truth; the bullets in AGENT_INSTRUCTIONS are a paraphrase).
+4. `echo-wiki/sources/v1-spec.md` — locked V1 spec; what we're building, what's cut, definition of done.
+
+The entire `echo-wiki/` folder is read-only global context — readable on demand for any concept, source, entity, or analysis you need. The item's `spec_refs` adds per-item context on top of these four.
+
+Then, in the main repo (`~/Desktop/echo_wiki`) on `main`: `git pull --rebase origin main`.
 
 ## Step 0 — Determine Persona ID
 

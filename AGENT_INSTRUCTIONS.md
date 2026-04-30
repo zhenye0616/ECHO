@@ -8,53 +8,65 @@ Multiple builder agents may run in parallel. The atomic claim + worktree pattern
 
 ---
 
+## Mandatory Reads (Every Run, In Order)
+
+These four files are required context for every run. Read them before doing anything else. They are small; collectively they take ~2 minutes.
+
+| File | Why |
+|---|---|
+| `AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
+| `NORTH_STAR.md` | Daily orient — brand promise, V1 scope summary, the 5 drift questions |
+| `echo-wiki/concepts/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
+| `echo-wiki/sources/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
+
+The **entire `echo-wiki/` folder is your global context** — read-only, but readable on demand for any concept (`echo-wiki/concepts/`), source (`echo-wiki/sources/`), entity (`echo-wiki/entities/`), or analysis (`echo-wiki/analyses/`) you need. The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
+
 ## Your Single Loop
 
 ```
  0. Determine your persona ID:
        AGENT_ID = ${ECHO_AGENT_ID:-$(hostname)-$USER}
        (stable across runs of the same agent installation)
- 1. Read AGENT_INSTRUCTIONS.md   (this file — every run)
- 2. Read NORTH_STAR.md           (the daily orient)
- 3. Pull main in the main repo
- 4. RECONCILE — look for an existing unfinished claim by AGENT_ID:
+ 1. Read mandatory global context (the four files above, in order)
+ 2. Pull main in the main repo
+ 3. RECONCILE — look for an existing unfinished claim by AGENT_ID:
        grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md
-       — if found: RESUME (skip step 5–6, go to step 7 with worktree-reuse)
+       — if found: RESUME (skip step 4–5, go to step 6 with worktree-reuse)
        — if not:   continue to fresh claim
- 5. List backlog/ready/, pick highest priority + oldest creation date
- 6. Atomic claim:
+ 4. List backlog/ready/, pick highest priority + oldest creation date
+ 5. Atomic claim:
        (in main repo on main)
        git mv backlog/ready/X.md backlog/claimed/X.md
        edit frontmatter: claimed_by, claimed_at, branch
        git commit -m "claim: <item-id>"
        git push origin main
-       — if push rejected, another agent claimed it; goto 3 with next item
- 7. Create-or-reuse worktree (idempotent — see "Worktree Mechanics"):
+       — if push rejected, another agent claimed it; goto 2 with next item
+ 6. Create-or-reuse worktree (idempotent — see "Worktree Mechanics"):
        — if dir + branch exist: cd in and git checkout
        — if branch exists locally only: worktree add on existing branch
        — if branch on remote only: fetch, then worktree add
        — fresh: worktree add -b agent/<slug>
- 8. Read all spec_refs from item frontmatter
- 9. Read item body (especially "Out of Scope (Don't Drift)" section)
-10. Implement to acceptance criteria — nothing more
-11. Run tests
-12. Commit on agent/<slug>; push the branch
-13. Write log: raw/internal/agent-runs/<today>-<item-id>.md  (in main repo on main)
+ 7. Read all spec_refs from item frontmatter (additional per-item context)
+ 8. Read item body (especially "Out of Scope (Don't Drift)" section)
+ 9. Implement to acceptance criteria — nothing more
+10. Run tests
+11. Commit on agent/<slug>; push the branch
+12. Write log: raw/internal/agent-runs/<today>-<item-id>.md  (in main repo on main)
        — if file exists from a prior attempt: APPEND "## Run N (resumed at …)" section, do NOT overwrite
-14. If tests pass + acceptance met:
+13. If tests pass + acceptance met:
        (in main repo on main, after pulling)
        ensure_stage(<item>, pending_review)   # upsert: no-op if already there
        edit frontmatter: agent_notes summary, head_sha, pr_url (if any)
        git commit -m "review: <item-id>"
        git push origin main
        STOP
-15. If uncertain or blocked:
-       Same as 14, but agent_notes is the SPECIFIC question, not a summary
+14. If uncertain or blocked:
+       Same as 13, but agent_notes is the SPECIFIC question, not a summary
        STOP
-16. If you caught yourself drifting:
+15. If you caught yourself drifting:
        Write raw/internal/decisions/<today>-DRIFT-<slug>.md
        Decide: rewind work OR escalate to founder
-       Either way: STOP via path 14 or 15
+       Either way: STOP via path 13 or 14
 ```
 
 **Do not pick up a second item in the same run.** One item per execution. Founder reviews before any next item starts.
@@ -69,7 +81,7 @@ The loop above is designed so that if it crashes at *any* point and the slash co
 - **Stage moves are upserts.** A helper `ensure_stage(item, stage)` checks current location and only moves if needed — calling it twice is a no-op. Use it for the move to `pending_review/`.
 - **Run logs append.** If `raw/internal/agent-runs/<today>-<item-id>.md` already exists, do not overwrite it. Append a `## Run N (resumed at <iso-timestamp>)` section. This preserves a forensic trail across attempts.
 
-If you cannot reconcile — e.g., the existing claim's branch was deleted out from under you, or the worktree path is now on a different branch you don't recognize — escalate via path 15. Don't try to fix the inconsistency yourself.
+If you cannot reconcile — e.g., the existing claim's branch was deleted out from under you, or the worktree path is now on a different branch you don't recognize — escalate via path 14 (the blocked/uncertain path). Don't try to fix the inconsistency yourself.
 
 ## Persona ID Conventions
 
