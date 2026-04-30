@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-010-cursor-extractor
 title: Cursor extractor (chat turns, full text)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.75d
 created: 2026-04-30
@@ -36,7 +36,41 @@ branch: "agent/cursor-extractor"
 worktree: "~/Desktop/Project_echo--cursor-extractor"
 head_sha: ""
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: Cursor's composer chat content does not live in per-workspace
+  `state.vscdb` (current Cursor on macOS, probed 2026-04-30). It lives in
+  `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`,
+  under `cursorDiskKV` keys prefixed `bubbleId:` and `composerData:`. Every
+  per-workspace `state.vscdb` I sampled has `cursorDiskKV` row count = 0
+  and only composer *metadata* (no message text) under
+  `ItemTable.composer.composerData`. So the spec's central premise — that
+  watching workspaceStorage `state.vscdb` files surfaces chat turns — does
+  not hold against current Cursor.
+
+  Tried: schema-only probe (sqlite_master + key prefixes + value lengths,
+  no content read into the agent transcript) across ~20 workspaces under
+  `~/Library/Application Support/Cursor/User/workspaceStorage/`. Same
+  result everywhere.
+
+  Best-guess answer (low confidence, not implemented): rewrite the spec as
+  Option 1 in the drift note —
+  watch `globalStorage/state.vscdb`, track per-composer (not per-workspace),
+  make `metadata.workspace_id` best-effort/nullable. Source string
+  `fs:<global-state.vscdb-path>` after extending `CAPTURED_SOURCES.fs_paths`.
+
+  Three options laid out in detail at:
+    raw/internal/decisions/2026-04-30-DRIFT-cursor-chat-storage-location.md
+
+  Run log:
+    raw/internal/agent-runs/2026-04-30-2026-04-30-010-cursor-extractor.md
+
+  Why I escalated rather than guessing: `metadata.workspace_id` and the
+  source-string convention are both spec-shape decisions with no clean
+  default. Picking one silently is exactly the drift pattern the doctrine
+  forbids ("ambiguity not resolved by spec → STOP, log, escalate").
+
+  Branch `agent/cursor-extractor` was created via worktree but has no
+  commits and was not pushed (nothing to show — no code written).
 review_notes: ""
 ---
 
