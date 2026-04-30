@@ -19,9 +19,9 @@ files_to_modify:
   - src/capture/sources.ts
   - tests/capture/sources.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "MacBook-Pro.local-zhenye"
+claimed_at: "2026-04-30T09:49:28Z"
+branch: "agent/capture-allowlist"
 worktree: ""
 head_sha: ""
 pr_url: ""
