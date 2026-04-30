@@ -16,7 +16,7 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-**Wave 2 — bring the substrate to life.** Foundation set (001–005) is in `complete/`. These four items wire it into a running daemon that captures Cursor and Claude Code workspace events to a real database. 006/007/008 are independent (parallel-safe via multi-session `ECHO_AGENT_ID`); 009 unblocks once all three land in `complete/`.
+**Wave 2 — bring the substrate to life.** Wires the substrate skeleton into a running daemon that captures Cursor and Claude Code workspace events to a real database. 006/007/008 independent (parallel-safe via multi-session `ECHO_AGENT_ID`); 009 unblocks once all three land in `complete/`.
 
 | Priority | ID | Title | Blocked By |
 |---|---|---|---|
@@ -24,6 +24,17 @@
 | HIGH | [2026-04-30-007](../backlog/ready/2026-04-30-007-daemon-entry.md) | Daemon entry point + lifecycle | — |
 | HIGH | [2026-04-30-008](../backlog/ready/2026-04-30-008-sqlite-storage.md) | SQLite Storage implementation (better-sqlite3) | — |
 | HIGH | [2026-04-30-009](../backlog/ready/2026-04-30-009-fs-watcher-cursor-and-claude-code.md) | FS watcher — first capture surface (Cursor + Claude Code) | 006, 007, 008 |
+
+**Wave 3 — close the loop with MCP.** Adds content extractors (chat turns), git capture (commits/diffs), an MCP server, and the `search_memories` retrieval tool. Lands the V1 spec's week 4–5 milestone: end-to-end demo to founder. 010/011 unblock when Wave 2's 009 ships; 012/013 unblock at their respective Wave 2 dependencies. 014 needs 013 + 010 + 011. 015 (manual integration test) is the demo gate.
+
+| Priority | ID | Title | Blocked By |
+|---|---|---|---|
+| HIGH | [2026-04-30-010](../backlog/ready/2026-04-30-010-cursor-extractor.md) | Cursor extractor (chat turns, full text) | 009 |
+| HIGH | [2026-04-30-011](../backlog/ready/2026-04-30-011-claude-code-extractor.md) | Claude Code extractor (chat turns, full text) | 009 |
+| HIGH | [2026-04-30-012](../backlog/ready/2026-04-30-012-git-capture.md) | Git capture surface (commits via refs watch) | 006, 007, 008 |
+| HIGH | [2026-04-30-013](../backlog/ready/2026-04-30-013-mcp-server-skeleton.md) | MCP server skeleton (HTTP transport, stub tool) | 007, 008 |
+| HIGH | [2026-04-30-014](../backlog/ready/2026-04-30-014-mcp-search-memories.md) | MCP `search_memories` tool | 013, 010, 011 |
+| HIGH | [2026-04-30-015](../backlog/ready/2026-04-30-015-mcp-integration-test.md) | Cursor + Claude Code MCP integration test | 014 |
 
 ---
 
