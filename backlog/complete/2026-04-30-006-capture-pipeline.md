@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-006-capture-pipeline
 title: Capture pipeline (gate → storage wire-up)
-status: ready
+status: complete
 priority: HIGH
 estimate: 0.5d
 created: 2026-04-30
@@ -31,7 +31,9 @@ head_sha: "27e1c52111676349a004d022b00a3c54b552124d"
 pr_url: ""
 agent_notes: |
   Shipped. processCandidate(event, storage) implemented in src/capture/pipeline.ts; reuses gate's RejectionReason. Storage is DI'd as the second param; on reject storage is untouched (asserted via count before/after in 3 tests). 10 new tests in tests/capture/pipeline.test.ts cover accept-path (with allowlist fixture mutation, same pattern as gate.test.ts), all four unknown_* rejections, malformed events, and DI isolation across two MemoryStorage instances. test/lint/typecheck/format:check all clean. 84/84 tests passing across the suite. No new dependencies; gate.ts and sources.ts unchanged.
-review_notes: ""
+review_notes: |
+  Approved 2026-04-30. Merged via --no-ff. All acceptance criteria met. Bonus: DI-isolation test across two MemoryStorage instances; "drops caller-supplied id" test.
+  Style note (non-blocking): tests mutate CAPTURED_SOURCES.apis directly and reset in afterEach instead of using a shimmed predicate. Outcome equivalent; sources.ts itself untouched. Acceptable.
 ---
 
 # Capture pipeline (gate → storage wire-up)
