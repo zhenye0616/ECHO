@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-010-cursor-extractor
 title: Cursor extractor (chat turns, full text)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.75d
 created: 2026-04-30
@@ -30,10 +30,10 @@ files_to_modify:
   - tests/capture/extractors/cursor.test.ts
   - tests/fixtures/cursor-state.vscdb (or generated programmatically)
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-04-30T22:35:00Z"
+branch: "agent/cursor-extractor"
+worktree: "~/Desktop/Project_echo--cursor-extractor"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
