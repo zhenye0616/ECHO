@@ -15,10 +15,15 @@ let signalsBound = false;
 let keepAlive: NodeJS.Timeout | null = null;
 let onShutdownHook: (() => void | Promise<void>) | null = null;
 
-function resolveDataDir(): string {
+export function resolveDataDir(): string {
   const env = process.env['ECHO_DATA_DIR'];
   if (isNonEmptyString(env)) return resolve(env);
   return join(homedir(), 'Library', 'Application Support', 'ECHO');
+}
+
+export function acquirePidLockOrExit(dataDir: string): void {
+  if (pidLockPath !== null) return;
+  pidLockPath = acquirePidLock(dataDir);
 }
 
 function readVersion(): string {
@@ -84,6 +89,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
 export interface LifecycleOptions {
   storage?: Storage;
   storageBackend?: string;
+  extraPayload?: Record<string, unknown>;
   onShutdown?: () => void | Promise<void>;
 }
 
@@ -94,7 +100,9 @@ export interface LifecycleHandle {
 
 export async function startLifecycle(options: LifecycleOptions = {}): Promise<LifecycleHandle> {
   const dataDir = resolveDataDir();
-  pidLockPath = acquirePidLock(dataDir);
+  if (pidLockPath === null) {
+    pidLockPath = acquirePidLock(dataDir);
+  }
 
   const storage: Storage = options.storage ?? new MemoryStorage();
   const storageBackend = options.storageBackend ?? 'memory';
@@ -111,6 +119,7 @@ export async function startLifecycle(options: LifecycleOptions = {}): Promise<Li
     version: readVersion(),
     storage_backend: storageBackend,
     data_dir: dataDir,
+    ...(options.extraPayload ?? {}),
   });
 
   if (!signalsBound) {

@@ -4,10 +4,11 @@ import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { isNonEmptyString } from '../guards.js';
+import { startMcpServer } from '../mcp/server.js';
 import type { Storage } from '../storage/interface.js';
 import { MemoryStorage } from '../storage/memory.js';
 import { SqliteStorage } from '../storage/sqlite.js';
-import { startLifecycle } from './lifecycle.js';
+import { acquirePidLockOrExit, resolveDataDir, startLifecycle } from './lifecycle.js';
 
 function resolveDbPath(): string {
   const dbPath = process.env['ECHO_DB_PATH'];
@@ -15,6 +16,14 @@ function resolveDbPath(): string {
   const dataDir = process.env['ECHO_DATA_DIR'];
   if (isNonEmptyString(dataDir)) return join(resolve(dataDir), 'echo.db');
   return join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db');
+}
+
+function resolveMcpPort(): number {
+  const raw = process.env['ECHO_MCP_PORT'];
+  if (raw === undefined || raw.length === 0) return 38478;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isInteger(n) || n < 0 || n > 65535) return 38478;
+  return n;
 }
 
 function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; dispose: () => void } {
@@ -25,15 +34,20 @@ function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; disp
   return { storage: sqlite, backend: 'sqlite', dispose: () => sqlite.close() };
 }
 
+acquirePidLockOrExit(resolveDataDir());
+
 const { storage, backend, dispose } = createStorage();
 
 const fsWatcher = await startFsWatcher(CAPTURED_SOURCES.fs_paths, storage);
 const gitWatcher = await startGitWatcher(CAPTURED_SOURCES.git_repos, storage);
+const mcp = await startMcpServer(storage, { port: resolveMcpPort() });
 
 await startLifecycle({
   storage,
   storageBackend: backend,
+  extraPayload: { mcp_port: mcp.port, mcp_url: mcp.url },
   onShutdown: async () => {
+    await mcp.stop();
     await gitWatcher.stop();
     await fsWatcher.stop();
     dispose();
