@@ -38,9 +38,30 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-04-30T22:56:35Z"
 branch: "agent/cursor-extractor"
 worktree: ""
-head_sha: ""
+head_sha: "6ea403ee49a67084d7e3d567ec0974a5ab3154eb"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented Option 1 (globalStorage / per-composer / workspace_id best-effort).
+  Branch agent/cursor-extractor at 6ea403ee49a67084d7e3d567ec0974a5ab3154eb. 16 new tests; 155/155 pass; lint
+  + typecheck clean.
+
+  Open items for founder review:
+  (1) LAG VERIFICATION PENDING — please send 5 chat messages in real Cursor
+      against a daemon running this branch and record the median lag here.
+      Cannot do safely from agent transcript (would read founder chat data).
+  (2) Bubble JSON parsing assumes {role, text, createdAt}. If real Cursor uses
+      different field names, parser needs a follow-up tweak — would manifest as
+      zero turns flowing through despite chat events firing.
+  (3) tests/capture/sources.test.ts updated outside files_to_modify (one line):
+      the exhaustive toEqual([...]) on fs_paths necessarily changes when an
+      entry is added per the acceptance-criterion allowlist update. Flagging
+      explicitly per drift rule 4.
+  (4) No initial workspace-inference scan at boot (spec says "on FS events");
+      first turn after fresh boot may ship without workspace_id until any
+      per-workspace state.vscdb is touched. Optional follow-up.
+
+  Run log appended at raw/internal/agent-runs/2026-04-30-2026-04-30-010-cursor-extractor.md
+  (Run 2 section).
 review_notes: |
   V1 of this spec assumed Cursor stored composer chat in per-workspace
   state.vscdb. The previous claim's empirical probe (drift note dated
