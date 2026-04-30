@@ -23,9 +23,9 @@ files_to_modify:
   - src/capture/pipeline.ts
   - tests/capture/pipeline.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "Mac.attlocal.net-zhenye"
+claimed_at: "2026-04-30T21:14:52Z"
+branch: "agent/006-capture-pipeline"
 worktree: ""
 head_sha: ""
 pr_url: ""
