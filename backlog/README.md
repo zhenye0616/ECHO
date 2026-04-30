@@ -4,13 +4,13 @@ Kanban-style work coordination across strategic conversations, one or more auton
 
 ## The Three Roles
 
-1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/ready/` items. Does **not** write to `echo-wiki/` until an item is shipped.
+1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/ready/` items. Does **not** write to `wiki/` until an item is shipped.
 2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel.
 3. **Founder (morning review)** — reviews items in `backlog/pending_review/`, merges branches, moves items to `complete/`, then asks the strategist to update the wiki.
 
 ## Wiki Update Discipline
 
-The product wiki (`echo-wiki/`) reflects only **shipped reality**. The flow is:
+The product wiki (`wiki/`) reflects only **shipped reality**. The flow is:
 
 ```
 [strategic conversation]
@@ -22,7 +22,7 @@ spec lives inside backlog item   ← single source of truth while in flight
 agent ships item, item lands in backlog/complete/
         │
         ▼
-strategist promotes the now-true decision to echo-wiki/
+strategist promotes the now-true decision to wiki/
         │  (sources/, concepts/, entities/, analyses/ as appropriate)
         ▼
 backlog item links to its wiki page; wiki page links back to the item
@@ -30,7 +30,7 @@ backlog item links to its wiki page; wiki page links back to the item
 
 This makes spec/build divergence structurally impossible — the wiki cannot claim something that hasn't shipped, because no one writes to the wiki until after merge.
 
-**Exception:** *operating-model* changes (this file, `CLAUDE.md`, `AGENT_INSTRUCTIONS.md`, the slash command) are not product decisions and do not pass through the backlog. They are updated immediately when the operating model changes.
+**Exception:** *operating-model* changes (this file, `CLAUDE.md`, `docs/AGENT_INSTRUCTIONS.md`, the slash command) are not product decisions and do not pass through the backlog. They are updated immediately when the operating model changes.
 
 ## Folder Structure
 
@@ -57,7 +57,7 @@ claimed/    ← agent owns it; works in its own worktree on agent/<slug> branch
      ▼
 pending_review/  ← agent done; founder reviews diff/tests/notes; merges PR
      │
-     ├── approved → complete/  ← strategist promotes decisions to echo-wiki/ in next conversation
+     ├── approved → complete/  ← strategist promotes decisions to wiki/ in next conversation
      └── rejected → back to ready/ with review_notes
 ```
 
@@ -77,19 +77,19 @@ If two agents race, one push is rejected. Loser pulls, picks the next ready item
 Each claimed item gets its own git worktree on its own feature branch. This keeps multiple agents from stepping on each other's working directories.
 
 ```
-~/Desktop/echo_wiki/                            ← main repo, on main, owned by founder
-~/Desktop/echo_wiki--<item-slug>/               ← agent worktree, on agent/<slug>
+~/Desktop/Project_echo/                            ← main repo, on main, owned by founder
+~/Desktop/Project_echo--<item-slug>/               ← agent worktree, on agent/<slug>
 ```
 
 **Conventions:**
 
-- **Worktree path:** `~/Desktop/echo_wiki--<item-slug>/` (sibling of main repo; double-dash disambiguates)
+- **Worktree path:** `~/Desktop/Project_echo--<item-slug>/` (sibling of main repo; double-dash disambiguates)
 - **Branch name:** `agent/<item-slug>` (e.g., `agent/2026-04-30-001-capture-gate`)
 - **Lifecycle commands** (agent runs these; the slash command wraps them):
 
 ```bash
 # 1. Atomic claim (in main repo on main)
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase
 git mv backlog/ready/<item>.md backlog/claimed/<item>.md
 # (edit frontmatter: claimed_by, claimed_at, branch)
@@ -98,15 +98,15 @@ git commit -m "claim: <item-id>"
 git push origin main
 
 # 2. Create worktree on a fresh feature branch
-git worktree add ~/Desktop/echo_wiki--<slug> -b agent/<slug>
+git worktree add ~/Desktop/Project_echo--<slug> -b agent/<slug>
 
 # 3. Implement (in worktree, on feature branch)
-cd ~/Desktop/echo_wiki--<slug>
+cd ~/Desktop/Project_echo--<slug>
 # ... implementation, tests, commits ...
 git push -u origin agent/<slug>
 
 # 4. Move item to pending_review (back in main repo on main)
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase
 git mv backlog/claimed/<item>.md backlog/pending_review/<item>.md
 # (edit frontmatter: agent_notes summary, head_sha, pr_url if any)
@@ -134,7 +134,7 @@ Every agent run starts with **reconciliation**, not a fresh claim:
 # Persona-based agent identity — stable across crashes, unique per machine/user
 AGENT_ID="${ECHO_AGENT_ID:-$(hostname)-$USER}"
 
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase origin main
 
 # Look for any unfinished claim by this agent
@@ -209,7 +209,7 @@ To release a stale claim manually:
 ```bash
 git mv backlog/claimed/<item>.md backlog/ready/<item>.md
 # clear claimed_by, claimed_at, branch in frontmatter
-git worktree remove ~/Desktop/echo_wiki--<slug> 2>/dev/null
+git worktree remove ~/Desktop/Project_echo--<slug> 2>/dev/null
 git branch -D agent/<slug> 2>/dev/null
 git push origin --delete agent/<slug> 2>/dev/null
 git commit -am "release: <item-id>"
@@ -221,8 +221,8 @@ A `tools/check-stale-claims.sh` and a `/release-stuck` slash command will land o
 **Cleanup (founder, after merge):**
 
 ```bash
-cd ~/Desktop/echo_wiki
-git worktree remove ~/Desktop/echo_wiki--<slug>
+cd ~/Desktop/Project_echo
+git worktree remove ~/Desktop/Project_echo--<slug>
 git branch -d agent/<slug>
 git push origin --delete agent/<slug>
 git mv backlog/pending_review/<item>.md backlog/complete/<item>.md
@@ -259,7 +259,7 @@ files_to_modify:                  # exhaustive list of code paths the agent may 
 claimed_by: ""                    # agent identifier
 claimed_at: ""                    # ISO timestamp
 branch: ""                        # agent/<slug>
-worktree: ""                      # ~/Desktop/echo_wiki--<slug>
+worktree: ""                      # ~/Desktop/Project_echo--<slug>
 head_sha: ""                      # sha of last commit on branch
 pr_url: ""                        # if PR opened
 agent_notes: ""                   # summary on completion or escalation
@@ -291,12 +291,12 @@ The strategist reads this section when promoting decisions to the wiki.]
 When an agent runs, it must:
 
 1. **Read mandatory global context** — every run, in order:
-   - `AGENT_INSTRUCTIONS.md` — operating manual
-   - `NORTH_STAR.md` — daily orient + drift questions
-   - `echo-wiki/concepts/drift-prevention.md` — canonical drift doctrine
-   - `echo-wiki/sources/v1-spec.md` — locked V1 spec
+   - `docs/AGENT_INSTRUCTIONS.md` — operating manual
+   - `docs/NORTH_STAR.md` — daily orient + drift questions
+   - `wiki/concepts/drift-prevention.md` — canonical drift doctrine
+   - `wiki/sources/v1-spec.md` — locked V1 spec
 
-   The entire `echo-wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
+   The entire `wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
 2. **Pull latest `main`** in the main repo
 3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found
 4. **Select** — run `python3 tools/blocked.py` to get the next claimable item path
@@ -316,7 +316,7 @@ When an agent runs, it must:
 
 Each morning:
 
-1. Open `BACKLOG.md` — see all items in `pending_review/`
+1. Open `docs/BACKLOG.md` — see all items in `pending_review/`
 2. For each item:
    - Read the item file (acceptance + agent_notes)
    - Read the agent run log
@@ -326,7 +326,7 @@ Each morning:
    - **Approve** → fill `review_notes`, merge `agent/<slug>` to `main` (handle any conflicts manually), move item to `complete/`, remove worktree, delete branch
    - **Rework** → fill `review_notes` with what's wrong, move back to `ready/` (worktree + branch can stay or be torn down)
    - **Cancel** → move to `complete/` with `review_notes: "cancelled — <reason>"`
-4. After items land in `complete/`, **request a wiki update** from the next strategist conversation. The strategist reads each item's "After Completion (Strategist Notes)" section and promotes the now-shipped decisions to `echo-wiki/`.
+4. After items land in `complete/`, **request a wiki update** from the next strategist conversation. The strategist reads each item's "After Completion (Strategist Notes)" section and promotes the now-shipped decisions to `wiki/`.
 
 Time budget: ~30 minutes/morning if 2–3 items came through overnight.
 
@@ -359,7 +359,7 @@ Filename: `YYYY-MM-DD-NNN-short-slug.md`
 After any strategic conversation that lands an actionable decision:
 
 1. **Create a `backlog/ready/<id>.md` item** — full spec lives here (this is the authoritative spec until the item ships)
-2. **Add a row to `BACKLOG.md`'s Ready table**
-3. **Do NOT touch `echo-wiki/`** — wiki updates happen only after the item lands in `complete/`
+2. **Add a row to `docs/BACKLOG.md`'s Ready table**
+3. **Do NOT touch `wiki/`** — wiki updates happen only after the item lands in `complete/`
 
 The wiki is for *what is shipped*. The backlog is for *what is in flight*. They connect via the item's "After Completion (Strategist Notes)" section once the item completes.

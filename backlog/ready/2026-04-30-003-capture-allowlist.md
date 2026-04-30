@@ -116,11 +116,11 @@ The empty-initial-content choice is a forcing function: the substrate becomes us
 
 Once shipped, the strategist's next task (after this and the gate item both ship) is to:
 
-1. Create `echo-wiki/sources/capture-allowlist.md` documenting:
+1. Create `wiki/sources/capture-allowlist.md` documenting:
    - The allowlist as the canonical "what ECHO sees" source of truth
    - The empty-initial design choice and the forcing function it creates
    - The four categories and their semantics
-2. Create `echo-wiki/concepts/sandboxed-capture.md` documenting the broader principle:
+2. Create `wiki/concepts/sandboxed-capture.md` documenting the broader principle:
    - Three layers of sandboxing (hardware / OS / application)
    - Why ECHO uses application-enforced sandboxing for daemon-side capture
    - Defense-in-depth: chokepoint + process privilege separation + tests

@@ -79,10 +79,10 @@ These are how you'll talk yourself into building the wrong thing. Catch yourself
 ## The Source of Truth
 
 When in doubt, the V1 spec wins:
-- [V1 Spec (Locked)](./echo-wiki/sources/v1-spec.md)
-- [Bundle Decision](./echo-wiki/sources/bundle-decision.md)
-- [Form Factor Decision](./echo-wiki/sources/form-factor-decision.md)
-- [Narrowest V1 Scope](./echo-wiki/analyses/narrowest-v1-scope.md)
+- [V1 Spec (Locked)](./wiki/sources/v1-spec.md)
+- [Bundle Decision](./wiki/sources/bundle-decision.md)
+- [Form Factor Decision](./wiki/sources/form-factor-decision.md)
+- [Narrowest V1 Scope](./wiki/analyses/narrowest-v1-scope.md)
 
 When deciding something not covered by these, write it down in `raw/internal/decisions/` so you don't re-litigate.
 

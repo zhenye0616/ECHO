@@ -107,7 +107,7 @@ Update with each batch of interviews / new landing page data / concierge week.
 
 ---
 
-## Week-by-Week Sequencing (per [V1 Spec](./echo-wiki/sources/v1-spec.md))
+## Week-by-Week Sequencing (per [V1 Spec](./wiki/sources/v1-spec.md))
 
 | Week | Build Target | Validation Target |
 |---|---|---|

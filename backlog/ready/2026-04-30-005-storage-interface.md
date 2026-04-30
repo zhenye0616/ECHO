@@ -126,7 +126,7 @@ Append-only is also a security/audit property: events can be inspected and forgo
 
 ## After Completion (Strategist Notes)
 
-Once shipped, create `echo-wiki/entities/storage.md` documenting:
+Once shipped, create `wiki/entities/storage.md` documenting:
 
 - The `Storage` interface contract
 - The append-only commitment and why (audit, security, simplicity)

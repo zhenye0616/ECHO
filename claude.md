@@ -10,14 +10,14 @@ ECHO is the cross-platform context layer for AI-era knowledge work. The product 
 
 This is both a **decision archive** (the wiki) and a **build coordination system** (the backlog + agent runs). Two important rules govern how the two halves stay honest:
 
-- **The product wiki (`echo-wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its `backlog/ready/<id>.md` item.
-- **Operating-model files** (this file, `AGENT_INSTRUCTIONS.md`, `backlog/README.md`, `.claude/commands/process-backlog.md`) update *immediately* when the operating model changes. They have no shipping milestone and are not product decisions.
+- **The product wiki (`wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its `backlog/ready/<id>.md` item.
+- **Operating-model files** (this file, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, `.claude/commands/process-backlog.md`) update *immediately* when the operating model changes. They have no shipping milestone and are not product decisions.
 
 ### When making strategic decisions
 
-1. **Search existing wiki + backlog first.** A shipped wiki page (`echo-wiki/concepts/`, `sources/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
+1. **Search existing wiki + backlog first.** A shipped wiki page (`wiki/concepts/`, `sources/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
 2. **Cite cross-project wisdom.** The `yc-wiki` (`~/Desktop/yc/yc-wiki/`) is the authoritative source for startup strategy frameworks. Reference its concept pages by `[[link]]` when applying them.
-3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — lives inside `backlog/ready/<id>.md`. The strategist does **not** write to `echo-wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
+3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — lives inside `backlog/ready/<id>.md`. The strategist does **not** write to `wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
 4. **Background reasoning** that doesn't correspond to an actionable build item lands in `raw/internal/decisions/`.
 5. **The manifest** is updated only when (and only when) a wiki page is actually created post-shipment.
 
@@ -25,12 +25,12 @@ This is both a **decision archive** (the wiki) and a **build coordination system
 
 - Drop research notes into `raw/external/precedents/` (Wispr Flow, 1Password, Plaid patterns, etc.)
 - Drop competitor scans into `raw/external/competitor-scans/`
-- Synthesize patterns into `echo-wiki/concepts/` only after multiple raw sources point the same direction
+- Synthesize patterns into `wiki/concepts/` only after multiple raw sources point the same direction
 
 ### When running validation experiments
 
 - Each user interview gets a markdown file in `raw/internal/interviews/`
-- Aggregate signals into `echo-wiki/analyses/` after 5+ interviews
+- Aggregate signals into `wiki/analyses/` after 5+ interviews
 - Concierge experiment notes also go in `raw/internal/interviews/`
 
 ## Folder Taxonomy
@@ -86,7 +86,7 @@ Working name: **ECHO**. Hard rename deadline: before public Show HN launch (week
 
 This repo coordinates three roles. **Multiple builder agents may run in parallel** — each works inside its own git worktree on its own feature branch.
 
-1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `echo-wiki/` until items ship
+1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `wiki/` until items ship
 2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline
 3. **Founder (morning review)** — reviews `backlog/pending_review/`, merges branches (handling conflicts manually), moves items to `complete/`, then asks the strategist to update the wiki
 
@@ -96,7 +96,7 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlog/complete/
                                                                          │
                                                                          ▼
-                                                            strategist updates echo-wiki/
+                                                            strategist updates wiki/
 ```
 
 ### Strategist Responsibilities (this Claude conversation)
@@ -104,17 +104,17 @@ backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlo
 After any strategic conversation that lands an actionable decision:
 
 1. **Create a `backlog/ready/<id>.md` item** — full spec lives here (this is the authoritative spec until the item ships). Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
-2. **Add a row to `BACKLOG.md`'s Ready table.**
-3. **Do NOT touch `echo-wiki/`.** Wiki edits happen only after items land in `complete/`.
+2. **Add a row to `docs/BACKLOG.md`'s Ready table.**
+3. **Do NOT touch `wiki/`.** Wiki edits happen only after items land in `complete/`.
 
-When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `echo-wiki/` (sources/, concepts/, entities/, analyses/, manifest, index).
+When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `wiki/` (sources/, concepts/, entities/, analyses/, manifest, index).
 
 ### Builder Agent Responsibilities
 
 When a builder agent runs:
 
 1. **Pull `main`**, then **atomically claim** an item: a single commit on `main` that moves the file `ready/ → claimed/` and sets `claimed_by`, `claimed_at`, `branch` in frontmatter. Push immediately. If push is rejected, another agent won — pick the next ready item.
-2. **Create the worktree** at `~/Desktop/echo_wiki--<slug>/` on a fresh `agent/<slug>` branch.
+2. **Create the worktree** at `~/Desktop/Project_echo--<slug>/` on a fresh `agent/<slug>` branch.
 3. **Read all `spec_refs`** in the item before writing code.
 4. **Implement to acceptance criteria only.** No scope expansion (per `drift-prevention` rules).
 5. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md`.

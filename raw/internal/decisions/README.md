@@ -85,4 +85,4 @@ If a pattern, note it for future me.
 After 5+ decision notes accumulate, look for patterns:
 - Am I drifting in one direction repeatedly? (e.g., always toward more integrations)
 - Are my V2 ideas converging on a coherent V2 spec? (good — start drafting)
-- Am I making the same trade-off repeatedly? (might be a concept worth promoting to `echo-wiki/concepts/`)
+- Am I making the same trade-off repeatedly? (might be a concept worth promoting to `wiki/concepts/`)

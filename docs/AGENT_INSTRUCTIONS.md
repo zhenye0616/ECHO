@@ -14,12 +14,12 @@ These four files are required context for every run. Read them before doing anyt
 
 | File | Why |
 |---|---|
-| `AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
-| `NORTH_STAR.md` | Daily orient — brand promise, V1 scope summary, the 5 drift questions |
-| `echo-wiki/concepts/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
-| `echo-wiki/sources/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
+| `docs/AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
+| `docs/NORTH_STAR.md` | Daily orient — brand promise, V1 scope summary, the 5 drift questions |
+| `wiki/concepts/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
+| `wiki/sources/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
 
-The **entire `echo-wiki/` folder is your global context** — read-only, but readable on demand for any concept (`echo-wiki/concepts/`), source (`echo-wiki/sources/`), entity (`echo-wiki/entities/`), or analysis (`echo-wiki/analyses/`) you need. The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
+The **entire `wiki/` folder is your global context** — read-only, but readable on demand for any concept (`wiki/concepts/`), source (`wiki/sources/`), entity (`wiki/entities/`), or analysis (`wiki/analyses/`) you need. The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
 
 ## Your Single Loop
 
@@ -108,8 +108,8 @@ You operate across two directories:
 
 | Directory | Branch | What happens here |
 |---|---|---|
-| `~/Desktop/echo_wiki/` (main repo) | `main` | Claim, log writing, item file moves, agent_notes edits, status transitions |
-| `~/Desktop/echo_wiki--<slug>/` (your worktree) | `agent/<slug>` | All implementation + test work |
+| `~/Desktop/Project_echo/` (main repo) | `main` | Claim, log writing, item file moves, agent_notes edits, status transitions |
+| `~/Desktop/Project_echo--<slug>/` (your worktree) | `agent/<slug>` | All implementation + test work |
 
 Backlog item files (in `backlog/`) and run logs (in `raw/internal/agent-runs/`) are **always** edited in the main repo on `main`, so every agent sees consistent backlog state. Code is **always** edited in your worktree on your feature branch, so agents don't collide.
 
@@ -141,7 +141,7 @@ Once you've claimed (or reconciled to an existing claim), use this idempotent bl
 
 ```bash
 # from main repo
-WORKTREE="$HOME/Desktop/echo_wiki--$SLUG"
+WORKTREE="$HOME/Desktop/Project_echo--$SLUG"
 
 if [ -d "$WORKTREE" ]; then
   # previous attempt left the worktree in place — reuse it
@@ -166,7 +166,7 @@ git push -u origin "agent/$SLUG"
 
 Conventions:
 
-- Worktree path: `~/Desktop/echo_wiki--<slug>/` (sibling of main repo, double-dash)
+- Worktree path: `~/Desktop/Project_echo--<slug>/` (sibling of main repo, double-dash)
 - Branch name: `agent/<slug>` (same slug as the item filename)
 - One worktree per claim; do not reuse worktrees across items
 - The `if [ -d "$WORKTREE" ]` reuse path means a crashed-and-resumed run picks up exactly where the previous attempt left off, with whatever uncommitted changes are present. Inspect `git status` inside the worktree before doing more work — if uncommitted state is present, decide whether to keep it (commit) or discard (`git restore .`) based on the run log of the previous attempt.
@@ -206,7 +206,7 @@ These rules override anything you might infer from context. If any rule conflict
 
 5. **Tests are mandatory, not optional.** If acceptance says "tests pass," tests must exist and pass. If no test framework exists yet, escalate — don't invent one.
 
-6. **No spec changes.** You do not edit `echo-wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
+6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
 
 7. **No merging your own branch.** You push `agent/<slug>`. The founder merges. You never run `git merge` on `main`.
 
@@ -303,11 +303,11 @@ Founder will respond by either:
 
 ## What You're Allowed to Read
 
-- All of `echo-wiki/` (record of shipped reality — read often)
+- All of `wiki/` (record of shipped reality — read often)
 - All of `backlog/` (the work queue)
 - All of `raw/` (project history; useful context)
 - All of source code in the repo
-- `NORTH_STAR.md`, `STATUS.md`, `BACKLOG.md`
+- `docs/NORTH_STAR.md`, `docs/STATUS.md`, `docs/BACKLOG.md`
 
 ## What You're Allowed to Write
 
@@ -320,11 +320,11 @@ Founder will respond by either:
 
 ## What You Must Not Write
 
-- Anything in `echo-wiki/` (only the strategist edits, and only post-shipment)
+- Anything in `wiki/` (only the strategist edits, and only post-shipment)
 - Item bodies in `backlog/` (only agent-managed frontmatter fields)
-- `BACKLOG.md` (founder regenerates manually after approval)
-- `STATUS.md` (founder updates Friday)
-- `NORTH_STAR.md` (founder owns this)
+- `docs/BACKLOG.md` (founder regenerates manually after approval)
+- `docs/STATUS.md` (founder updates Friday)
+- `docs/NORTH_STAR.md` (founder owns this)
 - Anything in `backlog/complete/` (founder-only)
 - Anything outside the repo (no Slack messages, no GitHub issues, no external API calls beyond test fixtures)
 

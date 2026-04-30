@@ -2,7 +2,7 @@
 
 **Kanban view of all active work.** Auto-orderable; each item is a file in `backlog/<status>/`.
 
-> **System:** the spec for any in-flight item lives inside the item file in `backlog/ready/` — the wiki is **not** updated at decision time. Agents claim items from `ready/`, work on a feature branch in their own worktree, and move items through `claimed/` and `pending_review/`. Founder merges and moves to `complete/`. The strategist promotes shipped decisions to `echo-wiki/` only after items land in `complete/`. See [`backlog/README.md`](./backlog/README.md) for the full workflow.
+> **System:** the spec for any in-flight item lives inside the item file in `backlog/ready/` — the wiki is **not** updated at decision time. Agents claim items from `ready/`, work on a feature branch in their own worktree, and move items through `claimed/` and `pending_review/`. Founder merges and moves to `complete/`. The strategist promotes shipped decisions to `wiki/` only after items land in `complete/`. See [`backlog/README.md`](./backlog/README.md) for the full workflow.
 
 ---
 
@@ -71,9 +71,9 @@ During a strategic conversation:
 
 1. Decision is made → spec is captured *inside* a new item file at `backlog/ready/<id>-<slug>.md` (this is the canonical spec until shipment)
 2. Add a row to the Ready table on this board
-3. Do **not** touch `echo-wiki/` — wiki updates happen only after the item lands in `complete/`
+3. Do **not** touch `wiki/` — wiki updates happen only after the item lands in `complete/`
 
-When items land in `complete/`, the next strategist conversation reads each item's "After Completion (Strategist Notes)" section and promotes the shipped decisions into `echo-wiki/`.
+When items land in `complete/`, the next strategist conversation reads each item's "After Completion (Strategist Notes)" section and promotes the shipped decisions into `wiki/`.
 
 ## How to Trigger an Agent
 
@@ -99,4 +99,4 @@ Same workflow, looped: keeps claiming and shipping unblocked items until a hard 
 
 **Scheduled trigger** (steady-state): see [`.claude/SETUP.md`](./.claude/SETUP.md). Recommended cadence and parallelism land there.
 
-**Operating manual:** [`AGENT_INSTRUCTIONS.md`](./AGENT_INSTRUCTIONS.md) — required reading for every agent on every run.
+**Operating manual:** [`docs/AGENT_INSTRUCTIONS.md`](./AGENT_INSTRUCTIONS.md) — required reading for every agent on every run.

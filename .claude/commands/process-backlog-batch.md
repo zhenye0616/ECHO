@@ -10,12 +10,12 @@ This command is the same workflow as `/process-backlog`, wrapped in a controlled
 
 The four mandatory files. Read them before the first iteration; they cover all iterations in this session:
 
-1. `AGENT_INSTRUCTIONS.md`
-2. `NORTH_STAR.md`
-3. `echo-wiki/concepts/drift-prevention.md`
-4. `echo-wiki/sources/v1-spec.md`
+1. `docs/AGENT_INSTRUCTIONS.md`
+2. `docs/NORTH_STAR.md`
+3. `wiki/concepts/drift-prevention.md`
+4. `wiki/sources/v1-spec.md`
 
-The full `echo-wiki/` is your global context — readable on demand. Per-item `spec_refs` are loaded fresh inside each iteration.
+The full `wiki/` is your global context — readable on demand. Per-item `spec_refs` are loaded fresh inside each iteration.
 
 ## Persona ID
 
@@ -58,7 +58,7 @@ LOOP:
     HALT(reason: "time budget exceeded: ${TIME_BUDGET_SECS}s")
 
   ── Step A: Reconcile or Claim ──
-  cd ~/Desktop/echo_wiki
+  cd ~/Desktop/Project_echo
   git pull --rebase origin main
 
   EXISTING=$(grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md 2>/dev/null | head -1)
@@ -93,7 +93,7 @@ LOOP:
     ITEM_FILE=backlog/claimed/$PICK_FILENAME
 
   ── Step B: Create-or-reuse worktree (idempotent) ──
-  WORKTREE="$HOME/Desktop/echo_wiki--$SLUG"
+  WORKTREE="$HOME/Desktop/Project_echo--$SLUG"
   IF -d $WORKTREE: cd in, git checkout agent/$SLUG
   ELIF branch exists locally: git worktree add $WORKTREE agent/$SLUG
   ELIF branch on remote: git fetch + git worktree add $WORKTREE agent/$SLUG
@@ -115,7 +115,7 @@ LOOP:
   Capture HEAD_SHA.
 
   ── Step E: Hand off ──
-  cd ~/Desktop/echo_wiki
+  cd ~/Desktop/Project_echo
   git pull --rebase origin main
   Write or APPEND to raw/internal/agent-runs/$(date +%Y-%m-%d)-$ITEM_ID.md
   ensure_stage($PICK_FILENAME, pending_review)
@@ -197,8 +197,8 @@ This summary is the founder's morning entry point.
 
 Same as `/process-backlog`:
 
-- Edit anything in `echo-wiki/`
-- Edit `BACKLOG.md`, `STATUS.md`, `NORTH_STAR.md`
+- Edit anything in `wiki/`
+- Edit `docs/BACKLOG.md`, `docs/STATUS.md`, `docs/NORTH_STAR.md`
 - Modify item bodies (only agent-managed frontmatter fields)
 - Move items to `backlog/complete/` (founder-only)
 - Merge `agent/<slug>` into `main` (founder-only)

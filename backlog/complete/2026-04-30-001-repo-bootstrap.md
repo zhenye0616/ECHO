@@ -30,7 +30,7 @@ files_to_modify:
 claimed_by: "MacBook-Pro.local-zhenye"
 claimed_at: "2026-04-30T08:59:20Z"
 branch: "agent/repo-bootstrap"
-worktree: "~/Desktop/echo_wiki--repo-bootstrap"
+worktree: "~/Desktop/Project_echo--repo-bootstrap"
 head_sha: "e8c88ffb317463b5c52f445ef652d115492757e8"
 pr_url: ""
 agent_notes: |
@@ -98,10 +98,10 @@ Strict TS settings catch a class of bugs cheaply and are dramatically cheaper to
 
 Once this item lands in `backlog/complete/`, the strategist's next task is to:
 
-1. Create `echo-wiki/sources/stack-decision.md` documenting:
+1. Create `wiki/sources/stack-decision.md` documenting:
    - Decision: TS/Node + Swift shim (Swift shim deferred)
    - Alternatives considered (Rust, Go, Swift-everything, pure-TS)
    - Rationale: velocity bet, founder fluency, first-party MCP SDK
    - Costs accepted: long-lived daemon discipline, Node bundling for distribution
-2. Update `echo-wiki/index.md` and `echo-wiki/.manifest.json` to register the new sources page
+2. Update `wiki/index.md` and `wiki/.manifest.json` to register the new sources page
 3. Once items 002, 003, 005 also complete, move them out of `ready/` into `complete/`-flow and unblock 004

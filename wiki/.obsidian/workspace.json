@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "concepts/context-as-moat.md",
+                "file": "index.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "context-as-moat"
+              "title": "index"
             }
           }
         ]
@@ -185,6 +185,7 @@
   },
   "active": "339588d23e6a4de8",
   "lastOpenFiles": [
+    "concepts/context-as-moat.md",
     "concepts/drift-prevention.md",
     "sources/brand-promise.md",
     "Untitled.canvas"

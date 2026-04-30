@@ -5,7 +5,7 @@ How to wire Claude Code to run as the autonomous builder agent on a routine sche
 ## What You Need
 
 - Claude Code installed and authenticated
-- This repo (`echo_wiki/`) opened in Claude Code at least once
+- This repo (`Project_echo/`) opened in Claude Code at least once
 - A scheduling mechanism (Claude Code's built-in scheduled tasks, or system cron/launchd)
 - Git initialized in the repo (recommended; see "Git Setup" below)
 
@@ -20,7 +20,7 @@ To invoke manually inside Claude Code:
 ```
 
 The command will:
-1. Read `AGENT_INSTRUCTIONS.md`
+1. Read `docs/AGENT_INSTRUCTIONS.md`
 2. Pick the next ready item (HIGH priority, oldest first)
 3. Run through the implementation loop
 4. Stop after exactly one item
@@ -46,7 +46,7 @@ If Claude Code's scheduled tasks aren't available or you want more control, use 
 crontab -e
 
 # Run /process-backlog every night at 2 AM
-0 2 * * * cd ~/Desktop/echo_wiki && claude --command "/process-backlog" --non-interactive >> .claude/logs/agent.log 2>&1
+0 2 * * * cd ~/Desktop/Project_echo && claude --command "/process-backlog" --non-interactive >> .claude/logs/agent.log 2>&1
 ```
 
 Adjust the path and timing to your needs. Make sure Claude Code is in your PATH.
@@ -66,7 +66,7 @@ Create `~/Library/LaunchAgents/com.echo.agent.plist`:
     <array>
         <string>/bin/bash</string>
         <string>-c</string>
-        <string>cd ~/Desktop/echo_wiki && claude --command "/process-backlog" --non-interactive</string>
+        <string>cd ~/Desktop/Project_echo && claude --command "/process-backlog" --non-interactive</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -97,7 +97,7 @@ For the first week, recommend running `/process-backlog` manually a few times to
 
 For V1 build (10 weeks):
 
-- **Week 1:** Manual triggers only. Run `/process-backlog` ~3x in the first few days. Watch the agent's behavior. Refine `AGENT_INSTRUCTIONS.md` and the slash command if needed.
+- **Week 1:** Manual triggers only. Run `/process-backlog` ~3x in the first few days. Watch the agent's behavior. Refine `docs/AGENT_INSTRUCTIONS.md` and the slash command if needed.
 - **Week 2+:** Schedule for overnight runs. One run at 2 AM is enough for one item per day; the founder reviews in the morning.
 - **Week 6+:** If the founder's morning review is fast, scale up to two runs (e.g., 11 PM and 4 AM) so two items land in `needs_review/` per morning.
 
@@ -112,7 +112,7 @@ Don't go faster than one item per ~6 hours. Faster cadence means less founder ti
 Initialize the repo:
 
 ```bash
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git init
 git add -A
 git commit -m "Initial commit: V1 spec + skeleton"
@@ -130,7 +130,7 @@ Each morning:
 
 1. Open the repo
 2. `git log --oneline -10` to see what the agent did overnight
-3. Open `BACKLOG.md` — see items in `needs_review/`
+3. Open `docs/BACKLOG.md` — see items in `needs_review/`
 4. For each item:
    - Open the item file → read `agent_notes`
    - Open the corresponding `raw/internal/agent-runs/` log
@@ -145,9 +145,9 @@ Time budget: ~30 minutes if 1–2 items came through overnight.
 
 ## Troubleshooting
 
-**Agent keeps stopping with the same question** → spec is unclear; update the item body in `backlog/ready/` and the relevant `echo-wiki/` page
+**Agent keeps stopping with the same question** → spec is unclear; update the item body in `backlog/ready/` and the relevant `wiki/` page
 
-**Agent shipped something that violates the V1 spec** → drift event happened. Read `raw/internal/decisions/<date>-DRIFT-*.md` if logged. Revert. Add the missed pattern to `AGENT_INSTRUCTIONS.md` Drift-Prevention Rules.
+**Agent shipped something that violates the V1 spec** → drift event happened. Read `raw/internal/decisions/<date>-DRIFT-*.md` if logged. Revert. Add the missed pattern to `docs/AGENT_INSTRUCTIONS.md` Drift-Prevention Rules.
 
 **Agent didn't run at scheduled time** → check `.claude/logs/agent.log` (cron) or `/tmp/echo-agent.log` (launchd). Common cause: Claude Code auth expired.
 

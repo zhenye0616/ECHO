@@ -8,14 +8,14 @@ You are an ECHO builder agent. Pick up the next ready backlog item — or resume
 
 Before doing anything, read these four files in order — they are your global context for every run:
 
-1. `AGENT_INSTRUCTIONS.md` — operating manual; loop, drift rules, write/no-write lists. Treat it as load-bearing.
-2. `NORTH_STAR.md` — daily orient + the 5 drift questions.
-3. `echo-wiki/concepts/drift-prevention.md` — canonical drift doctrine (this is the source of truth; the bullets in AGENT_INSTRUCTIONS are a paraphrase).
-4. `echo-wiki/sources/v1-spec.md` — locked V1 spec; what we're building, what's cut, definition of done.
+1. `docs/AGENT_INSTRUCTIONS.md` — operating manual; loop, drift rules, write/no-write lists. Treat it as load-bearing.
+2. `docs/NORTH_STAR.md` — daily orient + the 5 drift questions.
+3. `wiki/concepts/drift-prevention.md` — canonical drift doctrine (this is the source of truth; the bullets in AGENT_INSTRUCTIONS are a paraphrase).
+4. `wiki/sources/v1-spec.md` — locked V1 spec; what we're building, what's cut, definition of done.
 
-The entire `echo-wiki/` folder is read-only global context — readable on demand for any concept, source, entity, or analysis you need. The item's `spec_refs` adds per-item context on top of these four.
+The entire `wiki/` folder is read-only global context — readable on demand for any concept, source, entity, or analysis you need. The item's `spec_refs` adds per-item context on top of these four.
 
-Then, in the main repo (`~/Desktop/echo_wiki`) on `main`: `git pull --rebase origin main`.
+Then, in the main repo (`~/Desktop/Project_echo`) on `main`: `git pull --rebase origin main`.
 
 ## Step 0 — Determine Persona ID
 
@@ -31,7 +31,7 @@ If you are running a second agent on the same machine, set `ECHO_AGENT_ID` to a 
 ## Step A — Reconcile or Claim
 
 ```bash
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase origin main
 
 # Look for an existing unfinished claim by this persona
@@ -83,7 +83,7 @@ The slug is the filename minus the `YYYY-MM-DD-NNN-` prefix and `.md` extension 
 ## Step B — Create or Reuse Worktree (Idempotent)
 
 ```bash
-WORKTREE="$HOME/Desktop/echo_wiki--$SLUG"
+WORKTREE="$HOME/Desktop/Project_echo--$SLUG"
 
 if [ -d "$WORKTREE" ]; then
   cd "$WORKTREE"
@@ -137,7 +137,7 @@ Inside the worktree, on `agent/<slug>`:
 ### E1. Write or Append to the Run Log (in main repo on main)
 
 ```bash
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase origin main
 
 LOG="raw/internal/agent-runs/$(date +%Y-%m-%d)-$ITEM_ID.md"
@@ -175,7 +175,7 @@ ensure_stage() {
   git mv "$current" "backlog/$target/$item"
 }
 
-cd ~/Desktop/echo_wiki
+cd ~/Desktop/Project_echo
 git pull --rebase origin main
 ensure_stage "$(basename $ITEM_FILE)" "pending_review"
 # edit frontmatter:
@@ -227,8 +227,8 @@ If during implementation you catch yourself thinking any of:
 
 ## What You Must NOT Do
 
-- Edit anything in `echo-wiki/` (only strategist edits, only post-shipment)
-- Edit `BACKLOG.md`, `STATUS.md`, or `NORTH_STAR.md`
+- Edit anything in `wiki/` (only strategist edits, only post-shipment)
+- Edit `docs/BACKLOG.md`, `docs/STATUS.md`, or `docs/NORTH_STAR.md`
 - Modify item *bodies* in `backlog/` (only agent-managed frontmatter fields)
 - Move items to `backlog/complete/` (founder-only)
 - Merge `agent/<slug>` into `main` (founder-only)
@@ -243,7 +243,7 @@ By the end of the run:
 - One item file is now in `backlog/pending_review/` (committed + pushed on main)
 - One run log file is in `raw/internal/agent-runs/` (committed + pushed on main; appended-to if resumed)
 - One feature branch `agent/<slug>` exists at `origin` with your work
-- Your worktree at `~/Desktop/echo_wiki--<slug>/` still exists (founder cleans it up after merge)
+- Your worktree at `~/Desktop/Project_echo--<slug>/` still exists (founder cleans it up after merge)
 - Founder has everything they need to review in <30 minutes
 
-Now begin. Read `AGENT_INSTRUCTIONS.md` first.
+Now begin. Read `docs/AGENT_INSTRUCTIONS.md` first.
