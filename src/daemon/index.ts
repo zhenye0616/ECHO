@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
+import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { isNonEmptyString } from '../guards.js';
 import type { Storage } from '../storage/interface.js';
 import { MemoryStorage } from '../storage/memory.js';
@@ -27,11 +28,13 @@ function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; disp
 const { storage, backend, dispose } = createStorage();
 
 const fsWatcher = await startFsWatcher(CAPTURED_SOURCES.fs_paths, storage);
+const gitWatcher = await startGitWatcher(CAPTURED_SOURCES.git_repos, storage);
 
 await startLifecycle({
   storage,
   storageBackend: backend,
   onShutdown: async () => {
+    await gitWatcher.stop();
     await fsWatcher.stop();
     dispose();
   },

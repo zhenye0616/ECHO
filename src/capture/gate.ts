@@ -1,6 +1,12 @@
 import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
-import { isAllowedApi, isAllowedApp, isAllowedDomain, isAllowedPath } from './sources.js';
+import {
+  isAllowedApi,
+  isAllowedApp,
+  isAllowedDomain,
+  isAllowedPath,
+  isAllowedRepo,
+} from './sources.js';
 
 export interface CandidateEvent {
   source: string;
@@ -14,13 +20,14 @@ export type RejectionReason =
   | 'unknown_domain'
   | 'unknown_path'
   | 'unknown_api'
+  | 'unknown_repo'
   | 'malformed_event';
 
 export type GateResult =
   | { accepted: true; reason: 'allowlisted' }
   | { accepted: false; reason: RejectionReason };
 
-type SourceKind = 'app' | 'domain' | 'fs' | 'api';
+type SourceKind = 'app' | 'domain' | 'fs' | 'api' | 'git';
 
 const log = createLogger('capture.gate');
 
@@ -32,6 +39,7 @@ const SOURCE_KIND_TO_REJECTION: Record<
   domain: 'unknown_domain',
   fs: 'unknown_path',
   api: 'unknown_api',
+  git: 'unknown_repo',
 };
 
 const SOURCE_KIND_TO_PREDICATE: Record<SourceKind, (id: string) => boolean> = {
@@ -39,6 +47,7 @@ const SOURCE_KIND_TO_PREDICATE: Record<SourceKind, (id: string) => boolean> = {
   domain: isAllowedDomain,
   fs: isAllowedPath,
   api: isAllowedApi,
+  git: isAllowedRepo,
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -50,7 +59,13 @@ function parseSource(source: string): { kind: SourceKind; id: string } | null {
   if (sep <= 0 || sep === source.length - 1) return null;
   const kind = source.slice(0, sep);
   const id = source.slice(sep + 1);
-  if (kind === 'app' || kind === 'domain' || kind === 'fs' || kind === 'api') {
+  if (
+    kind === 'app' ||
+    kind === 'domain' ||
+    kind === 'fs' ||
+    kind === 'api' ||
+    kind === 'git'
+  ) {
     return { kind, id };
   }
   return null;
