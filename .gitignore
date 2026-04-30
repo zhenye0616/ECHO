@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Obsidian (if used for wiki)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Claude Code agent runtime logs
+.claude/logs/
+
+# Sensitive interview data (uncomment if needed)
+# raw/internal/interviews/

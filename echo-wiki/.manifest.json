@@ -1,0 +1,201 @@
+{
+  "$schema": "./.manifest-schema.json",
+  "_meta": {
+    "project": "ECHO",
+    "version": "skeleton-v0",
+    "generated": "2026-04-30",
+    "notes": "Initial skeleton seeded from strategic conversation locking in V1 scope. Each entry is a stub awaiting full content."
+  },
+  "concepts/compose-not-capture.md": {
+    "title": "Compose, Don't Capture",
+    "link": "compose-not-capture",
+    "summary": "ECHO ingests from tools that already capture; never builds its own capture surface for what others provide",
+    "aliases": ["Compose Not Capture"],
+    "topic": "Architecture",
+    "subtopic": "Compose Not Capture"
+  },
+  "concepts/felt-not-seen.md": {
+    "title": "Felt, Not Seen",
+    "link": "felt-not-seen",
+    "summary": "Ambient by default; visible on demand for trust. Product appears in the result, not the interface.",
+    "aliases": ["Felt Not Seen", "Ambient by Default"],
+    "topic": "Form Factor",
+    "subtopic": "Felt Not Seen"
+  },
+  "concepts/layer-above-saas.md": {
+    "title": "Layer Above SaaS",
+    "link": "layer-above-saas",
+    "summary": "ECHO is additive to existing tools, never a replacement. The connective tissue between apps.",
+    "aliases": ["Layer Above SaaS"],
+    "topic": "Architecture",
+    "subtopic": "Layer Above SaaS"
+  },
+  "concepts/context-as-moat.md": {
+    "title": "Context as Moat",
+    "link": "context-as-moat",
+    "summary": "Compete on context, not capability. Adjacent to foundation models, structurally outside their wars.",
+    "aliases": ["Context as Moat", "Compound on Context"],
+    "topic": "Brand & Positioning",
+    "subtopic": "Obsession Statement"
+  },
+  "concepts/ambient-form-factor.md": {
+    "title": "Ambient Form Factor",
+    "link": "ambient-form-factor",
+    "summary": "Browser extension + MCP server + hotkey overlay. No destination app. Three thin presences.",
+    "aliases": ["Ambient Form Factor"],
+    "topic": "Form Factor",
+    "subtopic": "Ambient Surfaces"
+  },
+  "concepts/clipboard-and-launch.md": {
+    "title": "Clipboard and Launch",
+    "link": "clipboard-and-launch",
+    "summary": "Universal delivery mechanism: assemble context, copy to clipboard, open target app, user pastes.",
+    "aliases": ["Clipboard and Launch", "Wispr Flow Pattern"],
+    "topic": "Form Factor",
+    "subtopic": "Hotkey Overlay"
+  },
+  "concepts/drift-prevention.md": {
+    "title": "Drift Prevention",
+    "link": "drift-prevention",
+    "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
+    "aliases": ["Drift Prevention", "Scope Discipline"],
+    "topic": "V1 Scope",
+    "subtopic": "Non-Goals"
+  },
+  "entities/browser-extension.md": {
+    "title": "Browser Extension",
+    "link": "browser-extension",
+    "summary": "Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.",
+    "aliases": ["Browser Extension", "Chrome Extension"],
+    "topic": "Form Factor",
+    "subtopic": "Browser Extension"
+  },
+  "entities/local-daemon.md": {
+    "title": "Local Daemon",
+    "link": "local-daemon",
+    "summary": "The substrate process that owns local storage, ingestion, and retrieval. Wedge-independent foundation.",
+    "aliases": ["Local Daemon", "ECHO Daemon"],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/mcp-server.md": {
+    "title": "MCP Server",
+    "link": "mcp-server",
+    "summary": "Exposes ECHO context to AI clients (Cursor, Claude Code, Claude Desktop) via Model Context Protocol.",
+    "aliases": ["MCP Server", "Model Context Protocol Server"],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "entities/hotkey-overlay.md": {
+    "title": "Hotkey Overlay",
+    "link": "hotkey-overlay",
+    "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
+    "aliases": ["Hotkey Overlay", "Hotkey Composer"],
+    "topic": "Form Factor",
+    "subtopic": "Hotkey Overlay"
+  },
+  "entities/audit-page.md": {
+    "title": "Audit Page",
+    "link": "audit-page",
+    "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
+    "aliases": ["Audit Page", "Inspector"],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/target-cohort-indie-ai-builders.md": {
+    "title": "Target Cohort: Indie AI Builders",
+    "link": "target-cohort-indie-ai-builders",
+    "summary": "V1 wedge: solo devs and small-team founders shipping AI tools. Strong founder-market-fit + warm distribution.",
+    "aliases": ["Indie AI Builders", "Target Cohort"],
+    "topic": "Cohorts",
+    "subtopic": "Indie AI Builders"
+  },
+  "sources/v1-spec.md": {
+    "title": "V1 Spec (Locked)",
+    "link": "v1-spec",
+    "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
+    "aliases": ["V1 Spec", "V1 Scope"],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  },
+  "sources/brand-promise.md": {
+    "title": "Brand Promise",
+    "link": "brand-promise",
+    "summary": "We don't make AI smarter. We make every AI smarter about you. Plus alternative formulations tested.",
+    "aliases": ["Brand Promise", "Tagline"],
+    "topic": "Brand & Positioning",
+    "subtopic": "Brand Promise"
+  },
+  "sources/form-factor-decision.md": {
+    "title": "Form Factor Decision",
+    "link": "form-factor-decision",
+    "summary": "Why no destination app. Browser extension + MCP server + hotkey overlay as the three thin presences.",
+    "aliases": ["Form Factor Decision"],
+    "topic": "Form Factor",
+    "subtopic": "Ambient Surfaces"
+  },
+  "sources/interface-layers.md": {
+    "title": "Interface Layers (1-5)",
+    "link": "interface-layers",
+    "summary": "Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.",
+    "aliases": ["Interface Layers", "Communication Stack"],
+    "topic": "Architecture",
+    "subtopic": "Layer Stack"
+  },
+  "sources/bundle-decision.md": {
+    "title": "Bundle Decision",
+    "link": "bundle-decision",
+    "summary": "V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.",
+    "aliases": ["Bundle Decision", "V1 Tools"],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  },
+  "sources/extension-funnel-logic.md": {
+    "title": "Extension Funnel Logic",
+    "link": "extension-funnel-logic",
+    "summary": "Extension and V1 are family, not pipeline. Gravitational conversion via shared thesis, not push-marketing.",
+    "aliases": ["Extension Funnel Logic"],
+    "topic": "Validation",
+    "subtopic": "Extension Funnel"
+  },
+  "sources/validation-experiments.md": {
+    "title": "Validation Experiments",
+    "link": "validation-experiments",
+    "summary": "Three experiments running parallel to substrate build: user interviews, landing page, concierge.",
+    "aliases": ["Validation Experiments"],
+    "topic": "Validation",
+    "subtopic": "Wedge Validation"
+  },
+  "analyses/wedge-vs-thesis-validation.md": {
+    "title": "Wedge vs Thesis Validation",
+    "link": "wedge-vs-thesis-validation",
+    "summary": "Extension validates thesis (people pay for unified context). V1 must separately validate the dev wedge.",
+    "aliases": ["Wedge vs Thesis Validation"],
+    "topic": "Validation",
+    "subtopic": "Wedge Validation"
+  },
+  "analyses/three-cohort-comparison.md": {
+    "title": "Three-Cohort Comparison",
+    "link": "three-cohort-comparison",
+    "summary": "Indie AI builders vs vibe coders vs solo SaaS founders. Why indie AI builders win the V1 wedge.",
+    "aliases": ["Three Cohort Comparison"],
+    "topic": "Cohorts",
+    "subtopic": "Indie AI Builders"
+  },
+  "analyses/tier-vs-vertical-slice.md": {
+    "title": "Tier-by-Tier vs Vertical Slice",
+    "link": "tier-vs-vertical-slice",
+    "summary": "Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.",
+    "aliases": ["Tier vs Vertical Slice"],
+    "topic": "V1 Scope",
+    "subtopic": "Sequencing"
+  },
+  "analyses/narrowest-v1-scope.md": {
+    "title": "Narrowest V1 Scope",
+    "link": "narrowest-v1-scope",
+    "summary": "L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.",
+    "aliases": ["Narrowest V1 Scope"],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  }
+}

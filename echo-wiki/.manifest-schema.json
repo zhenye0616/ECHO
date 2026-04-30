@@ -1,0 +1,46 @@
+{
+  "$schema": "Manifest schema for ECHO project wiki ingestion. The lead agent generates .manifest.json following this structure.",
+
+  "_entry_template": {
+    "<folder>/<filename>.md": {
+      "title": "Display name for index.md",
+      "link": "filename-without-folder-or-extension (agents use this verbatim in [[wikilinks]])",
+      "summary": "One-line description for index.md (written by lead agent, never parsed from page content)",
+      "aliases": ["Title Case", "CamelCase", "other common references"],
+      "topic": "Topic from taxonomy",
+      "subtopic": "Specific area within topic",
+      "raw": "path/to/source/file.md (source pages only, omit for entities/concepts/analyses)"
+    }
+  },
+
+  "_rules": {
+    "filenames": "kebab-case, globally unique across all folders. Prefix with src- if a source page would collide with a concept/entity.",
+    "link_field": "Filename only. No folder prefix, no .md extension. Agents copy this into [[link]] verbatim.",
+    "summary_field": "Max 120 chars. Written during manifest generation so consolidation never parses page content.",
+    "aliases_field": "Must include at least the Title Case version of the filename. Obsidian uses these to resolve [[wikilinks]].",
+    "topic_field": "Must match the taxonomy below. Reuse existing topics before creating new ones.",
+    "raw_field": "Relative path from project root. Only on source pages. Entities/concepts/analyses omit this."
+  },
+
+  "_folders": {
+    "sources/": "Strategic decisions, spec docs, captured reasoning",
+    "entities/": "Components, surfaces, target cohorts, integrated tools",
+    "concepts/": "Design patterns, principles, architectural commitments",
+    "analyses/": "Cross-cutting synthesis, comparisons, validation results"
+  },
+
+  "_taxonomy": {
+    "Brand & Positioning": ["Brand Promise", "Naming", "Obsession Statement"],
+    "Form Factor": ["Ambient Surfaces", "Felt Not Seen", "Hotkey Overlay", "Browser Extension", "MCP Server"],
+    "Architecture": ["Layer Stack", "Compose Not Capture", "Layer Above SaaS", "Storage", "Retrieval Composition"],
+    "V1 Scope": ["Bundle Decision", "Cohort Selection", "Sequencing", "Non-Goals"],
+    "Validation": ["Wedge Validation", "Thesis Validation", "Extension Funnel", "User Interviews", "Concierge"],
+    "GTM": ["Distribution", "Pricing", "Launch", "Onboarding"],
+    "Cohorts": ["Indie AI Builders", "Vibe Coders", "Solo SaaS Founders", "Future Cohorts"]
+  },
+
+  "_consolidation": {
+    "index.md": "Built from manifest: group entries by folder, then by topic. Each line: - [[link|title]] — summary",
+    "log.md": "Append one entry per operation with timestamp, operation type, and page counts."
+  }
+}
