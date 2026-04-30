@@ -4,7 +4,11 @@ import { isNonEmptyString } from '../guards.js';
 export const CAPTURED_SOURCES = {
   apps: {},
   domains: {},
-  fs_paths: ['~/Library/Application Support/Cursor/User/workspaceStorage/', '~/.claude/projects/'],
+  fs_paths: [
+    '~/Library/Application Support/Cursor/User/workspaceStorage/',
+    '~/Library/Application Support/Cursor/User/globalStorage/',
+    '~/.claude/projects/',
+  ],
   apis: [],
   git_repos: ['~/Desktop/Project_echo/'],
 } as const;

@@ -21,9 +21,10 @@ describe('CAPTURED_SOURCES', () => {
     expect(CAPTURED_SOURCES.apis).toEqual([]);
   });
 
-  it('declares the two FS prefixes for Cursor and Claude Code', () => {
+  it('declares the FS prefixes for Cursor (workspace + global) and Claude Code', () => {
     expect(CAPTURED_SOURCES.fs_paths).toEqual([
       '~/Library/Application Support/Cursor/User/workspaceStorage/',
+      '~/Library/Application Support/Cursor/User/globalStorage/',
       '~/.claude/projects/',
     ]);
   });
