@@ -298,9 +298,12 @@ When an agent runs, it must:
 
    The entire `echo-wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
 2. **Pull latest `main`** in the main repo
-3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found, else atomically claim a new item from the unblocked candidates
-   - **Unblocked candidate** = item in `backlog/ready/` whose `blocked_by` list is either empty OR every entry has a corresponding file in `backlog/complete/`
-   - If no candidates are unblocked, STOP without claiming — log "no claimable work" and exit cleanly
+3. **Reconcile** — check `backlog/claimed/` for an existing claim by this persona; resume it if found
+4. **Select** — run `python3 tools/blocked.py` to get the next claimable item path
+   - Exit 0: stdout has the path of the next unblocked, highest-priority, oldest item
+   - Exit 1: no unblocked work; stop cleanly
+   - Exit 2: validation failed (dangling `blocked_by`, cycle, malformed frontmatter, duplicate id, bad priority, id/filename mismatch); stop and surface the error
+   - **Do NOT filter manually.** The script is the deterministic enforcement of `blocked_by`; the agent's job is to call it, not to re-implement the rule. See `tools/blocked.py` for the selection logic and `tools/test_blocked.py` for the test surface (17 cases including dangling refs, cycles, partial dependency satisfaction, priority/date ordering)
 4. **Create-or-reuse the worktree** on `agent/<slug>` (idempotent — see Idempotency Guarantees)
 5. **Read all `spec_refs`** in the item before writing any code
 6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)

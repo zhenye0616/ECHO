@@ -1,0 +1,315 @@
+"""
+Tests for tools/blocked.py — the deterministic backlog selector + validator.
+
+Run: python3 tools/test_blocked.py
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+import unittest
+from pathlib import Path
+
+THIS_DIR = Path(__file__).resolve().parent
+SCRIPT = THIS_DIR / "blocked.py"
+
+
+def write_item(
+    repo: Path,
+    stage: str,
+    item_id: str,
+    *,
+    priority: str = "HIGH",
+    created: str = "2026-04-30",
+    blocked_by: list[str] | None = None,
+    extra_frontmatter: str = "",
+) -> Path:
+    """Write a minimal but valid item file under repo/backlog/<stage>/."""
+    blocked_by = blocked_by or []
+    if blocked_by:
+        bb = "blocked_by:\n" + "".join(f'  - "{b}"\n' for b in blocked_by)
+    else:
+        bb = "blocked_by: []\n"
+    # Note: do NOT use textwrap.dedent here. The variable substitutions can
+    # introduce inconsistent indentation that breaks dedent. Build the file
+    # explicitly with no leading whitespace.
+    body = (
+        f"---\n"
+        f"id: {item_id}\n"
+        f"priority: {priority}\n"
+        f"created: {created}\n"
+        f"{bb}"
+        f"{extra_frontmatter}"
+        f"---\n"
+        f"\n"
+        f"# body for {item_id}\n"
+    )
+    f = repo / "backlog" / stage / f"{item_id}.md"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(body, encoding="utf-8")
+    return f
+
+
+def make_repo() -> Path:
+    """Create a temp repo skeleton with the four backlog stages and a fake .git."""
+    repo = Path(tempfile.mkdtemp(prefix="blocked-test-"))
+    (repo / ".git").mkdir()
+    for stage in ("ready", "claimed", "pending_review", "complete"):
+        (repo / "backlog" / stage).mkdir(parents=True)
+    return repo
+
+
+def run_script(repo: Path, *args: str) -> tuple[int, str, str]:
+    """Run blocked.py with cwd=repo; return (returncode, stdout, stderr)."""
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+class BlockedScriptTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.repo = make_repo()
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.repo, ignore_errors=True)
+
+    # ── Default selection mode ──────────────────────────────────────────────
+
+    def test_empty_queue_exits_1(self) -> None:
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+    def test_single_unblocked_item_is_picked(self) -> None:
+        write_item(self.repo, "ready", "2026-04-30-001-foo")
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_blocker_in_pending_review_does_NOT_unblock(self) -> None:
+        # Critical safety property: only complete/ satisfies a dependency
+        write_item(self.repo, "pending_review", "2026-04-30-001-foo")
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-002-bar",
+            blocked_by=["2026-04-30-001-foo"],
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1, f"expected no candidates, got: {out}")
+        self.assertEqual(out.strip(), "")
+
+    def test_blocker_in_complete_unblocks(self) -> None:
+        write_item(self.repo, "complete", "2026-04-30-001-foo")
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-002-bar",
+            blocked_by=["2026-04-30-001-foo"],
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-002-bar.md", out)
+
+    def test_partial_dependency_satisfaction_does_NOT_unblock(self) -> None:
+        write_item(self.repo, "complete", "2026-04-30-001-foo")
+        write_item(self.repo, "ready", "2026-04-30-002-bar")  # not in complete
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-003-baz",
+            blocked_by=["2026-04-30-001-foo", "2026-04-30-002-bar"],
+        )
+        # Picks 002 (no deps), but 003 stays blocked
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-002-bar.md", out)
+        self.assertNotIn("2026-04-30-003-baz", out)
+
+    # ── Priority + date ordering ─────────────────────────────────────────────
+
+    def test_priority_outranks_date(self) -> None:
+        write_item(
+            self.repo, "ready", "2026-04-29-001-old-low",
+            priority="LOW", created="2026-04-29",
+        )
+        write_item(
+            self.repo, "ready", "2026-04-30-002-new-high",
+            priority="HIGH", created="2026-04-30",
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-002-new-high.md", out)
+
+    def test_date_breaks_priority_tie(self) -> None:
+        write_item(
+            self.repo, "ready", "2026-04-29-001-older",
+            priority="HIGH", created="2026-04-29",
+        )
+        write_item(
+            self.repo, "ready", "2026-04-30-001-newer",
+            priority="HIGH", created="2026-04-30",
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-29-001-older.md", out)
+
+    # ── Validation ───────────────────────────────────────────────────────────
+
+    def test_validate_clean_repo_exits_0(self) -> None:
+        write_item(self.repo, "ready", "2026-04-30-001-foo")
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("OK", out)
+
+    def test_dangling_blocked_by_exits_2(self) -> None:
+        write_item(
+            self.repo, "ready", "2026-04-30-002-bar",
+            blocked_by=["2026-04-30-999-does-not-exist"],
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("not a known item id", err)
+
+    def test_cycle_detection_exits_2(self) -> None:
+        write_item(
+            self.repo, "ready", "2026-04-30-001-a",
+            blocked_by=["2026-04-30-002-b"],
+        )
+        write_item(
+            self.repo, "ready", "2026-04-30-002-b",
+            blocked_by=["2026-04-30-001-a"],
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("cycle", err)
+
+    def test_id_filename_mismatch_exits_2(self) -> None:
+        # write a file whose id frontmatter contradicts its filename
+        f = self.repo / "backlog" / "ready" / "2026-04-30-001-correct.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                id: 2026-04-30-999-wrong
+                priority: HIGH
+                created: 2026-04-30
+                blocked_by: []
+                ---
+                """
+            ),
+            encoding="utf-8",
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("does not match filename", err)
+
+    def test_duplicate_id_exits_2(self) -> None:
+        write_item(self.repo, "ready", "2026-04-30-001-foo")
+        # Re-write the same id into a different stage
+        f = self.repo / "backlog" / "complete" / "2026-04-30-001-foo.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                id: 2026-04-30-001-foo
+                priority: HIGH
+                created: 2026-04-30
+                blocked_by: []
+                ---
+                """
+            ),
+            encoding="utf-8",
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("duplicate id", err)
+
+    def test_bad_priority_exits_2(self) -> None:
+        f = self.repo / "backlog" / "ready" / "2026-04-30-001-foo.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                id: 2026-04-30-001-foo
+                priority: URGENT
+                created: 2026-04-30
+                blocked_by: []
+                ---
+                """
+            ),
+            encoding="utf-8",
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("priority", err)
+
+    def test_status_field_is_NOT_validated(self) -> None:
+        # status field is informational; folder is truth. Items can have a stale
+        # status frontmatter without triggering validation errors.
+        f = self.repo / "backlog" / "complete" / "2026-04-30-001-foo.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                id: 2026-04-30-001-foo
+                status: ready
+                priority: HIGH
+                created: 2026-04-30
+                blocked_by: []
+                ---
+                """
+            ),
+            encoding="utf-8",
+        )
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("OK", out)
+
+    # ── Listing modes ────────────────────────────────────────────────────────
+
+    def test_list_all_shows_each_ready_item_with_status(self) -> None:
+        write_item(self.repo, "complete", "2026-04-30-001-foo")
+        write_item(
+            self.repo, "ready", "2026-04-30-002-bar",
+            blocked_by=["2026-04-30-001-foo"],
+        )
+        write_item(
+            self.repo, "ready", "2026-04-30-003-baz",
+            blocked_by=["2026-04-30-002-bar"],
+        )
+        rc, out, _ = run_script(self.repo, "--list-all")
+        self.assertEqual(rc, 0)
+        self.assertIn("READY", out)
+        self.assertIn("BLOCKED", out)
+        self.assertIn("2026-04-30-002-bar", out)
+        self.assertIn("2026-04-30-003-baz", out)
+
+    def test_list_blocked_shows_only_blocked_items(self) -> None:
+        write_item(self.repo, "complete", "2026-04-30-001-foo")
+        write_item(self.repo, "ready", "2026-04-30-002-bar")  # unblocked
+        write_item(
+            self.repo, "ready", "2026-04-30-003-baz",
+            blocked_by=["2026-04-30-002-bar"],
+        )
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("2026-04-30-002-bar:", out)  # unblocked, not listed
+        self.assertIn("2026-04-30-003-baz", out)
+
+    def test_unknown_flag_exits_2(self) -> None:
+        rc, _, err = run_script(self.repo, "--no-such-flag")
+        self.assertEqual(rc, 2)
+        self.assertIn("unknown flag", err)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

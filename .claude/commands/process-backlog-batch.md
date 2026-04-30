@@ -68,15 +68,16 @@ LOOP:
     Echo "Resuming previous claim: $ITEM_FILE"
   ELSE:
     RESUMING=0
-    # Find UNBLOCKED candidates: blocked_by is empty OR every blocked_by ID
-    # has a corresponding file in backlog/complete/
-    CANDIDATES=$(filter backlog/ready/*.md to those whose blocked_by entries
-                 are all present in backlog/complete/)
-
-    IF empty(CANDIDATES):
-      HALT(reason: "no unblocked work; queue drained or all remaining items blocked")
-
-    PICK=$(highest-priority + oldest-creation-date from CANDIDATES)
+    # Selection is enforced by tools/blocked.py (deterministic, validated, tested).
+    # Do NOT filter manually — call the script and act on its exit code.
+    NEXT_ITEM=$(python3 tools/blocked.py)
+    RC=$?
+    case "$RC" in
+      0) ;;                                                                # found
+      1) HALT(reason: "no unblocked work; queue drained or remaining items blocked") ;;
+      *) HALT(reason: "backlog validation failed; aborting batch") ;;     # dangling/cycle
+    esac
+    PICK="$(basename "$NEXT_ITEM")"
     SLUG=${PICK_FILENAME stripped of "YYYY-MM-DD-NNN-" prefix and ".md"}
     ITEM_ID=${PICK_FILENAME without .md}
 

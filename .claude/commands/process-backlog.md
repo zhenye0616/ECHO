@@ -47,12 +47,18 @@ else
   RESUMING=0
   # Fresh claim: pick highest priority + oldest creation date from ready/
   # (use your own logic to pick the right file; it must be from backlog/ready/)
-  # Selection rules:
-  #   - Filter to UNBLOCKED candidates: blocked_by is empty OR every blocked_by ID
-  #     has a corresponding file in backlog/complete/
-  #   - From unblocked candidates, pick HIGH > MED > LOW priority, oldest creation date
-  #   - If no unblocked candidates exist: STOP without claiming, log "no claimable work"
-  ITEM_FILE_NAME="<chosen-item-filename>.md"   # e.g., 2026-04-30-001-repo-bootstrap.md
+  # Selection is enforced by tools/blocked.py (deterministic, validated, tested).
+  # Do NOT filter manually — the agent's job is to call the script, not to interpret
+  # blocked_by status by reading frontmatter. The script checks dangling refs and
+  # cycles before returning a candidate; if validation fails, the loop aborts.
+  NEXT_ITEM=$(python3 tools/blocked.py)
+  RC=$?
+  case "$RC" in
+    0) ;;                                                     # candidate found
+    1) echo "no unblocked work; exiting cleanly"; exit 0 ;;   # nothing claimable
+    *) echo "backlog validation failed; aborting"; exit 2 ;;  # dangling/cycle/malformed
+  esac
+  ITEM_FILE_NAME=$(basename "$NEXT_ITEM")
   ITEM_ID="${ITEM_FILE_NAME%.md}"
   SLUG="${ITEM_ID#????-??-??-???-}"
 
