@@ -35,9 +35,9 @@ files_to_modify:
   - package.json
   - tests/capture/surfaces/fs-watcher.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "Mac.attlocal.net-zhenye"
+claimed_at: "2026-04-30T21:54:00Z"
+branch: "agent/009-fs-watcher-cursor-and-claude-code"
 worktree: ""
 head_sha: ""
 pr_url: ""
