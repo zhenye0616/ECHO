@@ -24,12 +24,14 @@
       "Bash(date:*)"
     ],
     "deny": [
-      "Bash(git push:*)",
       "Bash(rm -rf:*)",
       "Bash(curl:*)",
       "Bash(wget:*)",
       "Bash(ssh:*)",
       "Bash(scp:*)"
+    ],
+    "ask": [
+      "Bash(git push origin main:*)"
     ]
   }
 }
