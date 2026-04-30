@@ -16,15 +16,14 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-The first foundation set — five items establishing the substrate skeleton. Item 001 is the only initially-claimable item; 002 / 003 / 005 unblock when 001 lands; 004 unblocks when 002 + 003 + 005 all land.
+**Wave 2 — bring the substrate to life.** Foundation set (001–005) is in `complete/`. These four items wire it into a running daemon that captures Cursor and Claude Code workspace events to a real database. 006/007/008 are independent (parallel-safe via multi-session `ECHO_AGENT_ID`); 009 unblocks once all three land in `complete/`.
 
 | Priority | ID | Title | Blocked By |
 |---|---|---|---|
-| HIGH | [2026-04-30-001](./backlog/ready/2026-04-30-001-repo-bootstrap.md) | Repo bootstrap (TS/Node + Vitest + ESLint + Prettier) | — |
-| HIGH | [2026-04-30-002](./backlog/ready/2026-04-30-002-logger.md) | Logger module (structured, source-attributed) | 001 |
-| HIGH | [2026-04-30-003](./backlog/ready/2026-04-30-003-capture-allowlist.md) | Capture allowlist (sources.ts) | 001 |
-| HIGH | [2026-04-30-004](./backlog/ready/2026-04-30-004-capture-gate.md) | Capture gate (chokepoint pure function) | 002, 003, 005 |
-| HIGH | [2026-04-30-005](./backlog/ready/2026-04-30-005-storage-interface.md) | Storage interface + in-memory impl | 001 |
+| HIGH | [2026-04-30-006](../backlog/ready/2026-04-30-006-capture-pipeline.md) | Capture pipeline (gate → storage wire-up) | — |
+| HIGH | [2026-04-30-007](../backlog/ready/2026-04-30-007-daemon-entry.md) | Daemon entry point + lifecycle | — |
+| HIGH | [2026-04-30-008](../backlog/ready/2026-04-30-008-sqlite-storage.md) | SQLite Storage implementation (better-sqlite3) | — |
+| HIGH | [2026-04-30-009](../backlog/ready/2026-04-30-009-fs-watcher-cursor-and-claude-code.md) | FS watcher — first capture surface (Cursor + Claude Code) | 006, 007, 008 |
 
 ---
 
@@ -50,11 +49,15 @@ The first foundation set — five items establishing the substrate skeleton. Ite
 
 ## ✅ Complete (merged; wiki update may be pending)
 
-*(empty — first items land here after week 1)*
+**Wave 1 — substrate skeleton.** All five items merged; wiki promoted in commit `7ad5db7` (post-shipment, per the operating model).
 
-| ID | Title | Wiki Pages To Update |
+| ID | Title | Shipped |
 |---|---|---|
-| | | |
+| [2026-04-30-001](../backlog/complete/2026-04-30-001-repo-bootstrap.md) | Repo bootstrap | TS/Node + Vitest + ESLint + Prettier scaffold |
+| [2026-04-30-002](../backlog/complete/2026-04-30-002-logger.md) | Logger module | Structured JSON-per-line; source-attributed; ECHO_LOG_LEVEL env filter |
+| [2026-04-30-003](../backlog/complete/2026-04-30-003-capture-allowlist.md) | Capture allowlist | Empty CAPTURED_SOURCES + Source type + isAllowed* predicates |
+| [2026-04-30-004](../backlog/complete/2026-04-30-004-capture-gate.md) | Capture gate | Pure chokepoint function; 28+ test cases; stable rejection codes |
+| [2026-04-30-005](../backlog/complete/2026-04-30-005-storage-interface.md) | Storage interface + MemoryStorage | Append-only contract; in-memory impl as test fixture |
 
 ---
 
