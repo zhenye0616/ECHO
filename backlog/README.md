@@ -117,6 +117,107 @@ git push origin main
 
 **Two-directory pattern:** the agent does *backlog state changes* in the main repo on `main` (so all agents share consistent backlog state) and *code work* inside the worktree on the feature branch (so working directories never collide). The slash command handles this directory switching.
 
+## Idempotency Guarantees (At-Least-Once + Safe Retry)
+
+The system is designed so a crashed run, a re-run, or a network glitch mid-push converges to one coherent state — not corruption. The goal is **at-least-once execution with safe retries**, not exactly-once (which is impossible when an agent can crash between push and acknowledgement).
+
+### What we guarantee strongly
+
+- **At-most-one claim per item.** The atomic claim commit + push-rejection-on-race makes it impossible for two agents to both end up owning the same item.
+- **Single source of truth for an item's stage.** Git enforces that the file lives in exactly one of `ready/`, `claimed/`, `pending_review/`, `complete/` at any time.
+
+### What the agent loop must do to make the rest safe
+
+Every agent run starts with **reconciliation**, not a fresh claim:
+
+```bash
+# Persona-based agent identity — stable across crashes, unique per machine/user
+AGENT_ID="${ECHO_AGENT_ID:-$(hostname)-$USER}"
+
+cd ~/Desktop/echo_wiki
+git pull --rebase origin main
+
+# Look for any unfinished claim by this agent
+EXISTING=$(grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md 2>/dev/null | head -1)
+
+if [ -n "$EXISTING" ]; then
+  echo "Resuming previous claim: $EXISTING"
+  # skip the claim step; jump to worktree-reuse
+else
+  # normal claim flow
+fi
+```
+
+This turns a crashed run from "permanent orphan in `claimed/`" into "resumed automatically on next invocation."
+
+**Worktree creation must be detect-and-reuse**, not unconditional:
+
+```bash
+if [ -d "$WORKTREE" ]; then
+  cd "$WORKTREE" && git checkout "agent/$SLUG"
+elif git show-ref --verify --quiet "refs/heads/agent/$SLUG"; then
+  git worktree add "$WORKTREE" "agent/$SLUG"
+elif git ls-remote --exit-code origin "agent/$SLUG" >/dev/null 2>&1; then
+  git fetch origin "agent/$SLUG:agent/$SLUG"
+  git worktree add "$WORKTREE" "agent/$SLUG"
+else
+  git worktree add "$WORKTREE" -b "agent/$SLUG"
+fi
+```
+
+**Stage moves must be upserts**, not assumed-from-stage moves:
+
+```bash
+ensure_stage() {
+  local item="$1" target="$2"
+  local current
+  current=$(ls backlog/*/"$item" 2>/dev/null | head -1)
+  [ -z "$current" ] && { echo "ERROR: $item not found"; return 1; }
+  [ "$current" = "backlog/$target/$item" ] && return 0   # already there — no-op
+  git mv "$current" "backlog/$target/$item"
+}
+```
+
+This makes "move to `pending_review/`" safe to call when the file is already there from a previous attempt.
+
+**Run logs append on re-run.** If `raw/internal/agent-runs/<date>-<item-id>.md` already exists from a prior partial attempt, the agent appends a `## Run N (resumed at <iso-timestamp>)` section rather than overwriting. The log becomes a complete history of every attempt — better forensics, no data loss.
+
+### Agent persona convention
+
+`claimed_by` identifies a long-lived agent identity (an installation), not a single invocation:
+
+- Default: `$(hostname)-$USER`
+- Override via `ECHO_AGENT_ID` env var when running multiple agents on the same machine
+- Two simultaneous agents must use distinct personas (otherwise reconciliation can mis-resume)
+
+The atomic claim still saves us if two agents accidentally share a persona — the second push is rejected. The persona is just the resumption signal.
+
+### Stale-claim detection (founder, manual for now)
+
+A claim more than ~6 hours old with no progress is probably abandoned (agent crashed and is not coming back). Founder check:
+
+```bash
+for f in backlog/claimed/*.md; do
+  ts=$(grep '^claimed_at:' "$f" | cut -d'"' -f2)
+  age=$(( $(date +%s) - $(date -d "$ts" +%s) ))
+  [ "$age" -gt 21600 ] && echo "STALE: $f (claimed $ts, ${age}s ago)"
+done
+```
+
+To release a stale claim manually:
+
+```bash
+git mv backlog/claimed/<item>.md backlog/ready/<item>.md
+# clear claimed_by, claimed_at, branch in frontmatter
+git worktree remove ~/Desktop/echo_wiki--<slug> 2>/dev/null
+git branch -D agent/<slug> 2>/dev/null
+git push origin --delete agent/<slug> 2>/dev/null
+git commit -am "release: <item-id>"
+git push origin main
+```
+
+A `tools/check-stale-claims.sh` and a `/release-stuck` slash command will land once we've actually run the loop a few times and seen what real failures look like. Lease/heartbeat auto-recovery is V1.5+.
+
 **Cleanup (founder, after merge):**
 
 ```bash

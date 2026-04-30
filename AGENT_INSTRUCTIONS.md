@@ -11,11 +11,17 @@ Multiple builder agents may run in parallel. The atomic claim + worktree pattern
 ## Your Single Loop
 
 ```
+ 0. Determine your persona ID:
+       AGENT_ID = ${ECHO_AGENT_ID:-$(hostname)-$USER}
+       (stable across runs of the same agent installation)
  1. Read AGENT_INSTRUCTIONS.md   (this file — every run)
  2. Read NORTH_STAR.md           (the daily orient)
  3. Pull main in the main repo
- 4. List backlog/ready/          (find work)
- 5. Pick: highest priority + oldest creation date
+ 4. RECONCILE — look for an existing unfinished claim by AGENT_ID:
+       grep -l "^claimed_by: \"$AGENT_ID\"" backlog/claimed/*.md
+       — if found: RESUME (skip step 5–6, go to step 7 with worktree-reuse)
+       — if not:   continue to fresh claim
+ 5. List backlog/ready/, pick highest priority + oldest creation date
  6. Atomic claim:
        (in main repo on main)
        git mv backlog/ready/X.md backlog/claimed/X.md
@@ -23,18 +29,21 @@ Multiple builder agents may run in parallel. The atomic claim + worktree pattern
        git commit -m "claim: <item-id>"
        git push origin main
        — if push rejected, another agent claimed it; goto 3 with next item
- 7. Create worktree:
-       git worktree add ~/Desktop/echo_wiki--<slug> -b agent/<slug>
-       cd ~/Desktop/echo_wiki--<slug>
+ 7. Create-or-reuse worktree (idempotent — see "Worktree Mechanics"):
+       — if dir + branch exist: cd in and git checkout
+       — if branch exists locally only: worktree add on existing branch
+       — if branch on remote only: fetch, then worktree add
+       — fresh: worktree add -b agent/<slug>
  8. Read all spec_refs from item frontmatter
  9. Read item body (especially "Out of Scope (Don't Drift)" section)
 10. Implement to acceptance criteria — nothing more
 11. Run tests
 12. Commit on agent/<slug>; push the branch
 13. Write log: raw/internal/agent-runs/<today>-<item-id>.md  (in main repo on main)
+       — if file exists from a prior attempt: APPEND "## Run N (resumed at …)" section, do NOT overwrite
 14. If tests pass + acceptance met:
        (in main repo on main, after pulling)
-       git mv backlog/claimed/X.md backlog/pending_review/X.md
+       ensure_stage(<item>, pending_review)   # upsert: no-op if already there
        edit frontmatter: agent_notes summary, head_sha, pr_url (if any)
        git commit -m "review: <item-id>"
        git push origin main
@@ -49,6 +58,27 @@ Multiple builder agents may run in parallel. The atomic claim + worktree pattern
 ```
 
 **Do not pick up a second item in the same run.** One item per execution. Founder reviews before any next item starts.
+
+## Idempotency: Resume on Reclaim
+
+The loop above is designed so that if it crashes at *any* point and the slash command is re-run, the next invocation converges to one coherent state. The mechanics:
+
+- **Persona stays stable.** `AGENT_ID` is derived from your machine/user, not a per-run UUID. So a fresh run after a crash recognizes its own prior orphaned claim.
+- **Reconciliation runs first.** Step 4 looks for any item in `claimed/` already owned by your `AGENT_ID`. If one exists, you resume *that* item. You do not pick a new one until the existing one reaches `pending_review/`.
+- **Worktree creation is detect-and-reuse.** If the worktree dir exists, you cd into it. If the branch exists locally, you worktree-add onto it. If the branch is only on remote, you fetch then worktree-add. Only if nothing exists do you create fresh. Step 7 enumerates the four cases.
+- **Stage moves are upserts.** A helper `ensure_stage(item, stage)` checks current location and only moves if needed — calling it twice is a no-op. Use it for the move to `pending_review/`.
+- **Run logs append.** If `raw/internal/agent-runs/<today>-<item-id>.md` already exists, do not overwrite it. Append a `## Run N (resumed at <iso-timestamp>)` section. This preserves a forensic trail across attempts.
+
+If you cannot reconcile — e.g., the existing claim's branch was deleted out from under you, or the worktree path is now on a different branch you don't recognize — escalate via path 15. Don't try to fix the inconsistency yourself.
+
+## Persona ID Conventions
+
+`claimed_by` is the *agent persona*, not a per-run identifier:
+
+- Default: `$(hostname)-$USER` (e.g., `MacBook-Pro-zhenye`)
+- Override via env: `export ECHO_AGENT_ID="claude-code-laptop"` before invocation
+- Two simultaneous agents on the same machine MUST set distinct personas. If they don't, the second one's reconciliation may pick up the first one's in-flight claim and corrupt the state.
+- The atomic claim still protects against same-persona races at the file level (the second push is rejected), but reconciliation can't distinguish two simultaneous you's.
 
 ---
 
@@ -87,14 +117,31 @@ Never edit a `claimed/` item that doesn't list you as `claimed_by`. Never move a
 
 ## Worktree Mechanics
 
-Once you've claimed:
+Once you've claimed (or reconciled to an existing claim), use this idempotent block — it handles all four states (worktree exists, branch local, branch remote-only, fresh):
 
 ```bash
 # from main repo
-git worktree add ~/Desktop/echo_wiki--<slug> -b agent/<slug>
-cd ~/Desktop/echo_wiki--<slug>
+WORKTREE="$HOME/Desktop/echo_wiki--$SLUG"
+
+if [ -d "$WORKTREE" ]; then
+  # previous attempt left the worktree in place — reuse it
+  cd "$WORKTREE"
+  git checkout "agent/$SLUG"
+elif git show-ref --verify --quiet "refs/heads/agent/$SLUG"; then
+  # branch exists locally but no worktree — recreate worktree on existing branch
+  git worktree add "$WORKTREE" "agent/$SLUG"
+elif git ls-remote --exit-code origin "agent/$SLUG" >/dev/null 2>&1; then
+  # branch only on remote — fetch then attach worktree
+  git fetch origin "agent/$SLUG:agent/$SLUG"
+  git worktree add "$WORKTREE" "agent/$SLUG"
+else
+  # truly fresh — create branch and worktree together
+  git worktree add "$WORKTREE" -b "agent/$SLUG"
+fi
+
+cd "$WORKTREE"
 # implementation, tests, commits
-git push -u origin agent/<slug>
+git push -u origin "agent/$SLUG"
 ```
 
 Conventions:
@@ -102,8 +149,26 @@ Conventions:
 - Worktree path: `~/Desktop/echo_wiki--<slug>/` (sibling of main repo, double-dash)
 - Branch name: `agent/<slug>` (same slug as the item filename)
 - One worktree per claim; do not reuse worktrees across items
+- The `if [ -d "$WORKTREE" ]` reuse path means a crashed-and-resumed run picks up exactly where the previous attempt left off, with whatever uncommitted changes are present. Inspect `git status` inside the worktree before doing more work — if uncommitted state is present, decide whether to keep it (commit) or discard (`git restore .`) based on the run log of the previous attempt.
 
 You do **not** remove your own worktree. The founder removes worktrees after merging or rejecting.
+
+## Stage-Move Upsert Helper
+
+Use this for the move to `pending_review/` so a re-run is a no-op if the file is already there:
+
+```bash
+ensure_stage() {
+  local item="$1" target="$2"
+  local current
+  current=$(ls backlog/*/"$item" 2>/dev/null | head -1)
+  [ -z "$current" ] && { echo "ERROR: $item not found in any stage" >&2; return 1; }
+  [ "$current" = "backlog/$target/$item" ] && return 0   # already there — idempotent no-op
+  git mv "$current" "backlog/$target/$item"
+}
+```
+
+Call: `ensure_stage "$ITEM_FILE" "pending_review"` instead of an unconditional `git mv`.
 
 ---
 
@@ -164,15 +229,28 @@ Use `git mv` always. One item at a time. The move + frontmatter edit + commit mu
 
 Every run produces one log file in `raw/internal/agent-runs/`. Filename: `YYYY-MM-DD-<backlog-item-id>.md`. The log lives in the main repo on `main` (not the worktree).
 
-Required sections:
+**Append on resume.** If the file already exists from a prior partial attempt (i.e., you reconciled into an existing claim), do **not** overwrite it. Append a new section at the bottom:
 
-- What I implemented
-- Files modified (with line counts) and the branch + head_sha
+```markdown
+---
+
+## Run 2 (resumed at 2026-04-30T14:32:00Z)
+
+[fresh content for this attempt]
+```
+
+The first run's content stays intact. The log becomes a complete history of every attempt for this item — useful for forensics when something goes wrong.
+
+Required sections per run:
+
+- What I implemented (in this attempt)
+- Files modified (with line counts) and the branch + head_sha at end of attempt
 - Decisions made during implementation (especially anything not pre-specified)
 - Acceptance criteria status (each one: passing/failing/skipped)
 - Test results (verbatim output)
 - Open questions for founder (if any)
 - Drift events caught (if any)
+- If resumed: what state the previous attempt left behind, what you kept vs discarded
 
 If you skip the log, the founder can't review — so skipping the log is a hard fail.
 
