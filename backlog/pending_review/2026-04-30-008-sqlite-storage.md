@@ -35,9 +35,10 @@ claimed_by: "Mac.attlocal.net-zhenye"
 claimed_at: "2026-04-30T21:33:00Z"
 branch: "agent/008-sqlite-storage"
 worktree: ""
-head_sha: ""
+head_sha: "6c1a2f9d0be0c375c9872bbc97c5edce00c7848c"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Shipped. SqliteStorage on better-sqlite3 (WAL mode, prepared statements, idempotent close); home-rolled migration runner using PRAGMA user_version; daemon now defaults to SQLite at ~/Library/Application Support/ECHO/echo.db with ECHO_STORAGE=memory opt-out and ECHO_DB_PATH override. Lifecycle.ts gained a LifecycleOptions parameter ({storage, storageBackend, onShutdown}) so index.ts owns storage instantiation and the close hook; backwards-compatible default behavior preserved. 19 new sqlite tests + 1 file edit to lifecycle.test.ts (added ECHO_STORAGE=memory to spawn env — necessary downstream consequence of the daemon-default change). 107/107 tests passing; lint/typecheck/format clean. End-to-end smoke run with real SQLite verified: WAL files appear during runtime, single echo.db remains after shutdown. Note: only files touched beyond files_to_modify were tests/daemon/lifecycle.test.ts (justification in run log).
 review_notes: ""
 ---
 
