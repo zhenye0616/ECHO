@@ -10,18 +10,8 @@ import {
 } from '../../../src/capture/surfaces/fs-watcher.js';
 import type { CaptureEvent } from '../../../src/storage/interface.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
+import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
 import { captureStdout } from '../../fixtures/stdout.js';
-
-function resetAllowlist(): void {
-  const apps = CAPTURED_SOURCES.apps as Record<string, unknown>;
-  const domains = CAPTURED_SOURCES.domains as Record<string, unknown>;
-  const fsPaths = CAPTURED_SOURCES.fs_paths as unknown as string[];
-  const apis = CAPTURED_SOURCES.apis as unknown as string[];
-  for (const k of Object.keys(apps)) delete apps[k];
-  for (const k of Object.keys(domains)) delete domains[k];
-  fsPaths.length = 0;
-  apis.length = 0;
-}
 
 async function waitForCount(
   storage: MemoryStorage,
@@ -56,16 +46,13 @@ describe('startFsWatcher', () => {
   let restoreStdout: () => void;
 
   beforeEach(() => {
-    // Snapshot the production allowlist so we can restore after each test
-    const fsPaths = CAPTURED_SOURCES.fs_paths as unknown as string[];
-    originalFsPaths = [...fsPaths];
-
+    originalFsPaths = snapshotFsPaths();
     dir = mkdtempSync(join(tmpdir(), 'echo-fs-watcher-'));
     storage = new MemoryStorage();
     ({ restore: restoreStdout } = captureStdout());
 
     // Test-only allowlist mutation: include the temp dir as a prefix entry
-    fsPaths.push(`${dir}/`);
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(`${dir}/`);
   });
 
   afterEach(async () => {
@@ -75,9 +62,7 @@ describe('startFsWatcher', () => {
     }
     restoreStdout();
     resetAllowlist();
-    // Restore the production fs_paths entries snapshotted at beforeEach
-    const fsPaths = CAPTURED_SOURCES.fs_paths as unknown as string[];
-    for (const p of originalFsPaths) fsPaths.push(p);
+    restoreFsPaths(originalFsPaths);
     rmSync(dir, { recursive: true, force: true });
   });
 

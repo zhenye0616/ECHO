@@ -1,8 +1,9 @@
 import chokidar, { type FSWatcher } from 'chokidar';
-import { stat } from 'node:fs/promises';
+import { stat, type Stats } from 'node:fs';
 import { homedir } from 'node:os';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
+import { expandTilde } from '../sources.js';
 import { processCandidate } from '../pipeline.js';
 
 const log = createLogger('capture.surfaces.fs');
@@ -17,12 +18,6 @@ export function classifyKind(absPath: string): FsFileKind | undefined {
   if (absPath.startsWith(CURSOR_PREFIX)) return 'cursor-workspace';
   if (absPath.startsWith(CLAUDE_PREFIX)) return 'claude-project';
   return undefined;
-}
-
-function expandTilde(p: string): string {
-  if (p === '~') return HOME;
-  if (p.startsWith('~/')) return HOME + p.slice(1);
-  return p;
 }
 
 export interface FsWatcherHandle {
@@ -43,21 +38,26 @@ interface FsEventMetadata extends Record<string, unknown> {
   file_kind?: FsFileKind;
 }
 
+function statAsync(absPath: string): Promise<Stats | null> {
+  return new Promise((resolve) => {
+    stat(absPath, (err, s) => resolve(err ? null : s));
+  });
+}
+
 async function emitCandidate(
   event_type: EventType,
   absPath: string,
+  stats: Stats | undefined,
   storage: Storage,
 ): Promise<void> {
   log.debug('chokidar_event', { event_type, path: absPath });
 
   const content: FsEventContent = { event_type, path: absPath };
   if (event_type !== 'unlink') {
-    try {
-      const s = await stat(absPath);
+    const s = stats ?? (await statAsync(absPath));
+    if (s !== null) {
       content.mtime = s.mtime.toISOString();
       content.size = s.size;
-    } catch {
-      // file may have been removed between event and stat; emit without stat
     }
   }
 
@@ -87,17 +87,18 @@ export async function startFsWatcher(
   const watcher: FSWatcher = chokidar.watch(expanded, {
     ignoreInitial: true,
     persistent: true,
+    alwaysStat: true,
     awaitWriteFinish: false,
   });
 
-  watcher.on('add', (p: string) => {
-    void emitCandidate('add', p, storage);
+  watcher.on('add', (p: string, stats?: Stats) => {
+    void emitCandidate('add', p, stats, storage);
   });
-  watcher.on('change', (p: string) => {
-    void emitCandidate('change', p, storage);
+  watcher.on('change', (p: string, stats?: Stats) => {
+    void emitCandidate('change', p, stats, storage);
   });
   watcher.on('unlink', (p: string) => {
-    void emitCandidate('unlink', p, storage);
+    void emitCandidate('unlink', p, undefined, storage);
   });
   watcher.on('error', (err: unknown) => {
     log.error('watcher_error', { message: (err as Error).message });

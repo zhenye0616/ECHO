@@ -22,11 +22,11 @@ export function loadMigrations(migrationsDir: string): Migration[] {
   }
   migrations.sort((a, b) => a.version - b.version);
 
-  for (let i = 0; i < migrations.length; i++) {
+  for (const [i, m] of migrations.entries()) {
     const expected = i + 1;
-    if (migrations[i]!.version !== expected) {
+    if (m.version !== expected) {
       throw new Error(
-        `migration sequence error: expected version ${expected} but found ${migrations[i]!.version} (${migrations[i]!.filename})`,
+        `migration sequence error: expected version ${expected} but found ${m.version} (${m.filename})`,
       );
     }
   }

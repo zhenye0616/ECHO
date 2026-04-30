@@ -16,7 +16,7 @@ export type Source =
 
 const HOME = homedir();
 
-function expandTilde(p: string): string {
+export function expandTilde(p: string): string {
   if (p === '~') return HOME;
   if (p.startsWith('~/')) return HOME + p.slice(1);
   return p;
