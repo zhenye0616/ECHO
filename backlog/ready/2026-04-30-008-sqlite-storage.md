@@ -27,31 +27,17 @@ files_to_modify:
   - src/storage/migrate.ts
   - src/storage/migrations/0001_initial.sql
   - src/daemon/index.ts
+  - src/daemon/lifecycle.ts
   - package.json
   - tests/storage/sqlite.test.ts
 
-claimed_by: "Mac.attlocal.net-zhenye"
-claimed_at: "2026-04-30T21:30:00Z"
-branch: "agent/008-sqlite-storage"
+claimed_by: ""
+claimed_at: ""
+branch: ""
 worktree: ""
 head_sha: ""
 pr_url: ""
-agent_notes: |
-  BLOCKED: spec gap. Two acceptance criteria require editing src/daemon/lifecycle.ts, but lifecycle.ts is NOT in files_to_modify.
-
-  Specifically these two acceptance items can't be satisfied without lifecycle.ts edits:
-    (a) "Daemon's startup log payload now shows storage_backend: 'sqlite'" — the log line is emitted inside startLifecycle() with a hardcoded STORAGE_BACKEND constant in lifecycle.ts (item 007 shipped). To make it 'sqlite', lifecycle.ts must learn the backend from a parameter or env, which means editing it.
-    (b) "Daemon's lifecycle calls storage.close() on graceful shutdown" — shutdown() lives in lifecycle.ts. Without editing it, there's no clean place to wire close() in (any process.on('SIGTERM') registered from index.ts could call close, but that's a layering-violation workaround, not what the spec describes).
-
-  Tried: I considered making index.ts register its own SIGTERM/SIGINT handler ahead of lifecycle's, but this duplicates the lifecycle abstraction and doesn't fix (a) — the started log fires inside startLifecycle and is hardcoded. I also considered duplicating lifecycle's logic into index.ts, but that's an immediate regression of item 007's clean separation.
-
-  Best-guess answer: add src/daemon/lifecycle.ts to files_to_modify and:
-    - parameterize startLifecycle to accept { storage, storageBackend, onShutdown } (or similar) so index.ts owns instantiation and decides the backend label
-    - have shutdown() invoke onShutdown before clearing the keep-alive interval (so storage.close() runs before exit)
-    - keep the existing MemoryStorage default if no storage is passed (back-compat for any future caller)
-  Confidence: high that this is the intended path, since the acceptance criteria are explicit. Roughly 30 lines added to lifecycle.ts.
-
-  Why I escalated rather than guessing: this is exactly the "ambiguity not resolved by spec" pattern that drift rule 8 covers, and rule 4 forbids file creation/modification outside files_to_modify. The fix is small and obvious; I want a one-word "yes proceed" before touching lifecycle.ts so the spec→build trail stays honest. No code was written for this item; no agent branch was pushed. After founder confirms, this can be reclaimed and shipped quickly.
+agent_notes: ""
 review_notes: ""
 ---
 
