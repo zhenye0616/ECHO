@@ -4,7 +4,7 @@ import { isNonEmptyString } from '../guards.js';
 export const CAPTURED_SOURCES = {
   apps: {},
   domains: {},
-  fs_paths: [],
+  fs_paths: ['~/Library/Application Support/Cursor/User/workspaceStorage/', '~/.claude/projects/'],
   apis: [],
 } as const;
 
@@ -16,7 +16,7 @@ export type Source =
 
 const HOME = homedir();
 
-function expandTilde(p: string): string {
+export function expandTilde(p: string): string {
   if (p === '~') return HOME;
   if (p.startsWith('~/')) return HOME + p.slice(1);
   return p;

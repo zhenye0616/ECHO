@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
 import { MemoryStorage } from '../storage/memory.js';
 import type { Storage } from '../storage/interface.js';
@@ -16,7 +17,7 @@ let onShutdownHook: (() => void | Promise<void>) | null = null;
 
 function resolveDataDir(): string {
   const env = process.env['ECHO_DATA_DIR'];
-  if (env !== undefined && env.length > 0) return resolve(env);
+  if (isNonEmptyString(env)) return resolve(env);
   return join(homedir(), 'Library', 'Application Support', 'ECHO');
 }
 
@@ -54,9 +55,9 @@ function acquirePidLock(dataDir: string): string {
 function releasePidLock(): void {
   if (pidLockPath === null) return;
   try {
-    if (existsSync(pidLockPath)) unlinkSync(pidLockPath);
+    unlinkSync(pidLockPath);
   } catch {
-    // best effort — log already emitted by caller
+    // best effort: ENOENT (already gone) or EACCES (permissions) — neither is recoverable here
   }
   pidLockPath = null;
 }

@@ -40,7 +40,7 @@ export class SqliteStorage implements Storage {
   private readonly db: Database.Database;
   private readonly insertStmt: Database.Statement;
   private readonly countStmt: Database.Statement;
-  private closed = false;
+  private readonly queryStmtCache = new Map<string, Database.Statement>();
 
   constructor(dbPath: string) {
     if (dbPath !== ':memory:') {
@@ -48,6 +48,8 @@ export class SqliteStorage implements Storage {
     }
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
+    // NORMAL is safe under WAL and avoids per-append fsync — recommended by SQLite for app use.
+    this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
     migrate(this.db, MIGRATIONS_DIR);
 
@@ -95,7 +97,12 @@ export class SqliteStorage implements Storage {
     if (filter?.limit !== undefined) params['limit'] = filter.limit;
 
     const sql = `SELECT id, source, timestamp, content, metadata, embedding FROM events ${where} ORDER BY timestamp ASC ${limitClause}`;
-    const rows = this.db.prepare(sql).all(params) as EventRow[];
+    let stmt = this.queryStmtCache.get(sql);
+    if (stmt === undefined) {
+      stmt = this.db.prepare(sql);
+      this.queryStmtCache.set(sql, stmt);
+    }
+    const rows = stmt.all(params) as EventRow[];
     return rows.map(rowToEvent);
   }
 
@@ -105,8 +112,7 @@ export class SqliteStorage implements Storage {
   }
 
   close(): void {
-    if (this.closed) return;
-    this.closed = true;
+    if (!this.db.open) return;
     this.db.close();
   }
 }
