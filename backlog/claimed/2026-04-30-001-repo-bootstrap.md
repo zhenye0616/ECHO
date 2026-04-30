@@ -27,9 +27,9 @@ files_to_modify:
   - src/index.ts
   - tests/smoke.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "MacBook-Pro.local-zhenye"
+claimed_at: "2026-04-30T08:59:20Z"
+branch: "agent/repo-bootstrap"
 worktree: ""
 head_sha: ""
 pr_url: ""
