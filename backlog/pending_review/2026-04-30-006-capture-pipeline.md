@@ -27,9 +27,10 @@ claimed_by: "Mac.attlocal.net-zhenye"
 claimed_at: "2026-04-30T21:14:52Z"
 branch: "agent/006-capture-pipeline"
 worktree: ""
-head_sha: ""
+head_sha: "27e1c52111676349a004d022b00a3c54b552124d"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Shipped. processCandidate(event, storage) implemented in src/capture/pipeline.ts; reuses gate's RejectionReason. Storage is DI'd as the second param; on reject storage is untouched (asserted via count before/after in 3 tests). 10 new tests in tests/capture/pipeline.test.ts cover accept-path (with allowlist fixture mutation, same pattern as gate.test.ts), all four unknown_* rejections, malformed events, and DI isolation across two MemoryStorage instances. test/lint/typecheck/format:check all clean. 84/84 tests passing across the suite. No new dependencies; gate.ts and sources.ts unchanged.
 review_notes: ""
 ---
 
