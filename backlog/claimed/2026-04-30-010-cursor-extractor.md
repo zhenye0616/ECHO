@@ -34,9 +34,9 @@ files_to_modify:
   - tests/capture/extractors/cursor.test.ts
   - tests/fixtures/cursor-globalstorage.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-04-30T22:56:35Z"
+branch: "agent/cursor-extractor"
 worktree: ""
 head_sha: ""
 pr_url: ""
