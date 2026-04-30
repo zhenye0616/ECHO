@@ -20,10 +20,20 @@ The full `wiki/` is your global context — readable on demand. Per-item `spec_r
 ## Persona ID
 
 ```bash
-AGENT_ID="${ECHO_AGENT_ID:-$(hostname)-$USER}"
+AGENT_ID_FILE="$HOME/.echo/agent-id"
+if [ -z "${ECHO_AGENT_ID:-}" ] && [ ! -f "$AGENT_ID_FILE" ]; then
+  mkdir -p "$(dirname "$AGENT_ID_FILE")"
+  uuidgen > "$AGENT_ID_FILE"
+  echo "Generated stable agent ID: $(cat "$AGENT_ID_FILE")" >&2
+fi
+AGENT_ID="${ECHO_AGENT_ID:-$(cat "$AGENT_ID_FILE")}"
 ```
 
-If you are running multiple Claude Code sessions in parallel for batch parallelism, each session MUST have a distinct `ECHO_AGENT_ID`. Otherwise reconciliation across sessions will collide.
+The default persona is a UUID at `~/.echo/agent-id` (auto-generated on first use), stable forever, unique per machine.
+
+If you are running multiple Claude Code sessions in parallel for batch parallelism, each session MUST have a distinct `ECHO_AGENT_ID`. Otherwise reconciliation across sessions will collide. Use `ECHO_AGENT_ID=cc-1`, `cc-2`, etc. before invocation.
+
+(The earlier `$(hostname)-$USER` default is gone — `hostname` on macOS is not stable across networks and could cause two sessions on the same machine to false-match.)
 
 ## Batch Configuration
 

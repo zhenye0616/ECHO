@@ -24,9 +24,12 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
 ## Your Single Loop
 
 ```
- 0. Determine your persona ID:
-       AGENT_ID = ${ECHO_AGENT_ID:-$(hostname)-$USER}
-       (stable across runs of the same agent installation)
+ 0. Determine your persona ID — see "Persona ID Conventions" below for full
+    rules. tl;dr: a UUID stored at ~/.echo/agent-id (auto-generated on first
+    use), overridable via $ECHO_AGENT_ID for parallel agents on the same
+    machine. The hostname-based default that previously shipped is broken —
+    macOS hostname is not stable across networks, which can cause two sessions
+    on the same machine to false-match in reconciliation.
  1. Read mandatory global context (the four files above, in order)
  2. Pull main in the main repo
  3. RECONCILE — look for an existing unfinished claim by AGENT_ID:
@@ -83,7 +86,7 @@ Parallelism across agents is achieved by running multiple Claude Code sessions w
 
 The loop above is designed so that if it crashes at *any* point and the slash command is re-run, the next invocation converges to one coherent state. The mechanics:
 
-- **Persona stays stable.** `AGENT_ID` is derived from your machine/user, not a per-run UUID. So a fresh run after a crash recognizes its own prior orphaned claim.
+- **Persona stays stable.** `AGENT_ID` is a UUID written once to `~/.echo/agent-id` and read every run. So a fresh run after a crash recognizes its own prior orphaned claim. (Earlier versions of this file used `$(hostname)-$USER` as the default, but `hostname` is not stable on macOS — the file-based UUID fixes that.)
 - **Reconciliation runs first.** Step 4 looks for any item in `claimed/` already owned by your `AGENT_ID`. If one exists, you resume *that* item. You do not pick a new one until the existing one reaches `pending_review/`.
 - **Worktree creation is detect-and-reuse.** If the worktree dir exists, you cd into it. If the branch exists locally, you worktree-add onto it. If the branch is only on remote, you fetch then worktree-add. Only if nothing exists do you create fresh. Step 7 enumerates the four cases.
 - **Stage moves are upserts.** A helper `ensure_stage(item, stage)` checks current location and only moves if needed — calling it twice is a no-op. Use it for the move to `pending_review/`.
@@ -93,12 +96,34 @@ If you cannot reconcile — e.g., the existing claim's branch was deleted out fr
 
 ## Persona ID Conventions
 
-`claimed_by` is the *agent persona*, not a per-run identifier:
+`claimed_by` is the *agent persona*, not a per-run identifier. Resolution rule (in order):
 
-- Default: `$(hostname)-$USER` (e.g., `MacBook-Pro-zhenye`)
-- Override via env: `export ECHO_AGENT_ID="claude-code-laptop"` before invocation
-- Two simultaneous agents on the same machine MUST set distinct personas. If they don't, the second one's reconciliation may pick up the first one's in-flight claim and corrupt the state.
-- The atomic claim still protects against same-persona races at the file level (the second push is rejected), but reconciliation can't distinguish two simultaneous you's.
+1. If `$ECHO_AGENT_ID` is set in the environment, use that string directly.
+2. Otherwise, read the UUID at `~/.echo/agent-id`. If the file doesn't exist, generate one (`uuidgen`) and write it. Use that UUID.
+
+```bash
+# Canonical resolution snippet (used by both slash commands):
+AGENT_ID_FILE="$HOME/.echo/agent-id"
+if [ -z "${ECHO_AGENT_ID:-}" ] && [ ! -f "$AGENT_ID_FILE" ]; then
+  mkdir -p "$(dirname "$AGENT_ID_FILE")"
+  uuidgen > "$AGENT_ID_FILE"
+  echo "Generated stable agent ID: $(cat "$AGENT_ID_FILE")" >&2
+fi
+AGENT_ID="${ECHO_AGENT_ID:-$(cat "$AGENT_ID_FILE")}"
+```
+
+Properties:
+
+- **Stable across runs on the same machine.** The UUID is written once; subsequent runs read it.
+- **Unique per machine** by construction (each machine generates its own UUID on first run).
+- **Multiple agents on the same machine** still need distinct `ECHO_AGENT_ID` overrides. The default UUID is a single-machine identity; running two parallel sessions with that default would falsely look like the same agent. Use `ECHO_AGENT_ID=cc-1`, `cc-2`, etc.
+- **Why not hostname-based?** `hostname` on macOS is not stable across network changes (Bonjour `.local` vs. router-assigned `Mac.attlocal.net` etc.), so `$(hostname)-$USER` produced different strings on different runs of the same machine, breaking reconciliation. The file-based UUID has none of those failure modes.
+
+### Migration note (one-time)
+
+Items already in `backlog/claimed/` from before this fix have `claimed_by` strings derived from the old hostname-based scheme. They are still valid for the session that originally claimed them (that session has its persona resolved in memory). If such a session crashes and a fresh run needs to resume the claim, the new persona (UUID) will not match the old `claimed_by` string. Recovery: open the item file and update `claimed_by` to your new UUID, then re-run.
+
+After all current `claimed/` items have moved to `complete/`, the migration is finished — every future claim uses the new scheme by construction.
 
 ---
 

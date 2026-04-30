@@ -20,13 +20,21 @@ Then, in the main repo (`~/Desktop/Project_echo`) on `main`: `git pull --rebase 
 ## Step 0 — Determine Persona ID
 
 ```bash
-AGENT_ID="${ECHO_AGENT_ID:-$(hostname)-$USER}"
+AGENT_ID_FILE="$HOME/.echo/agent-id"
+if [ -z "${ECHO_AGENT_ID:-}" ] && [ ! -f "$AGENT_ID_FILE" ]; then
+  mkdir -p "$(dirname "$AGENT_ID_FILE")"
+  uuidgen > "$AGENT_ID_FILE"
+  echo "Generated stable agent ID: $(cat "$AGENT_ID_FILE")" >&2
+fi
+AGENT_ID="${ECHO_AGENT_ID:-$(cat "$AGENT_ID_FILE")}"
 echo "Agent persona: $AGENT_ID"
 ```
 
-The persona is stable across runs of the same agent installation. It is the resumption signal: a crashed run leaves a `claimed_by: <AGENT_ID>` in `backlog/claimed/`, and the next invocation finds it via grep.
+The default persona is a UUID stored at `~/.echo/agent-id`, generated on first use, stable forever. It is the resumption signal: a crashed run leaves a `claimed_by: <AGENT_ID>` in `backlog/claimed/`, and the next invocation finds it via grep.
 
-If you are running a second agent on the same machine, set `ECHO_AGENT_ID` to a distinct value before invocation.
+If you are running a second agent on the same machine, set `ECHO_AGENT_ID` to a distinct value (e.g., `cc-2`) before invocation. The default UUID is single-identity; running two parallel sessions with that default would falsely look like the same agent and step on each other's claims.
+
+(Why a file-based UUID and not `$(hostname)-$USER`? On macOS, `hostname` is not stable across network changes — Bonjour vs. router-assigned suffixes vary — so a hostname-based persona could produce different strings on different runs of the same machine, breaking reconciliation. See `docs/AGENT_INSTRUCTIONS.md` "Persona ID Conventions" for the full rationale.)
 
 ## Step A — Reconcile or Claim
 

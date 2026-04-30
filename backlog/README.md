@@ -132,7 +132,12 @@ Every agent run starts with **reconciliation**, not a fresh claim:
 
 ```bash
 # Persona-based agent identity — stable across crashes, unique per machine/user
-AGENT_ID="${ECHO_AGENT_ID:-$(hostname)-$USER}"
+AGENT_ID_FILE="$HOME/.echo/agent-id"
+if [ -z "${ECHO_AGENT_ID:-}" ] && [ ! -f "$AGENT_ID_FILE" ]; then
+  mkdir -p "$(dirname "$AGENT_ID_FILE")"
+  uuidgen > "$AGENT_ID_FILE"
+fi
+AGENT_ID="${ECHO_AGENT_ID:-$(cat "$AGENT_ID_FILE")}"
 
 cd ~/Desktop/Project_echo
 git pull --rebase origin main
@@ -186,7 +191,7 @@ This makes "move to `pending_review/`" safe to call when the file is already the
 
 `claimed_by` identifies a long-lived agent identity (an installation), not a single invocation:
 
-- Default: `$(hostname)-$USER`
+- Default: a UUID at `~/.echo/agent-id`, generated on first run, stable forever (unique per machine)
 - Override via `ECHO_AGENT_ID` env var when running multiple agents on the same machine
 - Two simultaneous agents must use distinct personas (otherwise reconciliation can mis-resume)
 
