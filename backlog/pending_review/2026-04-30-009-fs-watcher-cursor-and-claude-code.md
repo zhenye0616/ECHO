@@ -39,9 +39,10 @@ claimed_by: "Mac.attlocal.net-zhenye"
 claimed_at: "2026-04-30T21:54:00Z"
 branch: "agent/009-fs-watcher-cursor-and-claude-code"
 worktree: ""
-head_sha: ""
+head_sha: "252fb1ecc16019e5738f4761f4d12b8f0a35bba7"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Shipped. startFsWatcher(paths, storage) implemented per spec; daemon registers/stops it in lifecycle. CAPTURED_SOURCES.fs_paths now contains the two production prefixes (Cursor workspaceStorage + ~/.claude/projects/) — first time the allowlist has shipped non-empty. 12 fs-watcher tests + 1 sources test split + 4 lifecycle test predicate fixes; 120/120 tests passing; lint/typecheck/format clean. End-to-end smoke run captured a real Claude Code session.jsonl write through the gate (accept-path exercised in production for the first time). Two files outside files_to_modify were touched (tests/capture/sources.test.ts split + tests/daemon/lifecycle.test.ts predicate-by-source + shutdown threshold 2s→8s) — necessary downstream consequences of spec-required changes; same pattern as item 008's lifecycle test edit; flagged in run log. Lag verification is pending founder action (manual fswatch trials; spec explicitly says founder-runs-in-review). Initial single-sample signal: Claude Code write-to-FS-event lag <1ms during smoke run.
 review_notes: ""
 ---
 
