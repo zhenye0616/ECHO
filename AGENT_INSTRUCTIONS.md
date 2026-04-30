@@ -71,7 +71,11 @@ The **entire `echo-wiki/` folder is your global context** — read-only, but rea
        Either way: STOP via path 13 or 14
 ```
 
-**Do not pick up a second item in the same run.** One item per execution. Founder reviews before any next item starts.
+**Do not pick up a second item in the same run** when invoked via `/process-backlog`. One item per execution; founder reviews before the next.
+
+**Exception: `/process-backlog-batch`** wraps the same workflow in a controlled loop. In batch mode you DO repeat the loop until a hard stop fires (max items, time budget, escalation, no-candidates, or git error). Per-iteration discipline is identical to single-item mode — same atomic claim, same idempotent worktree, same `ensure_stage`, same drift rules. The only difference is "after handoff, return to step 2 and try for another candidate" instead of stopping. Mandatory context (the four files) is read once at session start, not per iteration. Per-item `spec_refs` are loaded fresh inside each iteration.
+
+Parallelism across agents is achieved by running multiple Claude Code sessions with distinct `ECHO_AGENT_ID` env vars; the atomic-claim mechanic prevents collisions. Batch mode is *sequential within a session*; multi-session parallelism composes orthogonally.
 
 ## Idempotency: Resume on Reclaim
 

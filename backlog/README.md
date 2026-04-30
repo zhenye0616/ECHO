@@ -307,7 +307,7 @@ When an agent runs, it must:
 7. **Log work** in `raw/internal/agent-runs/<date>-<item-id>.md` (append on resume, do not overwrite)
 8. **If uncertainty arises** that requires founder input — STOP, move item to `pending_review/` with the question in `agent_notes`. Do not guess.
 9. **When acceptance criteria pass** — push branch, `ensure_stage` to `pending_review/`, fill `agent_notes` with summary
-10. **One item per run.** Do not pick up a second item.
+10. **One item per run** when invoked via `/process-backlog`. The `/process-backlog-batch` command wraps the same workflow in a controlled loop and ships multiple items sequentially within one session, halting on max-items, time budget, escalation, no-candidates, or git error. Parallelism across agents is achieved by running multiple sessions with distinct `ECHO_AGENT_ID` — the atomic-claim mechanic prevents collisions.
 
 ## Founder Review Process
 

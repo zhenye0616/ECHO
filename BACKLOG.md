@@ -79,15 +79,23 @@ When items land in `complete/`, the next strategist conversation reads each item
 
 Agents use the `/process-backlog` slash command (defined in `.claude/commands/process-backlog.md`).
 
-**Manual trigger** (Claude Code):
+**Single-item trigger** (claim → ship → stop):
 
 ```
 /process-backlog
 ```
 
-The command claims the oldest highest-priority ready item, creates a worktree, implements, pushes the branch, and moves the item to `pending_review/`. One item per run.
+The command claims the oldest highest-priority unblocked ready item, creates a worktree, implements, pushes the branch, and moves the item to `pending_review/`. One item per run.
 
-**Parallel runs:** multiple agent instances may run `/process-backlog` simultaneously. The atomic-claim mechanic (a single commit on `main` that moves the file + writes `claimed_by`) ensures only one agent ever owns an item. If a push race occurs, the loser picks the next ready item and retries.
+**Batch trigger** (drain the queue):
+
+```
+/process-backlog-batch
+```
+
+Same workflow, looped: keeps claiming and shipping unblocked items until a hard stop fires (max items, time budget, escalation, no-candidates, or git error). Sequential within the session. Use this for late-night seed-and-walk-away workflows. Hard stops are configurable via env: `ECHO_BATCH_MAX_ITEMS` (default 10), `ECHO_BATCH_TIMEOUT_SECS` (default 21600 = 6h), `ECHO_BATCH_HALT_ON_ESCALATION` (default 1 = strict).
+
+**Parallel runs:** multiple sessions of either command may run simultaneously, each with a distinct `ECHO_AGENT_ID`. The atomic-claim mechanic ensures only one agent ever owns an item; if a push race occurs, the loser picks the next ready item and retries.
 
 **Scheduled trigger** (steady-state): see [`.claude/SETUP.md`](./.claude/SETUP.md). Recommended cadence and parallelism land there.
 
