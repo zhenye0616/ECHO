@@ -1,10 +1,6 @@
+import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
-import {
-  isAllowedApi,
-  isAllowedApp,
-  isAllowedDomain,
-  isAllowedPath,
-} from './sources.js';
+import { isAllowedApi, isAllowedApp, isAllowedDomain, isAllowedPath } from './sources.js';
 
 export interface CandidateEvent {
   source: string;
@@ -24,10 +20,12 @@ export type GateResult =
   | { accepted: true; reason: 'allowlisted' }
   | { accepted: false; reason: RejectionReason };
 
+type SourceKind = 'app' | 'domain' | 'fs' | 'api';
+
 const log = createLogger('capture.gate');
 
 const SOURCE_KIND_TO_REJECTION: Record<
-  'app' | 'domain' | 'fs' | 'api',
+  SourceKind,
   Extract<RejectionReason, `unknown_${string}`>
 > = {
   app: 'unknown_app',
@@ -36,17 +34,18 @@ const SOURCE_KIND_TO_REJECTION: Record<
   api: 'unknown_api',
 };
 
+const SOURCE_KIND_TO_PREDICATE: Record<SourceKind, (id: string) => boolean> = {
+  app: isAllowedApp,
+  domain: isAllowedDomain,
+  fs: isAllowedPath,
+  api: isAllowedApi,
+};
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0;
-}
-
-function parseSource(
-  source: string,
-): { kind: 'app' | 'domain' | 'fs' | 'api'; id: string } | null {
+function parseSource(source: string): { kind: SourceKind; id: string } | null {
   const sep = source.indexOf(':');
   if (sep <= 0 || sep === source.length - 1) return null;
   const kind = source.slice(0, sep);
@@ -66,7 +65,10 @@ export function gate(event: unknown): GateResult {
   const { source, timestamp, content, metadata } = event;
 
   if (!isNonEmptyString(source) || !isNonEmptyString(timestamp) || typeof content !== 'string') {
-    log.warn('rejected', { reason: 'malformed_event', source: typeof source === 'string' ? source : undefined });
+    log.warn('rejected', {
+      reason: 'malformed_event',
+      source: typeof source === 'string' ? source : undefined,
+    });
     return { accepted: false, reason: 'malformed_event' };
   }
 
@@ -81,16 +83,7 @@ export function gate(event: unknown): GateResult {
     return { accepted: false, reason: 'malformed_event' };
   }
 
-  const allowed =
-    parsed.kind === 'app'
-      ? isAllowedApp(parsed.id)
-      : parsed.kind === 'domain'
-        ? isAllowedDomain(parsed.id)
-        : parsed.kind === 'fs'
-          ? isAllowedPath(parsed.id)
-          : isAllowedApi(parsed.id);
-
-  if (allowed) {
+  if (SOURCE_KIND_TO_PREDICATE[parsed.kind](parsed.id)) {
     log.info('accepted', { source, timestamp });
     return { accepted: true, reason: 'allowlisted' };
   }

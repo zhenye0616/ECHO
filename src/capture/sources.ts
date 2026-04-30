@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import { isNonEmptyString } from '../guards.js';
 
 export const CAPTURED_SOURCES = {
   apps: {},
@@ -13,13 +14,11 @@ export type Source =
   | { kind: 'fs'; path: string }
   | { kind: 'api'; name: string };
 
-function isNonEmptyString(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0;
-}
+const HOME = homedir();
 
 function expandTilde(p: string): string {
-  if (p === '~') return homedir();
-  if (p.startsWith('~/')) return homedir() + p.slice(1);
+  if (p === '~') return HOME;
+  if (p.startsWith('~/')) return HOME + p.slice(1);
   return p;
 }
 
@@ -39,19 +38,13 @@ export function _isAllowedDomainIn(
   return Object.prototype.hasOwnProperty.call(domains, host);
 }
 
-export function _isAllowedPathIn(
-  path: unknown,
-  fsPaths: ReadonlyArray<string>,
-): boolean {
+export function _isAllowedPathIn(path: unknown, fsPaths: ReadonlyArray<string>): boolean {
   if (!isNonEmptyString(path)) return false;
   const expanded = expandTilde(path);
   return fsPaths.some((entry) => expanded.startsWith(expandTilde(entry)));
 }
 
-export function _isAllowedApiIn(
-  name: unknown,
-  apis: ReadonlyArray<string>,
-): boolean {
+export function _isAllowedApiIn(name: unknown, apis: ReadonlyArray<string>): boolean {
   if (!isNonEmptyString(name)) return false;
   return apis.includes(name);
 }
