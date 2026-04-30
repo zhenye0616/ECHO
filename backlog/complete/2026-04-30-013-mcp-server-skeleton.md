@@ -105,7 +105,46 @@ agent_notes: |
   - search_memories tool (deferred to 014), MCP resources, prompts, auth,
     stdio transport, multi-port, captured-tool-call audit, rate limiting,
     TLS, port-conflict auto-resolution, V1 user docs.
-review_notes: ""
+review_notes: |
+  Merged on 2026-04-30 via founder reconciliation + four pre-merge fixups.
+
+  Merge:
+  - daemon/index.ts: hand-merged. Final order is fs-watcher → git-watcher → MCP →
+    startLifecycle. onShutdown chain: mcp.stop() → gitWatcher.stop() →
+    fsWatcher.stop() → dispose().
+  - package.json: kept both chokidar (from 009) and @modelcontextprotocol/sdk.
+  - package-lock.json: regenerated via npm install (lockfile conflict was
+    too noisy to hand-merge).
+
+  Fixups applied:
+  1. Spec letter ("daemon's startup log payload extended with mcp_port and
+     mcp_url"): added LifecycleOptions.extraPayload, daemon passes
+     { mcp_port, mcp_url } through. Lifecycle's `started` log now carries
+     both fields. The `mcp.server started` line still fires too — fine.
+  2. PID lock ordering: extracted `acquirePidLockOrExit` from lifecycle.ts
+     and moved it to be the daemon's first action, before any port binding.
+     Without this the second-instance test failed because MCP's EADDRINUSE
+     fired before the singleton check.
+  3. Body-size cap (4 MB) in readJsonBody — returns 413 on overflow.
+  4. DNS-rebinding protection: passes `enableDnsRebindingProtection: true`
+     and `allowedHosts: [127.0.0.1:<port>, localhost:<port>]` to
+     StreamableHTTPServerTransport. boundPort closes over the actual
+     listening port so port=0 (ephemeral, used in tests) works correctly.
+
+  139/139 tests pass; lint and typecheck clean post-merge.
+
+  Note on commit history: the merge commit itself was finalized under a
+  misleading title ("rework: 010-cursor-extractor") because a parallel
+  session staged 010-rework changes into the same in-progress merge state.
+  The 013 src/ changes are correct and in HEAD; the title is just noise.
+
+  Follow-up items deferred (non-blocking):
+  - Pin `zod` explicitly in dependencies once team agrees on transitive-dep
+    policy.
+  - Cap concurrent MCP sessions and add idle-session expiration to guard a
+    long-running daemon against a buggy local client leaking sessions.
+  - Strategist: document loopback-only + DNS-rebinding stance in
+    wiki/entities/mcp-server.md during the post-shipment wiki promotion.
 ---
 
 # MCP server skeleton (HTTP transport, stub tool)
