@@ -22,10 +22,33 @@ files_to_modify:
 claimed_by: "MacBook-Pro.local-zhenye"
 claimed_at: "2026-04-30T09:49:28Z"
 branch: "agent/capture-allowlist"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/echo_wiki--capture-allowlist"
+head_sha: "076ddbf08abc153bac5ef6ccd2a5127b63ed0d9b"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All acceptance criteria met. typecheck/lint/test all clean (30/30 tests).
+
+  Implementation:
+  - src/capture/sources.ts (75 lines): CAPTURED_SOURCES (`as const`, all
+    categories empty) + Source union + 4 public predicates + 4 internal
+    helpers _isAllowed*In(input, allowlist) for fixture testing.
+  - tests/capture/sources.test.ts (165 lines, 20 cases): empty-allowlist
+    negatives, malformed-input rejection, fixture-allowlist positives,
+    domain exact-match (subdomain rejected), path prefix-match with ~
+    expansion (both sides), type-only Source-derivation assertion.
+
+  Notable decisions:
+  - Internal `_isAllowed*In(input, allowlist)` helpers exported to enable
+    the spec-permitted "test the helper logic against a parameterized
+    sample" path. Public predicates are thin wrappers that bind to
+    CAPTURED_SOURCES.
+  - Predicates statically type the input as string (callers get TS help)
+    but runtime-guard with `typeof === 'string' && length > 0` so JS
+    callers cannot bypass the boundary.
+  - `~` expansion happens on both the input path and each allowlist
+    entry before prefix-comparison.
+
+  See: raw/internal/agent-runs/2026-04-30-003-capture-allowlist.md
 review_notes: ""
 ---
 
