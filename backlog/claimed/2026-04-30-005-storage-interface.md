@@ -21,9 +21,9 @@ files_to_modify:
   - src/storage/memory.ts
   - tests/storage/memory.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "MacBook-Pro.local-zhenye"
+claimed_at: "2026-04-30T09:55:43Z"
+branch: "agent/storage-interface"
 worktree: ""
 head_sha: ""
 pr_url: ""
