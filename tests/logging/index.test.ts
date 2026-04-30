@@ -1,24 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureStdout } from '../fixtures/stdout.js';
 
-type WriteFn = typeof process.stdout.write;
 type LoggerModule = typeof import('../../src/logging/index.js');
 
-const writes: string[] = [];
-let originalWrite: WriteFn;
+let writes: string[];
+let restoreStdout: () => void;
 let originalEnvLevel: string | undefined;
-
-function captureWrite(): void {
-  originalWrite = process.stdout.write.bind(process.stdout);
-  process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    const text = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-    writes.push(text);
-    return true;
-  }) as WriteFn;
-}
-
-function restoreWrite(): void {
-  process.stdout.write = originalWrite;
-}
 
 async function loadLogger(level: string | undefined): Promise<LoggerModule> {
   if (level === undefined) {
@@ -32,13 +19,12 @@ async function loadLogger(level: string | undefined): Promise<LoggerModule> {
 
 describe('logger', () => {
   beforeEach(() => {
-    writes.length = 0;
     originalEnvLevel = process.env.ECHO_LOG_LEVEL;
-    captureWrite();
+    ({ writes, restore: restoreStdout } = captureStdout());
   });
 
   afterEach(() => {
-    restoreWrite();
+    restoreStdout();
     if (originalEnvLevel === undefined) {
       delete process.env.ECHO_LOG_LEVEL;
     } else {

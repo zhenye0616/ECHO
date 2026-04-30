@@ -1,24 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gate, type CandidateEvent } from '../../src/capture/gate.js';
 import { CAPTURED_SOURCES } from '../../src/capture/sources.js';
+import { captureStdout } from '../fixtures/stdout.js';
 
-type WriteFn = typeof process.stdout.write;
-
-const writes: string[] = [];
-let originalWrite: WriteFn;
-
-function captureWrite(): void {
-  originalWrite = process.stdout.write.bind(process.stdout);
-  process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    const text = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-    writes.push(text);
-    return true;
-  }) as WriteFn;
-}
-
-function restoreWrite(): void {
-  process.stdout.write = originalWrite;
-}
+let writes: string[];
+let restoreStdout: () => void;
 
 function validEvent(overrides: Partial<CandidateEvent> = {}): CandidateEvent {
   return {
@@ -33,14 +19,25 @@ function parseLine(line: string): Record<string, unknown> {
   return JSON.parse(line.endsWith('\n') ? line.slice(0, -1) : line) as Record<string, unknown>;
 }
 
+function resetAllowlist(): void {
+  const apps = CAPTURED_SOURCES.apps as Record<string, unknown>;
+  const domains = CAPTURED_SOURCES.domains as Record<string, unknown>;
+  const fsPaths = CAPTURED_SOURCES.fs_paths as unknown as string[];
+  const apis = CAPTURED_SOURCES.apis as unknown as string[];
+  for (const k of Object.keys(apps)) delete apps[k];
+  for (const k of Object.keys(domains)) delete domains[k];
+  fsPaths.length = 0;
+  apis.length = 0;
+}
+
 describe('gate', () => {
   beforeEach(() => {
-    writes.length = 0;
-    captureWrite();
+    ({ writes, restore: restoreStdout } = captureStdout());
   });
 
   afterEach(() => {
-    restoreWrite();
+    restoreStdout();
+    resetAllowlist();
   });
 
   describe('reject — well-formed but not in allowlist (current empty state)', () => {
@@ -125,7 +122,12 @@ describe('gate', () => {
       },
       {
         name: 'wrong-type metadata',
-        input: { source: 'app:foo', timestamp: '2026-04-30T12:00:00Z', content: 'x', metadata: 'oops' },
+        input: {
+          source: 'app:foo',
+          timestamp: '2026-04-30T12:00:00Z',
+          content: 'x',
+          metadata: 'oops',
+        },
       },
     ];
 
@@ -145,53 +147,37 @@ describe('gate', () => {
     it('app: matching bundle id → accepted with info log', () => {
       const apps = CAPTURED_SOURCES.apps as Record<string, { name: string }>;
       apps['com.example.fixture'] = { name: 'Fixture' };
-      try {
-        const r = gate(validEvent({ source: 'app:com.example.fixture' }));
-        expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
-        expect(writes).toHaveLength(1);
-        const entry = parseLine(writes[0]!);
-        expect(entry['level']).toBe('info');
-        expect(entry['source']).toBe('capture.gate');
-        expect(entry['message']).toBe('accepted');
-        const payload = entry['payload'] as Record<string, unknown>;
-        expect(payload['source']).toBe('app:com.example.fixture');
-        expect(payload['timestamp']).toBe('2026-04-30T12:00:00.000Z');
-      } finally {
-        delete apps['com.example.fixture'];
-      }
+      const r = gate(validEvent({ source: 'app:com.example.fixture' }));
+      expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
+      expect(writes).toHaveLength(1);
+      const entry = parseLine(writes[0]!);
+      expect(entry['level']).toBe('info');
+      expect(entry['source']).toBe('capture.gate');
+      expect(entry['message']).toBe('accepted');
+      const payload = entry['payload'] as Record<string, unknown>;
+      expect(payload['source']).toBe('app:com.example.fixture');
+      expect(payload['timestamp']).toBe('2026-04-30T12:00:00.000Z');
     });
 
     it('domain: matching host → accepted', () => {
       const domains = CAPTURED_SOURCES.domains as Record<string, { surfaces: string[] }>;
       domains['example.com'] = { surfaces: ['extension'] };
-      try {
-        const r = gate(validEvent({ source: 'domain:example.com' }));
-        expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
-      } finally {
-        delete domains['example.com'];
-      }
+      const r = gate(validEvent({ source: 'domain:example.com' }));
+      expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
     });
 
     it('fs: prefix-matching path → accepted', () => {
       const paths = CAPTURED_SOURCES.fs_paths as unknown as string[];
       paths.push('/var/echo/');
-      try {
-        const r = gate(validEvent({ source: 'fs:/var/echo/log.txt' }));
-        expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
-      } finally {
-        paths.length = 0;
-      }
+      const r = gate(validEvent({ source: 'fs:/var/echo/log.txt' }));
+      expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
     });
 
     it('api: matching name → accepted', () => {
       const apis = CAPTURED_SOURCES.apis as unknown as string[];
       apis.push('github');
-      try {
-        const r = gate(validEvent({ source: 'api:github' }));
-        expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
-      } finally {
-        apis.length = 0;
-      }
+      const r = gate(validEvent({ source: 'api:github' }));
+      expect(r).toEqual({ accepted: true, reason: 'allowlisted' });
     });
   });
 
