@@ -24,10 +24,32 @@ files_to_modify:
 claimed_by: "MacBook-Pro.local-zhenye"
 claimed_at: "2026-04-30T09:55:43Z"
 branch: "agent/storage-interface"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/echo_wiki--storage-interface"
+head_sha: "a8350f346b231cd380278c58726739a04ec52c34"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All acceptance criteria met. typecheck/lint/test all clean (26/26 tests).
+
+  Implementation:
+  - src/storage/interface.ts (24 lines): EventId, CaptureEvent,
+    QueryFilter, Storage interface.
+  - src/storage/memory.ts (38 lines): MemoryStorage implements Storage.
+    Private append-only array; randomUUID() ids; query() filters by
+    source (exact), since (inclusive), until (exclusive), limit (early
+    break); count() returns array length.
+  - tests/storage/memory.test.ts (189 lines, 16 cases): roundtrip with
+    optional fields, insertion order, 100 distinct ids, count accuracy,
+    source filter, since/until ranges, limit caps, combined filters
+    (source+since+limit, source+until), append-only invariant.
+
+  Notable decisions:
+  - crypto.randomUUID() (Node builtin, no new dep).
+  - ISO 8601 string comparison for timestamps (lexicographic sort works
+    for UTC strings of same precision).
+  - No deep-copy on query; references shared with caller. Acceptable
+    for in-memory fixture; SQLite naturally serializes copies later.
+
+  See: raw/internal/agent-runs/2026-04-30-005-storage-interface.md
 review_notes: ""
 ---
 
