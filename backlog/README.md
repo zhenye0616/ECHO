@@ -363,3 +363,11 @@ After any strategic conversation that lands an actionable decision:
 3. **Do NOT touch `wiki/`** — wiki updates happen only after the item lands in `complete/`
 
 The wiki is for *what is shipped*. The backlog is for *what is in flight*. They connect via the item's "After Completion (Strategist Notes)" section once the item completes.
+
+## Spec Authoring Lessons
+
+Things learned the hard way, accumulated as the project runs. Revisit when authoring similar items.
+
+### Bootstrap items must include the runtime's first-party type/util packages
+
+When authoring a bootstrap or scaffolding item for a new language/runtime, include the runtime's official type packages in `acceptance` and `files_to_modify` **even if the smoke test does not exercise them**. Otherwise the bootstrap ships clean (smoke test passes, typecheck passes), the next item that uses real runtime APIs hits a missing-types failure, and the agent escalates per drift rule 3 (no new deps without sign-off) — pure ceremony for a known-required package. For the TS/Node stack specifically: `@types/node` belongs in the bootstrap. Pattern: the smoke test's job is to prove the substrate compiles, but a green smoke test does NOT prove the substrate is ready for downstream consumption. Author bootstrap acceptance with downstream items in mind. *(Source: 2026-04-30 002-logger escalation; gap inherited from 001-repo-bootstrap.)*
