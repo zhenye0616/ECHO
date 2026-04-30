@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent } from '../../src/storage/interface.js';
 
-function eventInput(
-  overrides: Partial<Omit<CaptureEvent, 'id'>> = {},
-): Omit<CaptureEvent, 'id'> {
+function eventInput(overrides: Partial<Omit<CaptureEvent, 'id'>> = {}): Omit<CaptureEvent, 'id'> {
   return {
     source: 'fs:test',
     timestamp: '2026-04-30T12:00:00.000Z',

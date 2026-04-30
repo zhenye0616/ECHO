@@ -1,10 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type {
-  CaptureEvent,
-  EventId,
-  QueryFilter,
-  Storage,
-} from './interface.js';
+import type { CaptureEvent, EventId, QueryFilter, Storage } from './interface.js';
 
 export class MemoryStorage implements Storage {
   private readonly events: CaptureEvent[] = [];

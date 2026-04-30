@@ -107,7 +107,10 @@ describe('predicate logic with fixture allowlist', () => {
 
   it('isAllowedPath returns true when input prefix-matches an entry (~ expansion on input)', () => {
     expect(
-      _isAllowedPathIn('~/Library/Application Support/Cursor/User/workspaceStorage/foo.db', fixtureFsPaths),
+      _isAllowedPathIn(
+        '~/Library/Application Support/Cursor/User/workspaceStorage/foo.db',
+        fixtureFsPaths,
+      ),
     ).toBe(true);
     expect(_isAllowedPathIn('/var/log/echo/access.log', fixtureFsPaths)).toBe(true);
   });
