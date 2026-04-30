@@ -17,3 +17,9 @@
 
 # Sensitive interview data (uncomment if needed)
 # raw/internal/interviews/
+
+# Node / TypeScript
+node_modules/
+dist/
+coverage/
+*.log
