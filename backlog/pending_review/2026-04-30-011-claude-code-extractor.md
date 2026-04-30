@@ -32,9 +32,29 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-04-30T23:10:05Z"
 branch: "agent/claude-code-extractor"
 worktree: ""
-head_sha: ""
+head_sha: "1041a3cb324f81e576d455b7afe9169c70996085"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented per spec. Source: fs:<jsonl_path> (matches item 010). Backfill
+  uses exact byte_offset stored in metadata, so the spec's optional
+  short-SHA dedup was skipped — exact offsets eliminate duplicate risk.
+
+  Branch agent/claude-code-extractor at 1041a3cb324f81e576d455b7afe9169c70996085. 15 new tests; 154/154
+  pass; lint + typecheck clean.
+
+  Open items for founder review:
+  (1) LAG VERIFICATION PENDING — please run a daemon on this branch against
+      real Claude Code and record the median over 5 trials. Cannot do from
+      agent transcript without reading founder chat content.
+  (2) Parser uses real Claude Code JSONL shape ({type, sessionId, message:
+      {role, content with content-block array}, timestamp}). If real-world
+      data emits zero events, the field-name assumption is wrong; easy fix
+      to add a simpler-shape fallback.
+  (3) Merge with 010 will conflict on src/daemon/index.ts (both add an
+      extractor registration) — mechanical resolve: keep both
+      registrations. Item-body for 011 declares this expected.
+
+  Run log: raw/internal/agent-runs/2026-04-30-2026-04-30-011-claude-code-extractor.md
 review_notes: ""
 ---
 
