@@ -38,7 +38,7 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-04-30T22:56:35Z"
 branch: "agent/cursor-extractor"
 worktree: ""
-head_sha: "6ea403ee49a67084d7e3d567ec0974a5ab3154eb"
+head_sha: "2c01f8b4f588e8505d3f7155bc398f555e764c41"
 pr_url: ""
 agent_notes: |
   Implemented Option 1 (globalStorage / per-composer / workspace_id best-effort).
