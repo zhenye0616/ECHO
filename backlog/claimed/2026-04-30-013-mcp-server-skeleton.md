@@ -29,9 +29,9 @@ files_to_modify:
   - package.json
   - tests/mcp/server.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "Mac.attlocal.net-zhenye"
+claimed_at: "2026-04-30T22:30:00Z"
+branch: "agent/013-mcp-server-skeleton"
 worktree: ""
 head_sha: ""
 pr_url: ""
