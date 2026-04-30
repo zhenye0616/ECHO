@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json`. Do not edit by hand.
 
-**Totals:** 24 entries · 7 concepts · 6 entities · 7 sources · 4 analyses
+**Totals:** 28 entries · 8 concepts · 8 entities · 8 sources · 4 analyses
 
 ---
 
@@ -12,6 +12,7 @@ Auto-generated from `.manifest.json`. Do not edit by hand.
 
 - [[compose-not-capture|Compose, Don't Capture]] — ECHO ingests from tools that already capture; never builds its own capture surface for what others provide
 - [[layer-above-saas|Layer Above SaaS]] — ECHO is additive to existing tools, never a replacement. The connective tissue between apps.
+- [[sandboxed-capture|Sandboxed Capture]] — ECHO observes only what's on the allowlist. Enforced as code via the gate, not as policy.
 
 ### Form Factor
 
@@ -41,6 +42,8 @@ Auto-generated from `.manifest.json`. Do not edit by hand.
 
 - [[local-daemon|Local Daemon]] — The substrate process that owns local storage, ingestion, and retrieval. Wedge-independent foundation.
 - [[audit-page|Audit Page]] — Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.
+- [[capture-gate|Capture Gate]] — Pure-function chokepoint every captured event must pass through. Routes by source kind to allowlist predicates.
+- [[storage|Storage]] — Append-only Storage interface + MemoryStorage impl. SQLite drops in behind the same contract later.
 
 ### Cohorts
 
@@ -66,6 +69,7 @@ Auto-generated from `.manifest.json`. Do not edit by hand.
 ### Architecture
 
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
+- [[capture-allowlist|Capture Allowlist]] — CAPTURED_SOURCES — single canonical declaration of what ECHO is allowed to observe. Ships empty by design.
 
 ### Validation
 

@@ -197,5 +197,38 @@
     "aliases": ["Narrowest V1 Scope"],
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
+  },
+  "concepts/sandboxed-capture.md": {
+    "title": "Sandboxed Capture",
+    "link": "sandboxed-capture",
+    "summary": "ECHO observes only what's on the allowlist. Enforced as code via the gate, not as policy.",
+    "aliases": ["Sandboxed Capture", "Capture Sandbox"],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/capture-gate.md": {
+    "title": "Capture Gate",
+    "link": "capture-gate",
+    "summary": "Pure-function chokepoint every captured event must pass through. Routes by source kind to allowlist predicates.",
+    "aliases": ["Capture Gate", "Gate"],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/storage.md": {
+    "title": "Storage",
+    "link": "storage",
+    "summary": "Append-only Storage interface + MemoryStorage impl. SQLite drops in behind the same contract later.",
+    "aliases": ["Storage", "Storage Interface", "MemoryStorage"],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "sources/capture-allowlist.md": {
+    "title": "Capture Allowlist",
+    "link": "capture-allowlist",
+    "summary": "CAPTURED_SOURCES — single canonical declaration of what ECHO is allowed to observe. Ships empty by design.",
+    "aliases": ["Capture Allowlist", "CAPTURED_SOURCES"],
+    "topic": "Architecture",
+    "subtopic": "Storage",
+    "raw": "src/capture/sources.ts"
   }
 }
