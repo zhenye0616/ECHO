@@ -32,10 +32,79 @@ files_to_modify:
 claimed_by: "Mac.attlocal.net-zhenye"
 claimed_at: "2026-04-30T22:30:00Z"
 branch: "agent/013-mcp-server-skeleton"
-worktree: ""
-head_sha: ""
+worktree: "Project_echo--013-mcp-server-skeleton"
+head_sha: "0ddef08971732aaf7252b763eadf9e4125ae1118"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All acceptance criteria met. 114/114 tests pass; lint and typecheck clean.
+
+  Implementation summary:
+  - src/mcp/server.ts (new): startMcpServer(storage, options) returns
+    {stop, port, url}; binds 127.0.0.1; HTTP listener routes incoming
+    requests through per-session StreamableHTTPServerTransport instances.
+  - src/mcp/tools/echo-ping.ts (new): registers echo_ping with a zod input
+    schema { message: z.string().optional() }; returns
+    { pong: true, received: <message>, ts: <iso-now> } as
+    content[0].text JSON.
+  - src/daemon/index.ts: ECHO_MCP_PORT env (default 38478, validated to
+    0..65535) parsed; startMcpServer is invoked AFTER startLifecycle so
+    SIGINT/SIGTERM during MCP setup still produce clean shutdown; mcp.stop
+    runs before sqliteStore.close.
+  - tests/mcp/server.test.ts: 7 tests — boots on ephemeral port, binds
+    127.0.0.1 only, lists echo_ping, callTool with `hello` and without
+    args, stop() closes listener (subsequent connect throws), `started`
+    log carries port/url/host.
+
+  Notable design choices (not pre-specified, called out for review):
+  1. **Stateful transport with per-session McpServer.** I initially tried
+     stateless mode (sessionIdGenerator: undefined) for simplicity, but the
+     SDK's StreamableHTTPServerTransport refuses to be reused across requests
+     in stateless mode ("Stateless transport cannot be reused across
+     requests. Create a new transport per request."). Per-request
+     instantiation breaks the SDK Client's init→notification flow because
+     each fresh transport is uninitialized. Switched to stateful with a
+     `Map<sessionId, Session>` keyed on the SDK-generated session ID;
+     init requests spin up a new (transport, McpServer) pair, subsequent
+     requests reuse via the `mcp-session-id` header. This matches the
+     pattern in the SDK's documented stateful example. Single client per
+     session; multiple clients = multiple sessions, each with isolated state.
+  2. **Daemon log payload extension.** Spec says "daemon's startup log
+     payload extended with mcp_port and mcp_url". The lifecycle.ts file is
+     not in files_to_modify, so I did NOT extend the existing
+     `daemon.lifecycle started` payload. Instead, the `mcp.server started`
+     log line carries `host`, `port`, and `url` — emitted immediately after
+     the lifecycle's own started log during daemon boot. Net effect: a
+     `tail -f` of daemon stdout shows port/url in the startup banner, just
+     in a separate line. If the founder prefers the fields merged into the
+     lifecycle log, adding an `extraPayload?: Record<string, unknown>` to
+     `LifecycleOptions` is a one-line follow-up.
+  3. **Body parsing in the HTTP listener.** The SDK's StreamableHTTPServerTransport
+     can parse the body itself, but its handler only checks for an
+     initialize request when the body has been pre-parsed. I read the body
+     once in the listener (await readJsonBody) and pass it to handleRequest.
+     This is the same pattern shown in the SDK's express example.
+  4. **`zod` is used as a transitive dep of @modelcontextprotocol/sdk.** Per
+     spec ("zod or JSON schema, whichever the SDK uses") and the explicit
+     "Adding any dependency beyond @modelcontextprotocol/sdk — no Express,
+     no Fastify, no separate HTTP framework", I did NOT declare zod as a
+     top-level package.json dep. ESLint and typecheck pass importing it
+     directly. If the founder wants it pinned explicitly, that's a one-line
+     follow-up.
+
+  Merge-conflict pre-warning:
+  - Branch was forked from main at HEAD `156f379` (right after the 013
+    claim was pushed). That predates the founder's local 009-merge and
+    cleanup commits (a94b798, 4204bdc) which are sitting on local main,
+    not yet pushed. My agent/013 branch will conflict with whichever final
+    `src/daemon/index.ts` and `package.json` ends up on origin/main when
+    the founder pushes. The merge is mechanical: my MCP wiring (gitWatcher
+    pattern is identical) layers on top of fs-watcher + git-watcher
+    additions in onShutdown. chokidar / better-sqlite3 versions match.
+
+  Out-of-scope items observed but not implemented:
+  - search_memories tool (deferred to 014), MCP resources, prompts, auth,
+    stdio transport, multi-port, captured-tool-call audit, rate limiting,
+    TLS, port-conflict auto-resolution, V1 user docs.
 review_notes: ""
 ---
 
