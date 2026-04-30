@@ -6,13 +6,15 @@ export const CAPTURED_SOURCES = {
   domains: {},
   fs_paths: [],
   apis: [],
+  git_repos: ['~/Desktop/Project_echo/'],
 } as const;
 
 export type Source =
   | { kind: 'app'; bundleId: keyof typeof CAPTURED_SOURCES.apps }
   | { kind: 'domain'; host: keyof typeof CAPTURED_SOURCES.domains }
   | { kind: 'fs'; path: string }
-  | { kind: 'api'; name: string };
+  | { kind: 'api'; name: string }
+  | { kind: 'git'; repo: string };
 
 const HOME = homedir();
 
@@ -49,6 +51,19 @@ export function _isAllowedApiIn(name: unknown, apis: ReadonlyArray<string>): boo
   return apis.includes(name);
 }
 
+function stripTrailingSlash(p: string): string {
+  return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
+}
+
+export function _isAllowedRepoIn(
+  repoPath: unknown,
+  repos: ReadonlyArray<string>,
+): boolean {
+  if (!isNonEmptyString(repoPath)) return false;
+  const normalized = stripTrailingSlash(expandTilde(repoPath));
+  return repos.some((entry) => stripTrailingSlash(expandTilde(entry)) === normalized);
+}
+
 export function isAllowedApp(bundleId: string): boolean {
   return _isAllowedAppIn(bundleId, CAPTURED_SOURCES.apps);
 }
@@ -63,4 +78,8 @@ export function isAllowedPath(path: string): boolean {
 
 export function isAllowedApi(name: string): boolean {
   return _isAllowedApiIn(name, CAPTURED_SOURCES.apis);
+}
+
+export function isAllowedRepo(repoPath: string): boolean {
+  return _isAllowedRepoIn(repoPath, CAPTURED_SOURCES.git_repos);
 }

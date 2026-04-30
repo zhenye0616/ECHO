@@ -1,0 +1,375 @@
+import chokidar, { type FSWatcher } from 'chokidar';
+import { execFile } from 'node:child_process';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { createLogger } from '../../logging/index.js';
+import type { Storage } from '../../storage/interface.js';
+import { processCandidate } from '../pipeline.js';
+
+const log = createLogger('capture.surfaces.git');
+const execFileP = promisify(execFile);
+
+const DIFF_TRUNCATE_BYTES = 100 * 1024;
+const DEFAULT_POLL_MS = 30_000;
+const DEFAULT_BACKFILL = 50;
+const FORMAT = '%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f%b%x1e';
+
+function expandTilde(p: string): string {
+  const home = homedir();
+  if (p === '~') return home;
+  if (p.startsWith('~/')) return home + p.slice(1);
+  return p;
+}
+
+function stripTrailingSlash(p: string): string {
+  return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
+}
+
+function normalizeRepoPath(p: string): string {
+  return stripTrailingSlash(expandTilde(p));
+}
+
+function getBackfillCount(): number {
+  const env = process.env['ECHO_GIT_BACKFILL_COMMITS'];
+  if (env !== undefined && env.length > 0) {
+    const n = Number.parseInt(env, 10);
+    if (Number.isInteger(n) && n >= 0) return n;
+  }
+  return DEFAULT_BACKFILL;
+}
+
+interface CommitInfo {
+  sha: string;
+  parent_sha: string | undefined;
+  author: string;
+  author_iso: string;
+  subject: string;
+  body: string;
+}
+
+async function git(args: string[], cwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileP('git', args, {
+      cwd,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return stdout;
+  } catch (err) {
+    log.warn('git_command_failed', {
+      cwd,
+      args: args.slice(0, 2),
+      message: (err as Error).message,
+    });
+    return null;
+  }
+}
+
+async function getHead(repo: string): Promise<string | null> {
+  const out = await git(['rev-parse', 'HEAD'], repo);
+  return out === null ? null : out.trim();
+}
+
+function parseCommitRecords(out: string): CommitInfo[] {
+  const commits: CommitInfo[] = [];
+  const records = out.split('\x1e');
+  for (const rec of records) {
+    if (rec.length === 0) continue;
+    const fields = rec.split('\x1f');
+    if (fields.length < 6) continue;
+    const sha = fields[0];
+    const parents = fields[1];
+    const authorIso = fields[2];
+    const author = fields[3];
+    const subject = fields[4];
+    const body = fields[5];
+    if (
+      sha === undefined ||
+      parents === undefined ||
+      authorIso === undefined ||
+      author === undefined ||
+      subject === undefined ||
+      body === undefined
+    ) {
+      continue;
+    }
+    const trimmedSha = sha.replace(/^\n+/, '').trim();
+    if (trimmedSha.length === 0) continue;
+    const parentList = parents.trim();
+    const parent_sha =
+      parentList.length === 0 ? undefined : parentList.split(' ')[0];
+    commits.push({
+      sha: trimmedSha,
+      parent_sha,
+      author_iso: authorIso.trim(),
+      author: author.trim(),
+      subject: subject.trim(),
+      body: body.replace(/^\n+/, '').replace(/\n+$/, ''),
+    });
+  }
+  return commits;
+}
+
+async function enumerateNewCommits(
+  repo: string,
+  newHead: string,
+  lastSeen: string | undefined,
+  backfillLimit: number,
+): Promise<CommitInfo[]> {
+  const args: string[] = ['log', '--reverse', `--format=${FORMAT}`];
+  if (lastSeen !== undefined) {
+    args.push(`${lastSeen}..${newHead}`);
+  } else {
+    if (backfillLimit > 0) args.push(`-${backfillLimit}`);
+    args.push(newHead);
+  }
+  const out = await git(args, repo);
+  if (out === null || out.length === 0) return [];
+  return parseCommitRecords(out);
+}
+
+interface CommitStats {
+  files_changed: number;
+  additions: number;
+  deletions: number;
+}
+
+async function getCommitStats(repo: string, sha: string): Promise<CommitStats> {
+  const out = await git(
+    ['show', sha, '--no-color', '--format=', '--shortstat'],
+    repo,
+  );
+  if (out === null) return { files_changed: 0, additions: 0, deletions: 0 };
+  const line = out.trim();
+  let files_changed = 0;
+  let additions = 0;
+  let deletions = 0;
+  const fc = /(\d+)\s+files?\s+changed/.exec(line);
+  if (fc !== null) files_changed = Number.parseInt(fc[1] as string, 10);
+  const ad = /(\d+)\s+insertions?\(\+\)/.exec(line);
+  if (ad !== null) additions = Number.parseInt(ad[1] as string, 10);
+  const dl = /(\d+)\s+deletions?\(-\)/.exec(line);
+  if (dl !== null) deletions = Number.parseInt(dl[1] as string, 10);
+  return { files_changed, additions, deletions };
+}
+
+async function getDiff(
+  repo: string,
+  sha: string,
+  parent: string | undefined,
+): Promise<string> {
+  const raw =
+    parent !== undefined
+      ? await git(['diff', `${parent}..${sha}`, '--no-color'], repo)
+      : await git(['show', sha, '--no-color', '--format='], repo);
+  if (raw === null) return '';
+  if (raw.length > DIFF_TRUNCATE_BYTES) {
+    return (
+      raw.slice(0, DIFF_TRUNCATE_BYTES) +
+      `\n[diff truncated at ${DIFF_TRUNCATE_BYTES} bytes; full diff at ${sha}]\n`
+    );
+  }
+  return raw;
+}
+
+function shortSha(sha: string): string {
+  return sha.slice(0, 7);
+}
+
+async function buildAndEmit(
+  repo: string,
+  commit: CommitInfo,
+  storage: Storage,
+): Promise<boolean> {
+  const stats = await getCommitStats(repo, commit.sha);
+  const diff = await getDiff(repo, commit.sha, commit.parent_sha);
+
+  const bodyBlock = commit.body.length > 0 ? `${commit.body}\n\n` : '';
+  const content = `COMMIT ${shortSha(commit.sha)}: ${commit.subject}\n\n${bodyBlock}--- DIFF ---\n${diff}`;
+
+  const metadata: Record<string, unknown> = {
+    sha: commit.sha,
+    author: commit.author,
+    files_changed: stats.files_changed,
+    additions: stats.additions,
+    deletions: stats.deletions,
+  };
+  if (commit.parent_sha !== undefined) metadata['parent_sha'] = commit.parent_sha;
+
+  const candidate = {
+    source: `git:${repo}`,
+    timestamp: commit.author_iso,
+    content,
+    metadata,
+  };
+
+  log.info('candidate', { sha: commit.sha, repo });
+  const result = await processCandidate(candidate, storage);
+  if (!result.accepted) {
+    log.warn('rejected', { reason: result.reason, repo, sha: commit.sha });
+    return false;
+  }
+  return true;
+}
+
+async function discoverLastSeen(
+  repo: string,
+  storage: Storage,
+): Promise<string | undefined> {
+  const events = await storage.query({ source: `git:${repo}` });
+  if (events.length === 0) return undefined;
+  let latestTs = '';
+  let latestSha: string | undefined;
+  for (const evt of events) {
+    if (evt.timestamp >= latestTs) {
+      latestTs = evt.timestamp;
+      const meta = evt.metadata as Record<string, unknown> | undefined;
+      const sha = meta?.['sha'];
+      if (typeof sha === 'string') latestSha = sha;
+    }
+  }
+  return latestSha;
+}
+
+export interface GitWatcherHandle {
+  stop: () => Promise<void>;
+}
+
+export interface GitWatcherOptions {
+  pollIntervalMs?: number;
+  enableFsWatch?: boolean;
+}
+
+interface RepoState {
+  repo: string;
+  lastSeen: string | undefined;
+  busy: boolean;
+}
+
+export async function startGitWatcher(
+  repoPaths: ReadonlyArray<string>,
+  storage: Storage,
+  options: GitWatcherOptions = {},
+): Promise<GitWatcherHandle> {
+  const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_MS;
+  const enableFsWatch = options.enableFsWatch ?? true;
+  const backfillLimit = getBackfillCount();
+
+  const repos = repoPaths.map(normalizeRepoPath);
+  const states = new Map<string, RepoState>();
+  for (const repo of repos) {
+    states.set(repo, { repo, lastSeen: undefined, busy: false });
+  }
+
+  let stopped = false;
+  const inFlight = new Set<Promise<void>>();
+
+  function track(p: Promise<void>): void {
+    inFlight.add(p);
+    p.finally(() => inFlight.delete(p));
+  }
+
+  async function refreshRepo(state: RepoState): Promise<void> {
+    if (stopped || state.busy) return;
+    state.busy = true;
+    try {
+      if (state.lastSeen === undefined) {
+        const discovered = await discoverLastSeen(state.repo, storage);
+        if (stopped) return;
+        state.lastSeen = discovered;
+      }
+      const head = await getHead(state.repo);
+      if (stopped) return;
+      if (head === null) {
+        log.warn('rev_parse_failed', { repo: state.repo });
+        return;
+      }
+      if (state.lastSeen === head) return;
+
+      const commits = await enumerateNewCommits(
+        state.repo,
+        head,
+        state.lastSeen,
+        backfillLimit,
+      );
+      if (stopped) return;
+
+      for (const commit of commits) {
+        if (stopped) return;
+        const ok = await buildAndEmit(state.repo, commit, storage);
+        if (!ok) {
+          log.error('emit_failed', { repo: state.repo, sha: commit.sha });
+          break;
+        }
+        state.lastSeen = commit.sha;
+      }
+      if (commits.length === 0) state.lastSeen = head;
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  const fsWatchers: FSWatcher[] = [];
+  if (enableFsWatch) {
+    for (const state of states.values()) {
+      const watchPaths = [
+        join(state.repo, '.git', 'HEAD'),
+        join(state.repo, '.git', 'refs', 'heads'),
+      ];
+      const watcher = chokidar.watch(watchPaths, {
+        ignoreInitial: true,
+        persistent: true,
+      });
+      const onChange = (): void => {
+        if (stopped) return;
+        track(refreshRepo(state));
+      };
+      watcher.on('add', onChange);
+      watcher.on('change', onChange);
+      watcher.on('unlink', onChange);
+      watcher.on('error', (err: unknown) => {
+        log.error('watcher_error', {
+          repo: state.repo,
+          message: (err as Error).message,
+        });
+      });
+      await new Promise<void>((resolve) => {
+        watcher.once('ready', () => {
+          resolve();
+        });
+      });
+      fsWatchers.push(watcher);
+    }
+  }
+
+  const pollHandle = setInterval(() => {
+    if (stopped) return;
+    for (const state of states.values()) {
+      track(refreshRepo(state));
+    }
+  }, pollIntervalMs);
+
+  // Kick off initial backfill in the background so startGitWatcher returns
+  // quickly. stop() awaits any in-flight refresh before resolving.
+  for (const state of states.values()) {
+    track(refreshRepo(state));
+  }
+
+  log.info('started', {
+    repos,
+    poll_interval_ms: pollIntervalMs,
+    fs_watch: enableFsWatch,
+  });
+
+  return {
+    stop: async () => {
+      stopped = true;
+      clearInterval(pollHandle);
+      for (const w of fsWatchers) {
+        await w.close();
+      }
+      await Promise.allSettled(Array.from(inFlight));
+      log.info('stopped', {});
+    },
+  };
+}
