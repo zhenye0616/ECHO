@@ -31,9 +31,9 @@ files_to_modify:
   - package.json
   - tests/storage/sqlite.test.ts
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "Mac.attlocal.net-zhenye"
+claimed_at: "2026-04-30T21:33:00Z"
+branch: "agent/008-sqlite-storage"
 worktree: ""
 head_sha: ""
 pr_url: ""
