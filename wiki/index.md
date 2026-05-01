@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json`. Do not edit by hand.
 
-**Totals:** 28 entries · 8 concepts · 8 entities · 8 sources · 4 analyses
+**Totals:** 29 entries · 8 concepts · 8 entities · 8 sources · 5 analyses
 
 ---
 
@@ -92,3 +92,7 @@ Auto-generated from `.manifest.json`. Do not edit by hand.
 
 - [[tier-vs-vertical-slice|Tier-by-Tier vs Vertical Slice]] — Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.
 - [[narrowest-v1-scope|Narrowest V1 Scope]] — L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.
+
+### Architecture
+
+- [[system-architecture|System Architecture (Minimum Component View)]] — Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.

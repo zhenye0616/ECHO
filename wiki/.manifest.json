@@ -10,7 +10,9 @@
     "title": "Compose, Don't Capture",
     "link": "compose-not-capture",
     "summary": "ECHO ingests from tools that already capture; never builds its own capture surface for what others provide",
-    "aliases": ["Compose Not Capture"],
+    "aliases": [
+      "Compose Not Capture"
+    ],
     "topic": "Architecture",
     "subtopic": "Compose Not Capture"
   },
@@ -18,7 +20,10 @@
     "title": "Felt, Not Seen",
     "link": "felt-not-seen",
     "summary": "Ambient by default; visible on demand for trust. Product appears in the result, not the interface.",
-    "aliases": ["Felt Not Seen", "Ambient by Default"],
+    "aliases": [
+      "Felt Not Seen",
+      "Ambient by Default"
+    ],
     "topic": "Form Factor",
     "subtopic": "Felt Not Seen"
   },
@@ -26,7 +31,9 @@
     "title": "Layer Above SaaS",
     "link": "layer-above-saas",
     "summary": "ECHO is additive to existing tools, never a replacement. The connective tissue between apps.",
-    "aliases": ["Layer Above SaaS"],
+    "aliases": [
+      "Layer Above SaaS"
+    ],
     "topic": "Architecture",
     "subtopic": "Layer Above SaaS"
   },
@@ -34,7 +41,10 @@
     "title": "Context as Moat",
     "link": "context-as-moat",
     "summary": "Compete on context, not capability. Adjacent to foundation models, structurally outside their wars.",
-    "aliases": ["Context as Moat", "Compound on Context"],
+    "aliases": [
+      "Context as Moat",
+      "Compound on Context"
+    ],
     "topic": "Brand & Positioning",
     "subtopic": "Obsession Statement"
   },
@@ -42,7 +52,9 @@
     "title": "Ambient Form Factor",
     "link": "ambient-form-factor",
     "summary": "Browser extension + MCP server + hotkey overlay. No destination app. Three thin presences.",
-    "aliases": ["Ambient Form Factor"],
+    "aliases": [
+      "Ambient Form Factor"
+    ],
     "topic": "Form Factor",
     "subtopic": "Ambient Surfaces"
   },
@@ -50,7 +62,10 @@
     "title": "Clipboard and Launch",
     "link": "clipboard-and-launch",
     "summary": "Universal delivery mechanism: assemble context, copy to clipboard, open target app, user pastes.",
-    "aliases": ["Clipboard and Launch", "Wispr Flow Pattern"],
+    "aliases": [
+      "Clipboard and Launch",
+      "Wispr Flow Pattern"
+    ],
     "topic": "Form Factor",
     "subtopic": "Hotkey Overlay"
   },
@@ -58,7 +73,10 @@
     "title": "Drift Prevention",
     "link": "drift-prevention",
     "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
-    "aliases": ["Drift Prevention", "Scope Discipline"],
+    "aliases": [
+      "Drift Prevention",
+      "Scope Discipline"
+    ],
     "topic": "V1 Scope",
     "subtopic": "Non-Goals"
   },
@@ -66,7 +84,10 @@
     "title": "Browser Extension",
     "link": "browser-extension",
     "summary": "Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.",
-    "aliases": ["Browser Extension", "Chrome Extension"],
+    "aliases": [
+      "Browser Extension",
+      "Chrome Extension"
+    ],
     "topic": "Form Factor",
     "subtopic": "Browser Extension"
   },
@@ -74,7 +95,10 @@
     "title": "Local Daemon",
     "link": "local-daemon",
     "summary": "The substrate process that owns local storage, ingestion, and retrieval. Wedge-independent foundation.",
-    "aliases": ["Local Daemon", "ECHO Daemon"],
+    "aliases": [
+      "Local Daemon",
+      "ECHO Daemon"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage"
   },
@@ -82,7 +106,10 @@
     "title": "MCP Server",
     "link": "mcp-server",
     "summary": "Exposes ECHO context to AI clients (Cursor, Claude Code, Claude Desktop) via Model Context Protocol.",
-    "aliases": ["MCP Server", "Model Context Protocol Server"],
+    "aliases": [
+      "MCP Server",
+      "Model Context Protocol Server"
+    ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"
   },
@@ -90,7 +117,10 @@
     "title": "Hotkey Overlay",
     "link": "hotkey-overlay",
     "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
-    "aliases": ["Hotkey Overlay", "Hotkey Composer"],
+    "aliases": [
+      "Hotkey Overlay",
+      "Hotkey Composer"
+    ],
     "topic": "Form Factor",
     "subtopic": "Hotkey Overlay"
   },
@@ -98,7 +128,10 @@
     "title": "Audit Page",
     "link": "audit-page",
     "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
-    "aliases": ["Audit Page", "Inspector"],
+    "aliases": [
+      "Audit Page",
+      "Inspector"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage"
   },
@@ -106,7 +139,10 @@
     "title": "Target Cohort: Indie AI Builders",
     "link": "target-cohort-indie-ai-builders",
     "summary": "V1 wedge: solo devs and small-team founders shipping AI tools. Strong founder-market-fit + warm distribution.",
-    "aliases": ["Indie AI Builders", "Target Cohort"],
+    "aliases": [
+      "Indie AI Builders",
+      "Target Cohort"
+    ],
     "topic": "Cohorts",
     "subtopic": "Indie AI Builders"
   },
@@ -114,7 +150,10 @@
     "title": "V1 Spec (Locked)",
     "link": "v1-spec",
     "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
-    "aliases": ["V1 Spec", "V1 Scope"],
+    "aliases": [
+      "V1 Spec",
+      "V1 Scope"
+    ],
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
@@ -122,7 +161,10 @@
     "title": "Brand Promise",
     "link": "brand-promise",
     "summary": "We don't make AI smarter. We make every AI smarter about you. Plus alternative formulations tested.",
-    "aliases": ["Brand Promise", "Tagline"],
+    "aliases": [
+      "Brand Promise",
+      "Tagline"
+    ],
     "topic": "Brand & Positioning",
     "subtopic": "Brand Promise"
   },
@@ -130,7 +172,9 @@
     "title": "Form Factor Decision",
     "link": "form-factor-decision",
     "summary": "Why no destination app. Browser extension + MCP server + hotkey overlay as the three thin presences.",
-    "aliases": ["Form Factor Decision"],
+    "aliases": [
+      "Form Factor Decision"
+    ],
     "topic": "Form Factor",
     "subtopic": "Ambient Surfaces"
   },
@@ -138,7 +182,10 @@
     "title": "Interface Layers (1-5)",
     "link": "interface-layers",
     "summary": "Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.",
-    "aliases": ["Interface Layers", "Communication Stack"],
+    "aliases": [
+      "Interface Layers",
+      "Communication Stack"
+    ],
     "topic": "Architecture",
     "subtopic": "Layer Stack"
   },
@@ -146,7 +193,10 @@
     "title": "Bundle Decision",
     "link": "bundle-decision",
     "summary": "V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.",
-    "aliases": ["Bundle Decision", "V1 Tools"],
+    "aliases": [
+      "Bundle Decision",
+      "V1 Tools"
+    ],
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
@@ -154,7 +204,9 @@
     "title": "Extension Funnel Logic",
     "link": "extension-funnel-logic",
     "summary": "Extension and V1 are family, not pipeline. Gravitational conversion via shared thesis, not push-marketing.",
-    "aliases": ["Extension Funnel Logic"],
+    "aliases": [
+      "Extension Funnel Logic"
+    ],
     "topic": "Validation",
     "subtopic": "Extension Funnel"
   },
@@ -162,7 +214,9 @@
     "title": "Validation Experiments",
     "link": "validation-experiments",
     "summary": "Three experiments running parallel to substrate build: user interviews, landing page, concierge.",
-    "aliases": ["Validation Experiments"],
+    "aliases": [
+      "Validation Experiments"
+    ],
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
@@ -170,7 +224,9 @@
     "title": "Wedge vs Thesis Validation",
     "link": "wedge-vs-thesis-validation",
     "summary": "Extension validates thesis (people pay for unified context). V1 must separately validate the dev wedge.",
-    "aliases": ["Wedge vs Thesis Validation"],
+    "aliases": [
+      "Wedge vs Thesis Validation"
+    ],
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
@@ -178,7 +234,9 @@
     "title": "Three-Cohort Comparison",
     "link": "three-cohort-comparison",
     "summary": "Indie AI builders vs vibe coders vs solo SaaS founders. Why indie AI builders win the V1 wedge.",
-    "aliases": ["Three Cohort Comparison"],
+    "aliases": [
+      "Three Cohort Comparison"
+    ],
     "topic": "Cohorts",
     "subtopic": "Indie AI Builders"
   },
@@ -186,7 +244,9 @@
     "title": "Tier-by-Tier vs Vertical Slice",
     "link": "tier-vs-vertical-slice",
     "summary": "Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.",
-    "aliases": ["Tier vs Vertical Slice"],
+    "aliases": [
+      "Tier vs Vertical Slice"
+    ],
     "topic": "V1 Scope",
     "subtopic": "Sequencing"
   },
@@ -194,7 +254,9 @@
     "title": "Narrowest V1 Scope",
     "link": "narrowest-v1-scope",
     "summary": "L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.",
-    "aliases": ["Narrowest V1 Scope"],
+    "aliases": [
+      "Narrowest V1 Scope"
+    ],
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
@@ -202,7 +264,10 @@
     "title": "Sandboxed Capture",
     "link": "sandboxed-capture",
     "summary": "ECHO observes only what's on the allowlist. Enforced as code via the gate, not as policy.",
-    "aliases": ["Sandboxed Capture", "Capture Sandbox"],
+    "aliases": [
+      "Sandboxed Capture",
+      "Capture Sandbox"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage"
   },
@@ -210,7 +275,10 @@
     "title": "Capture Gate",
     "link": "capture-gate",
     "summary": "Pure-function chokepoint every captured event must pass through. Routes by source kind to allowlist predicates.",
-    "aliases": ["Capture Gate", "Gate"],
+    "aliases": [
+      "Capture Gate",
+      "Gate"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage"
   },
@@ -218,7 +286,11 @@
     "title": "Storage",
     "link": "storage",
     "summary": "Append-only Storage interface + MemoryStorage impl. SQLite drops in behind the same contract later.",
-    "aliases": ["Storage", "Storage Interface", "MemoryStorage"],
+    "aliases": [
+      "Storage",
+      "Storage Interface",
+      "MemoryStorage"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage"
   },
@@ -226,9 +298,25 @@
     "title": "Capture Allowlist",
     "link": "capture-allowlist",
     "summary": "CAPTURED_SOURCES — single canonical declaration of what ECHO is allowed to observe. Ships empty by design.",
-    "aliases": ["Capture Allowlist", "CAPTURED_SOURCES"],
+    "aliases": [
+      "Capture Allowlist",
+      "CAPTURED_SOURCES"
+    ],
     "topic": "Architecture",
     "subtopic": "Storage",
     "raw": "src/capture/sources.ts"
+  },
+  "analyses/system-architecture.md": {
+    "title": "System Architecture (Minimum Component View)",
+    "link": "system-architecture",
+    "summary": "Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.",
+    "aliases": [
+      "System Architecture",
+      "Minimum Component View",
+      "System Diagram",
+      "Architecture Diagram"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
   }
 }
