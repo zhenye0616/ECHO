@@ -30,10 +30,35 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-04-30T20:05:00Z"
 branch: "agent/mcp-search-memories"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--mcp-search-memories"
+head_sha: "37a2ff7ccc3d5cbdd0d797f9dffb5971663125d1"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented search_memories MCP tool. All 20 new tests pass; lint + typecheck clean.
+
+  Spec-authorized storage extension: added `source_prefix?: string` to QueryFilter
+  (mutually exclusive with `source`); honored by both MemoryStorage and SqliteStorage.
+  All 35 pre-existing storage tests still pass.
+
+  Design choice: DESC ordering done in the tool (sort + slice) rather than extending
+  QueryFilter with `order` — the latter wasn't spec-authorized and would have been
+  drift. For V1 dataset sizes this is fine. V1.5 should add `order` to QueryFilter
+  if retrieval becomes a hotspot.
+
+  TEST STABILITY CAVEAT: `npm run test` is flaky on this machine — about 50% of runs
+  hit a 5s-timeout failure in pre-existing chokidar-based tests
+  (claude-code-extractor / cursor-extractor / fs-watcher lifecycle). NONE of my changes
+  touch those surfaces. Failing test names vary between runs (race, not deterministic
+  failure). Failing tests pass in isolation. The whole suite passes when run with
+  `--pool=forks --poolOptions.forks.singleFork=true`. The added test load (~350ms,
+  20 tests, 191 vs 171) appears to be enough additional CPU pressure to surface a
+  pre-existing race in chokidar's lifecycle teardown. Tried bumping testTimeout to
+  15s in vitest.config.ts to mitigate; reverted because (a) only partly effective and
+  (b) vitest.config.ts is not in files_to_modify (drift). See run log for full detail
+  and suggested follow-up backlog items.
+
+  Open for founder: is the flaky test infra a blocker for this merge, or do you
+  want to ship the code and address the race in a separate item?
 review_notes: ""
 ---
 
