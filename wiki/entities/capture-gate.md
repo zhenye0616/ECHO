@@ -27,6 +27,7 @@ type RejectionReason =
   | 'unknown_domain'
   | 'unknown_path'
   | 'unknown_api'
+  | 'unknown_repo'
   | 'malformed_event';
 ```
 
@@ -42,6 +43,7 @@ Every event carries a `source` field formatted as `<kind>:<id>`:
 | `domain:app.slack.com` | Web surface, by host | `isAllowedDomain` |
 | `fs:/Users/foo/Library/.../workspaceStorage/x.db` | File-system path | `isAllowedPath` |
 | `api:github` | API connector | `isAllowedApi` |
+| `git:/Users/foo/Desktop/Project_echo` | Git repository, by absolute path | `isAllowedRepo` |
 
 The gate parses with `indexOf(':')` (not `split`) so IDs may contain colons (file paths, URLs with ports). Empty / leading-colon / trailing-colon sources are `malformed_event`.
 
@@ -55,6 +57,7 @@ Audit-page consumers can rely on these strings being permanent:
 | `unknown_domain` | Well-formed `domain:` source, host not in allowlist |
 | `unknown_path` | Well-formed `fs:` source, path doesn't prefix-match any allowed entry |
 | `unknown_api` | Well-formed `api:` source, name not in allowlist |
+| `unknown_repo` | Well-formed `git:` source, repo path doesn't match any allowed entry (added by [[git-capture]]) |
 | `malformed_event` | Wrong shape, wrong types, missing fields, unknown kind prefix, etc. |
 
 ## The Purity Claim
@@ -84,3 +87,4 @@ By design — these are out-of-scope and live elsewhere:
 - [[storage]] — the persistence layer the gate is upstream of
 - [[audit-page]] — consumer of stable rejection reason codes
 - [[local-daemon]] — host process for the gate
+- [[git-capture]] — introduced the `git:` source kind and the `unknown_repo` rejection

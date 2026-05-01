@@ -12,6 +12,12 @@ aliases:
 
 ECHO observes only what is on the [[capture-allowlist]]. Sandboxing is enforced *as code*, not as policy: the [[capture-gate]] is a single chokepoint function through which every captured event must pass to be persisted. Events from non-allowlisted sources cannot reach storage — by construction, not by convention.
 
+## In Practice
+
+As of items 009–012, the gate's accept-path is exercised in production. Every captured event from the [[fs-watcher]], the [[cursor-extractor]], the [[claude-code-extractor]], and the git watcher ([[git-capture]]) passes through `gate(event)` before being handed to storage. The accept-path is no longer a theoretical commitment; it is the single function on the hot path of every event ECHO ingests.
+
+The first non-empty allowlist landed with item 009, and the gate's accept branch fired on a real `~/.claude/projects/` write during that item's smoke test. Each subsequent capture surface has reused the same chokepoint — no surface has its own bypass, no surface defines its own allowlist.
+
 ## Three Layers of Sandboxing
 
 Operating systems offer three levels at which capture can be confined. ECHO uses each where it fits:
@@ -46,6 +52,19 @@ Two reasons compound:
 
 Sandboxing is what the gate *does*; the allowlist is what the gate *checks against*. They form a tight pair. The allowlist starts empty and grows by deliberate per-source commits; the gate stays the same as it grows. See [[capture-allowlist]] for the structure of that file and why it ships empty.
 
+## Stable Rejection Codes
+
+The gate emits one of six stable reason codes for any event it sees. Five name a well-formed source whose ID isn't allowlisted; one names everything else.
+
+- `unknown_app` — bundle ID not in `apps`
+- `unknown_domain` — host not in `domains`
+- `unknown_path` — path doesn't prefix-match any `fs_paths` entry
+- `unknown_api` — API name not in `apis`
+- `unknown_repo` — repo path not in `git_repos` (added by [[git-capture]] in item 012)
+- `malformed_event` — wrong shape, wrong types, missing fields, unknown kind prefix
+
+These codes are part of the audit-page contract — consumers can rely on the strings being permanent.
+
 ## Related
 
 - [[capture-allowlist]] — the source of truth the gate checks
@@ -54,3 +73,5 @@ Sandboxing is what the gate *does*; the allowlist is what the gate *checks again
 - [[audit-page]] — surfaces the allowlist for users
 - [[layer-above-saas]] — why "ingest, don't replicate" requires this discipline
 - [[felt-not-seen]] — quiet trust depends on visible enforcement
+- [[fs-watcher]] — first surface that exercised the gate's accept-path in production
+- [[git-capture]] — introduced the fifth source kind (`git:`) and the `unknown_repo` rejection

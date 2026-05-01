@@ -54,8 +54,8 @@ V1 ships when this demo works on a real GitHub issue in the founder's daily work
 
 ## Sequencing (10 Weeks)
 
-- **Weeks 1–3:** Substrate (local daemon + storage + MCP server skeleton + hotkey scaffold). No integrations yet.
-- **Weeks 4–5:** Cursor MCP + Claude Code MCP. End-to-end demo to founder.
+- **Weeks 1–3:** Substrate (local daemon + storage + MCP server skeleton + hotkey scaffold). No integrations yet. ✅ Shipped (items 001–009).
+- **Weeks 4–5:** Cursor MCP + Claude Code MCP. End-to-end demo to founder. ✅ Shipped (items 010–015). Killer demo loop is operational.
 - **Weeks 6–7:** GitHub integration via API.
 - **Week 8:** Slack integration via API.
 - **Week 9:** Browser extension upgrade — feeds into unified store.
@@ -67,7 +67,7 @@ V1 ships when this demo works on a real GitHub issue in the founder's daily work
 |---|---|---|
 | L1 — Passive ingestion | ✅ | Substrate + connectors |
 | L2 — Ambient surfacing | ❌ | Defer to V2 — calibration is hard |
-| L3 — Summoned response | ✅ | Both Q&A and assembly via [[clipboard-and-launch]] |
+| L3 — Summoned response | ✅ | Both Q&A and assembly via [[clipboard-and-launch]]. Pull mode operational via [[mcp-search-memories]] over [[mcp-server]]. |
 | L4 — Conversational dialogue | ❌ | Defer to V2 — would require destination UI |
 | L5 — Reflective / audit | ✅ minimal | [[audit-page]] |
 
@@ -122,6 +122,16 @@ V1 ships when ALL true:
 5. Demo gallery has 5 hand-curated cases ready to ship as launch asset
 
 If any not true at week 10, push launch one week and fix. Do not ship below the bar.
+
+### Status (as of waves 1–3 ship)
+
+Honest interim read against the five conditions:
+
+1. **Killer demo works in founder's daily workflow with no hand-staging** — Mechanically operational. Manual verification through real Cursor + Claude Code sessions confirmed during item 015 review. Daily-workflow soak ongoing.
+2. **≥3 of 5 indie AI builders ask "when can I pay?"** — Not yet. Needs Wave 4+ (the bundle is incomplete; GitHub + Slack haven't shipped, so the demo doesn't yet show the cross-tool magic).
+3. **Hotkey <100ms; storage no data loss** — Storage durability ✅ via SQLite WAL. Hotkey ❌ — Week 10 work.
+4. **Public weekly changelog ≥4 weeks** — ❌. First substantive entry pending.
+5. **Demo gallery (5 hand-curated cases)** — ❌. Week 10 work.
 
 ## Risks Watched (Not Blocking)
 

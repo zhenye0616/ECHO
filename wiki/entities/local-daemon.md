@@ -10,50 +10,69 @@ aliases:
 
 ## Definition
 
-The substrate process that owns local storage, ingestion, indexing, retrieval, and composition. The wedge-independent foundation — the part of V1 that's safe to start building immediately because it serves any future cohort or integration choice.
+A local Node.js process that owns capture, gating, persistence, and MCP-served retrieval. Boots once, runs continuously, binds only to `127.0.0.1`. Single-instance via PID lock at `~/Library/Application Support/ECHO/daemon.pid`. The wedge-independent foundation — every cohort and integration choice routes through the same substrate.
 
-## What Lives in the Daemon
+Entry: `src/daemon/index.ts`. Lifecycle scaffold: `src/daemon/lifecycle.ts`.
 
-Layer 1 (collection) and the silent middle:
+## Lifecycle
 
-- **Local storage** — append-only ledger (per [[/Users/zhenye/Desktop/AIE/claude-wiki/concepts/append-only-ledger.md|the AIE wiki pattern]])
-- **Ingestion adapters** — connector framework for browser extension feeds, MCP server context, future API adapters (GitHub, Slack, etc.)
-- **Indexing** — semantic embeddings for retrieval; structured indexes for source attribution
-- **Retrieval engine** — picks the right N fragments from a large corpus
-- **Composition engine** — synthesizes retrieved fragments into useful context bundles
+The daemon's lifetime is `boot → idle → SIGTERM/SIGINT → graceful shutdown`, orchestrated by `startLifecycle({ onShutdown })` in `src/daemon/lifecycle.ts`.
 
-## What Doesn't Live in the Daemon
+- **PID lock first.** `acquirePidLockOrExit(resolveDataDir())` runs before any subsystem starts. If a live process already owns the PID file, the new process writes a refusal line to stderr and exits 1. The lock is released in the shutdown hook.
+- **Started log line.** Once the lock is held and storage is open, the lifecycle emits `daemon.lifecycle started` carrying `pid`, `version` (read from `package.json`), `storage_backend`, `data_dir`, `mcp_port`, and `mcp_url`.
+- **Idle is event-loop kept alive** by a long-interval no-op timer; the daemon does no polling of its own — it waits for filesystem events and MCP requests.
+- **Shutdown** runs the registered `onShutdown` hook (which stops every subsystem in reverse order), releases the PID lock, clears the keepalive interval, and logs `stopped`. SIGTERM and SIGINT are both wired.
 
-- Layer 3 delivery (hotkey overlay is its own process)
-- Layer 5 audit (served as a local web page from the daemon, but UI is separate)
-- Specific connector logic (lives in adapters, not in the daemon core)
+## Data Directory
 
-## Why Local-First
+- Default: `~/Library/Application Support/ECHO/`. Override via `ECHO_DATA_DIR`.
+- SQLite database at `<data_dir>/echo.db` unless `ECHO_DB_PATH` overrides it explicitly.
+- PID file at `<data_dir>/daemon.pid`.
 
-Three reasons compound:
+## Subsystems Started on Boot
 
-1. **Privacy-by-architecture.** No server collects user data. Trust is structural, not promised.
-2. **User-side ingestion legality.** Once data is on the user's device through their authenticated session, the SaaS vendor's technical control ends. Reading what's on the user's screen is what every successful "above-the-app" tool does (Grammarly, 1Password, Honey, Rewind, ad-blockers). See [[layer-above-saas]] for the legal framing.
-3. **MCP composability.** A local daemon can serve MCP requests to whatever AI client the user runs locally without round-trip latency.
+After the wave-3 simplification (commit `238c530`), all subsystems start concurrently via a single `Promise.all`. The daemon does not proceed past startup until every one of them is ready:
 
-## Build Sequence (V1 Weeks 1–3)
+- [[fs-watcher]] — generic filesystem signal source
+- [[git-capture|git-watcher]] — commit + diff capture across allowlisted repos
+- [[claude-code-extractor]] — tails Claude Code session JSONL into turn pairs
+- [[cursor-extractor]] — parses Cursor's SQLite globalStorage/workspaceStorage into turn pairs
+- [[mcp-server]] — HTTP/SSE retrieval interface
 
-The daemon is **wedge-independent** — no risk of needing to rebuild based on validation signal. Start it on day one:
+The shutdown hook stops them in the inverse order (`mcp → cursor → claude-code → git → fs`) and then disposes the storage handle.
 
-- **Week 1:** Storage architecture (append-only ledger, indexing schema, retrieval primitives)
-- **Week 2:** Ingestion framework (adapter interface, browser-extension feed-in, MCP adapter shape)
-- **Week 3:** Composition engine (retrieval-to-context-bundle pipeline)
+## Storage Backend
 
-By end of week 3 you can run end-to-end tests with stub adapters. Real adapters wire in starting week 4.
+SQLite by default ([[storage|SqliteStorage]] at the resolved DB path). Setting `ECHO_STORAGE=memory` selects the in-memory backend, used in tests and smoke runs. The backend choice is logged on boot as `storage_backend`.
+
+## MCP Server
+
+The daemon hosts an MCP server on `127.0.0.1:38478` (loopback-only, never network-reachable). Override via `ECHO_MCP_PORT`; the special value `0` lets the kernel pick a free port (used in tests). The bound port and full URL are emitted in the `started` log line. See [[mcp-server]] and [[mcp-search-memories]].
+
+## What the Daemon Does Not Do (Yet)
+
+Honest status as of waves 1–3:
+
+- **No native-app Accessibility capture.** The Swift shim that would observe non-file-backed apps is deferred to a later wave.
+- **No browser-extension wiring.** The extension still ships standalone; unifying its feed into the daemon is a Wave 4 item.
+- **No GitHub / Slack / email / calendar API connectors.** Sources beyond the four file-backed ones are not yet wired.
+- **No hotkey overlay.** The system-wide `⌘⇧E` summon surface is Week 10 work.
+- **No audit page UI.** The Layer 5 minimal trust surface is still pending; the data is queryable but not rendered.
 
 ## The Critical Engineering Bet
 
-**Where ECHO's IP lives is the silent middle** — what gets retrieved and how it's composed at the moment of summon. A naive system pastes everything related into the prompt and overflows; the smart system picks the right 5 fragments out of 5,000 and produces a focused, relevant answer. That's where the product wins or loses against "we just dumped everything into Claude's context window."
+Where ECHO's IP lives is the silent middle — what gets retrieved and how it's composed at the moment of summon. A naive system pastes everything related into the prompt and overflows; the smart system picks the right N fragments out of thousands and produces a focused, relevant answer. The realized first version of that middle is now visible in [[mcp-search-memories]]; the bet that retrieval quality (not capture surface count) is where the product wins remains intact.
 
 ## Related
 
 - [[mcp-server]]
-- [[browser-extension]]
-- [[hotkey-overlay]]
+- [[mcp-search-memories]]
+- [[fs-watcher]]
+- [[cursor-extractor]]
+- [[claude-code-extractor]]
+- [[git-capture]]
+- [[storage]]
+- [[capture-gate]]
+- [[capture-pipeline]]
 - [[interface-layers]]
 - [[narrowest-v1-scope]]

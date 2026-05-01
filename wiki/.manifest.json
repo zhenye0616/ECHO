@@ -2,9 +2,9 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "skeleton-v0",
-    "generated": "2026-04-30",
-    "notes": "Initial skeleton seeded from strategic conversation locking in V1 scope. Each entry is a stub awaiting full content."
+    "version": "wave-3-shipped",
+    "generated": "2026-05-01",
+    "notes": "Waves 1–3 (items 001–015) shipped. Substrate + capture surfaces + MCP server + search_memories tool now reflected in entity pages. Aspirational stubs replaced with shipped-reality docs."
   },
   "concepts/compose-not-capture.md": {
     "title": "Compose, Don't Capture",
@@ -80,6 +80,17 @@
     "topic": "V1 Scope",
     "subtopic": "Non-Goals"
   },
+  "concepts/sandboxed-capture.md": {
+    "title": "Sandboxed Capture",
+    "link": "sandboxed-capture",
+    "summary": "Capture enforced as code via the single gate chokepoint, now exercised in production by all four V1 capture surfaces.",
+    "aliases": [
+      "Sandboxed Capture",
+      "Capture Sandbox"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
   "entities/browser-extension.md": {
     "title": "Browser Extension",
     "link": "browser-extension",
@@ -94,7 +105,7 @@
   "entities/local-daemon.md": {
     "title": "Local Daemon",
     "link": "local-daemon",
-    "summary": "The substrate process that owns local storage, ingestion, and retrieval. Wedge-independent foundation.",
+    "summary": "Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.",
     "aliases": [
       "Local Daemon",
       "ECHO Daemon"
@@ -105,7 +116,7 @@
   "entities/mcp-server.md": {
     "title": "MCP Server",
     "link": "mcp-server",
-    "summary": "Exposes ECHO context to AI clients (Cursor, Claude Code, Claude Desktop) via Model Context Protocol.",
+    "summary": "Local MCP server on 127.0.0.1:38478 exposing search_memories + echo_ping to MCP-compliant AI clients via Streamable HTTP/SSE.",
     "aliases": [
       "MCP Server",
       "Model Context Protocol Server"
@@ -145,6 +156,115 @@
     ],
     "topic": "Cohorts",
     "subtopic": "Indie AI Builders"
+  },
+  "entities/capture-gate.md": {
+    "title": "Capture Gate",
+    "link": "capture-gate",
+    "summary": "Pure-function chokepoint at src/capture/gate.ts; five source kinds, six stable rejection codes, exhaustive test coverage.",
+    "aliases": [
+      "Capture Gate",
+      "Gate"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/storage.md": {
+    "title": "Storage",
+    "link": "storage",
+    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix filter.",
+    "aliases": [
+      "Storage",
+      "Storage Interface",
+      "MemoryStorage",
+      "SqliteStorage"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "entities/logger.md": {
+    "title": "Logger",
+    "link": "logger",
+    "summary": "Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.",
+    "aliases": [
+      "Logger",
+      "createLogger",
+      "Structured Logger"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Observability"
+  },
+  "entities/capture-pipeline.md": {
+    "title": "Capture Pipeline",
+    "link": "capture-pipeline",
+    "summary": "Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.",
+    "aliases": [
+      "Capture Pipeline",
+      "processCandidate",
+      "Pipeline Seam"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture"
+  },
+  "entities/fs-watcher.md": {
+    "title": "FS Watcher",
+    "link": "fs-watcher",
+    "summary": "First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.",
+    "aliases": [
+      "FS Watcher",
+      "Filesystem Watcher",
+      "fs-watcher"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "entities/cursor-extractor.md": {
+    "title": "Cursor Extractor",
+    "link": "cursor-extractor",
+    "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents.",
+    "aliases": [
+      "Cursor Extractor",
+      "cursor-extractor",
+      "Cursor Composer Extractor"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "entities/claude-code-extractor.md": {
+    "title": "Claude Code Extractor",
+    "link": "claude-code-extractor",
+    "summary": "Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.",
+    "aliases": [
+      "Claude Code Extractor",
+      "claude-code-extractor",
+      "Claude Code Session Extractor"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "entities/git-capture.md": {
+    "title": "Git Capture",
+    "link": "git-capture",
+    "summary": "Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.",
+    "aliases": [
+      "Git Capture",
+      "Git Watcher",
+      "git-watcher",
+      "git-capture"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "entities/mcp-search-memories.md": {
+    "title": "MCP search_memories Tool",
+    "link": "mcp-search-memories",
+    "summary": "V1 MCP retrieval tool — case-insensitive substring + filters over captured events; embeddings deferred to V1.5.",
+    "aliases": [
+      "search_memories",
+      "MCP search_memories tool",
+      "Search Memories"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
   },
   "sources/v1-spec.md": {
     "title": "V1 Spec (Locked)",
@@ -220,6 +340,30 @@
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
+  "sources/capture-allowlist.md": {
+    "title": "Capture Allowlist",
+    "link": "capture-allowlist",
+    "summary": "Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.",
+    "aliases": [
+      "Capture Allowlist",
+      "CAPTURED_SOURCES"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage",
+    "raw": "src/capture/sources.ts"
+  },
+  "sources/stack-decision.md": {
+    "title": "Stack Decision",
+    "link": "stack-decision",
+    "summary": "Why ECHO's daemon is TypeScript on Node.js for V1, with the Swift Accessibility shim deferred.",
+    "aliases": [
+      "Stack Decision",
+      "Daemon Stack",
+      "Runtime Choice"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Substrate"
+  },
   "analyses/wedge-vs-thesis-validation.md": {
     "title": "Wedge vs Thesis Validation",
     "link": "wedge-vs-thesis-validation",
@@ -260,52 +404,6 @@
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
-  "concepts/sandboxed-capture.md": {
-    "title": "Sandboxed Capture",
-    "link": "sandboxed-capture",
-    "summary": "ECHO observes only what's on the allowlist. Enforced as code via the gate, not as policy.",
-    "aliases": [
-      "Sandboxed Capture",
-      "Capture Sandbox"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "entities/capture-gate.md": {
-    "title": "Capture Gate",
-    "link": "capture-gate",
-    "summary": "Pure-function chokepoint every captured event must pass through. Routes by source kind to allowlist predicates.",
-    "aliases": [
-      "Capture Gate",
-      "Gate"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "entities/storage.md": {
-    "title": "Storage",
-    "link": "storage",
-    "summary": "Append-only Storage interface + MemoryStorage impl. SQLite drops in behind the same contract later.",
-    "aliases": [
-      "Storage",
-      "Storage Interface",
-      "MemoryStorage"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "sources/capture-allowlist.md": {
-    "title": "Capture Allowlist",
-    "link": "capture-allowlist",
-    "summary": "CAPTURED_SOURCES — single canonical declaration of what ECHO is allowed to observe. Ships empty by design.",
-    "aliases": [
-      "Capture Allowlist",
-      "CAPTURED_SOURCES"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage",
-    "raw": "src/capture/sources.ts"
-  },
   "analyses/system-architecture.md": {
     "title": "System Architecture (Minimum Component View)",
     "link": "system-architecture",
@@ -318,5 +416,17 @@
     ],
     "topic": "Architecture",
     "subtopic": "System Architecture"
+  },
+  "analyses/wave-1-2-3-retrospective.md": {
+    "title": "Wave 1-2-3 Retrospective",
+    "link": "wave-1-2-3-retrospective",
+    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.",
+    "aliases": [
+      "Wave 1-2-3 Retrospective",
+      "Substrate Wave Retrospective",
+      "Wave Retrospective"
+    ],
+    "topic": "Process",
+    "subtopic": "Wave Retrospective"
   }
 }

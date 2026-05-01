@@ -10,9 +10,9 @@ aliases:
 
 ## Definition
 
-The capture allowlist is the single canonical declaration of *what ECHO is allowed to observe*. It lives at `src/capture/sources.ts` as the constant `CAPTURED_SOURCES`, organized into four categories: `apps`, `domains`, `fs_paths`, `apis`. Every capture surface ECHO ships — browser extension, Accessibility shim, file watchers, API connectors — consults this file to know what is in-scope. The [[capture-gate]] is the runtime chokepoint that enforces it.
+The capture allowlist is the single canonical declaration of *what ECHO is allowed to observe*. It lives at `src/capture/sources.ts` as the constant `CAPTURED_SOURCES`, organized into five categories: `apps`, `domains`, `fs_paths`, `apis`, `git_repos`. Every capture surface ECHO ships — browser extension, Accessibility shim, file watchers, git watcher, API connectors — consults this file to know what is in-scope. The [[capture-gate]] is the runtime chokepoint that enforces it.
 
-## The Four Categories
+## The Five Categories
 
 | Category | Match | Example |
 |---|---|---|
@@ -20,14 +20,41 @@ The capture allowlist is the single canonical declaration of *what ECHO is allow
 | `domains` | Exact host (no subdomain wildcarding for V1) | `app.slack.com` |
 | `fs_paths` | Prefix match after `~` expansion on both sides | `~/Library/Application Support/Cursor/User/workspaceStorage/` |
 | `apis` | Exact name | `github` |
+| `git_repos` | Exact match after `~` expansion + trailing-slash normalization | `~/Desktop/Project_echo/` |
 
-Each category is paired with a typed predicate (`isAllowedApp`, `isAllowedDomain`, `isAllowedPath`, `isAllowedApi`) that the gate calls. Predicates accept `unknown` and runtime-guard against malformed inputs — the boundary is defended at the type *and* runtime layers.
+Each category is paired with a typed predicate (`isAllowedApp`, `isAllowedDomain`, `isAllowedPath`, `isAllowedApi`, `isAllowedRepo`) that the gate calls. Predicates accept `unknown` and runtime-guard against malformed inputs — the boundary is defended at the type *and* runtime layers.
 
-## The Empty-Initial Commitment
+## The Empty-Initial Commitment (and How It Has Held)
 
-`CAPTURED_SOURCES` ships with all four categories empty. Adding a source — *any* source — is a deliberate, code-reviewed action. Each per-source decision lands in its own backlog item alongside the capture surface that consumes it.
+`CAPTURED_SOURCES` shipped with all categories empty at item 003. The commitment was: **entries land alongside the capture surface that consumes them, in the same per-source PR, never speculatively in advance.** That commitment has held through items 009–012.
 
-This is a forcing function: the substrate becomes useful only when paired with explicit per-source items. There is no remote config, no feature flag, no runtime mutation path. A change to the allowlist requires a commit, which is reviewable. Neither agents nor the founder can sneak sources in via a config edit.
+There is no remote config, no feature flag, no runtime mutation path. A change to the allowlist requires a commit, which is reviewable. Neither agents nor the founder can sneak sources in via a config edit.
+
+## What's in the Allowlist Today
+
+As of items 009–012:
+
+- **`fs_paths`** — three entries:
+  - `~/Library/Application Support/Cursor/User/workspaceStorage/` (per-workspace state, used for inferring the workspace_id of a composer)
+  - `~/Library/Application Support/Cursor/User/globalStorage/` (where Cursor composer chat content actually lives)
+  - `~/.claude/projects/` (Claude Code's append-only JSONL transcripts)
+- **`git_repos`** — one entry:
+  - `~/Desktop/Project_echo/` — the founder's dogfooding repo
+- **`apps`, `domains`, `apis`** — still empty. Native-app capture (macOS Accessibility) and API connectors (GitHub, Slack) are V1.5+; the browser extension uses its own `host_permissions` manifest, not this list.
+
+The canonical list is `CAPTURED_SOURCES` in `src/capture/sources.ts` — this page reflects it but does not replace it.
+
+## Per-Source Decision History
+
+Every entry in the allowlist traces back to a backlog item. The "why this path" reasoning lives there.
+
+| Entry | Added by | Notes |
+|---|---|---|
+| `~/Library/Application Support/Cursor/User/workspaceStorage/` | `2026-04-30-009` (FS watcher), refined by `2026-04-30-010` | Workspace state — used to infer composer→workspace mapping. See [[cursor-extractor]]. |
+| `~/Library/Application Support/Cursor/User/globalStorage/` | `2026-04-30-010` (Cursor extractor) | Where chat *content* lives. Drift-note 2026-04-30 corrected the original assumption that workspace storage held content. See [[cursor-extractor]]. |
+| `~/.claude/projects/` | `2026-04-30-009` (FS watcher), refined by `2026-04-30-011` | Claude Code transcripts (`*.jsonl`, append-only). See [[claude-code-extractor]]. |
+| `git_repos` category itself | `2026-04-30-012` (git capture) | Fifth category. Repos are not directories of files — commits are first-class events. Exact-match after `~` expansion and trailing-slash normalization. See [[git-capture]]. |
+| `~/Desktop/Project_echo/` | `2026-04-30-012` | The dogfooding repo. Each additional repo is its own per-repo PR. |
 
 ## Why This Shape
 
@@ -51,3 +78,7 @@ Three properties matter:
 - [[storage]] — accepts only events that pass the gate
 - [[audit-page]] — renders this file for users
 - [[drift-prevention]] — empty-initial is itself a drift safeguard
+- [[fs-watcher]] — first surface to populate `fs_paths`
+- [[cursor-extractor]] — added `globalStorage`
+- [[claude-code-extractor]] — refined `~/.claude/projects/` usage
+- [[git-capture]] — introduced the `git_repos` category
