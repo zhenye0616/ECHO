@@ -34,10 +34,33 @@ The extractor watches two paths under `~/Library/Application Support/Cursor/User
 
 | Path | Role |
 |---|---|
-| `globalStorage/state.vscdb` (and `-wal`, `-shm`) | **Content.** Composer bubbles live in `cursorDiskKV` rows keyed `bubbleId:<composer_id>:<bubble_id>`. |
+| `globalStorage/state.vscdb` (and `-wal`, `-shm`) | **Content.** Composer bubbles + composer metadata live in `cursorDiskKV` rows. |
 | `workspaceStorage/<hash>/state.vscdb` | **Workspace inference.** Per-workspace `ItemTable.composer.composerData` lists which composer IDs belong to that workspace. |
 
 This split is empirical, not designed. An earlier spec assumed chat lived in per-workspace `state.vscdb`; a privacy-respecting probe (logged in `raw/internal/decisions/2026-04-30-DRIFT-cursor-chat-storage-location.md`) showed the per-workspace `cursorDiskKV` row count was zero across ~20 workspaces — actual chat content sits in `globalStorage`. The spec was rewritten to match.
+
+## Cursor's `cursorDiskKV` row shape
+
+Two row kinds matter; both were probed empirically against a live Cursor install:
+
+```
+key                                            value (top-level keys, abbreviated)
+─────────────────────────────────────────      ──────────────────────────────────────────
+composerData:<composer-uuid>                   { composerId, createdAt: <ms>,
+                                                 fullConversationHeadersOnly: [
+                                                   { bubbleId, type },  // ordered
+                                                   …
+                                                 ],
+                                                 conversation, status, … }
+bubbleId:<composer-uuid>:<bubble-uuid>         { _v, type, text, bubbleId, … many fields }
+```
+
+Two facts are load-bearing for the parser:
+
+- **Role is encoded as `type` (number), not `role` (string).** `type: 1` is user, `type: 2` is assistant. There is no `role` field.
+- **Bubbles have no per-row timestamp.** The canonical chronological order comes from the parent `composerData:<id>.fullConversationHeadersOnly` array. The extractor synthesizes a per-bubble `createdAt` as `composer.createdAt + position-in-headers` for stable ordering and checkpointing.
+
+Any bubble row whose value JSON doesn't match these expectations is dropped with `log.warn('unrecognized_bubble_shape', { reason, key })`, where `reason` is one of `json_parse`, `not_object`, `unknown_type`, `missing_text`, `no_composer_row`, `not_in_composer_headers`. This is the observability hook that surfaces a future Cursor schema drift in seconds rather than as silent zero-turn output.
 
 ## Composer, Not Workspace
 
@@ -56,7 +79,7 @@ Workspace-DB events are not debounced — they only update the inference map, wh
 ```ts
 {
   source: `fs:${globalDbPath}`,
-  timestamp: <ISO from the assistant bubble's createdAt>,
+  timestamp: <ISO from the synthesized assistant_created_at>,
   content: `USER: ${user_message}\n\nASSISTANT: ${assistant_message}`,
   metadata: {
     composer_id: string,
@@ -79,7 +102,7 @@ The SQLite handle is opened with `{ readonly: true, fileMustExist: true }`. Curs
 ## What it does NOT do
 
 - **Does not extract diffs.** Code change capture is [[git-capture]]'s job. The split is structural: chat is "what was discussed," git is "what actually changed."
-- **Does not extract tool calls.** Bubbles with `tool_use` / `tool_result` types are ignored; only `role: 'user'` and `role: 'assistant'` text becomes content. A future tool-extraction item may revisit.
+- **Does not extract tool calls.** Only bubbles with `type: 1` (user) or `type: 2` (assistant) become content. Rows with any other `type` value are dropped with `unrecognized_bubble_shape: unknown_type`. A future tool-extraction item may revisit.
 - **Does not summarise.** The full assistant message is stored verbatim. No last-part heuristic, no truncation.
 - **Does not backfill old bubbles** beyond what is currently in `globalStorage`. Cursor manages its own retention; ECHO captures forward.
 - **Does not write to Cursor's data.** All DB handles are read-only.
