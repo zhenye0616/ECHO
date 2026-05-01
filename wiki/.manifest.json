@@ -364,6 +364,18 @@
     "topic": "Architecture",
     "subtopic": "Substrate"
   },
+  "sources/cursor-collected-data.md": {
+    "title": "Cursor — Collected Data Reference",
+    "link": "cursor-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.",
+    "aliases": [
+      "Cursor Data Collection",
+      "What ECHO Collects from Cursor",
+      "Cursor Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
   "analyses/wedge-vs-thesis-validation.md": {
     "title": "Wedge vs Thesis Validation",
     "link": "wedge-vs-thesis-validation",

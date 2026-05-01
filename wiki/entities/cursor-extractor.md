@@ -120,6 +120,7 @@ The SQLite handle is opened with `{ readonly: true, fileMustExist: true }`. Curs
 
 ## Related
 
+- [[cursor-collected-data]] — field-by-field reference of what data ECHO actually reads from Cursor (the *what*; this page is the *how*)
 - [[claude-code-extractor]] — sibling extractor that converges on the same `USER: ... ASSISTANT: ...` turn shape
 - [[fs-watcher]] — generic surface that ignores Cursor's SQLite triplet so this extractor owns it
 - [[capture-pipeline]] — downstream consumer of each emitted candidate

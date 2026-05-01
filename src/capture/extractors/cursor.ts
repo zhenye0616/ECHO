@@ -20,6 +20,27 @@ const COMPOSER_KEY_PREFIX = 'composerData:';
 const TYPE_USER = 1;
 const TYPE_ASSISTANT = 2;
 
+export interface ReferencedFile {
+  path: string;
+  language?: string;
+}
+
+// Tier-A context extracted from the bubble rows. Only the fields with content
+// in real Cursor data are surfaced here (probed empirically against a live
+// install: many bubble fields like `gitDiffs`, `toolResults`, `relevantFiles`
+// were always empty and are therefore not extracted today).
+export interface CursorTurnContext {
+  // Files the user dragged into the chat (from user bubble's
+  // attachedFileCodeChunksUris). Dedup'd, in the order they appeared.
+  attached_files?: string[];
+  // Files the assistant referenced or wrote code for (from each assistant
+  // bubble's codeBlocks[]). Dedup'd by path. Cluster-aggregated.
+  referenced_files?: ReferencedFile[];
+  // Files the assistant deleted in this turn (from each assistant bubble's
+  // deletedFiles[]). Dedup'd. Cluster-aggregated.
+  deleted_files?: string[];
+}
+
 export interface CursorTurn {
   composer_id: string;
   user_bubble_id: string;
@@ -38,12 +59,21 @@ export interface CursorTurn {
   assistant_message: string;
   assistant_created_at: number;
   mtime: number;
+  // Aggregated structured context from the user + assistant cluster. Only
+  // populated keys are present; omitted entirely if all categories are empty.
+  context?: CursorTurnContext;
 }
 
 interface ComposerInfo {
   composer_id: string;
   createdAt: number;
   bubbleOrder: Map<string, number>; // bubble_id → position in fullConversationHeadersOnly
+}
+
+interface BubbleContext {
+  attachedFiles: string[];
+  referencedFiles: ReferencedFile[];
+  deletedFiles: string[];
 }
 
 interface ParsedBubble {
@@ -55,6 +85,7 @@ interface ParsedBubble {
   // Cursor does not store a per-bubble timestamp; the composer's createdAt + ordering
   // index gives a stable, monotonically increasing key for sort + checkpoint logic.
   createdAt: number;
+  context: BubbleContext;
 }
 
 interface CursorDiskKVRow {
@@ -104,6 +135,55 @@ function parseComposerRow(row: CursorDiskKVRow): ComposerInfo | null {
     }
   }
   return { composer_id, createdAt, bubbleOrder };
+}
+
+function asString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+function extractAttachedFiles(v: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const arr = v['attachedFileCodeChunksUris'];
+  if (!Array.isArray(arr)) return out;
+  for (const entry of arr) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const path = asString((entry as Record<string, unknown>)['path']);
+    if (path !== undefined) out.push(path);
+  }
+  return out;
+}
+
+function extractReferencedFiles(v: Record<string, unknown>): ReferencedFile[] {
+  const out: ReferencedFile[] = [];
+  const arr = v['codeBlocks'];
+  if (!Array.isArray(arr)) return out;
+  for (const entry of arr) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    const uri = e['uri'];
+    if (typeof uri !== 'object' || uri === null) continue;
+    const path = asString((uri as Record<string, unknown>)['path']);
+    if (path === undefined) continue;
+    const ref: ReferencedFile = { path };
+    const language = asString(e['languageId']);
+    if (language !== undefined) ref.language = language;
+    out.push(ref);
+  }
+  return out;
+}
+
+function extractDeletedFiles(v: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const arr = v['deletedFiles'];
+  if (!Array.isArray(arr)) return out;
+  for (const entry of arr) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const uri = (entry as Record<string, unknown>)['uri'];
+    if (typeof uri !== 'object' || uri === null) continue;
+    const path = asString((uri as Record<string, unknown>)['path']);
+    if (path !== undefined) out.push(path);
+  }
+  return out;
 }
 
 function parseBubbleRow(
@@ -157,7 +237,64 @@ function parseBubbleRow(
     role: type === TYPE_USER ? 'user' : 'assistant',
     text,
     createdAt: composer.createdAt + order,
+    context: {
+      attachedFiles: extractAttachedFiles(v),
+      referencedFiles: extractReferencedFiles(v),
+      deletedFiles: extractDeletedFiles(v),
+    },
   };
+}
+
+function dedupStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of values) {
+    if (!seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+function dedupReferencedFiles(values: ReferencedFile[]): ReferencedFile[] {
+  const seen = new Map<string, ReferencedFile>();
+  for (const r of values) {
+    const existing = seen.get(r.path);
+    if (existing === undefined) {
+      seen.set(r.path, r);
+    } else if (existing.language === undefined && r.language !== undefined) {
+      // Promote a previously-language-less entry to one with language.
+      seen.set(r.path, r);
+    }
+  }
+  return [...seen.values()];
+}
+
+function buildTurnContext(
+  user: ParsedBubble,
+  assistantCluster: ParsedBubble[],
+): CursorTurnContext | undefined {
+  const attached = dedupStrings([
+    ...user.context.attachedFiles,
+    ...assistantCluster.flatMap((b) => b.context.attachedFiles),
+  ]);
+  const referenced = dedupReferencedFiles([
+    ...user.context.referencedFiles,
+    ...assistantCluster.flatMap((b) => b.context.referencedFiles),
+  ]);
+  const deleted = dedupStrings([
+    ...user.context.deletedFiles,
+    ...assistantCluster.flatMap((b) => b.context.deletedFiles),
+  ]);
+  if (attached.length === 0 && referenced.length === 0 && deleted.length === 0) {
+    return undefined;
+  }
+  const out: CursorTurnContext = {};
+  if (attached.length > 0) out.attached_files = attached;
+  if (referenced.length > 0) out.referenced_files = referenced;
+  if (deleted.length > 0) out.deleted_files = deleted;
+  return out;
 }
 
 async function safeMtimeMs(path: string): Promise<number> {
@@ -272,7 +409,7 @@ export async function extractCursorTurns(
         break;
       }
       const last = assistantCluster[assistantCluster.length - 1]!;
-      turns.push({
+      const turn: CursorTurn = {
         composer_id,
         user_bubble_id: cur.bubble_id,
         assistant_bubble_id: last.bubble_id,
@@ -281,7 +418,10 @@ export async function extractCursorTurns(
         assistant_message: assistantCluster.map((b) => b.text).join('\n\n'),
         assistant_created_at: last.createdAt,
         mtime,
-      });
+      };
+      const context = buildTurnContext(cur, assistantCluster);
+      if (context !== undefined) turn.context = context;
+      turns.push(turn);
       i = j;
     }
   }
@@ -415,6 +555,7 @@ export async function startCursorExtractor(
         mtime: turn.mtime,
       };
       if (ws !== undefined) metadata['workspace_id'] = ws;
+      if (turn.context !== undefined) metadata['context'] = turn.context;
       const candidate = {
         source: `fs:${globalDbPath}`,
         timestamp: new Date(turn.assistant_created_at).toISOString(),

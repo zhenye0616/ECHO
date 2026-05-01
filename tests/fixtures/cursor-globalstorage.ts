@@ -5,6 +5,11 @@ export interface FixtureBubble {
   bubble_id: string;
   type: 1 | 2; // 1=user, 2=assistant — Cursor's wire encoding
   text: string;
+  // Optional context-bearing fields. When set, the fixture marshals them into
+  // the same wire shape Cursor uses, so the parser can be tested end-to-end.
+  codeBlocks?: { path: string; languageId?: string }[];
+  attachedFileCodeChunksUris?: string[];
+  deletedFiles?: string[];
 }
 
 export interface FixtureOptions {
@@ -26,7 +31,26 @@ function buildHeaders(
 }
 
 function bubbleValue(b: FixtureBubble): string {
-  return JSON.stringify({ _v: 3, type: b.type, text: b.text, bubbleId: b.bubble_id });
+  const v: Record<string, unknown> = {
+    _v: 3,
+    type: b.type,
+    text: b.text,
+    bubbleId: b.bubble_id,
+  };
+  if (b.codeBlocks !== undefined) {
+    v['codeBlocks'] = b.codeBlocks.map((c) => {
+      const block: Record<string, unknown> = { uri: { path: c.path } };
+      if (c.languageId !== undefined) block['languageId'] = c.languageId;
+      return block;
+    });
+  }
+  if (b.attachedFileCodeChunksUris !== undefined) {
+    v['attachedFileCodeChunksUris'] = b.attachedFileCodeChunksUris.map((p) => ({ path: p }));
+  }
+  if (b.deletedFiles !== undefined) {
+    v['deletedFiles'] = b.deletedFiles.map((p) => ({ uri: { path: p } }));
+  }
+  return JSON.stringify(v);
 }
 
 function composerValue(composer_id: string, createdAt: number, headers: { bubbleId: string; type: number }[]): string {

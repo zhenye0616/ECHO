@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json`. Do not edit by hand.
 
-**Totals:** 38 entries · 8 concepts · 15 entities · 9 sources · 6 analyses
+**Totals:** 39 entries · 8 concepts · 15 entities · 10 sources · 6 analyses
 
 ---
 
@@ -81,6 +81,10 @@ Auto-generated from `.manifest.json`. Do not edit by hand.
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
 - [[capture-allowlist|Capture Allowlist]] — Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.
 - [[stack-decision|Stack Decision]] — Why ECHO's daemon is TypeScript on Node.js for V1, with the Swift Accessibility shim deferred.
+
+### Per-App Data Collection
+
+- [[cursor-collected-data|Cursor — Collected Data Reference]] — Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.
 
 ### Validation
 

@@ -159,6 +159,60 @@ describe('extractCursorTurns (pure)', () => {
     });
   });
 
+  it('extracts attached_files / referenced_files / deleted_files into turn.context', async () => {
+    const bubbles: FixtureBubble[] = [
+      {
+        composer_id: 'c1',
+        bubble_id: 'u1',
+        type: 1,
+        text: 'fix README',
+        attachedFileCodeChunksUris: ['/proj/README.md'],
+      },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: 'looking…',
+        codeBlocks: [{ path: '/proj/README.md', languageId: 'markdown' }],
+      },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a2',
+        type: 2,
+        text: 'wrote it + cleaned up',
+        codeBlocks: [
+          { path: '/proj/README.md', languageId: 'markdown' }, // dedup target
+          { path: '/proj/src/index.ts', languageId: 'typescript' },
+        ],
+        deletedFiles: ['/proj/old/legacy.md'],
+      },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+    const turns = await extractCursorTurns(dbPath, new Map());
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.context).toEqual({
+      attached_files: ['/proj/README.md'],
+      referenced_files: [
+        { path: '/proj/README.md', language: 'markdown' },
+        { path: '/proj/src/index.ts', language: 'typescript' },
+      ],
+      deleted_files: ['/proj/old/legacy.md'],
+    });
+  });
+
+  it('omits turn.context entirely when no bubble carried any extracted context', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'hi' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'hello back' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+    const turns = await extractCursorTurns(dbPath, new Map());
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.context).toBeUndefined();
+  });
+
   it('uses the cluster-last bubble as the resume checkpoint (multi-assistant turns)', async () => {
     const bubbles: FixtureBubble[] = [
       { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
