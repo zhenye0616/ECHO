@@ -57,7 +57,58 @@ agent_notes: |
        walkthrough through each client and record findings in review_notes.
        If a client cannot be configured cleanly, the spec says ESCALATE
        (don't paper over).
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-01 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (both files net-new on main)
+
+  Fixups applied (pre-merge):
+  - Manual Cursor verification: founder confirmed verbally that the documented
+    walkthrough works (configure ~/.cursor/mcp.json, restart, search_memories
+    appears in MCP panel, real query triggers the tool). Recorded as confirmed.
+  - Manual Claude Code verification: same — founder confirmed the
+    `claude mcp add --transport http --scope user echo http://127.0.0.1:38478/mcp`
+    flow and that real queries trigger the tool. Recorded as confirmed.
+  - docs/mcp-integration.md:18 example log line updated: real daemon emits
+    `{"timestamp":"...","level":"info","source":"mcp.server",...}` so the
+    timestamp+level prefix was added to the example for accuracy. Verified
+    against a live `ECHO_STORAGE=memory npm run daemon` capture.
+
+  Fixups deferred to follow-up items:
+  - Vitest CI harness for the smoke script (acceptance #3, ~30 LOC). The agent
+    correctly held the line on adding tests/tools/mcp-integration-smoke.test.ts
+    because that path was not in files_to_modify; founder authorizes a
+    follow-up item.
+  - docs/STATUS.md milestone entry (acceptance #5). The agent correctly refused
+    to touch STATUS.md per AGENT_INSTRUCTIONS.md ("founder updates Friday");
+    founder writes the entry post-merge.
+  - Spec-template fix: future "milestone" items should phrase STATUS.md updates
+    as founder-post-merge rather than as agent acceptance criteria, so this
+    operating-manual conflict doesn't recur. (Strategist task.)
+  - Polish on tools/mcp-integration-smoke.sh:47-55: add `-f` to the reachability
+    curl so 4xx/5xx surfaces with a clearer error than the current degraded
+    downstream message.
+
+  Verify (post-merge, on main with this commit half-staged):
+  - npm run lint: clean
+  - npm run typecheck: clean
+  - npm test: 185-187/191 pass (default parallel) and 187/191 (single-fork);
+    4-6 chokidar lifecycle tests flake. Same pre-existing race observed in
+    items 014 and 015 reviews. Item 015 touches ZERO TypeScript and is
+    causally innocent — flake is on main pre-merge as well. The fs-watcher
+    `ignored` rule + cursor-extractor debounce work currently in founder WIP
+    looks like the in-progress fix; tracked separately, not blocking 015.
+
+  Follow-up items (non-blocking, to be filed):
+  - Authorize tests/tools/mcp-integration-smoke.test.ts via a small backlog
+    item (acceptance #3 leftover).
+  - Founder-write the week's milestone entry into docs/STATUS.md post-merge.
+  - Strategist amends item-spec template re: STATUS.md ownership.
+  - Polish curl `-f` flag in tools/mcp-integration-smoke.sh.
+  - Land the chokidar lifecycle stability work (separate WIP) so the test
+    suite stops flaking under parallel load. Already in flight as
+    founder-stashed local work.
 ---
 
 # Cursor + Claude Code MCP integration test (first end-to-end demo)
