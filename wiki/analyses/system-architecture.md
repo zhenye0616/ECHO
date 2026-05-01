@@ -25,9 +25,9 @@ LAYER 1 ─ SOURCES (apps and files you already use; ECHO doesn't change them)
 
    Cursor                    Claude Code               local git repos
    ~/Library/.../Cursor/     ~/.claude/projects/       ~/Desktop/.../.git/
-   ├ globalStorage/          ├ <session-id>.jsonl      ├ refs/heads/*
-   │  state.vscdb (SQLite)   │  (append-only)          ├ HEAD
-   └ workspaceStorage/       └ tool-results/...        └ objects/, ...
+   ├ globalStorage/          └ <project-slug>/         ├ refs/heads/*
+   │  state.vscdb (SQLite)      └ <session-id>.jsonl   ├ HEAD
+   └ workspaceStorage/             (append-only)       └ objects/, ...
         |                          |                        |
         ▼ chokidar fires            ▼                        ▼ chokidar fires
         on file change              same                     on ref change
@@ -96,7 +96,7 @@ The minimum view names exactly six components in the data path. Anything else (l
 
 ### 1. Sources
 
-Local files written by apps the user already uses. ECHO does not write to them; it only reads. The current V1 sources are Cursor's SQLite database under `globalStorage/`, Cursor's per-workspace state under `workspaceStorage/`, Claude Code's session JSONL files under `~/.claude/projects/`, and the user's local git repos. Each source already exists on disk because the user is working — ECHO just rides along on what's already there. See [[ride-along-capture]] for the principle, [[capture-allowlist]] for the canonical list.
+Local files written by apps the user already uses. ECHO does not write to them; it only reads. The current V1 sources are Cursor's SQLite database under `globalStorage/`, Cursor's per-workspace state under `workspaceStorage/`, Claude Code's session JSONL files under `~/.claude/projects/`, and the user's local git repos. Each source already exists on disk because the user is working — ECHO just rides along on what's already there. See [[ride-along-capture]] for the principle, [[capture-allowlist]] for the canonical list, and [[cursor-collected-data]] for the field-by-field record of what's actually read from each Cursor source (a sibling page for Claude Code is queued).
 
 ### 2. Capture surfaces
 
