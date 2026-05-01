@@ -23,9 +23,18 @@ const TYPE_ASSISTANT = 2;
 export interface CursorTurn {
   composer_id: string;
   user_bubble_id: string;
+  // The last assistant bubble in the cluster — used as the resume checkpoint.
   assistant_bubble_id: string;
+  // Every assistant bubble that followed the user, in chronological order.
+  // Always at least 1; usually more (Cursor often splits a single assistant
+  // response into a thinking-block bubble + answer bubble + tool-result
+  // bubbles, all with type=2).
+  assistant_bubble_ids: string[];
   workspace_id?: string;
   user_message: string;
+  // Concatenated text of every assistant bubble in the cluster, joined by
+  // a blank line. Empty bubbles are kept (they may carry richText elsewhere
+  // that we don't extract today) but contribute no characters.
   assistant_message: string;
   assistant_created_at: number;
   mtime: number;
@@ -240,24 +249,40 @@ export async function extractCursorTurns(
     while (i < bubbles.length) {
       const cur = bubbles[i]!;
       if (cur.role === 'assistant') {
+        // Orphan assistant — no preceding user. Cursor sometimes writes these
+        // for system / synthesized bubbles. Drop with a warn rather than
+        // pairing into a malformed turn.
         log.warn('orphan_assistant_bubble', { composer_id, bubble_id: cur.bubble_id });
         i += 1;
         continue;
       }
-      const next = bubbles[i + 1];
-      if (next === undefined || next.role !== 'assistant') {
+      // cur is user. Collect every consecutive assistant bubble until we hit
+      // the next user bubble (or end of array). Cursor splits a single
+      // logical assistant response into multiple type=2 bubbles in many
+      // flows — pairing only the first would silently drop the rest.
+      const assistantCluster: ParsedBubble[] = [];
+      let j = i + 1;
+      while (j < bubbles.length && bubbles[j]!.role === 'assistant') {
+        assistantCluster.push(bubbles[j]!);
+        j += 1;
+      }
+      if (assistantCluster.length === 0) {
+        // User bubble with no assistant response yet — incomplete turn.
+        // Leave it for the next pass once Cursor finishes writing.
         break;
       }
+      const last = assistantCluster[assistantCluster.length - 1]!;
       turns.push({
         composer_id,
         user_bubble_id: cur.bubble_id,
-        assistant_bubble_id: next.bubble_id,
+        assistant_bubble_id: last.bubble_id,
+        assistant_bubble_ids: assistantCluster.map((b) => b.bubble_id),
         user_message: cur.text,
-        assistant_message: next.text,
-        assistant_created_at: next.createdAt,
+        assistant_message: assistantCluster.map((b) => b.text).join('\n\n'),
+        assistant_created_at: last.createdAt,
         mtime,
       });
-      i += 2;
+      i = j;
     }
   }
 
@@ -386,6 +411,7 @@ export async function startCursorExtractor(
         composer_id: turn.composer_id,
         user_bubble_id: turn.user_bubble_id,
         assistant_bubble_id: turn.assistant_bubble_id,
+        assistant_bubble_ids: turn.assistant_bubble_ids,
         mtime: turn.mtime,
       };
       if (ws !== undefined) metadata['workspace_id'] = ws;

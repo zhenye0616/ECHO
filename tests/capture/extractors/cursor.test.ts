@@ -131,6 +131,52 @@ describe('extractCursorTurns (pure)', () => {
     expect(turns[0]?.assistant_bubble_id).toBe('b2');
   });
 
+  it('pairs one user bubble with all consecutive assistant bubbles (Cursor often splits responses)', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'fix the bug' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'thinking...' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'I see the issue' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'here is the fix' },
+      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'thanks' },
+      { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'no problem' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+    const turns = await extractCursorTurns(dbPath, new Map());
+
+    expect(turns).toHaveLength(2);
+    expect(turns[0]).toMatchObject({
+      user_bubble_id: 'u1',
+      assistant_bubble_id: 'a3', // last bubble in cluster — used as checkpoint
+      assistant_bubble_ids: ['a1', 'a2', 'a3'],
+      user_message: 'fix the bug',
+      assistant_message: 'thinking...\n\nI see the issue\n\nhere is the fix',
+    });
+    expect(turns[1]).toMatchObject({
+      user_bubble_id: 'u2',
+      assistant_bubble_id: 'a4',
+      assistant_bubble_ids: ['a4'],
+      assistant_message: 'no problem',
+    });
+  });
+
+  it('uses the cluster-last bubble as the resume checkpoint (multi-assistant turns)', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1-part-1' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a1-part-2' },
+      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'q2' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'a2' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+
+    // Resuming from the LAST bubble of the first cluster should yield only the
+    // second turn — proving the checkpoint advances correctly across clusters.
+    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a2']]));
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.user_bubble_id).toBe('u2');
+    expect(turns[0]?.assistant_bubble_id).toBe('a3');
+  });
+
   it('logs warn and drops orphan assistant bubble (no preceding user)', async () => {
     const bubbles: FixtureBubble[] = [
       { composer_id: 'c1', bubble_id: 'b1', type: 2, text: 'orphan' },
