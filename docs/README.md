@@ -25,10 +25,14 @@ Project_echo/
 │   └── AGENT_INSTRUCTIONS.md       # builder-agent operating manual
 │
 ├── wiki/                           # Knowledge archive (post-shipment only)
-│   ├── concepts/                   # Design patterns, principles, invariants
-│   ├── entities/                   # Components, surfaces, cohorts
-│   ├── sources/                    # Strategic decisions and spec docs
-│   ├── analyses/                   # Cross-cutting synthesis
+│   ├── product/                    # Strategic decisions + locked V1 scope
+│   ├── principles/                 # Active commitments + disciplines
+│   ├── architecture/               # Substrate + canonical models
+│   ├── capture/                    # L1 capture surfaces
+│   │   └── per-app/                # Field-level data references per app
+│   ├── surfaces/                   # L3 + L5 — user/AI-facing surfaces
+│   ├── research/                   # Validation work
+│   ├── operating-model/            # Process meta (retros, drift audits)
 │   ├── index.md, .manifest.json
 │   └── .manifest-schema.json
 │
@@ -41,7 +45,8 @@ Project_echo/
 │
 ├── tools/                          # Scripts
 │   ├── blocked.py                  # deterministic backlog selector + validator
-│   └── test_blocked.py             # 17 tests for the selector
+│   ├── test_blocked.py             # 17 tests for the selector
+│   └── wiki_index.py               # generates wiki/index.md from .manifest.json
 │
 ├── raw/                            # Source materials (interviews, decisions, logs)
 │   ├── internal/  {extension, v1-spec, interviews, decisions, agent-runs}
@@ -64,7 +69,7 @@ Project_echo/
 - **Sequencing:** 10 weeks from substrate to public launch
 - **Layers in V1:** Layer 1 (passive ingestion) + Layer 3 (summoned response, with both Q&A and assembly modes via clipboard+launch) + minimal Layer 5 (audit page). Layers 2 (ambient) and 4 (conversational) deferred to V2.
 
-See `wiki/sources/v1-spec.md` for the full locked-in spec.
+See `wiki/product/v1-spec.md` for the full locked-in spec.
 
 ## Architectural Commitments
 

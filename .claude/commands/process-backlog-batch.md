@@ -12,8 +12,8 @@ The four mandatory files. Read them before the first iteration; they cover all i
 
 1. `docs/AGENT_INSTRUCTIONS.md`
 2. `docs/NORTH_STAR.md`
-3. `wiki/concepts/drift-prevention.md`
-4. `wiki/sources/v1-spec.md`
+3. `wiki/principles/drift-prevention.md`
+4. `wiki/product/v1-spec.md`
 
 The full `wiki/` is your global context — readable on demand. Per-item `spec_refs` are loaded fresh inside each iteration.
 

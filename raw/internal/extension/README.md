@@ -11,7 +11,7 @@ Notes and decisions specific to the Chrome extension.
 
 ## What doesn't go here
 
-- General strategic decisions about the extension's role in V1 → those go in `wiki/sources/extension-funnel-logic.md`
+- General strategic decisions about the extension's role in V1 → those go in `wiki/research/extension-funnel-logic.md`
 - Validation experiment notes → those go in `raw/internal/interviews/`
 
 ## Pattern

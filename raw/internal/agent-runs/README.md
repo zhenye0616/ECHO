@@ -97,7 +97,7 @@ test result: ok. 6 passed; 0 failed
 ## What This Folder Doesn't Contain
 
 - The backlog items themselves → `backlog/`
-- Strategic decisions → `wiki/sources/`
+- Strategic decisions → `wiki/product/`
 - Drift events → `raw/internal/decisions/` (with type: drift-event)
 - User interview notes → `raw/internal/interviews/`
 

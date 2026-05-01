@@ -2,11 +2,12 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "wave-3-shipped",
+    "version": "wave-3-shipped-restructured",
     "generated": "2026-05-01",
-    "notes": "Waves 1–3 (items 001–015) shipped. Substrate + capture surfaces + MCP server + search_memories tool now reflected in entity pages. Aspirational stubs replaced with shipped-reality docs."
+    "notes": "Restructured 2026-05-01 from concepts/entities/sources/analyses to product/principles/architecture/capture/surfaces/research/operating-model. Added status: shipped|planned to every entry. See raw/internal/decisions/2026-05-01-wiki-restructure-proposal.md."
   },
-  "concepts/compose-not-capture.md": {
+  "principles/compose-not-capture.md": {
+    "status": "shipped",
     "title": "Compose, Don't Capture",
     "link": "compose-not-capture",
     "summary": "ECHO ingests from tools that already capture; never builds its own capture surface for what others provide",
@@ -16,7 +17,8 @@
     "topic": "Architecture",
     "subtopic": "Compose Not Capture"
   },
-  "concepts/felt-not-seen.md": {
+  "principles/felt-not-seen.md": {
+    "status": "shipped",
     "title": "Felt, Not Seen",
     "link": "felt-not-seen",
     "summary": "Ambient by default; visible on demand for trust. Product appears in the result, not the interface.",
@@ -27,7 +29,8 @@
     "topic": "Form Factor",
     "subtopic": "Felt Not Seen"
   },
-  "concepts/layer-above-saas.md": {
+  "principles/layer-above-saas.md": {
+    "status": "shipped",
     "title": "Layer Above SaaS",
     "link": "layer-above-saas",
     "summary": "ECHO is additive to existing tools, never a replacement. The connective tissue between apps.",
@@ -37,7 +40,8 @@
     "topic": "Architecture",
     "subtopic": "Layer Above SaaS"
   },
-  "concepts/context-as-moat.md": {
+  "principles/context-as-moat.md": {
+    "status": "shipped",
     "title": "Context as Moat",
     "link": "context-as-moat",
     "summary": "Compete on context, not capability. Adjacent to foundation models, structurally outside their wars.",
@@ -48,7 +52,8 @@
     "topic": "Brand & Positioning",
     "subtopic": "Obsession Statement"
   },
-  "concepts/ambient-form-factor.md": {
+  "principles/ambient-form-factor.md": {
+    "status": "shipped",
     "title": "Ambient Form Factor",
     "link": "ambient-form-factor",
     "summary": "Browser extension + MCP server + hotkey overlay. No destination app. Three thin presences.",
@@ -58,7 +63,8 @@
     "topic": "Form Factor",
     "subtopic": "Ambient Surfaces"
   },
-  "concepts/clipboard-and-launch.md": {
+  "principles/clipboard-and-launch.md": {
+    "status": "shipped",
     "title": "Clipboard and Launch",
     "link": "clipboard-and-launch",
     "summary": "Universal delivery mechanism: assemble context, copy to clipboard, open target app, user pastes.",
@@ -69,7 +75,8 @@
     "topic": "Form Factor",
     "subtopic": "Hotkey Overlay"
   },
-  "concepts/drift-prevention.md": {
+  "principles/drift-prevention.md": {
+    "status": "shipped",
     "title": "Drift Prevention",
     "link": "drift-prevention",
     "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
@@ -80,7 +87,8 @@
     "topic": "V1 Scope",
     "subtopic": "Non-Goals"
   },
-  "concepts/sandboxed-capture.md": {
+  "principles/sandboxed-capture.md": {
+    "status": "shipped",
     "title": "Sandboxed Capture",
     "link": "sandboxed-capture",
     "summary": "Capture enforced as code via the single gate chokepoint, now exercised in production by all four V1 capture surfaces.",
@@ -91,7 +99,8 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "entities/browser-extension.md": {
+  "surfaces/browser-extension.md": {
+    "status": "shipped",
     "title": "Browser Extension",
     "link": "browser-extension",
     "summary": "Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.",
@@ -102,7 +111,8 @@
     "topic": "Form Factor",
     "subtopic": "Browser Extension"
   },
-  "entities/local-daemon.md": {
+  "architecture/local-daemon.md": {
+    "status": "shipped",
     "title": "Local Daemon",
     "link": "local-daemon",
     "summary": "Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.",
@@ -113,7 +123,8 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "entities/mcp-server.md": {
+  "surfaces/mcp-server.md": {
+    "status": "shipped",
     "title": "MCP Server",
     "link": "mcp-server",
     "summary": "Local MCP server on 127.0.0.1:38478 exposing search_memories + echo_ping to MCP-compliant AI clients via Streamable HTTP/SSE.",
@@ -124,7 +135,8 @@
     "topic": "Form Factor",
     "subtopic": "MCP Server"
   },
-  "entities/hotkey-overlay.md": {
+  "surfaces/hotkey-overlay.md": {
+    "status": "planned",
     "title": "Hotkey Overlay",
     "link": "hotkey-overlay",
     "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
@@ -135,7 +147,8 @@
     "topic": "Form Factor",
     "subtopic": "Hotkey Overlay"
   },
-  "entities/audit-page.md": {
+  "surfaces/audit-page.md": {
+    "status": "planned",
     "title": "Audit Page",
     "link": "audit-page",
     "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
@@ -146,7 +159,8 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "entities/target-cohort-indie-ai-builders.md": {
+  "product/target-cohort-indie-ai-builders.md": {
+    "status": "shipped",
     "title": "Target Cohort: Indie AI Builders",
     "link": "target-cohort-indie-ai-builders",
     "summary": "V1 wedge: solo devs and small-team founders shipping AI tools. Strong founder-market-fit + warm distribution.",
@@ -157,7 +171,8 @@
     "topic": "Cohorts",
     "subtopic": "Indie AI Builders"
   },
-  "entities/capture-gate.md": {
+  "architecture/capture-gate.md": {
+    "status": "shipped",
     "title": "Capture Gate",
     "link": "capture-gate",
     "summary": "Pure-function chokepoint at src/capture/gate.ts; five source kinds, six stable rejection codes, exhaustive test coverage.",
@@ -168,7 +183,8 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "entities/storage.md": {
+  "architecture/storage.md": {
+    "status": "shipped",
     "title": "Storage",
     "link": "storage",
     "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix filter.",
@@ -181,7 +197,8 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "entities/logger.md": {
+  "architecture/logger.md": {
+    "status": "shipped",
     "title": "Logger",
     "link": "logger",
     "summary": "Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.",
@@ -193,7 +210,8 @@
     "topic": "Architecture",
     "subtopic": "Observability"
   },
-  "entities/capture-pipeline.md": {
+  "architecture/capture-pipeline.md": {
+    "status": "shipped",
     "title": "Capture Pipeline",
     "link": "capture-pipeline",
     "summary": "Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.",
@@ -205,7 +223,8 @@
     "topic": "Architecture",
     "subtopic": "Capture"
   },
-  "entities/fs-watcher.md": {
+  "capture/fs-watcher.md": {
+    "status": "shipped",
     "title": "FS Watcher",
     "link": "fs-watcher",
     "summary": "First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.",
@@ -217,7 +236,8 @@
     "topic": "Architecture",
     "subtopic": "Capture Surfaces"
   },
-  "entities/cursor-extractor.md": {
+  "capture/cursor-extractor.md": {
+    "status": "shipped",
     "title": "Cursor Extractor",
     "link": "cursor-extractor",
     "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents.",
@@ -229,7 +249,8 @@
     "topic": "Architecture",
     "subtopic": "Capture Surfaces"
   },
-  "entities/claude-code-extractor.md": {
+  "capture/claude-code-extractor.md": {
+    "status": "shipped",
     "title": "Claude Code Extractor",
     "link": "claude-code-extractor",
     "summary": "Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.",
@@ -241,7 +262,8 @@
     "topic": "Architecture",
     "subtopic": "Capture Surfaces"
   },
-  "entities/git-capture.md": {
+  "capture/git-capture.md": {
+    "status": "shipped",
     "title": "Git Capture",
     "link": "git-capture",
     "summary": "Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.",
@@ -254,10 +276,11 @@
     "topic": "Architecture",
     "subtopic": "Capture Surfaces"
   },
-  "entities/mcp-search-memories.md": {
+  "surfaces/mcp-search-memories.md": {
+    "status": "shipped",
     "title": "MCP search_memories Tool",
     "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool — case-insensitive substring + filters over captured events; embeddings deferred to V1.5.",
+    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring + filters over captured events; embeddings deferred to V1.5.",
     "aliases": [
       "search_memories",
       "MCP search_memories tool",
@@ -266,7 +289,8 @@
     "topic": "Form Factor",
     "subtopic": "MCP Server"
   },
-  "sources/v1-spec.md": {
+  "product/v1-spec.md": {
+    "status": "shipped",
     "title": "V1 Spec (Locked)",
     "link": "v1-spec",
     "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
@@ -277,7 +301,8 @@
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
-  "sources/brand-promise.md": {
+  "product/brand-promise.md": {
+    "status": "shipped",
     "title": "Brand Promise",
     "link": "brand-promise",
     "summary": "We don't make AI smarter. We make every AI smarter about you. Plus alternative formulations tested.",
@@ -288,7 +313,8 @@
     "topic": "Brand & Positioning",
     "subtopic": "Brand Promise"
   },
-  "sources/form-factor-decision.md": {
+  "product/form-factor-decision.md": {
+    "status": "shipped",
     "title": "Form Factor Decision",
     "link": "form-factor-decision",
     "summary": "Why no destination app. Browser extension + MCP server + hotkey overlay as the three thin presences.",
@@ -298,7 +324,8 @@
     "topic": "Form Factor",
     "subtopic": "Ambient Surfaces"
   },
-  "sources/interface-layers.md": {
+  "architecture/interface-layers.md": {
+    "status": "shipped",
     "title": "Interface Layers (1-5)",
     "link": "interface-layers",
     "summary": "Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.",
@@ -309,7 +336,8 @@
     "topic": "Architecture",
     "subtopic": "Layer Stack"
   },
-  "sources/bundle-decision.md": {
+  "product/bundle-decision.md": {
+    "status": "shipped",
     "title": "Bundle Decision",
     "link": "bundle-decision",
     "summary": "V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.",
@@ -320,7 +348,8 @@
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
-  "sources/extension-funnel-logic.md": {
+  "research/extension-funnel-logic.md": {
+    "status": "shipped",
     "title": "Extension Funnel Logic",
     "link": "extension-funnel-logic",
     "summary": "Extension and V1 are family, not pipeline. Gravitational conversion via shared thesis, not push-marketing.",
@@ -330,7 +359,8 @@
     "topic": "Validation",
     "subtopic": "Extension Funnel"
   },
-  "sources/validation-experiments.md": {
+  "research/validation-experiments.md": {
+    "status": "shipped",
     "title": "Validation Experiments",
     "link": "validation-experiments",
     "summary": "Three experiments running parallel to substrate build: user interviews, landing page, concierge.",
@@ -340,7 +370,8 @@
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
-  "sources/capture-allowlist.md": {
+  "architecture/capture-allowlist.md": {
+    "status": "shipped",
     "title": "Capture Allowlist",
     "link": "capture-allowlist",
     "summary": "Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.",
@@ -352,7 +383,8 @@
     "subtopic": "Storage",
     "raw": "src/capture/sources.ts"
   },
-  "sources/stack-decision.md": {
+  "product/stack-decision.md": {
+    "status": "shipped",
     "title": "Stack Decision",
     "link": "stack-decision",
     "summary": "Why ECHO's daemon is TypeScript on Node.js for V1, with the Swift Accessibility shim deferred.",
@@ -364,8 +396,9 @@
     "topic": "Architecture",
     "subtopic": "Substrate"
   },
-  "sources/cursor-collected-data.md": {
-    "title": "Cursor — Collected Data Reference",
+  "capture/per-app/cursor-collected-data.md": {
+    "status": "shipped",
+    "title": "Cursor \u2014 Collected Data Reference",
     "link": "cursor-collected-data",
     "summary": "Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.",
     "aliases": [
@@ -376,7 +409,8 @@
     "topic": "Architecture",
     "subtopic": "Per-App Data Collection"
   },
-  "analyses/wedge-vs-thesis-validation.md": {
+  "research/wedge-vs-thesis-validation.md": {
+    "status": "shipped",
     "title": "Wedge vs Thesis Validation",
     "link": "wedge-vs-thesis-validation",
     "summary": "Extension validates thesis (people pay for unified context). V1 must separately validate the dev wedge.",
@@ -386,7 +420,8 @@
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
-  "analyses/three-cohort-comparison.md": {
+  "product/three-cohort-comparison.md": {
+    "status": "shipped",
     "title": "Three-Cohort Comparison",
     "link": "three-cohort-comparison",
     "summary": "Indie AI builders vs vibe coders vs solo SaaS founders. Why indie AI builders win the V1 wedge.",
@@ -396,7 +431,8 @@
     "topic": "Cohorts",
     "subtopic": "Indie AI Builders"
   },
-  "analyses/tier-vs-vertical-slice.md": {
+  "product/tier-vs-vertical-slice.md": {
+    "status": "shipped",
     "title": "Tier-by-Tier vs Vertical Slice",
     "link": "tier-vs-vertical-slice",
     "summary": "Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.",
@@ -406,7 +442,8 @@
     "topic": "V1 Scope",
     "subtopic": "Sequencing"
   },
-  "analyses/narrowest-v1-scope.md": {
+  "product/narrowest-v1-scope.md": {
+    "status": "shipped",
     "title": "Narrowest V1 Scope",
     "link": "narrowest-v1-scope",
     "summary": "L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.",
@@ -416,7 +453,8 @@
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
-  "analyses/system-architecture.md": {
+  "architecture/system-architecture.md": {
+    "status": "shipped",
     "title": "System Architecture (Minimum Component View)",
     "link": "system-architecture",
     "summary": "Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.",
@@ -429,10 +467,11 @@
     "topic": "Architecture",
     "subtopic": "System Architecture"
   },
-  "analyses/wave-1-2-3-retrospective.md": {
+  "operating-model/wave-1-2-3-retrospective.md": {
+    "status": "shipped",
     "title": "Wave 1-2-3 Retrospective",
     "link": "wave-1-2-3-retrospective",
-    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.",
+    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off \u2014 and where they didn't.",
     "aliases": [
       "Wave 1-2-3 Retrospective",
       "Substrate Wave Retrospective",

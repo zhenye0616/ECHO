@@ -298,8 +298,8 @@ When an agent runs, it must:
 1. **Read mandatory global context** — every run, in order:
    - `docs/AGENT_INSTRUCTIONS.md` — operating manual
    - `docs/NORTH_STAR.md` — daily orient + drift questions
-   - `wiki/concepts/drift-prevention.md` — canonical drift doctrine
-   - `wiki/sources/v1-spec.md` — locked V1 spec
+   - `wiki/principles/drift-prevention.md` — canonical drift doctrine
+   - `wiki/product/v1-spec.md` — locked V1 spec
 
    The entire `wiki/` folder is the agent's global context — readable on demand. The item's `spec_refs` is *additional* per-item context, not a substitute.
 2. **Pull latest `main`** in the main repo

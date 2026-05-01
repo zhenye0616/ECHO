@@ -15,7 +15,7 @@ This is both a **decision archive** (the wiki) and a **build coordination system
 
 ### When making strategic decisions
 
-1. **Search existing wiki + backlog first.** A shipped wiki page (`wiki/concepts/`, `sources/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
+1. **Search existing wiki + backlog first.** A shipped wiki page (`wiki/product/`, `wiki/principles/`, `wiki/architecture/`, `wiki/capture/`, `wiki/surfaces/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
 2. **Cite cross-project wisdom.** The `yc-wiki` (`~/Desktop/yc/yc-wiki/`) is the authoritative source for startup strategy frameworks. Reference its concept pages by `[[link]]` when applying them.
 3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — lives inside `backlog/ready/<id>.md`. The strategist does **not** write to `wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
 4. **Background reasoning** that doesn't correspond to an actionable build item lands in `raw/internal/decisions/`.
@@ -25,22 +25,30 @@ This is both a **decision archive** (the wiki) and a **build coordination system
 
 - Drop research notes into `raw/external/precedents/` (Wispr Flow, 1Password, Plaid patterns, etc.)
 - Drop competitor scans into `raw/external/competitor-scans/`
-- Synthesize patterns into `wiki/concepts/` only after multiple raw sources point the same direction
+- Synthesize patterns into `wiki/principles/` only after multiple raw sources point the same direction
 
 ### When running validation experiments
 
 - Each user interview gets a markdown file in `raw/internal/interviews/`
-- Aggregate signals into `wiki/analyses/` after 5+ interviews
+- Aggregate signals into `wiki/research/` after 5+ interviews
 - Concierge experiment notes also go in `raw/internal/interviews/`
 
 ## Folder Taxonomy
 
+The wiki is restructured (2026-05-01) into eight folders that mirror the substrate's left-edge / middle / right-edge architecture and the `interface-layers` L1/L3/L5 vocabulary. See `raw/internal/decisions/2026-05-01-wiki-restructure-proposal.md` for the diagnosis and reasoning.
+
 | Folder | Purpose | Examples |
 |---|---|---|
-| `concepts/` | Design patterns, principles, invariants | compose-not-capture, felt-not-seen |
-| `entities/` | Components, surfaces, cohorts | local-daemon, mcp-server, target-cohort-indie-ai-builders |
-| `sources/` | Strategic decisions and spec docs | v1-spec, brand-promise, bundle-decision |
-| `analyses/` | Cross-cutting synthesis | wedge-vs-thesis-validation, narrowest-v1-scope |
+| `product/` | Strategic "what" — locked V1 scope, target cohort, brand decisions | v1-spec, bundle-decision, target-cohort-indie-ai-builders |
+| `principles/` | Active commitments + disciplines (design, brand, scope) | felt-not-seen, compose-not-capture, drift-prevention |
+| `architecture/` | The durable middle — substrate components + canonical models | system-architecture, capture-gate, storage, interface-layers |
+| `capture/` | Layer 1 capture surfaces (substrate's left edge) | fs-watcher, cursor-extractor, claude-code-extractor |
+| `capture/per-app/` | Field-level reference for each connected app | cursor-collected-data |
+| `surfaces/` | Layer 3 + Layer 5 — what users + AI clients touch | mcp-server, hotkey-overlay, audit-page, browser-extension |
+| `research/` | Validation work | wedge-vs-thesis-validation, validation-experiments |
+| `operating-model/` | Process meta — wave retros, drift audits | wave-1-2-3-retrospective |
+
+Each page carries a `status: shipped | planned` frontmatter field. `shipped` documents reality that exists; `planned` is a V1 commitment specced but not yet built (today: hotkey-overlay, audit-page).
 
 ## Filename + Link Conventions
 
@@ -107,7 +115,7 @@ After any strategic conversation that lands an actionable decision:
 2. **Add a row to `docs/BACKLOG.md`'s Ready table.**
 3. **Do NOT touch `wiki/`.** Wiki edits happen only after items land in `complete/`.
 
-When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `wiki/` (sources/, concepts/, entities/, analyses/, manifest, index).
+When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `wiki/` — landing each page in the appropriate folder (product/, principles/, architecture/, capture/, capture/per-app/, surfaces/, research/, or operating-model/), then updating `.manifest.json` and regenerating `wiki/index.md` via `tools/wiki_index.py`.
 
 ### Builder Agent Responsibilities
 

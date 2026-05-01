@@ -16,10 +16,10 @@ These four files are required context for every run. Read them before doing anyt
 |---|---|
 | `docs/AGENT_INSTRUCTIONS.md` | This file — your operating manual; loop, drift rules, write/no-write lists |
 | `docs/NORTH_STAR.md` | Daily orient — brand promise, V1 scope summary, the 5 drift questions |
-| `wiki/concepts/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
-| `wiki/sources/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
+| `wiki/principles/drift-prevention.md` | Canonical drift doctrine; source of truth (the bullet list later in this file is a paraphrase) |
+| `wiki/product/v1-spec.md` | Locked V1 spec — what we're building, what's cut, definition of done |
 
-The **entire `wiki/` folder is your global context** — read-only, but readable on demand for any concept (`wiki/concepts/`), source (`wiki/sources/`), entity (`wiki/entities/`), or analysis (`wiki/analyses/`) you need. The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
+The **entire `wiki/` folder is your global context** — read-only, but readable on demand. The wiki is organized into eight folders: `product/` (strategic decisions), `principles/` (active commitments + disciplines), `architecture/` (substrate + canonical models), `capture/` (L1 surfaces) with `capture/per-app/` (field-level data refs), `surfaces/` (L3+L5 — what users and AI clients touch), `research/` (validation), and `operating-model/` (process meta). The four files above are mandatory; everything else is reachable as needed. The item's `spec_refs` list is *in addition to* these four, not a substitute.
 
 ## Your Single Loop
 

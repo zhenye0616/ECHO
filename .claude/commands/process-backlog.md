@@ -10,10 +10,10 @@ Before doing anything, read these four files in order — they are your global c
 
 1. `docs/AGENT_INSTRUCTIONS.md` — operating manual; loop, drift rules, write/no-write lists. Treat it as load-bearing.
 2. `docs/NORTH_STAR.md` — daily orient + the 5 drift questions.
-3. `wiki/concepts/drift-prevention.md` — canonical drift doctrine (this is the source of truth; the bullets in AGENT_INSTRUCTIONS are a paraphrase).
-4. `wiki/sources/v1-spec.md` — locked V1 spec; what we're building, what's cut, definition of done.
+3. `wiki/principles/drift-prevention.md` — canonical drift doctrine (this is the source of truth; the bullets in AGENT_INSTRUCTIONS are a paraphrase).
+4. `wiki/product/v1-spec.md` — locked V1 spec; what we're building, what's cut, definition of done.
 
-The entire `wiki/` folder is read-only global context — readable on demand for any concept, source, entity, or analysis you need. The item's `spec_refs` adds per-item context on top of these four.
+The entire `wiki/` folder is read-only global context — readable on demand. It is organized into product/, principles/, architecture/, capture/ (with capture/per-app/), surfaces/, research/, and operating-model/. The item's `spec_refs` adds per-item context on top of these four.
 
 Then, in the main repo (`~/Desktop/Project_echo`) on `main`: `git pull --rebase origin main`.
 
