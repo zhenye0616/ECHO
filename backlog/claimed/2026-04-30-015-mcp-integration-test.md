@@ -22,9 +22,9 @@ files_to_modify:
   - tools/mcp-integration-smoke.sh
   - docs/STATUS.md (record the milestone)
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-01T06:00:00Z"
+branch: "agent/mcp-integration-test"
 worktree: ""
 head_sha: ""
 pr_url: ""
