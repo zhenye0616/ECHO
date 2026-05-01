@@ -29,3 +29,11 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - Wire `limit: MAX_OVERFETCH` into `storage.query` once storage guarantees timestamp-DESC ordering. Today `searchMemories` loads the entire matching set into memory before sorting/slicing — fine for V1 dataset sizes, becomes O(N) memory at scale. (MCP search-memories tool; cross-cuts Storage interface.)
 - Add `order` / `order_by` to `QueryFilter` once a second consumer needs DESC. Until then the in-tool sort is fine. Worth a Spec Authoring Lesson once the second use case appears. (Storage interface.)
 - **Investigate chokidar lifecycle flake** — `cursor.test.ts`, `claude-code.test.ts`, `fs-watcher.test.ts` intermittently time out at 5000ms. Different tests fail each run (race, not deterministic regression). Surfaced by ~10% additional CPU pressure from 014's 20 new tests. Stop-gap: bump global `testTimeout` to 15s in `vitest.config.ts`. Real fix: investigate `watcher.close()` race in chokidar teardown. Workaround `--pool=forks --poolOptions.forks.singleFork=true` masks rather than fixes. (Test-infra item; high priority since the flake will block future merges.)
+
+## From merge of 2026-04-30-015-mcp-integration-test (2026-05-01)
+
+- [ ] Authorize `tests/tools/mcp-integration-smoke.test.ts` via a small backlog item — ~30 LOC Vitest test that spawns daemon (`ECHO_STORAGE=memory` + random port) and execs the smoke script, asserts RC=0. Resolves deferred acceptance #3.
+- [ ] Founder writes the week's MCP-demo milestone entry into `docs/STATUS.md`. Operating manual reserves STATUS.md for founder; agent (correctly) refused to touch it during 015.
+- [ ] Strategist amends item-spec template: phrase STATUS.md updates as founder-post-merge, not as agent acceptance. Otherwise this conflict recurs every "milestone" item.
+- [ ] Polish `tools/mcp-integration-smoke.sh:47-55`: add `-f` to the reachability `curl` so HTTP 4xx/5xx surfaces with a clearer error than the current degraded downstream message.
+- [ ] Land the chokidar lifecycle stability work currently in founder WIP (fs-watcher `ignored` rules + cursor-extractor debounce + corresponding test updates). Pre-existing race causing 4-6 test flakes under parallel load; observed across 014, 015 reviews and the 015 merge verify step.
