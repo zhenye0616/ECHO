@@ -87,8 +87,8 @@ export class SqliteStorage implements Storage {
       params['source'] = filter.source;
     }
     if (filter?.source_prefix !== undefined) {
-      clauses.push("source LIKE @source_prefix || '%'");
-      params['source_prefix'] = filter.source_prefix;
+      clauses.push("source LIKE @source_prefix || '%' ESCAPE '\\'");
+      params['source_prefix'] = filter.source_prefix.replace(/[\\%_]/g, '\\$&');
     }
     if (filter?.since !== undefined) {
       clauses.push('timestamp >= @since');

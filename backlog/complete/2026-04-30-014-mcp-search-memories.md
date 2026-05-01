@@ -59,7 +59,28 @@ agent_notes: |
 
   Open for founder: is the flaky test infra a blocker for this merge, or do you
   want to ship the code and address the race in a separate item?
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-01 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean adds; sidecar's no-conflict prediction held)
+
+  Fixups applied:
+  - src/storage/sqlite.ts:90 — escape %/_/\ in source_prefix; added ESCAPE '\' clause to SQL
+  - src/storage/memory.ts:30 — documented insertion-order limit semantics in a 2-line comment (matches SqliteStorage's ORDER BY timestamp ASC)
+
+  Fixups deferred to follow-up items:
+  - none (both pre-merge fixups applied)
+
+  Verify: 187/191 tests pass post-merge. The 4 failures are the pre-existing
+  chokidar lifecycle flake documented in the sidecar (claude-code.test.ts x2,
+  cursor.test.ts x1, fs-watcher.test.ts x1 — all 5000ms timeouts on disjoint
+  capture-surface code). Flake reproduced across all 3 reviewer runs with
+  different test names each time, confirming race not regression. Search-memories
+  tests pass deterministically. Lint and typecheck clean. Founder accepted the
+  flake under option 2 (treat as known, proceed) — added to follow-ups.
+
+  Follow-up items (non-blocking): see backlog/_followups.md
 ---
 
 # MCP `search_memories` tool — retrieval over captured events

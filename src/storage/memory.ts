@@ -27,6 +27,8 @@ export class MemoryStorage implements Storage {
       if (since !== undefined && event.timestamp < since) continue;
       if (until !== undefined && event.timestamp >= until) continue;
       matches.push(event);
+      // limit truncates oldest-first to match SqliteStorage's ORDER BY timestamp ASC.
+      // Consumers needing most-recent-first must overfetch and sort.
       if (limit !== undefined && matches.length >= limit) break;
     }
     return matches;
