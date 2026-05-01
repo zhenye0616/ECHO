@@ -54,10 +54,10 @@ describe('extractCursorTurns (pure)', () => {
 
   it('returns all complete turns when lastSeenMap is empty', async () => {
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'hello', createdAt: 1000 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'hi back', createdAt: 1100 },
-      { composer_id: 'c1', bubble_id: 'b3', role: 'user', text: 'follow up', createdAt: 1200 },
-      { composer_id: 'c1', bubble_id: 'b4', role: 'assistant', text: 'response', createdAt: 1300 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'hello' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'hi back' },
+      { composer_id: 'c1', bubble_id: 'b3', type: 1, text: 'follow up' },
+      { composer_id: 'c1', bubble_id: 'b4', type: 2, text: 'response' },
     ];
     createGlobalStorageFixture(dbPath, bubbles);
 
@@ -79,12 +79,14 @@ describe('extractCursorTurns (pure)', () => {
 
   it('tracks multiple composers independently', async () => {
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'cA', bubble_id: 'b1', role: 'user', text: 'a-q', createdAt: 100 },
-      { composer_id: 'cA', bubble_id: 'b2', role: 'assistant', text: 'a-a', createdAt: 200 },
-      { composer_id: 'cB', bubble_id: 'b1', role: 'user', text: 'b-q', createdAt: 150 },
-      { composer_id: 'cB', bubble_id: 'b2', role: 'assistant', text: 'b-a', createdAt: 250 },
+      { composer_id: 'cA', bubble_id: 'b1', type: 1, text: 'a-q' },
+      { composer_id: 'cA', bubble_id: 'b2', type: 2, text: 'a-a' },
+      { composer_id: 'cB', bubble_id: 'b1', type: 1, text: 'b-q' },
+      { composer_id: 'cB', bubble_id: 'b2', type: 2, text: 'b-a' },
     ];
-    createGlobalStorageFixture(dbPath, bubbles);
+    createGlobalStorageFixture(dbPath, bubbles, {
+      composers: { cA: { createdAt: 100 }, cB: { createdAt: 200 } },
+    });
 
     const turns = await extractCursorTurns(dbPath, new Map());
     expect(turns).toHaveLength(2);
@@ -94,10 +96,10 @@ describe('extractCursorTurns (pure)', () => {
 
   it('returns only bubbles after the per-composer checkpoint', async () => {
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'old-q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'old-a', createdAt: 200 },
-      { composer_id: 'c1', bubble_id: 'b3', role: 'user', text: 'new-q', createdAt: 300 },
-      { composer_id: 'c1', bubble_id: 'b4', role: 'assistant', text: 'new-a', createdAt: 400 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'old-q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'old-a' },
+      { composer_id: 'c1', bubble_id: 'b3', type: 1, text: 'new-q' },
+      { composer_id: 'c1', bubble_id: 'b4', type: 2, text: 'new-a' },
     ];
     createGlobalStorageFixture(dbPath, bubbles);
 
@@ -110,7 +112,7 @@ describe('extractCursorTurns (pure)', () => {
 
   it('emits zero turns for a user-only trailing bubble; emits one once the assistant arrives', async () => {
     createGlobalStorageFixture(dbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'pending', createdAt: 100 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'pending' },
     ]);
 
     const map = new Map<string, string>();
@@ -120,9 +122,8 @@ describe('extractCursorTurns (pure)', () => {
     appendBubble(dbPath, {
       composer_id: 'c1',
       bubble_id: 'b2',
-      role: 'assistant',
+      type: 2,
       text: 'finally',
-      createdAt: 200,
     });
     turns = await extractCursorTurns(dbPath, map);
     expect(turns).toHaveLength(1);
@@ -132,9 +133,9 @@ describe('extractCursorTurns (pure)', () => {
 
   it('logs warn and drops orphan assistant bubble (no preceding user)', async () => {
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'assistant', text: 'orphan', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'user', text: 'q', createdAt: 200 },
-      { composer_id: 'c1', bubble_id: 'b3', role: 'assistant', text: 'a', createdAt: 300 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 2, text: 'orphan' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b3', type: 2, text: 'a' },
     ];
     createGlobalStorageFixture(dbPath, bubbles);
 
@@ -159,8 +160,8 @@ describe('extractCursorTurns (pure)', () => {
 
   it('warns and skips composer when checkpoint bubble is no longer present', async () => {
     createGlobalStorageFixture(dbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
     ]);
     const map = new Map<string, string>([['c1', 'b-evicted']]);
     const turns = await extractCursorTurns(dbPath, map);
@@ -168,20 +169,41 @@ describe('extractCursorTurns (pure)', () => {
     expect(captured.writes.join('')).toContain('checkpoint_not_found');
   });
 
-  it('skips bubbles with malformed JSON or unrecognized role values', async () => {
+  it('warns and skips bubbles with malformed JSON or unrecognized type values', async () => {
     createGlobalStorageFixture(dbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
     ]);
     appendRawCursorDiskKVRow(dbPath, 'bubbleId:c1:b3', '{not valid json');
     appendRawCursorDiskKVRow(
       dbPath,
       'bubbleId:c1:b4',
-      JSON.stringify({ role: 'tool', text: 'x', createdAt: 300 }),
+      JSON.stringify({ _v: 3, type: 99, text: 'unknown', bubbleId: 'b4' }),
     );
     const turns = await extractCursorTurns(dbPath, new Map());
     expect(turns).toHaveLength(1);
     expect(turns[0]?.user_bubble_id).toBe('b1');
+    const log = captured.writes.join('');
+    expect(log).toContain('unrecognized_bubble_shape');
+    expect(log).toContain('json_parse');
+    expect(log).toContain('unknown_type');
+  });
+
+  it('warns when a bubble has no parent composerData row', async () => {
+    // A bubble row with a composer_id that has no corresponding composerData entry
+    // should be dropped with `unrecognized_bubble_shape: no_composer_row`.
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    appendRawCursorDiskKVRow(
+      dbPath,
+      'bubbleId:c-orphan:bX',
+      JSON.stringify({ _v: 3, type: 1, text: 'no parent', bubbleId: 'bX' }),
+    );
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(captured.writes.join('')).toContain('no_composer_row');
   });
 });
 
@@ -219,10 +241,14 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
   it('emits a CandidateEvent per turn through the pipeline on globalStorage change', async () => {
     handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
 
-    createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
-    ]);
+    createGlobalStorageFixture(
+      globalDbPath,
+      [
+        { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+        { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
+      ],
+      { composerCreatedAt: 1000 },
+    );
 
     await waitFor(async () => (await storage.count()) >= 1);
     const events = await storage.query();
@@ -230,7 +256,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     const evt = events[0]!;
     expect(evt.source).toBe(`fs:${globalDbPath}`);
     expect(evt.content).toBe('USER: q1\n\nASSISTANT: a1');
-    expect(evt.timestamp).toBe(new Date(200).toISOString());
+    expect(evt.timestamp).toBe(new Date(1001).toISOString());
     expect(evt.metadata).toMatchObject({
       composer_id: 'c1',
       user_bubble_id: 'b1',
@@ -241,8 +267,8 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
 
   it('emits a CandidateEvent when the globalStorage WAL changes', async () => {
     createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
     ]);
     const walPath = `${globalDbPath}-wal`;
     writeFileSync(walPath, '');
@@ -261,8 +287,8 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
 
   it('coalesces rapid globalStorage WAL changes into one emitted capture', async () => {
     createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
     ]);
     const walPath = `${globalDbPath}-wal`;
     writeFileSync(walPath, '');
@@ -284,19 +310,23 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
   it('emits distinct timestamps for multiple turns flushed in a single FS event', async () => {
     handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
 
-    createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
-      { composer_id: 'c1', bubble_id: 'b3', role: 'user', text: 'q2', createdAt: 300 },
-      { composer_id: 'c1', bubble_id: 'b4', role: 'assistant', text: 'a2', createdAt: 400 },
-    ]);
+    createGlobalStorageFixture(
+      globalDbPath,
+      [
+        { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+        { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
+        { composer_id: 'c1', bubble_id: 'b3', type: 1, text: 'q2' },
+        { composer_id: 'c1', bubble_id: 'b4', type: 2, text: 'a2' },
+      ],
+      { composerCreatedAt: 1000 },
+    );
 
     await waitFor(async () => (await storage.count()) >= 2);
     const events = await storage.query();
     expect(events).toHaveLength(2);
     const timestamps = events.map((e) => e.timestamp);
     expect(new Set(timestamps).size).toBe(2);
-    expect(timestamps).toEqual([new Date(200).toISOString(), new Date(400).toISOString()]);
+    expect(timestamps).toEqual([new Date(1001).toISOString(), new Date(1003).toISOString()]);
   });
 
   it('populates workspace_id when the per-workspace inference index has the composer', async () => {
@@ -319,8 +349,8 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     await new Promise((r) => setTimeout(r, 200));
 
     createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
@@ -338,16 +368,16 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
 
     const turnPairs: FixtureBubble[][] = [
       [
-        { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
-        { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+        { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+        { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
       ],
       [
-        { composer_id: 'c1', bubble_id: 'b3', role: 'user', text: 'q2', createdAt: 300 },
-        { composer_id: 'c1', bubble_id: 'b4', role: 'assistant', text: 'a2', createdAt: 400 },
+        { composer_id: 'c1', bubble_id: 'b3', type: 1, text: 'q2' },
+        { composer_id: 'c1', bubble_id: 'b4', type: 2, text: 'a2' },
       ],
       [
-        { composer_id: 'c1', bubble_id: 'b5', role: 'user', text: 'q3', createdAt: 500 },
-        { composer_id: 'c1', bubble_id: 'b6', role: 'assistant', text: 'a3', createdAt: 600 },
+        { composer_id: 'c1', bubble_id: 'b5', type: 1, text: 'q3' },
+        { composer_id: 'c1', bubble_id: 'b6', type: 2, text: 'a3' },
       ],
     ];
 
@@ -374,8 +404,8 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
 
   it('backfills lastSeenMap from prior storage events on boot', async () => {
     createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'old-q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'old-a', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'old-q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'old-a' },
     ]);
 
     await storage.append({
@@ -390,16 +420,14 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     appendBubble(globalDbPath, {
       composer_id: 'c1',
       bubble_id: 'b3',
-      role: 'user',
+      type: 1,
       text: 'new-q',
-      createdAt: 300,
     });
     appendBubble(globalDbPath, {
       composer_id: 'c1',
       bubble_id: 'b4',
-      role: 'assistant',
+      type: 2,
       text: 'new-a',
-      createdAt: 400,
     });
 
     await waitFor(async () => (await storage.count()) >= 2);
@@ -417,8 +445,8 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
   it('stop() resolves cleanly and prevents further events', async () => {
     handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
     createGlobalStorageFixture(globalDbPath, [
-      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q', createdAt: 100 },
-      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a', createdAt: 200 },
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
     const before = await storage.count();
@@ -429,16 +457,14 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     appendBubble(globalDbPath, {
       composer_id: 'c1',
       bubble_id: 'b3',
-      role: 'user',
+      type: 1,
       text: 'q2',
-      createdAt: 300,
     });
     appendBubble(globalDbPath, {
       composer_id: 'c1',
       bubble_id: 'b4',
-      role: 'assistant',
+      type: 2,
       text: 'a2',
-      createdAt: 400,
     });
     await new Promise((r) => setTimeout(r, 300));
     expect(await storage.count()).toBe(before);

@@ -14,6 +14,11 @@ const DEFAULT_GLOBAL_DB = `${HOME}/Library/Application Support/Cursor/User/globa
 const DEFAULT_WORKSPACE_PREFIX = `${HOME}/Library/Application Support/Cursor/User/workspaceStorage/`;
 
 const BUBBLE_KEY_PREFIX = 'bubbleId:';
+const COMPOSER_KEY_PREFIX = 'composerData:';
+
+// Cursor encodes bubble role as a numeric `type` in cursorDiskKV.
+const TYPE_USER = 1;
+const TYPE_ASSISTANT = 2;
 
 export interface CursorTurn {
   composer_id: string;
@@ -26,11 +31,20 @@ export interface CursorTurn {
   mtime: number;
 }
 
+interface ComposerInfo {
+  composer_id: string;
+  createdAt: number;
+  bubbleOrder: Map<string, number>; // bubble_id → position in fullConversationHeadersOnly
+}
+
 interface ParsedBubble {
   composer_id: string;
   bubble_id: string;
   role: 'user' | 'assistant';
   text: string;
+  // Synthesized: composer.createdAt + bubble's position in fullConversationHeadersOnly.
+  // Cursor does not store a per-bubble timestamp; the composer's createdAt + ordering
+  // index gives a stable, monotonically increasing key for sort + checkpoint logic.
   createdAt: number;
 }
 
@@ -50,9 +64,15 @@ function parseBubbleKey(key: string): { composer_id: string; bubble_id: string }
   };
 }
 
-function parseBubbleRow(row: CursorDiskKVRow): ParsedBubble | null {
-  const parsedKey = parseBubbleKey(row.key);
-  if (parsedKey === null) return null;
+function parseComposerKey(key: string): string | null {
+  if (!key.startsWith(COMPOSER_KEY_PREFIX)) return null;
+  const id = key.slice(COMPOSER_KEY_PREFIX.length);
+  return id.length > 0 ? id : null;
+}
+
+function parseComposerRow(row: CursorDiskKVRow): ComposerInfo | null {
+  const composer_id = parseComposerKey(row.key);
+  if (composer_id === null) return null;
   let value: unknown;
   try {
     value = JSON.parse(row.value);
@@ -61,18 +81,73 @@ function parseBubbleRow(row: CursorDiskKVRow): ParsedBubble | null {
   }
   if (typeof value !== 'object' || value === null) return null;
   const v = value as Record<string, unknown>;
-  const role = v['role'];
-  const text = v['text'];
   const createdAt = v['createdAt'];
-  if (role !== 'user' && role !== 'assistant') return null;
-  if (typeof text !== 'string') return null;
-  if (typeof createdAt !== 'number') return null;
+  const headers = v['fullConversationHeadersOnly'];
+  if (typeof createdAt !== 'number' || !Array.isArray(headers)) return null;
+  const bubbleOrder = new Map<string, number>();
+  for (let i = 0; i < headers.length; i += 1) {
+    const h = headers[i];
+    if (typeof h === 'object' && h !== null) {
+      const bid = (h as Record<string, unknown>)['bubbleId'];
+      if (typeof bid === 'string') {
+        bubbleOrder.set(bid, i);
+      }
+    }
+  }
+  return { composer_id, createdAt, bubbleOrder };
+}
+
+function parseBubbleRow(
+  row: CursorDiskKVRow,
+  composers: Map<string, ComposerInfo>,
+): ParsedBubble | null {
+  const parsedKey = parseBubbleKey(row.key);
+  if (parsedKey === null) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(row.value);
+  } catch {
+    log.warn('unrecognized_bubble_shape', { key: row.key, reason: 'json_parse' });
+    return null;
+  }
+  if (typeof value !== 'object' || value === null) {
+    log.warn('unrecognized_bubble_shape', { key: row.key, reason: 'not_object' });
+    return null;
+  }
+  const v = value as Record<string, unknown>;
+  const type = v['type'];
+  const text = v['text'];
+  if (type !== TYPE_USER && type !== TYPE_ASSISTANT) {
+    log.warn('unrecognized_bubble_shape', {
+      key: row.key,
+      reason: 'unknown_type',
+      type: typeof type === 'number' ? type : null,
+    });
+    return null;
+  }
+  if (typeof text !== 'string') {
+    log.warn('unrecognized_bubble_shape', { key: row.key, reason: 'missing_text' });
+    return null;
+  }
+  const composer = composers.get(parsedKey.composer_id);
+  if (composer === undefined) {
+    log.warn('unrecognized_bubble_shape', { key: row.key, reason: 'no_composer_row' });
+    return null;
+  }
+  const order = composer.bubbleOrder.get(parsedKey.bubble_id);
+  if (order === undefined) {
+    log.warn('unrecognized_bubble_shape', {
+      key: row.key,
+      reason: 'not_in_composer_headers',
+    });
+    return null;
+  }
   return {
     composer_id: parsedKey.composer_id,
     bubble_id: parsedKey.bubble_id,
-    role,
+    role: type === TYPE_USER ? 'user' : 'assistant',
     text,
-    createdAt,
+    createdAt: composer.createdAt + order,
   };
 }
 
@@ -97,7 +172,8 @@ export async function extractCursorTurns(
     return [];
   }
 
-  let rows: CursorDiskKVRow[];
+  let bubbleRows: CursorDiskKVRow[];
+  let composerRows: CursorDiskKVRow[];
   try {
     const tableExists = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='cursorDiskKV'")
@@ -107,7 +183,10 @@ export async function extractCursorTurns(
       db.close();
       return [];
     }
-    rows = db
+    composerRows = db
+      .prepare("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'")
+      .all() as CursorDiskKVRow[];
+    bubbleRows = db
       .prepare("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'")
       .all() as CursorDiskKVRow[];
   } catch (err) {
@@ -117,7 +196,13 @@ export async function extractCursorTurns(
   }
   db.close();
 
-  if (rows.length === 0) {
+  const composers = new Map<string, ComposerInfo>();
+  for (const row of composerRows) {
+    const info = parseComposerRow(row);
+    if (info !== null) composers.set(info.composer_id, info);
+  }
+
+  if (bubbleRows.length === 0) {
     log.warn('no_bubble_keys', { path: globalDbPath });
     return [];
   }
@@ -125,8 +210,8 @@ export async function extractCursorTurns(
   const mtime = await safeMtimeMs(globalDbPath);
 
   const byComposer = new Map<string, ParsedBubble[]>();
-  for (const row of rows) {
-    const parsed = parseBubbleRow(row);
+  for (const row of bubbleRows) {
+    const parsed = parseBubbleRow(row, composers);
     if (parsed === null) continue;
     let arr = byComposer.get(parsed.composer_id);
     if (arr === undefined) {
