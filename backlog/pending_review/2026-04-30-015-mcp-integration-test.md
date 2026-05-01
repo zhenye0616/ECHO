@@ -25,10 +25,38 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-01T06:00:00Z"
 branch: "agent/mcp-integration-test"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--mcp-integration-test"
+head_sha: "8517962123351367310a959260fd35a4ce253cc5"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Shipped docs/mcp-integration.md (Cursor + Claude Code setup, verification
+  walkthrough, troubleshooting, example query) and tools/mcp-integration-smoke.sh
+  (curl-based MCP handshake → tools/list → tools/call search_memories, asserts
+  shape, exits 0/1 with clear stderr). Smoke script verified empirically against
+  a live `npm run daemon` (RC=0) and against a not-running port (RC=1).
+
+  Lint + typecheck clean. `npm test` baseline-flaky on chokidar lifecycle tests
+  (same pre-existing race observed in item 014; this item touches zero
+  TypeScript so the flake is independent of my work — confirmed by reproducing
+  the flake with only the chokidar test files in isolation).
+
+  THREE JUDGMENT CALLS DEFERRED TO YOU (full reasoning in run log):
+    1. The Vitest test for the smoke script (acceptance #3) was NOT added.
+       Adding tests/tools/mcp-integration-smoke.test.ts would create a file
+       outside files_to_modify (drift). Suggest you either authorize the
+       test file in a follow-up item or append it to files_to_modify and
+       re-claim.
+    2. `docs/STATUS.md` was NOT touched. AGENT_INSTRUCTIONS.md
+       "What You Must Not Write" forbids agents from editing STATUS.md
+       (founder-only, "founder updates Friday"). The acceptance criterion
+       conflicts with the operating manual; I followed the operating
+       manual. Suggest you write the milestone entry yourself.
+    3. Manual verification (Cursor + Claude Code in real client sessions)
+       is founder work by the spec ("Manual verification (founder during
+       review)"). Run the smoke script first, then drive the documented
+       walkthrough through each client and record findings in review_notes.
+       If a client cannot be configured cleanly, the spec says ESCALATE
+       (don't paper over).
 review_notes: ""
 ---
 
