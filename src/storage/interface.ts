@@ -11,6 +11,7 @@ export interface CaptureEvent {
 
 export interface QueryFilter {
   source?: string;
+  source_prefix?: string;
   since?: string;
   until?: string;
   limit?: number;
