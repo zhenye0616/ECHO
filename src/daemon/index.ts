@@ -40,11 +40,13 @@ acquirePidLockOrExit(resolveDataDir());
 
 const { storage, backend, dispose } = createStorage();
 
-const fsWatcher = await startFsWatcher(CAPTURED_SOURCES.fs_paths, storage);
-const gitWatcher = await startGitWatcher(CAPTURED_SOURCES.git_repos, storage);
-const claudeCodeExtractor = await startClaudeCodeExtractor(storage);
-const cursorExtractor = await startCursorExtractor(storage);
-const mcp = await startMcpServer(storage, { port: resolveMcpPort() });
+const [fsWatcher, gitWatcher, claudeCodeExtractor, cursorExtractor, mcp] = await Promise.all([
+  startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
+  startGitWatcher(CAPTURED_SOURCES.git_repos, storage),
+  startClaudeCodeExtractor(storage),
+  startCursorExtractor(storage),
+  startMcpServer(storage, { port: resolveMcpPort() }),
+]);
 
 await startLifecycle({
   storage,

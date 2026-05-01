@@ -2,6 +2,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
@@ -17,7 +18,7 @@ const FORMAT = '%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f%b%x1e';
 
 function getBackfillCount(): number {
   const env = process.env['ECHO_GIT_BACKFILL_COMMITS'];
-  if (env !== undefined && env.length > 0) {
+  if (isNonEmptyString(env)) {
     const n = Number.parseInt(env, 10);
     if (Number.isInteger(n) && n >= 0) return n;
   }

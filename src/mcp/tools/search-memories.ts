@@ -47,7 +47,6 @@ export interface SearchMemoriesParams {
 
 function clampLimit(input: number | undefined): number {
   if (input === undefined) return DEFAULT_LIMIT;
-  if (Number.isNaN(input)) return DEFAULT_LIMIT;
   const floored = Math.floor(input);
   return Math.min(Math.max(1, floored), MAX_LIMIT);
 }
