@@ -77,11 +77,18 @@ export class SqliteStorage implements Storage {
   }
 
   async query(filter?: QueryFilter): Promise<CaptureEvent[]> {
+    if (filter?.source !== undefined && filter?.source_prefix !== undefined) {
+      throw new Error('QueryFilter.source and source_prefix are mutually exclusive');
+    }
     const clauses: string[] = [];
     const params: Record<string, unknown> = {};
     if (filter?.source !== undefined) {
       clauses.push('source = @source');
       params['source'] = filter.source;
+    }
+    if (filter?.source_prefix !== undefined) {
+      clauses.push("source LIKE @source_prefix || '%'");
+      params['source_prefix'] = filter.source_prefix;
     }
     if (filter?.since !== undefined) {
       clauses.push('timestamp >= @since');

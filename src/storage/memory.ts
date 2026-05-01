@@ -12,6 +12,10 @@ export class MemoryStorage implements Storage {
 
   async query(filter?: QueryFilter): Promise<CaptureEvent[]> {
     const source = filter?.source;
+    const sourcePrefix = filter?.source_prefix;
+    if (source !== undefined && sourcePrefix !== undefined) {
+      throw new Error('QueryFilter.source and source_prefix are mutually exclusive');
+    }
     const since = filter?.since;
     const until = filter?.until;
     const limit = filter?.limit;
@@ -19,6 +23,7 @@ export class MemoryStorage implements Storage {
     const matches: CaptureEvent[] = [];
     for (const event of this.events) {
       if (source !== undefined && event.source !== source) continue;
+      if (sourcePrefix !== undefined && !event.source.startsWith(sourcePrefix)) continue;
       if (since !== undefined && event.timestamp < since) continue;
       if (until !== undefined && event.timestamp >= until) continue;
       matches.push(event);

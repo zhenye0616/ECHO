@@ -6,6 +6,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
+import { registerSearchMemories } from './tools/search-memories.js';
 
 const log = createLogger('mcp.server');
 
@@ -55,7 +56,7 @@ async function readJsonBody(
 }
 
 export async function startMcpServer(
-  _storage: Storage,
+  storage: Storage,
   options: StartMcpServerOptions = {},
 ): Promise<McpServerHandle> {
   const host = options.host ?? '127.0.0.1';
@@ -67,6 +68,7 @@ export async function startMcpServer(
   async function createSession(): Promise<Session> {
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     registerEchoPing(mcp);
+    registerSearchMemories(mcp, storage);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       enableDnsRebindingProtection: true,
