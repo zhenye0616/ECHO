@@ -1,11 +1,11 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import { execFile } from 'node:child_process';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
+import { normalizeRepoPath } from '../sources.js';
 
 const log = createLogger('capture.surfaces.git');
 const execFileP = promisify(execFile);
@@ -14,21 +14,6 @@ const DIFF_TRUNCATE_BYTES = 100 * 1024;
 const DEFAULT_POLL_MS = 30_000;
 const DEFAULT_BACKFILL = 50;
 const FORMAT = '%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f%b%x1e';
-
-function expandTilde(p: string): string {
-  const home = homedir();
-  if (p === '~') return home;
-  if (p.startsWith('~/')) return home + p.slice(1);
-  return p;
-}
-
-function stripTrailingSlash(p: string): string {
-  return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
-}
-
-function normalizeRepoPath(p: string): string {
-  return stripTrailingSlash(expandTilde(p));
-}
 
 function getBackfillCount(): number {
   const env = process.env['ECHO_GIT_BACKFILL_COMMITS'];

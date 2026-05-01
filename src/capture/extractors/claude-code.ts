@@ -138,7 +138,7 @@ export async function extractClaudeCodeTurns(
   let pendingUser: { line: ParsedLine; hadToolThisTurn: boolean } | null = null;
   let hadToolBetween = false;
   let offsetCursor = lastByteOffset;
-  let turnIndex = 0; // local — caller may rebase against persisted state
+  let turnIndex = 0;
 
   for (const line of lines) {
     const lineBytes = Buffer.byteLength(line, 'utf8') + 1; // +1 for the newline
@@ -161,7 +161,6 @@ export async function extractClaudeCodeTurns(
       };
       hadToolBetween = false;
     } else {
-      // assistant
       if (pendingUser === null) {
         log.warn('orphan_assistant', { session_id });
         if (parsed.hasTool) hadToolBetween = true;
@@ -235,7 +234,6 @@ export async function startClaudeCodeExtractor(
     const cur = offsetMap.get(path) ?? { offset: 0, turn_index: -1 };
     const { turns, newOffset } = await extractClaudeCodeTurns(path, cur.offset);
     let nextTurnIndex = cur.turn_index + 1;
-    let lastOffset = cur.offset;
     for (const turn of turns) {
       const metadata: Record<string, unknown> = {
         project: turn.project,
@@ -255,16 +253,11 @@ export async function startClaudeCodeExtractor(
       const result = await processCandidate(candidate, storage);
       if (result.accepted) {
         nextTurnIndex += 1;
-        lastOffset = turn.byte_offset;
       } else {
         log.warn('candidate_rejected', { reason: result.reason, path });
       }
     }
     offsetMap.set(path, { offset: newOffset, turn_index: nextTurnIndex - 1 });
-    if (newOffset > lastOffset) {
-      // Note: even with no emitted turns (e.g., orphan/incomplete), newOffset
-      // advances past consumed bytes so we don't re-read partial content.
-    }
   }
 
   function schedule(work: () => Promise<void>): void {

@@ -59,13 +59,17 @@ function stripTrailingSlash(p: string): string {
   return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
 }
 
+export function normalizeRepoPath(p: string): string {
+  return stripTrailingSlash(expandTilde(p));
+}
+
 export function _isAllowedRepoIn(
   repoPath: unknown,
   repos: ReadonlyArray<string>,
 ): boolean {
   if (!isNonEmptyString(repoPath)) return false;
-  const normalized = stripTrailingSlash(expandTilde(repoPath));
-  return repos.some((entry) => stripTrailingSlash(expandTilde(entry)) === normalized);
+  const normalized = normalizeRepoPath(repoPath);
+  return repos.some((entry) => normalizeRepoPath(entry) === normalized);
 }
 
 export function isAllowedApp(bundleId: string): boolean {
