@@ -123,6 +123,9 @@ def load_items(repo_root: Path) -> dict[str, dict[str, Any]]:
         if not d.exists():
             continue
         for f in sorted(d.glob("*.md")):
+            # Skip /review-pending sidecars; they're metadata, not items.
+            if f.name.endswith(".review.md"):
+                continue
             text = f.read_text(encoding="utf-8")
             try:
                 fm = parse_frontmatter(text)

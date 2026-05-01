@@ -44,6 +44,15 @@ function statAsync(absPath: string): Promise<Stats | null> {
   });
 }
 
+function ignored(filepath: string): boolean {
+  // Cursor's SQLite triplet is owned by the cursor extractor; don't double-capture.
+  if (/\bstate\.vscdb(-wal|-shm|-journal)?$/.test(filepath)) return true;
+  if (filepath.endsWith('-journal')) return true;
+  if (filepath.endsWith('.tmp')) return true;
+  if (filepath.endsWith('/.DS_Store')) return true;
+  return false;
+}
+
 async function emitCandidate(
   event_type: EventType,
   absPath: string,
@@ -89,6 +98,7 @@ export async function startFsWatcher(
     persistent: true,
     alwaysStat: true,
     awaitWriteFinish: false,
+    ignored,
   });
 
   watcher.on('add', (p: string, stats?: Stats) => {

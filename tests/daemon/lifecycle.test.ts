@@ -36,6 +36,7 @@ function spawnDaemon(dataDir: string): DaemonProcess {
       ECHO_DATA_DIR: dataDir,
       ECHO_LOG_LEVEL: 'info',
       ECHO_STORAGE: 'memory',
+      ECHO_MCP_PORT: '0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

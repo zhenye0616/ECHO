@@ -282,6 +282,12 @@ export async function startCursorExtractor(
 
   let processing: Promise<void> = Promise.resolve();
   let stopped = false;
+  let debounceTimer: NodeJS.Timeout | null = null;
+  const DEBOUNCE_MS = 300;
+
+  function isGlobalDbFamily(p: string): boolean {
+    return p === globalDbPath || p === `${globalDbPath}-wal` || p === `${globalDbPath}-shm`;
+  }
 
   function isWorkspaceDb(p: string): boolean {
     return p.startsWith(workspacePrefix) && p.endsWith('state.vscdb');
@@ -333,6 +339,14 @@ export async function startCursorExtractor(
     });
   }
 
+  function scheduleGlobalChange(): void {
+    if (debounceTimer !== null) return;
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      schedule(() => handleGlobalChange());
+    }, DEBOUNCE_MS);
+  }
+
   const globalDbDir = dirname(globalDbPath);
   const watcher: FSWatcher = chokidar.watch([globalDbDir, workspacePrefix], {
     ignoreInitial: true,
@@ -341,8 +355,8 @@ export async function startCursorExtractor(
   });
 
   function dispatch(p: string): void {
-    if (p === globalDbPath) {
-      schedule(() => handleGlobalChange());
+    if (isGlobalDbFamily(p)) {
+      scheduleGlobalChange();
     } else if (isWorkspaceDb(p)) {
       schedule(() => handleWorkspaceChange(p));
     }
@@ -363,6 +377,10 @@ export async function startCursorExtractor(
   return {
     stop: async () => {
       stopped = true;
+      if (debounceTimer !== null) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
       await watcher.close();
       await processing;
       log.info('stopped', {});

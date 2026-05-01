@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -237,6 +237,48 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
       assistant_bubble_id: 'b2',
     });
     expect(evt.metadata).not.toHaveProperty('workspace_id');
+  });
+
+  it('emits a CandidateEvent when the globalStorage WAL changes', async () => {
+    createGlobalStorageFixture(globalDbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
+      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+    ]);
+    const walPath = `${globalDbPath}-wal`;
+    writeFileSync(walPath, '');
+
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    const touchedAt = new Date(Date.now() + 1000);
+    utimesSync(walPath, touchedAt, touchedAt);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${globalDbPath}`);
+    expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
+  });
+
+  it('coalesces rapid globalStorage WAL changes into one emitted capture', async () => {
+    createGlobalStorageFixture(globalDbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', role: 'user', text: 'q1', createdAt: 100 },
+      { composer_id: 'c1', bubble_id: 'b2', role: 'assistant', text: 'a1', createdAt: 200 },
+    ]);
+    const walPath = `${globalDbPath}-wal`;
+    writeFileSync(walPath, '');
+
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    for (let i = 0; i < 3; i += 1) {
+      const touchedAt = new Date(Date.now() + 1000 + i * 1000);
+      utimesSync(walPath, touchedAt, touchedAt);
+    }
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    await new Promise((r) => setTimeout(r, 150));
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
   });
 
   it('emits distinct timestamps for multiple turns flushed in a single FS event', async () => {

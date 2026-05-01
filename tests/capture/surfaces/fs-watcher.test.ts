@@ -100,6 +100,21 @@ describe('startFsWatcher', () => {
     expect(types).toContain('change');
   });
 
+  it('ignores Cursor SQLite WAL artifacts while still capturing normal files', async () => {
+    handle = await startFsWatcher([dir], storage);
+
+    const walPath = join(dir, 'state.vscdb-wal');
+    const filePath = join(dir, 'normal.txt');
+    writeFileSync(walPath, '');
+    writeFileSync(filePath, 'hello');
+
+    await waitForCount(storage, 1);
+    await new Promise((r) => setTimeout(r, 300));
+    const all = await storage.query();
+    expect(all.some((e) => e.source === `fs:${walPath}`)).toBe(false);
+    expect(all.some((e) => e.source === `fs:${filePath}`)).toBe(true);
+  });
+
   it('emits an unlink event when a file is deleted (no size in content)', async () => {
     const filePath = join(dir, 'c.txt');
     writeFileSync(filePath, 'gone soon');
