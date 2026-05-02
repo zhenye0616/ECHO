@@ -54,5 +54,5 @@ medium: Zoom / phone / in-person
 
 ## What doesn't go here
 
-- Aggregated synthesis → `wiki/analyses/`
+- Aggregated synthesis → `wiki/research/`
 - Survey data → use a separate spreadsheet, not markdown

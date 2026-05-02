@@ -11,8 +11,8 @@ Working drafts and supporting docs for V1 spec decisions.
 
 ## What doesn't go here
 
-- The locked V1 spec itself → `wiki/sources/v1-spec.md`
-- Final architectural commitments → `wiki/concepts/`
+- The locked V1 spec itself → `wiki/product/v1-spec.md`
+- Final architectural commitments → `wiki/principles/` (or `wiki/architecture/` if a substrate component)
 
 ## Pattern
 
