@@ -16,25 +16,7 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-**Wave 2 — bring the substrate to life.** Wires the substrate skeleton into a running daemon that captures Cursor and Claude Code workspace events to a real database. 006/007/008 independent (parallel-safe via multi-session `ECHO_AGENT_ID`); 009 unblocks once all three land in `complete/`.
-
-| Priority | ID | Title | Blocked By |
-|---|---|---|---|
-| HIGH | [2026-04-30-006](../backlog/ready/2026-04-30-006-capture-pipeline.md) | Capture pipeline (gate → storage wire-up) | — |
-| HIGH | [2026-04-30-007](../backlog/ready/2026-04-30-007-daemon-entry.md) | Daemon entry point + lifecycle | — |
-| HIGH | [2026-04-30-008](../backlog/ready/2026-04-30-008-sqlite-storage.md) | SQLite Storage implementation (better-sqlite3) | — |
-| HIGH | [2026-04-30-009](../backlog/ready/2026-04-30-009-fs-watcher-cursor-and-claude-code.md) | FS watcher — first capture surface (Cursor + Claude Code) | 006, 007, 008 |
-
-**Wave 3 — close the loop with MCP.** Adds content extractors (chat turns), git capture (commits/diffs), an MCP server, and the `search_memories` retrieval tool. Lands the V1 spec's week 4–5 milestone: end-to-end demo to founder. 010/011 unblock when Wave 2's 009 ships; 012/013 unblock at their respective Wave 2 dependencies. 014 needs 013 + 010 + 011. 015 (manual integration test) is the demo gate.
-
-| Priority | ID | Title | Blocked By |
-|---|---|---|---|
-| HIGH | [2026-04-30-010](../backlog/ready/2026-04-30-010-cursor-extractor.md) | Cursor extractor (chat turns, full text) | 009 |
-| HIGH | [2026-04-30-011](../backlog/ready/2026-04-30-011-claude-code-extractor.md) | Claude Code extractor (chat turns, full text) | 009 |
-| HIGH | [2026-04-30-012](../backlog/ready/2026-04-30-012-git-capture.md) | Git capture surface (commits via refs watch) | 006, 007, 008 |
-| HIGH | [2026-04-30-013](../backlog/ready/2026-04-30-013-mcp-server-skeleton.md) | MCP server skeleton (HTTP transport, stub tool) | 007, 008 |
-| HIGH | [2026-04-30-014](../backlog/ready/2026-04-30-014-mcp-search-memories.md) | MCP `search_memories` tool | 013, 010, 011 |
-| HIGH | [2026-04-30-015](../backlog/ready/2026-04-30-015-mcp-integration-test.md) | Cursor + Claude Code MCP integration test | 014 |
+*(empty — Waves 1–3 shipped; items 001–015 are in Complete below. Wave 4 (extension upgrade, GitHub adapter, Slack adapter, audit page, hotkey overlay) not yet specced — see `backlog/_followups.md` for the deferred fixups queue and the `wave-1-2-3-retrospective` operating-model lessons that should land in spec-template fixes before Wave 4 starts.)*
 
 ---
 
@@ -69,6 +51,26 @@
 | [2026-04-30-003](../backlog/complete/2026-04-30-003-capture-allowlist.md) | Capture allowlist | Empty CAPTURED_SOURCES + Source type + isAllowed* predicates |
 | [2026-04-30-004](../backlog/complete/2026-04-30-004-capture-gate.md) | Capture gate | Pure chokepoint function; 28+ test cases; stable rejection codes |
 | [2026-04-30-005](../backlog/complete/2026-04-30-005-storage-interface.md) | Storage interface + MemoryStorage | Append-only contract; in-memory impl as test fixture |
+
+**Wave 2 — bring the substrate to life.** Wires the substrate skeleton into a running daemon. 006/007/008 ran in parallel; 009 followed once all three landed. The capture gate's accept-path is exercised in production for the first time at 009. Wiki promoted in commit `44dd2d3` (waves 2 + 3 promoted together).
+
+| ID | Title | Shipped |
+|---|---|---|
+| [2026-04-30-006](../backlog/complete/2026-04-30-006-capture-pipeline.md) | Capture pipeline (gate → storage wire-up) | Thin async seam `processCandidate(event, storage)`; gates then appends; storage dependency-injected |
+| [2026-04-30-007](../backlog/complete/2026-04-30-007-daemon-entry.md) | Daemon entry + lifecycle | Boot/shutdown scaffold; PID lock; signal handling; loopback-only binding |
+| [2026-04-30-008](../backlog/complete/2026-04-30-008-sqlite-storage.md) | SQLite storage (better-sqlite3) | WAL mode; migration runner; `source_prefix` filter; default backend (override via `ECHO_STORAGE=memory`) |
+| [2026-04-30-009](../backlog/complete/2026-04-30-009-fs-watcher-cursor-and-claude-code.md) | FS watcher — first capture surface | chokidar-backed; allowlisted Cursor + Claude Code paths; gate accept-path live in production |
+
+**Wave 3 — close the loop with MCP.** Adds content extractors, git capture, the MCP server, and the `search_memories` retrieval tool. Lands the V1 spec's killer-demo loop end-to-end: a real Cursor or Claude Code session retrieves context through MCP from the unified store. Wiki promoted in commit `44dd2d3`. Process retrospective in `wiki/operating-model/wave-1-2-3-retrospective.md`.
+
+| ID | Title | Shipped |
+|---|---|---|
+| [2026-04-30-010](../backlog/complete/2026-04-30-010-cursor-extractor.md) | Cursor extractor (composer chat from globalStorage) | Read-only SQLite parser; user→assistant cluster pairing; `metadata.context` (attached/referenced/deleted files); drift-discipline exhibit (re-claimed after schema-probe correction) |
+| [2026-04-30-011](../backlog/complete/2026-04-30-011-claude-code-extractor.md) | Claude Code extractor | Byte-offset JSONL tail; one CaptureEvent per turn pair; nested `{type, message:{role, content}}` shape |
+| [2026-04-30-012](../backlog/complete/2026-04-30-012-git-capture.md) | Git capture (commits via refs watch) | Hybrid chokidar + poll watcher; one CaptureEvent per new commit (message + diff) from allowlisted git repos |
+| [2026-04-30-013](../backlog/complete/2026-04-30-013-mcp-server-skeleton.md) | MCP server skeleton (HTTP transport, stub tool) | Streamable HTTP/SSE on `127.0.0.1:38478`; `echo_ping` tool; loopback-only |
+| [2026-04-30-014](../backlog/complete/2026-04-30-014-mcp-search-memories.md) | MCP `search_memories` tool | Case-insensitive substring + filters (`source_prefix`, `since`, `until`, `limit`); DESC by timestamp; `source_prefix` LIKE-escape fix landed pre-merge; embeddings deferred to V1.5 |
+| [2026-04-30-015](../backlog/complete/2026-04-30-015-mcp-integration-test.md) | Cursor + Claude Code MCP integration test | Smoke script (`tools/mcp-integration-smoke.sh`); manual demo verified through real Cursor + Claude Code sessions; Vitest harness deferred to follow-up |
 
 ---
 
