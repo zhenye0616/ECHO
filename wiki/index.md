@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 39 pages · 37 shipped · 2 planned
+**Status:** 41 pages · 39 shipped · 2 planned
 
 ---
 
@@ -78,6 +78,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### Architecture
 
 - [[claude-code-extractor|Claude Code Extractor]] — Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.
+- [[codex-extractor|Codex Extractor]] — Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with consecutive assistant cluster; cwd + tool-use flag in metadata.
 - [[cursor-extractor|Cursor Extractor]] — Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents.
 - [[fs-watcher|FS Watcher]] — First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.
 - [[git-capture|Git Capture]] — Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.
@@ -88,6 +89,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Architecture
 
+- [[codex-collected-data|Codex — Collected Data Reference]] — Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; cwd, tool-use flag, ignored fields, future Tier-A.
 - [[cursor-collected-data|Cursor — Collected Data Reference]] — Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.
 
 ---

@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { startClaudeCodeExtractor } from '../capture/extractors/claude-code.js';
+import { startCodexExtractor } from '../capture/extractors/codex.js';
 import { startCursorExtractor } from '../capture/extractors/cursor.js';
 import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
@@ -40,13 +41,15 @@ acquirePidLockOrExit(resolveDataDir());
 
 const { storage, backend, dispose } = createStorage();
 
-const [fsWatcher, gitWatcher, claudeCodeExtractor, cursorExtractor, mcp] = await Promise.all([
-  startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
-  startGitWatcher(CAPTURED_SOURCES.git_repos, storage),
-  startClaudeCodeExtractor(storage),
-  startCursorExtractor(storage),
-  startMcpServer(storage, { port: resolveMcpPort() }),
-]);
+const [fsWatcher, gitWatcher, claudeCodeExtractor, codexExtractor, cursorExtractor, mcp] =
+  await Promise.all([
+    startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
+    startGitWatcher(CAPTURED_SOURCES.git_repos, storage),
+    startClaudeCodeExtractor(storage),
+    startCodexExtractor(storage),
+    startCursorExtractor(storage),
+    startMcpServer(storage, { port: resolveMcpPort() }),
+  ]);
 
 await startLifecycle({
   storage,
@@ -55,6 +58,7 @@ await startLifecycle({
   onShutdown: async () => {
     await mcp.stop();
     await cursorExtractor.stop();
+    await codexExtractor.stop();
     await claudeCodeExtractor.stop();
     await gitWatcher.stop();
     await fsWatcher.stop();

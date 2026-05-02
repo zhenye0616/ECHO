@@ -262,6 +262,19 @@
     "topic": "Architecture",
     "subtopic": "Capture Surfaces"
   },
+  "capture/codex-extractor.md": {
+    "status": "shipped",
+    "title": "Codex Extractor",
+    "link": "codex-extractor",
+    "summary": "Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with consecutive assistant cluster; cwd + tool-use flag in metadata.",
+    "aliases": [
+      "Codex Extractor",
+      "codex-extractor",
+      "Codex Session Extractor"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
   "capture/git-capture.md": {
     "status": "shipped",
     "title": "Git Capture",
@@ -405,6 +418,19 @@
       "Cursor Data Collection",
       "What ECHO Collects from Cursor",
       "Cursor Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
+  "capture/per-app/codex-collected-data.md": {
+    "status": "shipped",
+    "title": "Codex \u2014 Collected Data Reference",
+    "link": "codex-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; cwd, tool-use flag, ignored fields, future Tier-A.",
+    "aliases": [
+      "Codex Data Collection",
+      "What ECHO Collects from Codex",
+      "Codex Capture Reference"
     ],
     "topic": "Architecture",
     "subtopic": "Per-App Data Collection"

@@ -8,6 +8,7 @@ export const CAPTURED_SOURCES = {
     '~/Library/Application Support/Cursor/User/workspaceStorage/',
     '~/Library/Application Support/Cursor/User/globalStorage/',
     '~/.claude/projects/',
+    '~/.codex/sessions/',
   ],
   apis: [],
   git_repos: ['~/Desktop/Project_echo/'],

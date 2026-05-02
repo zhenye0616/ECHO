@@ -1,0 +1,437 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { CAPTURED_SOURCES } from '../../../src/capture/sources.js';
+import {
+  extractCodexTurns,
+  startCodexExtractor,
+  type CodexExtractorHandle,
+} from '../../../src/capture/extractors/codex.js';
+import { MemoryStorage } from '../../../src/storage/memory.js';
+import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
+import { captureStdout } from '../../fixtures/stdout.js';
+
+// ─── JSONL line builders matching Codex's wire format ───────────────────────
+
+interface CodexLine {
+  timestamp: string;
+  type: string;
+  payload: Record<string, unknown>;
+}
+
+function sessionMeta(opts: {
+  id?: string;
+  cwd?: string;
+  ts?: string;
+} = {}): CodexLine {
+  return {
+    timestamp: opts.ts ?? '2026-05-01T10:00:00.000Z',
+    type: 'session_meta',
+    payload: {
+      id: opts.id ?? '019de2b0-6551-7682-a51b-2affaa0a7bbf',
+      cwd: opts.cwd ?? '/Users/x/proj',
+    },
+  };
+}
+
+function userMsg(text: string, ts = '2026-05-01T10:00:01.000Z'): CodexLine {
+  return {
+    timestamp: ts,
+    type: 'response_item',
+    payload: {
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text }],
+    },
+  };
+}
+
+function assistantMsg(text: string, ts = '2026-05-01T10:00:02.000Z'): CodexLine {
+  return {
+    timestamp: ts,
+    type: 'response_item',
+    payload: {
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'output_text', text }],
+    },
+  };
+}
+
+function developerMsg(text: string): CodexLine {
+  return {
+    timestamp: '2026-05-01T10:00:00.001Z',
+    type: 'response_item',
+    payload: {
+      type: 'message',
+      role: 'developer',
+      content: [{ type: 'input_text', text }],
+    },
+  };
+}
+
+function functionCall(): CodexLine {
+  return {
+    timestamp: '2026-05-01T10:00:01.500Z',
+    type: 'response_item',
+    payload: { type: 'function_call', name: 'shell', arguments: '{}' },
+  };
+}
+
+function reasoning(): CodexLine {
+  return {
+    timestamp: '2026-05-01T10:00:01.700Z',
+    type: 'response_item',
+    payload: { type: 'reasoning', summary: [] },
+  };
+}
+
+function eventMsg(): CodexLine {
+  return {
+    timestamp: '2026-05-01T10:00:00.500Z',
+    type: 'event_msg',
+    payload: { kind: 'token_count', total: 100 },
+  };
+}
+
+function writeJsonl(path: string, lines: CodexLine[]): void {
+  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
+}
+
+function appendJsonl(path: string, lines: CodexLine[]): void {
+  appendFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
+}
+
+function tmpDir(): string {
+  return mkdtempSync(join(tmpdir(), 'echo-codex-'));
+}
+
+async function waitFor(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('waitFor: timeout');
+}
+
+// ─── Pure parser tests ──────────────────────────────────────────────────────
+
+describe('extractCodexTurns (pure)', () => {
+  let dir: string;
+  let path: string;
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    dir = tmpDir();
+    path = join(dir, 'rollout-2026-05-01T10-00-00-019de2b0-6551-7682-a51b-2affaa0a7bbf.jsonl');
+    captured = captureStdout();
+  });
+
+  afterEach(() => {
+    captured.restore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns no turns and unchanged offset for an empty file', async () => {
+    writeJsonl(path, []);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(0);
+    expect(r.newOffset).toBe(0);
+  });
+
+  it('returns no turns when only session_meta is present (no message yet)', async () => {
+    writeJsonl(path, [sessionMeta()]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(0);
+  });
+
+  it('does not emit a turn for a trailing user with no assistant', async () => {
+    writeJsonl(path, [sessionMeta(), userMsg('hi')]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(0);
+    // Pending cluster — offset MUST stay before the user line so the next
+    // pass re-reads it once an assistant arrives.
+    expect(r.newOffset).toBe(0);
+  });
+
+  it('does not emit even after assistant arrives — cluster only closes on next user', async () => {
+    writeJsonl(path, [sessionMeta(), userMsg('hi'), assistantMsg('hello')]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(0);
+    expect(r.newOffset).toBe(0);
+  });
+
+  it('emits the first cluster as a turn once a SECOND user arrives', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1', '2026-05-01T10:00:01Z'),
+      assistantMsg('a1', '2026-05-01T10:00:02Z'),
+      userMsg('q2'), // closes the first cluster
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]).toMatchObject({
+      user_message: 'q1',
+      assistant_message: 'a1',
+      timestamp: '2026-05-01T10:00:02Z',
+      cwd: '/Users/x/proj',
+      had_tool_use: false,
+    });
+    // Offset advanced past the first assistant line. Exact value is asserted in
+    // the dedicated byte-offset progression test below.
+    expect(r.newOffset).toBeGreaterThan(0);
+  });
+
+  it('clusters multiple consecutive assistant messages into one turn', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('build it'),
+      assistantMsg('thinking…'),
+      assistantMsg('I see the issue'),
+      assistantMsg('here is the fix'),
+      userMsg('thanks'), // closes the cluster
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.user_message).toBe('build it');
+    expect(r.turns[0]?.assistant_message).toBe('thinking…\n\nI see the issue\n\nhere is the fix');
+  });
+
+  it('marks had_tool_use when function_call appears between user and next user', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('run something'),
+      functionCall(),
+      assistantMsg('done'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.had_tool_use).toBe(true);
+  });
+
+  it('skips reasoning and event_msg lines without affecting pairing', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      eventMsg(),
+      userMsg('q'),
+      reasoning(),
+      assistantMsg('a'),
+      eventMsg(),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.user_message).toBe('q');
+    expect(r.turns[0]?.assistant_message).toBe('a');
+    expect(r.turns[0]?.had_tool_use).toBe(false);
+  });
+
+  it('ignores developer-role messages (treated as system noise)', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      developerMsg('AGENTS.md instructions…'),
+      userMsg('actual q'),
+      assistantMsg('actual a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.user_message).toBe('actual q');
+  });
+
+  it('emits two turns from a session with two complete clusters', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1a'),
+      assistantMsg('a1b'),
+      userMsg('q2'),
+      assistantMsg('a2'),
+      userMsg('q3'), // closes cluster 2
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(2);
+    expect(r.turns[0]?.assistant_message).toBe('a1a\n\na1b');
+    expect(r.turns[1]?.user_message).toBe('q2');
+    expect(r.turns[1]?.assistant_message).toBe('a2');
+  });
+
+  it('skips malformed JSON lines and continues parsing', async () => {
+    const valid = JSON.stringify(sessionMeta());
+    const u = JSON.stringify(userMsg('q'));
+    const a = JSON.stringify(assistantMsg('a'));
+    const next = JSON.stringify(userMsg('next'));
+    writeFileSync(path, [valid, '{not json', u, a, next, ''].join('\n'));
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.user_message).toBe('q');
+  });
+
+  it('byte-offset progression: a second pass starting at returned offset emits the next cluster', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'), // closes cluster 1
+    ]);
+    const pass1 = await extractCodexTurns(path, 0);
+    expect(pass1.turns).toHaveLength(1);
+    const offsetAfterPass1 = pass1.newOffset;
+
+    appendJsonl(path, [
+      assistantMsg('a2a'),
+      assistantMsg('a2b'),
+      userMsg('q3'), // closes cluster 2
+    ]);
+    const pass2 = await extractCodexTurns(path, offsetAfterPass1);
+    expect(pass2.turns).toHaveLength(1);
+    expect(pass2.turns[0]?.user_message).toBe('q2');
+    expect(pass2.turns[0]?.assistant_message).toBe('a2a\n\na2b');
+  });
+
+  it('returns empty when the JSONL file does not exist', async () => {
+    const r = await extractCodexTurns(join(dir, 'missing.jsonl'), 0);
+    expect(r.turns).toHaveLength(0);
+    expect(r.newOffset).toBe(0);
+    expect(captured.writes.join('')).toContain('stat_failed');
+  });
+
+  it('extracts session_id from the rollout filename UUID', async () => {
+    writeJsonl(path, [sessionMeta(), userMsg('q'), assistantMsg('a'), userMsg('next')]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.session_id).toBe('019de2b0-6551-7682-a51b-2affaa0a7bbf');
+  });
+});
+
+// ─── Lifecycle / integration tests ──────────────────────────────────────────
+
+describe('startCodexExtractor (lifecycle + integration)', () => {
+  let dir: string;
+  let sessionsPrefix: string;
+  let path: string;
+  let storage: MemoryStorage;
+  let handle: CodexExtractorHandle | null = null;
+  let originalFsPaths: string[];
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    originalFsPaths = snapshotFsPaths();
+    dir = tmpDir();
+    sessionsPrefix = `${dir}/sessions/`;
+    mkdirSync(`${sessionsPrefix}2026/05/01`, { recursive: true });
+    path = join(
+      sessionsPrefix,
+      '2026/05/01/rollout-2026-05-01T10-00-00-019de2b0-6551-7682-a51b-2affaa0a7bbf.jsonl',
+    );
+    storage = new MemoryStorage();
+    captured = captureStdout();
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(sessionsPrefix);
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    captured.restore();
+    resetAllowlist();
+    restoreFsPaths(originalFsPaths);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('emits a CaptureEvent through the pipeline once a cluster closes', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'), // closes the cluster
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    const evt = events[0]!;
+    expect(evt.source).toBe(`fs:${path}`);
+    expect(evt.content).toBe('USER: q1\n\nASSISTANT: a1');
+    expect(evt.metadata).toMatchObject({
+      session_id: '019de2b0-6551-7682-a51b-2affaa0a7bbf',
+      turn_index: 0,
+      cwd: '/Users/x/proj',
+    });
+    expect(evt.metadata).not.toHaveProperty('had_tool_use');
+  });
+
+  it('end-to-end: appending more clusters produces ordered, non-duplicate turns', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    await waitFor(async () => (await storage.count()) >= 2);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(2);
+    expect(events[0]?.content).toBe('USER: q1\n\nASSISTANT: a1');
+    expect(events[1]?.content).toBe('USER: q2\n\nASSISTANT: a2');
+    expect(
+      (events[1]?.metadata as Record<string, unknown> | undefined)?.['turn_index'],
+    ).toBe(1);
+  });
+
+  it('backfills offset map from prior storage events on boot (idempotent resume)', async () => {
+    writeJsonl(path, [sessionMeta(), userMsg('old-q'), assistantMsg('old-a'), userMsg('next')]);
+    // Pre-seed storage with the first turn already processed at a known offset.
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    await storage.append({
+      source: `fs:${path}`,
+      timestamp: r.turns[0]!.timestamp,
+      content: `USER: ${r.turns[0]!.user_message}\n\nASSISTANT: ${r.turns[0]!.assistant_message}`,
+      metadata: {
+        session_id: r.turns[0]!.session_id,
+        turn_index: 0,
+        mtime: r.turns[0]!.mtime,
+        byte_offset: r.turns[0]!.byte_offset,
+      },
+    });
+
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    appendJsonl(path, [assistantMsg('new-a'), userMsg('q3')]);
+    await waitFor(async () => (await storage.count()) >= 2);
+
+    const events = await storage.query();
+    const fresh = events.find((e) => e.content.includes('new-a'));
+    expect(fresh).toBeDefined();
+    expect((fresh!.metadata as Record<string, unknown>)['turn_index']).toBe(1);
+  });
+
+  it('stop() resolves cleanly and prevents further events', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [sessionMeta(), userMsg('q'), assistantMsg('a'), userMsg('next')]);
+    await waitFor(async () => (await storage.count()) >= 1);
+    const before = await storage.count();
+    await handle.stop();
+    handle = null;
+
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(await storage.count()).toBe(before);
+  });
+});
+
+describe('CAPTURED_SOURCES allowlist update for codex sessions', () => {
+  it('declares ~/.codex/sessions/ under fs_paths', () => {
+    expect(CAPTURED_SOURCES.fs_paths).toContain('~/.codex/sessions/');
+  });
+});
