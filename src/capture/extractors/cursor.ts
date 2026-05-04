@@ -6,6 +6,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
+import { dedupStrings } from './_shared.js';
 
 const log = createLogger('capture.cursor');
 
@@ -243,18 +244,6 @@ function parseBubbleRow(
       deletedFiles: extractDeletedFiles(v),
     },
   };
-}
-
-function dedupStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (!seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  }
-  return out;
 }
 
 function dedupReferencedFiles(values: ReferencedFile[]): ReferencedFile[] {

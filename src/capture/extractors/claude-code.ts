@@ -1,10 +1,12 @@
-import { open, readdir, stat } from 'node:fs/promises';
+import { open, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname } from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
+import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
+import { bootScanJsonl, dedupStrings } from './_shared.js';
 
 const log = createLogger('capture.claude-code');
 
@@ -65,7 +67,7 @@ function extractContent(content: unknown): { text: string; hasTool: boolean; fil
           const i = input as Record<string, unknown>;
           for (const key of FILE_INPUT_KEYS) {
             const v = i[key];
-            if (typeof v === 'string' && v.length > 0) files.push(v);
+            if (isNonEmptyString(v)) files.push(v);
           }
         }
       }
@@ -96,21 +98,9 @@ function parseLine(line: string): ParsedLine | null {
     text,
     hasTool,
     timestamp: typeof ts === 'string' ? ts : undefined,
-    cwd: typeof cwd === 'string' && cwd.length > 0 ? cwd : undefined,
+    cwd: isNonEmptyString(cwd) ? cwd : undefined,
     files,
   };
-}
-
-function dedupStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (!seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  }
-  return out;
 }
 
 function deriveSessionId(jsonlPath: string): string {
@@ -346,24 +336,7 @@ export async function startClaudeCodeExtractor(
     watcher.once('ready', () => resolve());
   });
 
-  // Boot-time catch-up scan: chokidar's `ignoreInitial: true` skips existing
-  // files at startup, and the offset-map backfill only knows about files
-  // already in storage. Subagent JSONLs are write-then-closed by transient
-  // runs, so they often see zero post-boot `change` events — without this
-  // scan they're silently never captured. We enumerate `.jsonl` files under
-  // projectsPrefix once at boot and schedule a handleJsonlChange for each;
-  // the offset-map ensures already-processed bytes are skipped.
-  try {
-    const entries = await readdir(projectsPrefix, { recursive: true, withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (!entry.name.endsWith('.jsonl')) continue;
-      const full = join(entry.parentPath, entry.name);
-      schedule(() => handleJsonlChange(full));
-    }
-  } catch (err) {
-    log.warn('boot_scan_failed', { projectsPrefix, message: (err as Error).message });
-  }
+  await bootScanJsonl(projectsPrefix, schedule, handleJsonlChange, log);
 
   log.info('started', { projectsPrefix });
 

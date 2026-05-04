@@ -186,9 +186,11 @@ async function buildAndEmit(
   commit: CommitInfo,
   storage: Storage,
 ): Promise<boolean> {
-  const stats = await getCommitStats(repo, commit.sha);
-  const diff = await getDiff(repo, commit.sha, commit.parent_sha);
-  const changedFiles = await getChangedFiles(repo, commit.sha, commit.parent_sha);
+  const [stats, diff, changedFiles] = await Promise.all([
+    getCommitStats(repo, commit.sha),
+    getDiff(repo, commit.sha, commit.parent_sha),
+    getChangedFiles(repo, commit.sha, commit.parent_sha),
+  ]);
 
   const bodyBlock = commit.body.length > 0 ? `${commit.body}\n\n` : '';
   const content = `COMMIT ${shortSha(commit.sha)}: ${commit.subject}\n\n${bodyBlock}--- DIFF ---\n${diff}`;
