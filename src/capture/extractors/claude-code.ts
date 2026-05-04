@@ -21,6 +21,7 @@ export interface ClaudeCodeTurn {
   timestamp: string;
   had_tool_use: boolean;
   byte_offset: number;
+  repo_root?: string;
 }
 
 export interface ExtractClaudeCodeResult {
@@ -33,6 +34,7 @@ interface ParsedLine {
   text: string;
   hasTool: boolean;
   timestamp: string | undefined;
+  cwd: string | undefined;
 }
 
 function extractContent(content: unknown): { text: string; hasTool: boolean } {
@@ -73,11 +75,13 @@ function parseLine(line: string): ParsedLine | null {
   if (role !== 'user' && role !== 'assistant') return null;
   const { text, hasTool } = extractContent(msg['content']);
   const ts = obj['timestamp'];
+  const cwd = obj['cwd'];
   return {
     role,
     text,
     hasTool,
     timestamp: typeof ts === 'string' ? ts : undefined,
+    cwd: typeof cwd === 'string' && cwd.length > 0 ? cwd : undefined,
   };
 }
 
@@ -139,12 +143,14 @@ export async function extractClaudeCodeTurns(
   let hadToolBetween = false;
   let offsetCursor = lastByteOffset;
   let turnIndex = 0;
+  let currentCwd: string | undefined;
 
   for (const line of lines) {
     const lineBytes = Buffer.byteLength(line, 'utf8') + 1; // +1 for the newline
     offsetCursor += lineBytes;
     const parsed = parseLine(line);
     if (parsed === null) continue;
+    if (parsed.cwd !== undefined) currentCwd = parsed.cwd;
 
     if (parsed.text === '') {
       if (parsed.hasTool) hadToolBetween = true;
@@ -168,7 +174,7 @@ export async function extractClaudeCodeTurns(
       }
       const had_tool_use =
         pendingUser.hadToolThisTurn || hadToolBetween || parsed.hasTool;
-      turns.push({
+      const turn: ClaudeCodeTurn = {
         project,
         session_id,
         turn_index: turnIndex,
@@ -178,7 +184,9 @@ export async function extractClaudeCodeTurns(
         timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
         had_tool_use,
         byte_offset: offsetCursor,
-      });
+      };
+      if (currentCwd !== undefined) turn.repo_root = currentCwd;
+      turns.push(turn);
       turnIndex += 1;
       pendingUser = null;
       hadToolBetween = false;
@@ -243,6 +251,7 @@ export async function startClaudeCodeExtractor(
         byte_offset: turn.byte_offset,
       };
       if (turn.had_tool_use) metadata['had_tool_use'] = true;
+      if (turn.repo_root !== undefined) metadata['repo_root'] = turn.repo_root;
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,

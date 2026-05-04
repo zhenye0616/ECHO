@@ -304,6 +304,17 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect(evt.metadata).toHaveProperty('byte_offset');
   });
 
+  it('populates metadata.repo_root from the cwd field on JSONL lines', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect((evt.metadata as Record<string, unknown>)['repo_root']).toBe('/Users/x/proj');
+  });
+
   it('end-to-end: chronological appends produce ordered, non-duplicate events', async () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
