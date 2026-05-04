@@ -297,6 +297,21 @@ function buildTurnContext(
   return out;
 }
 
+function flattenContextFiles(ctx: CursorTurnContext): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (p: string): void => {
+    if (!seen.has(p)) {
+      seen.add(p);
+      out.push(p);
+    }
+  };
+  for (const p of ctx.attached_files ?? []) push(p);
+  for (const r of ctx.referenced_files ?? []) push(r.path);
+  for (const p of ctx.deleted_files ?? []) push(p);
+  return out;
+}
+
 async function safeMtimeMs(path: string): Promise<number> {
   try {
     const s = await stat(path);
@@ -549,13 +564,18 @@ export async function startCursorExtractor(
       const ws = composerToWorkspace.get(turn.composer_id);
       const metadata: Record<string, unknown> = {
         composer_id: turn.composer_id,
+        session_id: turn.composer_id,
         user_bubble_id: turn.user_bubble_id,
         assistant_bubble_id: turn.assistant_bubble_id,
         assistant_bubble_ids: turn.assistant_bubble_ids,
         mtime: turn.mtime,
       };
       if (ws !== undefined) metadata['workspace_id'] = ws;
-      if (turn.context !== undefined) metadata['context'] = turn.context;
+      if (turn.context !== undefined) {
+        metadata['context'] = turn.context;
+        const filesReferenced = flattenContextFiles(turn.context);
+        if (filesReferenced.length > 0) metadata['files_referenced'] = filesReferenced;
+      }
       const candidate = {
         source: `fs:${globalDbPath}`,
         timestamp: new Date(turn.assistant_created_at).toISOString(),

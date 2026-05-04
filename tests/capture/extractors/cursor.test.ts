@@ -462,6 +462,69 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     });
   });
 
+  it('populates session_id as the composer_id (canonical alias for cross-source correlation)', async () => {
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    createGlobalStorageFixture(globalDbPath, [
+      { composer_id: 'composer-xyz', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'composer-xyz', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    const events = await storage.query();
+    const md = events[0]!.metadata as Record<string, unknown>;
+    expect(md['session_id']).toBe('composer-xyz');
+    expect(md['composer_id']).toBe('composer-xyz');
+  });
+
+  it('flattens turn.context paths into a deduped metadata.files_referenced array', async () => {
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    createGlobalStorageFixture(globalDbPath, [
+      {
+        composer_id: 'c1',
+        bubble_id: 'u1',
+        type: 1,
+        text: 'fix README',
+        attachedFileCodeChunksUris: ['/proj/README.md'],
+      },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: 'looking',
+        codeBlocks: [
+          { path: '/proj/README.md', languageId: 'markdown' }, // dedup with attached
+          { path: '/proj/src/index.ts', languageId: 'typescript' },
+        ],
+        deletedFiles: ['/proj/old/legacy.md'],
+      },
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    const events = await storage.query();
+    const md = events[0]!.metadata as Record<string, unknown>;
+    expect(md['files_referenced']).toEqual([
+      '/proj/README.md',
+      '/proj/src/index.ts',
+      '/proj/old/legacy.md',
+    ]);
+  });
+
+  it('omits metadata.files_referenced when no bubble carried any file references', async () => {
+    handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
+
+    createGlobalStorageFixture(globalDbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'hi' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'hello back' },
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    const events = await storage.query();
+    const md = events[0]!.metadata as Record<string, unknown>;
+    expect(md).not.toHaveProperty('files_referenced');
+  });
+
   it('end-to-end: chronological appends produce ordered, non-duplicate turns', async () => {
     createGlobalStorageFixture(globalDbPath, []);
     handle = await startCursorExtractor(storage, { globalDbPath, workspacePrefix });
