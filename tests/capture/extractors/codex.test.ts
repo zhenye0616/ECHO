@@ -378,6 +378,30 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('processes pre-existing JSONL files at boot (catches sessions written before daemon start)', async () => {
+    // Pre-create a complete cluster (closed by a second user line) BEFORE
+    // the extractor starts. With ignoreInitial:true and offset-map only
+    // populated from prior storage, this file would otherwise be silently
+    // skipped — same shape as the Claude Code subagent gap.
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+
+    // No further file changes — the file is frozen, like a finished
+    // codex session that ended before this daemon boot.
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${path}`);
+    expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
+  });
+
   it('emits a CaptureEvent through the pipeline once a cluster closes', async () => {
     handle = await startCodexExtractor(storage, { sessionsPrefix });
     writeJsonl(path, [

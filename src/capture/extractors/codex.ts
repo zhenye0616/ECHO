@@ -1,6 +1,6 @@
-import { open, stat } from 'node:fs/promises';
+import { open, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
@@ -385,6 +385,23 @@ export async function startCodexExtractor(
   await new Promise<void>((resolve) => {
     watcher.once('ready', () => resolve());
   });
+
+  // Boot-time catch-up scan — see the matching block in claude-code.ts. A
+  // codex session JSONL that exists at boot but receives no further writes
+  // (ended-before-restart) is otherwise silently skipped because chokidar's
+  // ignoreInitial:true suppresses the add event and the offset-map only
+  // knows about files already in storage.
+  try {
+    const entries = await readdir(sessionsPrefix, { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.jsonl')) continue;
+      const full = join(entry.parentPath, entry.name);
+      schedule(() => handleJsonlChange(full));
+    }
+  } catch (err) {
+    log.warn('boot_scan_failed', { sessionsPrefix, message: (err as Error).message });
+  }
 
   log.info('started', { sessionsPrefix });
 
