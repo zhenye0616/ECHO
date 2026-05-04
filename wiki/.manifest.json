@@ -435,6 +435,19 @@
     "topic": "Architecture",
     "subtopic": "Per-App Data Collection"
   },
+  "capture/per-app/claude-code-collected-data.md": {
+    "status": "shipped",
+    "title": "Claude Code \u2014 Collected Data Reference",
+    "link": "claude-code-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.",
+    "aliases": [
+      "Claude Code Data Collection",
+      "What ECHO Collects from Claude Code",
+      "Claude Code Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
   "research/wedge-vs-thesis-validation.md": {
     "status": "shipped",
     "title": "Wedge vs Thesis Validation",
