@@ -315,6 +315,52 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect((evt.metadata as Record<string, unknown>)['repo_root']).toBe('/Users/x/proj');
   });
 
+  it('extracts file_path / path / notebook_path inputs from tool_use blocks into metadata.files_referenced', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    const assistantWithToolUses: JsonlLine = {
+      type: 'assistant',
+      sessionId: 's1',
+      cwd: '/Users/x/proj',
+      uuid: 'a1',
+      timestamp: '2026-04-30T10:00:00Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Reading and editing.' },
+          { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: '/proj/a.ts' } },
+          { type: 'tool_use', id: 't2', name: 'Edit', input: { file_path: '/proj/b.ts' } },
+          { type: 'tool_use', id: 't3', name: 'Read', input: { file_path: '/proj/a.ts' } },
+          { type: 'tool_use', id: 't4', name: 'Bash', input: { command: 'ls' } },
+          { type: 'tool_use', id: 't5', name: 'Glob', input: { path: '/proj/lib' } },
+          { type: 'text', text: 'Done.' },
+        ],
+      },
+    };
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantWithToolUses]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect((evt.metadata as Record<string, unknown>)['files_referenced']).toEqual([
+      '/proj/a.ts',
+      '/proj/b.ts',
+      '/proj/lib',
+    ]);
+  });
+
+  it('omits metadata.files_referenced when assistant has no tool_use file inputs', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect(evt.metadata as Record<string, unknown>).not.toHaveProperty('files_referenced');
+  });
+
   it('end-to-end: chronological appends produce ordered, non-duplicate events', async () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
