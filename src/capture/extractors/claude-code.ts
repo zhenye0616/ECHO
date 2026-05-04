@@ -1,6 +1,6 @@
-import { open, stat } from 'node:fs/promises';
+import { open, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
@@ -345,6 +345,25 @@ export async function startClaudeCodeExtractor(
   await new Promise<void>((resolve) => {
     watcher.once('ready', () => resolve());
   });
+
+  // Boot-time catch-up scan: chokidar's `ignoreInitial: true` skips existing
+  // files at startup, and the offset-map backfill only knows about files
+  // already in storage. Subagent JSONLs are write-then-closed by transient
+  // runs, so they often see zero post-boot `change` events — without this
+  // scan they're silently never captured. We enumerate `.jsonl` files under
+  // projectsPrefix once at boot and schedule a handleJsonlChange for each;
+  // the offset-map ensures already-processed bytes are skipped.
+  try {
+    const entries = await readdir(projectsPrefix, { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.endsWith('.jsonl')) continue;
+      const full = join(entry.parentPath, entry.name);
+      schedule(() => handleJsonlChange(full));
+    }
+  } catch (err) {
+    log.warn('boot_scan_failed', { projectsPrefix, message: (err as Error).message });
+  }
 
   log.info('started', { projectsPrefix });
 

@@ -413,6 +413,64 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect((fresh.metadata as Record<string, unknown>)['turn_index']).toBe(1);
   });
 
+  it('processes pre-existing JSONL files at boot (catches subagent files written before daemon start)', async () => {
+    // Create a subagent JSONL BEFORE the extractor starts. Subagent JSONLs
+    // are short-lived: written-then-closed by a transient run, so they often
+    // see zero `change` events after their initial write. With the
+    // ignoreInitial:true watcher and offset-map backfill that only knows
+    // about files already in storage, these files get silently skipped
+    // forever on daemon boot — empirically observed in echo.db (0 parsed
+    // turns from 69 distinct subagent files).
+    const subagentsDir = join(projDir, 'session-abc', 'subagents');
+    mkdirSync(subagentsDir, { recursive: true });
+    const subagentPath = join(subagentsDir, 'agent-xyz.jsonl');
+    writeJsonlFresh(subagentPath, [
+      userText('subagent-xyz', 'u1', 'Q1'),
+      assistantText('subagent-xyz', 'a1', 'A1'),
+    ]);
+
+    // Start the extractor AFTER the file already exists.
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+
+    // Don't write any further changes — the file is frozen, like a finished
+    // subagent run.
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${subagentPath}`);
+    expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
+  });
+
+  it('captures turns from subagent JSONLs created mid-session in a nested subdir', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+
+    // Subagent layout per real Claude Code:
+    //   <project>/<session-id>/subagents/agent-<id>.jsonl
+    // The session dir + subagents dir are both created mid-session, AFTER the
+    // watcher started. This tests that chokidar's recursive watch picks up
+    // new subdirectories created after watcher start.
+    const sessionDir = join(projDir, 'session-abc');
+    const subagentsDir = join(sessionDir, 'subagents');
+    mkdirSync(subagentsDir, { recursive: true });
+
+    // No grace period — write the file immediately after creating the dir,
+    // matching how Claude Code spawns a subagent and writes its first
+    // message in the same tick.
+    const path = join(subagentsDir, 'agent-xyz.jsonl');
+    writeJsonlFresh(path, [
+      userText('subagent-xyz', 'u1', 'Q1'),
+      assistantText('subagent-xyz', 'a1', 'A1'),
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${path}`);
+    expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
+  });
+
   it('stop() resolves cleanly and prevents further events', async () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
