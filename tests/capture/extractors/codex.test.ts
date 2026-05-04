@@ -400,6 +400,21 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     expect(evt.metadata).not.toHaveProperty('had_tool_use');
   });
 
+  it('mirrors metadata.cwd into metadata.repo_root (cross-source canonical name)', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta({ cwd: '/Users/x/proj' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    expect(md['cwd']).toBe('/Users/x/proj');
+    expect(md['repo_root']).toBe('/Users/x/proj');
+  });
+
   it('carries cwd on every turn even when extraction spans multiple daemon ticks', async () => {
     handle = await startCodexExtractor(storage, { sessionsPrefix });
     writeJsonl(path, [

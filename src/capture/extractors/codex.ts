@@ -328,7 +328,10 @@ export async function startCodexExtractor(
         byte_offset: turn.byte_offset,
       };
       if (turn.had_tool_use) metadata['had_tool_use'] = true;
-      if (turn.cwd !== undefined) metadata['cwd'] = turn.cwd;
+      if (turn.cwd !== undefined) {
+        metadata['cwd'] = turn.cwd;
+        metadata['repo_root'] = turn.cwd;
+      }
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,
