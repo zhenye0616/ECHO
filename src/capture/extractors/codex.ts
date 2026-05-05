@@ -5,6 +5,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
+import { bootScanJsonl } from './_shared.js';
 
 const log = createLogger('capture.codex');
 
@@ -26,6 +27,7 @@ export interface CodexTurn {
 export interface ExtractCodexResult {
   turns: CodexTurn[];
   newOffset: number;
+  cwd?: string;
 }
 
 interface ParsedLine {
@@ -121,6 +123,7 @@ interface PendingCluster {
 export async function extractCodexTurns(
   jsonlPath: string,
   lastByteOffset: number,
+  lastKnownCwd?: string,
 ): Promise<ExtractCodexResult> {
   let st: Awaited<ReturnType<typeof stat>>;
   try {
@@ -162,7 +165,7 @@ export async function extractCodexTurns(
 
   const turns: CodexTurn[] = [];
   let pending: PendingCluster | null = null;
-  let cwd: string | undefined;
+  let cwd: string | undefined = lastKnownCwd;
   let lineStartOffset = lastByteOffset;
   // Tracks the END of the last line that contributed to an EMITTED turn.
   // Pending-cluster lines (user + assistants without a closing next-user) are
@@ -249,13 +252,19 @@ export async function extractCodexTurns(
   // as closed when the next user line appears (or the file is otherwise known
   // to be complete). Emitting on EOF risks duplicate turns when the next pass
   // sees more assistant lines arrive.
-  return { turns, newOffset: confirmedThroughOffset };
+  const result: ExtractCodexResult = { turns, newOffset: confirmedThroughOffset };
+  if (cwd !== undefined) result.cwd = cwd;
+  return result;
 }
 
-async function backfillOffsetMap(
-  storage: Storage,
-): Promise<Map<string, { offset: number; turn_index: number }>> {
-  const map = new Map<string, { offset: number; turn_index: number }>();
+interface OffsetEntry {
+  offset: number;
+  turn_index: number;
+  cwd?: string;
+}
+
+async function backfillOffsetMap(storage: Storage): Promise<Map<string, OffsetEntry>> {
+  const map = new Map<string, OffsetEntry>();
   const events = await storage.query({ source_prefix: 'fs:' });
   for (const evt of events) {
     if (!evt.source.endsWith('.jsonl')) continue;
@@ -266,9 +275,17 @@ async function backfillOffsetMap(
     const turn_index = md['turn_index'];
     if (typeof offset !== 'number' || typeof turn_index !== 'number') continue;
     const path = evt.source.slice('fs:'.length);
+    const cwdVal = md['cwd'];
+    const cwd = typeof cwdVal === 'string' ? cwdVal : undefined;
     const cur = map.get(path);
     if (cur === undefined || offset > cur.offset) {
-      map.set(path, { offset, turn_index });
+      // Older codex events written before the cwd-persistence fix may lack cwd on later turns.
+      const entry: OffsetEntry = { offset, turn_index };
+      if (cwd !== undefined) entry.cwd = cwd;
+      else if (cur?.cwd !== undefined) entry.cwd = cur.cwd;
+      map.set(path, entry);
+    } else if (cwd !== undefined && cur.cwd === undefined) {
+      map.set(path, { ...cur, cwd });
     }
   }
   return map;
@@ -298,7 +315,11 @@ export async function startCodexExtractor(
 
   async function handleJsonlChange(path: string): Promise<void> {
     const cur = offsetMap.get(path) ?? { offset: 0, turn_index: -1 };
-    const { turns, newOffset } = await extractCodexTurns(path, cur.offset);
+    const { turns, newOffset, cwd: passCwd } = await extractCodexTurns(
+      path,
+      cur.offset,
+      cur.cwd,
+    );
     let nextTurnIndex = cur.turn_index + 1;
     for (const turn of turns) {
       const metadata: Record<string, unknown> = {
@@ -308,7 +329,10 @@ export async function startCodexExtractor(
         byte_offset: turn.byte_offset,
       };
       if (turn.had_tool_use) metadata['had_tool_use'] = true;
-      if (turn.cwd !== undefined) metadata['cwd'] = turn.cwd;
+      if (turn.cwd !== undefined) {
+        metadata['cwd'] = turn.cwd;
+        metadata['repo_root'] = turn.cwd;
+      }
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,
@@ -323,7 +347,10 @@ export async function startCodexExtractor(
         log.warn('candidate_rejected', { reason: result.reason, path });
       }
     }
-    offsetMap.set(path, { offset: newOffset, turn_index: nextTurnIndex - 1 });
+    const nextCwd = passCwd ?? cur.cwd;
+    const next: OffsetEntry = { offset: newOffset, turn_index: nextTurnIndex - 1 };
+    if (nextCwd !== undefined) next.cwd = nextCwd;
+    offsetMap.set(path, next);
   }
 
   function schedule(work: () => Promise<void>): void {
@@ -359,6 +386,8 @@ export async function startCodexExtractor(
   await new Promise<void>((resolve) => {
     watcher.once('ready', () => resolve());
   });
+
+  await bootScanJsonl(sessionsPrefix, schedule, handleJsonlChange, log);
 
   log.info('started', { sessionsPrefix });
 

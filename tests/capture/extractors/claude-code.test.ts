@@ -304,6 +304,63 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect(evt.metadata).toHaveProperty('byte_offset');
   });
 
+  it('populates metadata.repo_root from the cwd field on JSONL lines', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect((evt.metadata as Record<string, unknown>)['repo_root']).toBe('/Users/x/proj');
+  });
+
+  it('extracts file_path / path / notebook_path inputs from tool_use blocks into metadata.files_referenced', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    const assistantWithToolUses: JsonlLine = {
+      type: 'assistant',
+      sessionId: 's1',
+      cwd: '/Users/x/proj',
+      uuid: 'a1',
+      timestamp: '2026-04-30T10:00:00Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Reading and editing.' },
+          { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: '/proj/a.ts' } },
+          { type: 'tool_use', id: 't2', name: 'Edit', input: { file_path: '/proj/b.ts' } },
+          { type: 'tool_use', id: 't3', name: 'Read', input: { file_path: '/proj/a.ts' } },
+          { type: 'tool_use', id: 't4', name: 'Bash', input: { command: 'ls' } },
+          { type: 'tool_use', id: 't5', name: 'Glob', input: { path: '/proj/lib' } },
+          { type: 'text', text: 'Done.' },
+        ],
+      },
+    };
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantWithToolUses]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect((evt.metadata as Record<string, unknown>)['files_referenced']).toEqual([
+      '/proj/a.ts',
+      '/proj/b.ts',
+      '/proj/lib',
+    ]);
+  });
+
+  it('omits metadata.files_referenced when assistant has no tool_use file inputs', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    expect(evt.metadata as Record<string, unknown>).not.toHaveProperty('files_referenced');
+  });
+
   it('end-to-end: chronological appends produce ordered, non-duplicate events', async () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
@@ -354,6 +411,64 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     const fresh = events.find((e) => e.timestamp !== '2026-04-30T00:00:00Z')!;
     expect(fresh.content).toBe('USER: Q2\n\nASSISTANT: A2');
     expect((fresh.metadata as Record<string, unknown>)['turn_index']).toBe(1);
+  });
+
+  it('processes pre-existing JSONL files at boot (catches subagent files written before daemon start)', async () => {
+    // Create a subagent JSONL BEFORE the extractor starts. Subagent JSONLs
+    // are short-lived: written-then-closed by a transient run, so they often
+    // see zero `change` events after their initial write. With the
+    // ignoreInitial:true watcher and offset-map backfill that only knows
+    // about files already in storage, these files get silently skipped
+    // forever on daemon boot — empirically observed in echo.db (0 parsed
+    // turns from 69 distinct subagent files).
+    const subagentsDir = join(projDir, 'session-abc', 'subagents');
+    mkdirSync(subagentsDir, { recursive: true });
+    const subagentPath = join(subagentsDir, 'agent-xyz.jsonl');
+    writeJsonlFresh(subagentPath, [
+      userText('subagent-xyz', 'u1', 'Q1'),
+      assistantText('subagent-xyz', 'a1', 'A1'),
+    ]);
+
+    // Start the extractor AFTER the file already exists.
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+
+    // Don't write any further changes — the file is frozen, like a finished
+    // subagent run.
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${subagentPath}`);
+    expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
+  });
+
+  it('captures turns from subagent JSONLs created mid-session in a nested subdir', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+
+    // Subagent layout per real Claude Code:
+    //   <project>/<session-id>/subagents/agent-<id>.jsonl
+    // The session dir + subagents dir are both created mid-session, AFTER the
+    // watcher started. This tests that chokidar's recursive watch picks up
+    // new subdirectories created after watcher start.
+    const sessionDir = join(projDir, 'session-abc');
+    const subagentsDir = join(sessionDir, 'subagents');
+    mkdirSync(subagentsDir, { recursive: true });
+
+    // No grace period — write the file immediately after creating the dir,
+    // matching how Claude Code spawns a subagent and writes its first
+    // message in the same tick.
+    const path = join(subagentsDir, 'agent-xyz.jsonl');
+    writeJsonlFresh(path, [
+      userText('subagent-xyz', 'u1', 'Q1'),
+      assistantText('subagent-xyz', 'a1', 'A1'),
+    ]);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${path}`);
+    expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
   });
 
   it('stop() resolves cleanly and prevents further events', async () => {

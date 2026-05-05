@@ -6,6 +6,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
+import { dedupStrings } from './_shared.js';
 
 const log = createLogger('capture.cursor');
 
@@ -245,18 +246,6 @@ function parseBubbleRow(
   };
 }
 
-function dedupStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (!seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  }
-  return out;
-}
-
 function dedupReferencedFiles(values: ReferencedFile[]): ReferencedFile[] {
   const seen = new Map<string, ReferencedFile>();
   for (const r of values) {
@@ -294,6 +283,21 @@ function buildTurnContext(
   if (attached.length > 0) out.attached_files = attached;
   if (referenced.length > 0) out.referenced_files = referenced;
   if (deleted.length > 0) out.deleted_files = deleted;
+  return out;
+}
+
+function flattenContextFiles(ctx: CursorTurnContext): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (p: string): void => {
+    if (!seen.has(p)) {
+      seen.add(p);
+      out.push(p);
+    }
+  };
+  for (const p of ctx.attached_files ?? []) push(p);
+  for (const r of ctx.referenced_files ?? []) push(r.path);
+  for (const p of ctx.deleted_files ?? []) push(p);
   return out;
 }
 
@@ -549,13 +553,18 @@ export async function startCursorExtractor(
       const ws = composerToWorkspace.get(turn.composer_id);
       const metadata: Record<string, unknown> = {
         composer_id: turn.composer_id,
+        session_id: turn.composer_id,
         user_bubble_id: turn.user_bubble_id,
         assistant_bubble_id: turn.assistant_bubble_id,
         assistant_bubble_ids: turn.assistant_bubble_ids,
         mtime: turn.mtime,
       };
       if (ws !== undefined) metadata['workspace_id'] = ws;
-      if (turn.context !== undefined) metadata['context'] = turn.context;
+      if (turn.context !== undefined) {
+        metadata['context'] = turn.context;
+        const filesReferenced = flattenContextFiles(turn.context);
+        if (filesReferenced.length > 0) metadata['files_referenced'] = filesReferenced;
+      }
       const candidate = {
         source: `fs:${globalDbPath}`,
         timestamp: new Date(turn.assistant_created_at).toISOString(),

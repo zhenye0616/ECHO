@@ -115,6 +115,42 @@ describe('startGitWatcher', () => {
     expect(typeof meta['files_changed']).toBe('number');
   });
 
+  it('populates metadata.repo_root and metadata.files_referenced for each commit', async () => {
+    const repo = await makeRepo();
+    cleanups.push(pushAllowedRepo(repo));
+    cleanups.push(() => rmSync(repo, { recursive: true, force: true }));
+
+    // First commit: one file
+    writeFileSync(join(repo, 'a.txt'), 'hello\n');
+    await execFileP('git', ['add', '.'], { cwd: repo });
+    await execFileP('git', ['commit', '-q', '-m', 'first'], { cwd: repo });
+
+    // Second commit: two files (one new, one modified)
+    writeFileSync(join(repo, 'a.txt'), 'hello again\n');
+    writeFileSync(join(repo, 'b.txt'), 'new\n');
+    await execFileP('git', ['add', '.'], { cwd: repo });
+    await execFileP('git', ['commit', '-q', '-m', 'second'], { cwd: repo });
+
+    const storage = new MemoryStorage();
+    const h = await startGitWatcher([repo], storage, { enableFsWatch: false });
+    handles.push(h);
+
+    await waitForCount(storage, 2);
+    const events = await storage.query({ source: `git:${repo}` });
+    expect(events).toHaveLength(2);
+
+    for (const evt of events) {
+      const md = evt.metadata as Record<string, unknown>;
+      expect(md['repo_root']).toBe(repo);
+    }
+
+    const firstFiles = (events[0]!.metadata as Record<string, unknown>)['files_referenced'];
+    expect(firstFiles).toEqual([join(repo, 'a.txt')]);
+
+    const secondFiles = (events[1]!.metadata as Record<string, unknown>)['files_referenced'];
+    expect(secondFiles).toEqual([join(repo, 'a.txt'), join(repo, 'b.txt')]);
+  });
+
   it('only emits new commits on a second boot (resumption from last_seen_sha)', async () => {
     const repo = await makeRepo();
     cleanups.push(pushAllowedRepo(repo));

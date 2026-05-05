@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 41 pages · 39 shipped · 2 planned
+**Status:** 42 pages · 40 shipped · 2 planned
 
 ---
 
@@ -89,6 +89,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Architecture
 
+- [[claude-code-collected-data|Claude Code — Collected Data Reference]] — Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.
 - [[codex-collected-data|Codex — Collected Data Reference]] — Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; cwd, tool-use flag, ignored fields, future Tier-A.
 - [[cursor-collected-data|Cursor — Collected Data Reference]] — Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.
 

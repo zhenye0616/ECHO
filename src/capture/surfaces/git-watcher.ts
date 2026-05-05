@@ -139,6 +139,25 @@ async function getCommitStats(repo: string, sha: string): Promise<CommitStats> {
   return { files_changed, additions, deletions };
 }
 
+async function getChangedFiles(
+  repo: string,
+  sha: string,
+  parent: string | undefined,
+): Promise<string[]> {
+  const args =
+    parent !== undefined
+      ? ['diff', '--name-only', `${parent}..${sha}`]
+      : ['show', '--name-only', '--format=', sha];
+  const out = await git(args, repo);
+  if (out === null) return [];
+  const files: string[] = [];
+  for (const line of out.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) files.push(join(repo, trimmed));
+  }
+  return files;
+}
+
 async function getDiff(
   repo: string,
   sha: string,
@@ -167,8 +186,11 @@ async function buildAndEmit(
   commit: CommitInfo,
   storage: Storage,
 ): Promise<boolean> {
-  const stats = await getCommitStats(repo, commit.sha);
-  const diff = await getDiff(repo, commit.sha, commit.parent_sha);
+  const [stats, diff, changedFiles] = await Promise.all([
+    getCommitStats(repo, commit.sha),
+    getDiff(repo, commit.sha, commit.parent_sha),
+    getChangedFiles(repo, commit.sha, commit.parent_sha),
+  ]);
 
   const bodyBlock = commit.body.length > 0 ? `${commit.body}\n\n` : '';
   const content = `COMMIT ${shortSha(commit.sha)}: ${commit.subject}\n\n${bodyBlock}--- DIFF ---\n${diff}`;
@@ -179,8 +201,10 @@ async function buildAndEmit(
     files_changed: stats.files_changed,
     additions: stats.additions,
     deletions: stats.deletions,
+    repo_root: repo,
   };
   if (commit.parent_sha !== undefined) metadata['parent_sha'] = commit.parent_sha;
+  if (changedFiles.length > 0) metadata['files_referenced'] = changedFiles;
 
   const candidate = {
     source: `git:${repo}`,

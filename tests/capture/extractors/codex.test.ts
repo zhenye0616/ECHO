@@ -273,6 +273,39 @@ describe('extractCodexTurns (pure)', () => {
     expect(r.turns[0]?.user_message).toBe('q');
   });
 
+  it('preserves cwd across incremental passes when session_meta is past lastByteOffset', async () => {
+    writeJsonl(path, [
+      sessionMeta({ cwd: '/Users/x/proj' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const pass1 = await extractCodexTurns(path, 0);
+    expect(pass1.turns).toHaveLength(1);
+    expect(pass1.turns[0]?.cwd).toBe('/Users/x/proj');
+    expect(pass1.cwd).toBe('/Users/x/proj');
+
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    const pass2 = await extractCodexTurns(path, pass1.newOffset, pass1.cwd);
+    expect(pass2.turns).toHaveLength(1);
+    expect(pass2.turns[0]?.user_message).toBe('q2');
+    expect(pass2.turns[0]?.cwd).toBe('/Users/x/proj');
+  });
+
+  it('omitting lastKnownCwd causes cwd to be dropped on later passes (regression guard)', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const pass1 = await extractCodexTurns(path, 0);
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    const pass2 = await extractCodexTurns(path, pass1.newOffset);
+    expect(pass2.turns).toHaveLength(1);
+    expect(pass2.turns[0]?.cwd).toBeUndefined();
+  });
+
   it('byte-offset progression: a second pass starting at returned offset emits the next cluster', async () => {
     writeJsonl(path, [
       sessionMeta(),
@@ -323,7 +356,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
   beforeEach(() => {
     originalFsPaths = snapshotFsPaths();
     dir = tmpDir();
-    sessionsPrefix = `${dir}/sessions/`;
+    sessionsPrefix = `${dir}/.codex/sessions/`;
     mkdirSync(`${sessionsPrefix}2026/05/01`, { recursive: true });
     path = join(
       sessionsPrefix,
@@ -343,6 +376,30 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     resetAllowlist();
     restoreFsPaths(originalFsPaths);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('processes pre-existing JSONL files at boot (catches sessions written before daemon start)', async () => {
+    // Pre-create a complete cluster (closed by a second user line) BEFORE
+    // the extractor starts. With ignoreInitial:true and offset-map only
+    // populated from prior storage, this file would otherwise be silently
+    // skipped — same shape as the Claude Code subagent gap.
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+
+    // No further file changes — the file is frozen, like a finished
+    // codex session that ended before this daemon boot.
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.source).toBe(`fs:${path}`);
+    expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
   });
 
   it('emits a CaptureEvent through the pipeline once a cluster closes', async () => {
@@ -365,6 +422,76 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       cwd: '/Users/x/proj',
     });
     expect(evt.metadata).not.toHaveProperty('had_tool_use');
+  });
+
+  it('mirrors metadata.cwd into metadata.repo_root (cross-source canonical name)', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta({ cwd: '/Users/x/proj' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    expect(md['cwd']).toBe('/Users/x/proj');
+    expect(md['repo_root']).toBe('/Users/x/proj');
+  });
+
+  it('carries cwd on every turn even when extraction spans multiple daemon ticks', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta({ cwd: '/Users/x/proj' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    await waitFor(async () => (await storage.count()) >= 2);
+
+    appendJsonl(path, [assistantMsg('a3'), userMsg('q4')]);
+    await waitFor(async () => (await storage.count()) >= 3);
+
+    const events = await storage.query();
+    expect(events).toHaveLength(3);
+    for (const e of events) {
+      expect((e.metadata as Record<string, unknown>)['cwd']).toBe('/Users/x/proj');
+    }
+  });
+
+  it('restores cwd from prior storage events on daemon restart (backfillOffsetMap)', async () => {
+    writeJsonl(path, [
+      sessionMeta({ cwd: '/Users/x/proj' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const r1 = await extractCodexTurns(path, 0);
+    expect(r1.turns).toHaveLength(1);
+    await storage.append({
+      source: `fs:${path}`,
+      timestamp: r1.turns[0]!.timestamp,
+      content: `USER: ${r1.turns[0]!.user_message}\n\nASSISTANT: ${r1.turns[0]!.assistant_message}`,
+      metadata: {
+        session_id: r1.turns[0]!.session_id,
+        turn_index: 0,
+        mtime: r1.turns[0]!.mtime,
+        byte_offset: r1.turns[0]!.byte_offset,
+        cwd: r1.turns[0]!.cwd,
+      },
+    });
+
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    await waitFor(async () => (await storage.count()) >= 2);
+
+    const events = await storage.query();
+    const fresh = events.find((e) => e.content.includes('a2'));
+    expect(fresh).toBeDefined();
+    expect((fresh!.metadata as Record<string, unknown>)['cwd']).toBe('/Users/x/proj');
   });
 
   it('end-to-end: appending more clusters produces ordered, non-duplicate turns', async () => {
