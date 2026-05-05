@@ -7,6 +7,7 @@
     "test": "vitest run",
     "daemon": "vite-node src/daemon/index.ts",
     "watch:stream": "vite-node tools/stream-watch.ts",
+    "render:trace": "vite-node tools/render-trace.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src tests package.json tsconfig.json vitest.config.ts eslint.config.js .prettierrc.json",
     "format:check": "prettier --check src tests package.json tsconfig.json vitest.config.ts eslint.config.js .prettierrc.json",
