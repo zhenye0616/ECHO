@@ -24,14 +24,49 @@ function sessionMeta(opts: {
   id?: string;
   cwd?: string;
   ts?: string;
+  source?: string;
+  cli_version?: string;
+  model_provider?: string;
+  git?: { commit_hash?: string; branch?: string; repository_url?: string };
 } = {}): CodexLine {
+  const payload: Record<string, unknown> = {
+    id: opts.id ?? '019de2b0-6551-7682-a51b-2affaa0a7bbf',
+    cwd: opts.cwd ?? '/Users/x/proj',
+  };
+  if (opts.source !== undefined) payload['source'] = opts.source;
+  if (opts.cli_version !== undefined) payload['cli_version'] = opts.cli_version;
+  if (opts.model_provider !== undefined) payload['model_provider'] = opts.model_provider;
+  if (opts.git !== undefined) payload['git'] = opts.git;
   return {
     timestamp: opts.ts ?? '2026-05-01T10:00:00.000Z',
     type: 'session_meta',
-    payload: {
-      id: opts.id ?? '019de2b0-6551-7682-a51b-2affaa0a7bbf',
-      cwd: opts.cwd ?? '/Users/x/proj',
-    },
+    payload,
+  };
+}
+
+function turnContext(opts: {
+  cwd?: string;
+  model?: string;
+  effort?: string;
+  personality?: string;
+  approval_policy?: string;
+  sandbox_policy_type?: string;
+} = {}): CodexLine {
+  const payload: Record<string, unknown> = {
+    turn_id: '019de2b0-6551-7682-a51b-2affaa0a7bbf',
+  };
+  if (opts.cwd !== undefined) payload['cwd'] = opts.cwd;
+  if (opts.model !== undefined) payload['model'] = opts.model;
+  if (opts.effort !== undefined) payload['effort'] = opts.effort;
+  if (opts.personality !== undefined) payload['personality'] = opts.personality;
+  if (opts.approval_policy !== undefined) payload['approval_policy'] = opts.approval_policy;
+  if (opts.sandbox_policy_type !== undefined) {
+    payload['sandbox_policy'] = { type: opts.sandbox_policy_type, network_access: false };
+  }
+  return {
+    timestamp: '2026-05-01T10:00:00.500Z',
+    type: 'turn_context',
+    payload,
   };
 }
 
@@ -340,6 +375,171 @@ describe('extractCodexTurns (pure)', () => {
     const r = await extractCodexTurns(path, 0);
     expect(r.turns[0]?.session_id).toBe('019de2b0-6551-7682-a51b-2affaa0a7bbf');
   });
+
+  // ─── Tier-1 metadata: session_meta + turn_context extras ──────────────────
+
+  it('extracts git metadata from session_meta.payload.git', async () => {
+    writeJsonl(path, [
+      sessionMeta({
+        git: {
+          commit_hash: '3f178d784381cf45f56ad4bf044f6f0aed852f83',
+          branch: 'fix/extraction-quality-gaps',
+          repository_url: 'https://github.com/zhenye0616/Echo_Extension.git',
+        },
+      }),
+      userMsg('q'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.git).toEqual({
+      sha: '3f178d784381cf45f56ad4bf044f6f0aed852f83',
+      branch: 'fix/extraction-quality-gaps',
+      origin_url: 'https://github.com/zhenye0616/Echo_Extension.git',
+    });
+    expect(r.git).toEqual(r.turns[0]?.git);
+  });
+
+  it('extracts source / cli_version / model_provider from session_meta', async () => {
+    writeJsonl(path, [
+      sessionMeta({
+        source: 'vscode',
+        cli_version: '0.128.0-alpha.1',
+        model_provider: 'openai',
+      }),
+      userMsg('q'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.codex).toMatchObject({
+      source: 'vscode',
+      cli_version: '0.128.0-alpha.1',
+      model_provider: 'openai',
+    });
+  });
+
+  it('extracts model / reasoning_effort / personality / sandbox / approval from turn_context', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      turnContext({
+        model: 'gpt-5.5',
+        effort: 'xhigh',
+        personality: 'pragmatic',
+        approval_policy: 'on-request',
+        sandbox_policy_type: 'workspace-write',
+      }),
+      userMsg('q'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.codex).toMatchObject({
+      model: 'gpt-5.5',
+      reasoning_effort: 'xhigh',
+      personality: 'pragmatic',
+      approval_policy: 'on-request',
+      sandbox_policy_type: 'workspace-write',
+    });
+  });
+
+  it('merges session_meta + turn_context fields into one codex object per turn', async () => {
+    writeJsonl(path, [
+      sessionMeta({ source: 'cli', cli_version: '0.77.0', model_provider: 'openai' }),
+      turnContext({ model: 'gpt-5.5', effort: 'xhigh', sandbox_policy_type: 'read-only' }),
+      userMsg('q'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.codex).toEqual({
+      source: 'cli',
+      cli_version: '0.77.0',
+      model_provider: 'openai',
+      model: 'gpt-5.5',
+      reasoning_effort: 'xhigh',
+      sandbox_policy_type: 'read-only',
+    });
+  });
+
+  it('omits git/codex on turns when no session_meta or turn_context fields are present', async () => {
+    writeJsonl(path, [
+      // session_meta with cwd only — no source/cli_version/git
+      { timestamp: '2026-05-01T10:00:00.000Z', type: 'session_meta', payload: { id: 'x', cwd: '/Users/x/proj' } },
+      userMsg('q'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.git).toBeUndefined();
+    expect(r.turns[0]?.codex).toBeUndefined();
+  });
+
+  it('preserves git + codex across incremental passes via lastKnownGit/lastKnownCodex', async () => {
+    writeJsonl(path, [
+      sessionMeta({
+        source: 'vscode',
+        cli_version: '0.128.0',
+        git: { commit_hash: 'abc1234', branch: 'main' },
+      }),
+      turnContext({ model: 'gpt-5.5', sandbox_policy_type: 'workspace-write' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const pass1 = await extractCodexTurns(path, 0);
+    expect(pass1.turns).toHaveLength(1);
+    expect(pass1.turns[0]?.git?.sha).toBe('abc1234');
+    expect(pass1.turns[0]?.codex?.model).toBe('gpt-5.5');
+
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    const pass2 = await extractCodexTurns(path, pass1.newOffset, {
+      lastKnownCwd: pass1.cwd,
+      lastKnownGit: pass1.git,
+      lastKnownCodex: pass1.codex,
+    });
+    expect(pass2.turns).toHaveLength(1);
+    expect(pass2.turns[0]?.user_message).toBe('q2');
+    expect(pass2.turns[0]?.git?.sha).toBe('abc1234');
+    expect(pass2.turns[0]?.codex?.model).toBe('gpt-5.5');
+    expect(pass2.turns[0]?.codex?.sandbox_policy_type).toBe('workspace-write');
+  });
+
+  it('omitting lastKnownGit/lastKnownCodex causes them to be dropped on later passes (regression guard)', async () => {
+    writeJsonl(path, [
+      sessionMeta({ git: { commit_hash: 'abc1234' } }),
+      turnContext({ model: 'gpt-5.5' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const pass1 = await extractCodexTurns(path, 0);
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    const pass2 = await extractCodexTurns(path, pass1.newOffset);
+    expect(pass2.turns).toHaveLength(1);
+    expect(pass2.turns[0]?.git).toBeUndefined();
+    expect(pass2.turns[0]?.codex).toBeUndefined();
+  });
+
+  it('a later turn_context updates codex (per-turn config drift)', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      turnContext({ model: 'gpt-5.4', effort: 'medium' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      // model changed between turns (rare but legal)
+      turnContext({ model: 'gpt-5.5', effort: 'xhigh' }),
+      userMsg('q2'),
+      assistantMsg('a2'),
+      userMsg('q3'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(2);
+    expect(r.turns[0]?.codex?.model).toBe('gpt-5.4');
+    expect(r.turns[0]?.codex?.reasoning_effort).toBe('medium');
+    expect(r.turns[1]?.codex?.model).toBe('gpt-5.5');
+    expect(r.turns[1]?.codex?.reasoning_effort).toBe('xhigh');
+  });
 });
 
 // ─── Lifecycle / integration tests ──────────────────────────────────────────
@@ -422,6 +622,92 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       cwd: '/Users/x/proj',
     });
     expect(evt.metadata).not.toHaveProperty('had_tool_use');
+  });
+
+  it('lands metadata.git and metadata.codex through the pipeline', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [
+      sessionMeta({
+        source: 'vscode',
+        cli_version: '0.128.0-alpha.1',
+        model_provider: 'openai',
+        git: {
+          commit_hash: 'abc1234deadbeef',
+          branch: 'main',
+          repository_url: 'https://github.com/u/repo.git',
+        },
+      }),
+      turnContext({
+        model: 'gpt-5.5',
+        effort: 'xhigh',
+        personality: 'pragmatic',
+        approval_policy: 'on-request',
+        sandbox_policy_type: 'workspace-write',
+      }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    await waitFor(async () => (await storage.count()) >= 1);
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    expect(md['git']).toEqual({
+      sha: 'abc1234deadbeef',
+      branch: 'main',
+      origin_url: 'https://github.com/u/repo.git',
+    });
+    expect(md['codex']).toEqual({
+      source: 'vscode',
+      cli_version: '0.128.0-alpha.1',
+      model_provider: 'openai',
+      model: 'gpt-5.5',
+      reasoning_effort: 'xhigh',
+      personality: 'pragmatic',
+      approval_policy: 'on-request',
+      sandbox_policy_type: 'workspace-write',
+    });
+  });
+
+  it('restores git + codex from prior storage events on daemon restart', async () => {
+    writeJsonl(path, [
+      sessionMeta({
+        source: 'vscode',
+        cli_version: '0.128.0',
+        git: { commit_hash: 'abc1234', branch: 'main' },
+      }),
+      turnContext({ model: 'gpt-5.5', sandbox_policy_type: 'workspace-write' }),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+    ]);
+    const r1 = await extractCodexTurns(path, 0);
+    expect(r1.turns).toHaveLength(1);
+    await storage.append({
+      source: `fs:${path}`,
+      timestamp: r1.turns[0]!.timestamp,
+      content: `USER: ${r1.turns[0]!.user_message}\n\nASSISTANT: ${r1.turns[0]!.assistant_message}`,
+      metadata: {
+        session_id: r1.turns[0]!.session_id,
+        turn_index: 0,
+        mtime: r1.turns[0]!.mtime,
+        byte_offset: r1.turns[0]!.byte_offset,
+        cwd: r1.turns[0]!.cwd,
+        git: r1.turns[0]!.git,
+        codex: r1.turns[0]!.codex,
+      },
+    });
+
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
+    await waitFor(async () => (await storage.count()) >= 2);
+
+    const events = await storage.query();
+    const fresh = events.find((e) => e.content.includes('a2'));
+    expect(fresh).toBeDefined();
+    const md = fresh!.metadata as Record<string, unknown>;
+    expect((md['git'] as Record<string, unknown>)['sha']).toBe('abc1234');
+    expect((md['codex'] as Record<string, unknown>)['model']).toBe('gpt-5.5');
+    expect((md['codex'] as Record<string, unknown>)['sandbox_policy_type']).toBe('workspace-write');
   });
 
   it('mirrors metadata.cwd into metadata.repo_root (cross-source canonical name)', async () => {

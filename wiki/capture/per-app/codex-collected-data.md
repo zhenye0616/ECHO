@@ -14,7 +14,7 @@ A field-by-field record of what ECHO reads from OpenAI Codex's local session tra
 
 ## TL;DR
 
-ECHO captures the **plain user and assistant text from every Codex session**, plus the working directory the session was launched in and a `had_tool_use` boolean per turn. Stable IDs let you group by chat (`session_id`) and per-turn ordering is preserved. Tool call payloads, reasoning blocks, developer-role system prompts, and Codex's internal event metadata are deliberately not collected today.
+ECHO captures the **plain user and assistant text from every Codex session**, plus the working directory the session was launched in, a `had_tool_use` boolean per turn, and a structured per-turn snapshot of the session's git state and Codex configuration (model, reasoning effort, sandbox + approval policy, cli version, source surface, personality). Stable IDs let you group by chat (`session_id`) and per-turn ordering is preserved. Tool call payloads, reasoning blocks, developer-role system prompts, and Codex's internal event metadata are deliberately not collected today.
 
 ## The watched path
 
@@ -36,8 +36,8 @@ Across a real Codex install (probed against ~25 recent sessions, 5 representativ
 
 | `type`           | Per session count | What it is | Read by ECHO? |
 |---|---:|---|---|
-| `session_meta`   | 1 (always first) | Session start: id, cwd, timestamp | ✅ `cwd` only |
-| `turn_context`   | 1–31 | Turn-level config Codex tracks (model, prompt mode, etc.) | ❌ |
+| `session_meta`   | 1 (always first) | Session start: id, cwd, timestamp, source, cli_version, git | ✅ `cwd`, `source`, `cli_version`, `model_provider`, `git.{commit_hash,branch,repository_url}` |
+| `turn_context`   | 1–31 | Turn-level config: model, effort, personality, sandbox/approval policy, etc. | ✅ `model`, `effort`, `personality`, `approval_policy`, `sandbox_policy.type` |
 | `event_msg`      | 7–107 | Status events (token counts, lifecycle pings, etc.) | ❌ |
 | `response_item`  | 5–120 | The actual message stream — user, assistant, reasoning, tools | ✅ filtered (see below) |
 
@@ -82,10 +82,28 @@ For `message.content[]`, each content block has a `type`:
     mtime:         <ms epoch — when the JSONL was last touched>,
     byte_offset:   <file offset just past the last line consumed for this turn>,
     cwd?:          "<working directory the Codex session was launched in>",
-    had_tool_use?: true   // omitted when false
+    repo_root?:    "<canonical alias of cwd; mirrors cwd today>",
+    had_tool_use?: true,   // omitted when false
+    git?: {                // populated when session_meta.git is present (~75–79% of threads)
+      sha?:        "<HEAD commit hash at session start>",
+      branch?:     "<branch at session start>",
+      origin_url?: "<git remote 'origin' URL>"
+    },
+    codex?: {              // populated when session_meta and/or turn_context carry config
+      source?:              "vscode" | "cli" | "exec" | <other>,  // which surface launched the session
+      cli_version?:         "<e.g. 0.128.0-alpha.1>",
+      model_provider?:      "<e.g. openai>",
+      model?:               "<e.g. gpt-5.5>",
+      reasoning_effort?:    "<e.g. xhigh>",
+      personality?:         "<e.g. pragmatic>",
+      approval_policy?:     "on-request" | "never" | "untrusted" | <other>,
+      sandbox_policy_type?: "read-only" | "workspace-write" | "danger-full-access" | <other>
+    }
   }
 }
 ```
+
+`git` and `codex` are only attached when the underlying fields are observed; sessions written by older Codex versions (or scenarios where git isn't applicable) cleanly omit them. Both are persisted across daemon restarts via the offset map, so a turn whose `session_meta`/`turn_context` lines were consumed in a prior pass still carries them.
 
 A "turn" is a user message paired with **every consecutive assistant message until the next user**. See [[codex-extractor]] § "Pairing Rule" for the rationale (Codex emits ~3–4 assistant messages per user, and a 1:1 pairing would silently drop most of the response).
 
@@ -107,13 +125,15 @@ Translation: Codex sessions are tool-heavy (the agent uses shell + file tools co
 
 | Signal | Why not collected today | Where it would come from |
 |---|---|---|
-| **Tool-call payloads** (which tool, what arguments, what output) | Tier-A-style extraction not yet implemented | Parser-only follow-up: read `function_call.{name,arguments}` and `function_call_output.output` from the same JSONL. ~50 LOC. |
+| **Tool-call payloads** (which tool, what arguments, what output) | Tier-A-style extraction not yet implemented | Parser-only follow-up: read `function_call.{name,arguments}` and `function_call_output.output` from the same JSONL. ~150 LOC including truncation rules. |
 | **Reasoning blocks** (the assistant's hidden thinking) | Out of scope for V1 retrieval (clutters search; doubles storage) | If/when useful, parser-only addition. Should probably ship behind a config flag. |
 | **Developer-role messages** (AGENTS.md text, environment context) | System noise, not chat | Could be promoted to a per-session `metadata.developer_context` field if useful. |
-| **`event_msg` / `turn_context` lines** (token counts, model selection, etc.) | Not chat content | Could be aggregated as session-level summary metadata. |
+| **`event_msg` lines** (token counters, lifecycle pings) | Not chat content | Could be aggregated as session-level summary metadata (e.g. running token totals). |
+| **`turn_context.permission_profile.entries`** (per-path access list) | Larger blob than the type-only summary already captured | If "did this turn have access to file X" becomes a question, parse the granular entries into a structured field. |
+| **`session_meta.payload.base_instructions.text`** (Codex's full system prompt + personality declaration) | Multi-KB blob; high signal but bulks every event | Could capture a SHA256 (deduplication-friendly) instead of the full text, or a hash + first-N-chars. |
 | **Multi-modal content** (images, file attachments) | Codex JSONL stores these as content blocks but only `input_text` / `output_text` are extracted | Parser extension — bigger lift if attachment payloads need to be persisted. |
-| **`logs_2.sqlite` (active session log DB)** and **`state_5.sqlite` (threads / agent jobs)** | Different schema; separate storage system | Out-of-scope for V1; could be its own extractor later. |
-| **`history.jsonl`** (interactive prompt history outside of sessions) | Interactive REPL history, not session transcripts | Probably valuable as cross-session "what prompts have I tried" — separate item. |
+| **`logs_2.sqlite` (active session log DB)** and **`state_5.sqlite` (threads / agent jobs)** | Most threads-table fields are also in `session_meta` / `turn_context` (now captured). The two truly SQLite-only fields are `title` (Codex's auto-summary) and `archived` (user action). | Out-of-scope for V1 — would require a new allowlisted path. Defer until auto-titles become a needed signal. |
+| **`history.jsonl`** (interactive prompt history outside of sessions) | Interactive REPL history, not session transcripts | Probably valuable as cross-session "what prompts have I tried" — separate item. Same shape as `~/.claude/history.jsonl`; one shared extractor could handle both. |
 
 ## Future extensions (Tier A and beyond)
 
