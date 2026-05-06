@@ -127,6 +127,9 @@ interface RenderRow {
   sandbox: string | null;
   files: string[];
   hadTool: boolean;
+  toolCalls: Array<Record<string, unknown>>;
+  thinking: string | null;
+  gitState: Record<string, unknown> | null;
   user: string;
   assistant: string;
   metadata: Record<string, unknown>;
@@ -163,6 +166,16 @@ function toRow(event: CaptureEvent, full: boolean): RenderRow | null {
     }
   }
 
+  const toolCallsRaw = md['tool_calls'];
+  const toolCalls: Array<Record<string, unknown>> = Array.isArray(toolCallsRaw)
+    ? (toolCallsRaw as unknown[]).filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null)
+    : [];
+  const thinking = typeof md['thinking'] === 'string' ? (md['thinking'] as string) : null;
+  const gitStateRaw = md['git_state'];
+  const gitState =
+    typeof gitStateRaw === 'object' && gitStateRaw !== null
+      ? (gitStateRaw as Record<string, unknown>)
+      : null;
   return {
     id: event.id,
     lane,
@@ -175,6 +188,9 @@ function toRow(event: CaptureEvent, full: boolean): RenderRow | null {
     sandbox,
     files,
     hadTool: md['had_tool_use'] === true,
+    toolCalls,
+    thinking,
+    gitState,
     user,
     assistant,
     metadata: md,
@@ -239,7 +255,18 @@ const TEMPLATE = `<!doctype html>
   .sandbox { color: var(--model); opacity: .8; }
   .tool { color: var(--tool); }
   .files { color: var(--dim); font-size: 11px; }
+  .gs { color: var(--branch); font-size: 11px; }
+  .gs.stale { color: var(--dim); }
+  .toolcount { color: var(--tool); font-size: 11px; }
   .row-body { padding: 10px 12px 12px; border-top: 1px dashed var(--border); display: none; }
+  .tool-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .tool { font-family: var(--mono); font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; }
+  .tool .tname { color: var(--tool); font-weight: 600; }
+  .tool .terror { color: #f85149; font-weight: 600; }
+  .tool details { margin-top: 4px; }
+  .tool details > summary { color: var(--dim); font-size: 11px; cursor: pointer; }
+  .tool pre { background: transparent; color: var(--fg); margin: 4px 0 0 0; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto; font-size: 11px; }
+  .thinking { margin-top: 8px; background: rgba(206, 145, 120, .06); border: 1px solid rgba(206, 145, 120, .2); border-radius: 4px; padding: 8px; font-family: var(--mono); font-size: 11px; color: #ce9178; white-space: pre-wrap; line-height: 1.5; max-height: 320px; overflow-y: auto; }
   .row.expanded .row-body { display: block; }
   .turn-pair { display: flex; flex-direction: column; gap: 8px; }
   .msg { font-family: var(--mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
@@ -297,22 +324,44 @@ const TEMPLATE = `<!doctype html>
   function fmtTs(iso){ return iso.replace('T',' ').slice(0,19); }
   function shortRepo(p){ if(!p) return '—'; const parts=p.split('/').filter(Boolean); return parts.slice(-2).join('/'); }
 
+  function toolHtml(t){
+    const errBadge = t.is_error ? ' <span class="terror">ERROR</span>' : '';
+    const args = t.args ? '<details><summary>args' + (t.args_truncated ? ' (truncated)' : '') + '</summary><pre>' + esc(t.args) + '</pre></details>' : '';
+    const out = t.output ? '<details open><summary>output' + (t.output_truncated ? ' (truncated)' : '') + '</summary><pre>' + esc(t.output) + '</pre></details>' : '';
+    return '<div class="tool"><span class="tname">' + esc(t.name || '?') + '</span>' + errBadge + args + out + '</div>';
+  }
+
+  function gitStateHtml(gs){
+    if (!gs) return '';
+    const head = gs.head_sha ? esc(String(gs.head_sha).slice(0,7)) : '?';
+    const branch = gs.branch ? '@' + esc(gs.branch) : '';
+    const dirty = (typeof gs.dirty_count === 'number') ? ' dirty=' + gs.dirty_count : '';
+    const cls = gs.fresh ? 'gs' : 'gs stale';
+    return ' <span class="' + cls + '">' + head + branch + dirty + '</span>';
+  }
+
   function rowHtml(r){
     const tools = r.hadTool ? '<span class="tool">🔧</span>' : '';
+    const tc = (r.toolCalls && r.toolCalls.length) ? ' <span class="toolcount">' + r.toolCalls.length + ' calls</span>' : '';
     const repoBranch = '<span class="repo">' + esc(shortRepo(r.repo)) + '</span>' +
       (r.branch ? '<span class="branch">@' + esc(r.branch) + '</span>' : '');
     const codexBits = (r.model || r.sandbox)
       ? ' <span class="model">' + esc([r.model, r.sandbox].filter(Boolean).join('/')) + '</span>'
       : '';
     const filesBits = r.files.length ? ' <span class="files">files=' + r.files.length + '</span>' : '';
+    const gsBits = gitStateHtml(r.gitState);
     const preview = esc((r.user || '').replace(/\\s+/g,' ').slice(0,180));
+    const toolsBlock = (r.toolCalls && r.toolCalls.length)
+      ? '<div class="tool-list">' + r.toolCalls.map(toolHtml).join('') + '</div>' : '';
+    const thinkingBlock = r.thinking
+      ? '<div class="thinking">' + esc(r.thinking) + '</div>' : '';
     return (
       '<div class="row" data-id="' + esc(r.id) + '" data-lane="' + r.lane + '">' +
         '<div class="row-head">' +
           '<span class="ts">' + esc(fmtTs(r.ts)) + '</span>' +
           '<span class="sid">' + esc(r.sid) + '/#' + r.turn + '</span>' +
-          tools +
-          repoBranch + filesBits + codexBits +
+          tools + tc +
+          repoBranch + filesBits + codexBits + gsBits +
           '<span class="preview">' + preview + '</span>' +
         '</div>' +
         '<div class="row-body">' +
@@ -320,6 +369,8 @@ const TEMPLATE = `<!doctype html>
             '<div class="msg user"><span class="role">user</span>' + esc(r.user) + '</div>' +
             '<div class="msg asst"><span class="role">assistant</span>' + esc(r.assistant) + '</div>' +
           '</div>' +
+          thinkingBlock +
+          toolsBlock +
           (r.files.length ? '<details class="meta"><summary>files_referenced (' + r.files.length + ')</summary><pre>' + esc(r.files.join('\\n')) + '</pre></details>' : '') +
           '<details class="meta"><summary>metadata</summary><pre>' + esc(JSON.stringify(r.metadata, null, 2)) + '</pre></details>' +
           '<details class="meta"><summary>source</summary><pre>' + esc(r.source) + '</pre></details>' +

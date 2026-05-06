@@ -106,19 +106,30 @@ function developerMsg(text: string): CodexLine {
   };
 }
 
-function functionCall(): CodexLine {
+function functionCall(name = 'shell', argsStr = '{}', call_id = 'call_001'): CodexLine {
   return {
     timestamp: '2026-05-01T10:00:01.500Z',
     type: 'response_item',
-    payload: { type: 'function_call', name: 'shell', arguments: '{}' },
+    payload: { type: 'function_call', name, arguments: argsStr, call_id },
   };
 }
 
-function reasoning(): CodexLine {
+function functionCallOutput(call_id = 'call_001', output = 'ok'): CodexLine {
+  return {
+    timestamp: '2026-05-01T10:00:01.600Z',
+    type: 'response_item',
+    payload: { type: 'function_call_output', call_id, output },
+  };
+}
+
+function reasoning(text?: string): CodexLine {
   return {
     timestamp: '2026-05-01T10:00:01.700Z',
     type: 'response_item',
-    payload: { type: 'reasoning', summary: [] },
+    payload: {
+      type: 'reasoning',
+      summary: text === undefined ? [] : [{ type: 'summary_text', text }],
+    },
   };
 }
 
@@ -519,6 +530,77 @@ describe('extractCodexTurns (pure)', () => {
     expect(pass2.turns).toHaveLength(1);
     expect(pass2.turns[0]?.git).toBeUndefined();
     expect(pass2.turns[0]?.codex).toBeUndefined();
+  });
+
+  // ─── Tier-3 metadata: tool_calls + thinking ────────────────────────────────
+
+  it('extracts tool_calls with name + args + output, matching by call_id', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('run ls'),
+      functionCall('exec_command', '{"cmd":"ls -la"}', 'call_xy'),
+      functionCallOutput('call_xy', 'total 12\nfoo.txt'),
+      assistantMsg('done'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    const tc = r.turns[0]?.tool_calls;
+    expect(tc).toHaveLength(1);
+    expect(tc?.[0]).toMatchObject({
+      name: 'exec_command',
+      args: '{"cmd":"ls -la"}',
+      output: 'total 12\nfoo.txt',
+      call_id: 'call_xy',
+    });
+    expect(tc?.[0]?.is_error).toBeUndefined();
+  });
+
+  it('marks tool_calls.is_error when output indicates non-zero exit', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('try'),
+      functionCall('exec_command', '{}', 'c1'),
+      functionCallOutput('c1', 'Process exited with code 1\nbroken'),
+      assistantMsg('failed'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.tool_calls?.[0]?.is_error).toBe(true);
+  });
+
+  it('extracts reasoning blocks into thinking field', async () => {
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q'),
+      reasoning('first I check the file…'),
+      reasoning('then I verify the diff'),
+      assistantMsg('a'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.thinking).toContain('first I check the file');
+    expect(r.turns[0]?.thinking).toContain('then I verify the diff');
+  });
+
+  it('omits tool_calls and thinking when neither is present', async () => {
+    writeJsonl(path, [sessionMeta(), userMsg('q'), assistantMsg('a'), userMsg('next')]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.tool_calls).toBeUndefined();
+    expect(r.turns[0]?.thinking).toBeUndefined();
+  });
+
+  it('caps tool_calls per turn (truncates beyond MAX_TOOL_CALLS_PER_TURN)', async () => {
+    const lines: CodexLine[] = [sessionMeta(), userMsg('q')];
+    for (let i = 0; i < 60; i++) {
+      lines.push(functionCall('exec', '{}', `c${i}`));
+      lines.push(functionCallOutput(`c${i}`, 'ok'));
+    }
+    lines.push(assistantMsg('a'));
+    lines.push(userMsg('next'));
+    writeJsonl(path, lines);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.tool_calls?.length).toBe(50);
   });
 
   it('a later turn_context updates codex (per-turn config drift)', async () => {

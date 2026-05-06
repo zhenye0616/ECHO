@@ -4,8 +4,17 @@ import { basename } from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
+import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { bootScanJsonl } from './_shared.js';
+import {
+  MAX_TOOL_CALLS_PER_TURN,
+  truncateArgs,
+  truncateOutput,
+  truncateThinking,
+  type GitState,
+  type ToolCall,
+} from './_turn_meta.js';
 
 const log = createLogger('capture.codex');
 
@@ -41,6 +50,9 @@ export interface CodexTurn {
   byte_offset: number; // file offset just past the LAST line consumed for this turn
   git?: CodexGitMeta;
   codex?: CodexSessionMeta;
+  tool_calls?: ToolCall[];
+  thinking?: string;
+  git_state?: GitState;
 }
 
 export interface ExtractCodexResult {
@@ -52,7 +64,7 @@ export interface ExtractCodexResult {
 }
 
 interface ParsedLine {
-  kind: 'message' | 'tool' | 'session_meta' | 'turn_context' | 'other';
+  kind: 'message' | 'tool_call' | 'tool_output' | 'reasoning' | 'session_meta' | 'turn_context' | 'other';
   role?: 'user' | 'assistant';
   text?: string;
   cwd?: string;
@@ -68,6 +80,13 @@ interface ParsedLine {
   personality?: string;
   approval_policy?: string;
   sandbox_policy_type?: string;
+  // Tool / reasoning payload extras
+  tool_call_name?: string;
+  tool_call_args?: string;
+  tool_call_id?: string;
+  tool_output?: string;
+  tool_is_error?: boolean;
+  reasoning_text?: string;
 }
 
 function extractMessageText(content: unknown): string {
@@ -156,13 +175,58 @@ function parseLine(line: string): ParsedLine | null {
   const p = payload as Record<string, unknown>;
   const ptype = p['type'];
 
-  if (
-    ptype === 'function_call' ||
-    ptype === 'function_call_output' ||
-    ptype === 'custom_tool_call' ||
-    ptype === 'custom_tool_call_output'
-  ) {
-    return { kind: 'tool', timestamp };
+  if (ptype === 'reasoning') {
+    const out: ParsedLine = { kind: 'reasoning', timestamp };
+    const summary = p['summary'];
+    if (Array.isArray(summary)) {
+      const parts: string[] = [];
+      for (const s of summary) {
+        if (typeof s === 'object' && s !== null) {
+          const sb = s as Record<string, unknown>;
+          if (typeof sb['text'] === 'string') parts.push(sb['text']);
+        } else if (typeof s === 'string') {
+          parts.push(s);
+        }
+      }
+      if (parts.length > 0) out.reasoning_text = parts.join('\n');
+    } else if (typeof p['text'] === 'string') {
+      out.reasoning_text = p['text'];
+    }
+    return out;
+  }
+
+  if (ptype === 'function_call' || ptype === 'custom_tool_call') {
+    const out: ParsedLine = { kind: 'tool_call', timestamp };
+    if (typeof p['name'] === 'string') out.tool_call_name = p['name'];
+    const args = p['arguments'];
+    if (typeof args === 'string') out.tool_call_args = args;
+    else if (args !== undefined && args !== null) out.tool_call_args = JSON.stringify(args);
+    if (typeof p['call_id'] === 'string') out.tool_call_id = p['call_id'];
+    return out;
+  }
+
+  if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
+    const out: ParsedLine = { kind: 'tool_output', timestamp };
+    if (typeof p['call_id'] === 'string') out.tool_call_id = p['call_id'];
+    const o = p['output'];
+    if (typeof o === 'string') {
+      out.tool_output = o;
+    } else if (typeof o === 'object' && o !== null) {
+      const od = o as Record<string, unknown>;
+      const c = od['content'];
+      if (typeof c === 'string') out.tool_output = c;
+      else if (typeof od['text'] === 'string') out.tool_output = od['text'] as string;
+      // Cheap exit-code heuristic for shell-style tools.
+      const md = od['metadata'];
+      if (typeof md === 'object' && md !== null) {
+        const ec = (md as Record<string, unknown>)['exit_code'];
+        if (typeof ec === 'number' && ec !== 0) out.tool_is_error = true;
+      }
+    }
+    if (out.tool_output !== undefined && /Process exited with code (?!0\b)\d+/.test(out.tool_output)) {
+      out.tool_is_error = true;
+    }
+    return out;
   }
 
   if (ptype !== 'message') return { kind: 'other', timestamp };
@@ -186,6 +250,14 @@ function deriveSessionId(jsonlPath: string): string {
   return base.endsWith('.jsonl') ? base.slice(0, -'.jsonl'.length) : base;
 }
 
+interface PendingToolCall {
+  name: string;
+  args?: string;
+  call_id?: string;
+  output?: string;
+  is_error?: boolean;
+}
+
 interface PendingCluster {
   userText: string;
   assistantTexts: string[];
@@ -195,6 +267,8 @@ interface PendingCluster {
   cwd?: string;
   git?: CodexGitMeta;
   codex?: CodexSessionMeta;
+  toolCalls: PendingToolCall[];
+  thinking: string[];
 }
 
 function mergeCodexMeta(
@@ -294,8 +368,32 @@ export async function extractCodexTurns(
     if (pending.cwd !== undefined) turn.cwd = pending.cwd;
     if (pending.git !== undefined) turn.git = pending.git;
     if (pending.codex !== undefined) turn.codex = pending.codex;
+    if (pending.toolCalls.length > 0) {
+      turn.tool_calls = pending.toolCalls.slice(0, MAX_TOOL_CALLS_PER_TURN).map(finalizeToolCall);
+    }
+    if (pending.thinking.length > 0) {
+      const t = truncateThinking(pending.thinking.join('\n\n'));
+      turn.thinking = t.value;
+    }
     turns.push(turn);
     confirmedThroughOffset = pending.assistantLastLineEndOffset;
+  }
+
+  function finalizeToolCall(p: PendingToolCall): ToolCall {
+    const tc: ToolCall = { name: p.name };
+    if (p.call_id !== undefined) tc.call_id = p.call_id;
+    if (p.args !== undefined) {
+      const t = truncateArgs(p.args);
+      tc.args = t.value;
+      if (t.truncated) tc.args_truncated = true;
+    }
+    if (p.output !== undefined) {
+      const t = truncateOutput(p.output);
+      tc.output = t.value;
+      if (t.truncated) tc.output_truncated = true;
+    }
+    if (p.is_error === true) tc.is_error = true;
+    return tc;
   }
 
   for (const line of lines) {
@@ -331,8 +429,42 @@ export async function extractCodexTurns(
       continue;
     }
 
-    if (parsed.kind === 'tool') {
-      if (pending !== null) pending.hadTool = true;
+    if (parsed.kind === 'tool_call') {
+      if (pending !== null && pending.toolCalls.length < MAX_TOOL_CALLS_PER_TURN) {
+        pending.hadTool = true;
+        const tc: PendingToolCall = { name: parsed.tool_call_name ?? '?' };
+        if (parsed.tool_call_args !== undefined) tc.args = parsed.tool_call_args;
+        if (parsed.tool_call_id !== undefined) tc.call_id = parsed.tool_call_id;
+        pending.toolCalls.push(tc);
+      } else if (pending !== null) {
+        pending.hadTool = true;
+      }
+      lineStartOffset = lineEndOffset;
+      continue;
+    }
+
+    if (parsed.kind === 'tool_output') {
+      if (pending !== null) {
+        pending.hadTool = true;
+        // Match to the most recent tool_call with the same call_id (or, lacking
+        // an id, the most recent un-resolved call). Single forward scan.
+        for (let i = pending.toolCalls.length - 1; i >= 0; i--) {
+          const tc = pending.toolCalls[i]!;
+          if (tc.output !== undefined) continue;
+          if (parsed.tool_call_id !== undefined && tc.call_id !== parsed.tool_call_id) continue;
+          if (parsed.tool_output !== undefined) tc.output = parsed.tool_output;
+          if (parsed.tool_is_error === true) tc.is_error = true;
+          break;
+        }
+      }
+      lineStartOffset = lineEndOffset;
+      continue;
+    }
+
+    if (parsed.kind === 'reasoning') {
+      if (pending !== null && parsed.reasoning_text !== undefined) {
+        pending.thinking.push(parsed.reasoning_text);
+      }
       lineStartOffset = lineEndOffset;
       continue;
     }
@@ -358,6 +490,8 @@ export async function extractCodexTurns(
         assistantLastLineEndOffset: lineEndOffset,
         hadTool: false,
         timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
+        toolCalls: [],
+        thinking: [],
       };
       if (cwd !== undefined) pending.cwd = cwd;
       if (git !== undefined) pending.git = git;
@@ -512,6 +646,10 @@ export async function startCodexExtractor(
       }
       if (turn.git !== undefined) metadata['git'] = turn.git;
       if (turn.codex !== undefined) metadata['codex'] = turn.codex;
+      if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
+      if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
+      const gitState = await probeGitState(turn.cwd, turn.timestamp);
+      if (gitState !== undefined) metadata['git_state'] = gitState;
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,

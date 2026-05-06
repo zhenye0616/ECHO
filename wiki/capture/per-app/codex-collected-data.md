@@ -98,6 +98,25 @@ For `message.content[]`, each content block has a `type`:
       personality?:         "<e.g. pragmatic>",
       approval_policy?:     "on-request" | "never" | "untrusted" | <other>,
       sandbox_policy_type?: "read-only" | "workspace-write" | "danger-full-access" | <other>
+    },
+    tool_calls?: [          // Layer 1 (Tier 3) — actions the agent took
+      { name: "exec_command",
+        args?: "<truncated JSON, ≤2 KB>",
+        args_truncated?: true,
+        output?: "<truncated stdout/stderr, ≤4 KB>",
+        output_truncated?: true,
+        is_error?: true,    // when output indicates non-zero exit / structured failure
+        call_id?: "<call_id linkage from JSONL>"
+      },
+      ...
+    ],
+    thinking?:    "<concatenated reasoning summary, ≤8 KB>",   // Layer 0a
+    git_state?: {            // Layer 2 — captured iff the turn is "fresh" (≤ 30s old when ECHO sees it)
+      head_sha?: "<HEAD commit at ECHO sample time>",
+      branch?:   "<branch name>",
+      dirty_count?: <int>,
+      captured_at: "<ISO sample timestamp>",
+      fresh: true
     }
   }
 }

@@ -5,8 +5,17 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
+import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { bootScanJsonl, dedupStrings } from './_shared.js';
+import {
+  MAX_TOOL_CALLS_PER_TURN,
+  truncateArgs,
+  truncateOutput,
+  truncateThinking,
+  type GitState,
+  type ToolCall,
+} from './_turn_meta.js';
 
 const log = createLogger('capture.claude-code');
 
@@ -25,11 +34,35 @@ export interface ClaudeCodeTurn {
   byte_offset: number;
   repo_root?: string;
   files_referenced?: string[];
+  tool_calls?: ToolCall[];
+  thinking?: string;
+  git_state?: GitState;
 }
 
 export interface ExtractClaudeCodeResult {
   turns: ClaudeCodeTurn[];
   newOffset: number;
+}
+
+interface ParsedToolUse {
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+interface ParsedToolResult {
+  tool_use_id: string;
+  content: string;
+  is_error: boolean;
+}
+
+interface ExtractedContent {
+  text: string;
+  hasTool: boolean;
+  files: string[];
+  toolUses: ParsedToolUse[];
+  toolResults: ParsedToolResult[];
+  thinking: string[];
 }
 
 interface ParsedLine {
@@ -39,19 +72,39 @@ interface ParsedLine {
   timestamp: string | undefined;
   cwd: string | undefined;
   files: string[];
+  toolUses: ParsedToolUse[];
+  toolResults: ParsedToolResult[];
+  thinking: string[];
 }
 
 const FILE_INPUT_KEYS = ['file_path', 'path', 'notebook_path'] as const;
 
-function extractContent(content: unknown): { text: string; hasTool: boolean; files: string[] } {
+function stringifyToolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: string[] = [];
+  for (const block of content) {
+    if (typeof block !== 'object' || block === null) continue;
+    const b = block as Record<string, unknown>;
+    if (b['type'] === 'text' && typeof b['text'] === 'string') {
+      parts.push(b['text']);
+    }
+  }
+  return parts.join('\n');
+}
+
+function extractContent(content: unknown): ExtractedContent {
   if (typeof content === 'string') {
-    return { text: content, hasTool: false, files: [] };
+    return { text: content, hasTool: false, files: [], toolUses: [], toolResults: [], thinking: [] };
   }
   if (!Array.isArray(content)) {
-    return { text: '', hasTool: false, files: [] };
+    return { text: '', hasTool: false, files: [], toolUses: [], toolResults: [], thinking: [] };
   }
   const parts: string[] = [];
   const files: string[] = [];
+  const toolUses: ParsedToolUse[] = [];
+  const toolResults: ParsedToolResult[] = [];
+  const thinking: string[] = [];
   let hasTool = false;
   for (const block of content) {
     if (typeof block !== 'object' || block === null) continue;
@@ -59,21 +112,36 @@ function extractContent(content: unknown): { text: string; hasTool: boolean; fil
     const blockType = b['type'];
     if (blockType === 'text' && typeof b['text'] === 'string') {
       parts.push(b['text']);
-    } else if (blockType === 'tool_use' || blockType === 'tool_result') {
+    } else if (blockType === 'thinking' && typeof b['thinking'] === 'string') {
+      thinking.push(b['thinking']);
+    } else if (blockType === 'tool_use') {
       hasTool = true;
-      if (blockType === 'tool_use') {
-        const input = b['input'];
-        if (typeof input === 'object' && input !== null) {
-          const i = input as Record<string, unknown>;
-          for (const key of FILE_INPUT_KEYS) {
-            const v = i[key];
-            if (isNonEmptyString(v)) files.push(v);
-          }
+      const id = b['id'];
+      const name = b['name'];
+      const input = b['input'];
+      if (isNonEmptyString(id) && isNonEmptyString(name)) {
+        toolUses.push({ id, name, input });
+      }
+      if (typeof input === 'object' && input !== null) {
+        const i = input as Record<string, unknown>;
+        for (const key of FILE_INPUT_KEYS) {
+          const v = i[key];
+          if (isNonEmptyString(v)) files.push(v);
         }
+      }
+    } else if (blockType === 'tool_result') {
+      hasTool = true;
+      const tuid = b['tool_use_id'];
+      if (isNonEmptyString(tuid)) {
+        toolResults.push({
+          tool_use_id: tuid,
+          content: stringifyToolResultContent(b['content']),
+          is_error: b['is_error'] === true,
+        });
       }
     }
   }
-  return { text: parts.join(''), hasTool, files };
+  return { text: parts.join(''), hasTool, files, toolUses, toolResults, thinking };
 }
 
 function parseLine(line: string): ParsedLine | null {
@@ -90,16 +158,19 @@ function parseLine(line: string): ParsedLine | null {
   const msg = message as Record<string, unknown>;
   const role = msg['role'];
   if (role !== 'user' && role !== 'assistant') return null;
-  const { text, hasTool, files } = extractContent(msg['content']);
+  const ec = extractContent(msg['content']);
   const ts = obj['timestamp'];
   const cwd = obj['cwd'];
   return {
     role,
-    text,
-    hasTool,
+    text: ec.text,
+    hasTool: ec.hasTool,
     timestamp: typeof ts === 'string' ? ts : undefined,
     cwd: isNonEmptyString(cwd) ? cwd : undefined,
-    files,
+    files: ec.files,
+    toolUses: ec.toolUses,
+    toolResults: ec.toolResults,
+    thinking: ec.thinking,
   };
 }
 
@@ -157,11 +228,20 @@ export async function extractClaudeCodeTurns(
   const fileMtime = st.mtimeMs;
 
   const turns: ClaudeCodeTurn[] = [];
-  let pendingUser:
-    | { line: ParsedLine; hadToolThisTurn: boolean; filesThisTurn: string[] }
-    | null = null;
+  interface PendingUser {
+    line: ParsedLine;
+    hadToolThisTurn: boolean;
+    filesThisTurn: string[];
+    toolUsesThisTurn: ParsedToolUse[];
+    toolResultsThisTurn: ParsedToolResult[];
+    thinkingThisTurn: string[];
+  }
+  let pendingUser: PendingUser | null = null;
   let hadToolBetween = false;
   let filesBetween: string[] = [];
+  let toolUsesBetween: ParsedToolUse[] = [];
+  let toolResultsBetween: ParsedToolResult[] = [];
+  let thinkingBetween: string[] = [];
   let offsetCursor = lastByteOffset;
   let turnIndex = 0;
   let currentCwd: string | undefined;
@@ -176,6 +256,9 @@ export async function extractClaudeCodeTurns(
     if (parsed.text === '') {
       if (parsed.hasTool) hadToolBetween = true;
       if (parsed.files.length > 0) filesBetween.push(...parsed.files);
+      if (parsed.toolUses.length > 0) toolUsesBetween.push(...parsed.toolUses);
+      if (parsed.toolResults.length > 0) toolResultsBetween.push(...parsed.toolResults);
+      if (parsed.thinking.length > 0) thinkingBetween.push(...parsed.thinking);
       continue;
     }
 
@@ -187,14 +270,23 @@ export async function extractClaudeCodeTurns(
         line: parsed,
         hadToolThisTurn: hadToolBetween || parsed.hasTool,
         filesThisTurn: [...filesBetween, ...parsed.files],
+        toolUsesThisTurn: [...toolUsesBetween, ...parsed.toolUses],
+        toolResultsThisTurn: [...toolResultsBetween, ...parsed.toolResults],
+        thinkingThisTurn: [...thinkingBetween, ...parsed.thinking],
       };
       hadToolBetween = false;
       filesBetween = [];
+      toolUsesBetween = [];
+      toolResultsBetween = [];
+      thinkingBetween = [];
     } else {
       if (pendingUser === null) {
         log.warn('orphan_assistant', { session_id });
         if (parsed.hasTool) hadToolBetween = true;
         if (parsed.files.length > 0) filesBetween.push(...parsed.files);
+        if (parsed.toolUses.length > 0) toolUsesBetween.push(...parsed.toolUses);
+        if (parsed.toolResults.length > 0) toolResultsBetween.push(...parsed.toolResults);
+        if (parsed.thinking.length > 0) thinkingBetween.push(...parsed.thinking);
         continue;
       }
       const had_tool_use =
@@ -204,6 +296,21 @@ export async function extractClaudeCodeTurns(
         ...filesBetween,
         ...parsed.files,
       ]);
+      const allToolUses = [
+        ...pendingUser.toolUsesThisTurn,
+        ...toolUsesBetween,
+        ...parsed.toolUses,
+      ];
+      const allToolResults = [
+        ...pendingUser.toolResultsThisTurn,
+        ...toolResultsBetween,
+        ...parsed.toolResults,
+      ];
+      const allThinking = [
+        ...pendingUser.thinkingThisTurn,
+        ...thinkingBetween,
+        ...parsed.thinking,
+      ];
       const turn: ClaudeCodeTurn = {
         project,
         session_id,
@@ -217,15 +324,53 @@ export async function extractClaudeCodeTurns(
       };
       if (currentCwd !== undefined) turn.repo_root = currentCwd;
       if (allFiles.length > 0) turn.files_referenced = allFiles;
+      const toolCalls = matchToolCalls(allToolUses, allToolResults);
+      if (toolCalls.length > 0) turn.tool_calls = toolCalls;
+      if (allThinking.length > 0) {
+        const joined = allThinking.join('\n\n');
+        const t = truncateThinking(joined);
+        turn.thinking = t.value;
+      }
       turns.push(turn);
       turnIndex += 1;
       pendingUser = null;
       hadToolBetween = false;
       filesBetween = [];
+      toolUsesBetween = [];
+      toolResultsBetween = [];
+      thinkingBetween = [];
     }
   }
 
   return { turns, newOffset: lastByteOffset + consumedBytes };
+}
+
+function matchToolCalls(
+  uses: ParsedToolUse[],
+  results: ParsedToolResult[],
+): ToolCall[] {
+  const resultById = new Map<string, ParsedToolResult>();
+  for (const r of results) resultById.set(r.tool_use_id, r);
+  const out: ToolCall[] = [];
+  for (const u of uses) {
+    if (out.length >= MAX_TOOL_CALLS_PER_TURN) break;
+    const r = resultById.get(u.id);
+    const tc: ToolCall = { name: u.name, call_id: u.id };
+    if (u.input !== undefined && u.input !== null) {
+      const argsStr = typeof u.input === 'string' ? u.input : JSON.stringify(u.input);
+      const t = truncateArgs(argsStr);
+      tc.args = t.value;
+      if (t.truncated) tc.args_truncated = true;
+    }
+    if (r !== undefined) {
+      const t = truncateOutput(r.content);
+      tc.output = t.value;
+      if (t.truncated) tc.output_truncated = true;
+      if (r.is_error) tc.is_error = true;
+    }
+    out.push(tc);
+  }
+  return out;
 }
 
 async function backfillOffsetMap(storage: Storage): Promise<Map<string, { offset: number; turn_index: number }>> {
@@ -285,6 +430,10 @@ export async function startClaudeCodeExtractor(
       if (turn.had_tool_use) metadata['had_tool_use'] = true;
       if (turn.repo_root !== undefined) metadata['repo_root'] = turn.repo_root;
       if (turn.files_referenced !== undefined) metadata['files_referenced'] = turn.files_referenced;
+      if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
+      if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
+      const gitState = await probeGitState(turn.repo_root, turn.timestamp);
+      if (gitState !== undefined) metadata['git_state'] = gitState;
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,

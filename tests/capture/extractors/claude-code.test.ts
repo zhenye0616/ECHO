@@ -251,6 +251,90 @@ describe('extractClaudeCodeTurns (pure)', () => {
     expect(r.turns).toHaveLength(0);
     expect(r.newOffset).toBe(fileSize);
   });
+
+  // ─── Tier-3 metadata: tool_calls, thinking ────────────────────────────────
+
+  it('extracts tool_calls with name + args + output, matching by tool_use_id', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const sessionId = 's1';
+    const cwd = '/Users/x/proj';
+    const u1: JsonlLine = {
+      type: 'user', sessionId, cwd,
+      message: { role: 'user', content: 'do a thing' },
+      uuid: 'u1', timestamp: ts,
+    };
+    const aTool: JsonlLine = {
+      type: 'assistant', sessionId, cwd,
+      message: { role: 'assistant', content: [
+        { type: 'tool_use', id: 'tu_42', name: 'Bash', input: { command: 'ls -la', description: 'list' } },
+      ]},
+      uuid: 'a1', timestamp: ts,
+    };
+    const uResult: JsonlLine = {
+      type: 'user', sessionId, cwd,
+      message: { role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'tu_42', content: 'total 12\nfoo.txt', is_error: false },
+      ]},
+      uuid: 'u2', timestamp: ts,
+    };
+    const aFinal: JsonlLine = {
+      type: 'assistant', sessionId, cwd,
+      message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+      uuid: 'a2', timestamp: ts,
+    };
+    writeJsonlFresh(path, [u1, aTool, uResult, aFinal]);
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    const tc = r.turns[0]?.tool_calls;
+    expect(tc).toHaveLength(1);
+    expect(tc?.[0]).toMatchObject({
+      name: 'Bash',
+      call_id: 'tu_42',
+      output: 'total 12\nfoo.txt',
+    });
+    expect(tc?.[0]?.args).toContain('"command":"ls -la"');
+  });
+
+  it('marks tool_calls.is_error when tool_result.is_error is true', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const lines: JsonlLine[] = [
+      { type: 'user', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'user', content: 'try' }, uuid: 'u1', timestamp: ts },
+      { type: 'assistant', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'assistant', content: [
+          { type: 'tool_use', id: 'tu1', name: 'Bash', input: { command: 'false' } },
+        ]}, uuid: 'a1', timestamp: ts },
+      { type: 'user', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'user', content: [
+          { type: 'tool_result', tool_use_id: 'tu1', content: 'oops', is_error: true },
+        ]}, uuid: 'u2', timestamp: ts },
+      { type: 'assistant', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'failed' }] },
+        uuid: 'a2', timestamp: ts },
+    ];
+    writeJsonlFresh(path, lines);
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns[0]?.tool_calls?.[0]?.is_error).toBe(true);
+  });
+
+  it('extracts thinking content blocks into the thinking field', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const lines: JsonlLine[] = [
+      { type: 'user', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'user', content: 'q' }, uuid: 'u1', timestamp: ts },
+      { type: 'assistant', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'assistant', content: [
+          { type: 'thinking', thinking: 'pondering the request…' },
+          { type: 'text', text: 'a' },
+        ]}, uuid: 'a1', timestamp: ts },
+    ];
+    writeJsonlFresh(path, lines);
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns[0]?.thinking).toContain('pondering');
+  });
 });
 
 describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
