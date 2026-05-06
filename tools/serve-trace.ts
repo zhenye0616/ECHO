@@ -14,6 +14,7 @@
 //   npm run serve:trace -- --port 4000
 
 import { createServer } from 'node:http';
+import { createInterface } from 'node:readline';
 
 import { startClaudeCodeExtractor } from '../src/capture/extractors/claude-code.js';
 import { startCodexExtractor } from '../src/capture/extractors/codex.js';
@@ -25,7 +26,14 @@ import type {
 } from '../src/storage/interface.js';
 import { MemoryStorage } from '../src/storage/memory.js';
 
-import { buildHtml, toRow, type RenderRow } from './_trace_render.js';
+import {
+  buildHtml,
+  eventsToRows,
+  formatGeneratedAt,
+  toRow,
+  waitForDrain,
+  type RenderRow,
+} from './_trace_render.js';
 
 interface Args {
   days: number;
@@ -91,23 +99,6 @@ class LiveStorage implements Storage {
   }
 }
 
-async function waitForDrain(storage: Storage, idleMs = 1500): Promise<void> {
-  let last = -1;
-  let stableMs = 0;
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const n = await storage.count();
-    if (n === last) {
-      stableMs += 200;
-      if (stableMs >= idleMs) return;
-    } else {
-      last = n;
-      stableMs = 0;
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-}
-
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const sinceMs = Date.now() - args.days * 24 * 3600 * 1000;
@@ -124,24 +115,43 @@ async function main(): Promise<void> {
   await waitForDrain(storage);
   storage.enableLiveMode();
 
-  const events = await storage.query();
-  const rows: RenderRow[] = [];
-  for (const e of events) {
-    const r = toRow(e, args.fullContent);
-    if (r !== null) rows.push(r);
+  // 4 KB threshold: at 1 s polling, sub-line gaps during active sessions are
+  // transient and would spam logs. A larger gap on refresh implies real drop.
+  const FRESHNESS_LOG_THRESHOLD_BYTES = 4096;
+
+  async function renderHtml(): Promise<string> {
+    const events = await storage.query();
+    const rows = eventsToRows(events, args.fullContent);
+    const [ccFresh, cxFresh] = await Promise.all([cc.probeFreshness(), cx.probeFreshness()]);
+    const worst = Math.max(ccFresh.maxGapBytes, cxFresh.maxGapBytes);
+    if (worst >= FRESHNESS_LOG_THRESHOLD_BYTES) {
+      console.log(
+        `freshness  cc=${ccFresh.maxGapBytes}b/${ccFresh.filesChecked}f  cx=${cxFresh.maxGapBytes}b/${cxFresh.filesChecked}f`,
+      );
+    }
+    return buildHtml(rows, {
+      days: args.days,
+      generatedAt: formatGeneratedAt(),
+      live: true,
+    });
   }
 
-  const html = buildHtml(rows, {
-    days: args.days,
-    generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    live: true,
-  });
-  console.log(`  loaded ${rows.length} events; entering live mode`);
+  const initialCount = await storage.count();
+  console.log(`  loaded ${initialCount} events; entering live mode`);
 
   const server = createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      void renderHtml().then(
+        (html) => {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        },
+        (err: unknown) => {
+          console.error('renderHtml failed', err);
+          res.writeHead(500);
+          res.end('render failed');
+        },
+      );
       return;
     }
     if (req.url === '/events') {
@@ -175,15 +185,43 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     console.log(`\nstopping…`);
-    await new Promise<void>((r) => server.close(() => r()));
+    await new Promise<void>((r) => {
+      server.close(() => r());
+      // Without this, persistent SSE connections keep server.close() hanging.
+      server.closeAllConnections();
+    });
     await cc.stop();
     await cx.stop();
     process.exit(0);
   }
+
+  let confirming = false;
   process.on('SIGINT', () => {
-    void shutdown();
+    if (stopping) return;
+    if (confirming) {
+      // Second ^C while at the prompt — bail out hard.
+      void shutdown();
+      return;
+    }
+    confirming = true;
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question('\nStop server? [y/N] ', (ans) => {
+      // Reset before close so a SIGTERM landing in the gap doesn't get swallowed.
+      confirming = false;
+      rl.close();
+      if (/^y(es)?$/i.test(ans.trim())) {
+        void shutdown();
+      } else {
+        console.log('continuing…');
+      }
+    });
   });
   process.on('SIGTERM', () => {
+    // npm propagates ^C to its child as SIGTERM right after the terminal
+    // delivers SIGINT to the process group, which would race past our
+    // confirmation prompt. While the prompt is open, ignore SIGTERM and let
+    // the user answer.
+    if (confirming) return;
     void shutdown();
   });
 }

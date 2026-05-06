@@ -4,7 +4,8 @@
 // the inline frontend bundle here means future schema changes only land in
 // one place.
 
-import type { CaptureEvent } from '../src/storage/interface.js';
+import { SOURCE_MARKERS } from '../src/capture/extractors/_shared.js';
+import type { CaptureEvent, Storage } from '../src/storage/interface.js';
 
 export interface RenderRow {
   id: string;
@@ -37,9 +38,46 @@ export function truncateField(s: string, full: boolean): string {
   );
 }
 
+/** Poll storage.count() until it stops changing for `idleMs`, or 60s elapses. */
+export async function waitForDrain(storage: Storage, idleMs = 1500): Promise<void> {
+  let last = -1;
+  let stableMs = 0;
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    const n = await storage.count();
+    if (n === last) {
+      stableMs += 200;
+      if (stableMs >= idleMs) return;
+    } else {
+      last = n;
+      stableMs = 0;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+export function eventsToRows(events: CaptureEvent[], full: boolean): RenderRow[] {
+  const rows: RenderRow[] = [];
+  for (const e of events) {
+    const r = toRow(e, full);
+    if (r !== null) rows.push(r);
+  }
+  return rows;
+}
+
+/** "YYYY-MM-DD HH:MM:SS" in the host machine's local time. */
+export function formatGeneratedAt(): string {
+  const d = new Date();
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
 export function toRow(event: CaptureEvent, full: boolean): RenderRow | null {
   const md = (event.metadata ?? {}) as Record<string, unknown>;
-  const lane: 'cc' | 'codex' = event.source.includes('/.codex/sessions/') ? 'codex' : 'cc';
+  const lane: 'cc' | 'codex' = event.source.includes(SOURCE_MARKERS.codex) ? 'codex' : 'cc';
   const sid = ((md['session_id'] as string) ?? '????????').slice(0, 8);
   const turn = Number(md['turn_index'] ?? 0);
 
@@ -172,6 +210,16 @@ const TEMPLATE = `<!doctype html>
   .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 4px 0 8px 0; padding: 4px 0; position: sticky; top: 0; background: var(--bg); }
   .col.cc h2 { color: var(--cc); }
   .col.codex h2 { color: var(--codex); }
+  .session { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: rgba(255,255,255,.015); overflow: hidden; }
+  .session-head { padding: 6px 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; cursor: pointer; background: rgba(88,166,255,.04); border-bottom: 1px solid var(--border); user-select: none; }
+  .session-head:hover { background: rgba(88,166,255,.08); }
+  .session-head .caret { color: var(--dim); width: 10px; display: inline-block; transition: transform .15s ease; }
+  .session.collapsed .caret { transform: rotate(-90deg); }
+  .session.collapsed .session-body { display: none; }
+  .session-head .ssid { color: var(--accent); font-weight: 600; }
+  .session-head .scount { color: var(--dim); }
+  .session-head .sts { color: var(--dimmer); margin-left: auto; }
+  .session-body { padding: 6px 8px 8px; }
   .row { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; transition: background .25s ease; }
   .row.fresh { background: rgba(63, 185, 80, .12); border-color: var(--pulse); }
   .row.expanded { background: var(--panel2); }
@@ -260,7 +308,13 @@ const TEMPLATE = `<!doctype html>
   }
 
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
-  function fmtTs(iso){ return iso.replace('T',' ').slice(0,19); }
+  function fmtTs(iso){
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso.replace('T',' ').slice(0,19);
+    const p = n => String(n).padStart(2,'0');
+    return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate())
+      + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
   function shortRepo(p){ if(!p) return '—'; const parts=p.split('/').filter(Boolean); return parts.slice(-2).join('/'); }
 
   function toolHtml(t){
@@ -329,6 +383,44 @@ const TEMPLATE = `<!doctype html>
     return true;
   }
 
+  function groupBySession(rows){
+    const bySid = new Map();
+    for (const r of rows) {
+      let g = bySid.get(r.sid);
+      if (!g) { g = []; bySid.set(r.sid, g); }
+      g.push(r);
+    }
+    const groups = [];
+    for (const [sid, turns] of bySid) {
+      turns.sort((a,b)=>a.ts.localeCompare(b.ts));
+      const latest = turns[turns.length-1];
+      groups.push({ sid, turns, latestTs: latest.ts, repo: latest.repo, branch: latest.branch });
+    }
+    groups.sort((a,b)=>b.latestTs.localeCompare(a.latestTs));
+    return groups;
+  }
+
+  function sessionHtml(g, collapsedSids){
+    const repoBranch = '<span class="repo">' + esc(shortRepo(g.repo)) + '</span>' +
+      (g.branch ? '<span class="branch">@' + esc(g.branch) + '</span>' : '');
+    const turns = g.turns.length;
+    const collapsed = collapsedSids.has(g.sid) ? ' collapsed' : '';
+    return (
+      '<div class="session' + collapsed + '" data-sid="' + esc(g.sid) + '">' +
+        '<div class="session-head">' +
+          '<span class="caret">▼</span>' +
+          '<span class="ssid">' + esc(g.sid) + '</span>' +
+          repoBranch +
+          '<span class="scount">' + turns + ' turn' + (turns===1?'':'s') + '</span>' +
+          '<span class="sts">' + esc(fmtTs(g.latestTs)) + '</span>' +
+        '</div>' +
+        '<div class="session-body">' +
+          g.turns.map(rowHtml).join('') +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function render(){
     const q = (document.getElementById('search').value || '').trim().toLowerCase();
     const repo = document.getElementById('repoFilter').value;
@@ -339,14 +431,25 @@ const TEMPLATE = `<!doctype html>
       if (!passes(r, q, repo, toolOnly, hideTool)) continue;
       if (r.lane === 'cc') cc.push(r); else cx.push(r);
     }
-    cc.sort((a,b)=>b.ts.localeCompare(a.ts));
-    cx.sort((a,b)=>b.ts.localeCompare(a.ts));
-    document.getElementById('list-cc').innerHTML = cc.length ? cc.map(rowHtml).join('') : '<div class="empty">no matches</div>';
-    document.getElementById('list-codex').innerHTML = cx.length ? cx.map(rowHtml).join('') : '<div class="empty">no matches</div>';
-    document.getElementById('counts').textContent = 'showing ' + cc.length + ' / ' + cx.length;
+    const ccGroups = groupBySession(cc);
+    const cxGroups = groupBySession(cx);
+    const collapsedSids = new Set(
+      Array.from(document.querySelectorAll('.session.collapsed'))
+        .map(s => s.getAttribute('data-sid'))
+    );
+    document.getElementById('list-cc').innerHTML = ccGroups.length ? ccGroups.map(g => sessionHtml(g, collapsedSids)).join('') : '<div class="empty">no matches</div>';
+    document.getElementById('list-codex').innerHTML = cxGroups.length ? cxGroups.map(g => sessionHtml(g, collapsedSids)).join('') : '<div class="empty">no matches</div>';
+    document.getElementById('counts').textContent =
+      'showing ' + cc.length + ' / ' + cx.length + ' turns · ' +
+      ccGroups.length + ' / ' + cxGroups.length + ' sessions';
   }
 
   document.body.addEventListener('click', (e) => {
+    const sHead = e.target.closest('.session-head');
+    if (sHead) {
+      sHead.parentElement.classList.toggle('collapsed');
+      return;
+    }
     const head = e.target.closest('.row-head');
     if (!head) return;
     head.parentElement.classList.toggle('expanded');
