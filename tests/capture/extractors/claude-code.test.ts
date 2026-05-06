@@ -217,6 +217,26 @@ describe('extractClaudeCodeTurns (pure)', () => {
     expect(third.turns[0]?.assistant_message).toBe('A2');
   });
 
+  it('back-to-back user lines without an assistant reply surface dropped users with classification', async () => {
+    const path = join(dir, 'sess.jsonl');
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', '<system-reminder>auto-mode active</system-reminder>'),
+      userText('s1', 'u2', 'real prompt that got dropped'),
+      userText('s1', 'u3', 'second real prompt'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u4', 'closes cluster'),
+    ]);
+    const { turns, droppedUsers } = await extractClaudeCodeTurns(path, 0);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.user_message).toBe('second real prompt');
+    expect(droppedUsers).toHaveLength(2);
+    expect(droppedUsers[0]?.classification).toBe('inject');
+    expect(droppedUsers[1]?.classification).toBe('prompt');
+    expect(droppedUsers[1]?.preview).toContain('real prompt');
+    // byte_offsets are monotonic so the dispatcher can dedup with a watermark.
+    expect(droppedUsers[0]!.byte_offset).toBeLessThan(droppedUsers[1]!.byte_offset);
+  });
+
   it('incomplete turn (only user, no assistant yet) emits zero turns', async () => {
     const path = join(dir, 'sess.jsonl');
     writeJsonlFresh(path, [userText('s1', 'u1', 'Q1')]);
