@@ -392,8 +392,8 @@ const TEMPLATE = `<!doctype html>
     }
     const groups = [];
     for (const [sid, turns] of bySid) {
-      turns.sort((a,b)=>a.ts.localeCompare(b.ts));
-      const latest = turns[turns.length-1];
+      turns.sort((a,b)=>b.ts.localeCompare(a.ts));
+      const latest = turns[0];
       groups.push({ sid, turns, latestTs: latest.ts, repo: latest.repo, branch: latest.branch });
     }
     groups.sort((a,b)=>b.latestTs.localeCompare(a.latestTs));
