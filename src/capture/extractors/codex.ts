@@ -1,18 +1,15 @@
-import { open, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
-import chokidar, { type FSWatcher } from 'chokidar';
 import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import {
-  bootScanJsonl,
   dedupStrings,
-  JSONL_WATCH_OPTS,
-  probeFreshness,
+  readJsonlTail,
   SOURCE_MARKERS,
+  wireJsonlExtractor,
   type ExtractorHandle,
 } from './_shared.js';
 import {
@@ -443,49 +440,13 @@ export interface ExtractCodexInput {
 export async function extractCodexTurns(
   jsonlPath: string,
   lastByteOffset: number,
-  lastKnownCwdOrInput?: string | ExtractCodexInput,
+  input: ExtractCodexInput = {},
 ): Promise<ExtractCodexResult> {
-  const input: ExtractCodexInput =
-    typeof lastKnownCwdOrInput === 'string'
-      ? { lastKnownCwd: lastKnownCwdOrInput }
-      : lastKnownCwdOrInput ?? {};
-  let st: Awaited<ReturnType<typeof stat>>;
-  try {
-    st = await stat(jsonlPath);
-  } catch (err) {
-    log.warn('stat_failed', { path: jsonlPath, message: (err as Error).message });
-    return { turns: [], newOffset: lastByteOffset };
-  }
-  const fileSize = st.size;
-  if (fileSize <= lastByteOffset) {
-    return { turns: [], newOffset: lastByteOffset };
-  }
-
-  const length = fileSize - lastByteOffset;
-  const buffer = Buffer.alloc(length);
-  let fh: Awaited<ReturnType<typeof open>>;
-  try {
-    fh = await open(jsonlPath, 'r');
-  } catch (err) {
-    log.warn('open_failed', { path: jsonlPath, message: (err as Error).message });
-    return { turns: [], newOffset: lastByteOffset };
-  }
-  try {
-    await fh.read(buffer, 0, length, lastByteOffset);
-  } finally {
-    await fh.close();
-  }
-
-  const text = buffer.toString('utf8');
-  const lastNewline = text.lastIndexOf('\n');
-  if (lastNewline === -1) {
-    return { turns: [], newOffset: lastByteOffset };
-  }
-  const consumable = text.slice(0, lastNewline + 1);
-
-  const lines = consumable.split('\n').filter((l) => l.length > 0);
+  const tail = await readJsonlTail(jsonlPath, lastByteOffset, log);
+  if (tail === null) return { turns: [], newOffset: lastByteOffset };
+  const { lines, mtimeMs: fileMtime } = tail;
+  if (lines.length === 0) return { turns: [], newOffset: lastByteOffset };
   const session_id = deriveSessionId(jsonlPath);
-  const fileMtime = st.mtimeMs;
 
   const turns: CodexTurn[] = [];
   let pending: PendingCluster | null = null;
@@ -803,13 +764,6 @@ export async function startCodexExtractor(
   const sessionsPrefix = options.sessionsPrefix ?? DEFAULT_SESSIONS_PREFIX;
   const offsetMap = await backfillOffsetMap(storage);
 
-  let processing: Promise<void> = Promise.resolve();
-  let stopped = false;
-
-  function isJsonl(p: string): boolean {
-    return p.startsWith(sessionsPrefix) && p.endsWith('.jsonl');
-  }
-
   async function handleJsonlChange(path: string): Promise<void> {
     const cur = offsetMap.get(path) ?? { offset: 0, turn_index: -1 };
     const extractInput: ExtractCodexInput = {};
@@ -867,47 +821,18 @@ export async function startCodexExtractor(
     offsetMap.set(path, next);
   }
 
-  function schedule(work: () => Promise<void>): void {
-    if (stopped) return;
-    processing = processing.then(async () => {
-      if (stopped) return;
-      try {
-        await work();
-      } catch (err) {
-        log.error('handler_error', { message: (err as Error).message });
-      }
-    });
-  }
-
-  const watcher: FSWatcher = chokidar.watch(sessionsPrefix, JSONL_WATCH_OPTS);
-
-  function dispatch(p: string): void {
-    if (isJsonl(p)) {
-      schedule(() => handleJsonlChange(p));
-    }
-  }
-
-  watcher.on('add', dispatch);
-  watcher.on('change', dispatch);
-  watcher.on('error', (err: unknown) => {
-    log.error('watcher_error', { message: (err as Error).message });
+  const handle = await wireJsonlExtractor({
+    prefix: sessionsPrefix,
+    offsetMap,
+    handle: handleJsonlChange,
+    log,
   });
-
-  await new Promise<void>((resolve) => {
-    watcher.once('ready', () => resolve());
-  });
-
-  await bootScanJsonl(sessionsPrefix, schedule, handleJsonlChange, log);
-
   log.info('started', { sessionsPrefix });
-
   return {
     stop: async () => {
-      stopped = true;
-      await watcher.close();
-      await processing;
+      await handle.stop();
       log.info('stopped', {});
     },
-    probeFreshness: () => probeFreshness(offsetMap),
+    probeFreshness: handle.probeFreshness,
   };
 }

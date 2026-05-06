@@ -1,5 +1,6 @@
-import { readdir, stat } from 'node:fs/promises';
+import { open, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import chokidar, { type FSWatcher } from 'chokidar';
 import type { Logger } from '../../logging/index.js';
 import type { CaptureEvent } from '../../storage/interface.js';
 
@@ -108,4 +109,109 @@ export async function bootScanJsonl(
   } catch (err) {
     log.warn('boot_scan_failed', { prefix, message: (err as Error).message });
   }
+}
+
+/** Read newly-appended lines from a JSONL file since `lastByteOffset`.
+ *  Returns `null` on stat/open failures (caller should bail). On success
+ *  returns the line list and the byte offset of the start of the first line
+ *  in that list — line offsets advance by `Buffer.byteLength(line)+1`. The
+ *  returned `lines` array is empty (with a defined `mtimeMs`) when the file
+ *  has not grown or has no complete line. */
+export async function readJsonlTail(
+  jsonlPath: string,
+  lastByteOffset: number,
+  log: Logger,
+): Promise<{ lines: string[]; firstLineOffset: number; mtimeMs: number } | null> {
+  let st: Awaited<ReturnType<typeof stat>>;
+  try {
+    st = await stat(jsonlPath);
+  } catch (err) {
+    log.warn('stat_failed', { path: jsonlPath, message: (err as Error).message });
+    return null;
+  }
+  if (st.size <= lastByteOffset) {
+    return { lines: [], firstLineOffset: lastByteOffset, mtimeMs: st.mtimeMs };
+  }
+
+  const length = st.size - lastByteOffset;
+  const buffer = Buffer.alloc(length);
+  let fh: Awaited<ReturnType<typeof open>>;
+  try {
+    fh = await open(jsonlPath, 'r');
+  } catch (err) {
+    log.warn('open_failed', { path: jsonlPath, message: (err as Error).message });
+    return null;
+  }
+  try {
+    await fh.read(buffer, 0, length, lastByteOffset);
+  } finally {
+    await fh.close();
+  }
+
+  const text = buffer.toString('utf8');
+  const lastNewline = text.lastIndexOf('\n');
+  if (lastNewline === -1) {
+    return { lines: [], firstLineOffset: lastByteOffset, mtimeMs: st.mtimeMs };
+  }
+  const consumable = text.slice(0, lastNewline + 1);
+  const lines = consumable.split('\n').filter((l) => l.length > 0);
+  return { lines, firstLineOffset: lastByteOffset, mtimeMs: st.mtimeMs };
+}
+
+/** Wire up a chokidar watcher + serialised processing queue + boot scan for a
+ *  JSONL prefix. Returns an `ExtractorHandle` whose `stop` shuts the watcher
+ *  and drains the queue. Caller supplies the per-file handler and the offset
+ *  map the freshness probe should read. */
+export async function wireJsonlExtractor(opts: {
+  prefix: string;
+  offsetMap: Map<string, { offset: number }>;
+  handle: (path: string) => Promise<void>;
+  log: Logger;
+}): Promise<ExtractorHandle> {
+  const { prefix, offsetMap, handle, log } = opts;
+  let processing: Promise<void> = Promise.resolve();
+  let stopped = false;
+
+  function isJsonl(p: string): boolean {
+    return p.startsWith(prefix) && p.endsWith('.jsonl');
+  }
+
+  function schedule(work: () => Promise<void>): void {
+    if (stopped) return;
+    processing = processing.then(async () => {
+      if (stopped) return;
+      try {
+        await work();
+      } catch (err) {
+        log.error('handler_error', { message: (err as Error).message });
+      }
+    });
+  }
+
+  const watcher: FSWatcher = chokidar.watch(prefix, JSONL_WATCH_OPTS);
+
+  function dispatch(p: string): void {
+    if (isJsonl(p)) schedule(() => handle(p));
+  }
+
+  watcher.on('add', dispatch);
+  watcher.on('change', dispatch);
+  watcher.on('error', (err: unknown) => {
+    log.error('watcher_error', { message: (err as Error).message });
+  });
+
+  await new Promise<void>((resolve) => {
+    watcher.once('ready', () => resolve());
+  });
+
+  await bootScanJsonl(prefix, schedule, handle, log);
+
+  return {
+    stop: async () => {
+      stopped = true;
+      await watcher.close();
+      await processing;
+    },
+    probeFreshness: () => probeFreshness(offsetMap),
+  };
 }

@@ -1,5 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CAPTURED_SOURCES } from '../../../src/capture/sources.js';
@@ -10,6 +9,7 @@ import {
 } from '../../../src/capture/extractors/codex.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
+import { appendJsonl, tmpDir, waitFor, writeJsonl } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
 
 // ─── JSONL line builders matching Codex's wire format ───────────────────────
@@ -192,30 +192,6 @@ function taskComplete(ts = '2026-05-01T10:00:03.000Z'): CodexLine {
   );
 }
 
-function writeJsonl(path: string, lines: CodexLine[]): void {
-  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
-}
-
-function appendJsonl(path: string, lines: CodexLine[]): void {
-  appendFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
-}
-
-function tmpDir(): string {
-  return mkdtempSync(join(tmpdir(), 'echo-codex-'));
-}
-
-async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 5000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) return;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('waitFor: timeout');
-}
-
 // ─── Pure parser tests ──────────────────────────────────────────────────────
 
 describe('extractCodexTurns (pure)', () => {
@@ -224,7 +200,7 @@ describe('extractCodexTurns (pure)', () => {
   let captured: ReturnType<typeof captureStdout>;
 
   beforeEach(() => {
-    dir = tmpDir();
+    dir = tmpDir('echo-codex-');
     path = join(dir, 'rollout-2026-05-01T10-00-00-019de2b0-6551-7682-a51b-2affaa0a7bbf.jsonl');
     captured = captureStdout();
   });
@@ -383,7 +359,7 @@ describe('extractCodexTurns (pure)', () => {
     expect(pass1.cwd).toBe('/Users/x/proj');
 
     appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
-    const pass2 = await extractCodexTurns(path, pass1.newOffset, pass1.cwd);
+    const pass2 = await extractCodexTurns(path, pass1.newOffset, { lastKnownCwd: pass1.cwd });
     expect(pass2.turns).toHaveLength(1);
     expect(pass2.turns[0]?.user_message).toBe('q2');
     expect(pass2.turns[0]?.cwd).toBe('/Users/x/proj');
@@ -751,7 +727,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
 
   beforeEach(() => {
     originalFsPaths = snapshotFsPaths();
-    dir = tmpDir();
+    dir = tmpDir('echo-codex-');
     sessionsPrefix = `${dir}/.codex/sessions/`;
     mkdirSync(`${sessionsPrefix}2026/05/01`, { recursive: true });
     path = join(

@@ -1,5 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, appendFileSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CAPTURED_SOURCES } from '../../../src/capture/sources.js';
@@ -10,6 +9,7 @@ import {
 } from '../../../src/capture/extractors/claude-code.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
+import { appendJsonl, tmpDir, waitFor, writeJsonl as writeJsonlFresh } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
 
 interface JsonlLine {
@@ -76,32 +76,12 @@ function userToolResult(sessionId: string, uuid: string): JsonlLine {
   };
 }
 
-function writeJsonlFresh(path: string, lines: JsonlLine[]): void {
-  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
-}
-
-function appendJsonl(path: string, lines: JsonlLine[]): void {
-  appendFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
-}
-
-async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 5000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) return;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('waitFor: timeout');
-}
-
 describe('extractClaudeCodeTurns (pure)', () => {
   let dir: string;
   let captured: ReturnType<typeof captureStdout>;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'echo-cc-'));
+    dir = tmpDir('echo-cc-');
     captured = captureStdout();
   });
 
@@ -533,7 +513,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
 
   beforeEach(() => {
     originalFsPaths = snapshotFsPaths();
-    dir = mkdtempSync(join(tmpdir(), 'echo-cc-int-'));
+    dir = tmpDir('echo-cc-int-');
     projectsPrefix = `${dir}/projects/`;
     projDir = join(projectsPrefix, 'my-proj');
     mkdirSync(projDir, { recursive: true });

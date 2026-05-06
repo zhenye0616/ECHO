@@ -161,14 +161,10 @@ export interface BuildHtmlOpts {
 }
 
 export function buildHtml(rows: RenderRow[], opts: BuildHtmlOpts): string {
-  const ccCount = rows.filter((r) => r.lane === 'cc').length;
-  const cxCount = rows.filter((r) => r.lane === 'codex').length;
   const meta = {
     days: opts.days,
     generatedAt: opts.generatedAt,
     live: opts.live,
-    ccCount,
-    cxCount,
   };
   const envelope = { meta, rows };
   const b64 = Buffer.from(JSON.stringify(envelope), 'utf-8').toString('base64');
