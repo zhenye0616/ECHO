@@ -220,7 +220,6 @@ export async function extractClaudeCodeTurns(
     return { turns: [], newOffset: lastByteOffset };
   }
   const consumable = text.slice(0, lastNewline + 1);
-  const consumedBytes = Buffer.byteLength(consumable, 'utf8');
 
   const lines = consumable.split('\n').filter((l) => l.length > 0);
   const session_id = deriveSessionId(jsonlPath);
@@ -228,121 +227,141 @@ export async function extractClaudeCodeTurns(
   const fileMtime = st.mtimeMs;
 
   const turns: ClaudeCodeTurn[] = [];
-  interface PendingUser {
-    line: ParsedLine;
-    hadToolThisTurn: boolean;
-    filesThisTurn: string[];
-    toolUsesThisTurn: ParsedToolUse[];
-    toolResultsThisTurn: ParsedToolResult[];
-    thinkingThisTurn: string[];
+  interface PendingCluster {
+    userText: string;
+    timestamp: string;
+    assistantTexts: string[];
+    assistantLastLineEndOffset: number;
+    hadTool: boolean;
+    files: string[];
+    toolUses: ParsedToolUse[];
+    toolResults: ParsedToolResult[];
+    thinking: string[];
+    repo_root?: string;
   }
-  let pendingUser: PendingUser | null = null;
+  let pending: PendingCluster | null = null;
+  // "Between" buffers accumulate side-effects from lines that arrive when no
+  // cluster is open (e.g., orphan tool_results before any user line). They
+  // get folded into the next cluster's pending state at user-line time.
   let hadToolBetween = false;
   let filesBetween: string[] = [];
   let toolUsesBetween: ParsedToolUse[] = [];
   let toolResultsBetween: ParsedToolResult[] = [];
   let thinkingBetween: string[] = [];
-  let offsetCursor = lastByteOffset;
-  let turnIndex = 0;
+  let lineStartOffset = lastByteOffset;
+  // Tracks the END of the last line that contributed to an EMITTED turn.
+  // Pending-cluster lines (user + assistants without a closing next-user) are
+  // intentionally NOT past confirmedThroughOffset, so the next pass re-reads
+  // them and rebuilds the pending cluster from scratch. Mirrors codex.ts.
+  let confirmedThroughOffset = lastByteOffset;
   let currentCwd: string | undefined;
 
+  function emitPendingIfComplete(): void {
+    if (pending === null) return;
+    if (pending.assistantTexts.length === 0) return;
+    const allFiles = dedupStrings(pending.files);
+    const turn: ClaudeCodeTurn = {
+      project,
+      session_id,
+      turn_index: turns.length,
+      user_message: pending.userText,
+      assistant_message: pending.assistantTexts.join('\n\n'),
+      mtime: fileMtime,
+      timestamp: pending.timestamp,
+      had_tool_use: pending.hadTool,
+      byte_offset: pending.assistantLastLineEndOffset,
+    };
+    if (pending.repo_root !== undefined) turn.repo_root = pending.repo_root;
+    if (allFiles.length > 0) turn.files_referenced = allFiles;
+    const toolCalls = matchToolCalls(pending.toolUses, pending.toolResults);
+    if (toolCalls.length > 0) turn.tool_calls = toolCalls;
+    if (pending.thinking.length > 0) {
+      const t = truncateThinking(pending.thinking.join('\n\n'));
+      turn.thinking = t.value;
+    }
+    turns.push(turn);
+    confirmedThroughOffset = pending.assistantLastLineEndOffset;
+  }
+
   for (const line of lines) {
-    const lineBytes = Buffer.byteLength(line, 'utf8') + 1; // +1 for the newline
-    offsetCursor += lineBytes;
+    const lineEndOffset = lineStartOffset + Buffer.byteLength(line, 'utf8') + 1;
     const parsed = parseLine(line);
-    if (parsed === null) continue;
+    if (parsed === null) {
+      lineStartOffset = lineEndOffset;
+      continue;
+    }
     if (parsed.cwd !== undefined) currentCwd = parsed.cwd;
 
     if (parsed.text === '') {
-      if (parsed.hasTool) hadToolBetween = true;
-      if (parsed.files.length > 0) filesBetween.push(...parsed.files);
-      if (parsed.toolUses.length > 0) toolUsesBetween.push(...parsed.toolUses);
-      if (parsed.toolResults.length > 0) toolResultsBetween.push(...parsed.toolResults);
-      if (parsed.thinking.length > 0) thinkingBetween.push(...parsed.thinking);
+      // Side-effects (tool_use, tool_result, thinking blocks) accumulate into
+      // the open cluster if there is one; otherwise into the "between" buffers
+      // so they fold into whatever cluster opens next.
+      if (pending !== null) {
+        if (parsed.hasTool) pending.hadTool = true;
+        if (parsed.files.length > 0) pending.files.push(...parsed.files);
+        if (parsed.toolUses.length > 0) pending.toolUses.push(...parsed.toolUses);
+        if (parsed.toolResults.length > 0) pending.toolResults.push(...parsed.toolResults);
+        if (parsed.thinking.length > 0) pending.thinking.push(...parsed.thinking);
+      } else {
+        if (parsed.hasTool) hadToolBetween = true;
+        if (parsed.files.length > 0) filesBetween.push(...parsed.files);
+        if (parsed.toolUses.length > 0) toolUsesBetween.push(...parsed.toolUses);
+        if (parsed.toolResults.length > 0) toolResultsBetween.push(...parsed.toolResults);
+        if (parsed.thinking.length > 0) thinkingBetween.push(...parsed.thinking);
+      }
+      lineStartOffset = lineEndOffset;
       continue;
     }
 
     if (parsed.role === 'user') {
-      if (pendingUser !== null) {
-        log.warn('user_replaced_without_assistant', { session_id });
+      // A new text-bearing user line closes any prior cluster.
+      if (pending !== null) {
+        if (pending.assistantTexts.length > 0) {
+          emitPendingIfComplete();
+        } else {
+          log.warn('user_replaced_without_assistant', { session_id });
+        }
       }
-      pendingUser = {
-        line: parsed,
-        hadToolThisTurn: hadToolBetween || parsed.hasTool,
-        filesThisTurn: [...filesBetween, ...parsed.files],
-        toolUsesThisTurn: [...toolUsesBetween, ...parsed.toolUses],
-        toolResultsThisTurn: [...toolResultsBetween, ...parsed.toolResults],
-        thinkingThisTurn: [...thinkingBetween, ...parsed.thinking],
+      pending = {
+        userText: parsed.text,
+        timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
+        assistantTexts: [],
+        assistantLastLineEndOffset: lineEndOffset,
+        hadTool: hadToolBetween || parsed.hasTool,
+        files: [...filesBetween, ...parsed.files],
+        toolUses: [...toolUsesBetween, ...parsed.toolUses],
+        toolResults: [...toolResultsBetween, ...parsed.toolResults],
+        thinking: [...thinkingBetween, ...parsed.thinking],
       };
+      if (currentCwd !== undefined) pending.repo_root = currentCwd;
       hadToolBetween = false;
       filesBetween = [];
       toolUsesBetween = [];
       toolResultsBetween = [];
       thinkingBetween = [];
     } else {
-      if (pendingUser === null) {
+      // text-bearing assistant
+      if (pending === null) {
         log.warn('orphan_assistant', { session_id });
-        if (parsed.hasTool) hadToolBetween = true;
-        if (parsed.files.length > 0) filesBetween.push(...parsed.files);
-        if (parsed.toolUses.length > 0) toolUsesBetween.push(...parsed.toolUses);
-        if (parsed.toolResults.length > 0) toolResultsBetween.push(...parsed.toolResults);
-        if (parsed.thinking.length > 0) thinkingBetween.push(...parsed.thinking);
-        continue;
+      } else {
+        pending.assistantTexts.push(parsed.text);
+        pending.assistantLastLineEndOffset = lineEndOffset;
+        if (parsed.timestamp !== undefined) pending.timestamp = parsed.timestamp;
+        if (parsed.hasTool) pending.hadTool = true;
+        if (parsed.files.length > 0) pending.files.push(...parsed.files);
+        if (parsed.toolUses.length > 0) pending.toolUses.push(...parsed.toolUses);
+        if (parsed.toolResults.length > 0) pending.toolResults.push(...parsed.toolResults);
+        if (parsed.thinking.length > 0) pending.thinking.push(...parsed.thinking);
       }
-      const had_tool_use =
-        pendingUser.hadToolThisTurn || hadToolBetween || parsed.hasTool;
-      const allFiles = dedupStrings([
-        ...pendingUser.filesThisTurn,
-        ...filesBetween,
-        ...parsed.files,
-      ]);
-      const allToolUses = [
-        ...pendingUser.toolUsesThisTurn,
-        ...toolUsesBetween,
-        ...parsed.toolUses,
-      ];
-      const allToolResults = [
-        ...pendingUser.toolResultsThisTurn,
-        ...toolResultsBetween,
-        ...parsed.toolResults,
-      ];
-      const allThinking = [
-        ...pendingUser.thinkingThisTurn,
-        ...thinkingBetween,
-        ...parsed.thinking,
-      ];
-      const turn: ClaudeCodeTurn = {
-        project,
-        session_id,
-        turn_index: turnIndex,
-        user_message: pendingUser.line.text,
-        assistant_message: parsed.text,
-        mtime: fileMtime,
-        timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
-        had_tool_use,
-        byte_offset: offsetCursor,
-      };
-      if (currentCwd !== undefined) turn.repo_root = currentCwd;
-      if (allFiles.length > 0) turn.files_referenced = allFiles;
-      const toolCalls = matchToolCalls(allToolUses, allToolResults);
-      if (toolCalls.length > 0) turn.tool_calls = toolCalls;
-      if (allThinking.length > 0) {
-        const joined = allThinking.join('\n\n');
-        const t = truncateThinking(joined);
-        turn.thinking = t.value;
-      }
-      turns.push(turn);
-      turnIndex += 1;
-      pendingUser = null;
-      hadToolBetween = false;
-      filesBetween = [];
-      toolUsesBetween = [];
-      toolResultsBetween = [];
-      thinkingBetween = [];
     }
+    lineStartOffset = lineEndOffset;
   }
 
-  return { turns, newOffset: lastByteOffset + consumedBytes };
+  // Intentionally do NOT emit pending here. A cluster only counts as closed
+  // when the next user line appears; emitting at EOF risks double-emission
+  // when the next pass sees more assistant lines arrive (for active sessions)
+  // or losing-then-recapturing content as orphans.
+  return { turns, newOffset: confirmedThroughOffset };
 }
 
 function matchToolCalls(

@@ -124,9 +124,31 @@ describe('extractClaudeCodeTurns (pure)', () => {
     expect(turns[2]?.had_tool_use).toBe(false);
     expect(turns.every((t) => t.session_id === 'claude-code-session')).toBe(true);
     expect(turns.every((t) => t.byte_offset > 0)).toBe(true);
-    // newOffset matches file size since the fixture ends with a newline.
+    // Under cluster-pairing, newOffset = end of the last emitted turn's last
+    // contributing line, which is strictly less than fileSize because the
+    // trailing closing-user line is consumed but pending (no closing user
+    // after it).
     const fixtureSize = readFileSync(fixturePath).length;
-    expect(newOffset).toBe(fixtureSize);
+    expect(newOffset).toBeGreaterThan(0);
+    expect(newOffset).toBeLessThan(fixtureSize);
+    expect(newOffset).toBe(turns[turns.length - 1]!.byte_offset);
+  });
+
+  it('pairs one user with multiple consecutive text-bearing assistant lines into a single turn', async () => {
+    const path = join(dir, 'sess.jsonl');
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'fix the bug'),
+      assistantText('s1', 'a1', 'thinking...'),
+      assistantText('s1', 'a2', 'I see the issue'),
+      assistantText('s1', 'a3', 'here is the fix'),
+      userText('s1', 'u2', 'thanks'), // closes the cluster
+    ]);
+    const { turns } = await extractClaudeCodeTurns(path, 0);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.user_message).toBe('fix the bug');
+    expect(turns[0]?.assistant_message).toBe(
+      'thinking...\n\nI see the issue\n\nhere is the fix',
+    );
   });
 
   it('returns all turns when reading from offset 0 on a fresh JSONL', async () => {
@@ -136,6 +158,7 @@ describe('extractClaudeCodeTurns (pure)', () => {
       assistantText('s1', 'a1', 'A1'),
       userText('s1', 'u2', 'Q2'),
       assistantText('s1', 'a2', 'A2'),
+      userText('s1', 'u3', 'Q3'), // closes the second cluster
     ]);
 
     const { turns, newOffset } = await extractClaudeCodeTurns(path, 0);
@@ -144,41 +167,54 @@ describe('extractClaudeCodeTurns (pure)', () => {
     expect(turns[0]?.assistant_message).toBe('A1');
     expect(turns[1]?.user_message).toBe('Q2');
     expect(turns[0]?.byte_offset).toBeLessThan(turns[1]!.byte_offset);
-    expect(newOffset).toBe(readFileSync(path).length);
+    expect(newOffset).toBe(turns[1]!.byte_offset);
   });
 
   it('resumes from a prior newOffset and returns only newly-appended turns', async () => {
     const path = join(dir, 'sess.jsonl');
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    // u2 closes cluster {u1, a1}; u2 stays pending until the next user arrives.
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+    ]);
     const first = await extractClaudeCodeTurns(path, 0);
     expect(first.turns).toHaveLength(1);
+    expect(first.turns[0]?.user_message).toBe('Q1');
 
-    appendJsonl(path, [userText('s1', 'u2', 'Q2'), assistantText('s1', 'a2', 'A2')]);
+    // a2 attaches to pending u2; u3 closes that cluster.
+    appendJsonl(path, [assistantText('s1', 'a2', 'A2'), userText('s1', 'u3', 'Q3')]);
     const second = await extractClaudeCodeTurns(path, first.newOffset);
     expect(second.turns).toHaveLength(1);
     expect(second.turns[0]?.user_message).toBe('Q2');
-    expect(second.newOffset).toBe(readFileSync(path).length);
+    expect(second.turns[0]?.assistant_message).toBe('A2');
   });
 
   it('partial line: bytes without trailing newline are NOT consumed; next call after newline returns full turn', async () => {
     const path = join(dir, 'sess.jsonl');
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'), // closes {u1, a1}; u2 pending
+    ]);
     const first = await extractClaudeCodeTurns(path, 0);
+    expect(first.turns).toHaveLength(1);
 
-    // Append a partial line (no trailing newline)
-    const partial = JSON.stringify(userText('s1', 'u2', 'Q2'));
+    // Append a partial assistant line (no trailing newline) — would attach to
+    // pending u2 once complete.
+    const partial = JSON.stringify(assistantText('s1', 'a2', 'A2'));
     appendFileSync(path, partial);
     const second = await extractClaudeCodeTurns(path, first.newOffset);
     expect(second.turns).toHaveLength(0);
     expect(second.newOffset).toBe(first.newOffset);
 
-    // Complete the line, then add the assistant
+    // Complete the partial line, then add a closing user.
     appendFileSync(path, '\n');
-    appendFileSync(path, JSON.stringify(assistantText('s1', 'a2', 'A2')) + '\n');
+    appendFileSync(path, JSON.stringify(userText('s1', 'u3', 'Q3')) + '\n');
     const third = await extractClaudeCodeTurns(path, second.newOffset);
     expect(third.turns).toHaveLength(1);
     expect(third.turns[0]?.user_message).toBe('Q2');
-    expect(third.newOffset).toBe(readFileSync(path).length);
+    expect(third.turns[0]?.assistant_message).toBe('A2');
   });
 
   it('incomplete turn (only user, no assistant yet) emits zero turns', async () => {
@@ -186,7 +222,9 @@ describe('extractClaudeCodeTurns (pure)', () => {
     writeJsonlFresh(path, [userText('s1', 'u1', 'Q1')]);
     const { turns, newOffset } = await extractClaudeCodeTurns(path, 0);
     expect(turns).toHaveLength(0);
-    expect(newOffset).toBe(readFileSync(path).length);
+    // No turn emitted means confirmedThroughOffset stays at lastByteOffset (0)
+    // — the user line is "consumed" but pending, so the next pass re-reads it.
+    expect(newOffset).toBe(0);
   });
 
   it('drops orphan assistant (no preceding user) and warns', async () => {
@@ -195,10 +233,12 @@ describe('extractClaudeCodeTurns (pure)', () => {
       assistantText('s1', 'a1', 'orphan'),
       userText('s1', 'u1', 'Q1'),
       assistantText('s1', 'a2', 'A1'),
+      userText('s1', 'u2', 'Q2'), // closes the cluster
     ]);
     const { turns } = await extractClaudeCodeTurns(path, 0);
     expect(turns).toHaveLength(1);
     expect(turns[0]?.user_message).toBe('Q1');
+    expect(turns[0]?.assistant_message).toBe('A1');
     expect(captured.writes.join('')).toContain('orphan_assistant');
   });
 
@@ -208,27 +248,34 @@ describe('extractClaudeCodeTurns (pure)', () => {
       JSON.stringify(userText('s1', 'u1', 'Q1')),
       '{not valid json',
       JSON.stringify(assistantText('s1', 'a1', 'A1')),
+      JSON.stringify(userText('s1', 'u2', 'Q2')), // closes the cluster
     ];
     writeFileSync(path, lines.join('\n') + '\n');
     const { turns } = await extractClaudeCodeTurns(path, 0);
     expect(turns).toHaveLength(1);
+    expect(turns[0]?.user_message).toBe('Q1');
+    expect(turns[0]?.assistant_message).toBe('A1');
   });
 
-  it('byte_offset on emitted turn equals the offset just past the assistant line', async () => {
+  it('byte_offset on emitted turn equals the offset just past the last assistant line in the cluster', async () => {
     const path = join(dir, 'sess.jsonl');
+    // Compute the offset that should match: end of the assistant line, before
+    // the closing user line is appended.
     writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
-    const fileSize = readFileSync(path).length;
+    const offsetAtEndOfAssistant = readFileSync(path).length;
+    appendJsonl(path, [userText('s1', 'u2', 'Q2')]); // closes the cluster
     const { turns } = await extractClaudeCodeTurns(path, 0);
-    expect(turns[0]?.byte_offset).toBe(fileSize);
+    expect(turns[0]?.byte_offset).toBe(offsetAtEndOfAssistant);
   });
 
-  it('handles tool-only assistant followed by orphan-text assistant: tool flag persists', async () => {
+  it('tool_use + tool_result interleaved with text-bearing assistant: tool flag and text both surface', async () => {
     const path = join(dir, 'sess.jsonl');
     writeJsonlFresh(path, [
       userText('s1', 'u1', 'Q1'),
       assistantToolUse('s1', 'a1'),
       userToolResult('s1', 'u2'),
       assistantText('s1', 'a2', 'tool-mediated answer'),
+      userText('s1', 'u3', 'Q3'), // closes the cluster
     ]);
     const { turns } = await extractClaudeCodeTurns(path, 0);
     expect(turns).toHaveLength(1);
@@ -283,7 +330,12 @@ describe('extractClaudeCodeTurns (pure)', () => {
       message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
       uuid: 'a2', timestamp: ts,
     };
-    writeJsonlFresh(path, [u1, aTool, uResult, aFinal]);
+    const uClose: JsonlLine = {
+      type: 'user', sessionId, cwd,
+      message: { role: 'user', content: 'next' },
+      uuid: 'u3', timestamp: ts,
+    };
+    writeJsonlFresh(path, [u1, aTool, uResult, aFinal, uClose]);
     const r = await extractClaudeCodeTurns(path, 0);
     expect(r.turns).toHaveLength(1);
     const tc = r.turns[0]?.tool_calls;
@@ -313,6 +365,8 @@ describe('extractClaudeCodeTurns (pure)', () => {
       { type: 'assistant', sessionId: 's1', cwd: '/Users/x/proj',
         message: { role: 'assistant', content: [{ type: 'text', text: 'failed' }] },
         uuid: 'a2', timestamp: ts },
+      { type: 'user', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'user', content: 'next' }, uuid: 'u3', timestamp: ts },
     ];
     writeJsonlFresh(path, lines);
     const r = await extractClaudeCodeTurns(path, 0);
@@ -330,6 +384,8 @@ describe('extractClaudeCodeTurns (pure)', () => {
           { type: 'thinking', thinking: 'pondering the request…' },
           { type: 'text', text: 'a' },
         ]}, uuid: 'a1', timestamp: ts },
+      { type: 'user', sessionId: 's1', cwd: '/Users/x/proj',
+        message: { role: 'user', content: 'next' }, uuid: 'u2', timestamp: ts },
     ];
     writeJsonlFresh(path, lines);
     const r = await extractClaudeCodeTurns(path, 0);
@@ -372,7 +428,11 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'), // closes the cluster
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
     const events = await storage.query();
@@ -392,7 +452,11 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
     const evt = (await storage.query())[0]!;
@@ -423,7 +487,11 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
       },
     };
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantWithToolUses]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantWithToolUses,
+      userText('s1', 'u2', 'Q2'),
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
     const evt = (await storage.query())[0]!;
@@ -438,7 +506,11 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
     const evt = (await storage.query())[0]!;
@@ -449,13 +521,19 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    // Cluster pairing: each round needs the *next* user line to close the
+    // current cluster. Each appended user closes the prior pending cluster.
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
-    appendJsonl(path, [userText('s1', 'u2', 'Q2'), assistantText('s1', 'a2', 'A2')]);
+    appendJsonl(path, [assistantText('s1', 'a2', 'A2'), userText('s1', 'u3', 'Q3')]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    appendJsonl(path, [userText('s1', 'u3', 'Q3'), assistantText('s1', 'a3', 'A3')]);
+    appendJsonl(path, [assistantText('s1', 'a3', 'A3'), userText('s1', 'u4', 'Q4')]);
     await waitFor(async () => (await storage.count()) >= 3);
 
     const events = await storage.query();
@@ -487,7 +565,11 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     });
 
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
-    appendJsonl(path, [userText('s1', 'u2', 'Q2'), assistantText('s1', 'a2', 'A2')]);
+    appendJsonl(path, [
+      userText('s1', 'u2', 'Q2'),
+      assistantText('s1', 'a2', 'A2'),
+      userText('s1', 'u3', 'Q3'), // closes the second cluster
+    ]);
     await waitFor(async () => (await storage.count()) >= 2);
 
     const events = await storage.query();
@@ -508,9 +590,13 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     const subagentsDir = join(projDir, 'session-abc', 'subagents');
     mkdirSync(subagentsDir, { recursive: true });
     const subagentPath = join(subagentsDir, 'agent-xyz.jsonl');
+    // Subagent JSONL with a closing user line — the cluster-pairing pattern
+    // requires the next user to close a pending cluster. Real subagent files
+    // ending on a final assistant text are a known followup gap.
     writeJsonlFresh(subagentPath, [
       userText('subagent-xyz', 'u1', 'Q1'),
       assistantText('subagent-xyz', 'a1', 'A1'),
+      userText('subagent-xyz', 'u2', 'Q2'),
     ]);
 
     // Start the extractor AFTER the file already exists.
@@ -545,6 +631,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     writeJsonlFresh(path, [
       userText('subagent-xyz', 'u1', 'Q1'),
       assistantText('subagent-xyz', 'a1', 'A1'),
+      userText('subagent-xyz', 'u2', 'Q2'),
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
@@ -559,14 +646,21 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');
 
-    writeJsonlFresh(path, [userText('s1', 'u1', 'Q1'), assistantText('s1', 'a1', 'A1')]);
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+    ]);
     await waitFor(async () => (await storage.count()) >= 1);
     const before = await storage.count();
 
     await handle.stop();
     handle = null;
 
-    appendJsonl(path, [userText('s1', 'u2', 'Q2'), assistantText('s1', 'a2', 'A2')]);
+    appendJsonl(path, [
+      assistantText('s1', 'a2', 'A2'),
+      userText('s1', 'u3', 'Q3'),
+    ]);
     await new Promise((r) => setTimeout(r, 300));
     expect(await storage.count()).toBe(before);
   });
