@@ -771,6 +771,41 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
   });
 
+  it('emits stale git_state (fresh:false, branch only) when probe refuses but JSONL gitBranch is present', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+    // Old timestamp → probeGitState's 30s freshness gate refuses.
+    // cwd at non-existent path → readBranch can't help either.
+    const ts = '2024-01-01T00:00:00Z';
+    const u1 = {
+      type: 'user', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/y',
+      message: { role: 'user', content: 'q' }, uuid: 'u1', timestamp: ts,
+    };
+    const a1 = {
+      type: 'assistant', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/y',
+      message: { role: 'assistant', content: [{ type: 'text', text: 'a' }] },
+      uuid: 'a1', timestamp: ts,
+    };
+    const u2 = {
+      type: 'user', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/y',
+      message: { role: 'user', content: 'next' }, uuid: 'u2', timestamp: ts,
+    };
+    writeFileSync(path, [u1, a1, u2].map((l) => JSON.stringify(l)).join('\n') + '\n');
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    const gs = md['git_state'] as Record<string, unknown>;
+    expect(gs).toBeDefined();
+    expect(gs['fresh']).toBe(false);
+    expect(gs['branch']).toBe('feature/y');
+    expect(gs['head_sha']).toBeUndefined();
+    expect(gs['dirty_count']).toBeUndefined();
+  });
+
   it('threads JSONL gitBranch / permissionMode / cli version / model into metadata', async () => {
     handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
     const path = join(projDir, 'sess.jsonl');

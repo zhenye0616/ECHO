@@ -602,7 +602,21 @@ export async function startClaudeCodeExtractor(
       if (turn.cli_version !== undefined) metadata['cli_version'] = turn.cli_version;
       if (turn.model !== undefined) metadata['model'] = turn.model;
       const gitState = await probeGitState(turn.repo_root, turn.timestamp);
-      if (gitState !== undefined) metadata['git_state'] = gitState;
+      if (gitState !== undefined) {
+        metadata['git_state'] = gitState;
+      } else if (turn.git_branch_jsonl !== undefined) {
+        // Stale (boot-scanned) turn: probe refused, but JSONL gitBranch is
+        // the branch the CC client recorded at turn time — strictly better
+        // provenance than nothing. Emit a partial GitState with fresh:false
+        // so consumers see a uniform shape with Codex's session_meta
+        // backfill. head_sha + dirty_count remain unrecoverable: CC JSONL
+        // doesn't record commit sha, and dirty status is point-in-time only.
+        metadata['git_state'] = {
+          captured_at: turn.timestamp,
+          fresh: false,
+          branch: turn.git_branch_jsonl,
+        };
+      }
       // Branch provenance: JSONL gitBranch is per-turn and authoritative —
       // recorded by the CC client at turn time. readBranch reads .git/HEAD
       // *now*, which is wrong for historical turns if the user has since
