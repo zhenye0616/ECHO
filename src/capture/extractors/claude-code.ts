@@ -9,9 +9,9 @@ import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { bootScanJsonl, dedupStrings } from './_shared.js';
 import {
+  buildToolCall,
+  FILE_INPUT_KEYS,
   MAX_TOOL_CALLS_PER_TURN,
-  truncateArgs,
-  truncateOutput,
   truncateThinking,
   type GitState,
   type ToolCall,
@@ -76,8 +76,6 @@ interface ParsedLine {
   toolResults: ParsedToolResult[];
   thinking: string[];
 }
-
-const FILE_INPUT_KEYS = ['file_path', 'path', 'notebook_path'] as const;
 
 function stringifyToolResultContent(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -374,20 +372,21 @@ function matchToolCalls(
   for (const u of uses) {
     if (out.length >= MAX_TOOL_CALLS_PER_TURN) break;
     const r = resultById.get(u.id);
-    const tc: ToolCall = { name: u.name, call_id: u.id };
-    if (u.input !== undefined && u.input !== null) {
-      const argsStr = typeof u.input === 'string' ? u.input : JSON.stringify(u.input);
-      const t = truncateArgs(argsStr);
-      tc.args = t.value;
-      if (t.truncated) tc.args_truncated = true;
-    }
-    if (r !== undefined) {
-      const t = truncateOutput(r.content);
-      tc.output = t.value;
-      if (t.truncated) tc.output_truncated = true;
-      if (r.is_error) tc.is_error = true;
-    }
-    out.push(tc);
+    const argsRaw =
+      u.input === undefined || u.input === null
+        ? undefined
+        : typeof u.input === 'string'
+          ? u.input
+          : JSON.stringify(u.input);
+    out.push(
+      buildToolCall({
+        name: u.name,
+        call_id: u.id,
+        argsRaw,
+        outputRaw: r?.content,
+        is_error: r?.is_error,
+      }),
+    );
   }
   return out;
 }
