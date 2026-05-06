@@ -133,12 +133,22 @@ function reasoning(text?: string): CodexLine {
   };
 }
 
-function eventMsg(): CodexLine {
-  return {
-    timestamp: '2026-05-01T10:00:00.500Z',
-    type: 'event_msg',
-    payload: { kind: 'token_count', total: 100 },
-  };
+function eventMsg(
+  payload: Record<string, unknown> = { kind: 'token_count', total: 100 },
+  ts = '2026-05-01T10:00:00.500Z',
+): CodexLine {
+  return { timestamp: ts, type: 'event_msg', payload };
+}
+
+function taskComplete(ts = '2026-05-01T10:00:03.000Z'): CodexLine {
+  return eventMsg(
+    {
+      type: 'task_complete',
+      turn_id: '019de2b0-6551-7682-a51b-2affaa0a7bbf',
+      last_agent_message: 'done',
+    },
+    ts,
+  );
 }
 
 function writeJsonl(path: string, lines: CodexLine[]): void {
@@ -704,6 +714,21 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       cwd: '/Users/x/proj',
     });
     expect(evt.metadata).not.toHaveProperty('had_tool_use');
+  });
+
+  // Regression: rapid in-place appends elude FSEvents; polling must catch them.
+  it('captures every turn from rapid back-to-back appends within the polling interval', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    writeJsonl(path, [sessionMeta(), userMsg('q1'), assistantMsg('a1'), taskComplete()]);
+    appendJsonl(path, [userMsg('q2'), assistantMsg('a2'), taskComplete()]);
+    appendJsonl(path, [userMsg('q3'), assistantMsg('a3'), taskComplete()]);
+    await waitFor(async () => (await storage.count()) >= 3, 4000);
+    const events = await storage.query();
+    expect(events.map((e) => e.content)).toEqual([
+      'USER: q1\n\nASSISTANT: a1',
+      'USER: q2\n\nASSISTANT: a2',
+      'USER: q3\n\nASSISTANT: a3',
+    ]);
   });
 
   it('lands metadata.git and metadata.codex through the pipeline', async () => {

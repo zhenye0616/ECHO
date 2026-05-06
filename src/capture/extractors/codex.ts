@@ -7,7 +7,12 @@ import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
-import { bootScanJsonl } from './_shared.js';
+import {
+  bootScanJsonl,
+  JSONL_WATCH_OPTS,
+  probeFreshness,
+  type ExtractorHandle,
+} from './_shared.js';
 import {
   buildToolCall,
   MAX_TOOL_CALLS_PER_TURN,
@@ -64,7 +69,15 @@ export interface ExtractCodexResult {
 }
 
 interface ParsedLine {
-  kind: 'message' | 'tool_call' | 'tool_output' | 'reasoning' | 'session_meta' | 'turn_context' | 'other';
+  kind:
+    | 'message'
+    | 'tool_call'
+    | 'tool_output'
+    | 'reasoning'
+    | 'session_meta'
+    | 'turn_context'
+    | 'task_complete'
+    | 'other';
   role?: 'user' | 'assistant';
   text?: string;
   cwd?: string;
@@ -122,23 +135,23 @@ function parseLine(line: string): ParsedLine | null {
     if (typeof payload === 'object' && payload !== null) {
       const p = payload as Record<string, unknown>;
       const c = p['cwd'];
-      if (typeof c === 'string' && c.length > 0) out.cwd = c;
+      if (isNonEmptyString(c)) out.cwd = c;
       const src = p['source'];
-      if (typeof src === 'string' && src.length > 0) out.source = src;
+      if (isNonEmptyString(src)) out.source = src;
       const cv = p['cli_version'];
-      if (typeof cv === 'string' && cv.length > 0) out.cli_version = cv;
+      if (isNonEmptyString(cv)) out.cli_version = cv;
       const mp = p['model_provider'];
-      if (typeof mp === 'string' && mp.length > 0) out.model_provider = mp;
+      if (isNonEmptyString(mp)) out.model_provider = mp;
       const git = p['git'];
       if (typeof git === 'object' && git !== null) {
         const g = git as Record<string, unknown>;
         const gm: CodexGitMeta = {};
         const sha = g['commit_hash'];
-        if (typeof sha === 'string' && sha.length > 0) gm.sha = sha;
+        if (isNonEmptyString(sha)) gm.sha = sha;
         const br = g['branch'];
-        if (typeof br === 'string' && br.length > 0) gm.branch = br;
+        if (isNonEmptyString(br)) gm.branch = br;
         const url = g['repository_url'];
-        if (typeof url === 'string' && url.length > 0) gm.origin_url = url;
+        if (isNonEmptyString(url)) gm.origin_url = url;
         if (Object.keys(gm).length > 0) out.git = gm;
       }
     }
@@ -151,22 +164,33 @@ function parseLine(line: string): ParsedLine | null {
     if (typeof payload === 'object' && payload !== null) {
       const p = payload as Record<string, unknown>;
       const c = p['cwd'];
-      if (typeof c === 'string' && c.length > 0) out.cwd = c;
+      if (isNonEmptyString(c)) out.cwd = c;
       const m = p['model'];
-      if (typeof m === 'string' && m.length > 0) out.model = m;
+      if (isNonEmptyString(m)) out.model = m;
       const eff = p['effort'];
-      if (typeof eff === 'string' && eff.length > 0) out.reasoning_effort = eff;
+      if (isNonEmptyString(eff)) out.reasoning_effort = eff;
       const pers = p['personality'];
-      if (typeof pers === 'string' && pers.length > 0) out.personality = pers;
+      if (isNonEmptyString(pers)) out.personality = pers;
       const ap = p['approval_policy'];
-      if (typeof ap === 'string' && ap.length > 0) out.approval_policy = ap;
+      if (isNonEmptyString(ap)) out.approval_policy = ap;
       const sp = p['sandbox_policy'];
       if (typeof sp === 'object' && sp !== null) {
         const spt = (sp as Record<string, unknown>)['type'];
-        if (typeof spt === 'string' && spt.length > 0) out.sandbox_policy_type = spt;
+        if (isNonEmptyString(spt)) out.sandbox_policy_type = spt;
       }
     }
     return out;
+  }
+
+  if (t === 'event_msg') {
+    const payload = obj['payload'];
+    if (typeof payload === 'object' && payload !== null) {
+      const p = payload as Record<string, unknown>;
+      if (p['type'] === 'task_complete') {
+        return { kind: 'task_complete', timestamp };
+      }
+    }
+    return { kind: 'other', timestamp };
   }
 
   if (t !== 'response_item') return { kind: 'other', timestamp };
@@ -276,7 +300,7 @@ function mergeCodexMeta(
   const next: CodexSessionMeta = { ...(base ?? {}) };
   let changed = false;
   for (const [k, v] of Object.entries(patch) as [keyof CodexSessionMeta, string | undefined][]) {
-    if (typeof v === 'string' && v.length > 0 && next[k] !== v) {
+    if (isNonEmptyString(v) && next[k] !== v) {
       next[k] = v;
       changed = true;
     }
@@ -460,6 +484,18 @@ export async function extractCodexTurns(
       continue;
     }
 
+    if (parsed.kind === 'task_complete') {
+      // Emitted after the assistant's final message lands in the file, so it's
+      // safe to close the cluster without waiting for a next-user line.
+      if (pending !== null && pending.assistantTexts.length > 0) {
+        pending.assistantLastLineEndOffset = lineEndOffset;
+        emitPendingIfComplete();
+        pending = null;
+      }
+      lineStartOffset = lineEndOffset;
+      continue;
+    }
+
     if (parsed.kind === 'other') {
       lineStartOffset = lineEndOffset;
       continue;
@@ -547,7 +583,7 @@ function readCodexMetaFromMd(md: Record<string, unknown>): CodexSessionMeta | un
     'sandbox_policy_type',
   ] as const) {
     const v = r[k];
-    if (typeof v === 'string' && v.length > 0) out[k] = v;
+    if (isNonEmptyString(v)) out[k] = v;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -596,9 +632,7 @@ export interface CodexExtractorOptions {
   sessionsPrefix?: string;
 }
 
-export interface CodexExtractorHandle {
-  stop: () => Promise<void>;
-}
+export type CodexExtractorHandle = ExtractorHandle;
 
 export async function startCodexExtractor(
   storage: Storage,
@@ -677,11 +711,7 @@ export async function startCodexExtractor(
     });
   }
 
-  const watcher: FSWatcher = chokidar.watch(sessionsPrefix, {
-    ignoreInitial: true,
-    persistent: true,
-    awaitWriteFinish: false,
-  });
+  const watcher: FSWatcher = chokidar.watch(sessionsPrefix, JSONL_WATCH_OPTS);
 
   function dispatch(p: string): void {
     if (isJsonl(p)) {
@@ -710,5 +740,6 @@ export async function startCodexExtractor(
       await processing;
       log.info('stopped', {});
     },
+    probeFreshness: () => probeFreshness(offsetMap),
   };
 }

@@ -7,7 +7,13 @@ import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
-import { bootScanJsonl, dedupStrings } from './_shared.js';
+import {
+  bootScanJsonl,
+  dedupStrings,
+  JSONL_WATCH_OPTS,
+  probeFreshness,
+  type ExtractorHandle,
+} from './_shared.js';
 import {
   buildToolCall,
   FILE_INPUT_KEYS,
@@ -39,9 +45,46 @@ export interface ClaudeCodeTurn {
   git_state?: GitState;
 }
 
+/** A text-bearing user line that was discarded because a later user line
+ *  arrived before any assistant reply. Surfaced to the dispatcher so it can
+ *  warn once per byte_offset (instead of every JSONL re-read). */
+export interface DroppedUserLine {
+  /** Byte offset of the start of the dropped line within the JSONL. Used as
+   *  the dedup key — re-reads observe the same offset and must not re-warn. */
+  byte_offset: number;
+  /** First ~120 chars of the dropped user text, for diagnosis. */
+  preview: string;
+  /** `inject` = system reminder / slash-command marker / local-command echo
+   *  (high-volume noise; logged at debug). `prompt` = anything else, treated
+   *  as a possibly-real user message that never got an assistant reply. */
+  classification: 'inject' | 'prompt';
+  timestamp?: string;
+}
+
 export interface ExtractClaudeCodeResult {
   turns: ClaudeCodeTurn[];
   newOffset: number;
+  droppedUsers: DroppedUserLine[];
+}
+
+const INJECT_TAG_PREFIXES = [
+  '<system-reminder>',
+  '<command-name>',
+  '<command-message>',
+  '<command-args>',
+  '<command-stdout>',
+  '<command-stderr>',
+  '<local-command-stdout>',
+  '<local-command-stderr>',
+  '<local-command-caveat>',
+] as const;
+
+function classifyDroppedUser(text: string): 'inject' | 'prompt' {
+  const head = text.trimStart();
+  for (const tag of INJECT_TAG_PREFIXES) {
+    if (head.startsWith(tag)) return 'inject';
+  }
+  return 'prompt';
 }
 
 interface ParsedToolUse {
@@ -69,6 +112,10 @@ interface ParsedLine {
   role: 'user' | 'assistant';
   text: string;
   hasTool: boolean;
+  /** True for assistant messages with `stop_reason: end_turn` — signals the
+   *  assistant has finished and the cluster can be closed without waiting
+   *  for the next user line. */
+  isEndTurn: boolean;
   timestamp: string | undefined;
   cwd: string | undefined;
   files: string[];
@@ -159,10 +206,12 @@ function parseLine(line: string): ParsedLine | null {
   const ec = extractContent(msg['content']);
   const ts = obj['timestamp'];
   const cwd = obj['cwd'];
+  const isEndTurn = role === 'assistant' && msg['stop_reason'] === 'end_turn';
   return {
     role,
     text: ec.text,
     hasTool: ec.hasTool,
+    isEndTurn,
     timestamp: typeof ts === 'string' ? ts : undefined,
     cwd: isNonEmptyString(cwd) ? cwd : undefined,
     files: ec.files,
@@ -190,11 +239,11 @@ export async function extractClaudeCodeTurns(
     st = await stat(jsonlPath);
   } catch (err) {
     log.warn('stat_failed', { path: jsonlPath, message: (err as Error).message });
-    return { turns: [], newOffset: lastByteOffset };
+    return { turns: [], newOffset: lastByteOffset, droppedUsers: [] };
   }
   const fileSize = st.size;
   if (fileSize <= lastByteOffset) {
-    return { turns: [], newOffset: lastByteOffset };
+    return { turns: [], newOffset: lastByteOffset, droppedUsers: [] };
   }
 
   const length = fileSize - lastByteOffset;
@@ -204,7 +253,7 @@ export async function extractClaudeCodeTurns(
     fh = await open(jsonlPath, 'r');
   } catch (err) {
     log.warn('open_failed', { path: jsonlPath, message: (err as Error).message });
-    return { turns: [], newOffset: lastByteOffset };
+    return { turns: [], newOffset: lastByteOffset, droppedUsers: [] };
   }
   try {
     await fh.read(buffer, 0, length, lastByteOffset);
@@ -215,7 +264,7 @@ export async function extractClaudeCodeTurns(
   const text = buffer.toString('utf8');
   const lastNewline = text.lastIndexOf('\n');
   if (lastNewline === -1) {
-    return { turns: [], newOffset: lastByteOffset };
+    return { turns: [], newOffset: lastByteOffset, droppedUsers: [] };
   }
   const consumable = text.slice(0, lastNewline + 1);
 
@@ -227,6 +276,7 @@ export async function extractClaudeCodeTurns(
   const turns: ClaudeCodeTurn[] = [];
   interface PendingCluster {
     userText: string;
+    userByteOffset: number;
     timestamp: string;
     assistantTexts: string[];
     assistantLastLineEndOffset: number;
@@ -238,6 +288,7 @@ export async function extractClaudeCodeTurns(
     repo_root?: string;
   }
   let pending: PendingCluster | null = null;
+  const droppedUsers: DroppedUserLine[] = [];
   // "Between" buffers accumulate side-effects from lines that arrive when no
   // cluster is open (e.g., orphan tool_results before any user line). They
   // get folded into the next cluster's pending state at user-line time.
@@ -317,11 +368,18 @@ export async function extractClaudeCodeTurns(
         if (pending.assistantTexts.length > 0) {
           emitPendingIfComplete();
         } else {
-          log.warn('user_replaced_without_assistant', { session_id });
+          const dropped: DroppedUserLine = {
+            byte_offset: pending.userByteOffset,
+            preview: pending.userText.slice(0, 120),
+            classification: classifyDroppedUser(pending.userText),
+          };
+          if (pending.timestamp !== undefined) dropped.timestamp = pending.timestamp;
+          droppedUsers.push(dropped);
         }
       }
       pending = {
         userText: parsed.text,
+        userByteOffset: lineStartOffset,
         timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
         assistantTexts: [],
         assistantLastLineEndOffset: lineEndOffset,
@@ -350,6 +408,11 @@ export async function extractClaudeCodeTurns(
         if (parsed.toolUses.length > 0) pending.toolUses.push(...parsed.toolUses);
         if (parsed.toolResults.length > 0) pending.toolResults.push(...parsed.toolResults);
         if (parsed.thinking.length > 0) pending.thinking.push(...parsed.thinking);
+        if (parsed.isEndTurn) {
+          // stop_reason=end_turn — assistant is done; close the cluster now.
+          emitPendingIfComplete();
+          pending = null;
+        }
       }
     }
     lineStartOffset = lineEndOffset;
@@ -359,7 +422,7 @@ export async function extractClaudeCodeTurns(
   // when the next user line appears; emitting at EOF risks double-emission
   // when the next pass sees more assistant lines arrive (for active sessions)
   // or losing-then-recapturing content as orphans.
-  return { turns, newOffset: confirmedThroughOffset };
+  return { turns, newOffset: confirmedThroughOffset, droppedUsers };
 }
 
 function matchToolCalls(
@@ -393,9 +456,8 @@ function matchToolCalls(
 
 async function backfillOffsetMap(storage: Storage): Promise<Map<string, { offset: number; turn_index: number }>> {
   const map = new Map<string, { offset: number; turn_index: number }>();
-  const events = await storage.query();
+  const events = await storage.query({ source_prefix: 'fs:' });
   for (const evt of events) {
-    if (!evt.source.startsWith('fs:')) continue;
     if (!evt.source.endsWith('.jsonl')) continue;
     const md = evt.metadata;
     if (md === undefined) continue;
@@ -415,9 +477,7 @@ export interface ClaudeCodeExtractorOptions {
   projectsPrefix?: string;
 }
 
-export interface ClaudeCodeExtractorHandle {
-  stop: () => Promise<void>;
-}
+export type ClaudeCodeExtractorHandle = ExtractorHandle;
 
 export async function startClaudeCodeExtractor(
   storage: Storage,
@@ -433,9 +493,34 @@ export async function startClaudeCodeExtractor(
     return p.startsWith(projectsPrefix) && p.endsWith('.jsonl');
   }
 
+  // Per-file watermark: the highest byte_offset of a dropped-user line we've
+  // already logged. Without this, every chokidar `change` event re-walks the
+  // unconfirmed tail and re-detects the same drops, spamming warnings.
+  const dropWatermark = new Map<string, number>();
+
   async function handleJsonlChange(path: string): Promise<void> {
     const cur = offsetMap.get(path) ?? { offset: 0, turn_index: -1 };
-    const { turns, newOffset } = await extractClaudeCodeTurns(path, cur.offset);
+    const { turns, newOffset, droppedUsers } = await extractClaudeCodeTurns(path, cur.offset);
+    const wm = dropWatermark.get(path) ?? -1;
+    const fresh = droppedUsers.filter((d) => d.byte_offset > wm);
+    if (fresh.length > 0) {
+      const session_id = deriveSessionId(path);
+      const prompts = fresh.filter((d) => d.classification === 'prompt');
+      const injects = fresh.filter((d) => d.classification === 'inject');
+      if (prompts.length > 0) {
+        log.warn('user_prompt_dropped_without_assistant_reply', {
+          session_id,
+          count: prompts.length,
+          previews: prompts.map((d) => d.preview),
+        });
+      }
+      if (injects.length > 0) {
+        log.debug('user_inject_dropped', { session_id, count: injects.length });
+      }
+      let maxOffset = wm;
+      for (const d of fresh) if (d.byte_offset > maxOffset) maxOffset = d.byte_offset;
+      dropWatermark.set(path, maxOffset);
+    }
     let nextTurnIndex = cur.turn_index + 1;
     for (const turn of turns) {
       const metadata: Record<string, unknown> = {
@@ -481,11 +566,7 @@ export async function startClaudeCodeExtractor(
     });
   }
 
-  const watcher: FSWatcher = chokidar.watch(projectsPrefix, {
-    ignoreInitial: true,
-    persistent: true,
-    awaitWriteFinish: false,
-  });
+  const watcher: FSWatcher = chokidar.watch(projectsPrefix, JSONL_WATCH_OPTS);
 
   function dispatch(p: string): void {
     if (isJsonl(p)) {
@@ -514,5 +595,6 @@ export async function startClaudeCodeExtractor(
       await processing;
       log.info('stopped', {});
     },
+    probeFreshness: () => probeFreshness(offsetMap),
   };
 }
