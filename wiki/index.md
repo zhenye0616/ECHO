@@ -78,7 +78,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### Architecture
 
 - [[claude-code-extractor|Claude Code Extractor]] — Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.
-- [[codex-extractor|Codex Extractor]] — Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with consecutive assistant cluster; cwd + tool-use flag in metadata.
+- [[codex-extractor|Codex Extractor]] — Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with assistant clusters and adds cwd, config, tool, reasoning, and git metadata.
 - [[cursor-extractor|Cursor Extractor]] — Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents.
 - [[fs-watcher|FS Watcher]] — First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.
 - [[git-capture|Git Capture]] — Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.
@@ -90,7 +90,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### Architecture
 
 - [[claude-code-collected-data|Claude Code — Collected Data Reference]] — Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.
-- [[codex-collected-data|Codex — Collected Data Reference]] — Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; cwd, tool-use flag, ignored fields, future Tier-A.
+- [[codex-collected-data|Codex — Collected Data Reference]] — Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; text, cwd, config, tool calls, reasoning summaries, git state, and ignored fields.
 - [[cursor-collected-data|Cursor — Collected Data Reference]] — Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.
 
 ---

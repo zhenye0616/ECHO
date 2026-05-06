@@ -14,7 +14,7 @@ A field-by-field record of what ECHO reads from OpenAI Codex's local session tra
 
 ## TL;DR
 
-ECHO captures the **plain user and assistant text from every Codex session**, plus the working directory the session was launched in, a `had_tool_use` boolean per turn, and a structured per-turn snapshot of the session's git state and Codex configuration (model, reasoning effort, sandbox + approval policy, cli version, source surface, personality). Stable IDs let you group by chat (`session_id`) and per-turn ordering is preserved. Tool call payloads, reasoning blocks, developer-role system prompts, and Codex's internal event metadata are deliberately not collected today.
+ECHO captures the **plain user and assistant text from every Codex session**, plus the working directory the session was launched in, a `had_tool_use` boolean per turn, bounded tool-call details, bounded reasoning summaries, and structured per-turn snapshots of the session's git state and Codex configuration (model, reasoning effort, sandbox + approval policy, cli version, source surface, personality). Stable IDs let you group by chat (`session_id`) and per-turn ordering is preserved. Developer-role system prompts, Codex lifecycle event metadata, multimodal payloads, and non-session Codex files are deliberately not collected today.
 
 ## The watched path
 
@@ -46,11 +46,11 @@ For each `response_item`, the inner `payload.type` partitions further:
 | `payload.type`              | What it is | Read by ECHO? |
 |---|---|---|
 | `message`                   | A user/assistant/developer text turn | ✅ for `role` ∈ {user, assistant} only |
-| `reasoning`                 | Assistant's hidden thinking block | ❌ |
-| `function_call`             | Assistant invoked a tool | ❌ payload, ✅ `had_tool_use` flag |
-| `function_call_output`      | Tool result | ❌ payload, ✅ `had_tool_use` flag |
-| `custom_tool_call`          | Newer custom-tool variant | ❌ payload, ✅ `had_tool_use` flag |
-| `custom_tool_call_output`   | Newer custom-tool result | ❌ payload, ✅ `had_tool_use` flag |
+| `reasoning`                 | Assistant reasoning summary block | ✅ bounded into `metadata.thinking` |
+| `function_call`             | Assistant invoked a tool | ✅ `had_tool_use`, `tool_calls[].name`, `args`, `call_id` |
+| `function_call_output`      | Tool result | ✅ matched into `tool_calls[].output`, `is_error` |
+| `custom_tool_call`          | Newer custom-tool variant | ✅ same as `function_call` |
+| `custom_tool_call_output`   | Newer custom-tool result | ✅ same as `function_call_output` |
 | `ghost_snapshot`            | State checkpoint of some kind | ❌ |
 
 For `message` payload, `role` is one of:
@@ -138,14 +138,14 @@ Probed on 2026-05-01 against the 25 newest session files in `~/.codex/sessions/`
 | Turns with `cwd` | 206 (100%) |
 | Distinct sessions touched | 20 |
 
-Translation: Codex sessions are tool-heavy (the agent uses shell + file tools constantly), and every turn carries a stable working directory you can group by. The `had_tool_use` boolean is on most turns; pulling tool details would be a meaningful future extension.
+Translation: Codex sessions are tool-heavy (the agent uses shell + file tools constantly), and every turn carries a stable working directory you can group by. Newer extractor runs include bounded tool details, but older persisted rows may only have the `had_tool_use` boolean because they were captured before the tool-detail extension shipped.
 
 ## What's deliberately not collected (and where it would have to come from)
 
 | Signal | Why not collected today | Where it would come from |
 |---|---|---|
-| **Tool-call payloads** (which tool, what arguments, what output) | Tier-A-style extraction not yet implemented | Parser-only follow-up: read `function_call.{name,arguments}` and `function_call_output.output` from the same JSONL. ~150 LOC including truncation rules. |
-| **Reasoning blocks** (the assistant's hidden thinking) | Out of scope for V1 retrieval (clutters search; doubles storage) | If/when useful, parser-only addition. Should probably ship behind a config flag. |
+| **Unbounded tool payloads** | Captured, but capped to keep event size sane: args <= 2 KB, output <= 4 KB, max 50 calls/turn | Same JSONL lines; would require changing truncation limits in `_turn_meta.ts`. |
+| **Full reasoning internals** | Only emitted reasoning summaries are captured, capped at 8 KB; raw/private internals are not separately read | Same JSONL if Codex writes more structured summary fields in future. |
 | **Developer-role messages** (AGENTS.md text, environment context) | System noise, not chat | Could be promoted to a per-session `metadata.developer_context` field if useful. |
 | **`event_msg` lines** (token counters, lifecycle pings) | Not chat content | Could be aggregated as session-level summary metadata (e.g. running token totals). |
 | **`turn_context.permission_profile.entries`** (per-path access list) | Larger blob than the type-only summary already captured | If "did this turn have access to file X" becomes a question, parse the granular entries into a structured field. |
@@ -154,9 +154,9 @@ Translation: Codex sessions are tool-heavy (the agent uses shell + file tools co
 | **`logs_2.sqlite` (active session log DB)** and **`state_5.sqlite` (threads / agent jobs)** | Most threads-table fields are also in `session_meta` / `turn_context` (now captured). The two truly SQLite-only fields are `title` (Codex's auto-summary) and `archived` (user action). | Out-of-scope for V1 — would require a new allowlisted path. Defer until auto-titles become a needed signal. |
 | **`history.jsonl`** (interactive prompt history outside of sessions) | Interactive REPL history, not session transcripts | Probably valuable as cross-session "what prompts have I tried" — separate item. Same shape as `~/.claude/history.jsonl`; one shared extractor could handle both. |
 
-## Future extensions (Tier A and beyond)
+## Future extensions
 
-A natural Tier-A follow-up (analogous to what shipped for Cursor) would surface a structured `metadata.context` block per turn:
+A natural follow-up would normalize tool details into a compact `metadata.context` block for cross-surface reasoning:
 
 ```ts
 metadata.context = {
@@ -166,7 +166,7 @@ metadata.context = {
 }
 ```
 
-All three live in the same JSONL the extractor already reads — pure parser additions.
+The raw material already lives in the same JSONL the extractor reads; the follow-up is mostly schema normalization for downstream consumers.
 
 ## The gate also enforces this
 

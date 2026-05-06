@@ -266,7 +266,7 @@
     "status": "shipped",
     "title": "Codex Extractor",
     "link": "codex-extractor",
-    "summary": "Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with consecutive assistant cluster; cwd + tool-use flag in metadata.",
+    "summary": "Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with assistant clusters and adds cwd, config, tool, reasoning, and git metadata.",
     "aliases": [
       "Codex Extractor",
       "codex-extractor",
@@ -426,7 +426,7 @@
     "status": "shipped",
     "title": "Codex \u2014 Collected Data Reference",
     "link": "codex-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; cwd, tool-use flag, ignored fields, future Tier-A.",
+    "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; text, cwd, config, tool calls, reasoning summaries, git state, and ignored fields.",
     "aliases": [
       "Codex Data Collection",
       "What ECHO Collects from Codex",
