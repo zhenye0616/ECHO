@@ -95,6 +95,8 @@ export function toRow(event: CaptureEvent, full: boolean): RenderRow | null {
   if (lane === 'codex') {
     const git = md['git'] as Record<string, unknown> | undefined;
     if (git !== undefined && typeof git['branch'] === 'string') branch = git['branch'] as string;
+  } else if (typeof md['branch'] === 'string') {
+    branch = md['branch'] as string;
   }
 
   let model: string | null = null;

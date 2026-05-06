@@ -7,6 +7,8 @@
 // undefined) — non-git-repo cwds are common and not interesting.
 
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { GitState } from './extractors/_turn_meta.js';
@@ -92,7 +94,42 @@ export async function probeGitState(
   return { ...state, fresh };
 }
 
+// Branch is stable across most turn windows, so probing it is safe even for
+// stale (boot-scanned) turns where probeGitState would refuse — branch rarely
+// lies the way HEAD or dirty_count would. Reading .git/HEAD directly avoids a
+// subprocess and keeps boot scan cheap.
+const BRANCH_CACHE_TTL_MS = 5_000;
+interface BranchCacheEntry {
+  branch: string | null;
+  expiresAt: number;
+}
+const branchCache = new Map<string, BranchCacheEntry>();
+
+export async function readBranch(cwd: string | undefined): Promise<string | undefined> {
+  if (cwd === undefined || cwd.length === 0) return undefined;
+  const now = Date.now();
+  const cached = branchCache.get(cwd);
+  if (cached !== undefined && cached.expiresAt > now) {
+    return cached.branch ?? undefined;
+  }
+  let branch: string | null = null;
+  try {
+    const head = await readFile(join(cwd, '.git', 'HEAD'), 'utf8');
+    const m = head.match(/^ref: refs\/heads\/(.+?)\s*$/m);
+    if (m && m[1] !== undefined) branch = m[1];
+  } catch {
+    // not a git repo, or worktree (.git is a file pointing elsewhere) — skip
+  }
+  if (branchCache.size >= 256 && !branchCache.has(cwd)) {
+    const oldest = branchCache.keys().next().value;
+    if (oldest !== undefined) branchCache.delete(oldest);
+  }
+  branchCache.set(cwd, { branch, expiresAt: now + BRANCH_CACHE_TTL_MS });
+  return branch ?? undefined;
+}
+
 /** For tests: clear the in-memory cache. */
 export function _resetGitStateCache(): void {
   cache.clear();
+  branchCache.clear();
 }
