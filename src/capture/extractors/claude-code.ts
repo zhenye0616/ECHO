@@ -341,7 +341,7 @@ export async function extractClaudeCodeTurns(
   // Tracks the END of the last line that contributed to an EMITTED turn.
   // Pending-cluster lines (user + assistants without a closing next-user) are
   // intentionally NOT past confirmedThroughOffset, so the next pass re-reads
-  // them and rebuilds the pending cluster from scratch. Mirrors codex.ts.
+  // them and rebuilds the pending cluster from scratch (idempotent).
   let confirmedThroughOffset = lastByteOffset;
   let currentCwd: string | undefined;
 

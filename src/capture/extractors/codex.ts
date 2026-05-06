@@ -12,6 +12,7 @@ import {
   dedupStrings,
   JSONL_WATCH_OPTS,
   probeFreshness,
+  SOURCE_MARKERS,
   type ExtractorHandle,
 } from './_shared.js';
 import {
@@ -669,7 +670,6 @@ export async function extractCodexTurns(
       if (git !== undefined) pending.git = git;
       if (codexMeta !== undefined) pending.codex = codexMeta;
     } else {
-      // assistant
       if (pending === null) {
         log.warn('orphan_assistant', { session_id });
       } else if ((parsed.text ?? '').length > 0) {
@@ -755,7 +755,7 @@ async function backfillOffsetMap(storage: Storage): Promise<Map<string, OffsetEn
   const events = await storage.query({ source_prefix: 'fs:' });
   for (const evt of events) {
     if (!evt.source.endsWith('.jsonl')) continue;
-    if (!evt.source.includes('/.codex/sessions/')) continue;
+    if (!evt.source.includes(SOURCE_MARKERS.codex)) continue;
     const md = evt.metadata;
     if (md === undefined) continue;
     const offset = md['byte_offset'];
@@ -768,8 +768,8 @@ async function backfillOffsetMap(storage: Storage): Promise<Map<string, OffsetEn
     const codex = readCodexMetaFromMd(md);
     const cur = map.get(path);
     if (cur === undefined || offset > cur.offset) {
-      // Older codex events written before the metadata-persistence fix may lack
-      // these on later turns; carry forward whatever we've already learned.
+      // Older events may lack cwd/git/codex; carry forward what we've already
+      // learned from earlier turns in the same file.
       const entry: OffsetEntry = { offset, turn_index };
       entry.cwd = cwd ?? cur?.cwd;
       entry.git = git ?? cur?.git;

@@ -20,22 +20,23 @@ export const FRESHNESS_WINDOW_MS = 30_000;
 /** Cached samples are reused inside this window — burst-safe. */
 const CACHE_TTL_MS = 5_000;
 
+// Bound for long-running serve-trace, where many distinct cwds may be touched.
+// Map preserves insertion order, so we evict the oldest entry when at cap.
+const CACHE_MAX_ENTRIES = 256;
+
+function lruSet<K, V>(map: Map<K, V>, key: K, value: V): void {
+  if (map.size >= CACHE_MAX_ENTRIES && !map.has(key)) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, value);
+}
+
 interface CacheEntry {
   state: Omit<GitState, 'fresh'>;
   expiresAt: number;
 }
-// Bound for long-running serve-trace, where many distinct cwds may be touched.
-// Map preserves insertion order, so we evict the oldest entries when at cap.
-const CACHE_MAX_ENTRIES = 256;
 const cache = new Map<string, CacheEntry>();
-
-function setCache(cwd: string, entry: CacheEntry): void {
-  if (cache.size >= CACHE_MAX_ENTRIES && !cache.has(cwd)) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
-  }
-  cache.set(cwd, entry);
-}
 
 async function gitOne(cwd: string, args: string[]): Promise<string | null> {
   try {
@@ -77,7 +78,7 @@ export async function probeGitState(
 
   if (headSha === null) {
     // Not a git repo, or git not available — cache the negative briefly.
-    setCache(cwd, { state: { captured_at: new Date(now).toISOString() }, expiresAt: now + CACHE_TTL_MS });
+    lruSet(cache, cwd, { state: { captured_at: new Date(now).toISOString() }, expiresAt: now + CACHE_TTL_MS });
     return undefined;
   }
 
@@ -90,7 +91,7 @@ export async function probeGitState(
     state.dirty_count = dirty.length === 0 ? 0 : dirty.split('\n').length;
   }
 
-  setCache(cwd, { state, expiresAt: now + CACHE_TTL_MS });
+  lruSet(cache, cwd, { state, expiresAt: now + CACHE_TTL_MS });
   return { ...state, fresh };
 }
 
@@ -120,11 +121,7 @@ export async function readBranch(cwd: string | undefined): Promise<string | unde
   } catch {
     // not a git repo, or worktree (.git is a file pointing elsewhere) — skip
   }
-  if (branchCache.size >= 256 && !branchCache.has(cwd)) {
-    const oldest = branchCache.keys().next().value;
-    if (oldest !== undefined) branchCache.delete(oldest);
-  }
-  branchCache.set(cwd, { branch, expiresAt: now + BRANCH_CACHE_TTL_MS });
+  lruSet(branchCache, cwd, { branch, expiresAt: now + BRANCH_CACHE_TTL_MS });
   return branch ?? undefined;
 }
 
