@@ -6,6 +6,10 @@
   "scripts": {
     "test": "vitest run",
     "daemon": "vite-node src/daemon/index.ts",
+    "daemon:install": "scripts/launchd/install.sh",
+    "daemon:uninstall": "scripts/launchd/uninstall.sh",
+    "daemon:status": "launchctl print gui/$(id -u)/com.echo.daemon | grep -E '^\\s*(state|pid|last exit code|program)' || echo 'not loaded'",
+    "daemon:logs": "tail -f $HOME/Library/Logs/echo/daemon.err.log $HOME/Library/Logs/echo/daemon.out.log",
     "watch:stream": "vite-node tools/stream-watch.ts",
     "render:trace": "vite-node tools/render-trace.ts",
     "serve:trace": "vite-node tools/serve-trace.ts",
