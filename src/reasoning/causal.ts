@@ -10,6 +10,7 @@
 // reasoning traces for a given event without ECHO having to maintain a
 // denormalised graph.
 
+import { FILE_INPUT_REGEX } from '../capture/extractors/_turn_meta.js';
 import type { CaptureEvent } from '../storage/interface.js';
 
 export interface ToolTouchEdge {
@@ -90,24 +91,21 @@ function filesTouchedBy(evt: CaptureEvent): string[] {
   if (Array.isArray(fr)) {
     for (const f of fr) if (typeof f === 'string' && f.length > 0) out.add(f);
   }
-  // Also pull file_path-style keys out of tool_calls[].args (stringified JSON).
+  // tool_calls[].args is truncated JSON; pull any file-path-style keys out
+  // using the regex that mirrors FILE_INPUT_KEYS, so the two stay in lock-step.
   const tcs = md['tool_calls'];
   if (Array.isArray(tcs)) {
     for (const tc of tcs) {
       if (typeof tc !== 'object' || tc === null) continue;
       const args = (tc as Record<string, unknown>)['args'];
       if (typeof args !== 'string') continue;
-      // Cheap regex: pull "file_path"/"path"/"notebook_path" / "cmd cd <p>" etc.
-      const m1 = args.match(/"(?:file_path|path|notebook_path)"\s*:\s*"([^"]+)"/g);
-      if (m1) {
-        for (const m of m1) {
-          const v = m.match(/"([^"]+)"$/)?.[1];
-          if (v !== undefined && v.length > 0) out.add(v);
-        }
+      const re = new RegExp(FILE_INPUT_REGEX.source, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(args)) !== null) {
+        if (m[1] !== undefined && m[1].length > 0) out.add(m[1]);
       }
     }
   }
-  // git-watcher events list `files_changed` directly.
   return [...out];
 }
 

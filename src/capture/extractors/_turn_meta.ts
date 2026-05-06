@@ -63,3 +63,40 @@ export function truncateThinking(s: string): { value: string; truncated: boolean
 }
 
 export const MAX_TOOL_CALLS_PER_TURN = 50;
+
+/** Tool-input keys whose values are file paths. Used to surface
+ *  metadata.files_referenced from CC's tool_use.input and to drive
+ *  cross-source file-touch matching in src/reasoning/causal.ts. */
+export const FILE_INPUT_KEYS = ['file_path', 'path', 'notebook_path'] as const;
+
+/** Regex that pulls file-path-style values out of a stringified args blob.
+ *  Mirrors FILE_INPUT_KEYS so the two stay in lock-step. */
+export const FILE_INPUT_REGEX = new RegExp(
+  `"(?:${FILE_INPUT_KEYS.join('|')})"\\s*:\\s*"([^"]+)"`,
+  'g',
+);
+
+/** Build a ToolCall with consistent truncation flags applied to args/output.
+ *  Both extractors call this rather than rolling their own truncation. */
+export function buildToolCall(opts: {
+  name: string;
+  call_id?: string;
+  argsRaw?: string;
+  outputRaw?: string;
+  is_error?: boolean;
+}): ToolCall {
+  const tc: ToolCall = { name: opts.name };
+  if (opts.call_id !== undefined) tc.call_id = opts.call_id;
+  if (opts.argsRaw !== undefined) {
+    const t = truncateArgs(opts.argsRaw);
+    tc.args = t.value;
+    if (t.truncated) tc.args_truncated = true;
+  }
+  if (opts.outputRaw !== undefined) {
+    const t = truncateOutput(opts.outputRaw);
+    tc.output = t.value;
+    if (t.truncated) tc.output_truncated = true;
+  }
+  if (opts.is_error === true) tc.is_error = true;
+  return tc;
+}

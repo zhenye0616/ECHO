@@ -2,15 +2,15 @@ import { open, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
+import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { bootScanJsonl } from './_shared.js';
 import {
+  buildToolCall,
   MAX_TOOL_CALLS_PER_TURN,
-  truncateArgs,
-  truncateOutput,
   truncateThinking,
   type GitState,
   type ToolCall,
@@ -197,26 +197,24 @@ function parseLine(line: string): ParsedLine | null {
 
   if (ptype === 'function_call' || ptype === 'custom_tool_call') {
     const out: ParsedLine = { kind: 'tool_call', timestamp };
-    if (typeof p['name'] === 'string') out.tool_call_name = p['name'];
+    if (isNonEmptyString(p['name'])) out.tool_call_name = p['name'];
     const args = p['arguments'];
     if (typeof args === 'string') out.tool_call_args = args;
     else if (args !== undefined && args !== null) out.tool_call_args = JSON.stringify(args);
-    if (typeof p['call_id'] === 'string') out.tool_call_id = p['call_id'];
+    if (isNonEmptyString(p['call_id'])) out.tool_call_id = p['call_id'];
     return out;
   }
 
   if (ptype === 'function_call_output' || ptype === 'custom_tool_call_output') {
     const out: ParsedLine = { kind: 'tool_output', timestamp };
-    if (typeof p['call_id'] === 'string') out.tool_call_id = p['call_id'];
+    if (isNonEmptyString(p['call_id'])) out.tool_call_id = p['call_id'];
     const o = p['output'];
     if (typeof o === 'string') {
       out.tool_output = o;
     } else if (typeof o === 'object' && o !== null) {
       const od = o as Record<string, unknown>;
-      const c = od['content'];
-      if (typeof c === 'string') out.tool_output = c;
-      else if (typeof od['text'] === 'string') out.tool_output = od['text'] as string;
-      // Cheap exit-code heuristic for shell-style tools.
+      if (typeof od['content'] === 'string') out.tool_output = od['content'];
+      else if (typeof od['text'] === 'string') out.tool_output = od['text'];
       const md = od['metadata'];
       if (typeof md === 'object' && md !== null) {
         const ec = (md as Record<string, unknown>)['exit_code'];
@@ -369,7 +367,17 @@ export async function extractCodexTurns(
     if (pending.git !== undefined) turn.git = pending.git;
     if (pending.codex !== undefined) turn.codex = pending.codex;
     if (pending.toolCalls.length > 0) {
-      turn.tool_calls = pending.toolCalls.slice(0, MAX_TOOL_CALLS_PER_TURN).map(finalizeToolCall);
+      turn.tool_calls = pending.toolCalls
+        .slice(0, MAX_TOOL_CALLS_PER_TURN)
+        .map((p) =>
+          buildToolCall({
+            name: p.name,
+            call_id: p.call_id,
+            argsRaw: p.args,
+            outputRaw: p.output,
+            is_error: p.is_error,
+          }),
+        );
     }
     if (pending.thinking.length > 0) {
       const t = truncateThinking(pending.thinking.join('\n\n'));
@@ -377,23 +385,6 @@ export async function extractCodexTurns(
     }
     turns.push(turn);
     confirmedThroughOffset = pending.assistantLastLineEndOffset;
-  }
-
-  function finalizeToolCall(p: PendingToolCall): ToolCall {
-    const tc: ToolCall = { name: p.name };
-    if (p.call_id !== undefined) tc.call_id = p.call_id;
-    if (p.args !== undefined) {
-      const t = truncateArgs(p.args);
-      tc.args = t.value;
-      if (t.truncated) tc.args_truncated = true;
-    }
-    if (p.output !== undefined) {
-      const t = truncateOutput(p.output);
-      tc.output = t.value;
-      if (t.truncated) tc.output_truncated = true;
-    }
-    if (p.is_error === true) tc.is_error = true;
-    return tc;
   }
 
   for (const line of lines) {

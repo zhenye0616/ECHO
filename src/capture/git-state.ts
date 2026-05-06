@@ -22,7 +22,18 @@ interface CacheEntry {
   state: Omit<GitState, 'fresh'>;
   expiresAt: number;
 }
+// Bound for long-running serve-trace, where many distinct cwds may be touched.
+// Map preserves insertion order, so we evict the oldest entries when at cap.
+const CACHE_MAX_ENTRIES = 256;
 const cache = new Map<string, CacheEntry>();
+
+function setCache(cwd: string, entry: CacheEntry): void {
+  if (cache.size >= CACHE_MAX_ENTRIES && !cache.has(cwd)) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(cwd, entry);
+}
 
 async function gitOne(cwd: string, args: string[]): Promise<string | null> {
   try {
@@ -64,7 +75,7 @@ export async function probeGitState(
 
   if (headSha === null) {
     // Not a git repo, or git not available — cache the negative briefly.
-    cache.set(cwd, { state: { captured_at: new Date(now).toISOString() }, expiresAt: now + CACHE_TTL_MS });
+    setCache(cwd, { state: { captured_at: new Date(now).toISOString() }, expiresAt: now + CACHE_TTL_MS });
     return undefined;
   }
 
@@ -77,7 +88,7 @@ export async function probeGitState(
     state.dirty_count = dirty.length === 0 ? 0 : dirty.split('\n').length;
   }
 
-  cache.set(cwd, { state, expiresAt: now + CACHE_TTL_MS });
+  setCache(cwd, { state, expiresAt: now + CACHE_TTL_MS });
   return { ...state, fresh };
 }
 
