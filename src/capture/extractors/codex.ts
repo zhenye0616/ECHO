@@ -9,12 +9,14 @@ import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import {
   bootScanJsonl,
+  dedupStrings,
   JSONL_WATCH_OPTS,
   probeFreshness,
   type ExtractorHandle,
 } from './_shared.js';
 import {
   buildToolCall,
+  FILE_INPUT_KEYS,
   MAX_TOOL_CALLS_PER_TURN,
   truncateThinking,
   type GitState,
@@ -41,6 +43,14 @@ export interface CodexSessionMeta {
   personality?: string;
   approval_policy?: string;
   sandbox_policy_type?: string;
+  sandbox_network_access?: boolean;
+  sandbox_writable_roots?: string[];
+  sandbox_exclude_tmpdir_env_var?: boolean;
+  sandbox_exclude_slash_tmp?: boolean;
+  permission_profile_type?: string;
+  permission_file_system_type?: string;
+  permission_network?: string;
+  file_system_sandbox_kind?: string;
 }
 
 export interface CodexTurn {
@@ -56,6 +66,9 @@ export interface CodexTurn {
   git?: CodexGitMeta;
   codex?: CodexSessionMeta;
   tool_calls?: ToolCall[];
+  tool_call_total?: number;
+  tool_calls_truncated?: boolean;
+  files_referenced?: string[];
   thinking?: string;
   git_state?: GitState;
 }
@@ -93,6 +106,14 @@ interface ParsedLine {
   personality?: string;
   approval_policy?: string;
   sandbox_policy_type?: string;
+  sandbox_network_access?: boolean;
+  sandbox_writable_roots?: string[];
+  sandbox_exclude_tmpdir_env_var?: boolean;
+  sandbox_exclude_slash_tmp?: boolean;
+  permission_profile_type?: string;
+  permission_file_system_type?: string;
+  permission_network?: string;
+  file_system_sandbox_kind?: string;
   // Tool / reasoning payload extras
   tool_call_name?: string;
   tool_call_args?: string;
@@ -175,8 +196,37 @@ function parseLine(line: string): ParsedLine | null {
       if (isNonEmptyString(ap)) out.approval_policy = ap;
       const sp = p['sandbox_policy'];
       if (typeof sp === 'object' && sp !== null) {
-        const spt = (sp as Record<string, unknown>)['type'];
+        const spr = sp as Record<string, unknown>;
+        const spt = spr['type'];
         if (isNonEmptyString(spt)) out.sandbox_policy_type = spt;
+        const sna = spr['network_access'];
+        if (typeof sna === 'boolean') out.sandbox_network_access = sna;
+        const roots = spr['writable_roots'];
+        if (Array.isArray(roots)) {
+          out.sandbox_writable_roots = dedupStrings(roots.filter(isNonEmptyString));
+        }
+        const excludeTmpdir = spr['exclude_tmpdir_env_var'];
+        if (typeof excludeTmpdir === 'boolean') out.sandbox_exclude_tmpdir_env_var = excludeTmpdir;
+        const excludeSlashTmp = spr['exclude_slash_tmp'];
+        if (typeof excludeSlashTmp === 'boolean') out.sandbox_exclude_slash_tmp = excludeSlashTmp;
+      }
+      const pp = p['permission_profile'];
+      if (typeof pp === 'object' && pp !== null) {
+        const ppr = pp as Record<string, unknown>;
+        const ppt = ppr['type'];
+        if (isNonEmptyString(ppt)) out.permission_profile_type = ppt;
+        const fs = ppr['file_system'];
+        if (typeof fs === 'object' && fs !== null) {
+          const fst = (fs as Record<string, unknown>)['type'];
+          if (isNonEmptyString(fst)) out.permission_file_system_type = fst;
+        }
+        const pn = ppr['network'];
+        if (isNonEmptyString(pn)) out.permission_network = pn;
+      }
+      const fssp = p['file_system_sandbox_policy'];
+      if (typeof fssp === 'object' && fssp !== null) {
+        const kind = (fssp as Record<string, unknown>)['kind'];
+        if (isNonEmptyString(kind)) out.file_system_sandbox_kind = kind;
       }
     }
     return out;
@@ -290,7 +340,64 @@ interface PendingCluster {
   git?: CodexGitMeta;
   codex?: CodexSessionMeta;
   toolCalls: PendingToolCall[];
+  toolCallTotal: number;
+  files: string[];
   thinking: string[];
+}
+
+const PATCH_FILE_RE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
+const PATCH_MOVE_RE = /^\*\*\* Move to: (.+)$/gm;
+
+function collectPatchFileRefs(s: string): string[] {
+  const out: string[] = [];
+  for (const re of [PATCH_FILE_RE, PATCH_MOVE_RE]) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      const path = m[1]?.trim();
+      if (path !== undefined && path.length > 0) out.push(path);
+    }
+  }
+  return out;
+}
+
+function collectStructuredFileRefs(value: unknown, out: string[]): void {
+  if (typeof value === 'string') {
+    out.push(...collectPatchFileRefs(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) collectStructuredFileRefs(v, out);
+    return;
+  }
+  if (typeof value !== 'object' || value === null) return;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      (FILE_INPUT_KEYS as readonly string[]).includes(k) &&
+      typeof v === 'string' &&
+      v.length > 0
+    ) {
+      out.push(v);
+    }
+    collectStructuredFileRefs(v, out);
+  }
+}
+
+function extractFileRefsFromToolArgs(argsRaw: string | undefined): string[] {
+  if (argsRaw === undefined || argsRaw.length === 0) return [];
+  const refs = collectPatchFileRefs(argsRaw);
+  try {
+    collectStructuredFileRefs(JSON.parse(argsRaw), refs);
+  } catch {
+    // Non-JSON custom tool payloads are common; patch headers above still apply.
+  }
+  return dedupStrings(refs);
+}
+
+type CodexMetaValue = string | boolean | string[] | undefined;
+
+function sameStringArray(a: string[] | undefined, b: string[]): boolean {
+  return a !== undefined && a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
 function mergeCodexMeta(
@@ -299,14 +406,31 @@ function mergeCodexMeta(
 ): CodexSessionMeta | undefined {
   const next: CodexSessionMeta = { ...(base ?? {}) };
   let changed = false;
-  for (const [k, v] of Object.entries(patch) as [keyof CodexSessionMeta, string | undefined][]) {
-    if (isNonEmptyString(v) && next[k] !== v) {
-      next[k] = v;
-      changed = true;
+  const mutableNext = next as Record<keyof CodexSessionMeta, CodexMetaValue>;
+  for (const [k, raw] of Object.entries(patch) as [keyof CodexSessionMeta, CodexMetaValue][]) {
+    let v: CodexMetaValue = raw;
+    if (typeof v === 'string' && !isNonEmptyString(v)) continue;
+    if (Array.isArray(v)) {
+      v = dedupStrings(v.filter(isNonEmptyString));
+      if (v.length === 0) continue;
+      if (sameStringArray(next[k] as string[] | undefined, v)) continue;
+    } else if (v === undefined || next[k] === v) {
+      continue;
     }
+    mutableNext[k] = v;
+    changed = true;
   }
   if (!changed && base !== undefined) return base;
   return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function gitStateFromCodexGit(git: CodexGitMeta | undefined, timestamp: string): GitState | undefined {
+  if (git === undefined) return undefined;
+  const state: GitState = { captured_at: timestamp, fresh: false };
+  if (isNonEmptyString(git.sha)) state.head_sha = git.sha;
+  if (isNonEmptyString(git.branch)) state.branch = git.branch;
+  if (state.head_sha === undefined && state.branch === undefined) return undefined;
+  return state;
 }
 
 export interface ExtractCodexInput {
@@ -392,7 +516,6 @@ export async function extractCodexTurns(
     if (pending.codex !== undefined) turn.codex = pending.codex;
     if (pending.toolCalls.length > 0) {
       turn.tool_calls = pending.toolCalls
-        .slice(0, MAX_TOOL_CALLS_PER_TURN)
         .map((p) =>
           buildToolCall({
             name: p.name,
@@ -403,6 +526,14 @@ export async function extractCodexTurns(
           }),
         );
     }
+    if (pending.toolCallTotal > 0) {
+      turn.tool_call_total = pending.toolCallTotal;
+      if (pending.toolCallTotal > pending.toolCalls.length) {
+        turn.tool_calls_truncated = true;
+      }
+    }
+    const files = dedupStrings(pending.files);
+    if (files.length > 0) turn.files_referenced = files;
     if (pending.thinking.length > 0) {
       const t = truncateThinking(pending.thinking.join('\n\n'));
       turn.thinking = t.value;
@@ -439,20 +570,32 @@ export async function extractCodexTurns(
         personality: parsed.personality,
         approval_policy: parsed.approval_policy,
         sandbox_policy_type: parsed.sandbox_policy_type,
+        sandbox_network_access: parsed.sandbox_network_access,
+        sandbox_writable_roots: parsed.sandbox_writable_roots,
+        sandbox_exclude_tmpdir_env_var: parsed.sandbox_exclude_tmpdir_env_var,
+        sandbox_exclude_slash_tmp: parsed.sandbox_exclude_slash_tmp,
+        permission_profile_type: parsed.permission_profile_type,
+        permission_file_system_type: parsed.permission_file_system_type,
+        permission_network: parsed.permission_network,
+        file_system_sandbox_kind: parsed.file_system_sandbox_kind,
       });
       lineStartOffset = lineEndOffset;
       continue;
     }
 
     if (parsed.kind === 'tool_call') {
-      if (pending !== null && pending.toolCalls.length < MAX_TOOL_CALLS_PER_TURN) {
+      if (pending !== null) {
         pending.hadTool = true;
-        const tc: PendingToolCall = { name: parsed.tool_call_name ?? '?' };
-        if (parsed.tool_call_args !== undefined) tc.args = parsed.tool_call_args;
-        if (parsed.tool_call_id !== undefined) tc.call_id = parsed.tool_call_id;
-        pending.toolCalls.push(tc);
-      } else if (pending !== null) {
-        pending.hadTool = true;
+        pending.toolCallTotal += 1;
+        if (parsed.tool_call_args !== undefined) {
+          pending.files.push(...extractFileRefsFromToolArgs(parsed.tool_call_args));
+        }
+        if (pending.toolCalls.length < MAX_TOOL_CALLS_PER_TURN) {
+          const tc: PendingToolCall = { name: parsed.tool_call_name ?? '?' };
+          if (parsed.tool_call_args !== undefined) tc.args = parsed.tool_call_args;
+          if (parsed.tool_call_id !== undefined) tc.call_id = parsed.tool_call_id;
+          pending.toolCalls.push(tc);
+        }
       }
       lineStartOffset = lineEndOffset;
       continue;
@@ -518,6 +661,8 @@ export async function extractCodexTurns(
         hadTool: false,
         timestamp: parsed.timestamp ?? new Date(fileMtime).toISOString(),
         toolCalls: [],
+        toolCallTotal: 0,
+        files: [],
         thinking: [],
       };
       if (cwd !== undefined) pending.cwd = cwd;
@@ -581,9 +726,26 @@ function readCodexMetaFromMd(md: Record<string, unknown>): CodexSessionMeta | un
     'personality',
     'approval_policy',
     'sandbox_policy_type',
+    'permission_profile_type',
+    'permission_file_system_type',
+    'permission_network',
+    'file_system_sandbox_kind',
   ] as const) {
     const v = r[k];
     if (isNonEmptyString(v)) out[k] = v;
+  }
+  for (const k of [
+    'sandbox_network_access',
+    'sandbox_exclude_tmpdir_env_var',
+    'sandbox_exclude_slash_tmp',
+  ] as const) {
+    const v = r[k];
+    if (typeof v === 'boolean') out[k] = v;
+  }
+  const roots = r['sandbox_writable_roots'];
+  if (Array.isArray(roots)) {
+    const writableRoots = dedupStrings(roots.filter(isNonEmptyString));
+    if (writableRoots.length > 0) out.sandbox_writable_roots = writableRoots;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -672,8 +834,14 @@ export async function startCodexExtractor(
       if (turn.git !== undefined) metadata['git'] = turn.git;
       if (turn.codex !== undefined) metadata['codex'] = turn.codex;
       if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
+      if (turn.tool_call_total !== undefined) metadata['tool_call_total'] = turn.tool_call_total;
+      if (turn.tool_calls_truncated !== undefined)
+        metadata['tool_calls_truncated'] = turn.tool_calls_truncated;
+      if (turn.files_referenced !== undefined) metadata['files_referenced'] = turn.files_referenced;
       if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
-      const gitState = await probeGitState(turn.cwd, turn.timestamp);
+      const gitState =
+        (await probeGitState(turn.cwd, turn.timestamp)) ??
+        gitStateFromCodexGit(turn.git, turn.timestamp);
       if (gitState !== undefined) metadata['git_state'] = gitState;
       const candidate = {
         source: `fs:${path}`,

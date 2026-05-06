@@ -51,6 +51,14 @@ function turnContext(opts: {
   personality?: string;
   approval_policy?: string;
   sandbox_policy_type?: string;
+  sandbox_network_access?: boolean;
+  sandbox_writable_roots?: string[];
+  sandbox_exclude_tmpdir_env_var?: boolean;
+  sandbox_exclude_slash_tmp?: boolean;
+  permission_profile_type?: string;
+  permission_file_system_type?: string;
+  permission_network?: string;
+  file_system_sandbox_kind?: string;
 } = {}): CodexLine {
   const payload: Record<string, unknown> = {
     turn_id: '019de2b0-6551-7682-a51b-2affaa0a7bbf',
@@ -61,7 +69,40 @@ function turnContext(opts: {
   if (opts.personality !== undefined) payload['personality'] = opts.personality;
   if (opts.approval_policy !== undefined) payload['approval_policy'] = opts.approval_policy;
   if (opts.sandbox_policy_type !== undefined) {
-    payload['sandbox_policy'] = { type: opts.sandbox_policy_type, network_access: false };
+    const sandboxPolicy: Record<string, unknown> = { type: opts.sandbox_policy_type };
+    if (opts.sandbox_network_access !== undefined) {
+      sandboxPolicy['network_access'] = opts.sandbox_network_access;
+    }
+    if (opts.sandbox_writable_roots !== undefined) {
+      sandboxPolicy['writable_roots'] = opts.sandbox_writable_roots;
+    }
+    if (opts.sandbox_exclude_tmpdir_env_var !== undefined) {
+      sandboxPolicy['exclude_tmpdir_env_var'] = opts.sandbox_exclude_tmpdir_env_var;
+    }
+    if (opts.sandbox_exclude_slash_tmp !== undefined) {
+      sandboxPolicy['exclude_slash_tmp'] = opts.sandbox_exclude_slash_tmp;
+    }
+    payload['sandbox_policy'] = sandboxPolicy;
+  }
+  if (
+    opts.permission_profile_type !== undefined ||
+    opts.permission_file_system_type !== undefined ||
+    opts.permission_network !== undefined
+  ) {
+    const permissionProfile: Record<string, unknown> = {};
+    if (opts.permission_profile_type !== undefined) {
+      permissionProfile['type'] = opts.permission_profile_type;
+    }
+    if (opts.permission_file_system_type !== undefined) {
+      permissionProfile['file_system'] = { type: opts.permission_file_system_type };
+    }
+    if (opts.permission_network !== undefined) {
+      permissionProfile['network'] = opts.permission_network;
+    }
+    payload['permission_profile'] = permissionProfile;
+  }
+  if (opts.file_system_sandbox_kind !== undefined) {
+    payload['file_system_sandbox_policy'] = { kind: opts.file_system_sandbox_kind };
   }
   return {
     timestamp: '2026-05-01T10:00:00.500Z',
@@ -449,6 +490,14 @@ describe('extractCodexTurns (pure)', () => {
         personality: 'pragmatic',
         approval_policy: 'on-request',
         sandbox_policy_type: 'workspace-write',
+        sandbox_network_access: false,
+        sandbox_writable_roots: ['/Users/x/proj', '/Users/x/proj'],
+        sandbox_exclude_tmpdir_env_var: false,
+        sandbox_exclude_slash_tmp: false,
+        permission_profile_type: 'managed',
+        permission_file_system_type: 'restricted',
+        permission_network: 'restricted',
+        file_system_sandbox_kind: 'restricted',
       }),
       userMsg('q'),
       assistantMsg('a'),
@@ -461,6 +510,14 @@ describe('extractCodexTurns (pure)', () => {
       personality: 'pragmatic',
       approval_policy: 'on-request',
       sandbox_policy_type: 'workspace-write',
+      sandbox_network_access: false,
+      sandbox_writable_roots: ['/Users/x/proj'],
+      sandbox_exclude_tmpdir_env_var: false,
+      sandbox_exclude_slash_tmp: false,
+      permission_profile_type: 'managed',
+      permission_file_system_type: 'restricted',
+      permission_network: 'restricted',
+      file_system_sandbox_kind: 'restricted',
     });
   });
 
@@ -503,7 +560,12 @@ describe('extractCodexTurns (pure)', () => {
         cli_version: '0.128.0',
         git: { commit_hash: 'abc1234', branch: 'main' },
       }),
-      turnContext({ model: 'gpt-5.5', sandbox_policy_type: 'workspace-write' }),
+      turnContext({
+        model: 'gpt-5.5',
+        sandbox_policy_type: 'workspace-write',
+        sandbox_network_access: false,
+        sandbox_writable_roots: ['/Users/x/proj'],
+      }),
       userMsg('q1'),
       assistantMsg('a1'),
       userMsg('q2'),
@@ -564,6 +626,46 @@ describe('extractCodexTurns (pure)', () => {
       call_id: 'call_xy',
     });
     expect(tc?.[0]?.is_error).toBeUndefined();
+    expect(r.turns[0]?.tool_call_total).toBe(1);
+    expect(r.turns[0]?.tool_calls_truncated).toBeUndefined();
+  });
+
+  it('extracts files_referenced from structured args and apply_patch payloads', async () => {
+    const patch = [
+      '*** Begin Patch',
+      '*** Update File: src/a.ts',
+      '*** Add File: src/b.ts',
+      '*** Delete File: src/c.ts',
+      '*** Move to: src/d.ts',
+      '*** End Patch',
+    ].join('\n');
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('touch files'),
+      functionCall(
+        'exec_command',
+        JSON.stringify({
+          cmd: 'cat src/index.ts',
+          path: 'src/index.ts',
+          nested: { file_path: 'src/capture/extractors/codex.ts' },
+          notebook_path: 'notes/demo.ipynb',
+        }),
+        'c1',
+      ),
+      functionCall('apply_patch', patch, 'c2'),
+      assistantMsg('done'),
+      userMsg('next'),
+    ]);
+    const r = await extractCodexTurns(path, 0);
+    expect(r.turns[0]?.files_referenced).toEqual([
+      'src/index.ts',
+      'src/capture/extractors/codex.ts',
+      'notes/demo.ipynb',
+      'src/a.ts',
+      'src/b.ts',
+      'src/c.ts',
+      'src/d.ts',
+    ]);
   });
 
   it('marks tool_calls.is_error when output indicates non-zero exit', async () => {
@@ -611,6 +713,8 @@ describe('extractCodexTurns (pure)', () => {
     writeJsonl(path, lines);
     const r = await extractCodexTurns(path, 0);
     expect(r.turns[0]?.tool_calls?.length).toBe(50);
+    expect(r.turns[0]?.tool_call_total).toBe(60);
+    expect(r.turns[0]?.tool_calls_truncated).toBe(true);
   });
 
   it('a later turn_context updates codex (per-turn config drift)', async () => {
@@ -750,6 +854,14 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
         personality: 'pragmatic',
         approval_policy: 'on-request',
         sandbox_policy_type: 'workspace-write',
+        sandbox_network_access: false,
+        sandbox_writable_roots: ['/Users/x/proj'],
+        sandbox_exclude_tmpdir_env_var: false,
+        sandbox_exclude_slash_tmp: false,
+        permission_profile_type: 'managed',
+        permission_file_system_type: 'restricted',
+        permission_network: 'restricted',
+        file_system_sandbox_kind: 'restricted',
       }),
       userMsg('q1'),
       assistantMsg('a1'),
@@ -772,7 +884,49 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       personality: 'pragmatic',
       approval_policy: 'on-request',
       sandbox_policy_type: 'workspace-write',
+      sandbox_network_access: false,
+      sandbox_writable_roots: ['/Users/x/proj'],
+      sandbox_exclude_tmpdir_env_var: false,
+      sandbox_exclude_slash_tmp: false,
+      permission_profile_type: 'managed',
+      permission_file_system_type: 'restricted',
+      permission_network: 'restricted',
+      file_system_sandbox_kind: 'restricted',
     });
+    expect(md['git_state']).toEqual({
+      head_sha: 'abc1234deadbeef',
+      branch: 'main',
+      captured_at: '2026-05-01T10:00:02.000Z',
+      fresh: false,
+    });
+  });
+
+  it('lands Codex tool overflow and files_referenced metadata through the pipeline', async () => {
+    handle = await startCodexExtractor(storage, { sessionsPrefix });
+    const lines: CodexLine[] = [sessionMeta(), userMsg('run many tools')];
+    for (let i = 0; i < 60; i++) {
+      lines.push(
+        functionCall(
+          'exec_command',
+          JSON.stringify({ cmd: `cat src/file-${i}.ts`, path: `src/file-${i}.ts` }),
+          `c${i}`,
+        ),
+      );
+      lines.push(functionCallOutput(`c${i}`, 'ok'));
+    }
+    lines.push(assistantMsg('done'));
+    lines.push(userMsg('next'));
+    writeJsonl(path, lines);
+
+    await waitFor(async () => (await storage.count()) >= 1);
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    expect(md['tool_call_total']).toBe(60);
+    expect(md['tool_calls_truncated']).toBe(true);
+    expect((md['tool_calls'] as unknown[]).length).toBe(50);
+    expect(md['files_referenced']).toEqual(
+      Array.from({ length: 60 }, (_, i) => `src/file-${i}.ts`),
+    );
   });
 
   it('restores git + codex from prior storage events on daemon restart', async () => {
@@ -782,7 +936,12 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
         cli_version: '0.128.0',
         git: { commit_hash: 'abc1234', branch: 'main' },
       }),
-      turnContext({ model: 'gpt-5.5', sandbox_policy_type: 'workspace-write' }),
+      turnContext({
+        model: 'gpt-5.5',
+        sandbox_policy_type: 'workspace-write',
+        sandbox_network_access: false,
+        sandbox_writable_roots: ['/Users/x/proj'],
+      }),
       userMsg('q1'),
       assistantMsg('a1'),
       userMsg('q2'),
@@ -815,6 +974,10 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     expect((md['git'] as Record<string, unknown>)['sha']).toBe('abc1234');
     expect((md['codex'] as Record<string, unknown>)['model']).toBe('gpt-5.5');
     expect((md['codex'] as Record<string, unknown>)['sandbox_policy_type']).toBe('workspace-write');
+    expect((md['codex'] as Record<string, unknown>)['sandbox_network_access']).toBe(false);
+    expect((md['codex'] as Record<string, unknown>)['sandbox_writable_roots']).toEqual([
+      '/Users/x/proj',
+    ]);
   });
 
   it('mirrors metadata.cwd into metadata.repo_root (cross-source canonical name)', async () => {
