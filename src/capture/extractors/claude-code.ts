@@ -5,7 +5,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
-import { probeGitState } from '../git-state.js';
+import { probeGitState, readBranch } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import {
   bootScanJsonl,
@@ -41,8 +41,25 @@ export interface ClaudeCodeTurn {
   repo_root?: string;
   files_referenced?: string[];
   tool_calls?: ToolCall[];
+  /** Total raw tool_use blocks observed in the cluster, before any truncation
+   *  to MAX_TOOL_CALLS_PER_TURN. Lets consumers detect overflow without re-
+   *  parsing the JSONL. Omitted when zero. */
+  tool_call_total?: number;
+  /** True iff total > MAX_TOOL_CALLS_PER_TURN and tool_calls was truncated. */
+  tool_calls_truncated?: boolean;
   thinking?: string;
   git_state?: GitState;
+  /** Branch as the CC client recorded it on the JSONL line itself (per-turn,
+   *  written at turn time). Authoritative — strictly better than reading
+   *  .git/HEAD at extraction time. */
+  git_branch_jsonl?: string;
+  /** CC session permissionMode (e.g. "auto", "default"). Sourced from the
+   *  user line's top-level field. */
+  permission_mode?: string;
+  /** Claude Code CLI version (e.g. "2.1.119"). */
+  cli_version?: string;
+  /** Model id from the assistant message (e.g. "claude-opus-4-7"). */
+  model?: string;
 }
 
 /** A text-bearing user line that was discarded because a later user line
@@ -118,6 +135,13 @@ interface ParsedLine {
   isEndTurn: boolean;
   timestamp: string | undefined;
   cwd: string | undefined;
+  /** Per-line CC top-level fields. All optional — different line types
+   *  carry different subsets (e.g. permissionMode is only on user lines,
+   *  message.model is only on assistant lines). */
+  gitBranch: string | undefined;
+  permissionMode: string | undefined;
+  version: string | undefined;
+  model: string | undefined;
   files: string[];
   toolUses: ParsedToolUse[];
   toolResults: ParsedToolResult[];
@@ -157,7 +181,11 @@ function extractContent(content: unknown): ExtractedContent {
     const blockType = b['type'];
     if (blockType === 'text' && typeof b['text'] === 'string') {
       parts.push(b['text']);
-    } else if (blockType === 'thinking' && typeof b['thinking'] === 'string') {
+    } else if (
+      blockType === 'thinking' &&
+      typeof b['thinking'] === 'string' &&
+      b['thinking'].trim().length > 0
+    ) {
       thinking.push(b['thinking']);
     } else if (blockType === 'tool_use') {
       hasTool = true;
@@ -206,6 +234,10 @@ function parseLine(line: string): ParsedLine | null {
   const ec = extractContent(msg['content']);
   const ts = obj['timestamp'];
   const cwd = obj['cwd'];
+  const gitBranch = obj['gitBranch'];
+  const permissionMode = obj['permissionMode'];
+  const version = obj['version'];
+  const model = msg['model'];
   const isEndTurn = role === 'assistant' && msg['stop_reason'] === 'end_turn';
   return {
     role,
@@ -214,6 +246,10 @@ function parseLine(line: string): ParsedLine | null {
     isEndTurn,
     timestamp: typeof ts === 'string' ? ts : undefined,
     cwd: isNonEmptyString(cwd) ? cwd : undefined,
+    gitBranch: isNonEmptyString(gitBranch) ? gitBranch : undefined,
+    permissionMode: isNonEmptyString(permissionMode) ? permissionMode : undefined,
+    version: isNonEmptyString(version) ? version : undefined,
+    model: isNonEmptyString(model) ? model : undefined,
     files: ec.files,
     toolUses: ec.toolUses,
     toolResults: ec.toolResults,
@@ -286,6 +322,10 @@ export async function extractClaudeCodeTurns(
     toolResults: ParsedToolResult[];
     thinking: string[];
     repo_root?: string;
+    gitBranch?: string;
+    permissionMode?: string;
+    version?: string;
+    model?: string;
   }
   let pending: PendingCluster | null = null;
   const droppedUsers: DroppedUserLine[] = [];
@@ -322,12 +362,20 @@ export async function extractClaudeCodeTurns(
     };
     if (pending.repo_root !== undefined) turn.repo_root = pending.repo_root;
     if (allFiles.length > 0) turn.files_referenced = allFiles;
-    const toolCalls = matchToolCalls(pending.toolUses, pending.toolResults);
-    if (toolCalls.length > 0) turn.tool_calls = toolCalls;
+    const tc = matchToolCalls(pending.toolUses, pending.toolResults);
+    if (tc.calls.length > 0) {
+      turn.tool_calls = tc.calls;
+      turn.tool_call_total = tc.total;
+      if (tc.truncated) turn.tool_calls_truncated = true;
+    }
     if (pending.thinking.length > 0) {
       const t = truncateThinking(pending.thinking.join('\n\n'));
       turn.thinking = t.value;
     }
+    if (pending.gitBranch !== undefined) turn.git_branch_jsonl = pending.gitBranch;
+    if (pending.permissionMode !== undefined) turn.permission_mode = pending.permissionMode;
+    if (pending.version !== undefined) turn.cli_version = pending.version;
+    if (pending.model !== undefined) turn.model = pending.model;
     turns.push(turn);
     confirmedThroughOffset = pending.assistantLastLineEndOffset;
   }
@@ -390,6 +438,9 @@ export async function extractClaudeCodeTurns(
         thinking: [...thinkingBetween, ...parsed.thinking],
       };
       if (currentCwd !== undefined) pending.repo_root = currentCwd;
+      if (parsed.gitBranch !== undefined) pending.gitBranch = parsed.gitBranch;
+      if (parsed.permissionMode !== undefined) pending.permissionMode = parsed.permissionMode;
+      if (parsed.version !== undefined) pending.version = parsed.version;
       hadToolBetween = false;
       filesBetween = [];
       toolUsesBetween = [];
@@ -408,6 +459,13 @@ export async function extractClaudeCodeTurns(
         if (parsed.toolUses.length > 0) pending.toolUses.push(...parsed.toolUses);
         if (parsed.toolResults.length > 0) pending.toolResults.push(...parsed.toolResults);
         if (parsed.thinking.length > 0) pending.thinking.push(...parsed.thinking);
+        if (parsed.model !== undefined) pending.model = parsed.model;
+        if (pending.gitBranch === undefined && parsed.gitBranch !== undefined) {
+          pending.gitBranch = parsed.gitBranch;
+        }
+        if (pending.version === undefined && parsed.version !== undefined) {
+          pending.version = parsed.version;
+        }
         if (parsed.isEndTurn) {
           // stop_reason=end_turn — assistant is done; close the cluster now.
           emitPendingIfComplete();
@@ -428,12 +486,15 @@ export async function extractClaudeCodeTurns(
 function matchToolCalls(
   uses: ParsedToolUse[],
   results: ParsedToolResult[],
-): ToolCall[] {
+): { calls: ToolCall[]; total: number; truncated: boolean } {
   const resultById = new Map<string, ParsedToolResult>();
   for (const r of results) resultById.set(r.tool_use_id, r);
-  const out: ToolCall[] = [];
-  for (const u of uses) {
-    if (out.length >= MAX_TOOL_CALLS_PER_TURN) break;
+  const total = uses.length;
+  const truncated = total > MAX_TOOL_CALLS_PER_TURN;
+  const cap = truncated ? MAX_TOOL_CALLS_PER_TURN : total;
+  const calls: ToolCall[] = [];
+  for (let i = 0; i < cap; i++) {
+    const u = uses[i]!;
     const r = resultById.get(u.id);
     const argsRaw =
       u.input === undefined || u.input === null
@@ -441,7 +502,7 @@ function matchToolCalls(
         : typeof u.input === 'string'
           ? u.input
           : JSON.stringify(u.input);
-    out.push(
+    calls.push(
       buildToolCall({
         name: u.name,
         call_id: u.id,
@@ -451,7 +512,7 @@ function matchToolCalls(
       }),
     );
   }
-  return out;
+  return { calls, total, truncated };
 }
 
 async function backfillOffsetMap(storage: Storage): Promise<Map<string, { offset: number; turn_index: number }>> {
@@ -534,9 +595,20 @@ export async function startClaudeCodeExtractor(
       if (turn.repo_root !== undefined) metadata['repo_root'] = turn.repo_root;
       if (turn.files_referenced !== undefined) metadata['files_referenced'] = turn.files_referenced;
       if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
+      if (turn.tool_call_total !== undefined) metadata['tool_call_total'] = turn.tool_call_total;
+      if (turn.tool_calls_truncated === true) metadata['tool_calls_truncated'] = true;
       if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
+      if (turn.permission_mode !== undefined) metadata['permission_mode'] = turn.permission_mode;
+      if (turn.cli_version !== undefined) metadata['cli_version'] = turn.cli_version;
+      if (turn.model !== undefined) metadata['model'] = turn.model;
       const gitState = await probeGitState(turn.repo_root, turn.timestamp);
       if (gitState !== undefined) metadata['git_state'] = gitState;
+      // Branch provenance: JSONL gitBranch is per-turn and authoritative —
+      // recorded by the CC client at turn time. readBranch reads .git/HEAD
+      // *now*, which is wrong for historical turns if the user has since
+      // switched branches. Prefer JSONL; fall back only when absent.
+      const branch = turn.git_branch_jsonl ?? (await readBranch(turn.repo_root));
+      if (branch !== undefined) metadata['branch'] = branch;
       const candidate = {
         source: `fs:${path}`,
         timestamp: turn.timestamp,

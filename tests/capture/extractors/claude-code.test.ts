@@ -411,6 +411,115 @@ describe('extractClaudeCodeTurns (pure)', () => {
     const r = await extractClaudeCodeTurns(path, 0);
     expect(r.turns[0]?.thinking).toContain('pondering');
   });
+
+  // ─── Per-line CC metadata (gitBranch / permissionMode / version / model) ──
+
+  it('surfaces gitBranch, permissionMode, version, and model from JSONL lines', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const u1 = {
+      type: 'user',
+      sessionId: 's1',
+      cwd: '/Users/x/proj',
+      gitBranch: 'feature/x',
+      permissionMode: 'auto',
+      version: '2.1.119',
+      message: { role: 'user', content: 'q' },
+      uuid: 'u1',
+      timestamp: ts,
+    };
+    const a1 = {
+      type: 'assistant',
+      sessionId: 's1',
+      cwd: '/Users/x/proj',
+      gitBranch: 'feature/x',
+      version: '2.1.119',
+      message: { role: 'assistant', model: 'claude-opus-4-7', content: [{ type: 'text', text: 'a' }] },
+      uuid: 'a1',
+      timestamp: ts,
+    };
+    const u2 = {
+      type: 'user',
+      sessionId: 's1',
+      cwd: '/Users/x/proj',
+      gitBranch: 'feature/x',
+      message: { role: 'user', content: 'next' },
+      uuid: 'u2',
+      timestamp: ts,
+    };
+    writeFileSync(path, [u1, a1, u2].map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.git_branch_jsonl).toBe('feature/x');
+    expect(r.turns[0]?.permission_mode).toBe('auto');
+    expect(r.turns[0]?.cli_version).toBe('2.1.119');
+    expect(r.turns[0]?.model).toBe('claude-opus-4-7');
+  });
+
+  it('omits per-line metadata fields when JSONL lines lack them (back-compat)', async () => {
+    const path = join(dir, 'sess.jsonl');
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'q'),
+      assistantText('s1', 'a1', 'a'),
+      userText('s1', 'u2', 'next'),
+    ]);
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns[0]?.git_branch_jsonl).toBeUndefined();
+    expect(r.turns[0]?.permission_mode).toBeUndefined();
+    expect(r.turns[0]?.cli_version).toBeUndefined();
+    expect(r.turns[0]?.model).toBeUndefined();
+  });
+
+  // ─── Tool-call overflow accounting ────────────────────────────────────────
+
+  it('emits tool_call_total + tool_calls_truncated when uses exceed MAX_TOOL_CALLS_PER_TURN', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const sessionId = 's1';
+    const cwd = '/Users/x/proj';
+    // 60 tool_use blocks in one assistant message — over the 50 cap.
+    const toolUses = Array.from({ length: 60 }, (_, i) => ({
+      type: 'tool_use' as const,
+      id: `tu_${i}`,
+      name: 'Bash',
+      input: { command: `echo ${i}` },
+    }));
+    const lines = [
+      { type: 'user', sessionId, cwd, message: { role: 'user', content: 'go' }, uuid: 'u1', timestamp: ts },
+      { type: 'assistant', sessionId, cwd, message: { role: 'assistant', content: toolUses }, uuid: 'a1', timestamp: ts },
+      { type: 'assistant', sessionId, cwd, message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] }, uuid: 'a2', timestamp: ts },
+      { type: 'user', sessionId, cwd, message: { role: 'user', content: 'next' }, uuid: 'u2', timestamp: ts },
+    ];
+    writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]?.tool_calls).toHaveLength(50);
+    expect(r.turns[0]?.tool_call_total).toBe(60);
+    expect(r.turns[0]?.tool_calls_truncated).toBe(true);
+  });
+
+  it('emits tool_call_total without truncated flag when at or under the cap', async () => {
+    const path = join(dir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    const sessionId = 's1';
+    const cwd = '/Users/x/proj';
+    const toolUses = Array.from({ length: 3 }, (_, i) => ({
+      type: 'tool_use' as const,
+      id: `tu_${i}`,
+      name: 'Bash',
+      input: { command: `echo ${i}` },
+    }));
+    const lines = [
+      { type: 'user', sessionId, cwd, message: { role: 'user', content: 'go' }, uuid: 'u1', timestamp: ts },
+      { type: 'assistant', sessionId, cwd, message: { role: 'assistant', content: toolUses }, uuid: 'a1', timestamp: ts },
+      { type: 'assistant', sessionId, cwd, message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] }, uuid: 'a2', timestamp: ts },
+      { type: 'user', sessionId, cwd, message: { role: 'user', content: 'next' }, uuid: 'u2', timestamp: ts },
+    ];
+    writeFileSync(path, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const r = await extractClaudeCodeTurns(path, 0);
+    expect(r.turns[0]?.tool_call_total).toBe(3);
+    expect(r.turns[0]?.tool_calls_truncated).toBeUndefined();
+  });
 });
 
 describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
@@ -660,6 +769,39 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect(events).toHaveLength(1);
     expect(events[0]!.source).toBe(`fs:${path}`);
     expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
+  });
+
+  it('threads JSONL gitBranch / permissionMode / cli version / model into metadata', async () => {
+    handle = await startClaudeCodeExtractor(storage, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+    const ts = '2026-04-30T10:00:00Z';
+    // cwd is intentionally a non-existent path so readBranch can't resolve a
+    // real branch — proving metadata.branch comes from the JSONL gitBranch.
+    const u1 = {
+      type: 'user', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/x', permissionMode: 'auto', version: '2.1.119',
+      message: { role: 'user', content: 'q' }, uuid: 'u1', timestamp: ts,
+    };
+    const a1 = {
+      type: 'assistant', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/x', version: '2.1.119',
+      message: { role: 'assistant', model: 'claude-opus-4-7', content: [{ type: 'text', text: 'a' }] },
+      uuid: 'a1', timestamp: ts,
+    };
+    const u2 = {
+      type: 'user', sessionId: 's1', cwd: '/no/such/dir',
+      gitBranch: 'feature/x',
+      message: { role: 'user', content: 'next' }, uuid: 'u2', timestamp: ts,
+    };
+    writeFileSync(path, [u1, a1, u2].map((l) => JSON.stringify(l)).join('\n') + '\n');
+    await waitFor(async () => (await storage.count()) >= 1);
+
+    const evt = (await storage.query())[0]!;
+    const md = evt.metadata as Record<string, unknown>;
+    expect(md['branch']).toBe('feature/x');
+    expect(md['permission_mode']).toBe('auto');
+    expect(md['cli_version']).toBe('2.1.119');
+    expect(md['model']).toBe('claude-opus-4-7');
   });
 
   it('stop() resolves cleanly and prevents further events', async () => {
