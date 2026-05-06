@@ -10,6 +10,7 @@
 // reasoning traces for a given event without ECHO having to maintain a
 // denormalised graph.
 
+import { laneOf } from '../capture/extractors/_shared.js';
 import { FILE_INPUT_REGEX } from '../capture/extractors/_turn_meta.js';
 import type { CaptureEvent } from '../storage/interface.js';
 
@@ -76,14 +77,6 @@ function tsMs(evt: CaptureEvent): number {
   return Number.isFinite(t) ? t : 0;
 }
 
-function laneOf(evt: CaptureEvent): string {
-  if (evt.source.startsWith('git:')) return 'git';
-  if (evt.source.includes('/.codex/sessions/')) return 'codex';
-  if (evt.source.includes('/.claude/projects/')) return 'cc';
-  if (evt.source.includes('/Cursor/')) return 'cursor';
-  return 'other';
-}
-
 function filesTouchedBy(evt: CaptureEvent): string[] {
   const md = safeMd(evt);
   const out = new Set<string>();
@@ -99,9 +92,7 @@ function filesTouchedBy(evt: CaptureEvent): string[] {
       if (typeof tc !== 'object' || tc === null) continue;
       const args = (tc as Record<string, unknown>)['args'];
       if (typeof args !== 'string') continue;
-      const re = new RegExp(FILE_INPUT_REGEX.source, 'g');
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(args)) !== null) {
+      for (const m of args.matchAll(FILE_INPUT_REGEX)) {
         if (m[1] !== undefined && m[1].length > 0) out.add(m[1]);
       }
     }
@@ -280,7 +271,8 @@ export function reasoningTraceFor(events: CaptureEvent[], anchorId: string): Rea
       state_transitions: [],
     };
   }
-  const taskEvents = events.filter((e) => task.event_ids.includes(e.id));
+  const idSet = new Set(task.event_ids);
+  const taskEvents = events.filter((e) => idSet.has(e.id));
   const anchorMs = tsMs(anchor);
   return {
     anchor_id: anchorId,

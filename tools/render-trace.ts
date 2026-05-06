@@ -26,7 +26,7 @@ import type {
 } from '../src/storage/interface.js';
 import { MemoryStorage } from '../src/storage/memory.js';
 
-import { buildHtml, toRow, type RenderRow } from './_trace_render.js';
+import { buildHtml, eventsToRows, formatGeneratedAt, waitForDrain } from './_trace_render.js';
 
 interface Args {
   days: number;
@@ -79,23 +79,6 @@ class WindowedStorage implements Storage {
   }
 }
 
-async function waitForDrain(storage: Storage, idleMs = 1500): Promise<void> {
-  let last = -1;
-  let stableMs = 0;
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const n = await storage.count();
-    if (n === last) {
-      stableMs += 200;
-      if (stableMs >= idleMs) return;
-    } else {
-      last = n;
-      stableMs = 0;
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-}
-
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const sinceMs = Date.now() - args.days * 24 * 3600 * 1000;
@@ -117,15 +100,11 @@ async function main(): Promise<void> {
   const events = await storage.query();
   console.log(`  collected ${events.length} events in window`);
 
-  const rows: RenderRow[] = [];
-  for (const e of events) {
-    const r = toRow(e, args.fullContent);
-    if (r !== null) rows.push(r);
-  }
+  const rows = eventsToRows(events, args.fullContent);
 
   const html = buildHtml(rows, {
     days: args.days,
-    generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    generatedAt: formatGeneratedAt(),
     live: false,
   });
 

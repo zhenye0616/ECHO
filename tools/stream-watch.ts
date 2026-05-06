@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { startClaudeCodeExtractor } from '../src/capture/extractors/claude-code.js';
 import { startCodexExtractor } from '../src/capture/extractors/codex.js';
+import { SOURCE_MARKERS } from '../src/capture/extractors/_shared.js';
 import type {
   CaptureEvent,
   EventId,
@@ -154,7 +155,7 @@ function printEvent(event: CaptureEvent): void {
   const md = (event.metadata ?? {}) as Record<string, unknown>;
   if (md['_seed'] === true) return; // safety net, shouldn't happen in liveMode
 
-  const isCodex = event.source.includes('/.codex/sessions/');
+  const isCodex = event.source.includes(SOURCE_MARKERS.codex);
   const lane = isCodex
     ? `${FG.magenta}CODEX${RESET}`
     : `${FG.cyan}CC   ${RESET}`;
