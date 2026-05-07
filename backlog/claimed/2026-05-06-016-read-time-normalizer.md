@@ -50,9 +50,9 @@ files_to_modify:
   - tests/normalize/adapters/git.test.ts
   - tests/normalize/fixtures/
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-07T05:59:52Z"
+branch: "agent/read-time-normalizer"
 worktree: ""
 head_sha: ""
 pr_url: ""
