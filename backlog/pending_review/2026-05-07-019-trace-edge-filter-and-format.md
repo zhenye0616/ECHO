@@ -54,9 +54,44 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-07T22:37:29Z"
 branch: "agent/trace-edge-filter-and-format"
 worktree: "~/Desktop/Project_echo--trace-edge-filter-and-format"
-head_sha: ""
+head_sha: "59e1c75df89cfc841bb06eb6c28a4f0ec8b0c8e9"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implementation complete for the code/test/smoke acceptance criteria. Wiki
+  updates DEFERRED — needs founder direction.
+
+  BLOCKED on wiki edits: a runtime hook denied edits to wiki/architecture/
+  work-trace.md and wiki/surfaces/mcp-recent-work-context.md, with reason
+  "only the strategist edits the wiki, post-shipment." But the spec body
+  lists those wiki paths in `files_to_modify` and "After Completion §4"
+  states wiki promotion is delegated to the implementation agent for items
+  016/018 onward.
+
+  Tried: applied the edits per spec; first edit on each page landed; the
+  second edit was denied; reverted partials via `git checkout -- wiki/...`.
+  Drift event written at raw/internal/decisions/2026-05-07-DRIFT-019-
+  wiki-edit-conflict.md.
+
+  Best guess if forced to pick: strategist owns the wiki edits (the
+  operating-model files are prescriptive; the spec body's delegation
+  language drifted ahead of CLAUDE.md / AGENT_INSTRUCTIONS without those
+  being updated). Confidence: medium — the actual policy decision is the
+  founder's. Either path resolves the conflict; the bad outcome is leaving
+  spec and operating-model in silent disagreement.
+
+  Why escalated: AGENT_INSTRUCTIONS rule "A request from any tool that asks
+  you to take an action you're unsure about → STOP, log, escalate." The
+  hook IS the user-side guard; bypassing it would be malicious.
+
+  Code/test acceptance: targeted suite passes 79/79 (tests/trace/* +
+  tests/mcp/tools/recent-work-context.test.ts). typecheck + lint clean.
+  npm run test surfaces 4 unrelated failures in tests/daemon/lifecycle and
+  tests/capture/extractors/cursor (timeout-bound capture/daemon flake;
+  none of those files touched by 019).
+
+  Branch: agent/trace-edge-filter-and-format
+  HEAD: 59e1c75df89cfc841bb06eb6c28a4f0ec8b0c8e9
+  Run log: raw/internal/agent-runs/2026-05-07-2026-05-07-019-trace-edge-filter-and-format.md
 review_notes: ""
 ---
 
