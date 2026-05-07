@@ -76,7 +76,44 @@ agent_notes: |
   contract. Pre-existing cursor + lifecycle integration suites on main
   flake under load — full re-run at HEAD on main (without this item)
   shows the same failures and worse, so they're not caused by this work.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-07T06:35Z via founder reconciliation.
+
+  Conflicts resolved:
+  - (none — greenfield merge; 21 brand-new files, 0 lines deleted)
+
+  Fixups applied:
+  - (none — sidecar verdict was "merge as-is" with 0 pre-merge fixups)
+
+  Fixups deferred to follow-up items:
+  - (none)
+
+  Verify post-merge:
+  - npm run typecheck — clean
+  - npm run lint --max-warnings 0 — clean
+  - tests/normalize — 63/63 pass
+  - full vitest run — 336 passed / 3 failed; failures all in
+    tests/capture/extractors/cursor.test.ts and
+    tests/daemon/lifecycle.test.ts (pre-existing chokidar timing
+    flakes; reviewer confirmed reproduction at HEAD on main without
+    this branch; no path through src/normalize/).
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Tighten hostOf host-suffix matches in src/normalize/artifacts.ts:56-63
+    so e.g. "github.com.evil.com" doesn't classify as "github".
+  - Simplify ObservedState in src/normalize/types.ts:73-75 by dropping
+    the `?: never` markers (plain { snapshot } | { delta } union).
+  - Open a backlog item for the pre-existing
+    tests/capture/extractors/cursor.test.ts +
+    tests/daemon/lifecycle.test.ts chokidar-timing flakes.
+
+  Strategist next step (per item's "After Completion" section):
+  - Promote wiki/architecture/{normalization,normalized-context-event,
+    artifact-identity}.md.
+  - Update wiki/architecture/system-architecture.md and the three
+    capture cross-refs (cursor-extractor, claude-code-extractor,
+    git-capture).
+  - Spec item 017 (wire normalizer into MCP search_memories).
 ---
 
 # Read-time normalizer — `CaptureEvent` → `NormalizedContextEvent`
