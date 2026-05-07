@@ -53,10 +53,29 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-07T05:59:52Z"
 branch: "agent/read-time-normalizer"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--read-time-normalizer"
+head_sha: "a95e60c967818a91223967255a5325d891fbf6ce"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented src/normalize/ module: types, dispatch (first-match-wins
+  registry over claude-code → codex → cursor → git), artifact-identity
+  helpers, four pure adapters, and tests. Storage and MCP untouched per
+  spec. 63 normalize tests pass; lint + typecheck clean. Adapters are
+  pure — purity grep on src/normalize/adapters/ produces zero hits for
+  Date.now / fs / require / 'fs' imports. Anonymized fixtures sourced
+  by sampling real events from ~/Library/Application Support/ECHO/echo.db
+  then replacing usernames + paths outside the repo root with synthetic
+  stand-ins; structural shape preserved exactly. Three deviations from
+  the bare minimum spec, each documented in the run log: (1) cursor
+  deleted_files map to artifacts (spec was silent — 5-line revert if
+  undesired); (2) CC and codex add file artifacts when
+  metadata.files_referenced is populated (load-bearing for the
+  killer-demo cross-tool join; additive to the required conversation
+  artifact); (3) repoArtifact derives provider from the URL host
+  (github / gitlab / bitbucket / git / local). None affect the public
+  contract. Pre-existing cursor + lifecycle integration suites on main
+  flake under load — full re-run at HEAD on main (without this item)
+  shows the same failures and worse, so they're not caused by this work.
 review_notes: ""
 ---
 
