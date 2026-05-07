@@ -92,7 +92,23 @@ agent_notes: |
   Branch: agent/trace-edge-filter-and-format
   HEAD: 59e1c75df89cfc841bb06eb6c28a4f0ec8b0c8e9
   Run log: raw/internal/agent-runs/2026-05-07-2026-05-07-019-trace-edge-filter-and-format.md
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-07 via founder reconciliation.
+
+  Conflicts resolved: none — clean fast-forward / ort merge, no overlap with main.
+
+  Fixups applied: none.
+
+  Fixups deferred to follow-up items:
+  - Run-log filename has doubled date prefix (2026-05-07-2026-05-07-019-...md). Cosmetic; prevailing convention in raw/internal/agent-runs/ is mixed, so left as-is. Optional rename later if the project standardizes.
+  - Wiki-edit policy decision (governance question, not a working-tree fix). Drift event at raw/internal/decisions/2026-05-07-DRIFT-019-wiki-edit-conflict.md captures the spec/operating-model conflict.
+
+  Verify: 413/418 tests pass (5 pre-existing capture/daemon timeout-bound flake, unrelated to 019 — branch did not touch tests/daemon/ or tests/capture/). Lint clean. Typecheck clean. Targeted suite for this item (tests/trace/* + tests/mcp/tools/recent-work-context.test.ts) passes 79/79.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Strategist: promote 019 to wiki/architecture/work-trace.md and wiki/surfaces/mcp-recent-work-context.md per acceptance criteria 7 + 8 (edges[] is signal-bearing, role taxonomy, format param). Reference raw/internal/decisions/2026-05-07-trace-edge-filter-design.md.
+  - Operating-model reconciliation: pick (a) strategist owns wiki promotion post-merge OR (b) update CLAUDE.md + AGENT_INSTRUCTIONS.md to delegate wiki edits to implementation agents for items 016+. Then update the spec-item template so future items don't list wiki paths in files_to_modify until policy is reconciled.
+  - Investigate pre-existing capture/daemon test flake (tests/daemon/lifecycle.test.ts waitFor timeout; tests/capture/extractors/cursor.test.ts 5000ms timeouts). Bump testTimeout or fix the underlying filesystem-watcher race.
 ---
 
 # V1.5 trace patch — drop redundant edges + `format` parameter
