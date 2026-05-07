@@ -16,7 +16,11 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-*(empty — Waves 1–3 shipped; items 001–015 are in Complete below. Wave 4 (extension upgrade, GitHub adapter, Slack adapter, audit page, hotkey overlay) not yet specced — see `backlog/_followups.md` for the deferred fixups queue and the `wave-1-2-3-retrospective` operating-model lessons that should land in spec-template fixes before Wave 4 starts.)*
+| Priority | ID | Title | Estimate | Notes |
+|---|---|---|---|---|
+| HIGH | [2026-05-06-016](../backlog/ready/2026-05-06-016-read-time-normalizer.md) | Read-time normalizer — `CaptureEvent` → `NormalizedContextEvent` (claude-code + codex + cursor + git adapters) | 2d | Storage stays raw; pure read-time adapter layer; opens the path to the V1.5 WorkTrace builder. Design reasoning in `raw/internal/decisions/2026-05-06-normalized-context-event-design.md`. Includes `(default — open to redline)` markers throughout; founder reviews before agent claims. |
+
+*Wave 4 (extension upgrade, GitHub adapter, Slack adapter, audit page, hotkey overlay) not yet specced. See `backlog/_followups.md` for the deferred fixups queue and the `wave-1-2-3-retrospective` operating-model lessons that should land in spec-template fixes before Wave 4 starts.*
 
 ---
 
