@@ -50,10 +50,10 @@ files_to_modify:
   - wiki/architecture/work-trace.md
   - wiki/surfaces/mcp-recent-work-context.md
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-07T22:37:29Z"
+branch: "agent/trace-edge-filter-and-format"
+worktree: "~/Desktop/Project_echo--trace-edge-filter-and-format"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
