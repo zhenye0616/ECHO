@@ -165,9 +165,80 @@ if ! printf '%s' "$CTX_PAYLOAD" | grep -qE '("truncation"|\\"truncation\\")[[:sp
   exit 1
 fi
 
+# --- 6. Edge-filter assertion (item 019) -------------------------------------
+#
+# For any cluster with atom_ids.length >= 5, edges.length must be strictly less
+# than C(N, 2). This proves the redundant-edge predicate is observably trimming
+# the K_n pairwise restatements in real data.
+#
+# The MCP tool wraps its JSON result inside content[0].text as a stringified
+# envelope, so we have to walk through it: extract the result.content[0].text,
+# parse it as JSON, then inspect clusters[]. python3 keeps the script portable
+# (no jq dependency) and lets us count atom_ids/edges directly.
+
+EDGE_CHECK=$(printf '%s' "$CTX_PAYLOAD" | python3 - <<'PY' 2>&1
+import json, sys
+raw = sys.stdin.read().strip()
+if not raw:
+    print("EMPTY_PAYLOAD")
+    sys.exit(0)
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"PAYLOAD_NOT_JSON: {exc}")
+    sys.exit(0)
+result = env.get("result") or env
+content = (result.get("content") or [])
+if not content:
+    print("OK_NO_CONTENT")
+    sys.exit(0)
+try:
+    inner = json.loads(content[0]["text"])
+except (KeyError, json.JSONDecodeError) as exc:
+    print(f"INNER_NOT_JSON: {exc}")
+    sys.exit(0)
+clusters = inner.get("clusters", [])
+checked = 0
+for c in clusters:
+    n = len(c.get("atom_ids", []))
+    if n < 5:
+        continue
+    checked += 1
+    edges = len(c.get("edges", []))
+    max_pairs = n * (n - 1) // 2
+    if edges >= max_pairs:
+        print(
+            f"REDUNDANT_EDGES: cluster {c.get('cluster_id', '?')} has "
+            f"atom_ids={n} edges={edges} (>= C({n},2)={max_pairs}); "
+            f"item-019 edge-filter is not trimming redundant edges"
+        )
+        sys.exit(0)
+print(f"OK_EDGE_CHECK: {checked} cluster(s) with atom_ids>=5 passed")
+PY
+)
+
+case "$EDGE_CHECK" in
+  OK_EDGE_CHECK*|OK_NO_CONTENT|EMPTY_PAYLOAD)
+    : # benign — either passed or no clusters >=5 in the live store
+    ;;
+  REDUNDANT_EDGES*)
+    log_err "$EDGE_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$CTX_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+  *)
+    log_err "edge-filter check: $EDGE_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$CTX_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+esac
+
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
+log_ok "OK: $EDGE_CHECK"
 exit 0
