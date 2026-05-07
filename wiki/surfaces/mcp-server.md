@@ -41,14 +41,15 @@ Three reasons:
 
 ## Tools Currently Registered
 
-Two tools are registered on every session at session creation:
+Three tools are registered on every session at session creation:
 
 | Tool | Purpose |
 |---|---|
-| [[mcp-search-memories|`search_memories`]] | Retrieval over captured events — the real V1 tool |
+| [[mcp-search-memories\|`search_memories`]] | Retrieval over captured events — the V1 raw-event search tool |
+| [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 clustered context: atoms joined by shared artifact identity into coherent work threads |
 | `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` |
 
-`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client; `search_memories` is the tool that closes the killer-demo loop.
+`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search). `get_recent_work_context` closes the V1.5 magic gap — instead of returning a flat event list, it returns clusters of related atoms joined automatically by what the user has been touching.
 
 ## Tool Registration Pattern
 
@@ -109,7 +110,10 @@ If MCP adoption stalls (low probability but non-zero), the desktop-AI ingestion 
 
 ## Related
 
-- [[mcp-search-memories]] — the V1 retrieval tool
+- [[mcp-search-memories]] — the V1 raw-event retrieval tool
+- [[mcp-recent-work-context]] — the V1.5 clustered-context tool
+- [[work-trace]] — the layer that powers `get_recent_work_context`
+- [[normalization]] — the layer that produces the atoms consumers see
 - [[storage]] — the substrate this server queries
 - [[local-daemon]] — the host process
 - [[clipboard-and-launch]] — the broader Push/Pull frame

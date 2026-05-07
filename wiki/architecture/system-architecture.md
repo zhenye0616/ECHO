@@ -66,9 +66,25 @@ LAYER 2 ─ ECHO DAEMON (one local Node process; binds to 127.0.0.1 only)
    │            │ storage.query(filter) when MCP tool fires              │
    │            ▼                                                        │
    │   ┌──────────────────┐                                              │
-   │   │  MCP server      │   tools: echo_ping, search_memories          │
-   │   │  HTTP @ loopback │   listens on 127.0.0.1:38478 only            │
-   │   │  :38478          │   (cannot be reached from network)           │
+   │   │  Normalizer      │   read-time, pure: CaptureEvent →            │
+   │   │  src/normalize/  │   NormalizedContextEvent (atom)              │
+   │   │  per-source      │   raw stays raw; storage untouched           │
+   │   │  adapters        │                                              │
+   │   └────────┬─────────┘                                              │
+   │            │ atoms                                                  │
+   │            ▼                                                        │
+   │   ┌──────────────────┐                                              │
+   │   │  Trace layer     │   atoms → connected-component clusters by    │
+   │   │  src/trace/      │   shared artifact identity within a 4h       │
+   │   │  pure, ephemeral │   window. Powers get_recent_work_context.    │
+   │   └────────┬─────────┘                                              │
+   │            │ clusters                                               │
+   │            ▼                                                        │
+   │   ┌──────────────────┐                                              │
+   │   │  MCP server      │   tools: echo_ping, search_memories,         │
+   │   │  HTTP @ loopback │     get_recent_work_context                  │
+   │   │  :38478          │   listens on 127.0.0.1:38478 only            │
+   │   │                  │   (cannot be reached from network)           │
    │   └────────┬─────────┘                                              │
    │            │                                                        │
    └────────────┼────────────────────────────────────────────────────────┘
@@ -91,9 +107,9 @@ LAYER 3 ─ CONSUMERS (any MCP-speaking AI client; ECHO doesn't care which)
                        conversational context
 ```
 
-## The Six Components
+## The Components
 
-The minimum view names exactly six components in the data path. Anything else (logger, lifecycle scaffold, migration runner, capture pipeline seam) is supporting infrastructure that lives alongside the loop, not within it.
+The minimum view names eight components in the data path. Anything else (logger, lifecycle scaffold, migration runner, capture pipeline seam) is supporting infrastructure that lives alongside the loop, not within it.
 
 ### 1. Sources
 
@@ -115,9 +131,17 @@ The pure-function chokepoint through which every captured event must pass to be 
 
 A single SQLite database file at `~/Library/Application Support/ECHO/echo.db`. Append-only by interface contract — no `update`, no `delete`, only `append`/`query`/`count`. WAL mode for concurrent reads during writes. Indexed on `source` and `timestamp` for the queries the MCP tool actually makes. See [[storage]].
 
-### 6. MCP server
+### 6. Normalizer (read-time)
 
-The single retrieval interface. HTTP/SSE on `127.0.0.1:38478` (loopback only — not reachable from network). Exposes tools registered with the `@modelcontextprotocol/sdk`. Today: `echo_ping` (connectivity check) and `search_memories` (the actual retrieval tool). Any MCP-speaking client (Cursor, Claude Code, Claude Desktop, Cline, Continue, custom scripts via curl) can call these. See [[mcp-server]] and [[mcp-search-memories]].
+A pure, in-process layer that converts raw `CaptureEvent`s into `NormalizedContextEvent` atoms — the joinable contract every read-path consumer speaks. Per-source adapters (claude-code, codex, cursor, git) dispatched first-match-wins. Storage stays raw and append-only; the normalizer never writes back. If the schema turns out wrong, deleting `src/normalize/` is the rollback. See [[normalization]], [[normalized-context-event]], and [[artifact-identity]].
+
+### 7. Trace layer (V1.5)
+
+A pure, in-process module that turns normalized atoms into *clusters* — connected components over a graph where atoms share artifact identity within a configurable time window (default 4 h). Cluster IDs are deterministic-ephemeral hashes; no persisted traces table. Today consumed only by `get_recent_work_context`. See [[work-trace]].
+
+### 8. MCP server
+
+The single retrieval interface. HTTP/SSE on `127.0.0.1:38478` (loopback only — not reachable from network). Exposes tools registered with the `@modelcontextprotocol/sdk`. Today three tools: `echo_ping` (connectivity check), [[mcp-search-memories|`search_memories`]] (raw event search), and [[mcp-recent-work-context|`get_recent_work_context`]] (clustered work threads via the trace layer). Any MCP-speaking client (Cursor, Claude Code, Claude Desktop, Cline, Continue, custom scripts via curl) can call these. See [[mcp-server]].
 
 ## The Data Shape
 
@@ -172,6 +196,10 @@ Sources fan in. Consumers fan out. The middle is fixed. That fixed middle is wha
 - [[capture-allowlist]] — what the gate permits
 - [[capture-gate]] — runtime enforcer
 - [[storage]] — the substrate's persistence layer
+- [[normalization]] — the read-time layer between storage and consumers
+- [[normalized-context-event]] — the atom shape every consumer reads
+- [[artifact-identity]] — the canonical-id rules that power cross-source joins
+- [[work-trace]] — the V1.5 layer that clusters atoms into coherent work threads
 - [[mcp-server]] — retrieval interface
 - [[sandboxed-capture]] — the principle the architecture enforces
 - [[felt-not-seen]] — why the daemon is the only ECHO process and there's no destination app

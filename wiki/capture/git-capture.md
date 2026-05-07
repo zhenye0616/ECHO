@@ -125,3 +125,4 @@ This rule is recorded in `backlog/README.md`'s Spec Authoring Lessons so future 
 - [[fs-watcher]] — sibling surface; emits raw FS events under allowlisted file paths
 - [[cursor-extractor]] — sibling content extractor for chat
 - [[claude-code-extractor]] — sibling content extractor for chat
+- [[normalization]] — the read-time layer that converts each commit's raw `CaptureEvent` into a `NormalizedContextEvent`; the git adapter emits `repoArtifact + commitArtifact + branchArtifact` plus one `fileArtifact` per file touched

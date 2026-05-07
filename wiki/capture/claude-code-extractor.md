@@ -119,3 +119,4 @@ The content shape and `fs:` source prefix match [[cursor-extractor]] by design �
 - [[capture-pipeline]] — downstream consumer of each emitted candidate
 - [[capture-gate]] — accepts `fs:<jsonl-path>` against the allowlist
 - [[storage]] — the persistence layer accepted turns flow into; also the source of byte-offset backfill
+- [[normalization]] — the read-time layer that converts this extractor's raw `CaptureEvent` into a `NormalizedContextEvent`; the claude-code adapter maps `metadata.session_id` / `turn_index` / `had_tool_use` into `conversation` and `context.ambient`

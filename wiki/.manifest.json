@@ -302,6 +302,73 @@
     "topic": "Form Factor",
     "subtopic": "MCP Server"
   },
+  "surfaces/mcp-recent-work-context.md": {
+    "status": "shipped",
+    "title": "MCP get_recent_work_context Tool",
+    "link": "mcp-recent-work-context",
+    "summary": "V1.5 MCP tool that returns clusters of related atoms joined by shared artifact identity within a recent time window.",
+    "aliases": [
+      "get_recent_work_context",
+      "MCP get_recent_work_context tool",
+      "Recent Work Context"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "architecture/normalization.md": {
+    "status": "shipped",
+    "title": "Normalization (Read-Time)",
+    "link": "normalization",
+    "summary": "Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.",
+    "aliases": [
+      "Normalization",
+      "Read-Time Normalizer",
+      "Normalizer"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
+  "architecture/normalized-context-event.md": {
+    "status": "shipped",
+    "title": "NormalizedContextEvent (the atom shape)",
+    "link": "normalized-context-event",
+    "summary": "The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.",
+    "aliases": [
+      "NormalizedContextEvent",
+      "Normalized Context Event",
+      "Atom",
+      "Normalized Atom"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
+  "architecture/artifact-identity.md": {
+    "status": "shipped",
+    "title": "Artifact Identity (the join-key contract)",
+    "link": "artifact-identity",
+    "summary": "Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing \u2014 powers cross-source cluster joins.",
+    "aliases": [
+      "Artifact Identity",
+      "Artifact Identity Policy",
+      "Canonical Artifact ID",
+      "Artifact ID"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
+  "architecture/work-trace.md": {
+    "status": "shipped",
+    "title": "Work Trace (the trace layer)",
+    "link": "work-trace",
+    "summary": "Pure module that clusters normalized atoms into coherent work threads via connected components over shared-artifact edges in a 4h window.",
+    "aliases": [
+      "Work Trace",
+      "Trace Layer",
+      "WorkTrace"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
   "product/v1-spec.md": {
     "status": "shipped",
     "title": "V1 Spec (Locked)",

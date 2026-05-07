@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 42 pages · 40 shipped · 2 planned
+**Status:** 47 pages · 45 shipped · 2 planned
 
 ---
 
@@ -62,14 +62,18 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Architecture
 
+- [[artifact-identity|Artifact Identity (the join-key contract)]] — Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing — powers cross-source cluster joins.
 - [[capture-allowlist|Capture Allowlist]] — Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.
 - [[capture-gate|Capture Gate]] — Pure-function chokepoint at src/capture/gate.ts; five source kinds, six stable rejection codes, exhaustive test coverage.
 - [[capture-pipeline|Capture Pipeline]] — Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
 - [[local-daemon|Local Daemon]] — Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.
 - [[logger|Logger]] — Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.
+- [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
+- [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
 - [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix filter.
 - [[system-architecture|System Architecture (Minimum Component View)]] — Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.
+- [[work-trace|Work Trace (the trace layer)]] — Pure module that clusters normalized atoms into coherent work threads via connected components over shared-artifact edges in a 4h window.
 
 ---
 
@@ -106,6 +110,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[browser-extension|Browser Extension]] — Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.
 - [[hotkey-overlay|Hotkey Overlay]] *(planned)* — System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.
 - [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing search_memories + echo_ping to MCP-compliant AI clients via Streamable HTTP/SSE.
+- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — V1.5 MCP tool that returns clusters of related atoms joined by shared artifact identity within a recent time window.
 - [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring + filters over captured events; embeddings deferred to V1.5.
 
 ---

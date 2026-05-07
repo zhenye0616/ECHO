@@ -128,3 +128,4 @@ The SQLite handle is opened with `{ readonly: true, fileMustExist: true }`. Curs
 - [[capture-gate]] — accepts `fs:<globalDbPath>` against the allowlist
 - [[capture-allowlist]] — declares both Cursor paths under `fs_paths`
 - [[storage]] — the persistence layer accepted turns flow into
+- [[normalization]] — the read-time layer that converts this extractor's raw `CaptureEvent` into a `NormalizedContextEvent`; the cursor adapter handles the `metadata.context` → `artifacts[]` + `context.visible[]` mapping
