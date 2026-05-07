@@ -6,6 +6,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
+import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 
 const log = createLogger('mcp.server');
@@ -69,6 +70,7 @@ export async function startMcpServer(
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     registerEchoPing(mcp);
     registerSearchMemories(mcp, storage);
+    registerRecentWorkContext(mcp, storage);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       enableDnsRebindingProtection: true,
