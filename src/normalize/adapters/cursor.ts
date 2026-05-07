@@ -30,11 +30,10 @@ export function matchesCursor(source: string): boolean {
 
 export const adaptCursor: Adapter = (
   event: CaptureEvent,
-): NormalizedContextEvent => {
+): NormalizedContextEvent | null => {
+  // Source-prefix dispatch is coarse — see claude-code adapter for context.
   const pair = tryParseTurnPair(event.content);
-  if (pair === null) {
-    fail(event, 'cursor: content does not match USER/ASSISTANT envelope');
-  }
+  if (pair === null) return null;
 
   const meta = event.metadata;
   const composer_id = getString(meta, 'composer_id') ?? getString(meta, 'session_id');

@@ -32,11 +32,10 @@ export function matchesCodex(source: string): boolean {
 
 export const adaptCodex: Adapter = (
   event: CaptureEvent,
-): NormalizedContextEvent => {
+): NormalizedContextEvent | null => {
+  // Source-prefix dispatch is coarse — see claude-code adapter for context.
   const pair = tryParseTurnPair(event.content);
-  if (pair === null) {
-    fail(event, 'codex: content does not match USER/ASSISTANT envelope');
-  }
+  if (pair === null) return null;
 
   const meta = event.metadata;
   const session_id = getString(meta, 'session_id');

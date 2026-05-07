@@ -89,7 +89,7 @@ export interface ProvenanceRef {
   parse_warnings?: string[];
 }
 
-export type Adapter = (event: CaptureEvent) => NormalizedContextEvent;
+export type Adapter = (event: CaptureEvent) => NormalizedContextEvent | null;
 
 export interface AdapterRegistration {
   name: string;

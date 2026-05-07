@@ -3,8 +3,10 @@
 #
 # Verifies a running ECHO daemon over HTTP MCP:
 #   1. The daemon's MCP endpoint is reachable.
-#   2. `tools/list` includes `search_memories`.
+#   2. `tools/list` includes `search_memories` and `get_recent_work_context`.
 #   3. `tools/call search_memories` returns a JSON result with a `matches` array.
+#   4. `tools/call get_recent_work_context` returns a JSON result with `clusters`
+#      and `truncation` fields (the V1.5 trace-layer response envelope).
 #
 # Exit codes:
 #   0 — all checks passed
@@ -81,7 +83,7 @@ curl -sS -o /dev/null \
   -H "Mcp-Session-Id: $SESSION" \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# --- 3. tools/list contains search_memories -----------------------------------
+# --- 3. tools/list contains search_memories and get_recent_work_context -------
 
 LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
@@ -94,6 +96,14 @@ LIST_PAYLOAD=$(extract_payload "$LIST_RESPONSE")
 
 if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"search_memories"'; then
   log_err "tools/list response did not include search_memories"
+  log_err "raw response:"
+  printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"get_recent_work_context"'; then
+  log_err "tools/list response did not include get_recent_work_context"
+  log_err "(item 018 may not have been picked up — has the daemon restarted since merge?)"
   log_err "raw response:"
   printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
   exit 1
@@ -128,7 +138,36 @@ if ! printf '%s' "$CALL_PAYLOAD" | grep -qE '("limit_applied"|\\"limit_applied\\
   exit 1
 fi
 
+# --- 5. tools/call get_recent_work_context returns clusters + truncation -----
+
+CTX_RESPONSE=$(curl -sS \
+  -X POST "$URL" \
+  -H "Accept: $ACCEPT" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: $SESSION" \
+  --data '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_recent_work_context","arguments":{}}}')
+
+CTX_PAYLOAD=$(extract_payload "$CTX_RESPONSE")
+
+# Same envelope rules as search_memories: tool result is stringified JSON inside
+# content[0].text, so on the wire `"clusters"` shows up as `\"clusters\"`.
+if ! printf '%s' "$CTX_PAYLOAD" | grep -qE '("clusters"|\\"clusters\\")[[:space:]]*:'; then
+  log_err "tools/call get_recent_work_context did not return a 'clusters' field"
+  log_err "raw response:"
+  printf '%s\n' "$CTX_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+if ! printf '%s' "$CTX_PAYLOAD" | grep -qE '("truncation"|\\"truncation\\")[[:space:]]*:'; then
+  log_err "tools/call get_recent_work_context response missing 'truncation' (envelope mismatch)"
+  log_err "raw response:"
+  printf '%s\n' "$CTX_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
+log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
+log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 exit 0

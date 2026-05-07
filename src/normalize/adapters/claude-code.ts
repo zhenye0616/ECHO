@@ -32,11 +32,12 @@ export function matchesClaudeCode(source: string): boolean {
 
 export const adaptClaudeCode: Adapter = (
   event: CaptureEvent,
-): NormalizedContextEvent => {
+): NormalizedContextEvent | null => {
+  // The source-prefix dispatch is intentionally coarse: a `fs:.../.claude/projects/.../*.jsonl`
+  // event might be a turn-pair from the claude-code-extractor OR a generic stat-change event
+  // from the fs-watcher (same path observed by two surfaces). Only the former is ours.
   const pair = tryParseTurnPair(event.content);
-  if (pair === null) {
-    fail(event, 'claude-code: content does not match USER/ASSISTANT envelope');
-  }
+  if (pair === null) return null;
 
   const meta = event.metadata;
   const session_id = getString(meta, 'session_id');

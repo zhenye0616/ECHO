@@ -269,6 +269,64 @@ describe('buildRecentWorkContext', () => {
     expect(r.clusters.map((c) => c.rank)).toEqual([1, 2, 3]);
   });
 
+  it('survives a normalizer that throws on some events; surfaces deduped warnings', () => {
+    const { events: goodEvents, normalize: goodNormalize } = asCapture([
+      {
+        id: 'good_1',
+        app: 'cursor',
+        occurred_at: '2026-05-06T06:00:00.000Z',
+        artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+      },
+      {
+        id: 'good_2',
+        app: 'cursor',
+        occurred_at: '2026-05-06T06:30:00.000Z',
+        artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+      },
+    ]);
+    const failingEvents: CaptureEvent[] = [
+      {
+        id: 'bad_1',
+        source: 'fixture:cursor',
+        timestamp: '2026-05-06T06:15:00.000Z',
+        content: '',
+      },
+      {
+        id: 'bad_2',
+        source: 'fixture:cursor',
+        timestamp: '2026-05-06T06:45:00.000Z',
+        content: '',
+      },
+      {
+        id: 'bad_distinct',
+        source: 'fixture:cursor',
+        timestamp: '2026-05-06T07:00:00.000Z',
+        content: '',
+      },
+    ];
+    const normalize = (e: CaptureEvent): NormalizedContextEvent | null => {
+      if (e.id === 'bad_1' || e.id === 'bad_2') throw new Error('shared boom');
+      if (e.id === 'bad_distinct') throw new Error('distinct boom');
+      return goodNormalize(e);
+    };
+    const r = buildRecentWorkContext(
+      [...goodEvents, ...failingEvents],
+      QUERY,
+      normalize,
+    );
+    // Good events still cluster.
+    expect(r.clusters.length).toBeGreaterThan(0);
+    expect(r.truncation.atoms_total_in_window).toBe(2);
+    // Warnings dedupe by message: shared boom (2×) collapses; distinct boom is its own entry.
+    expect(r.warnings).toHaveLength(2);
+    expect(r.warnings.some((w) => w.includes('shared boom') && w.includes('2×'))).toBe(
+      true,
+    );
+    expect(r.warnings.some((w) => w.includes('distinct boom') && w.includes('1 event'))).toBe(
+      true,
+    );
+  });
+
   it('performance: 500 atoms processed in <500ms', () => {
     const specs: AtomSpec[] = [];
     const baseTs = Date.parse('2026-05-06T05:00:00.000Z');

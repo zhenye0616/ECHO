@@ -57,8 +57,19 @@ export function buildRecentWorkContext(
 
   // 1. Normalize and filter to window
   const atoms: NormalizedContextEvent[] = [];
+  // Per-error-message counts; we dedupe and surface as warnings so a single bad
+  // event class (e.g., a malformed metadata field) doesn't spam thousands of
+  // identical warnings.
+  const errCounts = new Map<string, number>();
   for (const e of events) {
-    const a = normalize(e);
+    let a: NormalizedContextEvent | null;
+    try {
+      a = normalize(e);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errCounts.set(msg, (errCounts.get(msg) ?? 0) + 1);
+      continue;
+    }
     if (a === null) continue;
     const t = Date.parse(a.time.occurred_at);
     if (Number.isNaN(t)) continue;
@@ -149,9 +160,19 @@ export function buildRecentWorkContext(
       clusters_total: clustersTotal,
       truncated: truncated.didTruncate,
     },
-    warnings: [],
+    warnings: buildWarnings(errCounts),
   };
   return response;
+}
+
+function buildWarnings(errCounts: Map<string, number>): string[] {
+  const out: string[] = [];
+  for (const [msg, count] of errCounts) {
+    out.push(
+      count > 1 ? `${msg} (${count}× events skipped)` : `${msg} (1 event skipped)`,
+    );
+  }
+  return out;
 }
 
 function makeClusterId(atomIds: string[]): string {

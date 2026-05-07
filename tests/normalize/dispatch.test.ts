@@ -50,18 +50,28 @@ describe('normalize dispatch', () => {
     expect(codexMatch).toBe(1);
   });
 
-  it('throws NormalizationError on a source that matches but content is malformed', () => {
-    const malformed: CaptureEvent = {
+  it('returns null on a source-matched event whose content is not the adapter envelope (e.g., fs-watcher stat events on the same .jsonl path)', () => {
+    // The fs-watcher and the claude-code-extractor both observe the same
+    // `~/.claude/projects/.../*.jsonl` files and both emit events with the
+    // same `fs:` source prefix. Only the latter has USER:/ASSISTANT: content.
+    // Source-prefix dispatch matches both; the adapter must decline coarsely
+    // routed events that don't actually contain its envelope.
+    const fsWatcherChange: CaptureEvent = {
+      ...claudeCodeFixture,
+      content: JSON.stringify({
+        event_type: 'change',
+        path: '/Users/zhenye/.claude/projects/example/abc-123.jsonl',
+        mtime: '2026-05-07T00:00:00.000Z',
+        size: 12345,
+      }),
+    };
+    expect(normalizeEvent(fsWatcherChange)).toBeNull();
+
+    const plainText: CaptureEvent = {
       ...claudeCodeFixture,
       content: 'this does not contain the USER/ASSISTANT envelope',
     };
-    expect(() => normalizeEvent(malformed)).toThrow(NormalizationError);
-    try {
-      normalizeEvent(malformed);
-    } catch (err) {
-      expect(err).toBeInstanceOf(NormalizationError);
-      expect((err as NormalizationError).cause).toBe(malformed);
-    }
+    expect(normalizeEvent(plainText)).toBeNull();
   });
 
   it('throws NormalizationError when a matched adapter is missing required metadata', () => {
