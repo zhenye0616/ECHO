@@ -49,10 +49,10 @@ files_to_modify:
   - tests/mcp/tools/recent-work-context.test.ts
   - tests/trace/fixtures/
 
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-07T06:47:05Z"
+branch: "agent/recent-work-context-tool"
+worktree: "~/Desktop/Project_echo--recent-work-context-tool"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
