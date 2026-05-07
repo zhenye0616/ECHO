@@ -6,6 +6,7 @@ import {
   buildGraph,
   connectedComponents,
   DEFAULT_WINDOW_HOURS,
+  filterRedundantEdges,
 } from './cluster.js';
 import { enrichHints } from './hints.js';
 import { heuristicLabel } from './labels.js';
@@ -31,6 +32,7 @@ export type {
   RankSignals,
   RawCluster,
   RecentWorkContextResponse,
+  ResponseFormat,
   Truncation,
 } from './types.js';
 export {
@@ -38,10 +40,13 @@ export {
   buildGraph,
   connectedComponents,
   DEFAULT_WINDOW_HOURS,
+  filterRedundantEdges,
 } from './cluster.js';
 export { rankClusters, rankReasonsFor } from './rank.js';
 export { heuristicLabel } from './labels.js';
 export { enrichHints } from './hints.js';
+export { roleOf } from './role.js';
+export type { ArtifactRole } from './role.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -100,7 +105,11 @@ export function buildRecentWorkContext(
       rank_reason: [],
       anchor_artifacts,
       atom_ids: rc.atom_ids,
-      edges: rc.edges,
+      // Drop scope/session-only edges. Cluster membership (`atom_ids`) is
+      // computed from the unfiltered graph above; this filter trims redundant
+      // pairwise restatements without changing topology. See
+      // `raw/internal/decisions/2026-05-07-trace-edge-filter-design.md`.
+      edges: filterRedundantEdges(rc.edges),
       open_loop_hints,
       source_breakdown,
       time_range,
@@ -150,6 +159,7 @@ export function buildRecentWorkContext(
       since: query.since,
       until: query.until,
       artifact_hint: query.artifact_hint ?? null,
+      format: query.format ?? 'full',
     },
     clusters: truncated.clusters,
     atoms: atomsMap,

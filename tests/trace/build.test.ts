@@ -2,8 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { CaptureEvent } from '../../src/storage/interface.js';
 import type { NormalizedContextEvent } from '../../src/normalize/types.js';
 import { buildRecentWorkContext } from '../../src/trace/index.js';
+import { roleOf } from '../../src/trace/role.js';
 import type { Query } from '../../src/trace/types.js';
 import { makeAtom, type AtomSpec } from './fixtures/atoms.js';
+
+// An ArtifactKey is `${provider}:${type}:${id}` where id may itself contain
+// colons. Mirror the parser used in src/trace/cluster.ts.
+function typeFromArtifactKey(key: string): string {
+  const first = key.indexOf(':');
+  if (first < 0) return '';
+  const second = key.indexOf(':', first + 1);
+  if (second < 0) return key.slice(first + 1);
+  return key.slice(first + 1, second);
+}
 
 function asCapture(specs: AtomSpec[]): {
   events: CaptureEvent[];
@@ -50,6 +61,7 @@ describe('buildRecentWorkContext', () => {
       since: QUERY.since,
       until: QUERY.until,
       artifact_hint: null,
+      format: 'full',
     });
   });
 
@@ -350,5 +362,104 @@ describe('buildRecentWorkContext', () => {
     const elapsed = performance.now() - start;
     expect(r.clusters.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(500);
+  });
+
+  describe('V1.5 trace edge-filter (item 019)', () => {
+    it('every retained edge has at least one work-role or unknown-role artifact', () => {
+      // Mixed cluster: same repo + same conversation; some pairs additionally
+      // share a specific file. After filter, only pairs with the file edge
+      // should survive — and every retained edge should carry a non-scope,
+      // non-session artifact.
+      const baseTs = Date.parse('2026-05-06T08:00:00.000Z');
+      const specs: AtomSpec[] = [];
+      for (let i = 0; i < 6; i++) {
+        const arts = [
+          { provider: 'local', type: 'repo', id: 'local:/echo' },
+          { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+        ];
+        if (i < 3) {
+          arts.push({ provider: 'local_fs', type: 'file', id: 'r::shared.ts' });
+        }
+        specs.push({
+          id: `evt_${i}`,
+          app: 'claude_code',
+          occurred_at: new Date(baseTs + i * 60 * 1000).toISOString(),
+          artifacts: arts,
+        });
+      }
+      const { events, normalize } = asCapture(specs);
+      const r = buildRecentWorkContext(events, QUERY, normalize);
+      expect(r.clusters).toHaveLength(1);
+      const cluster = r.clusters[0]!;
+      // Cluster membership unchanged — all 6 atoms still present.
+      expect(cluster.atom_ids).toEqual([
+        'evt_0',
+        'evt_1',
+        'evt_2',
+        'evt_3',
+        'evt_4',
+        'evt_5',
+      ]);
+      for (const edge of cluster.edges) {
+        const hasSignal = edge.artifact_ids.some((key) => {
+          const role = roleOf(typeFromArtifactKey(key));
+          return role === 'work' || role === 'unknown';
+        });
+        expect(hasSignal).toBe(true);
+      }
+      // The 3 file-sharing atoms form C(3,2)=3 file-bearing edges; all should survive.
+      expect(cluster.edges).toHaveLength(3);
+    });
+
+    it('cluster.atom_ids and rank_reason are unchanged by the edge filter', () => {
+      // K_5 sharing only repo+conversation: cluster forms (atoms are joined),
+      // but every edge should be filtered out. atom_ids and rank_reason still
+      // reflect the un-filtered cluster state.
+      const baseTs = Date.parse('2026-05-06T08:00:00.000Z');
+      const specs: AtomSpec[] = [];
+      for (let i = 0; i < 5; i++) {
+        specs.push({
+          id: `evt_${i}`,
+          app: 'claude_code',
+          occurred_at: new Date(baseTs + i * 60 * 1000).toISOString(),
+          artifacts: [
+            { provider: 'local', type: 'repo', id: 'local:/echo' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+        });
+      }
+      const { events, normalize } = asCapture(specs);
+      const r = buildRecentWorkContext(events, QUERY, normalize);
+      expect(r.clusters).toHaveLength(1);
+      const cluster = r.clusters[0]!;
+      // membership unchanged: 5 atoms even with 0 retained edges
+      expect(cluster.atom_ids).toEqual([
+        'evt_0',
+        'evt_1',
+        'evt_2',
+        'evt_3',
+        'evt_4',
+      ]);
+      expect(cluster.edges).toEqual([]);
+      // `dense` reason still fires because atom_ids.length >= 5 — proves
+      // ranking ran on the unfiltered cluster.
+      expect(cluster.rank_reason).toContain('dense');
+    });
+
+    it('format defaults to "full" and is echoed in query', () => {
+      const { events, normalize } = asCapture([]);
+      const r = buildRecentWorkContext(events, QUERY, normalize);
+      expect(r.query.format).toBe('full');
+    });
+
+    it('format echoes the request value (minimal)', () => {
+      const { events, normalize } = asCapture([]);
+      const r = buildRecentWorkContext(
+        events,
+        { ...QUERY, format: 'minimal' },
+        normalize,
+      );
+      expect(r.query.format).toBe('minimal');
+    });
   });
 });

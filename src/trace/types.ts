@@ -8,18 +8,22 @@ export interface ArtifactHint {
   id: string;
 }
 
+export type ResponseFormat = 'full' | 'minimal';
+
 export interface Query {
   since: string;
   until: string;
   artifact_hint?: ArtifactHint;
   window_hours?: number;
   limit?: number;
+  format?: ResponseFormat;
 }
 
 export interface QueryEcho {
   since: string;
   until: string;
   artifact_hint: ArtifactHint | null;
+  format: ResponseFormat;
 }
 
 export type EdgeKind = 'shared_artifact';

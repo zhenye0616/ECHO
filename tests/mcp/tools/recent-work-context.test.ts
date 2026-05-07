@@ -190,4 +190,162 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     )) as CallToolResultLike;
     expect(result.isError).toBe(true);
   });
+
+  describe('format parameter (item 019)', () => {
+    const LONG_INPUT = 'A'.repeat(800);
+    const LONG_OUTPUT = 'B'.repeat(1200);
+    const SHORT_INPUT = 'short user message';
+    const SHORT_OUTPUT = 'short assistant reply';
+
+    async function seedLong(s: MemoryStorage): Promise<void> {
+      // Two events sharing a file so they cluster together; the first has a
+      // long input/output to exercise truncation, the second is short to
+      // verify ≤500-char fields are unmodified.
+      await s.append(
+        ccEvent('s_long', 0, tsPlus(60), [TYPES_PATH], {
+          user: LONG_INPUT,
+          assistant: LONG_OUTPUT,
+        }),
+      );
+      await s.append(
+        ccEvent('s_long', 1, tsPlus(75), [TYPES_PATH], {
+          user: SHORT_INPUT,
+          assistant: SHORT_OUTPUT,
+        }),
+      );
+    }
+
+    async function callWith(
+      args: Record<string, unknown>,
+    ): Promise<RecentWorkContextResponse> {
+      const result = (await withClient(handle!.url, async (c) =>
+        c.callTool({
+          name: 'get_recent_work_context',
+          arguments: args,
+        }),
+      )) as CallToolResultLike;
+      expect(result.isError).toBeFalsy();
+      return JSON.parse(
+        result.content![0]!.text,
+      ) as RecentWorkContextResponse;
+    }
+
+    it('format omitted echoes "full" in response.query.format', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({ since: SINCE, until: NOW });
+      expect(r.query.format).toBe('full');
+    });
+
+    it('format: "full" echoes "full" and is bit-for-bit identical to omitted format', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const omitted = await callWith({ since: SINCE, until: NOW });
+      const explicitFull = await callWith({
+        since: SINCE,
+        until: NOW,
+        format: 'full',
+      });
+      // expected difference: query.format is "full" in both, atoms identical
+      expect(explicitFull.query.format).toBe('full');
+      expect(explicitFull.atoms).toEqual(omitted.atoms);
+      expect(explicitFull.clusters).toEqual(omitted.clusters);
+    });
+
+    it('format: "minimal" caps action.input/output to 500 chars + exact suffix', async () => {
+      const fresh = new MemoryStorage();
+      await seedLong(fresh);
+      handle = await startMcpServer(fresh, { port: 0 });
+      const r = await callWith({ since: SINCE, until: NOW, format: 'minimal' });
+      expect(r.query.format).toBe('minimal');
+
+      // The long atom should be truncated.
+      const longAtom = Object.values(r.atoms).find(
+        (a) => a.action.input?.startsWith('A'),
+      );
+      expect(longAtom).toBeDefined();
+      const droppedIn = LONG_INPUT.length - 500;
+      const droppedOut = LONG_OUTPUT.length - 500;
+      expect(longAtom!.action.input).toBe(
+        'A'.repeat(500) +
+          `… [truncated; ${droppedIn} chars omitted; fetch full atom via search_memories]`,
+      );
+      expect(longAtom!.action.output).toBe(
+        'B'.repeat(500) +
+          `… [truncated; ${droppedOut} chars omitted; fetch full atom via search_memories]`,
+      );
+    });
+
+    it('format: "minimal" leaves atoms whose action.input/output are ≤500 chars unmodified', async () => {
+      const fresh = new MemoryStorage();
+      await seedLong(fresh);
+      handle = await startMcpServer(fresh, { port: 0 });
+      const r = await callWith({ since: SINCE, until: NOW, format: 'minimal' });
+
+      // The short atom contains the SHORT_INPUT marker and should be untouched.
+      const shortAtom = Object.values(r.atoms).find(
+        (a) => a.action.input === SHORT_INPUT,
+      );
+      expect(shortAtom).toBeDefined();
+      expect(shortAtom!.action.input).toBe(SHORT_INPUT);
+      expect(shortAtom!.action.output).toBe(SHORT_OUTPUT);
+      // No spurious suffix.
+      expect(shortAtom!.action.input).not.toContain('truncated;');
+      expect(shortAtom!.action.output).not.toContain('truncated;');
+    });
+
+    it('format: "minimal" leaves all non-action fields bit-for-bit identical to "full"', async () => {
+      const fresh = new MemoryStorage();
+      await seedLong(fresh);
+      handle = await startMcpServer(fresh, { port: 0 });
+      const full = await callWith({ since: SINCE, until: NOW, format: 'full' });
+      const minimal = await callWith({
+        since: SINCE,
+        until: NOW,
+        format: 'minimal',
+      });
+
+      const fullIds = Object.keys(full.atoms).sort();
+      const minIds = Object.keys(minimal.atoms).sort();
+      expect(minIds).toEqual(fullIds);
+
+      for (const id of fullIds) {
+        const f = full.atoms[id]!;
+        const m = minimal.atoms[id]!;
+        // Non-action fields must be unchanged.
+        expect(m.id).toBe(f.id);
+        expect(m.time).toEqual(f.time);
+        expect(m.source).toEqual(f.source);
+        expect(m.actors).toEqual(f.actors);
+        expect(m.artifacts).toEqual(f.artifacts);
+        expect(m.context).toEqual(f.context);
+        expect(m.conversation).toEqual(f.conversation);
+        expect(m.provenance).toEqual(f.provenance);
+        expect(m.open_loop_hints).toEqual(f.open_loop_hints);
+        // Within action: kind/verb/status untouched; only input/output may shrink.
+        expect(m.action.kind).toBe(f.action.kind);
+        expect(m.action.verb).toBe(f.action.verb);
+        expect(m.action.status).toBe(f.action.status);
+      }
+      // Cluster shape (atom_ids, edges, rank, label, etc.) is identical
+      expect(minimal.clusters).toEqual(full.clusters);
+    });
+
+    it('rejects an invalid format value with a tool error', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const result = (await withClient(handle.url, async (c) =>
+        c.callTool({
+          name: 'get_recent_work_context',
+          arguments: { since: SINCE, until: NOW, format: 'summary' },
+        }),
+      )) as CallToolResultLike;
+      expect(result.isError).toBe(true);
+    });
+
+    it('tool description mentions the format parameter and signal-bearing edges', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const tools = await withClient(handle.url, async (c) => c.listTools());
+      const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
+      expect(found?.description).toMatch(/format/);
+      expect(found?.description).toMatch(/signal-bearing|atom_ids/);
+    });
+  });
 });
