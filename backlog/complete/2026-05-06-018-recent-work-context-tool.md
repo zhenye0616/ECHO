@@ -73,7 +73,41 @@ agent_notes: |
   question the v1.5 dogfooding loop is meant to surface.
 
   Run log: raw/internal/agent-runs/2026-05-07-2026-05-06-018-recent-work-context-tool.md
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-07 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean merge; sidecar's no-conflict prediction held)
+
+  Fixups applied:
+  - none (verdict was "merge as-is")
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 388/391 tests pass post-merge. The 3 failures are exactly the
+  pre-existing chokidar lifecycle flake documented in item 014's
+  review_notes (cursor.test.ts x2, lifecycle.test.ts x1 — all 5000ms
+  timeouts on disjoint capture-surface / daemon-lifecycle code). Same race
+  signature: passes under --pool=forks --poolOptions.forks.singleFork=true
+  (390/391). This branch does not touch any capture, watcher, or
+  daemon-lifecycle file. The 52 tests added by this item pass
+  deterministically in isolation (npx vitest run tests/trace
+  tests/mcp/tools/recent-work-context.test.ts → 52/52 in 1.3s).
+  Lint and typecheck clean.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Tighten MCP `limit` zod schema to int+min/max so malformed values surface
+    as a tool error at the boundary (src/mcp/tools/recent-work-context.ts:90).
+  - Switch `computeTimeRange` to `Date.parse()` before any timezone-bearing
+    extractor lands (src/trace/index.ts:202).
+  - Broaden hint regexes during v1.5 dogfooding if too tight
+    (src/trace/hints.ts:5-6).
+  - Pick a convention for agent-run-log filenames and document in
+    backlog/README.md (spec date vs run-prefix date).
+  - Track the "shared-repo artifact coalesces multi-file work threads" signal
+    as a v1.5 dogfooding observation (already flagged by the agent).
+  - Carry forward the pre-existing chokidar lifecycle flake from item 014.
 ---
 
 # V1.5 trace layer — `get_recent_work_context` MCP tool
