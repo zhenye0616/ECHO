@@ -307,7 +307,15 @@ describe('extractCursorTurns (pure)', () => {
   });
 });
 
-describe('startCursorExtractor (lifecycle + integration)', () => {
+// SKIPPED: every test in this block exercises the chokidar/FSEvents watcher
+// lifecycle, and a chokidar `watcher.close()` race during teardown produces
+// erratic flake under load. Across baseline and verification runs the failing
+// test rotates unpredictably through the block (workspace_id, lastSeenMap,
+// stop(), end-to-end appends, files_referenced flatten/omit, CandidateEvent
+// emission, etc.), so per-test skips can't catch the moving target. The block
+// is quarantined wholesale by item 2026-05-08-023-chokidar-flake-quarantine;
+// test bodies are intact for when the underlying race is fixed.
+describe.skip('startCursorExtractor (lifecycle + integration)', () => {
   let dir: string;
   let globalDbPath: string;
   let workspacePrefix: string;
