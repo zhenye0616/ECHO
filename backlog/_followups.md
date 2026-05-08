@@ -33,6 +33,7 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - **Investigate chokidar lifecycle flake** — `cursor.test.ts`, `claude-code.test.ts`, `fs-watcher.test.ts` intermittently time out at 5000ms under parallel load. Different tests fail each run (race, not deterministic regression). Surface area was reduced in chore commit `912ebab` (fs-watcher now ignores Cursor's SQLite triplet; cursor-extractor debounces) but the deeper `watcher.close()` race in chokidar teardown remains. Workaround: `--pool=forks --poolOptions.forks.singleFork=true` masks rather than fixes. (Test-infra item; high priority since the flake will block future merges.)
 
 > Resolved (delivered after merge by 2026-05-08-023) for the `cursor.test.ts` portion only — the `describe('startCursorExtractor (lifecycle + integration)')` block is `describe.skip`-quarantined with a tracking comment. The `claude-code.test.ts` and `fs-watcher.test.ts` portions remain open per 023's Out-of-Scope.
+> Resolved (delivered after merge by 2026-05-08-024) for the `fs-watcher.test.ts` portion — the `describe('startFsWatcher')` block is `describe.skip`-quarantined with a tracking comment. The `claude-code.test.ts` portion remains open.
 
 ## From merge of 2026-04-30-015-mcp-integration-test (2026-05-01)
 
@@ -184,6 +185,8 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ## 2026-05-08 — from merge of 023-chokidar-flake-quarantine
 
 - [ ] **fs-watcher.test.ts Path C successor (~15 min).** The 023 carve-out: agent stayed strictly inside `files_to_modify` and did not quarantine `tests/capture/surfaces/fs-watcher.test.ts > startFsWatcher` despite ~33% solo flake rate. Apply the same Path C `describe.skip` with a `2026-05-08-023`-anchored tracking comment. ~30 LOC, same shape as the 023 changes to cursor.test.ts and lifecycle.test.ts. The 014 section's annotation already pre-lays the breadcrumb. (Test infra; small.)
+
+  > Resolved (delivered after merge by 2026-05-08-024) — `describe.skip` applied to the `startFsWatcher` block in `tests/capture/surfaces/fs-watcher.test.ts` with a tracking comment in the 023 shape. Three consecutive clean `npm test` runs verified.
 
 - [ ] **Chokidar real-fix item (post-V1.5; 2-3d).** Tracking comments at `tests/capture/extractors/cursor.test.ts` and `tests/daemon/lifecycle.test.ts` cite item 023; once 023 lands in `complete/` those references become tombstones unless a successor item exists. Investigate deterministic synchronization via the extractor's `probeFreshness` handle (already flagged in 016 followup) or sentinel-event subscription. The deeper `watcher.close()` race in chokidar teardown is the underlying root cause — quarantine is a holding pattern, not a fix. (Test infra; high priority post-V1.5.)
 
