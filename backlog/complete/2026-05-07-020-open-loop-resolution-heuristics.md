@@ -10,6 +10,61 @@ claimed_at: "2026-05-08T05:53:09Z"
 branch: "agent/open-loop-resolution-heuristics"
 head_sha: "9b9449b82fd1ba57192dd3dfd02c884c8aae9ef9"
 pr_url: ""
+review_notes: |
+  Merged on 2026-05-07 via founder reconciliation, with strategist as reviewer
+  per the new Reviewer Independence Rule (committed in 2830bda).
+
+  Reviewer: strategist (Claude conversation, spec author of 020). Review sidecar
+  preserved at backlog/pending_review/2026-05-07-020-open-loop-resolution-heuristics.review.md
+  before consumption (see commit history).
+
+  Conflicts resolved: none. Clean ort-strategy merge against main; the predicted
+  conflict on src/mcp/tools/recent-work-context.ts is deferred to item 021's
+  merge bench (description-string compose).
+
+  Fixups applied:
+  - package.json: added "validate:resolution": "vite-node tools/validate-resolution.ts"
+    npm script entry, satisfying spec acceptance line 174 (the agent's npx vite-node
+    workaround satisfied neither literal alternate). Smoke-test of the script against
+    live storage produced 111 rows (96 resolved, 15 unresolved) at
+    raw/internal/dogfooding/2026-05-08-resolution-validation.md — included in this
+    merge commit as the first concrete validation artifact for the founder hand-score
+    pass.
+
+  Fixups deferred to follow-up items (queued in backlog/_followups.md):
+  - Tighten R1.TODO type cast at src/trace/hints.ts:150 (cosmetic; replace
+    `(state as { delta?: ... }).delta` with `if ('delta' in state)` discriminated-
+    union narrowing).
+  - Add explicit "earliest" tests for R1.AQ and R1.TODO to mirror the existing R1.Q
+    earliest test (currently inferred from shared loop structure).
+  - One-line comment in src/trace/index.ts:202-211 documenting the UTC-Z invariant
+    for compareByOccurredAt's lex-sort.
+  - Strategist post-merge spec amendment: the spec text "context.conversation
+    artifact id" doesn't match the actual NormalizedContextEvent schema; the agent
+    correctly inferred conversation-typed ArtifactRef matching. Update spec wording
+    for future readers.
+  - R1.TODO snapshot-resolver expansion: commit atoms use state.snapshot, not
+    state.delta, so commits don't close TODOs in the current rule. Per spec, this
+    is faithful; revisit after dogfooding evidence.
+  - R1.AQ user-with-empty-input edge case: hasNonEmptyContent falls back to output
+    when input is empty. Probably fine; validate during dogfooding.
+  - Quarantine the pre-existing capture/daemon flake (already flagged from item 019;
+    re-confirmed here — 14 fails on first run, 3 fails on rerun, all in
+    tests/capture/extractors/cursor.test.ts and tests/daemon/lifecycle.test.ts,
+    both files untouched by this branch's diff).
+
+  Verify: typecheck clean. lint clean (--max-warnings 0). Tests fluctuated 14→3
+  failures on consecutive runs, all in pre-existing-flake files. All 16 new tests
+  added by this item pass: 12 in hints.test.ts, 2 in build.test.ts, 2 in
+  recent-work-context.test.ts.
+
+  Follow-up items (non-blocking):
+  - Founder hand-scores the 111 rows in 2026-05-08-resolution-validation.md as
+    TP/FP/TN/FN. If overall precision ≥80%, R1 is sufficient for V1 hotkey overlay.
+    Otherwise calibration becomes the next backlog item.
+  - Item 021 (currently in claimed/) merges next; expected mechanical conflict on
+    src/mcp/tools/recent-work-context.ts description string. Strategist composes
+    the diff, founder rubber-stamps, push.
 agent_notes: |
   R1 open-loop resolution heuristics implemented per spec. Branch agent/open-loop-resolution-heuristics pushed at SHA 9b9449b. 122/122 in-scope tests (tests/trace + tests/mcp) pass; npm run typecheck and npm run lint clean.
 

@@ -13,6 +13,7 @@
     "watch:stream": "vite-node tools/stream-watch.ts",
     "render:trace": "vite-node tools/render-trace.ts",
     "serve:trace": "vite-node tools/serve-trace.ts",
+    "validate:resolution": "vite-node tools/validate-resolution.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src tests package.json tsconfig.json vitest.config.ts eslint.config.js .prettierrc.json",
     "format:check": "prettier --check src tests package.json tsconfig.json vitest.config.ts eslint.config.js .prettierrc.json",
