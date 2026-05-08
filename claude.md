@@ -142,6 +142,29 @@ When a builder agent runs:
 
 The agent operates across **two directories**: backlog state changes happen in the main repo on `main` (so all agents share consistent backlog state); code work happens inside the worktree on the feature branch. The slash command handles directory switching.
 
+### Dogfooding journal discipline (every AI client)
+
+While a dogfooding window is active (today: V1.5 trace layer, journal at `raw/internal/dogfooding/<date>-trace-layer.md`), **every ECHO MCP call must be logged to that journal in the moment** — not at end-of-session, not at end-of-day. This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+
+**What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
+
+**Required entry shape** (the template lives in the journal preamble; copy it verbatim):
+
+```
+### YYYY-MM-DD HH:MM PDT — <one-line context>
+- **Trigger:** what the user (or AI client) just did that called the tool
+- **Query inputs:** since=…  until=…  artifact_hint=…  (or other args)
+- **Returned:** N clusters, M atoms; top cluster: "<label or none>"; rank_reasons: […]
+- **Sources:** source_breakdown={…} for trace; OR per-match source-prefix list for search; OR the specific jsonl/git/fs paths the atoms came from. ALWAYS shown — a reader must be able to tell which capture surfaces contributed and which were silently absent.
+- **Verdict:** ✅ right / 🟡 partial / ❌ wrong
+- **Note:** observation — what felt right or off
+- **Conjecture:** (optional) what algorithm/config change might help — observations only, don't design fixes here
+```
+
+The **Sources** field is non-optional. Source-volume bias and silent omission (e.g., a window whose git rows all got dropped by Bug A's text-compare WHERE clause) are the most-recurring failure modes; without explicit per-call source attribution, future readers can't tell whether a 1-cluster trace response is "right and narrow" or "wrong because all git rows got dropped." Codex started doing this organically at 2026-05-08 00:46 PDT and earlier; the discipline is now project-wide.
+
+**Don't design fixes in the journal.** Observations only. Backlog items come from end-of-window synthesis. If you find yourself drafting a fix, stop — the journal's "lossy in the moment" honesty is what makes it useful for backlog planning later.
+
 ### Drift Prevention Applies to Agents Too
 
 Agents are more dangerous than the founder for drift, because they don't have the founder's gut. Three safeguards:
