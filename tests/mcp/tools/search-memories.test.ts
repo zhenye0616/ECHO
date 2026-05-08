@@ -346,6 +346,52 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
     // content was ~100KB.
     expect(r.matches.every((m) => typeof m.bytes_elided === 'number')).toBe(true);
   });
+
+  it('V1.5.6 — total envelope stays under 25k on a 10× ~100KB-METADATA-tool_calls fixture (the 16:14 PDT failure mode)', async () => {
+    // Reproduce the 16:14 PDT post-Bug-A1-merge failure: content was capped
+    // (correctly) but metadata.tool_calls was 120-130KB per atom, so the
+    // per-match envelope was still ~133KB. Three matches blew the budget by
+    // 12.2× even after Bug A1's content cap. The V1.5.6 wire-shape
+    // projector's per-KEY metadata cap is what closes this. Test fails on a
+    // manual revert of the metadata cap — proves it's load-bearing.
+    const store = new MemoryStorage();
+    for (let i = 0; i < 10; i++) {
+      await store.append({
+        source: `fs:codex-${i}.jsonl`,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `JSON-RPC turn ${i} short body`,
+        metadata: {
+          // Small structured neighbours that should pass through verbatim.
+          session_id: `019e09${i}`,
+          turn_index: i,
+          byte_offset: 100_000 + i,
+          git_state: { branch: 'main' },
+          // Variadic heavy field — the actual bloat source post-026/027.
+          tool_calls: Array.from({ length: 30 }, (_, j) => ({
+            name: 'exec_command',
+            args: 'a'.repeat(2_000),
+            output: 'b'.repeat(1_000),
+            call_id: `call_${j}`,
+          })), // ~95KB serialized per atom
+        },
+      });
+    }
+
+    const r = await searchMemories(store, { query: 'JSON-RPC', limit: 10 });
+
+    expect(r.total_returned).toBe(10);
+    const envelopeBytes = JSON.stringify(r).length;
+    expect(envelopeBytes).toBeLessThan(25_000);
+    expect(
+      r.matches.every((m) => m.metadata_keys_elided?.includes('tool_calls')),
+    ).toBe(true);
+    expect(r.matches.every((m) => typeof m.metadata_bytes_elided === 'number')).toBe(
+      true,
+    );
+    // Per-KEY semantics: small structured metadata neighbours pass verbatim.
+    expect(r.matches.every((m) => m.metadata?.['session_id'] !== undefined)).toBe(true);
+    expect(r.matches.every((m) => m.metadata?.['git_state'] !== undefined)).toBe(true);
+  });
 });
 
 describe('search_memories (end-to-end via MCP server)', () => {

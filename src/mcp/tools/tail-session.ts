@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { projectMatch } from '../wire-shape/match.js';
 import {
   CursorDecodeError,
   decodeCursor,
@@ -50,8 +51,19 @@ export interface TailMatch {
   id: string;
   source: string;
   timestamp: string;
+  /** Capped by `WIRE_SHAPE_CAPS.match_content` via the wire-shape
+   *  projector. Format when clipped: head + elision marker + tail. */
   content: string;
+  /** Set only when `content` was clipped (V1.5.6 wire-shape projector). */
+  bytes_elided?: number;
+  /** Per-KEY clipped metadata: large variadic values (e.g. tool_calls)
+   *  replaced by `{__elided: true, original_size: N}`; small structured
+   *  neighbours (git_state, session_id) pass through verbatim. */
   metadata?: Record<string, unknown>;
+  /** Set only when one or more metadata values were clipped. */
+  metadata_bytes_elided?: number;
+  /** Set only when one or more metadata values were clipped. */
+  metadata_keys_elided?: string[];
 }
 
 function clampCount(input: number | undefined): number {
@@ -65,16 +77,13 @@ function clampCount(input: number | undefined): number {
   return Math.min(floored, MAX_COUNT);
 }
 
-function toMatch(e: CaptureEvent): TailMatch {
-  const m: TailMatch = {
-    id: e.id,
-    source: e.source,
-    timestamp: e.timestamp,
-    content: e.content,
-  };
-  if (e.metadata !== undefined) m.metadata = e.metadata;
-  return m;
-}
+// V1.5.6 (2026-05-08): single wire-shape projection point lives in
+// `src/mcp/wire-shape/match.ts`. `tail_session` and `search_memories` go
+// through the same `projectMatch` so per-match content + per-key metadata
+// caps stay synchronized. Closes the Bug A1 reach-gap (this file's
+// pre-V1.5.6 toMatch had no content cap at all) and Bug A2 (metadata
+// uncapped on both tools).
+const toMatch = projectMatch;
 
 function emitCursor(rows: CaptureEvent[], countApplied: number): {
   kept: CaptureEvent[];

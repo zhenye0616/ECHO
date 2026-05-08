@@ -15,6 +15,7 @@ import type {
   RecentWorkContextResponse,
   ResponseFormat,
 } from '../../trace/types.js';
+import { WIRE_SHAPE_CAPS } from '../wire-shape/caps.js';
 
 export const RECENT_WORK_CONTEXT_DESCRIPTION =
   "Retrieve clusters of related events from the user's captured ECHO memories — " +
@@ -68,7 +69,9 @@ export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 500;
 export const DEFAULT_WINDOW_HOURS = 4;
 export const STORAGE_OVERFETCH = 10;
-export const MINIMAL_CONTENT_CAP = 500;
+// V1.5.6: re-export from the shared wire-shape caps table so all three
+// retrieval tools see one source of truth. Behavior unchanged from item 025.
+export const MINIMAL_CONTENT_CAP = WIRE_SHAPE_CAPS.minimal_action;
 
 const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 const isoString = z
@@ -86,8 +89,9 @@ const formatSchema = z.enum(['full', 'minimal', 'skeleton']);
 // Item 028: caller-controlled head-clip on the surrogate `action.summary` we
 // synthesize for skeleton atoms. 200 chars is enough to disambiguate the atom
 // in a resume briefing without re-introducing the action.input/output bytes
-// minimal mode already caps at 500.
-export const SKELETON_SUMMARY_CAP = 200;
+// minimal mode already caps at 500. V1.5.6: re-exported from the shared
+// wire-shape caps table.
+export const SKELETON_SUMMARY_CAP = WIRE_SHAPE_CAPS.skeleton_summary;
 
 export interface SkeletonAtom {
   id: NormalizedContextEvent['id'];
