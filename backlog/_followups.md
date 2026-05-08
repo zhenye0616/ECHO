@@ -192,3 +192,42 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [ ] **Optional: grep-anchored CI ship-blocker for V1 cut.** CI fails if `describe.skip` paired with the literal `2026-05-08-023` tracking-comment string is still present in the tree after a target date. Insurance against the quarantine outliving memory and shipping skipped tests in V1. (CI / V1 cut hygiene.)
 
+---
+
+## 2026-05-08 — from merge of 025-mcp-best-practices
+
+### Per-merge cleanup (small, mechanical)
+
+- [ ] **`MAX_OVERFETCH = 200` dead constant** at `src/mcp/tools/search-memories.ts:11`. Exported but never applied as a cap after the path-aware `limit+1` overfetch refactor. Either wire it as a defensive cap on the substring-path candidate set (against unbounded full-window scans on huge stores) or delete the constant + rename the related test. Reviewer-flagged as misleading.
+- [ ] **`buildSourceAppMap()` rebuilt per call** at `src/mcp/tools/search-memories.ts:25-33,167`. Trivial allocation (`os.homedir()` + 4 string concats); hoist to module scope or memoize. Cosmetic.
+
+### Code-correctness follow-up (own item)
+
+- [ ] **`discoverLastSeen` non-determinism in `src/capture/surfaces/git-watcher.ts:225-242`.** Storage's new `id DESC` tie-break (introduced by this item per the spec's pagination requirement) exposes a pre-existing bug: on same-second commits the watcher now picks the id-ASC-smallest tied SHA as "last seen", which can cause it to re-emit prior commits as duplicates after restart. The 025 agent correctly downgraded the resumption test in `tests/capture/surfaces/git-watcher.test.ts` from `expect(events).toHaveLength(5)` to assert only the core contract ("both new SHAs land in storage"). Proper fix needs `git-watcher.ts` changes + a `rowid` ordering hint or a `git rev-parse --short HEAD`-based discovery mechanism. After the fix, restore the strict `toHaveLength(5)` assertion. (Capture surface; latent reliability bug.)
+
+### V1.6 territory (already specced as out-of-scope by 025)
+
+- [ ] **`source_apps: array[]` multi-source filtering.** Today `source_app` is a single-value enum mapping to one `source_prefix`. Multi-source filtering (e.g., "search across `claude_code` and `codex`") requires widening `QueryFilter` and is V1.6 territory.
+- [ ] **`format: 'skeleton'` response shape.** If post-merge dogfooding shows `format: 'minimal'` with `limit=20` is still too large on real fixtures, add a third response shape that returns `id`+`time`+`source`+`artifacts` only and lets the consumer fetch full content via `search_memories(id=...)` on demand. Already flagged as the highest-leverage payload move in the 022 follow-up section above.
+- [ ] **Raise `MAX_LIMIT=50` for `search_memories`.** Cursor pagination is the right answer for now; raising the cap is V1.6 work.
+- [ ] **Server-side substring search.** Already deferred per item 022 line 99.
+
+### Strategist post-merge
+
+- [ ] **Wiki promotion for 025.** Per the item's "After Completion (Strategist Notes)" section:
+  - **NEW:** `wiki/surfaces/mcp-server.md` — promote V1 MCP surface from `planned` to `shipped`. Cover three tools, `source_app` enum, default cost model (`limit=20`, `format='minimal'`), composite-cursor pagination, `readOnlyHint` annotations, `outputSchema`+`structuredContent` wire shape. Cross-reference `[[capture-gate]]`, `[[storage]]`, `[[interface-layers]]` (L3).
+  - **UPDATE:** `wiki/architecture/storage.md` — document the new `ORDER BY timestamp DESC, id DESC` deterministic ordering contract and the `before: { timestamp, id }` filter (`order:'asc'+before` rejection at the seam). Composite-key sort is now a stable property the rest of the substrate depends on.
+  - **UPDATE:** `wiki/architecture/interface-layers.md` — clarify L3 (summoned) now ships with structured-output capabilities and source-app routing.
+  - Manifest update + `tools/wiki_index.py` regeneration after the page lands.
+
+### Dogfooding (founder + AI clients)
+
+- [ ] **Re-run the 13:27 PDT scenario** from `raw/internal/dogfooding/mcp-interactions-journal.md` — `get_recent_work_context` over a 2.5h window with default args. Expect: response under 25k chars, no spill, `structuredContent` populated.
+- [ ] **Re-run the 14:43 PDT scenario** — `search_memories(query="JSON-RPC", source_app='codex', limit=20)`. Expect: same matches as the equivalent literal-prefix call.
+- [ ] **Capture AI-client uptake on the new affordances:** does Claude Code spontaneously use `source_app: 'claude_code'` for app-scoped queries instead of guessing FS prefixes? Does pagination via `next_cursor` get used at all, or do consumers default to wider `until` filters? Two more dogfooding entries' worth of signal needed before deciding whether the affordances are working as intended.
+
+### Process notes
+
+- **Test files outside `files_to_modify` (escalation pattern).** 025 agent self-flagged that three test files in `tests/capture/{extractors,surfaces}/*` were modified to absorb the spec-mandated `ORDER BY id` fallout. Reviewer judged: stand (diffs surgical, set-membership where order is no longer guaranteed, well-commented). For future runs the right move is to escalate via `agent_notes` first and let founder/strategist pre-bless test edits outside the listed file set. Same theme as the 020/021 "test fallout permitted in:" follow-up — the spec template improvement is overdue.
+- **Reviewer-vs-worktree drift on artifact location.** Reviewer subagent flagged the run log absent because it inspected the worktree's branch tip; the file was already on main from the review-stage commit. Future review prompts should explicitly direct the subagent to `git log --all -- <path>` for spec-required artifact files, not just `ls` inside the worktree.
+
