@@ -18,6 +18,19 @@ export const SEARCH_MEMORIES_DESCRIPTION =
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
 
+// Per-match content envelope cap (Bug A, surfaced 2026-05-08 15:54 PDT
+// post-026+027 dogfooding round). A real Codex turn JSONL atom is ~100KB;
+// without this cap, three matches can blow the 25k consumer tool-result
+// budget by 12.7×. Each match's `content` is clipped to head + elision
+// marker + tail at PER_MATCH_CONTENT_CAP total chars; `bytes_elided` carries
+// the dropped char count so the consumer can size the missing remainder.
+//
+// Cap chosen so 10 matches × cap × ~1.05 marker overhead < 25k budget,
+// leaving room for envelope/metadata.
+export const PER_MATCH_CONTENT_CAP = 2_000;
+const PER_MATCH_HEAD_CHARS = 1_000;
+const PER_MATCH_TAIL_CHARS = PER_MATCH_CONTENT_CAP - PER_MATCH_HEAD_CHARS;
+
 // Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?
 const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
@@ -47,6 +60,10 @@ export interface SearchMatch {
   source: string;
   timestamp: string;
   content: string;
+  // Present only when `content` was clipped by PER_MATCH_CONTENT_CAP. The
+  // original content length is `content.length - markerOverhead + bytes_elided`,
+  // but the simpler invariant for consumers is: missing chars = bytes_elided.
+  bytes_elided?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -95,13 +112,26 @@ function sortDesc(events: CaptureEvent[]): CaptureEvent[] {
   });
 }
 
+function clipContent(content: string): { content: string; bytes_elided?: number } {
+  if (content.length <= PER_MATCH_CONTENT_CAP) return { content };
+  const head = content.slice(0, PER_MATCH_HEAD_CHARS);
+  const tail = content.slice(content.length - PER_MATCH_TAIL_CHARS);
+  const bytes_elided = content.length - PER_MATCH_HEAD_CHARS - PER_MATCH_TAIL_CHARS;
+  // Marker is recognisable for both human + programmatic readers; the
+  // `bytes_elided` field on the match is the canonical machine reading.
+  const marker = `\n…[${bytes_elided} chars elided]…\n`;
+  return { content: head + marker + tail, bytes_elided };
+}
+
 function toMatch(e: CaptureEvent): SearchMatch {
+  const clipped = clipContent(e.content);
   const m: SearchMatch = {
     id: e.id,
     source: e.source,
     timestamp: e.timestamp,
-    content: e.content,
+    content: clipped.content,
   };
+  if (clipped.bytes_elided !== undefined) m.bytes_elided = clipped.bytes_elided;
   if (e.metadata !== undefined) m.metadata = e.metadata;
   return m;
 }
@@ -196,6 +226,8 @@ export const searchMatchSchema = z.object({
   source: z.string(),
   timestamp: z.string(),
   content: z.string(),
+  // Optional — present only when content was clipped by PER_MATCH_CONTENT_CAP.
+  bytes_elided: z.number().int().nonnegative().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
