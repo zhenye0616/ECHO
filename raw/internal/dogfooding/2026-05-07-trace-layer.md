@@ -350,6 +350,34 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 01:33 PDT — Codex asks ECHO what the founder is currently working on
+
+- **Trigger:** founder asked Codex: "use echo and see what i am current working on."
+- **Tool/input:** `get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=8, format="minimal")`.
+- **Returned:** 1 cluster, 3 atoms; top cluster: `"discussion about Project_echo"`; rank_reasons: `[]`; time range `2026-05-08T08:30:34Z` to `2026-05-08T08:32:03Z` (01:30-01:32 PDT). Anchor artifacts: repo `Project_echo`, Claude Code session `3c98f080-b09d-4fff-8a35-ccc3fe232f4d`, Claude Code session `20d5fc7d-c166-4d68-9292-9d90f5f4158e`.
+- **Sources:** source_breakdown `{ claude_code: 3 }`; silently absent from this trace response: codex/git despite active same-repo work in adjacent windows.
+- **Verdict:** 🟡 partial.
+- **Note:** The answer was directionally useful: founder is working in `Project_echo` on ECHO trace-layer reliability/process cleanup. The cluster surfaced (1) a Claude builder run for item 022 `v15.2 trace retrieval reliability`, including claimed/backlog/pending_review files and touched capture/storage/MCP tests, (2) a CLAUDE.md / ECHO-interaction-logging correction thread, and (3) a `claude` to `CLAUDE.md` case-rename cleanup. It did not surface the current Codex conversation that triggered this lookup, which keeps the source-coverage/ranking caveat alive.
+- **Conjecture:** For "current working on" questions, trace should probably bias toward the most recent normalized conversation atoms across all active AI clients and include a source-coverage warning when only one client contributes.
+
+---
+
+#### 2026-05-08 01:39 PDT — Codex investigates why Codex/git did not surface
+
+- **Trigger:** founder asked why Codex and git activity did not surface in the 01:33 trace result, then pointed to Claude session `3c98f080/#7` at 01:36:54 PDT as confirmation.
+- **Tool/input:**
+  1. `get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=20, format="minimal")`
+  2. `search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-b09d-4fff-8a35-ccc3fe232f4d.jsonl", since="2026-05-08T08:36:30Z", until="2026-05-08T08:37:15Z", limit=5)`
+- **Returned:**
+  1. 2 clusters, 6 atoms; top cluster `"discussion about Project_echo"` with source_breakdown `{ claude_code: 5 }`; second cluster source_breakdown `{ codex: 1 }`; warnings `[]`.
+  2. 2 matches: one raw fs-change row and the target Claude turn `a5cfa1d3...` / `turn_index=7`.
+- **Sources:** trace sources `{ claude_code: 5 }` and `{ codex: 1 }`; search sources were both the exact Claude Code session JSONL, one `metadata.surface="fs"` raw row and one normalized Claude conversation row.
+- **Verdict:** 🟡 partial.
+- **Note:** Direct SQLite inspection showed the root cause: at 01:33 the newest 80 storage rows were 59 Claude raw-fs rows, 10 Codex raw-fs rows, 8 other raw-fs rows, and only 3 Claude turn-pair rows. The newest Codex normalized turn was row 127 at that moment, outside `limit=8`'s `STORAGE_OVERFETCH=80` budget, while git rows were rows 1811-1850 because git stored `-07:00` timestamps and sorted below same-moment `Z` rows. The later 01:39 trace surfaced one Codex atom only because the current Codex turn had since been extracted and `limit=20` gave a 200-row storage budget. Git still did not surface. Claude `3c98f080/#7` confirms the theory: today is broken because "git rows silently dropped" and "fs noise crowds budget"; 022 is the pending fix.
+- **Conjecture:** This is exactly 022 Bug A + Bug C in live form. Do not expect clean `{ claude_code, codex, git }` source_breakdown until 022 is reviewed, merged, daemon-restarted, and the timestamp migration has run.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
