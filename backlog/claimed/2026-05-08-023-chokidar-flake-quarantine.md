@@ -1,10 +1,13 @@
 ---
 id: 2026-05-08-023-chokidar-flake-quarantine
 title: Quarantine the recurring chokidar / capture / daemon-lifecycle flake cluster
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T08:12:38Z"
+branch: "agent/chokidar-flake-quarantine"
 spec_refs:
   - tests/capture/extractors/cursor.test.ts
   - tests/daemon/lifecycle.test.ts
