@@ -53,15 +53,32 @@ Three tools are registered on every session at session creation:
 
 ## Tool Registration Pattern
 
-Tools register against an `McpServer` instance using zod input schemas:
+Tools register against an `McpServer` instance using zod input schemas. As of item 025, every tool also advertises an `outputSchema`, returns `structuredContent` alongside the text content, and carries a `readOnlyHint: true` annotation:
 
 ```ts
 server.registerTool(
   'search_memories',
-  { description, inputSchema: { query: z.string().optional(), /* ... */ } },
-  async (input) => { /* handler returns { content: [{ type: 'text', text }] } */ },
+  {
+    description,
+    inputSchema:  { query: z.string().optional(), source_app: z.enum([...]).optional(), /* ... */ },
+    outputSchema: { matches: z.array(...), total_returned: z.number(), next_cursor: z.string().nullable(), /* ... */ },
+    annotations:  { readOnlyHint: true },
+  },
+  async (input) => {
+    const result = await runHandler(input);
+    return {
+      content:          [{ type: 'text', text: JSON.stringify(result) }],
+      structuredContent: result,
+    };
+  },
 );
 ```
+
+The `content` text field stays for compat with clients that only read text content (Cursor's MCP client today). `structuredContent` lets newer clients (Claude Code, future Cursor versions) render the result as structured tool output without re-parsing JSON-as-text. SDK 1.29.0 advertises capabilities for both `2024-11-05` and `2025-06` MCP protocol versions; `structuredContent` is supported in both — no protocol-version pinning required.
+
+**Schema scoping decision (item 025).** Small response shapes (`echo_ping`, `search_memories`) are mirrored exactly. The deeply nested cluster/atom/edge bodies inside `get_recent_work_context` use permissive `z.record(z.string(), z.unknown())` / `z.array(z.unknown())` because their internal contract is still moving (items 016–022 reshape them on most weeks); top-level keys (`schema_version: z.literal(1)`, `tool: z.literal('get_recent_work_context')`, `query`, `clusters`, `atoms`, `truncation`, `warnings`) are exact. An exact-everywhere schema would reject every real response at validation time the next week trace internals shift.
+
+**`readOnlyHint: true` on all three.** All current tools are pure-read (no `storage.append` calls). The hint lets MCP clients render and route them as safe-by-default. Codex's 2026-05-08 13:25 PDT review settled the question of whether `echo_ping` should instead be reclassified as an MCP resource: stay a tool. Resources are application-controlled; tools are model-controlled. A model-invoked health check is a tool.
 
 The [[storage|`Storage`]] instance is passed into the tool's `register*` function at session-creation time, so handlers can `await storage.query(...)` without a global. This is the dependency-injection seam that lets tests run with `MemoryStorage` and production runs with `SqliteStorage`.
 

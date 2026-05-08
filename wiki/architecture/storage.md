@@ -41,6 +41,7 @@ interface QueryFilter {
   limit?: number;
   order?: 'asc' | 'desc';              // default 'desc' — keeps newest when limit is hit (item 021)
   exclude_metadata_surface?: string[]; // drop rows whose metadata.surface ∈ this set (item 022)
+  before?: { timestamp: string; id: string }; // descending-only page boundary (item 025)
 }
 ```
 
@@ -50,7 +51,11 @@ Three operations, no others. There is no `update`, no `delete`. Forgetting (when
 
 `order` (added in item 021) defaulted to ASC pre-021, which silently dropped the **newest** events when `limit` was hit — every existing caller's intent was "give me the recent N events," but ASC + LIMIT returned the oldest N. The default is now `'desc'` (newest-first selection); callers that genuinely need oldest-first (e.g., turn-pair reconstruction in extractors) pass `order: 'asc'` explicitly. Trace-layer callers re-sort ASC in memory after fetch since cluster determinism and forward-only resolution scans require ascending order. See [[work-trace]] for the trace-side adjustment.
 
+Item 025 added a deterministic secondary tie-break on `id` in the same direction as `timestamp` — the SQL ordering is `ORDER BY timestamp ${dir}, id ${dir}` (parallel directions, never mixed). Pre-025, same-millisecond rows had non-deterministic order and a naïve `oldest_minus_1ms` cursor would silently skip ties. Post-025, the composite key is stable, the `before` filter (above) can use it as a precise page boundary, and tests assert deterministic `id DESC` ordering across 10 consecutive runs over a same-ms-tied fixture. The composite-key sort is now a property the rest of the substrate depends on (cursor pagination, future range queries).
+
 `exclude_metadata_surface` (added in item 022) lets the trace tool drop raw fs-watcher change events (`metadata.surface === 'fs'`) at the storage layer. Codex measured these dominating storage's newest 1000 rows at 96.6% on busy days; without the filter the trace tool's overfetch budget was spent on rows the [[normalization|normalizer]] throws away. `search_memories` does NOT pass this filter — those raw rows stay searchable for forensic use. Both implementations apply the filter via SQL `AND COALESCE(json_extract(metadata, '$.surface'), '') NOT IN (...)` (sqlite) or array predicate (memory).
+
+`before` (added in item 025) is the page-boundary filter that powers the [[mcp-search-memories|`search_memories`]] cursor. It carries a composite `{timestamp, id}` key and applies as a row-value comparison: `(timestamp, id) < (@before_ts, @before_id)` in sqlite (`WHERE` clause uses SQLite's row-value tuple syntax, supported since 3.0); the memory adapter uses an equivalent JS predicate. `before` is **defined for descending queries only** — the only direction the cursor pagination flow exercises. Passing `before` together with `order: 'asc'` throws synchronously at the storage seam (a single early `RangeError`-style throw before SQL prep, no silent inversion). The asymmetry is documented inline in `interface.ts` so the next caller doesn't accidentally invert the cursor direction. Cursor encoding (opaque base64 of the JSON `{timestamp, id}`) lives in the MCP tool layer; storage only sees the decoded composite key.
 
 ## The Append-Only Commitment
 
@@ -93,7 +98,7 @@ Operational properties:
 - **Timestamp canonicalization migration on startup (item 022).** `canonicalizeTimestamps()` runs in the SqliteStorage constructor at every daemon boot; it rewrites any row whose `timestamp` lacks a trailing `Z` to canonical UTC `Z` form via `new Date(row.timestamp).toISOString()` inside a single transaction. Idempotent (the `WHERE timestamp NOT LIKE '%Z'` clause excludes already-canonicalized rows on re-runs); millisecond-preserving (Node's `Date` round-trip preserves all ms the original carried, unlike SQLite's `datetime()` which truncates to seconds). The migration verifies before exit that no non-`Z` rows remain, and logs `{message: 'canonicalized_timestamps', payload: {converted: N}}` when N > 0. See [[timestamp-canonicalization]] for the capture-side guarantee that prevents new mixed-form rows landing.
 - **`close()` for graceful shutdown.** The `Storage` interface itself does not require `close()`; `SqliteStorage` adds it as a method, and the daemon's lifecycle scaffold calls it during shutdown to flush WAL and release the file handle.
 - **Buffer-encoded embeddings.** The `embedding` column is `BLOB` — a `Float32Array` written via `Buffer.from(new Float32Array(arr).buffer)` on append, reconstructed via `new Float32Array(buf.buffer, buf.byteOffset, ...)` on read. No JSON, no precision loss.
-- **Indexed for the queries the MCP tool actually makes.** `CREATE INDEX` on `source` and on `timestamp`; results returned `ORDER BY timestamp` in the direction picked by `QueryFilter.order` (default DESC since item 021). The single timestamp index serves both directions efficiently.
+- **Indexed for the queries the MCP tool actually makes.** `CREATE INDEX` on `source` and on `timestamp`; results returned `ORDER BY timestamp ${dir}, id ${dir}` since item 025 (parallel directions, default DESC since item 021). The composite key is deterministic across same-ms ties, which the [[mcp-search-memories|`search_memories`]] cursor depends on. The single timestamp index serves both directions efficiently; the `id` tie-break is satisfied by the primary key.
 
 Backend selection happens once at daemon boot (`src/daemon/index.ts`): `ECHO_STORAGE=memory` selects `MemoryStorage`; anything else (including unset) selects `SqliteStorage`.
 
@@ -109,7 +114,7 @@ The single-form invariant is non-negotiable. Before item 022, the git-watcher em
 - **Indexing / fulltext search** — `query` is filter-only for V1
 - **Encryption-at-rest** — V1.5+
 - **Tombstones / forget-with-audit** — separate later item once the audit page exists
-- **Pagination beyond `limit`** — no cursors, no offsets, for V1
+- **Server-side pagination state / offsets** — storage exposes `before: { timestamp, id }` as a primitive (item 025); cursor opacity, encoding, and consumer contract live in the MCP tool layer, not here
 - **Concurrent-access semantics** — single-writer assumption for V1
 
 ## Related

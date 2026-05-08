@@ -44,6 +44,8 @@ Two delivery mechanisms ([[clipboard-and-launch]]):
 - **Push:** user → composer → assembled bundle → clipboard + open target → user pastes
 - **Pull:** AI tool → MCP request → ECHO returns context → AI uses it transparently
 
+The Pull side ships with structured-output affordances (item 025): every MCP tool advertises an `outputSchema`, returns `structuredContent` alongside `content` text, and carries `readOnlyHint: true` so AI clients can render and route it as safe-by-default. App-scoped retrieval uses a `source_app` enum (`cursor` | `claude_code` | `codex` | `git`) instead of a raw FS prefix string — closing the "AI clients guess `'claude_code'` and get 0 results" foot-gun that two tools tripped on the same day in 2026-05-07 dogfooding.
+
 **Required for V1.** Both Q&A and assembly modes ship; autonomous agent action does not.
 
 ### Layer 4 — Conversational Dialogue (deferred to V2)

@@ -127,7 +127,7 @@
     "status": "shipped",
     "title": "MCP Server",
     "link": "mcp-server",
-    "summary": "Local MCP server on 127.0.0.1:38478 exposing search_memories + echo_ping to MCP-compliant AI clients via Streamable HTTP/SSE.",
+    "summary": "Local MCP server on 127.0.0.1:38478 exposing three tools (search_memories, get_recent_work_context, echo_ping) to MCP-compliant AI clients via Streamable HTTP/SSE; outputSchema + structuredContent + readOnlyHint on every tool.",
     "aliases": [
       "MCP Server",
       "Model Context Protocol Server"
@@ -187,7 +187,7 @@
     "status": "shipped",
     "title": "Storage",
     "link": "storage",
-    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface filters, canonical-Z timestamps.",
+    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.",
     "aliases": [
       "Storage",
       "Storage Interface",
@@ -307,7 +307,7 @@
     "status": "shipped",
     "title": "MCP search_memories Tool",
     "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters over captured events; description disambiguates from semantic search; embeddings deferred to V1.5.",
+    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, outputSchema + structuredContent + readOnlyHint.",
     "aliases": [
       "search_memories",
       "MCP search_memories tool",
@@ -320,7 +320,7 @@
     "status": "shipped",
     "title": "MCP get_recent_work_context Tool",
     "link": "mcp-recent-work-context",
-    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; window_hours, format, resolved hints, signal-bearing edges, naive-TZ + storage-cap warnings.",
+    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; cost-safer defaults (limit=20, format='minimal'), window_hours, resolved hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.",
     "aliases": [
       "get_recent_work_context",
       "MCP get_recent_work_context tool",

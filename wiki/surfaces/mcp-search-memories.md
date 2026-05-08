@@ -20,21 +20,23 @@ The tool's name, description, input schema, and output shape are now a contract 
 
 **Tool name:** `search_memories`
 
-**Description (verbatim, what AI clients see):**
+**Description (verbatim, what AI clients see — composed across items 022 + 025):**
 
-> "Search the user's captured ECHO memories (Cursor + Claude Code conversations, git commits) by free-text query, source prefix, or time range. Returns the most recent matching events. Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions."
+> "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, source app, or time range. Returns the most recent matching events. Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Prefer `source_app` (`cursor` | `claude_code` | `codex` | `git`) for app-scoped queries; falls through to the FS-encoded `source_prefix` if you need a path-precise filter (e.g. a single Codex rollout JSONL). For result sets larger than `limit`, pass back the prior call's `next_cursor` verbatim — do not construct one client-side."
 
-The substring-not-semantic clarification was added in item 022 after dogfooding showed AI clients sending paraphrased queries against the implementation's literal-match contract and getting empty results — the original "free-text query" wording read as semantic search.
+The substring-not-semantic clarification was added in item 022 after dogfooding showed AI clients sending paraphrased queries against the implementation's literal-match contract and getting empty results. Item 025 introduced the `source_app` enum and stripped the FS-prefix prose ("logical names like `claude_code` or `cc` will not match", "broaden to `fs:`") that was carrying load-bearing teaching work in the description string — two AI clients in one day (Codex 16:22 PDT and Claude Code 16:33 PDT on 2026-05-07) had guessed the literal `'claude_code'` as a prefix and gotten 0 results, only recovering by pattern-matching against a *prior* captured FS path.
 
 **Input schema** (zod; all fields optional):
 
 ```ts
 {
-  query?:         string,    // case-insensitive substring match on content
-  source_prefix?: string,    // e.g. 'cursor-chat:', 'claude-code:', 'git:'
-  since?:         ISO8601,   // events with timestamp >= since
-  until?:         ISO8601,   // events with timestamp <  until
-  limit?:         number,    // default 10, clamped to [1, 50]
+  query?:         string,                                              // case-insensitive substring match on content
+  source_app?:    'cursor' | 'claude_code' | 'codex' | 'git',          // app-scoped enum (item 025)
+  source_prefix?: string,                                              // path-precise filter; wins on conflict with source_app
+  since?:         ISO8601,                                             // events with timestamp >= since
+  until?:         ISO8601,                                             // events with timestamp <  until
+  limit?:         number,                                              // default 10, clamped to [1, 50]
+  cursor?:        string,                                              // opaque base64 from prior next_cursor (item 025)
 }
 ```
 
@@ -48,11 +50,39 @@ The substring-not-semantic clarification was added in item 022 after dogfooding 
   ],
   total_returned: number,
   limit_applied:  number,
-  query_echo: { query, source_prefix, since, until, limit },
+  next_cursor:    string | null,    // always present; non-null when more rows available (item 025)
+  query_echo: { query, source_app, source_prefix, since, until, limit, cursor },
 }
 ```
 
-The `query_echo` field returns the inputs the tool actually used after defaulting and clamping — useful for clients that want to log or surface what was searched.
+The `query_echo` field returns the inputs the tool actually used after defaulting and clamping — useful for clients that want to log or surface what was searched. `source_app` and `source_prefix` are both echoed when both are passed, so consumers can see exactly which one took precedence.
+
+## `source_app` Enum (item 025)
+
+`source_app` accepts one of four values; the handler maps to a literal `source_prefix` using `os.homedir()` at request time:
+
+| `source_app` | maps to `source_prefix` |
+|---|---|
+| `cursor` | `fs:${homedir}/Library/Application Support/Cursor/` |
+| `claude_code` | `fs:${homedir}/.claude/projects/` |
+| `codex` | `fs:${homedir}/.codex/sessions/` |
+| `git` | `git:` |
+
+The `codex` mapping is the narrow `~/.codex/sessions/` because nothing under `~/.codex/` outside `sessions/` is in the [[capture-allowlist|capture allowlist]] (`src/capture/sources.ts:11` lists only `'~/.codex/sessions/'`). Cursor's broader directory prefix correctly LIKE-matches both `globalStorage/state.vscdb` and any `workspaceStorage/<hash>/state.vscdb` source string.
+
+**Precedence rule:** when both `source_app` and `source_prefix` are passed, `source_prefix` wins (explicit-over-implicit; this is the escape hatch for path-precise queries the enum can't express). Both are echoed in `query_echo` so consumers can see exactly what was applied. `source_app` cannot be used with the `source` exact-match field (already mutually exclusive with `source_prefix` per the [[storage|storage contract]]).
+
+**Out of scope for V1.5.3:** `source_apps?: array[]` for multi-source filtering. The [[storage|storage `QueryFilter`]] only takes one prefix today; widening it is a V1.6 follow-up.
+
+## Cursor Pagination (item 025)
+
+`MAX_LIMIT=50` stays. Result sets larger than 50 are reachable via opaque cursor:
+
+- **Cursor shape.** Composite `{timestamp, id}`, base64-encoded JSON. Opaque to the consumer — pass the prior call's `next_cursor` back verbatim; never construct one client-side. Why composite: same-millisecond rows have non-deterministic order under `timestamp DESC` alone, and a naïve `oldest_minus_1ms` cursor would silently skip ties. Item 025 added the `id`-secondary tie-break in [[storage]] so the composite key is stable.
+- **`next_cursor` is always present** in success responses (`string | null`). Null when no more rows; non-null base64 string when more exist. Not optional — consumers can rely on the field being present without conditional access.
+- **Detection mechanism: path-aware `limit + 1` overfetch.** See "Filter-before-slice" below — the recency-only and substring-query paths overfetch differently to preserve item 022's invariant.
+- **Malformed cursor.** Returns an MCP-style error result: `{ isError: true, content: [{ type: 'text', text: '...human-readable reason...' }] }` with NO `structuredContent`. Per MCP semantics, tool errors are signalled by `isError: true` on the result envelope, not by validation rejection of the JSON-RPC call (which still succeeds at the transport layer). Three concrete failure modes have explicit tests: not-base64 input, valid base64 but non-JSON, and valid JSON but missing `timestamp` or `id`.
+- **`cursor` + `until` together.** Both bounds applied: `until` is the outer time bound; `cursor` is the inner page boundary that narrows further. `query_echo` records both.
 
 ## Defaults, Clamping, Validation
 
@@ -80,14 +110,18 @@ The implementation is intentionally simple — no scoring, no embeddings. Two pa
 
 The output is already DESC by timestamp. There is no secondary ranking.
 
-### Filter-before-slice (item 022)
+### Filter-before-slice (item 022) and path-aware pagination (item 025)
 
-Pre-022, the content-filter path sliced to `limit * 4` (capped at 200) **before** the substring filter ran. A literal match in the 201st-newest row was silently invisible. Item 022 reordered the steps: filter first, slice last. The fix sounds trivial but the wrong-version-of-it (pushing `limit: MAX_OVERFETCH` into `storage.query`) just relocates the bug into the storage layer — a substring living in row 201 is still dropped if storage caps at 200. The correct V1.5 stance is:
+Pre-022, the content-filter path sliced to `limit * 4` (capped at 200) **before** the substring filter ran. A literal match in the 201st-newest row was silently invisible. Item 022 reordered the steps: filter first, slice last. The fix sounds trivial but the wrong-version-of-it (pushing `limit: MAX_OVERFETCH` into `storage.query`) just relocates the bug into the storage layer — a substring living in row 201 is still dropped if storage caps at 200.
 
-- **`query` undefined** → push `limit: limitApplied` into `storage.query`. Safe.
-- **`query` defined** → don't push `limit` into `storage.query`; load all matching rows, filter, then slice. Pays a memory cost bounded by the existing per-source / time-range filters.
+Item 025 added cursor pagination on top of this, and the natural temptation was to unify the two paths under a single `filter.limit = limitApplied + 1` storage call. That would have re-introduced the 022 bug. The correct path-aware wiring:
 
-The proper long-term fix — server-side `WHERE content LIKE ?` in `QueryFilter` — is deferred to V1.5.3 once a real content-filter contract is added. The current pattern works because V1 datasets are small (tens of thousands of events on one Mac).
+- **Recency-only path (`query` undefined)** → push `filter.limit = limitApplied + 1` into `storage.query`. Storage returns rows in DESC order; drop the `+1` if present, emit `next_cursor` from the last kept row's `{timestamp, id}` (composite key, base64-encoded). Safe because no post-storage filter can drop rows.
+- **Substring-query path (`query` defined)** → do NOT pass any `limit` to storage (preserves the 022 invariant). Substring filter runs over the full per-source / time-range slice, then `slice(0, limitApplied + 1)`; same drop-and-emit logic for `next_cursor`. Pays a memory cost bounded by the existing filters; rejects unbounded full-store scans because `since`/`until`/`source_prefix`/`source_app` are still applied at the storage seam.
+
+A test at `tests/mcp/tools/search-memories.test.ts:694-724` instruments the storage mock to assert `filter.limit === undefined` on the substring path, guarding the invariant against future "simplifications." A `// Item 025:` comment at the bifurcation site in `src/mcp/tools/search-memories.ts:181-191` documents the asymmetry so the next reader doesn't collapse the paths.
+
+The proper long-term fix — server-side `WHERE content LIKE ?` in `QueryFilter` — remains deferred to V1.5.3+ once a real content-filter contract is added. The current pattern works because V1 datasets are small (tens of thousands of events on one Mac).
 
 ## Substring V1, Embeddings V1.5
 
@@ -105,10 +139,11 @@ The clean long-term fix — server-side `content_contains` in `QueryFilter` so t
 
 ## What it does NOT do
 
-- **No relevance scoring.** Results are ordered by timestamp DESC only. There is no recency-decay, no TF-IDF, no rerank.
-- **No pagination.** No cursor, no offset. Clients page by narrowing `since` / `until`.
+- **No relevance scoring.** Results are ordered by timestamp DESC then id DESC only (item 025 composite key for cursor stability). There is no recency-decay, no TF-IDF, no rerank.
+- **No `source_apps` array** (V1.6 follow-up). `source_app` is single-valued; cross-app filtering requires widening [[storage|`QueryFilter`]] which is its own item.
+- **No raise of `MAX_LIMIT=50`.** Cursor pagination (item 025) is the V1.5 answer for "I need more than 50"; raising the cap is V1.6 work.
 - **No embeddings, no FTS5, no fuzzy match.** Exact case-insensitive substring on `content`.
-- **No write surface.** `search_memories` is read-only against [[storage]]. Forget / redact / delete are separate (V1.5+) tools.
+- **No write surface.** `search_memories` is read-only against [[storage]] — `readOnlyHint: true` advertises this to MCP clients (item 025). Forget / redact / delete are separate (V1.5+) tools.
 - **No auth.** Loopback-only is the V1 boundary; the [[mcp-server]] handles binding.
 - **No mutation of metadata.** What [[capture-pipeline|capture]] wrote is exactly what's returned.
 

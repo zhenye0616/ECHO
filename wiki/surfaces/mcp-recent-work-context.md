@@ -20,9 +20,9 @@ The tool's name, description, input schema, and response shape are now a contrac
 
 **Tool name:** `get_recent_work_context`
 
-**Description (verbatim, what AI clients see — composed across items 018/019/020/021):**
+**Description (verbatim, what AI clients see — composed across items 018/019/020/021/025):**
 
-> "Retrieve clusters of related events from the user's captured ECHO memories — joined by shared artifacts (files, repos, conversations) within a recent time window. Use when the user asks open-ended questions about what they were doing, where they left off, or to bring prior context (Cursor + Claude Code + Codex + git) into the current conversation. Returns one cluster per coherent work thread; the AI client decides which to attend to. `cluster.atom_ids[]` is the membership index; `cluster.edges[]` is signal-bearing (work-role pairs) and not exhaustive pairwise membership. `cluster.open_loop_hints[].resolved` indicates whether the hint has a downstream closure signal in the same window. `format: 'minimal'` caps `action.input/output` per atom to 500 chars. `window_hours` is inferred from the `(since, until)` span when not passed: span ≤ 4h uses span; span > 4h uses min(span, 24h). Always include explicit timezone (`Z` or `+HH:MM`) on `since`/`until` — naive ISO strings are parsed as local server time."
+> "Retrieve clusters of related events from the user's captured ECHO memories — joined by shared artifacts (files, repos, conversations) within a recent time window. Use when the user asks open-ended questions about what they were doing, where they left off, or to bring prior context (Cursor + Claude Code + Codex + git) into the current conversation. Returns one cluster per coherent work thread; the AI client decides which to attend to. `cluster.atom_ids[]` is the membership index; `cluster.edges[]` is signal-bearing (work-role pairs) and not exhaustive pairwise membership. `cluster.open_loop_hints[].resolved` indicates whether the hint has a downstream closure signal in the same window. **Defaults are now `limit=20`, `format='minimal'`** — pass `format: 'full'` only when you need full `action.input`/`action.output` content. `MAX_LIMIT=500` is available for offline/batch consumers but is rarely the right choice for interactive AI-client paths. `window_hours` is inferred from the `(since, until)` span when not passed: span ≤ 4h uses span; span > 4h uses min(span, 24h). Always include explicit timezone (`Z` or `+HH:MM`) on `since`/`until` — naive ISO strings are parsed as local server time."
 
 **Input schema** (zod; all fields optional):
 
@@ -31,9 +31,9 @@ The tool's name, description, input schema, and response shape are now a contrac
   since?:         ISO8601,                                  // default: now − 4h; include explicit TZ
   until?:         ISO8601,                                  // default: now; include explicit TZ
   artifact_hint?: { provider: string, type: string, id: string },
-  limit?:         number,                                   // max atoms in response (default 100; clamped [1, 500])
+  limit?:         number,                                   // default 20; clamped [1, 500] (item 025)
   window_hours?:  number,                                   // [0.1, 168]; inferred from span when omitted (item 021)
-  format?:        'full' | 'minimal',                       // default 'full'; 'minimal' caps action.input/output to 500 chars (item 019)
+  format?:        'full' | 'minimal',                       // default 'minimal' (item 025); caps action.input/output to 500 chars
 }
 ```
 
@@ -107,7 +107,9 @@ Every choice was settled during the V1.5 brainstorm + a Codex CLI redline pass; 
 - **`atom_ids[]` is membership; `edges[]` is signal-bearing.** Item 019 split these roles cleanly. Pre-019, `edges` enumerated all C(N, 2) pairs (97% redundant in dense clusters); post-019 it carries only pairs joined by at least one work-role or unknown-role artifact. Consumers that previously assumed `edges.length === C(N, 2)` must update — `atom_ids[]` is the membership index.
 - **Edges are explicit and structured** with a documented future-list (`temporal_near | same_conversation | state_transition | same_actor | semantic_similarity`). V1.5 ships only `shared_artifact`; consumers must tolerate unknown `edge.kind` values gracefully.
 - **Open-loop hints enriched at the trace layer**, not stored on atoms. Atom-side hints (`open_loop_hints?: string[]` on `NormalizedContextEvent`) are cheap regex hits; the trace layer turns them into `{kind, text, confidence, resolved, resolved_by_atom_id?}` for clusters. R1 heuristic resolution (item 020) ships in V1.5; LLM-based R2/R3 stay deferred.
-- **`format: 'full' | 'minimal'` is content cap, not schema variant.** `'minimal'` caps `action.input` and `action.output` per atom to 500 chars with a discoverable suffix; the atom is still a valid `NormalizedContextEvent`. Default stays `'full'` — flipping the default is a separate dogfooding-driven patch.
+- **`format: 'full' | 'minimal'` is content cap, not schema variant.** `'minimal'` caps `action.input` and `action.output` per atom to 500 chars with a discoverable suffix; the atom is still a valid `NormalizedContextEvent`. Item 025 flipped the default from `'full'` to `'minimal'` and lowered `DEFAULT_LIMIT` from 100 to 20 after dogfooding 2026-05-08 showed every Claude/Codex retrieval that day blew the consumer's 25k-char tool-result budget on first try, *even with* explicit `format='minimal'` and `limit=50`. The merge-time envelope-byte-size acceptance test (synthetic 200-atom multi-file fixture) measured `<25kB` JSON-stringified payload at `limit=20`, ~27kB at `limit=25` — which is why 025 shipped `20` using the spec's explicit "lower further" escape hatch. Pass `format: 'full'` explicitly when you need full content; `MAX_LIMIT=500` is available for offline/batch consumers.
+
+  **Known production regression (post-025, V1.5.4 territory).** Two real-world post-merge calls on 2026-05-08 (15:05 PDT verification: zero-args returned 72,283 chars; 15:14 PDT full-day-window resume: 76,593 chars) overflowed the 25k consumer budget by ~3× under the new defaults. The merge-time fixture under-represented real `claude_code` atom density — `truncateForMinimal` caps only `action.input`/`action.output`, while `artifacts[]`, `actors`, `provenance`, `context`, and the cluster's `edges`/`open_loop_hints` remain uncapped. For Read/Edit/Bash tool-call atoms that reference many files per turn, `artifacts[]` (33 entries / ~8.4kB on a measured top atom) is the dominant byte-share, not `action.*`. The fix is deferred until the second verification round after items 026 + 027 land, and is being tracked in `backlog/_followups.md` under "from merge of 025-mcp-best-practices"; candidate spec shapes include a `format: 'skeleton'` mode that drops `artifacts[]` etc. behind a follow-up retrieval, or moving the envelope guard into `get_recent_work_context` itself (e.g., auto-narrowing the effective `window_hours` when projected output exceeds budget).
 - **`window_hours` is exposed and span-inferred (item 021).** The pre-021 hardcoded 4h made "where did I leave off after a break" structurally impossible. Now: explicit value if passed; otherwise span-inferred (`min(span, 24h)` for span > 4h).
 - **`rank` + `rank_reason`, no `score`.** A numeric score without a calibrated formula misleads consumers. Default sort: `artifact_hint_match → has_open_loop → recent_activity → cluster_size → newer-median-age`.
 - **`label?` is optional, heuristic-only.** No LLM call. AI client can synthesize naming if the heuristic is bad.
@@ -182,6 +184,12 @@ The [[work-trace|trace layer]] processes ≤500 atoms in <500 ms wall-clock. The
 ## Truncation
 
 When the trace layer's clusters total more atoms than `limit`, the wrapper drops atoms from the **lowest-rank cluster's oldest atoms first**. Edges referencing dropped atoms are removed; if a cluster ends up empty, the cluster is dropped. `truncation.truncated = true` if anything was dropped; the counts surface what was returned vs. what existed in the window.
+
+## Wire-shape Affordances (item 025)
+
+The tool advertises an `outputSchema` and returns `structuredContent` alongside `content` text on every call. Schema scoping is intentionally permissive on the deeply nested cluster/atom/edge bodies (`z.record(z.string(), z.unknown())`) and exact on the top-level keys (`schema_version: z.literal(1)`, `tool: z.literal('get_recent_work_context')`, `query`, `clusters`, `atoms`, `truncation`, `warnings`). Full mirroring of the nested bodies would lock the agent into validating fields whose internal contract is still moving — items 016–022 reshape them on most weeks. Codex's 2026-05-08 13:51 PDT spec review caught that an earlier scoping draft omitted `schema_version` and `tool`; both are non-optional fields in the actual response, so an `outputSchema` that excluded them would reject every real response at validation time. The scoping decision is documented inline in `recent-work-context.ts` for the next reader.
+
+The tool also carries `annotations: { readOnlyHint: true }` so MCP clients can render and route it as safe-by-default. `get_recent_work_context` is pure-read against [[storage]] — no `storage.append` calls — so the hint is structurally accurate.
 
 ## What it does NOT do
 
