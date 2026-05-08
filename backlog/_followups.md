@@ -279,3 +279,23 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - **Test files outside `files_to_modify` (escalation pattern).** 025 agent self-flagged that three test files in `tests/capture/{extractors,surfaces}/*` were modified to absorb the spec-mandated `ORDER BY id` fallout. Reviewer judged: stand (diffs surgical, set-membership where order is no longer guaranteed, well-commented). For future runs the right move is to escalate via `agent_notes` first and let founder/strategist pre-bless test edits outside the listed file set. Same theme as the 020/021 "test fallout permitted in:" follow-up — the spec template improvement is overdue.
 - **Reviewer-vs-worktree drift on artifact location.** Reviewer subagent flagged the run log absent because it inspected the worktree's branch tip; the file was already on main from the review-stage commit. Future review prompts should explicitly direct the subagent to `git log --all -- <path>` for spec-required artifact files, not just `ls` inside the worktree.
 
+---
+
+## 2026-05-08 — from merge of 026-tail-session-tool
+
+### Per-merge cleanup (small, mechanical)
+
+- [ ] **Misleading `next_cursor` comment** at `tests/mcp/tools/tail-session.test.ts:131-133`. Comment claims `next_cursor` is null but the assertion is `not.toBeNull()`. The assertion is correct (overfetch grabbed `count+1=3` rows out of 3 available, so cursor IS emitted); the comment is wrong. Fix opportunistically.
+
+### Strategist post-merge
+
+- [ ] **Wiki promotion for 026.** Per item's "After Completion (Strategist Notes)": add `tail_session` to `wiki/surfaces/mcp-server.md` (the four-tool roster). Cover input modes (`source` vs `source_app`), `source_resolved` echo, cost contract (`< 10k chars typical`), composite cursor shared with `search_memories`, why `tail_session` exists separately from the other two retrieval tools. No new wiki page — single addition to the existing surfaces page.
+
+### Dogfooding (founder)
+
+- [ ] **Re-run today's bypass scenarios (13:27, 14:00 PDT entries) using `tail_session`.** Measure: byte-count of response, number of MCP calls to recover the same Codex turn that motivated this item. Expected: 1 call, < 10k bytes, no spill — vs today's 2 calls + subagent-slice. Journal an explicit "ECHO won this round" entry for each successful re-run; this is the controlled-experiment data the operating-model retrospectives will lean on.
+
+### Test infra (cross-cuts prior items)
+
+- [ ] **Confirm trace/build perf flake status.** The agent's run log reported 2 pre-existing flakes during 026 development: `tests/trace/build.test.ts` performance timing + `tests/capture/surfaces/git-watcher.test.ts` backfill concurrency. The merge-verify run showed 0 failures (likely the recent chore commit `7e4d4e0` fixed git-watcher's `discoverLastSeen` flake). Confirm trace/build.test.ts perf flake status across 3+ consecutive `npm test` runs to establish whether it's also closed or remains a noise source.
+

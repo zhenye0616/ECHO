@@ -39,7 +39,25 @@ agent_notes: |
   Two open questions for founder on test-file touching policy
   (recent-work-context.test.ts is outside files_to_modify) and on
   ECHO_SMOKE_LIVE gating; full reasoning in run log.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean --no-ff; auto-merging on src/mcp/tools/search-memories.ts and tools/mcp-integration-smoke.sh both no-op since main hadn't touched 026's edit regions).
+
+  Fixups applied:
+  - none (sidecar verdict was "merge as-is" with empty pre-merge punch list).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: 512/533 tests pass (21 skipped, 0 failed) post-merge; lint and typecheck clean. Note: agent's run log reported 2 pre-existing flakes (trace-perf timing + git-watcher backfill); those passed in this verify run, likely because the recent chore commit 7e4d4e0 fixed git-watcher's discoverLastSeen.
+
+  Follow-up items (non-blocking) — queued in backlog/_followups.md:
+  - Fix misleading `next_cursor` comment at tests/mcp/tools/tail-session.test.ts:131-133.
+  - Investigate any residual flake in tests/trace/build.test.ts (perf timing) — probably resolved but worth confirming.
+  - Founder dogfooding: re-run today's 13:27 / 14:00 PDT bypass scenarios via `tail_session`; journal "ECHO won this round" with byte-count + call-count comparison.
+  - Strategist wiki promotion: add `tail_session` to wiki/surfaces/mcp-server.md per the After Completion section.
 spec_refs:
   - src/mcp/tools/search-memories.ts
   - src/mcp/tools/recent-work-context.ts
