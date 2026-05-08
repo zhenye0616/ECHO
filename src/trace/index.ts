@@ -171,6 +171,20 @@ export function buildRecentWorkContext(
     }
   }
 
+  const warnings = buildWarnings(errCounts);
+  // Loud signal when truncation drops entire clusters — the structured
+  // `truncation.clusters_returned` vs `clusters_total` difference is easy for
+  // a consumer to miss, and the silently-lost cluster is exactly what the
+  // user was asking about more than half the time (see 2026-05-07 dogfooding
+  // 16:33 + Round 3 themes).
+  const clustersDropped = clustersTotal - truncated.clusters.length;
+  if (clustersDropped > 0) {
+    warnings.push(
+      `limit dropped ${clustersDropped} entire cluster(s); ` +
+        'raise `limit` or narrow the (since, until) window to retain them',
+    );
+  }
+
   const response: RecentWorkContextResponse = {
     schema_version: SCHEMA_VERSION,
     tool: 'get_recent_work_context',
@@ -190,7 +204,7 @@ export function buildRecentWorkContext(
       clusters_total: clustersTotal,
       truncated: truncated.didTruncate,
     },
-    warnings: buildWarnings(errCounts),
+    warnings,
   };
   return response;
 }

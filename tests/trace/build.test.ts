@@ -200,6 +200,37 @@ describe('buildRecentWorkContext', () => {
     expect(r.truncation.truncated).toBe(true);
     expect(r.truncation.atoms_returned).toBe(5);
     expect(r.truncation.atoms_total_in_window).toBe(10);
+    // Single-cluster truncation does not drop a whole cluster — no warning.
+    expect(
+      r.warnings.some((w) => w.includes('limit dropped') && w.includes('cluster')),
+    ).toBe(false);
+  });
+
+  it('emits a warning when limit drops entire clusters', () => {
+    // Three disjoint clusters (no shared artifacts), 4 atoms each → 12 total.
+    // Limit=5 forces the lowest-rank cluster to drop entirely.
+    const specs: AtomSpec[] = [];
+    const files = ['r::a.ts', 'r::b.ts', 'r::c.ts'];
+    files.forEach((file, threadIdx) => {
+      for (let i = 0; i < 4; i++) {
+        specs.push({
+          id: `t${threadIdx}_${i}`,
+          app: 'cursor',
+          occurred_at: `2026-05-06T0${threadIdx + 6}:${String(i * 5).padStart(2, '0')}:00.000Z`,
+          artifacts: [{ provider: 'local_fs', type: 'file', id: file }],
+        });
+      }
+    });
+    const { events, normalize } = asCapture(specs);
+    const r = buildRecentWorkContext(events, { ...QUERY, limit: 5 }, normalize);
+    expect(r.truncation.clusters_total).toBe(3);
+    expect(r.truncation.clusters_returned).toBeLessThan(3);
+    const dropped = r.truncation.clusters_total - r.truncation.clusters_returned;
+    expect(
+      r.warnings.some(
+        (w) => w.includes(`dropped ${dropped} entire cluster`) && w.includes('limit'),
+      ),
+    ).toBe(true);
   });
 
   it('roundtrips through JSON.parse/stringify without loss', () => {
