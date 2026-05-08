@@ -1,7 +1,7 @@
 ---
 id: 2026-05-08-028-rwc-envelope-skeleton-format
 title: V1.5.5 `get_recent_work_context` envelope fix — `format:'skeleton'` mode + realistic-density acceptance test
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
@@ -9,9 +9,45 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T23:01:33Z"
 branch: "agent/rwc-envelope-skeleton-format"
 worktree: "~/Desktop/Project_echo--rwc-envelope-skeleton-format"
-head_sha: ""
+head_sha: "73a94269234c87e3e914a0aefe208a7e62129411"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Shipped `format:'skeleton'` opt-in mode + a realistic-density envelope test
+  fixture sourced from the 2026-05-08 22:54 UTC (15:54 PDT) post-026+027
+  spill (founder filesystem paths redacted; 0 `zhenye` strings remain).
+  Skeleton-mode envelope on the realistic fixture measures **12,091 chars
+  vs minimal's 85,624** (86% reduction; ~3% headroom under the 12,500
+  threshold). Tests / lint / typecheck all green (522 passed).
+
+  Architectural decision worth founder eyes: skeleton transform is applied
+  at the MCP wire boundary inside `registerRecentWorkContext`, not inside
+  `getRecentWorkContext`. This keeps the latter's narrow
+  `RecentWorkContextResponse` return type so non-MCP callers (notably
+  `tools/validate-resolution.ts`) don't need a transitive cast — and so
+  the only files modified match `files_to_modify` exactly (no drift into
+  validate-resolution.ts).
+
+  Spec-vs-data mismatch worth flagging: the acceptance asked the fixture
+  to carry "≥30 entries in artifacts[]" per atom, but the canonical 15:54
+  PDT spill it cites caps at 17 artifacts on the densest atom (range 2–17
+  across all 20). I used the real spill faithfully rather than synthesize
+  more (per the stronger "Do NOT hand-author a synthetic fixture"
+  constraint). The load-bearing assertion (skeleton < 12,500 on real-shape
+  data) still holds and is now ~3% from the threshold — tight enough that
+  any future atom-shape regression lands on this test. If you want a
+  denser fixture I'd need a fresh spill from a heavier session (more
+  parallel Read/Edit/Bash per turn) — that's dogfooding, not agent work.
+
+  Field naming map: spec used colloquial names (`atom.timestamp`,
+  `source_app`, `source_prefix`, `action.summary`) that don't exist on
+  `NormalizedContextEvent`. Mapped to actual schema in
+  `applySkeletonAtom`'s comment block. `action.summary` is synthesized as
+  a 200-char head-clip of `action.input ?? action.output`.
+
+  Open questions in run log section "Open questions for founder" cover (1)
+  fixture density, (2) skeleton summary source ordering, (3) auto-downgrade
+  gating language in docs.
+review_notes: ""
 review_notes: ""
 spec_refs:
   - src/mcp/tools/recent-work-context.ts
