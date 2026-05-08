@@ -1,7 +1,23 @@
 ---
 id: 2026-05-08-024-fs-watcher-test-quarantine-successor
 title: fs-watcher.test.ts Path C successor — extend 023's quarantine to the third flaky file
-status: pending_review
+status: complete
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation.
+
+  Conflicts resolved: none — clean merge predicted by sidecar held in practice. Both modified files (`backlog/_followups.md` at distinct hunks ~line 36 and ~line 189; `tests/capture/surfaces/fs-watcher.test.ts` at the head of the file) were untouched on `main` since branch claim at 13:09 PDT.
+
+  Fixups applied: none — sidecar verdict was unconditional `merge as-is`.
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 463 passed | 21 skipped | 0 failed (= 15 from 023's two `describe.skip` blocks + 6 newly skipped from 024's `startFsWatcher` block). `npm run lint` and `npm run typecheck` clean. Re-verification matched the agent's three-run baseline counts exactly.
+
+  Follow-up items (non-blocking — already tracked in `_followups.md`):
+  - `claude-code.test.ts` portion of the chokidar flake cluster remains open per Out-of-Scope. Candidate 025 if it surfaces at a future verify step.
+  - Post-V1.5 chokidar real-fix item — now more attractive since all three quarantines (cursor.test.ts via 023, lifecycle.test.ts via 023, fs-watcher.test.ts via 024) are uniform and grep-anchorable.
+  - Grep-anchored CI ship-blocker item — trivially writable now: a single grep pattern on `2026-05-08-023` and `2026-05-08-024` finds all three quarantines.
+
 priority: HIGH
 estimate: 15min-30min
 created: 2026-05-08
