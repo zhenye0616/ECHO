@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 47 pages · 45 shipped · 2 planned
+**Status:** 48 pages · 46 shipped · 2 planned
 
 ---
 
@@ -71,9 +71,10 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[logger|Logger]] — Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.
 - [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
 - [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
-- [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix filter.
+- [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface filters, canonical-Z timestamps.
 - [[system-architecture|System Architecture (Minimum Component View)]] — Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.
-- [[work-trace|Work Trace (the trace layer)]] — Pure module that clusters normalized atoms into coherent work threads via connected components over shared-artifact edges in a 4h window.
+- [[timestamp-canonicalization|Timestamp Canonicalization]] — Single-chokepoint canonicalization at capture pipeline + idempotent migration on daemon startup; every events.timestamp row is canonical UTC Z form.
+- [[work-trace|Work Trace (the trace layer)]] — Pure module that clusters normalized atoms into work threads via connected components; signal-bearing edge filter (role taxonomy), R1 open-loop resolution, span-inferred window_hours, format cap.
 
 ---
 
@@ -110,8 +111,8 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[browser-extension|Browser Extension]] — Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.
 - [[hotkey-overlay|Hotkey Overlay]] *(planned)* — System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.
 - [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing search_memories + echo_ping to MCP-compliant AI clients via Streamable HTTP/SSE.
-- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — V1.5 MCP tool that returns clusters of related atoms joined by shared artifact identity within a recent time window.
-- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring + filters over captured events; embeddings deferred to V1.5.
+- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — V1.5 MCP tool returning clusters joined by shared artifact identity; window_hours, format, resolved hints, signal-bearing edges, naive-TZ + storage-cap warnings.
+- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring (filter-before-slice) + filters over captured events; description disambiguates from semantic search; embeddings deferred to V1.5.
 
 ---
 

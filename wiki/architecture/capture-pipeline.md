@@ -33,9 +33,17 @@ The `event` parameter is `unknown` — the gate is the validation boundary, and 
 
 1. Call `gate(event)`.
 2. If the gate rejects: return `{ accepted: false, reason }` immediately. **Storage is not touched.**
-3. If the gate accepts: narrow the event to the storage append shape (drops any caller-supplied `id`; storage assigns one), call `storage.append(...)`, return `{ accepted: true, id }`.
+3. If the gate accepts: narrow the event to the storage append shape (drops any caller-supplied `id`; storage assigns one), **canonicalize `timestamp` to UTC `Z` form**, call `storage.append(...)`, return `{ accepted: true, id }`.
 
 That's the whole function. No other branches, no other I/O.
+
+### Timestamp canonicalization (item 022)
+
+The pipeline is the single chokepoint where `CaptureEvent.timestamp` is rewritten to canonical UTC. The implementation is one line — `new Date(validated.timestamp).toISOString()` — applied immediately before `storage.append`. `Date.prototype.toISOString()` always returns the `YYYY-MM-DDTHH:MM:SS.sssZ` form regardless of input offset, preserving millisecond precision.
+
+This was specced as Codex's correction during the item 022 brainstorm: a per-source fix (e.g., only patching `git-watcher.ts`) leaves every future capture surface having to remember the convention. Centralizing at the pipeline makes the invariant structural — every capture event landing in [[storage]] is in canonical form, regardless of which surface produced it.
+
+Naive timestamps (no TZ marker) are canonicalized assuming UTC (per Codex's N1 recommendation). Capture surfaces today don't emit naive timestamps; the policy is a defensive stance for future surfaces. The trace tool's TZ warning still fires for AI clients passing naive *queries* (see [[mcp-recent-work-context]]). See [[timestamp-canonicalization]] for the full design and the one-time migration of pre-022 rows.
 
 ## Dependency Injection: Storage as Parameter
 
@@ -52,6 +60,7 @@ The pipeline is "pure up to inherited side effects." It introduces no new I/O of
 
 - The gate's one log line per call (info on accept, warn on reject) — inherited from [[capture-gate]].
 - The storage's `append` row insert — inherited from [[storage]].
+- Timestamp canonicalization (item 022) — pure transformation; reads no clock, no env, no file.
 
 Nothing else. No metrics, no retries, no second log line, no batch buffer. If you want to know what `processCandidate` does observationally, the answer is exactly: gate's log line, plus (on accept) one storage append.
 
@@ -81,5 +90,6 @@ By design — these are out-of-scope:
 - [[storage]] — the persistence layer the pipeline appends to on accept
 - [[capture-allowlist]] — what the gate consults; transitively governs the pipeline
 - [[sandboxed-capture]] — the architectural principle gate + pipeline together enforce at runtime
+- [[timestamp-canonicalization]] — the capture-side guarantee for canonical `Z` timestamps
 - [[fs-watcher]], [[cursor-extractor]], [[claude-code-extractor]], [[git-capture]] — the capture surfaces that call `processCandidate`
 - [[local-daemon]] — host process that constructs storage and threads it into every surface

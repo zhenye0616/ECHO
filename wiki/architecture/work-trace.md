@@ -53,44 +53,94 @@ interface Query {
   since: string;              // ISO 8601 — caller-resolved
   until: string;              // ISO 8601 — caller-resolved (also the "now" anchor for ranking)
   artifact_hint?: ArtifactHint;
-  window_hours?: number;      // default 4
+  window_hours?: number;      // resolved at the MCP boundary; see "Window-hours inference"
   limit?: number;             // default 100; clamped [1, 500] at the MCP boundary
+  format?: 'full' | 'minimal'; // content cap for action.input/output on emitted atoms
 }
 ```
 
 The function is dispatched per-call: `normalize` is the strategy, `events` is the input, `query` is the constraint. Adapters and storage stay out of the trace module entirely.
 
+`format` is a content cap, not a schema variant: every atom is still a valid `NormalizedContextEvent` in either mode, only `action.input` and `action.output` shrink. This keeps consumers that don't know about `format` parsing the response unmodified. (Item 019.)
+
+### Window-hours inference (item 021)
+
+Before item 021, `window_hours` was hardcoded to `DEFAULT_WINDOW_HOURS = 4` at the MCP wrapper and not exposed to callers. The trace layer's "where did I leave off after a break" use case structurally couldn't span a sleep gap. The MCP wrapper now resolves `window_hours` from the input:
+
+- Explicit caller value → used verbatim (clamped to `[0.1, 168]`).
+- Otherwise inferred from `(since, until)` span: `span ≤ 4h` → `span`; `span > 4h` → `min(span, 24h)`.
+- The `4h` constant remains as a fallback for degenerate inputs (NaN dates, `since ≥ until`).
+
+`response.query.window_hours` echoes the value actually used. Callers asking for explicit overnight context should pass either a span-equal `window_hours` or rely on the inference for typical 24h windows.
+
 ## Algorithm (V1.5 — `shared_artifact` only)
 
 ```
 buildRecentWorkContext(events, query, normalize):
-  # 1. Normalize and filter to time window
-  atoms = events.map(normalize).filter(non-null).filter(within [since, until])
+  # 1. Normalize, filter to time window, then sort ASC by occurred_at
+  #    (storage now returns DESC by default per item 021; the trace layer needs ASC
+  #    for cluster determinism and forward-only open-loop resolution scans)
+  atoms = events.map(normalize).filter(non-null).filter(within [since, until]).sort(ASC)
 
-  # 2. Index atoms by ArtifactKey = `${provider}:${type}:${id}`
+  # 2. Enrich open-loop hints — including R1 resolution (per item 020)
+  enriched_hints = enrichHints(atoms)   # forward-scan resolution; cluster-agnostic
+
+  # 3. Index atoms by ArtifactKey = `${provider}:${type}:${id}`
   by_artifact = group atoms.id by every artifact key in atom.artifacts
 
-  # 3. Build edge set: pairs sharing an artifact within window_hours (default 4)
+  # 4. Build full edge set: pairs sharing an artifact within window_hours
   for each artifact bucket with ≥2 atoms:
     for each pair (a, b) in the bucket:
       if |occurred_at(a) − occurred_at(b)| ≤ window_hours:
         add edge {from: a, to: b, kind: 'shared_artifact', artifact_ids[], confidence: 'high'}
 
-  # 4. Connected components → clusters
+  # 5. Connected components → clusters (uses the FULL edge set, including scope/session edges)
   clusters = union-find over (atoms, edges)
 
-  # 5. If artifact_hint provided: filter to clusters that touch it
+  # 6. Per-cluster edge filter (item 019): drop edges whose artifact_ids resolve to
+  #    only {scope, session} roles. Cluster membership unchanged; only edges trim.
+  for each cluster:
+    cluster.edges = cluster.edges.filter(e =>
+      e.artifact_ids.some(id => roleOf(typeOf(id)) ∈ {work, unknown})
+    )
+
+  # 7. If artifact_hint provided: filter to clusters that touch it
   if query.artifact_hint:
     clusters = clusters.filter(c => c touches hint_key)
 
-  # 6. For each cluster, compute label, hints, anchor_artifacts, source_breakdown, time_range
-  # 7. Rank (see "Ranking" below)
-  # 8. Truncate by atom limit (lowest-rank cluster's oldest atoms drop first)
+  # 8. Compute label, anchor_artifacts, source_breakdown, time_range; attach enriched_hints
+  # 9. Rank (see "Ranking" below)
+  # 10. Truncate by atom limit (lowest-rank cluster's oldest atoms drop first)
+  # 11. If format === 'minimal': cap action.input/output to 500 chars per atom
 
   return response
 ```
 
-Single-pass. O(N²) on atom pairs in the worst case, but for typical 4-hour windows (~50–200 atoms) it runs comfortably under 500 ms in plain Node — the artifact-bucket index gives O(sum-of-degree²) which is much smaller in practice.
+Single-pass. O(N²) on atom pairs in the worst case, but for typical windows (~50–200 atoms) it runs comfortably under 500 ms in plain Node — the artifact-bucket index gives O(sum-of-degree²) which is much smaller in practice. Open-loop resolution adds O(H · A) worst-case (H hints, A atoms), sub-millisecond at dogfooding scale.
+
+## Edge Filter & Role Taxonomy (item 019)
+
+`cluster.edges[]` is **signal-bearing** post-019 — it enumerates pairs that share at least one artifact whose role carries cross-atom signal beyond mere cluster membership. It is **not** an exhaustive enumeration of pairwise cluster membership; that role belongs to `cluster.atom_ids[]`.
+
+Each artifact type maps to one of four roles (`src/trace/role.ts`):
+
+| role | meaning | examples |
+|---|---|---|
+| `scope` | the broad context every cluster member shares — restating it is redundant | `repo`, `workspace`, `account`, `org` |
+| `session` | continuous conversational/temporal thread | `conversation`, `thread`, `channel` |
+| `work` | a concrete work artifact both atoms touched (real cross-tool / cross-time signal) | `file`, `pr`, `issue`, `branch`, `commit`, `doc`, `crm_record`, `task`, `meeting`, `email_thread`, `record` |
+| `unknown` | type the registry doesn't recognize — **edges are kept by default** | (any new V2+ adapter type before its registry entry lands) |
+
+The filter drops an edge iff every artifact_id in `edge.artifact_ids` resolves to a role in `{scope, session}`. Edges retain their full `artifact_ids[]` when kept (no per-edge trimming).
+
+Two design commitments make this safe:
+
+1. **Cluster membership is unchanged.** The filter runs on each cluster's edge list **after** `connectedComponents` — so an atom joined to its cluster only by `repo` is still a cluster member; we just don't enumerate the redundant edge.
+2. **`unknown` keeps the edge.** Generalizability default: future adapters' artifact types appear before the registry is updated; we'd rather over-emit an edge than silently drop signal we haven't classified yet.
+
+In dense clusters this trims ~95% of the pre-019 edges (the dogfooding fixture went from 630 K_36 edges to ~30) without losing signal. Consumer impact: any client that previously assumed `edges.length === C(N, 2)` must update — `cluster.atom_ids[]` is the membership index.
+
+The role registry is deliberately small for V1.5. Patches B (`shared_artifacts[]` schema replacement) and C (re-clustering on work-only edges) are deferred — both are real semantic shifts that require their own dogfooding window.
 
 ## Cluster IDs are Deterministic-Ephemeral
 
@@ -145,7 +195,7 @@ If the heuristic produces nothing useful (no dominant artifact, or only conversa
 
 ## Open-Loop Hint Enrichment (`src/trace/hints.ts`)
 
-Atoms carry per-atom `open_loop_hints?: string[]` from the [[normalization|normalizer]] — cheap regex hits. The trace layer enriches each into `{atom_id, kind, text, confidence}`:
+Atoms carry per-atom `open_loop_hints?: string[]` from the [[normalization|normalizer]] — cheap regex hits. The trace layer enriches each into `{atom_id, kind, text, confidence, resolved, resolved_by_atom_id?}`:
 
 | `kind` | text source | `confidence` |
 |---|---|---|
@@ -154,7 +204,24 @@ Atoms carry per-atom `open_loop_hints?: string[]` from the [[normalization|norma
 | `contains_todo` | first `TODO/FIXME` line in input/output | `high` |
 | `explicit_followup` | line containing `follow up` / `come back to` / `will do later` | `medium` |
 
-Confidence is *signal-quality* (how reliably this hint kind indicates an open loop), not *resolution-status* (whether the loop is actually open). V1.5 does not resolve.
+Confidence is *signal-quality* (how reliably this hint kind indicates an open loop), distinct from *resolution-status* — both ship in V1.5 but separately.
+
+### R1 resolution rules (item 020)
+
+`resolved: boolean` and (when resolved) `resolved_by_atom_id: string` are populated by a forward-scan pass over the input atom list, before clustering. The pass is cluster-agnostic — an atom's resolved state depends only on the input list, not on which cluster the atom lands in. Heuristic-only; no LLM on the read path.
+
+| Hint kind | Rule | Closes when |
+|---|---|---|
+| `ends_with_question` (R1.Q) | a later **non-question** turn in the **same conversation** (`context.conversation` artifact id match) | the conversation moved past the question |
+| `unresolved_assistant_q` (R1.AQ) | a later atom from `'user'` role in the same conversation, with non-empty trimmed input/output | the user replied (any length ≥ 1 char) |
+| `contains_todo` (R1.TODO) | a later atom whose `state.delta.artifact_id` matches one of the hint atom's file artifact ids | the file containing the TODO was edited after |
+| `explicit_followup` (R1.FU) | **never auto-resolves in V1** | conservative — phrasing too open-ended for a regex match to safely close |
+
+`resolved_by_atom_id` is the **earliest** qualifying later atom. Hints with no later atoms stay `resolved: false`. Resolution is identical in `format: 'full'` and `'minimal'` — truncation only affects atom emission, not the upstream hint pass.
+
+The bet: simple per-kind rules catch ≥80% of real closures. R2 (LLM resolution) and R3 (heuristic prefilter + LLM disambiguation) are V1.5+ upgrades reserved for the case where R1's precision proves insufficient. The `resolved_by_atom_id` pointer composes with that future upgrade without contract change.
+
+This V1 surface is what the hotkey overlay reads — `resolved: false` becomes "open loops still hanging." The substrate's hint *detection* alone was necessary but not sufficient for that magic moment; surfacing 17 false-positive open loops on a normal weekday would destroy trust faster than missing some real ones. R1 is the cheapest correctness lever.
 
 ## Edge Future-List (V1.5+ Roadmap)
 
@@ -178,7 +245,10 @@ If perf regresses under real dogfooding load: profile, propose a cache item; do 
 
 - **No persisted traces table.** Clusters are deterministic-ephemeral.
 - **No LLM-generated labels.** Heuristic only.
-- **No open-loop *resolution*.** Atoms emit hints; this layer renders them; nobody decides "this loop is now closed."
+- **No LLM-based open-loop resolution.** R1 ships heuristic-only; R2/R3 (LLM disambiguation) are deferred until R1's precision data argues for them.
+- **No cross-conversation closure joins.** A question in conversation A closed by a reply in conversation B is not detected. V2 territory.
+- **No persisted resolution state across queries.** Resolution is computed at trace time on each call.
+- **No re-clustering on work-only edges.** Item 019's filter is a per-cluster *decoration* over the full graph; cluster membership is computed against the unfiltered graph. Patch C (work-only clustering) is a deferred semantic shift.
 - **No embeddings.** `temporal_near` / `semantic_similarity` are documented future-list values, not implemented.
 - **No automatic context injection.** The AI client decides when to call `get_recent_work_context`; ECHO never pushes.
 - **No new MCP transport.** Uses the existing [[mcp-server|MCP server]] at `127.0.0.1:38478`.
@@ -210,4 +280,5 @@ These findings drive the V1.5+/V2 roadmap — they are *not* derivable from spec
 - [[mcp-recent-work-context]] — the V1.5 MCP tool that exposes trace responses to AI clients
 - [[mcp-server]] — the host server
 - [[storage]] — raw substrate read by the MCP tool wrapper
+- [[timestamp-canonicalization]] — capture-side guarantee that makes window queries comparable across sources
 - [[v1-spec]] — the V1.5 magic gap this layer closes

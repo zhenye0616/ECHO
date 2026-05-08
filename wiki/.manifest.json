@@ -187,12 +187,26 @@
     "status": "shipped",
     "title": "Storage",
     "link": "storage",
-    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix filter.",
+    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface filters, canonical-Z timestamps.",
     "aliases": [
       "Storage",
       "Storage Interface",
       "MemoryStorage",
       "SqliteStorage"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "architecture/timestamp-canonicalization.md": {
+    "status": "shipped",
+    "title": "Timestamp Canonicalization",
+    "link": "timestamp-canonicalization",
+    "summary": "Single-chokepoint canonicalization at capture pipeline + idempotent migration on daemon startup; every events.timestamp row is canonical UTC Z form.",
+    "aliases": [
+      "Timestamp Canonicalization",
+      "UTC Z form",
+      "Timestamp Migration",
+      "canonicalizeTimestamps"
     ],
     "topic": "Architecture",
     "subtopic": "Storage"
@@ -293,7 +307,7 @@
     "status": "shipped",
     "title": "MCP search_memories Tool",
     "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring + filters over captured events; embeddings deferred to V1.5.",
+    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters over captured events; description disambiguates from semantic search; embeddings deferred to V1.5.",
     "aliases": [
       "search_memories",
       "MCP search_memories tool",
@@ -306,7 +320,7 @@
     "status": "shipped",
     "title": "MCP get_recent_work_context Tool",
     "link": "mcp-recent-work-context",
-    "summary": "V1.5 MCP tool that returns clusters of related atoms joined by shared artifact identity within a recent time window.",
+    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; window_hours, format, resolved hints, signal-bearing edges, naive-TZ + storage-cap warnings.",
     "aliases": [
       "get_recent_work_context",
       "MCP get_recent_work_context tool",
@@ -360,7 +374,7 @@
     "status": "shipped",
     "title": "Work Trace (the trace layer)",
     "link": "work-trace",
-    "summary": "Pure module that clusters normalized atoms into coherent work threads via connected components over shared-artifact edges in a 4h window.",
+    "summary": "Pure module that clusters normalized atoms into work threads via connected components; signal-bearing edge filter (role taxonomy), R1 open-loop resolution, span-inferred window_hours, format cap.",
     "aliases": [
       "Work Trace",
       "Trace Layer",

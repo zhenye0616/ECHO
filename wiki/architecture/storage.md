@@ -34,17 +34,23 @@ interface CaptureEvent {
 }
 
 interface QueryFilter {
-  source?: string;        // exact match
-  source_prefix?: string; // prefix match; mutually exclusive with `source`
-  since?: string;         // ISO 8601; events with timestamp >= since (inclusive)
-  until?: string;         // ISO 8601; events with timestamp < until (exclusive)
+  source?: string;                     // exact match
+  source_prefix?: string;              // prefix match; mutually exclusive with `source`
+  since?: string;                      // ISO 8601; events with timestamp >= since (inclusive)
+  until?: string;                      // ISO 8601; events with timestamp < until (exclusive)
   limit?: number;
+  order?: 'asc' | 'desc';              // default 'desc' — keeps newest when limit is hit (item 021)
+  exclude_metadata_surface?: string[]; // drop rows whose metadata.surface ∈ this set (item 022)
 }
 ```
 
 Three operations, no others. There is no `update`, no `delete`. Forgetting (when it ships) will be implemented as a tombstone row, not as in-place deletion.
 
 `source_prefix` was added in wave 3 to support [[mcp-search-memories]], which needs to filter by family of sources (e.g., `domain:` vs `app:` vs `fs:`). It is mutually exclusive with `source` — supplying both throws. Both implementations honor the field with the same semantics: the event's `source` string must `startsWith` the filter value.
+
+`order` (added in item 021) defaulted to ASC pre-021, which silently dropped the **newest** events when `limit` was hit — every existing caller's intent was "give me the recent N events," but ASC + LIMIT returned the oldest N. The default is now `'desc'` (newest-first selection); callers that genuinely need oldest-first (e.g., turn-pair reconstruction in extractors) pass `order: 'asc'` explicitly. Trace-layer callers re-sort ASC in memory after fetch since cluster determinism and forward-only resolution scans require ascending order. See [[work-trace]] for the trace-side adjustment.
+
+`exclude_metadata_surface` (added in item 022) lets the trace tool drop raw fs-watcher change events (`metadata.surface === 'fs'`) at the storage layer. Codex measured these dominating storage's newest 1000 rows at 96.6% on busy days; without the filter the trace tool's overfetch budget was spent on rows the [[normalization|normalizer]] throws away. `search_memories` does NOT pass this filter — those raw rows stay searchable for forensic use. Both implementations apply the filter via SQL `AND COALESCE(json_extract(metadata, '$.surface'), '') NOT IN (...)` (sqlite) or array predicate (memory).
 
 ## The Append-Only Commitment
 
@@ -84,15 +90,18 @@ Operational properties:
 - **WAL mode.** `PRAGMA journal_mode = WAL` is set at construction so MCP reads can run concurrently with capture-surface appends.
 - **NORMAL synchronous mode.** `PRAGMA synchronous = NORMAL` is set under WAL — SQLite-recommended for app workloads, avoids per-append `fsync`, and remains crash-safe.
 - **Migration runner.** Schema lives in `src/storage/migrations/` as numbered SQL files (`0001_initial.sql`, etc.). `migrate()` reads them in order, applies any whose version exceeds `PRAGMA user_version`, and bumps `user_version` inside the same transaction. Sequence gaps are a hard error at boot.
+- **Timestamp canonicalization migration on startup (item 022).** `canonicalizeTimestamps()` runs in the SqliteStorage constructor at every daemon boot; it rewrites any row whose `timestamp` lacks a trailing `Z` to canonical UTC `Z` form via `new Date(row.timestamp).toISOString()` inside a single transaction. Idempotent (the `WHERE timestamp NOT LIKE '%Z'` clause excludes already-canonicalized rows on re-runs); millisecond-preserving (Node's `Date` round-trip preserves all ms the original carried, unlike SQLite's `datetime()` which truncates to seconds). The migration verifies before exit that no non-`Z` rows remain, and logs `{message: 'canonicalized_timestamps', payload: {converted: N}}` when N > 0. See [[timestamp-canonicalization]] for the capture-side guarantee that prevents new mixed-form rows landing.
 - **`close()` for graceful shutdown.** The `Storage` interface itself does not require `close()`; `SqliteStorage` adds it as a method, and the daemon's lifecycle scaffold calls it during shutdown to flush WAL and release the file handle.
 - **Buffer-encoded embeddings.** The `embedding` column is `BLOB` — a `Float32Array` written via `Buffer.from(new Float32Array(arr).buffer)` on append, reconstructed via `new Float32Array(buf.buffer, buf.byteOffset, ...)` on read. No JSON, no precision loss.
-- **Indexed for the queries the MCP tool actually makes.** `CREATE INDEX` on `source` and on `timestamp`; results returned `ORDER BY timestamp ASC`.
+- **Indexed for the queries the MCP tool actually makes.** `CREATE INDEX` on `source` and on `timestamp`; results returned `ORDER BY timestamp` in the direction picked by `QueryFilter.order` (default DESC since item 021). The single timestamp index serves both directions efficiently.
 
 Backend selection happens once at daemon boot (`src/daemon/index.ts`): `ECHO_STORAGE=memory` selects `MemoryStorage`; anything else (including unset) selects `SqliteStorage`.
 
 ## Timestamp Semantics
 
-Timestamps are ISO 8601 UTC strings. Comparisons in `query` are lexicographic, which works correctly for UTC strings of consistent precision. `since` is inclusive; `until` is exclusive — i.e., `[since, until)`. This matches the standard half-open-interval convention and avoids off-by-one bugs at boundaries.
+Timestamps are ISO 8601 UTC strings in canonical `Z` form (e.g., `2026-05-08T07:30:00.000Z`). Comparisons in `query` are lexicographic, which works correctly for UTC strings of consistent precision. `since` is inclusive; `until` is exclusive — i.e., `[since, until)`. This matches the standard half-open-interval convention and avoids off-by-one bugs at boundaries.
+
+The single-form invariant is non-negotiable. Before item 022, the git-watcher emitted `±HH:MM` offset-bearing strings while the JSONL extractors emitted `Z` form; the lex compare in `WHERE timestamp >= ?` then silently dropped git events from time windows. The fix lives at the [[capture-pipeline|capture chokepoint]] (canonicalize once, never per-source) plus a one-time migration of legacy rows on daemon startup. See [[timestamp-canonicalization]].
 
 ## What's Out of Scope (and Where It Lives Instead)
 
@@ -111,4 +120,6 @@ Timestamps are ISO 8601 UTC strings. Comparisons in `query` are lexicographic, w
 - [[sandboxed-capture]] — the architectural reason storage receives only allowlisted events
 - [[local-daemon]] — host process; owns the `Storage` instance
 - [[mcp-search-memories]] — consumer of `Storage.query`, including the `source_prefix` filter
+- [[mcp-recent-work-context]] — consumer of `Storage.query` with `exclude_metadata_surface` + `order: 'desc'`
+- [[timestamp-canonicalization]] — capture-time + migration-time guarantee that all rows are canonical `Z` form
 - [[audit-page]] — consumer of `query()` for "see memories" and "forget" operations
