@@ -1,10 +1,13 @@
 ---
 id: 2026-05-08-022-v15-2-trace-retrieval-reliability
 title: V1.5.2 trace + retrieval reliability — close the cross-source bias and silent-failure bugs
-status: ready
+status: claimed
 priority: HIGH
 estimate: 3-4d
 created: 2026-05-08
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T08:12:38Z"
+branch: "agent/v15-2-trace-retrieval-reliability"
 spec_refs:
   - src/capture/pipeline.ts
   - src/capture/gate.ts
