@@ -424,4 +424,118 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       }
     });
   });
+
+  describe('cross-gap window + naive-timestamp guardrail (item 021)', () => {
+    async function callWith(
+      args: Record<string, unknown>,
+    ): Promise<RecentWorkContextResponse> {
+      const result = (await withClient(handle!.url, async (c) =>
+        c.callTool({
+          name: 'get_recent_work_context',
+          arguments: args,
+        }),
+      )) as CallToolResultLike;
+      expect(result.isError).toBeFalsy();
+      return JSON.parse(
+        result.content![0]!.text,
+      ) as RecentWorkContextResponse;
+    }
+
+    it('default behavior on a 24h since/until span uses inferred window_hours = 24, not 4', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T00:00:00.000Z',
+        until: '2026-05-07T00:00:00.000Z',
+      });
+      expect(r.query.window_hours).toBe(24);
+    });
+
+    it('a 1h span infers window_hours = 1 (≤4h branch)', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00.000Z',
+        until: '2026-05-06T06:00:00.000Z',
+      });
+      expect(r.query.window_hours).toBe(1);
+    });
+
+    it('a span > 24h still caps inferred window_hours at 24', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-01T00:00:00.000Z',
+        until: '2026-05-07T00:00:00.000Z', // 144h span
+      });
+      expect(r.query.window_hours).toBe(24);
+    });
+
+    it('explicit window_hours wins over inference', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T00:00:00.000Z',
+        until: '2026-05-07T00:00:00.000Z',
+        window_hours: 6,
+      });
+      expect(r.query.window_hours).toBe(6);
+    });
+
+    it('naive ISO timestamps produce a one-line warning in response.warnings', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00',
+        until: '2026-05-06T09:00:00',
+      });
+      const tzWarnings = r.warnings.filter((w) => w.includes('TZ specifier'));
+      expect(tzWarnings).toHaveLength(1);
+    });
+
+    it('a single naive input (since only or until only) still triggers the warning', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00',
+        until: '2026-05-06T09:00:00.000Z',
+      });
+      const tzWarnings = r.warnings.filter((w) => w.includes('TZ specifier'));
+      expect(tzWarnings).toHaveLength(1);
+    });
+
+    it('Z-suffixed ISO timestamps produce no warning', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00.000Z',
+        until: '2026-05-06T09:00:00.000Z',
+      });
+      const tzWarnings = r.warnings.filter((w) => w.includes('TZ specifier'));
+      expect(tzWarnings).toHaveLength(0);
+    });
+
+    it('+HH:MM offset ISO timestamps produce no warning', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00-07:00',
+        until: '2026-05-06T09:00:00-07:00',
+      });
+      const tzWarnings = r.warnings.filter((w) => w.includes('TZ specifier'));
+      expect(tzWarnings).toHaveLength(0);
+    });
+
+    it('window_hours is exposed in the tool input schema (introspectable)', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const tools = await withClient(handle.url, async (c) => c.listTools());
+      const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
+      expect(found).toBeDefined();
+      const schemaProps = (
+        (found!.inputSchema as { properties?: Record<string, unknown> })
+          .properties ?? {}
+      );
+      expect(schemaProps['window_hours']).toBeDefined();
+    });
+
+    it('tool description mentions window_hours and the TZ guardrail', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const tools = await withClient(handle.url, async (c) => c.listTools());
+      const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
+      expect(found?.description).toMatch(/window_hours/);
+      expect(found?.description).toMatch(/timezone|TZ|UTC/);
+    });
+  });
 });

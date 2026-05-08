@@ -24,6 +24,7 @@ export interface QueryEcho {
   until: string;
   artifact_hint: ArtifactHint | null;
   format: ResponseFormat;
+  window_hours: number;
 }
 
 export type EdgeKind = 'shared_artifact';

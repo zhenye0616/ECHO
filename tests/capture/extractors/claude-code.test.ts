@@ -544,7 +544,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     const evt = events[0]!;
     expect(evt.source).toBe(`fs:${path}`);
@@ -568,7 +568,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     expect((evt.metadata as Record<string, unknown>)['repo_root']).toBe('/Users/x/proj');
   });
 
@@ -603,7 +603,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     expect((evt.metadata as Record<string, unknown>)['files_referenced']).toEqual([
       '/proj/a.ts',
       '/proj/b.ts',
@@ -622,7 +622,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     expect(evt.metadata as Record<string, unknown>).not.toHaveProperty('files_referenced');
   });
 
@@ -645,7 +645,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantText('s1', 'a3', 'A3'), userText('s1', 'u4', 'Q4')]);
     await waitFor(async () => (await storage.count()) >= 3);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(3);
     expect(events.map((e) => e.content)).toEqual([
       'USER: Q1\n\nASSISTANT: A1',
@@ -681,7 +681,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     ]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(2);
     const fresh = events.find((e) => e.timestamp !== '2026-04-30T00:00:00Z')!;
     expect(fresh.content).toBe('USER: Q2\n\nASSISTANT: A2');
@@ -715,7 +715,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     // subagent run.
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     expect(events[0]!.source).toBe(`fs:${subagentPath}`);
     expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
@@ -745,7 +745,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
 
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     expect(events[0]!.source).toBe(`fs:${path}`);
     expect(events[0]!.content).toBe('USER: Q1\n\nASSISTANT: A1');
@@ -776,7 +776,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     writeFileSync(path, [u1, a1, u2].map((l) => JSON.stringify(l)).join('\n') + '\n');
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     const md = evt.metadata as Record<string, unknown>;
     const gs = md['git_state'] as Record<string, unknown>;
     expect(gs).toBeDefined();
@@ -811,7 +811,7 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     writeFileSync(path, [u1, a1, u2].map((l) => JSON.stringify(l)).join('\n') + '\n');
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     const md = evt.metadata as Record<string, unknown>;
     expect(md['branch']).toBe('feature/x');
     expect(md['permission_mode']).toBe('auto');

@@ -19,19 +19,28 @@ export class MemoryStorage implements Storage {
     const since = filter?.since;
     const until = filter?.until;
     const limit = filter?.limit;
+    const order = filter?.order ?? 'desc';
 
-    const matches: CaptureEvent[] = [];
+    // Filter first (full pass), then sort by timestamp in the requested order,
+    // then truncate. Sorting before truncation preserves "keep the newest N"
+    // semantics regardless of insertion order.
+    const filtered: CaptureEvent[] = [];
     for (const event of this.events) {
       if (source !== undefined && event.source !== source) continue;
       if (sourcePrefix !== undefined && !event.source.startsWith(sourcePrefix)) continue;
       if (since !== undefined && event.timestamp < since) continue;
       if (until !== undefined && event.timestamp >= until) continue;
-      matches.push(event);
-      // limit truncates oldest-first to match SqliteStorage's ORDER BY timestamp ASC.
-      // Consumers needing most-recent-first must overfetch and sort.
-      if (limit !== undefined && matches.length >= limit) break;
+      filtered.push(event);
     }
-    return matches;
+    filtered.sort((a, b) => {
+      if (a.timestamp < b.timestamp) return order === 'asc' ? -1 : 1;
+      if (a.timestamp > b.timestamp) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+    if (limit !== undefined && filtered.length > limit) {
+      return filtered.slice(0, limit);
+    }
+    return filtered;
   }
 
   async count(): Promise<number> {

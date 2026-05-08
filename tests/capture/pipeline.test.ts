@@ -48,7 +48,7 @@ describe('processCandidate', () => {
       const after = await storage.count();
       expect(after).toBe(before + 1);
 
-      const all = await storage.query();
+      const all = await storage.query({ order: 'asc' });
       expect(all).toHaveLength(1);
       expect(all[0]!.id).toBe(result.id);
       expect(all[0]!.source).toBe('api:github');
@@ -68,7 +68,7 @@ describe('processCandidate', () => {
       );
 
       expect(result.accepted).toBe(true);
-      const [evt] = await storage.query();
+      const [evt] = await storage.query({ order: 'asc' });
       expect(evt!.metadata).toEqual({ repo: 'echo', kind: 'issue' });
     });
 
@@ -84,7 +84,7 @@ describe('processCandidate', () => {
       expect(result.accepted).toBe(true);
       if (!result.accepted) throw new Error('unreachable');
       expect(result.id).not.toBe('caller-supplied-id');
-      const [evt] = await storage.query();
+      const [evt] = await storage.query({ order: 'asc' });
       expect(evt!.id).toBe(result.id);
     });
   });

@@ -103,7 +103,9 @@ export class SqliteStorage implements Storage {
     const limitClause = filter?.limit !== undefined ? 'LIMIT @limit' : '';
     if (filter?.limit !== undefined) params['limit'] = filter.limit;
 
-    const sql = `SELECT id, source, timestamp, content, metadata, embedding FROM events ${where} ORDER BY timestamp ASC ${limitClause}`;
+    const order = filter?.order ?? 'desc';
+    const orderSql = order === 'asc' ? 'ASC' : 'DESC';
+    const sql = `SELECT id, source, timestamp, content, metadata, embedding FROM events ${where} ORDER BY timestamp ${orderSql} ${limitClause}`;
     let stmt = this.queryStmtCache.get(sql);
     if (stmt === undefined) {
       stmt = this.db.prepare(sql);

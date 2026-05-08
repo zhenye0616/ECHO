@@ -41,17 +41,23 @@ describe('MemoryStorage', () => {
       expect(evt!.embedding).toBeUndefined();
     });
 
-    it('returns events in insertion order', async () => {
-      const ids: string[] = [];
+    it('returns events in timestamp DESC order by default (021: keep-newest semantics)', async () => {
       for (let i = 0; i < 5; i++) {
-        ids.push(
-          await store.append(
-            eventInput({ content: `msg-${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
-          ),
+        await store.append(
+          eventInput({ content: `msg-${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
         );
       }
       const all = await store.query();
-      expect(all.map((e) => e.id)).toEqual(ids);
+      expect(all.map((e) => e.content)).toEqual(['msg-4', 'msg-3', 'msg-2', 'msg-1', 'msg-0']);
+    });
+
+    it('returns events in timestamp ASC order when order: "asc" is passed', async () => {
+      for (let i = 0; i < 5; i++) {
+        await store.append(
+          eventInput({ content: `msg-${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
+        );
+      }
+      const all = await store.query({ order: 'asc' });
       expect(all.map((e) => e.content)).toEqual(['msg-0', 'msg-1', 'msg-2', 'msg-3', 'msg-4']);
     });
   });
@@ -104,12 +110,12 @@ describe('MemoryStorage', () => {
     });
 
     it('since is inclusive', async () => {
-      const r = await store.query({ since: '2026-04-30T10:00:00.000Z' });
+      const r = await store.query({ since: '2026-04-30T10:00:00.000Z', order: 'asc' });
       expect(r.map((e) => e.content)).toEqual(['b', 'c', 'd']);
     });
 
     it('until is exclusive', async () => {
-      const r = await store.query({ until: '2026-04-30T11:00:00.000Z' });
+      const r = await store.query({ until: '2026-04-30T11:00:00.000Z', order: 'asc' });
       expect(r.map((e) => e.content)).toEqual(['a', 'b']);
     });
 
@@ -117,15 +123,31 @@ describe('MemoryStorage', () => {
       const r = await store.query({
         since: '2026-04-30T10:00:00.000Z',
         until: '2026-04-30T12:00:00.000Z',
+        order: 'asc',
       });
       expect(r.map((e) => e.content)).toEqual(['b', 'c']);
     });
   });
 
   describe('limit filter', () => {
-    it('caps result count at limit', async () => {
-      for (let i = 0; i < 10; i++) await store.append(eventInput({ content: `${i}` }));
+    it('with default DESC order, caps result at limit and returns the newest N (021)', async () => {
+      for (let i = 0; i < 10; i++) {
+        await store.append(
+          eventInput({ content: `${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
+        );
+      }
       const r = await store.query({ limit: 3 });
+      expect(r).toHaveLength(3);
+      expect(r.map((e) => e.content)).toEqual(['9', '8', '7']);
+    });
+
+    it('with order: "asc", caps result at limit and returns the oldest N', async () => {
+      for (let i = 0; i < 10; i++) {
+        await store.append(
+          eventInput({ content: `${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
+        );
+      }
+      const r = await store.query({ limit: 3, order: 'asc' });
       expect(r).toHaveLength(3);
       expect(r.map((e) => e.content)).toEqual(['0', '1', '2']);
     });
@@ -155,13 +177,13 @@ describe('MemoryStorage', () => {
       );
     });
 
-    it('source + since + limit compose correctly', async () => {
+    it('source + since + limit compose correctly under default DESC order (021)', async () => {
       const r = await store.query({
         source: 'fs:cursor',
         since: '2026-04-30T10:30:00.000Z',
         limit: 2,
       });
-      expect(r.map((e) => e.content)).toEqual(['cur2', 'cur3']);
+      expect(r.map((e) => e.content)).toEqual(['cur4', 'cur3']);
     });
 
     it('source + until rejects out-of-range matches', async () => {

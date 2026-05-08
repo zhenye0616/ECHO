@@ -81,14 +81,19 @@ export function buildRecentWorkContext(
     if (t < sinceMs || t > untilMs) continue;
     atoms.push(a);
   }
+  // Storage now defaults to DESC for "keep the newest N" semantics (item 021);
+  // the trace layer's window filtering and cluster determinism assume ascending
+  // order. Sort in-memory after normalization using compareByOccurredAt (the
+  // canonical sort defined below). Cost is bounded by the upstream overfetch
+  // cap (typically ≤ limit * STORAGE_OVERFETCH events).
+  atoms.sort(compareByOccurredAt);
   const atomsById = new Map(atoms.map((a) => [a.id, a]));
   const atomsTotalInWindow = atoms.length;
 
   // 2. Compute open-loop hints once, before clustering — resolution scans
-  //    over the full sorted atom list so the result is cluster-agnostic.
-  //    Hints are then filtered per-cluster by atom membership.
-  const sortedAtoms = [...atoms].sort(compareByOccurredAt);
-  const allHints = enrichHints(sortedAtoms);
+  //    over the full sorted atom list so the result is cluster-agnostic
+  //    (item 020). Hints are then filtered per-cluster by atom membership.
+  const allHints = enrichHints(atoms);
   const hintsByAtomId = new Map<string, typeof allHints>();
   for (const h of allHints) {
     const arr = hintsByAtomId.get(h.atom_id);
@@ -174,6 +179,7 @@ export function buildRecentWorkContext(
       until: query.until,
       artifact_hint: query.artifact_hint ?? null,
       format: query.format ?? 'full',
+      window_hours: windowHours,
     },
     clusters: truncated.clusters,
     atoms: atomsMap,

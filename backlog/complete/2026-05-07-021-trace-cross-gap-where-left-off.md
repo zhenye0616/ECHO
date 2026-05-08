@@ -10,6 +10,76 @@ claimed_at: "2026-05-08T06:30:00Z"
 branch: "agent/trace-cross-gap-where-left-off"
 head_sha: "d6890b9e4b84103108eb03a0c2ef971491b651aa"
 pr_url: ""
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation. Reviewer: independent
+  strategist session (sidecar at backlog/pending_review/...021.review.md
+  before consumption, preserved in commit 3965044). Reviewer Independence
+  Rule satisfied: 021 builder, 021 reviewer, and merger are three distinct
+  roles/sessions.
+
+  Conflicts resolved (3 files, all mechanical per the sidecar's prediction):
+  - src/mcp/tools/recent-work-context.ts: composed both branches' description
+    additions in natural reading order (atom_ids → 020's `resolved` sentence
+    → format → 021's `window_hours` inference → 021's TZ guidance).
+  - tests/trace/build.test.ts: split into two adjacent describe blocks, one
+    per item, preserving every test from each branch.
+  - tests/mcp/tools/recent-work-context.test.ts: split into two adjacent
+    describe blocks; each gets its own helper (callRwc for 020, callWith for
+    021). Bodies are identical except for name; duplication is intentional
+    for future-reader clarity.
+
+  Auto-merged with cleanup needed:
+  - src/trace/index.ts: 020 added compareByOccurredAt helper + a [...atoms]
+    .sort(compareByOccurredAt) call; 021 added an inline atoms.sort(...) call
+    using a duplicate inline comparator. Per sidecar fixup #1, replaced 021's
+    inline sort with atoms.sort(compareByOccurredAt) and dropped the now-
+    redundant [...atoms].sort + sortedAtoms intermediate, calling enrichHints
+    on atoms directly. Combined comment block notes both 020 and 021's reasons
+    for needing ASC order.
+  - src/trace/types.ts: auto-merged cleanly (020's resolved/resolved_by_atom_id
+    on OpenLoopHintEnriched + 021's window_hours on QueryEcho and Query are
+    disjoint).
+
+  Fixups applied:
+  - Sort-logic dedup in src/trace/index.ts (per sidecar fixup #1).
+  - Description-string concatenation in src/mcp/tools/recent-work-context.ts
+    (per sidecar fixup #2; was the auto-merge conflict).
+  - Test-file conflict resolution in two test files (per sidecar fixup #3).
+  - Clarifying comment at inferWindowHours' degenerate-input fallback in
+    src/mcp/tools/recent-work-context.ts (per sidecar fixup #5): explains
+    the 4h fallback for NaN dates / since>=until / zero span vs falling to 0.
+
+  Fixups deferred to follow-up items (queued in backlog/_followups.md):
+  - Stabilize the recurring fs-watcher / cursor / daemon-lifecycle flake
+    cluster (3-4 failures every run; same files since item 018 — fixture
+    races on FSEvents under load). File its own quarantine/fix item.
+  - Process improvement: spec template should add an explicit "test fallout
+    permitted in:" convention so collateral test-file edits (021 hit this
+    on tests/capture/*) don't read as drift.
+  - search_memories KNN determinism (flagged in 021's spec body but explicitly
+    out of scope). File as its own item if it persists.
+  - Strategist post-merge wiki promotion: wiki/architecture/work-trace.md
+    (window_hours inference + storage `order` semantic) and wiki/surfaces/
+    mcp-recent-work-context.md (input shape with `window_hours` + TZ warning).
+
+  Verify: typecheck clean. lint clean (--max-warnings 0). Targeted suite for
+  this item (tests/storage + tests/trace + tests/mcp): 174/174 pass. Full
+  suite: 4 failures, all in the known pre-existing flake cluster
+  (tests/capture/extractors/cursor.test.ts ×3, tests/daemon/lifecycle.test.ts
+  ×1). Neither file is in this branch's diff; same flake observed on items
+  019 and 020 merges.
+
+  Design-choice judgments (per sidecar):
+  - tests/capture/* ASC additions outside files_to_modify: STAND. Bug A's
+    spec body explicitly authorized this (`order: 'asc'` opt-in pattern).
+    Tests assert on observed event ordering; DESC flip would have broken
+    them silently.
+  - Span-inference test placement (recent-work-context.test.ts vs
+    build.test.ts): STAND. inferWindowHours lives in the MCP-tool layer;
+    test is correctly co-located with the function under test.
+
+  Branch agent/trace-cross-gap-where-left-off @ d6890b9 merged to main at
+  the merge commit landing immediately before this complete: commit.
 agent_notes: |
   Bug A (storage keep-newest), Bug B (window_hours exposed + span-inferred),
   Guardrail C (naive-TZ warning) all implemented per spec; tests + smoke

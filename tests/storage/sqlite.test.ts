@@ -61,7 +61,7 @@ describe('SqliteStorage', () => {
       expect(evt!.embedding).toBeUndefined();
     });
 
-    it('returns events in timestamp ASC order', async () => {
+    it('returns events in timestamp DESC order by default (021: keep-newest semantics)', async () => {
       const ids: string[] = [];
       const stamps = [
         '2026-04-30T12:04:00.000Z',
@@ -74,6 +74,21 @@ describe('SqliteStorage', () => {
         ids.push(await store.append(eventInput({ content: `msg-${i}`, timestamp: stamps[i]! })));
       }
       const all = await store.query();
+      expect(all.map((e) => e.timestamp)).toEqual([...stamps].sort().reverse());
+    });
+
+    it('returns events in timestamp ASC order when order: "asc" is passed', async () => {
+      const stamps = [
+        '2026-04-30T12:04:00.000Z',
+        '2026-04-30T12:00:00.000Z',
+        '2026-04-30T12:02:00.000Z',
+        '2026-04-30T12:01:00.000Z',
+        '2026-04-30T12:03:00.000Z',
+      ];
+      for (let i = 0; i < stamps.length; i++) {
+        await store.append(eventInput({ content: `msg-${i}`, timestamp: stamps[i]! }));
+      }
+      const all = await store.query({ order: 'asc' });
       expect(all.map((e) => e.timestamp)).toEqual([...stamps].sort());
     });
   });
@@ -132,12 +147,12 @@ describe('SqliteStorage', () => {
     });
 
     it('since is inclusive', async () => {
-      const r = await store.query({ since: '2026-04-30T10:00:00.000Z' });
+      const r = await store.query({ since: '2026-04-30T10:00:00.000Z', order: 'asc' });
       expect(r.map((e) => e.content)).toEqual(['b', 'c', 'd']);
     });
 
     it('until is exclusive', async () => {
-      const r = await store.query({ until: '2026-04-30T11:00:00.000Z' });
+      const r = await store.query({ until: '2026-04-30T11:00:00.000Z', order: 'asc' });
       expect(r.map((e) => e.content)).toEqual(['a', 'b']);
     });
 
@@ -145,19 +160,31 @@ describe('SqliteStorage', () => {
       const r = await store.query({
         since: '2026-04-30T10:00:00.000Z',
         until: '2026-04-30T12:00:00.000Z',
+        order: 'asc',
       });
       expect(r.map((e) => e.content)).toEqual(['b', 'c']);
     });
   });
 
   describe('limit filter', () => {
-    it('caps result count at limit', async () => {
+    it('with default DESC order, caps result at limit and returns the newest N (021)', async () => {
       for (let i = 0; i < 10; i++) {
         await store.append(
           eventInput({ content: `${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
         );
       }
       const r = await store.query({ limit: 3 });
+      expect(r).toHaveLength(3);
+      expect(r.map((e) => e.content)).toEqual(['9', '8', '7']);
+    });
+
+    it('with order: "asc", caps result at limit and returns the oldest N', async () => {
+      for (let i = 0; i < 10; i++) {
+        await store.append(
+          eventInput({ content: `${i}`, timestamp: `2026-04-30T12:0${i}:00.000Z` }),
+        );
+      }
+      const r = await store.query({ limit: 3, order: 'asc' });
       expect(r).toHaveLength(3);
       expect(r.map((e) => e.content)).toEqual(['0', '1', '2']);
     });
@@ -187,13 +214,13 @@ describe('SqliteStorage', () => {
       );
     });
 
-    it('source + since + limit compose correctly', async () => {
+    it('source + since + limit compose correctly under default DESC order (021)', async () => {
       const r = await store.query({
         source: 'fs:cursor',
         since: '2026-04-30T10:30:00.000Z',
         limit: 2,
       });
-      expect(r.map((e) => e.content)).toEqual(['cur2', 'cur3']);
+      expect(r.map((e) => e.content)).toEqual(['cur4', 'cur3']);
     });
 
     it('source + until rejects out-of-range matches', async () => {
