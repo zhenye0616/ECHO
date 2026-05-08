@@ -62,6 +62,7 @@ describe('buildRecentWorkContext', () => {
       until: QUERY.until,
       artifact_hint: null,
       format: 'full',
+      window_hours: 4,
     });
   });
 
@@ -460,6 +461,83 @@ describe('buildRecentWorkContext', () => {
         normalize,
       );
       expect(r.query.format).toBe('minimal');
+    });
+  });
+
+  describe('V1.5 cross-gap (item 021)', () => {
+    it('atoms returned to the trace builder are re-sorted ascending after DESC fetch (cluster determinism preserved)', () => {
+      // Storage now defaults to DESC; the trace layer must re-sort ASC so
+      // cluster_id (a hash of sorted atom ids) and edge construction stay
+      // deterministic regardless of upstream order.
+      const specs: AtomSpec[] = [
+        {
+          id: 'evt_b',
+          app: 'cursor',
+          occurred_at: '2026-05-06T08:00:00.000Z',
+          artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+        },
+        {
+          id: 'evt_a',
+          app: 'cursor',
+          occurred_at: '2026-05-06T07:00:00.000Z',
+          artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+        },
+        {
+          id: 'evt_c',
+          app: 'cursor',
+          occurred_at: '2026-05-06T08:30:00.000Z',
+          artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+        },
+      ];
+      // Build twice with different feed orders; cluster_id must match because
+      // the trace layer sorts internally.
+      const desc = asCapture([...specs].sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1)));
+      const asc = asCapture([...specs].sort((a, b) => (a.occurred_at < b.occurred_at ? -1 : 1)));
+      const rDesc = buildRecentWorkContext(desc.events, QUERY, desc.normalize);
+      const rAsc = buildRecentWorkContext(asc.events, QUERY, asc.normalize);
+      expect(rDesc.clusters[0]!.cluster_id).toBe(rAsc.clusters[0]!.cluster_id);
+      // Atoms list is implementation-detail-ordered, but the cluster id (which
+      // sorts internally) and the time_range bounds must be stable.
+      expect(rDesc.clusters[0]!.time_range).toEqual(rAsc.clusters[0]!.time_range);
+    });
+
+    it('explicit window_hours in input is echoed verbatim', () => {
+      const { events, normalize } = asCapture([]);
+      const r = buildRecentWorkContext(
+        events,
+        { ...QUERY, window_hours: 24 },
+        normalize,
+      );
+      expect(r.query.window_hours).toBe(24);
+    });
+
+    it('cluster spans the full (since, until) window when window_hours = span (atoms 5h apart in same project DO cluster together)', () => {
+      // Without raising window_hours above 4, two atoms 5h apart sharing only
+      // a file artifact would never form an edge. With window_hours = 24,
+      // they should cluster.
+      const specs: AtomSpec[] = [
+        {
+          id: 'morning',
+          app: 'cursor',
+          occurred_at: '2026-05-06T01:00:00.000Z',
+          artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+        },
+        {
+          id: 'evening',
+          app: 'cursor',
+          occurred_at: '2026-05-06T22:00:00.000Z',
+          artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::a.ts' }],
+        },
+      ];
+      const { events, normalize } = asCapture(specs);
+      const wideQuery: Query = {
+        since: '2026-05-06T00:00:00.000Z',
+        until: '2026-05-07T00:00:00.000Z',
+        window_hours: 24,
+      };
+      const r = buildRecentWorkContext(events, wideQuery, normalize);
+      expect(r.clusters).toHaveLength(1);
+      expect(r.clusters[0]!.atom_ids.sort()).toEqual(['evening', 'morning']);
     });
   });
 });

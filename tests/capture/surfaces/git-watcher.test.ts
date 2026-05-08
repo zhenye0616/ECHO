@@ -100,7 +100,7 @@ describe('startGitWatcher', () => {
     handles.push(h);
 
     await waitForCount(storage, 3);
-    const events = await storage.query({ source: `git:${repo}` });
+    const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
     expect(events).toHaveLength(3);
 
     const shas = events.map((e) => (e.metadata as Record<string, unknown>)['sha']);
@@ -136,7 +136,7 @@ describe('startGitWatcher', () => {
     handles.push(h);
 
     await waitForCount(storage, 2);
-    const events = await storage.query({ source: `git:${repo}` });
+    const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
     expect(events).toHaveLength(2);
 
     for (const evt of events) {
@@ -172,7 +172,7 @@ describe('startGitWatcher', () => {
     handles.push(h2);
 
     await waitForCount(storage, 5);
-    const events = await storage.query({ source: `git:${repo}` });
+    const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
     expect(events).toHaveLength(5);
     const newShas = events.slice(3).map(
       (e) => (e.metadata as Record<string, unknown>)['sha'],
@@ -201,7 +201,7 @@ describe('startGitWatcher', () => {
     await commitFile(repo, 'a.txt', '2', 'detected-by-polling');
     await waitForCount(storage, 2, 5000);
 
-    const events = await storage.query({ source: `git:${repo}` });
+    const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
     const second = events[1]!;
     expect(second.content).toContain('detected-by-polling');
   });
@@ -223,7 +223,7 @@ describe('startGitWatcher', () => {
     handles.push(h);
 
     await waitForCount(storage, 1);
-    const events: CaptureEvent[] = await storage.query({ source: `git:${repo}` });
+    const events: CaptureEvent[] = await storage.query({ source: `git:${repo}`, order: 'asc' });
     expect(events).toHaveLength(1);
     const evt = events[0]!;
     expect(evt.content).toContain(`[diff truncated at 102400 bytes; full diff at ${sha}]`);
@@ -303,7 +303,7 @@ describe('startGitWatcher', () => {
     await commitFile(repo, 'b.txt', 'second', 'second');
     await waitForCount(storage, 2, 8000);
 
-    const events = await storage.query({ source: `git:${repo}` });
+    const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
     expect(events.length).toBeGreaterThanOrEqual(2);
     expect(events[1]!.content).toContain(': second');
   });

@@ -73,7 +73,7 @@ describe('startFsWatcher', () => {
     writeFileSync(filePath, 'hello');
 
     await waitForCount(storage, 1);
-    const all = await storage.query();
+    const all = await storage.query({ order: 'asc' });
     const evt = all[0]!;
     expect(evt.source).toBe(`fs:${filePath}`);
     const content = parseContent(evt);
@@ -93,7 +93,7 @@ describe('startFsWatcher', () => {
     appendFileSync(filePath, ' second');
 
     await waitForCount(storage, 1);
-    const all = await storage.query();
+    const all = await storage.query({ order: 'asc' });
     const matching = all.filter((e) => e.source === `fs:${filePath}`);
     expect(matching.length).toBeGreaterThanOrEqual(1);
     const types = matching.map((e) => parseContent(e).event_type);
@@ -110,7 +110,7 @@ describe('startFsWatcher', () => {
 
     await waitForCount(storage, 1);
     await new Promise((r) => setTimeout(r, 300));
-    const all = await storage.query();
+    const all = await storage.query({ order: 'asc' });
     expect(all.some((e) => e.source === `fs:${walPath}`)).toBe(false);
     expect(all.some((e) => e.source === `fs:${filePath}`)).toBe(true);
   });
@@ -124,7 +124,7 @@ describe('startFsWatcher', () => {
     unlinkSync(filePath);
 
     await waitForCount(storage, 1);
-    const all = await storage.query();
+    const all = await storage.query({ order: 'asc' });
     const matching = all.filter((e) => parseContent(e).event_type === 'unlink');
     expect(matching.length).toBeGreaterThanOrEqual(1);
     const c = parseContent(matching[0]!);

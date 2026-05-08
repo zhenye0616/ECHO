@@ -21,7 +21,14 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   "only by scope (repo/workspace) or session (conversation/thread) artifacts are " +
   "omitted, so `edges.length` is no longer guaranteed to equal C(N, 2); use " +
   '`cluster.atom_ids[]` for membership. Pass `format: "minimal"` to cap each atom\'s ' +
-  '`action.input`/`action.output` to 500 chars (default `"full"` keeps everything).';
+  '`action.input`/`action.output` to 500 chars (default `"full"` keeps everything). ' +
+  'Pass `window_hours` to control the maximum temporal gap between atoms in a single ' +
+  'cluster; when omitted it is inferred from the (since, until) span (equal to span ' +
+  'when ≤ 4h, otherwise min(span, 24h)) — for "where did I leave off after a break" ' +
+  'queries, span-equal inference lets a single cluster bridge an overnight gap. ' +
+  '`since` and `until` should always carry an explicit timezone (`Z` for UTC or ' +
+  '`+HH:MM` offset); naive ISO strings are parsed as local server time, which is ' +
+  'rarely what an AI client intends.';
 
 export const DEFAULT_LIMIT = 100;
 export const MAX_LIMIT = 500;
@@ -47,6 +54,7 @@ export interface RecentWorkContextParams {
   until?: string;
   artifact_hint?: ArtifactHint;
   limit?: number;
+  window_hours?: number;
   format?: ResponseFormat;
 }
 
@@ -82,6 +90,29 @@ function clampLimit(input: number | undefined): number {
   return Math.min(Math.max(1, floored), MAX_LIMIT);
 }
 
+const TZ_MARKER_RE = /(?:Z|[+-]\d{2}:\d{2})$/;
+
+export function hasTzMarker(s: string): boolean {
+  return TZ_MARKER_RE.test(s);
+}
+
+// Span-driven default for window_hours. When the caller passes an explicit
+// value, that wins. Otherwise: short spans (≤4h) reuse the span exactly so a
+// 1h "what did I just do" query produces a tight 1h cluster cap; longer spans
+// cap at 24h to prevent week-long mega-clusters but still let overnight gaps
+// resolve into a single cluster.
+export function inferWindowHours(
+  sinceMs: number,
+  untilMs: number,
+  explicit: number | undefined,
+): number {
+  if (explicit !== undefined) return explicit;
+  const spanHours = (untilMs - sinceMs) / 3_600_000;
+  if (!Number.isFinite(spanHours) || spanHours <= 0) return DEFAULT_WINDOW_HOURS;
+  if (spanHours <= 4) return spanHours;
+  return Math.min(spanHours, 24);
+}
+
 export async function getRecentWorkContext(
   storage: Storage,
   params: RecentWorkContextParams,
@@ -93,6 +124,10 @@ export async function getRecentWorkContext(
   const since = params.since ?? new Date(Date.parse(until) - windowMs).toISOString();
   const format: ResponseFormat = params.format ?? 'full';
 
+  const sinceMs = Date.parse(since);
+  const untilMs = Date.parse(until);
+  const windowHours = inferWindowHours(sinceMs, untilMs, params.window_hours);
+
   const events = await storage.query({
     since,
     until,
@@ -103,7 +138,7 @@ export async function getRecentWorkContext(
     since,
     until,
     limit,
-    window_hours: DEFAULT_WINDOW_HOURS,
+    window_hours: windowHours,
     format,
   };
   if (params.artifact_hint !== undefined) {
@@ -111,6 +146,20 @@ export async function getRecentWorkContext(
   }
 
   const response = buildRecentWorkContext(events, query, normalizeEvent);
+
+  // Surface a single warning when the caller passed naive (TZ-less) timestamps.
+  // Naive strings are accepted by the schema regex but Date.parse interprets
+  // them as local server time, which is rarely intended by an AI client.
+  // Idempotent — one warning per request even if both inputs are naive.
+  if (
+    (params.since !== undefined && !hasTzMarker(params.since)) ||
+    (params.until !== undefined && !hasTzMarker(params.until))
+  ) {
+    response.warnings.push(
+      'input.since or input.until lacks a TZ specifier and was parsed as ' +
+        'local time; pass an explicit Z or +HH:MM to avoid ambiguity',
+    );
+  }
 
   if (format === 'minimal') {
     const minimalAtoms: Record<string, NormalizedContextEvent> = {};
@@ -136,6 +185,7 @@ export function registerRecentWorkContext(
         until: isoString.optional(),
         artifact_hint: artifactHintSchema.optional(),
         limit: z.number().optional(),
+        window_hours: z.number().min(0.1).max(168).optional(),
         format: formatSchema.optional(),
       },
     },

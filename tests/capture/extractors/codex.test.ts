@@ -768,7 +768,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     // codex session that ended before this daemon boot.
     await waitFor(async () => (await storage.count()) >= 1);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     expect(events[0]!.source).toBe(`fs:${path}`);
     expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
@@ -783,7 +783,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       userMsg('q2'), // closes the cluster
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     const evt = events[0]!;
     expect(evt.source).toBe(`fs:${path}`);
@@ -803,7 +803,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [userMsg('q2'), assistantMsg('a2'), taskComplete()]);
     appendJsonl(path, [userMsg('q3'), assistantMsg('a3'), taskComplete()]);
     await waitFor(async () => (await storage.count()) >= 3, 4000);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events.map((e) => e.content)).toEqual([
       'USER: q1\n\nASSISTANT: a1',
       'USER: q2\n\nASSISTANT: a2',
@@ -844,7 +844,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       userMsg('q2'),
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     const md = evt.metadata as Record<string, unknown>;
     expect(md['git']).toEqual({
       sha: 'abc1234deadbeef',
@@ -895,7 +895,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     writeJsonl(path, lines);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     const md = evt.metadata as Record<string, unknown>;
     expect(md['tool_call_total']).toBe(60);
     expect(md['tool_calls_truncated']).toBe(true);
@@ -943,7 +943,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const fresh = events.find((e) => e.content.includes('a2'));
     expect(fresh).toBeDefined();
     const md = fresh!.metadata as Record<string, unknown>;
@@ -965,7 +965,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
       userMsg('q2'),
     ]);
     await waitFor(async () => (await storage.count()) >= 1);
-    const evt = (await storage.query())[0]!;
+    const evt = (await storage.query({ order: 'asc' }))[0]!;
     const md = evt.metadata as Record<string, unknown>;
     expect(md['cwd']).toBe('/Users/x/proj');
     expect(md['repo_root']).toBe('/Users/x/proj');
@@ -987,7 +987,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantMsg('a3'), userMsg('q4')]);
     await waitFor(async () => (await storage.count()) >= 3);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(3);
     for (const e of events) {
       expect((e.metadata as Record<string, unknown>)['cwd']).toBe('/Users/x/proj');
@@ -1020,7 +1020,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const fresh = events.find((e) => e.content.includes('a2'));
     expect(fresh).toBeDefined();
     expect((fresh!.metadata as Record<string, unknown>)['cwd']).toBe('/Users/x/proj');
@@ -1039,7 +1039,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantMsg('a2'), userMsg('q3')]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(2);
     expect(events[0]?.content).toBe('USER: q1\n\nASSISTANT: a1');
     expect(events[1]?.content).toBe('USER: q2\n\nASSISTANT: a2');
@@ -1069,7 +1069,7 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [assistantMsg('new-a'), userMsg('q3')]);
     await waitFor(async () => (await storage.count()) >= 2);
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const fresh = events.find((e) => e.content.includes('new-a'));
     expect(fresh).toBeDefined();
     expect((fresh!.metadata as Record<string, unknown>)['turn_index']).toBe(1);

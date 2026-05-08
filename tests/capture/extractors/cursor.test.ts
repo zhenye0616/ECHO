@@ -351,7 +351,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     );
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     const evt = events[0]!;
     expect(evt.source).toBe(`fs:${globalDbPath}`);
@@ -379,7 +379,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     utimesSync(walPath, touchedAt, touchedAt);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     expect(events[0]!.source).toBe(`fs:${globalDbPath}`);
     expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
@@ -402,7 +402,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
 
     await waitFor(async () => (await storage.count()) >= 1);
     await new Promise((r) => setTimeout(r, 150));
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(1);
     expect(events[0]!.content).toBe('USER: q1\n\nASSISTANT: a1');
   });
@@ -422,7 +422,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     );
 
     await waitFor(async () => (await storage.count()) >= 2);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(2);
     const timestamps = events.map((e) => e.timestamp);
     expect(new Set(timestamps).size).toBe(2);
@@ -454,7 +454,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const evt = events[0]!;
     expect(evt.metadata).toMatchObject({
       composer_id: 'c1',
@@ -471,7 +471,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const md = events[0]!.metadata as Record<string, unknown>;
     expect(md['session_id']).toBe('composer-xyz');
     expect(md['composer_id']).toBe('composer-xyz');
@@ -502,7 +502,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const md = events[0]!.metadata as Record<string, unknown>;
     expect(md['files_referenced']).toEqual([
       '/proj/README.md',
@@ -520,7 +520,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     ]);
 
     await waitFor(async () => (await storage.count()) >= 1);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     const md = events[0]!.metadata as Record<string, unknown>;
     expect(md).not.toHaveProperty('files_referenced');
   });
@@ -551,7 +551,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
       await waitFor(async () => (await storage.count()) >= expected);
     }
 
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(3);
     const userBubbleIds = events.map(
       (e) => (e.metadata as Record<string, unknown>)['user_bubble_id'],
@@ -594,7 +594,7 @@ describe('startCursorExtractor (lifecycle + integration)', () => {
     });
 
     await waitFor(async () => (await storage.count()) >= 2);
-    const events = await storage.query();
+    const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(2);
     const fresh = events.find((e) => e.timestamp !== '2026-04-30T00:00:00Z');
     expect(fresh).toBeDefined();

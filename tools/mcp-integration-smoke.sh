@@ -238,10 +238,110 @@ case "$EDGE_CHECK" in
     ;;
 esac
 
+# --- 7. Cross-gap window assertion (item 021) --------------------------------
+#
+# Pre-021 the trace layer pinned `window_hours` at 4h regardless of the
+# (since, until) span, so a cluster spanning more than 4h of wall-clock time
+# was structurally impossible — even though `(since, until)` was honored at
+# the storage filter level. With 021's span-inferred window_hours, a 24h span
+# should produce at least one cluster whose `time_range` spans > 4h, so long
+# as the live store has any pair of related atoms across that gap.
+#
+# We probe a 24h window ending "now" (server-side). If the live store happens
+# to be empty for that window, OR if no cluster crosses the gap, we treat that
+# as benign — the assertion is a sentinel that fires only when the regression
+# is observable. (The unit-test layer covers the deterministic case.)
+
+NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+SINCE_ISO=$(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+  || date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+
+CROSS_RESPONSE=$(curl -sS \
+  -X POST "$URL" \
+  -H "Accept: $ACCEPT" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: $SESSION" \
+  --data "$(printf '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_work_context","arguments":{"since":"%s","until":"%s"}}}' "$SINCE_ISO" "$NOW_ISO")")
+
+CROSS_PAYLOAD=$(extract_payload "$CROSS_RESPONSE")
+CROSS_FILE="$WORK/cross-payload.json"
+printf '%s' "$CROSS_PAYLOAD" > "$CROSS_FILE"
+
+CROSS_CHECK=$(python3 - "$CROSS_FILE" <<'PY' 2>&1
+import json, sys
+from datetime import datetime
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
+if not raw:
+    print("EMPTY_PAYLOAD")
+    sys.exit(0)
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"PAYLOAD_NOT_JSON: {exc}")
+    sys.exit(0)
+result = env.get("result") or env
+content = (result.get("content") or [])
+if not content:
+    print("OK_NO_CONTENT")
+    sys.exit(0)
+try:
+    inner = json.loads(content[0]["text"])
+except (KeyError, json.JSONDecodeError) as exc:
+    print(f"INNER_NOT_JSON: {exc}")
+    sys.exit(0)
+wh = inner.get("query", {}).get("window_hours")
+if wh is None or wh <= 4:
+    print(f"WINDOW_HOURS_NOT_INFERRED: query.window_hours={wh} (expected >4)")
+    sys.exit(0)
+clusters = inner.get("clusters", [])
+if not clusters:
+    print(f"OK_NO_CLUSTERS (window_hours={wh})")
+    sys.exit(0)
+def _parse(s):
+    if not s: return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+widest = 0.0
+for c in clusters:
+    tr = c.get("time_range", {})
+    a = _parse(tr.get("from"))
+    b = _parse(tr.get("to"))
+    if a is None or b is None: continue
+    span_h = (b - a).total_seconds() / 3600.0
+    if span_h > widest: widest = span_h
+if widest > 4.0:
+    print(f"OK_CROSS_GAP: widest cluster spans {widest:.1f}h (window_hours={wh})")
+else:
+    print(f"OK_NO_CROSS_GAP: live store has no cluster >4h in last 24h (widest={widest:.1f}h)")
+PY
+)
+
+case "$CROSS_CHECK" in
+  OK_CROSS_GAP*|OK_NO_CROSS_GAP*|OK_NO_CLUSTERS*|OK_NO_CONTENT|EMPTY_PAYLOAD)
+    : # benign — either passed, no data to assert against, or store empty
+    ;;
+  WINDOW_HOURS_NOT_INFERRED*)
+    log_err "$CROSS_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$CROSS_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+  *)
+    log_err "cross-gap check: $CROSS_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$CROSS_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+esac
+
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"
+log_ok "OK: $CROSS_CHECK"
 exit 0

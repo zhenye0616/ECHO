@@ -81,6 +81,17 @@ export function buildRecentWorkContext(
     if (t < sinceMs || t > untilMs) continue;
     atoms.push(a);
   }
+  // Storage now defaults to DESC for "keep the newest N" semantics; the trace
+  // layer's window filtering and cluster determinism assume ascending order.
+  // Sort in-memory after normalization. Cost is bounded by the upstream
+  // overfetch cap (typically ≤ limit * STORAGE_OVERFETCH events).
+  atoms.sort((a, b) => {
+    const ta = a.time.occurred_at;
+    const tb = b.time.occurred_at;
+    if (ta < tb) return -1;
+    if (ta > tb) return 1;
+    return 0;
+  });
   const atomsById = new Map(atoms.map((a) => [a.id, a]));
   const atomsTotalInWindow = atoms.length;
 
@@ -160,6 +171,7 @@ export function buildRecentWorkContext(
       until: query.until,
       artifact_hint: query.artifact_hint ?? null,
       format: query.format ?? 'full',
+      window_hours: windowHours,
     },
     clusters: truncated.clusters,
     atoms: atomsMap,
