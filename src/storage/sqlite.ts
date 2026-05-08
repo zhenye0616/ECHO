@@ -87,6 +87,11 @@ export class SqliteStorage implements Storage {
     if (filter?.source !== undefined && filter?.source_prefix !== undefined) {
       throw new Error('QueryFilter.source and source_prefix are mutually exclusive');
     }
+    if (filter?.before !== undefined && filter?.order === 'asc') {
+      throw new RangeError(
+        'QueryFilter.before is defined for descending queries only; pass order: "desc" or omit it',
+      );
+    }
     const clauses: string[] = [];
     const params: Record<string, unknown> = {};
     if (filter?.source !== undefined) {
@@ -104,6 +109,14 @@ export class SqliteStorage implements Storage {
     if (filter?.until !== undefined) {
       clauses.push('timestamp < @until');
       params['until'] = filter.until;
+    }
+    if (filter?.before !== undefined) {
+      // SQLite ≥3.0 supports row-value comparison; this is the canonical way
+      // to express "rows strictly older than (ts, id)" in the composite-key
+      // ordering and matches the JS predicate in MemoryStorage exactly.
+      clauses.push('(timestamp, id) < (@before_ts, @before_id)');
+      params['before_ts'] = filter.before.timestamp;
+      params['before_id'] = filter.before.id;
     }
     if (filter?.exclude_metadata_surface !== undefined && filter.exclude_metadata_surface.length > 0) {
       // SQL parameter binding doesn't support IN-list expansion directly with
@@ -126,7 +139,11 @@ export class SqliteStorage implements Storage {
 
     const order = filter?.order ?? 'desc';
     const orderSql = order === 'asc' ? 'ASC' : 'DESC';
-    const sql = `SELECT id, source, timestamp, content, metadata, embedding FROM events ${where} ORDER BY timestamp ${orderSql} ${limitClause}`;
+    // `id` follows the same direction as `timestamp` so same-millisecond ties
+    // resolve deterministically. Mixing directions (e.g. `timestamp DESC, id
+    // ASC`) would reopen the same-ms tie-skip class of bug that the composite
+    // cursor was designed to close. Asc and desc both get parallel keys.
+    const sql = `SELECT id, source, timestamp, content, metadata, embedding FROM events ${where} ORDER BY timestamp ${orderSql}, id ${orderSql} ${limitClause}`;
     let stmt = this.queryStmtCache.get(sql);
     if (stmt === undefined) {
       stmt = this.db.prepare(sql);

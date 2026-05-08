@@ -50,7 +50,7 @@ Create the file (or merge into the existing `mcpServers` object) with:
 Then:
 
 1. Restart Cursor (full quit, not just window close — Cursor only loads MCP config on launch).
-2. Open Cursor's MCP panel (Settings → MCP, or via the command palette: "MCP: Show Servers"). Confirm `echo` appears in the list and shows two tools: `echo_ping` and `search_memories`.
+2. Open Cursor's MCP panel (Settings → MCP, or via the command palette: "MCP: Show Servers"). Confirm `echo` appears in the list and shows three tools: `echo_ping` (connectivity check), `search_memories` (substring + filter retrieval over captured events), and `get_recent_work_context` (clustered recent-work trace).
 3. If `echo` is greyed out or shows an error, check the message — it usually says "couldn't connect", which means the daemon isn't running on the configured port.
 
 ### Verify Cursor sees ECHO
@@ -97,7 +97,10 @@ You can confirm the tool is registered without sending a query by asking Claude 
 
 > *"List the MCP tools you have available."*
 
-`search_memories` should appear with its description.
+All three should appear with their descriptions:
+- `echo_ping` — connectivity check; returns pong + a timestamp.
+- `search_memories` — substring + filter retrieval over captured Cursor / Claude Code / Codex / git events.
+- `get_recent_work_context` — clustered recent-work trace across the captured tools.
 
 ## Troubleshooting
 

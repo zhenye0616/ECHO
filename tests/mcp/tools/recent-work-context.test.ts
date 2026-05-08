@@ -236,24 +236,24 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       ) as RecentWorkContextResponse;
     }
 
-    it('format omitted echoes "full" in response.query.format', async () => {
+    it('format omitted echoes "minimal" in response.query.format (item 025 cost-safer default)', async () => {
       handle = await startMcpServer(store, { port: 0 });
       const r = await callWith({ since: SINCE, until: NOW });
-      expect(r.query.format).toBe('full');
+      expect(r.query.format).toBe('minimal');
     });
 
-    it('format: "full" echoes "full" and is bit-for-bit identical to omitted format', async () => {
+    it('format: "minimal" echoes "minimal" and is bit-for-bit identical to omitted format (item 025)', async () => {
       handle = await startMcpServer(store, { port: 0 });
       const omitted = await callWith({ since: SINCE, until: NOW });
-      const explicitFull = await callWith({
+      const explicitMinimal = await callWith({
         since: SINCE,
         until: NOW,
-        format: 'full',
+        format: 'minimal',
       });
-      // expected difference: query.format is "full" in both, atoms identical
-      expect(explicitFull.query.format).toBe('full');
-      expect(explicitFull.atoms).toEqual(omitted.atoms);
-      expect(explicitFull.clusters).toEqual(omitted.clusters);
+      // expected difference: query.format is "minimal" in both, atoms identical
+      expect(explicitMinimal.query.format).toBe('minimal');
+      expect(explicitMinimal.atoms).toEqual(omitted.atoms);
+      expect(explicitMinimal.clusters).toEqual(omitted.clusters);
     });
 
     it('format: "minimal" caps action.input/output to 500 chars + exact suffix', async () => {
@@ -543,6 +543,200 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       expect(found?.description).toMatch(/window_hours/);
       expect(found?.description).toMatch(/timezone|TZ|UTC/);
     });
+  });
+});
+
+describe('item 025: cost-safer defaults + structured output + readOnlyHint', () => {
+  let handle: McpServerHandle | null = null;
+  let restoreStdout: () => void;
+  let store: MemoryStorage;
+
+  beforeEach(() => {
+    ({ restore: restoreStdout } = captureStdout());
+    store = new MemoryStorage();
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    restoreStdout();
+  });
+
+  // Realistic-size CC atom: short user/assistant payloads (well under the
+  // 500-char minimal cap) plus typical metadata. Modeled on the median
+  // turn-pair size from real dogfooding captures. `fileIdx` controls how the
+  // 200-atom fixture distributes across files — `i % 50` mimics real work
+  // spanning many files (multi-cluster shape).
+  function bigCcEvent(
+    session: string,
+    turn: number,
+    tsIso: string,
+    repoRoot: string,
+    fileIdx: number,
+  ): Omit<CaptureEvent, 'id'> {
+    return {
+      source: `fs:${repoRoot}/.claude/projects/abc/${session}.jsonl`,
+      timestamp: tsIso,
+      content: `USER: q${turn}\n\nASSISTANT: a${turn}`,
+      metadata: {
+        session_id: session,
+        turn_index: turn,
+        repo_root: repoRoot,
+        files_referenced: [`${repoRoot}/src/file${fileIdx}.ts`],
+        git_state: { origin_url: 'https://github.com/u/r' },
+      },
+    };
+  }
+
+  // Long CC atom: input/output well above the 500-char cap, used to verify
+  // truncation kicks in correctly.
+  function longCcEvent(
+    session: string,
+    turn: number,
+    tsIso: string,
+    repoRoot: string,
+    fileIdx: number,
+  ): Omit<CaptureEvent, 'id'> {
+    return {
+      source: `fs:${repoRoot}/.claude/projects/abc/${session}.jsonl`,
+      timestamp: tsIso,
+      content:
+        'USER: '.padEnd(800, 'u') + '\n\nASSISTANT: ' + 'a'.padEnd(800, 'a'),
+      metadata: {
+        session_id: session,
+        turn_index: turn,
+        repo_root: repoRoot,
+        files_referenced: [`${repoRoot}/src/file${fileIdx}.ts`],
+        git_state: { origin_url: 'https://github.com/u/r' },
+      },
+    };
+  }
+
+  it('default-args call returns at most DEFAULT_LIMIT atoms with each input/output capped at 500 chars', async () => {
+    const NOW = '2026-05-08T08:00:00.000Z';
+    const SINCE = new Date(Date.parse(NOW) - 4 * 3600_000).toISOString();
+    const baseMs = Date.parse(SINCE);
+    // Seed 200 long-content atoms in window. Long content exercises the
+    // 500-char minimal cap; multi-file distribution keeps the response
+    // shape realistic (matches dogfooding captures).
+    for (let i = 0; i < 200; i++) {
+      const ts = new Date(baseMs + i * 30_000).toISOString();
+      const fileIdx = i % 50;
+      await store.append(longCcEvent(`s${i}`, 0, ts, '/repo', fileIdx));
+    }
+    handle = await startMcpServer(store, { port: 0 });
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'get_recent_work_context',
+        arguments: { since: SINCE, until: NOW },
+      }),
+    )) as CallToolResultLike;
+    expect(result.isError).toBeFalsy();
+    const parsed = JSON.parse(
+      result.content![0]!.text,
+    ) as RecentWorkContextResponse;
+    expect(parsed.query.format).toBe('minimal');
+    const atomCount = Object.keys(parsed.atoms).length;
+    expect(atomCount).toBeLessThanOrEqual(25);
+    // Each atom's input/output capped — the 800-char inputs become 500+suffix.
+    for (const atom of Object.values(parsed.atoms)) {
+      const input = atom.action.input;
+      const output = atom.action.output;
+      if (input !== undefined) expect(input.length).toBeLessThan(700);
+      if (output !== undefined) expect(output.length).toBeLessThan(700);
+    }
+  });
+
+  it('envelope-byte-size: default-args response on a 200-atom fixture is < 25,000 chars', async () => {
+    const NOW = '2026-05-08T08:00:00.000Z';
+    const SINCE = new Date(Date.parse(NOW) - 4 * 3600_000).toISOString();
+    const baseMs = Date.parse(SINCE);
+    // Realistic-shape fixture: 200 atoms across 50 files — matches the
+    // multi-file work patterns in dogfooding captures (a single big-cluster
+    // shape would inflate edges combinatorially and isn't representative).
+    for (let i = 0; i < 200; i++) {
+      const ts = new Date(baseMs + i * 30_000).toISOString();
+      const fileIdx = i % 50;
+      await store.append(bigCcEvent(`s${i}`, 0, ts, '/repo', fileIdx));
+    }
+    handle = await startMcpServer(store, { port: 0 });
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'get_recent_work_context',
+        arguments: { since: SINCE, until: NOW },
+      }),
+    )) as CallToolResultLike;
+    expect(result.isError).toBeFalsy();
+    // Measure the literal payload — what the consumer's tool-result budget pays
+    // for. The text-content envelope is the on-the-wire size that mattered in
+    // dogfooding 2026-05-08 (every retrieval blew the 25k budget pre-fix).
+    const envelopeBytes = result.content![0]!.text.length;
+    expect(envelopeBytes).toBeLessThan(25_000);
+  });
+
+  it('format: "full" preserves full atom content (regression guard against limit/format coupling)', async () => {
+    const NOW = '2026-05-08T08:00:00.000Z';
+    const SINCE = new Date(Date.parse(NOW) - 4 * 3600_000).toISOString();
+    await store.append(longCcEvent('s1', 0, SINCE, '/repo', 0));
+    handle = await startMcpServer(store, { port: 0 });
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'get_recent_work_context',
+        arguments: { since: SINCE, until: NOW, format: 'full' },
+      }),
+    )) as CallToolResultLike;
+    const parsed = JSON.parse(
+      result.content![0]!.text,
+    ) as RecentWorkContextResponse;
+    expect(parsed.query.format).toBe('full');
+    const atom = Object.values(parsed.atoms)[0]!;
+    // Full input/output are 800-char strings — well above the 500-char cap.
+    if (atom.action.input !== undefined) {
+      expect(atom.action.input.length).toBeGreaterThan(500);
+    }
+  });
+
+  it('tools/list advertises outputSchema, readOnlyHint, and the new defaults in the description', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    const tools = await withClient(handle.url, async (c) => c.listTools());
+    interface ToolListEntry {
+      name: string;
+      description?: string;
+      outputSchema?: unknown;
+      annotations?: { readOnlyHint?: boolean };
+    }
+    const found = tools.tools.find(
+      (t) => t.name === 'get_recent_work_context',
+    ) as ToolListEntry | undefined;
+    expect(found).toBeDefined();
+    expect(found?.outputSchema).toBeDefined();
+    expect(found?.annotations?.readOnlyHint).toBe(true);
+    expect(found?.description).toMatch(/limit=20/);
+    expect(found?.description).toMatch(/format="minimal"/);
+  });
+
+  it('tools/call returns both content and structuredContent', async () => {
+    const NOW = '2026-05-08T08:00:00.000Z';
+    const SINCE = new Date(Date.parse(NOW) - 1 * 3600_000).toISOString();
+    handle = await startMcpServer(store, { port: 0 });
+    interface ResultWithStructured extends CallToolResultLike {
+      structuredContent?: Record<string, unknown>;
+    }
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'get_recent_work_context',
+        arguments: { since: SINCE, until: NOW },
+      }),
+    )) as ResultWithStructured;
+    expect(result.isError).toBeFalsy();
+    const text = result.content?.[0]?.text;
+    expect(text).toBeDefined();
+    const parsed = JSON.parse(text!) as Record<string, unknown>;
+    expect(result.structuredContent).toEqual(parsed);
+    expect(parsed['schema_version']).toBe(1);
+    expect(parsed['tool']).toBe('get_recent_work_context');
   });
 });
 

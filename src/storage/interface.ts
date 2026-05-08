@@ -25,6 +25,14 @@ export interface QueryFilter {
   // normalizer throws away — they otherwise dominate storage's newest-N and
   // starve real conversation/git atoms out of the trace input.
   exclude_metadata_surface?: string[];
+  // Composite-key cursor pagination boundary: returns rows strictly older than
+  // (timestamp, id) under the storage `(timestamp DESC, id DESC)` ordering.
+  // Defined for descending queries only — passing `before` together with
+  // `order: 'asc'` MUST throw a synchronous validation error at the storage
+  // seam rather than silently inverting. Adding asymmetric semantics here
+  // would re-introduce the same kind of "minus 1ms" tie-skip bug the
+  // composite cursor was designed to close.
+  before?: { timestamp: string; id: string };
 }
 
 export interface Storage {

@@ -24,9 +24,14 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   "omitted, so `edges.length` is no longer guaranteed to equal C(N, 2); use " +
   '`cluster.atom_ids[]` for membership. `cluster.open_loop_hints[].resolved` ' +
   'indicates whether the hint has a downstream closure signal in the same window ' +
-  '(heuristic — treat as a hint, not a guarantee). Pass `format: "minimal"` to ' +
-  "cap each atom's `action.input`/`action.output` to 500 chars (default " +
-  '`"full"` keeps everything). Pass `window_hours` to control the maximum temporal ' +
+  '(heuristic — treat as a hint, not a guarantee). ' +
+  'DEFAULTS (cost-safer): `limit=20`, `format="minimal"` — every retrieval pays ' +
+  "twice through tool-result budgets (the AI client's, then the user's chat), so " +
+  'minimal is the right starting point. Pass `format: "full"` only when you need ' +
+  "the complete `action.input`/`action.output` content. `limit` may be raised up " +
+  'to MAX_LIMIT=500 for offline/batch consumers but is rarely the right choice ' +
+  'for interactive AI-client paths. ' +
+  'Pass `window_hours` to control the maximum temporal ' +
   'gap between atoms in a single cluster; when omitted it is inferred from the ' +
   '(since, until) span (equal to span when ≤ 4h, otherwise min(span, 24h)) — for ' +
   '"where did I leave off after a break" queries, span-equal inference lets a single ' +
@@ -34,7 +39,21 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   'timezone (`Z` for UTC or `+HH:MM` offset); naive ISO strings are parsed as local ' +
   'server time, which is rarely what an AI client intends.';
 
-export const DEFAULT_LIMIT = 100;
+// Cost-safer defaults (item 025): every retrieval today blew the consumer's
+// 25k-char tool-result budget on first try (dogfooding 2026-05-08 entries
+// 13:27 PDT and 14:43 PDT) even with explicit `format='minimal'`, `limit=50`.
+// The previous defaults (`limit=100`, `format='full'`) were materially more
+// expensive than what already overflowed; flipping them shifts the cost
+// burden onto callers who explicitly opt into 'full'.
+//
+// The spec called for DEFAULT_LIMIT=25, but envelope-byte-size measurements on
+// a realistic 200-atom multi-file fixture showed 25 atoms produced ~27kB
+// envelopes — over the 25k budget the test enforces. Per the spec's explicit
+// escape hatch ("If the test fails post-implementation, lower DEFAULT_LIMIT
+// further or open a V1.6 follow-up for `format: 'skeleton'` — do NOT silently
+// accept a passing-with-warnings response"), we lower to 20: at limit=20 the
+// realistic-fixture envelope is ~22k, comfortably under 25k.
+export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 500;
 export const DEFAULT_WINDOW_HOURS = 4;
 export const STORAGE_OVERFETCH = 10;
@@ -130,7 +149,9 @@ export async function getRecentWorkContext(
   const windowMs = DEFAULT_WINDOW_HOURS * 60 * 60 * 1000;
   const until = params.until ?? now.toISOString();
   const since = params.since ?? new Date(Date.parse(until) - windowMs).toISOString();
-  const format: ResponseFormat = params.format ?? 'full';
+  // Default flipped to 'minimal' (item 025): full content envelopes routinely
+  // exceed the consumer's 25k-char tool-result budget on first call.
+  const format: ResponseFormat = params.format ?? 'minimal';
 
   const sinceMs = Date.parse(since);
   const untilMs = Date.parse(until);
@@ -200,6 +221,24 @@ export async function getRecentWorkContext(
   return response;
 }
 
+// outputSchema for get_recent_work_context. Mirror the FULL top-level key set
+// of `RecentWorkContextResponse` (`src/trace/types.ts:78-87`) so the SDK can
+// validate every real response without rejecting on a missing `schema_version`
+// or `tool` field. Deeply nested cluster/atom/edge bodies use permissive
+// `z.record` / `z.array(z.unknown())` because their internal contract is
+// still moving (items 016–022 reshape them); locking the agent into deep
+// validation here would lock V1.5/V1.6 trace work behind a schema migration.
+// This scoping is intentional: exact on top-level keys, permissive on bodies.
+const recentWorkContextOutputSchema = {
+  schema_version: z.literal(1),
+  tool: z.literal('get_recent_work_context'),
+  query: z.record(z.string(), z.unknown()),
+  clusters: z.array(z.record(z.string(), z.unknown())),
+  atoms: z.record(z.string(), z.record(z.string(), z.unknown())),
+  truncation: z.record(z.string(), z.unknown()),
+  warnings: z.array(z.string()),
+};
+
 export function registerRecentWorkContext(
   server: McpServer,
   storage: Storage,
@@ -216,6 +255,8 @@ export function registerRecentWorkContext(
         window_hours: z.number().min(0.1).max(168).optional(),
         format: formatSchema.optional(),
       },
+      outputSchema: recentWorkContextOutputSchema,
+      annotations: { readOnlyHint: true },
     },
     async (input) => {
       const result = await getRecentWorkContext(
@@ -224,6 +265,7 @@ export function registerRecentWorkContext(
       );
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
+        structuredContent: result as unknown as Record<string, unknown>,
       };
     },
   );

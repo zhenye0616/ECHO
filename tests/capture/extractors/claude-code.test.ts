@@ -647,12 +647,19 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
 
     const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(3);
-    expect(events.map((e) => e.content)).toEqual([
-      'USER: Q1\n\nASSISTANT: A1',
-      'USER: Q2\n\nASSISTANT: A2',
-      'USER: Q3\n\nASSISTANT: A3',
-    ]);
-    expect(events.map((e) => (e.metadata as Record<string, unknown>)['turn_index'])).toEqual([0, 1, 2]);
+    // Item 025: deterministic id-ASC tie-break on same-ms timestamps means we
+    // can no longer assume events[i] follows turn_index. Index by turn_index.
+    const byTurn = new Map(
+      events.map(
+        (e) => [
+          (e.metadata as Record<string, unknown>)['turn_index'] as number,
+          e,
+        ],
+      ),
+    );
+    expect(byTurn.get(0)?.content).toBe('USER: Q1\n\nASSISTANT: A1');
+    expect(byTurn.get(1)?.content).toBe('USER: Q2\n\nASSISTANT: A2');
+    expect(byTurn.get(2)?.content).toBe('USER: Q3\n\nASSISTANT: A3');
   });
 
   it('backfills offset map from prior storage events; resumes without duplicating', async () => {

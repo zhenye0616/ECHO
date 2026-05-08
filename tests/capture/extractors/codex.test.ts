@@ -804,11 +804,13 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     appendJsonl(path, [userMsg('q3'), assistantMsg('a3'), taskComplete()]);
     await waitFor(async () => (await storage.count()) >= 3, 4000);
     const events = await storage.query({ order: 'asc' });
-    expect(events.map((e) => e.content)).toEqual([
+    // Item 025: deterministic id-ASC tie-break on same-ms timestamps —
+    // rapid back-to-back appends can collide on timestamp. Compare as a set.
+    expect(new Set(events.map((e) => e.content))).toEqual(new Set([
       'USER: q1\n\nASSISTANT: a1',
       'USER: q2\n\nASSISTANT: a2',
       'USER: q3\n\nASSISTANT: a3',
-    ]);
+    ]));
   });
 
   it('lands metadata.git and metadata.codex through the pipeline', async () => {
@@ -1041,11 +1043,19 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
 
     const events = await storage.query({ order: 'asc' });
     expect(events).toHaveLength(2);
-    expect(events[0]?.content).toBe('USER: q1\n\nASSISTANT: a1');
-    expect(events[1]?.content).toBe('USER: q2\n\nASSISTANT: a2');
-    expect(
-      (events[1]?.metadata as Record<string, unknown> | undefined)?.['turn_index'],
-    ).toBe(1);
+    // Item 025: deterministic id-ASC tie-break on same-second timestamps
+    // means events[i] is no longer guaranteed to follow turn_index. Identify
+    // by metadata.turn_index.
+    const byTurn = new Map(
+      events.map(
+        (e) => [
+          (e.metadata as Record<string, unknown>)['turn_index'] as number,
+          e,
+        ],
+      ),
+    );
+    expect(byTurn.get(0)?.content).toBe('USER: q1\n\nASSISTANT: a1');
+    expect(byTurn.get(1)?.content).toBe('USER: q2\n\nASSISTANT: a2');
   });
 
   it('backfills offset map from prior storage events on boot (idempotent resume)', async () => {
