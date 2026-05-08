@@ -1,5 +1,5 @@
 ---
-id: 2026-05-08-022-v15.2-trace-retrieval-reliability
+id: 2026-05-08-022-v15-2-trace-retrieval-reliability
 title: V1.5.2 trace + retrieval reliability — close the cross-source bias and silent-failure bugs
 status: ready
 priority: HIGH
@@ -22,7 +22,7 @@ acceptance:
   - "**Bug A — Centralize timestamp canonicalization at the capture chokepoint.** All `CaptureEvent.timestamp` values written to storage MUST be in UTC `Z` form (e.g. `2026-05-08T07:30:00.000Z`). Any source emitting offset-bearing timestamps (today: git-watcher emits `-07:00` via `commit.author_iso`) is canonicalized at a single ingestion chokepoint, not patched per-source. Recommended chokepoint: `src/capture/pipeline.ts` immediately before `storage.append(toAppend)` at line 30, OR inside `src/capture/gate.ts` if the gate is the natural fail-loud point. Pick whichever is the smaller diff and document the decision in the run log. Implementation: `new Date(t).toISOString()` is the one-liner — converts both `Z` and `±HH:MM` forms to canonical `Z`."
   - "  - All four current capture surfaces (git-watcher, fs-watcher, claude-code extractor, codex extractor, cursor extractor) audited; the run log lists each surface's pre-canonicalization timestamp form."
   - "  - A unit test in the canonicalizer's location asserts: `Z` input → unchanged; `+07:00` input → converted to `Z`; `-07:00` input → converted to `Z`; missing TZ (naive) input → either canonicalized assuming UTC OR rejected with a structured error (pick one and document)."
-  - "**Bug A migration — Rewrite existing `-07:00` git rows to `Z` form.** Storage migration script in `src/storage/migrate.ts` (or a sibling in the migrations dir) that runs on daemon startup or via `npm run migrate:timestamps`. Idempotent: running twice does not double-convert. Behavior: `UPDATE events SET timestamp = strftime('%Y-%m-%dT%H:%M:%fZ', datetime(timestamp)) WHERE timestamp NOT LIKE '%Z';` (or equivalent that preserves millisecond precision)."
+  - "**Bug A migration — Rewrite existing `-07:00` git rows to `Z` form.** Storage migration script in `src/storage/migrate.ts` (or a sibling in the migrations dir) that runs on daemon startup or via `npm run migrate:timestamps`. Idempotent: running twice does not double-convert. Implementation: do the conversion in Node, NOT in pure SQL — SQLite's `datetime()` truncates sub-second precision. Loop rows where `timestamp NOT LIKE '%Z'`, update each with `new Date(row.timestamp).toISOString()` inside a single transaction. (Pure-SQL alternatives like `strftime('%Y-%m-%dT%H:%M:%fZ', datetime(timestamp))` are NOT acceptable because the inner `datetime()` call drops millisecond precision before `strftime` reads it.)"
   - "  - Migration tested on a fixture DB with 5+ mixed-form rows: pre-migration count split (`Z` vs offset) recorded; post-migration all `Z`; row IDs and content unchanged."
   - "  - Migration verifies before exit that `SELECT COUNT(*) FROM events WHERE timestamp NOT LIKE '%Z'` returns 0."
   - "**Bug A regression test in storage layer.** New test in `tests/storage/sqlite.test.ts` that seeds a row with `2026-05-08T00:00:00-07:00` (= `2026-05-08T07:00:00Z`), then queries with window `2026-05-08T05:00:00Z..09:00:00Z`. Pre-fix: row not returned (lex compare drops it). Post-fix: row returned. Asserts the canonicalization-or-migration path works end-to-end."
@@ -32,7 +32,7 @@ acceptance:
   - "**Bug C — Trace input filters raw FS noise.** Codex's round-4 measurement: 25h window had 3,827 raw FS events, 117 conversation turns, 26 git commits; storage's newest 1000 rows were 966 raw FS events + 34 conversation turns (96.6% noise). The trace tool's storage budget is being spent on rows the normalizer throws away. Fix: at `src/mcp/tools/recent-work-context.ts` storage-query layer, filter out raw FS-watcher change events (the ones whose `content` parses as `{event_type, path, mtime, size}` with `metadata.surface === 'fs'`). The conversation atoms riding the same `fs:/Users/...` source prefix are NOT raw — they have richer per-extractor metadata. Two paths: (P1) add a `QueryFilter.exclude_metadata_surface?: string[]` field and pass `['fs']` from the trace tool, OR (P2) introduce a `kind: 'meta' | 'data'` discriminator at capture-pipeline level. Pick P1 unless the agent has a strong reason for P2 (smaller diff, less invasive). Document the choice."
   - "  - Test that with a fixture mixing 100 raw fs change events + 5 normalized turn-pair events, the trace tool's storage query returns only the 5 turn-pair events."
   - "  - Smoke validation: live `get_recent_work_context` call with default args returns `source_breakdown` showing >1 source when multiple sources are active in the window. (Pre-fix: 100% claude_code domination on busy days.)"
-  - "**Bug D — `search_memories` filter-before-slice.** In `src/mcp/tools/search-memories.ts:85-95`, the current order is: `storage.query → sortDesc → slice(overfetch) → content filter`. Move the content filter BEFORE the slice, so substring matches outside the recency overfetch are still found. New order: `storage.query → sortDesc → content filter → slice(limitApplied)`. The `MAX_OVERFETCH` cap is no longer needed for the post-filter slice — apply it upstream of the content filter only as a memory guard."
+  - "**Bug D — `search_memories` filter-before-slice.** In `src/mcp/tools/search-memories.ts:85-95`, the current order is: `storage.query → sortDesc → slice(overfetch) → content filter`. Move the content filter BEFORE the slice, so substring matches outside the recency overfetch are still found. New order (when `query` is provided): `storage.query (no upstream limit) → sortDesc → content filter → slice(limitApplied)`. **DO NOT** pass `limit: MAX_OVERFETCH` into `storage.query` on the content-bearing path — that just relocates the same filter-before-slice bug into the storage layer (still drops candidates whose substring lives outside the newest 200 rows). The recency-only path (`query` is `undefined`) MAY pass `limit: limitApplied` to storage as an optimization, since no content predicate runs after. The proper long-term fix to push the substring filter into `storage.query` itself (server-side `WHERE content LIKE ?`) is a separate item — flagged in Out of Scope."
   - "  - Test: seed 30 events where the 25th-newest matches a unique substring; query with `limit=5`. Pre-fix: 0 returned (filter ran on top-20 only). Post-fix: 1 returned. Assert exact match."
   - "**Bug E — `search_memories` description clarification.** In `src/mcp/tools/search-memories.ts:5`, the description says `\"by free-text query\"` which AI clients reasonably read as semantic search. Add explicit text: `\"Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions.\"` Existing text about source_prefix and time-range is fine; just add the substring-semantic clarification."
   - "**Bug F — `hasTzMarker` regex broadening.** In `src/mcp/tools/recent-work-context.ts:97`, current regex `/Z$|[+-]\\d{2}:\\d{2}$/` misses ISO 8601 forms like `+0700` (no colon) and `+07` (hour-only). Broaden to `/Z$|[+-]\\d{2}(?::?\\d{2})?$/`. Test with all four legal forms (`Z`, `+07:00`, `+0700`, `+07`)."
@@ -45,7 +45,7 @@ acceptance:
   - "  - `tests/trace/build.test.ts` and existing trace tests must remain passing — this item does not change trace algorithm semantics."
   - "Smoke test (`tools/mcp-integration-smoke.sh`) extended: assert that calling `get_recent_work_context` over a 24h window with a forced `\"-07:00\"` git event present returns the git event in the response (post-canonicalization OR post-migration)."
   - "`npm run test`, `npm run lint`, `npm run typecheck` clean."
-  - "Run log appended to `raw/internal/agent-runs/2026-05-08-2026-05-08-022-v15.2-trace-retrieval-reliability.md` with: capture-surface audit table, chokepoint choice rationale, P1-vs-P2 raw-FS-filter choice rationale, migration row-count diff."
+  - "Run log appended to `raw/internal/agent-runs/2026-05-08-2026-05-08-022-v15-2-trace-retrieval-reliability.md` with: capture-surface audit table, chokepoint choice rationale, P1-vs-P2 raw-FS-filter choice rationale, migration row-count diff."
 files_to_modify:
   - src/capture/pipeline.ts
   - src/capture/gate.ts
@@ -127,15 +127,26 @@ Open question to resolve in the run log: when the input timestamp has NO timezon
 
 ## Bug A migration — Rewrite existing `-07:00` rows
 
-152 git rows currently in storage are all `-07:00`. Migration shape:
+152 git rows currently in storage are all `-07:00`. Migration shape (in Node, NOT pure SQL):
 
-```sql
-UPDATE events
-SET timestamp = strftime('%Y-%m-%dT%H:%M:%fZ', datetime(timestamp))
-WHERE timestamp NOT LIKE '%Z';
+```ts
+// src/storage/migrate.ts (sketch)
+const rows = db.prepare(
+  "SELECT id, timestamp FROM events WHERE timestamp NOT LIKE '%Z'"
+).all() as { id: number; timestamp: string }[];
+
+const update = db.prepare("UPDATE events SET timestamp = ? WHERE id = ?");
+const tx = db.transaction((rs: typeof rows) => {
+  for (const r of rs) {
+    update.run(new Date(r.timestamp).toISOString(), r.id);
+  }
+});
+tx(rows);
 ```
 
-Idempotent because the `WHERE` clause excludes already-canonicalized rows on a re-run. Test fixture: 5 mixed-form rows, run migration twice, assert no double-conversion + post-state has zero non-`Z` rows.
+**Why not pure SQL.** The seemingly-equivalent `UPDATE events SET timestamp = strftime('%Y-%m-%dT%H:%M:%fZ', datetime(timestamp)) WHERE timestamp NOT LIKE '%Z';` is **not acceptable** — SQLite's `datetime()` parses the offset-bearing string into a UTC moment but loses millisecond precision before `strftime` reads it (e.g. `2026-05-08T00:18:26.123-07:00` becomes `2026-05-08T07:18:26.000Z`). `Date.prototype.toISOString()` in Node always emits `.fffZ` and preserves all milliseconds the original timestamp carried.
+
+Idempotent because the `WHERE` clause excludes already-canonicalized rows on a re-run. Test fixture: 5 mixed-form rows including at least one with non-zero milliseconds (e.g. `2026-05-08T00:18:26.123-07:00`); run migration twice; assert no double-conversion, post-state has zero non-`Z` rows, AND post-state preserves the `.123` ms from the fixture row.
 
 Run automatically on daemon startup OR exposed as `npm run migrate:timestamps` for manual runs. Either works; pick the cheaper integration. (Recommend daemon startup so the founder doesn't have to run anything by hand — the migration is idempotent and fast at 152 rows.)
 
@@ -182,7 +193,12 @@ const top = candidates.slice(0, limitApplied);
 
 ```ts
 // Fixed order:
-const all = await storage.query(filter);
+const filterWithLimit: QueryFilter = {
+  ...filter,
+  // Only safe to upstream-limit when no content filter runs after.
+  ...(query === undefined ? { limit: limitApplied } : {}),
+};
+const all = await storage.query(filterWithLimit);
 const sorted = sortDesc(all);
 let candidates = sorted;
 if (query !== undefined) {
@@ -192,7 +208,11 @@ if (query !== undefined) {
 const top = candidates.slice(0, limitApplied);
 ```
 
-`MAX_OVERFETCH` (200) becomes a memory guard at the storage-query level if needed; pass `limit: MAX_OVERFETCH` into `storage.query` (note this works correctly post-021 because storage now defaults to DESC, so it returns the newest MAX_OVERFETCH rows). This was already flagged as a follow-up from item 014 — close it here.
+**Why no upstream limit on the content-bearing path.** The original 014 follow-up suggested wiring `limit: MAX_OVERFETCH` into `storage.query` as a memory guard. That sounds safe but reintroduces the same bug at a higher cap: if storage caps at 200 newest rows and the matching substring lives in row 201, the result is still empty. For V1.5.2 we accept the load-then-filter memory cost (the dataset is small enough to fit) and leave server-side substring filtering for a later item once a real content-filter contract is added to `QueryFilter`. The memory exposure is bounded by the existing per-source / time-range filters in the MCP tool's `QueryFilter`.
+
+The recency-only path (no `query`) keeps the upstream limit because no post-storage filter can drop rows.
+
+This closes the original 014 follow-up's "wire limit into storage.query" intent in the only direction that's correct.
 
 ## Bug E — Description clarification
 
@@ -213,6 +233,7 @@ Replace `/Z$|[+-]\d{2}:\d{2}$/` with `/Z$|[+-]\d{2}(?::?\d{2})?$/`. Matches `Z`,
 - **`search_memories` returning normalized atoms (item 017's old scope).** Out of scope.
 - **Per-source quota at storage query.** P2 alternative to P1 for Bug C; only if P1 has a real problem.
 - **Storage `count(filter)` method.** Could provide a more precise "did the cap hit" signal than `events.length === cap`. V1.5.3 territory if the heuristic proves noisy.
+- **Server-side substring filter in `QueryFilter` (e.g. `content_contains?: string`).** The clean long-term fix for Bug D's load-then-filter memory cost. Deferred so this item stays focused on the silent-failure correctness fix; tackle once dataset scale makes the load cost actually bite.
 - **Re-clustering or trace-algorithm changes.** Trace algorithm is correct; the bugs are at the data-input + retrieval-wrapper layers.
 - **Capture pipeline restructure.** Only the timestamp canonicalization line changes; rest of `pipeline.ts` is untouched.
 - **`metadata` schema migration.** P1 for Bug C uses existing `metadata.surface` as a query-time filter; no schema change.
@@ -240,4 +261,4 @@ Replace `/Z$|[+-]\d{2}:\d{2}$/` with `/Z$|[+-]\d{2}(?::?\d{2})?$/`. Matches `Z`,
 - [ ] **Bug E:** Description appended with the substring-semantic clarification.
 - [ ] **Bug F:** `hasTzMarker` regex broadened; 4-form test.
 - [ ] `npm run test`, `npm run lint`, `npm run typecheck` clean.
-- [ ] Run log at `raw/internal/agent-runs/2026-05-08-2026-05-08-022-v15.2-trace-retrieval-reliability.md` with all four required tables/rationales (surface audit, chokepoint choice, P1/P2 choice, migration count).
+- [ ] Run log at `raw/internal/agent-runs/2026-05-08-2026-05-08-022-v15-2-trace-retrieval-reliability.md` with all four required tables/rationales (surface audit, chokepoint choice, P1/P2 choice, migration count).

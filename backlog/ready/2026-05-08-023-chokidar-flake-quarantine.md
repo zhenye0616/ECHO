@@ -21,7 +21,7 @@ acceptance:
   - "  - **Path C (quarantine):** mark the affected `it()` blocks with `.skip()` and add a tracking comment pointing to this item id and the underlying race. Keeps verify steps clean; defers the real fix; keeps the test bodies intact for when someone picks them up."
   - "Whatever path is chosen, the post-fix `npm test` MUST show zero failures across **three consecutive runs**. Record the three counts in the run log."
   - "**No new tests required for Paths B or C** — the existing tests are the subject. Path A requires a regression test asserting the race is fixed."
-  - "**Update existing followups to mark this resolved.** Append a `> Resolved (delivered after merge)` block under each of the five places this flake was flagged in `backlog/_followups.md`: 014 section, 016 section, 018 section, 019 section, 020 section, 021 section. Cross-references prevent the next merge from re-flagging it."
+  - "**Update existing followups to mark this resolved (cursor + daemon-lifecycle subset only).** Append a `> Resolved (delivered after merge by 2026-05-08-023)` block under each of the six places this flake was flagged in `backlog/_followups.md`: 014 section, 016 section, 018 section, 019 section, 020 section, 021 section. **Scope discipline:** mark only the `cursor.test.ts` + `daemon/lifecycle.test.ts` portions resolved. The 014 entry also names `claude-code.test.ts` and `fs-watcher.test.ts`; those are out-of-scope for 023 (per `Out of Scope` below) and MUST be left as still-open items in that entry — either inline (e.g. `> Resolved by 023 for cursor + daemon-lifecycle. claude-code.test.ts and fs-watcher.test.ts portions remain open.`) or by splitting the 014 bullet. Cross-references prevent the next merge from re-flagging the cursor/daemon subset."
   - "`npm run lint`, `npm run typecheck` clean."
   - "Run log at `raw/internal/agent-runs/2026-05-08-2026-05-08-023-chokidar-flake-quarantine.md` with: 3 baseline runs, chosen path + rationale, 3 verification runs."
 files_to_modify:
@@ -76,6 +76,6 @@ The agent decides based on what the 3 baseline runs show. Document the reasoning
 - [ ] 3 baseline `npm test` runs recorded in run log.
 - [ ] One of three paths chosen with rationale documented.
 - [ ] Post-fix `npm test` passes 3 consecutive times.
-- [ ] All 5 historical references in `backlog/_followups.md` marked resolved (cross-reference 023).
+- [ ] All 6 historical references in `backlog/_followups.md` marked resolved for the cursor + daemon-lifecycle subset (cross-reference 023); the 014 entry's `claude-code.test.ts` + `fs-watcher.test.ts` portions remain explicitly open.
 - [ ] `npm run lint`, `npm run typecheck` clean.
 - [ ] Run log at `raw/internal/agent-runs/2026-05-08-2026-05-08-023-chokidar-flake-quarantine.md`.
