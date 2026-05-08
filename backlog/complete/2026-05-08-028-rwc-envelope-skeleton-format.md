@@ -47,8 +47,49 @@ agent_notes: |
   Open questions in run log section "Open questions for founder" cover (1)
   fixture density, (2) skeleton summary source ordering, (3) auto-downgrade
   gating language in docs.
-review_notes: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation (commit on agent/rwc-envelope-skeleton-format
+  was 73a9426; merged into main via --no-ff).
+
+  Conflicts resolved: none — clean merge against current main (Bug A+B
+  shipped on disjoint files: search-memories.ts + tail-session.ts).
+
+  Fixups applied: none. Verdict was `merge as-is`.
+
+  Verify post-merge: 528/528 tests pass (21 skipped); lint clean; typecheck clean.
+  (The agent's worktree counted 522 passed at branch tip; the +6 came from
+  the post-027 commits already on main.)
+
+  Drift note (non-blocking): the diff also widened `src/trace/types.ts:11`
+  ResponseFormat enum to include 'skeleton'. Outside the spec's
+  files_to_modify but mechanically required by acceptance bullet 1's
+  "update ResponseFormat accordingly" wording. Reviewer flagged this and
+  judged it implied by the spec — recording here so future audits see
+  the type-widening was deliberate.
+
+  Design-choice judgments confirmed (both flagged in agent_notes; reviewer
+  judged "stand"):
+    - Skeleton transform applied at the MCP wire boundary inside
+      registerRecentWorkContext (not getRecentWorkContext) — keeps the
+      narrow RecentWorkContextResponse type for non-MCP callers like
+      tools/validate-resolution.ts. Trade-off: non-MCP callers cannot
+      use skeleton mode. Sound for V1.
+    - Fixture density 17 artifacts max (vs spec's ≥30): agent chose the
+      stronger "do not hand-author synthetic fixtures" constraint.
+      Skeleton assertion still holds at 12,091 chars (3% headroom under
+      12,500 threshold) — load-bearing per the regression-revert test.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+    - When a denser real spill becomes available, swap fixture and
+      tighten the 12,500-char threshold; current 3% headroom is a
+      future flake risk.
+    - Strategist wiki promotion: note in wiki/surfaces/mcp-recent-work-context.md
+      that non-MCP callers of getRecentWorkContext cannot use skeleton
+      output, by design (transform lives at MCP wire boundary).
+    - Dogfooding follow-up (already queued from 028 spec): re-run the
+      15:54 PDT scenario with format:'skeleton' against the live daemon
+      post-merge, confirm envelope < 25k chars, log to journal as third
+      regression-closure measurement.
 spec_refs:
   - src/mcp/tools/recent-work-context.ts
   - tests/mcp/recent-work-context.test.ts
