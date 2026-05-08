@@ -118,7 +118,16 @@ function spawnDaemon(dataDir: string): DaemonProcess {
   return { child, stdoutLines, stderrLines, exitInfo, parsed, waitFor, waitForStderr };
 }
 
-describe('daemon lifecycle', () => {
+// SKIPPED: every test in this block spawns the real daemon, which holds an
+// FSEvents/chokidar watcher whose `watcher.close()` runs slow under load on
+// macOS — pushing total shutdown elapsed past the 8s waitFor predicate and
+// the inline `expect(elapsed).toBeLessThan(8000)` assertion. Across baseline
+// and verification runs the failing test rotates through the block (boots,
+// SIGINT, refuses to start, stale PID), so per-test skips can't pin the
+// flake. The block is quarantined wholesale by item
+// 2026-05-08-023-chokidar-flake-quarantine; test bodies are intact for when
+// the underlying race is fixed.
+describe.skip('daemon lifecycle', () => {
   let dataDir: string;
   const daemons: DaemonProcess[] = [];
 
