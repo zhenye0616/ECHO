@@ -1,13 +1,29 @@
 ---
 id: 2026-05-07-020-open-loop-resolution-heuristics
 title: V1 trace patch — open-loop resolution heuristics (R1)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 3-5d
 created: 2026-05-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T05:53:09Z"
 branch: "agent/open-loop-resolution-heuristics"
+head_sha: "9b9449b82fd1ba57192dd3dfd02c884c8aae9ef9"
+pr_url: ""
+agent_notes: |
+  R1 open-loop resolution heuristics implemented per spec. Branch agent/open-loop-resolution-heuristics pushed at SHA 9b9449b. 122/122 in-scope tests (tests/trace + tests/mcp) pass; npm run typecheck and npm run lint clean.
+
+  Two scope-edge calls flagged for founder review:
+  1. src/trace/index.ts modified despite not being in files_to_modify. Required to honor the cluster-agnostic resolution acceptance criterion — enrichHints must be called on the full sorted atom list (not per-cluster) so an atom's resolved status doesn't depend on which cluster it lands in. Change is minimal (one sort + per-cluster filter via Map). See run log decision 1.
+  2. tests/trace/rank.test.ts touched in two places to add the now-required `resolved: false` field to existing OpenLoopHintEnriched literals. Compile-only fix following the type change.
+
+  Pre-existing flaky failures in tests/capture/extractors/cursor.test.ts (3) and tests/daemon/lifecycle.test.ts (1) remain — verified by running same files with my changes stashed (saw 6 failures, fluctuating). Unrelated to item 020; founder may want to quarantine in a follow-up.
+
+  tools/validate-resolution.ts smoke-tested against an empty SQLite (output structure verified, 0 rows). Real run against ~/Library/Application Support/ECHO/echo.db deferred to founder validation pass per spec.
+
+  No npm run validate:resolution script entry added (package.json not in files_to_modify); script runs via `npx vite-node tools/validate-resolution.ts` per the spec's "or" alternate.
+
+  Full run log at raw/internal/agent-runs/2026-05-07-2026-05-07-020-open-loop-resolution-heuristics.md.
 spec_refs:
   - backlog/complete/2026-05-06-018-recent-work-context-tool.md
   - backlog/complete/2026-05-07-019-trace-edge-filter-and-format.md
