@@ -1,14 +1,14 @@
 ---
 id: 2026-05-08-028-rwc-envelope-skeleton-format
 title: V1.5.5 `get_recent_work_context` envelope fix — `format:'skeleton'` mode + realistic-density acceptance test
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T23:01:33Z"
+branch: "agent/rwc-envelope-skeleton-format"
+worktree: "~/Desktop/Project_echo--rwc-envelope-skeleton-format"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
