@@ -19,7 +19,6 @@ spec_refs:
   - tools/mcp-integration-smoke.sh
   - docs/mcp-integration.md
   - raw/internal/dogfooding/mcp-interactions-journal.md
-  - backlog/claimed/2026-05-08-025-mcp-best-practices.md
 blocked_by:
   - 2026-05-08-025-mcp-best-practices
 acceptance:

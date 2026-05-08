@@ -588,6 +588,15 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
   - **M5** cursor-helper module location: 026 mandates reusing 025's encode/decode, but 025 may have kept them file-local in `search-memories.ts` (025 is in `pending_review/`, not yet merged — strategist intentionally not peeking at the implementation). Strategist fix: spec adds an explicit "if file-local, extract to `src/mcp/tools/_cursor.ts` as part of 026's scope" contract, and `files_to_modify` updated. Removes `src/storage/interface.ts` since no storage-interface change is needed.
 - **Conjecture:** observations only — (a) the new always-call-first discipline produced exactly its expected outcome on first use: ECHO call attempted, overflowed, bypass logged with the failure-mode named (Failure A, payload size, NOT transport). One data point ≠ trend, but the journal-as-dataset principle is now exercised end-to-end including the bypass-logging step. (b) Codex catching B1+B2 mechanically (path checks, lex-tie-break) is the strongest case yet for the strategist→builder peer-review pattern — these are review failures the strategist alone wouldn't have found because they're operating-model artifacts (filesystem stage names, selector code) not in the strategist's working set. Don't design fixes here.
 
+#### 2026-05-08 14:46 PDT — Codex resumes from prior session via ECHO
+
+- **Trigger:** founder asked Codex to "use echo and resume from where we left off last session."
+- **Query inputs:** `get_recent_work_context(since="2026-05-07T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=24, limit=6, format="minimal")`.
+- **Returned:** 1 cluster (`ctx_247c6cae`) labeled "discussion about Project_echo", ranked for `has_open_loop` + `dense`, with anchors on `/Users/zhenye/Desktop/Project_echo`, a Claude Code conversation, and `docs/BACKLOG.md`. Returned 6 atoms out of a larger 60-atom window. Key visible atoms: `cf7f9f6` journal self-audit commit, `ef93cba` review move for 025, Claude review checks reporting `pending_review/` empty, and the 025 builder run. Warnings said one cluster was dropped and the storage overfetch cap may have silently truncated atoms.
+- **Sources:** `source_breakdown={ claude_code: 31, git: 20 }`; visible atom sources included Claude Code JSONL under `~/.claude/projects/` and git commits for `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** 🟡 partial — it recovered the right work thread and enough next-step hints, but the response is still truncated enough that Codex must verify current filesystem/git state before acting.
+- **Note:** The likely resume point is the 026/027 follow-up line: 025 had been moved through review, 026 received strategist fixes after Codex's pair-review, and 027 still needed its stale 025 `spec_refs` path checked/fixed on the next pass. Follow-up filesystem checks showed only this journal entry was locally modified before the 027 spec fix.
+
 ---
 
 ## Aggregated learnings (filled at end of window)
