@@ -1,0 +1,489 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { homedir } from 'node:os';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { startMcpServer, type McpServerHandle } from '../../../src/mcp/server.js';
+import { MemoryStorage } from '../../../src/storage/memory.js';
+import {
+  tailSession,
+  type TailSessionResult,
+} from '../../../src/mcp/tools/tail-session.js';
+import { encodeCursor } from '../../../src/mcp/tools/_cursor.js';
+import type { CaptureEvent } from '../../../src/storage/interface.js';
+import { captureStdout } from '../../fixtures/stdout.js';
+
+interface ToolContent {
+  type: string;
+  text: string;
+}
+
+interface CallToolResultLike {
+  content?: ToolContent[];
+  structuredContent?: unknown;
+  isError?: boolean;
+}
+
+async function withClient<T>(
+  url: string,
+  fn: (client: Client) => Promise<T>,
+): Promise<T> {
+  const transport = new StreamableHTTPClientTransport(new URL(url));
+  const client = new Client({ name: 'echo-test', version: '0.0.0' });
+  await client.connect(transport);
+  try {
+    return await fn(client);
+  } finally {
+    await client.close();
+  }
+}
+
+async function callTailSession(
+  url: string,
+  args: Record<string, unknown>,
+): Promise<CallToolResultLike> {
+  return withClient(url, async (client) =>
+    (await client.callTool({
+      name: 'tail_session',
+      arguments: args,
+    })) as CallToolResultLike,
+  );
+}
+
+function parseStructured(res: CallToolResultLike): TailSessionResult {
+  const text = res.content?.[0]?.text;
+  if (typeof text !== 'string') {
+    throw new Error(`tool result has no text content: ${JSON.stringify(res)}`);
+  }
+  return JSON.parse(text) as TailSessionResult;
+}
+
+describe('tailSession (handler-level)', () => {
+  it('exact-source happy path: returns the N newest events for that source, next_cursor non-null when more exist', async () => {
+    const store = new MemoryStorage();
+    // 10 events under source A, 5 under source B, with strictly-monotonic ts.
+    const eventsA: Omit<CaptureEvent, 'id'>[] = [];
+    for (let i = 0; i < 10; i++) {
+      eventsA.push({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+    const eventsB: Omit<CaptureEvent, 'id'>[] = [];
+    for (let i = 0; i < 5; i++) {
+      eventsB.push({
+        source: 'fs:B',
+        timestamp: `2026-04-25T11:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `B turn ${i}`,
+      });
+    }
+    for (const e of [...eventsA, ...eventsB]) await store.append(e);
+
+    const result = await tailSession(store, { source: 'fs:A', count: 3 });
+
+    expect(result.turns).toHaveLength(3);
+    expect(result.turns.every((t) => t.source === 'fs:A')).toBe(true);
+    // Newest-first: indices 9, 8, 7
+    expect(result.turns.map((t) => t.content)).toEqual([
+      'A turn 9',
+      'A turn 8',
+      'A turn 7',
+    ]);
+    expect(result.next_cursor).not.toBeNull();
+    expect(result.source_resolved).toBe('fs:A');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('source_app happy path: resolves to the most-recently-active session under the app prefix', async () => {
+    const store = new MemoryStorage();
+    const HOME = homedir();
+    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
+    // Three rollouts, each with 3 turns. Session-Z is the newest by ts.
+    const sessions = [
+      { src: `${codexPrefix}rollout-X.jsonl`, baseHour: 10 },
+      { src: `${codexPrefix}rollout-Y.jsonl`, baseHour: 11 },
+      { src: `${codexPrefix}rollout-Z.jsonl`, baseHour: 12 },
+    ];
+    for (const s of sessions) {
+      for (let i = 0; i < 3; i++) {
+        await store.append({
+          source: s.src,
+          timestamp: `2026-04-25T${s.baseHour.toString().padStart(2, '0')}:00:${i
+            .toString()
+            .padStart(2, '0')}.000Z`,
+          content: `${s.src} turn ${i}`,
+        });
+      }
+    }
+
+    const result = await tailSession(store, { source_app: 'codex', count: 2 });
+
+    expect(result.source_resolved).toBe(`${codexPrefix}rollout-Z.jsonl`);
+    expect(result.turns).toHaveLength(2);
+    expect(result.turns.every((t) => t.source === `${codexPrefix}rollout-Z.jsonl`)).toBe(
+      true,
+    );
+    // Newest-first within Z: indices 2, 1
+    expect(result.turns.map((t) => t.content)).toEqual([
+      `${codexPrefix}rollout-Z.jsonl turn 2`,
+      `${codexPrefix}rollout-Z.jsonl turn 1`,
+    ]);
+    // 3 turns - 2 returned = 1 remaining → next_cursor is null (overfetch
+    // grabbed only 3, kept 2, no extra to anchor a cursor on).
+    expect(result.next_cursor).not.toBeNull();
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('source-not-found: returns empty turns + warning, NOT an error, source_resolved echoes the input', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:A',
+      timestamp: '2026-04-25T10:00:00.000Z',
+      content: 'A 0',
+    });
+
+    const result = await tailSession(store, {
+      source: 'fs:nonexistent.jsonl',
+      count: 5,
+    });
+
+    expect(result.turns).toEqual([]);
+    expect(result.next_cursor).toBeNull();
+    expect(result.source_resolved).toBe('fs:nonexistent.jsonl');
+    expect(result.warnings).toEqual(['no captured atoms for this source']);
+  });
+
+  it('source_app empty store: source_resolved is null with the codex-specific warning', async () => {
+    const store = new MemoryStorage();
+
+    const result = await tailSession(store, { source_app: 'codex' });
+
+    expect(result.turns).toEqual([]);
+    expect(result.next_cursor).toBeNull();
+    expect(result.source_resolved).toBeNull();
+    expect(result.warnings).toEqual([
+      'no captured sessions found for source_app=codex',
+    ]);
+  });
+
+  it('count clamping: count: 100 is silently clamped to 20 (not rejected)', async () => {
+    const store = new MemoryStorage();
+    for (let i = 0; i < 30; i++) {
+      await store.append({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+
+    const result = await tailSession(store, { source: 'fs:A', count: 100 });
+
+    expect(result.turns).toHaveLength(20);
+    // Newest-first, so indices 29..10
+    expect(result.turns[0]!.content).toBe('A turn 29');
+    expect(result.turns[19]!.content).toBe('A turn 10');
+    expect(result.next_cursor).not.toBeNull();
+  });
+
+  it('default count is 5', async () => {
+    const store = new MemoryStorage();
+    for (let i = 0; i < 8; i++) {
+      await store.append({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+    const result = await tailSession(store, { source: 'fs:A' });
+    expect(result.turns).toHaveLength(5);
+  });
+});
+
+describe('tailSession (pagination + same-ms ties)', () => {
+  it('25 events, count 10 → 10 + cursor → 10 + cursor → 5 + null cursor (no skips, no duplicates)', async () => {
+    const store = new MemoryStorage();
+    for (let i = 0; i < 25; i++) {
+      await store.append({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:${i.toString().padStart(2, '0')}:00.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    let pageCount = 0;
+    let totalReturned = 0;
+    const expectedSizes = [10, 10, 5];
+
+    while (true) {
+      const args: Record<string, unknown> = { source: 'fs:A', count: 10 };
+      if (cursor !== undefined) args['cursor'] = cursor;
+      const r = await tailSession(store, args);
+      expect(r.turns).toHaveLength(expectedSizes[pageCount]!);
+      for (const t of r.turns) {
+        expect(seen.has(t.id)).toBe(false);
+        seen.add(t.id);
+        totalReturned++;
+      }
+      pageCount++;
+      if (r.next_cursor === null) break;
+      cursor = r.next_cursor;
+    }
+
+    expect(pageCount).toBe(3);
+    expect(totalReturned).toBe(25);
+    expect(seen.size).toBe(25);
+  });
+
+  it('5 events sharing one timestamp paginate fully (composite cursor breaks ties on id DESC)', async () => {
+    const store = new MemoryStorage();
+    // 5 events at the same wall-clock millisecond — id DESC is the only
+    // discriminator. Composite cursor must page through them without
+    // skips / duplicates.
+    const sharedTs = '2026-04-25T10:00:00.000Z';
+    for (let i = 0; i < 5; i++) {
+      await store.append({
+        source: 'fs:A',
+        timestamp: sharedTs,
+        content: `same-ms ${i}`,
+      });
+    }
+
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    let pageCount = 0;
+
+    while (true) {
+      const args: Record<string, unknown> = { source: 'fs:A', count: 2 };
+      if (cursor !== undefined) args['cursor'] = cursor;
+      const r = await tailSession(store, args);
+      for (const t of r.turns) {
+        expect(seen.has(t.id)).toBe(false);
+        seen.add(t.id);
+      }
+      pageCount++;
+      if (r.next_cursor === null) break;
+      cursor = r.next_cursor;
+    }
+
+    expect(seen.size).toBe(5);
+    // 5/2 = 3 pages (2, 2, 1)
+    expect(pageCount).toBe(3);
+  });
+});
+
+describe('tail_session (MCP wire — registered tool, schema validation, isError envelopes)', () => {
+  let handle: McpServerHandle | null = null;
+  let restoreStdout: () => void;
+
+  beforeEach(() => {
+    ({ restore: restoreStdout } = captureStdout());
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    restoreStdout();
+  });
+
+  it('tools/list advertises tail_session with outputSchema + readOnlyHint', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const tools = await withClient(handle.url, async (client) => client.listTools());
+    const tail = tools.tools.find((t) => t.name === 'tail_session');
+    expect(tail).toBeDefined();
+    expect(tail?.annotations?.readOnlyHint).toBe(true);
+    expect(tail?.outputSchema).toBeDefined();
+    // Sanity-check the output shape names appear in the advertised schema.
+    const schemaJson = JSON.stringify(tail?.outputSchema);
+    expect(schemaJson).toContain('turns');
+    expect(schemaJson).toContain('next_cursor');
+    expect(schemaJson).toContain('source_resolved');
+    expect(schemaJson).toContain('warnings');
+  });
+
+  it('end-to-end: source: fs:A returns the seeded turn through the wire', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: 'fs:A',
+      timestamp: '2026-04-25T10:00:00.000Z',
+      content: 'wire turn',
+    });
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, { source: 'fs:A', count: 5 });
+    expect(res.isError).not.toBe(true);
+    const body = parseStructured(res);
+    expect(body.turns).toHaveLength(1);
+    expect(body.turns[0]!.content).toBe('wire turn');
+    expect(body.source_resolved).toBe('fs:A');
+  });
+
+  it('rejects passing both source AND source_app via isError envelope', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, {
+      source: 'fs:A',
+      source_app: 'codex',
+    });
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    const text = res.content?.[0]?.text ?? '';
+    expect(text).toMatch(/exactly one of.*source.*source_app/i);
+  });
+
+  it('rejects passing neither source nor source_app via isError envelope', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, {});
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    const text = res.content?.[0]?.text ?? '';
+    expect(text).toMatch(/exactly one of.*source.*source_app/i);
+  });
+
+  it('rejects count: 0 via schema validation (NOT a clamp — hard reject)', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    let threwOrIsError = false;
+    try {
+      const res = await callTailSession(handle.url, { source: 'fs:A', count: 0 });
+      if (res.isError === true) threwOrIsError = true;
+    } catch {
+      // The SDK may surface input-schema rejections as a thrown error from
+      // callTool; either form (thrown OR isError envelope) counts as a
+      // reject, since both are observable to the consumer.
+      threwOrIsError = true;
+    }
+    expect(threwOrIsError).toBe(true);
+  });
+
+  it('count: 100 is clamped to 20 over the wire (not rejected)', async () => {
+    const storage = new MemoryStorage();
+    for (let i = 0; i < 25; i++) {
+      await storage.append({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, { source: 'fs:A', count: 100 });
+    expect(res.isError).not.toBe(true);
+    const body = parseStructured(res);
+    expect(body.turns).toHaveLength(20);
+  });
+
+  it('malformed cursor: not valid base64 → isError, no structuredContent', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: 'fs:A',
+      timestamp: '2026-04-25T10:00:00.000Z',
+      content: 'A 0',
+    });
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, {
+      source: 'fs:A',
+      cursor: '!!!not-base64!!!',
+    });
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    expect(res.content?.[0]?.text).toMatch(/malformed cursor/);
+  });
+
+  it('malformed cursor: valid base64 but empty → isError, no structuredContent', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: 'fs:A',
+      timestamp: '2026-04-25T10:00:00.000Z',
+      content: 'A 0',
+    });
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const res = await callTailSession(handle.url, {
+      source: 'fs:A',
+      // Buffer.from('').toString('base64') === '' is filtered out by the
+      // SDK as missing; instead use a base64 that decodes to empty JSON.
+      cursor: Buffer.from('""').toString('base64'),
+    });
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    expect(res.content?.[0]?.text).toMatch(/malformed cursor/);
+  });
+
+  it('malformed cursor: missing id field → isError, no structuredContent', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: 'fs:A',
+      timestamp: '2026-04-25T10:00:00.000Z',
+      content: 'A 0',
+    });
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const partial = Buffer.from(
+      JSON.stringify({ timestamp: '2026-04-25T10:00:00.000Z' }),
+    ).toString('base64');
+    const res = await callTailSession(handle.url, {
+      source: 'fs:A',
+      cursor: partial,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    expect(res.content?.[0]?.text).toMatch(/missing or non-string `id`/);
+  });
+
+  it('cursor reuse across tools: a search_memories cursor shape is decodable by tail_session (composite cursor is shared)', async () => {
+    // Item 026 acceptance: cursor handling reuses spec 025 helpers, NOT a
+    // duplicate. The shared {timestamp, id} composite cursor format is the
+    // canonical contract — verify by constructing a cursor from a known
+    // boundary and confirming tail_session pages from it correctly.
+    const storage = new MemoryStorage();
+    for (let i = 0; i < 10; i++) {
+      await storage.append({
+        source: 'fs:A',
+        timestamp: `2026-04-25T10:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `A turn ${i}`,
+      });
+    }
+    handle = await startMcpServer(storage, { port: 0 });
+
+    // First page (newest 3): 9, 8, 7
+    const page1 = parseStructured(
+      await callTailSession(handle.url, { source: 'fs:A', count: 3 }),
+    );
+    expect(page1.turns.map((t) => t.content)).toEqual([
+      'A turn 9',
+      'A turn 8',
+      'A turn 7',
+    ]);
+    expect(page1.next_cursor).not.toBeNull();
+
+    // Second page using a freshly-constructed composite cursor over the
+    // same shared encode — proves the format is stable across both tools.
+    const constructed = encodeCursor({
+      timestamp: page1.turns[2]!.timestamp,
+      id: page1.turns[2]!.id,
+    });
+    const page2 = parseStructured(
+      await callTailSession(handle.url, {
+        source: 'fs:A',
+        count: 3,
+        cursor: constructed,
+      }),
+    );
+    expect(page2.turns.map((t) => t.content)).toEqual([
+      'A turn 6',
+      'A turn 5',
+      'A turn 4',
+    ]);
+  });
+});

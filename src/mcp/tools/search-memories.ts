@@ -2,6 +2,15 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { CursorDecodeError, decodeCursor, encodeCursor } from './_cursor.js';
+// Re-export for any pre-existing callers / tests that imported the cursor
+// helpers from search-memories. New callers should import from `_cursor.ts`.
+export {
+  CursorDecodeError,
+  decodeCursor,
+  encodeCursor,
+  type DecodedCursor,
+} from './_cursor.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
   "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Prefer `source_app` (`cursor` | `claude_code` | `codex` | `git`) for app-scoped queries; falls through to the FS-encoded `source_prefix` if you need a path-precise filter (e.g. a single Codex rollout JSONL). When both `source_app` and `source_prefix` are passed, `source_prefix` wins (explicit-over-implicit). Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
@@ -97,48 +106,6 @@ function toMatch(e: CaptureEvent): SearchMatch {
   return m;
 }
 
-export interface DecodedCursor {
-  timestamp: string;
-  id: string;
-}
-
-export class CursorDecodeError extends Error {
-  constructor(reason: string) {
-    super(`malformed cursor: ${reason}; pass back the prior call's next_cursor verbatim`);
-    this.name = 'CursorDecodeError';
-  }
-}
-
-export function encodeCursor(c: DecodedCursor): string {
-  return Buffer.from(JSON.stringify(c)).toString('base64');
-}
-
-export function decodeCursor(raw: string): DecodedCursor {
-  let json: string;
-  try {
-    json = Buffer.from(raw, 'base64').toString('utf8');
-  } catch {
-    throw new CursorDecodeError('not valid base64');
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    throw new CursorDecodeError('decoded value is not JSON');
-  }
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new CursorDecodeError('decoded JSON is not an object');
-  }
-  const obj = parsed as { timestamp?: unknown; id?: unknown };
-  if (typeof obj.timestamp !== 'string') {
-    throw new CursorDecodeError('missing or non-string `timestamp` field');
-  }
-  if (typeof obj.id !== 'string') {
-    throw new CursorDecodeError('missing or non-string `id` field');
-  }
-  return { timestamp: obj.timestamp, id: obj.id };
-}
-
 function emitCursor(rows: CaptureEvent[], limitApplied: number): {
   kept: CaptureEvent[];
   next_cursor: string | null;
@@ -221,19 +188,22 @@ export async function searchMemories(
   };
 }
 
+// Single source-of-truth Zod shape for a captured atom in MCP tool responses.
+// Exported so `tail_session` (item 026) and any future retrieval tool reuse
+// the exact same type — keeps consumers stable when ECHO adds a tool.
+export const searchMatchSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  timestamp: z.string(),
+  content: z.string(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 // outputSchema for `tools/list` advertisement and structured-content
 // validation by the SDK. Mirrors SearchResult; matches use `z.unknown()` for
 // the optional metadata bag (its shape varies per source).
 const searchMemoriesOutputSchema = {
-  matches: z.array(
-    z.object({
-      id: z.string(),
-      source: z.string(),
-      timestamp: z.string(),
-      content: z.string(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-    }),
-  ),
+  matches: z.array(searchMatchSchema),
   total_returned: z.number(),
   limit_applied: z.number(),
   next_cursor: z.string().nullable(),

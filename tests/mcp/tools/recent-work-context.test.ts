@@ -122,7 +122,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Retrieve clusters of related events');
   });
 
-  it('all three tools are registered', async () => {
+  it('all four tools are registered', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
@@ -130,6 +130,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       'echo_ping',
       'get_recent_work_context',
       'search_memories',
+      'tail_session',
     ]);
   });
 

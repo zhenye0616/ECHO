@@ -92,7 +92,7 @@ curl -sS -o /dev/null \
   ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# --- 3. tools/list contains all three tools with item-025 advertisements -----
+# --- 3. tools/list contains all four tools with item-025/026 advertisements -
 
 LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
@@ -118,7 +118,15 @@ if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"get_recent_work_context"'; t
   exit 1
 fi
 
-# Item 025: tools/list must advertise three tools with outputSchema +
+if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"tail_session"'; then
+  log_err "tools/list response did not include tail_session"
+  log_err "(item 026 may not have been picked up — has the daemon restarted since merge?)"
+  log_err "raw response:"
+  printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+# Items 025 + 026: tools/list must advertise four tools with outputSchema +
 # readOnlyHint, plus the source_app enum on search_memories.
 LIST_FILE="$WORK/list-payload.json"
 printf '%s' "$LIST_PAYLOAD" > "$LIST_FILE"
@@ -134,7 +142,7 @@ except json.JSONDecodeError as exc:
 result = env.get("result") or env
 tools = result.get("tools") or []
 names = sorted(t.get("name") for t in tools)
-expected = ["echo_ping", "get_recent_work_context", "search_memories"]
+expected = ["echo_ping", "get_recent_work_context", "search_memories", "tail_session"]
 if names != expected:
     print(f"WRONG_TOOL_SET: got {names}, expected {expected}")
     sys.exit(0)
@@ -521,7 +529,8 @@ fi
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
-log_ok "OK: tools/list 3 tools, each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
+log_ok "OK: tools/list contains tail_session"
+log_ok "OK: tools/list 4 tools, each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"

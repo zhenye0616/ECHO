@@ -25,7 +25,7 @@ This is the V1 "killer demo" surface: you ask Cursor or Claude Code a question, 
    ```bash
    ./tools/mcp-integration-smoke.sh
    ```
-   Expect a sequence of `OK:` lines and exit `0` — including a final `OK: stale-session echo_ping recovery` line that proves the stateless transport from item 027 is in place. If it fails, see [Troubleshooting](#troubleshooting) below.
+   Expect a sequence of `OK:` lines and exit `0` — including `OK: tools/list 4 tools` (item 026 added `tail_session`) and a final `OK: stale-session echo_ping recovery` line that proves the stateless transport from item 027 is in place. If it fails, see [Troubleshooting](#troubleshooting) below.
 
 ## Cursor setup
 
@@ -97,10 +97,11 @@ You can confirm the tool is registered without sending a query by asking Claude 
 
 > *"List the MCP tools you have available."*
 
-All three should appear with their descriptions:
+All four should appear with their descriptions:
 - `echo_ping` — connectivity check; returns pong + a timestamp.
 - `search_memories` — substring + filter retrieval over captured Cursor / Claude Code / Codex / git events.
 - `get_recent_work_context` — clustered recent-work trace across the captured tools.
+- `tail_session` — the cheap counterpart for known-source tail lookups: returns the N most-recent atoms for a single named source (or the most-recently-active session for a `source_app`) without clustering or substring filtering. Use this for "where did `<app>` leave off" instead of substring search; default `count=5`, max `20`, typical response `< 10k chars`. Composite cursor is shared with `search_memories` (a `next_cursor` from one is decodable by the other).
 
 ## Troubleshooting
 

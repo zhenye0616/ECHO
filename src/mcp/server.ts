@@ -6,6 +6,7 @@ import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
+import { registerTailSession } from './tools/tail-session.js';
 
 const log = createLogger('mcp.server');
 
@@ -89,6 +90,7 @@ export async function startMcpServer(
     registerEchoPing(mcp);
     registerSearchMemories(mcp, storage);
     registerRecentWorkContext(mcp, storage);
+    registerTailSession(mcp, storage);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
