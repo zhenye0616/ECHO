@@ -475,6 +475,18 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 13:22 PDT — Codex tries to retrieve Claude MCP-tool best-practices claim
+
+- **Trigger:** founder asked Codex to review Claude's claim regarding MCP tool best practices against the current ECHO setup.
+- **Query inputs:** `search_memories(query="best practices", source_prefix="fs:/Users/zhenye/.claude/", limit=10)`.
+- **Returned:** no usable payload. The MCP connector failed before returning matches: `Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`.
+- **Sources:** intended source was Claude Code JSONL under `fs:/Users/zhenye/.claude/`; no source rows were returned because the connector failed.
+- **Verdict:** ❌ wrong.
+- **Note:** This is the same connector/transport failure class already seen at 02:05 PDT. It blocks using ECHO itself to retrieve the Claude claim, forcing fallback to local captured files or direct repo inspection.
+- **Conjecture:** Connector health needs to be fixed before ECHO can reliably serve as the first-hop "what did another AI client say?" substrate.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
