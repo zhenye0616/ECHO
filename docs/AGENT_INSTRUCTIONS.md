@@ -233,7 +233,7 @@ These rules override anything you might infer from context. If any rule conflict
 
 6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
 
-7. **No merging your own branch.** You push `agent/<slug>`. The founder merges. You never run `git merge` on `main`.
+7. **No merging your own branch.** You push `agent/<slug>`. Someone else merges — by preference the strategist, otherwise a second builder agent that did not build this item, otherwise the founder. **You never run `git merge` on `main` for an item you built.** If the user asks you to review and merge a *different* builder's pending item, you may operate in reviewer mode: read the diff, prep `review_notes` and any reconciliation diff, but the actual `git merge` and `git push origin main` still wait for founder green-light per the Reviewer Independence Rule in `claude.md` / `backlog/README.md`.
 
 8. **Stop signals override progress signals.** If you encounter:
    - An ambiguity not resolved by spec

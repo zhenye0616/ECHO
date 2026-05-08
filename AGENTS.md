@@ -27,11 +27,13 @@ The wiki is readable context, but do not treat planned ideas as shipped reality.
 
 ECHO uses three roles:
 
-- Strategist: talks with the founder, makes decisions, writes backlog specs, and does not edit `wiki/` until shipped items move to `complete/`.
-- Builder agent: claims one backlog item, works in an isolated worktree, implements only acceptance criteria, logs the run, and moves the item to review.
-- Founder: reviews pending work, merges, moves items to `complete/`, and asks the strategist to promote shipped decisions to the wiki.
+- **Strategist:** talks with the founder, makes decisions, writes backlog specs, does not edit `wiki/` until shipped items move to `complete/`. **May also review and prep merges** for `pending_review/` items per the Reviewer Independence Rule.
+- **Builder agent:** claims one backlog item, works in an isolated worktree, implements only acceptance criteria, logs the run, moves the item to review. **Never reviews or merges its own work; never runs `git merge` on `main` at all.**
+- **Founder:** gives final approval at the two irreversible moments — (a) substantive conflict resolution, (b) `git push origin main`. Handles end-to-end review when no strategist or independent reviewer is available. Asks the strategist to promote shipped decisions to the wiki.
 
-Codex must identify which role the current user request implies. For normal coding tasks in this repo, behave like a builder agent unless the user is explicitly brainstorming strategy or asking for explanation only.
+**Reviewer Independence Rule:** the reviewer-and-merger of any item must be a different role/agent than the builder. Preference order: strategist → second builder agent (not the one that built this item) → founder. Self-review is structurally weaker than independent review and is not allowed. Codex acting as a builder must never review its own diff into `main`; it may be asked to review a *different* builder's pending item, in which case it operates in reviewer mode (read-only on the feature branch, write-allowed on `review_notes` and merge-prep, never running `git merge`/`git push` without founder green-light).
+
+Codex must identify which role the current user request implies. For normal coding tasks in this repo, behave like a builder agent unless the user is explicitly brainstorming strategy, asking for explanation only, or asking you to review another agent's pending work.
 
 ## Repo Discipline From `claude.md`
 

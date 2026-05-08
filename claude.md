@@ -94,9 +94,19 @@ Working name: **ECHO**. Hard rename deadline: before public Show HN launch (week
 
 This repo coordinates three roles. **Multiple builder agents may run in parallel** — each works inside its own git worktree on its own feature branch.
 
-1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `wiki/` until items ship
-2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline
-3. **Founder (morning review)** — reviews `backlog/pending_review/`, merges branches (handling conflicts manually), moves items to `complete/`, then asks the strategist to update the wiki
+1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `wiki/` until items ship; **may also review and prep merges** for items in `pending_review/` (see "Reviewer independence rule" below)
+2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline; **never review or merge their own work**
+3. **Founder** — gives final approval at the two irreversible moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. Also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+
+### Reviewer independence rule
+
+The reviewer-and-merger of any item must be **a different role/agent than the builder** that wrote the code. Acceptable reviewers, in preference order:
+
+1. **Strategist** — has full design context, often more than founder for technical items
+2. **A second builder agent** (not the one that built the item) — independent eyes, no spec-author conflict-of-interest
+3. **Founder** — fallback when neither of the above is available, or whenever founder wants to review directly
+
+Self-review is the bad version. The agent that drifted into wrong scope can't see its own drift. Independence is the structural check that makes the pipeline trustworthy. Whoever reviews must (a) read the diff against acceptance criteria, (b) prep `review_notes` and any reconciliation diff for conflicts, (c) pause for founder green-light at substantive-conflict and `push-to-main` checkpoints. The reviewer never skips those two checkpoints; everything else they handle end-to-end.
 
 ### Pipeline
 

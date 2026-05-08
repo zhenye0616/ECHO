@@ -4,9 +4,19 @@ Kanban-style work coordination across strategic conversations, one or more auton
 
 ## The Three Roles
 
-1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/ready/` items. Does **not** write to `wiki/` until an item is shipped.
-2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel.
-3. **Founder (morning review)** — reviews items in `backlog/pending_review/`, merges branches, moves items to `complete/`, then asks the strategist to update the wiki.
+1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/ready/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
+2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel. **Never reviews or merges its own work** (and never merges any work — see `docs/AGENT_INSTRUCTIONS.md`).
+3. **Founder** — gives final approval at the two irreversible moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. Also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
+
+### Reviewer Independence Rule
+
+The reviewer-and-merger of any item must be **a different role/agent than the builder**. Acceptable reviewers, in preference order:
+
+1. **Strategist** — full design context; usually the right reviewer for items they specced.
+2. **A second builder agent** (not the builder of this item) — independent eyes, no design conflict-of-interest.
+3. **Founder** — fallback, or whenever founder wants direct review.
+
+Whoever reviews handles the cognitive work end-to-end (read diff against acceptance, prep `review_notes`, draft any reconciliation diff for conflicts), but **never skips the two founder checkpoints**: substantive conflict resolution and the actual `git push origin main`. Self-review is structurally weaker than independent review — the agent that drifted into wrong scope can't see its own drift.
 
 ## Wiki Update Discipline
 
@@ -317,23 +327,24 @@ When an agent runs, it must:
 9. **When acceptance criteria pass** — push branch, `ensure_stage` to `pending_review/`, fill `agent_notes` with summary
 10. **One item per run** when invoked via `/process-backlog`. The `/process-backlog-batch` command wraps the same workflow in a controlled loop and ships multiple items sequentially within one session, halting on max-items, time budget, escalation, no-candidates, or git error. Parallelism across agents is achieved by running multiple sessions with distinct `ECHO_AGENT_ID` — the atomic-claim mechanic prevents collisions.
 
-## Founder Review Process
+## Review Process
 
-Each morning:
+Per the Reviewer Independence Rule, the reviewer is the strategist, a second builder agent, or the founder — never the builder that wrote the code.
 
-1. Open `docs/BACKLOG.md` — see all items in `pending_review/`
-2. For each item:
-   - Read the item file (acceptance + agent_notes)
-   - Read the agent run log
-   - Check out the feature branch / inspect the diff
-   - Run tests locally
+For each item in `pending_review/`:
+
+1. Open `docs/BACKLOG.md` — see all items in `pending_review/`.
+2. Read the item file (acceptance + `agent_notes`), the agent run log, the feature-branch diff, and run tests locally.
 3. Decide:
-   - **Approve** → fill `review_notes`, merge `agent/<slug>` to `main` (handle any conflicts manually), move item to `complete/`, remove worktree, delete branch
-   - **Rework** → fill `review_notes` with what's wrong, move back to `ready/` (worktree + branch can stay or be torn down)
-   - **Cancel** → move to `complete/` with `review_notes: "cancelled — <reason>"`
-4. After items land in `complete/`, **request a wiki update** from the next strategist conversation. The strategist reads each item's "After Completion (Strategist Notes)" section and promotes the now-shipped decisions to `wiki/`.
+   - **Approve** → fill `review_notes`, merge `agent/<slug>` to `main`, move item to `complete/`, remove worktree, delete branch.
+   - **Rework** → fill `review_notes` with what's wrong, move back to `ready/` (worktree + branch can stay or be torn down).
+   - **Cancel** → move to `complete/` with `review_notes: "cancelled — <reason>"`.
+4. **Founder checkpoints (never skipped, regardless of reviewer):**
+   - Any **substantive conflict** in step 3's merge must be surfaced to the founder before resolution. Mechanical conflicts (e.g., two items adding adjacent fields to the same interface) the reviewer prepares as a composed diff for founder rubber-stamp.
+   - The actual **`git push origin main`** is gated on founder green-light per push.
+5. After items land in `complete/`, **request a wiki update** from the next strategist conversation. The strategist reads each item's "After Completion (Strategist Notes)" section and promotes the now-shipped decisions to `wiki/`.
 
-Time budget: ~30 minutes/morning if 2–3 items came through overnight.
+Time budget: ~30 minutes/morning if 2–3 items came through overnight, less when the strategist or a second agent has already prepped review notes and reconciliation diffs.
 
 ## Drift Prevention in This System
 
