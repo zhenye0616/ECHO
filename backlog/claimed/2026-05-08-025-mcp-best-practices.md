@@ -4,9 +4,9 @@ title: V1.5.3 MCP best-practices — structured outputs, source-app enum, cost-s
 priority: HIGH
 estimate: 1-2d
 created: 2026-05-08
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T21:08:30Z"
+branch: "agent/mcp-best-practices"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
