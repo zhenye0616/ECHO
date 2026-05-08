@@ -170,3 +170,13 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [ ] **Codex source-prefix retrieval ordering.** Entries 01:04 PDT and 01:24 PDT — `search_memories` scoped to a Codex source-prefix returned raw fs-change rows BEFORE extracted turn rows, even though the codex extractor runs and 1,990 extracted Codex turn rows exist in the local DB. **Re-verify post-022:** Bug C (raw-FS exclude on trace path) + Bug D (filter-before-slice) should help; specifically — does `search_memories(source_prefix="fs:/Users/zhenye/.codex/")` now surface extracted turn rows in the top-N, or do raw fs-change rows still dominate? `search_memories` does NOT pass `exclude_metadata_surface: ['fs']` per spec (forensic searchability preserved), so raw rows still appear — but the filter-before-slice fix should let extracted turns surface even when they're outside the recency overfetch window. (Source: dogfooding journal entries 01:04 PDT, 01:24 PDT, 01:28 PDT.)
 
+---
+
+## 2026-05-08 — from merge of 023-chokidar-flake-quarantine
+
+- [ ] **fs-watcher.test.ts Path C successor (~15 min).** The 023 carve-out: agent stayed strictly inside `files_to_modify` and did not quarantine `tests/capture/surfaces/fs-watcher.test.ts > startFsWatcher` despite ~33% solo flake rate. Apply the same Path C `describe.skip` with a `2026-05-08-023`-anchored tracking comment. ~30 LOC, same shape as the 023 changes to cursor.test.ts and lifecycle.test.ts. The 014 section's annotation already pre-lays the breadcrumb. (Test infra; small.)
+
+- [ ] **Chokidar real-fix item (post-V1.5; 2-3d).** Tracking comments at `tests/capture/extractors/cursor.test.ts` and `tests/daemon/lifecycle.test.ts` cite item 023; once 023 lands in `complete/` those references become tombstones unless a successor item exists. Investigate deterministic synchronization via the extractor's `probeFreshness` handle (already flagged in 016 followup) or sentinel-event subscription. The deeper `watcher.close()` race in chokidar teardown is the underlying root cause — quarantine is a holding pattern, not a fix. (Test infra; high priority post-V1.5.)
+
+- [ ] **Optional: grep-anchored CI ship-blocker for V1 cut.** CI fails if `describe.skip` paired with the literal `2026-05-08-023` tracking-comment string is still present in the tree after a target date. Insurance against the quarantine outliving memory and shipping skipped tests in V1. (CI / V1 cut hygiene.)
+
