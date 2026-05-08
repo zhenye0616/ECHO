@@ -159,4 +159,156 @@ describe('startMcpServer', () => {
       restore();
     }
   });
+
+  // --- Stateless transport regression tests (item 027) ----------------------
+  //
+  // These pin ECHO's MCP HTTP behavior to the documented stateless mode of
+  // StreamableHTTPServerTransport (sessionIdGenerator: undefined,
+  // enableJsonResponse: true). The motivating failure is Codex's RMCP client
+  // continuing to send a stale `Mcp-Session-Id` header after the ECHO daemon
+  // restarts. Pre-fix that produced HTTP 400 `no active session`, which Codex
+  // surfaced as `Deserialize error: data did not match any variant of untagged
+  // enum JsonRpcMessage`. Post-fix the server has no session memory at all,
+  // so a stale header is ignored and the request succeeds.
+
+  async function rawPost(
+    url: string,
+    body: object,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<{ status: number; headers: Headers; text: string }> {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json, text/event-stream',
+        'Content-Type': 'application/json',
+        ...extraHeaders,
+      },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, headers: res.headers, text: await res.text() };
+  }
+
+  it('tools/call echo_ping with a stale Mcp-Session-Id and no prior initialize succeeds (HTTP 200)', async () => {
+    // Root-cause regression test: simulates Codex's exact failure path after
+    // an ECHO daemon restart. The new process has no session map, so a stale
+    // session header from a long-lived client must NOT trigger the old
+    // "no active session" 400. With stateless transport the header is ignored.
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const resp = await rawPost(
+      handle.url,
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'echo_ping', arguments: { message: 'after-restart' } },
+      },
+      { 'Mcp-Session-Id': 'stale-codex-session' },
+    );
+
+    expect(resp.status).toBe(200);
+    // Stateless mode advertises no session header on responses.
+    expect(resp.headers.get('mcp-session-id')).toBeNull();
+
+    // JSON response mode: content-type is application/json, body is a single
+    // JSON-RPC envelope (not an SSE stream).
+    expect(resp.headers.get('content-type')).toMatch(/application\/json/);
+    const env = JSON.parse(resp.text) as {
+      jsonrpc: string;
+      id: number;
+      result?: { content?: { type: string; text: string }[] };
+      error?: unknown;
+    };
+    expect(env.jsonrpc).toBe('2.0');
+    expect(env.error).toBeUndefined();
+    const text = env.result?.content?.[0]?.text;
+    expect(typeof text).toBe('string');
+    const parsed = JSON.parse(text!) as { pong: boolean; received?: string };
+    expect(parsed.pong).toBe(true);
+    expect(parsed.received).toBe('after-restart');
+  });
+
+  it('initialize over raw HTTP returns application/json and no Mcp-Session-Id header', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    const resp = await rawPost(handle.url, {
+      jsonrpc: '2.0',
+      id: 0,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'echo-test', version: '0.0.0' },
+      },
+    });
+
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toMatch(/application\/json/);
+    expect(resp.headers.get('mcp-session-id')).toBeNull();
+    const env = JSON.parse(resp.text) as {
+      jsonrpc: string;
+      id: number;
+      result?: { protocolVersion: string };
+      error?: unknown;
+    };
+    expect(env.jsonrpc).toBe('2.0');
+    expect(env.error).toBeUndefined();
+    expect(env.result?.protocolVersion).toBeDefined();
+  });
+
+  it('GET /mcp returns 405 with Allow: POST and a JSON-RPC-style error body', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    for (const headers of [
+      undefined,
+      { 'Mcp-Session-Id': 'whatever' } as Record<string, string>,
+    ]) {
+      const res = await fetch(handle.url, {
+        method: 'GET',
+        headers,
+      });
+      expect(res.status).toBe(405);
+      expect(res.headers.get('allow')).toBe('POST');
+      const body = JSON.parse(await res.text()) as {
+        jsonrpc: string;
+        error: { code: number; message: string };
+      };
+      expect(body.jsonrpc).toBe('2.0');
+      expect(body.error.code).toBe(-32000);
+      expect(body.error.message.toLowerCase()).toContain('not allowed');
+    }
+  });
+
+  it('DELETE /mcp returns 405 with Allow: POST and a JSON-RPC-style error body', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+
+    for (const headers of [
+      undefined,
+      { 'Mcp-Session-Id': 'whatever' } as Record<string, string>,
+    ]) {
+      const res = await fetch(handle.url, {
+        method: 'DELETE',
+        headers,
+      });
+      expect(res.status).toBe(405);
+      expect(res.headers.get('allow')).toBe('POST');
+      const body = JSON.parse(await res.text()) as {
+        jsonrpc: string;
+        error: { code: number; message: string };
+      };
+      expect(body.jsonrpc).toBe('2.0');
+      expect(body.error.code).toBe(-32000);
+      expect(body.error.message.toLowerCase()).toContain('not allowed');
+    }
+  });
+
+  it('advertised URL is http://127.0.0.1:<port>/mcp (loopback only)', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+    expect(handle.url).toBe(`http://127.0.0.1:${handle.port}/mcp`);
+  });
 });
