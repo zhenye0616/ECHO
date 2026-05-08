@@ -109,7 +109,7 @@ spec_refs:
   - src/mcp/tools/recent-work-context.ts
   - backlog/complete/2026-05-06-018-recent-work-context-tool.md
   - backlog/complete/2026-05-07-019-trace-edge-filter-and-format.md
-  - raw/internal/dogfooding/2026-05-07-trace-layer.md
+  - raw/internal/dogfooding/mcp-interactions-journal.md
 blocked_by: []
 acceptance:
   - "**Bug A — Storage keep-newest semantics.** `Storage.query(filter)` interface (in `src/storage/interface.ts`) extended with optional `order?: 'asc' | 'desc'` field on `QueryFilter`. Default behavior **changes to `'desc'`** (newest-first) — preserves backwards compatibility on filter shape but flips the sort. Justification: every existing caller's intent is \"give me the recent N events\"; ASC + LIMIT silently drops newest. Callers that genuinely want oldest-first can now opt in explicitly."

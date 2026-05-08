@@ -1,17 +1,18 @@
-# Dogfooding journal — V1.5 trace layer (`get_recent_work_context`)
+# ECHO MCP interactions journal (cross-tool, cross-AI)
 
-**Item shipped:** [`2026-05-06-018-recent-work-context-tool`](../../../backlog/complete/2026-05-06-018-recent-work-context-tool.md)
-**Dogfooding window:** 2026-05-07 → ~2026-05-21 (2 weeks; extend if signal is thin)
+This is the **canonical, ever-growing log of every ECHO MCP call** from any AI client. Started 2026-05-07 as the V1.5 `get_recent_work_context` dogfooding journal (originally filed under `2026-05-07-trace-layer.md`); in operational practice it expanded to cover every `mcp__echo__*` / `mcp__echo-memory__*` invocation regardless of which item, tool, or AI client made the call. The original V1.5-trace-layer framing is preserved as the "Round 1–4" sections below; subsequent rounds extend across items 019, 020, 021, 022, 023, V1.5.1, and beyond.
+
+**Originating item:** [`2026-05-06-018-recent-work-context-tool`](../../../backlog/complete/2026-05-06-018-recent-work-context-tool.md) — but this journal is no longer scoped to one item.
 **Sources active in store:** claude-code, codex, cursor, git
-**Goal:** generate enough observations to know what V1.5+ should fix, what V2 should preserve, and whether item 017 (`search_memories` returning normalized atoms) is even needed.
+**Goal:** generate enough cross-tool observations to know what V1.5+ should fix, what V2 should preserve, and whether item 017 (`search_memories` returning normalized atoms) is needed.
 
 ## How to use this journal
 
-Fill an entry **in the moment** when ECHO's `get_recent_work_context` either delights or disappoints. The cost should be ~30 seconds per entry — copy the template, jot a one-liner, move on. Aspirational entries written at end-of-week are useless; lossy in-the-moment entries are gold.
+Fill an entry **in the moment** when any ECHO MCP call delights, disappoints, or fails. The cost should be ~30 seconds per entry — copy the template, jot a one-liner, move on. Aspirational entries written at end-of-week are useless; lossy in-the-moment entries are gold.
 
-Codex, Claude Code, and any other AI client must log every ECHO MCP interaction here during this dogfooding window, including `get_recent_work_context`, `search_memories`, `echo_ping`, and equivalent local MCP/CLI calls. Multiple calls from one task may be grouped into one detailed entry if the inputs and observed results are all captured.
+Codex, Claude Code, Cursor's Claude, agent runs, and any other AI client invoking the MCP server must log every ECHO MCP interaction here, including `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, and equivalent local MCP/CLI calls. Multiple calls from one task may be grouped into one detailed entry if the inputs and observed results are all captured.
 
-This journal is the **input**; the V1.5+ backlog items the strategist writes after the window are the **output**. Don't try to design fixes here — just observe.
+This journal is the **input**; the V1.5+ backlog items the strategist writes after each round of synthesis are the **output**. Don't try to design fixes here — just observe.
 
 ## Quick-fill observation template
 
@@ -59,7 +60,7 @@ If something happens that doesn't fit any of these, **make a new category and ca
 - **Returned:** 3 clusters, 40 atoms, top cluster "discussion about Project_echo" (rank_reasons: `["recent_activity", "dense"]`). Total response: **454,871 chars**.
 - **Verdict:** ❌ wrong — response was too big to even read. Tool result handler refused the payload.
 - **Note:** trace algorithm was correct (clustering, ranking, rank_reasons all looked right in the saved file). The bug is **payload representation, not clustering**. Forensic analysis: 97% of edges in the dominant 36-atom cluster were redundant (restated cluster anchors); 48% of per-atom bytes were inline `action.input`/`action.output` text.
-- **Conjecture:** drop edges whose shared artifacts are all `scope` or `session` role; add opt-in `format: 'minimal'` for atom-content truncation. Specced as item 019. Forensic data preserved at `raw/internal/dogfooding/2026-05-07-trace-response-sample/`.
+- **Conjecture:** drop edges whose shared artifacts are all `scope` or `session` role; add opt-in `format: 'minimal'` for atom-content truncation. Specced as item 019. Forensic data preserved at `raw/internal/dogfooding/019-trace-response-sample/`.
 
 #### 2026-05-07 15:39 PDT — first end-to-end success; sub-minute capture latency
 
@@ -484,6 +485,44 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 - **Verdict:** ❌ wrong.
 - **Note:** This is the same connector/transport failure class already seen at 02:05 PDT. It blocks using ECHO itself to retrieve the Claude claim, forcing fallback to local captured files or direct repo inspection.
 - **Conjecture:** Connector health needs to be fixed before ECHO can reliably serve as the first-hop "what did another AI client say?" substrate.
+
+#### 2026-05-08 14:43 PDT — Founder asked Claude to identify Codex's recurring JSON-RPC error via ECHO
+
+- **Trigger:** founder: "check the json rpc error codex keeps facing by checking codex session using echo".
+- **Query inputs:** `search_memories(query="JSON-RPC", source_prefix="fs:/Users/zhenye/.codex/", limit=20)`; then `search_memories(query="jsonrpc", source_prefix="fs:/Users/zhenye/.codex/", limit=20)`.
+- **Returned:** call 1 → 1 matching Codex assistant turn (rollout `019e068c-…` at 2026-05-08T09:08:07.791Z), 94,313-char single-line payload that exceeded the tool-result tokens cap and was spilled to disk (`tool-results/mcp-echo-search_memories-…txt`). Call 2 → 0 matches (`jsonrpc` lowercase is not a literal substring in the captured assistant text — Codex paraphrases as "JSON-RPC"; case-insensitive substring match still missed because hyphenation differs).
+- **Sources:** call 1 — single source `fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl` (Codex assistant turn). Call 2 — 0 sources. Neither call surfaced the *raw* `event_msg` lines containing the error string (lines 276/284 in the rollout) — the matched record was Codex's own narration about the error, not the tool-call output that produced it. The ground-truth error string was found only by direct grep of the rollout file outside ECHO.
+- **Verdict:** 🟡 partial — ECHO pointed at the right session but its match was Codex's paraphrase, not the underlying `event_msg` payload that contains the canonical error. The 94k-char single-line response also re-tripped the consumer-context-budget failure mode (entry 01:08 PDT, day 1).
+- **Note:** Two failure modes compounded in one call: (a) `search_memories` returns the assistant's narration but not the adjacent tool-output `event_msg` rows that carry the actual error wire format, so the highest-signal evidence is silently absent from the response; (b) returned payload is one massive line, forcing the consumer to spill-and-slice instead of reading directly. Direct `grep` on the rollout jsonl took <1s and surfaced the canonical error: `error: Deserialize error: data did not match any variant of untagged enum JsonRpcMessage` from `codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter` at lines 276/284 (2026-05-08T08:58:37Z and 09:00:36Z UTC ≈ 01:58 / 02:00 PDT).
+- **Conjecture:** observations only — (1) source-volume / shape bias: tool-output `event_msg` rows in Codex rollouts may be getting captured but not surfaced under the same query, or are being captured as separate atoms whose content doesn't contain the search literal; (2) atom-grouping question: should an assistant-turn atom and its preceding tool-output atom be co-returned when the assistant turn cites the tool output? Don't design fixes here — log for end-of-window synthesis.
+
+#### 2026-05-08 13:27 PDT — Claude retrieves Codex's MCP-best-practices counter-diagnosis
+
+- **Trigger:** founder asked Claude to read Codex's most recent diagnosis on the ECHO MCP setup (the review of Claude's earlier best-practices claim) and reverify each of Codex's claims against code.
+- **Query inputs:** (1) `get_recent_work_context(since="2026-05-08T18:00:00Z", until="2026-05-08T20:30:00Z", format="minimal", limit=50)`; (2) `search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T19:00:00Z", limit=15)`.
+- **Returned:** both calls succeeded but exceeded the consumer tool-result tokens cap and spilled to `tool-results/mcp-echo-*-1778272065256.txt` (77,066 chars) and `mcp-echo-search_memories-1778272068805.txt` (91,940 chars). A subagent sliced the spilled files and located Codex's final-answer turn in `~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-eaa9-7773-ad99-376e3e8d0f73.jsonl` line 338 (UTC 20:25:40 = 13:25 PDT, 4,071 chars), with reasoning chain at lines 213/220/234/244/263/279/312.
+- **Sources:** trace and search both surfaced `fs:/Users/zhenye/.codex/sessions/...rollout-...jsonl` Codex content. The on-disk rollout JSONL was the canonical source; ECHO's atoms matched but were not faster than direct file reads. No git/claude_code/cursor atoms were attended to (search was scoped to Codex prefix; trace payload not slice-read in main context).
+- **Verdict:** 🟡 partial — both calls returned the right rollout with usable content, but both blew the 25k-char tool-result budget on the first try and forced spill+subagent-slice. The pattern matches the 14:43 PDT entry: "useful content present, but the response is one massive line that the consumer can't read directly."
+- **Note:** The dogfooding workflow ended up being: ECHO call → spill → subagent slice → on-disk rollout JSONL grep. Direct rollout grep would have been ~3 steps shorter. Two cumulative pain-points re-confirmed: (a) default `get_recent_work_context` shape is too large even with `format="minimal"` and `limit=50` over a 2.5h window (claim-3 territory); (b) `search_memories` payload size scales with extracted-turn content length, no truncation hint, no streaming.
+- **Conjecture:** observations only — claim-3 (payload defaults) is the *consumer-side* failure mode of the dogfooding day; every Claude/Codex retrieval today has tripped it at least once. Worth promoting from "described in tool description" to "default-cost protection" — but spec lives in next backlog item, not here.
+
+#### 2026-05-08 13:35 PDT — Reverification of Codex's 8 claims against Project_echo code
+
+- **Trigger:** continuation of the 13:27 PDT retrieval — founder asked Claude to validate each Codex claim, not just relay them.
+- **Query inputs:** no further ECHO MCP calls. Direct file Reads on `src/mcp/server.ts`, `src/mcp/tools/{search-memories,recent-work-context,echo-ping}.ts`, `tests/mcp/tools/recent-work-context.test.ts`, `docs/mcp-integration.md`, `package.json`, `node_modules/@modelcontextprotocol/sdk/{package.json,dist/cjs/server/mcp.d.ts}`, `~/.claude.json`.
+- **Returned:** 8/8 of Codex's claims confirmed against current code at SHA 8c2d767. Result table:
+  1. **structuredContent/outputSchema gap — VALID.** All three tool handlers return only `content: [{ type: 'text', text: JSON.stringify(...) }]` (`search-memories.ts:131-133`, `recent-work-context.ts:225-227`, `echo-ping.ts:18-20`). SDK is `@modelcontextprotocol/sdk@1.29.0`; `node_modules/.../server/mcp.d.ts:154,257-258,270,283` confirm `outputSchema` and `structuredContent` are first-class.
+  2. **`source_prefix` leakiness — VALID.** `search-memories.ts:121-127` declares `source_prefix: z.string().optional()` with no enum; the FS-prefix rules live as prose in the description string at line 6.
+  3. **Payload-size defaults — VALID.** `recent-work-context.ts:37` `DEFAULT_LIMIT = 100`; line 133 `format = params.format ?? 'full'`; storage cap is `limit * STORAGE_OVERFETCH = 1000` (line 139). Description (lines 27-29) explains `minimal` exists but not the cost of the default.
+  4. **Pagination/cursor absence — VALID.** `search-memories.ts:9` `MAX_LIMIT = 50`; `clampLimit` (lines 48-52) enforces 1..50; no cursor/`before_timestamp` param in the schema.
+  5. **Single server, three tools (correction to Claude's "two namespaces") — VALID.** `src/mcp/server.ts:69-73` registers ONE server `echo-daemon` with all three tools. The "two namespaces" Claude observed are environmental: `~/.claude.json` user-scope has both `echo-memory` (legacy EchoChat Python backend at `/Users/zhenye/Desktop/Projects/EchoChat/apps/backend/.venv/bin/python -m app.mcp`, line 3227) AND `echo` HTTP at `127.0.0.1:38478/mcp` (line 3237). Project_echo's project-scope (line 3046) lists only the HTTP `echo`. So Codex's nuance is correct — the ECHO daemon itself is one server; the founder's machine has a second unrelated MCP from a different project.
+  6. **`echo_ping` should stay a tool — VALID.** Currently registered via `registerTool` at `echo-ping.ts:5`. MCP semantics: tools = model-controlled, resources = application-controlled; a model-invoked health check fits "tool."
+  7. **OAuth irrelevance — VALID.** `server.ts:63` defaults host to `127.0.0.1`; lines 76-77 enable DNS-rebinding protection with allowedHosts `['127.0.0.1:..', 'localhost:..']`. `docs/mcp-integration.md:7` explicitly says "loopback-only (no auth)."
+  8. **Doc staleness — VALID.** `docs/mcp-integration.md:53` says "shows two tools: `echo_ping` and `search_memories`"; line 100 only mentions `search_memories`. Test `tests/mcp/tools/recent-work-context.test.ts:125-132` asserts all three: `['echo_ping', 'get_recent_work_context', 'search_memories']`.
+- **Sources:** repo files at SHA 8c2d767; SDK `@modelcontextprotocol/sdk@1.29.0` `package.json` + `dist/cjs/server/mcp.d.ts`; Claude Code config `~/.claude.json` lines 3046 + 3227 + 3237.
+- **Verdict:** ✅ right — Codex's diagnosis is 8-for-8 against current code. Codex's two "qualifies-Claude" corrections (claim 5 + claim 6) hold; Codex's stand-alone observation (claim 8) is also confirmed.
+- **Note:** Reverification cost = 5 file Reads + 4 Bash greps. The fact that this took ~3 minutes after the (slow) ECHO retrieval means: for "validate a peer AI's diagnostic claim" tasks, ECHO's value is 100% in the *retrieval* step; once claims are in hand, code grounding still happens in the editor. Codex's claim 8 (doc/test divergence) is the cheapest standalone backlog item — pure doc fix, no code change.
+- **Conjecture:** observations only — (a) backlog candidate: doc fix for `mcp-integration.md:53,100` (cheap, blocks no one, completes drift between docs and tests); (b) the "two namespaces in the founder's environment" finding suggests a wiki note on legacy `echo-memory` cleanup may be warranted, separate from this validation; (c) tool descriptions doing teaching work (FS-prefix rules in `search-memories` description) is a recurring symptom of missing structured affordances — claim 1 + claim 2 are causally related, not independent. Don't design fixes here.
 
 ---
 

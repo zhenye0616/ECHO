@@ -102,9 +102,9 @@ Keep the V1 tape-above-desk from `claude.md` in mind:
 
 ## ECHO MCP Dogfooding Log
 
-During the active V1.5 trace-layer dogfooding window, every Codex interaction with ECHO must be logged in:
+Every Codex interaction with ECHO must be logged to the canonical cross-tool journal:
 
-`raw/internal/dogfooding/2026-05-07-trace-layer.md`
+`raw/internal/dogfooding/mcp-interactions-journal.md`
 
 This applies to every call to ECHO MCP tools, including:
 

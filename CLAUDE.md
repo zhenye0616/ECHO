@@ -144,7 +144,7 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 ### Dogfooding journal discipline (every AI client)
 
-While a dogfooding window is active (today: V1.5 trace layer, journal at `raw/internal/dogfooding/<date>-trace-layer.md`), **every ECHO MCP call must be logged to that journal in the moment** — not at end-of-session, not at end-of-day. This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+**Every ECHO MCP call must be logged to `raw/internal/dogfooding/mcp-interactions-journal.md` in the moment** — not at end-of-session, not at end-of-day. This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool, cross-item, and ever-growing — it's the canonical log, not a per-window file. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
 
 **What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
 

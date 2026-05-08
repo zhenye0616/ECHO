@@ -34,7 +34,7 @@ Resolution scans forward from the hint atom's index, single linear pass with ear
 | `tests/trace/build.test.ts` | +2 cases asserting `resolved` propagates into `cluster.open_loop_hints[]` |
 | `tests/mcp/tools/recent-work-context.test.ts` | +2 cases (response shape boolean check + format invariance) |
 | `tests/trace/rank.test.ts` | +2 inline updates: existing fixtures gained the new required `resolved` field (compile-only fix) |
-| `tools/validate-resolution.ts` | New script — opens `SqliteStorage` at `resolveDbPath()`, calls `getRecentWorkContext` over the last 7 days, writes per-hint scoring sheet to `raw/internal/dogfooding/2026-05-08-resolution-validation.md` |
+| `tools/validate-resolution.ts` | New script — opens `SqliteStorage` at `resolveDbPath()`, calls `getRecentWorkContext` over the last 7 days, writes per-hint scoring sheet to `raw/internal/dogfooding/020-resolution-validation.md` |
 
 **Branch:** `agent/open-loop-resolution-heuristics`
 **Head SHA:** `9b9449b82fd1ba57192dd3dfd02c884c8aae9ef9`
@@ -140,7 +140,7 @@ Calling this status 🟡 not ❌ because the in-scope work passes cleanly and th
 
 1. **`src/trace/index.ts` not in `files_to_modify`.** Is the small structural change (move `enrichHints` call, add a sort, build per-cluster map) acceptable as part of this item, or should it be split? My read: the cluster-agnostic property is unsatisfiable without it, so it's effectively required.
 2. **Pre-existing flaky tests in `tests/capture/extractors/cursor.test.ts` and `tests/daemon/lifecycle.test.ts`.** Worth a separate cleanup item (quarantine + investigate), or known-noise that doesn't gate merge?
-3. **`tools/validate-resolution.ts` could not be smoke-tested against live storage** because reading the production SQLite was correctly denied by the harness sandbox. Tested against an empty DB instead; markdown output structure verified. Founder will want to actually run it (against `~/Library/Application Support/ECHO/echo.db`) to produce `raw/internal/dogfooding/2026-05-08-resolution-validation.md` for the manual TP/FP/TN/FN scoring pass.
+3. **`tools/validate-resolution.ts` could not be smoke-tested against live storage** because reading the production SQLite was correctly denied by the harness sandbox. Tested against an empty DB instead; markdown output structure verified. Founder will want to actually run it (against `~/Library/Application Support/ECHO/echo.db`) to produce `raw/internal/dogfooding/020-resolution-validation.md` for the manual TP/FP/TN/FN scoring pass.
 
 ### Drift events
 

@@ -10,8 +10,8 @@ spec_refs:
   - backlog/complete/2026-05-06-016-read-time-normalizer.md
   - raw/internal/decisions/2026-05-06-v15-trace-layer-design.md
   - raw/internal/decisions/2026-05-07-trace-edge-filter-design.md
-  - raw/internal/dogfooding/2026-05-07-trace-response-sample/edge-graph.md
-  - raw/internal/dogfooding/2026-05-07-trace-response-sample/curated-preview.json
+  - raw/internal/dogfooding/019-trace-response-sample/edge-graph.md
+  - raw/internal/dogfooding/019-trace-response-sample/curated-preview.json
   - wiki/architecture/work-trace.md
   - wiki/surfaces/mcp-recent-work-context.md
 blocked_by: []
@@ -120,7 +120,7 @@ A targeted patch on top of item 018 that addresses two bloat sources surfaced by
 1. **Edge bloat:** the V1.5 trace tool returns all pairwise shared-artifact edges. In a tightly-coupled cluster (e.g., 36 atoms in one Claude Code session in one repo), this is K_36 = 630 edges, of which 97% restate cluster membership without adding signal. Patch: drop edges whose shared artifacts are all `scope` or `session` role.
 2. **Atom-content bloat:** each atom inlines full `action.input` / `action.output`, ~48% of per-atom bytes. Patch: optional `format: 'minimal'` query parameter caps both fields to 500 chars with a suffix telling the AI client how to fetch the full version. Default stays `'full'`; opt-in only.
 
-The patch is small (~50 LOC of code, plus tests and docs). Together with item 018, the trace layer's response is ~95% smaller in dense clusters with **no signal lost** — confirmed by the dogfooding analysis in `raw/internal/dogfooding/2026-05-07-trace-response-sample/`.
+The patch is small (~50 LOC of code, plus tests and docs). Together with item 018, the trace layer's response is ~95% smaller in dense clusters with **no signal lost** — confirmed by the dogfooding analysis in `raw/internal/dogfooding/019-trace-response-sample/`.
 
 This is **patch A** of a three-part roadmap (A/B/C) settled in `raw/internal/decisions/2026-05-07-trace-edge-filter-design.md`. B (`shared_artifacts[]` schema replacement) and C (work-role-only clustering) are parked until A's dogfooding surfaces real signal.
 
@@ -216,11 +216,11 @@ Default stays `'full'`. Reasons:
 - Phase 1 (this patch): observe whether the **edge filter alone** changes AI client response quality.
 - Phase 2 (separate later patch, no spec yet): if the dogfooding journal supports it, flip the default to `'minimal'`. That's the real product decision; this patch only introduces the lever.
 
-The dogfooding journal at `raw/internal/dogfooding/2026-05-07-trace-layer.md` should run two parallel observation tracks once this lands: (a) default-traffic observations capture the edge-filter effect; (b) intentional `format: 'minimal'` calls on the same queries observe the truncation effect in isolation.
+The dogfooding journal at `raw/internal/dogfooding/mcp-interactions-journal.md` should run two parallel observation tracks once this lands: (a) default-traffic observations capture the edge-filter effect; (b) intentional `format: 'minimal'` calls on the same queries observe the truncation effect in isolation.
 
 ## Why
 
-V1.5's trace tool shipped working but, as captured in `raw/internal/dogfooding/2026-05-07-trace-response-sample/`, produced 454K responses for ordinary queries — too large for Claude-in-Cursor's context budget on the very first dogfooding call. Forensic analysis showed:
+V1.5's trace tool shipped working but, as captured in `raw/internal/dogfooding/019-trace-response-sample/`, produced 454K responses for ordinary queries — too large for Claude-in-Cursor's context budget on the very first dogfooding call. Forensic analysis showed:
 
 - `clusters[]` was 37% of the response, almost entirely `edges[]` (162KB)
 - `atoms[]` was 66% of the response, dominated by inline `action.input`/`output` (48% of atom bytes)

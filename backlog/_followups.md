@@ -114,7 +114,7 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - **Quarantine the pre-existing capture/daemon flake** as a separate item: 3 failures intermittent in `tests/capture/extractors/cursor.test.ts` (workspace_id matching, lastSeenMap backfill, stop() timeout) + 1 in `tests/daemon/lifecycle.test.ts` (waitFor timeout). Already flagged from item 019's verification; re-confirmed at 020's merge. Flake fluctuates 3–14 failures across runs.
 
   > Resolved (delivered after merge by 2026-05-08-023) — flake cluster `describe.skip`-quarantined in both files with tracking comments pointing at item 023.
-- **Founder hand-scores the 111 rows** in `raw/internal/dogfooding/2026-05-08-resolution-validation.md` as TP / FP / TN / FN. If overall precision (TP / (TP + FP)) ≥ 80%, R1 is sufficient for V1 hotkey overlay. Otherwise calibration becomes the next backlog item before the overlay UI is specced.
+- **Founder hand-scores the 111 rows** in `raw/internal/dogfooding/020-resolution-validation.md` as TP / FP / TN / FN. If overall precision (TP / (TP + FP)) ≥ 80%, R1 is sufficient for V1 hotkey overlay. Otherwise calibration becomes the next backlog item before the overlay UI is specced.
 
 
 ---
@@ -143,12 +143,12 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ### Strategist post-merge
 
 - [ ] **Wiki promotion bundle 019+020+021+022.** Four items' worth of `wiki/architecture/work-trace.md` and `wiki/surfaces/mcp-recent-work-context.md` updates land together. New `wiki/architecture/` page on **timestamp canonicalization at capture** is wiki-worthy (single-chokepoint normalization decision is durable substrate doctrine).
-- [ ] **Re-run dogfooding scenarios post-022 + daemon-restart.** Specifically the 01:03 PDT and 01:33 PDT entries from `raw/internal/dogfooding/2026-05-07-trace-layer.md` — expect `source_breakdown` to include git ≥1 and codex ≥1 on the same window that previously returned `{claude_code: N}` only. If still missing, 022 didn't fully close the cross-source promise and a follow-up item is needed.
+- [ ] **Re-run dogfooding scenarios post-022 + daemon-restart.** Specifically the 01:03 PDT and 01:33 PDT entries from `raw/internal/dogfooding/mcp-interactions-journal.md` — expect `source_breakdown` to include git ≥1 and codex ≥1 on the same window that previously returned `{claude_code: N}` only. If still missing, 022 didn't fully close the cross-source promise and a follow-up item is needed.
 - [ ] **Verify migration row-count log surfaces 152 expected rows** on first daemon-boot post-merge against the founder's local DB. The fixup logs `{converted}` via `createLogger('storage.sqlite')`. Daemon was kickstarted at this merge (PID 7319); the log line should appear in daemon stdout if any `-07:00` rows existed.
 
 ### Dogfooding-journal surfaced gaps (status verified by Codex 02:05 PDT + Claude Code 02:10 PDT post-022/023)
 
-> **Source:** `raw/internal/dogfooding/2026-05-07-trace-layer.md` (16 entries through 2026-05-08 02:10 PDT, 4+ AI clients).
+> **Source:** `raw/internal/dogfooding/mcp-interactions-journal.md` (16 entries through 2026-05-08 02:10 PDT, 4+ AI clients).
 > **Verification convergence:** Codex's 02:05 PDT direct daemon+log inspection and Claude Code's 02:10 PDT MCP retrieval landed on the same gap classification on the same window — two reasoning processes from different starting points (one inspecting daemon stdout + SQLite directly; one calling the public MCP surface) converging is structural-correctness signal, similar to the 15:39 PDT day-1 V1-atom-design observation.
 > **Status legend:** ✅ closed by 022/023 · 🟡 partial / narrowed (capture fixed; UX or ranking gap remains) · ❌ still open · 🚨 newly surfaced during verification.
 
@@ -166,7 +166,7 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [x] 🟡 **Daemon-restart-after-merge — STEP IN PLACE BUT FLAPPING.** The `/merge-and-cleanup` C9b kickstart step ran successfully twice this morning (post-022 PID 7319, post-023 PID 13903). However, Codex 02:05 surfaced a new failure mode underneath: *"Launchd thinks the daemon is running, but the PID file disagrees (`7319` vs `7333`) and the MCP port is unreachable."* — see the new "MCP connector + daemon health" item below. The kickstart-on-merge mechanism is in place; what's now visible is a separate health/transport reliability gap. (Source: dogfooding entry 16:15 PDT, 02:05 PDT.)
 
-- [ ] ❌ **Founder hand-score pass on 020 R1 fixture** at `raw/internal/dogfooding/2026-05-08-resolution-validation.md`. Unchanged — verdict column still empty across all 111 rows. Half-day founder task; converts inferred precision into measured precision. (Source: existing 020 follow-up, unchanged by 022/023.)
+- [ ] ❌ **Founder hand-score pass on 020 R1 fixture** at `raw/internal/dogfooding/020-resolution-validation.md`. Unchanged — verdict column still empty across all 111 rows. Half-day founder task; converts inferred precision into measured precision. (Source: existing 020 follow-up, unchanged by 022/023.)
 
 - [ ] ❌ **AI-client tool-uptake measurement — UNCHANGED.** No new evidence on whether Claude/Codex now reach for `get_recent_work_context` vs `search_memories` for source-anchored queries. Today's 02:05/02:10 verification showed both AIs *can* use trace correctly when prompted; uptake-without-prompting is a separate question. (Source: dogfooding round 4 conjecture C4-D, unchanged.)
 

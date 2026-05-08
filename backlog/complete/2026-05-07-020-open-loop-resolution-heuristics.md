@@ -27,7 +27,7 @@ review_notes: |
     npm script entry, satisfying spec acceptance line 174 (the agent's npx vite-node
     workaround satisfied neither literal alternate). Smoke-test of the script against
     live storage produced 111 rows (96 resolved, 15 unresolved) at
-    raw/internal/dogfooding/2026-05-08-resolution-validation.md — included in this
+    raw/internal/dogfooding/020-resolution-validation.md — included in this
     merge commit as the first concrete validation artifact for the founder hand-score
     pass.
 
@@ -59,7 +59,7 @@ review_notes: |
   recent-work-context.test.ts.
 
   Follow-up items (non-blocking):
-  - Founder hand-scores the 111 rows in 2026-05-08-resolution-validation.md as
+  - Founder hand-scores the 111 rows in 020-resolution-validation.md as
     TP/FP/TN/FN. If overall precision ≥80%, R1 is sufficient for V1 hotkey overlay.
     Otherwise calibration becomes the next backlog item.
   - Item 021 (currently in claimed/) merges next; expected mechanical conflict on
@@ -86,7 +86,7 @@ spec_refs:
   - src/trace/hints.ts
   - src/trace/types.ts
   - src/trace/index.ts
-  - raw/internal/dogfooding/2026-05-07-trace-layer.md
+  - raw/internal/dogfooding/mcp-interactions-journal.md
   - wiki/architecture/work-trace.md
   - wiki/surfaces/mcp-recent-work-context.md
 blocked_by: []
@@ -120,7 +120,7 @@ acceptance:
   - "Tests in `tests/mcp/tools/recent-work-context.test.ts` (extend):"
   - "  - `response shape: every cluster.open_loop_hints[i].resolved is a boolean`"
   - "  - `format: 'minimal' does not alter resolved field on any hint`"
-  - "**Founder validation pass** (manual, after agent-side criteria pass): agent generates a script `tools/validate-resolution.ts` (or extends the smoke script) that calls `get_recent_work_context` over the last 7 days against live storage and writes the resulting `(hint kind, hint text, resolved, resolved_by_atom_id, full hint atom URL)` rows to `raw/internal/dogfooding/2026-05-08-resolution-validation.md`. Founder hand-scores each row as TP / FP / TN / FN. Agent does NOT change the heuristic based on this — agent finishes; the calibration pass is a follow-up item."
+  - "**Founder validation pass** (manual, after agent-side criteria pass): agent generates a script `tools/validate-resolution.ts` (or extends the smoke script) that calls `get_recent_work_context` over the last 7 days against live storage and writes the resulting `(hint kind, hint text, resolved, resolved_by_atom_id, full hint atom URL)` rows to `raw/internal/dogfooding/020-resolution-validation.md`. Founder hand-scores each row as TP / FP / TN / FN. Agent does NOT change the heuristic based on this — agent finishes; the calibration pass is a follow-up item."
   - "`npm run test`, `npm run lint`, `npm run typecheck` clean."
   - "Run log appended to `raw/internal/agent-runs/2026-05-07-2026-05-07-020-open-loop-resolution-heuristics.md`."
 files_to_modify:
@@ -206,7 +206,7 @@ The scan is forward-only (matches happen later in time than the hint), single-li
 ## After Completion (Strategist Notes)
 
 1. **Update the dogfooding journal.** First-day entries for resolution: did `resolved: true` correlate with the founder's gut judgment? Did any rule (especially R1.AQ's "any length" threshold or R1.TODO's `state.delta` match) produce surprising classifications?
-2. **Founder validation pass review.** Score the rows in `raw/internal/dogfooding/2026-05-08-resolution-validation.md`. If overall precision (TP / (TP + FP)) is ≥80%, R1 is sufficient for the V1 overlay. If <80%, the next backlog item is the calibration pass (tightening rules based on observed FP modes) before considering R3.
+2. **Founder validation pass review.** Score the rows in `raw/internal/dogfooding/020-resolution-validation.md`. If overall precision (TP / (TP + FP)) is ≥80%, R1 is sufficient for the V1 overlay. If <80%, the next backlog item is the calibration pass (tightening rules based on observed FP modes) before considering R3.
 3. **Spec the V1 hotkey overlay item.** The overlay reads `cluster.open_loop_hints[]`, filters `resolved: false`, applies the founder's "unresolved primary, pad to 5 with most-recent if fewer than 5 unresolved" composition rule. Surface size is **not capped** when unresolved ≥ 5; pad-to-5 is a floor, not a ceiling.
 4. **Wiki promotion.** Update `wiki/architecture/work-trace.md` to document the resolution pass and the four rules. `wiki/surfaces/mcp-recent-work-context.md` callout that `open_loop_hints[].resolved` is a heuristic signal (not ground truth) and AI clients should treat it as a hint, not a guarantee. Wiki edits land **post-merge by strategist** per the operating-model reconciliation pending from item 019.
 5. **No new entries in `_followups.md`** unless the agent surfaces a corner case — the spec is well-traced and acceptance criteria should map directly to implementation.
@@ -226,6 +226,6 @@ The scan is forward-only (matches happen later in time than the hint), single-li
 - [ ] **Tests in `tests/trace/hints.test.ts`** (12+ new cases per the acceptance list above).
 - [ ] **Tests in `tests/trace/build.test.ts`** (2+ new cases asserting `resolved` propagates into `cluster.open_loop_hints[]`).
 - [ ] **Tests in `tests/mcp/tools/recent-work-context.test.ts`** (2+ new cases asserting response shape and format invariance).
-- [ ] **Validation script** `tools/validate-resolution.ts` runnable as `npm run validate:resolution` (or `node tools/validate-resolution.ts`) — calls `get_recent_work_context` over last 7 days, writes one-row-per-hint scoring sheet to `raw/internal/dogfooding/2026-05-08-resolution-validation.md`. Script does not auto-score; produces the data the founder will hand-score.
+- [ ] **Validation script** `tools/validate-resolution.ts` runnable as `npm run validate:resolution` (or `node tools/validate-resolution.ts`) — calls `get_recent_work_context` over last 7 days, writes one-row-per-hint scoring sheet to `raw/internal/dogfooding/020-resolution-validation.md`. Script does not auto-score; produces the data the founder will hand-score.
 - [ ] `npm run test`, `npm run lint`, `npm run typecheck` clean.
 - [ ] Run log at `raw/internal/agent-runs/2026-05-07-2026-05-07-020-open-loop-resolution-heuristics.md`.

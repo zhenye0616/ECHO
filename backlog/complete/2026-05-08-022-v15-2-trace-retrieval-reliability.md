@@ -80,7 +80,7 @@ spec_refs:
   - src/mcp/tools/search-memories.ts
   - backlog/complete/2026-05-07-021-trace-cross-gap-where-left-off.md
   - backlog/complete/2026-05-07-019-trace-edge-filter-and-format.md
-  - raw/internal/dogfooding/2026-05-07-trace-layer.md
+  - raw/internal/dogfooding/mcp-interactions-journal.md
 blocked_by: []
 acceptance:
   - "**Bug A — Centralize timestamp canonicalization at the capture chokepoint.** All `CaptureEvent.timestamp` values written to storage MUST be in UTC `Z` form (e.g. `2026-05-08T07:30:00.000Z`). Any source emitting offset-bearing timestamps (today: git-watcher emits `-07:00` via `commit.author_iso`) is canonicalized at a single ingestion chokepoint, not patched per-source. Recommended chokepoint: `src/capture/pipeline.ts` immediately before `storage.append(toAppend)` at line 30, OR inside `src/capture/gate.ts` if the gate is the natural fail-loud point. Pick whichever is the smaller diff and document the decision in the run log. Implementation: `new Date(t).toISOString()` is the one-liner — converts both `Z` and `±HH:MM` forms to canonical `Z`."

@@ -2,7 +2,7 @@
 //
 // Calls get_recent_work_context over a 7-day window against live storage
 // and writes a per-hint scoring sheet to
-// raw/internal/dogfooding/2026-05-08-resolution-validation.md. The founder
+// raw/internal/dogfooding/020-resolution-validation.md. The founder
 // hand-scores each row (TP / FP / TN / FN); this script does NOT auto-score.
 //
 // Usage:
@@ -52,7 +52,7 @@ function defaultOutPath(): string {
     'raw',
     'internal',
     'dogfooding',
-    '2026-05-08-resolution-validation.md',
+    '020-resolution-validation.md',
   );
 }
 

@@ -4,13 +4,13 @@
 **Status:** committed (spec lives in `backlog/ready/2026-05-07-019-trace-edge-filter-and-format.md`)
 **Participants:** founder, Claude Code (this Claude), Codex CLI (founder's other AI session)
 **Depends on:** `2026-05-06-018-recent-work-context-tool` (shipped); `2026-05-06-016-read-time-normalizer` (shipped)
-**Related:** `2026-05-06-v15-trace-layer-design.md`, dogfooding journal at `raw/internal/dogfooding/2026-05-07-trace-layer.md`, response sample at `raw/internal/dogfooding/2026-05-07-trace-response-sample/`
+**Related:** `2026-05-06-v15-trace-layer-design.md`, dogfooding journal at `raw/internal/dogfooding/mcp-interactions-journal.md`, response sample at `raw/internal/dogfooding/019-trace-response-sample/`
 
 ## Problem
 
 V1.5's trace tool shipped item 018 working — the `get_recent_work_context` MCP tool returns clusters of related atoms. But the very first dogfooding call returned **454,871 chars**, which exceeded Claude-in-Cursor's per-tool-result context budget. The response was *too big to use* on the first try.
 
-Forensic analysis (`raw/internal/dogfooding/2026-05-07-trace-response-sample/`) located the bytes:
+Forensic analysis (`raw/internal/dogfooding/019-trace-response-sample/`) located the bytes:
 
 - 66% in `atoms[]` (40 atoms × ~7.5KB mean)
   - Within atoms: 48% `action.input`/`output` inline, 49% `artifacts[]`
@@ -110,5 +110,5 @@ These observations are the input to B's spec and C's brainstorm.
 
 - This Claude Code session, 2026-05-07.
 - Codex CLI session (founder's other AI), 2026-05-07: provided the role taxonomy critique, the `unknown: keep` generalizability default, the cap-only-truncation principle, the same-patch-with-default-full sequencing, and the framing that A is not purely additive semantically.
-- `raw/internal/dogfooding/2026-05-07-trace-response-sample/` — the live response data that produced the 97%-redundant-edges measurement and the role taxonomy validation.
-- `raw/internal/dogfooding/2026-05-07-trace-response-sample/edge-graph.md` — the visualized green/red edge classification.
+- `raw/internal/dogfooding/019-trace-response-sample/` — the live response data that produced the 97%-redundant-edges measurement and the role taxonomy validation.
+- `raw/internal/dogfooding/019-trace-response-sample/edge-graph.md` — the visualized green/red edge classification.
