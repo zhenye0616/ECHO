@@ -411,3 +411,83 @@ describe('SqliteStorage exclude_metadata_surface filter (item 022 Bug C)', () =>
     expect(await store.query({ exclude_metadata_surface: [] })).toHaveLength(1);
   });
 });
+
+describe('SqliteStorage composite-key ordering + cursor pagination (item 025)', () => {
+  let store: SqliteStorage;
+
+  beforeEach(() => {
+    store = new SqliteStorage(':memory:');
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  async function seedSameMs(ts: string, count: number): Promise<string[]> {
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      ids.push(
+        await store.append({
+          source: 'fs:test',
+          timestamp: ts,
+          content: `c-${i}`,
+        }),
+      );
+    }
+    return ids;
+  }
+
+  it('query({}) on same-ms-tied rows returns deterministic id-DESC order across 10 runs', async () => {
+    const ts = '2026-05-08T12:00:00.000Z';
+    await seedSameMs(ts, 5);
+    // Take a baseline ordering and assert it does not change across 10
+    // consecutive runs. Pre-fix the order was undefined (non-deterministic
+    // tie-break inside SQLite); post-fix it must be stable id-DESC.
+    const baseline = (await store.query({})).map((e) => e.id);
+    expect(baseline).toHaveLength(5);
+    // Confirm it's actually sorted id-DESC.
+    expect(baseline).toEqual([...baseline].sort().reverse());
+    for (let i = 0; i < 10; i++) {
+      const next = (await store.query({})).map((e) => e.id);
+      expect(next).toEqual(baseline);
+    }
+  });
+
+  it('query({order: "asc"}) on same-ms-tied rows returns deterministic id-ASC order', async () => {
+    const ts = '2026-05-08T12:00:00.000Z';
+    await seedSameMs(ts, 5);
+    const r = (await store.query({ order: 'asc' })).map((e) => e.id);
+    expect(r).toEqual([...r].sort());
+  });
+
+  it('before filter: returns rows strictly older than (timestamp, id)', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      ids.push(
+        await store.append({
+          source: 'fs:test',
+          timestamp: `2026-05-08T12:0${i}:00.000Z`,
+          content: `c-${i}`,
+        }),
+      );
+    }
+    // ids[3] is the 4th-appended (timestamp 12:03:00). Asking for rows
+    // strictly older than (12:03:00, ids[3]) should yield only the 3 earlier
+    // events under DESC ordering.
+    const r = await store.query({
+      before: { timestamp: '2026-05-08T12:03:00.000Z', id: ids[3]! },
+    });
+    expect(r).toHaveLength(3);
+    // DESC: 12:02 → 12:01 → 12:00
+    expect(r.map((e) => e.content)).toEqual(['c-2', 'c-1', 'c-0']);
+  });
+
+  it('before + order: "asc" throws synchronously', async () => {
+    await expect(
+      store.query({
+        before: { timestamp: '2026-05-08T12:00:00.000Z', id: 'some-id' },
+        order: 'asc',
+      }),
+    ).rejects.toThrow(/before is defined for descending queries only/);
+  });
+});

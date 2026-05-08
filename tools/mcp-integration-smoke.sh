@@ -83,7 +83,7 @@ curl -sS -o /dev/null \
   -H "Mcp-Session-Id: $SESSION" \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# --- 3. tools/list contains search_memories and get_recent_work_context -------
+# --- 3. tools/list contains all three tools with item-025 advertisements -----
 
 LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
@@ -108,6 +108,66 @@ if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"get_recent_work_context"'; t
   printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
   exit 1
 fi
+
+# Item 025: tools/list must advertise three tools with outputSchema +
+# readOnlyHint, plus the source_app enum on search_memories.
+LIST_FILE="$WORK/list-payload.json"
+printf '%s' "$LIST_PAYLOAD" > "$LIST_FILE"
+LIST_CHECK=$(python3 - "$LIST_FILE" <<'PY' 2>&1
+import json, sys
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"PAYLOAD_NOT_JSON: {exc}")
+    sys.exit(0)
+result = env.get("result") or env
+tools = result.get("tools") or []
+names = sorted(t.get("name") for t in tools)
+expected = ["echo_ping", "get_recent_work_context", "search_memories"]
+if names != expected:
+    print(f"WRONG_TOOL_SET: got {names}, expected {expected}")
+    sys.exit(0)
+for t in tools:
+    n = t.get("name")
+    if not t.get("annotations", {}).get("readOnlyHint"):
+        print(f"MISSING_READONLY_HINT: {n}")
+        sys.exit(0)
+    if not t.get("outputSchema"):
+        print(f"MISSING_OUTPUT_SCHEMA: {n}")
+        sys.exit(0)
+sm = next(t for t in tools if t["name"] == "search_memories")
+sa = (
+    sm.get("inputSchema", {}).get("properties", {}).get("source_app")
+)
+if sa is None:
+    print("SEARCH_MEMORIES_MISSING_SOURCE_APP")
+    sys.exit(0)
+sa_enum = sorted(sa.get("enum") or [])
+if sa_enum != sorted(["cursor", "claude_code", "codex", "git"]):
+    print(f"SEARCH_MEMORIES_WRONG_SOURCE_APP_ENUM: {sa_enum}")
+    sys.exit(0)
+rwc = next(t for t in tools if t["name"] == "get_recent_work_context")
+desc = rwc.get("description", "")
+if "limit=20" not in desc or 'format="minimal"' not in desc:
+    print(f"GET_RECENT_WORK_CONTEXT_DESC_MISSING_DEFAULTS")
+    sys.exit(0)
+print("OK_LIST_CHECK")
+PY
+)
+
+case "$LIST_CHECK" in
+  OK_LIST_CHECK*)
+    : # ok
+    ;;
+  *)
+    log_err "tools/list item-025 advertisement check: $LIST_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+esac
 
 # --- 4. tools/call search_memories returns a `matches` array ------------------
 
@@ -419,6 +479,7 @@ esac
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
+log_ok "OK: tools/list 3 tools, each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"

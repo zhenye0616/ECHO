@@ -207,4 +207,58 @@ describe('MemoryStorage', () => {
       expect(first).toHaveLength(1);
     });
   });
+
+  describe('composite-key ordering + cursor pagination (item 025)', () => {
+    async function seedSameMs(ts: string, count: number): Promise<string[]> {
+      const ids: string[] = [];
+      for (let i = 0; i < count; i++) {
+        ids.push(await store.append(eventInput({ timestamp: ts, content: `c-${i}` })));
+      }
+      return ids;
+    }
+
+    it('query({}) on same-ms-tied rows returns deterministic id-DESC order across 10 runs', async () => {
+      await seedSameMs('2026-05-08T12:00:00.000Z', 5);
+      const baseline = (await store.query({})).map((e) => e.id);
+      expect(baseline).toEqual([...baseline].sort().reverse());
+      for (let i = 0; i < 10; i++) {
+        const next = (await store.query({})).map((e) => e.id);
+        expect(next).toEqual(baseline);
+      }
+    });
+
+    it('query({order: "asc"}) on same-ms-tied rows returns deterministic id-ASC order', async () => {
+      await seedSameMs('2026-05-08T12:00:00.000Z', 5);
+      const r = (await store.query({ order: 'asc' })).map((e) => e.id);
+      expect(r).toEqual([...r].sort());
+    });
+
+    it('before filter: returns rows strictly older than (timestamp, id)', async () => {
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        ids.push(
+          await store.append(
+            eventInput({
+              timestamp: `2026-05-08T12:0${i}:00.000Z`,
+              content: `c-${i}`,
+            }),
+          ),
+        );
+      }
+      const r = await store.query({
+        before: { timestamp: '2026-05-08T12:03:00.000Z', id: ids[3]! },
+      });
+      expect(r).toHaveLength(3);
+      expect(r.map((e) => e.content)).toEqual(['c-2', 'c-1', 'c-0']);
+    });
+
+    it('before + order: "asc" throws synchronously', async () => {
+      await expect(
+        store.query({
+          before: { timestamp: '2026-05-08T12:00:00.000Z', id: 'some-id' },
+          order: 'asc',
+        }),
+      ).rejects.toThrow(/before is defined for descending queries only/);
+    });
+  });
 });

@@ -186,9 +186,11 @@ describe('searchMemories (pure handler)', () => {
     });
     expect(r.query_echo).toEqual({
       query: 'auth',
+      source_app: null,
       source_prefix: 'cursor-chat:',
       since: '2026-04-26T00:00:00.000Z',
       until: null,
+      cursor: null,
       limit: 3,
     });
   });
@@ -356,5 +358,368 @@ describe('search_memories (end-to-end via MCP server)', () => {
     expect(parsed.query_echo.until).toBe('2026-04-30T00:00:00.000Z');
     expect(parsed.matches[0]!.id).toBeDefined();
     expect(parsed.matches[0]!.source).toMatch(/^git:/);
+  });
+});
+
+describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + cursor)', () => {
+  let handle: McpServerHandle | null = null;
+  let restoreStdout: () => void;
+  let store: MemoryStorage;
+
+  beforeEach(async () => {
+    ({ restore: restoreStdout } = captureStdout());
+    store = new MemoryStorage();
+    await seedFixtureEvents(store);
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    restoreStdout();
+  });
+
+  interface ToolListEntry {
+    name: string;
+    description?: string;
+    inputSchema?: { properties?: Record<string, unknown> };
+    outputSchema?: unknown;
+    annotations?: { readOnlyHint?: boolean };
+  }
+
+  it('tools/list advertises outputSchema, readOnlyHint, and source_app enum', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    const tools = await withClient(handle.url, async (c) => c.listTools());
+    const found = tools.tools.find((t) => t.name === 'search_memories') as
+      | ToolListEntry
+      | undefined;
+    expect(found).toBeDefined();
+    expect(found?.outputSchema).toBeDefined();
+    expect(found?.annotations?.readOnlyHint).toBe(true);
+    // source_app appears in the input schema with the four-value enum.
+    const props = found?.inputSchema?.properties ?? {};
+    expect(props['source_app']).toBeDefined();
+    const sourceApp = props['source_app'] as { enum?: string[] };
+    expect(new Set(sourceApp.enum)).toEqual(
+      new Set(['cursor', 'claude_code', 'codex', 'git']),
+    );
+  });
+
+  it('tools/call returns both content (text JSON) and structuredContent with matching JSON', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    interface ResultWithStructured extends CallToolResultLike {
+      structuredContent?: Record<string, unknown>;
+    }
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({ name: 'search_memories', arguments: { limit: 2 } }),
+    )) as ResultWithStructured;
+    expect(result.isError).toBeFalsy();
+    const text = result.content?.[0]?.text;
+    expect(text).toBeDefined();
+    const parsed = JSON.parse(text!) as Record<string, unknown>;
+    expect(result.structuredContent).toEqual(parsed);
+  });
+
+  it('source_app maps to the same matches as the equivalent FS source_prefix', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    // Fresh fixture with FS-prefixed sources matching the source_app contract.
+    const fresh = new MemoryStorage();
+    const HOME = (await import('node:os')).homedir();
+    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
+    await fresh.append({
+      source: `${codexPrefix}2026/05/08/rollout-abc.jsonl`,
+      timestamp: '2026-05-08T10:00:00.000Z',
+      content: 'codex turn 1',
+    });
+    await fresh.append({
+      source: `${codexPrefix}2026/05/08/rollout-def.jsonl`,
+      timestamp: '2026-05-08T10:01:00.000Z',
+      content: 'codex turn 2',
+    });
+    await fresh.append({
+      source: 'git:repo',
+      timestamp: '2026-05-08T10:02:00.000Z',
+      content: 'irrelevant git',
+    });
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    const byApp = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { source_app: 'codex' },
+      }),
+    )) as CallToolResultLike;
+    const parsedByApp = JSON.parse(byApp.content![0]!.text) as SearchResult;
+
+    const byPrefix = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { source_prefix: codexPrefix },
+      }),
+    )) as CallToolResultLike;
+    const parsedByPrefix = JSON.parse(byPrefix.content![0]!.text) as SearchResult;
+
+    expect(parsedByApp.matches.map((m) => m.id).sort()).toEqual(
+      parsedByPrefix.matches.map((m) => m.id).sort(),
+    );
+    expect(parsedByApp.matches).toHaveLength(2);
+  });
+
+  it('source_prefix wins on conflict and query_echo records both raw inputs', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    const result = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: {
+          source_app: 'codex',
+          source_prefix: 'cursor-chat:',
+        },
+      }),
+    )) as CallToolResultLike;
+    const parsed = JSON.parse(result.content![0]!.text) as SearchResult;
+    // source_prefix wins (3 cursor-chat events in the fixture).
+    expect(parsed.matches.length).toBeGreaterThan(0);
+    expect(parsed.matches.every((m) => m.source.startsWith('cursor-chat:'))).toBe(true);
+    expect(parsed.query_echo.source_app).toBe('codex');
+    expect(parsed.query_echo.source_prefix).toBe('cursor-chat:');
+  });
+
+  it('paginates a 60-row recency-only result via next_cursor (no query)', async () => {
+    const fresh = new MemoryStorage();
+    for (let i = 0; i < 60; i++) {
+      const ts = new Date(Date.UTC(2026, 0, 1, 0, i, 0)).toISOString();
+      await fresh.append({
+        source: 'git:bulk',
+        timestamp: ts,
+        content: `event-${i}`,
+      });
+    }
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    const first = (await withClient(handle.url, async (c) =>
+      c.callTool({ name: 'search_memories', arguments: { limit: 50 } }),
+    )) as CallToolResultLike;
+    const p1 = JSON.parse(first.content![0]!.text) as SearchResult;
+    expect(p1.total_returned).toBe(50);
+    expect(p1.next_cursor).not.toBeNull();
+
+    const second = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { limit: 50, cursor: p1.next_cursor },
+      }),
+    )) as CallToolResultLike;
+    const p2 = JSON.parse(second.content![0]!.text) as SearchResult;
+    expect(p2.total_returned).toBe(10);
+    expect(p2.next_cursor).toBeNull();
+  });
+
+  it('same-millisecond ties paginate stably without skip or duplicate', async () => {
+    const fresh = new MemoryStorage();
+    const ts = '2026-05-08T12:00:00.000Z';
+    for (const c of ['a', 'b', 'c', 'd', 'e']) {
+      await fresh.append({
+        source: 'git:bulk',
+        timestamp: ts,
+        content: c,
+        // Use a stable id-shaped content to make assertions readable. The
+        // storage will assign random UUIDs; we identify by content instead.
+      });
+    }
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    // Page through 5 same-ms-tied rows in pages of 2; assert no skip / no dup.
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let p = 0; p < 5; p++) {
+      const args: Record<string, unknown> = { limit: 2 };
+      if (cursor !== null) args['cursor'] = cursor;
+      const r = (await withClient(handle.url, async (c) =>
+        c.callTool({ name: 'search_memories', arguments: args }),
+      )) as CallToolResultLike;
+      const parsed = JSON.parse(r.content![0]!.text) as SearchResult;
+      for (const m of parsed.matches) seen.push(m.content);
+      cursor = parsed.next_cursor;
+      if (cursor === null) break;
+    }
+    expect(seen).toHaveLength(5);
+    expect(new Set(seen)).toEqual(new Set(['a', 'b', 'c', 'd', 'e']));
+  });
+
+  it('substring-query path paginates by post-filter slice (preserves item 022 invariant)', async () => {
+    // Seed 30 events; 6 contain 'needle' at recency ranks 1, 5, 12, 18, 24, 28.
+    const fresh = new MemoryStorage();
+    const NEEDLE_RANKS = new Set([1, 5, 12, 18, 24, 28]);
+    for (let i = 0; i < 30; i++) {
+      const ts = new Date(Date.UTC(2026, 0, 1, 0, 30 - i, 0)).toISOString();
+      const isNeedle = NEEDLE_RANKS.has(i);
+      await fresh.append({
+        source: 'git:repo',
+        timestamp: ts,
+        content: isNeedle ? `event-${i} needle` : `event-${i}`,
+      });
+    }
+    // The 6 needle events end up most-recent-first as i=1, 5, 12, 18, 24, 28
+    // (see how the ts is computed: `30 - i` minutes — smaller i = later).
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    const first = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { query: 'needle', limit: 4 },
+      }),
+    )) as CallToolResultLike;
+    const p1 = JSON.parse(first.content![0]!.text) as SearchResult;
+    expect(p1.total_returned).toBe(4);
+    expect(p1.next_cursor).not.toBeNull();
+    expect(p1.matches.every((m) => m.content.includes('needle'))).toBe(true);
+
+    const second = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { query: 'needle', limit: 4, cursor: p1.next_cursor },
+      }),
+    )) as CallToolResultLike;
+    const p2 = JSON.parse(second.content![0]!.text) as SearchResult;
+    expect(p2.total_returned).toBe(2);
+    expect(p2.next_cursor).toBeNull();
+    expect(p2.matches.every((m) => m.content.includes('needle'))).toBe(true);
+
+    // No duplicates across pages.
+    const allIds = [...p1.matches, ...p2.matches].map((m) => m.id);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+
+  it('cursor + until apply both: cursor is inner page boundary, until is outer bound', async () => {
+    const fresh = new MemoryStorage();
+    for (let i = 0; i < 10; i++) {
+      const ts = new Date(Date.UTC(2026, 0, 1, 0, i, 0)).toISOString();
+      await fresh.append({
+        source: 'git:repo',
+        timestamp: ts,
+        content: `event-${i}`,
+      });
+    }
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    // Window: until = 0:08 (exclusive). Limit = 3 → page 1: event-7, event-6,
+    // event-5; cursor → next page: event-4, event-3, event-2.
+    const first = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { until: '2026-01-01T00:08:00.000Z', limit: 3 },
+      }),
+    )) as CallToolResultLike;
+    const p1 = JSON.parse(first.content![0]!.text) as SearchResult;
+    expect(p1.matches.map((m) => m.content)).toEqual([
+      'event-7',
+      'event-6',
+      'event-5',
+    ]);
+    expect(p1.next_cursor).not.toBeNull();
+
+    const second = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: {
+          until: '2026-01-01T00:08:00.000Z',
+          limit: 3,
+          cursor: p1.next_cursor,
+        },
+      }),
+    )) as CallToolResultLike;
+    const p2 = JSON.parse(second.content![0]!.text) as SearchResult;
+    expect(p2.matches.map((m) => m.content)).toEqual([
+      'event-4',
+      'event-3',
+      'event-2',
+    ]);
+    expect(p2.query_echo.until).toBe('2026-01-01T00:08:00.000Z');
+    expect(p2.query_echo.cursor).toBe(p1.next_cursor);
+  });
+
+  it('malformed cursor returns isError:true with no structuredContent', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+
+    interface ResultWithStructured extends CallToolResultLike {
+      structuredContent?: unknown;
+    }
+
+    // (a) not base64
+    const r1 = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { cursor: 'not-base64-at-all-!@#' },
+      }),
+    )) as ResultWithStructured;
+    expect(r1.isError).toBe(true);
+    expect(r1.content?.[0]?.text).toMatch(/cursor|JSON|base64|object|field/i);
+    expect(r1.structuredContent).toBeUndefined();
+
+    // (b) base64 of '{}' — valid base64, invalid shape
+    const r2 = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { cursor: Buffer.from('{}').toString('base64') },
+      }),
+    )) as ResultWithStructured;
+    expect(r2.isError).toBe(true);
+    expect(r2.structuredContent).toBeUndefined();
+
+    // (c) base64 of '{"timestamp":"..."}' — missing id
+    const r3 = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: {
+          cursor: Buffer.from(
+            JSON.stringify({ timestamp: '2026-05-08T12:00:00.000Z' }),
+          ).toString('base64'),
+        },
+      }),
+    )) as ResultWithStructured;
+    expect(r3.isError).toBe(true);
+    expect(r3.content?.[0]?.text).toMatch(/id/);
+    expect(r3.structuredContent).toBeUndefined();
+  });
+
+  it('description mentions source_app, cursor, and three-tool integration', async () => {
+    const { SEARCH_MEMORIES_DESCRIPTION } = await import(
+      '../../../src/mcp/tools/search-memories.js'
+    );
+    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/source_app/);
+    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/cursor.*claude_code.*codex.*git|next_cursor/);
+  });
+
+  it('substring-query path: storage is NOT called with filter.limit', async () => {
+    // Instrument a storage that records every filter passed to query().
+    const calls: Array<Record<string, unknown>> = [];
+    const inner = new MemoryStorage();
+    for (let i = 0; i < 30; i++) {
+      const ts = new Date(Date.UTC(2026, 0, 1, 0, 30 - i, 0)).toISOString();
+      await inner.append({
+        source: 'git:repo',
+        timestamp: ts,
+        content: i % 5 === 1 ? `event-${i} needle` : `event-${i}`,
+      });
+    }
+    const recording = {
+      append: inner.append.bind(inner),
+      count: inner.count.bind(inner),
+      query: async (filter?: Record<string, unknown>) => {
+        calls.push({ ...(filter ?? {}) });
+        return inner.query(filter as Parameters<typeof inner.query>[0]);
+      },
+    };
+    const { searchMemories } = await import(
+      '../../../src/mcp/tools/search-memories.js'
+    );
+    const r = await searchMemories(
+      recording as unknown as Parameters<typeof searchMemories>[0],
+      { query: 'needle', limit: 4 },
+    );
+    expect(calls.every((c) => c['limit'] === undefined)).toBe(true);
+    expect(r.total_returned).toBeGreaterThan(0);
+    expect(r.matches.every((m) => m.content.includes('needle'))).toBe(true);
   });
 });
