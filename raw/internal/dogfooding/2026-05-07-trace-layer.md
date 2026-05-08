@@ -459,6 +459,22 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 13:13 PDT — Codex resumes from prior Codex/ECHO context
+
+- **Trigger:** founder asked Codex to "use echo to see where the last codex session left off and resume from there."
+- **Query inputs:**
+  1. `search_memories(source_prefix="fs:/Users/zhenye/.codex/", limit=10)`.
+  2. `get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=24, limit=30, format="minimal")`.
+- **Returned:**
+  1. `search_memories`: 10 Codex-session matches. The freshest rows were raw fs-change events for the current `rollout-2026-05-08T13-09-48...jsonl`; the useful extracted turn was the prior Codex session `rollout-2026-05-08T00-45-16...jsonl`, whose final answer re-verified `_followups.md` gaps after 022/023 and listed closed/partial/open issues.
+  2. `get_recent_work_context`: 1 cluster returned out of 2 (`atoms_returned=30`, `atoms_total_in_window=78`, `truncated=true`) with warning `limit dropped 1 entire cluster(s)`. Top cluster `ctx_cd081cff` had `rank_reason=[has_open_loop,dense]`, anchored on Project_echo, `raw/internal/dogfooding/2026-05-07-trace-layer.md`, and `backlog/_followups.md`. The payload surfaced the newer handoff beyond the earlier Codex re-verification: item `2026-05-08-024-fs-watcher-test-quarantine-successor` was created (`a176369`) and claimed (`f2db319`).
+- **Sources:** Codex JSONL under `fs:/Users/zhenye/.codex/sessions/...`; git commits under `git:/Users/zhenye/Desktop/Project_echo`; Claude Code atoms under `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/...`. No Cursor atoms observed in the returned slice.
+- **Verdict:** ✅ right for resuming the work; 🟡 partial for retrieval ergonomics.
+- **Note:** ECHO correctly changed the handoff from "continue the old `_followups.md` verification" to "inspect claimed item 024 and resume builder flow." The raw Codex prefix search still returned mostly fs-change rows before contentful turns, and the trace response was very large/noisy even at `format=minimal`.
+- **Conjecture:** For "resume last Codex session," a content-first Codex-source view or skeleton trace would reduce the need to mentally filter raw fs events and giant atom maps.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*

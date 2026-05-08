@@ -1,7 +1,7 @@
 ---
 id: 2026-05-08-024-fs-watcher-test-quarantine-successor
 title: fs-watcher.test.ts Path C successor — extend 023's quarantine to the third flaky file
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 15min-30min
 created: 2026-05-08
