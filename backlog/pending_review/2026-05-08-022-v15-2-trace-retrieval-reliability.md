@@ -1,13 +1,52 @@
 ---
 id: 2026-05-08-022-v15-2-trace-retrieval-reliability
 title: V1.5.2 trace + retrieval reliability — close the cross-source bias and silent-failure bugs
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 3-4d
 created: 2026-05-08
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T08:12:38Z"
 branch: "agent/v15-2-trace-retrieval-reliability"
+head_sha: "98e0498961d5b1d7f994d90464b5276b27f4ab50"
+pr_url: ""
+agent_notes: |
+  Six bundled fixes per spec, all acceptance criteria met. Branch:
+  agent/v15-2-trace-retrieval-reliability @ 98e04989. Run log:
+  raw/internal/agent-runs/2026-05-08-2026-05-08-022-v15-2-trace-retrieval-reliability.md.
+
+  Highlights:
+  - Bug A canonicalization at pipeline chokepoint (rationale + 5-surface audit
+    table in run log); Date.toISOString() with naive-as-UTC (N1).
+  - Bug A migration in src/storage/migrate.ts; Node-side, ms-preserving;
+    invoked from SqliteStorage ctor on every daemon startup; idempotent.
+  - Bug C went P1 (QueryFilter.exclude_metadata_surface) — no schema change,
+    no row migration, more flexible.
+  - Bug D filter-before-slice + upstream-limit only on the recency-only path,
+    with inline rationale.
+  - Bugs B/E/F all per spec wording.
+
+  Verification: 480/484 tests passing. The 4 failures are all in
+  tests/capture/extractors/cursor.test.ts and tests/daemon/lifecycle.test.ts
+  — exactly the chokidar/lifecycle flake cluster that backlog item 023 is
+  designed to quarantine (3-14 fluctuating per run on main per 023's own
+  baseline). The 107 tests across the 5 files I modified all pass
+  deterministically. npm run lint + npm run typecheck clean.
+
+  Reviewer attention items (3, all in run log §"Open questions"):
+  1. src/storage/memory.ts is not in spec's files_to_modify but I extended
+     it to honor the new exclude_metadata_surface field. Without that, the
+     Storage interface contract is broken (MemoryStorage would silently
+     ignore the new filter). Flagged for explicit reviewer call.
+  2. Item 023 was unintentionally swept into my initial claim commit
+     (a3d1fe2) because its file was pre-staged in the index from a prior
+     session; a follow-up commit (578b5c5) wrote my agent-id into 023's
+     frontmatter. I did NOT work 023 in this run. Founder may want to
+     either let parallel 023 work continue or release 023 back to ready/.
+  3. canonicalizeTimestamps returns { converted: N } but the SqliteStorage
+     ctor doesn't log it. The migration count is only observable at first
+     daemon boot post-merge. A one-line console.log at the call site would
+     fix this if reviewer wants.
 spec_refs:
   - src/capture/pipeline.ts
   - src/capture/gate.ts
