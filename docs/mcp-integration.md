@@ -103,6 +103,32 @@ All four should appear with their descriptions:
 - `get_recent_work_context` — clustered recent-work trace across the captured tools.
 - `tail_session` — the cheap counterpart for known-source tail lookups: returns the N most-recent atoms for a single named source (or the most-recently-active session for a `source_app`) without clustering or substring filtering. Use this for "where did `<app>` leave off" instead of substring search; default `count=5`, max `20`, typical response `< 10k chars`. Composite cursor is shared with `search_memories` (a `next_cursor` from one is decodable by the other).
 
+## `get_recent_work_context` response formats
+
+The tool ships three response-format rungs ordered by envelope cost. The `format` parameter is opt-in; the default is `minimal`.
+
+| `format` | When to use | What it keeps | What it drops | Typical envelope |
+|---|---|---|---|---|
+| `skeleton` | Low-budget context-pull. The "use ECHO to resume" / "where did I leave off" use case where the AI client needs ids + counts to plan a follow-up call but does not yet need atom bodies. | `id`, `time`, `source` (full `SourceRef`), `action.kind`, a head-clipped `action.summary` (≤200 chars of `action.input`), per-cluster `cluster_id` / `rank` / `label` / `atom_ids` / `source_breakdown` / `time_range`, plus each `open_loop_hints` entry reduced to `{atom_id, resolved}`. | `artifacts[]`, `actors`, `provenance`, `context`, `conversation`, atom-level `open_loop_hints`, cluster `edges[]`, cluster `anchor_artifacts`, and the `text`/`kind`/`confidence` body of each open-loop-hint. | < 10k chars even on full-day windows |
+| `minimal` (default) | Default starting point. Caller wants atom heads + clipped action content but is willing to pay the full sub-collection bill. | Everything in the full response, with `action.input` and `action.output` clipped to 500 chars + a `[truncated; … chars omitted]` suffix. | Nothing else — `artifacts[]`, `actors`, `provenance`, cluster `edges[]`, and `open_loop_hints[].text` all pass through unbounded. | Fixture-shape dependent. Empty/synthetic atoms < 25k chars; realistic `claude_code` + `git` working-day shapes routinely exceed 25k and have crossed 80k in the wild (see dogfooding journal entries [15:05](../raw/internal/dogfooding/mcp-interactions-journal.md#L600), [15:14](../raw/internal/dogfooding/mcp-interactions-journal.md#L621), and [15:54](../raw/internal/dogfooding/mcp-interactions-journal.md#L631) PDT on 2026-05-08 — 72,283 / 76,593 / 84,188 chars on the same default-args path). |
+| `full` | Debug / offline inspection. Verbatim atom envelopes for forensic work. Not for interactive AI-client paths. | Verbatim `RecentWorkContextResponse` — every atom field, every sub-collection, every cluster body. | Nothing. | Multiples of `minimal`. |
+
+### When to pick `skeleton`
+
+Pick `skeleton` whenever the caller is hydrating into a tight tool-result budget — most commonly:
+
+1. **Resume-the-session calls.** "Use ECHO to resume" / "where did I leave off" / cross-session handoff. The AI client needs ids and a label to plan a follow-up; it does not need 20 atom bodies × 30 artifacts each. The 2026-05-08 15:14 PDT journal entry is the canonical failure-without-skeleton case.
+2. **Cross-AI handoff routing.** One AI client is briefing another and only needs counts + cluster metadata, not atom content.
+3. **Low-context-window models.** A consumer that can only afford ≤25k chars per tool result should default to skeleton and ask for hydration via `search_memories` if needed.
+
+### When to pick `minimal`
+
+Pick `minimal` when the caller needs the atom *head* — short summaries of what was said or done — but can tolerate the realistic-shape envelope cost. This is the default for backwards compatibility, but on `claude_code` + `git` heavy days the budget blow-through is real (the regression history above). If the call is on an interactive AI-client path with a tight tool-result budget, prefer `skeleton`.
+
+### Auto-downgrade is intentionally NOT in the MCP server
+
+The MCP server does not project response size and silently downgrade `minimal` → `skeleton`. The caller picks deterministically. This is a load-bearing decision: an AI client that asked for `minimal` and silently got `skeleton` (no atom bodies) would produce a wrong "where you left off" briefing without knowing why. Once the explicit-skeleton uptake pattern is observed in production, a future item may add an opt-in `format='auto'` ladder.
+
 ## Troubleshooting
 
 ### `mcp-smoke: cannot reach http://127.0.0.1:38478/mcp`

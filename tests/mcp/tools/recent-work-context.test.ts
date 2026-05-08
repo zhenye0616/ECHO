@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_LIMIT,
   STORAGE_OVERFETCH,
+  applySkeletonAtom,
+  applySkeletonCluster,
+  buildSkeletonResponse,
   getRecentWorkContext,
   hasTzMarker,
 } from '../../../src/mcp/tools/recent-work-context.js';
@@ -864,5 +870,251 @@ describe('storage-cap warning + raw-FS filter (item 022 Bugs B + C)', () => {
     // The trace input should reflect only the 5 conversation atoms; the 100
     // raw fs events were filtered at the storage-query layer.
     expect(r.truncation.atoms_total_in_window).toBe(5);
+  });
+});
+
+describe("item 028: format='skeleton' on realistic-density fixture", () => {
+  // Fixture sourced from a real spilled `get_recent_work_context` response
+  // (the 2026-05-08 22:54 UTC / 15:54 PDT post-026+027 verification round —
+  // the canonical regression-confirmed shape per dogfooding journal lines
+  // 631-660). Founder filesystem paths redacted; otherwise byte-for-byte
+  // identical to what the MCP tool actually returned that day.
+  //
+  // Why this matters: the 025 acceptance test passed at merge precisely
+  // because its synthetic atoms were envelope-cheap (empty artifacts[],
+  // empty actors, empty provenance). Real `claude_code` + `git` atoms in
+  // a working day carry populated sub-collections; this fixture preserves
+  // that density so the size assertion below is load-bearing on production
+  // shape, not on a synthetic stand-in.
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const FIXTURE_PATH = join(
+    HERE,
+    '..',
+    'fixtures',
+    'recent-work-context-realistic-claude-code.json',
+  );
+  const fixture = JSON.parse(
+    readFileSync(FIXTURE_PATH, 'utf8'),
+  ) as RecentWorkContextResponse;
+
+  it('fixture preserves the post-026+027 regression shape', () => {
+    // Sanity-guard the fixture so a future accidental edit (or a test that
+    // shrinks the fixture for speed) can't silently turn this test into a
+    // tautology. These are the cardinal counts the dogfooding journal
+    // recorded for the 15:54 PDT spill.
+    expect(Object.keys(fixture.atoms)).toHaveLength(20);
+    expect(fixture.clusters).toHaveLength(1);
+    const cluster = fixture.clusters[0]!;
+    // Cluster must carry a populated open_loop_hints body (≥15 entries) —
+    // dropping that body is one of the load-bearing skeleton-mode strips.
+    expect(cluster.open_loop_hints.length).toBeGreaterThanOrEqual(15);
+    expect(cluster.edges.length).toBeGreaterThan(0);
+    // Each atom must carry the populated sub-collections that minimal mode
+    // doesn't cap (artifacts / actors / provenance). The realistic fixture
+    // has artifacts ranging 2-17/atom; assert the cluster total stays
+    // representative even on a tightened fixture.
+    let totalArtifacts = 0;
+    for (const atom of Object.values(fixture.atoms)) {
+      expect(atom.actors.length).toBeGreaterThan(0);
+      expect(atom.provenance).toBeDefined();
+      totalArtifacts += atom.artifacts.length;
+    }
+    // 20 atoms with ≥2 artifacts/atom on average is the floor.
+    expect(totalArtifacts).toBeGreaterThanOrEqual(40);
+  });
+
+  it('minimal-mode envelope on this fixture exceeds 25,000 chars (documents the gap skeleton closes)', () => {
+    // We are NOT promising minimal stays under budget on realistic-shape
+    // input — that's exactly the regression skeleton mode addresses.
+    // Recording the gap here keeps the next reader from confusing skeleton
+    // for a redundant rung.
+    const envelopeBytes = JSON.stringify(fixture).length;
+    expect(envelopeBytes).toBeGreaterThan(25_000);
+  });
+
+  it('skeleton-mode envelope on this fixture is < 12,500 chars (half the consumer budget, leaves headroom)', () => {
+    // Half of the 25k consumer tool-result budget. Headroom matters because
+    // skeleton output is meant for the resume use case where the AI client
+    // still needs room to synthesize a briefing on top of the response.
+    const skeleton = buildSkeletonResponse(fixture);
+    const envelopeBytes = JSON.stringify(skeleton).length;
+    expect(envelopeBytes).toBeLessThan(12_500);
+  });
+
+  it('skeleton mode strips artifacts, actors, provenance, context, conversation, and atom-level open_loop_hints', () => {
+    // Walk a realistic atom and confirm every sub-collection that minimal
+    // leaves uncapped is gone. This is the first half of the strip
+    // contract; the second half (cluster-level edges + hint-body) is
+    // checked below.
+    const atomWithBody = Object.values(fixture.atoms).find(
+      (a) =>
+        a.artifacts.length > 0 &&
+        a.actors.length > 0 &&
+        a.provenance !== undefined,
+    );
+    expect(atomWithBody).toBeDefined();
+    const skeleton = applySkeletonAtom(atomWithBody!);
+    expect((skeleton as unknown as Record<string, unknown>).artifacts).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).actors).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).provenance).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).context).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).conversation).toBeUndefined();
+    expect(
+      (skeleton as unknown as Record<string, unknown>).open_loop_hints,
+    ).toBeUndefined();
+    // Affordances are retained.
+    expect(skeleton.id).toBe(atomWithBody!.id);
+    expect(skeleton.time).toEqual(atomWithBody!.time);
+    expect(skeleton.source).toEqual(atomWithBody!.source);
+    expect(skeleton.action.kind).toBe(atomWithBody!.action.kind);
+  });
+
+  it('skeleton atom action.summary is a head-clip ≤200 chars of action.input', () => {
+    // Every realistic atom in the fixture has populated action.input. The
+    // summary surrogate clips to SKELETON_SUMMARY_CAP (200) so a downstream
+    // resume briefing can still tell atoms apart.
+    const atomWithLongInput = Object.values(fixture.atoms).find(
+      (a) => (a.action.input ?? '').length > 200,
+    );
+    expect(atomWithLongInput).toBeDefined();
+    const skeleton = applySkeletonAtom(atomWithLongInput!);
+    expect(skeleton.action.summary).toBeDefined();
+    expect(skeleton.action.summary!.length).toBe(200);
+    expect(skeleton.action.summary!).toBe(
+      atomWithLongInput!.action.input!.slice(0, 200),
+    );
+  });
+
+  it('skeleton cluster drops edges body and reduces open_loop_hints to {atom_id, resolved}', () => {
+    const cluster = fixture.clusters[0]!;
+    const skeleton = applySkeletonCluster(cluster);
+    expect((skeleton as unknown as Record<string, unknown>).edges).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).anchor_artifacts)
+      .toBeUndefined();
+    // Hint count is preserved — only the body is stripped, so a downstream
+    // caller can decide whether to hydrate via search_memories.
+    expect(skeleton.open_loop_hints).toHaveLength(
+      cluster.open_loop_hints.length,
+    );
+    for (const h of skeleton.open_loop_hints) {
+      expect(Object.keys(h).sort()).toEqual(['atom_id', 'resolved']);
+      expect(typeof h.resolved).toBe('boolean');
+      expect(typeof h.atom_id).toBe('string');
+    }
+    // Affordances are retained.
+    expect(skeleton.cluster_id).toBe(cluster.cluster_id);
+    expect(skeleton.label).toBe(cluster.label);
+    expect(skeleton.atom_ids).toEqual(cluster.atom_ids);
+    expect(skeleton.source_breakdown).toEqual(cluster.source_breakdown);
+    expect(skeleton.time_range).toEqual(cluster.time_range);
+  });
+
+  it('manual revert of skeleton stripping pushes the envelope above 12,500 chars (proves the test is load-bearing, not a tautology)', () => {
+    // If a future refactor accidentally short-circuits the strip
+    // (e.g., skeleton ends up just renaming `format` without dropping
+    // sub-collections), the fixture re-serialized as-is is the size
+    // skeleton mode is supposed to defeat. This test pins the fact that
+    // doing nothing fails the budget.
+    const noStrip = JSON.stringify(fixture).length;
+    expect(noStrip).toBeGreaterThan(12_500);
+  });
+
+  it('format="skeleton" round-trips through the MCP server for a smaller fixture', async () => {
+    // The fixture-level assertions above test the transform in isolation.
+    // This end-to-end test seeds a tiny store, calls the tool with
+    // `format:'skeleton'`, and verifies the response shape on the wire.
+    const store = new MemoryStorage();
+    const NOW = '2026-05-08T08:00:00.000Z';
+    const SINCE = '2026-05-08T04:00:00.000Z';
+    const baseMs = Date.parse(SINCE);
+    for (let i = 0; i < 5; i++) {
+      const ts = new Date(baseMs + i * 30_000).toISOString();
+      await store.append({
+        source: `fs:/Users/<redacted>/.claude/projects/abc/s${i}.jsonl`,
+        timestamp: ts,
+        content: `USER: turn ${i}\n\nASSISTANT: reply ${i}`,
+        metadata: {
+          session_id: `s${i}`,
+          turn_index: 0,
+          repo_root: '/repo',
+          files_referenced: ['/repo/src/file.ts'],
+          git_state: { origin_url: 'https://github.com/u/r' },
+        },
+      });
+    }
+    const { restore } = captureStdout();
+    const handle = await startMcpServer(store, { port: 0 });
+    try {
+      const result = (await withClient(handle.url, async (c) =>
+        c.callTool({
+          name: 'get_recent_work_context',
+          arguments: { since: SINCE, until: NOW, format: 'skeleton' },
+        }),
+      )) as { isError?: boolean; content?: { text: string }[] };
+      expect(result.isError).toBeFalsy();
+      const parsed = JSON.parse(result.content![0]!.text) as Record<
+        string,
+        unknown
+      >;
+      const atoms = parsed['atoms'] as Record<string, Record<string, unknown>>;
+      for (const atom of Object.values(atoms)) {
+        expect(atom['artifacts']).toBeUndefined();
+        expect(atom['actors']).toBeUndefined();
+        expect(atom['provenance']).toBeUndefined();
+      }
+      const clusters = parsed['clusters'] as Record<string, unknown>[];
+      for (const c of clusters) {
+        expect(c['edges']).toBeUndefined();
+      }
+    } finally {
+      await handle.stop();
+      restore();
+    }
+  });
+
+  it('tool description advertises the three-format ladder by intent', async () => {
+    const store = new MemoryStorage();
+    const { restore } = captureStdout();
+    const handle = await startMcpServer(store, { port: 0 });
+    try {
+      const tools = await withClient(handle.url, async (c) => c.listTools());
+      const found = tools.tools.find(
+        (t) => t.name === 'get_recent_work_context',
+      );
+      expect(found?.description).toMatch(/skeleton/);
+      expect(found?.description).toMatch(/minimal/);
+      expect(found?.description).toMatch(/full/);
+      // Cost-ordering language must survive — the resume use case is what
+      // motivates skeleton's existence.
+      expect(found?.description).toMatch(/resume|cheapest|leave off/i);
+    } finally {
+      await handle.stop();
+      restore();
+    }
+  });
+
+  it('format="skeleton" is accepted by the tool input schema (not rejected as before)', async () => {
+    // Pre-028 the format enum only accepted full|minimal — passing
+    // 'skeleton' would have raised an InputValidationError. This test
+    // documents the schema widening.
+    const store = new MemoryStorage();
+    const { restore } = captureStdout();
+    const handle = await startMcpServer(store, { port: 0 });
+    try {
+      const result = (await withClient(handle.url, async (c) =>
+        c.callTool({
+          name: 'get_recent_work_context',
+          arguments: {
+            since: '2026-05-08T04:00:00.000Z',
+            until: '2026-05-08T08:00:00.000Z',
+            format: 'skeleton',
+          },
+        }),
+      )) as { isError?: boolean };
+      expect(result.isError).toBeFalsy();
+    } finally {
+      await handle.stop();
+      restore();
+    }
   });
 });
