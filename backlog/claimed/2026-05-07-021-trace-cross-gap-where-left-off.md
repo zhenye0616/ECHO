@@ -1,10 +1,13 @@
 ---
 id: 2026-05-07-021-trace-cross-gap-where-left-off
 title: V1.5 trace patch — make "where did I leave off" work across >4h gaps
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1-2d
 created: 2026-05-07
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T06:30:00Z"
+branch: "agent/trace-cross-gap-where-left-off"
 spec_refs:
   - src/storage/sqlite.ts
   - src/storage/interface.ts
