@@ -8,9 +8,18 @@ created: 2026-05-08
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T20:09:28Z"
 branch: "agent/fs-watcher-test-quarantine-successor"
-head_sha: ""
+head_sha: "07291fc5d8034493d0696afc0c3fed9f91e057ba"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Mechanical extension of 023's Path C quarantine landed exactly as specced. `describe.skip` applied to `describe('startFsWatcher')` at `tests/capture/surfaces/fs-watcher.test.ts:41` with an 8-line tracking comment ending in the spec-required two-line closer (`2026-05-08-024-fs-watcher-test-quarantine-successor; test bodies are intact for when` / `the underlying race is fixed.`). The `classifyKind` and `_isAllowedPathIn` blocks remain enabled per acceptance — pure-function, no chokidar.
+
+  Verification: 3 consecutive clean `npm test` runs (463 passed, 21 skipped, 0 failed each = 15 from 023 + 6 newly skipped from 024's 6-test block). `npm run lint` and `npm run typecheck` clean.
+
+  `_followups.md` updated in two places: 023-section's `fs-watcher.test.ts Path C successor` bullet annotated `> Resolved (delivered after merge by 2026-05-08-024) ...`; 014-section's existing 023-resolution line extended with a sibling line noting the `fs-watcher.test.ts` portion is now closed by 024 (claude-code.test.ts portion remains open per item's Out-of-Scope, candidate for 025 if it surfaces at a future verify step).
+
+  No drift events. Comment line count is 8 (vs spec's stated "7"); closing two-line pattern is exact per spec; preceding prose mirrors the cursor.test.ts (8-line) / lifecycle.test.ts (9-line) anchors cited as the canonical shape.
+
+  Full run log: `raw/internal/agent-runs/2026-05-08-2026-05-08-024-fs-watcher-test-quarantine-successor.md`.
 spec_refs:
   - tests/capture/surfaces/fs-watcher.test.ts
   - backlog/complete/2026-05-08-023-chokidar-flake-quarantine.md
