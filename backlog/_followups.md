@@ -105,3 +105,14 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - **Quarantine the pre-existing capture/daemon flake** as a separate item: 3 failures intermittent in `tests/capture/extractors/cursor.test.ts` (workspace_id matching, lastSeenMap backfill, stop() timeout) + 1 in `tests/daemon/lifecycle.test.ts` (waitFor timeout). Already flagged from item 019's verification; re-confirmed at 020's merge. Flake fluctuates 3–14 failures across runs.
 - **Founder hand-scores the 111 rows** in `raw/internal/dogfooding/2026-05-08-resolution-validation.md` as TP / FP / TN / FN. If overall precision (TP / (TP + FP)) ≥ 80%, R1 is sufficient for V1 hotkey overlay. Otherwise calibration becomes the next backlog item before the overlay UI is specced.
 
+
+---
+
+## 2026-05-08 — from merge of 021-trace-cross-gap-where-left-off
+
+- **Quarantine the recurring fs-watcher / cursor / daemon-lifecycle flake.** Same files since item 018 (`tests/capture/extractors/cursor.test.ts`, `tests/daemon/lifecycle.test.ts`); failure count fluctuates 3–14 across runs. Fixture races on FSEvents under load. File its own backlog item — bump test timeout, fix the underlying race, or quarantine via `.skip` with a tracking comment.
+- **Spec template improvement: explicit "test fallout permitted in:" convention.** 021 hit this on `tests/capture/*` (six test files needed `order: 'asc'` after Bug A's DESC flip). Both items 020 and 021 had small test-only diffs outside `files_to_modify` that needed agent-notes call-outs. Convention would be: spec author lists test files where collateral edits are expected, removing the agent-side ambiguity.
+- **`search_memories` KNN determinism investigation.** Flagged as out-of-scope inside 021's spec body but is an independent reliability issue the dogfooding journal also surfaced (same query returning different match counts on consecutive calls; e.g., "hotkey overlay" returned 1 match earlier today and 0 matches later in the same session). File its own item if it persists across V1.5+ retrieval work.
+- **Strategist wiki promotion (post-021):** update `wiki/architecture/work-trace.md` with the storage `order: 'asc'|'desc'` semantic + the `window_hours` inference rule (≤4h → span; >4h → min(span, 24)); update `wiki/surfaces/mcp-recent-work-context.md` with the new input parameter, the TZ-marker recommendation, and the `response.warnings` semantic. Bundles with the still-pending 019 and 020 wiki promotions.
+- **Independent C: TZ guardrail false-negative.** Current `hasTzMarker` is `/Z$|[+-]\d{2}:\d{2}$/`. ISO 8601 also permits forms like `+0700` (no colon) and the bare `+07` hour-only offset; the regex misses these. Low-priority — most consumers use Z or `+HH:MM` — but worth tightening if dogfooding ever surfaces a missed warning.
+
