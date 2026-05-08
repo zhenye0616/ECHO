@@ -29,7 +29,12 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ## 2026-05-01 — from merge of 014-mcp-search-memories
 
 - Wire `limit: MAX_OVERFETCH` into `storage.query` once storage guarantees timestamp-DESC ordering. Today `searchMemories` loads the entire matching set into memory before sorting/slicing — fine for V1 dataset sizes, becomes O(N) memory at scale. (MCP search-memories tool; cross-cuts Storage interface.)
+
+  > Re-verified 2026-05-08 post-025: `MAX_OVERFETCH = 200` is still exported at `src/mcp/tools/search-memories.ts:11` and still NOT wired into the production storage call after 025's path-aware `limit+1` overfetch refactor. The constant is now genuinely dead code — subsumed by the 025 follow-up bullet ("`MAX_OVERFETCH = 200` dead constant") which proposes the same fix shape (wire it as a defensive cap on the substring path, or delete). Track from there; don't double-count.
+
 - Add `order` / `order_by` to `QueryFilter` once a second consumer needs DESC. Until then the in-tool sort is fine. Worth a Spec Authoring Lesson once the second use case appears. (Storage interface.)
+
+  > Resolved (delivered after merge by 2026-05-08-021) — `QueryFilter.order?: 'asc' | 'desc'` now lives at `src/storage/interface.ts:18-22` with `'desc'` default. The 021 spec needed asc-ordered storage for cross-gap reconstruction, which was the second consumer the followup anticipated.
 - **Investigate chokidar lifecycle flake** — `cursor.test.ts`, `claude-code.test.ts`, `fs-watcher.test.ts` intermittently time out at 5000ms under parallel load. Different tests fail each run (race, not deterministic regression). Surface area was reduced in chore commit `912ebab` (fs-watcher now ignores Cursor's SQLite triplet; cursor-extractor debounces) but the deeper `watcher.close()` race in chokidar teardown remains. Workaround: `--pool=forks --poolOptions.forks.singleFork=true` masks rather than fixes. (Test-infra item; high priority since the flake will block future merges.)
 
 > Resolved (delivered after merge by 2026-05-08-023) for the `cursor.test.ts` portion only — the `describe('startCursorExtractor (lifecycle + integration)')` block is `describe.skip`-quarantined with a tracking comment. The `claude-code.test.ts` and `fs-watcher.test.ts` portions remain open per 023's Out-of-Scope.
@@ -41,6 +46,8 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - [ ] Founder writes the week's MCP-demo milestone entry into `docs/STATUS.md`. Operating manual reserves STATUS.md for founder; agent (correctly) refused to touch it during 015.
 - [ ] Strategist amends item-spec template: phrase STATUS.md updates as founder-post-merge, not as agent acceptance. Otherwise this conflict recurs every "milestone" item.
 - [ ] Polish `tools/mcp-integration-smoke.sh:47-55`: add `-f` to the reachability `curl` so HTTP 4xx/5xx surfaces with a clearer error than the current degraded downstream message.
+
+  > Re-verified 2026-05-08 post-025: still open. Reachability check at line 49 is `curl -sS --connect-timeout 2 ...` — no `-f`. One-line fix.
 
 ---
 
@@ -60,7 +67,11 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [ ] **Tighten `hostOf` host-suffix matches** in `src/normalize/artifacts.ts:56-63`. Current `host.endsWith('github.com')` would also classify `github.com.evil.com` as `github`. Change to `host === 'github.com' || host.endsWith('.github.com')` (and the same for gitlab/bitbucket). Low practical risk for git remotes today; tighten before any user-controlled URL flows through this. (Normalize artifacts.)
 
+  > Re-verified 2026-05-08 post-025: still open. `src/normalize/artifacts.ts:58-62` unchanged.
+
 - [ ] **Simplify `ObservedState` discriminated union** in `src/normalize/types.ts:73-75`. Today: `{ snapshot; delta?: never } | { delta; snapshot?: never }` — the `?: never` flavor is awkward to construct from generic code (the git adapter test had to navigate it carefully). Drop to plain `{ snapshot: SnapshotRef } | { delta: DeltaRef }`. Behavior-preserving; cosmetic. (Normalize types.)
+
+  > Re-verified 2026-05-08 post-025: still open. `src/normalize/types.ts:73-75` unchanged.
 
 - [ ] **Pre-existing chokidar timing flakes** in `tests/capture/extractors/cursor.test.ts` (3 failures intermittent) and `tests/daemon/lifecycle.test.ts` (1 failure intermittent). Reproduces on `main` with no inbound branch — count varies (3-9 failures across runs depending on box load). Either bump per-test timeout on the chokidar suites or switch them from `waitFor(predicate, ms)` to deterministic synchronization via the extractor's `probeFreshness` handle. Already partially flagged in the 014-mcp-search-memories follow-up section above; this run confirms the issue is still live and now blocks the verify step's signal-to-noise on every merge. (Test infra; high priority — flakes will keep noise-pollution merge verifies until fixed.)
 
@@ -70,9 +81,15 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [ ] **Tighten MCP `limit` zod schema** in `src/mcp/tools/recent-work-context.ts:90`. Change `z.number().optional()` → `z.number().int().min(1).max(500).optional()` so a malformed value surfaces as a structured tool-error at the boundary rather than silently being clamped by `clampLimit`. Founder-facing validation is looser than typical MCP tools today. (MCP tool; cosmetic boundary tightening.)
 
+  > Re-verified 2026-05-08 post-025: still open. `src/mcp/tools/recent-work-context.ts:254` is still `limit: z.number().optional()`. Note: 025 made an explicit choice for `search_memories.ts` to add `.int().min(1)` (no max) and let the handler clamp >MAX_LIMIT, so the precedent is set for this tool too.
+
 - [ ] **Switch `computeTimeRange` to `Date.parse()`** in `src/trace/index.ts:202`. Uses string comparison on `occurred_at` today — works for Z-suffixed UTC (which storage emits) but breaks ordering for offset-bearing timestamps (e.g. `+02:00` vs equal-moment `Z`). Change before any timezone-bearing extractor lands. (Trace module; dormant correctness.)
 
+  > Re-verified 2026-05-08 post-025: `computeTimeRange` at `src/trace/index.ts:274-285` still uses string comparison on `a.time.occurred_at`. **Status downgraded from "dormant correctness" to "structurally unreachable"** — item 022 closed Bug A by canonicalizing all stored timestamps to Z-suffixed UTC at storage append-time, so any offset-bearing input is converted before it can reach the trace layer. The lex-sort ≡ chronological invariant now holds by construction. Code unchanged but bug is no longer a live exposure. Defer until something actually wants to bypass the storage normalizer.
+
 - [ ] **Broaden hint regexes during V1.5 dogfooding** in `src/trace/hints.ts:5-6`. `FOLLOWUP_RE` matches three exact phrases ("follow up", "come back to", "will do later"); `TODO_RE` requires `:` or whitespace after `TODO`. Per spec these are intentionally scoped — refine if dogfooding shows them too tight. (Trace module; product tuning.)
+
+  > Re-verified 2026-05-08 post-025: regexes unchanged (`hints.ts:4-5`). No dogfooding signal yet that they're too tight; defer per spec.
 
 - [ ] **Pick a convention for agent-run-log filenames** and document in `backlog/README.md`. Spec acceptance referenced `raw/internal/agent-runs/<spec-date>-<item-id>.md`; agent wrote `<run-date>-<item-id>.md` per the `$(date +%Y-%m-%d)` pattern in the slash command. Trivial, but the divergence will keep recurring on every cross-day item until the convention is locked. (Process meta.)
 
@@ -106,6 +123,8 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ## 2026-05-07 — from merge of 020-open-loop-resolution-heuristics
 
 - **Tighten R1.TODO type cast** at `src/trace/hints.ts:150`. Replace `(state as { delta?: { artifact_id: string } }).delta` with the discriminated-union narrowing `if ('delta' in state)`. Cosmetic; functionally equivalent.
+
+  > Re-verified 2026-05-08 post-025: still open. `src/trace/hints.ts:150` unchanged. Note: companion item 016 followup ("Simplify `ObservedState`") would unblock the cleaner narrowing — best to bundle the two when either is touched.
 - **Add explicit "earliest" tests** for R1.AQ and R1.TODO to mirror the existing R1.Q earliest test (currently inferred from shared loop structure).
 - **One-line UTC-Z invariant comment** in `src/trace/index.ts:202-211` documenting that `compareByOccurredAt` lex-sort ≡ chronological order only under the normalizer's UTC-Z guarantee. Prevents a future change from breaking the assumption silently.
 - **Strategist post-merge spec amendment:** spec line 42 prose says "matching by `context.conversation` artifact id" but the actual `NormalizedContextEvent.context` schema has only `visible/selected/ambient` strings. Agent correctly inferred conversation-typed `ArtifactRef` matching by `provider:type:id`. Update spec wording for future readers.
@@ -135,10 +154,21 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ### Per-merge cleanup (small, mechanical)
 
-- [ ] **Resolve item 023 backlog-state collision.** 022's claim commit `a3d1fe2` swept in a pre-staged `git mv` of item 023, and follow-up `578b5c5` wrote 022's persona into 023's frontmatter. The 022 agent did not work 023's code. 023 is independently under review on `agent/chokidar-flake-quarantine`. Founder action: either let parallel work continue or revert 023's frontmatter. (Backlog-state, not code.)
+- [x] **Resolve item 023 backlog-state collision.** 022's claim commit `a3d1fe2` swept in a pre-staged `git mv` of item 023, and follow-up `578b5c5` wrote 022's persona into 023's frontmatter. The 022 agent did not work 023's code. 023 is independently under review on `agent/chokidar-flake-quarantine`. Founder action: either let parallel work continue or revert 023's frontmatter. (Backlog-state, not code.)
+
+  > Resolved 2026-05-08: item 023 landed in `backlog/complete/` with status `complete` and its own merge reconciliation; 022 and 023 both shipped successfully without further conflict. Collision is moot.
+
 - [ ] **Add explanatory comment at `src/storage/migrate.ts:71`** documenting the `TZ_MARKER_RE` else-branch (defensive for naive rows that bypass the SQL `WHERE timestamp NOT LIKE '%Z'` filter). Logic is correct but non-obvious.
+
+  > Re-verified 2026-05-08 post-025: 🟡 partial — `canonicalizeTimestamps` at `src/storage/migrate.ts:55-60` now carries a 6-line function-level comment explaining the Node-not-SQL choice and the idempotency guarantee, but the inline `TZ_MARKER_RE.test(...) ? ... : ... + 'Z'` ternary at line 71 still has no per-line note explaining why the defense is needed when the WHERE clause already filters. One small inline comment short of done.
+
 - [ ] **Lift cap-hit equality to `>=` storageCap** at `src/mcp/tools/recent-work-context.ts:170` once a `count(filter)` storage method exists. V1.5.3 territory; spec already flagged in Out of Scope.
-- [ ] **`backlog/pending_review/2026-05-08-023-chokidar-flake-quarantine.review.md` got tracked** by `git add -A` in the 022 post-merge commit. Sidecars are typically untracked; will be `git rm`'d when `/merge-and-cleanup 023` runs. Cosmetic; flagging for awareness.
+
+  > Re-verified 2026-05-08 post-025: still open. `src/mcp/tools/recent-work-context.ts:191` reads `if (events.length === storageCap)`. Strict equality preserved.
+
+- [x] **`backlog/pending_review/2026-05-08-023-chokidar-flake-quarantine.review.md` got tracked** by `git add -A` in the 022 post-merge commit. Sidecars are typically untracked; will be `git rm`'d when `/merge-and-cleanup 023` runs. Cosmetic; flagging for awareness.
+
+  > Resolved 2026-05-08: `pending_review/` is empty post-023 merge; sidecar removed as part of the cleanup pass.
 
 ### Strategist post-merge
 
@@ -199,11 +229,18 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ### Per-merge cleanup (small, mechanical)
 
 - [ ] **`MAX_OVERFETCH = 200` dead constant** at `src/mcp/tools/search-memories.ts:11`. Exported but never applied as a cap after the path-aware `limit+1` overfetch refactor. Either wire it as a defensive cap on the substring-path candidate set (against unbounded full-window scans on huge stores) or delete the constant + rename the related test. Reviewer-flagged as misleading.
+
+  > Re-verified 2026-05-08: still open. Subsumes the older 014 followup of the same shape. Test at `tests/mcp/tools/search-memories.test.ts:244` still references the constant by name, so the "delete + rename" path requires both edits.
+
 - [ ] **`buildSourceAppMap()` rebuilt per call** at `src/mcp/tools/search-memories.ts:25-33,167`. Trivial allocation (`os.homedir()` + 4 string concats); hoist to module scope or memoize. Cosmetic.
+
+  > Re-verified 2026-05-08: still open. `src/mcp/tools/search-memories.ts:25` is still `function buildSourceAppMap()`; line 167 still calls per-invocation.
 
 ### Code-correctness follow-up (own item)
 
 - [ ] **`discoverLastSeen` non-determinism in `src/capture/surfaces/git-watcher.ts:225-242`.** Storage's new `id DESC` tie-break (introduced by this item per the spec's pagination requirement) exposes a pre-existing bug: on same-second commits the watcher now picks the id-ASC-smallest tied SHA as "last seen", which can cause it to re-emit prior commits as duplicates after restart. The 025 agent correctly downgraded the resumption test in `tests/capture/surfaces/git-watcher.test.ts` from `expect(events).toHaveLength(5)` to assert only the core contract ("both new SHAs land in storage"). Proper fix needs `git-watcher.ts` changes + a `rowid` ordering hint or a `git rev-parse --short HEAD`-based discovery mechanism. After the fix, restore the strict `toHaveLength(5)` assertion. (Capture surface; latent reliability bug.)
+
+  > Re-verified 2026-05-08 post-025 merge: still open. `src/capture/surfaces/git-watcher.ts:225-242` is unchanged — `discoverLastSeen` does an unordered `storage.query({ source: ... })` then walks the array picking the lex-largest `timestamp` with `>=` (last-write-wins on ties). Storage's post-025 `(timestamp DESC, id DESC)` ordering means the *first* iterated tied row has id-DESC-largest, but `>=` overwrites with the *last* iterated tied row → id-DESC-smallest wins. Bug is live; test downgrade still in place.
 
 ### V1.6 territory (already specced as out-of-scope by 025)
 
@@ -222,9 +259,11 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ### Dogfooding (founder + AI clients)
 
-- [ ] **Re-run the 13:27 PDT scenario** from `raw/internal/dogfooding/mcp-interactions-journal.md` — `get_recent_work_context` over a 2.5h window with default args. Expect: response under 25k chars, no spill, `structuredContent` populated.
-- [ ] **Re-run the 14:43 PDT scenario** — `search_memories(query="JSON-RPC", source_app='codex', limit=20)`. Expect: same matches as the equivalent literal-prefix call.
+- [x] 🟡 **Bug 3 cost-safer defaults — REGRESSED IN PRODUCTION.** Claude Code 15:05 PDT post-merge verification (journal entry of same timestamp): `get_recent_work_context()` zero-args (defaults `limit=20`, `format='minimal'`, `window_hours=4`) returned **72,283 chars — ~3× over the 25k consumer budget** and spilled to a tool-results sidecar. Same Failure A shape as the 13:27 PDT and 14:43 PDT pre-025 entries; merge-time envelope-byte-size acceptance test (synthetic 200-atom fixture) did not catch it. Root cause from probe: `truncateForMinimal` caps `action.input/action.output` at 500 chars but leaves `artifacts[]` (33 entries / 8.4 kB on the top atom), `actors`, `provenance`, `context`, and the cluster's `edges`/`open_loop_hints` untouched. For real `claude_code` atoms with many file references per turn, `artifacts[]` dominates the byte-share. **Defer fix until after 026 + 027 merge** — second verification round will tell us whether further trace-side / transport-side changes shift the envelope shape, before we spec a fixture-density fix or commit to the V1.6 `format: 'skeleton'` move below.
+- [x] ✅ **Bug 2 `source_app` ↔ literal-prefix parity** — verified 15:05 PDT. `search_memories(source_app='codex', limit=5)` and `search_memories(source_prefix='fs:/Users/zhenye/.codex/sessions/', limit=5)` returned identical 5 matches in identical order with identical `next_cursor`; `query_echo` faithfully records each input form distinctly.
+- [x] ✅ **Bug 4 composite cursor + same-ms tie stability + malformed-cursor error envelope** — verified 15:05 PDT. Page 2's first row had the same timestamp as page 1's last row but a different id (composite `(timestamp, id) <` row-value comparison engaged correctly, no skip, no dup). Malformed cursor `'not-base64-at-all-!@#'` returned a recognizable error message at the JSON-RPC layer.
 - [ ] **Capture AI-client uptake on the new affordances:** does Claude Code spontaneously use `source_app: 'claude_code'` for app-scoped queries instead of guessing FS prefixes? Does pagination via `next_cursor` get used at all, or do consumers default to wider `until` filters? Two more dogfooding entries' worth of signal needed before deciding whether the affordances are working as intended.
+- [ ] **Second verification round after 026 + 027 merge.** Re-run the 15:05 PDT default-args scenario plus the 14:43 PDT `search_memories(query="JSON-RPC", source_app='codex')` scenario after both 026 and 027 land. Compare envelope size against today's 72,283-char baseline; if the regression persists post-026/027, file the fixture-density / `format:'skeleton'` item then.
 
 ### Process notes
 
