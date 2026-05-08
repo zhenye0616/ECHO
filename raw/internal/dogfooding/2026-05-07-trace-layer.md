@@ -421,6 +421,25 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 12:03 PDT — Claude Code reconstructs "where founder left off last night" via two trace calls
+
+- **Trigger:** founder opened a fresh session this morning and asked Claude Code to "read the most recent interactions across all sessions from last night and figure out where i left off using echo."
+- **Query inputs:** call A — `get_recent_work_context` since=2026-05-08T00:00-07:00 until=2026-05-08T09:00-07:00 format=minimal limit=10. Call B — same tool, since=2026-05-08T02:00-07:00 until=2026-05-08T08:30-07:00 format=minimal limit=15.
+- **Returned:**
+  - **Call A:** 1 cluster returned (of 2 in window — `truncated: true`, "limit dropped 1 entire cluster(s)"). Cluster `ctx_f5418cb6` rank_reason=[`has_open_loop`,`dense`], anchored on Project_echo repo + two claude_code conversations (`3c98f080…` strategist session + `c1dbc9c1…`). 60 atoms in window, 10 returned. `source_breakdown={claude_code: 27, git: 23}` — 50 attributed; remainder presumably in the truncated 2nd cluster. Time range UTC 07:03:20 → 08:59:47 = PDT 00:03 → 01:59. Storage cap warning also raised.
+  - **Call B:** 0 clusters, 0 atoms. Empty.
+- **Sources:** Call A — claude_code (27) + git (23); claude_code raw_pointers under `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/` (sessions `3c98f080…`, `7430c728…`, plus subagent jsonl `agent-a5b270757e08f49e8`); git raw_pointer `git:/Users/zhenye/Desktop/Project_echo` covering commits `62bb8c7` → `73d7f64`. **No codex, no cursor, no fs surface.** Call B — no source attribution because no rows returned.
+- **Verdict:** ✅ right (call A) / 🟡 partial (call B — see note 2).
+- **Note:**
+  1. **Trace layer answered "where did I leave off" cleanly with one call.** Cluster correctly bound the 022→023 merge sequence: builder→reviewer→merge→post-merge fixup commits all in one cluster, anchored on shared file artifacts (`backlog/_followups.md`, `backlog/pending_review/2026-05-08-023-chokidar-flake-quarantine.review.md`, `src/storage/sqlite.ts`). 9 of 9 high-confidence edges joined via `shared_artifact` (zero scope-only or session-only edges) — exactly the post-019 edge-pruning behavior.
+  2. **Empty 02:00–08:30 PDT window is "right" but reads as "broken" without ground-truth.** I extended the window forward expecting commits like `b6005bd` (02:05), `5f47d1e` (02:13), `46cf180` (02:17), `0a2e6ca` (02:20) to surface. ECHO returned 0 atoms. Cross-checked via `git log` directly: those commits exist on disk. So either (a) git extractor hasn't caught up post-02:00 PDT (lag > 10h), (b) trace layer's clustering threshold dropped the run because it's a single thin sequence with no claude_code accompaniment, or (c) some filter bound at the cluster-level discards lone-source-thin runs. Worth investigating — this is the failure mode "valid window, real activity, zero clusters" which a user would interpret as "I did nothing then" when in fact 4 commits exist.
+  3. **Open-loop hint resolution working correctly post-022.** 9 of 11 hints marked `resolved: true` with explicit `resolved_by_atom_id`; the 2 unresolved are TODO-comment hints, which can't be auto-resolved by definition.
+  4. **Truncation warning fired correctly** ("limit dropped 1 entire cluster(s)") — exactly the cluster-loss warning shipped in 022. The warning surfaced the issue without me having to reason from atom counts. Lift-from-1-cluster-to-2-clusters via `limit=15` re-query was unnecessary because cluster 1 already answered the user's question; warning is doing its job as a hint, not a forcing function.
+- **Conjecture (observation only — for end-of-window backlog synthesis, not for fixing here):**
+  - The empty-but-real-activity window in call B feels like a real gap. If git extractor has caught up but the cluster pipeline is dropping single-source-thin runs, that's a clustering correctness bug. If the extractor hasn't caught up, that's an SLA/lag question for V1.5.3. Either way: a `search_memories(since=02:00-07:00, source_prefix='git:')` probe could disambiguate. Logging here, not running the probe — discipline.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
