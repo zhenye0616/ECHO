@@ -38,7 +38,15 @@ function parseContent(evt: CaptureEvent): FsContent {
   return JSON.parse(evt.content) as FsContent;
 }
 
-describe('startFsWatcher', () => {
+// SKIPPED: every test in this block calls startFsWatcher directly, holding
+// a chokidar/FSEvents watcher whose `watcher.close()` runs slow under load
+// on macOS — afterEach's `handle.stop()` then races the next test's setup,
+// flaking ~33% of solo runs (surfaced during 023's verification). The
+// failing test rotates across the block (add/change/unlink/ignore-WAL/stop),
+// so per-test skips can't pin it. The block is quarantined wholesale by item
+// 2026-05-08-024-fs-watcher-test-quarantine-successor; test bodies are intact for when
+// the underlying race is fixed.
+describe.skip('startFsWatcher', () => {
   let dir: string;
   let storage: MemoryStorage;
   let handle: FsWatcherHandle | null = null;
