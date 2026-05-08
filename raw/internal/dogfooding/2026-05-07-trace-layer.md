@@ -22,6 +22,7 @@ Copy this block when adding an entry. **All times are local (PDT, America/Los_An
 - **Trigger:** what I (or Cursor's Claude) just did that called the tool
 - **Query inputs:** since=…  until=…  artifact_hint=…
 - **Returned:** N clusters, M atoms; top cluster: "<label or none>"; rank_reasons: […]
+- **Sources:** source_breakdown={…} for trace; OR per-match source-prefix list for search; OR the specific jsonl/git/fs paths the atoms came from. Always shown — a reader must be able to tell which capture surfaces contributed and which were silently absent (source-volume bias and silent-omission are the most-recurring failure modes in this journal).
 - **Verdict:** ✅ right / 🟡 partial / ❌ wrong
 - **Note:** one-line observation — what felt right or off
 - **Conjecture:** (optional) what algorithm/config change might help
@@ -283,6 +284,52 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 - **Verdict:** partial.
 - **Note:** Claude's revised scope is directionally right, but one refinement remains: timestamp normalization at capture must either be centralized (pipeline/gate/storage append) or paired with a backfill/query hardening path for existing mixed-offset rows. Git-only future normalization will not repair existing stored `-07:00` rows or prevent another capture surface from reintroducing offset strings.
 - **Conjecture:** Acceptance for the reliability item should include an existing-row mixed timestamp regression: a `Z` window must retrieve stored git rows with `-07:00` timestamps, or the item must migrate/canonicalize those rows before relying on lexicographic storage comparisons.
+
+---
+
+#### 2026-05-08 01:11 PDT — Codex check: Claude applied spec review fixes
+
+- **Trigger:** founder said Claude had applied all fixes to the 022/023 specs and asked Codex to retrieve the interaction, then review against the codebase source of truth.
+- **Tool/input:** `search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=8)`
+- **Returned:** 8 matches. Newest useful conversational turn was at `2026-05-08T08:10:50.157Z`, session `3c98f080-b09d-4fff-8a35-ccc3fe232f4d`, `turn_index=2`. Claude reported commits `9ff7550` (rename only) and `be92b67` (actual content fixes), validator clean, and both 022/023 READY HIGH.
+- **Verdict:** right.
+- **Note:** Codebase verification matched Claude's summary: local HEAD is `be92b67`, working tree was clean before this journal entry, `python3 tools/blocked.py --validate` passed, and `tools/blocked.py --list-all` showed only 022/023 ready. Remaining issue is a minor stale phrase in 023's out-of-scope prose (`5 historical sections`) while acceptance/board now correctly say 6 and preserve the 014 carve-out.
+- **Conjecture:** Future spec-review fixes should run `rg` for stale phrasing after patching the exact acceptance lines; the validator catches ids, not prose drift.
+
+---
+
+#### 2026-05-08 01:03 PDT — Claude resume: where did I leave off after /clear
+
+- **Trigger:** founder cleared context to free the window and asked Claude to use ECHO to reconstruct where the prior session ended.
+- **Tool/input:**
+  1. `get_recent_work_context(limit=5, format="minimal")` (default 4h auto-window)
+  2. `get_recent_work_context(since="2026-05-07T16:00:00Z", until="2026-05-08T08:10:00Z", limit=8, format="minimal")`
+- **Returned:**
+  1. 1 cluster, 1 atom; top cluster anchored on session `c1dbc9c1-...` + repo Project_echo + `MEMORY.md`; `rank_reasons: ["recent_activity"]`. The atom was the very last assistant turn of the prior session (08:03:28 UTC).
+  2. 1 cluster, 2 atoms; same anchors plus an `unresolved_assistant_q` open-loop hint at 07:59:20 UTC, marked `resolved: true` with `resolved_by_atom_id` pointing to the 08:03:28 atom (R1.AQ working as designed).
+- **Sources:** source_breakdown `{ claude_code: 2 }` on the wider window. Notably absent: codex (Codex's parallel review session at 00:42–01:04 PDT had been actively writing rollouts in `~/.codex/sessions/2026/05/08/...` during this window, but the codex extractor surfaces those as raw fs-change events with no extracted message content — so the trace cluster missed them entirely). Git commits `fc59361` + `1435389` from the same window also absent — possibly Bug A's `-07:00` text-compare drop, possibly outside the 16h span window.
+- **Verdict:** 🟡 partial. Ranking and resolution heuristics correct; cross-source coverage failed silently (no warning that codex/git rows were missing despite being live in the same window).
+- **Note:** Was sufficient to reconstruct "the prior session ended on a commit-and-memory-save action," which was enough to answer the founder. But the absence of codex was load-bearing context the founder cared about — they had to follow up with "use echo to pull codex reply" because trace alone didn't surface it. Two-call pattern (broaden window → still misses codex) is exactly the symptom 022 Bug A + Bug C target. Confirmed with founder workflow, not just synthetic measurement.
+- **Conjecture:** When 022 ships, this exact query should return source_breakdown `{ claude_code: 2, codex: ≥1, git: ≥2 }`. Acceptance gate: re-run this entry's two calls post-merge and assert all three sources surface.
+
+---
+
+#### 2026-05-08 01:04 PDT — Claude lookup: pull Codex's spec review reply
+
+- **Trigger:** founder said Codex had finished its review of specs 022/023 and asked Claude to pull Codex's reply via ECHO so the review could be acted on.
+- **Tool/input:**
+  1. `search_memories(query="spec review 022 023 V1.5.2 chokidar", source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T07:00:00Z", limit=10)`
+  2. `search_memories(query="codex", source_prefix="fs:", since="2026-05-08T07:30:00Z", limit=15)`
+- **Returned:**
+  1. 0 matches.
+  2. 15 matches. Of those: 14 raw fs-change events under `fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-...jsonl` (each one a `{event_type:"change", path, mtime, size}` payload, no message content); 1 conversation atom under `fs:/Users/zhenye/.claude/projects/...jsonl` (Claude's own session). Zero atoms with extracted Codex message text.
+- **Sources:** match-by-match:
+  - 14 × `fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-41-29-019e0688-...jsonl` (raw fs-change metadata only, no extractor)
+  - 1 × `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-...jsonl` (claude-code extractor, this session's first turn)
+  - **Codex extractor: 0 atoms.** The `.codex/` rollout JSONL was being actively written every ~3s during the query window (sizes growing from 1.21MB → 1.24MB across the 14 fs-change events in the result set), but no Codex extractor turned those file-mtime ticks into searchable message content.
+- **Verdict:** ❌ wrong. The query couldn't fulfill its purpose via ECHO — to actually read Codex's review I had to `Bash` the rollout JSONL directly with a Python parser (extracting `event_msg.payload.type=="agent_message"` records). ECHO returned only the existence of the file, not what's in it.
+- **Note:** This is the cleanest reproduction yet of the asymmetry: Claude Code has a working extractor (cross-AI memory works in one direction); Codex does not (cross-AI memory does NOT work in the other direction). Bug C in 022 addresses the noise-pollution side of this — filtering raw fs-watcher events out of trace input — but it does NOT add a Codex extractor; the gap remains. This is also why my 01:03 trace entry's source_breakdown showed `{ claude_code: 2 }` and not `{ claude_code: 2, codex: ≥1 }`: the codex extractor doesn't exist, so the raw fs-change events are the only codex-prefix evidence in storage and they're unindexed for content.
+- **Conjecture (new — promote to backlog candidate):** A Codex extractor is its own item, not subsumed by 022 or 023. The Codex JSONL schema is already known (the same parser I wrote in Bash today: extract `event_msg` records where `payload.type=="agent_message"` for assistant turns and `response_item` records where `payload.type=="message" && payload.role=="user"` for user turns). Estimate: same shape as Claude Code extractor. Without it, the V1 hotkey overlay's "what is anyone working on" promise is structurally false for any Codex-using founder workflow. Surface as a V1.5.2-or-V1.5.3 candidate item after 022/023 ship.
 
 ---
 
