@@ -543,6 +543,24 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 - **Verdict:** ❌ wrong.
 - **Note:** The narrower, extractor-aligned prefix did not change the failure mode. Spec evaluation proceeded from repo-grounded artifacts already recovered by direct reads.
 
+#### 2026-05-08 14:14 PDT — Codex tries to retrieve Claude bypass deep dive
+
+- **Trigger:** founder asked Codex to review Claude's most recent deep dive on why Claude bypassed ECHO and read Codex session JSONL directly, then validate Claude's proposed optimization follow-ups.
+- **Query inputs:** `search_memories(query="bypass ECHO", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=10)`.
+- **Returned:** no usable payload. Same Codex MCP connector error: `Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`.
+- **Sources:** intended source was Claude Code project JSONL under `fs:/Users/zhenye/.claude/projects/`; no rows returned. Recovery path was direct inspection of the current Claude project JSONL, specifically `72c1a494-9d45-418c-8520-34069d1ff017.jsonl` line 354, plus repo reads of MCP server/tool code and journal entries.
+- **Verdict:** ❌ wrong.
+- **Note:** This is now a direct reproduction of the bypass topic itself: Codex could not use ECHO to retrieve Claude's analysis of ECHO bypassing, so the review had to start from source files.
+
+#### 2026-05-08 14:22 PDT — Codex minimal transport reproduction for 027
+
+- **Trigger:** founder asked Codex to investigate the root cause of the Codex ECHO MCP failure before writing a builder-ready 027 spec.
+- **Query inputs:** `echo_ping(message="codex transport root cause investigation for spec 027")`; direct curl initialize to `POST http://127.0.0.1:38478/mcp`; direct curl stale-header `tools/call echo_ping` with `Mcp-Session-Id: stale-codex-session`; `./tools/mcp-integration-smoke.sh` against the live daemon.
+- **Returned:** MCP tool call returned no usable payload: `Transport send error ... WorkerTransport<...StreamableHttpClientWorker<codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter>> ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`. Direct fresh curl initialize returned HTTP 200 SSE with a valid initialize result and new `mcp-session-id`. Direct stale-header curl returned HTTP 400 with ECHO's custom `Bad Request: no active session` body. Escalated live smoke passed all checks: tools/list, `search_memories`, `get_recent_work_context`, edge check, cross-gap check, git timestamp check.
+- **Sources:** live `echo` MCP daemon at `127.0.0.1:38478/mcp`; Codex log `~/.codex/log/codex-tui.log`; ECHO launchd logs `~/Library/Logs/echo/daemon.out.log`; repo code `src/mcp/server.ts`; SDK StreamableHTTP docs/types under `node_modules/@modelcontextprotocol/sdk/dist/esm/server`.
+- **Verdict:** 🟡 partial — the direct transport works for fresh clients, but Codex's long-lived session fails after daemon restart.
+- **Note:** Root-cause timeline: current Codex session initialized at 20:09 UTC and made successful ECHO calls around 20:12 UTC; ECHO daemon restarted at 20:22:11 UTC; Codex calls from 20:22:20 UTC onward fail while reusing the stale MCP session. The bug is process-local stateful StreamableHTTP sessions plus an unfriendly stale-session router branch, not payload size or tool-specific handler logic.
+
 ---
 
 ## Aggregated learnings (filled at end of window)
