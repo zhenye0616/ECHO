@@ -1,4 +1,8 @@
-import type { NormalizedContextEvent } from '../../../src/normalize/types.js';
+import type {
+  ActorRef,
+  NormalizedContextEvent,
+  ObservedState,
+} from '../../../src/normalize/types.js';
 
 export interface AtomSpec {
   id: string;
@@ -10,6 +14,8 @@ export interface AtomSpec {
   input?: string;
   output?: string;
   hints?: string[];
+  actors?: ActorRef[];
+  state?: ObservedState;
 }
 
 export function makeAtom(spec: AtomSpec): NormalizedContextEvent {
@@ -18,7 +24,7 @@ export function makeAtom(spec: AtomSpec): NormalizedContextEvent {
     id: spec.id,
     time: { occurred_at: spec.occurred_at },
     source: { app: spec.app, raw_pointer: `fs:fixture/${spec.id}` },
-    actors: [{ role: 'user' }],
+    actors: spec.actors ?? [{ role: 'user' }],
     action: {
       kind: spec.kind ?? 'message',
     },
@@ -40,5 +46,6 @@ export function makeAtom(spec: AtomSpec): NormalizedContextEvent {
   if (spec.hints !== undefined && spec.hints.length > 0) {
     out.open_loop_hints = spec.hints;
   }
+  if (spec.state !== undefined) out.state = spec.state;
   return out;
 }

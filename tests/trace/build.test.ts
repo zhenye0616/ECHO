@@ -462,4 +462,89 @@ describe('buildRecentWorkContext', () => {
       expect(r.query.format).toBe('minimal');
     });
   });
+
+  describe('V1 trace patch — open-loop resolution heuristics (item 020)', () => {
+    it('enriched hints in cluster.open_loop_hints[] carry resolved + resolved_by_atom_id fields', () => {
+      const { events, normalize } = asCapture([
+        {
+          id: 'evt_q',
+          app: 'claude_code',
+          occurred_at: '2026-05-06T08:00:00.000Z',
+          artifacts: [
+            { provider: 'local_fs', type: 'file', id: 'r::x.ts' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+          input: 'should I refactor it?',
+          output: '',
+          hints: ['ends_with_question'],
+        },
+        {
+          id: 'evt_ans',
+          app: 'claude_code',
+          occurred_at: '2026-05-06T08:01:00.000Z',
+          artifacts: [
+            { provider: 'local_fs', type: 'file', id: 'r::x.ts' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+          input: 'sure go ahead',
+          output: 'will do.',
+        },
+      ]);
+      const r = buildRecentWorkContext(events, QUERY, normalize);
+      expect(r.clusters).toHaveLength(1);
+      const hints = r.clusters[0]!.open_loop_hints;
+      expect(hints).toHaveLength(1);
+      expect(hints[0]!.resolved).toBe(true);
+      expect(hints[0]!.resolved_by_atom_id).toBe('evt_ans');
+    });
+
+    it('at least one resolved hint and one unresolved hint coexist in the same cluster on a fixture mixing closed and open loops', () => {
+      const { events, normalize } = asCapture([
+        // Closed loop: question + later non-question reply, same conversation.
+        {
+          id: 'evt_q_closed',
+          app: 'claude_code',
+          occurred_at: '2026-05-06T08:00:00.000Z',
+          artifacts: [
+            { provider: 'local_fs', type: 'file', id: 'r::shared.ts' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+          input: 'should I refactor it?',
+          output: '',
+          hints: ['ends_with_question'],
+        },
+        {
+          id: 'evt_ans_closed',
+          app: 'claude_code',
+          occurred_at: '2026-05-06T08:01:00.000Z',
+          artifacts: [
+            { provider: 'local_fs', type: 'file', id: 'r::shared.ts' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+          input: 'yes go ahead',
+          output: 'will do.',
+        },
+        // Open loop: explicit_followup, never resolves per R1.FU.
+        {
+          id: 'evt_open_fu',
+          app: 'claude_code',
+          occurred_at: '2026-05-06T08:02:00.000Z',
+          artifacts: [
+            { provider: 'local_fs', type: 'file', id: 'r::shared.ts' },
+            { provider: 'claude_code', type: 'conversation', id: 'claude_code:s1' },
+          ],
+          input: 'we will follow up next week',
+          output: '',
+          hints: ['explicit_followup'],
+        },
+      ]);
+      const r = buildRecentWorkContext(events, QUERY, normalize);
+      expect(r.clusters).toHaveLength(1);
+      const hints = r.clusters[0]!.open_loop_hints;
+      const closed = hints.filter((h) => h.resolved);
+      const open = hints.filter((h) => !h.resolved);
+      expect(closed.length).toBeGreaterThanOrEqual(1);
+      expect(open.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

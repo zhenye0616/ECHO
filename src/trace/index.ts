@@ -84,18 +84,32 @@ export function buildRecentWorkContext(
   const atomsById = new Map(atoms.map((a) => [a.id, a]));
   const atomsTotalInWindow = atoms.length;
 
-  // 2. Graph + components
+  // 2. Compute open-loop hints once, before clustering — resolution scans
+  //    over the full sorted atom list so the result is cluster-agnostic.
+  //    Hints are then filtered per-cluster by atom membership.
+  const sortedAtoms = [...atoms].sort(compareByOccurredAt);
+  const allHints = enrichHints(sortedAtoms);
+  const hintsByAtomId = new Map<string, typeof allHints>();
+  for (const h of allHints) {
+    const arr = hintsByAtomId.get(h.atom_id);
+    if (arr === undefined) hintsByAtomId.set(h.atom_id, [h]);
+    else arr.push(h);
+  }
+
+  // 3. Graph + components
   const graph = buildGraph(atoms, windowHours);
   const rawClusters = connectedComponents(graph);
 
-  // 3. Compute cluster fields
+  // 4. Compute cluster fields
   let clusters: Cluster[] = rawClusters.map((rc) => {
     const clusterAtoms = rc.atom_ids
       .map((id) => atomsById.get(id))
       .filter((a): a is NormalizedContextEvent => a !== undefined);
     const cluster_id = makeClusterId(rc.atom_ids);
     const label = heuristicLabel(clusterAtoms);
-    const open_loop_hints = enrichHints(clusterAtoms);
+    const open_loop_hints = rc.atom_ids.flatMap(
+      (id) => hintsByAtomId.get(id) ?? [],
+    );
     const anchor_artifacts = topArtifacts(clusterAtoms, 3);
     const source_breakdown = countByApp(clusterAtoms);
     const time_range = computeTimeRange(clusterAtoms);
@@ -118,7 +132,7 @@ export function buildRecentWorkContext(
     return cluster;
   });
 
-  // 4. Filter by artifact_hint if provided
+  // 5. Filter by artifact_hint if provided
   if (query.artifact_hint !== undefined) {
     const hintKey = `${query.artifact_hint.provider}:${query.artifact_hint.type}:${query.artifact_hint.id}`;
     clusters = clusters.filter((c) => {
@@ -131,7 +145,7 @@ export function buildRecentWorkContext(
     });
   }
 
-  // 5. Rank
+  // 6. Rank
   clusters = rankClusters(clusters, atomsById, query);
   clusters.forEach((c, i) => {
     c.rank = i + 1;
@@ -140,10 +154,10 @@ export function buildRecentWorkContext(
 
   const clustersTotal = clusters.length;
 
-  // 6. Truncate by atom limit (lowest-rank cluster atoms drop first)
+  // 7. Truncate by atom limit (lowest-rank cluster atoms drop first)
   const truncated = truncate(clusters, atomsById, limit);
 
-  // 7. Build atoms map (only those still referenced)
+  // 8. Build atoms map (only those still referenced)
   const atomsMap: Record<string, NormalizedContextEvent> = {};
   for (const c of truncated.clusters) {
     for (const id of c.atom_ids) {
@@ -183,6 +197,17 @@ function buildWarnings(errCounts: Map<string, number>): string[] {
     );
   }
   return out;
+}
+
+function compareByOccurredAt(
+  a: NormalizedContextEvent,
+  b: NormalizedContextEvent,
+): number {
+  const ta = a.time.occurred_at;
+  const tb = b.time.occurred_at;
+  if (ta < tb) return -1;
+  if (ta > tb) return 1;
+  return 0;
 }
 
 function makeClusterId(atomIds: string[]): string {

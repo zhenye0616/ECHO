@@ -49,6 +49,8 @@ export interface OpenLoopHintEnriched {
   kind: OpenLoopHintKind;
   text: string;
   confidence: Confidence;
+  resolved: boolean;
+  resolved_by_atom_id?: string;
 }
 
 export interface Cluster {
