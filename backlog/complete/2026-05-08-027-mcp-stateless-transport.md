@@ -27,7 +27,25 @@ agent_notes: |
   no mcp-session-id; POST with arbitrary stale session header returns 200 with
   pong:true; GET/DELETE return 405 + Allow: POST. All acceptance criteria met.
   Branch agent/mcp-stateless-transport pushed at cbcf79e.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation (auto-mode).
+
+  Conflicts resolved:
+  - (none — clean --no-ff merge; sidecar predicted no conflicts and none materialized)
+
+  Fixups applied:
+  - (none — sidecar verdict was "merge as-is" with empty pre-merge punch list)
+
+  Fixups deferred to follow-up items:
+  - (none)
+
+  Verify post-merge: 494/494 tests pass (21 skipped); `npm run lint` clean; `npm run typecheck` clean. `tests/mcp/server.test.ts` 12/12 including the five new stateless regression tests (stale Mcp-Session-Id → 200; raw HTTP initialize → application/json with no mcp-session-id; GET /mcp → 405 + Allow: POST + JSON-RPC error body; DELETE /mcp same; advertised URL pinned to http://127.0.0.1:<port>/mcp).
+
+  Follow-up items (non-blocking, queued to backlog/_followups.md):
+  - Confirm raw/internal/agent-runs/2026-05-08-027-mcp-stateless-transport.md exists with the root-cause timeline (Codex success at 20:12 UTC → ECHO daemon restart at 20:22:11 UTC → Codex failures from 20:22:20 UTC) and before/after wire examples for stale Mcp-Session-Id. If absent, append post-merge.
+  - One-time manual ./tools/mcp-integration-smoke.sh against a launchd-cycled daemon to close the dogfooding loop.
+  - Strategist post-merge promotion (per item's "After Completion" section): update wiki/surfaces/mcp-server.md to document V1 MCP as stateless JSON-response StreamableHTTP that survives daemon restart without client reconnect.
+  - Re-run a fresh Codex session through the daemon-restart cycle (echo_ping → restart daemon → echo_ping again) and log to the dogfooding journal as the real-world validation of the fix.
 spec_refs:
   - src/mcp/server.ts
   - tests/mcp/server.test.ts
