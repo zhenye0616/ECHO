@@ -440,6 +440,25 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 12:08 PDT — Disambiguation probe: search_memories drops timezone offset on `since`/`until`
+
+- **Trigger:** founder said "c then b do it back to back" — running the disambiguating `search_memories` probe to decide whether call B's empty result was extractor-lag vs clustering-pipeline.
+- **Query inputs:** `search_memories` since=2026-05-08T02:00:00-07:00 until=2026-05-08T08:30:00-07:00 source_prefix=`git:` limit=20.
+- **Returned:** 20 git matches — but the time range of returned matches was UTC 06:35:50Z (oldest) → UTC 08:29:42Z (newest). Result body was 423K chars (overflow → spilled to tool-results file). `query_echo` reflected the request unchanged: `since: "2026-05-08T02:00:00-07:00"` and `until: "2026-05-08T08:30:00-07:00"`.
+- **Sources:** git (20) — `source: "git:/Users/zhenye/Desktop/Project_echo"`. SHAs `2830bda` → `de39ce1` (all from May 7 PDT 23:35 → May 8 PDT 01:29). The 4 SHAs I expected (`b6005bd` 02:05 PDT / `5f47d1e` 02:13 / `46cf180` 02:17 / `0a2e6ca` 02:20) were **NOT** in the result (`grep -c <sha>` = 0 for all 4).
+- **Verdict:** ❌ wrong — but the wrongness is structurally informative.
+- **Note:**
+  1. **Search clipped at UTC 08:30 even though I passed `until=08:30-07:00` (= UTC 15:30).** PDT-offset is being silently stripped — the offset on `since`/`until` is parsed as if the value were a UTC literal. Equivalent for `since`: `02:00-07:00` (= UTC 09:00) became UTC 02:00 floor. So the effective window was UTC 02:00 → UTC 08:30, missing the 4 commits at UTC 09:05–09:20 entirely.
+  2. **Settles call B's mystery: it's not extractor lag.** The 4 commits ARE in storage (`git log` confirms locally; search would have returned them under a properly-parsed window). The 0-result was the same TZ-offset bug, manifesting in the trace pipeline's own (since, until) interpretation — both `search_memories` and `get_recent_work_context` likely share the same parse path.
+  3. **Schema docstring already warns about this** but for the *naive* case ("naive ISO strings are parsed as local server time"). My input was an *explicit-offset* string, exactly the case the docstring says is supposed to work. So the bug is one layer deeper — explicit offset is being parsed and then *discarded* before the storage WHERE clause, not "missing TZ defaults to local."
+  4. **Symmetry to the bug 022 fixed.** 022 fixed text-compare WHERE drops on `-07:00`-stamped git rows (storage write-side TZ). This is the read-side mirror: `since`/`until` arguments to MCP tools are also being TZ-stripped before reaching the WHERE clause. Both would be invisible without explicit cross-checking against `git log`. The Sources field of the journal is the only thing that surfaces this — without the per-call source attribution, "ECHO returned 0 atoms" reads as "you didn't do anything" instead of "the search was looking at the wrong window."
+  5. **Confidence the four atoms exist in trace's input set is high** — they show up in call A's cluster (`b6005bd` → `0a2e6ca` are commits in the time_range UTC 07:03–08:59 on call A, which were correctly picked up because call A's UTC-stripped window 00:00 → 09:00 happens to include them).
+- **Conjecture (observation only — for end-of-window backlog synthesis, not for fixing here):**
+  - V1.5.3 candidate: audit MCP tool input-parameter parsing for `since`/`until` (both `search_memories` and `get_recent_work_context` and any future TZ-aware filter). Likely fix surface is the `parseTimeArg` (or equivalent) shared helper. Test: round-trip `02:00-07:00` and assert `parsed === 09:00Z`. The bug fits the V1.5.2 reliability theme but was specifically out-of-scope for 022 (read-side, not write-side).
+  - Severity: silent under-counting of work near UTC midnight boundaries. Anyone in PDT/PST/CET/IST etc. asking about "this morning" / "yesterday afternoon" loses ~7h of activity at the window edge.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
