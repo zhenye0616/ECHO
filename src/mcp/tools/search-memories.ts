@@ -8,7 +8,6 @@ export const SEARCH_MEMORIES_DESCRIPTION =
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
-export const MAX_OVERFETCH = 200;
 
 // Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?
 const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
@@ -20,9 +19,8 @@ const isoString = z
 // Logical app names → literal FS source prefixes. Keep in sync with
 // src/capture/sources.ts (CAPTURED_SOURCES.fs_paths) and the per-app extractors.
 // `git` is path-prefix `git:` because git commits are stored with that scheme,
-// not under any homedir path. The mapping is built at registration time using
-// os.homedir() so test environments and production resolve correctly.
-function buildSourceAppMap(): Record<'cursor' | 'claude_code' | 'codex' | 'git', string> {
+// not under any homedir path. Resolved once at module load using os.homedir().
+const SOURCE_APP_MAP: Record<'cursor' | 'claude_code' | 'codex' | 'git', string> = (() => {
   const HOME = homedir();
   return {
     cursor: `fs:${HOME}/Library/Application Support/Cursor/`,
@@ -30,7 +28,7 @@ function buildSourceAppMap(): Record<'cursor' | 'claude_code' | 'codex' | 'git',
     codex: `fs:${HOME}/.codex/sessions/`,
     git: 'git:',
   };
-}
+})();
 
 const SOURCE_APP_VALUES = ['cursor', 'claude_code', 'codex', 'git'] as const;
 type SourceApp = (typeof SOURCE_APP_VALUES)[number];
@@ -164,7 +162,7 @@ export async function searchMemories(
   // are echoed in query_echo so callers can see which one ended up applied.
   let effectivePrefix: string | undefined = source_prefix;
   if (effectivePrefix === undefined && source_app !== undefined) {
-    effectivePrefix = buildSourceAppMap()[source_app];
+    effectivePrefix = SOURCE_APP_MAP[source_app];
   }
 
   let before: { timestamp: string; id: string } | undefined;

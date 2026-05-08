@@ -46,7 +46,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 # --- 1. Reachability ----------------------------------------------------------
 
-if ! curl -sS --connect-timeout 2 -o /dev/null -w '' \
+if ! curl -fsS --connect-timeout 2 -o /dev/null -w '' \
     -X POST "$URL" \
     -H "Accept: $ACCEPT" \
     -H "Content-Type: application/json" \

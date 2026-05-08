@@ -226,19 +226,27 @@ async function discoverLastSeen(
   repo: string,
   storage: Storage,
 ): Promise<string | undefined> {
+  // Walk git log from HEAD backwards, return the first SHA that's already in
+  // storage. This is deterministic regardless of storage's timestamp tie-break:
+  // event ids are uuids and don't reflect git chronology on same-second commits,
+  // so the prior storage-only resolution would re-emit prior commits as
+  // duplicates after restart whenever two commits shared an author timestamp.
   const events = await storage.query({ source: `git:${repo}` });
   if (events.length === 0) return undefined;
-  let latestTs = '';
-  let latestSha: string | undefined;
+  const stored = new Set<string>();
   for (const evt of events) {
-    if (evt.timestamp >= latestTs) {
-      latestTs = evt.timestamp;
-      const meta = evt.metadata as Record<string, unknown> | undefined;
-      const sha = meta?.['sha'];
-      if (typeof sha === 'string') latestSha = sha;
-    }
+    const meta = evt.metadata as Record<string, unknown> | undefined;
+    const sha = meta?.['sha'];
+    if (typeof sha === 'string') stored.add(sha);
   }
-  return latestSha;
+  if (stored.size === 0) return undefined;
+  const log = await git(['log', '--format=%H'], repo);
+  if (log === null) return undefined;
+  for (const sha of log.split('\n')) {
+    const trimmed = sha.trim();
+    if (trimmed.length > 0 && stored.has(trimmed)) return trimmed;
+  }
+  return undefined;
 }
 
 export interface GitWatcherHandle {

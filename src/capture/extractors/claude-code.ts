@@ -218,7 +218,11 @@ function parseLine(line: string): ParsedLine | null {
   let raw: unknown;
   try {
     raw = JSON.parse(line);
-  } catch {
+  } catch (err) {
+    log.warn('parse_failed', {
+      preview: line.slice(0, 120),
+      message: (err as Error).message,
+    });
     return null;
   }
   if (typeof raw !== 'object' || raw === null) return null;

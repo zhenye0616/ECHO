@@ -56,23 +56,6 @@ async function waitForCount(
   throw new Error(`storage count never reached ${target}; current=${got}`);
 }
 
-async function waitForSha(
-  storage: MemoryStorage,
-  repo: string,
-  sha: string,
-  timeoutMs = 8000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const events = await storage.query({ source: `git:${repo}` });
-    if (events.some((e) => (e.metadata as Record<string, unknown>)['sha'] === sha)) {
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error(`sha ${sha} never landed in storage`);
-}
-
 function pushAllowedRepo(repo: string): () => void {
   const repos = CAPTURED_SOURCES.git_repos as unknown as string[];
   repos.push(repo);
@@ -199,25 +182,16 @@ describe('startGitWatcher', () => {
     const h2 = await startGitWatcher([repo], storage, { enableFsWatch: false });
     handles.push(h2);
 
-    // Item 025: storage's new deterministic id-DESC tie-break on same-second
-    // author timestamps surfaces a latent ambiguity in the watcher's
-    // `discoverLastSeen` — it picks the last-iterated max-timestamp SHA,
-    // which is now id-ASC-smallest among ties (random UUID), not necessarily
-    // sha3. As a result, the watcher may re-emit some prior commits as
-    // "new". Wait until sha5 (the actual head) lands in storage rather than
-    // counting events; on a misidentified lastSeen the count climbs past 5.
-    await waitForSha(storage, repo, sha5, 5000);
+    await waitForCount(storage, 5);
     const events = await storage.query({ source: `git:${repo}`, order: 'asc' });
-    const allShas = new Set(
-      events.map((e) => (e.metadata as Record<string, unknown>)['sha']),
-    );
-    // Core resumption contract: both new commits must land in storage.
-    expect(allShas.has(sha4)).toBe(true);
-    expect(allShas.has(sha5)).toBe(true);
-    // Originals must still be present.
-    expect(allShas.has(sha1)).toBe(true);
-    expect(allShas.has(sha2)).toBe(true);
-    expect(allShas.has(sha3)).toBe(true);
+    // discoverLastSeen walks `git log` and intersects with stored SHAs, so
+    // resumption is exactly "the 2 new commits added": no duplicates of the
+    // first-boot trio. Length + set-membership is the strict contract; capture
+    // order across same-second commits is not asserted (commits in this test
+    // complete within one author-second and share a tied timestamp).
+    expect(events).toHaveLength(5);
+    const shas = events.map((e) => (e.metadata as Record<string, unknown>)['sha']);
+    expect(new Set(shas)).toEqual(new Set([sha1, sha2, sha3, sha4, sha5]));
   });
 
   it('polling fallback catches commits when fs watching is disabled', async () => {

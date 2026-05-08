@@ -241,7 +241,7 @@ describe('searchMemories (pure handler)', () => {
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/NOT a semantic/);
   });
 
-  it('overfetch caps to MAX_OVERFETCH (200) — large dataset still gives DESC top-N', async () => {
+  it('recency-only path returns DESC top-N regardless of fixture size', async () => {
     const big = new MemoryStorage();
     // 250 events spanning 250 minutes; the most-recent 50 should win for a limit=50 query.
     for (let i = 0; i < 250; i++) {
