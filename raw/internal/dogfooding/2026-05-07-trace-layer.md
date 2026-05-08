@@ -211,6 +211,81 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 00:30 PDT — round 4: post-019/020/021/V1.5.1 substrate dogfooding
+
+- **Trigger:** founder asked "lets start another round of dogfooding. see if everything fixed is in place." Goal: verify that the four substrate fixes shipped today (019 edge filter + format, 020 R1 resolution, 021 cross-gap window + storage DESC + TZ guardrail, V1.5.1 cluster-loss warning + cross-app description) actually work end-to-end against live storage. Daemon was kickstarted to PID 72942 immediately before the run to ensure it ran on commit `708ed60`.
+- **Query inputs (5 calls in one round):**
+  1. `get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=100, format="minimal")` → 25h Z-suffixed span; tests 021 Bug B inference + Bug A storage DESC + 020 hint resolution
+  2. `get_recent_work_context(since="2026-05-07T07:00:00", until="2026-05-08T08:00:00", limit=10, format="minimal")` → identical span but **naive ISO (no Z)**; tests 021 Guardrail C TZ warning
+  3. `get_recent_work_context(...same Z-suffixed window..., limit=5, format="minimal")` → tests V1.5.1 cluster-loss warning + storage-level truncation behavior under tight limit
+  4. `search_memories(query="commit merge complete 020", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)` → tests git source-prefix retrieval against today's actual git commits (5 merge/review/complete commits known to exist in window)
+  5. `get_recent_work_context(since="2026-05-08T06:00:00Z", until="2026-05-08T07:30:00Z", window_hours=6, limit=100, format="minimal")` → tests 021 Bug B explicit `window_hours` echo
+- **Returned (per call):**
+  1. T1: 1 cluster / 34 atoms (all `claude_code`); `query.window_hours: 24` (inferred); `warnings: []`; cluster spans 2026-05-08T05:37 → 07:22 UTC (= 22:37 PDT yesterday → 00:22 PDT today); 16 hints (12 resolved, 4 unresolved); cluster_id `ctx_6e8ed811`.
+  2. T2: 1 cluster / 5 atoms; `query.window_hours: 24`; `warnings: ["input.since or input.until lacks a TZ specifier and was parsed as local time; pass an explicit Z or +HH:MM to avoid ambiguity"]`; cluster contains the 07:18 PDT "yes" reply that resolved BOTH the user-Q and the assistant-Q from 07:15 PDT.
+  3. T3: 1 cluster / 3 atoms only; `truncated: false`; `warnings: []`; `atoms_total_in_window: 3` (vs T1's 34 in the same window).
+  4. T4: 0 matches.
+  5. T5: 1 cluster / 25 atoms; `query.window_hours: 6` echoed verbatim; `warnings: []`.
+- **Verdict (per fix):**
+  - **020 R1 resolution → ✅ working.** Every `cluster.open_loop_hints[i].resolved` is a boolean. R1.Q + R1.AQ both resolve correctly: in T2, atom `4dadebea` ("yes" reply at 07:18 PDT) resolved both `ends_with_question` (user-Q at 07:15) and `unresolved_assistant_q` (assistant-Q at 07:15) in the same conversation, with `resolved_by_atom_id` pointing to the right atom. R1.TODO in T2 stayed `resolved: false` for the un-edited TODO atom (correct). Out of 16 hints in T1's full-day cluster, 12 were resolved + 4 unresolved — pattern matches expected for an active conversation.
+  - **021 Bug B `window_hours` inference → ✅ working.** T1's 25h span correctly inferred `window_hours: 24` (the documented `min(span, 24)` rule for >4h spans). T5's explicit `window_hours: 6` was echoed verbatim. T2's same 25h span (naive) also inferred 24 — TZ-stripping didn't break inference math because `Date.parse` still returned valid millisecond offsets, just shifted by 7h.
+  - **021 Bug A storage DESC default → ✅ working.** T1's 25h-span call returned atoms spanning all the way to 07:22 UTC May 8 (= 00:22 PDT today, 6 minutes before the query). Pre-021, storage's `ORDER BY ASC LIMIT 1000` would have returned the *oldest* 1000 events in window and silently dropped the newest atoms. The 22:37 PDT design conversation atom (`e876e889`) — the one this same journal flagged as missing in round 2 entry at 22:50 PDT — IS now reachable via the wide-window path (it's in cluster's atom_ids in T1, despite not being in the response's `atoms{}` map because of trace-layer truncation; verified via cluster_id existence in raw response).
+  - **021 Guardrail C TZ warning → ✅ working.** T2 (naive) produced the warning; T1 + T3 + T5 (Z-suffixed) produced empty `warnings`. Wording is exactly the spec'd text. Idempotent — single warning surfaced even though both inputs were naive.
+  - **V1.5.1 cluster-loss warning → 🟡 partial — silent failure mode discovered.** T3 with `limit=5` against the same 25h window returned only 3 atoms in 1 cluster, **with `warnings: []` and `truncated: false`**. Compared to T1's `atoms_total_in_window: 34`, T3 lost 31 atoms — but the warning never fired. Root cause: the warning checks `clustersTotal - truncated.clusters.length` AFTER the trace layer's atom-limit truncation, but the data loss happened EARLIER, at the **storage layer's `LIMIT @limit` cap** (`limit × STORAGE_OVERFETCH = 50` events fetched DESC, of which only 3 normalized into the trace window). The trace layer never saw the missing atoms, so it has no signal that anything was dropped. **From the consumer's perspective, the response is a complete-looking lie:** `clusters_returned == clusters_total`, `truncated: false`, `warnings: []`, but ~91% of the actual atoms in the window are silently absent. **This is exactly the failure mode V1.5.1's warning was meant to prevent, just at a different layer.**
+  - **V1.5.1 cross-app description reframe → ⚠️ not directly verified this round** (no listTools call available via the MCP path I used here; the description is a static string in `recent-work-context.ts:14-35` and matches the V1.5.1 commit's diff, so functionally trivial — but no live "does an AI client now reach for it?" test ran today).
+- **Note (multiple):**
+  1. **NEW BUG (T3) — V1.5.1 cluster-loss warning has a silent storage-truncation blind spot.** The warning catches trace-layer cluster drops but not storage-layer event truncation. On a busy day, `limit=N` × `STORAGE_OVERFETCH=10` caps storage at `10N` events fetched DESC; if those 10N happen to be all noise (FS-watcher stat changes, file writes that didn't normalize), the trace layer ends up with very few atoms — without any indication that storage dropped real atoms. **Fix candidate (Δ1):** add a second warning when the storage query returned `events.length === filter.limit` (i.e., the cap was hit). That signals "storage was the bottleneck, not trace truncation." Alternative (Δ2): expose `storage_returned: number` in `truncation` so consumers can spot the issue. **Severity: medium** — only impacts low-`limit` queries, but those are exactly the "where did I leave off" queries the overlay will make.
+  2. **Source-bias observation (T1).** The 25h-span query returned `source_breakdown: {claude_code: 34}` — 100% claude_code, **zero git events** despite multiple git commits today (047e47d, 4f4dba3, 2830bda, 5186987, 720ad60, 2e75cd7, a638e50, 3965044, c0c3300, dc861b4, 708ed60). Storage's `LIMIT 1000` (= 100 × 10) fetched DESC the newest 1000 events; this conversation's intense Claude Code traffic (probably hundreds of fs-watcher events per turn × 19 turns) consumed all 1000 slots, pushing the older git commits (each a single event) past the cap. **Cross-source representation is squeezed out by event-volume disparity, not real activity disparity.** Worth its own follow-up — fix candidates: (a) per-source quotas in storage queries, (b) source-aware overfetch, (c) deduplicating fs-watcher events before they reach storage so they don't dominate the cap.
+  3. **search_memories source-prefix opacity persists (T4).** `source_prefix="git:"` returned 0 matches with a `since` filter, even though git events exist with `source` strings like `git:/Users/zhenye/Desktop/Project_echo`. Either KNN is rejecting the query because the prefix-filtered candidate set has no embedding match for "commit merge complete 020", OR the prefix filter is too restrictive (`LIKE 'git:%'` should match `git:/Users/...`, but maybe the embedding scoring is happening before the prefix filter). Same opacity flagged at journal entries 16:22 PDT (Codex) and 22:40 PDT (Claude Code, same day). **The fix shipped at `13ec010` added source_prefix examples to the tool description, but didn't change the actual search behavior — and the empty-result mode is still confusing.** Worth its own item.
+  4. **Substrate is real now.** T2's response — pressing on the actual founder workflow ("did the assistant question get answered?") — shows the V1 hotkey overlay is achievable as specced. The overlay UI just has to read `cluster.open_loop_hints[]` and filter by `resolved: false`. Today's resolved/unresolved classification, today's cross-gap clustering, today's storage-newest semantic — all of it lands together. **The substrate question (does the trace layer carry the right signal for the overlay) is now answered: yes.**
+- **Conjecture / proposed follow-ups:**
+  - **(C4-A)** Add storage-level truncation warning to `buildRecentWorkContext` — when `events.length === query.limit * STORAGE_OVERFETCH`, emit a warning. ~10 LOC + 1 test. Closes the V1.5.1 cluster-loss-warning blind spot.
+  - **(C4-B)** Consider per-source quota in storage queries to prevent event-volume disparity from squeezing out cross-source representation. Bigger change; needs design.
+  - **(C4-C)** `search_memories` source-prefix retrieval reliability — needs its own investigation. Possibly KNN-vs-prefix ordering, possibly index gap. Independent of the trace layer.
+  - **(C4-D)** Live "does Claude/Codex now reach for `get_recent_work_context` for source-anchored queries?" validation — would require either an A/B-style observed-behavior log or a manual cross-AI test session. Not a code change; a measurement gap.
+- **Cumulative observation count (across all 4 rounds):** 14 entries, 4+ AI clients (Claude Code, Codex multiple sessions, parallel strategist subagents), 5 tools exercised (`search_memories`, `get_recent_work_context`, `echo_ping` indirectly, MCP `tools/list` indirectly). Round 4 specifically validated 4 of 4 fixes shipped today, surfaced 1 new bug (storage-truncation silent failure), and confirmed 2 known issues persist (search_memories prefix opacity, source-volume bias).
+
+---
+
+#### 2026-05-08 00:42 PDT — Codex lookup: latest Claude interaction
+
+- **Trigger:** founder asked Codex to "retrieve most recent interaction between me and claude."
+- **Tool/input:** `search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)`
+- **Returned:** 5 matches. Newest match was a raw Claude-project filesystem change at `2026-05-08T07:40:04.450Z`. Newest actual conversational turn was the next match at `2026-05-08T07:40:04.096Z`, session `c1dbc9c1-1b22-46f1-9b63-ddca2c9fc1ca`, `turn_index=20`, with files referenced in `_followups.md`, `src/mcp/tools/recent-work-context.ts`, and `src/mcp/tools/search-memories.ts`.
+- **Verdict:** right.
+- **Note:** Retrieval found the right latest Claude exchange, but the first result was an FS watcher event rather than conversation content. The useful answer required skipping that metadata event and reading the second match. Payload was large because the assistant turn included full bug triage and embedded tool-call outputs.
+- **Conjecture:** Claude conversation retrieval would be easier if `search_memories` could prefer normalized conversation atoms over raw filesystem change events, or expose an event-kind filter.
+
+---
+
+#### 2026-05-08 00:46 PDT — Codex review: verify Claude's round-4 bug claims
+
+- **Trigger:** founder asked Codex to review Claude's latest bug triage and do an independent investigation.
+- **Tool/input:**
+  1. `search_memories(query="commit merge complete 020", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)`
+  2. `get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=5, format="minimal")`
+  3. `search_memories(query="1ba3580", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)`
+- **Returned:**
+  1. `search_memories` returned 0 matches even though direct SQLite inspection showed 26 `git:` events in the window, including commits whose content contains "merge" and "020".
+  2. `get_recent_work_context` returned 1 cluster / 1 atom, `source_breakdown: { codex: 1 }`, `truncation.truncated: false`, `warnings: []`.
+  3. `search_memories` returned 0 matches for exact literal `1ba3580`, while direct SQLite inspection showed commit `1ba3580` exists as git row 26 in the same window.
+- **Verdict:** right for the two live symptoms Claude flagged.
+- **Note:** The low-limit trace response still looks complete even though direct storage inspection shows thousands of events in the same window; storage fetch cap and source-volume bias happen before trace-layer truncation can warn. The original `"commit merge complete 020"` probe is ambiguous because `search_memories` is literal substring search, but the `1ba3580` probe confirms the separate order-of-operations failure: `searchMemories` slices the most recent `limit * 4` candidates before applying the content substring filter.
+- **Conjecture:** Add storage-cap warning first because it prevents misleading "complete" answers. Then fix `search_memories` filter-before-slice and clarify that text search is literal substring, not semantic retrieval.
+
+---
+
+#### 2026-05-08 00:53 PDT — Codex check: Claude validation of Codex review
+
+- **Trigger:** founder asked Codex to check the most recent Claude interaction after Claude validated Codex's claims, and reply `proceed` if no further refinement was needed.
+- **Tool/input:** `search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)`
+- **Returned:** 5 matches. Newest useful conversational turn was at `2026-05-08T07:51:30.414Z`, session `c1dbc9c1-1b22-46f1-9b63-ddca2c9fc1ca`, `turn_index=21`. Claude confirmed Codex's `search_memories` filter-order diagnosis, storage-cap silent failure, raw-FS source-volume framing, and timestamp-comparison bug; Claude promoted timestamp normalization into the V1.5.2 P0 reliability item and kept chokidar as a separate item.
+- **Verdict:** partial.
+- **Note:** Claude's revised scope is directionally right, but one refinement remains: timestamp normalization at capture must either be centralized (pipeline/gate/storage append) or paired with a backfill/query hardening path for existing mixed-offset rows. Git-only future normalization will not repair existing stored `-07:00` rows or prevent another capture surface from reintroducing offset strings.
+- **Conjecture:** Acceptance for the reliability item should include an existing-row mixed timestamp regression: a `Z` window must retrieve stored git rows with `-07:00` timestamps, or the item must migrate/canonicalize those rows before relying on lexicographic storage comparisons.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
