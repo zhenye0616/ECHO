@@ -4,9 +4,9 @@ title: V1.5.4 `tail_session` MCP tool — cheap exact-fetch for the cross-AI han
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-08T22:15:00Z"
+branch: "agent/tail-session-tool"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
