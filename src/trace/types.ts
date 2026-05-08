@@ -8,7 +8,7 @@ export interface ArtifactHint {
   id: string;
 }
 
-export type ResponseFormat = 'full' | 'minimal';
+export type ResponseFormat = 'full' | 'minimal' | 'skeleton';
 
 export interface Query {
   since: string;

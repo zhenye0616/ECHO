@@ -2,10 +2,15 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { normalizeEvent } from '../../normalize/index.js';
 import type { Storage } from '../../storage/interface.js';
-import type { NormalizedContextEvent } from '../../normalize/types.js';
+import type {
+  NormalizedContextEvent,
+  SourceRef,
+  TimeRef,
+} from '../../normalize/types.js';
 import { buildRecentWorkContext } from '../../trace/index.js';
 import type {
   ArtifactHint,
+  Cluster,
   Query,
   RecentWorkContextResponse,
   ResponseFormat,
@@ -27,10 +32,16 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   '(heuristic — treat as a hint, not a guarantee). ' +
   'DEFAULTS (cost-safer): `limit=20`, `format="minimal"` — every retrieval pays ' +
   "twice through tool-result budgets (the AI client's, then the user's chat), so " +
-  'minimal is the right starting point. Pass `format: "full"` only when you need ' +
-  "the complete `action.input`/`action.output` content. `limit` may be raised up " +
-  'to MAX_LIMIT=500 for offline/batch consumers but is rarely the right choice ' +
-  'for interactive AI-client paths. ' +
+  'minimal is the right starting point. Three-format ladder by cost ordering: ' +
+  '`format:"skeleton"` (cheapest — ids + label + counts only, drops artifacts/' +
+  'actors/provenance/cluster-edges/open-loop-hint-bodies; typical < 10k chars ' +
+  'even on full-day windows; use for low-budget context-pull / "where did I ' +
+  'leave off" / resume calls), `format:"minimal"` (default — atom heads with ' +
+  'action.input/output clipped to 500 chars; uncapped sub-collections still ' +
+  'pass through, so realistic claude_code days can exceed the consumer 25k ' +
+  'budget), `format:"full"` (debug — verbatim atom envelopes, only for offline ' +
+  'inspection). `limit` may be raised up to MAX_LIMIT=500 for offline/batch ' +
+  'consumers but is rarely the right choice for interactive AI-client paths. ' +
   'Pass `window_hours` to control the maximum temporal ' +
   'gap between atoms in a single cluster; when omitted it is inferred from the ' +
   '(since, until) span (equal to span when ≤ 4h, otherwise min(span, 24h)) — for ' +
@@ -70,7 +81,107 @@ const artifactHintSchema = z.object({
   id: z.string(),
 });
 
-const formatSchema = z.enum(['full', 'minimal']);
+const formatSchema = z.enum(['full', 'minimal', 'skeleton']);
+
+// Item 028: caller-controlled head-clip on the surrogate `action.summary` we
+// synthesize for skeleton atoms. 200 chars is enough to disambiguate the atom
+// in a resume briefing without re-introducing the action.input/output bytes
+// minimal mode already caps at 500.
+export const SKELETON_SUMMARY_CAP = 200;
+
+export interface SkeletonAtom {
+  id: NormalizedContextEvent['id'];
+  // Keep the full TimeRef sub-object: its three optional fields are tiny
+  // (occurred_at + maybe observed_at + duration_ms) and the AI client needs
+  // the timestamp to order atoms across a resume briefing.
+  time: TimeRef;
+  // Keep the full SourceRef: app + surface + raw_pointer + optional account.
+  // raw_pointer is the only realistically heavy field (~80 chars on fs:
+  // pointers) but it is the only stable handle for follow-up tail_session /
+  // search_memories calls. Drop it and skeleton mode loses its primary
+  // affordance for hydration.
+  source: SourceRef;
+  // 200-char head-clip surrogate. Spec acceptance refers to "action.summary";
+  // the underlying NormalizedContextEvent type carries `action.input` /
+  // `action.output` instead, so we synthesize a summary by clipping the head
+  // of input ?? output. Matches the spec's intent ("a head-clipped action
+  // summary") against the actual schema.
+  action: {
+    kind: NormalizedContextEvent['action']['kind'];
+    summary?: string;
+  };
+}
+
+export interface SkeletonOpenLoopHint {
+  atom_id: string;
+  resolved: boolean;
+}
+
+export interface SkeletonCluster {
+  cluster_id: Cluster['cluster_id'];
+  rank: Cluster['rank'];
+  rank_reason: Cluster['rank_reason'];
+  label?: Cluster['label'];
+  // Drop anchor_artifacts (ArtifactRef[] body), edges (Edge[] body), and the
+  // open_loop_hints text/kind/confidence body. Keep the affordances that make
+  // skeleton mode useful for the resume use case: id + label + atom_ids +
+  // source_breakdown + time_range + minimal-shape hints.
+  atom_ids: Cluster['atom_ids'];
+  source_breakdown: Cluster['source_breakdown'];
+  time_range: Cluster['time_range'];
+  open_loop_hints: SkeletonOpenLoopHint[];
+}
+
+export interface SkeletonResponse {
+  schema_version: RecentWorkContextResponse['schema_version'];
+  tool: RecentWorkContextResponse['tool'];
+  query: RecentWorkContextResponse['query'];
+  truncation: RecentWorkContextResponse['truncation'];
+  warnings: RecentWorkContextResponse['warnings'];
+  clusters: SkeletonCluster[];
+  atoms: Record<string, SkeletonAtom>;
+}
+
+export function applySkeletonAtom(atom: NormalizedContextEvent): SkeletonAtom {
+  // Source for the surrogate summary: prefer action.input (the user/originator
+  // turn) over action.output (the assistant reply) — the resume use case is
+  // "what did I do," not "what did the assistant say back." Falls through to
+  // output only when input is missing (rare; e.g., assistant-only atoms).
+  const summarySrc = atom.action.input ?? atom.action.output;
+  const summary =
+    summarySrc !== undefined && summarySrc.length > 0
+      ? summarySrc.slice(0, SKELETON_SUMMARY_CAP)
+      : undefined;
+  const skeleton: SkeletonAtom = {
+    id: atom.id,
+    time: atom.time,
+    source: atom.source,
+    action: { kind: atom.action.kind },
+  };
+  if (summary !== undefined) {
+    skeleton.action.summary = summary;
+  }
+  return skeleton;
+}
+
+export function applySkeletonCluster(cluster: Cluster): SkeletonCluster {
+  const skeleton: SkeletonCluster = {
+    cluster_id: cluster.cluster_id,
+    rank: cluster.rank,
+    rank_reason: cluster.rank_reason,
+    atom_ids: cluster.atom_ids,
+    source_breakdown: cluster.source_breakdown,
+    time_range: cluster.time_range,
+    open_loop_hints: cluster.open_loop_hints.map((h) => ({
+      atom_id: h.atom_id,
+      resolved: h.resolved,
+    })),
+  };
+  if (cluster.label !== undefined) {
+    skeleton.label = cluster.label;
+  }
+  return skeleton;
+}
 
 export interface RecentWorkContextParams {
   since?: string;
@@ -218,7 +329,37 @@ export async function getRecentWorkContext(
     return { ...response, atoms: minimalAtoms };
   }
 
+  // Skeleton transform is applied by the MCP registration layer at the wire
+  // boundary (`buildSkeletonResponse` returns a SkeletonResponse, which is a
+  // structurally distinct shape from RecentWorkContextResponse). Keeping the
+  // transform out of `getRecentWorkContext` lets non-MCP callers (e.g.
+  // tools/validate-resolution.ts) keep the strong RecentWorkContextResponse
+  // return type without conditional narrowing.
+
   return response;
+}
+
+// Item 028: build a skeleton-mode response by replacing every atom with its
+// stripped variant and every cluster with its stripped variant. The return
+// type intentionally widens to the union — the MCP tool serializer is
+// permissive (z.record on outputSchema bodies), so a skeleton response with
+// flatter atoms/clusters validates against the same outputSchema.
+export function buildSkeletonResponse(
+  response: RecentWorkContextResponse,
+): SkeletonResponse {
+  const skeletonAtoms: Record<string, SkeletonAtom> = {};
+  for (const [id, atom] of Object.entries(response.atoms)) {
+    skeletonAtoms[id] = applySkeletonAtom(atom);
+  }
+  return {
+    schema_version: response.schema_version,
+    tool: response.tool,
+    query: response.query,
+    truncation: response.truncation,
+    warnings: response.warnings,
+    clusters: response.clusters.map(applySkeletonCluster),
+    atoms: skeletonAtoms,
+  };
 }
 
 // outputSchema for get_recent_work_context. Mirror the FULL top-level key set
@@ -259,10 +400,15 @@ export function registerRecentWorkContext(
       annotations: { readOnlyHint: true },
     },
     async (input) => {
-      const result = await getRecentWorkContext(
-        storage,
-        input as RecentWorkContextParams,
-      );
+      const params = input as RecentWorkContextParams;
+      const full = await getRecentWorkContext(storage, params);
+      // Apply skeleton at the wire boundary so the in-process function
+      // signature stays narrow. SkeletonResponse and RecentWorkContextResponse
+      // both serialize to a JSON object that validates against the permissive
+      // outputSchema (top-level keys are exact; inner bodies are z.record /
+      // z.array(z.unknown()), so a flatter atom/cluster body still passes).
+      const result: RecentWorkContextResponse | SkeletonResponse =
+        params.format === 'skeleton' ? buildSkeletonResponse(full) : full;
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
         structuredContent: result as unknown as Record<string, unknown>,
