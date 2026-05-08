@@ -1,13 +1,35 @@
 ---
 id: 2026-05-07-021-trace-cross-gap-where-left-off
 title: V1.5 trace patch — make "where did I leave off" work across >4h gaps
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1-2d
 created: 2026-05-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T06:30:00Z"
 branch: "agent/trace-cross-gap-where-left-off"
+head_sha: "d6890b9e4b84103108eb03a0c2ef971491b651aa"
+pr_url: ""
+agent_notes: |
+  Bug A (storage keep-newest), Bug B (window_hours exposed + span-inferred),
+  Guardrail C (naive-TZ warning) all implemented per spec; tests + smoke
+  extended; storage caller audit in run log (no production caller required
+  explicit `order: 'asc'`).
+
+  Two flagged deviations for founder sign-off (full rationale in run log):
+  (1) Six test files in tests/capture/ outside files_to_modify gained
+      `order: 'asc'` on bare query() calls — explicitly authorized by Bug A
+      spec text ("if any genuinely need ASC … they pass `order: 'asc'`").
+  (2) The span-inference test lives in tests/mcp/tools/recent-work-context
+      .test.ts (where inferWindowHours actually lives), not tests/trace/
+      build.test.ts as the literal acceptance list states. Behavior fully
+      covered.
+
+  npm run typecheck / lint clean. npm test: 432 passed / 3 failed (435
+  total). The 3 failures are pre-existing FS-watcher / daemon-lifecycle
+  flakes verified by stashing my changes and re-running on clean main
+  (which produces 6 failures). All 158 tests in tests/storage, tests/trace,
+  tests/mcp pass cleanly.
 spec_refs:
   - src/storage/sqlite.ts
   - src/storage/interface.ts
