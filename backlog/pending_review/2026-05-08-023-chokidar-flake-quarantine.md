@@ -1,13 +1,25 @@
 ---
 id: 2026-05-08-023-chokidar-flake-quarantine
 title: Quarantine the recurring chokidar / capture / daemon-lifecycle flake cluster
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T08:12:38Z"
 branch: "agent/chokidar-flake-quarantine"
+head_sha: "fbaa7586e8eac794762cd5883ff36ab341bfc4cd"
+pr_url: ""
+agent_notes: |
+  Path C (skip-with-tracking-comment) chosen at the describe-block level — `describe.skip` on `tests/capture/extractors/cursor.test.ts`'s `startCursorExtractor (lifecycle + integration)` block (11 tests) and on `tests/daemon/lifecycle.test.ts`'s `daemon lifecycle` block (4 tests). Three baseline runs (3, 5, 4 failures, rotating set) plus a per-it.skip false-start showed the failing test rotates across the entire describe block — per-it skips couldn't pin a moving target. Three consecutive post-fix `npm test` runs are clean (437 passed, 15 skipped, 0 failed). lint + typecheck clean.
+
+  Path A rejected (non-deterministic flake; out of 0.5–1d budget). Path B rejected for lifecycle.test.ts because the test contains an inline `expect(elapsed).toBeLessThan(8000)` assertion that fails when chokidar.close() is slow regardless of test/waitFor timeouts.
+
+  6 historical `_followups.md` references annotated `> Resolved (delivered after merge by 2026-05-08-023)` for the cursor.test.ts + daemon/lifecycle.test.ts subset. The 014 entry's claude-code.test.ts and fs-watcher.test.ts portions left explicitly open per 023's Out-of-Scope.
+
+  **Open question for founder:** baseline + verification runs surfaced the same chokidar close-race intermittently flaking `tests/capture/surfaces/fs-watcher.test.ts` (~33% of runs). 023's Out-of-Scope forbids quarantining other test files; my full-suite verification reached "0 failures × 3 consecutive runs" by chance. Founder should decide: (a) expand 023 before merge to also quarantine fs-watcher.test.ts, or (b) merge 023 as-is and file a separate item — the 021-section followup annotation flags this for the latter.
+
+  vitest.config.ts (in `files_to_modify`) was not modified — Path C didn't need it. Full run log at raw/internal/agent-runs/2026-05-08-2026-05-08-023-chokidar-flake-quarantine.md.
 spec_refs:
   - tests/capture/extractors/cursor.test.ts
   - tests/daemon/lifecycle.test.ts
