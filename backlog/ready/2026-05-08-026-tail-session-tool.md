@@ -21,15 +21,15 @@ spec_refs:
   - tests/mcp/tools/search-memories.test.ts
   - docs/mcp-integration.md
   - raw/internal/dogfooding/mcp-interactions-journal.md
-  - backlog/ready/2026-05-08-025-mcp-best-practices.md
 blocked_by:
   - "2026-05-08-025-mcp-best-practices"
+  - "2026-05-08-027-mcp-stateless-transport"
 acceptance:
   - "**New tool: `tail_session`.** Registered alongside the existing three at `src/mcp/server.ts:69-73`. Cheap, exact-fetch counterpart to `search_memories` (substring) and `get_recent_work_context` (clustered). Returns the N most-recent stored events for a single named source — no substring filter, no clustering, no ranking. Designed for the V1 killer-demo case 'where did Codex / Claude Code leave off in their last session' which today is served by direct file `grep` because neither existing tool fits."
   - "**Input schema:**"
   - "  - Exactly one of `source` (string, the literal stored source — e.g., `fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-XYZ.jsonl`) OR `source_app` (enum: `'cursor' | 'claude_code' | 'codex' | 'git'`, mapping per spec 025 Bug 2 — `codex` → `fs:${homedir}/.codex/sessions/`, etc.) MUST be provided. Pass both → schema-level rejection with a structured error message. Pass neither → same."
-  - "  - `count?: number` — default 5, min 1, max 20. Capped low because this tool's contract is 'cheap'; consumers wanting more should use `search_memories` with cursor pagination."
-  - "  - `cursor?: string` — composite `{timestamp, id}` opaque base64, identical contract to spec 025 Bug 4. Reuses the same encoder/decoder helpers — DO NOT duplicate."
+  - "  - `count?: number` — default 5, schema accepts any positive integer (`z.number().int().min(1)`); the handler clamps `count > 20` down to 20 (NOT a schema-level rejection — clamping matches the cheap-tool intent: a consumer accidentally passing 100 gets 20, not an error). `count <= 0` IS rejected at schema time. This intentional asymmetry is documented inline in `tail-session.ts`. Per Codex's 14:40 PDT pair-review, the prior `max(20)` schema was contradictory against the clamp test — Zod `max` rejects, doesn't clamp."
+  - "  - `cursor?: string` — composite `{timestamp, id}` opaque base64, identical contract to spec 025 Bug 4. Reuses the same encoder/decoder helpers — DO NOT duplicate. **Helper-location contract** (per Codex's 14:40 PDT pair-review): inspect 025's merged implementation. If 025's builder kept the encode/decode helpers file-local in `search-memories.ts`, 026's builder MUST extract them to a shared module at `src/mcp/tools/_cursor.ts` (exporting `encodeCursor`, `decodeCursor`, and the `before` filter type) and update `search-memories.ts` to import from the shared module — that refactor is part of 026's scope, not a deferred item. If 025's builder already extracted them: import from wherever they landed. Document the path actually taken in the run log."
   - "**Resolution semantics:**"
   - "  - **Exact-`source` mode:** storage query for that literal source, ordered by `timestamp DESC, id DESC` (relies on spec 025's storage-layer change), limited to `count + 1` (overfetch for `next_cursor` per 025's pattern). If zero atoms match: return `{ turns: [], next_cursor: null, source_resolved: <input source>, warnings: ['no captured atoms for this source'] }` — NOT an error."
   - "  - **`source_app` mode:** two-step resolution. (1) query storage with `source_prefix = <app's mapped prefix>` ordered DESC, limit 1; pluck the `source` field of the newest row (the most-recently-active session). (2) tail that resolved source per the exact-source path. Echo the resolved source in the response field `source_resolved` so the consumer can pin subsequent calls. If no atoms match the app's prefix at all: return `{ turns: [], next_cursor: null, source_resolved: null, warnings: ['no captured sessions found for source_app=<app>'] }`."
@@ -37,7 +37,7 @@ acceptance:
   - "**Cursor handling:** decode `cursor` to `before: { timestamp, id }` per spec 025 helpers; pass to storage. Malformed cursor → MCP-style `{ isError: true, content: [{ type: 'text', text: '...reason...' }] }` with NO `structuredContent`, identical to spec 025 Bug 4. Reuse the spec 025 helpers — do not reimplement."
   - "**Annotations:** `annotations: { readOnlyHint: true }` on `registerTool`, per spec 025 Bug 6. Tool only reads from storage; no `storage.append`."
   - "**Description string:** terse and cost-aware. Suggested wording: `'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Default count=5, max 20; typical response < 10k chars. Use this for \"where did <app> leave off\" lookups instead of substring search.'`"
-  - "**Storage interface:** the existing `QueryFilter.source_prefix` (LIKE-escaped match) handles the exact-`source` case when called with the full literal source string — `LIKE 'fs:.../rollout-X.jsonl%'` matches because the source string itself is the entire prefix and there are no longer rows under it. Verify this works in practice; if not, add `source?: string` (exact match) to `QueryFilter` and use it. Document the choice inline in `src/storage/interface.ts`."
+  - "**Storage interface:** use `QueryFilter.source` (exact match) — already exists at `src/storage/interface.ts:13` and `src/storage/sqlite.ts:91-95` (`source = @source` SQL clause; mutual-exclusion with `source_prefix` enforced at sqlite.ts line 88). DO NOT use `source_prefix` for the exact-source path — the prior spec text suggesting prefix-as-exact was misleading and was corrected per Codex's 14:40 PDT pair-review. The `source_app` two-step resolution still uses `source_prefix` for step 1 (find the most-recently-active session under the app's prefix), then `source` exact for step 2 (tail that resolved session)."
   - "**Tests** in new `tests/mcp/tools/tail-session.test.ts`:"
   - "  - Exact-`source` happy path: seed 10 events under one source + 5 under another; `tail_session({ source: 'A', count: 3 })` returns the 3 newest under A, `next_cursor` non-null, `source_resolved === 'A'`."
   - "  - `source_app` happy path: seed events under 3 different `fs:.../rollout-…` codex sources with distinct timestamps; `tail_session({ source_app: 'codex', count: 2 })` returns the 2 newest events of the most-recently-active session, `source_resolved` equals that session's source."
@@ -54,8 +54,9 @@ acceptance:
   - "Run log appended to `raw/internal/agent-runs/2026-05-08-2026-05-08-026-tail-session-tool.md` covering: schema-vs-runtime exact-or-app branch placement decision, the storage-filter exact-match verification (whether `source_prefix` worked or whether `source: string` had to be added), and a measured byte-count for the `source_app: 'codex'` smoke call against the founder's local DB."
 files_to_modify:
   - src/mcp/tools/tail-session.ts
+  - src/mcp/tools/_cursor.ts
+  - src/mcp/tools/search-memories.ts
   - src/mcp/server.ts
-  - src/storage/interface.ts
   - tests/mcp/tools/tail-session.test.ts
   - docs/mcp-integration.md
   - tools/mcp-integration-smoke.sh
