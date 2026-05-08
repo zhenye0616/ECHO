@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { projectMatch } from '../wire-shape/match.js';
 import { CursorDecodeError, decodeCursor, encodeCursor } from './_cursor.js';
 // Re-export for any pre-existing callers / tests that imported the cursor
 // helpers from search-memories. New callers should import from `_cursor.ts`.
@@ -18,18 +19,11 @@ export const SEARCH_MEMORIES_DESCRIPTION =
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
 
-// Per-match content envelope cap (Bug A, surfaced 2026-05-08 15:54 PDT
-// post-026+027 dogfooding round). A real Codex turn JSONL atom is ~100KB;
-// without this cap, three matches can blow the 25k consumer tool-result
-// budget by 12.7×. Each match's `content` is clipped to head + elision
-// marker + tail at PER_MATCH_CONTENT_CAP total chars; `bytes_elided` carries
-// the dropped char count so the consumer can size the missing remainder.
-//
-// Cap chosen so 10 matches × cap × ~1.05 marker overhead < 25k budget,
-// leaving room for envelope/metadata.
-export const PER_MATCH_CONTENT_CAP = 2_000;
-const PER_MATCH_HEAD_CHARS = 1_000;
-const PER_MATCH_TAIL_CHARS = PER_MATCH_CONTENT_CAP - PER_MATCH_HEAD_CHARS;
+// V1.5.6 (2026-05-08): per-match content + per-key metadata caps live in
+// the shared `src/mcp/wire-shape/` projector. `projectMatch` enforces both
+// in a single call site; `search_memories` and `tail_session` go through
+// the same projector so a future cap tightening only touches one file.
+// Bugs A1, A2, and the tail-session content-cap reach-gap close together.
 
 // Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?
 const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
@@ -59,12 +53,21 @@ export interface SearchMatch {
   id: string;
   source: string;
   timestamp: string;
+  /** Capped by `WIRE_SHAPE_CAPS.match_content`. When clipped, format is
+   *  head + elision marker + tail. Missing-chars invariant for consumers:
+   *  retained-byte-count + bytes_elided + marker-overhead = original. */
   content: string;
-  // Present only when `content` was clipped by PER_MATCH_CONTENT_CAP. The
-  // original content length is `content.length - markerOverhead + bytes_elided`,
-  // but the simpler invariant for consumers is: missing chars = bytes_elided.
+  /** Present only when `content` was clipped by the wire-shape projector. */
   bytes_elided?: number;
+  /** Per-KEY clipped: any single value whose JSON-stringified form exceeds
+   *  `WIRE_SHAPE_CAPS.metadata_value` is replaced by
+   *  `{__elided: true, original_size: N}`. Other keys pass through verbatim. */
   metadata?: Record<string, unknown>;
+  /** Set only when one or more metadata values were clipped. */
+  metadata_bytes_elided?: number;
+  /** Set only when one or more metadata values were clipped. Names the
+   *  affected keys so the consumer can hydrate selectively. */
+  metadata_keys_elided?: string[];
 }
 
 export interface SearchResult {
@@ -110,30 +113,6 @@ function sortDesc(events: CaptureEvent[]): CaptureEvent[] {
     if (a.id > b.id) return -1;
     return 0;
   });
-}
-
-function clipContent(content: string): { content: string; bytes_elided?: number } {
-  if (content.length <= PER_MATCH_CONTENT_CAP) return { content };
-  const head = content.slice(0, PER_MATCH_HEAD_CHARS);
-  const tail = content.slice(content.length - PER_MATCH_TAIL_CHARS);
-  const bytes_elided = content.length - PER_MATCH_HEAD_CHARS - PER_MATCH_TAIL_CHARS;
-  // Marker is recognisable for both human + programmatic readers; the
-  // `bytes_elided` field on the match is the canonical machine reading.
-  const marker = `\n…[${bytes_elided} chars elided]…\n`;
-  return { content: head + marker + tail, bytes_elided };
-}
-
-function toMatch(e: CaptureEvent): SearchMatch {
-  const clipped = clipContent(e.content);
-  const m: SearchMatch = {
-    id: e.id,
-    source: e.source,
-    timestamp: e.timestamp,
-    content: clipped.content,
-  };
-  if (clipped.bytes_elided !== undefined) m.bytes_elided = clipped.bytes_elided;
-  if (e.metadata !== undefined) m.metadata = e.metadata;
-  return m;
 }
 
 function emitCursor(rows: CaptureEvent[], limitApplied: number): {
@@ -202,7 +181,7 @@ export async function searchMemories(
   const { kept, next_cursor } = emitCursor(overfetched, limitApplied);
 
   return {
-    matches: kept.map(toMatch),
+    matches: kept.map(projectMatch),
     total_returned: kept.length,
     limit_applied: limitApplied,
     next_cursor,
@@ -226,9 +205,13 @@ export const searchMatchSchema = z.object({
   source: z.string(),
   timestamp: z.string(),
   content: z.string(),
-  // Optional — present only when content was clipped by PER_MATCH_CONTENT_CAP.
+  // Optional — set by the wire-shape projector when content was clipped.
   bytes_elided: z.number().int().nonnegative().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  // Optional — set by the wire-shape projector when one or more metadata
+  // values exceeded the per-key cap and were replaced by elision placeholders.
+  metadata_bytes_elided: z.number().int().nonnegative().optional(),
+  metadata_keys_elided: z.array(z.string()).optional(),
 });
 
 // outputSchema for `tools/list` advertisement and structured-content

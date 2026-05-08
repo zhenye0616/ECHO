@@ -315,6 +315,76 @@ describe('tailSession Bug B — fs-watcher meta-events must be excluded', () => 
   });
 });
 
+// V1.5.6 wire-shape projector — closes Bug A2 (per-key metadata cap on
+// tail_session) AND the Bug A1 reach gap (tail_session previously had no
+// content cap). Both tools (search_memories + tail_session) now go through
+// `src/mcp/wire-shape/match.ts:projectMatch` so envelope discipline is one
+// codepath.
+describe('tailSession V1.5.6 — wire-shape projector envelope budget', () => {
+  it('5 turns × ~95KB tool_calls metadata stays under 25k bytes (the 16:14 PDT failure mode)', async () => {
+    // Mirrors tail_session(source_app='claude_code') at 16:14 PDT: 5 turns
+    // returned, 2 of them carrying 50-65KB metadata.tool_calls each. Pre-fix
+    // the response was 128k chars; per-key metadata cap brings it under
+    // budget. Test fails on a manual revert of the metadata cap.
+    const store = new MemoryStorage();
+    const exactSrc = 'fs:/tmp/heavy-session.jsonl';
+    for (let i = 0; i < 5; i++) {
+      await store.append({
+        source: exactSrc,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: `USER: q${i}\n\nASSISTANT: short answer ${i}`,
+        metadata: {
+          session_id: 'sess-x',
+          turn_index: i,
+          git_state: { branch: 'main' },
+          tool_calls: Array.from({ length: 30 }, (_, j) => ({
+            name: 'Bash',
+            args: 'a'.repeat(2_000),
+            output: 'b'.repeat(1_000),
+            call_id: `c_${j}`,
+          })),
+        },
+      });
+    }
+
+    const r = await tailSession(store, { source: exactSrc, count: 5 });
+
+    expect(r.turns).toHaveLength(5);
+    const envelopeBytes = JSON.stringify(r).length;
+    expect(envelopeBytes).toBeLessThan(25_000);
+    expect(r.turns.every((t) => t.metadata_keys_elided?.includes('tool_calls'))).toBe(
+      true,
+    );
+    // Per-KEY semantics: small structured neighbours pass verbatim.
+    expect(r.turns.every((t) => t.metadata?.['session_id'] === 'sess-x')).toBe(true);
+    expect(r.turns.every((t) => t.metadata?.['git_state'] !== undefined)).toBe(true);
+  });
+
+  it('long content (Bug A1 reach gap) is now clipped via the projector — 100KB content turn returns under 5KB content', async () => {
+    // tail-session.ts pre-V1.5.6 had its own toMatch with NO content cap.
+    // Today this is masked because real tail content is small, but a
+    // long-content extractor atom (e.g., Cursor session with very long
+    // assistant turns) would have surfaced the same Bug A1 failure mode.
+    // V1.5.6 unifies via projectMatch; this test asserts the cap is engaged.
+    const store = new MemoryStorage();
+    const exactSrc = 'fs:/tmp/long-content.jsonl';
+    await store.append({
+      source: exactSrc,
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: 'HEAD_SENTINEL_' + 'x'.repeat(100_000) + '_TAIL_SENTINEL',
+    });
+
+    const r = await tailSession(store, { source: exactSrc });
+
+    expect(r.turns).toHaveLength(1);
+    const t = r.turns[0]!;
+    expect(t.content.length).toBeLessThan(5_000);
+    expect(t.content.startsWith('HEAD_SENTINEL_')).toBe(true);
+    expect(t.content.endsWith('_TAIL_SENTINEL')).toBe(true);
+    expect(t.bytes_elided).toBeGreaterThan(0);
+  });
+});
+
 describe('tailSession (pagination + same-ms ties)', () => {
   it('25 events, count 10 → 10 + cursor → 10 + cursor → 5 + null cursor (no skips, no duplicates)', async () => {
     const store = new MemoryStorage();
