@@ -7,9 +7,38 @@ created: 2026-05-08
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T22:15:00Z"
 branch: "agent/tail-session-tool"
-head_sha: ""
+worktree: "~/Desktop/Project_echo--tail-session-tool"
+head_sha: "981735f3bc896f2d2e3bb2169b5c1737683b6cd0"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented tail_session as the cheap exact-fetch retrieval primitive for
+  cross-AI handoff lookups. New files: src/mcp/tools/_cursor.ts (extracted
+  composite-cursor helpers from 025's file-local definitions),
+  src/mcp/tools/tail-session.ts (the new tool, 250 LOC),
+  tests/mcp/tools/tail-session.test.ts (18 tests covering all acceptance
+  cases plus regressions). Modified: search-memories.ts (re-exports moved
+  cursor helpers, exports searchMatchSchema for cross-tool reuse), server.ts
+  (registers tail_session inside post-027 stateless handlePost),
+  recent-work-context.test.ts (one assertion: 3 tools → 4 tools — forced
+  consequence; flagged in run log), smoke script (asserts tail_session in
+  tools/list, bumps expected count 3 → 4), docs/mcp-integration.md (lists
+  4th tool with cost contract).
+  Two-step source_app resolution: query newest source under app's prefix
+  via source_prefix + limit:1, then tail that exact source via
+  QueryFilter.source. count schema z.int.min(1) rejects 0; handler clamps
+  upward at MAX_COUNT=20. XOR (source / source_app) refinement at handler
+  entry surfaced as isError envelope. Composite cursor shared with
+  search_memories — one cross-tool regression test proves this.
+  Live measurement against the founder's DB via isolated test daemon
+  (port 39479): tail_session({source_app: 'codex', count: 1}) = 8296 bytes,
+  well under the spec's <10k typical target. 18/18 tail-session tests
+  pass; full MCP test set 104/104 passes. Lint + typecheck clean. 3
+  unrelated flaky tests (trace-perf timing + 2 git-watcher concurrency)
+  pass in isolation; verified on bare main as pre-existing — not caused
+  by 026.
+  Two open questions for founder on test-file touching policy
+  (recent-work-context.test.ts is outside files_to_modify) and on
+  ECHO_SMOKE_LIVE gating; full reasoning in run log.
 review_notes: ""
 spec_refs:
   - src/mcp/tools/search-memories.ts
