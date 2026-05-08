@@ -524,6 +524,25 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 - **Note:** Reverification cost = 5 file Reads + 4 Bash greps. The fact that this took ~3 minutes after the (slow) ECHO retrieval means: for "validate a peer AI's diagnostic claim" tasks, ECHO's value is 100% in the *retrieval* step; once claims are in hand, code grounding still happens in the editor. Codex's claim 8 (doc/test divergence) is the cheapest standalone backlog item — pure doc fix, no code change.
 - **Conjecture:** observations only — (a) backlog candidate: doc fix for `mcp-integration.md:53,100` (cheap, blocks no one, completes drift between docs and tests); (b) the "two namespaces in the founder's environment" finding suggests a wiki note on legacy `echo-memory` cleanup may be warranted, separate from this validation; (c) tool descriptions doing teaching work (FS-prefix rules in `search-memories` description) is a recurring symptom of missing structured affordances — claim 1 + claim 2 are causally related, not independent. Don't design fixes here.
 
+#### 2026-05-08 13:46 PDT — Codex tries to retrieve Claude's 025 spec context
+
+- **Trigger:** founder said Claude validated Codex's MCP best-practices claims and wrote spec 025, then asked Codex to use ECHO for session context and evaluate the spec.
+- **Query inputs:** `search_memories(query="025", source_prefix="fs:/Users/zhenye/.claude/", limit=10)`.
+- **Returned:** no usable payload. The MCP connector failed before returning matches: `Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`.
+- **Sources:** intended source was Claude Code JSONL under `fs:/Users/zhenye/.claude/`; no source rows were returned because the connector failed. Fallback context came from direct repo reads of `raw/internal/dogfooding/mcp-interactions-journal.md`, `docs/BACKLOG.md`, and `backlog/ready/2026-05-08-025-mcp-best-practices.md`.
+- **Verdict:** ❌ wrong.
+- **Note:** Same connector failure class as 13:22 PDT. The canonical journal itself now contains the Claude 13:27/13:35 validation entries, so direct file read recovered the context faster than the broken MCP path.
+- **Conjecture:** observations only — the connector transport issue is now blocking precisely the cross-AI handoff use case ECHO is meant to make easy.
+
+#### 2026-05-08 13:51 PDT — Codex retries exact 025 Claude-context lookup
+
+- **Trigger:** before final spec evaluation, Codex retried ECHO against the exact spec/session token to verify whether the connector failure was transient.
+- **Query inputs:** `search_memories(query="2026-05-08-025", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)`.
+- **Returned:** no usable payload. Same MCP connector error: `Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`.
+- **Sources:** intended source was Claude Code project JSONL under `fs:/Users/zhenye/.claude/projects/`; no rows returned.
+- **Verdict:** ❌ wrong.
+- **Note:** The narrower, extractor-aligned prefix did not change the failure mode. Spec evaluation proceeded from repo-grounded artifacts already recovered by direct reads.
+
 ---
 
 ## Aggregated learnings (filled at end of window)
