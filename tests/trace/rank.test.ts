@@ -84,6 +84,7 @@ describe('rankReasonsFor', () => {
           kind: 'contains_todo',
           text: 'TODO: x',
           confidence: 'high',
+          resolved: false,
         },
       ],
     });
@@ -155,6 +156,7 @@ describe('rankClusters', () => {
           kind: 'ends_with_question',
           text: 'q?',
           confidence: 'high',
+          resolved: false,
         },
       ],
     });

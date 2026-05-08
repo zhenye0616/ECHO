@@ -20,8 +20,11 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   "decides which to attend to. `cluster.edges[]` is signal-bearing — pairs joined " +
   "only by scope (repo/workspace) or session (conversation/thread) artifacts are " +
   "omitted, so `edges.length` is no longer guaranteed to equal C(N, 2); use " +
-  '`cluster.atom_ids[]` for membership. Pass `format: "minimal"` to cap each atom\'s ' +
-  '`action.input`/`action.output` to 500 chars (default `"full"` keeps everything).';
+  '`cluster.atom_ids[]` for membership. `cluster.open_loop_hints[].resolved` ' +
+  'indicates whether the hint has a downstream closure signal in the same window ' +
+  '(heuristic — treat as a hint, not a guarantee). Pass `format: "minimal"` to ' +
+  "cap each atom's `action.input`/`action.output` to 500 chars (default " +
+  '`"full"` keeps everything).';
 
 export const DEFAULT_LIMIT = 100;
 export const MAX_LIMIT = 500;
