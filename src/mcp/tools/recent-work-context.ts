@@ -94,7 +94,8 @@ function clampLimit(input: number | undefined): number {
   return Math.min(Math.max(1, floored), MAX_LIMIT);
 }
 
-const TZ_MARKER_RE = /(?:Z|[+-]\d{2}:\d{2})$/;
+// Accepts all four legal ISO 8601 TZ forms: Z, ±HH:MM, ±HHMM, ±HH.
+const TZ_MARKER_RE = /Z$|[+-]\d{2}(?::?\d{2})?$/;
 
 export function hasTzMarker(s: string): boolean {
   return TZ_MARKER_RE.test(s);
@@ -135,10 +136,18 @@ export async function getRecentWorkContext(
   const untilMs = Date.parse(until);
   const windowHours = inferWindowHours(sinceMs, untilMs, params.window_hours);
 
+  const storageCap = limit * STORAGE_OVERFETCH;
   const events = await storage.query({
     since,
     until,
-    limit: limit * STORAGE_OVERFETCH,
+    limit: storageCap,
+    // Raw fs-watcher change events (`metadata.surface === 'fs'`) normalize to
+    // null and thus consume the storage cap without contributing to the trace
+    // input. Filtering them at the storage-query layer (P1) keeps the cap budget
+    // available for real conversation/git atoms. The conversation atoms riding
+    // the same `fs:/Users/...` source prefix carry richer per-extractor metadata
+    // (no `surface: 'fs'`), so they are unaffected.
+    exclude_metadata_surface: ['fs'],
   });
 
   const query: Query = {
@@ -153,6 +162,18 @@ export async function getRecentWorkContext(
   }
 
   const response = buildRecentWorkContext(events, query, normalizeEvent);
+
+  // Storage-cap silent-truncation guard. When the storage query returned
+  // exactly `limit * STORAGE_OVERFETCH` rows, additional in-window atoms may
+  // have been silently dropped at the storage layer; surface a single warning
+  // so the consumer can raise `limit` or narrow `(since, until)`.
+  if (events.length === storageCap) {
+    response.warnings.push(
+      'storage cap hit (events.length === limit * STORAGE_OVERFETCH); ' +
+        'atoms in window may be silently truncated. ' +
+        'Raise limit or narrow (since, until) to retain them.',
+    );
+  }
 
   // Surface a single warning when the caller passed naive (TZ-less) timestamps.
   // Naive strings are accepted by the schema regex but Date.parse interprets

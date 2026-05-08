@@ -20,6 +20,11 @@ export interface QueryFilter {
   // silently dropped the newest. Pass 'asc' explicitly when downstream logic
   // needs oldest-first (e.g., turn-pair reconstruction).
   order?: 'asc' | 'desc';
+  // Exclude rows whose metadata.surface is in this list. Used by the trace
+  // tool to drop raw fs-watcher change events (`surface: 'fs'`) that the
+  // normalizer throws away — they otherwise dominate storage's newest-N and
+  // starve real conversation/git atoms out of the trace input.
+  exclude_metadata_surface?: string[];
 }
 
 export interface Storage {

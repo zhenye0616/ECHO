@@ -206,6 +206,39 @@ describe('searchMemories (pure handler)', () => {
     expect(r.matches).toHaveLength(0);
   });
 
+  it('filter-before-slice: out-of-overfetch substring match is still returned (item 022 Bug D)', async () => {
+    const fresh = new MemoryStorage();
+    // Seed 30 events; the i=5 (6th oldest = 25th-newest) carries a unique
+    // substring. Pre-fix: limit=5 produces overfetch=20, which slices to the
+    // newest 20 BEFORE applying the content filter, so the 25th-newest match
+    // is dropped. Post-fix: filter runs across all events first, then slice.
+    for (let i = 0; i < 30; i++) {
+      const ts = new Date(Date.UTC(2026, 0, 1, 0, i, 0)).toISOString();
+      await fresh.append({
+        source: 'git:bulk',
+        timestamp: ts,
+        content: i === 5 ? 'needle-out-of-overfetch' : `event-${i}`,
+      });
+    }
+    const r = await searchMemories(fresh, {
+      query: 'needle-out-of-overfetch',
+      limit: 5,
+    });
+    expect(r.total_returned).toBe(1);
+    expect(r.matches[0]!.content).toBe('needle-out-of-overfetch');
+  });
+
+  it('description clarifies substring (not semantic) search (item 022 Bug E)', async () => {
+    // SEARCH_MEMORIES_DESCRIPTION is exported; the e2e test below also
+    // verifies it via tools/list, but a unit-level assertion makes the
+    // intent explicit.
+    const { SEARCH_MEMORIES_DESCRIPTION } = await import(
+      '../../../src/mcp/tools/search-memories.js'
+    );
+    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/case-insensitive literal substring/);
+    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/NOT a semantic/);
+  });
+
   it('overfetch caps to MAX_OVERFETCH (200) — large dataset still gives DESC top-N', async () => {
     const big = new MemoryStorage();
     // 250 events spanning 250 minutes; the most-recent 50 should win for a limit=50 query.

@@ -1,6 +1,12 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  DEFAULT_LIMIT,
+  STORAGE_OVERFETCH,
+  getRecentWorkContext,
+  hasTzMarker,
+} from '../../../src/mcp/tools/recent-work-context.js';
 import { startMcpServer, type McpServerHandle } from '../../../src/mcp/server.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import type { CaptureEvent } from '../../../src/storage/interface.js';
@@ -537,5 +543,131 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       expect(found?.description).toMatch(/window_hours/);
       expect(found?.description).toMatch(/timezone|TZ|UTC/);
     });
+  });
+});
+
+describe('hasTzMarker (item 022 Bug F: regex broadening)', () => {
+  it('matches Z', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00Z')).toBe(true);
+  });
+
+  it('matches +HH:MM', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00+07:00')).toBe(true);
+  });
+
+  it('matches -HH:MM', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00-07:00')).toBe(true);
+  });
+
+  it('matches +HHMM (no colon)', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00+0700')).toBe(true);
+  });
+
+  it('matches +HH (hour-only)', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00+07')).toBe(true);
+  });
+
+  it('rejects naive (no TZ marker)', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00')).toBe(false);
+  });
+
+  it('rejects naive with milliseconds', () => {
+    expect(hasTzMarker('2026-05-08T07:00:00.123')).toBe(false);
+  });
+});
+
+describe('storage-cap warning + raw-FS filter (item 022 Bugs B + C)', () => {
+  let store: MemoryStorage;
+  let restoreStdout: () => void;
+  const SINCE = '2026-05-08T00:00:00.000Z';
+  const UNTIL = '2026-05-08T23:59:59.000Z';
+
+  beforeEach(() => {
+    ({ restore: restoreStdout } = captureStdout());
+    store = new MemoryStorage();
+  });
+
+  afterEach(() => {
+    restoreStdout();
+  });
+
+  it('storage-cap warning fires when events.length === limit * STORAGE_OVERFETCH', async () => {
+    // Default limit = 100, STORAGE_OVERFETCH = 10 → cap = 1000.
+    // Seed cap+200 in-window events; storage returns exactly cap.
+    const cap = DEFAULT_LIMIT * STORAGE_OVERFETCH;
+    const baseMs = Date.parse(SINCE);
+    for (let i = 0; i < cap + 200; i++) {
+      const ts = new Date(baseMs + i * 1000).toISOString();
+      await store.append({
+        source: 'git:repo',
+        timestamp: ts,
+        content: `event-${i}`,
+      });
+    }
+    const r = await getRecentWorkContext(store, { since: SINCE, until: UNTIL });
+    const capWarnings = r.warnings.filter((w) =>
+      w.includes('storage cap hit'),
+    );
+    expect(capWarnings).toHaveLength(1);
+    expect(capWarnings[0]).toContain('Raise limit or narrow');
+  });
+
+  it('storage-cap warning does NOT fire when events.length < cap', async () => {
+    const baseMs = Date.parse(SINCE);
+    for (let i = 0; i < 5; i++) {
+      const ts = new Date(baseMs + i * 1000).toISOString();
+      await store.append({
+        source: 'git:repo',
+        timestamp: ts,
+        content: `event-${i}`,
+      });
+    }
+    const r = await getRecentWorkContext(store, { since: SINCE, until: UNTIL });
+    const capWarnings = r.warnings.filter((w) =>
+      w.includes('storage cap hit'),
+    );
+    expect(capWarnings).toHaveLength(0);
+  });
+
+  it('raw fs-watcher events (metadata.surface=fs) are filtered out of the trace input', async () => {
+    // 100 raw fs-watcher noise events in the window.
+    const baseMs = Date.parse(SINCE);
+    for (let i = 0; i < 100; i++) {
+      const ts = new Date(baseMs + i * 1000).toISOString();
+      await store.append({
+        source: `fs:/Users/zhen/Library/Application Support/Cursor/User/workspaceStorage/x/${i}.vscdb`,
+        timestamp: ts,
+        content: JSON.stringify({
+          event_type: 'change',
+          path: `/Users/zhen/x/${i}`,
+          mtime: ts,
+          size: 100,
+        }),
+        metadata: { surface: 'fs', file_kind: 'cursor-workspace' },
+      });
+    }
+    // 5 normalized turn-pair events that happen to share the fs: source prefix
+    // (they're claude-code conversation atoms, NOT raw fs-watcher noise).
+    for (let i = 0; i < 5; i++) {
+      const ts = new Date(baseMs + 200_000 + i * 1000).toISOString();
+      await store.append({
+        source: `fs:/Users/zhen/.claude/projects/abc/s.jsonl`,
+        timestamp: ts,
+        content: `USER: msg ${i}\n\nASSISTANT: reply ${i}`,
+        metadata: {
+          session_id: 'abc',
+          turn_index: i,
+          repo_root: '/Users/zhen/Desktop/echo',
+          files_referenced: ['/Users/zhen/Desktop/echo/src/types.ts'],
+          git_state: { origin_url: 'https://github.com/zhen/echo' },
+        },
+      });
+    }
+
+    const r = await getRecentWorkContext(store, { since: SINCE, until: UNTIL });
+
+    // The trace input should reflect only the 5 conversation atoms; the 100
+    // raw fs events were filtered at the storage-query layer.
+    expect(r.truncation.atoms_total_in_window).toBe(5);
   });
 });
