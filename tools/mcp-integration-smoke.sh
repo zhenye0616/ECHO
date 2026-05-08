@@ -176,9 +176,12 @@ fi
 # parse it as JSON, then inspect clusters[]. python3 keeps the script portable
 # (no jq dependency) and lets us count atom_ids/edges directly.
 
-EDGE_CHECK=$(printf '%s' "$CTX_PAYLOAD" | python3 - <<'PY' 2>&1
+PAYLOAD_FILE="$WORK/ctx-payload.json"
+printf '%s' "$CTX_PAYLOAD" > "$PAYLOAD_FILE"
+EDGE_CHECK=$(python3 - "$PAYLOAD_FILE" <<'PY' 2>&1
 import json, sys
-raw = sys.stdin.read().strip()
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
 if not raw:
     print("EMPTY_PAYLOAD")
     sys.exit(0)

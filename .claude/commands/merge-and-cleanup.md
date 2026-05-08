@@ -219,6 +219,16 @@ Use `-d` (not `-D`) for the local delete — this fails loud if the branch isn't
 
 If the remote delete fails because the branch was already pushed for someone else's reference (rare): surface the error and ask the human; do not force.
 
+### C9b. Restart the ECHO daemon
+
+`vite-node` only loads source at process start. If the daemon is running from before this merge, the next dogfooding call will silently run on stale code — looks like the patch didn't ship. Observed twice (post-018, post-019) before this step was codified.
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.echo.daemon"
+```
+
+If the daemon isn't managed by launchd in this environment (e.g., during a manual `npm run daemon` session), surface that to the founder rather than skipping silently — they should restart by hand before the next call.
+
 ### C10. File follow-up items
 
 For each fixup deferred in C4 and each item in the sidecar's "Follow-up items" section: append a one-line entry to a queue file `backlog/_followups.md` (create if missing). Founder turns these into proper backlog items in their next strategist conversation.
@@ -281,6 +291,7 @@ For each id in the argument list, by the end of the run:
 - Merge commit on `main` with descriptive message; pushed to origin.
 - Worktree `~/Desktop/Project_echo--<slug>/` removed.
 - Branch `agent/<slug>` deleted locally and on origin.
+- ECHO daemon kickstarted so the next call runs on merged code.
 - Tests pass, lint clean, typecheck clean post-merge.
 - `backlog/_followups.md` updated with deferred fixups and follow-up items.
 - The founder is unblocked to invoke a strategist conversation for wiki promotion.

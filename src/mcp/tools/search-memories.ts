@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
-  "Search the user's captured ECHO memories (Cursor + Claude Code conversations, git commits) by free-text query, source prefix, or time range. Returns the most recent matching events.";
+  "Search the user's captured ECHO memories (Cursor + Claude Code conversations, git commits) by free-text query, source prefix, or time range. Returns the most recent matching events. `source_prefix` is matched literally against the stored source string, which is filesystem-path-encoded (e.g., `fs:/Users/<user>/.claude/projects/` for Claude Code, `fs:/Users/<user>/.codex/` for Codex, `git:` for commits) — logical names like `claude_code` or `cc` will not match. If a guessed prefix returns 0 results, broaden to `fs:` and inspect the `source` field on returned events to discover the right prefix.";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
