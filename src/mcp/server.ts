@@ -1,7 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { randomUUID } from 'node:crypto';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
@@ -20,11 +18,6 @@ export interface McpServerHandle {
 export interface StartMcpServerOptions {
   port?: number;
   host?: string;
-}
-
-interface Session {
-  transport: StreamableHTTPServerTransport;
-  mcp: McpServer;
 }
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -56,6 +49,25 @@ async function readJsonBody(
   }
 }
 
+function methodNotAllowed(
+  res: import('node:http').ServerResponse,
+  method: string | undefined,
+): void {
+  res.statusCode = 405;
+  res.setHeader('Allow', 'POST');
+  res.setHeader('content-type', 'application/json');
+  res.end(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: `Method Not Allowed: ${method ?? 'unknown'} (POST only)`,
+      },
+      id: null,
+    }),
+  );
+}
+
 export async function startMcpServer(
   storage: Storage,
   options: StartMcpServerOptions = {},
@@ -63,79 +75,64 @@ export async function startMcpServer(
   const host = options.host ?? '127.0.0.1';
   const requestedPort = options.port ?? 38478;
 
-  const sessions = new Map<string, Session>();
   let boundPort = requestedPort;
 
-  async function createSession(): Promise<Session> {
+  // Stateless: per-request McpServer + StreamableHTTPServerTransport.
+  // Storage is shared (process-scoped); only the MCP protocol/session wrapper
+  // is request-scoped, so daemon restart no longer invalidates client sessions.
+  async function handlePost(
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse,
+    body: unknown,
+  ): Promise<void> {
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     registerEchoPing(mcp);
     registerSearchMemories(mcp, storage);
     registerRecentWorkContext(mcp, storage);
+
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
       enableDnsRebindingProtection: true,
       allowedHosts: [`127.0.0.1:${boundPort}`, `localhost:${boundPort}`],
-      onsessionclosed: (sid: string) => {
-        const session = sessions.get(sid);
-        if (session !== undefined) {
-          sessions.delete(sid);
-          void session.mcp.close();
-        }
-      },
     });
-    await mcp.connect(transport);
-    return { transport, mcp };
+
+    try {
+      await mcp.connect(transport);
+      await transport.handleRequest(req, res, body);
+    } finally {
+      await transport.close();
+      await mcp.close();
+    }
   }
 
   const httpServer: HttpServer = createServer((req, res) => {
     void (async () => {
-      const sessionIdHeader = req.headers['mcp-session-id'];
-      const sessionId =
-        typeof sessionIdHeader === 'string' ? sessionIdHeader : undefined;
-
-      let session = sessionId !== undefined ? sessions.get(sessionId) : undefined;
-      let body: unknown;
-
-      if (req.method === 'POST') {
-        try {
-          body = await readJsonBody(req);
-        } catch (err) {
-          if (err instanceof BodyTooLargeError) {
-            res.statusCode = 413;
-            res.setHeader('content-type', 'application/json');
-            res.end(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                error: { code: -32000, message: 'request body too large' },
-              }),
-            );
-            return;
-          }
-          throw err;
-        }
-      }
-
-      if (session === undefined) {
-        if (req.method === 'POST' && isInitializeRequest(body)) {
-          session = await createSession();
-          await session.transport.handleRequest(req, res, body);
-          if (session.transport.sessionId !== undefined) {
-            sessions.set(session.transport.sessionId, session);
-          }
-          return;
-        }
-        res.statusCode = 400;
-        res.setHeader('content-type', 'application/json');
-        res.end(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            error: { code: -32000, message: 'Bad Request: no active session' },
-          }),
-        );
+      if (req.method !== 'POST') {
+        methodNotAllowed(res, req.method);
         return;
       }
 
-      await session.transport.handleRequest(req, res, body);
+      let body: unknown;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        if (err instanceof BodyTooLargeError) {
+          res.statusCode = 413;
+          res.setHeader('content-type', 'application/json');
+          res.end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32000, message: 'request body too large' },
+              id: null,
+            }),
+          );
+          return;
+        }
+        throw err;
+      }
+
+      await handlePost(req, res, body);
     })().catch((err: unknown) => {
       log.error('handle_request_failed', {
         message: (err as Error).message,
@@ -177,10 +174,6 @@ export async function startMcpServer(
         });
         httpServer.closeAllConnections?.();
       });
-      for (const session of sessions.values()) {
-        await session.mcp.close();
-      }
-      sessions.clear();
       log.info('stopped', {});
     },
   };

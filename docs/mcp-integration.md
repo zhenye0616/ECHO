@@ -25,7 +25,7 @@ This is the V1 "killer demo" surface: you ask Cursor or Claude Code a question, 
    ```bash
    ./tools/mcp-integration-smoke.sh
    ```
-   Expect three `OK:` lines and exit `0`. If it fails, see [Troubleshooting](#troubleshooting) below.
+   Expect a sequence of `OK:` lines and exit `0` — including a final `OK: stale-session echo_ping recovery` line that proves the stateless transport from item 027 is in place. If it fails, see [Troubleshooting](#troubleshooting) below.
 
 ## Cursor setup
 
@@ -140,6 +140,16 @@ python3 -m json.tool ~/.cursor/mcp.json
 ### Cursor / Claude Code shows the server but lists no tools
 
 Restart the client. Some clients only call `tools/list` once at MCP-handshake time and cache the result — if the daemon was restarted after the client connected, the client may be holding a stale, empty list.
+
+### Daemon restart used to break my client; does it still?
+
+No. Item 027 switched ECHO's MCP HTTP endpoint to **stateless StreamableHTTP**: each POST to `/mcp` is handled by a fresh per-request `McpServer` + transport, the server emits no `Mcp-Session-Id` response header, and any `Mcp-Session-Id` the client sends is ignored. Restarting `npm run daemon` (or having `launchd` cycle the daemon) **should not require restarting Cursor / Claude Code / Codex** to recover. The previous failure mode — daemon restart wipes the in-memory session map → next client request hits the old session-id branch → server returns `400 Bad Request: no active session`, which Codex's RMCP client surfaces as `Deserialize error: data did not match any variant of untagged enum JsonRpcMessage` — is gone.
+
+If a client still fails after a daemon restart, the next suspect is **client-side cached tool metadata** (some clients call `tools/list` only once per connection and hold the result), not server-side session loss. Recover by restarting the client; if that's a recurring annoyance, file a separate item — it's a client behavior, not a server bug.
+
+### `GET /mcp` or `DELETE /mcp` returns 405
+
+This is intentional. Stateless ECHO supports `POST /mcp` only; GET and DELETE return `405 Method Not Allowed` with `Allow: POST` and a JSON-RPC-style error body. Client tooling that probes `GET /mcp` for SSE streams or `DELETE /mcp` for session termination is targeting the stateful protocol path, which V1 does not implement (and does not need — ECHO's three tools are unary request/response).
 
 ### Tool gets called but `matches` array is empty
 

@@ -56,7 +56,13 @@ if ! curl -sS --connect-timeout 2 -o /dev/null -w '' \
   exit 1
 fi
 
-# --- 2. Initialize and capture session header ---------------------------------
+# --- 2. Initialize ------------------------------------------------------------
+#
+# Item 027: ECHO's MCP endpoint is stateless. The server does NOT emit an
+# Mcp-Session-Id header, and clients no longer need to round-trip one.
+# Pre-027 the script REQUIRED the header on every subsequent request; that
+# expectation is gone. We still tolerate a returned session header so the
+# script keeps working if a future SDK/server reverts to stateful behavior.
 
 INIT_HEADERS="$WORK/init.headers"
 INIT_BODY="$WORK/init.body"
@@ -68,11 +74,14 @@ curl -sS -D "$INIT_HEADERS" -o "$INIT_BODY" \
   --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"echo-smoke","version":"0.0.0"}}}'
 
 SESSION=$(awk 'tolower($1) == "mcp-session-id:" { sub(/\r$/,"",$2); print $2; exit }' "$INIT_HEADERS")
-if [ -z "${SESSION:-}" ]; then
-  log_err "initialize did not return Mcp-Session-Id header"
-  log_err "response headers:"
-  sed 's/^/  /' "$INIT_HEADERS" >&2
-  exit 1
+
+# Build an optional `-H "Mcp-Session-Id: …"` arg for downstream curl calls.
+# In stateless mode SESSION is empty; the array stays empty and curl sends no
+# such header. If a future SDK starts returning the header again, we forward
+# it transparently rather than failing.
+SESSION_HDR=()
+if [ -n "${SESSION:-}" ]; then
+  SESSION_HDR=(-H "Mcp-Session-Id: $SESSION")
 fi
 
 # Notify the server we're done initializing (required by the protocol).
@@ -80,7 +89,7 @@ curl -sS -o /dev/null \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
 # --- 3. tools/list contains all three tools with item-025 advertisements -----
@@ -89,7 +98,7 @@ LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
 
 LIST_PAYLOAD=$(extract_payload "$LIST_RESPONSE")
@@ -175,7 +184,7 @@ CALL_RESPONSE=$(curl -sS \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_memories","arguments":{"limit":3}}}')
 
 CALL_PAYLOAD=$(extract_payload "$CALL_RESPONSE")
@@ -204,7 +213,7 @@ CTX_RESPONSE=$(curl -sS \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_recent_work_context","arguments":{}}}')
 
 CTX_PAYLOAD=$(extract_payload "$CTX_RESPONSE")
@@ -320,7 +329,7 @@ CROSS_RESPONSE=$(curl -sS \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data "$(printf '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_recent_work_context","arguments":{"since":"%s","until":"%s"}}}' "$SINCE_ISO" "$NOW_ISO")")
 
 CROSS_PAYLOAD=$(extract_payload "$CROSS_RESPONSE")
@@ -416,7 +425,7 @@ GITSCAN_RESPONSE=$(curl -sS \
   -X POST "$URL" \
   -H "Accept: $ACCEPT" \
   -H "Content-Type: application/json" \
-  -H "Mcp-Session-Id: $SESSION" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data "$(printf '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"search_memories","arguments":{"source_prefix":"git:","since":"%s","until":"%s","limit":50}}}' "$SINCE_ISO" "$NOW_ISO")")
 
 GITSCAN_PAYLOAD=$(extract_payload "$GITSCAN_RESPONSE")
@@ -476,6 +485,39 @@ case "$GITSCAN_CHECK" in
     ;;
 esac
 
+# --- 9. Stateless live-recovery probe (item 027) -----------------------------
+#
+# Reproduces Codex's "ECHO daemon restarted underneath me" recovery case: send
+# `tools/call echo_ping` with an arbitrary stale Mcp-Session-Id and no prior
+# initialize on this connection. Pre-027 the server returned HTTP 400
+# `Bad Request: no active session`. Post-027 stateless mode ignores the header
+# and the call succeeds.
+
+STALE_RESPONSE=$(curl -sS -w '\n__HTTP_STATUS__:%{http_code}\n' \
+  -X POST "$URL" \
+  -H "Accept: $ACCEPT" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: stale-codex-session" \
+  --data '{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"echo_ping","arguments":{"message":"after-restart"}}}')
+
+STALE_STATUS=$(printf '%s' "$STALE_RESPONSE" | sed -n 's/^__HTTP_STATUS__://p' | tail -1)
+STALE_BODY=$(printf '%s' "$STALE_RESPONSE" | sed '/^__HTTP_STATUS__:/d')
+
+if [ "$STALE_STATUS" != "200" ]; then
+  log_err "stale-session recovery returned HTTP $STALE_STATUS (expected 200)"
+  log_err "raw response:"
+  printf '%s\n' "$STALE_BODY" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+STALE_PAYLOAD=$(extract_payload "$STALE_BODY")
+if ! printf '%s' "$STALE_PAYLOAD" | grep -qE '("pong"|\\"pong\\")[[:space:]]*:[[:space:]]*true'; then
+  log_err "stale-session recovery body missing pong:true"
+  log_err "raw response:"
+  printf '%s\n' "$STALE_BODY" | sed 's/^/  /' >&2
+  exit 1
+fi
+
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
@@ -485,4 +527,5 @@ log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"
 log_ok "OK: $CROSS_CHECK"
 log_ok "OK: $GITSCAN_CHECK"
+log_ok "OK: stale-session echo_ping recovery (item 027 stateless transport)"
 exit 0
