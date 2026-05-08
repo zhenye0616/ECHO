@@ -57,7 +57,31 @@ agent_notes: |
   item-025 advertisement assertions but not run in this session (would
   require `npm run daemon` + listening daemon). `bash -n` syntax-check
   passed.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — `git merge --no-ff agent/mcp-best-practices` ran clean under the `ort` strategy. The sidecar's expected `src/storage/sqlite.ts` conflict (around the `canonicalizeTimestamps` log block at lines 58-61) auto-resolved as a three-way merge because the agent's branch already contained the `e969b0a` post-022 fixup line.
+
+  Fixups applied:
+  - none required at merge time. Both pre-merge fixups in the sidecar were resolved before this command ran:
+    - Run log (`raw/internal/agent-runs/2026-05-08-2026-05-08-025-mcp-best-practices.md`) was committed to main directly at `ef93cba` (the review-stage move). The reviewer subagent flagged its absence because it inspected the worktree branch tip; the file is on main. Spec acceptance bullet for the run log is met.
+    - The sqlite.ts dry-run conflict check became moot once the actual merge ran clean.
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify post-merge: 489 tests pass / 21 skipped / 0 fail; `npm run lint` clean (eslint --max-warnings 0); `npm run typecheck` clean (tsc --noEmit). Worktree HEAD `d8db7b8` matched recorded `head_sha` at review time.
+
+  Follow-up items (non-blocking, file via /backlog or strategist conversation):
+  - `discoverLastSeen` non-determinism in `src/capture/surfaces/git-watcher.ts:225-242`. Storage's new `id DESC` tie-break exposes a pre-existing bug: on same-second commits the watcher now picks the id-ASC-smallest tied SHA as last-seen, which can re-emit prior commits as duplicates after restart. Agent's resumption test was correctly downgraded to assert only the core contract; proper fix needs `git-watcher.ts` changes + a `rowid` ordering hint or a `git rev-parse --short HEAD` discovery mechanism.
+  - `MAX_OVERFETCH = 200` dead-code cleanup at `src/mcp/tools/search-memories.ts:11`. Constant is exported but never applied as a cap. Either wire it as a defensive cap on the substring-path candidate set (against unbounded full-window scans on huge stores) or delete it + rename the related test.
+  - `buildSourceAppMap()` rebuilt per call at `src/mcp/tools/search-memories.ts:25-33,167`. Trivial; hoist to module scope.
+  - V1.6: `source_apps: array[]` filtering (already specced as out-of-scope in this item).
+  - Strategist (post-merge): promote item's "After Completion" wiki pages — new `wiki/surfaces/mcp-server.md` (planned → shipped), update `wiki/architecture/storage.md` (composite-key sort + `before` filter contract), update `wiki/architecture/interface-layers.md` (L3 structured-output + source-app routing). Manifest + `tools/wiki_index.py` regen after.
+  - Founder dogfooding: re-run the 13:27 PDT and 14:43 PDT scenarios from `raw/internal/dogfooding/mcp-interactions-journal.md` to confirm the new defaults stay under the 25k-char tool-result budget, and that `source_app: 'codex'` matches the literal-prefix call.
+
+  Process note (not blocking): agent self-flagged in `agent_notes` that three test files outside `files_to_modify` were modified to absorb the spec-mandated `ORDER BY id` fallout (`tests/capture/surfaces/git-watcher.test.ts`, `tests/capture/extractors/{claude-code,codex}.test.ts`). Reviewer judged: stand — diffs are surgical, set-membership-where-order-is-no-longer-guaranteed, well-commented with `// Item 025:` markers. For future runs the right move is to escalate via `agent_notes` first and let founder/strategist pre-bless test edits outside the listed file set.
 spec_refs:
   - src/mcp/tools/echo-ping.ts
   - src/mcp/tools/search-memories.ts
