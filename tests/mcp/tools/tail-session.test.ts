@@ -199,6 +199,122 @@ describe('tailSession (handler-level)', () => {
   });
 });
 
+// Bug B — `tail_session(source_app=<app>)` must not return fs-watcher
+// meta-events.
+//
+// Surfaced by the 2026-05-08 15:54 PDT post-026+027 dogfooding round:
+// `tail_session(source_app='codex')` and `tail_session(source_app='claude_code')`
+// both returned atoms whose content was a fs-watcher event payload
+// (`{event_type:"change", path:"...", mtime:"...", size:N}`,
+// `metadata.surface:"fs"`) — i.e., the file-modification meta-stream
+// targeting the app's session file, NOT the app's extracted turn atoms.
+//
+// Contract (mirrors `recent-work-context.ts:171` `exclude_metadata_surface`):
+// when resolving and tailing for `source_app=<app>` AND when tailing an
+// explicit `source=` path, fs-watcher meta-events
+// (`metadata.surface === 'fs'`) MUST be excluded. The cheap-tool intent of
+// tail_session is "show me the last N things this app actually did," not
+// "show me the file-modification stream."
+describe('tailSession Bug B — fs-watcher meta-events must be excluded', () => {
+  it('source_app: returns extractor turn atoms, not fs-watcher events under the same source', async () => {
+    const store = new MemoryStorage();
+    const HOME = homedir();
+    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
+    const rolloutSrc = `${codexPrefix}rollout-2026-05-08.jsonl`;
+
+    // Seed five fs-watcher events on the rollout file (the noisy meta-stream
+    // — every file mtime tick) AND three extractor turn atoms (the actual
+    // captured codex content). All share the same `source` string. Only the
+    // surface metadata distinguishes them.
+    for (let i = 0; i < 5; i++) {
+      await store.append({
+        source: rolloutSrc,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: JSON.stringify({
+          event_type: 'change',
+          path: rolloutSrc,
+          mtime: `2026-05-08T22:00:${i}.000Z`,
+          size: 1234 + i,
+        }),
+        metadata: { surface: 'fs', file_kind: 'codex-rollout' },
+      });
+    }
+    for (let i = 0; i < 3; i++) {
+      await store.append({
+        source: rolloutSrc,
+        timestamp: `2026-05-08T22:10:${i.toString().padStart(2, '0')}.000Z`,
+        content: `EXTRACTOR_TURN_${i}: codex assistant said something interesting here`,
+        metadata: { surface: 'codex', turn_index: i },
+      });
+    }
+
+    const result = await tailSession(store, { source_app: 'codex', count: 5 });
+
+    expect(result.source_resolved).toBe(rolloutSrc);
+    // We get the 3 extractor turns back, NEVER any fs-watcher events.
+    expect(result.turns).toHaveLength(3);
+    expect(result.turns.every((t) => t.content.startsWith('EXTRACTOR_TURN_'))).toBe(true);
+    expect(
+      result.turns.every((t) => (t.metadata as { surface?: string }).surface !== 'fs'),
+    ).toBe(true);
+  });
+
+  it('source_app: when ONLY fs-watcher events exist under the prefix, source resolution returns empty + warning (does not fall back to fs noise)', async () => {
+    const store = new MemoryStorage();
+    const HOME = homedir();
+    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
+
+    for (let i = 0; i < 5; i++) {
+      await store.append({
+        source: `${codexPrefix}rollout-X.jsonl`,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: JSON.stringify({ event_type: 'change', size: i }),
+        metadata: { surface: 'fs' },
+      });
+    }
+
+    const result = await tailSession(store, { source_app: 'codex' });
+
+    // Pre-fix: would have resolved to the rollout file and returned 5
+    // fs-watcher events. Post-fix: resolution finds no eligible
+    // (non-fs-surface) atom under the prefix → empty + warning, same shape
+    // as a truly empty store.
+    expect(result.source_resolved).toBeNull();
+    expect(result.turns).toEqual([]);
+    expect(result.warnings).toEqual([
+      'no captured sessions found for source_app=codex',
+    ]);
+  });
+
+  it('exact source: same exclusion applies — explicit `source=` path returns extractor atoms, not fs noise', async () => {
+    const store = new MemoryStorage();
+    const exactSrc = 'fs:/tmp/some-rollout.jsonl';
+
+    for (let i = 0; i < 4; i++) {
+      await store.append({
+        source: exactSrc,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: JSON.stringify({ event_type: 'change', size: i }),
+        metadata: { surface: 'fs' },
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      await store.append({
+        source: exactSrc,
+        timestamp: `2026-05-08T22:10:${i.toString().padStart(2, '0')}.000Z`,
+        content: `EXTRACTED_${i}`,
+        metadata: { surface: 'codex' },
+      });
+    }
+
+    const result = await tailSession(store, { source: exactSrc, count: 5 });
+
+    expect(result.source_resolved).toBe(exactSrc);
+    expect(result.turns).toHaveLength(2);
+    expect(result.turns.map((t) => t.content)).toEqual(['EXTRACTED_1', 'EXTRACTED_0']);
+  });
+});
+
 describe('tailSession (pagination + same-ms ties)', () => {
   it('25 events, count 10 → 10 + cursor → 10 + cursor → 5 + null cursor (no skips, no duplicates)', async () => {
     const store = new MemoryStorage();

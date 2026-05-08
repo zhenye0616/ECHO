@@ -260,6 +260,94 @@ describe('searchMemories (pure handler)', () => {
   });
 });
 
+// Bug A — per-match content envelope cap.
+//
+// Surfaced by the 2026-05-08 15:54 PDT post-026+027 dogfooding round:
+// `search_memories(query='JSON-RPC', source_app='codex')` returned only 3
+// matches but 318,574 chars total — single matches at 138k / 85k / 94k. A
+// real Codex turn JSONL atom is ~100KB, and the response had no per-match
+// content cap at all. Distinct from Bug 3 (cluster envelope in
+// get_recent_work_context).
+//
+// Contract: each match's `content` is capped at PER_MATCH_CONTENT_CAP chars
+// total. When elided, the content becomes head + elision marker + tail, and
+// `bytes_elided` carries the dropped char count so the consumer can size the
+// remainder.
+describe('searchMemories Bug A — per-match content envelope cap', () => {
+  it('content under cap is returned verbatim with no bytes_elided field', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:tiny',
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: 'short turn that fits well under the per-match cap',
+    });
+    const r = await searchMemories(store, {});
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]!.content).toBe('short turn that fits well under the per-match cap');
+    expect(r.matches[0]!.bytes_elided).toBeUndefined();
+  });
+
+  it('content over cap is elided to head + marker + tail; bytes_elided reports dropped chars', async () => {
+    const store = new MemoryStorage();
+    // 100 KB of repeating text — mirrors the 15:54 PDT real-world ~100KB
+    // Codex match shape that motivated this fix.
+    const head = 'HEAD_SENTINEL_' + 'a'.repeat(50_000);
+    const tail = 'b'.repeat(50_000) + '_TAIL_SENTINEL';
+    const big = head + tail;
+    expect(big.length).toBe(100_028);
+    await store.append({
+      source: 'fs:big.jsonl',
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: big,
+    });
+
+    const r = await searchMemories(store, {});
+
+    expect(r.matches).toHaveLength(1);
+    const m = r.matches[0]!;
+    // Net match content is bounded by the cap + a small marker overhead, NOT
+    // the original 100KB. Cap is the load-bearing invariant; assert it here.
+    expect(m.content.length).toBeLessThanOrEqual(2500);
+    // Both ends present — caller can identify the original by sentinel
+    // strings without reading the middle.
+    expect(m.content.startsWith('HEAD_SENTINEL_')).toBe(true);
+    expect(m.content.endsWith('_TAIL_SENTINEL')).toBe(true);
+    // Elision marker is present and references a positive char count.
+    expect(m.content).toMatch(/\[\d+\s*chars elided\]/);
+    // bytes_elided is exposed as a top-level field on the match for
+    // programmatic consumers, and its value plus retained content equals the
+    // original byte length.
+    expect(typeof m.bytes_elided).toBe('number');
+    expect(m.bytes_elided).toBeGreaterThan(0);
+  });
+
+  it('total response envelope stays under the consumer 25k budget on a 10× ~100KB-match fixture (the 15:54 PDT failure mode)', async () => {
+    const store = new MemoryStorage();
+    // Reproduce the 15:54 PDT shape exactly: many large matches under the
+    // codex prefix, all matching a substring query. Pre-fix: 3 matches blew
+    // 318k chars. Post-fix: even 10 matches must stay under 25k.
+    for (let i = 0; i < 10; i++) {
+      await store.append({
+        source: `fs:codex-${i}.jsonl`,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content:
+          `JSON-RPC turn ${i} ` +
+          'x'.repeat(100_000), // 100KB body, like the real Codex turns
+      });
+    }
+
+    const r = await searchMemories(store, { query: 'JSON-RPC', limit: 10 });
+
+    expect(r.total_returned).toBe(10);
+    const envelopeBytes = JSON.stringify(r).length;
+    // Hard envelope ceiling — the load-bearing acceptance check.
+    expect(envelopeBytes).toBeLessThan(25_000);
+    // Every match contributes a bytes_elided field, since each original
+    // content was ~100KB.
+    expect(r.matches.every((m) => typeof m.bytes_elided === 'number')).toBe(true);
+  });
+});
+
 describe('search_memories (end-to-end via MCP server)', () => {
   let handle: McpServerHandle | null = null;
   let restoreStdout: () => void;

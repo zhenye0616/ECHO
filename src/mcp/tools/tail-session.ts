@@ -88,14 +88,30 @@ function emitCursor(rows: CaptureEvent[], countApplied: number): {
   return { kept: rows, next_cursor: null };
 }
 
+// Bug B (surfaced 2026-05-08 15:54 PDT): both source resolution and the
+// per-source tail must EXCLUDE fs-watcher meta-events
+// (`metadata.surface === 'fs'`). Pre-fix, `tail_session(source_app='codex')`
+// resolved to the rollout file (correct) but then returned 5 fs-watcher
+// change events (`{event_type:"change", path, mtime, size}`) instead of the
+// codex extractor's turn atoms. Mirrors `recent-work-context.ts:171` —
+// `tail_session` is the cheap "where did <app> leave off" tool, and
+// fs-watcher events are an implementation detail of capture, not user-facing
+// content.
+const EXCLUDED_SURFACES_FOR_TAIL = ['fs'] as const;
+
 // Step 1 of `source_app` resolution: find the most-recently-active session
-// under the app's prefix. Returns the source string of the newest row, or
-// null if no atoms match the prefix at all.
+// under the app's prefix, IGNORING fs-watcher meta-events. Returns the source
+// string of the newest non-fs row, or null if no eligible atoms exist under
+// the prefix.
 async function resolveNewestSourceForApp(
   storage: Storage,
   prefix: string,
 ): Promise<string | null> {
-  const rows = await storage.query({ source_prefix: prefix, limit: 1 });
+  const rows = await storage.query({
+    source_prefix: prefix,
+    exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
+    limit: 1,
+  });
   if (rows.length === 0) return null;
   return rows[0]!.source;
 }
@@ -147,8 +163,12 @@ async function tailExactSource(
 ): Promise<TailSessionResult> {
   // Overfetch one extra row so we can emit a cursor when there are more rows
   // beyond `countApplied` — same pattern as search-memories' emitCursor.
+  // `exclude_metadata_surface` matches the `recent-work-context.ts:171`
+  // discipline: fs-watcher meta-events are capture-implementation detail,
+  // not user-facing tail content (Bug B, 2026-05-08 15:54 PDT).
   const filter: QueryFilter = {
     source: exactSource,
+    exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
     limit: countApplied + 1,
   };
   if (before !== undefined) filter.before = before;
