@@ -337,6 +337,85 @@ case "$CROSS_CHECK" in
     ;;
 esac
 
+# --- 8. Offset-form timestamp visibility (item 022 Bug A) --------------------
+#
+# Pre-022 the storage layer stored mixed timestamp forms (`Z` and `±HH:MM`),
+# and the WHERE clauses on (since, until) were lex-compares against canonical
+# `Z`-form ISO strings — so any in-window git event written with `-07:00`
+# would silently vanish from the result set. Post-022 the capture pipeline
+# canonicalizes all incoming timestamps to `Z`, and the daemon-startup
+# migration rewrites legacy `-07:00` rows on first boot.
+#
+# We probe a 24h window over the live store via `search_memories` (which gives
+# us a cheap source-typed listing) and assert: if any git event is present in
+# the window, every returned timestamp ends with `Z`. This is a sentinel — it
+# fires only when the regression is observable. (The unit-test layer covers
+# the deterministic case.)
+
+GITSCAN_RESPONSE=$(curl -sS \
+  -X POST "$URL" \
+  -H "Accept: $ACCEPT" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: $SESSION" \
+  --data "$(printf '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"search_memories","arguments":{"source_prefix":"git:","since":"%s","until":"%s","limit":50}}}' "$SINCE_ISO" "$NOW_ISO")")
+
+GITSCAN_PAYLOAD=$(extract_payload "$GITSCAN_RESPONSE")
+GITSCAN_FILE="$WORK/gitscan-payload.json"
+printf '%s' "$GITSCAN_PAYLOAD" > "$GITSCAN_FILE"
+
+GITSCAN_CHECK=$(python3 - "$GITSCAN_FILE" <<'PY' 2>&1
+import json, sys
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
+if not raw:
+    print("EMPTY_PAYLOAD")
+    sys.exit(0)
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"PAYLOAD_NOT_JSON: {exc}")
+    sys.exit(0)
+result = env.get("result") or env
+content = (result.get("content") or [])
+if not content:
+    print("OK_NO_CONTENT")
+    sys.exit(0)
+try:
+    inner = json.loads(content[0]["text"])
+except (KeyError, json.JSONDecodeError) as exc:
+    print(f"INNER_NOT_JSON: {exc}")
+    sys.exit(0)
+matches = inner.get("matches", [])
+if not matches:
+    print("OK_NO_GIT_IN_WINDOW")
+    sys.exit(0)
+non_z = [m for m in matches if not m.get("timestamp", "").endswith("Z")]
+if non_z:
+    bad = non_z[0].get("timestamp")
+    print(f"OFFSET_FORM_PRESENT: {len(non_z)}/{len(matches)} git events; first non-Z timestamp={bad}")
+    sys.exit(0)
+print(f"OK_ALL_GIT_CANONICAL: {len(matches)} git events all in Z-form")
+PY
+)
+
+case "$GITSCAN_CHECK" in
+  OK_ALL_GIT_CANONICAL*|OK_NO_GIT_IN_WINDOW|OK_NO_CONTENT|EMPTY_PAYLOAD)
+    : # benign — either all canonical, or no git events to probe
+    ;;
+  OFFSET_FORM_PRESENT*)
+    log_err "$GITSCAN_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$GITSCAN_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+  *)
+    log_err "git canonicalization check: $GITSCAN_CHECK"
+    log_err "raw response:"
+    printf '%s\n' "$GITSCAN_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+    ;;
+esac
+
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
@@ -344,4 +423,5 @@ log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"
 log_ok "OK: $CROSS_CHECK"
+log_ok "OK: $GITSCAN_CHECK"
 exit 0

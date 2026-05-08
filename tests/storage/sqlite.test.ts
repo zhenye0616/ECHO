@@ -305,3 +305,109 @@ describe('migration runner', () => {
     db.close();
   });
 });
+
+describe('SqliteStorage timestamp canonicalization migration (item 022 Bug A)', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'echo-canon-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('mixed-form window query: -07:00 row inserted raw, then canonicalized on reopen, returned by Z-form window', async () => {
+    const dbPath = join(dir, 'echo.db');
+    // First open: applies SQL migrations + canonicalize (no-op on empty DB).
+    const a = new SqliteStorage(dbPath);
+    // SqliteStorage.append stores the timestamp verbatim (canonicalization
+    // lives in the capture pipeline, not in storage's append). Append a
+    // -07:00 row directly so this exercises the migration path that runs on
+    // SqliteStorage construction.
+    await a.append({
+      source: 'git:repo',
+      timestamp: '2026-05-08T00:00:00.000-07:00', // = 2026-05-08T07:00:00.000Z
+      content: 'commit-pre-canon',
+    });
+    // Sanity: pre-fix lex compare drops this row from the Z-form window.
+    const preMig = await a.query({
+      since: '2026-05-08T05:00:00.000Z',
+      until: '2026-05-08T09:00:00.000Z',
+    });
+    expect(preMig).toHaveLength(0);
+    a.close();
+
+    // Reopen: ctor runs canonicalizeTimestamps and rewrites the -07:00 row.
+    const b = new SqliteStorage(dbPath);
+    const postMig = await b.query({
+      since: '2026-05-08T05:00:00.000Z',
+      until: '2026-05-08T09:00:00.000Z',
+    });
+    expect(postMig).toHaveLength(1);
+    expect(postMig[0]!.timestamp).toBe('2026-05-08T07:00:00.000Z');
+    expect(postMig[0]!.content).toBe('commit-pre-canon');
+    b.close();
+  });
+});
+
+describe('SqliteStorage exclude_metadata_surface filter (item 022 Bug C)', () => {
+  let store: SqliteStorage;
+
+  beforeEach(() => {
+    store = new SqliteStorage(':memory:');
+  });
+
+  afterEach(() => {
+    store.close();
+  });
+
+  it('excludes rows whose metadata.surface is in the exclusion list', async () => {
+    await store.append({
+      source: 'fs:/Users/zhen/.claude/projects/abc/s.jsonl',
+      timestamp: '2026-05-08T10:00:00.000Z',
+      content: 'turn-pair',
+      metadata: { session_id: 'abc' }, // no surface
+    });
+    await store.append({
+      source: 'fs:/Users/zhen/file.txt',
+      timestamp: '2026-05-08T10:01:00.000Z',
+      content: '{"event_type":"change","path":"/x","mtime":"...","size":1}',
+      metadata: { surface: 'fs', file_kind: 'cursor-workspace' },
+    });
+    await store.append({
+      source: 'git:repo',
+      timestamp: '2026-05-08T10:02:00.000Z',
+      content: 'commit',
+      metadata: { sha: 'abc' },
+    });
+
+    const all = await store.query();
+    expect(all).toHaveLength(3);
+
+    const filtered = await store.query({ exclude_metadata_surface: ['fs'] });
+    expect(filtered).toHaveLength(2);
+    expect(filtered.map((e) => e.content).sort()).toEqual(['commit', 'turn-pair']);
+  });
+
+  it('preserves the conversation-atom path: fs: source-prefix events without surface=fs are kept', async () => {
+    await store.append({
+      source: 'fs:/Users/zhen/.claude/projects/abc/s.jsonl',
+      timestamp: '2026-05-08T10:00:00.000Z',
+      content: 'USER: ...\n\nASSISTANT: ...',
+      metadata: { session_id: 'abc', repo_root: '/repo' },
+    });
+    const r = await store.query({ exclude_metadata_surface: ['fs'] });
+    expect(r).toHaveLength(1);
+  });
+
+  it('empty exclusion list is a no-op', async () => {
+    await store.append({
+      source: 'fs:test',
+      timestamp: '2026-05-08T10:00:00.000Z',
+      content: 'x',
+      metadata: { surface: 'fs' },
+    });
+    expect(await store.query({ exclude_metadata_surface: [] })).toHaveLength(1);
+  });
+});

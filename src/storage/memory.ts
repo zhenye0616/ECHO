@@ -20,6 +20,10 @@ export class MemoryStorage implements Storage {
     const until = filter?.until;
     const limit = filter?.limit;
     const order = filter?.order ?? 'desc';
+    const excludeSurfaces =
+      filter?.exclude_metadata_surface !== undefined && filter.exclude_metadata_surface.length > 0
+        ? new Set(filter.exclude_metadata_surface)
+        : undefined;
 
     // Filter first (full pass), then sort by timestamp in the requested order,
     // then truncate. Sorting before truncation preserves "keep the newest N"
@@ -30,6 +34,10 @@ export class MemoryStorage implements Storage {
       if (sourcePrefix !== undefined && !event.source.startsWith(sourcePrefix)) continue;
       if (since !== undefined && event.timestamp < since) continue;
       if (until !== undefined && event.timestamp >= until) continue;
+      if (excludeSurfaces !== undefined) {
+        const surface = (event.metadata as { surface?: unknown } | undefined)?.surface;
+        if (typeof surface === 'string' && excludeSurfaces.has(surface)) continue;
+      }
       filtered.push(event);
     }
     filtered.sort((a, b) => {

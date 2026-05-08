@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import type { CaptureEvent, EventId, QueryFilter, Storage } from './interface.js';
-import { migrate } from './migrate.js';
+import { canonicalizeTimestamps, migrate } from './migrate.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 
@@ -52,6 +52,7 @@ export class SqliteStorage implements Storage {
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
     migrate(this.db, MIGRATIONS_DIR);
+    canonicalizeTimestamps(this.db);
 
     this.insertStmt = this.db.prepare(
       `INSERT INTO events (id, source, timestamp, content, metadata, embedding)
@@ -97,6 +98,20 @@ export class SqliteStorage implements Storage {
     if (filter?.until !== undefined) {
       clauses.push('timestamp < @until');
       params['until'] = filter.until;
+    }
+    if (filter?.exclude_metadata_surface !== undefined && filter.exclude_metadata_surface.length > 0) {
+      // SQL parameter binding doesn't support IN-list expansion directly with
+      // better-sqlite3 named params, so the clause is built with positional
+      // placeholders and the list is encoded into params under indexed names.
+      const placeholders: string[] = [];
+      filter.exclude_metadata_surface.forEach((surface, i) => {
+        const key = `__exclude_surface_${i}`;
+        placeholders.push(`@${key}`);
+        params[key] = surface;
+      });
+      clauses.push(
+        `COALESCE(json_extract(metadata, '$.surface'), '') NOT IN (${placeholders.join(', ')})`,
+      );
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';

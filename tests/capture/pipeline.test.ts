@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { processCandidate } from '../../src/capture/pipeline.js';
+import { canonicalizeTimestamp, processCandidate } from '../../src/capture/pipeline.js';
 import { CAPTURED_SOURCES } from '../../src/capture/sources.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import { resetAllowlist } from '../fixtures/allowlist.js';
@@ -147,5 +147,85 @@ describe('processCandidate', () => {
       expect(await a.count()).toBe(1);
       expect(await b.count()).toBe(0);
     });
+  });
+
+  describe('timestamp canonicalization at the chokepoint (item 022 Bug A)', () => {
+    beforeEach(() => {
+      const apis = CAPTURED_SOURCES.apis as unknown as string[];
+      apis.push('github');
+    });
+
+    it('Z-suffixed input is stored unchanged', async () => {
+      await processCandidate(
+        validEvent({ source: 'api:github', timestamp: '2026-05-08T07:00:00.000Z' }),
+        storage,
+      );
+      const [evt] = await storage.query();
+      expect(evt!.timestamp).toBe('2026-05-08T07:00:00.000Z');
+    });
+
+    it('+07:00 offset input is converted to canonical Z form', async () => {
+      await processCandidate(
+        validEvent({ source: 'api:github', timestamp: '2026-05-08T14:00:00.000+07:00' }),
+        storage,
+      );
+      const [evt] = await storage.query();
+      expect(evt!.timestamp).toBe('2026-05-08T07:00:00.000Z');
+    });
+
+    it('-07:00 offset input is converted to canonical Z form (the git-watcher case)', async () => {
+      await processCandidate(
+        validEvent({ source: 'api:github', timestamp: '2026-05-08T00:00:00.000-07:00' }),
+        storage,
+      );
+      const [evt] = await storage.query();
+      expect(evt!.timestamp).toBe('2026-05-08T07:00:00.000Z');
+    });
+
+    it('preserves millisecond precision through canonicalization', async () => {
+      await processCandidate(
+        validEvent({ source: 'api:github', timestamp: '2026-05-08T00:18:26.123-07:00' }),
+        storage,
+      );
+      const [evt] = await storage.query();
+      expect(evt!.timestamp).toBe('2026-05-08T07:18:26.123Z');
+    });
+
+    it('naive (TZ-less) input is canonicalized assuming UTC (N1 policy)', async () => {
+      await processCandidate(
+        validEvent({ source: 'api:github', timestamp: '2026-05-08T07:00:00' }),
+        storage,
+      );
+      const [evt] = await storage.query();
+      expect(evt!.timestamp).toBe('2026-05-08T07:00:00.000Z');
+    });
+  });
+});
+
+describe('canonicalizeTimestamp (pure helper)', () => {
+  it('returns Z-form unchanged', () => {
+    expect(canonicalizeTimestamp('2026-05-08T07:00:00.000Z')).toBe('2026-05-08T07:00:00.000Z');
+  });
+
+  it('converts +HH:MM offset to Z', () => {
+    expect(canonicalizeTimestamp('2026-05-08T14:00:00.000+07:00')).toBe(
+      '2026-05-08T07:00:00.000Z',
+    );
+  });
+
+  it('converts -HH:MM offset to Z', () => {
+    expect(canonicalizeTimestamp('2026-05-08T00:00:00.000-07:00')).toBe(
+      '2026-05-08T07:00:00.000Z',
+    );
+  });
+
+  it('preserves millisecond precision', () => {
+    expect(canonicalizeTimestamp('2026-05-08T00:18:26.123-07:00')).toBe(
+      '2026-05-08T07:18:26.123Z',
+    );
+  });
+
+  it('treats naive (TZ-less) input as UTC', () => {
+    expect(canonicalizeTimestamp('2026-05-08T07:00:00')).toBe('2026-05-08T07:00:00.000Z');
   });
 });

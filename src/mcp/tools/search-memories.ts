@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
-  "Search the user's captured ECHO memories (Cursor + Claude Code conversations, git commits) by free-text query, source prefix, or time range. Returns the most recent matching events. `source_prefix` is matched literally against the stored source string, which is filesystem-path-encoded (e.g., `fs:/Users/<user>/.claude/projects/` for Claude Code, `fs:/Users/<user>/.codex/` for Codex, `git:` for commits) — logical names like `claude_code` or `cc` will not match. If a guessed prefix returns 0 results, broaden to `fs:` and inspect the `source` field on returned events to discover the right prefix.";
+  "Search the user's captured ECHO memories (Cursor + Claude Code conversations, git commits) by free-text query, source prefix, or time range. Returns the most recent matching events. `source_prefix` is matched literally against the stored source string, which is filesystem-path-encoded (e.g., `fs:/Users/<user>/.claude/projects/` for Claude Code, `fs:/Users/<user>/.codex/` for Codex, `git:` for commits) — logical names like `claude_code` or `cc` will not match. If a guessed prefix returns 0 results, broaden to `fs:` and inspect the `source` field on returned events to discover the right prefix. Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions.";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
@@ -81,11 +81,17 @@ export async function searchMemories(
   if (source_prefix !== undefined) filter.source_prefix = source_prefix;
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
+  // Only safe to upstream-limit when no content filter runs after. With a
+  // content predicate, the upstream limit would relocate the filter-before-slice
+  // bug into the storage layer (matches outside the newest-N would still vanish).
+  // Push a server-side substring filter into QueryFilter is the proper long-term
+  // fix; until then we accept the load-then-filter memory cost. The recency-only
+  // path gets the optimization for free.
+  if (query === undefined) filter.limit = limitApplied;
 
   const all = await storage.query(filter);
   const sorted = sortDesc(all);
-  const overfetch = Math.min(limitApplied * 4, MAX_OVERFETCH);
-  let candidates = sorted.slice(0, overfetch);
+  let candidates = sorted;
 
   if (query !== undefined) {
     const q = query.toLowerCase();
