@@ -1,7 +1,25 @@
 ---
 id: 2026-05-08-023-chokidar-flake-quarantine
 title: Quarantine the recurring chokidar / capture / daemon-lifecycle flake cluster
-status: pending_review
+status: complete
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation.
+
+  Conflicts resolved: none. backlog/_followups.md auto-merged cleanly — branch's annotations to existing 014/016/018/019/020/021 sections did not collide with main's freshly-appended "from merge of 022" section (added at file-trailer between sidecar write and merge).
+
+  Fixups applied: none — implementation is correct as-is.
+
+  Founder decision: option (b) confirmed (founder ran /merge-and-cleanup 023 after seeing the sidecar's recommendation). 023 merges as-is; the fs-watcher.test.ts carve-out becomes a tight successor follow-up (~15 min, same Path C describe.skip shape).
+
+  Verify: 469/469 tests pass | 15 skipped | 0 failed. The two quarantined describe blocks (cursor.test.ts startCursorExtractor lifecycle + integration, lifecycle.test.ts daemon lifecycle) are cleanly skipped. fs-watcher.test.ts happened to pass this run — within the ~67% solo pass rate the sidecar flagged. Lint and typecheck clean.
+
+  Pre-merge baseline (item 022 merge ran ~2 minutes before 023): 9 failures across the same cluster, exactly the noise this item was specced to silence. Post-023 the cluster is silent.
+
+  Follow-up items (non-blocking):
+  - fs-watcher.test.ts Path C successor — apply describe.skip to startFsWatcher block (~30 LOC, ~15 min). The 014 section's annotation in _followups.md already pre-lays the breadcrumb.
+  - File the chokidar real-fix item (post-V1.5; 2-3d). Tracking comments at tests/capture/extractors/cursor.test.ts and tests/daemon/lifecycle.test.ts cite 023; when 023 lands in complete/, those references become tombstones. Investigate deterministic synchronization via probeFreshness handle (already flagged in 016 followup) or sentinel-event subscription.
+  - Optional: grep-anchored CI ship-blocker for V1 cut. CI fails if describe.skip paired with 2026-05-08-023 is still present after a target date. Insurance against deferral outliving memory.
+
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-08
