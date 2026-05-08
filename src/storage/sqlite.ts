@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import type { CaptureEvent, EventId, QueryFilter, Storage } from './interface.js';
 import { canonicalizeTimestamps, migrate } from './migrate.js';
+import { createLogger } from '../logging/index.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
+
+const log = createLogger('storage.sqlite');
 
 interface EventRow {
   id: string;
@@ -52,7 +55,10 @@ export class SqliteStorage implements Storage {
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
     migrate(this.db, MIGRATIONS_DIR);
-    canonicalizeTimestamps(this.db);
+    const { converted } = canonicalizeTimestamps(this.db);
+    if (converted > 0) {
+      log.info('canonicalized_timestamps', { converted });
+    }
 
     this.insertStmt = this.db.prepare(
       `INSERT INTO events (id, source, timestamp, content, metadata, embedding)

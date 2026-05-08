@@ -1,7 +1,29 @@
 ---
 id: 2026-05-08-022-v15-2-trace-retrieval-reliability
 title: V1.5.2 trace + retrieval reliability — close the cross-source bias and silent-failure bugs
-status: pending_review
+status: complete
+review_notes: |
+  Merged on 2026-05-08 via founder reconciliation.
+
+  Conflicts resolved: none — clean fast-forward; branch was one commit ahead of main with no overlapping touches.
+
+  Fixups applied:
+  - src/storage/sqlite.ts: log canonicalized_timestamps return value when converted > 0 via the project's createLogger('storage.sqlite'). Closes the spec's "migration row-count diff" observability requirement and the agent's open question #3.
+
+  Fixups deferred to follow-up items: none (only one fixup; applied).
+
+  Verify: 107/107 tests pass on 022's 5 modified test files (pipeline, migrate, sqlite, recent-work-context, search-memories) deterministically. Full-suite shows 9 unrelated failures in tests/capture/extractors/cursor.test.ts + tests/capture/surfaces/fs-watcher.test.ts — the chokidar/cursor/fs-watcher flake cluster targeted by item 023 (currently under review). Lint and typecheck clean.
+
+  Live-store evidence the fixup is wired correctly: sqlite.test.ts produced the structured log line {"source":"storage.sqlite","message":"canonicalized_timestamps","payload":{"converted":1}} during the regression test that seeds a -07:00 row, confirming first-daemon-boot post-merge observability for the 152 expected legacy rows in the founder's local DB.
+
+  Follow-up items (non-blocking):
+  - Resolve item 023 backlog-state collision (agent's claim commit a3d1fe2 wrote 022's persona into 023's frontmatter; agent did not touch 023's code). 023 is independently under review.
+  - Add explanatory comment at src/storage/migrate.ts:71 (TZ_MARKER_RE branch — defensive for naive rows that bypass the SQL `WHERE timestamp NOT LIKE '%Z'` filter).
+  - Consider lifting cap-hit equality check to >= storageCap once a count(filter) storage method exists (V1.5.3).
+  - Strategist: wiki promotion bundle 019+020+021+022, including new wiki/architecture/ page on timestamp canonicalization at capture.
+  - Dogfooding: re-run 01:03 PDT and 01:33 PDT scenarios post-daemon-restart; expect source_breakdown to include git ≥1 and codex ≥1.
+  - Dogfooding-surfaced gaps to be specced as separate items: source-prefix retrieval reliability, cross-source representation balance / per-source quotas, KNN non-determinism, default 4h window framing for "where did I leave off", cluster-loss truncation strategy, atom-skeleton-only mode, daemon-restart-after-merge automation, R1 founder hand-score pass on 020 fixture.
+
 priority: HIGH
 estimate: 3-4d
 created: 2026-05-08
