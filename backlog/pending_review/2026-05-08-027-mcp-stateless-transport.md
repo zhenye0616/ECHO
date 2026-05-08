@@ -8,10 +8,25 @@ created: 2026-05-08
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-08T22:30:00Z"
 branch: "agent/mcp-stateless-transport"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--mcp-stateless-transport"
+head_sha: "cbcf79e7ad6b16a5eca7d5f76588a4931f2e7dc5"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Switched ECHO's MCP HTTP transport from process-local stateful sessions to
+  documented stateless mode (sessionIdGenerator: undefined, enableJsonResponse:
+  true). Per-request fresh McpServer + StreamableHTTPServerTransport; the
+  shared Storage stays process-scoped. Server emits no Mcp-Session-Id response
+  header; any client-supplied session header is silently ignored. GET/DELETE
+  /mcp return 405 with Allow: POST and a JSON-RPC-style error body. Loopback
+  DNS rebinding protection preserved via SDK allowedHosts. 5 new regression
+  tests added (12 total in tests/mcp/server.test.ts; full suite 494 passed).
+  Smoke script updated to optional-session-header behavior plus a final
+  stale-session echo_ping recovery probe — passes against a live daemon.
+  docs/mcp-integration.md troubleshooting documents the new behavior.
+  Live curl -i confirms: initialize returns content-type application/json with
+  no mcp-session-id; POST with arbitrary stale session header returns 200 with
+  pong:true; GET/DELETE return 405 + Allow: POST. All acceptance criteria met.
+  Branch agent/mcp-stateless-transport pushed at cbcf79e.
 review_notes: ""
 spec_refs:
   - src/mcp/server.ts
