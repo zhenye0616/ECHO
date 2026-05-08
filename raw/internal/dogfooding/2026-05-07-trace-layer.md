@@ -378,6 +378,49 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+#### 2026-05-08 02:05 PDT — Codex re-verifies `_followups.md` gaps after 022/023
+
+- **Trigger:** founder asked Codex to check `backlog/_followups.md` and reverify the post-022 gaps.
+- **Tool/input:**
+  1. `get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=50, format="minimal")` via ECHO MCP connector → transport deserialize error.
+  2. `echo_ping(message="post-022 gap verification connectivity check")` via ECHO MCP connector → same transport deserialize error.
+  3. Direct HTTP MCP `get_recent_work_context` same day window, `limit=50`, `format="minimal"`.
+  4. Direct HTTP MCP `get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=100, format="minimal")`.
+  5. Direct HTTP MCP `search_memories(source_prefix="git:", since="2026-05-08T00:00:00-07:00", limit=5)`.
+  6. Direct HTTP MCP `search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T00:00:00-07:00", limit=5)`.
+  7. Direct HTTP MCP `search_memories(query="use echo and see what i am current working on", source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T00:00:00-07:00", limit=5)`.
+  8. Direct HTTP MCP `search_memories(query="hotkey overlay", since="2026-05-07T00:00:00-07:00", limit=5)` twice.
+  9. Direct HTTP MCP same day window with `limit=100`.
+  10. `echo_ping(message="post-kickstart connector health check")` via ECHO MCP connector after launchd kickstart.
+- **Returned:** connector failed before payload both before and after kickstart (`Deserialize error: data did not match any variant of untagged enum JsonRpcMessage`). Direct HTTP MCP worked after launchd kickstart. Day `limit=50`: 1 returned cluster / 50 atoms of 60, warning `limit dropped 1 entire cluster(s)`, source_breakdown `{claude_code: 27, git: 23}`. Day `limit=100`: 2 clusters / 60 atoms, no truncation, source_breakdowns `{claude_code: 27, git: 23}` and `{codex: 10}`. Round-4 window: 1 returned cluster / 100 atoms of 153, warning `limit dropped 3 entire cluster(s)`, source_breakdown `{git: 32, claude_code: 88}`. `search_memories(source_prefix="git:")` returned 5 commit rows. Codex prefix without query returned 5 raw fs-change rows; Codex prefix with exact query returned the normalized Codex turn. `hotkey overlay` returned identical 5-match results across two calls.
+- **Sources:** direct trace now includes git in the Project_echo cluster and Codex in a separate lower-rank cluster; search sources were `git:/Users/zhenye/Desktop/Project_echo`, `fs:/Users/zhenye/.codex/...jsonl`, and mixed git/Claude rows for `hotkey overlay`.
+- **Verdict:** 🟡 partial.
+- **Note:** 022 fixed timestamp canonicalization and raw-FS trace budget for git; DB now has 0 non-`Z` timestamps and daemon log showed `storage.sqlite canonicalized_timestamps` with `converted:168`. Remaining retrieval/ranking issue: at lower limits Codex is still a separate dropped cluster, though the cluster-loss warning now says so. `search_memories` still returns raw fs rows on recency-only Codex prefix lookups by design; exact content queries now surface normalized turns.
+- **Conjecture:** Close the "git silently missing" and "same query nondeterminism" gaps; keep "Codex prefix recency returns raw rows", "source-balanced trace ranking at low limits", and "MCP connector/daemon health" as live follow-ups.
+
+---
+
+#### 2026-05-08 02:10 PDT — Claude Code retrieves Codex's 02:05 PDT investigation via ECHO (post-022/023 meta-dogfooding)
+
+- **Trigger:** founder asked Claude Code to "investigate codex's finding first pull it using echo" — verifying the 02:05 PDT entry against ECHO's own captured memory of Codex's session, post-022 + post-023 daemon restarts.
+- **Tool/input (sequence):**
+  1. `get_recent_work_context(since="2026-05-08T08:30:00Z", until="2026-05-08T09:30:00Z", window_hours=1, limit=50, format="minimal")`
+  2. `search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T08:50:00Z", until="2026-05-08T09:30:00Z", limit=10)`
+- **Returned:**
+  1. **Tool result over CC's budget at 105,933 chars** (saved to disk; sliced via subagent). Trace contained 2 clusters / 28 atoms across the 1h window: cluster 1 `{claude_code: 13, git: 11}` rank_reasons `[recent_activity, has_open_loop, dense]`, cluster 2 `{codex: 4}` rank_reasons `[recent_activity]`. `truncated: false`, `warnings: []`, `atoms_returned: 28 / atoms_total_in_window: 28`.
+  2. **98,484 chars** — also over budget. 10 matches; 9 raw fs-change rows (194 chars each) + 1 extracted Codex turn (atom `c4b7684f-7cd6-449b-98f3-98c47a4ae6d3`, 6,567 chars, `turn_index: 3`, model `gpt-5.5`, `had_tool_use: True`).
+- **Sources:** `search_memories` returned only `fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl` — 9 raw fs-change rows + 1 extracted turn; no git/claude_code/cursor surfaces. Trace `source_breakdown` per cluster: cluster 1 claude_code 13 + git 11; cluster 2 codex 4.
+- **Verdict:** 🟡 partial.
+- **Note:**
+  1. **Codex extractor IS working** — substantive Codex turn extracted, full 02:05 narration preserved. Settles the 01:24/01:28 PDT correction thread definitively.
+  2. **Source-prefix recency lookup still drowns content in raw fs-change rows** — 9 of 10 matches were 194-char raw rows; only one carried real content. Confirms the "Codex source-prefix retrieval ordering" gap (filed under 022 followups) is unchanged by 022's Bug C/D — `search_memories` deliberately doesn't pass `exclude_metadata_surface: ['fs']` per spec (forensic preservation), so this gap requires a separate fix shape.
+  3. **Trace ranking surfaces Codex as a separate lower-rank cluster** at `limit=50` — convergent with Codex's 02:05 PDT direct daemon observation on the same window. Cluster 1 (claude_code + git) outranks cluster 2 (codex alone) because of `has_open_loop` + `dense` boosting; Codex's 4 atoms didn't merge into the dominant Project_echo cluster because no shared artifact joined them across sources. Two independent runs converging on the same observation is structural-correctness signal for the gap inventory.
+  4. **Atom envelope payload floor confirmed live post-022** — trace at 50 atoms = 105K chars; search at 10 atoms = 98K chars; `format: "minimal"` already in use. The skeleton-only-mode candidate from 16:16 PDT (round 2 themes) is now the highest-leverage payload move.
+- **Conjecture (observation only — for end-of-window backlog synthesis, not for fixing here):**
+  - Several `_followups.md` entries can now move from "needs re-verification post-022" to specific resolution states. The convergence between Codex's 02:05 PDT direct inspection and this 02:10 PDT MCP retrieval gives high confidence on which gaps closed vs persist vs narrowed — but the journal is observational; do not edit followups in this entry.
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
