@@ -677,6 +677,111 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+### 2026-05-08 17:01–17:03 PDT — V1.5 full-halt live test (post-028 + post-V1.5.6)
+
+> Founder paused for full live testing. Single Claude Code session (`bcc0a351-...jsonl`) running on merged main (HEAD `21edd69`, V1.5.6 wire-shape projector live). Multi-call entry — every ECHO MCP tool exercised across cross-session, cross-tool, cross-day axes. Observations only; gap classifications captured separately in `2026-05-08-v1-5-livetest-gaps.md`.
+
+#### Call 1 — `echo_ping(message="v1.5 live test starting")`
+- **Trigger:** connectivity smoke test before deeper queries.
+- **Returned:** `{pong: true, ts: 2026-05-09T00:01:17.797Z, received: "v1.5 live test starting"}`.
+- **Sources:** N/A (ping).
+- **Verdict:** ✅ right.
+- **Note:** server up, transport healthy, clock returns UTC ISO (founder is PDT — `ts` does not localize, which is correct for the wire layer but worth flagging for any human-shown surface).
+
+#### Call 2 — `get_recent_work_context(format="skeleton", window_hours=24, limit=20)`
+- **Trigger:** open-ended "what was I working on" pull.
+- **Query inputs:** since=2026-05-08T20:01:18Z, until=2026-05-09T00:01:18Z, limit=20, format=skeleton, window_hours=24.
+- **Returned:** 1 cluster of 2, 20/144 atoms; top cluster "discussion about Project_echo"; rank_reasons `[recent_activity, has_open_loop, dense]`. Warnings: `limit dropped 1 entire cluster(s)`. Envelope ~ inline (well under 25k).
+- **Sources:** `cluster.source_breakdown = {git: 49, claude_code: 84}` — **codex and cursor entirely absent** even though codex sessions exist for 2026-05-08 (verified via tail_session below) and the 2026-05-06+ window has 244 atoms total.
+- **Verdict:** 🟡 partial — skeleton envelope itself is clean and rank reason is right, but a 24h window with 144 atoms returns only **claude_code+git** when codex+cursor activity exists in the same window. Either codex/cursor atoms are in the dropped second cluster (mono-tool clustering) or they never join the dominant repo cluster.
+- **Note:** the strict-shared-artifact join policy (post-019 edge filter) likely excludes codex turns whose `repo_root` matches but whose `cwd`/`files_referenced` don't co-occur with claude_code's. This was a known design trade-off; live-test confirms it bites the "what is everyone working on" use case the rwc tool's docstring promises (`source_breakdown` per-app counts) on real cross-tool days.
+
+#### Call 3 — `search_memories(query="028", since="2026-05-06T00:00:00", limit=10)`
+- **Trigger:** cross-day substring lookup against the just-merged item id.
+- **Query inputs:** query=028, since=2026-05-06T00:00:00 (no Z), limit=10.
+- **Returned:** 10 matches, `next_cursor` populated. Spans 2026-05-08T23:30→23:58Z. Top match is the live conversation's user prompt (mtime indexed sub-second after capture — capture-pipeline freshness confirmed).
+- **Sources:** mix of `claude_code` (jsonl) and `git` (commit). No codex, no cursor — but "028" is a recent claude_code-coined item id, so absence is plausible not pathological.
+- **Verdict:** ✅ right.
+- **Note:** `since` lacked a Z suffix, but **no warning was emitted** (unlike `get_recent_work_context` Call 8 below). Inconsistent TZ-validation between tools. Schema regex `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}` accepts both forms silently in `search_memories`. Match metadata showed `metadata_bytes_elided` populated (V1.5.6 working) and per-match envelope < 8KB even on the Codex-spec turn (which pre-V1.5.6 spilled).
+
+#### Call 4 — `search_memories(query="envelope", source_app="codex", limit=5)`
+- **Trigger:** confirm codex data is reachable via `source_app=codex` filter (cross-tool query).
+- **Returned:** 5 matches, all from `fs:/Users/zhenye/.codex/sessions/2026/05/{07,08}/...jsonl`. Newest 2026-05-08T21:32Z, oldest 2026-05-07T23:23Z.
+- **Sources:** all codex; metadata shows `tool_calls.__elided = true` (V1.5.6 metadata cap engaged). Envelope inline.
+- **Verdict:** ✅ right — codex IS in the store and reachable; absent from Call 2's cluster is therefore a *clustering* gap, not a capture gap.
+- **Note:** confirms Codex extractor + V1.5.6 metadata cap shipping correctly together.
+
+#### Call 5 — `search_memories(query="v1.5", source_app="cursor", limit=5)`
+- **Trigger:** does Cursor have any "v1.5" hits?
+- **Returned:** **0 matches**. `next_cursor: null`.
+- **Sources:** N/A (empty).
+- **Verdict:** 🟡 partial — semantically valid (cursor turns from a week ago wouldn't say "v1.5"), but coupled with Call 6/13 below paints a *Cursor capture is silent* picture.
+
+#### Call 6 — `tail_session(source_app="cursor", count=5)`
+- **Trigger:** cross-session "where did Cursor leave off" — sanity check Cursor capture freshness.
+- **Returned:** 5 turns, all from `state.vscdb`, **newest at 2026-05-01T08:40:14Z** — i.e., **Cursor turn capture is 7 full days stale on a machine where Cursor has been used since**.
+- **Sources:** `fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb`.
+- **Verdict:** ❌ wrong (against documented "where did `<app>` leave off" affordance).
+- **Note:** the auto-resolved most-recent-active session for `source_app=cursor` is 7 days old. Either cursor extractor has stopped emitting turn atoms, or only fs-events on workspaceStorage are being captured (see Call 13). High-priority confirmation needed before V1.5 ship — "Cursor + Claude Code" is a V1 cohort bundle promise.
+
+#### Calls 7a/7b/7c — `tail_session(source_app="codex"|"claude_code"|"git", count=5)`
+- **Trigger:** cross-tool tail-session sanity for the other three apps.
+- **Returned:** codex auto-resolved to `rollout-2026-05-08T14-44-57-019e098d-...jsonl` (today, ~14:44 PDT); claude_code resolved to today's live `bcc0a351-...jsonl`; git resolved to `git:/Users/zhenye/Desktop/Project_echo` with 5 most-recent commits including the V1.5.6 merge.
+- **Sources:** all three resolve to the right newest-session for their app.
+- **Verdict:** ✅ right for codex/claude_code/git. Pairs with Call 6 to localize the Cursor freshness issue to the cursor extractor specifically.
+
+#### Call 8 — `get_recent_work_context(format="skeleton", window_hours=48, since="2026-05-06T00:00:00", until="2026-05-08T00:00:00", limit=30)`
+- **Trigger:** cross-day query (two-day-old window, before today's work).
+- **Returned:** 1 cluster of 5, 30/244 atoms, **dropped 4 entire clusters** at limit=30. Cluster source_breakdown `{git: 39, claude_code: 142}`.
+- **Warnings:** `input.since or input.until lacks a TZ specifier and was parsed as local time; pass an explicit Z or +HH:MM to avoid ambiguity` ✅.
+- **Verdict:** 🟡 partial — TZ warning is good; default `limit=20/30` discards 4/5 of clusters in a multi-day window. The user-facing affordance "what was I doing 2 days ago" is unusable at default limits without iteration.
+- **Note:** `truncation.clusters_total: 5` is visible to the AI client, but there's no opt-in to *just see the cluster headers* (label + counts only) before deciding which to hydrate. Stage-1 surface-then-deep-dive design intent partially missing — see Call 15 spill below.
+
+#### Calls 9/10/11/14 — `memory_get_profile()`, `memory_list_recent(limit=15)`, `memory_search(query="v1.5 envelope skeleton format", k=5)`, `memory_ingest(text="Live test ping...")`
+- **Trigger:** test the second MCP server (`echo-memory`) — singleton facts, recent facts, KNN search, write path.
+- **Returned:** **all four calls fail** with `(sqlite3.OperationalError) unable to open database file` (memory_ingest returned `{error: "enqueue_failed", detail: "..."}`).
+- **Sources:** N/A (server-side failure before query).
+- **Verdict:** ❌ wrong — `echo-memory` MCP server is fully broken end-to-end. `memory_ingest`, `memory_search`, `memory_list_recent`, `memory_get_profile` all return the same SQLite error. The store path the server is trying to open doesn't exist or is unreadable.
+- **Note:** this is a **separate process** from the main ECHO daemon (which is healthy per Call 1). Either the SQLite file location is mis-configured in the connector's environment or the file was never created. Before V1.5 ship the memory MCP either has to (a) fail open with a useful pointer to setup, or (b) be removed from the published MCP surface so AI clients don't hit a 100% error rate on its tools. **`memory_get_task_status` was not exercised since enqueue itself failed** — there's no way to obtain a task_id.
+
+#### Call 12 — `get_recent_work_context(format="minimal", window_hours=4, limit=10)`
+- **Trigger:** confirm V1.5.6 minimal-format inline-envelope claim on live data.
+- **Returned:** 1 cluster of 2, 10/100 atoms. Inline (well under 25k). Per-atom `action.input/output` clipped to 500 chars; `[truncated; N chars omitted; fetch full atom via search_memories]` marker present.
+- **Warnings:** `storage cap hit (events.length === limit * STORAGE_OVERFETCH); atoms in window may be silently truncated.` ✅ (`limit*10 = 100`, all 100 returned, more in window).
+- **Verdict:** ✅ right — V1.5.6 minimal envelope holds on a real live response.
+
+#### Call 13 — `search_memories(query="", source_app="cursor", limit=3, since="2026-05-07T00:00:00Z")`
+- **Trigger:** what does the Cursor lane have AT ALL since yesterday?
+- **Returned:** 3 matches, **all from `cursor-retrieval/embeddable_files.txt` and `high_level_folder_description.txt`** — fs-watcher change events on Cursor's internal workspace-storage files, **not Cursor turns**. Content shape: `{event_type: "change", path: "...", mtime: "...", size: N}`. `metadata.surface = "fs"`, `metadata.file_kind = "cursor-workspace"`.
+- **Sources:** `fs:/Users/zhenye/Library/Application Support/Cursor/User/workspaceStorage/...`.
+- **Verdict:** ❌ wrong against the documented `source_app="cursor"` semantic ("Cursor + Claude Code + Codex conversations" per docstring). The lane is contaminated with fs-watcher noise on Cursor's own internal files. This is the same shape as the original "Bug B" surface-fs-event leak that was supposedly closed for `claude_code`/`codex` lanes.
+- **Note:** combine with Call 6 (Cursor turn capture stale 7 days) and Call 5 (zero "v1.5" hits): the Cursor lane is currently **fs-noise without turn signal** — the *opposite* of what the AI-client contract promises. Bug B's fix evidently didn't reach the `cursor` source_app filter on `search_memories`.
+
+#### Call 15 — `get_recent_work_context(format="skeleton", window_hours=48, since="2026-05-06T00:00:00Z", until="2026-05-08T07:00:00Z", limit=100)`
+- **Trigger:** raise limit to confirm whether the dropped clusters from Call 8 would surface.
+- **Returned:** **OVERFLOW SPILL — 53,413 chars > 25k consumer budget** (saved to tool-results spill file). 100/330 atoms returned, 1/4 clusters returned, 3 clusters still dropped. Cluster source_breakdown `{git: 56, claude_code: 217}`.
+- **Verdict:** ❌ wrong — V1.5.6's "skeleton fits in budget" claim has a regression hole at higher `limit` values. Skeleton was sized against the 15:54 PDT 30-atom fixture (~12k chars, 3% headroom under 12,500); at `limit=100` and 273 atoms in the dominant cluster the open_loop_hints array alone (one entry per atom with hints) plus `atom_ids[]` overflow. The 028 review notes flagged this risk explicitly: *"3% headroom is a future flake risk if atom shape grows"* — and "atom shape grows" turned out to also mean "atom *count* grows." Skeleton's per-cluster cost scales with cluster size; no cap is applied to `atom_ids[]` or `open_loop_hints[]` length.
+- **Note:** docstring says skeleton is *"typical < 10k chars even on full-day windows; use for low-budget context-pull"* — but at `limit=100` (well within `MAX_LIMIT=500`) on a 48h window the AI client gets a spill error and a useless tool-results path. The "use for low-budget" advice is implicitly limit-bounded; the schema doesn't enforce it.
+
+**Source-attribution roll-up across the 15 calls:** git ✅ healthy, claude_code ✅ healthy, codex ✅ reachable via search_memories/tail_session but absent from cross-tool clusters in get_recent_work_context, cursor ❌ turn capture stale 7 days + lane contaminated with fs-watcher noise. Memory MCP (echo-memory) ❌ fully broken (4/4 tools fail, 5th not testable).
+
+#### 2026-05-08 17:05 PDT — Claude Code post-V1.5.6.1-merge live verification (workflow trajectory close)
+
+- **Trigger:** founder merged V1.5.6.1 tool_calls trajectory projector at 17:02 PDT (commit `264a7af`). Re-fired the canonical four calls — looking for `metadata.tool_calls` as the actual workflow trajectory (not the V1.5.6 `{__elided}` placeholder).
+- **Query inputs:** `echo_ping`, `search_memories(query='JSON-RPC', source_app='codex')`, `tail_session(source_app='codex')`, `tail_session(source_app='claude_code')` — identical to all prior rounds.
+- **Returned:** **All four calls returned inline. Workflow trajectory visible on every turn that had tool calls.**
+  - `echo_ping`: pong, `ts:'2026-05-09T00:05:07.471Z'`. V1.5.6.1 daemon live.
+  - `search_memories` first match (027 spec writing, 114 tool calls): `metadata.tool_calls = ["update_plan","exec_command","exec_command",...,"echo_ping",...,"apply_patch","exec_command","exec_command","write_stdin","write_stdin","exec_command",...]` — 50 entries (extractor's `MAX_TOOL_CALLS_PER_TURN` cap, with `tool_calls_truncated: true` preserved). `tool_calls_by_name = {update_plan:1, exec_command:45, echo_ping:1, apply_patch:1, write_stdin:2}`. `metadata_keys_projected: ["tool_calls"]` (NEW field — distinct from `metadata_keys_elided`). `metadata_bytes_elided: 130256` (slightly less than V1.5.6's 130960 — trajectory + histogram cost ~700B vs the placeholder's ~50B; small price for the recovered workflow signal).
+  - `search_memories` second match: `tool_calls = ["search_memories","exec_command",...,"apply_patch",...,"write_stdin","exec_command","exec_command"]`. Trajectory shows agent started with an ECHO call, ran 30 shell commands, applied a patch, wrote to stdin, did 2 more shell commands. Intent legible.
+  - `tail_session(codex)` first turn (commit two traced edits): `tool_calls = ["exec_command","exec_command","exec_command","exec_command"]`. Agent did 4 shell commands — typical git status/add/commit/verify pattern. Intent legible at-a-glance.
+  - `tail_session(claude_code)` first turn (THIS V1.5.6.1 implementation work): `tool_calls = ["Bash","Bash","Write","Edit","Read","Edit","Edit","Read","Edit","Edit","Read","Edit","Write","Read","Edit","Edit","Bash","Read","Edit","Read","Edit","Bash","Bash","Bash","Bash"]`. `tool_calls_by_name = {Bash:7, Write:2, Edit:10, Read:6}`. **The TDD pattern is legible from the trajectory alone** — write code, read existing code, iterate edits, run test commands. Exactly the agent-intent inference the founder's design intent calls for.
+- **Sources:** all matches/turns from real extractor atoms (zero `metadata.surface:'fs'`). `search_memories` source_app='codex' parity preserved. `tail_session` source resolution lands on the same rollouts as prior rounds.
+- **Verdict:** ✅ **complete close — V1.5 cap-stone landed for the surface-retrieval atom path.** Both budget safety AND value density on the wire. `metadata_keys_projected` carries the new "reshaped to useful summary" semantic distinct from `metadata_keys_elided` ("opaque placeholder"). Per-key metadata cap (V1.5.6) for unknown shapes; shape-aware projection (V1.5.6.1) for `tool_calls` specifically. Future shape-aware projections (e.g. `files_referenced` head/tail, `actors` name-list) follow the same pattern: add a projector to `src/mcp/wire-shape/`, dispatch in `match.ts:projectMatch` before the standard cap.
+- **Note:** A consumer reading any of the live responses can now answer "what was this agent working on?" without hydrating any field. Trajectory + histogram + git_state + session_id + cwd + content head+tail collectively form a surface-level summary that's actually useful — not just budget-safe. Stage 2 deep-dive (`get_atom(id, fields?)`) deferred to V1.6, with the projected/elided field labels telling the consumer exactly which keys to query around when they need depth.
+- **Conjecture:** (observation-only) — V1.5.6.1 closes the four MCP envelope-overflow bugs from this dogfooding window with both load-bearing test coverage and live wire confirmation. **Full halt to solidify V1.5 is appropriate now for the atom-shape retrieval path.** The 17:01–17:03 PDT v1.5-livetest-gaps round (above) surfaced a separate Bug 3.1 in `get_recent_work_context` skeleton mode at high `limit` values (53,413-char overflow at `limit=100, format='skeleton'`) — that's the cluster-shape projector and lives outside V1.5.6/V1.5.6.1's scope; file as the next item. V1.6 starting candidates (priority order): (1) **Bug 3.1 skeleton-mode `limit=100` overflow** (cluster-shape `atom_ids[]` and `open_loop_hints[]` need bounds, not just per-atom shape); (2) stage-2 deep-dive `get_atom(id, fields?)` — the missing primitive that makes elision acceptable as default; (3) USER-aware content clip — keep USER verbatim, head+tail clip only ASSISTANT; (4) `metadata.layer:'content'|'meta'` positive-marker convention; (5) cursor capture stale 7 days + fs-watcher contamination (separate issue from MCP envelope work, surfaced by 17:01 round).
+
+---
+
 ## Aggregated learnings (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
