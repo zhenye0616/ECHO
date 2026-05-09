@@ -15,7 +15,7 @@ import type {
   RecentWorkContextResponse,
   ResponseFormat,
 } from '../../trace/types.js';
-import { hasTzMarker, TZ_NAIVE_WARNING } from '../util/iso8601.js';
+import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
 import { WIRE_SHAPE_CAPS } from '../wire-shape/caps.js';
 
 export const RECENT_WORK_CONTEXT_DESCRIPTION =
@@ -73,11 +73,6 @@ export const STORAGE_OVERFETCH = 10;
 // V1.5.6: re-export from the shared wire-shape caps table so all three
 // retrieval tools see one source of truth. Behavior unchanged from item 025.
 export const MINIMAL_CONTENT_CAP = WIRE_SHAPE_CAPS.minimal_action;
-
-const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-const isoString = z
-  .string()
-  .regex(ISO8601_RE, 'expected ISO 8601 timestamp like 2026-04-30T12:00:00.000Z');
 
 const artifactHintSchema = z.object({
   provider: z.string(),

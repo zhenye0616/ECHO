@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
-import { hasTzMarker, TZ_NAIVE_WARNING } from '../util/iso8601.js';
+import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
+import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch } from '../wire-shape/match.js';
-import { CursorDecodeError, decodeCursor, encodeCursor } from './_cursor.js';
+import { CursorDecodeError, decodeCursor, emitCursor } from './_cursor.js';
 // Re-export for any pre-existing callers / tests that imported the cursor
 // helpers from search-memories. New callers should import from `_cursor.ts`.
 export {
@@ -26,29 +26,8 @@ export const MAX_LIMIT = 50;
 // the same projector so a future cap tightening only touches one file.
 // Bugs A1, A2, and the tail-session content-cap reach-gap close together.
 
-// Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?
-const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-
-const isoString = z
-  .string()
-  .regex(ISO8601_RE, 'expected ISO 8601 timestamp like 2026-04-30T12:00:00.000Z');
-
-// Logical app names → literal FS source prefixes. Keep in sync with
-// src/capture/sources.ts (CAPTURED_SOURCES.fs_paths) and the per-app extractors.
-// `git` is path-prefix `git:` because git commits are stored with that scheme,
-// not under any homedir path. Resolved once at module load using os.homedir().
-const SOURCE_APP_MAP: Record<'cursor' | 'claude_code' | 'codex' | 'git', string> = (() => {
-  const HOME = homedir();
-  return {
-    cursor: `fs:${HOME}/Library/Application Support/Cursor/`,
-    claude_code: `fs:${HOME}/.claude/projects/`,
-    codex: `fs:${HOME}/.codex/sessions/`,
-    git: 'git:',
-  };
-})();
-
-const SOURCE_APP_VALUES = ['cursor', 'claude_code', 'codex', 'git'] as const;
-type SourceApp = (typeof SOURCE_APP_VALUES)[number];
+// Resolved once at module load via os.homedir(); same map as tail_session.
+const SOURCE_APP_MAP = buildSourceAppMap();
 
 export interface SearchMatch {
   id: string;
@@ -128,18 +107,6 @@ function sortDesc(events: CaptureEvent[]): CaptureEvent[] {
     if (a.id > b.id) return -1;
     return 0;
   });
-}
-
-function emitCursor(rows: CaptureEvent[], limitApplied: number): {
-  kept: CaptureEvent[];
-  next_cursor: string | null;
-} {
-  if (rows.length > limitApplied) {
-    const kept = rows.slice(0, limitApplied);
-    const last = kept[kept.length - 1]!;
-    return { kept, next_cursor: encodeCursor({ timestamp: last.timestamp, id: last.id }) };
-  }
-  return { kept: rows, next_cursor: null };
 }
 
 export async function searchMemories(

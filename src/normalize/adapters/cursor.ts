@@ -10,6 +10,7 @@ import type {
   NormalizedContextEvent,
 } from '../types.js';
 import {
+  buildConversation,
   buildProvenance,
   extractOpenLoopHints,
   fail,
@@ -103,7 +104,7 @@ export const adaptCursor: Adapter = (
     },
     artifacts,
     provenance: buildProvenance(event, CURSOR_VERSION),
-    conversation: buildConversation(composer_id, turn_index),
+    conversation: buildConversation(composer_id, turn_index, 'cursor'),
   };
 
   if (context !== undefined) out.context = context;
@@ -113,14 +114,3 @@ export const adaptCursor: Adapter = (
   return out;
 };
 
-function buildConversation(
-  session_id: string,
-  turn_index: number | undefined,
-): NormalizedContextEvent['conversation'] {
-  const conv: NonNullable<NormalizedContextEvent['conversation']> = {
-    provider: 'cursor',
-    session_id,
-  };
-  if (turn_index !== undefined) conv.turn_index = turn_index;
-  return conv;
-}

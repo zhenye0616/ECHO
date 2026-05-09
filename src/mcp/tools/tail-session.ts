@@ -1,37 +1,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { homedir } from 'node:os';
 import { z } from 'zod';
-import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import type { QueryFilter, Storage } from '../../storage/interface.js';
+import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch } from '../wire-shape/match.js';
 import {
   CursorDecodeError,
   decodeCursor,
-  encodeCursor,
+  emitCursor,
   type DecodedCursor,
 } from './_cursor.js';
 import { searchMatchSchema } from './search-memories.js';
+
+export type { SourceApp };
 
 export const TAIL_SESSION_DESCRIPTION =
   'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Default count=5, max 20; typical response < 10k chars. Use this for "where did <app> leave off" lookups instead of substring search.';
 
 export const DEFAULT_COUNT = 5;
 export const MAX_COUNT = 20;
-
-const SOURCE_APP_VALUES = ['cursor', 'claude_code', 'codex', 'git'] as const;
-export type SourceApp = (typeof SOURCE_APP_VALUES)[number];
-
-// Logical app names → literal FS source prefixes. Same mapping as
-// search-memories.ts; rebuilt at registration time so test environments and
-// production resolve correctly via os.homedir().
-function buildSourceAppMap(): Record<SourceApp, string> {
-  const HOME = homedir();
-  return {
-    cursor: `fs:${HOME}/Library/Application Support/Cursor/`,
-    claude_code: `fs:${HOME}/.claude/projects/`,
-    codex: `fs:${HOME}/.codex/sessions/`,
-    git: 'git:',
-  };
-}
 
 export interface TailSessionParams {
   source?: string;
@@ -90,18 +76,6 @@ function clampCount(input: number | undefined): number {
 // pre-V1.5.6 toMatch had no content cap at all) and Bug A2 (metadata
 // uncapped on both tools).
 const toMatch = projectMatch;
-
-function emitCursor(rows: CaptureEvent[], countApplied: number): {
-  kept: CaptureEvent[];
-  next_cursor: string | null;
-} {
-  if (rows.length > countApplied) {
-    const kept = rows.slice(0, countApplied);
-    const last = kept[kept.length - 1]!;
-    return { kept, next_cursor: encodeCursor({ timestamp: last.timestamp, id: last.id }) };
-  }
-  return { kept: rows, next_cursor: null };
-}
 
 // Bug B (surfaced 2026-05-08 15:54 PDT): both source resolution and the
 // per-source tail must EXCLUDE fs-watcher meta-events

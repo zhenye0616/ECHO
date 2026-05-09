@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { CaptureEvent } from '../../storage/interface.js';
+import { repoArtifact } from '../artifacts.js';
 import { NormalizationError } from '../errors.js';
-import type { ProvenanceRef } from '../types.js';
+import type { ArtifactRef, NormalizedContextEvent, ProvenanceRef } from '../types.js';
 
 const TURN_PAIR_RE = /^USER: ([\s\S]*?)\n\nASSISTANT: ([\s\S]*)$/;
 
@@ -89,6 +90,38 @@ export function getRecord(
     return v as Record<string, unknown>;
   }
   return undefined;
+}
+
+export function buildAssistant(
+  model: string | undefined,
+  provider: string,
+): NormalizedContextEvent['actors'][number] {
+  const a: NormalizedContextEvent['actors'][number] = { role: 'assistant', provider };
+  if (model !== undefined) a.model = model;
+  return a;
+}
+
+export function buildConversation(
+  session_id: string,
+  turn_index: number | undefined,
+  provider: string,
+): NormalizedContextEvent['conversation'] {
+  const conv: NonNullable<NormalizedContextEvent['conversation']> = { provider, session_id };
+  if (turn_index !== undefined) conv.turn_index = turn_index;
+  return conv;
+}
+
+/** Caller passes `origin_url` extracted from its own metadata shape
+ *  (claude-code: `meta.git_state.origin_url`; codex: `git.origin_url`).
+ *  Centralizes the `repo_root === undefined → null` early return and the
+ *  `repoArtifact` call so adapters don't reimplement either. */
+export function buildRepoArtifact(
+  repo_root: string | undefined,
+  origin_url: string | undefined,
+): { artifact: ArtifactRef; id: string } | null {
+  if (repo_root === undefined) return null;
+  const artifact = repoArtifact(origin_url ?? null, repo_root);
+  return { artifact, id: artifact.id };
 }
 
 export function extractOpenLoopHints(input: string, output: string): string[] {

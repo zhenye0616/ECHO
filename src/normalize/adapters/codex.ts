@@ -1,9 +1,5 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import {
-  conversationArtifact,
-  fileArtifact,
-  repoArtifact,
-} from '../artifacts.js';
+import { conversationArtifact, fileArtifact } from '../artifacts.js';
 import type {
   Adapter,
   ArtifactRef,
@@ -11,7 +7,10 @@ import type {
   NormalizedContextEvent,
 } from '../types.js';
 import {
+  buildAssistant,
+  buildConversation,
   buildProvenance,
+  buildRepoArtifact,
   extractOpenLoopHints,
   fail,
   getBoolean,
@@ -51,7 +50,8 @@ export const adaptCodex: Adapter = (
   const git = getRecord(meta, 'git');
   const model = codex !== undefined ? getString(codex, 'model') : undefined;
 
-  const repo = buildRepoArtifact(repo_root, git);
+  const originUrl = git !== undefined ? getString(git, 'origin_url') : undefined;
+  const repo = buildRepoArtifact(repo_root, originUrl);
   const artifacts: ArtifactRef[] = [conversationArtifact('codex', session_id)];
   if (repo !== null) artifacts.push(repo.artifact);
 
@@ -104,7 +104,7 @@ export const adaptCodex: Adapter = (
     },
     artifacts,
     provenance: buildProvenance(event, CODEX_VERSION),
-    conversation: buildConversation(session_id, turn_index),
+    conversation: buildConversation(session_id, turn_index, 'codex'),
   };
 
   if (context !== undefined) out.context = context;
@@ -114,33 +114,3 @@ export const adaptCodex: Adapter = (
   return out;
 };
 
-function buildAssistant(
-  model: string | undefined,
-  provider: string,
-): NormalizedContextEvent['actors'][number] {
-  const a: NormalizedContextEvent['actors'][number] = { role: 'assistant', provider };
-  if (model !== undefined) a.model = model;
-  return a;
-}
-
-function buildConversation(
-  session_id: string,
-  turn_index: number | undefined,
-): NormalizedContextEvent['conversation'] {
-  const conv: NonNullable<NormalizedContextEvent['conversation']> = {
-    provider: 'codex',
-    session_id,
-  };
-  if (turn_index !== undefined) conv.turn_index = turn_index;
-  return conv;
-}
-
-function buildRepoArtifact(
-  repo_root: string | undefined,
-  git: Record<string, unknown> | undefined,
-): { artifact: ArtifactRef; id: string } | null {
-  if (repo_root === undefined) return null;
-  const remote = git !== undefined ? getString(git, 'origin_url') : undefined;
-  const artifact = repoArtifact(remote ?? null, repo_root);
-  return { artifact, id: artifact.id };
-}

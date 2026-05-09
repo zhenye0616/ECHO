@@ -10,6 +10,8 @@
 // foot-gun for clients on a non-UTC machine — the founder is PDT, so
 // silent local-time parse drops or expands the window by 7 hours.
 
+import { z } from 'zod';
+
 // Accepts all four legal ISO 8601 TZ forms: Z, ±HH:MM, ±HHMM, ±HH.
 const TZ_MARKER_RE = /Z$|[+-]\d{2}(?::?\d{2})?$/;
 
@@ -24,3 +26,12 @@ export function hasTzMarker(s: string): boolean {
 export const TZ_NAIVE_WARNING =
   'input.since or input.until lacks a TZ specifier and was parsed as ' +
   'local time; pass an explicit Z or +HH:MM to avoid ambiguity';
+
+// Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?
+// Intentionally permissive on the TZ marker — `hasTzMarker` runs after
+// schema validation to surface the TZ-naive warning rather than reject.
+export const ISO8601_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+export const isoString = z
+  .string()
+  .regex(ISO8601_RE, 'expected ISO 8601 timestamp like 2026-04-30T12:00:00.000Z');

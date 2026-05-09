@@ -5,6 +5,8 @@
 // `search-memories.ts` per item 026 acceptance ("MUST extract them to a
 // shared module ... that refactor is part of 026's scope").
 
+import type { CaptureEvent } from '../../storage/interface.js';
+
 export interface DecodedCursor {
   timestamp: string;
   id: string;
@@ -51,4 +53,20 @@ export function decodeCursor(raw: string): DecodedCursor {
     throw new CursorDecodeError('missing or non-string `id` field');
   }
   return { timestamp: obj.timestamp, id: obj.id };
+}
+
+/** Slice an overfetched (limit + 1) result list and emit a next_cursor when
+ *  the extra row was present. Shared by `search_memories` and `tail_session`
+ *  — both pass `limit + 1` (or `count + 1`) to storage so a non-null cursor
+ *  comes from the LAST kept row rather than the dropped overflow row. */
+export function emitCursor(
+  rows: CaptureEvent[],
+  limitApplied: number,
+): { kept: CaptureEvent[]; next_cursor: string | null } {
+  if (rows.length > limitApplied) {
+    const kept = rows.slice(0, limitApplied);
+    const last = kept[kept.length - 1]!;
+    return { kept, next_cursor: encodeCursor({ timestamp: last.timestamp, id: last.id }) };
+  }
+  return { kept: rows, next_cursor: null };
 }

@@ -1,9 +1,5 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import {
-  conversationArtifact,
-  fileArtifact,
-  repoArtifact,
-} from '../artifacts.js';
+import { conversationArtifact, fileArtifact } from '../artifacts.js';
 import type {
   Adapter,
   ArtifactRef,
@@ -11,7 +7,10 @@ import type {
   NormalizedContextEvent,
 } from '../types.js';
 import {
+  buildAssistant,
+  buildConversation,
   buildProvenance,
+  buildRepoArtifact,
   extractOpenLoopHints,
   fail,
   getBoolean,
@@ -52,7 +51,9 @@ export const adaptClaudeCode: Adapter = (
   const model = getString(meta, 'model');
   const branch = getString(meta, 'branch');
 
-  const repo = buildRepoArtifact(meta, repo_root);
+  const gitState = getRecord(meta, 'git_state');
+  const originUrl = gitState !== undefined ? getString(gitState, 'origin_url') : undefined;
+  const repo = buildRepoArtifact(repo_root, originUrl);
   const artifacts: ArtifactRef[] = [conversationArtifact('claude_code', session_id)];
   if (repo !== null) artifacts.push(repo.artifact);
 
@@ -93,7 +94,7 @@ export const adaptClaudeCode: Adapter = (
     },
     artifacts,
     provenance: buildProvenance(event, CLAUDE_CODE_VERSION),
-    conversation: buildConversation(session_id, turn_index),
+    conversation: buildConversation(session_id, turn_index, 'claude_code'),
   };
 
   if (context !== undefined) out.context = context;
@@ -103,34 +104,3 @@ export const adaptClaudeCode: Adapter = (
   return out;
 };
 
-function buildAssistant(
-  model: string | undefined,
-  provider: string,
-): NormalizedContextEvent['actors'][number] {
-  const a: NormalizedContextEvent['actors'][number] = { role: 'assistant', provider };
-  if (model !== undefined) a.model = model;
-  return a;
-}
-
-function buildConversation(
-  session_id: string,
-  turn_index: number | undefined,
-): NormalizedContextEvent['conversation'] {
-  const conv: NonNullable<NormalizedContextEvent['conversation']> = {
-    provider: 'claude_code',
-    session_id,
-  };
-  if (turn_index !== undefined) conv.turn_index = turn_index;
-  return conv;
-}
-
-function buildRepoArtifact(
-  meta: Record<string, unknown> | undefined,
-  repo_root: string | undefined,
-): { artifact: ArtifactRef; id: string } | null {
-  if (repo_root === undefined) return null;
-  const gitState = getRecord(meta, 'git_state');
-  const remote = gitState !== undefined ? getString(gitState, 'origin_url') : undefined;
-  const artifact = repoArtifact(remote ?? null, repo_root);
-  return { artifact, id: artifact.id };
-}
