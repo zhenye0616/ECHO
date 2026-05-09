@@ -28,3 +28,7 @@ dist/
 coverage/
 *.log
 .claude/settings.local.json
+
+# Python (tools/blocked.py et al)
+__pycache__/
+*.pyc
