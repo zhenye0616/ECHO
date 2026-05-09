@@ -407,6 +407,129 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
   });
 });
 
+// Gap 3 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): search_memories
+// must EXCLUDE fs-watcher meta-events (`metadata.surface === 'fs'`) — same
+// discipline as `recent-work-context.ts:171` and `tail-session.ts:94-99`.
+// V1.5.6's Bug B fix landed in tail_session and recent-work-context but not
+// here; the cursor lane surfaced it because Cursor's extractor was stale and
+// the noise dominated, but the same contract violation applies to every
+// source_app.
+describe('searchMemories Gap 3 — fs-watcher meta-events must be excluded', () => {
+  it('source_app cursor: returns extractor turns, not fs-watcher events under the same prefix', async () => {
+    const store = new MemoryStorage();
+    const HOME = process.env['HOME'] ?? '/tmp';
+    const cursorPrefix = `fs:${HOME}/Library/Application Support/Cursor/`;
+    const wsRoot = `${cursorPrefix}User/workspaceStorage/abc/`;
+
+    // Seed five fs-watcher events on workspace files (the noisy meta-stream
+    // — every file mtime tick) AND two cursor extractor turn atoms.
+    for (let i = 0; i < 5; i++) {
+      await store.append({
+        source: `${wsRoot}cursor-retrieval/embeddable_files.txt`,
+        timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
+        content: JSON.stringify({
+          event_type: 'change',
+          path: `${wsRoot}cursor-retrieval/embeddable_files.txt`,
+          mtime: `2026-05-08T22:00:${i}.000Z`,
+          size: 1234 + i,
+        }),
+        metadata: { surface: 'fs', file_kind: 'cursor-workspace' },
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      await store.append({
+        source: `${cursorPrefix}User/globalStorage/state.vscdb`,
+        timestamp: `2026-05-08T22:10:${i.toString().padStart(2, '0')}.000Z`,
+        content: `EXTRACTOR_TURN_${i}: cursor user said something`,
+        metadata: { workspace_id: 'abc', thread_id: 't1' },
+      });
+    }
+
+    const r = await searchMemories(store, { source_app: 'cursor', limit: 10 });
+
+    // Pre-fix: would return 5 fs-watcher events (newest by ts among the
+    // matching prefix). Post-fix: returns only the 2 extractor turns.
+    expect(r.total_returned).toBe(2);
+    expect(r.matches.every((m) => m.content.startsWith('EXTRACTOR_TURN_'))).toBe(true);
+    expect(
+      r.matches.every((m) => (m.metadata as { surface?: string }).surface !== 'fs'),
+    ).toBe(true);
+  });
+
+  it('no source_app: fs exclusion still applies (whole-store substring search)', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/some/path.jsonl',
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: JSON.stringify({ event_type: 'change' }),
+      metadata: { surface: 'fs' },
+    });
+    await store.append({
+      source: 'fs:/some/path.jsonl',
+      timestamp: '2026-05-08T22:10:00.000Z',
+      content: 'real conversation about the change event',
+      metadata: { session_id: 's1' },
+    });
+
+    const r = await searchMemories(store, { query: 'change', limit: 10 });
+
+    // Both atoms have "change" in content, but the fs-watcher one must be
+    // excluded. Only the conversation turn survives.
+    expect(r.total_returned).toBe(1);
+    expect(r.matches[0]!.content).toBe('real conversation about the change event');
+  });
+});
+
+// Gap 6 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): the TZ-naive
+// warning is emitted by get_recent_work_context but was silent on
+// search_memories despite the two tools sharing the same regex. Lifted into
+// `src/mcp/util/iso8601.ts`; both tools now emit the same TZ_NAIVE_WARNING.
+describe('searchMemories Gap 6 — TZ-naive timestamp warning parity', () => {
+  it('warnings is always present (empty when no advisories)', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:x',
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: 'hello',
+    });
+    const r = await searchMemories(store, { limit: 5 });
+    expect(Array.isArray(r.warnings)).toBe(true);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('emits TZ_NAIVE_WARNING when `since` lacks a TZ marker', async () => {
+    const store = new MemoryStorage();
+    const r = await searchMemories(store, { since: '2026-05-08T22:00:00' });
+    expect(r.warnings.length).toBe(1);
+    expect(r.warnings[0]).toMatch(/lacks a TZ specifier/);
+  });
+
+  it('emits TZ_NAIVE_WARNING when `until` lacks a TZ marker', async () => {
+    const store = new MemoryStorage();
+    const r = await searchMemories(store, { until: '2026-05-08T22:00:00' });
+    expect(r.warnings.length).toBe(1);
+    expect(r.warnings[0]).toMatch(/lacks a TZ specifier/);
+  });
+
+  it('does NOT emit when both inputs carry a TZ marker (Z, +HH:MM)', async () => {
+    const store = new MemoryStorage();
+    const r = await searchMemories(store, {
+      since: '2026-05-08T22:00:00.000Z',
+      until: '2026-05-08T23:00:00+00:00',
+    });
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('idempotent — single warning even when both inputs are naive', async () => {
+    const store = new MemoryStorage();
+    const r = await searchMemories(store, {
+      since: '2026-05-08T22:00:00',
+      until: '2026-05-08T23:00:00',
+    });
+    expect(r.warnings.length).toBe(1);
+  });
+});
+
 describe('search_memories (end-to-end via MCP server)', () => {
   let handle: McpServerHandle | null = null;
   let restoreStdout: () => void;

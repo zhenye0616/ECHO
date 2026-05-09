@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { hasTzMarker, TZ_NAIVE_WARNING } from '../util/iso8601.js';
 import { projectMatch } from '../wire-shape/match.js';
 import { CursorDecodeError, decodeCursor, encodeCursor } from './_cursor.js';
 // Re-export for any pre-existing callers / tests that imported the cursor
@@ -92,6 +93,12 @@ export interface SearchResult {
     cursor: string | null;
     limit: number;
   };
+  /** V1.5.7 (Gap 6): non-blocking advisories. Mirrors
+   *  `RecentWorkContextResponse.warnings`. Today emits the TZ-naive
+   *  warning; future small advisories live here too. Always present
+   *  (possibly empty) so consumers can do `r.warnings.length > 0` without
+   *  optional-chaining. */
+  warnings: string[];
 }
 
 export interface SearchMemoriesParams {
@@ -154,7 +161,16 @@ export async function searchMemories(
     before = decodeCursor(cursor);
   }
 
-  const filter: QueryFilter = {};
+  // Gap 3 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): the V1.5.6
+  // Bug B fs-watcher exclusion landed in tail-session.ts and
+  // recent-work-context.ts but NOT here. The cursor lane was the visible
+  // failure (extractor stale + fs-watcher noise dominating), but the same
+  // contract violation applies to every source_app — search_memories returns
+  // user-facing content, not the fs-watcher meta-stream. Mirror the
+  // recent-work-context.ts:171 / tail-session.ts:94-99 discipline.
+  const filter: QueryFilter = {
+    exclude_metadata_surface: ['fs'],
+  };
   if (effectivePrefix !== undefined) filter.source_prefix = effectivePrefix;
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
@@ -188,6 +204,19 @@ export async function searchMemories(
   const overfetched = candidates.slice(0, limitApplied + 1);
   const { kept, next_cursor } = emitCursor(overfetched, limitApplied);
 
+  // V1.5.7 (Gap 6): same TZ-naive warning as get_recent_work_context. The
+  // schema regex ISO8601_RE is intentionally permissive (accepts naive
+  // strings); the warning surfaces the parse-as-local-time foot-gun on
+  // non-UTC machines without breaking callers that pass naive strings on
+  // purpose.
+  const warnings: string[] = [];
+  if (
+    (since !== undefined && !hasTzMarker(since)) ||
+    (until !== undefined && !hasTzMarker(until))
+  ) {
+    warnings.push(TZ_NAIVE_WARNING);
+  }
+
   return {
     matches: kept.map(projectMatch),
     total_returned: kept.length,
@@ -202,6 +231,7 @@ export async function searchMemories(
       cursor: cursor ?? null,
       limit: limitApplied,
     },
+    warnings,
   };
 }
 
@@ -243,6 +273,8 @@ const searchMemoriesOutputSchema = {
     cursor: z.string().nullable(),
     limit: z.number(),
   }),
+  // V1.5.7 (Gap 6): non-blocking advisories. Always present (possibly empty).
+  warnings: z.array(z.string()),
 };
 
 export function registerSearchMemories(server: McpServer, storage: Storage): void {
