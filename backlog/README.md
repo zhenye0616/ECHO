@@ -195,7 +195,9 @@ ensure_stage() {
 
 This makes "move to `pending_review/`" safe to call when the file is already there from a previous attempt.
 
-**Run logs append on re-run.** If `raw/internal/agent-runs/<date>-<item-id>.md` already exists from a prior partial attempt, the agent appends a `## Run N (resumed at <iso-timestamp>)` section rather than overwriting. The log becomes a complete history of every attempt — better forensics, no data loss.
+**Run logs append on re-run.** If `raw/internal/agent-runs/<spec-date>-<item-id>-<slug>.md` already exists from a prior partial attempt, the agent appends a `## Run N (resumed at <iso-timestamp>)` section rather than overwriting. The log becomes a complete history of every attempt — better forensics, no data loss.
+
+**Run-log filename convention** (locked 2026-05-09): `raw/internal/agent-runs/<spec-date>-<item-id>-<slug>.md`. The `<spec-date>` is the date in the item's filename (e.g., `2026-05-08` for `2026-05-08-022-…`), NOT the date the agent ran. Earlier runs (April–early May) used a doubled prefix `<run-date>-<spec-date>-<item-id>-<slug>.md` because the slash command defaulted to `$(date +%Y-%m-%d)`; those legacy filenames stay as-is — they're referenced from `backlog/complete/` items (immutable shipped history). New runs use the single-date convention.
 
 ### Agent persona convention
 

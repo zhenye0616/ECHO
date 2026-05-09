@@ -20,14 +20,15 @@ raw/internal/dogfooding/**/full-response.json
 
 # Sensitive interview data (uncomment if needed)
 # raw/internal/interviews/
-.claude/settings.local.json # if you want to ignore it
+
+# Per-user Claude Code settings — never check in
+.claude/settings.local.json
 
 # Node / TypeScript
 node_modules/
 dist/
 coverage/
 *.log
-.claude/settings.local.json
 
 # Python (tools/blocked.py et al)
 __pycache__/
