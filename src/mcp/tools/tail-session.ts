@@ -56,14 +56,20 @@ export interface TailMatch {
   content: string;
   /** Set only when `content` was clipped (V1.5.6 wire-shape projector). */
   bytes_elided?: number;
-  /** Per-KEY clipped metadata: large variadic values (e.g. tool_calls)
-   *  replaced by `{__elided: true, original_size: N}`; small structured
-   *  neighbours (git_state, session_id) pass through verbatim. */
+  /** Per-KEY clipped metadata: small structured neighbours (git_state,
+   *  session_id) pass through verbatim. Large variadic values get one of:
+   *  (a) shape-aware projection — `tool_calls` becomes a string
+   *  trajectory `["git_status","Read","Edit",…]` (V1.5.6.1) plus a
+   *  sibling `tool_calls_by_name` count map; (b) standard cap — replaced
+   *  by `{__elided: true, original_size: N}`. */
   metadata?: Record<string, unknown>;
-  /** Set only when one or more metadata values were clipped. */
+  /** Sum of bytes dropped across elision + projection. */
   metadata_bytes_elided?: number;
-  /** Set only when one or more metadata values were clipped. */
+  /** Keys whose value got the `{__elided:true}` placeholder. */
   metadata_keys_elided?: string[];
+  /** V1.5.6.1: keys reshaped to a smaller useful representation
+   *  (e.g. `tool_calls` → name trajectory). Read at face value. */
+  metadata_keys_projected?: string[];
 }
 
 function clampCount(input: number | undefined): number {

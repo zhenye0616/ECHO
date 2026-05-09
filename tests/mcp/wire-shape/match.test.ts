@@ -69,14 +69,17 @@ describe('projectMatch — per-metadata-value cap', () => {
         },
       }),
     );
+    // V1.5.6.1: tool_calls is now PROJECTED to its name trajectory
+    // (preserving workflow shape) instead of being opaqued out. Small
+    // structured neighbours still pass through verbatim.
     expect(m.metadata).toBeDefined();
     expect(m.metadata!['session_id']).toBe('abc');
     expect(m.metadata!['git_state']).toEqual({ branch: 'main' });
-    expect(m.metadata!['tool_calls']).toMatchObject({
-      __elided: true,
-      original_size: expect.any(Number),
-    });
-    expect(m.metadata_keys_elided).toEqual(['tool_calls']);
+    expect(m.metadata!['tool_calls']).toEqual(Array(50).fill('Bash'));
+    expect(m.metadata!['tool_calls_by_name']).toEqual({ Bash: 50 });
+    // Projected, not elided — distinct semantic.
+    expect(m.metadata_keys_projected).toEqual(['tool_calls']);
+    expect(m.metadata_keys_elided).toBeUndefined();
     expect(m.metadata_bytes_elided).toBeGreaterThan(0);
   });
 
@@ -127,9 +130,53 @@ describe('projectMatch — realistic-density envelope', () => {
     );
     const envelope = JSON.stringify({ matches });
     expect(envelope.length).toBeLessThan(25_000);
-    // Every match SHOULD have its tool_calls clipped on this fixture.
-    expect(matches.every((m) => m.metadata_keys_elided?.includes('tool_calls'))).toBe(
+    // V1.5.6.1: every match's tool_calls is now PROJECTED to a name
+    // trajectory (workflow shape preserved), not opaqued out.
+    expect(matches.every((m) => m.metadata_keys_projected?.includes('tool_calls'))).toBe(
       true,
     );
+    // Trajectory survives — first match's tool_calls is the 30-entry
+    // exec_command sequence.
+    expect(matches[0]!.metadata!['tool_calls']).toEqual(Array(30).fill('exec_command'));
+    expect(matches[0]!.metadata!['tool_calls_by_name']).toEqual({ exec_command: 30 });
+  });
+
+  it('V1.5.6.1: tool_calls trajectory preserves the workflow shape across MIXED tool names', () => {
+    // The whole point of the trajectory: a consumer should be able to
+    // infer agent intent from the ordered name list. e.g.
+    // "git_status → Read → Read → Edit → Bash → git_commit" reads as
+    // "the agent investigated, read two files, edited one, ran tests,
+    // committed." Pre-V1.5.6.1 the consumer got tool_call_total: 6 — a
+    // useless count. Post: the trajectory + histogram answer "what was
+    // the agent doing?".
+    const m = projectMatch(
+      ev({
+        metadata: {
+          tool_calls: [
+            { name: 'git_status', args: 'a'.repeat(2_000), output: '' },
+            { name: 'Read', args: '{path: a}', output: 'a'.repeat(2_000) },
+            { name: 'Read', args: '{path: b}', output: 'a'.repeat(2_000) },
+            { name: 'Edit', args: '{path: a}', output: 'a'.repeat(2_000) },
+            { name: 'Bash', args: 'npm test', output: 'a'.repeat(4_000) },
+            { name: 'git_commit', args: '{msg}', output: '' },
+          ],
+        },
+      }),
+    );
+    expect(m.metadata!['tool_calls']).toEqual([
+      'git_status',
+      'Read',
+      'Read',
+      'Edit',
+      'Bash',
+      'git_commit',
+    ]);
+    expect(m.metadata!['tool_calls_by_name']).toEqual({
+      git_status: 1,
+      Read: 2,
+      Edit: 1,
+      Bash: 1,
+      git_commit: 1,
+    });
   });
 });

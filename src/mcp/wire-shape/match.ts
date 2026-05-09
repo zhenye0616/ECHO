@@ -15,6 +15,7 @@
 import type { CaptureEvent } from '../../storage/interface.js';
 import { WIRE_SHAPE_CAPS } from './caps.js';
 import { clipMetadataValues, clipString } from './clip.js';
+import { projectToolCallsTrajectory } from './tool-calls.js';
 
 export interface ProjectedMatch {
   id: string;
@@ -28,13 +29,30 @@ export interface ProjectedMatch {
   bytes_elided?: number;
   /** Per-key clipped: any individual metadata value whose JSON-stringified
    *  form exceeds WIRE_SHAPE_CAPS.metadata_value is replaced by
-   *  `{__elided: true, original_size: N}`. Other keys pass through verbatim. */
+   *  `{__elided: true, original_size: N}`. Other keys pass through verbatim.
+   *  Specialised projection: `metadata.tool_calls` is reshaped to a
+   *  string array (the workflow trajectory) by V1.5.6.1 — see
+   *  `tool-calls.ts`. The reshape is signalled via
+   *  `metadata_keys_projected` (NOT `metadata_keys_elided`); a sibling
+   *  `metadata.tool_calls_by_name` count map is added when present. */
   metadata?: Record<string, unknown>;
-  /** Set only when one or more metadata values were clipped. */
+  /** Sum of bytes dropped across (a) per-key elision placeholders and
+   *  (b) specialised projections like tool_calls trajectory. Surfaced as
+   *  one number because consumers care about "how much context did I
+   *  lose?" — distinguishing elision-style vs projection-style modifies
+   *  is for the keys_elided / keys_projected fields. */
   metadata_bytes_elided?: number;
-  /** Set only when one or more metadata values were clipped. Names the
-   *  affected keys so the consumer can hydrate selectively if needed. */
+  /** Keys whose value was REPLACED by `{__elided:true, original_size:N}`
+   *  because their serialized form exceeded the per-key cap. The original
+   *  shape is opaque on a projected response — consumers wanting to drill
+   *  in must hydrate via a follow-up call (V1.6 `get_atom` tool). */
   metadata_keys_elided?: string[];
+  /** Keys whose value was RESHAPED to a smaller useful representation
+   *  (not opaqued out). Today this is `["tool_calls"]` when the original
+   *  array was projected to its name trajectory. The consumer can read
+   *  the projected value at face value (e.g., the trajectory array is
+   *  legitimate data, not a placeholder). */
+  metadata_keys_projected?: string[];
 }
 
 /** Project a raw CaptureEvent (storage row) onto the consumer-budget-safe
@@ -50,10 +68,38 @@ export function projectMatch(e: CaptureEvent): ProjectedMatch {
   };
   if (content.bytes_elided > 0) m.bytes_elided = content.bytes_elided;
   if (e.metadata !== undefined) {
-    const md = clipMetadataValues(e.metadata, WIRE_SHAPE_CAPS.metadata_value);
+    // Step 1: specialised pre-projection. tool_calls (and any future
+    // shape-aware projections) get a useful summary instead of being
+    // opaqued out by the standard per-key cap. Run BEFORE
+    // clipMetadataValues so the reshaped value is what the cap sees.
+    const preprocessed: Record<string, unknown> = { ...e.metadata };
+    let projectedBytes = 0;
+    const projectedKeys: string[] = [];
+
+    const tcRaw = preprocessed['tool_calls'];
+    if (tcRaw !== undefined) {
+      const tcProj = projectToolCallsTrajectory(tcRaw);
+      if (tcProj !== null && tcProj.bytes_elided > 0) {
+        preprocessed['tool_calls'] = tcProj.trajectory;
+        // Sibling histogram for aggregate views — only when there are
+        // calls to count, to avoid noise on empty/missing turns.
+        if (Object.keys(tcProj.by_name).length > 0) {
+          preprocessed['tool_calls_by_name'] = tcProj.by_name;
+        }
+        projectedBytes += tcProj.bytes_elided;
+        projectedKeys.push('tool_calls');
+      }
+    }
+
+    // Step 2: standard per-key cap on what remains. Small values pass
+    // verbatim; oversize values get the {__elided:true} placeholder.
+    const md = clipMetadataValues(preprocessed, WIRE_SHAPE_CAPS.metadata_value);
     m.metadata = md.metadata;
-    if (md.bytes_elided > 0) m.metadata_bytes_elided = md.bytes_elided;
+
+    const totalElided = projectedBytes + md.bytes_elided;
+    if (totalElided > 0) m.metadata_bytes_elided = totalElided;
     if (md.keys_elided.length > 0) m.metadata_keys_elided = md.keys_elided;
+    if (projectedKeys.length > 0) m.metadata_keys_projected = projectedKeys;
   }
   return m;
 }

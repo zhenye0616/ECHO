@@ -63,11 +63,19 @@ export interface SearchMatch {
    *  `WIRE_SHAPE_CAPS.metadata_value` is replaced by
    *  `{__elided: true, original_size: N}`. Other keys pass through verbatim. */
   metadata?: Record<string, unknown>;
-  /** Set only when one or more metadata values were clipped. */
+  /** Sum of bytes dropped across (a) per-key elision placeholders and
+   *  (b) shape-aware projections (e.g. tool_calls → name trajectory). */
   metadata_bytes_elided?: number;
-  /** Set only when one or more metadata values were clipped. Names the
-   *  affected keys so the consumer can hydrate selectively. */
+  /** Keys whose value was REPLACED by `{__elided: true, original_size: N}`.
+   *  Original shape is opaque on the wire; consumers wanting depth must
+   *  hydrate via a follow-up call (deferred V1.6 deep-dive primitive). */
   metadata_keys_elided?: string[];
+  /** V1.5.6.1: keys whose value was RESHAPED to a smaller useful
+   *  representation (NOT opaqued). Today: `["tool_calls"]` when the
+   *  original ToolCall[] was projected to its name trajectory. The
+   *  consumer can read the projected value at face value — it carries
+   *  legitimate signal (workflow shape), not just a size hint. */
+  metadata_keys_projected?: string[];
 }
 
 export interface SearchResult {
@@ -212,6 +220,10 @@ export const searchMatchSchema = z.object({
   // values exceeded the per-key cap and were replaced by elision placeholders.
   metadata_bytes_elided: z.number().int().nonnegative().optional(),
   metadata_keys_elided: z.array(z.string()).optional(),
+  // V1.5.6.1 — optional, set when one or more metadata values were
+  // RESHAPED to a smaller useful representation (e.g. tool_calls → name
+  // trajectory). Distinct semantics from metadata_keys_elided.
+  metadata_keys_projected: z.array(z.string()).optional(),
 });
 
 // outputSchema for `tools/list` advertisement and structured-content

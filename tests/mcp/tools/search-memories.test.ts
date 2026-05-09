@@ -382,10 +382,23 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
     expect(r.total_returned).toBe(10);
     const envelopeBytes = JSON.stringify(r).length;
     expect(envelopeBytes).toBeLessThan(25_000);
+    // V1.5.6.1: tool_calls is now PROJECTED to a name trajectory (workflow
+    // shape), not opaqued out. Distinct from the per-key elision path.
     expect(
-      r.matches.every((m) => m.metadata_keys_elided?.includes('tool_calls')),
+      r.matches.every((m) => m.metadata_keys_projected?.includes('tool_calls')),
     ).toBe(true);
     expect(r.matches.every((m) => typeof m.metadata_bytes_elided === 'number')).toBe(
+      true,
+    );
+    // Trajectory survives — every match carries the 30-entry exec_command
+    // workflow as a string array and a sibling histogram.
+    expect(
+      r.matches.every((m) =>
+        Array.isArray(m.metadata?.['tool_calls']) &&
+        (m.metadata!['tool_calls'] as string[]).length === 30,
+      ),
+    ).toBe(true);
+    expect(r.matches.every((m) => m.metadata?.['tool_calls_by_name'] !== undefined)).toBe(
       true,
     );
     // Per-KEY semantics: small structured metadata neighbours pass verbatim.
