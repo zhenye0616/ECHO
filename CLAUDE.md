@@ -165,6 +165,17 @@ The **Sources** field is non-optional. Source-volume bias and silent omission (e
 
 **Don't design fixes in the journal.** Observations only. Backlog items come from end-of-window synthesis. If you find yourself drafting a fix, stop — the journal's "lossy in the moment" honesty is what makes it useful for backlog planning later.
 
+**Keep the HTML twin in sync.** The journal has a rendered HTML twin at `raw/internal/dogfooding/mcp-interactions-journal.html` (matching the MD/HTML pairing convention used elsewhere under `raw/internal/`). The MD remains the canonical write target — it's the only format that's ergonomic to append in-the-moment — but after appending entries, regenerate the HTML in the same response so readers always have the better-formatted view. One-liner:
+
+```
+pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 \
+  -H raw/internal/dogfooding/journal-style.html \
+  raw/internal/dogfooding/mcp-interactions-journal.md \
+  -o raw/internal/dogfooding/mcp-interactions-journal.html
+```
+
+Commit the `.md` and `.html` together. Same pattern applies to other `raw/internal/` notes that already have `.html` twins (decisions, dogfooding writeups) — when you edit the MD, regenerate the HTML in the same commit.
+
 ### Drift Prevention Applies to Agents Too
 
 Agents are more dangerous than the founder for drift, because they don't have the founder's gut. Three safeguards:

@@ -1,0 +1,3613 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>ECHO MCP interactions journal (cross-tool, cross-AI)</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #1a1a1a;
+      --muted: #5a5a5a;
+      --label: #7a3e9d;
+      --accent: #0a66c2;
+      --code-bg: #eef1f4;
+      --border: #d8dde2;
+      --card-bg: #ffffff;
+    }
+    html {
+      line-height: 1.55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      max-width: 56em;
+      margin: 0 auto;
+      padding: 2em 3em 4em;
+    }
+    @media (max-width: 700px) {
+      body { padding: 1em; font-size: 14px; }
+    }
+    h1.title {
+      font-size: 1.8em;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.4em;
+      margin-top: 0.5em;
+    }
+    h1 { font-size: 1.7em; }
+    h2 {
+      font-size: 1.35em;
+      margin-top: 2.4em;
+      padding-top: 0.6em;
+      border-top: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1.05em;
+      margin-top: 2em;
+      padding: 0.55em 0.9em;
+      background: var(--card-bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    h4 {
+      font-size: 0.98em;
+      color: var(--muted);
+      margin-top: 1.6em;
+      font-weight: 600;
+    }
+    h5, h6 { font-size: 0.95em; color: var(--muted); }
+    p { margin: 0.8em 0; }
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.86em;
+      background: var(--code-bg);
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 0.8em 1em;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.85em;
+      line-height: 1.45;
+      border: 1px solid var(--border);
+    }
+    pre code { background: transparent; padding: 0; font-size: inherit; }
+    ul, ol { padding-left: 1.5em; margin: 0.7em 0; }
+    li { margin: 0.3em 0; }
+    li > ul, li > ol { margin: 0.3em 0; }
+    /* Field labels: bulleted lines that start with "**Trigger:**", "**Sources:**", etc.
+       Pandoc renders these as <li><strong>Label:</strong> content</li>. */
+    li > strong:first-child {
+      color: var(--label);
+      font-variant: small-caps;
+      letter-spacing: 0.03em;
+      font-weight: 600;
+    }
+    /* But in headings/paragraphs we want strong to read normal */
+    h1 strong, h2 strong, h3 strong, h4 strong, p > strong {
+      color: inherit;
+      font-variant: normal;
+      letter-spacing: normal;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:visited { color: var(--accent); }
+    blockquote {
+      border-left: 3px solid var(--border);
+      padding: 0.2em 1em;
+      color: var(--muted);
+      margin: 1em 0;
+      background: var(--card-bg);
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1em 0;
+      font-size: 0.92em;
+      width: 100%;
+    }
+    th, td {
+      padding: 0.5em 0.8em;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--code-bg); font-weight: 600; }
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.8em 0;
+    }
+    /* TOC */
+    nav#TOC {
+      font-size: 0.88em;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1em 1.5em;
+      margin: 1.5em 0 2.5em;
+    }
+    nav#TOC > ul { padding-left: 1.2em; margin: 0.4em 0; }
+    nav#TOC ul ul { padding-left: 1.2em; font-size: 0.96em; }
+    nav#TOC li { margin: 0.15em 0; }
+    /* Subtle anchor for date-stamped entry headers */
+    h3, h4 { scroll-margin-top: 1em; }
+    /* Print */
+    @media print {
+      body { background: white; padding: 0; max-width: none; font-size: 11pt; }
+      h3 { box-shadow: none; background: transparent; }
+      nav#TOC { page-break-after: always; }
+    }
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">ECHO MCP interactions journal (cross-tool,
+cross-AI)</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#echo-mcp-interactions-journal-cross-tool-cross-ai"
+id="toc-echo-mcp-interactions-journal-cross-tool-cross-ai">ECHO MCP
+interactions journal (cross-tool, cross-AI)</a>
+<ul>
+<li><a href="#how-to-use-this-journal"
+id="toc-how-to-use-this-journal">How to use this journal</a></li>
+<li><a href="#quick-fill-observation-template"
+id="toc-quick-fill-observation-template">Quick-fill observation
+template</a></li>
+<li><a href="#what-to-watch-for-from-item-018s-what-v1.5-will-teach-us"
+id="toc-what-to-watch-for-from-item-018s-what-v1.5-will-teach-us">What
+to watch for (from item 018’s “what V1.5 will teach us”)</a></li>
+<li><a href="#daily-entries" id="toc-daily-entries">Daily entries</a>
+<ul>
+<li><a href="#dogfooding-day-1" id="toc-dogfooding-day-1">2026-05-07 —
+dogfooding day 1</a></li>
+<li><a href="#pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6"
+id="toc-pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">2026-05-08
+17:01–17:03 PDT — V1.5 full-halt live test (post-028 +
+post-V1.5.6)</a></li>
+</ul></li>
+<li><a href="#aggregated-learnings-filled-at-end-of-window"
+id="toc-aggregated-learnings-filled-at-end-of-window">Aggregated
+learnings (filled at end of window)</a></li>
+<li><a href="#recommendations-candidate-v1.5-backlog-items"
+id="toc-recommendations-candidate-v1.5-backlog-items">Recommendations /
+candidate V1.5+ backlog items</a></li>
+<li><a href="#notes-on-running-this-journal"
+id="toc-notes-on-running-this-journal">Notes on running this
+journal</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="echo-mcp-interactions-journal-cross-tool-cross-ai">ECHO MCP
+interactions journal (cross-tool, cross-AI)</h1>
+<p>This is the <strong>canonical, ever-growing log of every ECHO MCP
+call</strong> from any AI client. Started 2026-05-07 as the V1.5
+<code>get_recent_work_context</code> dogfooding journal (originally
+filed under <code>2026-05-07-trace-layer.md</code>); in operational
+practice it expanded to cover every <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> invocation regardless of which item,
+tool, or AI client made the call. The original V1.5-trace-layer framing
+is preserved as the “Round 1–4” sections below; subsequent rounds extend
+across items 019, 020, 021, 022, 023, V1.5.1, and beyond.</p>
+<p><strong>Originating item:</strong> <a
+href="../../../backlog/complete/2026-05-06-018-recent-work-context-tool.md"><code>2026-05-06-018-recent-work-context-tool</code></a>
+— but this journal is no longer scoped to one item. <strong>Sources
+active in store:</strong> claude-code, codex, cursor, git
+<strong>Goal:</strong> generate enough cross-tool observations to know
+what V1.5+ should fix, what V2 should preserve, and whether item 017
+(<code>search_memories</code> returning normalized atoms) is needed.</p>
+<h2 id="how-to-use-this-journal">How to use this journal</h2>
+<p>Fill an entry <strong>in the moment</strong> when any ECHO MCP call
+delights, disappoints, or fails. The cost should be ~30 seconds per
+entry — copy the template, jot a one-liner, move on. Aspirational
+entries written at end-of-week are useless; lossy in-the-moment entries
+are gold.</p>
+<p>Codex, Claude Code, Cursor’s Claude, agent runs, and any other AI
+client invoking the MCP server must log every ECHO MCP interaction here,
+including <code>get_recent_work_context</code>,
+<code>search_memories</code>, <code>echo_ping</code>,
+<code>memory_*</code>, and equivalent local MCP/CLI calls. Multiple
+calls from one task may be grouped into one detailed entry if the inputs
+and observed results are all captured.</p>
+<p>This journal is the <strong>input</strong>; the V1.5+ backlog items
+the strategist writes after each round of synthesis are the
+<strong>output</strong>. Don’t try to design fixes here — just
+observe.</p>
+<h2 id="quick-fill-observation-template">Quick-fill observation
+template</h2>
+<p>Copy this block when adding an entry. <strong>All times are local
+(PDT, America/Los_Angeles)</strong> — convert from raw ISO 8601 UTC on
+write so the journal reads naturally on the founder’s machine.</p>
+<pre><code>### YYYY-MM-DD HH:MM PDT — &lt;one-line context&gt;
+- **Trigger:** what I (or Cursor&#39;s Claude) just did that called the tool
+- **Query inputs:** since=…  until=…  artifact_hint=…
+- **Returned:** N clusters, M atoms; top cluster: &quot;&lt;label or none&gt;&quot;; rank_reasons: […]
+- **Sources:** source_breakdown={…} for trace; OR per-match source-prefix list for search; OR the specific jsonl/git/fs paths the atoms came from. Always shown — a reader must be able to tell which capture surfaces contributed and which were silently absent (source-volume bias and silent-omission are the most-recurring failure modes in this journal).
+- **Verdict:** ✅ right / 🟡 partial / ❌ wrong
+- **Note:** one-line observation — what felt right or off
+- **Conjecture:** (optional) what algorithm/config change might help</code></pre>
+<h2 id="what-to-watch-for-from-item-018s-what-v1.5-will-teach-us">What
+to watch for (from item 018’s “what V1.5 will teach us”)</h2>
+<p>Use these as the prompts you scan against during the day:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signal category</th>
+<th>Sounds like</th>
+<th>Implication</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Artifact-identity policy joins</strong></td>
+<td>“Two atoms reference the same file but ECHO split them into
+different clusters”</td>
+<td>The canonical-id rule needs amendment (most likely a different
+fallback for some artifact type)</td>
+</tr>
+<tr class="even">
+<td><strong>4h window correctness</strong></td>
+<td>“ECHO included Friday morning’s work in Monday’s cluster” or “ECHO
+split a coherent 6h thread”</td>
+<td>Default window needs tuning; possibly per-source</td>
+</tr>
+<tr class="odd">
+<td><strong>Label heuristic quality</strong></td>
+<td>“The label said ‘discussion about <random file>’ which was
+misleading”</td>
+<td>Heuristic needs work, or <code>label?</code> should be dropped from
+V1.5</td>
+</tr>
+<tr class="even">
+<td><strong>Rank ordering vs gut</strong></td>
+<td>“I expected the open-loop cluster first; ECHO ranked it third”</td>
+<td>Tune ranking signals or add a new one</td>
+</tr>
+<tr class="odd">
+<td><strong>Edge-kind sufficiency</strong></td>
+<td>“Two atoms about the same idea but no shared artifact got
+split”</td>
+<td><code>temporal_near</code> / <code>same_conversation</code> edges
+might be needed in V1.5.1</td>
+</tr>
+<tr class="even">
+<td><strong>AI client uptake</strong></td>
+<td>“Claude in Cursor responded better / worse / not differently when
+the trace was available”</td>
+<td>Validates whether the contract is right</td>
+</tr>
+<tr class="odd">
+<td><strong>Latency</strong></td>
+<td>“I waited” or “felt instant”</td>
+<td>500ms p95 SLO holds or doesn’t</td>
+</tr>
+<tr class="even">
+<td><strong>Open-loop hint quality</strong></td>
+<td>“ECHO surfaced an ‘open question’ that was actually closed”</td>
+<td>Atom-level hint regex too greedy; or hint-resolution work moved up
+from V2</td>
+</tr>
+<tr class="odd">
+<td><strong>Source-diversity bias</strong></td>
+<td>“All 12 atoms were Cursor; the matching Claude Code session was
+missing”</td>
+<td>Storage query may need ordering; or normalizer dropped events
+silently</td>
+</tr>
+</tbody>
+</table>
+<p>If something happens that doesn’t fit any of these, <strong>make a
+new category and call it out</strong> — that’s the highest-signal
+observation.</p>
+<h2 id="daily-entries">Daily entries</h2>
+<h3 id="dogfooding-day-1">2026-05-07 — dogfooding day 1</h3>
+<blockquote>
+<p><strong>Timezone convention:</strong> all times in this journal are
+<strong>founder’s local time (PDT, America/Los_Angeles)</strong> unless
+explicitly noted. Source data (CaptureEvent timestamps, MCP responses)
+stores ISO 8601 UTC; entries here are converted on write.</p>
+</blockquote>
+<h4 id="pdt-first-call-wedged-the-consumers-context-budget">2026-05-07
+01:08 PDT — first call wedged the consumer’s context budget</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked “check my echo mcp and see
+if you can know what codex is currently working on.” Claude Code session
+called <code>get_recent_work_context</code> with no args.</li>
+<li><strong>Query inputs:</strong> all defaults (since = now − 4h, until
+= now, no artifact_hint, limit = 100).</li>
+<li><strong>Returned:</strong> 3 clusters, 40 atoms, top cluster
+“discussion about Project_echo” (rank_reasons:
+<code>["recent_activity", "dense"]</code>). Total response:
+<strong>454,871 chars</strong>.</li>
+<li><strong>Verdict:</strong> ❌ wrong — response was too big to even
+read. Tool result handler refused the payload.</li>
+<li><strong>Note:</strong> trace algorithm was correct (clustering,
+ranking, rank_reasons all looked right in the saved file). The bug is
+<strong>payload representation, not clustering</strong>. Forensic
+analysis: 97% of edges in the dominant 36-atom cluster were redundant
+(restated cluster anchors); 48% of per-atom bytes were inline
+<code>action.input</code>/<code>action.output</code> text.</li>
+<li><strong>Conjecture:</strong> drop edges whose shared artifacts are
+all <code>scope</code> or <code>session</code> role; add opt-in
+<code>format: 'minimal'</code> for atom-content truncation. Specced as
+item 019. Forensic data preserved at
+<code>raw/internal/dogfooding/019-trace-response-sample/</code>.</li>
+</ul>
+<h4
+id="pdt-first-end-to-end-success-sub-minute-capture-latency">2026-05-07
+15:39 PDT — first end-to-end success; sub-minute capture latency</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked “can you see me and codex
+convo in the past 5 mins” — testing whether ECHO actually captures live
+activity.</li>
+<li><strong>Query inputs:</strong> <code>search_memories</code> (not
+<code>get_recent_work_context</code>) with
+<code>source_prefix: 'fs:/Users/zhenye/.codex/'</code>,
+<code>limit: 10</code>. Used the targeted retrieval to dodge the
+019-blocked bloat.</li>
+<li><strong>Returned:</strong> 10 events; the most recent turn-pair was
+timestamped 15:39:34 PDT, ~7 minutes before the query at 15:46 PDT.
+Recovered the full prompt + assistant response.</li>
+<li><strong>Verdict:</strong> ✅ right — capture pipeline + retrieval
+are working end-to-end.</li>
+<li><strong>Note:</strong> sub-minute capture latency from codex’s JSONL
+append → SQLite. The conversation codex was having (about whether V1
+schema supports non-git work like Google Docs / Salesforce deals)
+<strong>independently validated the V1 design</strong> — codex’s framing
+converged with what we locked in items 016/018 (open vocabulary,
+<code>state.snapshot</code>/<code>state.delta</code>, work-object
+inferred at trace layer). Two reasoning processes converging from
+different starts ≈ structural correctness signal.</li>
+<li><strong>Conjecture:</strong> none for this observation. Worth
+tracking longitudinally whether other independent design conversations
+land on similar primitives — that’s repeatable validation.</li>
+</ul>
+<h4
+id="pdt-one-hour-cross-platform-context-retrieval-from-codex">2026-05-07
+15:56 PDT — one-hour cross-platform context retrieval from Codex</h4>
+<ul>
+<li><strong>Trigger:</strong> founder clarified “we are currently on
+V1.5 use ECHO MCP and read into Claude for better context; limit the
+time window to the past one hour.” Codex called
+<code>get_recent_work_context</code> directly through ECHO MCP to pull
+the last hour into context.</li>
+<li><strong>Query inputs:</strong>
+<code>since=2026-05-07T21:56:33.000Z</code> (14:56 PDT),
+<code>until=2026-05-07T22:56:33.000Z</code> (15:56 PDT),
+<code>artifact_hint=null</code>, <code>limit=100</code>.</li>
+<li><strong>Returned:</strong> 2 clusters, 21 atoms; top cluster had no
+<code>label</code>, anchors <code>Project_echo</code>, Claude Code
+conversation <code>684f37f7...</code>, and
+<code>backlog/ready/2026-05-07-019-trace-edge-filter-and-format.md</code>;
+rank_reasons:
+<code>["recent_activity", "has_open_loop", "dense"]</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the retrieval found the right
+recent work across surfaces, but the response still carried the pre-019
+dense edge payload.</li>
+<li><strong>Note:</strong> this is the V1.5 loop working in miniature:
+Codex used ECHO MCP to recover recent Claude Code implementation context
+for item 019 plus the active Codex design conversation, without the
+founder manually pasting either thread. The one-hour window felt like
+the right scope for “what is happening right now” context.</li>
+<li><strong>Conjecture:</strong> after 019 is merged/restarted, repeat
+the same one-hour call with default <code>format: 'full'</code> and then
+opt-in <code>format: 'minimal'</code> to compare whether Claude/Codex
+gets the same orientation with less payload.</li>
+</ul>
+<h4
+id="pdt-false-negative-edge-filter-didnt-work-because-daemon-was-stale">2026-05-07
+16:15 PDT — false-negative: edge filter “didn’t work” because daemon was
+stale</h4>
+<ul>
+<li><strong>Trigger:</strong> post-019-merge dogfooding. Claude Code
+called <code>get_recent_work_context</code> with the same one-hour
+window (<code>22:00 → 23:00 UTC</code>).</li>
+<li><strong>Query inputs:</strong>
+<code>since=2026-05-07T22:00:00.000Z</code>,
+<code>until=2026-05-07T23:00:00.000Z</code>, defaults otherwise.</li>
+<li><strong>Returned:</strong> 2 clusters, 24 atoms. Total response
+163,060 chars (already 64% smaller than yesterday’s 454K, so something
+improved). BUT cluster 1 had 91 edges = K_14 (100% of pairs), cluster 2
+had 45 edges = K_10. Surviving edges all had only
+<code>conversation</code> + <code>repo</code> artifacts — exactly the
+case 019’s predicate should drop. <code>query.format</code> echoed
+<code>null</code> instead of <code>'full'</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong — looked like the predicate was
+broken.</li>
+<li><strong>Note:</strong> <strong>the daemon was stale.</strong> PID
+59875 had been running since 01:04 PDT this morning (14+ hours); 019’s
+code shipped at 15:51 PDT. <code>vite-node</code> hot-loads from source
+files but only at process start. <strong>Same pattern as post-018
+yesterday</strong> — the merge commit didn’t auto-restart the
+daemon.</li>
+<li><strong>Conjecture:</strong> worth documenting daemon restart as a
+standard step in <code>merge-and-cleanup</code>, OR adding a launchd
+<code>WatchPaths</code> entry on <code>src/</code> so launchd restarts
+the process on code changes. Filed as a meta-observation below — not a
+backlog item yet; want to see if it recurs.</li>
+</ul>
+<h4 id="pdt-post-restart-edge-filter-validated">2026-05-07 16:16 PDT —
+post-restart: edge filter validated</h4>
+<ul>
+<li><strong>Trigger:</strong> restarted daemon via
+<code>launchctl kickstart -k gui/$(id -u)/com.echo.daemon</code>. New
+PID 41940. Repeated identical query.</li>
+<li><strong>Query inputs:</strong> identical to 16:15
+(<code>22:00 → 23:00 UTC</code>, defaults).</li>
+<li><strong>Returned:</strong> 2 clusters, 24 atoms (same membership).
+Total response 126,473 chars (<strong>72% smaller than yesterday
+baseline</strong>). Cluster 1: 91 → <strong>2 edges</strong> (97.8%
+drop). Cluster 2: 45 → <strong>0 edges</strong> (100% drop). Both
+surviving edges in cluster 1 carry at least one <code>file</code>
+artifact. <code>query.format</code> echoes <code>'full'</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — predicate works exactly as 019
+specified.</li>
+<li><strong>Note:</strong> the byte distribution shifted as predicted:
+<code>clusters[]</code> collapsed from 170KB → 4.5KB (97% drop), making
+<code>atoms[]</code> now 99.3% of payload. The brainstorm prediction
+(97% redundant edges) matched live data within 1pp. <strong>Edge work
+was overstated as half the bloat — in reality, edges were the easy half;
+atom envelope is the dominant half and untouched by 019.</strong></li>
+</ul>
+<h4 id="pdt-format-minimal-validated">2026-05-07 16:16 PDT —
+<code>format: 'minimal'</code> validated</h4>
+<ul>
+<li><strong>Trigger:</strong> same query, opt-in
+<code>format: 'minimal'</code>.</li>
+<li><strong>Query inputs:</strong> identical to 16:16-prior plus
+<code>format: 'minimal'</code>.</li>
+<li><strong>Returned:</strong> 2 clusters, 24 atoms. Total response
+<strong>64,006 chars (86% smaller than yesterday baseline)</strong>.
+<code>query.format</code> echoes <code>'minimal'</code>. 8 of 24 atoms
+had <code>action.input</code> truncated; all 24 had
+<code>action.output</code> truncated (long assistant turns). Truncation
+suffix verbatim per spec:
+<code>"… [truncated; 1707 chars omitted; fetch full atom via search_memories]"</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — minimal mode caps content,
+leaves all other fields unchanged, suffix carries the fetch hint.</li>
+<li><strong>Note:</strong> even at 64K, <strong>still over Claude Code’s
+tool-result context budget</strong> (the harness saved to disk again).
+The reduction is real but the bottleneck has moved: with edges already
+optimal, the 99.3% of payload that’s atom-envelope (artifacts,
+provenance, conversation refs, source, time, actors) sets the floor.
+<code>format: 'minimal'</code> only attacks the content blob inside
+atoms; it doesn’t shrink the envelope itself.</li>
+</ul>
+<hr />
+<p><strong>Round 2 themes (post-019):</strong></p>
+<ul>
+<li><strong>Edge filter is fully effective</strong> — predicate matched
+the brainstorm prediction within 1pp on live data.</li>
+<li><strong><code>format: 'minimal'</code> is fully effective</strong>
+at what it targets — long content blobs — but the per-atom envelope
+(~3-4KB of structural metadata) is now the floor, not the content.</li>
+<li><strong>Atom envelope is the next bottleneck.</strong> Edge
+optimization (B) would save maybe 4KB from already-small
+<code>clusters[]</code>. The bigger lever is some form of “atom-id-only”
+mode where consumer fetches selected atoms via
+<code>search_memories(id=…)</code> only when needed.</li>
+<li><strong>Daemon-restart-after-merge is a recurring pattern</strong>
+(yesterday post-018, today post-019). First post-merge call silently
+runs on stale code → looks like the patch didn’t ship. Worth a small
+follow-up: either <code>WatchPaths</code> in
+<code>com.echo.daemon.plist</code> or a step in
+<code>merge-and-cleanup</code> that calls
+<code>launchctl kickstart -k</code>.</li>
+<li><strong>Smoke script has a SIGPIPE bug</strong> introduced by 019’s
+edge-filter assertion (python <code>sys.exit(0)</code> early-exits
+before consuming all stdin → upstream <code>printf</code> fails under
+<code>set -o pipefail</code>). Trivial fix:
+<code>sys.stdin.read()</code> first, then process.</li>
+<li>The brainstorm’s framing of A/B/C ordering needs a small adjustment
+in light of the real bottleneck: B (<code>shared_artifacts[]</code>)
+becomes lower-priority because edges are already small; a hypothetical D
+(atom-skeleton-only mode) becomes the high-leverage move.</li>
+</ul>
+<p><strong>Decision (founder, 2026-05-07 16:19 PDT):</strong> no changes
+for now. Keep dogfooding; collect interaction patterns; revisit the
+prioritization once we have ~1 week of real-use observations.</p>
+<h4 id="pdt-codex-asks-echo-what-claude-just-changed">2026-05-07 16:22
+PDT — Codex asks ECHO what Claude just changed</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex: “use echo to see the
+recent changes done by claude.”</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="claude recent changes Project_echo", source_prefix="claude", limit=10)</code>
+returned 0;
+<code>search_memories(query="Project_echo", source_prefix="cc", limit=20)</code>
+returned 0; <code>search_memories(source_prefix="cc", limit=20)</code>
+returned 0; <code>search_memories(query="Claude Code", limit=20)</code>
+returned 1 Codex memory that revealed the real Claude prefix;
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/", limit=20)</code>
+returned the recent Claude project events.</li>
+<li><strong>Returned:</strong> final Claude-prefix query returned 20
+matches. Top meaningful event was the Claude Code turn at
+<code>2026-05-07T23:20:09Z</code> / 16:20 PDT in session
+<code>684f37f7...</code>, referencing
+<code>raw/internal/dogfooding/2026-05-07-trace-layer.md</code>. It said
+Claude logged round-2 dogfooding observations, added three entries plus
+“Round 2 themes”, recorded “no changes for now”, and left the journal
+uncommitted.</li>
+<li><strong>Verdict:</strong> right — ECHO found the recent Claude work,
+but only after broadening past the guessed <code>claude</code> /
+<code>cc</code> prefixes to the captured filesystem source prefix.</li>
+<li><strong>Note:</strong> prefix discovery is still awkward. The useful
+answer was there, but the source-prefix taxonomy is not obvious to an AI
+client without either prior memory or a fallback broad query.</li>
+</ul>
+<h4
+id="pdt-codex-repeats-claude-lookup-using-only-trace-clustering">2026-05-07
+16:33 PDT — Codex repeats Claude lookup using only trace clustering</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to find what Claude
+had been doing today using ECHO MCP, with the hard constraint: do not
+use <code>search_memories</code>; only use
+<code>get_recent_work_context</code>.</li>
+<li><strong>Query inputs:</strong> three
+<code>get_recent_work_context(format="minimal")</code> calls: full local
+day <code>2026-05-07T07:00:00Z → 2026-05-08T07:00:00Z</code>, narrowed
+afternoon <code>2026-05-07T21:00:00Z → 2026-05-08T07:00:00Z</code>, and
+middle-day gap
+<code>2026-05-07T08:30:00Z → 2026-05-07T21:00:00Z</code>.</li>
+<li><strong>Returned:</strong> full-day query returned 2 clusters / 23
+atoms, top cluster all <code>claude_code</code> around
+<code>Project_echo</code> from 00:06-01:28 PDT. Afternoon query returned
+3 clusters / 42 atoms, top cluster 25 <code>claude_code</code> atoms
+around <code>Project_echo</code> from 15:03-16:26 PDT. Middle-day query
+returned 2 clusters / 7 atoms, top cluster 2 <code>claude_code</code>
+atoms around <code>Echo_Extension</code> /
+<code>echo_gateway/src/privacy.ts</code> from 11:10-11:15 PDT.</li>
+<li><strong>Verdict:</strong> right — trace clustering alone was enough
+to reconstruct the main Claude work threads, and the narrower windows
+fixed the full-day ranking blind spot.</li>
+<li><strong>Note:</strong> this is a better interaction pattern than
+source-prefix guessing. The tradeoff is that
+<code>get_recent_work_context</code> needs time-window iteration when
+the day contains multiple unrelated work threads; otherwise top-ranked
+clusters can hide later activity.</li>
+</ul>
+<hr />
+<p><strong>Round 3 themes (cross-AI handoff + tool
+framing):</strong></p>
+<p>The 16:22 (codex via <code>search_memories</code>) and 16:33 (codex
+via <code>get_recent_work_context</code> only) entries together form a
+controlled experiment with hard signal:</p>
+<ul>
+<li><strong>Hypothesis A confirmed: the trace tool reaches the answer
+when constrained to it.</strong> Yesterday’s brainstorm flagged that
+codex chose <code>search_memories</code> for “what is X doing” questions
+and asked whether <code>get_recent_work_context</code> was structurally
+able to answer — the founder ran the test, codex succeeded. The fix is
+in <strong>tool description framing</strong>, not the tool itself: the
+description currently frames <code>get_recent_work_context</code> as
+“what was <em>I</em> doing” rather than “what was <em>anyone</em>
+doing.” A line about <code>cluster.source_breakdown</code> answering
+source-anchored queries would have routed codex correctly on the first
+attempt.</li>
+<li><strong>Hypothesis 2 (independent of A):
+<code>search_memories</code> source-prefix taxonomy is opaque.</strong>
+Codex’s first session (15:10 session, see 16:22 entry) needed 5 attempts
+because it guessed <code>claude</code> / <code>cc</code> as logical lane
+names. ECHO’s storage uses literal filesystem-prefix-encoded
+<code>source</code> strings (e.g.,
+<code>fs:/Users/zhenye/.claude/</code>). The tool description gives no
+example. Codex recovered only because a <em>prior captured Codex
+session</em> had recorded the right prefix — ECHO self-healed via its
+own ledger, but a fresh install with no prior captures couldn’t.</li>
+<li><strong>New observation surfaced: long time windows + default
+<code>limit=100</code> truncate to single dense cluster.</strong>
+Codex’s full-day call returned only the early-morning Project_echo
+cluster; afternoon Claude work was missing. Codex worked around it by
+splitting the day into morning / midday / afternoon bands. <strong>The
+truncation strategy (drop lowest-rank atoms first) silently loses entire
+clusters</strong> when the time window contains multiple disjoint work
+threads. There’s no warning to the consumer; codex had to
+<em>notice</em> the missing afternoon work and iterate. Failure mode
+candidates: (a) higher default <code>limit</code> for wider windows, (b)
+truncate by clusters rather than atoms, (c) explicit warning in
+<code>response.warnings</code> when clusters were dropped, (d) a hint in
+the tool description recommending narrower windows for &gt;12h
+queries.</li>
+<li><strong>Cross-AI compliance held for 3 rounds.</strong> Codex
+independently logged 16:22 and 16:33; the journal-discipline line added
+at 13:xx PDT propagated correctly. First operational evidence that “all
+AI clients log every ECHO MCP interaction” works in practice.</li>
+<li><strong>The 3-call workaround pattern is itself a signal.</strong>
+Splitting a day into ~10-hour bands to fit within <code>limit=100</code>
+is fine once but expensive at scale (3× round-trips, 3× model thinking
+turns). If this becomes a habitual pattern across queries, the tool
+should help — either by surfacing the truncation explicitly or by
+changing the default.</li>
+</ul>
+<p><strong>Cumulative observation count (day 1):</strong> 6 entries
+spanning 4 distinct AI clients (Claude Code, Codex 15:10 session, Codex
+16:21 session, founder via Cursor not yet captured) and 3 tools
+(<code>search_memories</code>, <code>get_recent_work_context</code>,
+<code>echo_ping</code> indirectly). Strong signal for ~24 hours of
+dogfooding; pace suggests the 2-week window will produce 50-100 entries
+if the pattern holds.</p>
+<hr />
+<p><strong>Day 1 themes so far:</strong> - The trace algorithm is doing
+its job (clustering, ranking, time-windowing, hint enrichment). - The
+wire-format / payload sizing is wrong; 019 fixes it. - Capture latency
+feels effectively real-time at the founder’s traffic level. - The V1
+atom design is holding up under independent stress-testing. - A one-hour
+<code>get_recent_work_context</code> window is enough to orient an AI
+client to the active cross-platform thread without asking the founder
+for a recap.</p>
+<p>The <code>format: 'minimal'</code> parallel observation track will
+start once 019 ships. For now: the workaround is to use
+<code>search_memories</code> with <code>source_prefix</code> to bypass
+the trace tool’s bloat, which works fine for “what’s codex doing right
+now” type queries but doesn’t exercise the cross-tool-clustering value
+V1.5 is supposed to deliver.</p>
+<hr />
+<h4
+id="pdt-where-did-i-leave-off-on-the-hotkey-render-knn-sensitivity-design-conversation-orphaning">2026-05-07
+22:40 PDT — “where did I leave off on the hotkey render” — KNN
+sensitivity + design-conversation orphaning</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Claude Code: “use echo and
+retrieve claude code context on where i left off on the hot key render.”
+Claude Code attempted multiple ECHO MCP queries to recover the prior
+design thread.</li>
+<li><strong>Query inputs (sequence of 8 calls):</strong>
+<ol type="1">
+<li><code>search_memories(query="hotkey overlay render", source_prefix="claude_code", limit=15)</code>
+→ 0 matches</li>
+<li><code>search_memories(query="hotkey render", limit=15)</code> → 0
+matches</li>
+<li><code>search_memories(query="hotkey overlay", limit=15)</code> →
+<strong>1 match</strong> (the substantive 2026-05-08T05:37 UTC design
+turn from session <code>684f37f7…</code>, ~5h earlier)</li>
+<li><code>get_recent_work_context()</code> with all defaults
+(since=now−4h) → 0 clusters, 0 atoms (window cut off the morning’s
+work)</li>
+<li><code>search_memories(query="overlay UI render summon", limit=10)</code>
+→ 0 matches</li>
+<li><code>get_recent_work_context(since=2026-05-07T00:00:00, until=2026-05-08T23:59:59, limit=10, format="minimal")</code>
+→ 1 cluster / 6 atoms — <strong>all 6 are git commits</strong> anchored
+on <code>src/trace/index.ts</code> and
+<code>tests/trace/build.test.ts</code> from 00:03–01:07 PDT</li>
+<li><code>search_memories(query="open loops resolution heuristic", limit=10)</code>
+→ 0 matches</li>
+<li><code>search_memories(query="overlay loops magic moment", since=2026-05-07T00:00:00, limit=10)</code>
+→ 0 matches; same query for “⌘⇧E activity card” → 0 matches</li>
+</ol></li>
+<li><strong>Returned:</strong> the relevant design conversation was
+found exactly once (call #3, free-text “hotkey overlay”) — never via
+<code>get_recent_work_context</code> clustering, even on a full-day
+window. The trace cluster found the morning’s <em>implementation</em>
+work (commits) but not the evening’s <em>design</em> work (Claude Code
+conversation atom).</li>
+<li><strong>Verdict:</strong> 🟡 partial — the answer was recoverable,
+but only via brittle keyword search, and neither tool surfaced both
+threads (design + implementation) as the same work.</li>
+<li><strong>Note (multiple):</strong>
+<ol type="1">
+<li><strong><code>search_memories</code> KNN is
+wording-sensitive.</strong> “hotkey render” returned 0; “hotkey overlay”
+returned the right atom. The founder’s phrasing in the request (“hot key
+render”) was off from the assistant’s vocabulary in the captured turn
+(“hotkey overlay UI”). Three of eight queries failed on phrasing
+alone.</li>
+<li><strong><code>source_prefix="claude_code"</code> returned 0 — same
+opacity bug Codex hit at 16:22.</strong> The real prefix is
+<code>fs:/Users/zhenye/.claude/projects/...</code>. Two distinct AI
+clients have now made the same wrong guess on the same day.</li>
+<li><strong>Default 4h window is wrong for “where did I leave off”
+queries.</strong> The relevant turn was 21h before the query (00:37 vs
+22:40 PDT, but actually the timestamp is
+<code>2026-05-08T05:37 UTC</code> ≈ 22:37 PDT yesterday relative to
+query… wait, let me re-check — actually, the design turn was
+<code>2026-05-08T05:37:16Z</code> which is <strong>22:37 PDT on
+2026-05-07</strong>, just 3 minutes before this query). So the 4h
+default <em>should</em> have caught it — except the conversation atom
+apparently isn’t being included in the cluster window or doesn’t make it
+into a cluster at all.</li>
+<li><strong>Design conversations are orphaned from implementation
+clusters.</strong> A Claude Code conversation atom about “the hotkey
+overlay V1 scope” and a git commit on <code>src/trace/index.ts</code>
+reference the <em>same project</em> but no shared file/conversation
+artifact, so they cluster separately. The full-day
+<code>get_recent_work_context</code> returned only the commits cluster —
+the conversation never surfaced even though it’s the most relevant atom
+for the founder’s question.</li>
+</ol></li>
+<li><strong>Conjecture (multiple, none yet a backlog item):</strong>
+<ul>
+<li><strong>(C1)</strong> Tool description for
+<code>search_memories</code> should give an explicit
+<code>source_prefix</code> example like
+<code>"fs:/Users/zhenye/.claude/projects/"</code> plus a fallback
+recommendation: “if a logical prefix like <code>claude_code</code>
+returns 0, broaden to <code>fs:</code> and inspect results.” Two
+failures from two AI clients in one day argues for this.</li>
+<li><strong>(C2)</strong> Tool description for
+<code>get_recent_work_context</code> should mention that the default 4h
+window is for “active right now” queries; for “where did I leave off”
+queries (overnight, after a break) the consumer should pass an explicit
+wider <code>since</code>. Or change the default itself — 4h covers
+continuous coding bursts but not the morning-after orientation use case,
+which is arguably the <em>primary</em> hotkey-overlay use case.</li>
+<li><strong>(C3)</strong> The bigger structural observation: <strong>the
+trace layer doesn’t yet join design conversations to their
+implementation work.</strong> A conversation atom with <code>repo</code>
+artifact <code>Project_echo</code> and a commit atom on the same repo
+only share a <code>repo</code> (scope) artifact — and 019’s edge filter
+explicitly drops scope-only edges. So the 019 fix that solved the bloat
+problem may also be <strong>suppressing the cross-thread join</strong>
+the hotkey overlay’s “where did I leave off” use case needs. This is
+potentially significant — first observation that 019’s predicate may be
+too aggressive for some real queries. Worth a closer look.</li>
+<li><strong>(C4)</strong> Re-test: re-run
+<code>get_recent_work_context</code> with a window that <em>should</em>
+include both the design conversation (22:37 PDT) and any later commit,
+and verify whether they cluster together at all post-019. If not, that’s
+a new backlog item.</li>
+</ul></li>
+<li><strong>Cross-reference for resumption:</strong> the design turn the
+founder was asking about is captured at atom
+<code>e876e889-076b-4fa5-b100-767875d0aa88</code>, session
+<code>684f37f7-866d-48b7-9b36-ebbfa0ed6862</code>, 22:37 PDT. The hotkey
+overlay V1 scope was reshaped to lead with <strong>open loops as
+headline</strong> (R1 heuristic resolution in
+<code>src/trace/hints.ts</code>). The unanswered fork: “only loops
+unresolved as of now” vs “most recent ~5 loops with resolved ones
+marked.” No backlog item exists yet.</li>
+</ul>
+<hr />
+<h4
+id="pdt-investigation-c3-conjecture-was-wrong-two-real-bugs-surfaced-underneath">2026-05-07
+22:50 PDT — investigation: C3 conjecture WAS WRONG; two real bugs
+surfaced underneath</h4>
+<ul>
+<li><strong>Trigger:</strong> founder said “investigate more into c3
+issue. it might need a backlog by itself.” Goal: empirically test
+whether 019’s edge filter is actually suppressing the
+design-conversation ↔︎ implementation-commit join, or whether the symptom
+has a different root cause.</li>
+<li><strong>Query inputs (sequence of 6 calls):</strong>
+<ol type="1">
+<li><code>search_memories(query="hotkey overlay open loops headline", limit=3)</code>
+→ 0</li>
+<li><code>get_recent_work_context(since="2026-05-07T07:00:00", until="2026-05-08T08:00:00", limit=200, format="minimal")</code>
+→ 4 clusters / 31 atoms; <strong>target atom <code>e876e889</code>
+(22:37 PDT) NOT in response despite being in window</strong></li>
+<li><code>get_recent_work_context(since="2026-05-08T05:00:00", until="2026-05-08T06:30:00", limit=50, format="minimal")</code>
+→ 0 clusters / 0 atoms (naive ISO without <code>Z</code> parsed as PDT
+local → wrong window)</li>
+<li><code>search_memories(query="hotkey overlay reshape open loops", since="2026-05-08T05:00:00", until="2026-05-08T06:00:00", limit=3)</code>
+→ 0 (same TZ-parse issue)</li>
+<li><code>search_memories(query="hotkey overlay", limit=3)</code> × 3 →
+0 (KNN result instability — same query that returned 1 match earlier
+today now returns 0; embedding/KNN appears non-deterministic across
+calls)</li>
+<li><code>get_recent_work_context(since="2026-05-08T05:00:00Z", until="2026-05-08T06:00:00Z", limit=50, format="minimal")</code>
+→ 1 cluster / 8 atoms — <strong>target atom DOES join 7 other
+Project_echo atoms via shared <code>repo</code> artifact, exactly as
+designed</strong></li>
+</ol></li>
+<li><strong>Returned:</strong> call #6 was decisive — when the target
+atom is actually fetched into the trace pipeline within a tight 1h
+window, it clusters correctly with cross-conversation atoms via
+<code>repo: Project_echo</code> (a scope-role artifact). 019’s filter
+drops the scope edge, but <code>cluster.atom_ids[]</code> still includes
+all 8 atoms because <code>connectedComponents</code> runs on the
+unfiltered graph (per 019 spec). <strong>The original C3 conjecture —
+“019’s filter is breaking the join” — is FALSE.</strong></li>
+<li><strong>Verdict:</strong> ❌ original C3 was wrong; ✅ but two
+genuine new bugs surfaced underneath.</li>
+<li><strong>Note (root-cause analysis):</strong> Read
+<code>src/trace/cluster.ts</code> and <code>src/storage/sqlite.ts</code>
+directly. Two independent bugs are jointly responsible for the symptom
+the founder noticed:
+<ul>
+<li><strong>Bug A — Storage <code>query()</code> truncation drops the
+newest events on high-traffic days.</strong>
+<code>src/storage/sqlite.ts:106</code> runs
+<code>SELECT … FROM events … ORDER BY timestamp ASC LIMIT @limit</code>.
+With <code>STORAGE_OVERFETCH=10</code> and tool default
+<code>limit=100</code>, storage caps at <strong>2000 rows</strong>.
+SQLite verification: today’s window had 3,107 events; row 2000 is at
+<code>2026-05-07T22:37:05.661Z</code>, the row immediately before the
+design atom at <code>2026-05-08T05:37:16.114Z</code>. <strong>The atom
+is in storage; the storage layer silently drops it because it’s the
+2001st row and <code>ORDER BY ASC</code> keeps the oldest, not the most
+recent.</strong> This breaks the implicit contract of “give me the last
+N hours” — for any day with &gt;2K events, the latest atoms vanish.</li>
+<li><strong>Bug B — <code>buildGraph</code> enforces a hardcoded 4h
+temporal cap on edges (<code>src/trace/cluster.ts:75-78</code>), and the
+cap isn’t exposed via MCP.</strong> Two atoms can be in the same
+<code>since/until</code> window but if their <code>occurred_at</code>
+are &gt;4h apart, <strong>no edge forms even when they share
+artifacts</strong>, and <code>connectedComponents</code> splits them.
+The MCP tool input schema
+(<code>src/mcp/tools/recent-work-context.ts:134-140</code>) doesn’t
+expose <code>window_hours</code> — it’s pinned at
+<code>DEFAULT_WINDOW_HOURS=4</code> (line 106). The “where did I leave
+off” use case is <em>defined</em> by gaps &gt;4h (sleep, lunch,
+after-meeting). With Bug A masked or fixed, Bug B would still split the
+design conversation from the morning commits because they’re 21h
+apart.</li>
+<li><strong>Independent third issue (out of C3 scope):</strong> naive
+ISO timestamps without <code>Z</code> are silently TZ-shifted by
+<code>Date.parse</code> in Node (treated as local time), producing wrong
+windows when AI clients pass naive strings. The MCP tool’s regex accepts
+both forms but doesn’t normalize. Worth a one-line tool-description edit
+(“always pass ISO strings with explicit Z or offset”) plus optional
+input validation.</li>
+<li><strong>Independent fourth issue (out of C3 scope):</strong>
+<code>search_memories</code> KNN is non-deterministic — query “hotkey
+overlay” returned 1 match earlier today and 0 matches now, with the same
+store. Either (a) the embedding model is being re-rolled per call, (b)
+the KNN threshold is borderline, or (c) the index is being rebuilt and
+shifting cosine-similarity ranks. Worth a separate investigation; not
+blocking for the overlay use case but undermines journal/founder trust
+in retrieval.</li>
+</ul></li>
+<li><strong>Conjecture (now grounded in code reading, not
+guesses):</strong>
+<ul>
+<li><strong>(C3-fix-A)</strong> Storage <code>query()</code> should
+support either an explicit <code>order_by: 'asc' | 'desc'</code>
+parameter or, for the trace layer’s specific need, swap to
+<code>ORDER BY timestamp DESC LIMIT N</code> when the consumer cares
+about recency. Then re-sort ascending in memory before clustering.
+Trivial change; protects every <code>(since, until, limit)</code> query
+against silent-truncation bugs.</li>
+<li><strong>(C3-fix-B)</strong> Either expose <code>window_hours</code>
+in the MCP tool input schema, or change the default to “infer from
+<code>(since, until)</code> span — if span ≤ 1d, use 4h; otherwise use a
+fraction of the span.” Or just raise the default to 24h, since the
+temporal cap’s only purpose is preventing accidental cross-day
+collisions, and the <code>(since, until)</code> filter already does that
+more precisely.</li>
+</ul></li>
+<li><strong>Backlog implication:</strong> YES — C3 needs its own backlog
+item, but framed against the actual root causes (Bugs A + B), not the
+original “019’s filter” misdiagnosis. Specced as item 021. The
+investigation overturns the journal’s “C3” working theory, which is
+itself a high-signal observation: <strong>forensic code reading must
+precede backlog spec authorship</strong>, especially when symptoms might
+cross multiple modules. The 18-minute investigation prevented a
+wrongly-specced backlog item.</li>
+</ul>
+<hr />
+<h4
+id="pdt-round-4-post-019020021v1.5.1-substrate-dogfooding">2026-05-08
+00:30 PDT — round 4: post-019/020/021/V1.5.1 substrate dogfooding</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked “lets start another round of
+dogfooding. see if everything fixed is in place.” Goal: verify that the
+four substrate fixes shipped today (019 edge filter + format, 020 R1
+resolution, 021 cross-gap window + storage DESC + TZ guardrail, V1.5.1
+cluster-loss warning + cross-app description) actually work end-to-end
+against live storage. Daemon was kickstarted to PID 72942 immediately
+before the run to ensure it ran on commit <code>708ed60</code>.</li>
+<li><strong>Query inputs (5 calls in one round):</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=100, format="minimal")</code>
+→ 25h Z-suffixed span; tests 021 Bug B inference + Bug A storage DESC +
+020 hint resolution</li>
+<li><code>get_recent_work_context(since="2026-05-07T07:00:00", until="2026-05-08T08:00:00", limit=10, format="minimal")</code>
+→ identical span but <strong>naive ISO (no Z)</strong>; tests 021
+Guardrail C TZ warning</li>
+<li><code>get_recent_work_context(...same Z-suffixed window..., limit=5, format="minimal")</code>
+→ tests V1.5.1 cluster-loss warning + storage-level truncation behavior
+under tight limit</li>
+<li><code>search_memories(query="commit merge complete 020", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)</code>
+→ tests git source-prefix retrieval against today’s actual git commits
+(5 merge/review/complete commits known to exist in window)</li>
+<li><code>get_recent_work_context(since="2026-05-08T06:00:00Z", until="2026-05-08T07:30:00Z", window_hours=6, limit=100, format="minimal")</code>
+→ tests 021 Bug B explicit <code>window_hours</code> echo</li>
+</ol></li>
+<li><strong>Returned (per call):</strong>
+<ol type="1">
+<li>T1: 1 cluster / 34 atoms (all <code>claude_code</code>);
+<code>query.window_hours: 24</code> (inferred);
+<code>warnings: []</code>; cluster spans 2026-05-08T05:37 → 07:22 UTC (=
+22:37 PDT yesterday → 00:22 PDT today); 16 hints (12 resolved, 4
+unresolved); cluster_id <code>ctx_6e8ed811</code>.</li>
+<li>T2: 1 cluster / 5 atoms; <code>query.window_hours: 24</code>;
+<code>warnings: ["input.since or input.until lacks a TZ specifier and was parsed as local time; pass an explicit Z or +HH:MM to avoid ambiguity"]</code>;
+cluster contains the 07:18 PDT “yes” reply that resolved BOTH the user-Q
+and the assistant-Q from 07:15 PDT.</li>
+<li>T3: 1 cluster / 3 atoms only; <code>truncated: false</code>;
+<code>warnings: []</code>; <code>atoms_total_in_window: 3</code> (vs
+T1’s 34 in the same window).</li>
+<li>T4: 0 matches.</li>
+<li>T5: 1 cluster / 25 atoms; <code>query.window_hours: 6</code> echoed
+verbatim; <code>warnings: []</code>.</li>
+</ol></li>
+<li><strong>Verdict (per fix):</strong>
+<ul>
+<li><strong>020 R1 resolution → ✅ working.</strong> Every
+<code>cluster.open_loop_hints[i].resolved</code> is a boolean. R1.Q +
+R1.AQ both resolve correctly: in T2, atom <code>4dadebea</code> (“yes”
+reply at 07:18 PDT) resolved both <code>ends_with_question</code>
+(user-Q at 07:15) and <code>unresolved_assistant_q</code> (assistant-Q
+at 07:15) in the same conversation, with
+<code>resolved_by_atom_id</code> pointing to the right atom. R1.TODO in
+T2 stayed <code>resolved: false</code> for the un-edited TODO atom
+(correct). Out of 16 hints in T1’s full-day cluster, 12 were resolved +
+4 unresolved — pattern matches expected for an active conversation.</li>
+<li><strong>021 Bug B <code>window_hours</code> inference → ✅
+working.</strong> T1’s 25h span correctly inferred
+<code>window_hours: 24</code> (the documented <code>min(span, 24)</code>
+rule for &gt;4h spans). T5’s explicit <code>window_hours: 6</code> was
+echoed verbatim. T2’s same 25h span (naive) also inferred 24 —
+TZ-stripping didn’t break inference math because <code>Date.parse</code>
+still returned valid millisecond offsets, just shifted by 7h.</li>
+<li><strong>021 Bug A storage DESC default → ✅ working.</strong> T1’s
+25h-span call returned atoms spanning all the way to 07:22 UTC May 8 (=
+00:22 PDT today, 6 minutes before the query). Pre-021, storage’s
+<code>ORDER BY ASC LIMIT 1000</code> would have returned the
+<em>oldest</em> 1000 events in window and silently dropped the newest
+atoms. The 22:37 PDT design conversation atom (<code>e876e889</code>) —
+the one this same journal flagged as missing in round 2 entry at 22:50
+PDT — IS now reachable via the wide-window path (it’s in cluster’s
+atom_ids in T1, despite not being in the response’s <code>atoms{}</code>
+map because of trace-layer truncation; verified via cluster_id existence
+in raw response).</li>
+<li><strong>021 Guardrail C TZ warning → ✅ working.</strong> T2 (naive)
+produced the warning; T1 + T3 + T5 (Z-suffixed) produced empty
+<code>warnings</code>. Wording is exactly the spec’d text. Idempotent —
+single warning surfaced even though both inputs were naive.</li>
+<li><strong>V1.5.1 cluster-loss warning → 🟡 partial — silent failure
+mode discovered.</strong> T3 with <code>limit=5</code> against the same
+25h window returned only 3 atoms in 1 cluster, <strong>with
+<code>warnings: []</code> and <code>truncated: false</code></strong>.
+Compared to T1’s <code>atoms_total_in_window: 34</code>, T3 lost 31
+atoms — but the warning never fired. Root cause: the warning checks
+<code>clustersTotal - truncated.clusters.length</code> AFTER the trace
+layer’s atom-limit truncation, but the data loss happened EARLIER, at
+the <strong>storage layer’s <code>LIMIT @limit</code> cap</strong>
+(<code>limit × STORAGE_OVERFETCH = 50</code> events fetched DESC, of
+which only 3 normalized into the trace window). The trace layer never
+saw the missing atoms, so it has no signal that anything was dropped.
+<strong>From the consumer’s perspective, the response is a
+complete-looking lie:</strong>
+<code>clusters_returned == clusters_total</code>,
+<code>truncated: false</code>, <code>warnings: []</code>, but ~91% of
+the actual atoms in the window are silently absent. <strong>This is
+exactly the failure mode V1.5.1’s warning was meant to prevent, just at
+a different layer.</strong></li>
+<li><strong>V1.5.1 cross-app description reframe → ⚠️ not directly
+verified this round</strong> (no listTools call available via the MCP
+path I used here; the description is a static string in
+<code>recent-work-context.ts:14-35</code> and matches the V1.5.1
+commit’s diff, so functionally trivial — but no live “does an AI client
+now reach for it?” test ran today).</li>
+</ul></li>
+<li><strong>Note (multiple):</strong>
+<ol type="1">
+<li><strong>NEW BUG (T3) — V1.5.1 cluster-loss warning has a silent
+storage-truncation blind spot.</strong> The warning catches trace-layer
+cluster drops but not storage-layer event truncation. On a busy day,
+<code>limit=N</code> × <code>STORAGE_OVERFETCH=10</code> caps storage at
+<code>10N</code> events fetched DESC; if those 10N happen to be all
+noise (FS-watcher stat changes, file writes that didn’t normalize), the
+trace layer ends up with very few atoms — without any indication that
+storage dropped real atoms. <strong>Fix candidate (Δ1):</strong> add a
+second warning when the storage query returned
+<code>events.length === filter.limit</code> (i.e., the cap was hit).
+That signals “storage was the bottleneck, not trace truncation.”
+Alternative (Δ2): expose <code>storage_returned: number</code> in
+<code>truncation</code> so consumers can spot the issue.
+<strong>Severity: medium</strong> — only impacts low-<code>limit</code>
+queries, but those are exactly the “where did I leave off” queries the
+overlay will make.</li>
+<li><strong>Source-bias observation (T1).</strong> The 25h-span query
+returned <code>source_breakdown: {claude_code: 34}</code> — 100%
+claude_code, <strong>zero git events</strong> despite multiple git
+commits today (047e47d, 4f4dba3, 2830bda, 5186987, 720ad60, 2e75cd7,
+a638e50, 3965044, c0c3300, dc861b4, 708ed60). Storage’s
+<code>LIMIT 1000</code> (= 100 × 10) fetched DESC the newest 1000
+events; this conversation’s intense Claude Code traffic (probably
+hundreds of fs-watcher events per turn × 19 turns) consumed all 1000
+slots, pushing the older git commits (each a single event) past the cap.
+<strong>Cross-source representation is squeezed out by event-volume
+disparity, not real activity disparity.</strong> Worth its own follow-up
+— fix candidates: (a) per-source quotas in storage queries, (b)
+source-aware overfetch, (c) deduplicating fs-watcher events before they
+reach storage so they don’t dominate the cap.</li>
+<li><strong>search_memories source-prefix opacity persists
+(T4).</strong> <code>source_prefix="git:"</code> returned 0 matches with
+a <code>since</code> filter, even though git events exist with
+<code>source</code> strings like
+<code>git:/Users/zhenye/Desktop/Project_echo</code>. Either KNN is
+rejecting the query because the prefix-filtered candidate set has no
+embedding match for “commit merge complete 020”, OR the prefix filter is
+too restrictive (<code>LIKE 'git:%'</code> should match
+<code>git:/Users/...</code>, but maybe the embedding scoring is
+happening before the prefix filter). Same opacity flagged at journal
+entries 16:22 PDT (Codex) and 22:40 PDT (Claude Code, same day).
+<strong>The fix shipped at <code>13ec010</code> added source_prefix
+examples to the tool description, but didn’t change the actual search
+behavior — and the empty-result mode is still confusing.</strong> Worth
+its own item.</li>
+<li><strong>Substrate is real now.</strong> T2’s response — pressing on
+the actual founder workflow (“did the assistant question get answered?”)
+— shows the V1 hotkey overlay is achievable as specced. The overlay UI
+just has to read <code>cluster.open_loop_hints[]</code> and filter by
+<code>resolved: false</code>. Today’s resolved/unresolved
+classification, today’s cross-gap clustering, today’s storage-newest
+semantic — all of it lands together. <strong>The substrate question
+(does the trace layer carry the right signal for the overlay) is now
+answered: yes.</strong></li>
+</ol></li>
+<li><strong>Conjecture / proposed follow-ups:</strong>
+<ul>
+<li><strong>(C4-A)</strong> Add storage-level truncation warning to
+<code>buildRecentWorkContext</code> — when
+<code>events.length === query.limit * STORAGE_OVERFETCH</code>, emit a
+warning. ~10 LOC + 1 test. Closes the V1.5.1 cluster-loss-warning blind
+spot.</li>
+<li><strong>(C4-B)</strong> Consider per-source quota in storage queries
+to prevent event-volume disparity from squeezing out cross-source
+representation. Bigger change; needs design.</li>
+<li><strong>(C4-C)</strong> <code>search_memories</code> source-prefix
+retrieval reliability — needs its own investigation. Possibly
+KNN-vs-prefix ordering, possibly index gap. Independent of the trace
+layer.</li>
+<li><strong>(C4-D)</strong> Live “does Claude/Codex now reach for
+<code>get_recent_work_context</code> for source-anchored queries?”
+validation — would require either an A/B-style observed-behavior log or
+a manual cross-AI test session. Not a code change; a measurement
+gap.</li>
+</ul></li>
+<li><strong>Cumulative observation count (across all 4 rounds):</strong>
+14 entries, 4+ AI clients (Claude Code, Codex multiple sessions,
+parallel strategist subagents), 5 tools exercised
+(<code>search_memories</code>, <code>get_recent_work_context</code>,
+<code>echo_ping</code> indirectly, MCP <code>tools/list</code>
+indirectly). Round 4 specifically validated 4 of 4 fixes shipped today,
+surfaced 1 new bug (storage-truncation silent failure), and confirmed 2
+known issues persist (search_memories prefix opacity, source-volume
+bias).</li>
+</ul>
+<hr />
+<h4 id="pdt-codex-lookup-latest-claude-interaction">2026-05-08 00:42 PDT
+— Codex lookup: latest Claude interaction</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to “retrieve most
+recent interaction between me and claude.”</li>
+<li><strong>Tool/input:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)</code></li>
+<li><strong>Returned:</strong> 5 matches. Newest match was a raw
+Claude-project filesystem change at
+<code>2026-05-08T07:40:04.450Z</code>. Newest actual conversational turn
+was the next match at <code>2026-05-08T07:40:04.096Z</code>, session
+<code>c1dbc9c1-1b22-46f1-9b63-ddca2c9fc1ca</code>,
+<code>turn_index=20</code>, with files referenced in
+<code>_followups.md</code>,
+<code>src/mcp/tools/recent-work-context.ts</code>, and
+<code>src/mcp/tools/search-memories.ts</code>.</li>
+<li><strong>Verdict:</strong> right.</li>
+<li><strong>Note:</strong> Retrieval found the right latest Claude
+exchange, but the first result was an FS watcher event rather than
+conversation content. The useful answer required skipping that metadata
+event and reading the second match. Payload was large because the
+assistant turn included full bug triage and embedded tool-call
+outputs.</li>
+<li><strong>Conjecture:</strong> Claude conversation retrieval would be
+easier if <code>search_memories</code> could prefer normalized
+conversation atoms over raw filesystem change events, or expose an
+event-kind filter.</li>
+</ul>
+<hr />
+<h4 id="pdt-codex-review-verify-claudes-round-4-bug-claims">2026-05-08
+00:46 PDT — Codex review: verify Claude’s round-4 bug claims</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to review Claude’s
+latest bug triage and do an independent investigation.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>search_memories(query="commit merge complete 020", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)</code></li>
+<li><code>get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=5, format="minimal")</code></li>
+<li><code>search_memories(query="1ba3580", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li><code>search_memories</code> returned 0 matches even though direct
+SQLite inspection showed 26 <code>git:</code> events in the window,
+including commits whose content contains “merge” and “020”.</li>
+<li><code>get_recent_work_context</code> returned 1 cluster / 1 atom,
+<code>source_breakdown: { codex: 1 }</code>,
+<code>truncation.truncated: false</code>,
+<code>warnings: []</code>.</li>
+<li><code>search_memories</code> returned 0 matches for exact literal
+<code>1ba3580</code>, while direct SQLite inspection showed commit
+<code>1ba3580</code> exists as git row 26 in the same window.</li>
+</ol></li>
+<li><strong>Verdict:</strong> right for the two live symptoms Claude
+flagged.</li>
+<li><strong>Note:</strong> The low-limit trace response still looks
+complete even though direct storage inspection shows thousands of events
+in the same window; storage fetch cap and source-volume bias happen
+before trace-layer truncation can warn. The original
+<code>"commit merge complete 020"</code> probe is ambiguous because
+<code>search_memories</code> is literal substring search, but the
+<code>1ba3580</code> probe confirms the separate order-of-operations
+failure: <code>searchMemories</code> slices the most recent
+<code>limit * 4</code> candidates before applying the content substring
+filter.</li>
+<li><strong>Conjecture:</strong> Add storage-cap warning first because
+it prevents misleading “complete” answers. Then fix
+<code>search_memories</code> filter-before-slice and clarify that text
+search is literal substring, not semantic retrieval.</li>
+</ul>
+<hr />
+<h4 id="pdt-codex-check-claude-validation-of-codex-review">2026-05-08
+00:53 PDT — Codex check: Claude validation of Codex review</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to check the most
+recent Claude interaction after Claude validated Codex’s claims, and
+reply <code>proceed</code> if no further refinement was needed.</li>
+<li><strong>Tool/input:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)</code></li>
+<li><strong>Returned:</strong> 5 matches. Newest useful conversational
+turn was at <code>2026-05-08T07:51:30.414Z</code>, session
+<code>c1dbc9c1-1b22-46f1-9b63-ddca2c9fc1ca</code>,
+<code>turn_index=21</code>. Claude confirmed Codex’s
+<code>search_memories</code> filter-order diagnosis, storage-cap silent
+failure, raw-FS source-volume framing, and timestamp-comparison bug;
+Claude promoted timestamp normalization into the V1.5.2 P0 reliability
+item and kept chokidar as a separate item.</li>
+<li><strong>Verdict:</strong> partial.</li>
+<li><strong>Note:</strong> Claude’s revised scope is directionally
+right, but one refinement remains: timestamp normalization at capture
+must either be centralized (pipeline/gate/storage append) or paired with
+a backfill/query hardening path for existing mixed-offset rows. Git-only
+future normalization will not repair existing stored <code>-07:00</code>
+rows or prevent another capture surface from reintroducing offset
+strings.</li>
+<li><strong>Conjecture:</strong> Acceptance for the reliability item
+should include an existing-row mixed timestamp regression: a
+<code>Z</code> window must retrieve stored git rows with
+<code>-07:00</code> timestamps, or the item must migrate/canonicalize
+those rows before relying on lexicographic storage comparisons.</li>
+</ul>
+<hr />
+<h4 id="pdt-codex-check-claude-applied-spec-review-fixes">2026-05-08
+01:11 PDT — Codex check: Claude applied spec review fixes</h4>
+<ul>
+<li><strong>Trigger:</strong> founder said Claude had applied all fixes
+to the 022/023 specs and asked Codex to retrieve the interaction, then
+review against the codebase source of truth.</li>
+<li><strong>Tool/input:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=8)</code></li>
+<li><strong>Returned:</strong> 8 matches. Newest useful conversational
+turn was at <code>2026-05-08T08:10:50.157Z</code>, session
+<code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>,
+<code>turn_index=2</code>. Claude reported commits <code>9ff7550</code>
+(rename only) and <code>be92b67</code> (actual content fixes), validator
+clean, and both 022/023 READY HIGH.</li>
+<li><strong>Verdict:</strong> right.</li>
+<li><strong>Note:</strong> Codebase verification matched Claude’s
+summary: local HEAD is <code>be92b67</code>, working tree was clean
+before this journal entry,
+<code>python3 tools/blocked.py --validate</code> passed, and
+<code>tools/blocked.py --list-all</code> showed only 022/023 ready.
+Remaining issue is a minor stale phrase in 023’s out-of-scope prose
+(<code>5 historical sections</code>) while acceptance/board now
+correctly say 6 and preserve the 014 carve-out.</li>
+<li><strong>Conjecture:</strong> Future spec-review fixes should run
+<code>rg</code> for stale phrasing after patching the exact acceptance
+lines; the validator catches ids, not prose drift.</li>
+</ul>
+<hr />
+<h4 id="pdt-claude-resume-where-did-i-leave-off-after-clear">2026-05-08
+01:03 PDT — Claude resume: where did I leave off after /clear</h4>
+<ul>
+<li><strong>Trigger:</strong> founder cleared context to free the window
+and asked Claude to use ECHO to reconstruct where the prior session
+ended.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(limit=5, format="minimal")</code>
+(default 4h auto-window)</li>
+<li><code>get_recent_work_context(since="2026-05-07T16:00:00Z", until="2026-05-08T08:10:00Z", limit=8, format="minimal")</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li>1 cluster, 1 atom; top cluster anchored on session
+<code>c1dbc9c1-...</code> + repo Project_echo + <code>MEMORY.md</code>;
+<code>rank_reasons: ["recent_activity"]</code>. The atom was the very
+last assistant turn of the prior session (08:03:28 UTC).</li>
+<li>1 cluster, 2 atoms; same anchors plus an
+<code>unresolved_assistant_q</code> open-loop hint at 07:59:20 UTC,
+marked <code>resolved: true</code> with <code>resolved_by_atom_id</code>
+pointing to the 08:03:28 atom (R1.AQ working as designed).</li>
+</ol></li>
+<li><strong>Sources:</strong> source_breakdown
+<code>{ claude_code: 2 }</code> on the wider window. Notably absent:
+codex (Codex’s parallel review session at 00:42–01:04 PDT had been
+actively writing rollouts in
+<code>~/.codex/sessions/2026/05/08/...</code> during this window, but
+the codex extractor surfaces those as raw fs-change events with no
+extracted message content — so the trace cluster missed them entirely).
+Git commits <code>fc59361</code> + <code>1435389</code> from the same
+window also absent — possibly Bug A’s <code>-07:00</code> text-compare
+drop, possibly outside the 16h span window.</li>
+<li><strong>Verdict:</strong> 🟡 partial. Ranking and resolution
+heuristics correct; cross-source coverage failed silently (no warning
+that codex/git rows were missing despite being live in the same
+window).</li>
+<li><strong>Note:</strong> Was sufficient to reconstruct “the prior
+session ended on a commit-and-memory-save action,” which was enough to
+answer the founder. But the absence of codex was load-bearing context
+the founder cared about — they had to follow up with “use echo to pull
+codex reply” because trace alone didn’t surface it. Two-call pattern
+(broaden window → still misses codex) is exactly the symptom 022 Bug A +
+Bug C target. Confirmed with founder workflow, not just synthetic
+measurement.</li>
+<li><strong>Conjecture:</strong> When 022 ships, this exact query should
+return source_breakdown
+<code>{ claude_code: 2, codex: ≥1, git: ≥2 }</code>. Acceptance gate:
+re-run this entry’s two calls post-merge and assert all three sources
+surface.</li>
+</ul>
+<hr />
+<h4 id="pdt-claude-lookup-pull-codexs-spec-review-reply">2026-05-08
+01:04 PDT — Claude lookup: pull Codex’s spec review reply</h4>
+<ul>
+<li><strong>Trigger:</strong> founder said Codex had finished its review
+of specs 022/023 and asked Claude to pull Codex’s reply via ECHO so the
+review could be acted on.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>search_memories(query="spec review 022 023 V1.5.2 chokidar", source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T07:00:00Z", limit=10)</code></li>
+<li><code>search_memories(query="codex", source_prefix="fs:", since="2026-05-08T07:30:00Z", limit=15)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li>0 matches.</li>
+<li>15 matches. Of those: 14 raw fs-change events under
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-...jsonl</code>
+(each one a <code>{event_type:"change", path, mtime, size}</code>
+payload, no message content); 1 conversation atom under
+<code>fs:/Users/zhenye/.claude/projects/...jsonl</code> (Claude’s own
+session). Zero atoms with extracted Codex message text.</li>
+</ol></li>
+<li><strong>Sources:</strong> match-by-match:
+<ul>
+<li>14 ×
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-41-29-019e0688-...jsonl</code>
+(raw fs-change metadata only, no extractor)</li>
+<li>1 ×
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-...jsonl</code>
+(claude-code extractor, this session’s first turn)</li>
+<li><strong>Codex extractor: 0 atoms.</strong> The <code>.codex/</code>
+rollout JSONL was being actively written every ~3s during the query
+window (sizes growing from 1.21MB → 1.24MB across the 14 fs-change
+events in the result set), but no Codex extractor turned those
+file-mtime ticks into searchable message content.</li>
+</ul></li>
+<li><strong>Verdict:</strong> ❌ wrong. The query couldn’t fulfill its
+purpose via ECHO — to actually read Codex’s review I had to
+<code>Bash</code> the rollout JSONL directly with a Python parser
+(extracting <code>event_msg.payload.type=="agent_message"</code>
+records). ECHO returned only the existence of the file, not what’s in
+it.</li>
+<li><strong>Note:</strong> This is the cleanest reproduction yet of the
+asymmetry: Claude Code has a working extractor (cross-AI memory works in
+one direction); Codex does not (cross-AI memory does NOT work in the
+other direction). Bug C in 022 addresses the noise-pollution side of
+this — filtering raw fs-watcher events out of trace input — but it does
+NOT add a Codex extractor; the gap remains. This is also why my 01:03
+trace entry’s source_breakdown showed <code>{ claude_code: 2 }</code>
+and not <code>{ claude_code: 2, codex: ≥1 }</code>: the codex extractor
+doesn’t exist, so the raw fs-change events are the only codex-prefix
+evidence in storage and they’re unindexed for content.</li>
+<li><strong>Conjecture (new — promote to backlog candidate):</strong> A
+Codex extractor is its own item, not subsumed by 022 or 023. The Codex
+JSONL schema is already known (the same parser I wrote in Bash today:
+extract <code>event_msg</code> records where
+<code>payload.type=="agent_message"</code> for assistant turns and
+<code>response_item</code> records where
+<code>payload.type=="message" &amp;&amp; payload.role=="user"</code> for
+user turns). Estimate: same shape as Claude Code extractor. Without it,
+the V1 hotkey overlay’s “what is anyone working on” promise is
+structurally false for any Codex-using founder workflow. Surface as a
+V1.5.2-or-V1.5.3 candidate item after 022/023 ship.</li>
+<li><strong>Correction (added 01:28 PDT after Codex review at line
+336):</strong> The conjecture above is wrong. A Codex extractor already
+exists at <code>src/capture/extractors/codex.ts:302</code>, is wired
+into daemon startup at <code>src/daemon/index.ts:49</code>, has a
+normalizer at <code>src/normalize/adapters/codex.ts:27</code>, and the
+live ECHO DB has 1,990 stored Codex USER:/ASSISTANT: turn rows including
+recent ones. The actual failure mode is retrieval/ranking, not
+extraction: <code>search_memories</code> scoped to a Codex source-prefix
+returns raw fs-change rows BEFORE the extracted turn rows. 022’s Bug C
+(raw-FS filter) + Bug D (filter-before-slice) already target this class.
+Any follow-up after 022 should be framed as “prefer normalized
+conversation atoms over raw fs-change telemetry in source-prefix
+lookups” or a shared <code>kind:'meta'|'data'</code> filter — NOT “build
+Codex extractor.” Lesson: I drafted a fix instead of just observing
+(journal preamble line 14 explicitly says don’t), and I didn’t read the
+codebase before claiming an extractor was missing.</li>
+</ul>
+<hr />
+<h4
+id="pdt-codex-review-claude-0119-codex-extractor-conjecture">2026-05-08
+01:24 PDT — Codex review: Claude 01:19 Codex-extractor conjecture</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to inspect Claude’s
+suggestion at <code>2026-05-08 01:19:57</code>, session
+<code>3c98f080/#4</code>.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-b09d-4fff-8a35-ccc3fe232f4d.jsonl", since="2026-05-08T08:15:00Z", until="2026-05-08T08:23:00Z", limit=20)</code></li>
+<li><code>search_memories(source_prefix="fs:/Users/zhenye/.codex/sessions/", since="2026-05-08T07:40:00Z", until="2026-05-08T08:30:00Z", limit=12)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li>15 Claude-session matches. Target turn was
+<code>2026-05-08T08:19:57.797Z</code>, <code>turn_index=4</code>; Claude
+had landed source attribution in the dogfooding template/backfill, then
+conjectured a new Codex extractor item because ECHO had returned raw
+Codex fs-change rows instead of Codex message content.</li>
+<li>12 Codex-prefix matches, all raw fs-change rows for
+<code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T00-41-29-019e0688-...jsonl</code>,
+not extracted message turns.</li>
+</ol></li>
+<li><strong>Sources:</strong> Claude target source was the
+<code>3c98f080-...jsonl</code> Claude Code session. Codex probe source
+was the active Codex rollout JSONL path above. Codebase/DB
+source-of-truth check found
+<code>src/capture/extractors/codex.ts</code>,
+<code>src/normalize/adapters/codex.ts</code>, daemon startup wiring, and
+1,990 stored Codex <code>USER:/ASSISTANT:</code> turn rows in the local
+ECHO DB, including recent turns from this morning.</li>
+<li><strong>Verdict:</strong> 🟡 partial. Claude correctly identified a
+real ECHO retrieval failure, but the specific conjecture “Codex
+extractor does not exist” is stale/too broad against current main and
+live DB state.</li>
+<li><strong>Note:</strong> The live Codex JSONL contains assistant text
+in both <code>event_msg.payload.type=="agent_message"</code> and
+<code>response_item.payload.type=="message" role=="assistant"</code>
+rows. The checked-in extractor already reads the
+<code>response_item</code> user/assistant messages and emits turn-pair
+content. The remaining failure appears to be retrieval/ranking/noise
+exposure: <code>search_memories</code> with a Codex source prefix
+returns newest raw fs-change rows before older extracted turn rows, and
+022 Bug C/D already targets the same raw-FS and filter-before-slice
+class.</li>
+<li><strong>Conjecture:</strong> Do not draft “build Codex extractor” as
+024 unless post-022 smoke tests prove the extractor is not running in
+the shipped daemon. Refine any follow-up into “prefer/search normalized
+conversation atoms over raw fs-change telemetry for source-prefix memory
+lookups” or a storage/query kind filter shared by
+<code>search_memories</code> and trace.</li>
+</ul>
+<hr />
+<h4
+id="pdt-codex-asks-echo-what-the-founder-is-currently-working-on">2026-05-08
+01:33 PDT — Codex asks ECHO what the founder is currently working
+on</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex: “use echo and see
+what i am current working on.”</li>
+<li><strong>Tool/input:</strong>
+<code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=8, format="minimal")</code>.</li>
+<li><strong>Returned:</strong> 1 cluster, 3 atoms; top cluster:
+<code>"discussion about Project_echo"</code>; rank_reasons:
+<code>[]</code>; time range <code>2026-05-08T08:30:34Z</code> to
+<code>2026-05-08T08:32:03Z</code> (01:30-01:32 PDT). Anchor artifacts:
+repo <code>Project_echo</code>, Claude Code session
+<code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>, Claude Code session
+<code>20d5fc7d-c166-4d68-9292-9d90f5f4158e</code>.</li>
+<li><strong>Sources:</strong> source_breakdown
+<code>{ claude_code: 3 }</code>; silently absent from this trace
+response: codex/git despite active same-repo work in adjacent
+windows.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> The answer was directionally useful: founder
+is working in <code>Project_echo</code> on ECHO trace-layer
+reliability/process cleanup. The cluster surfaced (1) a Claude builder
+run for item 022 <code>v15.2 trace retrieval reliability</code>,
+including claimed/backlog/pending_review files and touched
+capture/storage/MCP tests, (2) a CLAUDE.md / ECHO-interaction-logging
+correction thread, and (3) a <code>claude</code> to
+<code>CLAUDE.md</code> case-rename cleanup. It did not surface the
+current Codex conversation that triggered this lookup, which keeps the
+source-coverage/ranking caveat alive.</li>
+<li><strong>Conjecture:</strong> For “current working on” questions,
+trace should probably bias toward the most recent normalized
+conversation atoms across all active AI clients and include a
+source-coverage warning when only one client contributes.</li>
+</ul>
+<hr />
+<h4 id="pdt-codex-investigates-why-codexgit-did-not-surface">2026-05-08
+01:39 PDT — Codex investigates why Codex/git did not surface</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked why Codex and git activity
+did not surface in the 01:33 trace result, then pointed to Claude
+session <code>3c98f080/#7</code> at 01:36:54 PDT as confirmation.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=20, format="minimal")</code></li>
+<li><code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-b09d-4fff-8a35-ccc3fe232f4d.jsonl", since="2026-05-08T08:36:30Z", until="2026-05-08T08:37:15Z", limit=5)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li>2 clusters, 6 atoms; top cluster
+<code>"discussion about Project_echo"</code> with source_breakdown
+<code>{ claude_code: 5 }</code>; second cluster source_breakdown
+<code>{ codex: 1 }</code>; warnings <code>[]</code>.</li>
+<li>2 matches: one raw fs-change row and the target Claude turn
+<code>a5cfa1d3...</code> / <code>turn_index=7</code>.</li>
+</ol></li>
+<li><strong>Sources:</strong> trace sources
+<code>{ claude_code: 5 }</code> and <code>{ codex: 1 }</code>; search
+sources were both the exact Claude Code session JSONL, one
+<code>metadata.surface="fs"</code> raw row and one normalized Claude
+conversation row.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> Direct SQLite inspection showed the root
+cause: at 01:33 the newest 80 storage rows were 59 Claude raw-fs rows,
+10 Codex raw-fs rows, 8 other raw-fs rows, and only 3 Claude turn-pair
+rows. The newest Codex normalized turn was row 127 at that moment,
+outside <code>limit=8</code>’s <code>STORAGE_OVERFETCH=80</code> budget,
+while git rows were rows 1811-1850 because git stored
+<code>-07:00</code> timestamps and sorted below same-moment
+<code>Z</code> rows. The later 01:39 trace surfaced one Codex atom only
+because the current Codex turn had since been extracted and
+<code>limit=20</code> gave a 200-row storage budget. Git still did not
+surface. Claude <code>3c98f080/#7</code> confirms the theory: today is
+broken because “git rows silently dropped” and “fs noise crowds budget”;
+022 is the pending fix.</li>
+<li><strong>Conjecture:</strong> This is exactly 022 Bug A + Bug C in
+live form. Do not expect clean <code>{ claude_code, codex, git }</code>
+source_breakdown until 022 is reviewed, merged, daemon-restarted, and
+the timestamp migration has run.</li>
+</ul>
+<hr />
+<h4
+id="pdt-codex-re-verifies-_followups.md-gaps-after-022023">2026-05-08
+02:05 PDT — Codex re-verifies <code>_followups.md</code> gaps after
+022/023</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to check
+<code>backlog/_followups.md</code> and reverify the post-022 gaps.</li>
+<li><strong>Tool/input:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=50, format="minimal")</code>
+via ECHO MCP connector → transport deserialize error.</li>
+<li><code>echo_ping(message="post-022 gap verification connectivity check")</code>
+via ECHO MCP connector → same transport deserialize error.</li>
+<li>Direct HTTP MCP <code>get_recent_work_context</code> same day
+window, <code>limit=50</code>, <code>format="minimal"</code>.</li>
+<li>Direct HTTP MCP
+<code>get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=100, format="minimal")</code>.</li>
+<li>Direct HTTP MCP
+<code>search_memories(source_prefix="git:", since="2026-05-08T00:00:00-07:00", limit=5)</code>.</li>
+<li>Direct HTTP MCP
+<code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T00:00:00-07:00", limit=5)</code>.</li>
+<li>Direct HTTP MCP
+<code>search_memories(query="use echo and see what i am current working on", source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T00:00:00-07:00", limit=5)</code>.</li>
+<li>Direct HTTP MCP
+<code>search_memories(query="hotkey overlay", since="2026-05-07T00:00:00-07:00", limit=5)</code>
+twice.</li>
+<li>Direct HTTP MCP same day window with <code>limit=100</code>.</li>
+<li><code>echo_ping(message="post-kickstart connector health check")</code>
+via ECHO MCP connector after launchd kickstart.</li>
+</ol></li>
+<li><strong>Returned:</strong> connector failed before payload both
+before and after kickstart
+(<code>Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>).
+Direct HTTP MCP worked after launchd kickstart. Day
+<code>limit=50</code>: 1 returned cluster / 50 atoms of 60, warning
+<code>limit dropped 1 entire cluster(s)</code>, source_breakdown
+<code>{claude_code: 27, git: 23}</code>. Day <code>limit=100</code>: 2
+clusters / 60 atoms, no truncation, source_breakdowns
+<code>{claude_code: 27, git: 23}</code> and <code>{codex: 10}</code>.
+Round-4 window: 1 returned cluster / 100 atoms of 153, warning
+<code>limit dropped 3 entire cluster(s)</code>, source_breakdown
+<code>{git: 32, claude_code: 88}</code>.
+<code>search_memories(source_prefix="git:")</code> returned 5 commit
+rows. Codex prefix without query returned 5 raw fs-change rows; Codex
+prefix with exact query returned the normalized Codex turn.
+<code>hotkey overlay</code> returned identical 5-match results across
+two calls.</li>
+<li><strong>Sources:</strong> direct trace now includes git in the
+Project_echo cluster and Codex in a separate lower-rank cluster; search
+sources were <code>git:/Users/zhenye/Desktop/Project_echo</code>,
+<code>fs:/Users/zhenye/.codex/...jsonl</code>, and mixed git/Claude rows
+for <code>hotkey overlay</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> 022 fixed timestamp canonicalization and
+raw-FS trace budget for git; DB now has 0 non-<code>Z</code> timestamps
+and daemon log showed
+<code>storage.sqlite canonicalized_timestamps</code> with
+<code>converted:168</code>. Remaining retrieval/ranking issue: at lower
+limits Codex is still a separate dropped cluster, though the
+cluster-loss warning now says so. <code>search_memories</code> still
+returns raw fs rows on recency-only Codex prefix lookups by design;
+exact content queries now surface normalized turns.</li>
+<li><strong>Conjecture:</strong> Close the “git silently missing” and
+“same query nondeterminism” gaps; keep “Codex prefix recency returns raw
+rows”, “source-balanced trace ranking at low limits”, and “MCP
+connector/daemon health” as live follow-ups.</li>
+</ul>
+<hr />
+<h4
+id="pdt-claude-code-retrieves-codexs-0205-pdt-investigation-via-echo-post-022023-meta-dogfooding">2026-05-08
+02:10 PDT — Claude Code retrieves Codex’s 02:05 PDT investigation via
+ECHO (post-022/023 meta-dogfooding)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Claude Code to “investigate
+codex’s finding first pull it using echo” — verifying the 02:05 PDT
+entry against ECHO’s own captured memory of Codex’s session, post-022 +
+post-023 daemon restarts.</li>
+<li><strong>Tool/input (sequence):</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-08T08:30:00Z", until="2026-05-08T09:30:00Z", window_hours=1, limit=50, format="minimal")</code></li>
+<li><code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T08:50:00Z", until="2026-05-08T09:30:00Z", limit=10)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li><strong>Tool result over CC’s budget at 105,933 chars</strong>
+(saved to disk; sliced via subagent). Trace contained 2 clusters / 28
+atoms across the 1h window: cluster 1
+<code>{claude_code: 13, git: 11}</code> rank_reasons
+<code>[recent_activity, has_open_loop, dense]</code>, cluster 2
+<code>{codex: 4}</code> rank_reasons <code>[recent_activity]</code>.
+<code>truncated: false</code>, <code>warnings: []</code>,
+<code>atoms_returned: 28 / atoms_total_in_window: 28</code>.</li>
+<li><strong>98,484 chars</strong> — also over budget. 10 matches; 9 raw
+fs-change rows (194 chars each) + 1 extracted Codex turn (atom
+<code>c4b7684f-7cd6-449b-98f3-98c47a4ae6d3</code>, 6,567 chars,
+<code>turn_index: 3</code>, model <code>gpt-5.5</code>,
+<code>had_tool_use: True</code>).</li>
+</ol></li>
+<li><strong>Sources:</strong> <code>search_memories</code> returned only
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl</code>
+— 9 raw fs-change rows + 1 extracted turn; no git/claude_code/cursor
+surfaces. Trace <code>source_breakdown</code> per cluster: cluster 1
+claude_code 13 + git 11; cluster 2 codex 4.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong>
+<ol type="1">
+<li><strong>Codex extractor IS working</strong> — substantive Codex turn
+extracted, full 02:05 narration preserved. Settles the 01:24/01:28 PDT
+correction thread definitively.</li>
+<li><strong>Source-prefix recency lookup still drowns content in raw
+fs-change rows</strong> — 9 of 10 matches were 194-char raw rows; only
+one carried real content. Confirms the “Codex source-prefix retrieval
+ordering” gap (filed under 022 followups) is unchanged by 022’s Bug C/D
+— <code>search_memories</code> deliberately doesn’t pass
+<code>exclude_metadata_surface: ['fs']</code> per spec (forensic
+preservation), so this gap requires a separate fix shape.</li>
+<li><strong>Trace ranking surfaces Codex as a separate lower-rank
+cluster</strong> at <code>limit=50</code> — convergent with Codex’s
+02:05 PDT direct daemon observation on the same window. Cluster 1
+(claude_code + git) outranks cluster 2 (codex alone) because of
+<code>has_open_loop</code> + <code>dense</code> boosting; Codex’s 4
+atoms didn’t merge into the dominant Project_echo cluster because no
+shared artifact joined them across sources. Two independent runs
+converging on the same observation is structural-correctness signal for
+the gap inventory.</li>
+<li><strong>Atom envelope payload floor confirmed live post-022</strong>
+— trace at 50 atoms = 105K chars; search at 10 atoms = 98K chars;
+<code>format: "minimal"</code> already in use. The skeleton-only-mode
+candidate from 16:16 PDT (round 2 themes) is now the highest-leverage
+payload move.</li>
+</ol></li>
+<li><strong>Conjecture (observation only — for end-of-window backlog
+synthesis, not for fixing here):</strong>
+<ul>
+<li>Several <code>_followups.md</code> entries can now move from “needs
+re-verification post-022” to specific resolution states. The convergence
+between Codex’s 02:05 PDT direct inspection and this 02:10 PDT MCP
+retrieval gives high confidence on which gaps closed vs persist vs
+narrowed — but the journal is observational; do not edit followups in
+this entry.</li>
+</ul></li>
+</ul>
+<hr />
+<h4
+id="pdt-claude-code-reconstructs-where-founder-left-off-last-night-via-two-trace-calls">2026-05-08
+12:03 PDT — Claude Code reconstructs “where founder left off last night”
+via two trace calls</h4>
+<ul>
+<li><strong>Trigger:</strong> founder opened a fresh session this
+morning and asked Claude Code to “read the most recent interactions
+across all sessions from last night and figure out where i left off
+using echo.”</li>
+<li><strong>Query inputs:</strong> call A —
+<code>get_recent_work_context</code> since=2026-05-08T00:00-07:00
+until=2026-05-08T09:00-07:00 format=minimal limit=10. Call B — same
+tool, since=2026-05-08T02:00-07:00 until=2026-05-08T08:30-07:00
+format=minimal limit=15.</li>
+<li><strong>Returned:</strong>
+<ul>
+<li><strong>Call A:</strong> 1 cluster returned (of 2 in window —
+<code>truncated: true</code>, “limit dropped 1 entire cluster(s)”).
+Cluster <code>ctx_f5418cb6</code>
+rank_reason=[<code>has_open_loop</code>,<code>dense</code>], anchored on
+Project_echo repo + two claude_code conversations
+(<code>3c98f080…</code> strategist session + <code>c1dbc9c1…</code>). 60
+atoms in window, 10 returned.
+<code>source_breakdown={claude_code: 27, git: 23}</code> — 50
+attributed; remainder presumably in the truncated 2nd cluster. Time
+range UTC 07:03:20 → 08:59:47 = PDT 00:03 → 01:59. Storage cap warning
+also raised.</li>
+<li><strong>Call B:</strong> 0 clusters, 0 atoms. Empty.</li>
+</ul></li>
+<li><strong>Sources:</strong> Call A — claude_code (27) + git (23);
+claude_code raw_pointers under
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>
+(sessions <code>3c98f080…</code>, <code>7430c728…</code>, plus subagent
+jsonl <code>agent-a5b270757e08f49e8</code>); git raw_pointer
+<code>git:/Users/zhenye/Desktop/Project_echo</code> covering commits
+<code>62bb8c7</code> → <code>73d7f64</code>. <strong>No codex, no
+cursor, no fs surface.</strong> Call B — no source attribution because
+no rows returned.</li>
+<li><strong>Verdict:</strong> ✅ right (call A) / 🟡 partial (call B —
+see note 2).</li>
+<li><strong>Note:</strong>
+<ol type="1">
+<li><strong>Trace layer answered “where did I leave off” cleanly with
+one call.</strong> Cluster correctly bound the 022→023 merge sequence:
+builder→reviewer→merge→post-merge fixup commits all in one cluster,
+anchored on shared file artifacts (<code>backlog/_followups.md</code>,
+<code>backlog/pending_review/2026-05-08-023-chokidar-flake-quarantine.review.md</code>,
+<code>src/storage/sqlite.ts</code>). 9 of 9 high-confidence edges joined
+via <code>shared_artifact</code> (zero scope-only or session-only edges)
+— exactly the post-019 edge-pruning behavior.</li>
+<li><strong>Empty 02:00–08:30 PDT window is “right” but reads as
+“broken” without ground-truth.</strong> I extended the window forward
+expecting commits like <code>b6005bd</code> (02:05),
+<code>5f47d1e</code> (02:13), <code>46cf180</code> (02:17),
+<code>0a2e6ca</code> (02:20) to surface. ECHO returned 0 atoms.
+Cross-checked via <code>git log</code> directly: those commits exist on
+disk. So either (a) git extractor hasn’t caught up post-02:00 PDT (lag
+&gt; 10h), (b) trace layer’s clustering threshold dropped the run
+because it’s a single thin sequence with no claude_code accompaniment,
+or (c) some filter bound at the cluster-level discards lone-source-thin
+runs. Worth investigating — this is the failure mode “valid window, real
+activity, zero clusters” which a user would interpret as “I did nothing
+then” when in fact 4 commits exist.</li>
+<li><strong>Open-loop hint resolution working correctly
+post-022.</strong> 9 of 11 hints marked <code>resolved: true</code> with
+explicit <code>resolved_by_atom_id</code>; the 2 unresolved are
+TODO-comment hints, which can’t be auto-resolved by definition.</li>
+<li><strong>Truncation warning fired correctly</strong> (“limit dropped
+1 entire cluster(s)”) — exactly the cluster-loss warning shipped in 022.
+The warning surfaced the issue without me having to reason from atom
+counts. Lift-from-1-cluster-to-2-clusters via <code>limit=15</code>
+re-query was unnecessary because cluster 1 already answered the user’s
+question; warning is doing its job as a hint, not a forcing
+function.</li>
+</ol></li>
+<li><strong>Conjecture (observation only — for end-of-window backlog
+synthesis, not for fixing here):</strong>
+<ul>
+<li>The empty-but-real-activity window in call B feels like a real gap.
+If git extractor has caught up but the cluster pipeline is dropping
+single-source-thin runs, that’s a clustering correctness bug. If the
+extractor hasn’t caught up, that’s an SLA/lag question for V1.5.3.
+Either way: a
+<code>search_memories(since=02:00-07:00, source_prefix='git:')</code>
+probe could disambiguate. Logging here, not running the probe —
+discipline.</li>
+</ul></li>
+</ul>
+<hr />
+<h4
+id="pdt-disambiguation-probe-search_memories-drops-timezone-offset-on-sinceuntil">2026-05-08
+12:08 PDT — Disambiguation probe: search_memories drops timezone offset
+on <code>since</code>/<code>until</code></h4>
+<ul>
+<li><strong>Trigger:</strong> founder said “c then b do it back to back”
+— running the disambiguating <code>search_memories</code> probe to
+decide whether call B’s empty result was extractor-lag vs
+clustering-pipeline.</li>
+<li><strong>Query inputs:</strong> <code>search_memories</code>
+since=2026-05-08T02:00:00-07:00 until=2026-05-08T08:30:00-07:00
+source_prefix=<code>git:</code> limit=20.</li>
+<li><strong>Returned:</strong> 20 git matches — but the time range of
+returned matches was UTC 06:35:50Z (oldest) → UTC 08:29:42Z (newest).
+Result body was 423K chars (overflow → spilled to tool-results file).
+<code>query_echo</code> reflected the request unchanged:
+<code>since: "2026-05-08T02:00:00-07:00"</code> and
+<code>until: "2026-05-08T08:30:00-07:00"</code>.</li>
+<li><strong>Sources:</strong> git (20) —
+<code>source: "git:/Users/zhenye/Desktop/Project_echo"</code>. SHAs
+<code>2830bda</code> → <code>de39ce1</code> (all from May 7 PDT 23:35 →
+May 8 PDT 01:29). The 4 SHAs I expected (<code>b6005bd</code> 02:05 PDT
+/ <code>5f47d1e</code> 02:13 / <code>46cf180</code> 02:17 /
+<code>0a2e6ca</code> 02:20) were <strong>NOT</strong> in the result
+(<code>grep -c &lt;sha&gt;</code> = 0 for all 4).</li>
+<li><strong>Verdict:</strong> ❌ wrong — but the wrongness is
+structurally informative.</li>
+<li><strong>Note:</strong>
+<ol type="1">
+<li><strong>Search clipped at UTC 08:30 even though I passed
+<code>until=08:30-07:00</code> (= UTC 15:30).</strong> PDT-offset is
+being silently stripped — the offset on
+<code>since</code>/<code>until</code> is parsed as if the value were a
+UTC literal. Equivalent for <code>since</code>: <code>02:00-07:00</code>
+(= UTC 09:00) became UTC 02:00 floor. So the effective window was UTC
+02:00 → UTC 08:30, missing the 4 commits at UTC 09:05–09:20
+entirely.</li>
+<li><strong>Settles call B’s mystery: it’s not extractor lag.</strong>
+The 4 commits ARE in storage (<code>git log</code> confirms locally;
+search would have returned them under a properly-parsed window). The
+0-result was the same TZ-offset bug, manifesting in the trace pipeline’s
+own (since, until) interpretation — both <code>search_memories</code>
+and <code>get_recent_work_context</code> likely share the same parse
+path.</li>
+<li><strong>Schema docstring already warns about this</strong> but for
+the <em>naive</em> case (“naive ISO strings are parsed as local server
+time”). My input was an <em>explicit-offset</em> string, exactly the
+case the docstring says is supposed to work. So the bug is one layer
+deeper — explicit offset is being parsed and then <em>discarded</em>
+before the storage WHERE clause, not “missing TZ defaults to
+local.”</li>
+<li><strong>Symmetry to the bug 022 fixed.</strong> 022 fixed
+text-compare WHERE drops on <code>-07:00</code>-stamped git rows
+(storage write-side TZ). This is the read-side mirror:
+<code>since</code>/<code>until</code> arguments to MCP tools are also
+being TZ-stripped before reaching the WHERE clause. Both would be
+invisible without explicit cross-checking against <code>git log</code>.
+The Sources field of the journal is the only thing that surfaces this —
+without the per-call source attribution, “ECHO returned 0 atoms” reads
+as “you didn’t do anything” instead of “the search was looking at the
+wrong window.”</li>
+<li><strong>Confidence the four atoms exist in trace’s input set is
+high</strong> — they show up in call A’s cluster (<code>b6005bd</code> →
+<code>0a2e6ca</code> are commits in the time_range UTC 07:03–08:59 on
+call A, which were correctly picked up because call A’s UTC-stripped
+window 00:00 → 09:00 happens to include them).</li>
+</ol></li>
+<li><strong>Conjecture (observation only — for end-of-window backlog
+synthesis, not for fixing here):</strong>
+<ul>
+<li>V1.5.3 candidate: audit MCP tool input-parameter parsing for
+<code>since</code>/<code>until</code> (both <code>search_memories</code>
+and <code>get_recent_work_context</code> and any future TZ-aware
+filter). Likely fix surface is the <code>parseTimeArg</code> (or
+equivalent) shared helper. Test: round-trip <code>02:00-07:00</code> and
+assert <code>parsed === 09:00Z</code>. The bug fits the V1.5.2
+reliability theme but was specifically out-of-scope for 022 (read-side,
+not write-side).</li>
+<li>Severity: silent under-counting of work near UTC midnight
+boundaries. Anyone in PDT/PST/CET/IST etc. asking about “this morning” /
+“yesterday afternoon” loses ~7h of activity at the window edge.</li>
+</ul></li>
+</ul>
+<hr />
+<h4 id="pdt-codex-resumes-from-prior-codexecho-context">2026-05-08 13:13
+PDT — Codex resumes from prior Codex/ECHO context</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to “use echo to see
+where the last codex session left off and resume from there.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", limit=10)</code>.</li>
+<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=24, limit=30, format="minimal")</code>.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li><code>search_memories</code>: 10 Codex-session matches. The freshest
+rows were raw fs-change events for the current
+<code>rollout-2026-05-08T13-09-48...jsonl</code>; the useful extracted
+turn was the prior Codex session
+<code>rollout-2026-05-08T00-45-16...jsonl</code>, whose final answer
+re-verified <code>_followups.md</code> gaps after 022/023 and listed
+closed/partial/open issues.</li>
+<li><code>get_recent_work_context</code>: 1 cluster returned out of 2
+(<code>atoms_returned=30</code>, <code>atoms_total_in_window=78</code>,
+<code>truncated=true</code>) with warning
+<code>limit dropped 1 entire cluster(s)</code>. Top cluster
+<code>ctx_cd081cff</code> had
+<code>rank_reason=[has_open_loop,dense]</code>, anchored on
+Project_echo,
+<code>raw/internal/dogfooding/2026-05-07-trace-layer.md</code>, and
+<code>backlog/_followups.md</code>. The payload surfaced the newer
+handoff beyond the earlier Codex re-verification: item
+<code>2026-05-08-024-fs-watcher-test-quarantine-successor</code> was
+created (<code>a176369</code>) and claimed (<code>f2db319</code>).</li>
+</ol></li>
+<li><strong>Sources:</strong> Codex JSONL under
+<code>fs:/Users/zhenye/.codex/sessions/...</code>; git commits under
+<code>git:/Users/zhenye/Desktop/Project_echo</code>; Claude Code atoms
+under
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/...</code>.
+No Cursor atoms observed in the returned slice.</li>
+<li><strong>Verdict:</strong> ✅ right for resuming the work; 🟡 partial
+for retrieval ergonomics.</li>
+<li><strong>Note:</strong> ECHO correctly changed the handoff from
+“continue the old <code>_followups.md</code> verification” to “inspect
+claimed item 024 and resume builder flow.” The raw Codex prefix search
+still returned mostly fs-change rows before contentful turns, and the
+trace response was very large/noisy even at
+<code>format=minimal</code>.</li>
+<li><strong>Conjecture:</strong> For “resume last Codex session,” a
+content-first Codex-source view or skeleton trace would reduce the need
+to mentally filter raw fs events and giant atom maps.</li>
+</ul>
+<hr />
+<h4
+id="pdt-codex-tries-to-retrieve-claude-mcp-tool-best-practices-claim">2026-05-08
+13:22 PDT — Codex tries to retrieve Claude MCP-tool best-practices
+claim</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to review Claude’s
+claim regarding MCP tool best practices against the current ECHO
+setup.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="best practices", source_prefix="fs:/Users/zhenye/.claude/", limit=10)</code>.</li>
+<li><strong>Returned:</strong> no usable payload. The MCP connector
+failed before returning matches:
+<code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
+<li><strong>Sources:</strong> intended source was Claude Code JSONL
+under <code>fs:/Users/zhenye/.claude/</code>; no source rows were
+returned because the connector failed.</li>
+<li><strong>Verdict:</strong> ❌ wrong.</li>
+<li><strong>Note:</strong> This is the same connector/transport failure
+class already seen at 02:05 PDT. It blocks using ECHO itself to retrieve
+the Claude claim, forcing fallback to local captured files or direct
+repo inspection.</li>
+<li><strong>Conjecture:</strong> Connector health needs to be fixed
+before ECHO can reliably serve as the first-hop “what did another AI
+client say?” substrate.</li>
+</ul>
+<h4
+id="pdt-founder-asked-claude-to-identify-codexs-recurring-json-rpc-error-via-echo">2026-05-08
+14:43 PDT — Founder asked Claude to identify Codex’s recurring JSON-RPC
+error via ECHO</h4>
+<ul>
+<li><strong>Trigger:</strong> founder: “check the json rpc error codex
+keeps facing by checking codex session using echo”.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="JSON-RPC", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>;
+then
+<code>search_memories(query="jsonrpc", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>.</li>
+<li><strong>Returned:</strong> call 1 → 1 matching Codex assistant turn
+(rollout <code>019e068c-…</code> at 2026-05-08T09:08:07.791Z),
+94,313-char single-line payload that exceeded the tool-result tokens cap
+and was spilled to disk
+(<code>tool-results/mcp-echo-search_memories-…txt</code>). Call 2 → 0
+matches (<code>jsonrpc</code> lowercase is not a literal substring in
+the captured assistant text — Codex paraphrases as “JSON-RPC”;
+case-insensitive substring match still missed because hyphenation
+differs).</li>
+<li><strong>Sources:</strong> call 1 — single source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl</code>
+(Codex assistant turn). Call 2 — 0 sources. Neither call surfaced the
+<em>raw</em> <code>event_msg</code> lines containing the error string
+(lines 276/284 in the rollout) — the matched record was Codex’s own
+narration about the error, not the tool-call output that produced it.
+The ground-truth error string was found only by direct grep of the
+rollout file outside ECHO.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO pointed at the right
+session but its match was Codex’s paraphrase, not the underlying
+<code>event_msg</code> payload that contains the canonical error. The
+94k-char single-line response also re-tripped the
+consumer-context-budget failure mode (entry 01:08 PDT, day 1).</li>
+<li><strong>Note:</strong> Two failure modes compounded in one call: (a)
+<code>search_memories</code> returns the assistant’s narration but not
+the adjacent tool-output <code>event_msg</code> rows that carry the
+actual error wire format, so the highest-signal evidence is silently
+absent from the response; (b) returned payload is one massive line,
+forcing the consumer to spill-and-slice instead of reading directly.
+Direct <code>grep</code> on the rollout jsonl took &lt;1s and surfaced
+the canonical error:
+<code>error: Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>
+from
+<code>codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter</code>
+at lines 276/284 (2026-05-08T08:58:37Z and 09:00:36Z UTC ≈ 01:58 / 02:00
+PDT).</li>
+<li><strong>Conjecture:</strong> observations only — (1) source-volume /
+shape bias: tool-output <code>event_msg</code> rows in Codex rollouts
+may be getting captured but not surfaced under the same query, or are
+being captured as separate atoms whose content doesn’t contain the
+search literal; (2) atom-grouping question: should an assistant-turn
+atom and its preceding tool-output atom be co-returned when the
+assistant turn cites the tool output? Don’t design fixes here — log for
+end-of-window synthesis.</li>
+</ul>
+<h4
+id="pdt-claude-retrieves-codexs-mcp-best-practices-counter-diagnosis">2026-05-08
+13:27 PDT — Claude retrieves Codex’s MCP-best-practices
+counter-diagnosis</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Claude to read Codex’s most
+recent diagnosis on the ECHO MCP setup (the review of Claude’s earlier
+best-practices claim) and reverify each of Codex’s claims against
+code.</li>
+<li><strong>Query inputs:</strong> (1)
+<code>get_recent_work_context(since="2026-05-08T18:00:00Z", until="2026-05-08T20:30:00Z", format="minimal", limit=50)</code>;
+(2)
+<code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T19:00:00Z", limit=15)</code>.</li>
+<li><strong>Returned:</strong> both calls succeeded but exceeded the
+consumer tool-result tokens cap and spilled to
+<code>tool-results/mcp-echo-*-1778272065256.txt</code> (77,066 chars)
+and <code>mcp-echo-search_memories-1778272068805.txt</code> (91,940
+chars). A subagent sliced the spilled files and located Codex’s
+final-answer turn in
+<code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-eaa9-7773-ad99-376e3e8d0f73.jsonl</code>
+line 338 (UTC 20:25:40 = 13:25 PDT, 4,071 chars), with reasoning chain
+at lines 213/220/234/244/263/279/312.</li>
+<li><strong>Sources:</strong> trace and search both surfaced
+<code>fs:/Users/zhenye/.codex/sessions/...rollout-...jsonl</code> Codex
+content. The on-disk rollout JSONL was the canonical source; ECHO’s
+atoms matched but were not faster than direct file reads. No
+git/claude_code/cursor atoms were attended to (search was scoped to
+Codex prefix; trace payload not slice-read in main context).</li>
+<li><strong>Verdict:</strong> 🟡 partial — both calls returned the right
+rollout with usable content, but both blew the 25k-char tool-result
+budget on the first try and forced spill+subagent-slice. The pattern
+matches the 14:43 PDT entry: “useful content present, but the response
+is one massive line that the consumer can’t read directly.”</li>
+<li><strong>Note:</strong> The dogfooding workflow ended up being: ECHO
+call → spill → subagent slice → on-disk rollout JSONL grep. Direct
+rollout grep would have been ~3 steps shorter. Two cumulative
+pain-points re-confirmed: (a) default
+<code>get_recent_work_context</code> shape is too large even with
+<code>format="minimal"</code> and <code>limit=50</code> over a 2.5h
+window (claim-3 territory); (b) <code>search_memories</code> payload
+size scales with extracted-turn content length, no truncation hint, no
+streaming.</li>
+<li><strong>Conjecture:</strong> observations only — claim-3 (payload
+defaults) is the <em>consumer-side</em> failure mode of the dogfooding
+day; every Claude/Codex retrieval today has tripped it at least once.
+Worth promoting from “described in tool description” to “default-cost
+protection” — but spec lives in next backlog item, not here.</li>
+</ul>
+<h4
+id="pdt-reverification-of-codexs-8-claims-against-project_echo-code">2026-05-08
+13:35 PDT — Reverification of Codex’s 8 claims against Project_echo
+code</h4>
+<ul>
+<li><strong>Trigger:</strong> continuation of the 13:27 PDT retrieval —
+founder asked Claude to validate each Codex claim, not just relay
+them.</li>
+<li><strong>Query inputs:</strong> no further ECHO MCP calls. Direct
+file Reads on <code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/{search-memories,recent-work-context,echo-ping}.ts</code>,
+<code>tests/mcp/tools/recent-work-context.test.ts</code>,
+<code>docs/mcp-integration.md</code>, <code>package.json</code>,
+<code>node_modules/@modelcontextprotocol/sdk/{package.json,dist/cjs/server/mcp.d.ts}</code>,
+<code>~/.claude.json</code>.</li>
+<li><strong>Returned:</strong> 8/8 of Codex’s claims confirmed against
+current code at SHA 8c2d767. Result table:
+<ol type="1">
+<li><strong>structuredContent/outputSchema gap — VALID.</strong> All
+three tool handlers return only
+<code>content: [{ type: 'text', text: JSON.stringify(...) }]</code>
+(<code>search-memories.ts:131-133</code>,
+<code>recent-work-context.ts:225-227</code>,
+<code>echo-ping.ts:18-20</code>). SDK is
+<code>@modelcontextprotocol/sdk@1.29.0</code>;
+<code>node_modules/.../server/mcp.d.ts:154,257-258,270,283</code>
+confirm <code>outputSchema</code> and <code>structuredContent</code> are
+first-class.</li>
+<li><strong><code>source_prefix</code> leakiness — VALID.</strong>
+<code>search-memories.ts:121-127</code> declares
+<code>source_prefix: z.string().optional()</code> with no enum; the
+FS-prefix rules live as prose in the description string at line 6.</li>
+<li><strong>Payload-size defaults — VALID.</strong>
+<code>recent-work-context.ts:37</code> <code>DEFAULT_LIMIT = 100</code>;
+line 133 <code>format = params.format ?? 'full'</code>; storage cap is
+<code>limit * STORAGE_OVERFETCH = 1000</code> (line 139). Description
+(lines 27-29) explains <code>minimal</code> exists but not the cost of
+the default.</li>
+<li><strong>Pagination/cursor absence — VALID.</strong>
+<code>search-memories.ts:9</code> <code>MAX_LIMIT = 50</code>;
+<code>clampLimit</code> (lines 48-52) enforces 1..50; no
+cursor/<code>before_timestamp</code> param in the schema.</li>
+<li><strong>Single server, three tools (correction to Claude’s “two
+namespaces”) — VALID.</strong> <code>src/mcp/server.ts:69-73</code>
+registers ONE server <code>echo-daemon</code> with all three tools. The
+“two namespaces” Claude observed are environmental:
+<code>~/.claude.json</code> user-scope has both <code>echo-memory</code>
+(legacy EchoChat Python backend at
+<code>/Users/zhenye/Desktop/Projects/EchoChat/apps/backend/.venv/bin/python -m app.mcp</code>,
+line 3227) AND <code>echo</code> HTTP at
+<code>127.0.0.1:38478/mcp</code> (line 3237). Project_echo’s
+project-scope (line 3046) lists only the HTTP <code>echo</code>. So
+Codex’s nuance is correct — the ECHO daemon itself is one server; the
+founder’s machine has a second unrelated MCP from a different
+project.</li>
+<li><strong><code>echo_ping</code> should stay a tool — VALID.</strong>
+Currently registered via <code>registerTool</code> at
+<code>echo-ping.ts:5</code>. MCP semantics: tools = model-controlled,
+resources = application-controlled; a model-invoked health check fits
+“tool.”</li>
+<li><strong>OAuth irrelevance — VALID.</strong>
+<code>server.ts:63</code> defaults host to <code>127.0.0.1</code>; lines
+76-77 enable DNS-rebinding protection with allowedHosts
+<code>['127.0.0.1:..', 'localhost:..']</code>.
+<code>docs/mcp-integration.md:7</code> explicitly says “loopback-only
+(no auth).”</li>
+<li><strong>Doc staleness — VALID.</strong>
+<code>docs/mcp-integration.md:53</code> says “shows two tools:
+<code>echo_ping</code> and <code>search_memories</code>”; line 100 only
+mentions <code>search_memories</code>. Test
+<code>tests/mcp/tools/recent-work-context.test.ts:125-132</code> asserts
+all three:
+<code>['echo_ping', 'get_recent_work_context', 'search_memories']</code>.</li>
+</ol></li>
+<li><strong>Sources:</strong> repo files at SHA 8c2d767; SDK
+<code>@modelcontextprotocol/sdk@1.29.0</code> <code>package.json</code>
++ <code>dist/cjs/server/mcp.d.ts</code>; Claude Code config
+<code>~/.claude.json</code> lines 3046 + 3227 + 3237.</li>
+<li><strong>Verdict:</strong> ✅ right — Codex’s diagnosis is 8-for-8
+against current code. Codex’s two “qualifies-Claude” corrections (claim
+5 + claim 6) hold; Codex’s stand-alone observation (claim 8) is also
+confirmed.</li>
+<li><strong>Note:</strong> Reverification cost = 5 file Reads + 4 Bash
+greps. The fact that this took ~3 minutes after the (slow) ECHO
+retrieval means: for “validate a peer AI’s diagnostic claim” tasks,
+ECHO’s value is 100% in the <em>retrieval</em> step; once claims are in
+hand, code grounding still happens in the editor. Codex’s claim 8
+(doc/test divergence) is the cheapest standalone backlog item — pure doc
+fix, no code change.</li>
+<li><strong>Conjecture:</strong> observations only — (a) backlog
+candidate: doc fix for <code>mcp-integration.md:53,100</code> (cheap,
+blocks no one, completes drift between docs and tests); (b) the “two
+namespaces in the founder’s environment” finding suggests a wiki note on
+legacy <code>echo-memory</code> cleanup may be warranted, separate from
+this validation; (c) tool descriptions doing teaching work (FS-prefix
+rules in <code>search-memories</code> description) is a recurring
+symptom of missing structured affordances — claim 1 + claim 2 are
+causally related, not independent. Don’t design fixes here.</li>
+</ul>
+<h4 id="pdt-codex-tries-to-retrieve-claudes-025-spec-context">2026-05-08
+13:46 PDT — Codex tries to retrieve Claude’s 025 spec context</h4>
+<ul>
+<li><strong>Trigger:</strong> founder said Claude validated Codex’s MCP
+best-practices claims and wrote spec 025, then asked Codex to use ECHO
+for session context and evaluate the spec.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="025", source_prefix="fs:/Users/zhenye/.claude/", limit=10)</code>.</li>
+<li><strong>Returned:</strong> no usable payload. The MCP connector
+failed before returning matches:
+<code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
+<li><strong>Sources:</strong> intended source was Claude Code JSONL
+under <code>fs:/Users/zhenye/.claude/</code>; no source rows were
+returned because the connector failed. Fallback context came from direct
+repo reads of
+<code>raw/internal/dogfooding/mcp-interactions-journal.md</code>,
+<code>docs/BACKLOG.md</code>, and
+<code>backlog/ready/2026-05-08-025-mcp-best-practices.md</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong.</li>
+<li><strong>Note:</strong> Same connector failure class as 13:22 PDT.
+The canonical journal itself now contains the Claude 13:27/13:35
+validation entries, so direct file read recovered the context faster
+than the broken MCP path.</li>
+<li><strong>Conjecture:</strong> observations only — the connector
+transport issue is now blocking precisely the cross-AI handoff use case
+ECHO is meant to make easy.</li>
+</ul>
+<h4 id="pdt-codex-retries-exact-025-claude-context-lookup">2026-05-08
+13:51 PDT — Codex retries exact 025 Claude-context lookup</h4>
+<ul>
+<li><strong>Trigger:</strong> before final spec evaluation, Codex
+retried ECHO against the exact spec/session token to verify whether the
+connector failure was transient.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="2026-05-08-025", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)</code>.</li>
+<li><strong>Returned:</strong> no usable payload. Same MCP connector
+error:
+<code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
+<li><strong>Sources:</strong> intended source was Claude Code project
+JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no rows
+returned.</li>
+<li><strong>Verdict:</strong> ❌ wrong.</li>
+<li><strong>Note:</strong> The narrower, extractor-aligned prefix did
+not change the failure mode. Spec evaluation proceeded from
+repo-grounded artifacts already recovered by direct reads.</li>
+</ul>
+<h4 id="pdt-codex-tries-to-retrieve-claude-bypass-deep-dive">2026-05-08
+14:14 PDT — Codex tries to retrieve Claude bypass deep dive</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to review Claude’s
+most recent deep dive on why Claude bypassed ECHO and read Codex session
+JSONL directly, then validate Claude’s proposed optimization
+follow-ups.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="bypass ECHO", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=10)</code>.</li>
+<li><strong>Returned:</strong> no usable payload. Same Codex MCP
+connector error:
+<code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
+<li><strong>Sources:</strong> intended source was Claude Code project
+JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no rows
+returned. Recovery path was direct inspection of the current Claude
+project JSONL, specifically
+<code>72c1a494-9d45-418c-8520-34069d1ff017.jsonl</code> line 354, plus
+repo reads of MCP server/tool code and journal entries.</li>
+<li><strong>Verdict:</strong> ❌ wrong.</li>
+<li><strong>Note:</strong> This is now a direct reproduction of the
+bypass topic itself: Codex could not use ECHO to retrieve Claude’s
+analysis of ECHO bypassing, so the review had to start from source
+files.</li>
+</ul>
+<h4 id="pdt-codex-minimal-transport-reproduction-for-027">2026-05-08
+14:22 PDT — Codex minimal transport reproduction for 027</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to investigate the
+root cause of the Codex ECHO MCP failure before writing a builder-ready
+027 spec.</li>
+<li><strong>Query inputs:</strong>
+<code>echo_ping(message="codex transport root cause investigation for spec 027")</code>;
+direct curl initialize to <code>POST http://127.0.0.1:38478/mcp</code>;
+direct curl stale-header <code>tools/call echo_ping</code> with
+<code>Mcp-Session-Id: stale-codex-session</code>;
+<code>./tools/mcp-integration-smoke.sh</code> against the live
+daemon.</li>
+<li><strong>Returned:</strong> MCP tool call returned no usable payload:
+<code>Transport send error ... WorkerTransport&lt;...StreamableHttpClientWorker&lt;codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter&gt;&gt; ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.
+Direct fresh curl initialize returned HTTP 200 SSE with a valid
+initialize result and new <code>mcp-session-id</code>. Direct
+stale-header curl returned HTTP 400 with ECHO’s custom
+<code>Bad Request: no active session</code> body. Escalated live smoke
+passed all checks: tools/list, <code>search_memories</code>,
+<code>get_recent_work_context</code>, edge check, cross-gap check, git
+timestamp check.</li>
+<li><strong>Sources:</strong> live <code>echo</code> MCP daemon at
+<code>127.0.0.1:38478/mcp</code>; Codex log
+<code>~/.codex/log/codex-tui.log</code>; ECHO launchd logs
+<code>~/Library/Logs/echo/daemon.out.log</code>; repo code
+<code>src/mcp/server.ts</code>; SDK StreamableHTTP docs/types under
+<code>node_modules/@modelcontextprotocol/sdk/dist/esm/server</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the direct transport works
+for fresh clients, but Codex’s long-lived session fails after daemon
+restart.</li>
+<li><strong>Note:</strong> Root-cause timeline: current Codex session
+initialized at 20:09 UTC and made successful ECHO calls around 20:12
+UTC; ECHO daemon restarted at 20:22:11 UTC; Codex calls from 20:22:20
+UTC onward fail while reusing the stale MCP session. The bug is
+process-local stateful StreamableHTTP sessions plus an unfriendly
+stale-session router branch, not payload size or tool-specific handler
+logic.</li>
+</ul>
+<h4
+id="pdt-strategist-self-audit-todays-echo-bypasses-corrected-failure-b-root-cause">2026-05-08
+14:35 PDT — Strategist self-audit: today’s ECHO bypasses + corrected
+Failure B root cause</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked the strategist (Claude) to
+confirm whether today’s cross-AI Codex retrievals actually went through
+ECHO, and to root-cause the bypass before writing a journal entry.</li>
+<li><strong>Query inputs:</strong> no new ECHO calls in this self-audit.
+Audit was over today’s earlier journal entries (13:27, 13:35, 14:00,
+14:14, 14:22 PDT) and the Codex rollout
+<code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-...jsonl</code>
+lines 565 + 610 (Codex’s two reviews of spec 025).</li>
+<li><strong>Returned:</strong> confirmation that the strategist bypassed
+ECHO MCP for both Codex review extractions. Subagent prompts pointed
+directly at the rollout JSONL on disk; the only ECHO calls today were
+<code>get_recent_work_context(since=18:00Z, until=20:30Z, format=minimal, limit=50)</code>
+and
+<code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", since=19:00Z, limit=15)</code>
+— both succeeded transport-wise but each returned 77,066 / 91,940 chars
+respectively, exceeding the consumer 25k-char tool-result budget on
+first call, forcing spill+subagent-slice. After those two spills,
+subsequent retrievals went direct-to-rollout-JSONL.</li>
+<li><strong>Sources:</strong> today’s journal entries 13:27 PDT
+(strategist’s own retrieval log), 13:35 PDT (8/8 reverification), 14:00
+PDT (no journal entry of own; subagent prompt verbatim went to
+disk-grep, not ECHO); Codex’s rollout file on disk; the two saved
+tool-result <code>.txt</code> spills under
+<code>.claude/projects/.../tool-results/</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong by intent. ECHO is supposed to be
+the entry point for any AI client doing cross-AI retrieval; the
+strategist bypassed it twice in one afternoon and is documenting the
+bypass post-hoc rather than logging it in-the-moment.</li>
+<li><strong>Note (deep dive):</strong> Two distinct failure modes today,
+not one — and my initial deep-dive root-cause for one of them was wrong:
+<ul>
+<li><strong>Failure A — response overflow (Claude → Codex
+direction).</strong> ECHO transport works; tool result exceeds consumer
+25k-char budget. <code>format='minimal'</code> only caps
+<code>action.input/output</code> per atom, not the cluster/edges/hints
+envelope. Spec 025 Bug 3 partially addresses with <code>limit=25</code>
+default + envelope-byte test, but doesn’t add a “give me one specific
+recent turn” primitive — that’s what spec 026
+(<code>tail_session</code>) introduces. Today’s bypass was driven
+entirely by this — the spilled tool-results landed on disk, and direct
+rollout-JSONL grep was strictly cheaper than spill+slice.</li>
+<li><strong>Failure B — stale session after daemon restart (Codex →
+Claude direction).</strong> My earlier deep-dive guessed
+wire-framing/SSE-vs-Content-Length mismatch between Codex’s RMCP client
+and ECHO’s StreamableHTTP server. <strong>Wrong.</strong> Codex’s 14:22
+PDT investigation (above) root-caused it correctly: Codex initialized at
+20:09 UTC, called ECHO successfully at 20:12 UTC, ECHO daemon restarted
+at 20:22:11 UTC (launchd), Codex from 20:22:20 UTC onward reused a stale
+<code>Mcp-Session-Id</code> against an empty in-memory
+<code>sessions</code> map — ECHO’s custom router returned
+<code>400 Bad Request: no active session</code>, which Codex’s RMCP
+client surfaced as
+<code>Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.
+The error string is misleading; it’s a stale-session error masquerading
+as a transport-deserialize error. Spec 027 (Codex-authored) closes it
+via stateless StreamableHTTP
+(<code>sessionIdGenerator: undefined</code>, JSON response mode).</li>
+</ul></li>
+<li><strong>Conjecture:</strong> observations only — (a) the
+wrong-root-cause guess underscores why Codex’s parallel investigation
+matters: I was reasoning from outside (treating the JsonRpcMessage error
+as descriptive) while Codex traced it from inside (matching restart
+timestamps to first failure). The strategist→builder peer-review pattern
+this week (025’s two-round Codex review; 027’s Codex-led root-cause)
+keeps producing better diagnoses than either party alone; (b) “always
+make the ECHO call first, log the bypass when you fall back” is the
+founder-confirmed parallel-use discipline going forward (as of this
+conversation) — direct-file-reads stay allowed, but every bypass must
+produce a journal entry naming the failure mode it’s responding to. The
+journal is the dataset that drives V1.5.4+ priorities; a successful
+bypass that goes unlogged is worse than a failed ECHO call that does.
+Don’t design fixes here — 026 + 027 already capture the planned
+response.</li>
+</ul>
+<h4
+id="pdt-strategist-applies-new-discipline-codex-pair-review-finds-5-issues-in-026">2026-05-08
+14:43 PDT — Strategist applies new discipline; Codex pair-review finds 5
+issues in 026</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked the strategist to “review
+codex finding” — Codex had run a second-pass pair-review of specs 026 +
+027 together (Codex’s user prompt:
+<code>"both 026 and 027 are pushed by claude. do one more round of checking on the spec"</code>).</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-eaa9-7773-ad99-376e3e8d0f73.jsonl", since="2026-05-08T21:00:00Z", limit=5)</code>
+— first ECHO call under the new “always-call-first” discipline.</li>
+<li><strong>Returned:</strong> transport succeeded; payload was 126,188
+chars, exceeded the consumer 25k tool-result budget, spilled to
+<code>tool-results/mcp-echo-search_memories-1778276484034.txt</code>.
+Recovery via subagent reading the rollout JSONL directly (line 610 area
+for Codex’s final-answer turn at UTC 21:40 PDT 14:40).</li>
+<li><strong>Sources:</strong> intended source was the active Codex
+rollout
+<code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-...jsonl</code>;
+ECHO matched but spilled. Recovery sources: the rollout file directly +
+spot-check Reads of
+<code>src/storage/{interface.ts:13, sqlite.ts:88-100}</code>,
+<code>tools/blocked.py:34,242</code>,
+<code>backlog/pending_review/</code>, <code>backlog/claimed/</code>, and
+the 026 spec.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO transport worked (good
+signal: post-cf7f9f6 the same Codex-rollout retrieval shape that
+overflowed at 13:27 PDT still overflows at 14:43 PDT, but transport
+itself never failed; this is Failure A at exactly the same spot, not
+Failure B). Bypass driver was strictly response-size, not stale
+session.</li>
+<li><strong>Note (Codex review payload):</strong> Codex’s pair-review of
+026+027 ran at 14:40 PDT (same rollout, line 610). Verdict: “Not
+builder-ready as a pair yet.” 5 numbered findings, all verified against
+current repo at <code>cf7f9f6</code>:
+<ul>
+<li><strong>B1</strong> stale <code>spec_refs</code> paths to 025 (026
+says <code>ready/</code>, 027 says <code>claimed/</code> — both wrong;
+025 is in <code>pending_review/</code> per merge <code>ef93cba</code>).
+Strategist fix: drop 025 from 026’s <code>spec_refs</code> (relationship
+is captured by <code>blocked_by</code>). 027’s stale path is Codex’s to
+fix on its next pass — flagged in commit message.</li>
+<li><strong>B2</strong> lex-tie-break risk: with
+<code>blocked_by: [025]</code> on both, once 025 lands in
+<code>complete/</code>, both 026+027 unblock and
+<code>tools/blocked.py:242</code> sorts <code>c["id"]</code> ascending →
+026 wins. That violates 027’s “do not add new tools” scope. Strategist
+fix: 026 now also <code>blocked_by: 027</code>.</li>
+<li><strong>H3</strong> <code>count</code> schema-vs-test contradiction:
+schema said <code>min 1, max 20</code> while test asserted
+<code>count: 100</code> clamps to 20. Zod <code>max(20)</code> rejects,
+doesn’t clamp. Strategist fix: schema is
+<code>z.number().int().min(1)</code> (no max); handler clamps
+<code>&gt;20</code>. <code>&lt;= 0</code> still schema-rejected.
+Documented inline.</li>
+<li><strong>M4</strong> exact-source filter: spec said “use
+<code>source_prefix</code> with the full literal source as exact-match”;
+Codex correctly noted <code>QueryFilter.source</code> already exists at
+<code>interface.ts:13</code> and <code>sqlite.ts:91-95</code>.
+Strategist fix: spec now requires <code>source</code> directly. The
+two-step <code>source_app</code> resolution still uses
+<code>source_prefix</code> for step 1.</li>
+<li><strong>M5</strong> cursor-helper module location: 026 mandates
+reusing 025’s encode/decode, but 025 may have kept them file-local in
+<code>search-memories.ts</code> (025 is in <code>pending_review/</code>,
+not yet merged — strategist intentionally not peeking at the
+implementation). Strategist fix: spec adds an explicit “if file-local,
+extract to <code>src/mcp/tools/_cursor.ts</code> as part of 026’s scope”
+contract, and <code>files_to_modify</code> updated. Removes
+<code>src/storage/interface.ts</code> since no storage-interface change
+is needed.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> observations only — (a) the new
+always-call-first discipline produced exactly its expected outcome on
+first use: ECHO call attempted, overflowed, bypass logged with the
+failure-mode named (Failure A, payload size, NOT transport). One data
+point ≠ trend, but the journal-as-dataset principle is now exercised
+end-to-end including the bypass-logging step. (b) Codex catching B1+B2
+mechanically (path checks, lex-tie-break) is the strongest case yet for
+the strategist→builder peer-review pattern — these are review failures
+the strategist alone wouldn’t have found because they’re operating-model
+artifacts (filesystem stage names, selector code) not in the
+strategist’s working set. Don’t design fixes here.</li>
+</ul>
+<h4 id="pdt-codex-resumes-from-prior-session-via-echo">2026-05-08 14:46
+PDT — Codex resumes from prior session via ECHO</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to “use echo and
+resume from where we left off last session.”</li>
+<li><strong>Query inputs:</strong>
+<code>get_recent_work_context(since="2026-05-07T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=24, limit=6, format="minimal")</code>.</li>
+<li><strong>Returned:</strong> 1 cluster (<code>ctx_247c6cae</code>)
+labeled “discussion about Project_echo”, ranked for
+<code>has_open_loop</code> + <code>dense</code>, with anchors on
+<code>/Users/zhenye/Desktop/Project_echo</code>, a Claude Code
+conversation, and <code>docs/BACKLOG.md</code>. Returned 6 atoms out of
+a larger 60-atom window. Key visible atoms: <code>cf7f9f6</code> journal
+self-audit commit, <code>ef93cba</code> review move for 025, Claude
+review checks reporting <code>pending_review/</code> empty, and the 025
+builder run. Warnings said one cluster was dropped and the storage
+overfetch cap may have silently truncated atoms.</li>
+<li><strong>Sources:</strong>
+<code>source_breakdown={ claude_code: 31, git: 20 }</code>; visible atom
+sources included Claude Code JSONL under
+<code>~/.claude/projects/</code> and git commits for
+<code>/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — it recovered the right work
+thread and enough next-step hints, but the response is still truncated
+enough that Codex must verify current filesystem/git state before
+acting.</li>
+<li><strong>Note:</strong> The likely resume point is the 026/027
+follow-up line: 025 had been moved through review, 026 received
+strategist fixes after Codex’s pair-review, and 027 still needed its
+stale 025 <code>spec_refs</code> path checked/fixed on the next pass.
+Follow-up filesystem checks showed only this journal entry was locally
+modified before the 027 spec fix.</li>
+</ul>
+<h4
+id="pdt-claude-code-post-merge-verification-of-item-025-mcp-best-practices">2026-05-08
+15:05 PDT — Claude Code post-merge verification of item 025 (MCP
+best-practices)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked “newest task 025 just landed
+use echo to verify the behav” — running the post-merge dogfooding check
+listed in 025’s <code>review_notes</code> (envelope budget on default
+args; <code>source_app: 'codex'</code> ↔︎ literal-prefix parity).</li>
+<li><strong>Query inputs:</strong> five calls in sequence —
+<ol type="1">
+<li><code>echo_ping()</code> — liveness.</li>
+<li><code>get_recent_work_context()</code> — zero args, exercising new
+defaults <code>limit=20</code>, <code>format='minimal'</code>, inferred
+<code>window_hours=4</code>.</li>
+<li><code>search_memories(source_app='codex', limit=5)</code>.</li>
+<li><code>search_memories(source_prefix='fs:/Users/zhenye/.codex/sessions/', limit=5)</code>.</li>
+<li><code>search_memories(source_app='codex', limit=5, cursor=&lt;page1 next_cursor&gt;)</code>
+— pagination second page.</li>
+<li><code>search_memories(cursor='not-base64-at-all-!@#')</code> —
+malformed-cursor error path.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><ol type="1">
+<li><code>{pong:true, ts:"2026-05-08T22:05:13.945Z"}</code> — succeeded;
+<code>outputSchema</code>/<code>structuredContent</code> advertisement
+visible in tool description block.</li>
+</ol></li>
+<li><ol start="2" type="1">
+<li><strong>72,283 chars — overflowed the 25,000-char consumer
+tool-result budget</strong> despite default args.
+<code>truncation = {atoms_returned:20, atoms_total_in_window:76, clusters_returned:1, clusters_total:2, truncated:true}</code>.
+Probe: top atom is 10,421 chars, of which <code>artifacts</code> array
+(33 entries) is 8,421 chars; <code>action</code> is correctly capped at
+1,200 chars by <code>truncateForMinimal</code>. <strong>Bloat source:
+<code>artifacts[]</code> is not capped by minimal mode</strong> — only
+<code>action.input/action.output</code> are. Real
+<code>claude_code</code> tool-call atoms carry many file references per
+turn.</li>
+</ol></li>
+<li><ol start="3" type="1">
+<li>and (4) returned <strong>identical 5 matches in identical
+order</strong>, identical <code>next_cursor</code>, with
+<code>query_echo</code> faithfully recording the input form
+(<code>source_app:'codex'</code> vs
+<code>source_prefix:'fs:/.../sessions/'</code>).</li>
+</ol></li>
+<li><ol start="5" type="1">
+<li>page 2 returned 5 more rows; first row of page 2 has the
+<strong>same timestamp <code>2026-05-08T21:54:55.896Z</code></strong> as
+the last row of page 1 with a different id — composite-cursor
+<code>(timestamp, id) &lt;</code> row-value comparison correctly
+returned the next id-DESC tie at the same ms instead of skipping past
+it. Non-null <code>next_cursor</code> continues the chain.</li>
+</ol></li>
+<li><ol start="6" type="1">
+<li>returned a JSON-RPC-level error
+<code>"malformed cursor: decoded value is not JSON; pass back the prior call's next_cursor verbatim"</code>
+— surfaced cleanly to the client.</li>
+</ol></li>
+</ul></li>
+<li><strong>Sources:</strong> (3) and (4) both hit
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-*.jsonl</code>
+exclusively. (2) drew from
+<code>source_breakdown={git:27, claude_code:38}</code> inside the single
+returned cluster. (5)/(6) tested only the cursor decode path, no source
+filter beyond <code>source_app='codex'</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — Bug 2
+(<code>source_app</code> parity), Bug 4 (composite cursor + same-ms tie
+stability + malformed-cursor error envelope), and Bug 8
+(description-side advertisement of three tools, opaque-cursor language,
+new defaults) all behave as specced. <strong>Bug 3 (cost-safer defaults)
+is regressed in production:</strong> envelope-byte-size acceptance test
+(synthetic 200-atom fixture) passed at merge, but real
+<code>claude_code</code> atoms blow the 25k budget by ~3× under the new
+<code>limit=20</code>/<code>format='minimal'</code> defaults. Confirms
+Failure A is still active — same shape as 13:27 PDT and 14:43 PDT, but
+now reproduced on the post-025 build. Acceptance-test fixture did not
+represent real <code>artifacts[]</code> density.</li>
+<li><strong>Note:</strong> <code>truncateForMinimal</code> caps
+<code>action.input/action.output</code> at 500 chars but leaves
+<code>artifacts[]</code>, <code>actors</code>, <code>provenance</code>,
+<code>context</code>, and the cluster’s
+<code>edges</code>/<code>open_loop_hints</code> untouched. For
+<code>claude_code</code> atoms (Read/Edit/Bash tool calls referencing
+many files per turn), <code>artifacts[]</code> is the dominant
+byte-share. Tie-stability path (composite cursor + <code>before</code>
+row-value comparison) works as Codex’s 13:51 PDT review demanded —
+same-ms ties traverse without skip or duplicate.</li>
+<li><strong>Conjecture:</strong> (observation-only, not a fix) — Bug 3’s
+envelope guard needs a fixture closer to real <code>claude_code</code>
+atom density (≥30 artifacts/atom, full action+actors+provenance) to
+catch this class of overflow at merge time. Don’t design here — leave
+for end-of-window synthesis.</li>
+</ul>
+<h4
+id="pdt-claude-code-use-echo-to-resume-session-resume-context-pull">2026-05-08
+15:14 PDT — Claude Code “use echo to resume” — session-resume context
+pull</h4>
+<ul>
+<li><strong>Trigger:</strong> founder opened a fresh Claude Code session
+and asked “use echo to resume” — the canonical resume-where-I-left-off
+use case for <code>get_recent_work_context</code>.</li>
+<li><strong>Query inputs:</strong>
+<code>get_recent_work_context(since='2026-05-08T00:00:00-07:00', until='2026-05-08T23:59:59-07:00')</code>
+— full-day PDT window, all other args defaulted (<code>limit=20</code>,
+<code>format='minimal'</code>, no <code>artifact_hint</code>,
+<code>window_hours</code> inferred from span =
+<code>min(span, 24h) = 24h</code>).</li>
+<li><strong>Returned:</strong> <strong>76,593 chars — overflowed the
+25,000-char consumer tool-result budget by ~3×</strong> despite default
+<code>format='minimal'</code> / <code>limit=20</code>. Result spilled to
+disk at
+<code>tool-results/mcp-echo-get_recent_work_context-1778278493629.txt</code>.
+<code>truncation = {atoms_returned:20, atoms_total_in_window:149, clusters_returned:1, clusters_total:2, truncated:true}</code>.
+Subagent then digested the spill file with jq and returned a 350-word
+resume briefing.</li>
+<li><strong>Sources:</strong> the single returned cluster’s
+<code>source_breakdown = {claude_code: 72, git: 55}</code> —
+<strong>zero <code>cursor</code> and zero <code>codex</code>
+atoms</strong> in a 24h window where the founder unambiguously used both
+Codex (post-merge dogfooding entry above is co-authored with Codex
+review notes) and likely Cursor. Either (a) capture is silently dropping
+those sources for this window, or (b) cursor/codex atoms were below the
+per-atom inclusion threshold for this cluster and the <em>second,
+dropped cluster</em> held them.</li>
+<li><strong>Verdict:</strong> 🟡 partial — tool delivered the right
+substantive answer (founder got an accurate “where you left off”
+briefing pointing at item 027 awaiting review), but <strong>the
+front-door resume use case overflows the envelope budget on a same-day
+full-window query</strong>. Bug 3 (cost-safer defaults) regressed
+identically to the 15:05 PDT entry — second consecutive real-world
+reproduction post-025-merge.</li>
+<li><strong>Note:</strong> the silent-omission failure mode the journal
+preamble warns about is visible here: <code>source_breakdown</code>
+shows only claude_code+git, and a casual reader of the briefing would
+not realize cursor/codex coverage might be missing. The “Sources” field
+discipline saved the verdict — without it the truncation would have
+looked benign. Also: 1 entire cluster was dropped at limit=20 atoms (149
+in window); raising limit isn’t a fix — it makes the overflow
+worse.</li>
+<li><strong>Conjecture:</strong> (observation-only) — same
+fixture-density gap as the 15:05 PDT entry. Distinct from that entry:
+this is the <em>resume</em> path, not the verification path, and
+overflow forces a Read-by-subagent indirection that defeats the “drop
+into the conversation as context” UX promise of the tool. End-of-window
+synthesis should weigh whether the envelope guard belongs at
+<code>get_recent_work_context</code> itself (e.g., auto-narrowing the
+effective <code>window_hours</code> when projected output exceeds
+budget) rather than at the per-atom truncator. Don’t design here.</li>
+</ul>
+<h4
+id="pdt-claude-code-post-026027-second-verification-round-the-gated-round">2026-05-08
+15:54 PDT — Claude Code post-026+027 second verification round (THE
+GATED ROUND)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked “both 026 and 027 landed do
+the full second round of reverification” — directly executing the gated
+bullet in <code>backlog/_followups.md</code> (“Second verification round
+after 026 + 027 merge”). Six MCP calls fired in parallel:
+<code>echo_ping</code>, <code>get_recent_work_context()</code>
+zero-args,
+<code>search_memories(query="JSON-RPC", source_app='codex')</code>,
+<code>tail_session(source_app='codex')</code>,
+<code>tail_session(source_app='claude_code')</code>. Daemon was
+kickstarted at 15:38 PDT during the 027 merge so this is the
+post-restart, post-stateless-transport, post-tail_session-tool
+world.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_ping(message='post-027-merge stateless verification, leg 1')</code></li>
+<li><code>get_recent_work_context()</code> — zero args; effective
+<code>since=2026-05-08T18:54:22.202Z until=2026-05-08T22:54:22.202Z window_hours=4 format='minimal' limit=20</code></li>
+<li><code>search_memories(query='JSON-RPC', source_app='codex')</code> —
+limit defaulted to 10</li>
+<li><code>tail_session(source_app='codex')</code> — count defaulted to
+5</li>
+<li><code>tail_session(source_app='claude_code')</code> — count
+defaulted to 5</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li><code>{pong:true, ts:'2026-05-08T22:54:21.963Z', received:'…'}</code>
+— succeeded; <strong>stateless transport works post-restart with no
+Mcp-Session-Id round-trip</strong>, the exact behaviour 027
+promised.</li>
+<li><strong>84,188 chars — overflowed the 25,000-char consumer
+tool-result budget</strong> by ~3.4×. Bug 3 regression is
+<strong>worse</strong> than the 15:14 PDT 72,283-char baseline (+11,905
+/ +16.5%) on essentially the same path.
+<code>truncation = {atoms_returned:20, atoms_total_in_window:110, clusters_returned:1, clusters_total:2, truncated:true}</code>.
+Single returned cluster carries <strong>18 open_loop_hints</strong> —
+that subarray is plausibly a major byte contributor on its own.
+<code>format='minimal'</code> does not cap
+<code>open_loop_hints[]</code>, <code>artifacts[]</code>,
+<code>actors</code>, <code>provenance</code>, or cluster
+<code>edges</code> — same root cause as 15:05 / 15:14 PDT, just with
+more open-loop accretion as the day went on.</li>
+<li><strong>318,574 chars — overflowed the budget by ~12.7×.</strong>
+Only 3 matches returned (limit_applied:10), but per-match byte sizes are
+<strong>138,903 / 85,321 / 94,147 chars</strong>.
+<code>search_memories</code> apparently has <strong>no per-match
+envelope cap at all</strong> — it returns full atom content for every
+hit. A single Codex turn match is ~100KB. This is a distinct failure
+class from Bug 3; Bug 3 is about cluster-envelope size in
+<code>get_recent_work_context</code>, this is about per-match atom size
+in <code>search_memories</code>. <strong>Treat as a new candidate
+item.</strong></li>
+<li>4 turns / ~2.3k chars total / well within budget — auto-resolved to
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T15-03-05-019e099d-9f26-7f53-b4b6-25481b81a984.jsonl</code>.
+<strong>026 tool wired up correctly and reachable.</strong> BUT every
+returned atom’s <code>content</code> is a fs-watcher event payload like
+<code>{"event_type":"change","path":"/Users/.../rollout-…jsonl","mtime":"2026-05-08T22:03:26.998Z","size":55508}</code>,
+with <code>metadata.surface:"fs"</code>. These are file-modification
+meta-events targeting the rollout file, not extracted Codex conversation
+turns. If the spec intent is “show me what Codex actually said in its
+last 5 turns,” <code>tail_session(source_app='codex')</code> returns the
+wrong layer of atom — it returns the fs-watcher meta-stream, not the
+codex-extractor’s turn atoms. <strong>Treat as a new candidate
+item.</strong></li>
+<li>Same pattern — 5 fs-watcher change events on this exact session’s
+<code>f89407ef-eb99-4968-a961-114d15e938fe.jsonl</code>, none of them
+extracted claude-code turns. <code>next_cursor</code> non-null,
+paginatable. Confirms (4) is not codex-specific — it’s the
+source-resolution rule.</li>
+</ol></li>
+<li><strong>Sources:</strong> (1) no source — pure liveness probe. (2)
+cluster’s <code>source_breakdown = {git: 40, claude_code: 59}</code>,
+<strong>zero cursor / zero codex</strong> in the 4h window — same
+silent-omission shape as 15:14 PDT, in a window where Codex’s rollout
+was actively being modified (per call 4’s evidence). The dropped second
+cluster (warning: <code>"limit dropped 1 entire cluster(s)"</code>)
+plausibly held the codex/cursor atoms — they didn’t make the top-1
+cluster’s atom_ids cut. (3) all three matches’ <code>source</code>
+started with
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-…jsonl</code>
+per the spill — <code>source_app='codex'</code> parity with
+literal-prefix held. (4) source resolved to one Codex rollout file,
+contributing fs-watcher events. (5) source resolved to this Claude Code
+project’s JSONL, contributing fs-watcher events.</li>
+<li><strong>Verdict:</strong> 🟡 partial — three substantive negatives
+plus a major positive.
+<ul>
+<li>✅ <strong>Stateless transport (027) works in production.</strong>
+Post-launchctl-kickstart <code>echo_ping</code> returns 200 with no
+session-header dance; this is the canonical post-restart smoke and it
+passes.</li>
+<li>✅ <strong><code>tail_session</code> (026) is wired up, reachable,
+source-resolution arrives at the right session file, and stays well
+within budget.</strong></li>
+<li>❌ <strong>Bug 3 regression is NOT fixed by 026+027 — and is
+worse.</strong> 84,188 vs 72,283 baseline. Followup-gate triggered: file
+the fixture-density / <code>format:'skeleton'</code> item now, per the
+gated followup’s exact contract.</li>
+<li>❌ <strong>NEW Bug A</strong> (<code>search_memories</code>
+envelope): per-match atom byte size is uncapped; a single Codex match is
+~100KB; three matches blow the budget by 12.7×. Distinct from Bug
+3.</li>
+<li>❌ <strong>NEW Bug B</strong> (<code>tail_session</code> source
+resolution): <code>source_app=&lt;app&gt;</code> resolves to the
+fs-watcher atoms targeting that app’s files, not the app’s extracted
+turn atoms. The 026 tool ships but probably returns the wrong layer of
+content for the canonical “where did <app> leave off” use case.</li>
+</ul></li>
+<li><strong>Note:</strong> silent-omission discipline keeps paying.
+(2)’s <code>source_breakdown</code> again hides cursor/codex from the
+casual reader; (4) and (5) reveal that even when an app’s session is
+being actively modified during the same 4h window, its atoms don’t enter
+the top cluster. This is the same observation as 15:14 PDT but now
+reproducibly tied to the limit-dropped-cluster warning. Also notable:
+the 318k <code>search_memories</code> overflow is the largest single
+tool-result spill seen in this journal — the per-match cap absence is a
+real cliff, not a tail bias.</li>
+<li><strong>Conjecture:</strong> (observation-only) — three distinct
+candidate items emerge, in priority order: (a)
+<code>format:'skeleton'</code> mode for
+<code>get_recent_work_context</code> that drops
+<code>artifacts[]</code>, <code>actors</code>, <code>provenance</code>,
+<code>open_loop_hints</code> body content, cluster <code>edges</code>,
+keeping only ids + label + source_breakdown + counts (Bug 3 fix); (b)
+per-match byte cap for <code>search_memories</code> results, e.g.,
+truncate atom content &gt; 4KB to a head + tail with explicit “(N chars
+elided)” marker, and project a <code>match.bytes_elided</code> field
+(new Bug A); (c) <code>tail_session</code> source resolution should
+prefer the extractor’s turn atoms over fs-watcher events when both
+target the same path (new Bug B). Don’t design here.</li>
+</ul>
+<h4
+id="pdt-claude-code-post-bugs-ab-merge-live-verification-third-round">2026-05-08
+16:14 PDT — Claude Code post-Bugs-A+B-merge live verification (third
+round)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder merged
+<code>agent/mcp-envelope-bugs-ab</code> into main at 16:11 PDT (commit
+<code>2fecd10</code>); Claude Code kickstarted the daemon via
+<code>launchctl kickstart -k gui/$(id -u)/com.echo.daemon</code> (exit
+0) and re-fired the exact three calls from the 15:54 PDT round to verify
+the fixes shipped end-to-end. This is the first opportunity to confirm
+Bugs A and B against the live wire path (the 15:54 PDT round was
+pre-merge; the worktree-level TDD tests passed at 16:08 PDT but TDD ≠
+live-daemon proof).</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_ping(message='post-fix-merge live verification of Bugs A+B')</code></li>
+<li><code>search_memories(query='JSON-RPC', source_app='codex')</code> —
+exactly the 15:54 PDT call</li>
+<li><code>tail_session(source_app='codex')</code> — exactly the 15:54
+PDT call</li>
+<li><code>tail_session(source_app='claude_code')</code> — exactly the
+15:54 PDT call</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li><code>{pong:true, ts:'2026-05-08T23:14:35.650Z', received:'…'}</code>
+— succeeded; daemon is up on the merged code.</li>
+<li><strong>305,632 chars total — overflowed budget by ~12.2×.</strong>
+BUT: per-match <code>content_lengths = [2023, 2023, 2023]</code>
+(exactly <code>PER_MATCH_CONTENT_CAP=2000</code> + ~23-char marker
+overhead) and <code>bytes_elided = [4507, 3900, 4567]</code> are
+populated. <strong>Bug A’s content cap is engaged correctly.</strong>
+The remaining envelope bloat lives in <code>metadata</code> —
+specifically <code>metadata.tool_calls</code> at <strong>130,997 /
+unprobed / unprobed chars</strong> for the first match. Per-match byte
+budget = 2KB content + 130KB tool_calls + ~600B other metadata = ~133KB
+per match × 3 matches = ~400KB pre-envelope. <strong>NEW SUB-BUG A2
+surfaced</strong> — <code>search_memories</code> (and tail_session,
+which uses the same <code>toMatch</code> shape) needs an envelope cap on
+<code>metadata</code> sub-objects too, not just on <code>content</code>.
+Codex’s per-turn extractor stores raw <code>tool_calls</code> payloads
+in metadata; on a <code>JSON-RPC</code>-grep window where every Codex
+turn that mentioned MCP also had heavy tool calls, the metadata is now
+the dominant byte source.</li>
+<li><strong>130,677 chars — overflowed budget by ~5.2×.</strong> BUT:
+<code>surfaces = [null, null]</code> — <strong>zero
+<code>metadata.surface:'fs'</code> atoms.</strong> The 15:54 PDT failure
+mode is fully closed: the response now contains the codex extractor’s
+actual turn atoms, not the fs-watcher meta-stream. <strong>Bug B’s
+source-resolution fix and exclude-fs filter are engaged
+correctly</strong> — <code>source_resolved</code> lands on the right
+rollout file
+(<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T14-44-57-…jsonl</code>),
+<code>n_turns=2</code> of real content
+(<code>content_lengths=[431, 5277]</code>), no warnings. The envelope
+bloat here is the same Bug A2 issue downstream — the second turn’s
+per-atom JSON envelope is 126,842 chars driven by
+<code>metadata.tool_calls = 120,171</code> chars. Bug B’s success
+surfaced Bug A2’s reach into <code>tail_session</code> (which has its
+own <code>toMatch</code> that doesn’t apply Bug A1’s content cap either
+— that’s a third gap).</li>
+<li><strong>128,834 chars — overflowed budget by ~5.2×.</strong> Same
+shape as (3): <code>surfaces=[null,null,null,null,null]</code> (zero fs
+noise — Bug B fix engaged), <code>n_turns=5</code> of real Claude Code
+conversation atoms,
+<code>content_lengths=[1646, 3164, 4749, 4132, 102]</code> (all under
+5KB content), but the per-turn envelopes are 2,366 / 5,269 /
+<strong>68,788 / 51,420</strong> / 695 chars. The two large turns drag
+the total. Same metadata-driven bloat — likely Claude Code extractor
+also has a heavy metadata sub-object, possibly
+<code>metadata.tool_calls</code> or analogous (didn’t probe the keys for
+this surface).</li>
+</ol></li>
+<li><strong>Sources:</strong> (1) liveness only. (2) all 3 matches
+<code>source</code> starts with
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-…jsonl</code>
+per spill — <code>source_app='codex'</code> parity preserved post-fix.
+(3) one Codex rollout file, both turns from the same source, all
+<code>metadata.surface ≠ 'fs'</code>. (4) one Claude Code project JSONL
+(this very session’s <code>f89407ef-…jsonl</code>), all 5 turns from the
+same source, all <code>metadata.surface ≠ 'fs'</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — clean structural wins on both
+Bugs A1 and B, but (i) Bug A1 is incomplete because metadata is uncapped
+(NEW Bug A2), and (ii) <code>tail_session.toMatch</code> has no content
+cap at all (Bug A1 reach gap into tail-session.ts).
+<ul>
+<li>✅ <strong>Bug A1 (content cap on <code>search_memories</code>)
+works exactly as designed.</strong> Content is 2023 chars,
+<code>bytes_elided</code> populated, marker
+<code>\n…[N chars elided]…\n</code> present in spilled responses.</li>
+<li>✅ <strong>Bug B (fs-watcher exclusion) works exactly as
+designed.</strong> Surfaces field is <code>null</code> for every
+returned atom. No fs-event payloads. Real extractor turn atoms returned.
+Source resolution lands on the right session file.</li>
+<li>❌ <strong>NEW Bug A2 — <code>metadata</code> sub-objects
+(especially <code>metadata.tool_calls</code>) are uncapped.</strong> In
+the live wire path this bites both <code>search_memories</code> and
+<code>tail_session</code> (since they share
+<code>searchMatchSchema</code> and pass through <code>metadata</code>
+verbatim from the storage row). Per-key sizes: <code>tool_calls</code>
+is 120-130KB per atom; everything else combined is &lt; 1KB. The Codex
+extractor is the source of the <code>tool_calls</code> density; a future
+capture-side fix could trim what gets stored, but the MCP-side fix
+should not depend on capture changes.</li>
+<li>❌ <strong>Bug A1 reach gap —
+<code>tail-session.ts:68 toMatch</code> does not apply
+<code>clipContent</code>.</strong> Today this is masked because tail
+content is small (max 5277 chars); on a tail of long-content extractor
+atoms it would surface. Same fix shape as
+<code>search-memories.ts:115</code>; the two <code>toMatch</code>
+functions should plausibly converge on a shared helper.</li>
+</ul></li>
+<li><strong>Note:</strong> the journal preamble’s “negative observations
+are more valuable” rule earned its keep. Logging the <em>partial</em>
+win honestly — content cap engaged, metadata bloat surfaced — is the
+only way the next round of backlog planning catches Bug A2 instead of
+celebrating a clean 318k → 25k victory that the wire bytes don’t
+actually support. Worth noting for the end-of-window synthesis: the
+15:54 PDT round’s “Bug A is per-match content cap” framing was
+structurally correct but undersized — the <em>real</em> per-match
+envelope problem is “all uncapped per-atom JSON” (content + metadata +
+any future fields). Future spec language for envelope caps should target
+the serialized atom byte size, not just the content string.</li>
+<li><strong>Conjecture:</strong> (observation-only) — Bug A2 wants a
+per-key metadata cap with a per-match
+<code>metadata_bytes_elided: number</code> and an optional
+<code>metadata_keys_elided: string[]</code> summary. Cap value: probably
+the same total budget as content (e.g., 2KB after which the largest
+values get replaced by
+<code>{ __elided: true, original_size: N }</code>). Codex extractor’s
+<code>tool_calls</code> storage choice is a separate capture-side
+question (does the Codex turn atom <em>need</em> to store the entire raw
+tool-call payload in metadata, or could it store a head+count summary?).
+Don’t design here. The clean separation: MCP-side cap is unconditional
+safety; capture-side trim is a quality choice.</li>
+</ul>
+<hr />
+<h3 id="pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">2026-05-08
+17:01–17:03 PDT — V1.5 full-halt live test (post-028 + post-V1.5.6)</h3>
+<blockquote>
+<p>Founder paused for full live testing. Single Claude Code session
+(<code>bcc0a351-...jsonl</code>) running on merged main (HEAD
+<code>21edd69</code>, V1.5.6 wire-shape projector live). Multi-call
+entry — every ECHO MCP tool exercised across cross-session, cross-tool,
+cross-day axes. Observations only; gap classifications captured
+separately in <code>2026-05-08-v1-5-livetest-gaps.md</code>.</p>
+</blockquote>
+<h4 id="call-1-echo_pingmessagev1.5-live-test-starting">Call 1 —
+<code>echo_ping(message="v1.5 live test starting")</code></h4>
+<ul>
+<li><strong>Trigger:</strong> connectivity smoke test before deeper
+queries.</li>
+<li><strong>Returned:</strong>
+<code>{pong: true, ts: 2026-05-09T00:01:17.797Z, received: "v1.5 live test starting"}</code>.</li>
+<li><strong>Sources:</strong> N/A (ping).</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> server up, transport healthy, clock returns
+UTC ISO (founder is PDT — <code>ts</code> does not localize, which is
+correct for the wire layer but worth flagging for any human-shown
+surface).</li>
+</ul>
+<h4
+id="call-2-get_recent_work_contextformatskeleton-window_hours24-limit20">Call
+2 —
+<code>get_recent_work_context(format="skeleton", window_hours=24, limit=20)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> open-ended “what was I working on”
+pull.</li>
+<li><strong>Query inputs:</strong> since=2026-05-08T20:01:18Z,
+until=2026-05-09T00:01:18Z, limit=20, format=skeleton,
+window_hours=24.</li>
+<li><strong>Returned:</strong> 1 cluster of 2, 20/144 atoms; top cluster
+“discussion about Project_echo”; rank_reasons
+<code>[recent_activity, has_open_loop, dense]</code>. Warnings:
+<code>limit dropped 1 entire cluster(s)</code>. Envelope ~ inline (well
+under 25k).</li>
+<li><strong>Sources:</strong>
+<code>cluster.source_breakdown = {git: 49, claude_code: 84}</code> —
+<strong>codex and cursor entirely absent</strong> even though codex
+sessions exist for 2026-05-08 (verified via tail_session below) and the
+2026-05-06+ window has 244 atoms total.</li>
+<li><strong>Verdict:</strong> 🟡 partial — skeleton envelope itself is
+clean and rank reason is right, but a 24h window with 144 atoms returns
+only <strong>claude_code+git</strong> when codex+cursor activity exists
+in the same window. Either codex/cursor atoms are in the dropped second
+cluster (mono-tool clustering) or they never join the dominant repo
+cluster.</li>
+<li><strong>Note:</strong> the strict-shared-artifact join policy
+(post-019 edge filter) likely excludes codex turns whose
+<code>repo_root</code> matches but whose
+<code>cwd</code>/<code>files_referenced</code> don’t co-occur with
+claude_code’s. This was a known design trade-off; live-test confirms it
+bites the “what is everyone working on” use case the rwc tool’s
+docstring promises (<code>source_breakdown</code> per-app counts) on
+real cross-tool days.</li>
+</ul>
+<h4
+id="call-3-search_memoriesquery028-since2026-05-06t000000-limit10">Call
+3 —
+<code>search_memories(query="028", since="2026-05-06T00:00:00", limit=10)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> cross-day substring lookup against the
+just-merged item id.</li>
+<li><strong>Query inputs:</strong> query=028, since=2026-05-06T00:00:00
+(no Z), limit=10.</li>
+<li><strong>Returned:</strong> 10 matches, <code>next_cursor</code>
+populated. Spans 2026-05-08T23:30→23:58Z. Top match is the live
+conversation’s user prompt (mtime indexed sub-second after capture —
+capture-pipeline freshness confirmed).</li>
+<li><strong>Sources:</strong> mix of <code>claude_code</code> (jsonl)
+and <code>git</code> (commit). No codex, no cursor — but “028” is a
+recent claude_code-coined item id, so absence is plausible not
+pathological.</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> <code>since</code> lacked a Z suffix, but
+<strong>no warning was emitted</strong> (unlike
+<code>get_recent_work_context</code> Call 8 below). Inconsistent
+TZ-validation between tools. Schema regex
+<code>^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}</code> accepts both forms
+silently in <code>search_memories</code>. Match metadata showed
+<code>metadata_bytes_elided</code> populated (V1.5.6 working) and
+per-match envelope &lt; 8KB even on the Codex-spec turn (which
+pre-V1.5.6 spilled).</li>
+</ul>
+<h4 id="call-4-search_memoriesqueryenvelope-source_appcodex-limit5">Call
+4 —
+<code>search_memories(query="envelope", source_app="codex", limit=5)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> confirm codex data is reachable via
+<code>source_app=codex</code> filter (cross-tool query).</li>
+<li><strong>Returned:</strong> 5 matches, all from
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/{07,08}/...jsonl</code>.
+Newest 2026-05-08T21:32Z, oldest 2026-05-07T23:23Z.</li>
+<li><strong>Sources:</strong> all codex; metadata shows
+<code>tool_calls.__elided = true</code> (V1.5.6 metadata cap engaged).
+Envelope inline.</li>
+<li><strong>Verdict:</strong> ✅ right — codex IS in the store and
+reachable; absent from Call 2’s cluster is therefore a
+<em>clustering</em> gap, not a capture gap.</li>
+<li><strong>Note:</strong> confirms Codex extractor + V1.5.6 metadata
+cap shipping correctly together.</li>
+</ul>
+<h4 id="call-5-search_memoriesqueryv1.5-source_appcursor-limit5">Call 5
+—
+<code>search_memories(query="v1.5", source_app="cursor", limit=5)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> does Cursor have any “v1.5” hits?</li>
+<li><strong>Returned:</strong> <strong>0 matches</strong>.
+<code>next_cursor: null</code>.</li>
+<li><strong>Sources:</strong> N/A (empty).</li>
+<li><strong>Verdict:</strong> 🟡 partial — semantically valid (cursor
+turns from a week ago wouldn’t say “v1.5”), but coupled with Call 6/13
+below paints a <em>Cursor capture is silent</em> picture.</li>
+</ul>
+<h4 id="call-6-tail_sessionsource_appcursor-count5">Call 6 —
+<code>tail_session(source_app="cursor", count=5)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> cross-session “where did Cursor leave off”
+— sanity check Cursor capture freshness.</li>
+<li><strong>Returned:</strong> 5 turns, all from
+<code>state.vscdb</code>, <strong>newest at
+2026-05-01T08:40:14Z</strong> — i.e., <strong>Cursor turn capture is 7
+full days stale on a machine where Cursor has been used
+since</strong>.</li>
+<li><strong>Sources:</strong>
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong (against documented “where did
+<code>&lt;app&gt;</code> leave off” affordance).</li>
+<li><strong>Note:</strong> the auto-resolved most-recent-active session
+for <code>source_app=cursor</code> is 7 days old. Either cursor
+extractor has stopped emitting turn atoms, or only fs-events on
+workspaceStorage are being captured (see Call 13). High-priority
+confirmation needed before V1.5 ship — “Cursor + Claude Code” is a V1
+cohort bundle promise.</li>
+</ul>
+<h4
+id="calls-7a7b7c-tail_sessionsource_appcodexclaude_codegit-count5">Calls
+7a/7b/7c —
+<code>tail_session(source_app="codex"|"claude_code"|"git", count=5)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> cross-tool tail-session sanity for the
+other three apps.</li>
+<li><strong>Returned:</strong> codex auto-resolved to
+<code>rollout-2026-05-08T14-44-57-019e098d-...jsonl</code> (today,
+~14:44 PDT); claude_code resolved to today’s live
+<code>bcc0a351-...jsonl</code>; git resolved to
+<code>git:/Users/zhenye/Desktop/Project_echo</code> with 5 most-recent
+commits including the V1.5.6 merge.</li>
+<li><strong>Sources:</strong> all three resolve to the right
+newest-session for their app.</li>
+<li><strong>Verdict:</strong> ✅ right for codex/claude_code/git. Pairs
+with Call 6 to localize the Cursor freshness issue to the cursor
+extractor specifically.</li>
+</ul>
+<h4
+id="call-8-get_recent_work_contextformatskeleton-window_hours48-since2026-05-06t000000-until2026-05-08t000000-limit30">Call
+8 —
+<code>get_recent_work_context(format="skeleton", window_hours=48, since="2026-05-06T00:00:00", until="2026-05-08T00:00:00", limit=30)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> cross-day query (two-day-old window,
+before today’s work).</li>
+<li><strong>Returned:</strong> 1 cluster of 5, 30/244 atoms,
+<strong>dropped 4 entire clusters</strong> at limit=30. Cluster
+source_breakdown <code>{git: 39, claude_code: 142}</code>.</li>
+<li><strong>Warnings:</strong>
+<code>input.since or input.until lacks a TZ specifier and was parsed as local time; pass an explicit Z or +HH:MM to avoid ambiguity</code>
+✅.</li>
+<li><strong>Verdict:</strong> 🟡 partial — TZ warning is good; default
+<code>limit=20/30</code> discards 4/5 of clusters in a multi-day window.
+The user-facing affordance “what was I doing 2 days ago” is unusable at
+default limits without iteration.</li>
+<li><strong>Note:</strong> <code>truncation.clusters_total: 5</code> is
+visible to the AI client, but there’s no opt-in to <em>just see the
+cluster headers</em> (label + counts only) before deciding which to
+hydrate. Stage-1 surface-then-deep-dive design intent partially missing
+— see Call 15 spill below.</li>
+</ul>
+<h4
+id="calls-9101114-memory_get_profile-memory_list_recentlimit15-memory_searchqueryv1.5-envelope-skeleton-format-k5-memory_ingesttextlive-test-ping...">Calls
+9/10/11/14 — <code>memory_get_profile()</code>,
+<code>memory_list_recent(limit=15)</code>,
+<code>memory_search(query="v1.5 envelope skeleton format", k=5)</code>,
+<code>memory_ingest(text="Live test ping...")</code></h4>
+<ul>
+<li><strong>Trigger:</strong> test the second MCP server
+(<code>echo-memory</code>) — singleton facts, recent facts, KNN search,
+write path.</li>
+<li><strong>Returned:</strong> <strong>all four calls fail</strong> with
+<code>(sqlite3.OperationalError) unable to open database file</code>
+(memory_ingest returned
+<code>{error: "enqueue_failed", detail: "..."}</code>).</li>
+<li><strong>Sources:</strong> N/A (server-side failure before
+query).</li>
+<li><strong>Verdict:</strong> ❌ wrong — <code>echo-memory</code> MCP
+server is fully broken end-to-end. <code>memory_ingest</code>,
+<code>memory_search</code>, <code>memory_list_recent</code>,
+<code>memory_get_profile</code> all return the same SQLite error. The
+store path the server is trying to open doesn’t exist or is
+unreadable.</li>
+<li><strong>Note:</strong> this is a <strong>separate process</strong>
+from the main ECHO daemon (which is healthy per Call 1). Either the
+SQLite file location is mis-configured in the connector’s environment or
+the file was never created. Before V1.5 ship the memory MCP either has
+to (a) fail open with a useful pointer to setup, or (b) be removed from
+the published MCP surface so AI clients don’t hit a 100% error rate on
+its tools. <strong><code>memory_get_task_status</code> was not exercised
+since enqueue itself failed</strong> — there’s no way to obtain a
+task_id.</li>
+</ul>
+<h4
+id="call-12-get_recent_work_contextformatminimal-window_hours4-limit10">Call
+12 —
+<code>get_recent_work_context(format="minimal", window_hours=4, limit=10)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> confirm V1.5.6 minimal-format
+inline-envelope claim on live data.</li>
+<li><strong>Returned:</strong> 1 cluster of 2, 10/100 atoms. Inline
+(well under 25k). Per-atom <code>action.input/output</code> clipped to
+500 chars;
+<code>[truncated; N chars omitted; fetch full atom via search_memories]</code>
+marker present.</li>
+<li><strong>Warnings:</strong>
+<code>storage cap hit (events.length === limit * STORAGE_OVERFETCH); atoms in window may be silently truncated.</code>
+✅ (<code>limit*10 = 100</code>, all 100 returned, more in window).</li>
+<li><strong>Verdict:</strong> ✅ right — V1.5.6 minimal envelope holds
+on a real live response.</li>
+</ul>
+<h4
+id="call-13-search_memoriesquery-source_appcursor-limit3-since2026-05-07t000000z">Call
+13 —
+<code>search_memories(query="", source_app="cursor", limit=3, since="2026-05-07T00:00:00Z")</code></h4>
+<ul>
+<li><strong>Trigger:</strong> what does the Cursor lane have AT ALL
+since yesterday?</li>
+<li><strong>Returned:</strong> 3 matches, <strong>all from
+<code>cursor-retrieval/embeddable_files.txt</code> and
+<code>high_level_folder_description.txt</code></strong> — fs-watcher
+change events on Cursor’s internal workspace-storage files, <strong>not
+Cursor turns</strong>. Content shape:
+<code>{event_type: "change", path: "...", mtime: "...", size: N}</code>.
+<code>metadata.surface = "fs"</code>,
+<code>metadata.file_kind = "cursor-workspace"</code>.</li>
+<li><strong>Sources:</strong>
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/workspaceStorage/...</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong against the documented
+<code>source_app="cursor"</code> semantic (“Cursor + Claude Code + Codex
+conversations” per docstring). The lane is contaminated with fs-watcher
+noise on Cursor’s own internal files. This is the same shape as the
+original “Bug B” surface-fs-event leak that was supposedly closed for
+<code>claude_code</code>/<code>codex</code> lanes.</li>
+<li><strong>Note:</strong> combine with Call 6 (Cursor turn capture
+stale 7 days) and Call 5 (zero “v1.5” hits): the Cursor lane is
+currently <strong>fs-noise without turn signal</strong> — the
+<em>opposite</em> of what the AI-client contract promises. Bug B’s fix
+evidently didn’t reach the <code>cursor</code> source_app filter on
+<code>search_memories</code>.</li>
+</ul>
+<h4
+id="call-15-get_recent_work_contextformatskeleton-window_hours48-since2026-05-06t000000z-until2026-05-08t070000z-limit100">Call
+15 —
+<code>get_recent_work_context(format="skeleton", window_hours=48, since="2026-05-06T00:00:00Z", until="2026-05-08T07:00:00Z", limit=100)</code></h4>
+<ul>
+<li><strong>Trigger:</strong> raise limit to confirm whether the dropped
+clusters from Call 8 would surface.</li>
+<li><strong>Returned:</strong> <strong>OVERFLOW SPILL — 53,413 chars
+&gt; 25k consumer budget</strong> (saved to tool-results spill file).
+100/330 atoms returned, 1/4 clusters returned, 3 clusters still dropped.
+Cluster source_breakdown <code>{git: 56, claude_code: 217}</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong — V1.5.6’s “skeleton fits in
+budget” claim has a regression hole at higher <code>limit</code> values.
+Skeleton was sized against the 15:54 PDT 30-atom fixture (~12k chars, 3%
+headroom under 12,500); at <code>limit=100</code> and 273 atoms in the
+dominant cluster the open_loop_hints array alone (one entry per atom
+with hints) plus <code>atom_ids[]</code> overflow. The 028 review notes
+flagged this risk explicitly: <em>“3% headroom is a future flake risk if
+atom shape grows”</em> — and “atom shape grows” turned out to also mean
+“atom <em>count</em> grows.” Skeleton’s per-cluster cost scales with
+cluster size; no cap is applied to <code>atom_ids[]</code> or
+<code>open_loop_hints[]</code> length.</li>
+<li><strong>Note:</strong> docstring says skeleton is <em>“typical &lt;
+10k chars even on full-day windows; use for low-budget
+context-pull”</em> — but at <code>limit=100</code> (well within
+<code>MAX_LIMIT=500</code>) on a 48h window the AI client gets a spill
+error and a useless tool-results path. The “use for low-budget” advice
+is implicitly limit-bounded; the schema doesn’t enforce it.</li>
+</ul>
+<p><strong>Source-attribution roll-up across the 15 calls:</strong> git
+✅ healthy, claude_code ✅ healthy, codex ✅ reachable via
+search_memories/tail_session but absent from cross-tool clusters in
+get_recent_work_context, cursor ❌ turn capture stale 7 days + lane
+contaminated with fs-watcher noise. Memory MCP (echo-memory) ❌ fully
+broken (4/4 tools fail, 5th not testable).</p>
+<h4
+id="pdt-claude-code-post-v1.5.6.1-merge-live-verification-workflow-trajectory-close">2026-05-08
+17:05 PDT — Claude Code post-V1.5.6.1-merge live verification (workflow
+trajectory close)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder merged V1.5.6.1 tool_calls
+trajectory projector at 17:02 PDT (commit <code>264a7af</code>).
+Re-fired the canonical four calls — looking for
+<code>metadata.tool_calls</code> as the actual workflow trajectory (not
+the V1.5.6 <code>{__elided}</code> placeholder).</li>
+<li><strong>Query inputs:</strong> <code>echo_ping</code>,
+<code>search_memories(query='JSON-RPC', source_app='codex')</code>,
+<code>tail_session(source_app='codex')</code>,
+<code>tail_session(source_app='claude_code')</code> — identical to all
+prior rounds.</li>
+<li><strong>Returned:</strong> <strong>All four calls returned inline.
+Workflow trajectory visible on every turn that had tool calls.</strong>
+<ul>
+<li><code>echo_ping</code>: pong,
+<code>ts:'2026-05-09T00:05:07.471Z'</code>. V1.5.6.1 daemon live.</li>
+<li><code>search_memories</code> first match (027 spec writing, 114 tool
+calls):
+<code>metadata.tool_calls = ["update_plan","exec_command","exec_command",...,"echo_ping",...,"apply_patch","exec_command","exec_command","write_stdin","write_stdin","exec_command",...]</code>
+— 50 entries (extractor’s <code>MAX_TOOL_CALLS_PER_TURN</code> cap, with
+<code>tool_calls_truncated: true</code> preserved).
+<code>tool_calls_by_name = {update_plan:1, exec_command:45, echo_ping:1, apply_patch:1, write_stdin:2}</code>.
+<code>metadata_keys_projected: ["tool_calls"]</code> (NEW field —
+distinct from <code>metadata_keys_elided</code>).
+<code>metadata_bytes_elided: 130256</code> (slightly less than V1.5.6’s
+130960 — trajectory + histogram cost ~700B vs the placeholder’s ~50B;
+small price for the recovered workflow signal).</li>
+<li><code>search_memories</code> second match:
+<code>tool_calls = ["search_memories","exec_command",...,"apply_patch",...,"write_stdin","exec_command","exec_command"]</code>.
+Trajectory shows agent started with an ECHO call, ran 30 shell commands,
+applied a patch, wrote to stdin, did 2 more shell commands. Intent
+legible.</li>
+<li><code>tail_session(codex)</code> first turn (commit two traced
+edits):
+<code>tool_calls = ["exec_command","exec_command","exec_command","exec_command"]</code>.
+Agent did 4 shell commands — typical git status/add/commit/verify
+pattern. Intent legible at-a-glance.</li>
+<li><code>tail_session(claude_code)</code> first turn (THIS V1.5.6.1
+implementation work):
+<code>tool_calls = ["Bash","Bash","Write","Edit","Read","Edit","Edit","Read","Edit","Edit","Read","Edit","Write","Read","Edit","Edit","Bash","Read","Edit","Read","Edit","Bash","Bash","Bash","Bash"]</code>.
+<code>tool_calls_by_name = {Bash:7, Write:2, Edit:10, Read:6}</code>.
+<strong>The TDD pattern is legible from the trajectory alone</strong> —
+write code, read existing code, iterate edits, run test commands.
+Exactly the agent-intent inference the founder’s design intent calls
+for.</li>
+</ul></li>
+<li><strong>Sources:</strong> all matches/turns from real extractor
+atoms (zero <code>metadata.surface:'fs'</code>).
+<code>search_memories</code> source_app=‘codex’ parity preserved.
+<code>tail_session</code> source resolution lands on the same rollouts
+as prior rounds.</li>
+<li><strong>Verdict:</strong> ✅ <strong>complete close — V1.5 cap-stone
+landed for the surface-retrieval atom path.</strong> Both budget safety
+AND value density on the wire. <code>metadata_keys_projected</code>
+carries the new “reshaped to useful summary” semantic distinct from
+<code>metadata_keys_elided</code> (“opaque placeholder”). Per-key
+metadata cap (V1.5.6) for unknown shapes; shape-aware projection
+(V1.5.6.1) for <code>tool_calls</code> specifically. Future shape-aware
+projections (e.g. <code>files_referenced</code> head/tail,
+<code>actors</code> name-list) follow the same pattern: add a projector
+to <code>src/mcp/wire-shape/</code>, dispatch in
+<code>match.ts:projectMatch</code> before the standard cap.</li>
+<li><strong>Note:</strong> A consumer reading any of the live responses
+can now answer “what was this agent working on?” without hydrating any
+field. Trajectory + histogram + git_state + session_id + cwd + content
+head+tail collectively form a surface-level summary that’s actually
+useful — not just budget-safe. Stage 2 deep-dive
+(<code>get_atom(id, fields?)</code>) deferred to V1.6, with the
+projected/elided field labels telling the consumer exactly which keys to
+query around when they need depth.</li>
+<li><strong>Conjecture:</strong> (observation-only) — V1.5.6.1 closes
+the four MCP envelope-overflow bugs from this dogfooding window with
+both load-bearing test coverage and live wire confirmation. <strong>Full
+halt to solidify V1.5 is appropriate now for the atom-shape retrieval
+path.</strong> The 17:01–17:03 PDT v1.5-livetest-gaps round (above)
+surfaced a separate Bug 3.1 in <code>get_recent_work_context</code>
+skeleton mode at high <code>limit</code> values (53,413-char overflow at
+<code>limit=100, format='skeleton'</code>) — that’s the cluster-shape
+projector and lives outside V1.5.6/V1.5.6.1’s scope; file as the next
+item. V1.6 starting candidates (priority order): (1) <strong>Bug 3.1
+skeleton-mode <code>limit=100</code> overflow</strong> (cluster-shape
+<code>atom_ids[]</code> and <code>open_loop_hints[]</code> need bounds,
+not just per-atom shape); (2) stage-2 deep-dive
+<code>get_atom(id, fields?)</code> — the missing primitive that makes
+elision acceptable as default; (3) USER-aware content clip — keep USER
+verbatim, head+tail clip only ASSISTANT; (4)
+<code>metadata.layer:'content'|'meta'</code> positive-marker convention;
+(5) cursor capture stale 7 days + fs-watcher contamination (separate
+issue from MCP envelope work, surfaced by 17:01 round).</li>
+</ul>
+<h4
+id="pdt-claude-code-post-v1.5.7-bundle-live-verification-gap-diagnoses">2026-05-08
+20:55 PDT — Claude Code post-V1.5.7 bundle live verification + Gap
+diagnoses</h4>
+<ul>
+<li><strong>Trigger:</strong> founder ran the V1.5.7 patch sweep on the
+17:01 PDT v1.5-livetest-gaps file: Gap 3 (search_memories fs-noise) +
+Gap 6 (TZ-warning parity) + Gap 4 (skeleton cluster bounds) shipped at
+commit <code>c20db34</code>; Gap 2 stop-spam patch shipped at
+<code>98fbd10</code>. This entry captures the live diagnostic runs that
+surfaced root causes for Gaps 1 and 2, and the live confirmation that
+Gap 2’s spam-quietening landed.</li>
+<li><strong>Query inputs (this round was diagnostic, not benchmark — no
+canonical four-call repro):</strong>
+<ol type="1">
+<li>SQLite probes against
+<code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(Cursor’s storage, not ECHO’s): bubble/composer counts,
+<code>fullConversationHeadersOnly</code> shape audit,
+<code>agentKv:blob:</code> discovery.</li>
+<li>SQLite probes against
+<code>~/Library/Application Support/ECHO/echo.db</code> (ECHO storage):
+per-composer checkpoint extraction.</li>
+<li>Daemon log analysis
+(<code>~/Library/Logs/echo/daemon.out.log</code>):
+orphan_assistant_bubble timestamp distribution + per-minute rate.</li>
+<li>Post-merge
+<code>launchctl kickstart -k gui/$(id -u)/com.echo.daemon</code> +
+30-second silence verification.</li>
+</ol></li>
+<li><strong>Returned (notable findings):</strong>
+<ul>
+<li><strong>Gap 2 root cause has TWO layers.</strong> Layer 1: Cursor
+migrated from <code>bubbleId:</code>/<code>composerData:</code> to
+<code>agentKv:blob:</code> (256 entries) +
+<code>messageRequestContext:</code> (96 entries) on 2026-05-01 — the
+bubbleId: table has been frozen since. ECHO’s cursor extractor reads
+only the old layout; new conversations are invisible. Layer 2: 902,716
+orphan_assistant_bubble warnings in the daemon log (from 23:04 May 6 →
+03:45 May 9, 1232 distinct minutes × ~250/minute) come from the OLD
+bubble layer — when ECHO captured a turn mid-stream, the checkpoint
+pointed to the partial-cluster-last assistant. On every subsequent tick,
+the parser walked past the checkpoint, landed on the bubbles Cursor had
+since added to extend the response, and orphaned each one. The two
+layers compound: even if a future <code>agentKv:</code> extractor lands,
+the OLD bubble-layer spam needed quieting independently. V1.5.7 patch
+addresses Layer 2; Layer 1 is V1.6+.</li>
+<li><strong>Gap 1 is NOT a Project_echo bug.</strong> Wiki + journal
+cross-reference revealed the <code>echo-memory</code> MCP server is the
+<strong>legacy EchoChat Python backend</strong> at
+<code>/Users/zhenye/Desktop/Projects/EchoChat/apps/backend/.venv/bin/python -m app.mcp</code>
+— a sibling-project artifact, registered in <code>~/.claude.json</code>
+user-scope around line 3227. ECHO V1’s published MCP surface is ONLY
+<code>mcp__echo__*</code> (echo_ping, search_memories, tail_session,
+get_recent_work_context). The 5 broken <code>mcp__echo-memory__*</code>
+tools come from a separate dormant project that ECHO superseded. The
+journal already noted this dual-registration issue at the time of item
+025 (line 518): <em>“the ‘two namespaces in the founder’s environment’
+finding suggests a wiki note on legacy <code>echo-memory</code> cleanup
+may be warranted.”</em> That cleanup never happened, so today’s
+v1.5-livetest re-surfaced the same pre-existing config drift as a Gap 1
+ship-blocker.</li>
+<li><strong>Gap 2 patch live-confirmed:</strong> post-merge
+<code>launchctl kickstart</code> at 20:50 PDT; 30 seconds later the
+daemon log shows <strong>0 orphan_assistant_bubble warnings since
+restart</strong> (vs ~250/minute pre-patch). Spam silenced cleanly.</li>
+</ul></li>
+<li><strong>Sources:</strong> Cursor SQLite at
+<code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>;
+ECHO SQLite at <code>~/Library/Application Support/ECHO/echo.db</code>
+(<code>~/.echo/store.sqlite</code> is a 0-byte stale file; daemon uses
+the <code>Library/Application Support/ECHO/</code> path per
+<code>daemon/index.ts:21</code>); EchoChat backend at
+<code>/Users/zhenye/Desktop/Projects/EchoChat/apps/backend/</code>;
+daemon log at <code>~/Library/Logs/echo/daemon.out.log</code>. No MCP
+calls fired this round — entirely diagnostic.</li>
+<li><strong>Verdict:</strong> ✅ <strong>V1.5 ship-blocker
+reconciliation complete.</strong> Gap 3, 4, 6, and Gap 2’s
+spam-quietening shipped on <code>c20db34</code> + <code>98fbd10</code>.
+Gap 1’s resolution is a <code>~/.claude.json</code> user-scope edit
+(un-register the legacy <code>echo-memory</code> MCP) — out of agent
+edit scope (credentials file), surgical command surfaced for founder to
+run: <code>python3 -c "import json; p='~/.claude.json'; ..."</code>
+style or hand-edit lines ~3227-3236. Gap 2’s deeper Path B
+(<code>agentKv:</code> extractor rewrite) is a known V1.6
+carry-over.</li>
+<li><strong>Note:</strong> the v1.5-livetest-gaps file (parallel CC
+session) was substantially more thorough than the canonical-four-call
+rounds — it tested the published MCP surface across
+cross-session/cross-tool/cross-day axes. The two ship-blockers I missed
+(Gaps 1 + 2) flowed directly from that breadth. <strong>Sampling
+discipline lesson for future “halt readiness” claims: a 4-call canonical
+repro is a regression-confirmation tool, not a halt-readiness audit.
+Halt audits need cross-axis coverage of every published surface (every
+tool, every source_app, multi-day windows).</strong></li>
+<li><strong>Conjecture:</strong> (observation-only) — Gap 1’s resolution
+should also land a wiki page at
+<code>wiki/operating-model/legacy-echo-memory-cleanup.md</code>
+documenting the dual-registration finding so a future audit doesn’t
+re-discover the same config-drift. The journal’s original 2026-05-08
+note suggesting this never converted to a wiki action item; closing it
+now (alongside the un-registration) prevents the third recurrence in
+V1.6+.</li>
+</ul>
+<h4 id="pdt-codex-resume-check-where-we-left-off">2026-05-08 23:36 PDT —
+Codex resume check: “where we left off”</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to use ECHO to
+understand where the prior session left off.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(artifact_hint={provider:"filesystem", type:"directory", id:"/Users/zhenye/Desktop/Project_echo"}, format="minimal", limit=10, since="2026-05-06T00:00:00-07:00", until="2026-05-09T23:59:59-07:00")</code></li>
+<li><code>tail_session(source_app="codex", count=10)</code></li>
+<li><code>tail_session(source_app="claude_code", count=10)</code></li>
+<li><code>get_recent_work_context(format="skeleton", limit=10, since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", window_hours=24)</code></li>
+<li><code>search_memories(query="V1.5.7", limit=5, since="2026-05-08T00:00:00-07:00")</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>Call 1 returned no clusters and no atoms, despite
+<code>atoms_total_in_window:100</code> and a storage-cap warning. This
+was not useful for resume; likely the directory artifact hint did not
+match the relevant repo/session artifacts.</li>
+<li>Call 2 returned the latest Codex session: commit
+<code>61a7aa0 spec: clean 027 refs after ECHO resume</code>; the last
+Codex-visible loose end was an untracked
+<code>backlog/pending_review/2026-05-08-025-mcp-best-practices.review.md</code>
+sidecar at that time.</li>
+<li>Call 3 returned the latest Claude Code session: “turn the mcp
+interaction into html too…” It generated
+<code>raw/internal/dogfooding/mcp-interactions-journal.html</code>,
+updated <code>CLAUDE.md</code> with the HTML-twin rule, updated the
+Claude feedback memory, and explicitly left the change uncommitted.</li>
+<li>Call 4 returned one <code>discussion about Project_echo</code>
+cluster (<code>ctx_b99f68ec</code>), ranked <code>has_open_loop</code> +
+<code>dense</code>, with
+<code>source_breakdown:{claude_code:65, git:35}</code> over
+<code>2026-05-08T22:02:02Z</code> to <code>2026-05-09T06:36:12Z</code>;
+10/100 atoms returned, truncated true. Anchors included V1.5.7 cap-stone
+commit <code>23e7876</code>, MCP namespace diagnosis, doc-orientation
+work, worktree cleanup, and the HTML-journal task.</li>
+<li>Call 5 returned five <code>V1.5.7</code> matches. Top match directly
+answered the resume question: V1.5.7 closed at <code>23e7876</code>;
+<code>ready/</code>, <code>claimed/</code>, and
+<code>pending_review/</code> were empty; five stale merged worktrees
+were removed; local/remote <code>agent/*</code> branches were deleted;
+<code>extractors-causal-metadata</code> was left untouched; next move is
+to pick a new V1.5+ direction or open a new ready item.</li>
+</ul></li>
+<li><strong>Verdict:</strong> right overall, partial on the first call.
+<code>search_memories("V1.5.7")</code> plus
+<code>tail_session(claude_code)</code> produced the most actionable
+resume state. The artifact-hinted <code>get_recent_work_context</code>
+path was misleadingly empty and should not be trusted alone for
+repo-resume.</li>
+<li><strong>Note:</strong> ECHO separated three layers that plain
+<code>git status</code> alone would blur: (1) old Codex state around
+025/026/027, (2) later Claude Code V1.5.7 closure and worktree cleanup,
+and (3) newest uncommitted docs/rendering change. Current local
+verification after the ECHO calls shows <code>main</code> at
+<code>23e7876</code>, no backlog items ready/claimed/pending_review, and
+a dirty tree from <code>CLAUDE.md</code> plus generated/readability
+files.</li>
+<li><strong>Conjecture:</strong> directory artifact hints should
+probably normalize to repo-root/session artifacts or expose a warning
+when the hint filters out all clusters while unhinted recent-work finds
+a dense matching repo cluster.</li>
+</ul>
+<h4
+id="pdt-claude-code-where-did-we-leave-off-clean-worktrees-resume-call">2026-05-08
+23:32 PDT — Claude Code “where did we leave off + clean worktrees”
+resume call</h4>
+<ul>
+<li><strong>Trigger:</strong> founder opened a fresh CC session: “use
+echo and understand where we left off and clean up all the worktrees” —
+classic resume-call shape (no item context, just wants the orientation
+pull).</li>
+<li><strong>Query inputs:</strong> <code>get_recent_work_context</code>
+with <code>format="skeleton"</code>, <code>limit=15</code>. No
+<code>since</code>/<code>until</code> (defaulted to last ~4h
+window).</li>
+<li><strong>Returned:</strong> 1 cluster (<code>ctx_efff893b</code>), 15
+atoms, <code>source_breakdown={claude_code:10, git:5}</code>, label
+“discussion about Project_echo”,
+rank_reasons=<code>[recent_activity, has_open_loop, dense]</code>. 6
+<code>open_loop_hints</code> all marked <code>resolved:true</code>.
+Atoms surfaced V1.5.7 cap-stone <code>23e7876</code>, Gap 2 merge
+<code>98fbd10</code>, Gap 3+4+6 merge <code>c20db34</code>, plus the
+founder messages that drove them.</li>
+<li><strong>Sources:</strong> atoms came entirely from
+<code>claude_code</code> jsonl (3 distinct session UUIDs under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>) +
+<code>git</code> commits on this repo. <strong>No <code>cursor</code> /
+<code>codex</code> atoms in the window</strong> — consistent with cursor
+capture being stale (Layer 1 finding from the 20:55 PDT entry above) and
+no codex activity this evening. Cross-checked against
+<code>git log --oneline -10</code> and <code>git worktree list</code>;
+commit SHAs in the cluster matched main’s tip exactly.</li>
+<li><strong>Verdict:</strong> ✅ right — the skeleton response was
+sufficient on its own to reconstruct “where we left off” (V1.5.7
+cap-stone closed, backlog
+<code>claimed/</code>+<code>pending_review/</code> empty, 5 stale
+worktrees on disk). One shot, right cluster; no follow-up
+<code>search_memories</code> / <code>tail_session</code> needed.</li>
+<li><strong>Note:</strong> this is exactly the resume-call shape
+skeleton format was designed for (item 028) —
+<code>&lt; 10k chars</code>, no atom bodies, just enough to orient.
+Worked as advertised. All 6 open-loop hints <code>resolved:true</code>
+correctly reflects the V1.5.7 cap-stone state.</li>
+<li><strong>Conjecture:</strong> (observation-only) — silent absence of
+<code>cursor</code> source atoms in the cluster’s
+<code>source_breakdown</code> is the load-bearing signal here, not the
+surfaced atoms. A future “halt readiness” audit could fold a per-source
+presence check into the resume-call ritual (“is every expected
+source_app present in the window?”) — the 7-day-stale cursor capture
+would surface earlier with a <code>source_breakdown</code> floor
+expectation. Don’t design fixes here; observation only.</li>
+</ul>
+<hr />
+<h2 id="aggregated-learnings-filled-at-end-of-window">Aggregated
+learnings (filled at end of window)</h2>
+<p><em>To be written by the founder + strategist together at end of
+window. Sections to cover:</em></p>
+<ul>
+<li><strong>What’s the trace layer’s actual hit rate</strong> (% of
+calls that returned the right cluster) on a representative sample</li>
+<li><strong>Most common failure modes</strong> (ranked by frequency and
+severity)</li>
+<li><strong>Surprises</strong> (positive and negative — things we didn’t
+predict in item 018’s spec)</li>
+<li><strong>Whether the founder’s daily workflow felt different</strong>
+(the V1.5 north star)</li>
+<li><strong>Whether Claude-in-Cursor used the graph</strong> vs ignored
+it</li>
+<li><strong>Whether item 017 is needed</strong> based on real use, or if
+<code>get_recent_work_context</code> makes <code>search_memories</code>
+mostly redundant</li>
+</ul>
+<h2 id="recommendations-candidate-v1.5-backlog-items">Recommendations /
+candidate V1.5+ backlog items</h2>
+<p><em>Filled at end of window. Each candidate item should
+name:</em></p>
+<ul>
+<li>The observation it’s responding to (link to the daily
+entry/entries)</li>
+<li>The proposed change (algorithm / shape / config)</li>
+<li>Estimated cost</li>
+<li>Whether it’s a minor tune (V1.5.1) or a structural change (V1.6 /
+V2)</li>
+</ul>
+<h2 id="notes-on-running-this-journal">Notes on running this
+journal</h2>
+<ul>
+<li>Entries with <strong>only</strong> a one-line note are fine. Don’t
+gate on having a conjecture.</li>
+<li>Negative observations are more valuable than positive ones for V1.5+
+planning. Don’t filter.</li>
+<li>Screenshots / paste of MCP responses welcome — drop them inline as
+code blocks.</li>
+<li>If the founder forgets and skips a day, no problem. Quality of
+entries beats coverage.</li>
+<li>This file is not a backlog item — <code>tools/blocked.py</code> will
+not pick it up.</li>
+</ul>
+</body>
+</html>

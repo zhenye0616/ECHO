@@ -797,6 +797,35 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 - **Note:** the v1.5-livetest-gaps file (parallel CC session) was substantially more thorough than the canonical-four-call rounds — it tested the published MCP surface across cross-session/cross-tool/cross-day axes. The two ship-blockers I missed (Gaps 1 + 2) flowed directly from that breadth. **Sampling discipline lesson for future "halt readiness" claims: a 4-call canonical repro is a regression-confirmation tool, not a halt-readiness audit. Halt audits need cross-axis coverage of every published surface (every tool, every source_app, multi-day windows).**
 - **Conjecture:** (observation-only) — Gap 1's resolution should also land a wiki page at `wiki/operating-model/legacy-echo-memory-cleanup.md` documenting the dual-registration finding so a future audit doesn't re-discover the same config-drift. The journal's original 2026-05-08 note suggesting this never converted to a wiki action item; closing it now (alongside the un-registration) prevents the third recurrence in V1.6+.
 
+#### 2026-05-08 23:36 PDT — Codex resume check: "where we left off"
+
+- **Trigger:** founder asked Codex to use ECHO to understand where the prior session left off.
+- **Query inputs:**
+  1. `get_recent_work_context(artifact_hint={provider:"filesystem", type:"directory", id:"/Users/zhenye/Desktop/Project_echo"}, format="minimal", limit=10, since="2026-05-06T00:00:00-07:00", until="2026-05-09T23:59:59-07:00")`
+  2. `tail_session(source_app="codex", count=10)`
+  3. `tail_session(source_app="claude_code", count=10)`
+  4. `get_recent_work_context(format="skeleton", limit=10, since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", window_hours=24)`
+  5. `search_memories(query="V1.5.7", limit=5, since="2026-05-08T00:00:00-07:00")`
+- **Returned:**
+  - Call 1 returned no clusters and no atoms, despite `atoms_total_in_window:100` and a storage-cap warning. This was not useful for resume; likely the directory artifact hint did not match the relevant repo/session artifacts.
+  - Call 2 returned the latest Codex session: commit `61a7aa0 spec: clean 027 refs after ECHO resume`; the last Codex-visible loose end was an untracked `backlog/pending_review/2026-05-08-025-mcp-best-practices.review.md` sidecar at that time.
+  - Call 3 returned the latest Claude Code session: "turn the mcp interaction into html too..." It generated `raw/internal/dogfooding/mcp-interactions-journal.html`, updated `CLAUDE.md` with the HTML-twin rule, updated the Claude feedback memory, and explicitly left the change uncommitted.
+  - Call 4 returned one `discussion about Project_echo` cluster (`ctx_b99f68ec`), ranked `has_open_loop` + `dense`, with `source_breakdown:{claude_code:65, git:35}` over `2026-05-08T22:02:02Z` to `2026-05-09T06:36:12Z`; 10/100 atoms returned, truncated true. Anchors included V1.5.7 cap-stone commit `23e7876`, MCP namespace diagnosis, doc-orientation work, worktree cleanup, and the HTML-journal task.
+  - Call 5 returned five `V1.5.7` matches. Top match directly answered the resume question: V1.5.7 closed at `23e7876`; `ready/`, `claimed/`, and `pending_review/` were empty; five stale merged worktrees were removed; local/remote `agent/*` branches were deleted; `extractors-causal-metadata` was left untouched; next move is to pick a new V1.5+ direction or open a new ready item.
+- **Verdict:** right overall, partial on the first call. `search_memories("V1.5.7")` plus `tail_session(claude_code)` produced the most actionable resume state. The artifact-hinted `get_recent_work_context` path was misleadingly empty and should not be trusted alone for repo-resume.
+- **Note:** ECHO separated three layers that plain `git status` alone would blur: (1) old Codex state around 025/026/027, (2) later Claude Code V1.5.7 closure and worktree cleanup, and (3) newest uncommitted docs/rendering change. Current local verification after the ECHO calls shows `main` at `23e7876`, no backlog items ready/claimed/pending_review, and a dirty tree from `CLAUDE.md` plus generated/readability files.
+- **Conjecture:** directory artifact hints should probably normalize to repo-root/session artifacts or expose a warning when the hint filters out all clusters while unhinted recent-work finds a dense matching repo cluster.
+
+#### 2026-05-08 23:32 PDT — Claude Code "where did we leave off + clean worktrees" resume call
+
+- **Trigger:** founder opened a fresh CC session: "use echo and understand where we left off and clean up all the worktrees" — classic resume-call shape (no item context, just wants the orientation pull).
+- **Query inputs:** `get_recent_work_context` with `format="skeleton"`, `limit=15`. No `since`/`until` (defaulted to last ~4h window).
+- **Returned:** 1 cluster (`ctx_efff893b`), 15 atoms, `source_breakdown={claude_code:10, git:5}`, label "discussion about Project_echo", rank_reasons=`[recent_activity, has_open_loop, dense]`. 6 `open_loop_hints` all marked `resolved:true`. Atoms surfaced V1.5.7 cap-stone `23e7876`, Gap 2 merge `98fbd10`, Gap 3+4+6 merge `c20db34`, plus the founder messages that drove them.
+- **Sources:** atoms came entirely from `claude_code` jsonl (3 distinct session UUIDs under `~/.claude/projects/-Users-zhenye-Desktop-Project-echo/`) + `git` commits on this repo. **No `cursor` / `codex` atoms in the window** — consistent with cursor capture being stale (Layer 1 finding from the 20:55 PDT entry above) and no codex activity this evening. Cross-checked against `git log --oneline -10` and `git worktree list`; commit SHAs in the cluster matched main's tip exactly.
+- **Verdict:** ✅ right — the skeleton response was sufficient on its own to reconstruct "where we left off" (V1.5.7 cap-stone closed, backlog `claimed/`+`pending_review/` empty, 5 stale worktrees on disk). One shot, right cluster; no follow-up `search_memories` / `tail_session` needed.
+- **Note:** this is exactly the resume-call shape skeleton format was designed for (item 028) — `< 10k chars`, no atom bodies, just enough to orient. Worked as advertised. All 6 open-loop hints `resolved:true` correctly reflects the V1.5.7 cap-stone state.
+- **Conjecture:** (observation-only) — silent absence of `cursor` source atoms in the cluster's `source_breakdown` is the load-bearing signal here, not the surfaced atoms. A future "halt readiness" audit could fold a per-source presence check into the resume-call ritual ("is every expected source_app present in the window?") — the 7-day-stale cursor capture would surface earlier with a `source_breakdown` floor expectation. Don't design fixes here; observation only.
+
 ---
 
 ## Aggregated learnings (filled at end of window)
