@@ -15,6 +15,7 @@ import type {
   RecentWorkContextResponse,
   ResponseFormat,
 } from '../../trace/types.js';
+import { hasTzMarker, TZ_NAIVE_WARNING } from '../util/iso8601.js';
 import { WIRE_SHAPE_CAPS } from '../wire-shape/caps.js';
 
 export const RECENT_WORK_CONTEXT_DESCRIPTION =
@@ -93,6 +94,21 @@ const formatSchema = z.enum(['full', 'minimal', 'skeleton']);
 // wire-shape caps table.
 export const SKELETON_SUMMARY_CAP = WIRE_SHAPE_CAPS.skeleton_summary;
 
+// V1.5.7 (Gap 4, surfaced 2026-05-08 17:01 PDT v1.5-livetest): per-cluster
+// bounds on skeleton-mode arrays. At limit=100 over 48h, the dominant
+// cluster carried 273 atoms — atom_ids[] alone (UUIDs × 273) + one
+// open_loop_hint per atom blew the consumer 25k budget at 53,413 chars.
+// 028's review notes flagged the 3% headroom risk explicitly.
+//
+// Cap shape: when a cluster's atom_ids or open_loop_hints exceeds the cap,
+// keep first N/2 + last N/2 entries and emit a `*_omitted` integer field
+// per omission. Mirrors the V1.5.6/V1.5.6.1 elision-bookkeeping pattern
+// (bytes_elided, metadata_keys_elided): consumer can detect omission
+// programmatically and decide whether to re-query with smaller `limit`
+// or hydrate the cluster via a future deep-dive primitive.
+export const SKELETON_CLUSTER_ATOM_IDS_CAP = 50;
+export const SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP = 30;
+
 export interface SkeletonAtom {
   id: NormalizedContextEvent['id'];
   // Keep the full TimeRef sub-object: its three optional fields are tiny
@@ -130,10 +146,22 @@ export interface SkeletonCluster {
   // open_loop_hints text/kind/confidence body. Keep the affordances that make
   // skeleton mode useful for the resume use case: id + label + atom_ids +
   // source_breakdown + time_range + minimal-shape hints.
+  //
+  // V1.5.7 (Gap 4): atom_ids and open_loop_hints capped per-cluster. When
+  // the original exceeded the cap, head + tail kept and an `*_omitted`
+  // integer surfaces the dropped count.
   atom_ids: Cluster['atom_ids'];
   source_breakdown: Cluster['source_breakdown'];
   time_range: Cluster['time_range'];
   open_loop_hints: SkeletonOpenLoopHint[];
+  /** V1.5.7 (Gap 4): set only when atom_ids was clipped. */
+  atom_ids_omitted?: number;
+  /** V1.5.7 (Gap 4): set only when open_loop_hints was clipped. */
+  open_loop_hints_omitted?: number;
+  /** V1.5.7 (Gap 4): true when EITHER atom_ids or open_loop_hints was
+   *  clipped — convenience flag so consumers can branch without checking
+   *  both omission counters. */
+  truncated?: boolean;
 }
 
 export interface SkeletonResponse {
@@ -168,15 +196,37 @@ export function applySkeletonAtom(atom: NormalizedContextEvent): SkeletonAtom {
   return skeleton;
 }
 
+/** Head + tail clip on an array. When `arr.length <= cap`, returns the
+ *  array verbatim with omitted=0. Otherwise keeps `floor(cap/2)` from the
+ *  front and `ceil(cap/2)` from the back; reports the dropped count. */
+function clipArray<T>(arr: readonly T[], cap: number): { kept: T[]; omitted: number } {
+  if (arr.length <= cap) return { kept: [...arr], omitted: 0 };
+  const headN = Math.floor(cap / 2);
+  const tailN = cap - headN;
+  return {
+    kept: [...arr.slice(0, headN), ...arr.slice(arr.length - tailN)],
+    omitted: arr.length - cap,
+  };
+}
+
 export function applySkeletonCluster(cluster: Cluster): SkeletonCluster {
+  // V1.5.7 (Gap 4): per-cluster bounds. Pre-fix, a 273-atom dominant cluster
+  // at limit=100 produced a 53,413-char skeleton response (>25k consumer
+  // budget). Cap atom_ids and open_loop_hints to head+tail; surface the
+  // omission count so the consumer can choose to re-query narrower.
+  const aIds = clipArray(cluster.atom_ids, SKELETON_CLUSTER_ATOM_IDS_CAP);
+  const hints = clipArray(
+    cluster.open_loop_hints,
+    SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP,
+  );
   const skeleton: SkeletonCluster = {
     cluster_id: cluster.cluster_id,
     rank: cluster.rank,
     rank_reason: cluster.rank_reason,
-    atom_ids: cluster.atom_ids,
+    atom_ids: aIds.kept,
     source_breakdown: cluster.source_breakdown,
     time_range: cluster.time_range,
-    open_loop_hints: cluster.open_loop_hints.map((h) => ({
+    open_loop_hints: hints.kept.map((h) => ({
       atom_id: h.atom_id,
       resolved: h.resolved,
     })),
@@ -184,6 +234,9 @@ export function applySkeletonCluster(cluster: Cluster): SkeletonCluster {
   if (cluster.label !== undefined) {
     skeleton.label = cluster.label;
   }
+  if (aIds.omitted > 0) skeleton.atom_ids_omitted = aIds.omitted;
+  if (hints.omitted > 0) skeleton.open_loop_hints_omitted = hints.omitted;
+  if (aIds.omitted > 0 || hints.omitted > 0) skeleton.truncated = true;
   return skeleton;
 }
 
@@ -228,12 +281,11 @@ function clampLimit(input: number | undefined): number {
   return Math.min(Math.max(1, floored), MAX_LIMIT);
 }
 
-// Accepts all four legal ISO 8601 TZ forms: Z, ±HH:MM, ±HHMM, ±HH.
-const TZ_MARKER_RE = /Z$|[+-]\d{2}(?::?\d{2})?$/;
-
-export function hasTzMarker(s: string): boolean {
-  return TZ_MARKER_RE.test(s);
-}
+// V1.5.7 (Gap 6): TZ-marker check now lives in src/mcp/util/iso8601.ts so
+// search_memories (and any future since/until-bearing tool) shares the
+// same validation. Re-exported here for backward compatibility with any
+// consumer that already imported `hasTzMarker` from this module.
+export { hasTzMarker } from '../util/iso8601.js';
 
 // Span-driven default for window_hours. When the caller passes an explicit
 // value, that wins. Otherwise: short spans (≤4h) reuse the span exactly so a
@@ -319,10 +371,7 @@ export async function getRecentWorkContext(
     (params.since !== undefined && !hasTzMarker(params.since)) ||
     (params.until !== undefined && !hasTzMarker(params.until))
   ) {
-    response.warnings.push(
-      'input.since or input.until lacks a TZ specifier and was parsed as ' +
-        'local time; pass an explicit Z or +HH:MM to avoid ambiguity',
-    );
+    response.warnings.push(TZ_NAIVE_WARNING);
   }
 
   if (format === 'minimal') {

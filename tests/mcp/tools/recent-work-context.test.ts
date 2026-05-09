@@ -1118,3 +1118,83 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     }
   });
 });
+
+// Gap 4 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest):
+// `format='skeleton'` at `limit=100` over a 48h window blew the 25k consumer
+// budget at 53,413 chars because per-cluster `atom_ids[]` and
+// `open_loop_hints[]` arrays scaled with cluster size (273 atoms in the
+// dominant cluster). 028's review notes flagged the 3% headroom risk;
+// V1.5.7 caps both arrays per-cluster with omission counts surfaced.
+describe('skeleton-mode V1.5.7 cluster bounds (Gap 4)', () => {
+  it('clipArray applied to atom_ids: <= cap passes verbatim, > cap returns head + tail with omitted count', () => {
+    // Probe applySkeletonCluster directly with a synthetic Cluster shape.
+    // Using `as any` cast for the Cluster fixture to avoid pulling the
+    // entire Cluster type into the test surface.
+    const ids = Array.from({ length: 60 }, (_, i) => `atom-${i.toString().padStart(3, '0')}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cluster: any = {
+      cluster_id: 'c1',
+      rank: 1,
+      rank_reason: ['test'],
+      atom_ids: ids,
+      source_breakdown: { claude_code: 60 },
+      time_range: { since: '2026-05-08T22:00:00.000Z', until: '2026-05-08T23:00:00.000Z' },
+      open_loop_hints: [],
+    };
+    const skel = applySkeletonCluster(cluster);
+    // Cap is 50 → keep 25 + 25 = 50, omit 10.
+    expect(skel.atom_ids.length).toBe(50);
+    expect(skel.atom_ids[0]).toBe('atom-000');
+    expect(skel.atom_ids[24]).toBe('atom-024');
+    expect(skel.atom_ids[25]).toBe('atom-035'); // tail starts at 60-25 = 35
+    expect(skel.atom_ids[49]).toBe('atom-059');
+    expect(skel.atom_ids_omitted).toBe(10);
+    expect(skel.truncated).toBe(true);
+  });
+
+  it('clipArray applied to open_loop_hints with separate cap', () => {
+    const hints = Array.from({ length: 50 }, (_, i) => ({
+      atom_id: `atom-${i}`,
+      resolved: i % 2 === 0,
+      // body fields the skeleton transformer drops (text/kind/confidence)
+      text: `hint ${i}`,
+      kind: 'todo',
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cluster: any = {
+      cluster_id: 'c1',
+      rank: 1,
+      rank_reason: ['test'],
+      atom_ids: ['only-one'],
+      source_breakdown: { claude_code: 1 },
+      time_range: { since: '2026-05-08T22:00:00.000Z', until: '2026-05-08T23:00:00.000Z' },
+      open_loop_hints: hints,
+    };
+    const skel = applySkeletonCluster(cluster);
+    // Cap is 30 → keep 15 + 15.
+    expect(skel.open_loop_hints.length).toBe(30);
+    expect(skel.open_loop_hints_omitted).toBe(20);
+    expect(skel.truncated).toBe(true);
+    // Hints retained the {atom_id, resolved} skeleton shape (no text/kind).
+    expect(skel.open_loop_hints[0]).toEqual({ atom_id: 'atom-0', resolved: true });
+  });
+
+  it('small clusters (≤cap) pass verbatim with no truncated flag', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cluster: any = {
+      cluster_id: 'c1',
+      rank: 1,
+      rank_reason: ['test'],
+      atom_ids: ['a', 'b', 'c'],
+      source_breakdown: { claude_code: 3 },
+      time_range: { since: '2026-05-08T22:00:00.000Z', until: '2026-05-08T23:00:00.000Z' },
+      open_loop_hints: [{ atom_id: 'a', resolved: false, text: 't', kind: 'todo' }],
+    };
+    const skel = applySkeletonCluster(cluster);
+    expect(skel.atom_ids).toEqual(['a', 'b', 'c']);
+    expect(skel.open_loop_hints).toEqual([{ atom_id: 'a', resolved: false }]);
+    expect(skel.atom_ids_omitted).toBeUndefined();
+    expect(skel.open_loop_hints_omitted).toBeUndefined();
+    expect(skel.truncated).toBeUndefined();
+  });
+});
