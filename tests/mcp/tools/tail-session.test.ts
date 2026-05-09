@@ -471,6 +471,117 @@ describe('tailSession (pagination + same-ms ties)', () => {
   });
 });
 
+// V1.5.7 polish (2026-05-09): no-args fallback. Pre-fix, calling
+// `tail_session()` with neither `source` nor `source_app` returned a
+// schema rejection envelope — the morning's resume call hit this and
+// had to retry. Post-fix, the handler scans the four known app prefixes
+// for the freshest non-fs atom inside a 24h window and tails that app's
+// most-recent session, mirroring the ergonomic shape `source_app=` already
+// has for a single app.
+describe('tailSession no-args fallback (V1.5.7 polish 2026-05-09)', () => {
+  const HOME = homedir();
+
+  it('picks the freshest source_app across all four prefixes', async () => {
+    const storage = new MemoryStorage();
+    // codex 04:00, claude_code 06:00 (freshest), cursor 02:00 — claude_code wins.
+    await storage.append({
+      source: `fs:${HOME}/.codex/sessions/abc.jsonl`,
+      timestamp: '2026-05-09T04:00:00.000Z',
+      content: 'codex turn',
+    });
+    await storage.append({
+      source: `fs:${HOME}/.claude/projects/proj-x/sess-1.jsonl`,
+      timestamp: '2026-05-09T06:00:00.000Z',
+      content: 'cc turn',
+    });
+    await storage.append({
+      source: `fs:${HOME}/Library/Application Support/Cursor/User/workspaceStorage/abc/state.vscdb`,
+      timestamp: '2026-05-09T02:00:00.000Z',
+      content: 'cursor turn',
+    });
+
+    const r = await tailSession(storage, {}, new Date('2026-05-09T07:00:00.000Z'));
+    expect(r.source_app_resolved).toBe('claude_code');
+    expect(r.source_resolved).toContain('.claude/projects/');
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]!.content).toBe('cc turn');
+    expect(r.warnings).toHaveLength(0);
+  });
+
+  it('skips apps whose freshest atom is older than the 24h fallback window', async () => {
+    const storage = new MemoryStorage();
+    // codex is fresh (1h ago), claude_code is stale (48h ago) — codex wins
+    // even though claude_code is alphabetically/order-wise different.
+    await storage.append({
+      source: `fs:${HOME}/.codex/sessions/recent.jsonl`,
+      timestamp: '2026-05-09T06:00:00.000Z',
+      content: 'fresh codex',
+    });
+    await storage.append({
+      source: `fs:${HOME}/.claude/projects/proj-y/old.jsonl`,
+      timestamp: '2026-05-07T07:00:00.000Z',
+      content: 'stale cc',
+    });
+
+    const r = await tailSession(storage, {}, new Date('2026-05-09T07:00:00.000Z'));
+    expect(r.source_app_resolved).toBe('codex');
+    expect(r.turns[0]!.content).toBe('fresh codex');
+  });
+
+  it('returns empty + advisory warning when no app has activity in the last 24h', async () => {
+    const storage = new MemoryStorage();
+    // Single stale row outside the window.
+    await storage.append({
+      source: `fs:${HOME}/.codex/sessions/old.jsonl`,
+      timestamp: '2026-05-05T00:00:00.000Z',
+      content: 'old codex',
+    });
+
+    const r = await tailSession(storage, {}, new Date('2026-05-09T07:00:00.000Z'));
+    expect(r.source_resolved).toBeNull();
+    expect(r.source_app_resolved).toBeUndefined();
+    expect(r.turns).toHaveLength(0);
+    expect(r.warnings.some((w) => /no captured sessions.*last 24h/i.test(w))).toBe(true);
+  });
+
+  it('rejects no-args + cursor combination (cursor invalidates after fresh resolve)', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: `fs:${HOME}/.codex/sessions/x.jsonl`,
+      timestamp: '2026-05-09T06:00:00.000Z',
+      content: 'codex',
+    });
+    const cursor = encodeCursor({
+      timestamp: '2026-05-09T05:00:00.000Z',
+      id: 'fake',
+    });
+    await expect(
+      tailSession(storage, { cursor }, new Date('2026-05-09T07:00:00.000Z')),
+    ).rejects.toThrow(/cursor.*requires.*source/i);
+  });
+
+  it('excludes fs-watcher meta-events from the resolution scan', async () => {
+    const storage = new MemoryStorage();
+    // fs-watcher noise IS the freshest under cursor's prefix, but it has
+    // metadata.surface=fs and must be ignored. The codex turn (older but
+    // non-fs) wins.
+    await storage.append({
+      source: `fs:${HOME}/Library/Application Support/Cursor/User/workspaceStorage/x/state.vscdb`,
+      timestamp: '2026-05-09T06:30:00.000Z',
+      content: '{"event_type":"change"}',
+      metadata: { surface: 'fs' },
+    });
+    await storage.append({
+      source: `fs:${HOME}/.codex/sessions/x.jsonl`,
+      timestamp: '2026-05-09T05:00:00.000Z',
+      content: 'codex turn',
+    });
+
+    const r = await tailSession(storage, {}, new Date('2026-05-09T07:00:00.000Z'));
+    expect(r.source_app_resolved).toBe('codex');
+  });
+});
+
 describe('tail_session (MCP wire — registered tool, schema validation, isError envelopes)', () => {
   let handle: McpServerHandle | null = null;
   let restoreStdout: () => void;
@@ -532,18 +643,26 @@ describe('tail_session (MCP wire — registered tool, schema validation, isError
     expect(res.isError).toBe(true);
     expect(res.structuredContent).toBeUndefined();
     const text = res.content?.[0]?.text ?? '';
-    expect(text).toMatch(/exactly one of.*source.*source_app/i);
+    expect(text).toMatch(/at most one of.*source.*source_app/i);
   });
 
-  it('rejects passing neither source nor source_app via isError envelope', async () => {
+  // V1.5.7 polish (2026-05-09): the "neither" case used to be rejected.
+  // It now triggers the no-args fallback that auto-resolves the freshest
+  // source_app across all apps in the last 24h. With an empty store the
+  // fallback returns a successful empty envelope plus a "no sessions in
+  // last 24h" warning — NOT an error, because the no-args shape is
+  // a valid resume call.
+  it('no-args (neither source nor source_app) falls back rather than rejecting', async () => {
     const storage = new MemoryStorage();
     handle = await startMcpServer(storage, { port: 0 });
 
     const res = await callTailSession(handle.url, {});
-    expect(res.isError).toBe(true);
-    expect(res.structuredContent).toBeUndefined();
-    const text = res.content?.[0]?.text ?? '';
-    expect(text).toMatch(/exactly one of.*source.*source_app/i);
+    expect(res.isError).not.toBe(true);
+    const body = parseStructured(res);
+    expect(body.turns).toHaveLength(0);
+    expect(body.source_resolved).toBeNull();
+    expect(body.source_app_resolved).toBeUndefined();
+    expect(body.warnings.some((w) => /no captured sessions.*last 24h/i.test(w))).toBe(true);
   });
 
   it('rejects count: 0 via schema validation (NOT a clamp — hard reject)', async () => {
