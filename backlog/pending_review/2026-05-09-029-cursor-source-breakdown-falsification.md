@@ -1,7 +1,7 @@
 ---
 id: 2026-05-09-029-cursor-source-breakdown-falsification
 title: "Cursor `source_breakdown` miss — 3-way falsification + targeted fix at the right layer"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-05-09
@@ -9,9 +9,87 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-09T21:39:03Z"
 branch: "agent/cursor-source-breakdown-falsification"
 worktree: "~/Desktop/Project_echo--cursor-source-breakdown-falsification"
-head_sha: ""
+head_sha: "8b36287504405068e4dbf4ec5d6498cd48a52bab"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Phase 1 finding (3-way falsification, concrete numbers in run log): bucket
+  (c) Truncation. Capture is healthy (12 cursor atoms in echo.db for the test
+  composer); clustering is correct given the cursor adapter's narrow artifact
+  emission (cursor atoms only emit `conversation:cursor:<composer_id>`, no
+  shared file/repo with claude_code/git/codex, so they form a sibling
+  cluster); default limit=20 drops the cursor cluster entirely from the
+  response — `cluster[rank=1].source_breakdown` ends up reporting only
+  `{claude_code, git}`, the journal-reported false negative.
+
+  Phase 2 fix: trace/index.ts populates a new optional field
+  `Truncation.source_breakdown` computed from countByApp(allAtomsInWindow)
+  BEFORE rank-and-truncate. Per-cluster source_breakdown unchanged.
+  Permissive z.record outputSchema accepts the new field with no MCP
+  schema migration. Verified post-fix on real echo.db via the unit-test
+  seam: `truncation.source_breakdown = {cursor:16, git:7, claude_code:19,
+  codex:6}` on a window where rank-1's cluster source_breakdown is
+  `{claude_code:19, git:7}`.
+
+  Files changed (4 total, 2 outside files_to_modify with item 028 precedent):
+    - src/trace/index.ts (in scope) — populate-line + comment.
+    - src/trace/types.ts (out of scope, mechanically required by acceptance 2c) —
+      extend Truncation interface with optional source_breakdown.
+    - tests/mcp/tools/recent-work-context.test.ts (in scope per Phase 4
+      truncation-bucket mapping; actual file is one level deeper than the
+      spec wrote — `tests/mcp/tools/...` vs `tests/mcp/...`. Took the
+      existing repo layout as the canonical location).
+    - tests/trace/build.test.ts (out of scope, mechanical strict-equality
+      fallout from Truncation widen — same as item 028's review_notes).
+
+  Three reviewer judgment calls flagged for explicit eyes:
+    (1) **File-mapping divergence for bucket (c).** Spec text mapped (c) to
+        `src/mcp/tools/recent-work-context.ts`; I picked `src/trace/index.ts`
+        instead because the truncation field is constructed inside
+        buildRecentWorkContext (the wire-layer file has no access to
+        pre-truncate atoms without redoing the storage query + normalize
+        pass). files_to_modify lists trace/index.ts as one of three options
+        — picking it is in-bounds. Documented in run log Phase 1 verdict.
+    (2) **Phase 3 wording vs bucket (c).** Spec phrased Phase 3 as
+        "the most recent activity-dominant cluster's source_breakdown
+        reports cursor: ≥1." That is bucket-(b)-shaped acceptance language.
+        For my bucket-(c) fix, cursor remains structurally in a sibling
+        cluster (it would take cursor-adapter enrichment OR cluster-builder
+        edge-rule changes — both expressly out-of-scope) so cluster[rank=1]
+        still won't list cursor. The bucket-(c) Phase 3 check lives on the
+        new field: `truncation.source_breakdown.cursor ≥ 1`. The journal-
+        reported false negative ("ECHO doesn't see Cursor") IS closed at
+        the response level — consumer reads `truncation.source_breakdown`
+        and gets the right answer. Reviewer call: does this satisfy intent?
+    (3) **Synthetic-fixture regression test instead of real-spill fixture.**
+        Acceptance 4 asks for a real-`echo.db` fixture per item 028's
+        precedent. 028's reasoning was envelope-byte-size shape-density —
+        synthetic atoms missed real-shape regressions. My bug class is
+        truncation arithmetic, not shape-density: a synthetic 3-cluster
+        scenario reproduces the bug exactly (test fails on revert, proven
+        in run log). Real-DB fixture would be marginal here and would
+        bring brittleness (paths, DB-state coupling). Documented and open
+        to swapping if reviewer prefers the precedent.
+
+  Phase 3 wire-path verification deferred to founder post-merge: running
+  daemon is on `main` (pre-fix), so a live `mcp__echo__get_recent_work_context()`
+  call right now would not yet exhibit the new field. Procedure post-merge:
+  `launchctl kickstart -k gui/$(id -u)/com.echo.daemon` → call from any
+  client → confirm `response.truncation.source_breakdown` is present and
+  reports cursor when Cursor was active in the 4h window.
+
+  030-deferral observation per acceptance 8(e): Phase 1 measurement of the
+  test composer (an agent-mode composer with messageRequestContext: rows
+  AND composerData/bubbleId rows) showed legacy bubbleId capture is
+  active but cadence-limited (12 atoms captured at composer creation, ~52
+  subsequent bubble pairs over 80 min did not produce additional events).
+  This points at a capture-cadence question (extractor debounce / WAL
+  poll), NOT an agentKv: schema gap. Item 030 (agentKv: extraction)
+  remains deferred per the spec's measurement-gate; if dogfooding
+  surfaces ongoing capture-cadence shortfalls, that's its own item.
+
+  Stack: 568 tests pass, 21 skipped, 0 failed. lint + typecheck clean.
+  Regression test is load-bearing — fails on revert of trace/index.ts
+  populate-line (verified manually).
 review_notes: ""
 spec_refs:
   - src/trace/index.ts
