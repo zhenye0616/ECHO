@@ -35,6 +35,16 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - `wiki/product/v1-spec.md` — added "Known V1 Limitations" subsection naming this gap
 - `backlog/_followups.md` (this file) — this section + de-prioritized the rewrite from the V1.6 priority list in the item 017 kill note below
 
+### MCP retrieval — long-turn elision + envelope caps (review / handoff risk)
+
+**Status:** known limitation in V1, not a capture bug. **Surfaced 2026-05-09** during cross-session review (Claude Code strategist thread `71b36548-cf1d-4fe5-9370-b0317f9c4ac0`): `tail_session` returned a load-bearing assistant turn with thousands of characters replaced by a middle elision marker (`bytes_elided` / `…[N chars elided]…`); the full turn text was recoverable only from the source JSONL on disk (`~/.claude/projects/...`), not from the MCP response alone.
+
+**Why it matters:** Any workflow that treats MCP output as the authoritative transcript—second-agent review, strategist handoffs, “what did the other session conclude?”—can miss middle paragraphs, not just tails. Same class of risk applies to `get_recent_work_context` (cluster / atom count limits, dropped clusters, storage overfetch caps, skeleton/minimal projection) and substring paging on `search_memories`.
+
+**Mitigations today:** Read the underlying capture file (per-app JSONL / SQLite) for disputes; narrow time windows and raise `count` / limits where the wire allows; chain multiple queries instead of assuming one call is complete.
+
+**Candidate backlog (founder/strategist):** Make caps and elision behavior obvious in tool docs or responses; consider `tail_session` pagination / cursor semantics for “next chunk of same turn”; consider a trusted-local “no elide” or debug shape; longer-term alignment with a `get_atom(id, fields?)`-style primitive (already hinted in the item 017 kill note).
+
 ---
 
 ## ❌ Killed (won't ship)
