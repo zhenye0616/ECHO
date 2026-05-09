@@ -543,6 +543,9 @@ dogfooding day 1</a></li>
 id="toc-pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">2026-05-08
 17:01–17:03 PDT — V1.5 full-halt live test (post-028 +
 post-V1.5.6)</a></li>
+<li><a href="#dogfooding-day-3-post-v1.5-promotion-demo-video-planning"
+id="toc-dogfooding-day-3-post-v1.5-promotion-demo-video-planning">2026-05-09
+— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</a></li>
 </ul></li>
 <li><a href="#aggregated-learnings-filled-at-end-of-window"
 id="toc-aggregated-learnings-filled-at-end-of-window">Aggregated
@@ -3780,6 +3783,109 @@ presence check into the resume-call ritual (“is every expected
 source_app present in the window?”) — the 7-day-stale cursor capture
 would surface earlier with a <code>source_breakdown</code> floor
 expectation. Don’t design fixes here; observation only.</li>
+</ul>
+<h3
+id="dogfooding-day-3-post-v1.5-promotion-demo-video-planning">2026-05-09
+— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</h3>
+<h4
+id="pdt-claude-code-use-echo-to-see-where-we-left-off-resume-call">2026-05-09
+13:41 PDT — Claude Code “use echo to see where we left off” resume
+call</h4>
+<ul>
+<li><strong>Trigger:</strong> founder opened a fresh CC session: “use
+echo to see where we left off.” Classic resume-call shape, no item
+context, no other args. Same shape as the 2026-05-08 23:32 PDT entry
+above.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>get_recent_work_context()</code> — all defaults (since = now −
+4h, until = now, no artifact_hint, format=minimal, limit=20).</li>
+<li><code>get_recent_work_context(window_hours=24, format="skeleton")</code>
+— second attempt after the first returned empty; <strong>passed
+<code>window_hours</code> as string by mistake →
+InputValidationError</strong> (zod expected number).</li>
+<li><code>tail_session()</code> — no args; <strong>rejected:
+“tail_session requires exactly one of <code>source</code> or
+<code>source_app</code>”</strong>.</li>
+<li><code>get_recent_work_context(since="2026-05-07T00:00:00", until="2026-05-09T23:59:59", format="skeleton")</code>
+— explicit window since the implicit 4h was empty.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>Call 1: 0 clusters, 0 atoms, 0 warnings. Window was
+<code>2026-05-09T16:41:23.575Z → 20:41:23.575Z</code> (09:41 → 13:41
+PDT) — quiet stretch since the 08:44 PDT message earlier this morning,
+so empty is <em>correct</em>.</li>
+<li>Call 2: schema error (string vs number). My fault for not consulting
+the schema before invoking; the deferred-tool registry hadn’t loaded the
+full schema for <code>get_recent_work_context</code> yet.</li>
+<li>Call 3: schema-enforced rejection — clean, helpful error
+message.</li>
+<li>Call 4 (the actually useful one): 1 cluster
+(<code>ctx_311f37f5</code>) of 4 returned, 20/200 atoms,
+<code>source_breakdown={claude_code:123, git:59}</code>,
+<code>time_range:{from:2026-05-08T20:59:08Z, to:2026-05-09T08:44:50Z}</code>,
+label “discussion about Project_echo”,
+rank_reasons=<code>["has_open_loop","dense"]</code>. 30
+<code>open_loop_hints</code> (16 omitted), most marked
+<code>resolved:true</code>. Atoms surfaced this morning’s V1.5
+finalization commits (<code>a1ec2b0d</code> kill 017,
+<code>099330d8</code> BACKLOG cleanup, <code>1d2d35e2</code> strategist
+promotion, <code>fa0b7f70</code> HTML twin collapsibles,
+<code>a7bdd4b8</code> Cursor demotion) and the founder’s open-loop
+messages: “is the hotkey overlay ready besides the UI?” (08:39 PDT) and
+“next goal is to have a product ready for a demo video… need to have a
+genuine magic moment as a customer so i can film the product demo video”
+(08:44 PDT).</li>
+<li>Three warnings on Call 4: (a) limit dropped 3 entire clusters; (b)
+storage-cap hit, atoms in window may be silently truncated; (c)
+<strong><code>since</code>/<code>until</code> lacked TZ specifier and
+was parsed as local time</strong> — the V1.5.7 TZ-warning patch fired
+exactly as designed.</li>
+</ul></li>
+<li><strong>Sources:</strong> Call 4 atoms came entirely from
+<code>claude_code</code> jsonl (sessions <code>2077c6ef-...</code> and
+<code>f79df4b5-...</code> under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>) +
+<code>git</code> commits on this repo. <strong>No <code>cursor</code> /
+<code>codex</code> atoms</strong> — consistent with cursor capture being
+known-degraded V1 surface (item from <code>961fe14</code>) and no codex
+activity since last night. Cross-checked against
+<code>git log --oneline -5</code> and SHA prefixes in atoms matched
+<code>main</code> exactly.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the <em>answer</em> was right
+(Call 4 surfaced exactly the open loops the founder cared about), but it
+took <strong>4 calls and 2 schema errors</strong> to get there. Default
+4h window was empty (correct, but unhelpful for resume), and the natural
+recovery instinct (“widen to 24h”) tripped on the
+<code>window_hours</code> type and a missed-required-arg on
+<code>tail_session</code>. The TZ warning fired correctly and I noted it
+for future invocations.</li>
+<li><strong>Note:</strong> <strong>Resume-call ergonomics gap.</strong>
+The <code>get_recent_work_context()</code> no-args path is sized for
+“what just happened in the last 4h” — but the most common resume-call
+shape is “I came back after a quiet stretch, what’s the most recent live
+cluster?” Today there was a ~5h quiet stretch between 08:44 PDT (last
+message) and 13:41 PDT (this call); default 4h returned empty even
+though the answer was sitting one hour back. The 2026-05-08 23:32 PDT
+entry above hit the same 4h-window and got lucky because activity was
+inside the window; today exposed the failure mode. Schema friction
+(string vs number, <code>tail_session</code> missing required arg)
+compounded — both errors were schema-validatable and the AI client could
+have caught them pre-flight if the deferred-tool schemas were loaded
+eagerly.</li>
+<li><strong>Conjecture:</strong> (observation-only, do not design fixes
+here) — two separate observations worth carrying to the next
+end-of-window synthesis: (1) <strong>resume-call ergonomics</strong> —
+for the no-args <code>get_recent_work_context()</code> path
+specifically, an “auto-expand if empty” or a “look-back to most-recent
+cluster” mode would have made this a 1-call resume instead of 4. The
+skeleton format is the right cost shape; the default-window picker is
+what bit. (2) <strong>TZ-warning UX</strong> — the warning fired but
+it’s an <em>advisory</em> on a successful response; future resume calls
+might want the warning escalated to a soft hint in the cluster label
+(“warning: query window crossed local-midnight boundary, atoms may have
+shifted”). Don’t design fixes here.</li>
 </ul>
 <hr />
 <h2 id="aggregated-learnings-filled-at-end-of-window">Aggregated
