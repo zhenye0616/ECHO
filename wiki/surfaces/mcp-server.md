@@ -34,22 +34,23 @@ Three reasons:
 
 ## Transport, Binding, Port
 
-- **Transport:** Streamable HTTP/SSE via `@modelcontextprotocol/sdk`'s `StreamableHTTPServerTransport`. Stdio is deliberately unused — the daemon is already a long-lived singleton, so spawn-per-client doesn't fit.
+- **Transport:** Stateless StreamableHTTP via `@modelcontextprotocol/sdk`'s `StreamableHTTPServerTransport`, configured with `sessionIdGenerator: undefined` and `enableJsonResponse: true` (item 027). Each unary tool call is independent — no `Mcp-Session-Id` is issued, none is required, none is rejected if a stale one is sent. This eliminates the post-daemon-restart failure mode where MCP clients (Codex CLI especially) cached a session ID across a restart and got `400 Bad Request: no active session` from the next call. Stdio is deliberately unused — the daemon is already a long-lived singleton, so spawn-per-client doesn't fit.
 - **Host:** `127.0.0.1` only. Never `0.0.0.0`. The transport additionally enables `enableDnsRebindingProtection` with `allowedHosts: ['127.0.0.1:<port>', 'localhost:<port>']`, so a malicious page can't trick a browser into hitting the daemon.
 - **Port:** default `38478`. Override via env `ECHO_MCP_PORT`. Setting `ECHO_MCP_PORT=0` lets the kernel pick a free port (used by tests for parallel safety).
 - **URL:** `http://<host>:<port>/mcp`. This is what AI client config files point at.
 
 ## Tools Currently Registered
 
-Three tools are registered on every session at session creation:
+Four tools are registered per request (stateless transport — no session ties):
 
 | Tool | Purpose |
 |---|---|
-| [[mcp-search-memories\|`search_memories`]] | Retrieval over captured events — the V1 raw-event search tool |
+| [[mcp-search-memories\|`search_memories`]] | Retrieval over captured events — the V1 raw-event substring search tool |
 | [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 clustered context: atoms joined by shared artifact identity into coherent work threads |
+| [[mcp-tail-session\|`tail_session`]] | V1.5.4 cheap exact-fetch primitive — N most-recent atoms from a single named `source` (or auto-resolved by `source_app`) |
 | `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` |
 
-`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search). `get_recent_work_context` closes the V1.5 magic gap — instead of returning a flat event list, it returns clusters of related atoms joined automatically by what the user has been touching.
+`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search). `get_recent_work_context` closes the V1.5 magic gap — instead of returning a flat event list, it returns clusters of related atoms joined automatically by what the user has been touching. `tail_session` is the missing cheap counterpart: when an AI client wants "the last 3 turns from a specific Codex session," neither paraphrased substring search nor clustered-context retrieval is the right shape; `tail_session` returns exactly that, in < 10 kB typically.
 
 ## Tool Registration Pattern
 
@@ -78,19 +79,21 @@ The `content` text field stays for compat with clients that only read text conte
 
 **Schema scoping decision (item 025).** Small response shapes (`echo_ping`, `search_memories`) are mirrored exactly. The deeply nested cluster/atom/edge bodies inside `get_recent_work_context` use permissive `z.record(z.string(), z.unknown())` / `z.array(z.unknown())` because their internal contract is still moving (items 016–022 reshape them on most weeks); top-level keys (`schema_version: z.literal(1)`, `tool: z.literal('get_recent_work_context')`, `query`, `clusters`, `atoms`, `truncation`, `warnings`) are exact. An exact-everywhere schema would reject every real response at validation time the next week trace internals shift.
 
-**`readOnlyHint: true` on all three.** All current tools are pure-read (no `storage.append` calls). The hint lets MCP clients render and route them as safe-by-default. Codex's 2026-05-08 13:25 PDT review settled the question of whether `echo_ping` should instead be reclassified as an MCP resource: stay a tool. Resources are application-controlled; tools are model-controlled. A model-invoked health check is a tool.
+**`readOnlyHint: true` on all four.** All current tools are pure-read (no `storage.append` calls). The hint lets MCP clients render and route them as safe-by-default. Codex's 2026-05-08 13:25 PDT review settled the question of whether `echo_ping` should instead be reclassified as an MCP resource: stay a tool. Resources are application-controlled; tools are model-controlled. A model-invoked health check is a tool.
 
 The [[storage|`Storage`]] instance is passed into the tool's `register*` function at session-creation time, so handlers can `await storage.query(...)` without a global. This is the dependency-injection seam that lets tests run with `MemoryStorage` and production runs with `SqliteStorage`.
 
-## Sessions
+## Stateless Per-Request Transport (item 027)
 
-Each MCP client session gets its own `(McpServer, StreamableHTTPServerTransport)` pair. Sessions are tracked in a `Map<sessionId, Session>` keyed on the `mcp-session-id` header that the SDK assigns on the initialize call:
+Every tool invocation is a self-contained HTTP request. The server creates a fresh `(McpServer, StreamableHTTPServerTransport)` pair, dispatches the request, and tears the pair down at end-of-request. There is no `Map<sessionId, Session>`, no `Mcp-Session-Id` header generation, no `onsessionclosed` handler — the SDK transport runs in JSON-response mode (`enableJsonResponse: true`) and per-request mode (`sessionIdGenerator: undefined`). A stale `Mcp-Session-Id` header from a client that survived a daemon restart is silently ignored.
 
-- Initialize request → spin up a new session, register tools, store under the SDK-generated session ID.
-- Subsequent requests with `mcp-session-id` → routed to the matching session.
-- `onsessionclosed` from the transport → `session.mcp.close()` and drop from the map.
+Why this shape:
+- ECHO's tools are all pure-read (`readOnlyHint: true`); no per-session state to retain across calls.
+- The pre-027 stateful transport caused a known failure: a Codex CLI session that called ECHO at 20:12 UTC, then encountered a daemon restart at 20:22 UTC, retained its `Mcp-Session-Id` and got `400 Bad Request: no active session` from the next call. Stateless dispatch eliminates the failure mode without loss of capability.
+- Bodies are pre-parsed in the HTTP listener with a 4 MB cap (413 on overflow).
+- DNS-rebinding protection still applies per request.
 
-Multiple clients = multiple sessions, each with isolated state. Bodies are pre-parsed in the HTTP listener with a 4 MB cap (413 on overflow).
+Multiple clients = multiple concurrent requests; isolation is per-request rather than per-session, but the observable behavior to AI clients is identical for unary tool calls.
 
 ## Lifecycle Integration
 
@@ -127,8 +130,9 @@ If MCP adoption stalls (low probability but non-zero), the desktop-AI ingestion 
 
 ## Related
 
-- [[mcp-search-memories]] — the V1 raw-event retrieval tool
+- [[mcp-search-memories]] — the V1 raw-event substring retrieval tool
 - [[mcp-recent-work-context]] — the V1.5 clustered-context tool
+- [[mcp-tail-session]] — the V1.5.4 cheap exact-fetch tool
 - [[work-trace]] — the layer that powers `get_recent_work_context`
 - [[normalization]] — the layer that produces the atoms consumers see
 - [[storage]] — the substrate this server queries

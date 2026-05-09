@@ -2,9 +2,9 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "wave-3-shipped-restructured",
-    "generated": "2026-05-01",
-    "notes": "Restructured 2026-05-01 from concepts/entities/sources/analyses to product/principles/architecture/capture/surfaces/research/operating-model. Added status: shipped|planned to every entry. See raw/internal/decisions/2026-05-01-wiki-restructure-proposal.md."
+    "version": "v1.5-shipped",
+    "generated": "2026-05-09",
+    "notes": "V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches promoted to wiki on 2026-05-09. Trace layer + retrieval reliability + envelope discipline + tail_session all shipped. See raw/internal/decisions/2026-05-06-v15-trace-layer-design.md and the V1.5 Complete block in docs/BACKLOG.md. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
   },
   "principles/compose-not-capture.md": {
     "status": "shipped",
@@ -127,7 +127,7 @@
     "status": "shipped",
     "title": "MCP Server",
     "link": "mcp-server",
-    "summary": "Local MCP server on 127.0.0.1:38478 exposing three tools (search_memories, get_recent_work_context, echo_ping) to MCP-compliant AI clients via Streamable HTTP/SSE; outputSchema + structuredContent + readOnlyHint on every tool.",
+    "summary": "Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.",
     "aliases": [
       "MCP Server",
       "Model Context Protocol Server"
@@ -307,7 +307,7 @@
     "status": "shipped",
     "title": "MCP search_memories Tool",
     "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, outputSchema + structuredContent + readOnlyHint.",
+    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, V1.5.6 wire-shape projection, V1.5.7 fs-watcher exclusion + TZ-naive warning, outputSchema + structuredContent + readOnlyHint.",
     "aliases": [
       "search_memories",
       "MCP search_memories tool",
@@ -320,11 +320,24 @@
     "status": "shipped",
     "title": "MCP get_recent_work_context Tool",
     "link": "mcp-recent-work-context",
-    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; cost-safer defaults (limit=20, format='minimal'), window_hours, resolved hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.",
+    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays, window_hours inference, resolved open-loop hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.",
     "aliases": [
       "get_recent_work_context",
       "MCP get_recent_work_context tool",
       "Recent Work Context"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-tail-session.md": {
+    "status": "shipped",
+    "title": "MCP tail_session Tool",
+    "link": "mcp-tail-session",
+    "summary": "V1.5.4 MCP cheap exact-fetch primitive — N most-recent atoms from a single named source (or auto-resolved newest session via source_app); shared composite cursor with search_memories, fs-watcher exclusion, V1.5.6 wire-shape projection, < 10kB typical response.",
+    "aliases": [
+      "tail_session",
+      "MCP tail_session tool",
+      "Tail Session"
     ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"

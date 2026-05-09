@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 48 pages · 46 shipped · 2 planned
+**Status:** 49 pages · 47 shipped · 2 planned
 
 ---
 
@@ -110,9 +110,10 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 - [[browser-extension|Browser Extension]] — Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.
 - [[hotkey-overlay|Hotkey Overlay]] *(planned)* — System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.
-- [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing three tools (search_memories, get_recent_work_context, echo_ping) to MCP-compliant AI clients via Streamable HTTP/SSE; outputSchema + structuredContent + readOnlyHint on every tool.
-- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — V1.5 MCP tool returning clusters joined by shared artifact identity; cost-safer defaults (limit=20, format='minimal'), window_hours, resolved hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.
-- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, outputSchema + structuredContent + readOnlyHint.
+- [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.
+- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays, window_hours inference, resolved open-loop hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.
+- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, V1.5.6 wire-shape projection, V1.5.7 fs-watcher exclusion + TZ-naive warning, outputSchema + structuredContent + readOnlyHint.
+- [[mcp-tail-session|MCP tail_session Tool]] — V1.5.4 MCP cheap exact-fetch primitive — N most-recent atoms from a single named source (or auto-resolved newest session via source_app); shared composite cursor with search_memories, fs-watcher exclusion, V1.5.6 wire-shape projection, < 10kB typical response.
 
 ---
 

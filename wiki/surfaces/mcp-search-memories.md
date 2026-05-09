@@ -45,17 +45,21 @@ The substring-not-semantic clarification was added in item 022 after dogfooding 
 ```ts
 {
   matches: [
-    { id, source, timestamp, content, metadata? },
+    { id, source, timestamp, content, bytes_elided?, metadata?,
+      metadata_bytes_elided?, metadata_keys_elided?, metadata_keys_projected? },
     ...
   ],
   total_returned: number,
   limit_applied:  number,
   next_cursor:    string | null,    // always present; non-null when more rows available (item 025)
   query_echo: { query, source_app, source_prefix, since, until, limit, cursor },
+  warnings: string[],               // always present (possibly empty) — V1.5.7 Gap 6
 }
 ```
 
 The `query_echo` field returns the inputs the tool actually used after defaulting and clamping — useful for clients that want to log or surface what was searched. `source_app` and `source_prefix` are both echoed when both are passed, so consumers can see exactly which one took precedence.
+
+The per-match `bytes_elided` / `metadata_bytes_elided` / `metadata_keys_elided` / `metadata_keys_projected` fields are populated by the V1.5.6 wire-shape projector (`src/mcp/wire-shape/match.ts`) when content or specific metadata keys exceed the per-match cap (`PER_MATCH_CONTENT_CAP=2000` chars; per-key metadata cap on values like `tool_calls`). `tool_calls` is reshaped to its workflow trajectory (V1.5.6.1) instead of an opaque elision placeholder; small structured neighbours (`git_state`, `session_id`) pass verbatim. `tail_session` and `search_memories` go through the same projector — caps stay synchronized across both retrieval tools.
 
 ## `source_app` Enum (item 025)
 
@@ -88,7 +92,12 @@ The `codex` mapping is the narrow `~/.codex/sessions/` because nothing under `~/
 
 - **`limit`** defaults to `10`. Provided values are floored (non-integers like `2.7` become `2`), then clamped to `[1, 50]`. Asking for `limit: 1000` returns at most 50.
 - **`since` / `until`** are validated by a structural ISO 8601 regex (`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}`). The check is structural, not full RFC; malformed timestamps are rejected by zod before the handler runs.
+- **TZ-naive warning (V1.5.7 Gap 6).** The regex intentionally accepts strings without a TZ marker (`Z` / `±HH:MM` / `±HHMM` / `±HH`), but a naive `since` or `until` parses as local server time — silently expands or contracts the window by hours on a non-UTC machine. The handler emits a `warnings[]` advisory ("input.since or input.until lacks a TZ specifier and was parsed as local time; pass an explicit Z or +HH:MM to avoid ambiguity") rather than reject. Same warning fires from `get_recent_work_context`. Single string literal across both tools so a multi-tool trace can grep for it.
 - **`query` / `source_prefix`** have no length cap and no normalization beyond `toLowerCase()` for `query` matching.
+
+### fs-watcher exclusion (V1.5.7 Gap 3)
+
+Storage rows where `metadata.surface === 'fs'` are raw fs-watcher meta-events (`{event_type:"change", path, mtime, size}` shape) — capture-implementation detail, not user-facing content. The handler's [[storage|`QueryFilter`]] always passes `exclude_metadata_surface: ['fs']`. Pre-V1.5.7, `search_memories(source_app='cursor')` could silently return hundreds of fs change events when the cursor extractor was stale, even though the AI client wanted conversation atoms. The exclusion mirrors the same discipline `tail_session` and `get_recent_work_context` already enforced. Conversation atoms riding the same `fs:/Users/.../Cursor/` source prefix carry richer per-extractor metadata (no `surface: 'fs'`), so they're unaffected.
 
 ## Retrieval Behavior
 
