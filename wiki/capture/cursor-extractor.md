@@ -1,5 +1,6 @@
 ---
 status: shipped
+capture_status: degraded
 topic: Architecture
 subtopic: Capture Surfaces
 aliases:
@@ -9,6 +10,8 @@ aliases:
 ---
 
 # Cursor Extractor
+
+> ⚠️ **Capture degraded since 2026-05-01.** Cursor migrated chat storage from `bubbleId:` / `composerData:` (which this extractor reads) to `agentKv:blob:` / `messageRequestContext:` (not yet implemented). New conversations after 2026-05-01 are silently invisible to ECHO; legacy bubble rows remain readable but frozen. The V1.5.7 patch quieted the `orphan_assistant_bubble` spam, but did NOT restore live capture. Path B rewrite (`agentKv:` extractor) is **not** a current V1.6 priority — gated on a Cursor-using dogfooder entering the validation loop. Founder's personal stack is Claude Code + Codex; without daily Cursor use, capture-quality regressions can't be caught quickly enough to commit to the surface. See `backlog/_followups.md` "Cursor capture — known V1 degraded surface" for the full rationale.
 
 ## Definition
 

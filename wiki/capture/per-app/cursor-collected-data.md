@@ -1,5 +1,6 @@
 ---
 status: shipped
+capture_status: degraded
 topic: Architecture
 subtopic: Per-App Data Collection
 aliases:
@@ -9,6 +10,8 @@ aliases:
 ---
 
 # Cursor — Collected Data Reference
+
+> ⚠️ **Capture degraded since 2026-05-01.** Cursor's `cursorDiskKV` chat storage migrated from `bubbleId:` / `composerData:` (documented below) to `agentKv:blob:` / `messageRequestContext:`. The reference below describes what the *legacy* layout contains, which is what ECHO's V1 extractor reads. Conversations created or extended after 2026-05-01 live in `agentKv:` rows and are silently invisible to ECHO until a new extractor lands. See [[cursor-extractor]] for status; see `backlog/_followups.md` "Cursor capture — known V1 degraded surface" for why the rewrite is gated on cohort dogfooding signal rather than scheduled for V1.6.
 
 A field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it ends up as in the unified `CaptureEvent`. This is reference documentation for "what context do I actually have?" — not a strategic decision page. The *mechanics* of how the watcher and parser work live in [[cursor-extractor]]; this page is about the **data**.
 

@@ -39,13 +39,17 @@ Architectural commitment: [[compose-not-capture]].
 
 | # | Tool | Integration | Role | Effort |
 |---|---|---|---|---|
-| 1 | Cursor | MCP server | Production tool — code editor | ~3 days |
+| 1 | Cursor | MCP server | Production tool — code editor (capture **currently degraded** — see Known V1 Limitations) | ~3 days |
 | 2 | Claude Code | MCP server | Production AI — terminal coding | ~2 days (overlap with Cursor) |
 | 3 | GitHub | REST + GraphQL API | Code, PRs, issues | ~5 days |
 | 4 | Slack | API + Events | Team comms — per-issue context | ~5 days |
 | 5 | Web AI extension | Already built | Claude.ai + ChatGPT + Gemini chat history | 0 (upgrade only) |
 
 See [[bundle-decision]] for why these and why not Zoom / email.
+
+### Known V1 Limitations
+
+- **Cursor capture degraded since 2026-05-01.** Cursor migrated chat storage from `bubbleId:` / `composerData:` to `agentKv:` / `messageRequestContext:`; ECHO's V1 [[cursor-extractor]] reads only the legacy schema, so conversations created or extended after 2026-05-01 are silently invisible. Legacy rows remain readable but frozen. The V1.5.7 patch quieted the `orphan_assistant_bubble` spam this caused; **it did not restore live capture**. The `agentKv:` rewrite is intentionally **not** scheduled for V1.6 — gated on a Cursor-using dogfooder entering the validation loop, since the founder's personal stack is Claude Code + Codex and capture-quality regressions on a non-dogfooded surface go undetected (this one went 8 days). The bundle commitment to Cursor stands; the validation loop to maintain it does not yet. Track in `backlog/_followups.md` "Cursor capture — known V1 degraded surface".
 
 ## Killer Demo
 

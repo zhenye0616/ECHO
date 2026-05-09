@@ -4,6 +4,37 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ---
 
+## ⚠️ Known V1 degraded surfaces
+
+### Cursor capture — `agentKv:` migration (gated, not scheduled)
+
+**Status:** known-degraded surface in V1, intentionally not scheduled for V1.6 rewrite. Effective 2026-05-01 — Cursor migrated chat storage from `bubbleId:` / `composerData:` (which ECHO's `src/capture/extractors/cursor.ts` reads) to `agentKv:blob:` / `messageRequestContext:`. New conversations after that date are silently invisible to ECHO; legacy bubble rows remain readable but frozen. V1.5.7 (commit `4c6915f`) quieted the `orphan_assistant_bubble` warning spam this caused but did NOT restore live capture.
+
+**Why not scheduled for V1.6:**
+
+1. **Founder's personal stack is Claude Code + Codex, no Cursor.** Cursor capture-quality regressions on a non-dogfooded surface go undetected — this one went 8 days before the V1.5.7 round caught it through infrastructure dogfooding rather than missing-data signal. Shipping the rewrite without a daily-Cursor user in the validation loop just guarantees the next silent break.
+2. **Cursor remains in the V1 bundle commitment.** The cohort (indie AI builders) skews Cursor-heavy, so removing Cursor from `wiki/product/v1-spec.md` is a strategic retreat unjustified by founder usage alone. Demoting capture to "known degraded" preserves the bundle while being honest about the gap.
+3. **Reversible by design.** Keep ~787 LOC of cursor extractor + 116 LOC adapter + ~933 LOC tests + 345 LOC wiki pages in place; flip back to scheduled priority when a Cursor-using cohort member enters the validation loop.
+
+**Reactivation criteria:** any one of the following gates the `agentKv:` rewrite back into V1.6 priority:
+- A Cursor-using cohort member (indie AI builder) commits to ≥2 weeks of daily Cursor + ECHO dogfooding with journal entries on the `mcp-interactions-journal.md` cadence
+- The founder's stack changes such that they personally use Cursor as a primary AI-coding tool
+- A paying-customer signal: ≥1 prospective $25/mo customer flags Cursor capture as their reason to wait
+
+**What stays untouched until reactivation:**
+- All Cursor source code (`src/capture/extractors/cursor.ts`, `src/normalize/adapters/cursor.ts`)
+- All Cursor tests + fixtures
+- All Cursor wiki pages (now carrying `capture_status: degraded` frontmatter + a top-of-page warning callout)
+- Cursor in `SOURCE_APP_VALUES` + the source-app→prefix map
+- The `bundle-decision.md`, `target-cohort-indie-ai-builders.md`, `narrowest-v1-scope.md` strategic commitments
+
+**What changed in this designation pass (2026-05-09):**
+- `wiki/capture/cursor-extractor.md` + `wiki/capture/per-app/cursor-collected-data.md` — added `capture_status: degraded` frontmatter + top-of-page warning callout
+- `wiki/product/v1-spec.md` — added "Known V1 Limitations" subsection naming this gap
+- `backlog/_followups.md` (this file) — this section + de-prioritized the rewrite from the V1.6 priority list in the item 017 kill note below
+
+---
+
 ## ❌ Killed (won't ship)
 
 ### Item 017 — "Wire normalizer into MCP `search_memories` response shape"
@@ -18,7 +49,7 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 2. **Reintroduces V1.5 envelope risk.** Normalized atoms add `actors`, `artifacts[]`, `provenance`, `context`, `open_loop_hints[]` per match. The V1.5.6 wire-shape projector (`src/mcp/wire-shape/match.ts`) caps `content` and per-key metadata; it has no slots for the normalized sub-fields. Adding format dispatch either expands the projector (more cap surface to maintain) or lets the budget creep back, undoing V1.5.5/V1.5.6/V1.5.7's three rounds of envelope-overflow closures.
 3. **No surfaced consumer demand.** The V1.5 dogfooding journal entries (16:22 / 22:40 / 00:30 / 02:05 PDT through 17:01 PDT) flag substring-tool pain as envelope overflow, fs-watcher noise, TZ-naive parsing, and substring-vs-semantic confusion — all closed. None ask for normalized-from-substring. The 016-era promise predates the trace layer; the substrate it was solving for now exists.
 
-**Reopen criteria:** a concrete consumer (not an abstract API improvement) asks for substring + normalized in one call AND the chained `search_memories` → `tail_session` path is observably insufficient for that use case. Reopen as a narrow `format: 'normalized'` opt-in (no `'both'` — that's the schema-bifurcation trap), single non-default mode, projector-capped, default stays `'raw'`. ~0.5d. Until that surfaces, save the spec slot for V1.6 priorities the journals actually flagged: cursor `agentKv:` extractor rewrite (V1.5.7 Gap 2 Layer 1, real broken capture) and `get_atom(id, fields?)` deep-dive primitive (the wire-shape elision pattern is implicitly waiting for it).
+**Reopen criteria:** a concrete consumer (not an abstract API improvement) asks for substring + normalized in one call AND the chained `search_memories` → `tail_session` path is observably insufficient for that use case. Reopen as a narrow `format: 'normalized'` opt-in (no `'both'` — that's the schema-bifurcation trap), single non-default mode, projector-capped, default stays `'raw'`. ~0.5d. Until that surfaces, save the spec slot for the V1.6 priority the journals actually flagged: `get_atom(id, fields?)` deep-dive primitive (the wire-shape elision pattern is implicitly waiting for it). The cursor `agentKv:` extractor rewrite was previously also in this V1.6 list but has been demoted to a gated known-degraded surface — see "Cursor capture — `agentKv:` migration" above.
 
 **Stale references** (historical, do not edit):
 - `backlog/complete/2026-05-06-016-read-time-normalizer.md:30, 116, 421, 444` — original deferral

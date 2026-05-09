@@ -252,9 +252,10 @@
   },
   "capture/cursor-extractor.md": {
     "status": "shipped",
+    "capture_status": "degraded",
     "title": "Cursor Extractor",
     "link": "cursor-extractor",
-    "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents.",
+    "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents. Capture degraded since 2026-05-01 — Cursor migrated to agentKv: schema; rewrite gated on cohort dogfooder, not scheduled for V1.6.",
     "aliases": [
       "Cursor Extractor",
       "cursor-extractor",
@@ -505,9 +506,10 @@
   },
   "capture/per-app/cursor-collected-data.md": {
     "status": "shipped",
+    "capture_status": "degraded",
     "title": "Cursor \u2014 Collected Data Reference",
     "link": "cursor-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from Cursor's local data, where it lives, and what it becomes in CaptureEvent.",
+    "summary": "Field-by-field record of what ECHO reads from Cursor's legacy bubbleId: / composerData: schema, where it lives, and what it becomes in CaptureEvent. Capture degraded since 2026-05-01 \u2014 agentKv: migration not yet implemented.",
     "aliases": [
       "Cursor Data Collection",
       "What ECHO Collects from Cursor",
