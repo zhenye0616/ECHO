@@ -1314,3 +1314,157 @@ describe('no-args resume auto-expand (V1.5.7 polish 2026-05-09)', () => {
     expect(spanH).toBeCloseTo(24, 1);
   });
 });
+
+// Item 029: window-wide source_breakdown computed pre-truncate, so a consumer
+// can answer "was source X active in this window?" even when X's sibling
+// cluster got dropped by `limit`. Reproduces the journal-reported bug:
+// `cluster[rank=1].source_breakdown` showed only `{claude_code, git}` while
+// cursor was active in a sibling cluster that limit=20 dropped entirely.
+describe('truncation.source_breakdown (item 029)', () => {
+  const HOME = process.env['HOME'] ?? '/Users/test';
+  const SINCE = '2026-05-09T20:00:00.000Z';
+  const UNTIL = '2026-05-09T22:00:00.000Z';
+
+  function tsAt(minutesAfterSince: number): string {
+    return new Date(
+      Date.parse(SINCE) + minutesAfterSince * 60_000,
+    ).toISOString();
+  }
+
+  function ccEventClustering(
+    session: string,
+    turn: number,
+    minutesAfter: number,
+    file: string,
+  ): Omit<CaptureEvent, 'id'> {
+    return {
+      source: `fs:${HOME}/.claude/projects/abc/${session}.jsonl`,
+      timestamp: tsAt(minutesAfter),
+      content: `USER: q${turn}\n\nASSISTANT: a${turn}`,
+      metadata: {
+        session_id: session,
+        turn_index: turn,
+        files_referenced: [file],
+        // No git_state / repo_root → cluster topology is driven solely by the
+        // file artifact. Keeps the three source clusters disjoint without
+        // accidentally cross-joining via repo.
+      },
+    };
+  }
+
+  function cursorEventClustering(
+    composerId: string,
+    turn: number,
+    minutesAfter: number,
+  ): Omit<CaptureEvent, 'id'> {
+    return {
+      source: `fs:${HOME}/Library/Application Support/Cursor/User/globalStorage/state.vscdb`,
+      timestamp: tsAt(minutesAfter),
+      content: `USER: q${turn}\n\nASSISTANT: a${turn}`,
+      metadata: {
+        composer_id: composerId,
+        turn_index: turn,
+      },
+    };
+  }
+
+  function codexEventClustering(
+    sessionId: string,
+    turn: number,
+    minutesAfter: number,
+  ): Omit<CaptureEvent, 'id'> {
+    return {
+      source: `fs:${HOME}/.codex/sessions/${sessionId}.jsonl`,
+      timestamp: tsAt(minutesAfter),
+      content: `USER: q${turn}\n\nASSISTANT: a${turn}`,
+      metadata: {
+        session_id: sessionId,
+        turn_index: turn,
+      },
+    };
+  }
+
+  it('window-wide source_breakdown includes sources from clusters dropped by limit', async () => {
+    const store = new MemoryStorage();
+    // 3 disjoint clusters across 3 source apps:
+    //   - 6 claude_code atoms sharing one file artifact (rank-1 candidate)
+    //   - 4 cursor atoms in one composer (sibling — composer artifact only)
+    //   - 2 codex atoms in one session (sibling — conversation artifact only)
+    // No shared scope/repo across the three, so the cluster builder produces
+    // exactly three connected components. limit=2 forces truncation to drop
+    // every sibling cluster entirely (toDrop = 12-2 = 10; rank-3 [2] +
+    // rank-2 [4] = 6 fully dropped, then 4 atoms dropped from rank-1).
+    const ccFile = '/Users/test/repo/src/file.ts';
+    for (let i = 0; i < 6; i++) {
+      await store.append(ccEventClustering('cc-session', i, 30 + i, ccFile));
+    }
+    for (let i = 0; i < 4; i++) {
+      await store.append(cursorEventClustering('cur-composer-1', i, 60 + i));
+    }
+    for (let i = 0; i < 2; i++) {
+      await store.append(codexEventClustering('cx-session-1', i, 80 + i));
+    }
+
+    const r = await getRecentWorkContext(store, {
+      since: SINCE,
+      until: UNTIL,
+      limit: 2,
+      format: 'full',
+    });
+
+    // Truncation actually fires.
+    expect(r.truncation.truncated).toBe(true);
+    expect(r.truncation.atoms_total_in_window).toBe(12);
+    expect(r.truncation.clusters_total).toBe(3);
+    expect(r.truncation.clusters_returned).toBeLessThan(3);
+
+    // The returned cluster's per-cluster source_breakdown reflects ONLY its
+    // own atoms — it does NOT mention the dropped sibling sources. Pre-fix,
+    // this is the only place a consumer could read source counts, which is
+    // exactly the journal-reported false negative.
+    const clusterSb = r.clusters[0]?.source_breakdown ?? {};
+    const clusterSources = Object.keys(clusterSb);
+    expect(clusterSources.length).toBeGreaterThan(0);
+    // At least one of cursor/codex is missing from the cluster-level breakdown
+    // — otherwise truncation didn't drop a sibling, and the test premise is
+    // moot.
+    expect(
+      clusterSources.includes('cursor') && clusterSources.includes('codex'),
+    ).toBe(false);
+
+    // Window-wide source_breakdown surfaces every source that contributed
+    // atoms in (since, until), regardless of whether their cluster survived
+    // truncation. This is the load-bearing assertion — fails on revert of
+    // the trace/index.ts populate-line.
+    expect(r.truncation.source_breakdown).toBeDefined();
+    const winSb = r.truncation.source_breakdown!;
+    expect(winSb['claude_code']).toBe(6);
+    expect(winSb['cursor']).toBe(4);
+    expect(winSb['codex']).toBe(2);
+
+    // And it sums to atoms_total_in_window — invariant the consumer can rely on.
+    const winSbTotal = Object.values(winSb).reduce((a, b) => a + b, 0);
+    expect(winSbTotal).toBe(r.truncation.atoms_total_in_window);
+  });
+
+  it('window-wide source_breakdown is populated even when no truncation occurs', async () => {
+    const store = new MemoryStorage();
+    // Tiny scenario: 2 cursor atoms, well under any limit. Even though no
+    // cluster is dropped, the field still surfaces — gives consumers a stable
+    // shape to read regardless of truncation state.
+    for (let i = 0; i < 2; i++) {
+      await store.append(cursorEventClustering('cur-composer-2', i, 10 + i));
+    }
+
+    const r = await getRecentWorkContext(store, {
+      since: SINCE,
+      until: UNTIL,
+      limit: 100,
+      format: 'full',
+    });
+
+    expect(r.truncation.truncated).toBe(false);
+    expect(r.truncation.source_breakdown).toBeDefined();
+    expect(r.truncation.source_breakdown!['cursor']).toBe(2);
+  });
+});

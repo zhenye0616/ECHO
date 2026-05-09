@@ -90,7 +90,71 @@ agent_notes: |
   Stack: 568 tests pass, 21 skipped, 0 failed. lint + typecheck clean.
   Regression test is load-bearing — fails on revert of trace/index.ts
   populate-line (verified manually).
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-09 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean automatic merge against main (no overlap with post-claim
+    main edits, which were limited to journal HTML twin redesign).
+
+  Fixups applied (founder decisions, no code changes):
+  - judgment (1) accepted: bucket-(c) fix landed in src/trace/index.ts
+    (one of three files_to_modify options); architecturally correct since
+    wire layer has no pre-truncate atom access.
+  - judgment (2) accepted: "ECHO sees cursor" now lives at
+    response.truncation.source_breakdown.cursor, NOT
+    response.clusters[0].source_breakdown.cursor. Real semantic shift —
+    consumers must read both fields. Cursor-narrow-emission gap that
+    forces cursor into a sibling cluster remains (see follow-up #1).
+  - judgment (3) accepted: synthetic 3-cluster regression fixture instead
+    of real-echo.db fixture per item 028 precedent. Bug class is
+    truncation arithmetic (not envelope-byte-density), so synthetic
+    reproduces exactly; reverting populate-line at src/trace/index.ts:98
+    fails the test.
+  - Phase 3 live verification accepted as deferred-to-post-merge action:
+    `launchctl kickstart -k gui/$(id -u)/com.echo.daemon` → call
+    `mcp__echo__get_recent_work_context()` after ≥30 min Cursor activity
+    → confirm `response.truncation.source_breakdown.cursor ≥ 1`. Log in
+    dogfooding journal per the 6-field template.
+
+  Fixups deferred to follow-up items:
+  - none — all 4 fixups accepted as decisions.
+
+  Verify: 568/568 tests pass (34 files passed, 1 file skipped, 21 tests
+  skipped, 0 failed); lint and typecheck clean post-merge.
+
+  Follow-up items (non-blocking, filed in backlog/_followups.md):
+  - Cursor adapter narrow-emission enrichment — cursor atoms emit only
+    `conversation:cursor:<composer_id>`, no file/repo artifact, so
+    structurally always-sibling-clustered against claude_code/git/codex.
+    Item to enrich the cursor adapter with workspace_id-derived repo
+    artifact (or workspace.json read per _followups 2026-05-04 entry).
+  - Cursor capture-cadence gap — test composer captured 12 events in a
+    110ms initial burst but ~52 subsequent bubble pairs over 80 minutes
+    did not produce additional events. Suggests extractor debounce /
+    WAL-poll cadence issue. NOT item 030 (this is not an agentKv: schema
+    gap). Worth its own item if dogfooding signal accumulates.
+  - Real-echo.db skeleton test for truncation.source_breakdown — mirror
+    item 028's pattern with a real-DB fixture asserting the new field's
+    shape; catches future shape-density-shaped regressions.
+  - AI-client docs update — wiki MCP-tool-response-shape page should
+    call out `truncation.source_breakdown` as authoritative
+    "what sources were active in this window" with
+    `cluster.source_breakdown` as cluster-scoped. Strategist task
+    alongside the wiki demotion-reversal already in this item's
+    "After Completion" notes.
+
+  Strategist follow-ups (After Completion section):
+  - Reverse Cursor capture wiki demotion (cursor-extractor.md,
+    cursor-collected-data.md, v1-spec.md).
+  - Append [CORRECTED 2026-05-09] block to 2026-05-08 20:55 PDT journal
+    entry pointing at the decision note.
+  - Move _followups.md "Cursor capture — agentKv: migration" to
+    "Resolved (with corrected diagnosis)" section.
+  - Item 030 remains deferred: per Phase 1 measurement, agent-mode capture
+    is not insufficient — capture-cadence is the surfaced gap, not
+    schema. _followups.md note: "agentKv: extraction not needed (Phase 1
+    measurement)."
 spec_refs:
   - src/trace/index.ts
   - src/capture/extractors/cursor.ts

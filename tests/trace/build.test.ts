@@ -55,6 +55,9 @@ describe('buildRecentWorkContext', () => {
       clusters_returned: 0,
       clusters_total: 0,
       truncated: false,
+      // Item 029: window-wide source_breakdown is always present, empty when
+      // there are no atoms in window.
+      source_breakdown: {},
     });
     expect(r.warnings).toEqual([]);
     expect(r.query).toEqual({
