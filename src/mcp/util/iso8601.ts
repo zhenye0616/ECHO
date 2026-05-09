@@ -22,9 +22,15 @@ export function hasTzMarker(s: string): boolean {
 /** Returns the canonical warning string when an ISO timestamp lacks a TZ
  *  marker. Tools call this after schema validation but before the storage
  *  query, and push the result into their `warnings` array. Single string
- *  literal so consumers can grep for it across a multi-tool trace. */
+ *  literal so consumers can grep for it across a multi-tool trace.
+ *
+ *  V1.5.7 polish (2026-05-09): prefixed with `[TZ]` so the warning is
+ *  visually distinguishable from truncation/cap warnings when a busy
+ *  response stacks several into `warnings[]`. The morning's resume call
+ *  surfaced 3 warnings simultaneously (limit-dropped-clusters,
+ *  storage-cap-hit, TZ-naive) and the TZ one was easy to miss. */
 export const TZ_NAIVE_WARNING =
-  'input.since or input.until lacks a TZ specifier and was parsed as ' +
+  '[TZ] input.since or input.until lacks a TZ specifier and was parsed as ' +
   'local time; pass an explicit Z or +HH:MM to avoid ambiguity';
 
 // Basic ISO 8601 structural check: YYYY-MM-DDTHH:MM:SS(.sss)?(Z|±HH:MM)?

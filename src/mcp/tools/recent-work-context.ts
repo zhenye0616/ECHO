@@ -50,7 +50,11 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   '"where did I leave off after a break" queries, span-equal inference lets a single ' +
   'cluster bridge an overnight gap. `since` and `until` should always carry an explicit ' +
   'timezone (`Z` for UTC or `+HH:MM` offset); naive ISO strings are parsed as local ' +
-  'server time, which is rarely what an AI client intends.';
+  'server time, which is rarely what an AI client intends. NO-ARGS RESUME: when ' +
+  'called with neither `since` nor `until`, the default 4h window auto-expands to ' +
+  '24h on a single retry if the 4h pass returns 0 clusters — covers "where did I ' +
+  'leave off after a quiet stretch" without forcing the caller to pre-pick a span. ' +
+  'Auto-expand fires a `[AUTO_EXPAND]`-prefixed warning so the implicit widen is visible.';
 
 // Cost-safer defaults (item 025): every retrieval today blew the consumer's
 // 25k-char tool-result budget on first try (dogfooding 2026-05-08 entries
@@ -70,6 +74,16 @@ export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 500;
 export const DEFAULT_WINDOW_HOURS = 4;
 export const STORAGE_OVERFETCH = 10;
+
+// V1.5.7 polish (2026-05-09): no-args resume auto-expand. The 4h default
+// is right for "what just happened" but wrong for "where did I leave off
+// after a quiet stretch" — the morning's resume call returned 0 clusters
+// because the last activity was ~5h back. When the caller passes neither
+// `since` nor `until`, fall through to a single retry at this wider
+// window if the 4h pass was empty. The retry only fires on the no-args
+// shape: an explicit `since`/`until` is a deliberate window choice we
+// must respect.
+export const NO_ARGS_AUTO_EXPAND_WINDOW_HOURS = 24;
 // V1.5.6: re-export from the shared wire-shape caps table so all three
 // retrieval tools see one source of truth. Behavior unchanged from item 025.
 export const MINIMAL_CONTENT_CAP = WIRE_SHAPE_CAPS.minimal_action;
@@ -302,23 +316,18 @@ export function inferWindowHours(
   return Math.min(spanHours, 24);
 }
 
-export async function getRecentWorkContext(
+// Single-pass query + trace build. Extracted so the no-args auto-expand
+// path can call it twice (4h, then 24h) without duplicating the storage
+// query / cap-warning logic.
+async function runRecentWorkContextPass(
   storage: Storage,
-  params: RecentWorkContextParams,
-  now: Date = new Date(),
+  since: string,
+  until: string,
+  limit: number,
+  windowHours: number,
+  format: ResponseFormat,
+  artifactHint: ArtifactHint | undefined,
 ): Promise<RecentWorkContextResponse> {
-  const limit = clampLimit(params.limit);
-  const windowMs = DEFAULT_WINDOW_HOURS * 60 * 60 * 1000;
-  const until = params.until ?? now.toISOString();
-  const since = params.since ?? new Date(Date.parse(until) - windowMs).toISOString();
-  // Default flipped to 'minimal' (item 025): full content envelopes routinely
-  // exceed the consumer's 25k-char tool-result budget on first call.
-  const format: ResponseFormat = params.format ?? 'minimal';
-
-  const sinceMs = Date.parse(since);
-  const untilMs = Date.parse(until);
-  const windowHours = inferWindowHours(sinceMs, untilMs, params.window_hours);
-
   const storageCap = limit * STORAGE_OVERFETCH;
   const events = await storage.query({
     since,
@@ -340,8 +349,8 @@ export async function getRecentWorkContext(
     window_hours: windowHours,
     format,
   };
-  if (params.artifact_hint !== undefined) {
-    query.artifact_hint = params.artifact_hint;
+  if (artifactHint !== undefined) {
+    query.artifact_hint = artifactHint;
   }
 
   const response = buildRecentWorkContext(events, query, normalizeEvent);
@@ -355,6 +364,76 @@ export async function getRecentWorkContext(
       'storage cap hit (events.length === limit * STORAGE_OVERFETCH); ' +
         'atoms in window may be silently truncated. ' +
         'Raise limit or narrow (since, until) to retain them.',
+    );
+  }
+
+  return response;
+}
+
+export async function getRecentWorkContext(
+  storage: Storage,
+  params: RecentWorkContextParams,
+  now: Date = new Date(),
+): Promise<RecentWorkContextResponse> {
+  const limit = clampLimit(params.limit);
+  const windowMs = DEFAULT_WINDOW_HOURS * 60 * 60 * 1000;
+  const until = params.until ?? now.toISOString();
+  const since = params.since ?? new Date(Date.parse(until) - windowMs).toISOString();
+  // Default flipped to 'minimal' (item 025): full content envelopes routinely
+  // exceed the consumer's 25k-char tool-result budget on first call.
+  const format: ResponseFormat = params.format ?? 'minimal';
+
+  const sinceMs = Date.parse(since);
+  const untilMs = Date.parse(until);
+  const windowHours = inferWindowHours(sinceMs, untilMs, params.window_hours);
+
+  let response = await runRecentWorkContextPass(
+    storage,
+    since,
+    until,
+    limit,
+    windowHours,
+    format,
+    params.artifact_hint,
+  );
+
+  // V1.5.7 polish (2026-05-09): no-args auto-expand. The 4h default is right
+  // for "what just happened" but wrong for "where did I leave off after a
+  // quiet stretch." When the caller passed neither `since` nor `until` AND
+  // the 4h pass returned 0 clusters, retry once at 24h and annotate the
+  // response so the consumer can see the implicit window-widen.
+  // The retry preserves an explicit `window_hours` if the caller passed one;
+  // otherwise inferWindowHours re-derives it from the wider span (which caps
+  // at 24h, matching the wider until-since span). One retry, hard-bounded.
+  const isNoArgsShape = params.since === undefined && params.until === undefined;
+  if (
+    isNoArgsShape &&
+    response.clusters.length === 0 &&
+    NO_ARGS_AUTO_EXPAND_WINDOW_HOURS > DEFAULT_WINDOW_HOURS
+  ) {
+    const expandedWindowMs =
+      NO_ARGS_AUTO_EXPAND_WINDOW_HOURS * 60 * 60 * 1000;
+    const expandedSince = new Date(
+      Date.parse(until) - expandedWindowMs,
+    ).toISOString();
+    const expandedSinceMs = Date.parse(expandedSince);
+    const expandedWindowHours = inferWindowHours(
+      expandedSinceMs,
+      untilMs,
+      params.window_hours,
+    );
+    response = await runRecentWorkContextPass(
+      storage,
+      expandedSince,
+      until,
+      limit,
+      expandedWindowHours,
+      format,
+      params.artifact_hint,
+    );
+    response.warnings.push(
+      `[AUTO_EXPAND] no-args call: 4h default returned 0 clusters; auto-expanded to ${NO_ARGS_AUTO_EXPAND_WINDOW_HOURS}h. ` +
+        'Pass explicit `since`/`until` to suppress this fallback.',
     );
   }
 

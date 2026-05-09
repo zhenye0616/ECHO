@@ -501,6 +501,20 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       expect(tzWarnings).toHaveLength(1);
     });
 
+    // V1.5.7 polish (2026-05-09): warning prefixed with `[TZ]` so it's
+    // visually distinguishable from truncation/cap warnings when several
+    // stack into the same response. The morning's resume call surfaced
+    // three warnings simultaneously and the TZ one was easy to miss.
+    it('TZ warning is prefixed with [TZ] for grep-distinguishability', async () => {
+      handle = await startMcpServer(store, { port: 0 });
+      const r = await callWith({
+        since: '2026-05-06T05:00:00',
+        until: '2026-05-06T09:00:00',
+      });
+      const tzWarnings = r.warnings.filter((w) => w.startsWith('[TZ]'));
+      expect(tzWarnings).toHaveLength(1);
+    });
+
     it('a single naive input (since only or until only) still triggers the warning', async () => {
       handle = await startMcpServer(store, { port: 0 });
       const r = await callWith({
@@ -1196,5 +1210,107 @@ describe('skeleton-mode V1.5.7 cluster bounds (Gap 4)', () => {
     expect(skel.atom_ids_omitted).toBeUndefined();
     expect(skel.open_loop_hints_omitted).toBeUndefined();
     expect(skel.truncated).toBeUndefined();
+  });
+});
+
+// V1.5.7 polish (2026-05-09): no-args resume auto-expand. Pre-fix, calling
+// `getRecentWorkContext({})` after a >4h quiet stretch returned 0 clusters
+// with no recovery primitive — the morning's resume call took 4 attempts
+// to land. Post-fix, the no-args shape auto-expands to 24h on a single
+// retry when the 4h pass returns 0 clusters, and surfaces an
+// `[AUTO_EXPAND]`-prefixed warning so the implicit widen is visible.
+describe('no-args resume auto-expand (V1.5.7 polish 2026-05-09)', () => {
+  it('auto-expands to 24h when 4h returns 0 clusters and no since/until passed', async () => {
+    const store = new MemoryStorage();
+    // One conversation 6h before NOW — outside the 4h default, inside 24h.
+    const NOW_DATE = new Date('2026-05-09T13:41:00.000Z'); // ~13:41 PDT
+    const tsSixHrsBefore = '2026-05-09T07:41:00.000Z';
+    await store.append(
+      ccEvent('resume-sess', 0, tsSixHrsBefore, [TYPES_PATH], {
+        user: 'leftoff message',
+        assistant: 'noted',
+      }),
+    );
+    await store.append(
+      ccEvent('resume-sess', 1, '2026-05-09T07:42:00.000Z', [TYPES_PATH], {
+        user: 'follow-up',
+        assistant: 'kept going',
+      }),
+    );
+
+    const r = await getRecentWorkContext(store, {}, NOW_DATE);
+
+    expect(r.clusters.length).toBeGreaterThan(0);
+    const expandWarn = r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'));
+    expect(expandWarn).toBeDefined();
+    expect(expandWarn).toMatch(/4h.*0 clusters.*24h/);
+    // Final response window should reflect the expanded 24h, not 4h.
+    const sinceMs = Date.parse(r.query.since);
+    const untilMs = Date.parse(r.query.until);
+    const spanH = (untilMs - sinceMs) / 3_600_000;
+    expect(spanH).toBeCloseTo(24, 1);
+  });
+
+  it('does NOT auto-expand when caller passed an explicit since', async () => {
+    const store = new MemoryStorage();
+    const NOW_DATE = new Date('2026-05-09T13:41:00.000Z');
+    // Activity 6h before NOW — would have shown up under 24h auto-expand,
+    // but the explicit 4h `since` is the user's deliberate choice. Empty
+    // is correct.
+    await store.append(
+      ccEvent('s', 0, '2026-05-09T07:41:00.000Z', [TYPES_PATH], {
+        user: 'old',
+        assistant: 'older',
+      }),
+    );
+
+    const since = '2026-05-09T09:41:00.000Z';
+    const r = await getRecentWorkContext(store, { since }, NOW_DATE);
+
+    expect(r.clusters).toHaveLength(0);
+    expect(r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'))).toBeUndefined();
+  });
+
+  it('does NOT auto-expand when 4h pass already had clusters', async () => {
+    const store = new MemoryStorage();
+    const NOW_DATE = new Date('2026-05-09T13:41:00.000Z');
+    // Activity 1h before NOW — inside the 4h default; no expansion needed.
+    await store.append(
+      ccEvent('s', 0, '2026-05-09T12:41:00.000Z', [TYPES_PATH], {
+        user: 'recent',
+        assistant: 'fresh',
+      }),
+    );
+
+    const r = await getRecentWorkContext(store, {}, NOW_DATE);
+
+    expect(r.clusters.length).toBeGreaterThan(0);
+    expect(r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'))).toBeUndefined();
+    const spanH =
+      (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
+    expect(spanH).toBeCloseTo(4, 1);
+  });
+
+  it('still returns empty when even 24h has no activity (single retry, no infinite expand)', async () => {
+    const store = new MemoryStorage();
+    const NOW_DATE = new Date('2026-05-09T13:41:00.000Z');
+    // Activity 48h back — outside both 4h and 24h windows.
+    await store.append(
+      ccEvent('s', 0, '2026-05-07T13:41:00.000Z', [TYPES_PATH], {
+        user: 'ancient',
+        assistant: 'historical',
+      }),
+    );
+
+    const r = await getRecentWorkContext(store, {}, NOW_DATE);
+
+    expect(r.clusters).toHaveLength(0);
+    // The auto-expand warning STILL fires (the retry happened) but no
+    // further widening. Consumer can read the warning and decide whether
+    // to widen further with explicit since/until.
+    expect(r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'))).toBeDefined();
+    const spanH =
+      (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
+    expect(spanH).toBeCloseTo(24, 1);
   });
 });
