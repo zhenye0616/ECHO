@@ -1,3 +1,44 @@
+---
+id: 2026-05-09-029-cursor-source-breakdown-falsification
+title: "Cursor `source_breakdown` miss — 3-way falsification + targeted fix at the right layer"
+status: claimed
+priority: HIGH
+estimate: 1-1.5d
+created: 2026-05-09
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-09T21:39:03Z"
+branch: "agent/cursor-source-breakdown-falsification"
+worktree: "~/Desktop/Project_echo--cursor-source-breakdown-falsification"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+spec_refs:
+  - src/trace/index.ts
+  - src/capture/extractors/cursor.ts
+  - src/normalize/adapters/cursor.ts
+  - src/mcp/util/source-app.ts
+  - src/mcp/tools/recent-work-context.ts
+  - raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md
+  - raw/internal/dogfooding/mcp-interactions-journal.md
+  - backlog/_followups.md
+  - backlog/complete/2026-05-08-028-rwc-envelope-skeleton-format.md
+blocked_by: []
+acceptance:
+  - "**Phase 1 — Three-way falsification (read-only diagnostic, no code changes).** For a defined test window W (the agent's own active Cursor session, e.g. composer-id passed via `agent_notes`), produce a written diagnostic report in the run log answering all three questions in order: (a) **Capture:** does `echo.db` have ≥1 normalized cursor atom for the test composer in window W? Use `sqlite3 ~/Library/Application\\ Support/ECHO/echo.db \"SELECT COUNT(*), MAX(timestamp) FROM events WHERE source LIKE '%state.vscdb%' AND json_extract(metadata, '$.composer_id') = '<composer-id>' AND timestamp >= '<W.start>';\"`. (b) **Clustering:** for those captured atoms, does `getRecentWorkContext({since: W.start, until: W.end, format: 'full'})` (called via the unit test seam, NOT MCP wire) include them in the rank-1 cluster's `atom_ids[]`, OR do they sit in a sibling cluster (rank ≥ 2)? Inspect `src/trace/index.ts` cluster-building output directly. (c) **Truncation:** if cursor atoms sit in a sibling cluster, did the MCP wire-layer `limit` parameter drop that cluster? Re-run the same call via the MCP wire path with the default `limit=20` and inspect the `truncation` field in the response — `clusters_returned vs clusters_total` tells you whether truncation hid cursor activity. The diagnostic report MUST answer (a), (b), AND (c) with concrete numbers before the agent picks a fix bucket. Three separate yes/no answers, not one verdict."
+  - "**Phase 2 — Targeted fix at the surfaced layer.** Based on Phase 1 outcomes: (a) If capture is broken (no cursor atoms in `echo.db` for window W despite Cursor SQLite showing bubble writes), fix `src/capture/extractors/cursor.ts` (extractor regression). (b) If capture is fine but clustering splits cursor atoms into a sibling cluster, fix the cluster-builder's edge/join logic in `src/trace/index.ts` (likely an artifact-identity rule or edge-kind sufficiency issue — see `wiki/architecture/work-trace.md` for the design intent). (c) If capture + clustering are both fine but truncation drops the cursor cluster, fix the truncation UX in `src/mcp/tools/recent-work-context.ts` (e.g., add a `next_cluster_cursor` for pagination, OR raise `source_breakdown` to be computed pre-truncate so it reflects all clusters in the window even when only N are returned). Pick exactly ONE bucket; do not multi-fix without re-running Phase 1 to confirm the second cause is real."
+  - "**Phase 3 — Live verification.** Founder runs Cursor for ≥30 min of normal activity (chat + tool calls in any mode — Ask, Agent, Composer). After: agent runs `mcp__echo__get_recent_work_context()` (no args, default 4h window) and confirms `cluster.source_breakdown` contains a non-zero `cursor` count for the dominant cluster. Capture the response in the run log. Acceptance: the most recent activity-dominant cluster's `source_breakdown` reports `cursor: ≥1` when Cursor was active in the window. Verification MUST happen against a real founder session, not a synthetic fixture (Cursor's actual usage is the load-bearing test surface)."
+  - "**Phase 4 — Regression test.** Add a test that fails on a manual revert of the Phase 2 fix. Test placement depends on the bucket: capture-fix → `tests/capture/cursor.test.ts`; clustering-fix → `tests/trace/index.test.ts` (or wherever `getRecentWorkContext` unit tests live); truncation-fix → `tests/mcp/recent-work-context.test.ts`. Test must use a fixture sourced from real `echo.db` data (redacted of `/Users/zhenye/...` paths per item 028's precedent) — NOT a hand-authored synthetic fixture, because the bug class lives in shape-density assumptions that synthetics don't reproduce."
+  - "**Out-of-scope guardrail (do not drift):** This item does NOT touch `agentKv:`, `messageRequestContext:`, or `checkpointId:` extraction. Those are item 030's territory and gated on this item's Phase 1 finding. If Phase 1 concludes capture IS broken AND the broken capture is specifically agent-mode composers writing only to agentKv:/messageRequestContext: (no bubbleId entries), STOP and move to `pending_review/` with a note — do not implement agentKv: extraction inside this item's scope. Item 030 gets its own spec."
+  - "**Decision-note + journal hygiene:** This item references `raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md` as load-bearing context. Do NOT modify the decision note during implementation (it's the historical record). The 2026-05-08 20:55 PDT journal entry will get a `[CORRECTED 2026-05-09]` amendment from the strategist post-merge — agent does NOT touch the journal beyond logging Phase 1/3 MCP calls per the standard 6-field template."
+  - "**Tests overall:** `npm test` passes (full suite); `npm run lint` passes; `npm run typecheck` passes. The new regression test fails on a clean revert of the Phase 2 fix."
+  - "Run log appended to `raw/internal/agent-runs/<run-date>-2026-05-09-029-cursor-source-breakdown-falsification.md` with: (a) the full Phase 1 diagnostic transcript with concrete numbers for (a)/(b)/(c), (b) the chosen fix bucket and rationale, (c) the Phase 2 diff with one-line summary per file, (d) the Phase 3 live `get_recent_work_context` response showing non-zero cursor in `source_breakdown`, (e) any 030-deferral observations (what agent-mode-only capture would buy beyond legacy bubble capture, if anything)."
+files_to_modify:
+  - "depends on Phase 1 outcome — exactly ONE of: src/capture/extractors/cursor.ts | src/trace/index.ts | src/mcp/tools/recent-work-context.ts"
+  - "tests/<corresponding test path per Phase 4>"
+  - "raw/internal/agent-runs/2026-05-09-2026-05-09-029-cursor-source-breakdown-falsification.md (NEW)"
+---
+
 # Cursor `source_breakdown` miss — 3-way falsification + targeted fix at the right layer
 
 > **Strategist note (2026-05-09):** frontmatter intentionally omitted from this draft to keep the current session a strategist conversation, not a builder claim. The claiming builder (a separate Claude Code agent already in flight per founder direction) will populate the standard frontmatter (`id`, `status`, `priority`, `estimate`, `created`, `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`, `review_notes`, `spec_refs`, `blocked_by`, `acceptance`, `files_to_modify`) at atomic-claim time, lifting the acceptance bullets verbatim from the **Acceptance Criteria** section below.
