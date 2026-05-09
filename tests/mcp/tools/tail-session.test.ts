@@ -352,7 +352,19 @@ describe('tailSession V1.5.6 — wire-shape projector envelope budget', () => {
     expect(r.turns).toHaveLength(5);
     const envelopeBytes = JSON.stringify(r).length;
     expect(envelopeBytes).toBeLessThan(25_000);
-    expect(r.turns.every((t) => t.metadata_keys_elided?.includes('tool_calls'))).toBe(
+    // V1.5.6.1: tool_calls is now PROJECTED to a name trajectory (workflow
+    // shape), not opaqued out.
+    expect(
+      r.turns.every((t) => t.metadata_keys_projected?.includes('tool_calls')),
+    ).toBe(true);
+    expect(
+      r.turns.every(
+        (t) =>
+          Array.isArray(t.metadata?.['tool_calls']) &&
+          (t.metadata!['tool_calls'] as string[]).every((n) => n === 'Bash'),
+      ),
+    ).toBe(true);
+    expect(r.turns.every((t) => t.metadata?.['tool_calls_by_name'] !== undefined)).toBe(
       true,
     );
     // Per-KEY semantics: small structured neighbours pass verbatim.
