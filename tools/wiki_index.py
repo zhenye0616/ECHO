@@ -62,7 +62,7 @@ def load_manifest() -> dict:
         sys.exit(2)
 
 
-def render_index(manifest: dict) -> str:
+def render_index(manifest: dict) -> tuple[str, int]:
     entries = {
         k: v for k, v in manifest.items() if not k.startswith("_") and k != "$schema"
     }
@@ -128,14 +128,14 @@ def render_index(manifest: dict) -> str:
         lines.pop()
     lines.append("")
 
-    return "\n".join(lines)
+    return "\n".join(lines), total
 
 
 def main() -> int:
     check_only = "--check" in sys.argv
 
     manifest = load_manifest()
-    rendered = render_index(manifest)
+    rendered, total = render_index(manifest)
 
     if check_only:
         on_disk = INDEX.read_text() if INDEX.exists() else ""
@@ -146,9 +146,6 @@ def main() -> int:
         return 0
 
     INDEX.write_text(rendered)
-    total = sum(
-        1 for k in manifest if not k.startswith("_") and k != "$schema"
-    )
     print(f"Wrote {INDEX} ({total} entries).")
     return 0
 

@@ -30,7 +30,7 @@ export interface RenderRow {
 
 const MAX_CHARS_PER_FIELD = 32_000;
 
-export function truncateField(s: string, full: boolean): string {
+function truncateField(s: string, full: boolean): string {
   if (full || s.length <= MAX_CHARS_PER_FIELD) return s;
   return (
     s.slice(0, MAX_CHARS_PER_FIELD) +

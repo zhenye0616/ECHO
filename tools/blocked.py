@@ -45,7 +45,6 @@ from typing import Any, Optional
 
 PRIORITY_ORDER = {"HIGH": 0, "MED": 1, "LOW": 2}
 STAGES = ("ready", "claimed", "pending_review", "complete")
-STATUS_VALUES = set(STAGES)
 ID_FILENAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{3}-[a-z][a-z0-9-]*$")
 
 
