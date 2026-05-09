@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="dcterms.date" content="2026-04-30" />
+  <title>Drift event: Cursor chat is NOT in per-workspace `state.vscdb`</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      --bg: #fafaf7;
+      --fg: #1f1f1f;
+      --muted: #666;
+      --accent: #b8541a;
+      --code-bg: #f0ede4;
+      --border: #e2dfd6;
+      --maxw: 760px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #181816; --fg: #e8e6df; --muted: #999; --accent: #d77a3f; --code-bg: #26241f; --border: #2c2a25; }
+    }
+    html { background: var(--bg); }
+    body {
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 3rem 1.5rem 6rem;
+    }
+    h1, h2, h3, h4 { line-height: 1.25; margin-top: 2em; }
+    h1 { font-size: 1.9rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4em; margin-top: 0; }
+    h2 { font-size: 1.4rem; }
+    h3 { font-size: 1.15rem; }
+    a { color: var(--accent); }
+    code {
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      font-size: 0.92em;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 1em;
+      border-radius: 5px;
+      overflow-x: auto;
+      font-size: 0.88em;
+      line-height: 1.45;
+    }
+    pre code { background: none; padding: 0; }
+    blockquote {
+      border-left: 3px solid var(--border);
+      margin: 1em 0;
+      padding: 0.2em 1em;
+      color: var(--muted);
+    }
+    table { border-collapse: collapse; margin: 1em 0; }
+    th, td { border: 1px solid var(--border); padding: 0.4em 0.8em; text-align: left; }
+    th { background: var(--code-bg); }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+    .meta { color: var(--muted); font-size: 0.9em; margin-top: -0.5em; }
+    ul, ol { padding-left: 1.6em; }
+    li { margin: 0.2em 0; }
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Drift event: Cursor chat is NOT in per-workspace
+`state.vscdb`</h1>
+<p class="date">2026-04-30</p>
+</header>
+<h1
+id="drift-event-cursor-chat-is-not-in-per-workspace-statevscdb">Drift
+event: Cursor chat is NOT in per-workspace <code>state.vscdb</code></h1>
+<h2 id="context">Context</h2>
+<p>Item 010 (<code>cursor-extractor</code>) specifies an extractor that
+"Reads Cursor's <code>state.vscdb</code> SQLite file, queries the chat
+history table(s)" and is "Triggered by the existing FS watcher (item
+009) when Cursor's <code>state.vscdb</code> files change". Item 009
+wired
+<code>~/Library/Application Support/Cursor/User/workspaceStorage/</code>
+into <code>CAPTURED_SOURCES.fs_paths</code>, so the FS watcher already
+monitors per-workspace state files.</p>
+<p>The spec's mental model: chat turns are persisted into each
+workspace's own <code>state.vscdb</code>; the extractor opens that DB,
+walks the chat-shaped tables, emits one <code>CandidateEvent</code> per
+turn with <code>metadata.workspace_id</code> = the workspace hash
+directory name.</p>
+<h2 id="what-i-found">What I found</h2>
+<p>Schema-only probe (no chat content read; sqlite_master + key prefixes
++ value lengths only) across ~20 workspaces under
+<code>~/Library/Application Support/Cursor/User/workspaceStorage/</code>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Per-workspace <code>state.vscdb</code></th>
+<th>Observation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cursorDiskKV</code> row count</td>
+<td><strong>0</strong> in every workspace probed</td>
+</tr>
+<tr class="even">
+<td><code>ItemTable.aiService.prompts</code> length</td>
+<td>mostly 2 (<code>[]</code>); a couple workspaces had 148–2370 bytes —
+these are the legacy Cmd-K inline-prompt path, not composer chat</td>
+</tr>
+<tr class="odd">
+<td><code>ItemTable.aiService.generations</code> length</td>
+<td>similar — almost always <code>[]</code></td>
+</tr>
+<tr class="even">
+<td><code>ItemTable.composer.composerData</code> length</td>
+<td>100s–1000s of bytes, but value is <strong>composer metadata
+only</strong> (ids, mode, createdAt, hasUnreadMessages…) — no message
+text</td>
+</tr>
+</tbody>
+</table>
+<p>I did not read chat content out of any DB; I only inspected lengths
+and sqlite_master so the agent transcript stays free of Cursor's user
+data.</p>
+<p>By contrast,
+<code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+has:</p>
+<ul>
+<li><code>cursorDiskKV</code> row count = <strong>3393</strong></li>
+<li>key-prefix sample: <code>bubbleId:</code>,
+<code>composerData:</code>, <code>agentKv:</code>,
+<code>checkpointId:</code>, <code>codeBlockDiff:</code>,
+<code>inlineDiffs-&lt;workspace-hash&gt;</code> (per workspace), …</li>
+</ul>
+<p>That is, in current Cursor (probed against the local install on
+2026-04-30), composer chat — the user/assistant turn content the killer
+demo wants — lives in <strong>globalStorage</strong>, not
+per-workspace.</p>
+<p>The <code>composer.composerData</code> entry inside each workspace
+<code>state.vscdb</code> only maps that workspace to a list of
+<code>composerId</code>s; the actual messages ("bubbles") sit globally
+under
+<code>cursorDiskKV.bubbleId:&lt;composerId&gt;:&lt;bubbleId&gt;</code>.</p>
+<h2 id="why-this-is-drift-not-a-small-adaptation">Why this is drift, not
+a small adaptation</h2>
+<p>Three concrete consequences for the spec as written:</p>
+<ol type="1">
+<li><p><strong>The FS watcher won't fire on chat events.</strong>
+Workspaces' <code>state.vscdb</code> only mutates when composer
+<em>metadata</em> (created/archived/title) changes, not on every turn.
+The lag-in-storage acceptance criterion ("median ≤2s") cannot be
+measured because there are no events to measure.</p></li>
+<li><p><strong><code>metadata.workspace_id</code> is ambiguous.</strong>
+A composer can be referenced from one workspace but its bubbles live
+globally; bubbles also have no direct workspace pointer. To reconstruct
+workspace_id you'd have to scan every per-workspace
+<code>composer.composerData</code> and inverse-map composerId →
+workspace. That logic doesn't exist anywhere in the spec.</p></li>
+<li><p><strong>The recommended source-string convention breaks.</strong>
+Spec acceptance recommends <code>fs:&lt;path-to-state.vscdb&gt;</code>
+to reuse the existing fs allowlist. But the path that <em>contains</em>
+chat is <code>globalStorage/state.vscdb</code>, which item 009 did not
+allowlist. Either the allowlist needs another entry, or the convention
+has to change.</p></li>
+</ol>
+<p>These aren't implementation details I can resolve with a code probe
+and a sensible default. They are spec-shape decisions about (a) what
+surface to watch, (b) how to name the unit of state-tracking
+(workspace_id vs composerId), and (c) what source string flows through
+the gate. Picking any of them silently would lock in a contract that the
+strategist and founder didn't agree to.</p>
+<h2 id="options-for-the-founderstrategist">Options for the
+founder/strategist</h2>
+<p><strong>Option 1 — Watch globalStorage; track per-composer.</strong>
+Add
+<code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(or its parent dir) to <code>CAPTURED_SOURCES.fs_paths</code>. Treat
+<code>composerId</code> as the unit;
+<code>Map&lt;composerId, last_seen_bubble_id&gt;</code>. Drop
+<code>workspace_id</code> from metadata or mark it nullable. Source
+string: <code>fs:&lt;global-state.vscdb-path&gt;</code> or a new
+<code>cursor-chat:&lt;composerId&gt;</code> kind.</p>
+<p>Pros: captures real chat content; matches Cursor's actual layout.
+Cons: rewrites the per-workspace tracking model. May want to refresh
+<code>metadata.workspace_id</code> later by joining against
+per-workspace <code>composer.composerData</code>.</p>
+<p><strong>Option 2 — Watch globalStorage <em>and</em> keep
+per-workspace mapping.</strong> Same as Option 1 plus, on each
+per-workspace <code>state.vscdb</code> change, refresh an in-memory
+<code>composerId → workspace_hash</code> index from that workspace's
+<code>composer.composerData</code>. Bubbles emitted with the most-recent
+known mapping.</p>
+<p>Pros: preserves the spec's <code>metadata.workspace_id</code> shape.
+Cons: more code, new race (bubble appears globally before its workspace
+records the composer), needs a fallback for un-mapped composerIds.</p>
+<p><strong>Option 3 — Defer composer chat; capture only the legacy
+aiService path.</strong> Implement the extractor against per-workspace
+<code>ItemTable.aiService.prompts</code> /
+<code>aiService.generations</code> (where small amounts of legacy Cmd-K
+data still appear). Spec is satisfied literally — workspace state.vscdb
+is read, schema is probed, events flow when present — at the cost of
+capturing very little of what users actually do in Cursor today.</p>
+<p>Pros: smallest change; respects spec's "no allowlist change" hint
+literally; FS watcher fires on the right files. Cons: misses the
+killer-demo content (composer chats with the AI), which is the whole
+point of the surface.</p>
+<h2 id="my-recommendation-for-the-record-not-acted-on">My
+recommendation, for the record (not acted on)</h2>
+<p>Option 1 is the smallest change that actually delivers what the spec
+was trying to deliver. <code>metadata.workspace_id</code> becomes a
+"best-effort" field: populated when the per-workspace
+<code>composer.composerData</code> index has seen the composerId,
+otherwise omitted. The audit page never relies on workspace_id
+structurally.</p>
+<p>But I am not making that call myself — the spec was written assuming
+a storage layout that doesn't match Cursor's reality, so the right move
+is to rewrite the spec, not to interpret the existing one.</p>
+<h2 id="what-i-did-not-do">What I did not do</h2>
+<ul>
+<li>Did not write any code in <code>src/capture/extractors/</code>.</li>
+<li>Did not modify <code>CAPTURED_SOURCES.fs_paths</code>.</li>
+<li>Did not read Cursor chat content out of any DB into the agent
+transcript.</li>
+<li>Did not push the empty <code>agent/cursor-extractor</code> worktree
+branch (no commits to push).</li>
+</ul>
+<h2 id="pointer">Pointer</h2>
+<p>Question handed to founder via item file <code>agent_notes</code> and
+run log:</p>
+<ul>
+<li><code>backlog/pending_review/2026-04-30-010-cursor-extractor.md</code></li>
+<li><code>raw/internal/agent-runs/2026-04-30-2026-04-30-010-cursor-extractor.md</code></li>
+</ul>
+</body>
+</html>

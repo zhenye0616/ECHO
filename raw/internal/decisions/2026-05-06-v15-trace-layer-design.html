@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>V1.5 trace layer — design reasoning</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      --bg: #fafaf7;
+      --fg: #1f1f1f;
+      --muted: #666;
+      --accent: #b8541a;
+      --code-bg: #f0ede4;
+      --border: #e2dfd6;
+      --maxw: 760px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #181816; --fg: #e8e6df; --muted: #999; --accent: #d77a3f; --code-bg: #26241f; --border: #2c2a25; }
+    }
+    html { background: var(--bg); }
+    body {
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 3rem 1.5rem 6rem;
+    }
+    h1, h2, h3, h4 { line-height: 1.25; margin-top: 2em; }
+    h1 { font-size: 1.9rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4em; margin-top: 0; }
+    h2 { font-size: 1.4rem; }
+    h3 { font-size: 1.15rem; }
+    a { color: var(--accent); }
+    code {
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      font-size: 0.92em;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 1em;
+      border-radius: 5px;
+      overflow-x: auto;
+      font-size: 0.88em;
+      line-height: 1.45;
+    }
+    pre code { background: none; padding: 0; }
+    blockquote {
+      border-left: 3px solid var(--border);
+      margin: 1em 0;
+      padding: 0.2em 1em;
+      color: var(--muted);
+    }
+    table { border-collapse: collapse; margin: 1em 0; }
+    th, td { border: 1px solid var(--border); padding: 0.4em 0.8em; text-align: left; }
+    th { background: var(--code-bg); }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+    .meta { color: var(--muted); font-size: 0.9em; margin-top: -0.5em; }
+    ul, ol { padding-left: 1.6em; }
+    li { margin: 0.2em 0; }
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">V1.5 trace layer — design reasoning</h1>
+</header>
+<h1 id="v15-trace-layer--design-reasoning">V1.5 trace layer — design
+reasoning</h1>
+<p><strong>Date:</strong> 2026-05-06 <strong>Status:</strong> committed
+(spec lives in
+<code>backlog/ready/2026-05-06-018-recent-work-context-tool.md</code>)
+<strong>Participants:</strong> founder, Claude Code (this Claude), Codex
+CLI (founder's other AI session) <strong>Depends on:</strong>
+<code>2026-05-06-016-read-time-normalizer</code> (uses
+<code>NormalizedContextEvent</code> as input contract)
+<strong>Related:</strong>
+<code>2026-05-06-normalized-context-event-design.md</code> (the
+substrate that makes this possible)</p>
+<h2 id="context">Context</h2>
+<p>V1 ships the killer-demo loop <em>mechanically</em> — events flow
+from extractors through capture-gate into storage, MCP retrieves them.
+But <code>wiki/product/v1-spec.md</code> line 132 documents that V1
+doesn't yet trigger the "when can I pay?" reaction. Two reasons
+named:</p>
+<ol type="1">
+<li>The bundle is incomplete (GitHub + Slack haven't shipped — Wave 4
+work).</li>
+<li>The cross-tool join isn't built.</li>
+</ol>
+<p>V1.5 closes (2). Wave 4 (deferred) will close (1).</p>
+<p>This document captures the brainstorm decisions for V1.5's trace
+layer. The actionable spec lives in the backlog item; this document is
+the <em>why</em>.</p>
+<h2 id="what-v15-ships">What V1.5 ships</h2>
+<p>A single new MCP tool — <code>get_recent_work_context</code> — that
+returns <em>clusters of related atoms</em> instead of a flat event list.
+The trace layer is a thin module (<code>src/trace/</code>) that consumes
+normalized atoms from item 016 and builds a connected-component graph
+keyed by shared artifact identity within a time window.</p>
+<p>This is the <strong>trace layer (option α)</strong> locked during the
+brainstorm. Wave 4 (β — GitHub + Slack adapters) is deferred to a
+parallel thread.</p>
+<h2 id="decisions-reached-during-the-brainstorm">Decisions reached
+during the brainstorm</h2>
+<p>The brainstorm walked through five sequential decision points. Each
+was a multiple-choice with a recommended option and explicit
+alternatives.</p>
+<h3 id="1-demo-flavor--whats-the-v15-magic">1. Demo flavor — what's the
+V1.5 magic?</h3>
+<p>Three flavors considered:</p>
+<ul>
+<li><strong>(1) Cross-tool answer (passive).</strong> AI client calls
+ECHO; receives clustered context. No new UI.</li>
+<li><strong>(2) Resume packet (summoned).</strong> User triggers via
+hotkey; receives one-page brief.</li>
+<li><strong>(3) Open-loop surfacing (proactive).</strong> ECHO surfaces
+unresolved threads in a notification surface.</li>
+</ul>
+<p><strong>Decision: (1)</strong> — smallest scope, compounds with daily
+Cursor + Claude Code use, reuses existing MCP plumbing, lets the trace
+layer's correctness be validated before betting on UI shape for (2) or
+(3).</p>
+<p>(2) and (3) are V2 product surfaces. V1.5 ships the substrate that
+makes them possible.</p>
+<h3 id="2-return-shape--what-does-echo-actually-return">2. Return shape
+— what does ECHO actually return?</h3>
+<p>Four shapes considered:</p>
+<ul>
+<li>(a) Flat list of normalized atoms (just like search_memories but
+using item 016's normalized form)</li>
+<li>(b) Atoms + a join graph (atoms + edges showing which share
+artifacts)</li>
+<li>(c) Atoms + a structured <code>WorkTrace</code> (pre-interpreted:
+trace_id, work_object_label, links, open_loops)</li>
+<li>(d) Atoms + a natural-language brief (LLM-summarized)</li>
+</ul>
+<p><strong>Decision: (b)</strong> — atoms + join graph.</p>
+<p>Reasoning: (a) is too thin (item 016 alone gets us this). (d) puts an
+LLM call on the read path with hallucination risk on the very feature
+that has to land trust — defer to V2. (b) vs (c) is the real fork. (b)
+treats the AI client (Claude in Cursor) as the smart consumer; (c)
+treats ECHO as the smart producer. Claude-in-Cursor is <em>already</em>
+a smart consumer; we don't need to do its job. (c) becomes the V1.5+
+upgrade path: same MCP tool, richer payload, no client-side breaking
+change.</p>
+<h3 id="3-trigger--how-does-echo-know-what-cluster-to-retrieve">3.
+Trigger — how does ECHO know what cluster to retrieve?</h3>
+<p>Three triggers considered:</p>
+<ul>
+<li>(i) User phrases it. Text query only (today's
+<code>search_memories</code>).</li>
+<li>(ii) AI client passes a hint (file path, URL, session_id).</li>
+<li>(iii) ECHO infers from recent activity (last N minutes of
+CaptureEvents).</li>
+</ul>
+<p><strong>Decision: (iii) with optional (ii) override.</strong></p>
+<p>Reasoning: for the magic to feel <em>passive</em>, the user shouldn't
+have to phrase the artifact. (i) requires the user to do the work; (ii)
+requires AI client cooperation; (iii) is fully ECHO-side and can fire
+automatically.</p>
+<p>The tool signature:
+<code>get_recent_work_context({ since?, until?, artifact_hint?, limit? })</code>.
+All optional. Defaults pull recent activity; hint overrides.</p>
+<h3 id="4-clustering-algorithm--what-counts-as-in-the-cluster">4.
+Clustering algorithm — what counts as "in" the cluster?</h3>
+<p>Four algorithms considered:</p>
+<ul>
+<li>(A) Pure artifact join — connected components over shared
+<code>artifact_id</code>.</li>
+<li>(B) Artifact + time window — (A) but only edges within N hours.</li>
+<li>(C) (B) + content similarity (embeddings) — weighted edges by cosine
+similarity.</li>
+<li>(D) LLM-based clustering — pass atoms to Claude, ask for
+clusters.</li>
+</ul>
+<p><strong>Decision: (B)</strong> — artifact + 4-hour time window
+(configurable).</p>
+<p>Reasoning: (A) alone collapses time — "what was I doing Friday on the
+normalizer?" returns Friday's work tangled with months of prior commits.
+Useless. (D) puts an LLM on every retrieval — V2 territory. (C) is the
+upgrade path once embeddings ship — backwards-compatible enrichment. (B)
+is rule-based, deterministic, debuggable, fast, and aligns with how the
+dev cohort thinks ("right now I'm working on X").</p>
+<h3 id="5-v15-scope--trace-layer-only-or-trace--bundle-expansion">5.
+V1.5 scope — trace layer only, or trace + bundle expansion?</h3>
+<p>Three scopes considered:</p>
+<ul>
+<li>(α) Trace layer only. Source set stays at 4 (claude-code, codex,
+cursor, git).</li>
+<li>(β) Bundle expansion only (GitHub + Slack adapters). No trace
+layer.</li>
+<li>(γ) Both.</li>
+</ul>
+<p><strong>Decision: (α) for V1.5 ship; (β) parallel/follow-up; (γ)
+rejected as scope explosion.</strong></p>
+<p>Reasoning: founder's daily evidence stream is dominated by AI
+conversations + code. Claude Code + Codex + Cursor + git already covers
+70-80%. GitHub PRs and Slack are nice but not where daily magic lives
+for the indie-AI-builder cohort. Trace layer is the <em>new
+architectural primitive</em>; once it works on 4 sources, adding
+adapters is mechanical. (γ) doubles V1.5 scope, slows the feedback loop.
+(β) without (α) is "more search results" — better, not magical.</p>
+<h2 id="codex-redline-pass-on-the-response-shape">Codex redline pass on
+the response shape</h2>
+<p>After the response shape was sketched, codex returned a 7-change
+redline. Six accepted (with three adjustments), one pushed back.</p>
+<h3 id="accepted-as-is-4">Accepted as-is (4)</h3>
+<ul>
+<li><code>schema_version: 1</code> at response level.</li>
+<li>Rename <code>input_echo</code> → <code>query</code>.</li>
+<li>Tool rename <code>get_current_work_context</code> →
+<code>get_recent_work_context</code> (the original name overpromised
+real-time).</li>
+<li>Structured edge shape:
+<code>{ kind: 'shared_artifact', artifact_ids[], confidence, from, to }</code>
+with documented future-list
+(<code>temporal_near | same_conversation | state_transition | same_actor | semantic_similarity</code>).</li>
+<li>Structured <code>artifact_hint: { provider, type, id }</code>.</li>
+<li><code>truncation.truncated: bool</code> flag.</li>
+</ul>
+<h3 id="accepted-with-adjustment-3">Accepted with adjustment (3)</h3>
+<ul>
+<li><strong>Open-loop hints structured
+(<code>{kind, text, confidence}</code>)</strong>: accepted, but flagged
+the layering. Atoms keep cheap <code>string[]</code> hints (item 016
+contract); trace layer enriches into
+<code>{kind, text, confidence}</code> when packaging clusters. We do NOT
+retroactively change item 016's atom shape. Atom = observation; trace =
+interpretation.</li>
+<li><strong>Cluster <code>label</code></strong>: accepted as
+<code>label?: string</code>, optional. Heuristic-only (no LLM call). If
+the heuristic produces nothing useful, omit. AI client can synthesize
+naming from contents.</li>
+<li><strong><code>warnings[]</code></strong>: accepted at <em>response
+level only</em>. Cluster-level warnings deferred until a use case
+surfaces — adding later is non-breaking.</li>
+</ul>
+<h3 id="rejected-1">Rejected (1)</h3>
+<ul>
+<li><strong><code>score: 0.87</code></strong>: dropped. A numeric score
+without a calibrated formula misleads consumers. The AI client can't
+tell if 0.87 is "trust this" or "barely surfaced." Two reliable signals
+are enough: <code>rank</code> (1-indexed integer position) +
+<code>rank_reason</code> (string list). Score becomes useful when
+ranking is calibrated against ground truth — V2 territory after
+dogfooding produces labeled examples. Adding it now invites the AI
+client to depend on numbers we'll later have to break.</li>
+</ul>
+<h2 id="architecture-summary">Architecture summary</h2>
+<pre><code>CaptureEvent (storage, raw)
+        │
+        ▼
+normalizeEvent (item 016, read-time, pure)
+        │
+        ▼
+NormalizedContextEvent (atom — observation)
+        │
+        ▼
+buildRecentWorkContext (this item, read-time, pure)
+        │
+        ▼
+RecentWorkContextResponse (clusters + atoms + graph — interpretation)
+        │
+        ▼
+[MCP get_recent_work_context tool] [V2 trace viewer] [V2 Resume Packet]</code></pre>
+<p>The trace layer is <strong>pure</strong>: takes events + a query,
+returns a response. No I/O. No clock reads (the MCP tool wrapper
+resolves the time window from <code>Date.now()</code> at the boundary
+and passes it in). No persisted traces table — <code>cluster_id</code>
+is a deterministic hash of the sorted atom-ids, enabling within-session
+reference without storage.</p>
+<p>If the trace layer turns out to be wrong, deleting
+<code>src/trace/</code> is the rollback. Storage and the normalizer stay
+clean.</p>
+<h2 id="what-v15-explicitly-does-not-do">What V1.5 explicitly does NOT
+do</h2>
+<ul>
+<li>No persisted traces table — clusters computed on demand.</li>
+<li>No LLM-generated labels — heuristic only.</li>
+<li>No open-loop <em>resolution</em> — atoms emit hints; trace renders
+them; nobody decides "this loop is closed."</li>
+<li>No embeddings — <code>temporal_near</code> /
+<code>semantic_similarity</code> edge kinds are documented as
+future-list, not implemented.</li>
+<li>No new dependencies (uses <code>node:crypto</code> for hashing
+only).</li>
+<li>No automatic context injection — AI client decides when to call this
+tool.</li>
+<li>No new MCP transport — uses item 013's existing server at
+<code>127.0.0.1:38478</code>.</li>
+<li>No trace viewer / UI — V2.</li>
+<li>No GitHub / Slack adapters — Wave 4, parallel thread.</li>
+<li>No <code>search_memories</code> change — item 017's scope,
+separate.</li>
+</ul>
+<h2 id="what-v15-will-teach-us">What V1.5 will teach us</h2>
+<p>The trace layer, dogfooded for ~2 weeks in the founder's daily Cursor
++ Claude Code + Codex + git workflow, will surface:</p>
+<ul>
+<li><strong>Whether the artifact-identity policy correctly
+joins.</strong> If clusters split a coherent thread because two atoms
+reference the same file via different identity rules, the policy needs
+amendment.</li>
+<li><strong>Whether the 4-hour window is the right default.</strong> Too
+narrow → coherent threads split. Too wide → unrelated work tangles.</li>
+<li><strong>Whether the label heuristic reads right on real
+clusters.</strong> If "discussion about <random file>" feels misleading
+often, the heuristic needs work — or the field gets dropped.</li>
+<li><strong>Whether the rank ordering matches the founder's
+intuition.</strong> "I expected the open-loop cluster first; ECHO ranked
+it third." Tunes the ranking signals.</li>
+<li><strong>Whether <code>shared_artifact</code> alone is
+enough</strong>, or if <code>temporal_near</code> /
+<code>same_conversation</code> edge kinds need to land in V1.5.1.</li>
+<li><strong>Whether the AI client (Claude in Cursor) actually uses the
+graph.</strong> If clusters help, conversation quality goes up; if
+Claude ignores the graph, the contract was wrong.</li>
+<li><strong>Whether 500ms p95 is the right perf SLO.</strong> If the
+founder waits, retreat to caching.</li>
+</ul>
+<p>These findings drive the V1.5+/V2 roadmap. They are <em>not</em>
+derivable from spec review — only dogfooding shows them.</p>
+<h2 id="conversation-artifacts-referenced">Conversation artifacts
+referenced</h2>
+<ul>
+<li>This Claude Code session, 2026-05-06.</li>
+<li>Codex CLI session (founder's other AI), 2026-05-06: response-shape
+redline pass; the rename to <code>get_recent_work_context</code>; the
+structured edge / hint shapes; the rejected <code>score</code>
+field.</li>
+<li><code>wiki/product/v1-spec.md</code> line 132: the explicit V1 gap
+that V1.5 closes ("the demo doesn't yet show the cross-tool
+magic").</li>
+<li>Item 016
+(<code>backlog/ready/2026-05-06-016-read-time-normalizer.md</code>): the
+substrate that makes this work possible.</li>
+</ul>
+</body>
+</html>
