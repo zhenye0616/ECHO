@@ -131,10 +131,228 @@
   nav#TOC li { margin: 0.15em 0; }
   /* Subtle anchor for date-stamped entry headers */
   h3, h4 { scroll-margin-top: 1em; }
-  /* Print */
+
+  /* ── Collapsible entries ──────────────────────────────────────────────
+     A small DOMContentLoaded script (below) wraps every H3/H4 in the body
+     into a <details> element so individual journal entries can be collapsed.
+     The MD source is untouched; collapsibility lives entirely in the HTML
+     twin so the in-the-moment append discipline is unchanged. */
+
+  .entry-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding: 0.55em 0;
+    margin: 0.4em 0 1.2em;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.4em;
+    align-items: center;
+  }
+  .entry-toolbar button {
+    font-family: inherit;
+    font-size: 0.84em;
+    padding: 0.32em 0.85em;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--fg);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .entry-toolbar button:hover { background: var(--code-bg); }
+  .entry-toolbar .hint {
+    font-size: 0.8em;
+    color: var(--muted);
+    margin-left: 0.6em;
+  }
+
+  details.entry { margin: 0.4em 0; }
+  details.entry.level-3 { margin-top: 1.6em; }
+  details.entry.level-4 { margin-top: 0.7em; }
+
+  /* The original H3/H4 styling now lives on the summary, scoped by level. */
+  summary.entry-summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    position: relative;
+    padding-left: 1.5em;
+  }
+  summary.entry-summary::-webkit-details-marker { display: none; }
+  summary.entry-summary::before {
+    content: '▸';
+    position: absolute;
+    left: 0.45em;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85em;
+    color: var(--muted);
+    transition: transform 0.12s ease;
+  }
+  details.entry[open] > summary.entry-summary::before {
+    transform: translateY(-50%) rotate(90deg);
+  }
+
+  summary.entry-summary.level-3 {
+    font-size: 1.05em;
+    font-weight: 600;
+    padding: 0.55em 0.9em 0.55em 1.7em;
+    background: var(--card-bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 3px 3px 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  summary.entry-summary.level-4 {
+    font-size: 0.98em;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 0.4em 0.4em 0.4em 1.5em;
+    border-bottom: 1px dashed var(--border);
+  }
+  summary.entry-summary:hover { background: var(--code-bg); }
+
+  /* Reset the inner heading element (h3/h4 that's now wrapped in <summary>)
+     so it inherits summary styles instead of the base h3/h4 ones. */
+  summary.entry-summary > h3,
+  summary.entry-summary > h4 {
+    display: inline;
+    font: inherit;
+    color: inherit;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    font-weight: inherit;
+  }
+
+  /* Indent H4 details a touch when nested under an H3 details. */
+  details.entry.level-3[open] > details.entry.level-4 {
+    margin-left: 0.6em;
+  }
+
+  /* Print: open everything, drop chrome */
   @media print {
     body { background: white; padding: 0; max-width: none; font-size: 11pt; }
-    h3 { box-shadow: none; background: transparent; }
+    .entry-toolbar { display: none; }
+    details.entry > * { display: block !important; }
+    summary.entry-summary {
+      list-style: none;
+      padding-left: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    summary.entry-summary::before { display: none; }
+    summary.entry-summary.level-3 { background: transparent; box-shadow: none; }
     nav#TOC { page-break-after: always; }
   }
 </style>
+
+<script>
+  (function () {
+    function init() {
+      var body = document.body;
+      if (!body || body.dataset.entriesWrapped === '1') return;
+
+      // Bottom-up: wrap H4 first, then H3, so H3 details naturally contain H4 details.
+      wrapHeadingLevel(4);
+      wrapHeadingLevel(3);
+
+      installToolbar();
+      installHashOpener();
+      body.dataset.entriesWrapped = '1';
+    }
+
+    function wrapHeadingLevel(level) {
+      var tag = 'h' + level;
+      // Snapshot before mutating. Skip headings that are already inside a summary
+      // (defensive — shouldn't happen given bottom-up order) or inside the TOC.
+      var headings = Array.prototype.filter.call(
+        document.getElementsByTagName(tag),
+        function (h) {
+          if (h.closest('summary.entry-summary')) return false;
+          if (h.closest('nav#TOC')) return false;
+          if (h.classList.contains('title')) return false;
+          return true;
+        }
+      );
+      // Stop tags: any heading at this level or higher (including h1.title).
+      var stopTags = {};
+      for (var l = 1; l <= level; l++) stopTags['H' + l] = true;
+
+      headings.forEach(function (heading) {
+        var details = document.createElement('details');
+        details.className = 'entry level-' + level;
+
+        var summary = document.createElement('summary');
+        summary.className = 'entry-summary level-' + level;
+
+        // Move heading element itself into the summary so its id and content
+        // are preserved verbatim (TOC anchors keep working, screen readers
+        // still see an h3/h4).
+        var parent = heading.parentNode;
+        parent.insertBefore(details, heading);
+        details.appendChild(summary);
+        summary.appendChild(heading);
+
+        // Mirror the heading id onto the details so linking opens it.
+        if (heading.id) details.id = heading.id + '--entry';
+
+        // Pull subsequent siblings into details until we hit a stop heading.
+        while (details.nextSibling) {
+          var sib = details.nextSibling;
+          if (sib.nodeType === 1 && stopTags[sib.tagName]) break;
+          details.appendChild(sib);
+        }
+      });
+    }
+
+    function installToolbar() {
+      var toolbar = document.createElement('div');
+      toolbar.className = 'entry-toolbar';
+      toolbar.innerHTML =
+        '<button type="button" data-act="expand">Expand all</button>' +
+        '<button type="button" data-act="collapse">Collapse all</button>' +
+        '<span class="hint">click any heading to expand · ⌘F still searches collapsed entries on most browsers</span>';
+      // Insert before the TOC (or, if no TOC, before the first body child).
+      var anchor = document.querySelector('nav#TOC') || document.body.firstChild;
+      document.body.insertBefore(toolbar, anchor);
+
+      toolbar.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('button[data-act]');
+        if (!btn) return;
+        var open = btn.getAttribute('data-act') === 'expand';
+        document.querySelectorAll('details.entry').forEach(function (d) {
+          d.open = open;
+        });
+      });
+    }
+
+    function installHashOpener() {
+      function openTo(hash) {
+        if (!hash) return;
+        var id = hash.charAt(0) === '#' ? hash.slice(1) : hash;
+        var el = document.getElementById(id);
+        if (!el) return;
+        var cur = el;
+        while (cur && cur !== document.body) {
+          if (cur.tagName === 'DETAILS') cur.open = true;
+          cur = cur.parentElement;
+        }
+        // Re-scroll so the now-revealed target lines up.
+        try { el.scrollIntoView({ block: 'start' }); } catch (_) {}
+      }
+      window.addEventListener('hashchange', function () { openTo(location.hash); });
+      // Defer until after the layout settles.
+      setTimeout(function () { openTo(location.hash); }, 0);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
