@@ -73,6 +73,11 @@ export interface Truncation {
   clusters_returned: number;
   clusters_total: number;
   truncated: boolean;
+  // Per-source atom counts across the entire window, computed BEFORE
+  // rank-and-truncate drops sibling clusters. Lets a consumer answer
+  // "was source X active in this window?" even when source X's cluster
+  // got dropped from `clusters[]` by `limit`. Item 029.
+  source_breakdown?: Record<string, number>;
 }
 
 export interface RecentWorkContextResponse {

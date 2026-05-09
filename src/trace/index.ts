@@ -89,6 +89,13 @@ export function buildRecentWorkContext(
   atoms.sort(compareByOccurredAt);
   const atomsById = new Map(atoms.map((a) => [a.id, a]));
   const atomsTotalInWindow = atoms.length;
+  // Window-wide source_breakdown computed pre-truncate, so the consumer can
+  // see every source active in (since, until) even when limit drops the
+  // sibling cluster carrying that source. Cluster-level source_breakdown is
+  // unchanged. Item 029 — a Cursor-only sibling cluster was being dropped at
+  // default limit=20, hiding "cursor was active" from
+  // `cluster[rank=1].source_breakdown`.
+  const windowSourceBreakdown = countByApp(atoms);
 
   // 2. Compute open-loop hints once, before clustering — resolution scans
   //    over the full sorted atom list so the result is cluster-agnostic
@@ -203,6 +210,7 @@ export function buildRecentWorkContext(
       clusters_returned: truncated.clusters.length,
       clusters_total: clustersTotal,
       truncated: truncated.didTruncate,
+      source_breakdown: windowSourceBreakdown,
     },
     warnings,
   };
