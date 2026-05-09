@@ -245,6 +245,66 @@ describe('extractCursorTurns (pure)', () => {
     expect(captured.writes.join('')).toContain('orphan_assistant_bubble');
   });
 
+  // Gap 2 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): when the
+  // checkpoint lands inside an extended assistant cluster (Cursor streamed
+  // more assistant bubbles after ECHO captured an earlier partial state),
+  // the new bubbles should NOT be flagged as orphans. Pre-fix: ~250 spam
+  // warnings per chokidar event × 1232 minutes = 902,716 warnings on the
+  // same already-captured composers. Post-fix: silent fast-forward, no
+  // warnings, and any subsequent REAL user turn captures cleanly.
+  it('streaming continuation: assistant bubbles after the checkpoint are silently fast-forwarded (Gap 2)', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1-partial' },
+      // Cursor extends the cluster after ECHO captured the partial state:
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a1-extended-1' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'a1-extended-2' },
+      // A second user turn arrives after the extended cluster:
+      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'q2' },
+      { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'a2' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+
+    // ECHO captured the partial state at a1 (single-asst cluster). Now
+    // re-extracting with that checkpoint: a2 + a3 are extension bubbles
+    // (silently skipped, not orphaned), and the q2/a4 turn is captured.
+    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a1']]));
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.user_bubble_id).toBe('u2');
+    expect(turns[0]?.assistant_bubble_id).toBe('a4');
+    // CRITICAL: zero orphan warnings for the streaming-continuation bubbles.
+    expect(captured.writes.join('')).not.toContain('orphan_assistant_bubble');
+  });
+
+  it('streaming continuation: empty store (no user after extension) emits zero turns + zero warnings', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'partial' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'extended' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+
+    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a1']]));
+    expect(turns).toHaveLength(0);
+    expect(captured.writes.join('')).not.toContain('orphan_assistant_bubble');
+  });
+
+  it('first-pass orphans (no checkpoint) still warn loudly — fix is scoped to the streaming-continuation case', async () => {
+    // True orphans (assistant before any user, with no checkpoint)
+    // remain warned. The Gap 2 fix only quietens the post-checkpoint
+    // assistant case.
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'b1', type: 2, text: 'orphan-asst' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 1, text: 'late-user' },
+      { composer_id: 'c1', bubble_id: 'b3', type: 2, text: 'paired-asst' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(captured.writes.join('')).toContain('orphan_assistant_bubble');
+  });
+
   it('produces zero events and warns when cursorDiskKV table is missing', async () => {
     createSchemaUnrecognizedFixture(dbPath);
     const turns = await extractCursorTurns(dbPath, new Map());

@@ -386,13 +386,34 @@ export async function extractCursorTurns(
       startIdx = ix + 1;
     }
 
+    // Gap 2 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): when
+    // the checkpoint lands on an assistant bubble (Cursor streamed more
+    // assistant bubbles into a turn that ECHO already captured at an
+    // earlier partial state), treat them as a streaming continuation and
+    // silently fast-forward to the next user bubble. Pre-fix: each tick
+    // emitted ~250 orphan_assistant_bubble warnings × 1232 minutes of
+    // activity = 902,716 spam warnings on the OLD bubble layer that was
+    // already captured. Post-fix: silent fast-forward; next REAL user
+    // turn after the continuation captures cleanly. The continuation
+    // bubbles themselves remain uncaptured for V1.5.7 — proper fix is
+    // the `agentKv:` schema rewrite (Path B, V1.6+; Cursor moved to a
+    // new storage namespace on 2026-05-01 and the bubbleId: table has
+    // been frozen since).
     let i = startIdx;
+    if (
+      checkpoint !== undefined &&
+      i < bubbles.length &&
+      bubbles[i]!.role === 'assistant'
+    ) {
+      while (i < bubbles.length && bubbles[i]!.role === 'assistant') i += 1;
+    }
     while (i < bubbles.length) {
       const cur = bubbles[i]!;
       if (cur.role === 'assistant') {
-        // Orphan assistant — no preceding user. Cursor sometimes writes these
-        // for system / synthesized bubbles. Drop with a warn rather than
-        // pairing into a malformed turn.
+        // True orphan — no preceding user AND no checkpoint that would
+        // explain the assistant as a streaming continuation. Cursor
+        // sometimes writes these for system / synthesized bubbles. Drop
+        // with a warn rather than pairing into a malformed turn.
         log.warn('orphan_assistant_bubble', { composer_id, bubble_id: cur.bubble_id });
         i += 1;
         continue;
