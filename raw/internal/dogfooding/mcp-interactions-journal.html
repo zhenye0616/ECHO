@@ -161,9 +161,17 @@
       --muted: #5a5a5a;
       --label: #7a3e9d;
       --accent: #0a66c2;
+      --accent-soft: #e6f0fa;
       --code-bg: #eef1f4;
       --border: #d8dde2;
       --card-bg: #ffffff;
+      --date-tint: #f6f8fb;
+      --ok: #1f7a3a;
+      --ok-bg: #e7f5ec;
+      --partial: #a06a00;
+      --partial-bg: #fbf3df;
+      --wrong: #b3261e;
+      --wrong-bg: #fbe8e7;
     }
     html {
       line-height: 1.55;
@@ -285,12 +293,46 @@
     nav#TOC > ul { padding-left: 1.2em; margin: 0.4em 0; }
     nav#TOC ul ul { padding-left: 1.2em; font-size: 0.96em; }
     nav#TOC li { margin: 0.15em 0; }
-    /* Subtle anchor for date-stamped entry headers */
-    h3, h4 { scroll-margin-top: 1em; }
+    details.toc {
+      margin: 1.5em 0 2.2em;
+    }
+    summary.toc-summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      position: relative;
+      padding: 0.55em 0.9em 0.55em 1.7em;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 3px;
+      font-weight: 650;
+    }
+    summary.toc-summary::-webkit-details-marker { display: none; }
+    summary.toc-summary::before {
+      content: '▸';
+      position: absolute;
+      left: 0.55em;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85em;
+      color: var(--muted);
+      transition: transform 0.12s ease;
+    }
+    details.toc[open] > summary.toc-summary::before {
+      transform: translateY(-50%) rotate(90deg);
+    }
+    details.toc > nav#TOC {
+      margin: 0.8em 0 0;
+    }
+    /* Subtle anchor for collapsible section headers */
+    h2, h3, h4 { scroll-margin-top: 1em; }
 
     /* ── Collapsible entries ──────────────────────────────────────────────
-       A small DOMContentLoaded script (below) wraps every H3/H4 in the body
-       into a <details> element so individual journal entries can be collapsed.
+       A small DOMContentLoaded script (below) wraps H3/H4 entries and selected
+       non-date H2 sections into <details> elements. Date H2 headings stay on the
+       surface as scan anchors; accumulating summary/backlog/notes sections
+       collapse. The generated index/TOC is wrapped separately.
        The MD source is untouched; collapsibility lives entirely in the HTML
        twin so the in-the-moment append discipline is unchanged. */
 
@@ -324,10 +366,11 @@
     }
 
     details.entry { margin: 0.4em 0; }
+    details.entry.level-2 { margin-top: 2.1em; }
     details.entry.level-3 { margin-top: 1.6em; }
     details.entry.level-4 { margin-top: 0.7em; }
 
-    /* The original H3/H4 styling now lives on the summary, scoped by level. */
+    /* The original H2/H3/H4 styling now lives on the summary, scoped by level. */
     summary.entry-summary {
       cursor: pointer;
       list-style: none;
@@ -350,6 +393,52 @@
       transform: translateY(-50%) rotate(90deg);
     }
 
+    /* Growing-section H2 (Aggregated learnings / End-Of-Window Synthesis /
+       Recommendations / Candidate Backlog Items) */
+    summary.entry-summary.level-2 {
+      font-size: 1.32em;
+      font-weight: 650;
+      margin-top: 0.4em;
+      padding: 0.7em 0.9em 0.7em 1.7em;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    /* Date H2 — calendar-flavored card, gradient tint, prominent left rail */
+    summary.entry-summary.level-2.date-summary {
+      font-size: 1.18em;
+      padding: 0.85em 1em 0.85em 2.5em;
+      background: linear-gradient(180deg, var(--card-bg) 0%, var(--date-tint) 100%);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-top: 0.6em;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.55em;
+    }
+    summary.entry-summary.level-2.date-summary::before {
+      left: 0.7em;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.95em;
+    }
+    details.entry.date-card[open] > summary.entry-summary.level-2.date-summary::before {
+      transform: translateY(-50%) rotate(90deg);
+    }
+    /* Calendar glyph as a soft visual hook on date cards */
+    summary.entry-summary.level-2.date-summary > h2::before {
+      content: '📅 ';
+      margin-right: 0.15em;
+      opacity: 0.65;
+      font-weight: normal;
+    }
+
+    /* Plain H3 entry */
     summary.entry-summary.level-3 {
       font-size: 1.05em;
       font-weight: 600;
@@ -359,6 +448,26 @@
       border-radius: 0 3px 3px 0;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
+    /* Date H3 — same date-summary treatment, slightly less prominent than H2 */
+    summary.entry-summary.level-3.date-summary {
+      font-size: 1.1em;
+      padding: 0.65em 0.9em 0.65em 2.3em;
+      background: linear-gradient(180deg, var(--card-bg) 0%, var(--date-tint) 100%);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.55em;
+    }
+    summary.entry-summary.level-3.date-summary > h3::before {
+      content: '📅 ';
+      margin-right: 0.15em;
+      opacity: 0.65;
+      font-weight: normal;
+    }
+
     summary.entry-summary.level-4 {
       font-size: 0.98em;
       color: var(--muted);
@@ -366,10 +475,53 @@
       padding: 0.4em 0.4em 0.4em 1.5em;
       border-bottom: 1px dashed var(--border);
     }
-    summary.entry-summary:hover { background: var(--code-bg); }
 
-    /* Reset the inner heading element (h3/h4 that's now wrapped in <summary>)
+    summary.entry-summary:hover { background: var(--code-bg); }
+    summary.entry-summary.date-summary:hover {
+      background: linear-gradient(180deg, var(--code-bg) 0%, var(--date-tint) 100%);
+    }
+
+    /* Date-summary meta row: TODAY badge / entry count / verdict roll-up */
+    .date-meta {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45em;
+      font-size: 0.78em;
+      font-weight: 500;
+    }
+    .date-badge.today {
+      background: var(--accent);
+      color: #fff;
+      padding: 0.18em 0.6em;
+      border-radius: 999px;
+      font-size: 0.78em;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .entry-count {
+      color: var(--muted);
+      background: var(--code-bg);
+      padding: 0.18em 0.6em;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+    .verdict-row { display: inline-flex; gap: 0.3em; }
+    .verdict {
+      padding: 0.18em 0.5em;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 0.96em;
+    }
+    .verdict.ok { color: var(--ok); background: var(--ok-bg); }
+    .verdict.partial { color: var(--partial); background: var(--partial-bg); }
+    .verdict.wrong { color: var(--wrong); background: var(--wrong-bg); }
+
+    /* Reset the inner heading element (h2/h3/h4 that's now wrapped in <summary>)
        so it inherits summary styles instead of the base h3/h4 ones. */
+    summary.entry-summary > h2,
     summary.entry-summary > h3,
     summary.entry-summary > h4 {
       display: inline;
@@ -384,7 +536,10 @@
       font-weight: inherit;
     }
 
-    /* Indent H4 details a touch when nested under an H3 details. */
+    /* Indent nested details a touch while preserving scanability. */
+    details.entry.level-2[open] > details.entry.level-3 {
+      margin-left: 0.45em;
+    }
     details.entry.level-3[open] > details.entry.level-4 {
       margin-left: 0.6em;
     }
@@ -393,28 +548,81 @@
     @media print {
       body { background: white; padding: 0; max-width: none; font-size: 11pt; }
       .entry-toolbar { display: none; }
+      .date-meta { display: none; }
       details.entry > * { display: block !important; }
       summary.entry-summary {
         list-style: none;
         padding-left: 0;
-        background: transparent;
+        background: transparent !important;
         box-shadow: none;
+        border: none;
       }
       summary.entry-summary::before { display: none; }
-      summary.entry-summary.level-3 { background: transparent; box-shadow: none; }
+      summary.entry-summary.level-2,
+      summary.entry-summary.level-3,
+      summary.entry-summary.date-summary {
+        background: transparent !important;
+        box-shadow: none;
+        border-left: none;
+      }
+      summary.entry-summary.date-summary > h2::before,
+      summary.entry-summary.date-summary > h3::before { content: ''; }
       nav#TOC { page-break-after: always; }
     }
   </style>
 
   <script>
+    /* 2026-05-09 redesign — date-grouped, weighted collapsibility.
+
+       Static H2 sections (How To Read / Interaction Schema / Quick-Fill
+       Template / What To Watch For / Interactions By Date label / Journal
+       Operating Notes) NEVER collapse — reference material that doesn't
+       grow with the project.
+
+       Growing H2 sections (Aggregated learnings / End-Of-Window Synthesis /
+       Recommendations / Candidate Backlog Items) DO collapse — they
+       accumulate as windows close.
+
+       Date H2 sections (`YYYY-MM-DD …`) become date cards — closed by
+       default, latest auto-opens, "TODAY" badge if the date matches the
+       local calendar day. Each card auto-renders an entry-count + verdict
+       roll-up (✅ / 🟡 / ❌) parsed from the H3 entries inside.
+
+       H3 and H4 entries collapse individually as before. */
     (function () {
+      var DATE_RE = /^(\d{4}-\d{2}-\d{2})\b/;
+      // Static section ids — these stay always-visible. Match by id rather
+      // than text so renaming a heading body doesn't accidentally flip
+      // a section into collapse mode.
+      var STATIC_H2_IDS = [
+        'how-to-read-this-journal',
+        'how-to-use-this-journal',
+        'interaction-schema',
+        'quick-fill-template',
+        'quick-fill-observation-template',
+        'what-to-watch-for',
+        'what-to-watch-for-from-item-018s-what-v1.5-will-teach-us',
+        'interactions-by-date',
+        'daily-entries',
+        'notes-on-running-this-journal',
+        'journal-operating-notes',
+      ];
+
       function init() {
         var body = document.body;
         if (!body || body.dataset.entriesWrapped === '1') return;
 
-        // Bottom-up: wrap H4 first, then H3, so H3 details naturally contain H4 details.
+        // Bottom-up so children get wrapped before parents claim siblings.
         wrapHeadingLevel(4);
         wrapHeadingLevel(3);
+        wrapHeadingLevel(2);
+        // Same-day H2/H3s get merged into one card; keeps the
+        // one-card-per-day promise even when the source MD authored a
+        // date-header followed by a sibling timestamped section.
+        mergeSameDayCards();
+        decorateDateCards();
+        openLatestDate();
+        wrapTOC();
 
         installToolbar();
         installHashOpener();
@@ -423,14 +631,13 @@
 
       function wrapHeadingLevel(level) {
         var tag = 'h' + level;
-        // Snapshot before mutating. Skip headings that are already inside a summary
-        // (defensive — shouldn't happen given bottom-up order) or inside the TOC.
         var headings = Array.prototype.filter.call(
           document.getElementsByTagName(tag),
           function (h) {
             if (h.closest('summary.entry-summary')) return false;
             if (h.closest('nav#TOC')) return false;
             if (h.classList.contains('title')) return false;
+            if (level === 2 && !shouldWrapH2(h)) return false;
             return true;
           }
         );
@@ -439,15 +646,19 @@
         for (var l = 1; l <= level; l++) stopTags['H' + l] = true;
 
         headings.forEach(function (heading) {
+          var isDate = DATE_RE.test((heading.textContent || '').trim());
+
           var details = document.createElement('details');
           details.className = 'entry level-' + level;
+          if (isDate) details.classList.add('date-card');
 
           var summary = document.createElement('summary');
           summary.className = 'entry-summary level-' + level;
+          if (isDate) summary.classList.add('date-summary');
 
           // Move heading element itself into the summary so its id and content
           // are preserved verbatim (TOC anchors keep working, screen readers
-          // still see an h3/h4).
+          // still see an h2/h3/h4).
           var parent = heading.parentNode;
           parent.insertBefore(details, heading);
           details.appendChild(summary);
@@ -465,22 +676,161 @@
         });
       }
 
+      // Wrap if (a) date-pattern (always — dates collapse into cards),
+      // OR (b) not in the static-id list (growing reference sections).
+      function shouldWrapH2(heading) {
+        var text = (heading.textContent || '').trim();
+        if (DATE_RE.test(text)) return true;
+        var id = heading.id || '';
+        if (STATIC_H2_IDS.indexOf(id) !== -1) return false;
+        // Anything else (Aggregated learnings, End-Of-Window, Candidate
+        // Backlog Items, Recommendations) is a growing section → wrap.
+        return true;
+      }
+
+      // When two date-cards share the same date prefix (e.g., a date
+      // header at H2 followed by a timestamped block at H2 on the same
+      // day), demote the second to a level-3 entry inside the first.
+      function mergeSameDayCards() {
+        var cards = Array.prototype.slice.call(
+          document.querySelectorAll('details.entry.date-card')
+        );
+        var firstByDate = {};
+        cards.forEach(function (card) {
+          var heading = card.querySelector('summary > h2, summary > h3');
+          if (!heading) return;
+          var match = DATE_RE.exec((heading.textContent || '').trim());
+          if (!match) return;
+          var key = match[1];
+          if (firstByDate[key] && firstByDate[key] !== card) {
+            // Demote: drop the date-card affordance so the second reads
+            // as a regular entry, then re-parent inside the first card.
+            card.classList.remove('date-card');
+            card.classList.remove('level-2');
+            card.classList.add('level-3');
+            var summary = card.querySelector('summary.entry-summary');
+            if (summary) {
+              summary.classList.remove('date-summary');
+              summary.classList.remove('level-2');
+              summary.classList.add('level-3');
+            }
+            firstByDate[key].appendChild(card);
+          } else {
+            firstByDate[key] = card;
+          }
+        });
+      }
+
+      // Inject a meta line into each date card's summary: TODAY badge +
+      // entry count + verdict tally parsed from the entries inside.
+      function decorateDateCards() {
+        var cards = document.querySelectorAll('details.entry.date-card');
+        var todayKey = localTodayKey();
+        cards.forEach(function (card) {
+          var heading = card.querySelector('summary > h2, summary > h3');
+          if (!heading) return;
+          var match = DATE_RE.exec((heading.textContent || '').trim());
+          if (!match) return;
+          var dateKey = match[1];
+
+          // Count direct child entries (H3 collapsibles + nested non-date H2
+          // collapsibles that were demoted by mergeSameDayCards).
+          var entryEls = card.querySelectorAll(
+            ':scope > details.entry.level-3, :scope > details.entry.level-4'
+          );
+          var entryCount = entryEls.length;
+
+          // Verdict roll-up: scan the inner text once and tally verdict emoji.
+          var bodyText = card.textContent || '';
+          var verdicts = {
+            ok: (bodyText.match(/✅/g) || []).length,
+            partial: (bodyText.match(/🟡/g) || []).length,
+            wrong: (bodyText.match(/❌/g) || []).length,
+          };
+
+          var meta = document.createElement('span');
+          meta.className = 'date-meta';
+
+          var parts = [];
+          if (dateKey === todayKey) {
+            parts.push('<span class="date-badge today">TODAY</span>');
+          }
+          if (entryCount > 0) {
+            parts.push(
+              '<span class="entry-count">' + entryCount +
+              ' entr' + (entryCount === 1 ? 'y' : 'ies') + '</span>'
+            );
+          }
+          var verdictBadges = [];
+          if (verdicts.ok)
+            verdictBadges.push('<span class="verdict ok" title="right">✅ ' + verdicts.ok + '</span>');
+          if (verdicts.partial)
+            verdictBadges.push('<span class="verdict partial" title="partial">🟡 ' + verdicts.partial + '</span>');
+          if (verdicts.wrong)
+            verdictBadges.push('<span class="verdict wrong" title="wrong">❌ ' + verdicts.wrong + '</span>');
+          if (verdictBadges.length) {
+            parts.push(
+              '<span class="verdict-row">' + verdictBadges.join('') + '</span>'
+            );
+          }
+
+          if (parts.length === 0) return;
+          meta.innerHTML = parts.join('');
+          var summary = card.querySelector('summary.date-summary');
+          if (summary) summary.appendChild(meta);
+        });
+      }
+
+      // Open the most recently-dated card by default. Cards appear in
+      // document order; content authors append newest at the bottom of
+      // each file, so the LAST card is the most recent.
+      function openLatestDate() {
+        var cards = document.querySelectorAll('details.entry.date-card');
+        if (cards.length === 0) return;
+        cards[cards.length - 1].setAttribute('open', '');
+      }
+
+      function localTodayKey() {
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+      }
+
+      function wrapTOC() {
+        var toc = document.querySelector('nav#TOC');
+        if (!toc || toc.closest('details.toc')) return;
+
+        var details = document.createElement('details');
+        details.className = 'toc';
+
+        var summary = document.createElement('summary');
+        summary.className = 'toc-summary';
+        summary.textContent = 'Index';
+
+        var parent = toc.parentNode;
+        parent.insertBefore(details, toc);
+        details.appendChild(summary);
+        details.appendChild(toc);
+      }
+
       function installToolbar() {
         var toolbar = document.createElement('div');
         toolbar.className = 'entry-toolbar';
         toolbar.innerHTML =
           '<button type="button" data-act="expand">Expand all</button>' +
           '<button type="button" data-act="collapse">Collapse all</button>' +
-          '<span class="hint">click any heading to expand · ⌘F still searches collapsed entries on most browsers</span>';
-        // Insert before the TOC (or, if no TOC, before the first body child).
-        var anchor = document.querySelector('nav#TOC') || document.body.firstChild;
+          '<span class="hint">latest day opens by default · click any date to expand · ⌘F still searches collapsed entries on most browsers</span>';
+        // Insert before the collapsible TOC (or, if no TOC, before the first body child).
+        var anchor = document.querySelector('details.toc') || document.querySelector('nav#TOC') || document.body.firstChild;
         document.body.insertBefore(toolbar, anchor);
 
         toolbar.addEventListener('click', function (e) {
           var btn = e.target.closest && e.target.closest('button[data-act]');
           if (!btn) return;
           var open = btn.getAttribute('data-act') === 'expand';
-          document.querySelectorAll('details.entry').forEach(function (d) {
+          document.querySelectorAll('details.entry, details.toc').forEach(function (d) {
             d.open = open;
           });
         });
@@ -527,40 +877,268 @@ cross-AI)</h1>
 id="toc-echo-mcp-interactions-journal-cross-tool-cross-ai">ECHO MCP
 interactions journal (cross-tool, cross-AI)</a>
 <ul>
-<li><a href="#how-to-use-this-journal"
-id="toc-how-to-use-this-journal">How to use this journal</a></li>
-<li><a href="#quick-fill-observation-template"
-id="toc-quick-fill-observation-template">Quick-fill observation
-template</a></li>
-<li><a href="#what-to-watch-for-from-item-018s-what-v1.5-will-teach-us"
-id="toc-what-to-watch-for-from-item-018s-what-v1.5-will-teach-us">What
-to watch for (from item 018’s “what V1.5 will teach us”)</a></li>
-<li><a href="#daily-entries" id="toc-daily-entries">Daily entries</a>
-<ul>
+<li><a href="#how-to-read-this-journal"
+id="toc-how-to-read-this-journal">How To Read This Journal</a></li>
+<li><a href="#interaction-schema"
+id="toc-interaction-schema">Interaction Schema</a></li>
+<li><a href="#quick-fill-template"
+id="toc-quick-fill-template">Quick-Fill Template</a></li>
+<li><a href="#what-to-watch-for" id="toc-what-to-watch-for">What To
+Watch For</a></li>
+<li><a href="#interactions-by-date"
+id="toc-interactions-by-date">Interactions By Date</a></li>
 <li><a href="#dogfooding-day-1" id="toc-dogfooding-day-1">2026-05-07 —
-dogfooding day 1</a></li>
+dogfooding day 1</a>
+<ul>
+<li><a href="#pdt-first-call-wedged-the-consumers-context-budget"
+id="toc-pdt-first-call-wedged-the-consumers-context-budget">01:08 PDT —
+first call wedged the consumer’s context budget</a></li>
+<li><a href="#pdt-first-end-to-end-success-sub-minute-capture-latency"
+id="toc-pdt-first-end-to-end-success-sub-minute-capture-latency">15:39
+PDT — first end-to-end success; sub-minute capture latency</a></li>
+<li><a href="#pdt-one-hour-cross-platform-context-retrieval-from-codex"
+id="toc-pdt-one-hour-cross-platform-context-retrieval-from-codex">15:56
+PDT — one-hour cross-platform context retrieval from Codex</a></li>
+<li><a
+href="#pdt-false-negative-edge-filter-didnt-work-because-daemon-was-stale"
+id="toc-pdt-false-negative-edge-filter-didnt-work-because-daemon-was-stale">16:15
+PDT — false-negative: edge filter “didn’t work” because daemon was
+stale</a></li>
+<li><a href="#pdt-post-restart-edge-filter-validated"
+id="toc-pdt-post-restart-edge-filter-validated">16:16 PDT —
+post-restart: edge filter validated</a></li>
+<li><a href="#pdt-format-minimal-validated"
+id="toc-pdt-format-minimal-validated">16:16 PDT —
+<code>format: 'minimal'</code> validated</a></li>
+<li><a href="#pdt-codex-asks-echo-what-claude-just-changed"
+id="toc-pdt-codex-asks-echo-what-claude-just-changed">16:22 PDT — Codex
+asks ECHO what Claude just changed</a></li>
+<li><a
+href="#pdt-codex-repeats-claude-lookup-using-only-trace-clustering"
+id="toc-pdt-codex-repeats-claude-lookup-using-only-trace-clustering">16:33
+PDT — Codex repeats Claude lookup using only trace clustering</a></li>
+<li><a
+href="#pdt-where-did-i-leave-off-on-the-hotkey-render-knn-sensitivity-design-conversation-orphaning"
+id="toc-pdt-where-did-i-leave-off-on-the-hotkey-render-knn-sensitivity-design-conversation-orphaning">22:40
+PDT — “where did I leave off on the hotkey render” — KNN sensitivity +
+design-conversation orphaning</a></li>
+<li><a
+href="#pdt-investigation-c3-conjecture-was-wrong-two-real-bugs-surfaced-underneath"
+id="toc-pdt-investigation-c3-conjecture-was-wrong-two-real-bugs-surfaced-underneath">22:50
+PDT — investigation: C3 conjecture WAS WRONG; two real bugs surfaced
+underneath</a></li>
+</ul></li>
+<li><a href="#dogfooding-day-2" id="toc-dogfooding-day-2">2026-05-08 —
+dogfooding day 2</a>
+<ul>
+<li><a href="#pdt-round-4-post-019020021v1.5.1-substrate-dogfooding"
+id="toc-pdt-round-4-post-019020021v1.5.1-substrate-dogfooding">00:30 PDT
+— round 4: post-019/020/021/V1.5.1 substrate dogfooding</a></li>
+<li><a href="#pdt-codex-lookup-latest-claude-interaction"
+id="toc-pdt-codex-lookup-latest-claude-interaction">00:42 PDT — Codex
+lookup: latest Claude interaction</a></li>
+<li><a href="#pdt-codex-review-verify-claudes-round-4-bug-claims"
+id="toc-pdt-codex-review-verify-claudes-round-4-bug-claims">00:46 PDT —
+Codex review: verify Claude’s round-4 bug claims</a></li>
+<li><a href="#pdt-codex-check-claude-validation-of-codex-review"
+id="toc-pdt-codex-check-claude-validation-of-codex-review">00:53 PDT —
+Codex check: Claude validation of Codex review</a></li>
+<li><a href="#pdt-claude-resume-where-did-i-leave-off-after-clear"
+id="toc-pdt-claude-resume-where-did-i-leave-off-after-clear">01:03 PDT —
+Claude resume: where did I leave off after /clear</a></li>
+<li><a href="#pdt-claude-lookup-pull-codexs-spec-review-reply"
+id="toc-pdt-claude-lookup-pull-codexs-spec-review-reply">01:04 PDT —
+Claude lookup: pull Codex’s spec review reply</a></li>
+<li><a href="#pdt-codex-check-claude-applied-spec-review-fixes"
+id="toc-pdt-codex-check-claude-applied-spec-review-fixes">01:11 PDT —
+Codex check: Claude applied spec review fixes</a></li>
+<li><a href="#pdt-codex-review-claude-0119-codex-extractor-conjecture"
+id="toc-pdt-codex-review-claude-0119-codex-extractor-conjecture">01:24
+PDT — Codex review: Claude 01:19 Codex-extractor conjecture</a></li>
+<li><a
+href="#pdt-codex-asks-echo-what-the-founder-is-currently-working-on"
+id="toc-pdt-codex-asks-echo-what-the-founder-is-currently-working-on">01:33
+PDT — Codex asks ECHO what the founder is currently working on</a></li>
+<li><a href="#pdt-codex-investigates-why-codexgit-did-not-surface"
+id="toc-pdt-codex-investigates-why-codexgit-did-not-surface">01:39 PDT —
+Codex investigates why Codex/git did not surface</a></li>
+<li><a href="#pdt-codex-re-verifies-_followups.md-gaps-after-022023"
+id="toc-pdt-codex-re-verifies-_followups.md-gaps-after-022023">02:05 PDT
+— Codex re-verifies <code>_followups.md</code> gaps after
+022/023</a></li>
+<li><a
+href="#pdt-claude-code-retrieves-codexs-0205-pdt-investigation-via-echo-post-022023-meta-dogfooding"
+id="toc-pdt-claude-code-retrieves-codexs-0205-pdt-investigation-via-echo-post-022023-meta-dogfooding">02:10
+PDT — Claude Code retrieves Codex’s 02:05 PDT investigation via ECHO
+(post-022/023 meta-dogfooding)</a></li>
+<li><a
+href="#pdt-claude-code-reconstructs-where-founder-left-off-last-night-via-two-trace-calls"
+id="toc-pdt-claude-code-reconstructs-where-founder-left-off-last-night-via-two-trace-calls">12:03
+PDT — Claude Code reconstructs “where founder left off last night” via
+two trace calls</a></li>
+<li><a
+href="#pdt-disambiguation-probe-search_memories-drops-timezone-offset-on-sinceuntil"
+id="toc-pdt-disambiguation-probe-search_memories-drops-timezone-offset-on-sinceuntil">12:08
+PDT — Disambiguation probe: search_memories drops timezone offset on
+<code>since</code>/<code>until</code></a></li>
+<li><a href="#pdt-codex-resumes-from-prior-codexecho-context"
+id="toc-pdt-codex-resumes-from-prior-codexecho-context">13:13 PDT —
+Codex resumes from prior Codex/ECHO context</a></li>
+<li><a
+href="#pdt-codex-tries-to-retrieve-claude-mcp-tool-best-practices-claim"
+id="toc-pdt-codex-tries-to-retrieve-claude-mcp-tool-best-practices-claim">13:22
+PDT — Codex tries to retrieve Claude MCP-tool best-practices
+claim</a></li>
+<li><a
+href="#pdt-claude-retrieves-codexs-mcp-best-practices-counter-diagnosis"
+id="toc-pdt-claude-retrieves-codexs-mcp-best-practices-counter-diagnosis">13:27
+PDT — Claude retrieves Codex’s MCP-best-practices
+counter-diagnosis</a></li>
+<li><a
+href="#pdt-reverification-of-codexs-8-claims-against-project_echo-code"
+id="toc-pdt-reverification-of-codexs-8-claims-against-project_echo-code">13:35
+PDT — Reverification of Codex’s 8 claims against Project_echo
+code</a></li>
+<li><a href="#pdt-codex-tries-to-retrieve-claudes-025-spec-context"
+id="toc-pdt-codex-tries-to-retrieve-claudes-025-spec-context">13:46 PDT
+— Codex tries to retrieve Claude’s 025 spec context</a></li>
+<li><a href="#pdt-codex-retries-exact-025-claude-context-lookup"
+id="toc-pdt-codex-retries-exact-025-claude-context-lookup">13:51 PDT —
+Codex retries exact 025 Claude-context lookup</a></li>
+<li><a href="#pdt-codex-tries-to-retrieve-claude-bypass-deep-dive"
+id="toc-pdt-codex-tries-to-retrieve-claude-bypass-deep-dive">14:14 PDT —
+Codex tries to retrieve Claude bypass deep dive</a></li>
+<li><a href="#pdt-codex-minimal-transport-reproduction-for-027"
+id="toc-pdt-codex-minimal-transport-reproduction-for-027">14:22 PDT —
+Codex minimal transport reproduction for 027</a></li>
+<li><a
+href="#pdt-strategist-self-audit-todays-echo-bypasses-corrected-failure-b-root-cause"
+id="toc-pdt-strategist-self-audit-todays-echo-bypasses-corrected-failure-b-root-cause">14:35
+PDT — Strategist self-audit: today’s ECHO bypasses + corrected Failure B
+root cause</a></li>
+<li><a
+href="#pdt-founder-asked-claude-to-identify-codexs-recurring-json-rpc-error-via-echo"
+id="toc-pdt-founder-asked-claude-to-identify-codexs-recurring-json-rpc-error-via-echo">14:43
+PDT — Founder asked Claude to identify Codex’s recurring JSON-RPC error
+via ECHO</a></li>
+<li><a
+href="#pdt-strategist-applies-new-discipline-codex-pair-review-finds-5-issues-in-026"
+id="toc-pdt-strategist-applies-new-discipline-codex-pair-review-finds-5-issues-in-026">14:43
+PDT — Strategist applies new discipline; Codex pair-review finds 5
+issues in 026</a></li>
+<li><a href="#pdt-codex-resumes-from-prior-session-via-echo"
+id="toc-pdt-codex-resumes-from-prior-session-via-echo">14:46 PDT — Codex
+resumes from prior session via ECHO</a></li>
+<li><a
+href="#pdt-claude-code-post-merge-verification-of-item-025-mcp-best-practices"
+id="toc-pdt-claude-code-post-merge-verification-of-item-025-mcp-best-practices">15:05
+PDT — Claude Code post-merge verification of item 025 (MCP
+best-practices)</a></li>
+<li><a
+href="#pdt-claude-code-use-echo-to-resume-session-resume-context-pull"
+id="toc-pdt-claude-code-use-echo-to-resume-session-resume-context-pull">15:14
+PDT — Claude Code “use echo to resume” — session-resume context
+pull</a></li>
+<li><a
+href="#pdt-claude-code-post-026027-second-verification-round-the-gated-round"
+id="toc-pdt-claude-code-post-026027-second-verification-round-the-gated-round">15:54
+PDT — Claude Code post-026+027 second verification round (THE GATED
+ROUND)</a></li>
+<li><a
+href="#pdt-claude-code-post-bugs-ab-merge-live-verification-third-round"
+id="toc-pdt-claude-code-post-bugs-ab-merge-live-verification-third-round">16:14
+PDT — Claude Code post-Bugs-A+B-merge live verification (third
+round)</a></li>
 <li><a href="#pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6"
-id="toc-pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">2026-05-08
-17:01–17:03 PDT — V1.5 full-halt live test (post-028 +
-post-V1.5.6)</a></li>
+id="toc-pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">17:01–17:03
+PDT — V1.5 full-halt live test (post-028 + post-V1.5.6)</a></li>
+<li><a
+href="#pdt-claude-code-post-v1.5.6.1-merge-live-verification-workflow-trajectory-close"
+id="toc-pdt-claude-code-post-v1.5.6.1-merge-live-verification-workflow-trajectory-close">17:05
+PDT — Claude Code post-V1.5.6.1-merge live verification (workflow
+trajectory close)</a></li>
+<li><a
+href="#pdt-claude-code-post-v1.5.7-bundle-live-verification-gap-diagnoses"
+id="toc-pdt-claude-code-post-v1.5.7-bundle-live-verification-gap-diagnoses">20:55
+PDT — Claude Code post-V1.5.7 bundle live verification + Gap
+diagnoses</a></li>
+<li><a
+href="#pdt-claude-code-where-did-we-leave-off-clean-worktrees-resume-call"
+id="toc-pdt-claude-code-where-did-we-leave-off-clean-worktrees-resume-call">23:32
+PDT — Claude Code “where did we leave off + clean worktrees” resume
+call</a></li>
+<li><a href="#pdt-codex-resume-check-where-we-left-off"
+id="toc-pdt-codex-resume-check-where-we-left-off">23:36 PDT — Codex
+resume check: “where we left off”</a></li>
+</ul></li>
 <li><a href="#dogfooding-day-3-post-v1.5-promotion-demo-video-planning"
 id="toc-dogfooding-day-3-post-v1.5-promotion-demo-video-planning">2026-05-09
-— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</a></li>
+— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</a>
+<ul>
+<li><a
+href="#pdt-claude-code-use-echo-to-see-where-we-left-off-resume-call"
+id="toc-pdt-claude-code-use-echo-to-see-where-we-left-off-resume-call">13:41
+PDT — Claude Code “use echo to see where we left off” resume
+call</a></li>
 <li><a
 href="#pdt-tail_session-cross-session-peek-tail-my-active-claude-session"
-id="toc-pdt-tail_session-cross-session-peek-tail-my-active-claude-session">2026-05-09
-13:55 PDT — <code>tail_session</code> cross-session peek (“tail my
-active claude session”)</a></li>
+id="toc-pdt-tail_session-cross-session-peek-tail-my-active-claude-session">13:55
+PDT — <code>tail_session</code> cross-session peek (“tail my active
+claude session”)</a></li>
+<li><a
+href="#pdt-cross-app-all-active-sessions-sweep-get_recent_work_context-4-tail_session"
+id="toc-pdt-cross-app-all-active-sessions-sweep-get_recent_work_context-4-tail_session">13:58
+PDT — Cross-app “all active sessions” sweep
+(<code>get_recent_work_context</code> + 4×
+<code>tail_session</code>)</a></li>
+<li><a
+href="#pdt-claude-code-tail-of-cursor-for-cross-tool-review-loop-complements-codex-1415-pdt-entry"
+id="toc-pdt-claude-code-tail-of-cursor-for-cross-tool-review-loop-complements-codex-1415-pdt-entry">14:01
+PDT — Claude Code tail of Cursor for cross-tool review loop (complements
+Codex 14:15 PDT entry)</a></li>
+<li><a
+href="#pdt-codex-follow-up-project_echo-current-session-inventory"
+id="toc-pdt-codex-follow-up-project_echo-current-session-inventory">14:02
+PDT — Codex follow-up: Project_echo current-session inventory</a></li>
+<li><a
+href="#pdt-handoff-ping-cc-drafting-029-for-cursor-builder-tail_session-precise-source"
+id="toc-pdt-handoff-ping-cc-drafting-029-for-cursor-builder-tail_session-precise-source">14:05
+PDT — Handoff ping: CC drafting 029 for Cursor builder
+(<code>tail_session</code> precise source)</a></li>
+<li><a href="#pdt-tail-refresh-for-claude-answer-review-029-scope-pivot"
+id="toc-pdt-tail-refresh-for-claude-answer-review-029-scope-pivot">14:15
+PDT — Tail refresh for Claude answer review (029 scope pivot)</a></li>
+<li><a
+href="#pdt-codex-tool-registry-anomaly-tail_session-absent-in-this-client"
+id="toc-pdt-codex-tool-registry-anomaly-tail_session-absent-in-this-client">14:17
+PDT — Codex tool-registry anomaly: <code>tail_session</code> absent in
+this client</a></li>
+<li><a href="#pdt-codex-direct-http-tail-of-claude-cursor-review-loop"
+id="toc-pdt-codex-direct-http-tail-of-claude-cursor-review-loop">14:20
+PDT — Codex direct HTTP tail of Claude-Cursor review loop</a></li>
+<li><a
+href="#pdt-tail_sessionclaude_code-mru-for-parallel-strategist-brainstorm"
+id="toc-pdt-tail_sessionclaude_code-mru-for-parallel-strategist-brainstorm">2026-05-09
+14:48 PDT — <code>tail_session(claude_code)</code> MRU for parallel
+strategist brainstorm</a></li>
+<li><a
+href="#pdt-tail_sessionclaude_code-founder-friction-triad-session-link-resume-artifact-determinism"
+id="toc-pdt-tail_sessionclaude_code-founder-friction-triad-session-link-resume-artifact-determinism">2026-05-09
+14:53 PDT — <code>tail_session(claude_code)</code> founder friction
+triad (session link / resume / artifact determinism)</a></li>
+<li><a
+href="#pdt-evaluation-cc-turn-14-artifact-worry-robustness-ladder-tail_session-refresh"
+id="toc-pdt-evaluation-cc-turn-14-artifact-worry-robustness-ladder-tail_session-refresh">2026-05-09
+15:12 PDT — Evaluation: CC turn 14 (artifact worry / robustness ladder)
++ <code>tail_session</code> refresh</a></li>
 </ul></li>
-<li><a href="#aggregated-learnings-filled-at-end-of-window"
-id="toc-aggregated-learnings-filled-at-end-of-window">Aggregated
-learnings (filled at end of window)</a></li>
-<li><a href="#recommendations-candidate-v1.5-backlog-items"
-id="toc-recommendations-candidate-v1.5-backlog-items">Recommendations /
-candidate V1.5+ backlog items</a></li>
-<li><a href="#notes-on-running-this-journal"
-id="toc-notes-on-running-this-journal">Notes on running this
-journal</a></li>
+<li><a href="#end-of-window-synthesis-filled-at-end-of-window"
+id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
+Synthesis (filled at end of window)</a></li>
+<li><a href="#candidate-backlog-items"
+id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
+<li><a href="#journal-operating-notes"
+id="toc-journal-operating-notes">Journal Operating Notes</a></li>
 </ul></li>
 </ul>
 </nav>
@@ -572,9 +1150,7 @@ call</strong> from any AI client. Started 2026-05-07 as the V1.5
 filed under <code>2026-05-07-trace-layer.md</code>); in operational
 practice it expanded to cover every <code>mcp__echo__*</code> /
 <code>mcp__echo-memory__*</code> invocation regardless of which item,
-tool, or AI client made the call. The original V1.5-trace-layer framing
-is preserved as the “Round 1–4” sections below; subsequent rounds extend
-across items 019, 020, 021, 022, 023, V1.5.1, and beyond.</p>
+tool, or AI client made the call.</p>
 <p><strong>Originating item:</strong> <a
 href="../../../backlog/complete/2026-05-06-018-recent-work-context-tool.md"><code>2026-05-06-018-recent-work-context-tool</code></a>
 — but this journal is no longer scoped to one item. <strong>Sources
@@ -582,39 +1158,56 @@ active in store:</strong> claude-code, codex, cursor, git
 <strong>Goal:</strong> generate enough cross-tool observations to know
 what V1.5+ should fix, what V2 should preserve, and whether item 017
 (<code>search_memories</code> returning normalized atoms) is needed.</p>
-<h2 id="how-to-use-this-journal">How to use this journal</h2>
-<p>Fill an entry <strong>in the moment</strong> when any ECHO MCP call
-delights, disappoints, or fails. The cost should be ~30 seconds per
-entry — copy the template, jot a one-liner, move on. Aspirational
-entries written at end-of-week are useless; lossy in-the-moment entries
-are gold.</p>
-<p>Codex, Claude Code, Cursor’s Claude, agent runs, and any other AI
-client invoking the MCP server must log every ECHO MCP interaction here,
-including <code>get_recent_work_context</code>,
-<code>search_memories</code>, <code>echo_ping</code>,
-<code>memory_*</code>, and equivalent local MCP/CLI calls. Multiple
-calls from one task may be grouped into one detailed entry if the inputs
-and observed results are all captured.</p>
-<p>This journal is the <strong>input</strong>; the V1.5+ backlog items
-the strategist writes after each round of synthesis are the
-<strong>output</strong>. Don’t try to design fixes here — just
-observe.</p>
-<h2 id="quick-fill-observation-template">Quick-fill observation
-template</h2>
-<p>Copy this block when adding an entry. <strong>All times are local
-(PDT, America/Los_Angeles)</strong> — convert from raw ISO 8601 UTC on
-write so the journal reads naturally on the founder’s machine.</p>
-<pre><code>### YYYY-MM-DD HH:MM PDT — &lt;one-line context&gt;
-- **Trigger:** what I (or Cursor&#39;s Claude) just did that called the tool
-- **Query inputs:** since=…  until=…  artifact_hint=…
-- **Returned:** N clusters, M atoms; top cluster: &quot;&lt;label or none&gt;&quot;; rank_reasons: […]
-- **Sources:** source_breakdown={…} for trace; OR per-match source-prefix list for search; OR the specific jsonl/git/fs paths the atoms came from. Always shown — a reader must be able to tell which capture surfaces contributed and which were silently absent (source-volume bias and silent-omission are the most-recurring failure modes in this journal).
-- **Verdict:** ✅ right / 🟡 partial / ❌ wrong
-- **Note:** one-line observation — what felt right or off
-- **Conjecture:** (optional) what algorithm/config change might help</code></pre>
-<h2 id="what-to-watch-for-from-item-018s-what-v1.5-will-teach-us">What
-to watch for (from item 018’s “what V1.5 will teach us”)</h2>
-<p>Use these as the prompts you scan against during the day:</p>
+<h2 id="how-to-read-this-journal">How To Read This Journal</h2>
+<p>Entries are grouped by local calendar date. Each interaction has the
+same outer schema so a reader can quickly see who called ECHO, what
+tool/read path was used, which captured sources contributed, and whether
+the result was right.</p>
+<p><strong>Timezone convention:</strong> all times in this journal are
+<strong>founder’s local time (PDT, America/Los_Angeles)</strong> unless
+explicitly noted. Source data (CaptureEvent timestamps, MCP responses)
+stores ISO 8601 UTC; entries here are converted on write.</p>
+<h2 id="interaction-schema">Interaction Schema</h2>
+<p>Every interaction should use these fields in this order:</p>
+<ul>
+<li><strong>Source agent:</strong> the AI client or role that invoked
+ECHO: <code>Claude Code</code>, <code>Codex</code>,
+<code>Cursor's Claude</code>, <code>Strategist / Claude Code</code>, or
+<code>mixed</code>.</li>
+<li><strong>Trigger:</strong> what the user or AI client was trying to
+do.</li>
+<li><strong>Query inputs:</strong> exact tool names and arguments,
+including <code>since</code>, <code>until</code>, <code>source</code>,
+<code>source_app</code>, <code>source_prefix</code>,
+<code>format</code>, <code>limit</code>, and <code>cursor</code> when
+present.</li>
+<li><strong>Returned:</strong> response shape, not raw payload:
+clusters/atoms, matches, turns, warnings, top labels, rank reasons, ids,
+and whether payload spilled or was elided.</li>
+<li><strong>Read sources:</strong> non-optional. Use
+<code>source_breakdown={...}</code> for trace calls, exact
+<code>source_resolved=...</code> for tail calls, per-match source
+prefixes for search, or explicit filesystem/git/SQLite paths for direct
+probes. If a historical entry did not record this, say so plainly.</li>
+<li><strong>Verdict:</strong> ✅ right / 🟡 partial / ❌ wrong, with one
+short reason.</li>
+<li><strong>Note:</strong> the high-signal observation: useful, missing,
+too large, stale, surprising, or operationally awkward.</li>
+<li><strong>Conjecture:</strong> optional follow-up idea. Keep it
+observation-level; backlog specs are written elsewhere.</li>
+</ul>
+<h2 id="quick-fill-template">Quick-Fill Template</h2>
+<pre><code>### HH:MM PDT — &lt;one-line context&gt;
+
+- **Source agent:** &lt;Claude Code | Codex | Cursor&#39;s Claude | Strategist / Claude Code | mixed&gt;
+- **Trigger:** &lt;why the tool was called&gt;
+- **Query inputs:** &lt;tool(args), one line or compact numbered list&gt;
+- **Returned:** &lt;N clusters/M atoms, N matches, N turns, warnings, top label/rank reasons&gt;
+- **Read sources:** &lt;source_breakdown | source_resolved | per-match prefixes | exact paths&gt;
+- **Verdict:** &lt;✅ right | 🟡 partial | ❌ wrong&gt; — &lt;short reason&gt;
+- **Note:** &lt;what felt useful/off&gt;
+- **Conjecture:** &lt;optional&gt;</code></pre>
+<h2 id="what-to-watch-for">What To Watch For</h2>
 <table>
 <colgroup>
 <col style="width: 33%" />
@@ -687,20 +1280,18 @@ silently</td>
 </tr>
 </tbody>
 </table>
-<p>If something happens that doesn’t fit any of these, <strong>make a
-new category and call it out</strong> — that’s the highest-signal
-observation.</p>
-<h2 id="daily-entries">Daily entries</h2>
-<h3 id="dogfooding-day-1">2026-05-07 — dogfooding day 1</h3>
+<h2 id="interactions-by-date">Interactions By Date</h2>
+<h2 id="dogfooding-day-1">2026-05-07 — dogfooding day 1</h2>
 <blockquote>
 <p><strong>Timezone convention:</strong> all times in this journal are
 <strong>founder’s local time (PDT, America/Los_Angeles)</strong> unless
 explicitly noted. Source data (CaptureEvent timestamps, MCP responses)
 stores ISO 8601 UTC; entries here are converted on write.</p>
 </blockquote>
-<h4 id="pdt-first-call-wedged-the-consumers-context-budget">2026-05-07
-01:08 PDT — first call wedged the consumer’s context budget</h4>
+<h3 id="pdt-first-call-wedged-the-consumers-context-budget">01:08 PDT —
+first call wedged the consumer’s context budget</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked “check my echo mcp and see
 if you can know what codex is currently working on.” Claude Code session
 called <code>get_recent_work_context</code> with no args.</li>
@@ -710,6 +1301,9 @@ called <code>get_recent_work_context</code> with no args.</li>
 “discussion about Project_echo” (rank_reasons:
 <code>["recent_activity", "dense"]</code>). Total response:
 <strong>454,871 chars</strong>.</li>
+<li><strong>Read sources:</strong> <code>get_recent_work_context</code>
+default 4h window across ECHO storage; original entry did not record
+per-cluster <code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> ❌ wrong — response was too big to even
 read. Tool result handler refused the payload.</li>
 <li><strong>Note:</strong> trace algorithm was correct (clustering,
@@ -724,10 +1318,10 @@ all <code>scope</code> or <code>session</code> role; add opt-in
 item 019. Forensic data preserved at
 <code>raw/internal/dogfooding/019-trace-response-sample/</code>.</li>
 </ul>
-<h4
-id="pdt-first-end-to-end-success-sub-minute-capture-latency">2026-05-07
-15:39 PDT — first end-to-end success; sub-minute capture latency</h4>
+<h3 id="pdt-first-end-to-end-success-sub-minute-capture-latency">15:39
+PDT — first end-to-end success; sub-minute capture latency</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked “can you see me and codex
 convo in the past 5 mins” — testing whether ECHO actually captures live
 activity.</li>
@@ -739,6 +1333,9 @@ activity.</li>
 <li><strong>Returned:</strong> 10 events; the most recent turn-pair was
 timestamped 15:39:34 PDT, ~7 minutes before the query at 15:46 PDT.
 Recovered the full prompt + assistant response.</li>
+<li><strong>Read sources:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.codex/")</code>;
+Codex JSONL-derived atoms under <code>~/.codex/</code>.</li>
 <li><strong>Verdict:</strong> ✅ right — capture pipeline + retrieval
 are working end-to-end.</li>
 <li><strong>Note:</strong> sub-minute capture latency from codex’s JSONL
@@ -753,10 +1350,10 @@ different starts ≈ structural correctness signal.</li>
 tracking longitudinally whether other independent design conversations
 land on similar primitives — that’s repeatable validation.</li>
 </ul>
-<h4
-id="pdt-one-hour-cross-platform-context-retrieval-from-codex">2026-05-07
-15:56 PDT — one-hour cross-platform context retrieval from Codex</h4>
+<h3 id="pdt-one-hour-cross-platform-context-retrieval-from-codex">15:56
+PDT — one-hour cross-platform context retrieval from Codex</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder clarified “we are currently on
 V1.5 use ECHO MCP and read into Claude for better context; limit the
 time window to the past one hour.” Codex called
@@ -772,6 +1369,12 @@ conversation <code>684f37f7...</code>, and
 <code>backlog/ready/2026-05-07-019-trace-edge-filter-and-format.md</code>;
 rank_reasons:
 <code>["recent_activity", "has_open_loop", "dense"]</code>.</li>
+<li><strong>Read sources:</strong> <code>get_recent_work_context</code>
+over the one-hour cross-platform window; anchors included
+<code>Project_echo</code>, Claude Code session <code>684f37f7...</code>,
+and
+<code>backlog/ready/2026-05-07-019-trace-edge-filter-and-format.md</code>.
+Original entry did not record <code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> 🟡 partial — the retrieval found the right
 recent work across surfaces, but the response still carried the pre-019
 dense edge payload.</li>
@@ -785,11 +1388,12 @@ the same one-hour call with default <code>format: 'full'</code> and then
 opt-in <code>format: 'minimal'</code> to compare whether Claude/Codex
 gets the same orientation with less payload.</li>
 </ul>
-<h4
-id="pdt-false-negative-edge-filter-didnt-work-because-daemon-was-stale">2026-05-07
-16:15 PDT — false-negative: edge filter “didn’t work” because daemon was
-stale</h4>
+<h3
+id="pdt-false-negative-edge-filter-didnt-work-because-daemon-was-stale">16:15
+PDT — false-negative: edge filter “didn’t work” because daemon was
+stale</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> post-019-merge dogfooding. Claude Code
 called <code>get_recent_work_context</code> with the same one-hour
 window (<code>22:00 → 23:00 UTC</code>).</li>
@@ -803,6 +1407,9 @@ had 45 edges = K_10. Surviving edges all had only
 <code>conversation</code> + <code>repo</code> artifacts — exactly the
 case 019’s predicate should drop. <code>query.format</code> echoed
 <code>null</code> instead of <code>'full'</code>.</li>
+<li><strong>Read sources:</strong> <code>get_recent_work_context</code>
+over the same one-hour window as 15:56; original entry did not record
+<code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> ❌ wrong — looked like the predicate was
 broken.</li>
 <li><strong>Note:</strong> <strong>the daemon was stale.</strong> PID
@@ -817,9 +1424,10 @@ standard step in <code>merge-and-cleanup</code>, OR adding a launchd
 the process on code changes. Filed as a meta-observation below — not a
 backlog item yet; want to see if it recurs.</li>
 </ul>
-<h4 id="pdt-post-restart-edge-filter-validated">2026-05-07 16:16 PDT —
-post-restart: edge filter validated</h4>
+<h3 id="pdt-post-restart-edge-filter-validated">16:16 PDT —
+post-restart: edge filter validated</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> restarted daemon via
 <code>launchctl kickstart -k gui/$(id -u)/com.echo.daemon</code>. New
 PID 41940. Repeated identical query.</li>
@@ -831,6 +1439,9 @@ baseline</strong>). Cluster 1: 91 → <strong>2 edges</strong> (97.8%
 drop). Cluster 2: 45 → <strong>0 edges</strong> (100% drop). Both
 surviving edges in cluster 1 carry at least one <code>file</code>
 artifact. <code>query.format</code> echoes <code>'full'</code>.</li>
+<li><strong>Read sources:</strong> <code>get_recent_work_context</code>
+over the post-restart one-hour window; original entry did not record
+<code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> ✅ right — predicate works exactly as 019
 specified.</li>
 <li><strong>Note:</strong> the byte distribution shifted as predicted:
@@ -840,9 +1451,10 @@ specified.</li>
 was overstated as half the bloat — in reality, edges were the easy half;
 atom envelope is the dominant half and untouched by 019.</strong></li>
 </ul>
-<h4 id="pdt-format-minimal-validated">2026-05-07 16:16 PDT —
-<code>format: 'minimal'</code> validated</h4>
+<h3 id="pdt-format-minimal-validated">16:16 PDT —
+<code>format: 'minimal'</code> validated</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> same query, opt-in
 <code>format: 'minimal'</code>.</li>
 <li><strong>Query inputs:</strong> identical to 16:16-prior plus
@@ -854,6 +1466,10 @@ had <code>action.input</code> truncated; all 24 had
 <code>action.output</code> truncated (long assistant turns). Truncation
 suffix verbatim per spec:
 <code>"… [truncated; 1707 chars omitted; fetch full atom via search_memories]"</code>.</li>
+<li><strong>Read sources:</strong>
+<code>get_recent_work_context(format="minimal")</code> over the same
+one-hour trace window; original entry did not record
+<code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> ✅ right — minimal mode caps content,
 leaves all other fields unchanged, suffix carries the fetch hint.</li>
 <li><strong>Note:</strong> even at 64K, <strong>still over Claude Code’s
@@ -897,9 +1513,10 @@ becomes lower-priority because edges are already small; a hypothetical D
 <p><strong>Decision (founder, 2026-05-07 16:19 PDT):</strong> no changes
 for now. Keep dogfooding; collect interaction patterns; revisit the
 prioritization once we have ~1 week of real-use observations.</p>
-<h4 id="pdt-codex-asks-echo-what-claude-just-changed">2026-05-07 16:22
-PDT — Codex asks ECHO what Claude just changed</h4>
+<h3 id="pdt-codex-asks-echo-what-claude-just-changed">16:22 PDT — Codex
+asks ECHO what Claude just changed</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex: “use echo to see the
 recent changes done by claude.”</li>
 <li><strong>Query inputs:</strong>
@@ -919,6 +1536,11 @@ matches. Top meaningful event was the Claude Code turn at
 Claude logged round-2 dogfooding observations, added three entries plus
 “Round 2 themes”, recorded “no changes for now”, and left the journal
 uncommitted.</li>
+<li><strong>Read sources:</strong> Search attempts first used guessed
+logical prefixes <code>claude</code> / <code>cc</code>; useful read came
+from
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/")</code>,
+returning Claude Code project JSONL-derived atoms.</li>
 <li><strong>Verdict:</strong> right — ECHO found the recent Claude work,
 but only after broadening past the guessed <code>claude</code> /
 <code>cc</code> prefixes to the captured filesystem source prefix.</li>
@@ -926,10 +1548,11 @@ but only after broadening past the guessed <code>claude</code> /
 answer was there, but the source-prefix taxonomy is not obvious to an AI
 client without either prior memory or a fallback broad query.</li>
 </ul>
-<h4
-id="pdt-codex-repeats-claude-lookup-using-only-trace-clustering">2026-05-07
-16:33 PDT — Codex repeats Claude lookup using only trace clustering</h4>
+<h3
+id="pdt-codex-repeats-claude-lookup-using-only-trace-clustering">16:33
+PDT — Codex repeats Claude lookup using only trace clustering</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to find what Claude
 had been doing today using ECHO MCP, with the hard constraint: do not
 use <code>search_memories</code>; only use
@@ -948,6 +1571,11 @@ around <code>Project_echo</code> from 15:03-16:26 PDT. Middle-day query
 returned 2 clusters / 7 atoms, top cluster 2 <code>claude_code</code>
 atoms around <code>Echo_Extension</code> /
 <code>echo_gateway/src/privacy.ts</code> from 11:10-11:15 PDT.</li>
+<li><strong>Read sources:</strong> Three
+<code>get_recent_work_context</code> windows; returned clusters were
+<code>claude_code</code>-heavy (<code>Project_echo</code> and
+<code>Echo_Extension</code> threads). Original entry did not record full
+per-cluster <code>source_breakdown</code>.</li>
 <li><strong>Verdict:</strong> right — trace clustering alone was enough
 to reconstruct the main Claude work threads, and the narrower windows
 fixed the full-day ranking blind spot.</li>
@@ -1033,16 +1661,17 @@ the trace tool’s bloat, which works fine for “what’s codex doing right
 now” type queries but doesn’t exercise the cross-tool-clustering value
 V1.5 is supposed to deliver.</p>
 <hr />
-<h4
-id="pdt-where-did-i-leave-off-on-the-hotkey-render-knn-sensitivity-design-conversation-orphaning">2026-05-07
-22:40 PDT — “where did I leave off on the hotkey render” — KNN
-sensitivity + design-conversation orphaning</h4>
+<h3
+id="pdt-where-did-i-leave-off-on-the-hotkey-render-knn-sensitivity-design-conversation-orphaning">22:40
+PDT — “where did I leave off on the hotkey render” — KNN sensitivity +
+design-conversation orphaning</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked Claude Code: “use echo and
 retrieve claude code context on where i left off on the hot key render.”
 Claude Code attempted multiple ECHO MCP queries to recover the prior
 design thread.</li>
-<li><strong>Query inputs (sequence of 8 calls):</strong>
+<li><strong>Query inputs:</strong> sequence of 8 calls.
 <ol type="1">
 <li><code>search_memories(query="hotkey overlay render", source_prefix="claude_code", limit=15)</code>
 → 0 matches</li>
@@ -1071,6 +1700,11 @@ found exactly once (call #3, free-text “hotkey overlay”) — never via
 window. The trace cluster found the morning’s <em>implementation</em>
 work (commits) but not the evening’s <em>design</em> work (Claude Code
 conversation atom).</li>
+<li><strong>Read sources:</strong> Mixed <code>search_memories</code>
+and <code>get_recent_work_context</code> calls. Useful search hit came
+from the Claude Code conversation atom in session
+<code>684f37f7...</code>; trace call surfaced git commits only. Original
+entry did not record exact source paths.</li>
 <li><strong>Verdict:</strong> 🟡 partial — the answer was recoverable,
 but only via brittle keyword search, and neither tool surfaced both
 threads (design + implementation) as the same work.</li>
@@ -1148,17 +1782,18 @@ unresolved as of now” vs “most recent ~5 loops with resolved ones
 marked.” No backlog item exists yet.</li>
 </ul>
 <hr />
-<h4
-id="pdt-investigation-c3-conjecture-was-wrong-two-real-bugs-surfaced-underneath">2026-05-07
-22:50 PDT — investigation: C3 conjecture WAS WRONG; two real bugs
-surfaced underneath</h4>
+<h3
+id="pdt-investigation-c3-conjecture-was-wrong-two-real-bugs-surfaced-underneath">22:50
+PDT — investigation: C3 conjecture WAS WRONG; two real bugs surfaced
+underneath</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder said “investigate more into c3
 issue. it might need a backlog by itself.” Goal: empirically test
 whether 019’s edge filter is actually suppressing the
 design-conversation ↔︎ implementation-commit join, or whether the symptom
 has a different root cause.</li>
-<li><strong>Query inputs (sequence of 6 calls):</strong>
+<li><strong>Query inputs:</strong> sequence of 6 calls.
 <ol type="1">
 <li><code>search_memories(query="hotkey overlay open loops headline", limit=3)</code>
 → 0</li>
@@ -1187,6 +1822,11 @@ drops the scope edge, but <code>cluster.atom_ids[]</code> still includes
 all 8 atoms because <code>connectedComponents</code> runs on the
 unfiltered graph (per 019 spec). <strong>The original C3 conjecture —
 “019’s filter is breaking the join” — is FALSE.</strong></li>
+<li><strong>Read sources:</strong> Mixed ECHO
+<code>search_memories</code> / <code>get_recent_work_context</code>
+calls plus direct repo reads of <code>src/trace/cluster.ts</code> and
+<code>src/storage/sqlite.ts</code>; decisive trace read used
+<code>2026-05-08T05:00:00Z</code> to <code>06:00:00Z</code>.</li>
 <li><strong>Verdict:</strong> ❌ original C3 was wrong; ✅ but two
 genuine new bugs surfaced underneath.</li>
 <li><strong>Note (root-cause analysis):</strong> Read
@@ -1265,10 +1905,11 @@ cross multiple modules. The 18-minute investigation prevented a
 wrongly-specced backlog item.</li>
 </ul>
 <hr />
-<h4
-id="pdt-round-4-post-019020021v1.5.1-substrate-dogfooding">2026-05-08
-00:30 PDT — round 4: post-019/020/021/V1.5.1 substrate dogfooding</h4>
+<h2 id="dogfooding-day-2">2026-05-08 — dogfooding day 2</h2>
+<h3 id="pdt-round-4-post-019020021v1.5.1-substrate-dogfooding">00:30 PDT
+— round 4: post-019/020/021/V1.5.1 substrate dogfooding</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked “lets start another round of
 dogfooding. see if everything fixed is in place.” Goal: verify that the
 four substrate fixes shipped today (019 edge filter + format, 020 R1
@@ -1276,7 +1917,7 @@ resolution, 021 cross-gap window + storage DESC + TZ guardrail, V1.5.1
 cluster-loss warning + cross-app description) actually work end-to-end
 against live storage. Daemon was kickstarted to PID 72942 immediately
 before the run to ensure it ran on commit <code>708ed60</code>.</li>
-<li><strong>Query inputs (5 calls in one round):</strong>
+<li><strong>Query inputs:</strong> 5 calls in one round.
 <ol type="1">
 <li><code>get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=100, format="minimal")</code>
 → 25h Z-suffixed span; tests 021 Bug B inference + Bug A storage DESC +
@@ -1293,7 +1934,7 @@ under tight limit</li>
 <li><code>get_recent_work_context(since="2026-05-08T06:00:00Z", until="2026-05-08T07:30:00Z", window_hours=6, limit=100, format="minimal")</code>
 → tests 021 Bug B explicit <code>window_hours</code> echo</li>
 </ol></li>
-<li><strong>Returned (per call):</strong>
+<li><strong>Returned:</strong> per call.
 <ol type="1">
 <li>T1: 1 cluster / 34 atoms (all <code>claude_code</code>);
 <code>query.window_hours: 24</code> (inferred);
@@ -1311,7 +1952,12 @@ T1’s 34 in the same window).</li>
 <li>T5: 1 cluster / 25 atoms; <code>query.window_hours: 6</code> echoed
 verbatim; <code>warnings: []</code>.</li>
 </ol></li>
-<li><strong>Verdict (per fix):</strong>
+<li><strong>Read sources:</strong> <code>get_recent_work_context</code>
+and <code>search_memories</code> over 2026-05-07/08 windows. T1 source
+mix recorded in-note as <code>source_breakdown: {claude_code: 34}</code>
+with git silently absent; T4 read <code>source_prefix="git:"</code> and
+returned 0.</li>
+<li><strong>Verdict:</strong> per fix.
 <ul>
 <li><strong>020 R1 resolution → ✅ working.</strong> Every
 <code>cluster.open_loop_hints[i].resolved</code> is a boolean. R1.Q +
@@ -1459,12 +2105,13 @@ known issues persist (search_memories prefix opacity, source-volume
 bias).</li>
 </ul>
 <hr />
-<h4 id="pdt-codex-lookup-latest-claude-interaction">2026-05-08 00:42 PDT
-— Codex lookup: latest Claude interaction</h4>
+<h3 id="pdt-codex-lookup-latest-claude-interaction">00:42 PDT — Codex
+lookup: latest Claude interaction</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to “retrieve most
 recent interaction between me and claude.”</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)</code></li>
 <li><strong>Returned:</strong> 5 matches. Newest match was a raw
 Claude-project filesystem change at
@@ -1475,6 +2122,10 @@ was the next match at <code>2026-05-08T07:40:04.096Z</code>, session
 <code>_followups.md</code>,
 <code>src/mcp/tools/recent-work-context.ts</code>, and
 <code>src/mcp/tools/search-memories.ts</code>.</li>
+<li><strong>Read sources:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/")</code>;
+Claude Code project JSONL-derived atoms, with the newest row a raw fs
+watcher event and the second row the useful conversation turn.</li>
 <li><strong>Verdict:</strong> right.</li>
 <li><strong>Note:</strong> Retrieval found the right latest Claude
 exchange, but the first result was an FS watcher event rather than
@@ -1488,12 +2139,13 @@ conversation atoms over raw filesystem change events, or expose an
 event-kind filter.</li>
 </ul>
 <hr />
-<h4 id="pdt-codex-review-verify-claudes-round-4-bug-claims">2026-05-08
-00:46 PDT — Codex review: verify Claude’s round-4 bug claims</h4>
+<h3 id="pdt-codex-review-verify-claudes-round-4-bug-claims">00:46 PDT —
+Codex review: verify Claude’s round-4 bug claims</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to review Claude’s
 latest bug triage and do an independent investigation.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>search_memories(query="commit merge complete 020", source_prefix="git:", since="2026-05-07T07:00:00Z", limit=5)</code></li>
 <li><code>get_recent_work_context(since="2026-05-07T07:00:00Z", until="2026-05-08T08:00:00Z", limit=5, format="minimal")</code></li>
@@ -1512,6 +2164,11 @@ including commits whose content contains “merge” and “020”.</li>
 <code>1ba3580</code>, while direct SQLite inspection showed commit
 <code>1ba3580</code> exists as git row 26 in the same window.</li>
 </ol></li>
+<li><strong>Read sources:</strong>
+<code>search_memories(source_prefix="git:")</code>,
+<code>get_recent_work_context(...)</code>, plus direct SQLite inspection
+of stored git rows; exposed a mismatch between ECHO retrieval and rows
+present in storage.</li>
 <li><strong>Verdict:</strong> right for the two live symptoms Claude
 flagged.</li>
 <li><strong>Note:</strong> The low-limit trace response still looks
@@ -1530,13 +2187,14 @@ it prevents misleading “complete” answers. Then fix
 search is literal substring, not semantic retrieval.</li>
 </ul>
 <hr />
-<h4 id="pdt-codex-check-claude-validation-of-codex-review">2026-05-08
-00:53 PDT — Codex check: Claude validation of Codex review</h4>
+<h3 id="pdt-codex-check-claude-validation-of-codex-review">00:53 PDT —
+Codex check: Claude validation of Codex review</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to check the most
 recent Claude interaction after Claude validated Codex’s claims, and
 reply <code>proceed</code> if no further refinement was needed.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=5)</code></li>
 <li><strong>Returned:</strong> 5 matches. Newest useful conversational
 turn was at <code>2026-05-08T07:51:30.414Z</code>, session
@@ -1546,6 +2204,10 @@ turn was at <code>2026-05-08T07:51:30.414Z</code>, session
 failure, raw-FS source-volume framing, and timestamp-comparison bug;
 Claude promoted timestamp normalization into the V1.5.2 P0 reliability
 item and kept chokidar as a separate item.</li>
+<li><strong>Read sources:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/")</code>;
+Claude Code project JSONL-derived atoms, newest useful turn in session
+<code>c1dbc9c1-1b22-46f1-9b63-ddca2c9fc1ca</code>.</li>
 <li><strong>Verdict:</strong> partial.</li>
 <li><strong>Note:</strong> Claude’s revised scope is directionally
 right, but one refinement remains: timestamp normalization at capture
@@ -1561,41 +2223,14 @@ should include an existing-row mixed timestamp regression: a
 those rows before relying on lexicographic storage comparisons.</li>
 </ul>
 <hr />
-<h4 id="pdt-codex-check-claude-applied-spec-review-fixes">2026-05-08
-01:11 PDT — Codex check: Claude applied spec review fixes</h4>
+<h3 id="pdt-claude-resume-where-did-i-leave-off-after-clear">01:03 PDT —
+Claude resume: where did I leave off after /clear</h3>
 <ul>
-<li><strong>Trigger:</strong> founder said Claude had applied all fixes
-to the 022/023 specs and asked Codex to retrieve the interaction, then
-review against the codebase source of truth.</li>
-<li><strong>Tool/input:</strong>
-<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=8)</code></li>
-<li><strong>Returned:</strong> 8 matches. Newest useful conversational
-turn was at <code>2026-05-08T08:10:50.157Z</code>, session
-<code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>,
-<code>turn_index=2</code>. Claude reported commits <code>9ff7550</code>
-(rename only) and <code>be92b67</code> (actual content fixes), validator
-clean, and both 022/023 READY HIGH.</li>
-<li><strong>Verdict:</strong> right.</li>
-<li><strong>Note:</strong> Codebase verification matched Claude’s
-summary: local HEAD is <code>be92b67</code>, working tree was clean
-before this journal entry,
-<code>python3 tools/blocked.py --validate</code> passed, and
-<code>tools/blocked.py --list-all</code> showed only 022/023 ready.
-Remaining issue is a minor stale phrase in 023’s out-of-scope prose
-(<code>5 historical sections</code>) while acceptance/board now
-correctly say 6 and preserve the 014 carve-out.</li>
-<li><strong>Conjecture:</strong> Future spec-review fixes should run
-<code>rg</code> for stale phrasing after patching the exact acceptance
-lines; the validator catches ids, not prose drift.</li>
-</ul>
-<hr />
-<h4 id="pdt-claude-resume-where-did-i-leave-off-after-clear">2026-05-08
-01:03 PDT — Claude resume: where did I leave off after /clear</h4>
-<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder cleared context to free the window
 and asked Claude to use ECHO to reconstruct where the prior session
 ended.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>get_recent_work_context(limit=5, format="minimal")</code>
 (default 4h auto-window)</li>
@@ -1612,7 +2247,7 @@ last assistant turn of the prior session (08:03:28 UTC).</li>
 marked <code>resolved: true</code> with <code>resolved_by_atom_id</code>
 pointing to the 08:03:28 atom (R1.AQ working as designed).</li>
 </ol></li>
-<li><strong>Sources:</strong> source_breakdown
+<li><strong>Read sources:</strong> source_breakdown
 <code>{ claude_code: 2 }</code> on the wider window. Notably absent:
 codex (Codex’s parallel review session at 00:42–01:04 PDT had been
 actively writing rollouts in
@@ -1641,13 +2276,14 @@ re-run this entry’s two calls post-merge and assert all three sources
 surface.</li>
 </ul>
 <hr />
-<h4 id="pdt-claude-lookup-pull-codexs-spec-review-reply">2026-05-08
-01:04 PDT — Claude lookup: pull Codex’s spec review reply</h4>
+<h3 id="pdt-claude-lookup-pull-codexs-spec-review-reply">01:04 PDT —
+Claude lookup: pull Codex’s spec review reply</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder said Codex had finished its review
 of specs 022/023 and asked Claude to pull Codex’s reply via ECHO so the
 review could be acted on.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>search_memories(query="spec review 022 023 V1.5.2 chokidar", source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T07:00:00Z", limit=10)</code></li>
 <li><code>search_memories(query="codex", source_prefix="fs:", since="2026-05-08T07:30:00Z", limit=15)</code></li>
@@ -1662,7 +2298,7 @@ payload, no message content); 1 conversation atom under
 <code>fs:/Users/zhenye/.claude/projects/...jsonl</code> (Claude’s own
 session). Zero atoms with extracted Codex message text.</li>
 </ol></li>
-<li><strong>Sources:</strong> match-by-match:
+<li><strong>Read sources:</strong> match-by-match:
 <ul>
 <li>14 ×
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-41-29-019e0688-...jsonl</code>
@@ -1721,14 +2357,47 @@ Codex extractor.” Lesson: I drafted a fix instead of just observing
 codebase before claiming an extractor was missing.</li>
 </ul>
 <hr />
-<h4
-id="pdt-codex-review-claude-0119-codex-extractor-conjecture">2026-05-08
-01:24 PDT — Codex review: Claude 01:19 Codex-extractor conjecture</h4>
+<h3 id="pdt-codex-check-claude-applied-spec-review-fixes">01:11 PDT —
+Codex check: Claude applied spec review fixes</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder said Claude had applied all fixes
+to the 022/023 specs and asked Codex to retrieve the interaction, then
+review against the codebase source of truth.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/", limit=8)</code></li>
+<li><strong>Returned:</strong> 8 matches. Newest useful conversational
+turn was at <code>2026-05-08T08:10:50.157Z</code>, session
+<code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>,
+<code>turn_index=2</code>. Claude reported commits <code>9ff7550</code>
+(rename only) and <code>be92b67</code> (actual content fixes), validator
+clean, and both 022/023 READY HIGH.</li>
+<li><strong>Read sources:</strong>
+<code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/")</code>;
+Claude Code project JSONL-derived atoms, newest useful turn in session
+<code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>.</li>
+<li><strong>Verdict:</strong> right.</li>
+<li><strong>Note:</strong> Codebase verification matched Claude’s
+summary: local HEAD is <code>be92b67</code>, working tree was clean
+before this journal entry,
+<code>python3 tools/blocked.py --validate</code> passed, and
+<code>tools/blocked.py --list-all</code> showed only 022/023 ready.
+Remaining issue is a minor stale phrase in 023’s out-of-scope prose
+(<code>5 historical sections</code>) while acceptance/board now
+correctly say 6 and preserve the 014 carve-out.</li>
+<li><strong>Conjecture:</strong> Future spec-review fixes should run
+<code>rg</code> for stale phrasing after patching the exact acceptance
+lines; the validator catches ids, not prose drift.</li>
+</ul>
+<hr />
+<h3 id="pdt-codex-review-claude-0119-codex-extractor-conjecture">01:24
+PDT — Codex review: Claude 01:19 Codex-extractor conjecture</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to inspect Claude’s
 suggestion at <code>2026-05-08 01:19:57</code>, session
 <code>3c98f080/#4</code>.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-b09d-4fff-8a35-ccc3fe232f4d.jsonl", since="2026-05-08T08:15:00Z", until="2026-05-08T08:23:00Z", limit=20)</code></li>
 <li><code>search_memories(source_prefix="fs:/Users/zhenye/.codex/sessions/", since="2026-05-08T07:40:00Z", until="2026-05-08T08:30:00Z", limit=12)</code></li>
@@ -1744,7 +2413,7 @@ Codex fs-change rows instead of Codex message content.</li>
 <code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T00-41-29-019e0688-...jsonl</code>,
 not extracted message turns.</li>
 </ol></li>
-<li><strong>Sources:</strong> Claude target source was the
+<li><strong>Read sources:</strong> Claude target source was the
 <code>3c98f080-...jsonl</code> Claude Code session. Codex probe source
 was the active Codex rollout JSONL path above. Codebase/DB
 source-of-truth check found
@@ -1774,14 +2443,14 @@ lookups” or a storage/query kind filter shared by
 <code>search_memories</code> and trace.</li>
 </ul>
 <hr />
-<h4
-id="pdt-codex-asks-echo-what-the-founder-is-currently-working-on">2026-05-08
-01:33 PDT — Codex asks ECHO what the founder is currently working
-on</h4>
+<h3
+id="pdt-codex-asks-echo-what-the-founder-is-currently-working-on">01:33
+PDT — Codex asks ECHO what the founder is currently working on</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex: “use echo and see
 what i am current working on.”</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=8, format="minimal")</code>.</li>
 <li><strong>Returned:</strong> 1 cluster, 3 atoms; top cluster:
 <code>"discussion about Project_echo"</code>; rank_reasons:
@@ -1790,7 +2459,7 @@ what i am current working on.”</li>
 repo <code>Project_echo</code>, Claude Code session
 <code>3c98f080-b09d-4fff-8a35-ccc3fe232f4d</code>, Claude Code session
 <code>20d5fc7d-c166-4d68-9292-9d90f5f4158e</code>.</li>
-<li><strong>Sources:</strong> source_breakdown
+<li><strong>Read sources:</strong> source_breakdown
 <code>{ claude_code: 3 }</code>; silently absent from this trace
 response: codex/git despite active same-repo work in adjacent
 windows.</li>
@@ -1811,13 +2480,14 @@ conversation atoms across all active AI clients and include a
 source-coverage warning when only one client contributes.</li>
 </ul>
 <hr />
-<h4 id="pdt-codex-investigates-why-codexgit-did-not-surface">2026-05-08
-01:39 PDT — Codex investigates why Codex/git did not surface</h4>
+<h3 id="pdt-codex-investigates-why-codexgit-did-not-surface">01:39 PDT —
+Codex investigates why Codex/git did not surface</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked why Codex and git activity
 did not surface in the 01:33 trace result, then pointed to Claude
 session <code>3c98f080/#7</code> at 01:36:54 PDT as confirmation.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=20, format="minimal")</code></li>
 <li><code>search_memories(source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/3c98f080-b09d-4fff-8a35-ccc3fe232f4d.jsonl", since="2026-05-08T08:36:30Z", until="2026-05-08T08:37:15Z", limit=5)</code></li>
@@ -1831,7 +2501,7 @@ session <code>3c98f080/#7</code> at 01:36:54 PDT as confirmation.</li>
 <li>2 matches: one raw fs-change row and the target Claude turn
 <code>a5cfa1d3...</code> / <code>turn_index=7</code>.</li>
 </ol></li>
-<li><strong>Sources:</strong> trace sources
+<li><strong>Read sources:</strong> trace sources
 <code>{ claude_code: 5 }</code> and <code>{ codex: 1 }</code>; search
 sources were both the exact Claude Code session JSONL, one
 <code>metadata.surface="fs"</code> raw row and one normalized Claude
@@ -1856,14 +2526,13 @@ source_breakdown until 022 is reviewed, merged, daemon-restarted, and
 the timestamp migration has run.</li>
 </ul>
 <hr />
-<h4
-id="pdt-codex-re-verifies-_followups.md-gaps-after-022023">2026-05-08
-02:05 PDT — Codex re-verifies <code>_followups.md</code> gaps after
-022/023</h4>
+<h3 id="pdt-codex-re-verifies-_followups.md-gaps-after-022023">02:05 PDT
+— Codex re-verifies <code>_followups.md</code> gaps after 022/023</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to check
 <code>backlog/_followups.md</code> and reverify the post-022 gaps.</li>
-<li><strong>Tool/input:</strong>
+<li><strong>Query inputs:</strong>
 <ol type="1">
 <li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-08T23:59:59-07:00", window_hours=6, limit=50, format="minimal")</code>
 via ECHO MCP connector → transport deserialize error.</li>
@@ -1903,7 +2572,7 @@ rows. Codex prefix without query returned 5 raw fs-change rows; Codex
 prefix with exact query returned the normalized Codex turn.
 <code>hotkey overlay</code> returned identical 5-match results across
 two calls.</li>
-<li><strong>Sources:</strong> direct trace now includes git in the
+<li><strong>Read sources:</strong> direct trace now includes git in the
 Project_echo cluster and Codex in a separate lower-rank cluster; search
 sources were <code>git:/Users/zhenye/Desktop/Project_echo</code>,
 <code>fs:/Users/zhenye/.codex/...jsonl</code>, and mixed git/Claude rows
@@ -1924,16 +2593,17 @@ rows”, “source-balanced trace ranking at low limits”, and “MCP
 connector/daemon health” as live follow-ups.</li>
 </ul>
 <hr />
-<h4
-id="pdt-claude-code-retrieves-codexs-0205-pdt-investigation-via-echo-post-022023-meta-dogfooding">2026-05-08
-02:10 PDT — Claude Code retrieves Codex’s 02:05 PDT investigation via
-ECHO (post-022/023 meta-dogfooding)</h4>
+<h3
+id="pdt-claude-code-retrieves-codexs-0205-pdt-investigation-via-echo-post-022023-meta-dogfooding">02:10
+PDT — Claude Code retrieves Codex’s 02:05 PDT investigation via ECHO
+(post-022/023 meta-dogfooding)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked Claude Code to “investigate
 codex’s finding first pull it using echo” — verifying the 02:05 PDT
 entry against ECHO’s own captured memory of Codex’s session, post-022 +
 post-023 daemon restarts.</li>
-<li><strong>Tool/input (sequence):</strong>
+<li><strong>Query inputs:</strong> sequence.
 <ol type="1">
 <li><code>get_recent_work_context(since="2026-05-08T08:30:00Z", until="2026-05-08T09:30:00Z", window_hours=1, limit=50, format="minimal")</code></li>
 <li><code>search_memories(source_prefix="fs:/Users/zhenye/.codex/", since="2026-05-08T08:50:00Z", until="2026-05-08T09:30:00Z", limit=10)</code></li>
@@ -1954,7 +2624,8 @@ fs-change rows (194 chars each) + 1 extracted Codex turn (atom
 <code>turn_index: 3</code>, model <code>gpt-5.5</code>,
 <code>had_tool_use: True</code>).</li>
 </ol></li>
-<li><strong>Sources:</strong> <code>search_memories</code> returned only
+<li><strong>Read sources:</strong> <code>search_memories</code> returned
+only
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl</code>
 — 9 raw fs-change rows + 1 extracted turn; no git/claude_code/cursor
 surfaces. Trace <code>source_breakdown</code> per cluster: cluster 1
@@ -1999,11 +2670,12 @@ this entry.</li>
 </ul></li>
 </ul>
 <hr />
-<h4
-id="pdt-claude-code-reconstructs-where-founder-left-off-last-night-via-two-trace-calls">2026-05-08
-12:03 PDT — Claude Code reconstructs “where founder left off last night”
-via two trace calls</h4>
+<h3
+id="pdt-claude-code-reconstructs-where-founder-left-off-last-night-via-two-trace-calls">12:03
+PDT — Claude Code reconstructs “where founder left off last night” via
+two trace calls</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder opened a fresh session this
 morning and asked Claude Code to “read the most recent interactions
 across all sessions from last night and figure out where i left off
@@ -2028,7 +2700,7 @@ range UTC 07:03:20 → 08:59:47 = PDT 00:03 → 01:59. Storage cap warning
 also raised.</li>
 <li><strong>Call B:</strong> 0 clusters, 0 atoms. Empty.</li>
 </ul></li>
-<li><strong>Sources:</strong> Call A — claude_code (27) + git (23);
+<li><strong>Read sources:</strong> Call A — claude_code (27) + git (23);
 claude_code raw_pointers under
 <code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>
 (sessions <code>3c98f080…</code>, <code>7430c728…</code>, plus subagent
@@ -2088,11 +2760,12 @@ discipline.</li>
 </ul></li>
 </ul>
 <hr />
-<h4
-id="pdt-disambiguation-probe-search_memories-drops-timezone-offset-on-sinceuntil">2026-05-08
-12:08 PDT — Disambiguation probe: search_memories drops timezone offset
-on <code>since</code>/<code>until</code></h4>
+<h3
+id="pdt-disambiguation-probe-search_memories-drops-timezone-offset-on-sinceuntil">12:08
+PDT — Disambiguation probe: search_memories drops timezone offset on
+<code>since</code>/<code>until</code></h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder said “c then b do it back to back”
 — running the disambiguating <code>search_memories</code> probe to
 decide whether call B’s empty result was extractor-lag vs
@@ -2106,7 +2779,7 @@ Result body was 423K chars (overflow → spilled to tool-results file).
 <code>query_echo</code> reflected the request unchanged:
 <code>since: "2026-05-08T02:00:00-07:00"</code> and
 <code>until: "2026-05-08T08:30:00-07:00"</code>.</li>
-<li><strong>Sources:</strong> git (20) —
+<li><strong>Read sources:</strong> git (20) —
 <code>source: "git:/Users/zhenye/Desktop/Project_echo"</code>. SHAs
 <code>2830bda</code> → <code>de39ce1</code> (all from May 7 PDT 23:35 →
 May 8 PDT 01:29). The 4 SHAs I expected (<code>b6005bd</code> 02:05 PDT
@@ -2172,9 +2845,10 @@ boundaries. Anyone in PDT/PST/CET/IST etc. asking about “this morning” /
 </ul></li>
 </ul>
 <hr />
-<h4 id="pdt-codex-resumes-from-prior-codexecho-context">2026-05-08 13:13
-PDT — Codex resumes from prior Codex/ECHO context</h4>
+<h3 id="pdt-codex-resumes-from-prior-codexecho-context">13:13 PDT —
+Codex resumes from prior Codex/ECHO context</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to “use echo to see
 where the last codex session left off and resume from there.”</li>
 <li><strong>Query inputs:</strong>
@@ -2204,7 +2878,7 @@ handoff beyond the earlier Codex re-verification: item
 <code>2026-05-08-024-fs-watcher-test-quarantine-successor</code> was
 created (<code>a176369</code>) and claimed (<code>f2db319</code>).</li>
 </ol></li>
-<li><strong>Sources:</strong> Codex JSONL under
+<li><strong>Read sources:</strong> Codex JSONL under
 <code>fs:/Users/zhenye/.codex/sessions/...</code>; git commits under
 <code>git:/Users/zhenye/Desktop/Project_echo</code>; Claude Code atoms
 under
@@ -2223,11 +2897,11 @@ content-first Codex-source view or skeleton trace would reduce the need
 to mentally filter raw fs events and giant atom maps.</li>
 </ul>
 <hr />
-<h4
-id="pdt-codex-tries-to-retrieve-claude-mcp-tool-best-practices-claim">2026-05-08
-13:22 PDT — Codex tries to retrieve Claude MCP-tool best-practices
-claim</h4>
+<h3
+id="pdt-codex-tries-to-retrieve-claude-mcp-tool-best-practices-claim">13:22
+PDT — Codex tries to retrieve Claude MCP-tool best-practices claim</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to review Claude’s
 claim regarding MCP tool best practices against the current ECHO
 setup.</li>
@@ -2236,7 +2910,7 @@ setup.</li>
 <li><strong>Returned:</strong> no usable payload. The MCP connector
 failed before returning matches:
 <code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
-<li><strong>Sources:</strong> intended source was Claude Code JSONL
+<li><strong>Read sources:</strong> intended source was Claude Code JSONL
 under <code>fs:/Users/zhenye/.claude/</code>; no source rows were
 returned because the connector failed.</li>
 <li><strong>Verdict:</strong> ❌ wrong.</li>
@@ -2248,66 +2922,11 @@ repo inspection.</li>
 before ECHO can reliably serve as the first-hop “what did another AI
 client say?” substrate.</li>
 </ul>
-<h4
-id="pdt-founder-asked-claude-to-identify-codexs-recurring-json-rpc-error-via-echo">2026-05-08
-14:43 PDT — Founder asked Claude to identify Codex’s recurring JSON-RPC
-error via ECHO</h4>
+<h3
+id="pdt-claude-retrieves-codexs-mcp-best-practices-counter-diagnosis">13:27
+PDT — Claude retrieves Codex’s MCP-best-practices counter-diagnosis</h3>
 <ul>
-<li><strong>Trigger:</strong> founder: “check the json rpc error codex
-keeps facing by checking codex session using echo”.</li>
-<li><strong>Query inputs:</strong>
-<code>search_memories(query="JSON-RPC", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>;
-then
-<code>search_memories(query="jsonrpc", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>.</li>
-<li><strong>Returned:</strong> call 1 → 1 matching Codex assistant turn
-(rollout <code>019e068c-…</code> at 2026-05-08T09:08:07.791Z),
-94,313-char single-line payload that exceeded the tool-result tokens cap
-and was spilled to disk
-(<code>tool-results/mcp-echo-search_memories-…txt</code>). Call 2 → 0
-matches (<code>jsonrpc</code> lowercase is not a literal substring in
-the captured assistant text — Codex paraphrases as “JSON-RPC”;
-case-insensitive substring match still missed because hyphenation
-differs).</li>
-<li><strong>Sources:</strong> call 1 — single source
-<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl</code>
-(Codex assistant turn). Call 2 — 0 sources. Neither call surfaced the
-<em>raw</em> <code>event_msg</code> lines containing the error string
-(lines 276/284 in the rollout) — the matched record was Codex’s own
-narration about the error, not the tool-call output that produced it.
-The ground-truth error string was found only by direct grep of the
-rollout file outside ECHO.</li>
-<li><strong>Verdict:</strong> 🟡 partial — ECHO pointed at the right
-session but its match was Codex’s paraphrase, not the underlying
-<code>event_msg</code> payload that contains the canonical error. The
-94k-char single-line response also re-tripped the
-consumer-context-budget failure mode (entry 01:08 PDT, day 1).</li>
-<li><strong>Note:</strong> Two failure modes compounded in one call: (a)
-<code>search_memories</code> returns the assistant’s narration but not
-the adjacent tool-output <code>event_msg</code> rows that carry the
-actual error wire format, so the highest-signal evidence is silently
-absent from the response; (b) returned payload is one massive line,
-forcing the consumer to spill-and-slice instead of reading directly.
-Direct <code>grep</code> on the rollout jsonl took &lt;1s and surfaced
-the canonical error:
-<code>error: Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>
-from
-<code>codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter</code>
-at lines 276/284 (2026-05-08T08:58:37Z and 09:00:36Z UTC ≈ 01:58 / 02:00
-PDT).</li>
-<li><strong>Conjecture:</strong> observations only — (1) source-volume /
-shape bias: tool-output <code>event_msg</code> rows in Codex rollouts
-may be getting captured but not surfaced under the same query, or are
-being captured as separate atoms whose content doesn’t contain the
-search literal; (2) atom-grouping question: should an assistant-turn
-atom and its preceding tool-output atom be co-returned when the
-assistant turn cites the tool output? Don’t design fixes here — log for
-end-of-window synthesis.</li>
-</ul>
-<h4
-id="pdt-claude-retrieves-codexs-mcp-best-practices-counter-diagnosis">2026-05-08
-13:27 PDT — Claude retrieves Codex’s MCP-best-practices
-counter-diagnosis</h4>
-<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked Claude to read Codex’s most
 recent diagnosis on the ECHO MCP setup (the review of Claude’s earlier
 best-practices claim) and reverify each of Codex’s claims against
@@ -2325,7 +2944,7 @@ final-answer turn in
 <code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-eaa9-7773-ad99-376e3e8d0f73.jsonl</code>
 line 338 (UTC 20:25:40 = 13:25 PDT, 4,071 chars), with reasoning chain
 at lines 213/220/234/244/263/279/312.</li>
-<li><strong>Sources:</strong> trace and search both surfaced
+<li><strong>Read sources:</strong> trace and search both surfaced
 <code>fs:/Users/zhenye/.codex/sessions/...rollout-...jsonl</code> Codex
 content. The on-disk rollout JSONL was the canonical source; ECHO’s
 atoms matched but were not faster than direct file reads. No
@@ -2351,11 +2970,11 @@ day; every Claude/Codex retrieval today has tripped it at least once.
 Worth promoting from “described in tool description” to “default-cost
 protection” — but spec lives in next backlog item, not here.</li>
 </ul>
-<h4
-id="pdt-reverification-of-codexs-8-claims-against-project_echo-code">2026-05-08
-13:35 PDT — Reverification of Codex’s 8 claims against Project_echo
-code</h4>
+<h3
+id="pdt-reverification-of-codexs-8-claims-against-project_echo-code">13:35
+PDT — Reverification of Codex’s 8 claims against Project_echo code</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> continuation of the 13:27 PDT retrieval —
 founder asked Claude to validate each Codex claim, not just relay
 them.</li>
@@ -2425,7 +3044,7 @@ mentions <code>search_memories</code>. Test
 all three:
 <code>['echo_ping', 'get_recent_work_context', 'search_memories']</code>.</li>
 </ol></li>
-<li><strong>Sources:</strong> repo files at SHA 8c2d767; SDK
+<li><strong>Read sources:</strong> repo files at SHA 8c2d767; SDK
 <code>@modelcontextprotocol/sdk@1.29.0</code> <code>package.json</code>
 + <code>dist/cjs/server/mcp.d.ts</code>; Claude Code config
 <code>~/.claude.json</code> lines 3046 + 3227 + 3237.</li>
@@ -2450,9 +3069,10 @@ rules in <code>search-memories</code> description) is a recurring
 symptom of missing structured affordances — claim 1 + claim 2 are
 causally related, not independent. Don’t design fixes here.</li>
 </ul>
-<h4 id="pdt-codex-tries-to-retrieve-claudes-025-spec-context">2026-05-08
-13:46 PDT — Codex tries to retrieve Claude’s 025 spec context</h4>
+<h3 id="pdt-codex-tries-to-retrieve-claudes-025-spec-context">13:46 PDT
+— Codex tries to retrieve Claude’s 025 spec context</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder said Claude validated Codex’s MCP
 best-practices claims and wrote spec 025, then asked Codex to use ECHO
 for session context and evaluate the spec.</li>
@@ -2461,7 +3081,7 @@ for session context and evaluate the spec.</li>
 <li><strong>Returned:</strong> no usable payload. The MCP connector
 failed before returning matches:
 <code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
-<li><strong>Sources:</strong> intended source was Claude Code JSONL
+<li><strong>Read sources:</strong> intended source was Claude Code JSONL
 under <code>fs:/Users/zhenye/.claude/</code>; no source rows were
 returned because the connector failed. Fallback context came from direct
 repo reads of
@@ -2477,9 +3097,10 @@ than the broken MCP path.</li>
 transport issue is now blocking precisely the cross-AI handoff use case
 ECHO is meant to make easy.</li>
 </ul>
-<h4 id="pdt-codex-retries-exact-025-claude-context-lookup">2026-05-08
-13:51 PDT — Codex retries exact 025 Claude-context lookup</h4>
+<h3 id="pdt-codex-retries-exact-025-claude-context-lookup">13:51 PDT —
+Codex retries exact 025 Claude-context lookup</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> before final spec evaluation, Codex
 retried ECHO against the exact spec/session token to verify whether the
 connector failure was transient.</li>
@@ -2488,17 +3109,18 @@ connector failure was transient.</li>
 <li><strong>Returned:</strong> no usable payload. Same MCP connector
 error:
 <code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
-<li><strong>Sources:</strong> intended source was Claude Code project
-JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no rows
-returned.</li>
+<li><strong>Read sources:</strong> intended source was Claude Code
+project JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no
+rows returned.</li>
 <li><strong>Verdict:</strong> ❌ wrong.</li>
 <li><strong>Note:</strong> The narrower, extractor-aligned prefix did
 not change the failure mode. Spec evaluation proceeded from
 repo-grounded artifacts already recovered by direct reads.</li>
 </ul>
-<h4 id="pdt-codex-tries-to-retrieve-claude-bypass-deep-dive">2026-05-08
-14:14 PDT — Codex tries to retrieve Claude bypass deep dive</h4>
+<h3 id="pdt-codex-tries-to-retrieve-claude-bypass-deep-dive">14:14 PDT —
+Codex tries to retrieve Claude bypass deep dive</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to review Claude’s
 most recent deep dive on why Claude bypassed ECHO and read Codex session
 JSONL directly, then validate Claude’s proposed optimization
@@ -2508,9 +3130,9 @@ follow-ups.</li>
 <li><strong>Returned:</strong> no usable payload. Same Codex MCP
 connector error:
 <code>Transport send error ... Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>.</li>
-<li><strong>Sources:</strong> intended source was Claude Code project
-JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no rows
-returned. Recovery path was direct inspection of the current Claude
+<li><strong>Read sources:</strong> intended source was Claude Code
+project JSONL under <code>fs:/Users/zhenye/.claude/projects/</code>; no
+rows returned. Recovery path was direct inspection of the current Claude
 project JSONL, specifically
 <code>72c1a494-9d45-418c-8520-34069d1ff017.jsonl</code> line 354, plus
 repo reads of MCP server/tool code and journal entries.</li>
@@ -2520,9 +3142,10 @@ bypass topic itself: Codex could not use ECHO to retrieve Claude’s
 analysis of ECHO bypassing, so the review had to start from source
 files.</li>
 </ul>
-<h4 id="pdt-codex-minimal-transport-reproduction-for-027">2026-05-08
-14:22 PDT — Codex minimal transport reproduction for 027</h4>
+<h3 id="pdt-codex-minimal-transport-reproduction-for-027">14:22 PDT —
+Codex minimal transport reproduction for 027</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to investigate the
 root cause of the Codex ECHO MCP failure before writing a builder-ready
 027 spec.</li>
@@ -2542,7 +3165,7 @@ stale-header curl returned HTTP 400 with ECHO’s custom
 passed all checks: tools/list, <code>search_memories</code>,
 <code>get_recent_work_context</code>, edge check, cross-gap check, git
 timestamp check.</li>
-<li><strong>Sources:</strong> live <code>echo</code> MCP daemon at
+<li><strong>Read sources:</strong> live <code>echo</code> MCP daemon at
 <code>127.0.0.1:38478/mcp</code>; Codex log
 <code>~/.codex/log/codex-tui.log</code>; ECHO launchd logs
 <code>~/Library/Logs/echo/daemon.out.log</code>; repo code
@@ -2559,11 +3182,12 @@ process-local stateful StreamableHTTP sessions plus an unfriendly
 stale-session router branch, not payload size or tool-specific handler
 logic.</li>
 </ul>
-<h4
-id="pdt-strategist-self-audit-todays-echo-bypasses-corrected-failure-b-root-cause">2026-05-08
-14:35 PDT — Strategist self-audit: today’s ECHO bypasses + corrected
-Failure B root cause</h4>
+<h3
+id="pdt-strategist-self-audit-todays-echo-bypasses-corrected-failure-b-root-cause">14:35
+PDT — Strategist self-audit: today’s ECHO bypasses + corrected Failure B
+root cause</h3>
 <ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code</li>
 <li><strong>Trigger:</strong> founder asked the strategist (Claude) to
 confirm whether today’s cross-AI Codex retrievals actually went through
 ECHO, and to root-cause the bypass before writing a journal entry.</li>
@@ -2582,7 +3206,7 @@ and
 respectively, exceeding the consumer 25k-char tool-result budget on
 first call, forcing spill+subagent-slice. After those two spills,
 subsequent retrievals went direct-to-rollout-JSONL.</li>
-<li><strong>Sources:</strong> today’s journal entries 13:27 PDT
+<li><strong>Read sources:</strong> today’s journal entries 13:27 PDT
 (strategist’s own retrieval log), 13:35 PDT (8/8 reverification), 14:00
 PDT (no journal entry of own; subagent prompt verbatim went to
 disk-grep, not ECHO); Codex’s rollout file on disk; the two saved
@@ -2638,11 +3262,68 @@ bypass that goes unlogged is worse than a failed ECHO call that does.
 Don’t design fixes here — 026 + 027 already capture the planned
 response.</li>
 </ul>
-<h4
-id="pdt-strategist-applies-new-discipline-codex-pair-review-finds-5-issues-in-026">2026-05-08
-14:43 PDT — Strategist applies new discipline; Codex pair-review finds 5
-issues in 026</h4>
+<h3
+id="pdt-founder-asked-claude-to-identify-codexs-recurring-json-rpc-error-via-echo">14:43
+PDT — Founder asked Claude to identify Codex’s recurring JSON-RPC error
+via ECHO</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder: “check the json rpc error codex
+keeps facing by checking codex session using echo”.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="JSON-RPC", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>;
+then
+<code>search_memories(query="jsonrpc", source_prefix="fs:/Users/zhenye/.codex/", limit=20)</code>.</li>
+<li><strong>Returned:</strong> call 1 → 1 matching Codex assistant turn
+(rollout <code>019e068c-…</code> at 2026-05-08T09:08:07.791Z),
+94,313-char single-line payload that exceeded the tool-result tokens cap
+and was spilled to disk
+(<code>tool-results/mcp-echo-search_memories-…txt</code>). Call 2 → 0
+matches (<code>jsonrpc</code> lowercase is not a literal substring in
+the captured assistant text — Codex paraphrases as “JSON-RPC”;
+case-insensitive substring match still missed because hyphenation
+differs).</li>
+<li><strong>Read sources:</strong> call 1 — single source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T00-45-16-019e068c-4579-7fc3-8f6c-7f5fcde7ab92.jsonl</code>
+(Codex assistant turn). Call 2 — 0 sources. Neither call surfaced the
+<em>raw</em> <code>event_msg</code> lines containing the error string
+(lines 276/284 in the rollout) — the matched record was Codex’s own
+narration about the error, not the tool-call output that produced it.
+The ground-truth error string was found only by direct grep of the
+rollout file outside ECHO.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO pointed at the right
+session but its match was Codex’s paraphrase, not the underlying
+<code>event_msg</code> payload that contains the canonical error. The
+94k-char single-line response also re-tripped the
+consumer-context-budget failure mode (entry 01:08 PDT, day 1).</li>
+<li><strong>Note:</strong> Two failure modes compounded in one call: (a)
+<code>search_memories</code> returns the assistant’s narration but not
+the adjacent tool-output <code>event_msg</code> rows that carry the
+actual error wire format, so the highest-signal evidence is silently
+absent from the response; (b) returned payload is one massive line,
+forcing the consumer to spill-and-slice instead of reading directly.
+Direct <code>grep</code> on the rollout jsonl took &lt;1s and surfaced
+the canonical error:
+<code>error: Deserialize error: data did not match any variant of untagged enum JsonRpcMessage</code>
+from
+<code>codex_rmcp_client::http_client_adapter::StreamableHttpClientAdapter</code>
+at lines 276/284 (2026-05-08T08:58:37Z and 09:00:36Z UTC ≈ 01:58 / 02:00
+PDT).</li>
+<li><strong>Conjecture:</strong> observations only — (1) source-volume /
+shape bias: tool-output <code>event_msg</code> rows in Codex rollouts
+may be getting captured but not surfaced under the same query, or are
+being captured as separate atoms whose content doesn’t contain the
+search literal; (2) atom-grouping question: should an assistant-turn
+atom and its preceding tool-output atom be co-returned when the
+assistant turn cites the tool output? Don’t design fixes here — log for
+end-of-window synthesis.</li>
+</ul>
+<h3
+id="pdt-strategist-applies-new-discipline-codex-pair-review-finds-5-issues-in-026">14:43
+PDT — Strategist applies new discipline; Codex pair-review finds 5
+issues in 026</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code</li>
 <li><strong>Trigger:</strong> founder asked the strategist to “review
 codex finding” — Codex had run a second-pass pair-review of specs 026 +
 027 together (Codex’s user prompt:
@@ -2655,7 +3336,7 @@ chars, exceeded the consumer 25k tool-result budget, spilled to
 <code>tool-results/mcp-echo-search_memories-1778276484034.txt</code>.
 Recovery via subagent reading the rollout JSONL directly (line 610 area
 for Codex’s final-answer turn at UTC 21:40 PDT 14:40).</li>
-<li><strong>Sources:</strong> intended source was the active Codex
+<li><strong>Read sources:</strong> intended source was the active Codex
 rollout
 <code>~/.codex/sessions/2026/05/08/rollout-2026-05-08T13-09-48-019e0935-...jsonl</code>;
 ECHO matched but spilled. Recovery sources: the rollout file directly +
@@ -2723,9 +3404,10 @@ the strategist alone wouldn’t have found because they’re operating-model
 artifacts (filesystem stage names, selector code) not in the
 strategist’s working set. Don’t design fixes here.</li>
 </ul>
-<h4 id="pdt-codex-resumes-from-prior-session-via-echo">2026-05-08 14:46
-PDT — Codex resumes from prior session via ECHO</h4>
+<h3 id="pdt-codex-resumes-from-prior-session-via-echo">14:46 PDT — Codex
+resumes from prior session via ECHO</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to “use echo and
 resume from where we left off last session.”</li>
 <li><strong>Query inputs:</strong>
@@ -2740,7 +3422,7 @@ self-audit commit, <code>ef93cba</code> review move for 025, Claude
 review checks reporting <code>pending_review/</code> empty, and the 025
 builder run. Warnings said one cluster was dropped and the storage
 overfetch cap may have silently truncated atoms.</li>
-<li><strong>Sources:</strong>
+<li><strong>Read sources:</strong>
 <code>source_breakdown={ claude_code: 31, git: 20 }</code>; visible atom
 sources included Claude Code JSONL under
 <code>~/.claude/projects/</code> and git commits for
@@ -2756,11 +3438,12 @@ stale 025 <code>spec_refs</code> path checked/fixed on the next pass.
 Follow-up filesystem checks showed only this journal entry was locally
 modified before the 027 spec fix.</li>
 </ul>
-<h4
-id="pdt-claude-code-post-merge-verification-of-item-025-mcp-best-practices">2026-05-08
-15:05 PDT — Claude Code post-merge verification of item 025 (MCP
-best-practices)</h4>
+<h3
+id="pdt-claude-code-post-merge-verification-of-item-025-mcp-best-practices">15:05
+PDT — Claude Code post-merge verification of item 025 (MCP
+best-practices)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked “newest task 025 just landed
 use echo to verify the behav” — running the post-merge dogfooding check
 listed in 025’s <code>review_notes</code> (envelope budget on default
@@ -2818,7 +3501,7 @@ it. Non-null <code>next_cursor</code> continues the chain.</li>
 — surfaced cleanly to the client.</li>
 </ol></li>
 </ul></li>
-<li><strong>Sources:</strong> (3) and (4) both hit
+<li><strong>Read sources:</strong> (3) and (4) both hit
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-*.jsonl</code>
 exclusively. (2) drew from
 <code>source_breakdown={git:27, claude_code:38}</code> inside the single
@@ -2852,11 +3535,12 @@ atom density (≥30 artifacts/atom, full action+actors+provenance) to
 catch this class of overflow at merge time. Don’t design here — leave
 for end-of-window synthesis.</li>
 </ul>
-<h4
-id="pdt-claude-code-use-echo-to-resume-session-resume-context-pull">2026-05-08
-15:14 PDT — Claude Code “use echo to resume” — session-resume context
-pull</h4>
+<h3
+id="pdt-claude-code-use-echo-to-resume-session-resume-context-pull">15:14
+PDT — Claude Code “use echo to resume” — session-resume context
+pull</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder opened a fresh Claude Code session
 and asked “use echo to resume” — the canonical resume-where-I-left-off
 use case for <code>get_recent_work_context</code>.</li>
@@ -2874,7 +3558,7 @@ disk at
 <code>truncation = {atoms_returned:20, atoms_total_in_window:149, clusters_returned:1, clusters_total:2, truncated:true}</code>.
 Subagent then digested the spill file with jq and returned a 350-word
 resume briefing.</li>
-<li><strong>Sources:</strong> the single returned cluster’s
+<li><strong>Read sources:</strong> the single returned cluster’s
 <code>source_breakdown = {claude_code: 72, git: 55}</code> —
 <strong>zero <code>cursor</code> and zero <code>codex</code>
 atoms</strong> in a 24h window where the founder unambiguously used both
@@ -2908,11 +3592,12 @@ synthesis should weigh whether the envelope guard belongs at
 effective <code>window_hours</code> when projected output exceeds
 budget) rather than at the per-atom truncator. Don’t design here.</li>
 </ul>
-<h4
-id="pdt-claude-code-post-026027-second-verification-round-the-gated-round">2026-05-08
-15:54 PDT — Claude Code post-026+027 second verification round (THE
-GATED ROUND)</h4>
+<h3
+id="pdt-claude-code-post-026027-second-verification-round-the-gated-round">15:54
+PDT — Claude Code post-026+027 second verification round (THE GATED
+ROUND)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder asked “both 026 and 027 landed do
 the full second round of reverification” — directly executing the gated
 bullet in <code>backlog/_followups.md</code> (“Second verification round
@@ -2983,15 +3668,15 @@ extracted claude-code turns. <code>next_cursor</code> non-null,
 paginatable. Confirms (4) is not codex-specific — it’s the
 source-resolution rule.</li>
 </ol></li>
-<li><strong>Sources:</strong> (1) no source — pure liveness probe. (2)
-cluster’s <code>source_breakdown = {git: 40, claude_code: 59}</code>,
-<strong>zero cursor / zero codex</strong> in the 4h window — same
-silent-omission shape as 15:14 PDT, in a window where Codex’s rollout
-was actively being modified (per call 4’s evidence). The dropped second
-cluster (warning: <code>"limit dropped 1 entire cluster(s)"</code>)
-plausibly held the codex/cursor atoms — they didn’t make the top-1
-cluster’s atom_ids cut. (3) all three matches’ <code>source</code>
-started with
+<li><strong>Read sources:</strong> (1) no source — pure liveness probe.
+(2) cluster’s
+<code>source_breakdown = {git: 40, claude_code: 59}</code>, <strong>zero
+cursor / zero codex</strong> in the 4h window — same silent-omission
+shape as 15:14 PDT, in a window where Codex’s rollout was actively being
+modified (per call 4’s evidence). The dropped second cluster (warning:
+<code>"limit dropped 1 entire cluster(s)"</code>) plausibly held the
+codex/cursor atoms — they didn’t make the top-1 cluster’s atom_ids cut.
+(3) all three matches’ <code>source</code> started with
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-…jsonl</code>
 per the spill — <code>source_app='codex'</code> parity with
 literal-prefix held. (4) source resolved to one Codex rollout file,
@@ -3044,11 +3729,12 @@ elided)” marker, and project a <code>match.bytes_elided</code> field
 prefer the extractor’s turn atoms over fs-watcher events when both
 target the same path (new Bug B). Don’t design here.</li>
 </ul>
-<h4
-id="pdt-claude-code-post-bugs-ab-merge-live-verification-third-round">2026-05-08
-16:14 PDT — Claude Code post-Bugs-A+B-merge live verification (third
-round)</h4>
+<h3
+id="pdt-claude-code-post-bugs-ab-merge-live-verification-third-round">16:14
+PDT — Claude Code post-Bugs-A+B-merge live verification (third
+round)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder merged
 <code>agent/mcp-envelope-bugs-ab</code> into main at 16:11 PDT (commit
 <code>2fecd10</code>); Claude Code kickstarted the daemon via
@@ -3118,7 +3804,7 @@ also has a heavy metadata sub-object, possibly
 <code>metadata.tool_calls</code> or analogous (didn’t probe the keys for
 this surface).</li>
 </ol></li>
-<li><strong>Sources:</strong> (1) liveness only. (2) all 3 matches
+<li><strong>Read sources:</strong> (1) liveness only. (2) all 3 matches
 <code>source</code> starts with
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-…jsonl</code>
 per spill — <code>source_app='codex'</code> parity preserved post-fix.
@@ -3182,16 +3868,26 @@ Don’t design here. The clean separation: MCP-side cap is unconditional
 safety; capture-side trim is a quality choice.</li>
 </ul>
 <hr />
-<h3 id="pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">2026-05-08
-17:01–17:03 PDT — V1.5 full-halt live test (post-028 + post-V1.5.6)</h3>
-<blockquote>
-<p>Founder paused for full live testing. Single Claude Code session
-(<code>bcc0a351-...jsonl</code>) running on merged main (HEAD
-<code>21edd69</code>, V1.5.6 wire-shape projector live). Multi-call
-entry — every ECHO MCP tool exercised across cross-session, cross-tool,
-cross-day axes. Observations only; gap classifications captured
-separately in <code>2026-05-08-v1-5-livetest-gaps.md</code>.</p>
-</blockquote>
+<h3 id="pdt-v1.5-full-halt-live-test-post-028-post-v1.5.6">17:01–17:03
+PDT — V1.5 full-halt live test (post-028 + post-V1.5.6)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
+<li><strong>Trigger:</strong> Founder paused for full live testing.</li>
+<li><strong>Query inputs:</strong> Multi-call live test; every ECHO MCP
+tool was exercised across cross-session, cross-tool, and cross-day axes.
+Per-call details below.</li>
+<li><strong>Returned:</strong> Per-call results below. Single Claude
+Code session <code>bcc0a351-...jsonl</code> was running on merged main
+at HEAD <code>21edd69</code> with V1.5.6 wire-shape projector live.</li>
+<li><strong>Read sources:</strong> Mixed, per-call below: ping only,
+trace <code>source_breakdown</code>, search result sources, tail
+<code>source_resolved</code>, and memory-tool calls.</li>
+<li><strong>Verdict:</strong> 🟡 partial — broad halt-readiness coverage
+worked, but the per-call findings surfaced multiple V1.5 gaps.</li>
+<li><strong>Note:</strong> Observations only; gap classifications
+captured separately in
+<code>2026-05-08-v1-5-livetest-gaps.md</code>.</li>
+</ul>
 <h4 id="call-1-echo_pingmessagev1.5-live-test-starting">Call 1 —
 <code>echo_ping(message="v1.5 live test starting")</code></h4>
 <ul>
@@ -3199,7 +3895,7 @@ separately in <code>2026-05-08-v1-5-livetest-gaps.md</code>.</p>
 queries.</li>
 <li><strong>Returned:</strong>
 <code>{pong: true, ts: 2026-05-09T00:01:17.797Z, received: "v1.5 live test starting"}</code>.</li>
-<li><strong>Sources:</strong> N/A (ping).</li>
+<li><strong>Read sources:</strong> N/A (ping).</li>
 <li><strong>Verdict:</strong> ✅ right.</li>
 <li><strong>Note:</strong> server up, transport healthy, clock returns
 UTC ISO (founder is PDT — <code>ts</code> does not localize, which is
@@ -3221,7 +3917,7 @@ window_hours=24.</li>
 <code>[recent_activity, has_open_loop, dense]</code>. Warnings:
 <code>limit dropped 1 entire cluster(s)</code>. Envelope ~ inline (well
 under 25k).</li>
-<li><strong>Sources:</strong>
+<li><strong>Read sources:</strong>
 <code>cluster.source_breakdown = {git: 49, claude_code: 84}</code> —
 <strong>codex and cursor entirely absent</strong> even though codex
 sessions exist for 2026-05-08 (verified via tail_session below) and the
@@ -3254,9 +3950,9 @@ just-merged item id.</li>
 populated. Spans 2026-05-08T23:30→23:58Z. Top match is the live
 conversation’s user prompt (mtime indexed sub-second after capture —
 capture-pipeline freshness confirmed).</li>
-<li><strong>Sources:</strong> mix of <code>claude_code</code> (jsonl)
-and <code>git</code> (commit). No codex, no cursor — but “028” is a
-recent claude_code-coined item id, so absence is plausible not
+<li><strong>Read sources:</strong> mix of <code>claude_code</code>
+(jsonl) and <code>git</code> (commit). No codex, no cursor — but “028”
+is a recent claude_code-coined item id, so absence is plausible not
 pathological.</li>
 <li><strong>Verdict:</strong> ✅ right.</li>
 <li><strong>Note:</strong> <code>since</code> lacked a Z suffix, but
@@ -3278,7 +3974,7 @@ pre-V1.5.6 spilled).</li>
 <li><strong>Returned:</strong> 5 matches, all from
 <code>fs:/Users/zhenye/.codex/sessions/2026/05/{07,08}/...jsonl</code>.
 Newest 2026-05-08T21:32Z, oldest 2026-05-07T23:23Z.</li>
-<li><strong>Sources:</strong> all codex; metadata shows
+<li><strong>Read sources:</strong> all codex; metadata shows
 <code>tool_calls.__elided = true</code> (V1.5.6 metadata cap engaged).
 Envelope inline.</li>
 <li><strong>Verdict:</strong> ✅ right — codex IS in the store and
@@ -3294,7 +3990,7 @@ cap shipping correctly together.</li>
 <li><strong>Trigger:</strong> does Cursor have any “v1.5” hits?</li>
 <li><strong>Returned:</strong> <strong>0 matches</strong>.
 <code>next_cursor: null</code>.</li>
-<li><strong>Sources:</strong> N/A (empty).</li>
+<li><strong>Read sources:</strong> N/A (empty).</li>
 <li><strong>Verdict:</strong> 🟡 partial — semantically valid (cursor
 turns from a week ago wouldn’t say “v1.5”), but coupled with Call 6/13
 below paints a <em>Cursor capture is silent</em> picture.</li>
@@ -3309,7 +4005,7 @@ below paints a <em>Cursor capture is silent</em> picture.</li>
 2026-05-01T08:40:14Z</strong> — i.e., <strong>Cursor turn capture is 7
 full days stale on a machine where Cursor has been used
 since</strong>.</li>
-<li><strong>Sources:</strong>
+<li><strong>Read sources:</strong>
 <code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>.</li>
 <li><strong>Verdict:</strong> ❌ wrong (against documented “where did
 <code>&lt;app&gt;</code> leave off” affordance).</li>
@@ -3333,7 +4029,7 @@ other three apps.</li>
 <code>bcc0a351-...jsonl</code>; git resolved to
 <code>git:/Users/zhenye/Desktop/Project_echo</code> with 5 most-recent
 commits including the V1.5.6 merge.</li>
-<li><strong>Sources:</strong> all three resolve to the right
+<li><strong>Read sources:</strong> all three resolve to the right
 newest-session for their app.</li>
 <li><strong>Verdict:</strong> ✅ right for codex/claude_code/git. Pairs
 with Call 6 to localize the Cursor freshness issue to the cursor
@@ -3376,7 +4072,7 @@ write path.</li>
 <code>(sqlite3.OperationalError) unable to open database file</code>
 (memory_ingest returned
 <code>{error: "enqueue_failed", detail: "..."}</code>).</li>
-<li><strong>Sources:</strong> N/A (server-side failure before
+<li><strong>Read sources:</strong> N/A (server-side failure before
 query).</li>
 <li><strong>Verdict:</strong> ❌ wrong — <code>echo-memory</code> MCP
 server is fully broken end-to-end. <code>memory_ingest</code>,
@@ -3427,7 +4123,7 @@ Cursor turns</strong>. Content shape:
 <code>{event_type: "change", path: "...", mtime: "...", size: N}</code>.
 <code>metadata.surface = "fs"</code>,
 <code>metadata.file_kind = "cursor-workspace"</code>.</li>
-<li><strong>Sources:</strong>
+<li><strong>Read sources:</strong>
 <code>fs:/Users/zhenye/Library/Application Support/Cursor/User/workspaceStorage/...</code>.</li>
 <li><strong>Verdict:</strong> ❌ wrong against the documented
 <code>source_app="cursor"</code> semantic (“Cursor + Claude Code + Codex
@@ -3477,11 +4173,12 @@ search_memories/tail_session but absent from cross-tool clusters in
 get_recent_work_context, cursor ❌ turn capture stale 7 days + lane
 contaminated with fs-watcher noise. Memory MCP (echo-memory) ❌ fully
 broken (4/4 tools fail, 5th not testable).</p>
-<h4
-id="pdt-claude-code-post-v1.5.6.1-merge-live-verification-workflow-trajectory-close">2026-05-08
-17:05 PDT — Claude Code post-V1.5.6.1-merge live verification (workflow
-trajectory close)</h4>
+<h3
+id="pdt-claude-code-post-v1.5.6.1-merge-live-verification-workflow-trajectory-close">17:05
+PDT — Claude Code post-V1.5.6.1-merge live verification (workflow
+trajectory close)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder merged V1.5.6.1 tool_calls
 trajectory projector at 17:02 PDT (commit <code>264a7af</code>).
 Re-fired the canonical four calls — looking for
@@ -3527,7 +4224,7 @@ write code, read existing code, iterate edits, run test commands.
 Exactly the agent-intent inference the founder’s design intent calls
 for.</li>
 </ul></li>
-<li><strong>Sources:</strong> all matches/turns from real extractor
+<li><strong>Read sources:</strong> all matches/turns from real extractor
 atoms (zero <code>metadata.surface:'fs'</code>).
 <code>search_memories</code> source_app=‘codex’ parity preserved.
 <code>tail_session</code> source resolution lands on the same rollouts
@@ -3571,11 +4268,12 @@ verbatim, head+tail clip only ASSISTANT; (4)
 (5) cursor capture stale 7 days + fs-watcher contamination (separate
 issue from MCP envelope work, surfaced by 17:01 round).</li>
 </ul>
-<h4
-id="pdt-claude-code-post-v1.5.7-bundle-live-verification-gap-diagnoses">2026-05-08
-20:55 PDT — Claude Code post-V1.5.7 bundle live verification + Gap
-diagnoses</h4>
+<h3
+id="pdt-claude-code-post-v1.5.7-bundle-live-verification-gap-diagnoses">20:55
+PDT — Claude Code post-V1.5.7 bundle live verification + Gap
+diagnoses</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder ran the V1.5.7 patch sweep on the
 17:01 PDT v1.5-livetest-gaps file: Gap 3 (search_memories fs-noise) +
 Gap 6 (TZ-warning parity) + Gap 4 (skeleton cluster bounds) shipped at
@@ -3583,8 +4281,8 @@ commit <code>c20db34</code>; Gap 2 stop-spam patch shipped at
 <code>98fbd10</code>. This entry captures the live diagnostic runs that
 surfaced root causes for Gaps 1 and 2, and the live confirmation that
 Gap 2’s spam-quietening landed.</li>
-<li><strong>Query inputs (this round was diagnostic, not benchmark — no
-canonical four-call repro):</strong>
+<li><strong>Query inputs:</strong> this round was diagnostic, not
+benchmark — no canonical four-call repro.
 <ol type="1">
 <li>SQLite probes against
 <code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
@@ -3601,7 +4299,7 @@ orphan_assistant_bubble timestamp distribution + per-minute rate.</li>
 <code>launchctl kickstart -k gui/$(id -u)/com.echo.daemon</code> +
 30-second silence verification.</li>
 </ol></li>
-<li><strong>Returned (notable findings):</strong>
+<li><strong>Returned:</strong> notable findings.
 <ul>
 <li><strong>Gap 2 root cause has TWO layers.</strong> Layer 1: Cursor
 migrated from <code>bubbleId:</code>/<code>composerData:</code> to
@@ -3638,7 +4336,7 @@ ship-blocker.</li>
 daemon log shows <strong>0 orphan_assistant_bubble warnings since
 restart</strong> (vs ~250/minute pre-patch). Spam silenced cleanly.</li>
 </ul></li>
-<li><strong>Sources:</strong> Cursor SQLite at
+<li><strong>Read sources:</strong> Cursor SQLite at
 <code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>;
 ECHO SQLite at <code>~/Library/Application Support/ECHO/echo.db</code>
 (<code>~/.echo/store.sqlite</code> is a 0-byte stale file; daemon uses
@@ -3675,9 +4373,61 @@ note suggesting this never converted to a wiki action item; closing it
 now (alongside the un-registration) prevents the third recurrence in
 V1.6+.</li>
 </ul>
-<h4 id="pdt-codex-resume-check-where-we-left-off">2026-05-08 23:36 PDT —
-Codex resume check: “where we left off”</h4>
+<h3
+id="pdt-claude-code-where-did-we-leave-off-clean-worktrees-resume-call">23:32
+PDT — Claude Code “where did we leave off + clean worktrees” resume
+call</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
+<li><strong>Trigger:</strong> founder opened a fresh CC session: “use
+echo and understand where we left off and clean up all the worktrees” —
+classic resume-call shape (no item context, just wants the orientation
+pull).</li>
+<li><strong>Query inputs:</strong> <code>get_recent_work_context</code>
+with <code>format="skeleton"</code>, <code>limit=15</code>. No
+<code>since</code>/<code>until</code> (defaulted to last ~4h
+window).</li>
+<li><strong>Returned:</strong> 1 cluster (<code>ctx_efff893b</code>), 15
+atoms, <code>source_breakdown={claude_code:10, git:5}</code>, label
+“discussion about Project_echo”,
+rank_reasons=<code>[recent_activity, has_open_loop, dense]</code>. 6
+<code>open_loop_hints</code> all marked <code>resolved:true</code>.
+Atoms surfaced V1.5.7 cap-stone <code>23e7876</code>, Gap 2 merge
+<code>98fbd10</code>, Gap 3+4+6 merge <code>c20db34</code>, plus the
+founder messages that drove them.</li>
+<li><strong>Read sources:</strong> atoms came entirely from
+<code>claude_code</code> jsonl (3 distinct session UUIDs under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>) +
+<code>git</code> commits on this repo. <strong>No <code>cursor</code> /
+<code>codex</code> atoms in the window</strong> — consistent with cursor
+capture being stale (Layer 1 finding from the 20:55 PDT entry above) and
+no codex activity this evening. Cross-checked against
+<code>git log --oneline -10</code> and <code>git worktree list</code>;
+commit SHAs in the cluster matched main’s tip exactly.</li>
+<li><strong>Verdict:</strong> ✅ right — the skeleton response was
+sufficient on its own to reconstruct “where we left off” (V1.5.7
+cap-stone closed, backlog
+<code>claimed/</code>+<code>pending_review/</code> empty, 5 stale
+worktrees on disk). One shot, right cluster; no follow-up
+<code>search_memories</code> / <code>tail_session</code> needed.</li>
+<li><strong>Note:</strong> this is exactly the resume-call shape
+skeleton format was designed for (item 028) —
+<code>&lt; 10k chars</code>, no atom bodies, just enough to orient.
+Worked as advertised. All 6 open-loop hints <code>resolved:true</code>
+correctly reflects the V1.5.7 cap-stone state.</li>
+<li><strong>Conjecture:</strong> (observation-only) — silent absence of
+<code>cursor</code> source atoms in the cluster’s
+<code>source_breakdown</code> is the load-bearing signal here, not the
+surfaced atoms. A future “halt readiness” audit could fold a per-source
+presence check into the resume-call ritual (“is every expected
+source_app present in the window?”) — the 7-day-stale cursor capture
+would surface earlier with a <code>source_breakdown</code> floor
+expectation. Don’t design fixes here; observation only.</li>
+</ul>
+<h3 id="pdt-codex-resume-check-where-we-left-off">23:36 PDT — Codex
+resume check: “where we left off”</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to use ECHO to
 understand where the prior session left off.</li>
 <li><strong>Query inputs:</strong>
@@ -3720,6 +4470,12 @@ were removed; local/remote <code>agent/*</code> branches were deleted;
 <code>extractors-causal-metadata</code> was left untouched; next move is
 to pick a new V1.5+ direction or open a new ready item.</li>
 </ul></li>
+<li><strong>Read sources:</strong> Multi-tool resume: trace with
+Project_echo directory artifact hint;
+<code>tail_session(source_app="codex")</code>;
+<code>tail_session(source_app="claude_code")</code>; skeleton trace;
+<code>search_memories(query="V1.5.7")</code>. Exact per-call sources are
+summarized in <code>Returned</code>.</li>
 <li><strong>Verdict:</strong> right overall, partial on the first call.
 <code>search_memories("V1.5.7")</code> plus
 <code>tail_session(claude_code)</code> produced the most actionable
@@ -3739,64 +4495,14 @@ probably normalize to repo-root/session artifacts or expose a warning
 when the hint filters out all clusters while unhinted recent-work finds
 a dense matching repo cluster.</li>
 </ul>
-<h4
-id="pdt-claude-code-where-did-we-leave-off-clean-worktrees-resume-call">2026-05-08
-23:32 PDT — Claude Code “where did we leave off + clean worktrees”
-resume call</h4>
-<ul>
-<li><strong>Trigger:</strong> founder opened a fresh CC session: “use
-echo and understand where we left off and clean up all the worktrees” —
-classic resume-call shape (no item context, just wants the orientation
-pull).</li>
-<li><strong>Query inputs:</strong> <code>get_recent_work_context</code>
-with <code>format="skeleton"</code>, <code>limit=15</code>. No
-<code>since</code>/<code>until</code> (defaulted to last ~4h
-window).</li>
-<li><strong>Returned:</strong> 1 cluster (<code>ctx_efff893b</code>), 15
-atoms, <code>source_breakdown={claude_code:10, git:5}</code>, label
-“discussion about Project_echo”,
-rank_reasons=<code>[recent_activity, has_open_loop, dense]</code>. 6
-<code>open_loop_hints</code> all marked <code>resolved:true</code>.
-Atoms surfaced V1.5.7 cap-stone <code>23e7876</code>, Gap 2 merge
-<code>98fbd10</code>, Gap 3+4+6 merge <code>c20db34</code>, plus the
-founder messages that drove them.</li>
-<li><strong>Sources:</strong> atoms came entirely from
-<code>claude_code</code> jsonl (3 distinct session UUIDs under
-<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>) +
-<code>git</code> commits on this repo. <strong>No <code>cursor</code> /
-<code>codex</code> atoms in the window</strong> — consistent with cursor
-capture being stale (Layer 1 finding from the 20:55 PDT entry above) and
-no codex activity this evening. Cross-checked against
-<code>git log --oneline -10</code> and <code>git worktree list</code>;
-commit SHAs in the cluster matched main’s tip exactly.</li>
-<li><strong>Verdict:</strong> ✅ right — the skeleton response was
-sufficient on its own to reconstruct “where we left off” (V1.5.7
-cap-stone closed, backlog
-<code>claimed/</code>+<code>pending_review/</code> empty, 5 stale
-worktrees on disk). One shot, right cluster; no follow-up
-<code>search_memories</code> / <code>tail_session</code> needed.</li>
-<li><strong>Note:</strong> this is exactly the resume-call shape
-skeleton format was designed for (item 028) —
-<code>&lt; 10k chars</code>, no atom bodies, just enough to orient.
-Worked as advertised. All 6 open-loop hints <code>resolved:true</code>
-correctly reflects the V1.5.7 cap-stone state.</li>
-<li><strong>Conjecture:</strong> (observation-only) — silent absence of
-<code>cursor</code> source atoms in the cluster’s
-<code>source_breakdown</code> is the load-bearing signal here, not the
-surfaced atoms. A future “halt readiness” audit could fold a per-source
-presence check into the resume-call ritual (“is every expected
-source_app present in the window?”) — the 7-day-stale cursor capture
-would surface earlier with a <code>source_breakdown</code> floor
-expectation. Don’t design fixes here; observation only.</li>
-</ul>
-<h3
+<h2
 id="dogfooding-day-3-post-v1.5-promotion-demo-video-planning">2026-05-09
-— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</h3>
-<h4
-id="pdt-claude-code-use-echo-to-see-where-we-left-off-resume-call">2026-05-09
-13:41 PDT — Claude Code “use echo to see where we left off” resume
-call</h4>
+— dogfooding day 3 (post-V1.5 promotion, demo-video planning)</h2>
+<h3
+id="pdt-claude-code-use-echo-to-see-where-we-left-off-resume-call">13:41
+PDT — Claude Code “use echo to see where we left off” resume call</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> founder opened a fresh CC session: “use
 echo to see where we left off.” Classic resume-call shape, no item
 context, no other args. Same shape as the 2026-05-08 23:32 PDT entry
@@ -3848,7 +4554,7 @@ storage-cap hit, atoms in window may be silently truncated; (c)
 was parsed as local time</strong> — the V1.5.7 TZ-warning patch fired
 exactly as designed.</li>
 </ul></li>
-<li><strong>Sources:</strong> Call 4 atoms came entirely from
+<li><strong>Read sources:</strong> Call 4 atoms came entirely from
 <code>claude_code</code> jsonl (sessions <code>2077c6ef-...</code> and
 <code>f79df4b5-...</code> under
 <code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>) +
@@ -3893,10 +4599,11 @@ might want the warning escalated to a soft hint in the cluster label
 shifted”). Don’t design fixes here.</li>
 </ul>
 <h3
-id="pdt-tail_session-cross-session-peek-tail-my-active-claude-session">2026-05-09
-13:55 PDT — <code>tail_session</code> cross-session peek (“tail my
-active claude session”)</h3>
+id="pdt-tail_session-cross-session-peek-tail-my-active-claude-session">13:55
+PDT — <code>tail_session</code> cross-session peek (“tail my active
+claude session”)</h3>
 <ul>
+<li><strong>Source agent:</strong> Claude Code</li>
 <li><strong>Trigger:</strong> Founder asked “can you use echo and tail
 my active claude session” — wanted a peek at the <em>other</em> live
 Claude Code conversation from this one.</li>
@@ -3910,7 +4617,7 @@ timestamps 20:44:35Z and 20:47:46Z = 13:44 / 13:47 PDT).
 eliding (<code>bytes_elided</code> 738 + 3313). Metadata projected to
 <code>tool_calls</code> only, with <code>metadata_bytes_elided</code>
 4758 + 24882 — nice cost discipline.</li>
-<li><strong>Sources:</strong>
+<li><strong>Read sources:</strong>
 <code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>
 — single-file claude_code jsonl, no git/cursor/codex mixing (correct for
 <code>tail_session</code> semantics).</li>
@@ -3943,12 +4650,13 @@ question is “where did <one app> leave off,” prefer
 <code>tail_session</code> over <code>get_recent_work_context</code> —
 the latter is for cross-source synthesis. Don’t design fixes here.</li>
 </ul>
-<h4
-id="pdt-cross-app-all-active-sessions-sweep-get_recent_work_context-4-tail_session">2026-05-09
-13:58 PDT — Cross-app “all active sessions” sweep
+<h3
+id="pdt-cross-app-all-active-sessions-sweep-get_recent_work_context-4-tail_session">13:58
+PDT — Cross-app “all active sessions” sweep
 (<code>get_recent_work_context</code> + 4×
-<code>tail_session</code>)</h4>
+<code>tail_session</code>)</h3>
 <ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
 <li><strong>Trigger:</strong> founder asked Cursor agent: “use echo and
 identify all the active sessions and what they are currently doing” —
 wants a live inventory across capture surfaces, not a single-app
@@ -4009,10 +4717,11 @@ etc.); <code>next_cursor</code> non-null (pagination continues older
 commits).</li>
 </ol></li>
 </ul></li>
-<li><strong>Sources:</strong> Attributed per call above. <strong>Not
-exhaustive session inventory:</strong> <code>tail_session</code> returns
-<strong>one MRU source per <code>source_app</code></strong>; additional
-Claude Code sessions (<code>2077c6ef-…</code>, <code>f79df4b5-…</code>,
+<li><strong>Read sources:</strong> Attributed per call above.
+<strong>Not exhaustive session inventory:</strong>
+<code>tail_session</code> returns <strong>one MRU source per
+<code>source_app</code></strong>; additional Claude Code sessions
+(<code>2077c6ef-…</code>, <code>f79df4b5-…</code>,
 <code>0f9511ed-…</code>, subagent jsonl) appear <strong>inside</strong>
 the clustered atoms but were <strong>not</strong> individually tailed in
 this 5-call sequence. <strong><code>cursor</code> / <code>codex</code>
@@ -4042,126 +4751,12 @@ window or higher limit <strong>only if</strong> synthesis across
 clusters is needed — avoids paying clustering cost when the user asked
 for per-lane status.</li>
 </ul>
-<h4
-id="pdt-codex-follow-up-project_echo-current-session-inventory">2026-05-09
-14:02 PDT — Codex follow-up: Project_echo current-session inventory</h4>
+<h3
+id="pdt-claude-code-tail-of-cursor-for-cross-tool-review-loop-complements-codex-1415-pdt-entry">14:01
+PDT — Claude Code tail of Cursor for cross-tool review loop (complements
+Codex 14:15 PDT entry)</h3>
 <ul>
-<li><strong>Trigger:</strong> founder asked Codex after
-<code>/clear</code>: “use echo to understand all the current sessions in
-this project.”</li>
-<li><strong>Query inputs:</strong>
-<ol type="1">
-<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", window_hours=48, limit=20, format="minimal", artifact_hint={provider:"fs", type:"repo", id:"/Users/zhenye/Desktop/Project_echo"})</code></li>
-<li><code>search_memories(query="Project_echo", since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
-<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=50)</code></li>
-<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.codex/sessions/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=30)</code></li>
-<li><code>search_memories(source_prefix="git:/Users/zhenye/Desktop/Project_echo", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
-</ol></li>
-<li><strong>Returned:</strong>
-<ul>
-<li><ol type="1">
-<li><strong>0 clusters / 0 atoms</strong> despite
-<code>atoms_total_in_window=200</code>; warning: storage cap hit. The
-repo artifact hint did not function as a useful current-session
-directory.</li>
-</ol></li>
-<li><ol start="2" type="1">
-<li>20 matches. Top signal: git commit <code>e26c2cd</code> logging the
-13:41 resume call; also the May 9 cleanup subagent results, V1.5
-cap-stone, worktree cleanup, and recent Project_echo Claude/Codex
-turns.</li>
-</ol></li>
-<li><ol start="3" type="1">
-<li>50 Claude Code project-session matches. Most recent Project_echo
-session is <code>71b36548-...</code>: Cursor demotion/reactivation
-thread, active <code>agentKv:</code> schema probing, and the pending
-item-029 framing question. Parallel session <code>0f9511ed-...</code>
-had pushed <code>2f2aba5</code> then paused for founder confirmation
-before implementing cheap fixes A+B+C. Older active May 9 lanes include
-V1.5 finalization, demo-video planning, cleanup scans, HTML journal
-work, and worktree cleanup.</li>
-</ol></li>
-<li><ol start="4" type="1">
-<li>9 Codex-session matches. Only one current Project_echo Codex match
-after this <code>/clear</code>: session <code>019e0688-...</code>, turn
-6, timestamp <code>2026-05-09T21:00:21Z</code>, content
-<code>/clear</code> → <code>Cleared</code>. The rest were either older
-Project_echo resume work (<code>019e0b72-...</code>) or unrelated
-<code>isr-demo-mohsen</code> Codex work.</li>
-</ol></li>
-<li><ol start="5" type="1">
-<li>20 git matches. Recent Project_echo commits: <code>2f2aba5</code>
-tail_session cross-window peek, <code>e26c2cd</code> resume-call log,
-<code>961fe14</code> Cursor capture demotion, plus V1.5
-promotion/backlog cleanup/code cleanup commits.</li>
-</ol></li>
-</ul></li>
-<li><strong>Sources:</strong> Claude project JSONLs under
-<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>;
-Codex rollout JSONLs under <code>~/.codex/sessions/</code>; git source
-<code>git:/Users/zhenye/Desktop/Project_echo</code>; local repo status
-checked separately after the ECHO calls.</li>
-<li><strong>Verdict:</strong> 🟡 partial. Search-based lane inventory
-worked, but <code>get_recent_work_context</code> with a repo artifact
-hint failed empty and cap-warned. This reinforces the prior 13:58
-finding: Echo currently has good per-lane evidence but no complete “list
-all active project sessions” primitive.</li>
-<li><strong>Note:</strong> Local verification after the ECHO calls: repo
-<code>main</code> at <code>2f2aba5</code>; <code>backlog/ready</code>,
-<code>backlog/claimed</code>, and <code>backlog/pending_review</code>
-have no active item files; working tree already had uncommitted edits to
-<code>mcp-interactions-journal.{md,html}</code> from the concurrent
-13:58 sweep.</li>
-<li><strong>Conjecture:</strong> (observation-only) — The highest-signal
-answer shape for this user prompt is a merged per-session table: session
-id, app, latest timestamp, current task, blocked/waiting state. Echo can
-supply the data through
-<code>search_memories</code>/<code>tail_session</code>, but the caller
-has to synthesize the directory manually today.</li>
-</ul>
-<h4
-id="pdt-handoff-ping-cc-drafting-029-for-cursor-builder-tail_session-precise-source">2026-05-09
-14:05 PDT — Handoff ping: CC drafting 029 for Cursor builder
-(<code>tail_session</code> precise source)</h4>
-<ul>
-<li><strong>Trigger:</strong> founder noted Claude Code is writing
-backlog <strong>029</strong> so the <strong>Cursor builder
-agent</strong> can pick up implementation after
-<strong><code>tail_session</code> on that CC session</strong>; Cursor
-agent re-checked tail against explicit <code>source</code> (not
-<code>source_app</code> MRU).</li>
-<li><strong>Query inputs:</strong>
-<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=6)</code></li>
-<li><strong>Returned:</strong> <strong>3 turns</strong>,
-<code>next_cursor:null</code>, no warnings. Newest USER (<strong>13:57
-PDT</strong>) — cross-agent handoff + continue in Cursor; newest
-ASSISTANT still frames <strong>pre-029</strong> work (live
-<strong><code>agentKv:</code></strong> vs legacy key counts, reframing
-V1.5.7 demotion premise) and asks whether to verify
-<strong><code>echo.db</code></strong> ingestion for composer
-<strong><code>c15c2eca…</code></strong>. At journal write time
-<strong><code>backlog/**/*029*</code></strong> still absent — spec not
-yet landed as <code>ready/</code> file.</li>
-<li><strong>Sources:</strong> <code>source_resolved</code> matches
-request — single CC JSONL for <strong>Project_echo</strong>,
-<code>session_id</code>
-<strong><code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0</code></strong>.</li>
-<li><strong>Verdict:</strong> 🟡 partial — confirms <strong>canonical fs
-pointer + strategist intent</strong> for 029 handoff; builder should
-<strong>re-tail after <code>ready/029</code> exists</strong> (or when
-acceptance criteria reference closes).</li>
-<li><strong>Note:</strong> Prefer <strong><code>source=</code> exact
-path</strong> over <strong><code>source_app=claude_code</code></strong>
-whenever MRU could drift to another CC window.</li>
-<li><strong>Conjecture:</strong> (observation-only) — optional
-frontmatter on 029: <code>resume_tail_source:</code> fs line above —
-zero ambiguity for agents booting cold.</li>
-</ul>
-<h4
-id="pdt-claude-code-tail-of-cursor-for-cross-tool-review-loop-complements-codex-1415-pdt-entry">2026-05-09
-14:01 PDT — Claude Code tail of Cursor for cross-tool review loop
-(complements Codex 14:15 PDT entry)</h4>
-<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
 <li><strong>Trigger:</strong> founder bridged Cursor↔︎Claude Code review
 loop (“identify the specific cursor session then tail that session”).
 Goal: pull Cursor’s Claude’s actual replies into Claude Code’s context
@@ -4179,7 +4774,7 @@ spanning 13:34–13:50 PDT), 8 from older composers
 (<code>3ce99c8c</code>, <code>d128341d</code> from 2026-05-01 setup-test
 sessions). <code>next_cursor</code> present,
 <code>warnings=[]</code>.</li>
-<li><strong>Sources:</strong> all 15 turns from the same single
+<li><strong>Read sources:</strong> all 15 turns from the same single
 source-prefix
 <code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
 (cursor extractor’s normalized output). Cross-checked against direct
@@ -4238,10 +4833,127 @@ the source-prefix is shared across all composers (single
 <code>composer_id</code> parameter or <code>dedupe_by=composer_id</code>
 strategy would close this. Don’t design here — observation only.</li>
 </ul>
-<h4
-id="pdt-tail-refresh-for-claude-answer-review-029-scope-pivot">2026-05-09
-14:15 PDT — Tail refresh for Claude answer review (029 scope pivot)</h4>
+<h3
+id="pdt-codex-follow-up-project_echo-current-session-inventory">14:02
+PDT — Codex follow-up: Project_echo current-session inventory</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder asked Codex after
+<code>/clear</code>: “use echo to understand all the current sessions in
+this project.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", window_hours=48, limit=20, format="minimal", artifact_hint={provider:"fs", type:"repo", id:"/Users/zhenye/Desktop/Project_echo"})</code></li>
+<li><code>search_memories(query="Project_echo", since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=50)</code></li>
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.codex/sessions/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=30)</code></li>
+<li><code>search_memories(source_prefix="git:/Users/zhenye/Desktop/Project_echo", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><ol type="1">
+<li><strong>0 clusters / 0 atoms</strong> despite
+<code>atoms_total_in_window=200</code>; warning: storage cap hit. The
+repo artifact hint did not function as a useful current-session
+directory.</li>
+</ol></li>
+<li><ol start="2" type="1">
+<li>20 matches. Top signal: git commit <code>e26c2cd</code> logging the
+13:41 resume call; also the May 9 cleanup subagent results, V1.5
+cap-stone, worktree cleanup, and recent Project_echo Claude/Codex
+turns.</li>
+</ol></li>
+<li><ol start="3" type="1">
+<li>50 Claude Code project-session matches. Most recent Project_echo
+session is <code>71b36548-...</code>: Cursor demotion/reactivation
+thread, active <code>agentKv:</code> schema probing, and the pending
+item-029 framing question. Parallel session <code>0f9511ed-...</code>
+had pushed <code>2f2aba5</code> then paused for founder confirmation
+before implementing cheap fixes A+B+C. Older active May 9 lanes include
+V1.5 finalization, demo-video planning, cleanup scans, HTML journal
+work, and worktree cleanup.</li>
+</ol></li>
+<li><ol start="4" type="1">
+<li>9 Codex-session matches. Only one current Project_echo Codex match
+after this <code>/clear</code>: session <code>019e0688-...</code>, turn
+6, timestamp <code>2026-05-09T21:00:21Z</code>, content
+<code>/clear</code> → <code>Cleared</code>. The rest were either older
+Project_echo resume work (<code>019e0b72-...</code>) or unrelated
+<code>isr-demo-mohsen</code> Codex work.</li>
+</ol></li>
+<li><ol start="5" type="1">
+<li>20 git matches. Recent Project_echo commits: <code>2f2aba5</code>
+tail_session cross-window peek, <code>e26c2cd</code> resume-call log,
+<code>961fe14</code> Cursor capture demotion, plus V1.5
+promotion/backlog cleanup/code cleanup commits.</li>
+</ol></li>
+</ul></li>
+<li><strong>Read sources:</strong> Claude project JSONLs under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>;
+Codex rollout JSONLs under <code>~/.codex/sessions/</code>; git source
+<code>git:/Users/zhenye/Desktop/Project_echo</code>; local repo status
+checked separately after the ECHO calls.</li>
+<li><strong>Verdict:</strong> 🟡 partial. Search-based lane inventory
+worked, but <code>get_recent_work_context</code> with a repo artifact
+hint failed empty and cap-warned. This reinforces the prior 13:58
+finding: Echo currently has good per-lane evidence but no complete “list
+all active project sessions” primitive.</li>
+<li><strong>Note:</strong> Local verification after the ECHO calls: repo
+<code>main</code> at <code>2f2aba5</code>; <code>backlog/ready</code>,
+<code>backlog/claimed</code>, and <code>backlog/pending_review</code>
+have no active item files; working tree already had uncommitted edits to
+<code>mcp-interactions-journal.{md,html}</code> from the concurrent
+13:58 sweep.</li>
+<li><strong>Conjecture:</strong> (observation-only) — The highest-signal
+answer shape for this user prompt is a merged per-session table: session
+id, app, latest timestamp, current task, blocked/waiting state. Echo can
+supply the data through
+<code>search_memories</code>/<code>tail_session</code>, but the caller
+has to synthesize the directory manually today.</li>
+</ul>
+<h3
+id="pdt-handoff-ping-cc-drafting-029-for-cursor-builder-tail_session-precise-source">14:05
+PDT — Handoff ping: CC drafting 029 for Cursor builder
+(<code>tail_session</code> precise source)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder noted Claude Code is writing
+backlog <strong>029</strong> so the <strong>Cursor builder
+agent</strong> can pick up implementation after
+<strong><code>tail_session</code> on that CC session</strong>; Cursor
+agent re-checked tail against explicit <code>source</code> (not
+<code>source_app</code> MRU).</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=6)</code></li>
+<li><strong>Returned:</strong> <strong>3 turns</strong>,
+<code>next_cursor:null</code>, no warnings. Newest USER (<strong>13:57
+PDT</strong>) — cross-agent handoff + continue in Cursor; newest
+ASSISTANT still frames <strong>pre-029</strong> work (live
+<strong><code>agentKv:</code></strong> vs legacy key counts, reframing
+V1.5.7 demotion premise) and asks whether to verify
+<strong><code>echo.db</code></strong> ingestion for composer
+<strong><code>c15c2eca…</code></strong>. At journal write time
+<strong><code>backlog/**/*029*</code></strong> still absent — spec not
+yet landed as <code>ready/</code> file.</li>
+<li><strong>Read sources:</strong> <code>source_resolved</code> matches
+request — single CC JSONL for <strong>Project_echo</strong>,
+<code>session_id</code>
+<strong><code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0</code></strong>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — confirms <strong>canonical fs
+pointer + strategist intent</strong> for 029 handoff; builder should
+<strong>re-tail after <code>ready/029</code> exists</strong> (or when
+acceptance criteria reference closes).</li>
+<li><strong>Note:</strong> Prefer <strong><code>source=</code> exact
+path</strong> over <strong><code>source_app=claude_code</code></strong>
+whenever MRU could drift to another CC window.</li>
+<li><strong>Conjecture:</strong> (observation-only) — optional
+frontmatter on 029: <code>resume_tail_source:</code> fs line above —
+zero ambiguity for agents booting cold.</li>
+</ul>
+<h3 id="pdt-tail-refresh-for-claude-answer-review-029-scope-pivot">14:15
+PDT — Tail refresh for Claude answer review (029 scope pivot)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
 <li><strong>Trigger:</strong> founder asked Cursor agent to
 <strong>review Claude Code’s answer</strong> after CC pivoted 029
 framing (Cursor MCP connected; delegate verification to Cursor).</li>
@@ -4260,7 +4972,7 @@ timing + confirms sharper 029 handoff to Cursor Claude.
 artifacts may exist only locally uncommitted</strong> (workspace
 snapshot still had <strong>zero</strong> <code>backlog/**/*029*</code>
 files at review time).</li>
-<li><strong>Sources:</strong> same CC JSONL
+<li><strong>Read sources:</strong> same CC JSONL
 <code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code> only.</li>
 <li><strong>Verdict:</strong> ✅ right — tail surfaced <strong>material
 scope change</strong> vs earlier “029 = agentKv rewrite” framing;
@@ -4278,11 +4990,12 @@ force a <strong>three-way falsification</strong> (storage query vs
 single-cluster membership vs full-cluster list pre-truncate) before
 picking a fix bucket.</li>
 </ul>
-<h4
-id="pdt-codex-tool-registry-anomaly-tail_session-absent-in-this-client">2026-05-09
-14:17 PDT — Codex tool-registry anomaly: <code>tail_session</code>
-absent in this client</h4>
+<h3
+id="pdt-codex-tool-registry-anomaly-tail_session-absent-in-this-client">14:17
+PDT — Codex tool-registry anomaly: <code>tail_session</code> absent in
+this client</h3>
 <ul>
+<li><strong>Source agent:</strong> Codex</li>
 <li><strong>Trigger:</strong> founder asked Codex to tail both Claude
 and Cursor active sessions in the interactive review loop; Codex
 incorrectly said <code>tail_session</code> was not exposed in this
@@ -4300,7 +5013,7 @@ composer (<code>c15c2eca-914a-4d9f-aceb-5d4c4dfac226</code>, latest
 captured user turn “review claude answer”). The interactive-review query
 returned Claude’s 14:13 turn confirming it had used
 <code>mcp__echo__tail_session</code> twice.</li>
-<li><strong>Sources:</strong> Claude project JSONL + Cursor
+<li><strong>Read sources:</strong> Claude project JSONL + Cursor
 <code>state.vscdb</code> through <code>search_memories</code>. No direct
 Codex <code>tail_session</code> call was possible because this Codex
 client’s currently exposed <code>mcp__echo__*</code> tools are only
@@ -4319,42 +5032,162 @@ dogfooding should include a “tool list freshness” check; one AI client
 can have a stale schema while another sees the current server
 surface.</li>
 </ul>
-<h4
-id="pdt-tail_sessionclaude_code-mru-founder-artifact-worry-coordination-ladder">2026-05-09
-15:07 PDT — <code>tail_session(claude_code)</code> MRU (founder:
-artifact worry / coordination ladder)</h4>
+<h3 id="pdt-codex-direct-http-tail-of-claude-cursor-review-loop">14:20
+PDT — Codex direct HTTP tail of Claude-Cursor review loop</h3>
 <ul>
-<li><strong>Trigger:</strong> founder asked Cursor agent to tail Claude
-Code session.</li>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder asked Codex to “use echo tail the
+interctive review session between claude and cursor.” This Codex
+environment still did not expose an in-process
+<code>mcp__echo__tail_session</code> tool, so Codex used the daemon’s
+public HTTP MCP endpoint directly.</li>
 <li><strong>Query inputs:</strong>
-<code>tail_session(source_app="claude_code", count=8)</code></li>
-<li><strong>Returned:</strong> 8 turns; <strong>newest USER</strong>:
-careful artifact state slowed founder; scaling agent team; no serious
-collisions yet; wants users <strong>not to worry about artifact
-state</strong> — design <strong>robust system</strong>.
-<strong>ASSISTANT</strong>: reframes <strong>self-throttling vs
-collision</strong>; non-goal <strong>no orchestrator destination
-app</strong>; <strong>robustness ladder</strong> + git-worktree ceiling;
-passive-capture <strong>+ coordination</strong> as architectural step;
-wiki only post-merge; asks if ladder fits. Older: <strong>C</strong>
-merged brainstorm, A–J scenario list, friction triad, organic L1+L2,
-demo magic <strong>A</strong>, Cursor tail, 029 <code>bd86d02</code>
-strategist edit.</li>
-<li><strong>Sources:</strong>
-<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>;
-newest metadata
-<code>head_sha=eccb6b602f60dd4ee874d9135bb9c360937e80c0</code>,
-<code>dirty_count=0</code>.</li>
-<li><strong>Verdict:</strong> ✅ right.</li>
-<li><strong>Note:</strong> Newest assistant body partially
-<code>bytes_elided</code> on wire.</li>
-<li><strong>Conjecture:</strong> (observation-only) — coordination
-backlog items should cite <strong>v1-spec non-goals</strong> in Out of
-Scope to prevent destination-app drift.</li>
+<ol type="1">
+<li><code>tail_session(source_app="cursor", count=20)</code> via direct
+HTTP MCP.</li>
+<li><code>tail_session(source_app="claude_code", count=20)</code> via
+direct HTTP MCP.</li>
+<li><code>search_memories(query="71b36548 source_breakdown cursor 029", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=10)</code>
+via direct HTTP MCP.</li>
+<li><code>search_memories(query="source_breakdown silent cursor", source_prefix="fs:/Users/zhenye/.claude/projects/", limit=10)</code>
+via direct HTTP MCP.</li>
+<li><code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=12)</code>
+via direct HTTP MCP.</li>
+</ol></li>
+<li><strong>Returned:</strong> (1) resolved Cursor source to
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+and surfaced active composer
+<code>c15c2eca-914a-4d9f-aceb-5d4c4dfac226</code>; newest turn is
+“review claude answer” with Cursor’s Claude checking
+<code>source_breakdown</code> computation. (2) resolved MRU Claude Code
+to session <code>0f9511ed-...</code>, the V1.5.7-polish merge/push lane,
+not the review target. (3)/(4) returned 0 matches, useful negative
+evidence that substring search is poor for resolving this handoff by
+partial session id / diagnosis terms. (5) exact-source tail returned 5
+turns from target Claude Code session
+<code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0</code>, latest at 14:13 PDT,
+confirming it identified Cursor composer <code>c15c2eca</code>, tailed
+Cursor, appended a complementary journal entry, and is waiting to draft
+029 with Cursor/Codex review findings folded in.</li>
+<li><strong>Read sources:</strong> Cursor <code>state.vscdb</code>
+through cursor extractor; Claude Code JSONLs <code>0f9511ed-...</code>
+and exact <code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>; no
+git/codex atoms expected for <code>tail_session</code> exact-source
+semantics.</li>
+<li><strong>Verdict:</strong> ✅ right for <code>tail_session</code>
+once the exact source was known; 🟡 partial for <code>source_app</code>
+auto-resolution and search. <code>source_app=claude_code</code> picked
+the fresher merge lane, not the older interactive-review lane.
+<code>search_memories</code> could not resolve the review session from
+natural keywords.</li>
+<li><strong>Note:</strong> Confirms the operational rule from the 14:05
+entry: when multiple Claude Code windows are active, use the exact
+<code>source=</code> from the handoff (<code>71b36548...</code>) rather
+than <code>source_app=claude_code</code>. Also confirms the Cursor side
+of the loop is composer <code>c15c2eca...</code>; Cursor’s latest
+captured user turn is “review claude answer.”</li>
+<li><strong>Conjecture:</strong> (observation-only) —
+<code>tail_session</code> would be more handoff-friendly with an
+app-specific secondary discriminator (<code>session_id</code> for
+Claude/Codex, <code>composer_id</code> for Cursor) so callers do not
+need to know the full fs source path.</li>
+</ul>
+<h3
+id="pdt-tail_sessionclaude_code-mru-for-parallel-strategist-brainstorm">2026-05-09
+14:48 PDT — <code>tail_session(claude_code)</code> MRU for parallel
+strategist brainstorm</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder asked to tail Claude Code and
+brainstorm in parallel for a different POV; MRU strategist session
+<code>71b36548-...</code>.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app="claude_code", count=10)</code></li>
+<li><strong>Returned:</strong> 10 turns, newest USER (~14:48 PDT):
+organic customer experience first—feel L1+L2 friction, defer rushing
+“L3”; ASSISTANT: demo follows felt experience, friction inventory
+(cursor in resume, truncation, <code>bytes_elided</code>, TZ warning
+bury, re-tail lag), asks founder to rank. Older turns: L1/L2/L3 stack
+reframe (1:n agents), demo magic-moment options A–D,
+<code>bd86d02</code> 029 frontmatter→body for strategist session, Cursor
+tail of this composer’s “demo and substrate” reply.</li>
+<li><strong>Read sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>
+only; <code>git_state</code> in newest turn
+<code>head_sha=9e65f31a…</code>, <code>dirty_count=2</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — MRU matched intended strategist
+session; snapshot sufficient for Cursor-side alternate framing (V1 L2
+cut vs founder “L2 feel”, substrate vs client friction split).</li>
+<li><strong>Note:</strong> <code>source_app=claude_code</code> was
+correct here because the strategist session was hottest; multi-window
+case still prefers explicit <code>source=</code> per 14:xx entries.</li>
+<li><strong>Conjecture:</strong> (observation-only) — founder’s “L2”
+language may need a glossary tie to <code>interface-layers</code> to
+prevent ambient-scope creep while brainstorming.</li>
+</ul>
+<h3
+id="pdt-tail_sessionclaude_code-founder-friction-triad-session-link-resume-artifact-determinism">2026-05-09
+14:53 PDT — <code>tail_session(claude_code)</code> founder friction
+triad (session link / resume / artifact determinism)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder asked whether Cursor can see their
+message on current friction (answered via Echo tail of strategist CC
+session).</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app="claude_code", count=3)</code></li>
+<li><strong>Returned:</strong> 3 turns; newest USER lists (1) manual
+tail reactivation → want linked sessions that tail each other, (2)
+resume OK from user POV vs agent friction, (3) deterministic
+version/artifact state beyond git, collision + mid-task context drift —
+brainstorm. Prior turn: organic L1+L2 before L3.</li>
+<li><strong>Read sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code></li>
+<li><strong>Verdict:</strong> ✅ right — capture contained the exact
+founder wording for confirmation.</li>
+<li><strong>Note:</strong> Visibility is via ECHO-captured JSONL, not
+live CC UI.</li>
+<li><strong>Conjecture:</strong> (observation-only) — item 029 addresses
+a slice of (1)/(2); (3) is a separate V1.5+ architecture thread unless
+scoped as “run log + worktree discipline” only.</li>
+</ul>
+<h3
+id="pdt-evaluation-cc-turn-14-artifact-worry-robustness-ladder-tail_session-refresh">2026-05-09
+15:12 PDT — Evaluation: CC turn 14 (artifact worry / robustness ladder)
++ <code>tail_session</code> refresh</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder asked to <strong>evaluate Claude
+Code’s response</strong> to the message on careful artifact state,
+scaling agents, and users not worrying about artifact state.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=3)</code></li>
+<li><strong>Returned:</strong> Turn 14 (self-throttle vs collision
+reframe, v1-spec non-goals, robustness ladder,
+passive-capture→+coordination, wiki post-merge only); turns 12–13 for
+context.</li>
+<li><strong>Read sources:</strong> CC JSONL <code>71b36548-…</code>
+only.</li>
+<li><strong>Verdict (evaluation):</strong> 🟡 partial —
+<strong>strong:</strong> aligns with <strong>no destination
+orchestrator</strong>, flags <strong>real architectural step</strong>,
+defers wiki correctly, ends with one clarifying question.
+<strong>weak:</strong> “not actual collision” overstates — turn 13
+<strong>A</strong> (journal MD lost race) is a real concurrent write,
+just benign; promise “brain stops modeling concurrency” is an
+<strong>asymptote</strong> — better as <strong>fewer surprises + cheap
+recovery</strong>; ~3k chars <strong>elided</strong> so Approach 1
+details unreviewable from Echo alone.</li>
+<li><strong>Note:</strong> Independent from CC: V1 <strong>L2 ambient
+cut</strong> still applies — coordination primitives must not become
+<strong>ambient control plane</strong> by another name.</li>
+<li><strong>Conjecture:</strong> (observation-only) — future
+coordination AC should split <strong>detected conflict</strong> vs
+<strong>silent semantic merge</strong> failure modes.</li>
 </ul>
 <hr />
-<h2 id="aggregated-learnings-filled-at-end-of-window">Aggregated
-learnings (filled at end of window)</h2>
+<h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
+Synthesis (filled at end of window)</h2>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
 <ul>
@@ -4372,8 +5205,7 @@ it</li>
 <code>get_recent_work_context</code> makes <code>search_memories</code>
 mostly redundant</li>
 </ul>
-<h2 id="recommendations-candidate-v1.5-backlog-items">Recommendations /
-candidate V1.5+ backlog items</h2>
+<h2 id="candidate-backlog-items">Candidate Backlog Items</h2>
 <p><em>Filled at end of window. Each candidate item should
 name:</em></p>
 <ul>
@@ -4384,8 +5216,7 @@ entry/entries)</li>
 <li>Whether it’s a minor tune (V1.5.1) or a structural change (V1.6 /
 V2)</li>
 </ul>
-<h2 id="notes-on-running-this-journal">Notes on running this
-journal</h2>
+<h2 id="journal-operating-notes">Journal Operating Notes</h2>
 <ul>
 <li>Entries with <strong>only</strong> a one-line note are fine. Don’t
 gate on having a conjecture.</li>
@@ -4397,6 +5228,10 @@ code blocks.</li>
 entries beats coverage.</li>
 <li>This file is not a backlog item — <code>tools/blocked.py</code> will
 not pick it up.</li>
+<li>Markdown is canonical. Regenerate
+<code>mcp-interactions-journal.html</code> after every journal edit
+with:
+<code>pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 -H raw/internal/dogfooding/journal-style.html raw/internal/dogfooding/mcp-interactions-journal.md -o raw/internal/dogfooding/mcp-interactions-journal.html</code></li>
 </ul>
 </body>
 </html>
