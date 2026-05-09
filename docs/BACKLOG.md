@@ -20,7 +20,7 @@
 
 | Priority | ID | Title | Estimate | Notes |
 |---|---|---|---|---|
-| | | | | |
+| HIGH | [2026-05-09-029-cursor-source-breakdown-falsification](../backlog/ready/2026-05-09-029-cursor-source-breakdown-falsification.md) | Cursor `source_breakdown` miss — 3-way falsification + targeted fix at the right layer | 1-1.5d | Recommended claimer: Cursor's Claude (Agent mode). Diagnoses capture/clustering/truncation as 3 candidate root causes; corrects 2026-05-08 V1.5.7 misdiagnosis. Decision note: `raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md`. |
 
 *Wave 4 (extension upgrade, GitHub adapter, Slack adapter, audit page, hotkey overlay UI) not yet specced. See `backlog/_followups.md` for the deferred fixups queue and the `wave-1-2-3-retrospective` operating-model lessons that should land in spec-template fixes before Wave 4 starts. Item 020 is the substrate prerequisite for the hotkey overlay; UI ships as a separate Wave 4 / V2 item.*
 

@@ -546,6 +546,11 @@ post-V1.5.6)</a></li>
 <li><a href="#dogfooding-day-3-post-v1.5-promotion-demo-video-planning"
 id="toc-dogfooding-day-3-post-v1.5-promotion-demo-video-planning">2026-05-09
 — dogfooding day 3 (post-V1.5 promotion, demo-video planning)</a></li>
+<li><a
+href="#pdt-tail_session-cross-session-peek-tail-my-active-claude-session"
+id="toc-pdt-tail_session-cross-session-peek-tail-my-active-claude-session">2026-05-09
+13:55 PDT — <code>tail_session</code> cross-session peek (“tail my
+active claude session”)</a></li>
 </ul></li>
 <li><a href="#aggregated-learnings-filled-at-end-of-window"
 id="toc-aggregated-learnings-filled-at-end-of-window">Aggregated
@@ -3886,6 +3891,433 @@ it’s an <em>advisory</em> on a successful response; future resume calls
 might want the warning escalated to a soft hint in the cluster label
 (“warning: query window crossed local-midnight boundary, atoms may have
 shifted”). Don’t design fixes here.</li>
+</ul>
+<h3
+id="pdt-tail_session-cross-session-peek-tail-my-active-claude-session">2026-05-09
+13:55 PDT — <code>tail_session</code> cross-session peek (“tail my
+active claude session”)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked “can you use echo and tail
+my active claude session” — wanted a peek at the <em>other</em> live
+Claude Code conversation from this one.</li>
+<li><strong>Query inputs:</strong> <code>source_app=claude_code</code>,
+<code>count=10</code>. No explicit <code>source</code> — relied on
+app-level auto-resolve to most-recently-active session.</li>
+<li><strong>Returned:</strong> 2 turns from session
+<code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0</code> (turn_index 0 + 1,
+timestamps 20:44:35Z and 20:47:46Z = 13:44 / 13:47 PDT).
+<code>next_cursor:null</code>, no warnings. Each turn ~3–5k chars after
+eliding (<code>bytes_elided</code> 738 + 3313). Metadata projected to
+<code>tool_calls</code> only, with <code>metadata_bytes_elided</code>
+4758 + 24882 — nice cost discipline.</li>
+<li><strong>Sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>
+— single-file claude_code jsonl, no git/cursor/codex mixing (correct for
+<code>tail_session</code> semantics).</li>
+<li><strong>Verdict:</strong> ✅ right — 1-call answer, exactly the
+ergonomic shape the V1.5 retrieval surface promised. Founder asked “tail
+my active session” and got the most-recent two turns of the
+<em>other</em> Claude Code window with no schema friction, no widening,
+no warnings. Direct counter-example to yesterday’s 4-call
+<code>get_recent_work_context()</code> resume struggle.</li>
+<li><strong>Note:</strong>
+<code>tail_session(source_app=claude_code)</code> is the ergonomic fix
+for the “peek at the other live window” use case that
+<code>get_recent_work_context</code> was overserving.
+<code>count=10</code> returned 2 turns — the session only had 2 user
+turns total, so the cap wasn’t binding. Worth noting that
+<code>tail_session</code> returns <em>full</em> turn content (USER +
+ASSISTANT) with bytes_elided summarization; the auto-resolved
+<code>source_resolved</code> field made the source attribution
+unambiguous without me having to know the session UUID. Also confirms
+tail_session is a one-shot resume primitive — no need to chain with
+<code>get_recent_work_context</code> when the question is “where did
+THIS app leave off.”</li>
+<li><strong>Conjecture:</strong> (observation-only) —
+<code>tail_session(source_app=…)</code> is the right shape for
+<em>cross-window peek</em> and <em>resume-after-quiet-stretch</em> use
+cases; the default-window failure mode that bit yesterday’s resume call
+wouldn’t have happened if I’d reached for <code>tail_session</code>
+first. Future resume-call hygiene heuristic worth carrying: if the
+question is “where did <one app> leave off,” prefer
+<code>tail_session</code> over <code>get_recent_work_context</code> —
+the latter is for cross-source synthesis. Don’t design fixes here.</li>
+</ul>
+<h4
+id="pdt-cross-app-all-active-sessions-sweep-get_recent_work_context-4-tail_session">2026-05-09
+13:58 PDT — Cross-app “all active sessions” sweep
+(<code>get_recent_work_context</code> + 4×
+<code>tail_session</code>)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Cursor agent: “use echo and
+identify all the active sessions and what they are currently doing” —
+wants a live inventory across capture surfaces, not a single-app
+tail.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-07T00:00:00Z", until="2026-05-09T23:59:59Z", format="skeleton", limit=40)</code></li>
+<li><code>tail_session(source_app="cursor", count=8)</code></li>
+<li><code>tail_session(source_app="claude_code", count=8)</code></li>
+<li><code>tail_session(source_app="codex", count=8)</code></li>
+<li><code>tail_session(source_app="git", count=8)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><ol type="1">
+<li><strong>1 cluster</strong> returned of <strong>5 total</strong>
+(<code>ctx_22148b75</code>), <strong>40/400 atoms</strong> in window,
+label <strong>“discussion about Project_echo”</strong>,
+rank_reasons=<code>["has_open_loop","dense"]</code>, cluster
+<code>source_breakdown={claude_code:231, git:122}</code>. Warnings:
+<strong>limit dropped 4 entire cluster(s)</strong>; <strong>storage
+cap</strong> (<code>events.length === limit * STORAGE_OVERFETCH</code>)
+— additional atoms/clusters may be missing from the response.</li>
+</ol></li>
+<li><ol start="2" type="1">
+<li><strong>Cursor:</strong> 8 turns from
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+— MRU composer/session <code>c15c2eca-914a-4d9f-aceb-5d4c4dfac226</code>
+includes <strong>this</strong> thread (MCP setup → Echo reconnect →
+Ask-mode limitation note → <strong>this</strong> sweep request); older
+May 1 bubbles same DB.</li>
+</ol></li>
+<li><ol start="3" type="1">
+<li><strong>Claude Code (MRU by <code>source_app</code>):</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>
+— latest USER message (<strong>2026-05-09 13:57 PDT</strong>)
+coordinates cross-agent handoff (“tell other claude agent to tail from
+this session… implement fixes in another worktree… continue with
+cursor”); assistant turn probes live
+<strong><code>agentKv:</code></strong> counts vs legacy keys and
+reframes demotion premise ahead of <strong>item 029</strong> spec.</li>
+</ol></li>
+<li><ol start="4" type="1">
+<li><strong>Codex (MRU):</strong>
+<code>source_resolved=fs:/Users/zhenye/.codex/sessions/2026/05/08/rollout-2026-05-08T23-54-01-019e0b83-b616-7e91-af98-f905cd02f3b3.jsonl</code>
+— <strong><code>isr-demo-mohsen</code></strong> workspace
+(<code>/Users/zhenye/Projects/isr-demo-mohsen</code>); thread progressed
+ROI panel flashing / low-FPS compositor diagnosis; last captured USER
+turn (<strong>2026-05-09 00:45 PDT</strong>) “free to push back… proceed
+if nothing to add” → assistant agrees with Claude’s fix order.</li>
+</ol></li>
+<li><ol start="5" type="1">
+<li><strong>Git:</strong> tail from
+<code>git:/Users/zhenye/Desktop/Project_echo</code> — recent commits are
+dogfooding journal entries + V1.5 promotion/demotion/docs
+(<code>2f2aba5</code>, <code>e26c2cd</code>, <code>961fe14</code>,
+etc.); <code>next_cursor</code> non-null (pagination continues older
+commits).</li>
+</ol></li>
+</ul></li>
+<li><strong>Sources:</strong> Attributed per call above. <strong>Not
+exhaustive session inventory:</strong> <code>tail_session</code> returns
+<strong>one MRU source per <code>source_app</code></strong>; additional
+Claude Code sessions (<code>2077c6ef-…</code>, <code>f79df4b5-…</code>,
+<code>0f9511ed-…</code>, subagent jsonl) appear <strong>inside</strong>
+the clustered atoms but were <strong>not</strong> individually tailed in
+this 5-call sequence. <strong><code>cursor</code> / <code>codex</code>
+atoms absent from the lone cluster’s
+<code>source_breakdown</code></strong> despite both surfaces
+contributing tails — consistent with clustering/time-span skew +
+truncation warnings (cross-source thread may have landed in dropped
+clusters).</li>
+<li><strong>Verdict:</strong> 🟡 partial — the <strong>quadrant tail
+sweep answered “what each app last did”</strong> crisply (especially CC
+handoff + Codex ISR thread), but
+<strong><code>get_recent_work_context</code> could not serve as a
+complete multi-session directory</strong> under these params (clusters
+dropped, cap warning). Founder question said “<strong>all</strong>
+active sessions”; Echo <strong>does not expose a list primitive</strong>
+— honest answer is <strong>compose tails + optional
+widen/narrow/re-query</strong>, not one omnibus call.</li>
+<li><strong>Note:</strong> This run validates the Agent-mode recovery
+path after Ask-mode blocked MCP (prior bubbles in same composer).
+TZ-safe <code>Z</code> suffix on since/until — no TZ-warning noise on
+call (1).</li>
+<li><strong>Conjecture:</strong> (observation-only) — For “inventory my
+lanes” prompts, consider <strong><code>tail_session</code>×4
+first</strong> (deterministic MRU per app), then
+<strong><code>get_recent_work_context</code></strong> with tighter
+window or higher limit <strong>only if</strong> synthesis across
+clusters is needed — avoids paying clustering cost when the user asked
+for per-lane status.</li>
+</ul>
+<h4
+id="pdt-codex-follow-up-project_echo-current-session-inventory">2026-05-09
+14:02 PDT — Codex follow-up: Project_echo current-session inventory</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex after
+<code>/clear</code>: “use echo to understand all the current sessions in
+this project.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>get_recent_work_context(since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", window_hours=48, limit=20, format="minimal", artifact_hint={provider:"fs", type:"repo", id:"/Users/zhenye/Desktop/Project_echo"})</code></li>
+<li><code>search_memories(query="Project_echo", since="2026-05-08T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=50)</code></li>
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.codex/sessions/", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=30)</code></li>
+<li><code>search_memories(source_prefix="git:/Users/zhenye/Desktop/Project_echo", since="2026-05-09T00:00:00-07:00", until="2026-05-09T23:59:59-07:00", limit=20)</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><ol type="1">
+<li><strong>0 clusters / 0 atoms</strong> despite
+<code>atoms_total_in_window=200</code>; warning: storage cap hit. The
+repo artifact hint did not function as a useful current-session
+directory.</li>
+</ol></li>
+<li><ol start="2" type="1">
+<li>20 matches. Top signal: git commit <code>e26c2cd</code> logging the
+13:41 resume call; also the May 9 cleanup subagent results, V1.5
+cap-stone, worktree cleanup, and recent Project_echo Claude/Codex
+turns.</li>
+</ol></li>
+<li><ol start="3" type="1">
+<li>50 Claude Code project-session matches. Most recent Project_echo
+session is <code>71b36548-...</code>: Cursor demotion/reactivation
+thread, active <code>agentKv:</code> schema probing, and the pending
+item-029 framing question. Parallel session <code>0f9511ed-...</code>
+had pushed <code>2f2aba5</code> then paused for founder confirmation
+before implementing cheap fixes A+B+C. Older active May 9 lanes include
+V1.5 finalization, demo-video planning, cleanup scans, HTML journal
+work, and worktree cleanup.</li>
+</ol></li>
+<li><ol start="4" type="1">
+<li>9 Codex-session matches. Only one current Project_echo Codex match
+after this <code>/clear</code>: session <code>019e0688-...</code>, turn
+6, timestamp <code>2026-05-09T21:00:21Z</code>, content
+<code>/clear</code> → <code>Cleared</code>. The rest were either older
+Project_echo resume work (<code>019e0b72-...</code>) or unrelated
+<code>isr-demo-mohsen</code> Codex work.</li>
+</ol></li>
+<li><ol start="5" type="1">
+<li>20 git matches. Recent Project_echo commits: <code>2f2aba5</code>
+tail_session cross-window peek, <code>e26c2cd</code> resume-call log,
+<code>961fe14</code> Cursor capture demotion, plus V1.5
+promotion/backlog cleanup/code cleanup commits.</li>
+</ol></li>
+</ul></li>
+<li><strong>Sources:</strong> Claude project JSONLs under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>;
+Codex rollout JSONLs under <code>~/.codex/sessions/</code>; git source
+<code>git:/Users/zhenye/Desktop/Project_echo</code>; local repo status
+checked separately after the ECHO calls.</li>
+<li><strong>Verdict:</strong> 🟡 partial. Search-based lane inventory
+worked, but <code>get_recent_work_context</code> with a repo artifact
+hint failed empty and cap-warned. This reinforces the prior 13:58
+finding: Echo currently has good per-lane evidence but no complete “list
+all active project sessions” primitive.</li>
+<li><strong>Note:</strong> Local verification after the ECHO calls: repo
+<code>main</code> at <code>2f2aba5</code>; <code>backlog/ready</code>,
+<code>backlog/claimed</code>, and <code>backlog/pending_review</code>
+have no active item files; working tree already had uncommitted edits to
+<code>mcp-interactions-journal.{md,html}</code> from the concurrent
+13:58 sweep.</li>
+<li><strong>Conjecture:</strong> (observation-only) — The highest-signal
+answer shape for this user prompt is a merged per-session table: session
+id, app, latest timestamp, current task, blocked/waiting state. Echo can
+supply the data through
+<code>search_memories</code>/<code>tail_session</code>, but the caller
+has to synthesize the directory manually today.</li>
+</ul>
+<h4
+id="pdt-handoff-ping-cc-drafting-029-for-cursor-builder-tail_session-precise-source">2026-05-09
+14:05 PDT — Handoff ping: CC drafting 029 for Cursor builder
+(<code>tail_session</code> precise source)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder noted Claude Code is writing
+backlog <strong>029</strong> so the <strong>Cursor builder
+agent</strong> can pick up implementation after
+<strong><code>tail_session</code> on that CC session</strong>; Cursor
+agent re-checked tail against explicit <code>source</code> (not
+<code>source_app</code> MRU).</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=6)</code></li>
+<li><strong>Returned:</strong> <strong>3 turns</strong>,
+<code>next_cursor:null</code>, no warnings. Newest USER (<strong>13:57
+PDT</strong>) — cross-agent handoff + continue in Cursor; newest
+ASSISTANT still frames <strong>pre-029</strong> work (live
+<strong><code>agentKv:</code></strong> vs legacy key counts, reframing
+V1.5.7 demotion premise) and asks whether to verify
+<strong><code>echo.db</code></strong> ingestion for composer
+<strong><code>c15c2eca…</code></strong>. At journal write time
+<strong><code>backlog/**/*029*</code></strong> still absent — spec not
+yet landed as <code>ready/</code> file.</li>
+<li><strong>Sources:</strong> <code>source_resolved</code> matches
+request — single CC JSONL for <strong>Project_echo</strong>,
+<code>session_id</code>
+<strong><code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0</code></strong>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — confirms <strong>canonical fs
+pointer + strategist intent</strong> for 029 handoff; builder should
+<strong>re-tail after <code>ready/029</code> exists</strong> (or when
+acceptance criteria reference closes).</li>
+<li><strong>Note:</strong> Prefer <strong><code>source=</code> exact
+path</strong> over <strong><code>source_app=claude_code</code></strong>
+whenever MRU could drift to another CC window.</li>
+<li><strong>Conjecture:</strong> (observation-only) — optional
+frontmatter on 029: <code>resume_tail_source:</code> fs line above —
+zero ambiguity for agents booting cold.</li>
+</ul>
+<h4
+id="pdt-claude-code-tail-of-cursor-for-cross-tool-review-loop-complements-codex-1415-pdt-entry">2026-05-09
+14:01 PDT — Claude Code tail of Cursor for cross-tool review loop
+(complements Codex 14:15 PDT entry)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder bridged Cursor↔︎Claude Code review
+loop (“identify the specific cursor session then tail that session”).
+Goal: pull Cursor’s Claude’s actual replies into Claude Code’s context
+to react to its review of the corrected V1.5.7 diagnosis.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app='cursor', count=15)</code>. Used
+<code>source_app</code> not <code>source</code> to test the
+auto-resolve-most-recent-session path. (Codex’s 14:15 PDT entry covered
+the precise-source variant on the CC side; this complements with the
+Cursor-side tail.)</li>
+<li><strong>Returned:</strong> 15 turns;
+<code>source_resolved='fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb'</code>.
+7 from today’s active composer <code>c15c2eca-...</code> (mtimes
+spanning 13:34–13:50 PDT), 8 from older composers
+(<code>3ce99c8c</code>, <code>d128341d</code> from 2026-05-01 setup-test
+sessions). <code>next_cursor</code> present,
+<code>warnings=[]</code>.</li>
+<li><strong>Sources:</strong> all 15 turns from the same single
+source-prefix
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(cursor extractor’s normalized output). Cross-checked against direct
+sqlite probe of the live Cursor DB: composer <code>c15c2eca</code> has
+26 bubbleId entries; created today at 20:40:37 UTC. Legacy
+bubbleId/composerData schema <strong>actively written</strong>
+(1387/1413 composers post-2025-05-01) — directly refutes the 2026-05-08
+V1.5.7 “frozen since 2026-05-01” claim that drove the Cursor demotion in
+<code>wiki/product/v1-spec.md</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — found the active composer
+correctly, but <code>tail_session(source_app)</code> returns by
+source-prefix recency on the shared <code>state.vscdb</code> path, not
+composer-filtered. With 15 turns requested and only 7 in today’s
+composer, the remaining 8 leaked in from older 2026-05-01 composers. The
+7 c15c2eca turns alone reconstructed the founder↔︎Cursor review loop; the
+older 8 were ignorable but consumed budget.</li>
+<li><strong>Note (timestamp drift, surprise finding worth
+flagging):</strong> all 7 c15c2eca turns came back with
+<code>event.timestamp</code> clustered in a sub-second range
+(<code>2026-05-09T20:40:37.239–.310Z</code>), but the metadata
+<code>mtime</code> field shows the bubbles were written across ~16
+real-time minutes (13:34–13:50 PDT). The cursor extractor’s
+<code>event.timestamp</code> reflects the <strong>SQLite-scan
+tick</strong>, not the bubble-write time — so all bubbles read in one
+extractor pass get near-identical timestamps. Affects time-window
+queries: a <code>since</code>/<code>until</code> filter at
+second-precision will either include all turns from a tick or none,
+hiding real ordering. Same source-batching pattern flagged for
+fs-watcher in earlier rounds, now confirmed for cursor extractor
+specifically. Not a regression — by design — but worth knowing for
+trace-layer ranking heuristics that use timestamp recency.</li>
+<li><strong>Note (operational, blocks delegation):</strong> Cursor’s
+Claude reported in a captured turn: <em>“I can’t run Echo MCP from Ask
+mode (tool calls are treated as non–read-only here)… Switch this chat to
+Agent mode and ask again.”</em> Until founder flips Cursor to Agent
+mode, the cross-tool review loop is <strong>one-way</strong> — founder
+bridges by pasting; Cursor’s Claude can’t run its own MCP probes. This
+blocks the “delegate Cursor-domain 029 work to Cursor’s Claude” plan
+until Agent mode is enabled.</li>
+<li><strong>Note (concurrence with Codex 14:15 PDT entry):</strong>
+Codex’s independent code-read of <code>src/trace/index.ts</code>
+<code>countByApp(clusterAtoms)</code> correctly identified that the
+missing-cursor-in-source_breakdown symptom has <strong>three possible
+root causes</strong> (capture, graph split, or truncation dropping
+cursor clusters). The 13:41 PDT resume call returned
+<code>1/4 clusters</code> with
+<code>"limit dropped 3 entire cluster(s)"</code> — cursor activity may
+have been inside a dropped cluster. 029 should encode three-way
+falsification, not assume a single bug bucket.</li>
+<li><strong>Conjecture:</strong> (observation-only) —
+<code>tail_session</code> composer-filter gap: for cursor specifically,
+the source-prefix is shared across all composers (single
+<code>state.vscdb</code> file), so
+<code>tail_session(source_app='cursor', count=N)</code> can’t deliver
+“tail of one specific composer” without leakage. A
+<code>composer_id</code> parameter or <code>dedupe_by=composer_id</code>
+strategy would close this. Don’t design here — observation only.</li>
+</ul>
+<h4
+id="pdt-tail-refresh-for-claude-answer-review-029-scope-pivot">2026-05-09
+14:15 PDT — Tail refresh for Claude answer review (029 scope pivot)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Cursor agent to
+<strong>review Claude Code’s answer</strong> after CC pivoted 029
+framing (Cursor MCP connected; delegate verification to Cursor).</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=12)</code></li>
+<li><strong>Returned:</strong> <strong>4 turns</strong> visible through
+index 3 (new vs prior tail): USER (<strong>14:04 PDT</strong>) — Cursor
+fully on MCP, delegate Cursor-side work to Cursor; ASSISTANT — reframes
+<strong>wrong-V1.5.7-diagnosis</strong>, probes
+<strong><code>echo.db</code></strong> capture, proposes priority stack
+(<strong>029</strong> = cluster <code>source_breakdown</code> / resume
+non-zero cursor → <strong>wiki reversal post-029-merge</strong> →
+<strong>030</strong> agentKv enrichment deferred), asks founder wiki
+timing + confirms sharper 029 handoff to Cursor Claude.
+<code>git_state.dirty_count:2</code> in metadata — <strong>spec
+artifacts may exist only locally uncommitted</strong> (workspace
+snapshot still had <strong>zero</strong> <code>backlog/**/*029*</code>
+files at review time).</li>
+<li><strong>Sources:</strong> same CC JSONL
+<code>71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code> only.</li>
+<li><strong>Verdict:</strong> ✅ right — tail surfaced <strong>material
+scope change</strong> vs earlier “029 = agentKv rewrite” framing;
+partial — heavy <strong><code>bytes_elided</code></strong> + no grounded
+diff vs repo HEAD from Echo alone.</li>
+<li><strong>Note:</strong> Independent code read:
+<code>source_breakdown</code> is <code>countByApp(clusterAtoms)</code>
+in <code>src/trace/index.ts</code> — <strong>only atoms that landed in
+that cluster</strong> count; silent cursor can be
+<strong>capture</strong>, <strong>graph split</strong>, or
+<strong>truncation dropping cursor clusters</strong>, not necessarily
+one bug.</li>
+<li><strong>Conjecture:</strong> (observation-only) — 029 AC should
+force a <strong>three-way falsification</strong> (storage query vs
+single-cluster membership vs full-cluster list pre-truncate) before
+picking a fix bucket.</li>
+</ul>
+<h4
+id="pdt-codex-tool-registry-anomaly-tail_session-absent-in-this-client">2026-05-09
+14:17 PDT — Codex tool-registry anomaly: <code>tail_session</code>
+absent in this client</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Codex to tail both Claude
+and Cursor active sessions in the interactive review loop; Codex
+incorrectly said <code>tail_session</code> was not exposed in this
+session, then founder noted <code>tail_session</code> is part of the MCP
+and offered to restart.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", since="2026-05-09T13:40:00-07:00", until="2026-05-09T23:59:59-07:00", limit=10)</code></li>
+<li><code>search_memories(query="USER:", source_prefix="fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb", since="2026-05-09T13:40:00-07:00", until="2026-05-09T23:59:59-07:00", limit=10)</code></li>
+<li><code>search_memories(query="interactive review", since="2026-05-09T13:40:00-07:00", until="2026-05-09T23:59:59-07:00", limit=10)</code></li>
+</ol></li>
+<li><strong>Returned:</strong> Search fallback found the active Claude
+session (<code>71b36548-...</code>, latest turn 14:13 PDT) and Cursor
+composer (<code>c15c2eca-914a-4d9f-aceb-5d4c4dfac226</code>, latest
+captured user turn “review claude answer”). The interactive-review query
+returned Claude’s 14:13 turn confirming it had used
+<code>mcp__echo__tail_session</code> twice.</li>
+<li><strong>Sources:</strong> Claude project JSONL + Cursor
+<code>state.vscdb</code> through <code>search_memories</code>. No direct
+Codex <code>tail_session</code> call was possible because this Codex
+client’s currently exposed <code>mcp__echo__*</code> tools are only
+<code>echo_ping</code>, <code>get_recent_work_context</code>, and
+<code>search_memories</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial / client-tooling anomaly. ECHO
+daemon is not the likely fault: Claude Code exposed and used
+<code>mcp__echo__tail_session</code> successfully minutes earlier. This
+Codex session likely has a stale/incomplete MCP tool registry.</li>
+<li><strong>Note:</strong> Recommended recovery: restart/reload this
+<strong>Codex MCP tool context</strong>. Restarting the ECHO daemon is
+probably unnecessary unless a fresh Codex session still lacks
+<code>tail_session</code>.</li>
+<li><strong>Conjecture:</strong> (observation-only) — Cross-client MCP
+dogfooding should include a “tool list freshness” check; one AI client
+can have a stale schema while another sees the current server
+surface.</li>
 </ul>
 <hr />
 <h2 id="aggregated-learnings-filled-at-end-of-window">Aggregated
