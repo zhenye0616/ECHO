@@ -129,12 +129,46 @@
   nav#TOC > ul { padding-left: 1.2em; margin: 0.4em 0; }
   nav#TOC ul ul { padding-left: 1.2em; font-size: 0.96em; }
   nav#TOC li { margin: 0.15em 0; }
-  /* Subtle anchor for date-stamped entry headers */
-  h3, h4 { scroll-margin-top: 1em; }
+  details.toc {
+    margin: 1.5em 0 2.2em;
+  }
+  summary.toc-summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    position: relative;
+    padding: 0.55em 0.9em 0.55em 1.7em;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 3px;
+    font-weight: 650;
+  }
+  summary.toc-summary::-webkit-details-marker { display: none; }
+  summary.toc-summary::before {
+    content: '▸';
+    position: absolute;
+    left: 0.55em;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85em;
+    color: var(--muted);
+    transition: transform 0.12s ease;
+  }
+  details.toc[open] > summary.toc-summary::before {
+    transform: translateY(-50%) rotate(90deg);
+  }
+  details.toc > nav#TOC {
+    margin: 0.8em 0 0;
+  }
+  /* Subtle anchor for collapsible section headers */
+  h2, h3, h4 { scroll-margin-top: 1em; }
 
   /* ── Collapsible entries ──────────────────────────────────────────────
-     A small DOMContentLoaded script (below) wraps every H3/H4 in the body
-     into a <details> element so individual journal entries can be collapsed.
+     A small DOMContentLoaded script (below) wraps H3/H4 entries and selected
+     non-date H2 sections into <details> elements. Date H2 headings stay on the
+     surface as scan anchors; accumulating summary/backlog/notes sections
+     collapse. The generated index/TOC is wrapped separately.
      The MD source is untouched; collapsibility lives entirely in the HTML
      twin so the in-the-moment append discipline is unchanged. */
 
@@ -168,10 +202,11 @@
   }
 
   details.entry { margin: 0.4em 0; }
+  details.entry.level-2 { margin-top: 2.1em; }
   details.entry.level-3 { margin-top: 1.6em; }
   details.entry.level-4 { margin-top: 0.7em; }
 
-  /* The original H3/H4 styling now lives on the summary, scoped by level. */
+  /* The original H2/H3/H4 styling now lives on the summary, scoped by level. */
   summary.entry-summary {
     cursor: pointer;
     list-style: none;
@@ -194,6 +229,17 @@
     transform: translateY(-50%) rotate(90deg);
   }
 
+  summary.entry-summary.level-2 {
+    font-size: 1.35em;
+    font-weight: 650;
+    margin-top: 0.4em;
+    padding: 0.65em 0.9em 0.6em 1.7em;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 3px 3px 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
   summary.entry-summary.level-3 {
     font-size: 1.05em;
     font-weight: 600;
@@ -212,8 +258,9 @@
   }
   summary.entry-summary:hover { background: var(--code-bg); }
 
-  /* Reset the inner heading element (h3/h4 that's now wrapped in <summary>)
+  /* Reset the inner heading element (h2/h3/h4 that's now wrapped in <summary>)
      so it inherits summary styles instead of the base h3/h4 ones. */
+  summary.entry-summary > h2,
   summary.entry-summary > h3,
   summary.entry-summary > h4 {
     display: inline;
@@ -228,7 +275,10 @@
     font-weight: inherit;
   }
 
-  /* Indent H4 details a touch when nested under an H3 details. */
+  /* Indent nested details a touch while preserving scanability. */
+  details.entry.level-2[open] > details.entry.level-3 {
+    margin-left: 0.45em;
+  }
   details.entry.level-3[open] > details.entry.level-4 {
     margin-left: 0.6em;
   }
@@ -245,6 +295,7 @@
       box-shadow: none;
     }
     summary.entry-summary::before { display: none; }
+    summary.entry-summary.level-2 { background: transparent; box-shadow: none; border-left: none; }
     summary.entry-summary.level-3 { background: transparent; box-shadow: none; }
     nav#TOC { page-break-after: always; }
   }
@@ -256,9 +307,12 @@
       var body = document.body;
       if (!body || body.dataset.entriesWrapped === '1') return;
 
-      // Bottom-up: wrap H4 first, then H3, so H3 details naturally contain H4 details.
+      // Bottom-up: wrap H4 and H3 first. Then wrap selected H2 sections while
+      // leaving date H2 headings visible on the page surface.
       wrapHeadingLevel(4);
       wrapHeadingLevel(3);
+      wrapHeadingLevel(2);
+      wrapTOC();
 
       installToolbar();
       installHashOpener();
@@ -275,6 +329,7 @@
           if (h.closest('summary.entry-summary')) return false;
           if (h.closest('nav#TOC')) return false;
           if (h.classList.contains('title')) return false;
+          if (level === 2 && !shouldWrapH2(h)) return false;
           return true;
         }
       );
@@ -309,22 +364,49 @@
       });
     }
 
+    function shouldWrapH2(heading) {
+      var text = (heading.textContent || '').trim();
+      // Date sections should stay visible. They are the main scan surface.
+      if (/^\d{4}-\d{2}-\d{2}\b/.test(text)) return false;
+      // This is just the parent label for the date sequence; collapsing it
+      // would hide the whole journal body behind one affordance.
+      if (text === 'Interactions By Date') return false;
+      return true;
+    }
+
+    function wrapTOC() {
+      var toc = document.querySelector('nav#TOC');
+      if (!toc || toc.closest('details.toc')) return;
+
+      var details = document.createElement('details');
+      details.className = 'toc';
+
+      var summary = document.createElement('summary');
+      summary.className = 'toc-summary';
+      summary.textContent = 'Index';
+
+      var parent = toc.parentNode;
+      parent.insertBefore(details, toc);
+      details.appendChild(summary);
+      details.appendChild(toc);
+    }
+
     function installToolbar() {
       var toolbar = document.createElement('div');
       toolbar.className = 'entry-toolbar';
       toolbar.innerHTML =
         '<button type="button" data-act="expand">Expand all</button>' +
         '<button type="button" data-act="collapse">Collapse all</button>' +
-        '<span class="hint">click any heading to expand · ⌘F still searches collapsed entries on most browsers</span>';
-      // Insert before the TOC (or, if no TOC, before the first body child).
-      var anchor = document.querySelector('nav#TOC') || document.body.firstChild;
+        '<span class="hint">click the index, summary sections, interactions, or calls to expand · date headings stay visible</span>';
+      // Insert before the collapsible TOC (or, if no TOC, before the first body child).
+      var anchor = document.querySelector('details.toc') || document.querySelector('nav#TOC') || document.body.firstChild;
       document.body.insertBefore(toolbar, anchor);
 
       toolbar.addEventListener('click', function (e) {
         var btn = e.target.closest && e.target.closest('button[data-act]');
         if (!btn) return;
         var open = btn.getAttribute('data-act') === 'expand';
-        document.querySelectorAll('details.entry').forEach(function (d) {
+        document.querySelectorAll('details.entry, details.toc').forEach(function (d) {
           d.open = open;
         });
       });
