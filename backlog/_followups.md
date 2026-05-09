@@ -4,6 +4,32 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ---
 
+## ❌ Killed (won't ship)
+
+### Item 017 — "Wire normalizer into MCP `search_memories` response shape"
+
+**Status:** killed 2026-05-09. Never specced into `backlog/ready/`. Originally deferred from item 016 ("MCP wiring is the next item"); re-deferred by item 018 ("V1.6, informed by trace-layer learnings"); kept Out of Scope by item 022.
+
+**Original 016 proposal:** add `format: 'raw' | 'normalized' | 'both'` to `search_memories`, returning `match.normalized: NormalizedContextEvent` alongside `match.content`.
+
+**Why killed:**
+
+1. **The need has been unbundled.** When 016 wrote the proposal, `search_memories` was the only retrieval tool. V1.5 added `get_recent_work_context` (clustered + normalized atoms in `atoms[id]`) and `tail_session` (sequential, same wire shape). A consumer who hits `search_memories` and wants the normalized shape can chain `tail_session(source=match.source)` — one extra call, but the three retrieval tools stay separable: substring vs. clustered vs. exact-tail.
+2. **Reintroduces V1.5 envelope risk.** Normalized atoms add `actors`, `artifacts[]`, `provenance`, `context`, `open_loop_hints[]` per match. The V1.5.6 wire-shape projector (`src/mcp/wire-shape/match.ts`) caps `content` and per-key metadata; it has no slots for the normalized sub-fields. Adding format dispatch either expands the projector (more cap surface to maintain) or lets the budget creep back, undoing V1.5.5/V1.5.6/V1.5.7's three rounds of envelope-overflow closures.
+3. **No surfaced consumer demand.** The V1.5 dogfooding journal entries (16:22 / 22:40 / 00:30 / 02:05 PDT through 17:01 PDT) flag substring-tool pain as envelope overflow, fs-watcher noise, TZ-naive parsing, and substring-vs-semantic confusion — all closed. None ask for normalized-from-substring. The 016-era promise predates the trace layer; the substrate it was solving for now exists.
+
+**Reopen criteria:** a concrete consumer (not an abstract API improvement) asks for substring + normalized in one call AND the chained `search_memories` → `tail_session` path is observably insufficient for that use case. Reopen as a narrow `format: 'normalized'` opt-in (no `'both'` — that's the schema-bifurcation trap), single non-default mode, projector-capped, default stays `'raw'`. ~0.5d. Until that surfaces, save the spec slot for V1.6 priorities the journals actually flagged: cursor `agentKv:` extractor rewrite (V1.5.7 Gap 2 Layer 1, real broken capture) and `get_atom(id, fields?)` deep-dive primitive (the wire-shape elision pattern is implicitly waiting for it).
+
+**Stale references** (historical, do not edit):
+- `backlog/complete/2026-05-06-016-read-time-normalizer.md:30, 116, 421, 444` — original deferral
+- `backlog/complete/2026-05-06-018-recent-work-context-tool.md:429, 452` — V1.6 punt
+- `backlog/complete/2026-05-08-022-v15-2-trace-retrieval-reliability.md:297` — out-of-scope confirmation
+- `raw/internal/decisions/2026-05-06-v15-trace-layer-design.md:153` — design-doc note
+
+`wiki/architecture/work-trace.md:258` updated in this kill commit to remove the forward-pointing reference.
+
+---
+
 ## 2026-04-30 — from merge of 010-cursor-extractor
 
 - Boot-time workspace-inference scan: walk `workspacePrefix` for existing `state.vscdb` files at startup and prime the composer→workspace map, so the first turn after fresh daemon boot can carry `workspace_id`. (Cursor extractor; addresses agent_notes item 4.)
