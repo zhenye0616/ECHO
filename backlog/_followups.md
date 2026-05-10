@@ -43,7 +43,22 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 **Mitigations today:** Read the underlying capture file (per-app JSONL / SQLite) for disputes; narrow time windows and raise `count` / limits where the wire allows; chain multiple queries instead of assuming one call is complete.
 
-**Candidate backlog (founder/strategist):** Make caps and elision behavior obvious in tool docs or responses; consider `tail_session` pagination / cursor semantics for “next chunk of same turn”; consider a trusted-local “no elide” or debug shape; longer-term alignment with a `get_atom(id, fields?)`-style primitive (already hinted in the item 017 kill note).
+**Candidate backlog (founder/strategist):** Make caps and elision behavior obvious in tool docs or responses; consider `tail_session` pagination / cursor semantics for “next chunk of same turn”; consider a trusted-local “no elide” or debug shape; longer-term alignment with a `get_atom(id, fields?)`-style primitive (already hinted in the item 017 kill note). **Item 030's `truncations: string[]` field is the read-time trust mechanism that addresses this entry's core concern (closes the trust-bug part); `_followups.md` keeps the entry until 030 ships and the structural fix is verified end-to-end against the listed candidates.**
+
+### Coordination layer — held pending 030 live test
+
+**Status:** Held 2026-05-10 ~01:00 PDT. The general multi-agent coordination layer (artifact-state determinism, mutation log + watermarks, lease primitives) was brainstormed in detail today (strategist conversation, Claude Code session `71b36548-...`); founder narrowed scope twice and ultimately deferred. Full conversation archive + decision rationale + trigger conditions live at `raw/internal/decisions/2026-05-10-coordination-layer-defer-pending-030.md` — read that note before reopening this entry.
+
+**Why held now:** Item 030 (`backlog/ready/2026-05-09-030-mcp-toolkit-reshape-and-group-session.md`) is the load-bearing V1.6 ship — group session A primitive (`wait_for_new_turns`) + atomic toolkit decomposition. Splitting attention to coordination work would dilute it. Founder's deferral rule: revisit only when (a) 030 is shipped + ~1–2 weeks live-tested AND (b) the founder is ready to step out of the loop most of the time, OR a concrete trigger fires earlier (see decision note for the 5 trigger conditions).
+
+**Adjacent observation (today's data):** the journal-write race condition fired **5 times today** during the 030 review iteration (3 silent overwrites or near-misses, 2 mtime-guard rejections — see decision note Phase 5 for full mechanics). The asymmetric Edit-vs-Write failure mode means silent data loss is possible on any shared file the moment two agents touch it concurrently. The journal is the highest-contention surface (multi-writer by design per CLAUDE.md), but the same pattern can hit `_followups.md`, `docs/BACKLOG.md`, or any shared wiki page. Strategists should chain `verify → pandoc → git add → commit → push` as a single shell command (not separate steps) to minimize the race window — the practice that recovered today's lost journal entry. **Not adding a narrow journal-only fix yet; founder explicitly held the narrow fix too pending 030 dogfooding evidence.**
+
+**Reopening criteria (any one fires):**
+1. Semantic loss from journal race (an entry is silently lost AND not recoverable from agent's session memory).
+2. Race spreads beyond the journal to another shared file, silently.
+3. 030 ships and founder reaches the "out of loop most of the time" state.
+4. Cohort dogfooding reveals collision in the bundle.
+5. The narrow journal-shards fix turns out to be non-trivial (semantic conflicts, ordering, dedup).
 
 ---
 
