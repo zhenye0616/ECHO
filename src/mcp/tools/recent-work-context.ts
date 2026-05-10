@@ -2,12 +2,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { normalizeEvent } from '../../normalize/index.js';
 import type { Storage } from '../../storage/interface.js';
-import type {
-  NormalizedContextEvent,
-  SourceRef,
-  TimeRef,
-} from '../../normalize/types.js';
-import { buildRecentWorkContext } from '../../trace/index.js';
+import type { NormalizedContextEvent, SourceRef, TimeRef } from '../../normalize/types.js';
+import { noUsefulCluster } from '../../trace/auto-expand.js';
+import { buildRecentWorkContext, rankClusters, rankReasonsFor } from '../../trace/index.js';
 import type {
   ArtifactHint,
   Cluster,
@@ -26,7 +23,7 @@ export const RECENT_WORK_CONTEXT_DEPRECATION_MARKER =
   'This tool will be removed in item 031 after a 1-2 week dogfooding period. ' +
   'Migration recipe in description below.]**\n\n' +
   'Migration:\n' +
-  '  OLD: get_recent_work_context(window_hours=24, format=\'minimal\')\n' +
+  "  OLD: get_recent_work_context(window_hours=24, format='minimal')\n" +
   '       // window_hours=24 in the OLD shape was being misused as lookback —\n' +
   '       // it actually controls cluster-gap (the temporal gap allowed between\n' +
   '       // atoms in a single cluster). The default lookback was 4h via the\n' +
@@ -34,7 +31,7 @@ export const RECENT_WORK_CONTEXT_DEPRECATION_MARKER =
   '       // lookback, NOT window_hours=.\n' +
   '\n' +
   '  NEW: c = find_clusters(since=now-24h)        // explicit 24h lookback\n' +
-  '       // (omit since= to get find_clusters\' V1.5.7-equivalent no-args\n' +
+  "       // (omit since= to get find_clusters' V1.5.7-equivalent no-args\n" +
   '       // semantics: 4h default, auto-expand to 24h if empty.)\n' +
   '       //\n' +
   '       // Inspect c.clusters[]: each has rank, label, source_breakdown,\n' +
@@ -47,8 +44,18 @@ export const RECENT_WORK_CONTEXT_DEPRECATION_MARKER =
   '       // get_atoms accepts ≤50 ids per call. If picked.atom_ids.length > 50,\n' +
   '       // partition into chunks and concat results:\n' +
   '       //   chunks = chunk(picked.atom_ids, 50)\n' +
-  '       //   a = flatMap(chunks, ids => get_atoms(ids, format=\'minimal\'))\n' +
-  '       a = get_atoms(picked.atom_ids, format=\'minimal\')   // single call if ≤50\n' +
+  "       //   a = flatMap(chunks, ids => get_atoms(ids, format='minimal'))\n" +
+  "       a = get_atoms(picked.atom_ids, format='minimal')   // single call if ≤50\n" +
+  '\n' +
+  '  RESUME-STYLE QUERIES (item 032): for "where did I leave off after a gap":\n' +
+  "       - Pass `prefer='newest_first'` to `get_atoms` so the prefix-drop on\n" +
+  '         envelope overflow drops the OLDEST atom (and missing IDs) first,\n' +
+  '         not the freshest — the freshest is exactly what the resume caller\n' +
+  '         needs.\n' +
+  '       - No-args `find_clusters()` now auto-expands to 24h when the only\n' +
+  "         returned cluster is the calling session's own recent activity\n" +
+  '         (single-source-recent), AND demotes that cluster so prior\n' +
+  '         multi-source work surfaces at clusters[0].\n' +
   '\n' +
   '---\n\n';
 
@@ -58,12 +65,12 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   'joined by shared artifacts (files, repos, conversations) within a recent time window. ' +
   'Use when the user asks open-ended questions about recent work across their tools — ' +
   'their own activity, or another agent/app on the same machine ("what is Codex/Claude ' +
-  "Code working on?\" — answered via `cluster.source_breakdown`, which counts atoms per " +
+  'Code working on?" — answered via `cluster.source_breakdown`, which counts atoms per ' +
   'app inside each cluster). Also: where they left off, or to bring prior context ' +
   '(Cursor + Claude Code + Codex + git) into the current conversation. Returns one ' +
-  "cluster per coherent work thread; the AI client decides which to attend to. `cluster.edges[]` is signal-bearing — pairs joined " +
-  "only by scope (repo/workspace) or session (conversation/thread) artifacts are " +
-  "omitted, so `edges.length` is no longer guaranteed to equal C(N, 2); use " +
+  'cluster per coherent work thread; the AI client decides which to attend to. `cluster.edges[]` is signal-bearing — pairs joined ' +
+  'only by scope (repo/workspace) or session (conversation/thread) artifacts are ' +
+  'omitted, so `edges.length` is no longer guaranteed to equal C(N, 2); use ' +
   '`cluster.atom_ids[]` for membership. `cluster.open_loop_hints[].resolved` ' +
   'indicates whether the hint has a downstream closure signal in the same window ' +
   '(heuristic — treat as a hint, not a guarantee). ' +
@@ -259,10 +266,7 @@ export function applySkeletonCluster(cluster: Cluster): SkeletonCluster {
   // budget). Cap atom_ids and open_loop_hints to head+tail; surface the
   // omission count so the consumer can choose to re-query narrower.
   const aIds = clipArray(cluster.atom_ids, SKELETON_CLUSTER_ATOM_IDS_CAP);
-  const hints = clipArray(
-    cluster.open_loop_hints,
-    SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP,
-  );
+  const hints = clipArray(cluster.open_loop_hints, SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP);
   const skeleton: SkeletonCluster = {
     cluster_id: cluster.cluster_id,
     rank: cluster.rank,
@@ -303,9 +307,7 @@ export function truncateForMinimal(s: string | undefined): string | undefined {
   );
 }
 
-function applyMinimal(
-  atom: NormalizedContextEvent,
-): NormalizedContextEvent {
+function applyMinimal(atom: NormalizedContextEvent): NormalizedContextEvent {
   const input = truncateForMinimal(atom.action.input);
   const output = truncateForMinimal(atom.action.output);
   if (input === atom.action.input && output === atom.action.output) {
@@ -432,44 +434,89 @@ export async function getRecentWorkContext(
     params.artifact_hint,
   );
 
-  // V1.5.7 polish (2026-05-09): no-args auto-expand. The 4h default is right
-  // for "what just happened" but wrong for "where did I leave off after a
-  // quiet stretch." When the caller passed neither `since` nor `until` AND
-  // the 4h pass returned 0 clusters, retry once at 24h and annotate the
-  // response so the consumer can see the implicit window-widen.
-  // The retry preserves an explicit `window_hours` if the caller passed one;
-  // otherwise inferWindowHours re-derives it from the wider span (which caps
-  // at 24h, matching the wider until-since span). One retry, hard-bounded.
+  // V1.5.7 polish (2026-05-09) + item 032 (2026-05-10): no-args auto-expand
+  // with generalized trigger predicate. The 4h default is right for
+  // "what just happened" but wrong for "where did I leave off after a
+  // quiet stretch." When the caller passed neither `since` nor `until`
+  // AND `noUsefulCluster(4h)` is true (either 0 clusters — the historic
+  // "empty" trigger — OR every returned cluster is single-source-recent,
+  // i.e. the calling AI client's own session noise from the last 5
+  // minutes), retry once at 24h. Annotate the warning with the trigger
+  // label so the consumer can see why the implicit widen fired. When the
+  // trigger is `single-source-recent`, re-rank the 24h clusters with
+  // `demoteSingleSourceRecent=true` so prior multi-source work surfaces
+  // at clusters[0] regardless of the noise cluster's other rank signals
+  // (matches_artifact_hint, has_open_loop, recent_activity, size, age).
+  // See item 032 AC1 + R2-2 for the strict-partition rationale.
   const isNoArgsShape = params.since === undefined && params.until === undefined;
-  if (
-    isNoArgsShape &&
-    response.clusters.length === 0 &&
-    NO_ARGS_AUTO_EXPAND_WINDOW_HOURS > DEFAULT_WINDOW_HOURS
-  ) {
-    const expandedWindowMs =
-      NO_ARGS_AUTO_EXPAND_WINDOW_HOURS * 60 * 60 * 1000;
-    const expandedSince = new Date(
-      Date.parse(until) - expandedWindowMs,
-    ).toISOString();
-    const expandedSinceMs = Date.parse(expandedSince);
-    const expandedWindowHours = inferWindowHours(
-      expandedSinceMs,
-      untilMs,
-      params.window_hours,
+  if (isNoArgsShape && NO_ARGS_AUTO_EXPAND_WINDOW_HOURS > DEFAULT_WINDOW_HOURS) {
+    const nowMs = now.getTime();
+    const atomsByIdFor = (r: RecentWorkContextResponse): Map<string, NormalizedContextEvent> =>
+      new Map(Object.entries(r.atoms));
+    const fourHourClustersAreUseless = noUsefulCluster(
+      response.clusters,
+      atomsByIdFor(response),
+      nowMs,
     );
-    response = await runRecentWorkContextPass(
-      storage,
-      expandedSince,
-      until,
-      limit,
-      expandedWindowHours,
-      format,
-      params.artifact_hint,
-    );
-    response.warnings.push(
-      `[AUTO_EXPAND] no-args call: 4h default returned 0 clusters; auto-expanded to ${NO_ARGS_AUTO_EXPAND_WINDOW_HOURS}h. ` +
-        'Pass explicit `since`/`until` to suppress this fallback.',
-    );
+    if (fourHourClustersAreUseless) {
+      // Identify the trigger label BEFORE the retry. `empty` and
+      // `single-source-recent` both satisfy `noUsefulCluster` (empty is
+      // vacuously true); the consumer distinguishes them via the warning.
+      const trigger: 'empty' | 'single-source-recent' =
+        response.clusters.length === 0 ? 'empty' : 'single-source-recent';
+
+      const expandedWindowMs = NO_ARGS_AUTO_EXPAND_WINDOW_HOURS * 60 * 60 * 1000;
+      const expandedSince = new Date(Date.parse(until) - expandedWindowMs).toISOString();
+      const expandedSinceMs = Date.parse(expandedSince);
+      const expandedWindowHours = inferWindowHours(expandedSinceMs, untilMs, params.window_hours);
+      response = await runRecentWorkContextPass(
+        storage,
+        expandedSince,
+        until,
+        limit,
+        expandedWindowHours,
+        format,
+        params.artifact_hint,
+      );
+
+      // Apply the rank demotion ONLY when the single-source-recent trigger
+      // fired. The empty trigger needs no demotion by construction (no
+      // single-source-recent cluster existed in the 4h pass; the 24h set
+      // is ranked in normal order). Single-source-recent trigger means
+      // the 24h set may contain BOTH the noise cluster AND the prior
+      // multi-source work — strict partition is the demo-bar guarantee.
+      if (trigger === 'single-source-recent') {
+        const atomsById24h = atomsByIdFor(response);
+        const queryEcho: Query = {
+          since: response.query.since,
+          until: response.query.until,
+          limit,
+          window_hours: response.query.window_hours,
+          format,
+        };
+        if (params.artifact_hint !== undefined) {
+          queryEcho.artifact_hint = params.artifact_hint;
+        }
+        const reranked = rankClusters(response.clusters, atomsById24h, queryEcho, {
+          demoteSingleSourceRecent: true,
+          nowMs,
+        });
+        reranked.forEach((c, i) => {
+          c.rank = i + 1;
+          c.rank_reason = rankReasonsFor(c, atomsById24h, queryEcho);
+        });
+        response.clusters = reranked;
+      }
+
+      response.warnings.push(
+        `[AUTO_EXPAND] ${trigger} no-args call: 4h default ${
+          trigger === 'empty'
+            ? 'returned 0 clusters'
+            : "returned only single-source-recent clusters (likely the calling session's own activity)"
+        }; auto-expanded to ${NO_ARGS_AUTO_EXPAND_WINDOW_HOURS}h. ` +
+          'Pass explicit `since`/`until` to suppress this fallback.',
+      );
+    }
   }
 
   // Surface a single warning when the caller passed naive (TZ-less) timestamps.
@@ -506,9 +553,7 @@ export async function getRecentWorkContext(
 // type intentionally widens to the union — the MCP tool serializer is
 // permissive (z.record on outputSchema bodies), so a skeleton response with
 // flatter atoms/clusters validates against the same outputSchema.
-export function buildSkeletonResponse(
-  response: RecentWorkContextResponse,
-): SkeletonResponse {
+export function buildSkeletonResponse(response: RecentWorkContextResponse): SkeletonResponse {
   const skeletonAtoms: Record<string, SkeletonAtom> = {};
   for (const [id, atom] of Object.entries(response.atoms)) {
     skeletonAtoms[id] = applySkeletonAtom(atom);
@@ -542,10 +587,7 @@ const recentWorkContextOutputSchema = {
   warnings: z.array(z.string()),
 };
 
-export function registerRecentWorkContext(
-  server: McpServer,
-  storage: Storage,
-): void {
+export function registerRecentWorkContext(server: McpServer, storage: Storage): void {
   server.registerTool(
     'get_recent_work_context',
     {

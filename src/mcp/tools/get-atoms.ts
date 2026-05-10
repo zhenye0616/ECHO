@@ -31,16 +31,17 @@ export const GET_ATOMS_MAX_IDS = 50;
 
 export const GET_ATOMS_DESCRIPTION =
   // discriminator one-liner per item 025
-  'Use when you have a specific list of atom IDs (from `find_clusters.clusters[].atom_ids[]` or `search_memories.matches[].id`) and want their bodies. The targeted body-fetch counterpart to `find_clusters`\' cheap discovery.\n\n' +
+  "Use when you have a specific list of atom IDs (from `find_clusters.clusters[].atom_ids[]` or `search_memories.matches[].id`) and want their bodies. The targeted body-fetch counterpart to `find_clusters`' cheap discovery.\n\n" +
   // cost class
   'Cost: medium. Each returned atom passes through the same wire-shape projector as `search_memories` / `tail_session` (per-content cap, per-key metadata cap, projector reshapes). Hard envelope ceiling: 25k chars; deterministic prefix-drop on overflow (see below).\n\n' +
   // shape
   'PARAMETERS:\n' +
   '  • `atom_ids: string[]` — required. Non-empty, ≤ ' +
   String(GET_ATOMS_MAX_IDS) +
-  '. Atoms are returned in REQUESTED ORDER.\n' +
+  '. Atoms are returned in REQUESTED ORDER by default.\n' +
   '  • `fields?: string[]` — optional projection. When present, only the listed top-level fields are returned per atom (always-on: `id`, `source`, `timestamp`, `truncations`). Useful for cost reduction.\n' +
-  '  • `format?: "minimal"` — V1.6 only ships "minimal" (applies WIRE_SHAPE_CAPS to content + per-key metadata). A future debug-only "full" mode is a separate item if real demand surfaces.\n\n' +
+  '  • `format?: "minimal"` — V1.6 only ships "minimal" (applies WIRE_SHAPE_CAPS to content + per-key metadata). A future debug-only "full" mode is a separate item if real demand surfaces.\n' +
+  '  • `prefer?: "as_requested" | "newest_first"` — default `"as_requested"` preserves the existing contract (atoms returned in input order; duplicate input IDs returned as repeated entries). Pass `"newest_first"` for resume-style queries: atoms are sorted by `CaptureEvent.timestamp` DESCENDING (newest first; ties resolve in input order), duplicate IDs are de-duplicated to first occurrence BEFORE sorting (NEW behavior — opt-in only), and missing IDs (not in storage) land at the END of the iteration order. Under the deterministic prefix-drop budget, that END is the FIRST thing dropped — so the freshest atoms survive overflow, matching the resume-call intent. If you have already ordered `atom_ids` intentionally, pass `"as_requested"` (or omit `prefer`) — `"newest_first"` will override your order.\n\n' +
   // truncations
   'TRUST SIGNAL — `truncations: string[]` is on EVERY returned atom. `[]` ⟺ everything verbatim. `["content"]` ⟺ content was clipped to the wire-shape cap. `["metadata.<key>"]` ⟺ per-key cap fired (LOSSY — opaqued out). `["metadata.<key>:projected"]` ⟺ projector reshaped (REFORMATTED, not clipped — e.g. tool_calls → trajectory). `["fields_omitted"]` ⟺ caller passed `fields[]` excluding some.\n\n' +
   // drop rule
@@ -49,11 +50,15 @@ export const GET_ATOMS_DESCRIPTION =
   'If even a single projected atom alone would exceed 25k, the response is `{atoms: [], atoms_dropped: input_count, atoms_dropped_ids: [all]}` plus a warning telling the caller to retry with a narrower `fields[]` projection. We do NOT raise WIRE_SHAPE_CAPS to make this pass.';
 
 const formatSchema = z.enum(['minimal']);
+const preferSchema = z.enum(['as_requested', 'newest_first']);
+
+export type GetAtomsPrefer = 'as_requested' | 'newest_first';
 
 export interface GetAtomsParams {
   atom_ids: string[];
   fields?: string[];
   format?: 'minimal';
+  prefer?: GetAtomsPrefer;
 }
 
 /** Atom shape on the wire. Mirrors ProjectedMatch but keeps the spec's
@@ -143,11 +148,60 @@ function projectAtom(
   return { atom, bytes };
 }
 
-export async function getAtoms(
-  storage: Storage,
-  params: GetAtomsParams,
-): Promise<GetAtomsResult> {
-  const { atom_ids, fields, format } = params;
+/** Build the iteration order for the prefix-drop loop, given the caller's
+ *  `prefer` choice. The list returned here is the order atoms are processed
+ *  AND the order their IDs land in `atoms_dropped_ids` when the budget runs
+ *  out. Item 032 (`prefer="newest_first"`):
+ *    - duplicate IDs in input are de-duplicated to first occurrence BEFORE
+ *      sorting (NEW behavior — opt-in; preserves the existing duplicates-
+ *      returned-as-repeated-entries contract under `as_requested`),
+ *    - existing rows are sorted by `CaptureEvent.timestamp` DESCENDING
+ *      (newest first; ties resolve to original input order via stable sort),
+ *    - missing IDs (not in storage) are appended at the END preserving
+ *      their relative request order so the prefix-drop loop drops them
+ *      before any existing atom.
+ *  Under `as_requested` (default), the iteration order is the input verbatim
+ *  — duplicates pass through, missing IDs sit at their original position. */
+function buildProcessOrder(
+  atom_ids: readonly string[],
+  fetchedById: Map<string, CaptureEvent>,
+  prefer: GetAtomsPrefer,
+): string[] {
+  if (prefer === 'as_requested') {
+    return [...atom_ids];
+  }
+  // newest_first: dedupe → split existing vs missing → stable-sort existing
+  // by timestamp desc → append missing.
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const id of atom_ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(id);
+  }
+  const existing: string[] = [];
+  const missing: string[] = [];
+  for (const id of unique) {
+    if (fetchedById.has(id)) existing.push(id);
+    else missing.push(id);
+  }
+  // Stable timestamp-desc sort: decorate with original position, sort,
+  // then strip. Date.parse on ISO strings; non-parsable timestamps sort
+  // to the end (treated as -Infinity for "newest first" ordering).
+  const decorated = existing.map((id, idx) => {
+    const ev = fetchedById.get(id)!;
+    const t = Date.parse(ev.timestamp);
+    return { id, idx, t: Number.isNaN(t) ? -Infinity : t };
+  });
+  decorated.sort((a, b) => {
+    if (a.t !== b.t) return b.t - a.t;
+    return a.idx - b.idx;
+  });
+  return [...decorated.map((d) => d.id), ...missing];
+}
+
+export async function getAtoms(storage: Storage, params: GetAtomsParams): Promise<GetAtomsResult> {
+  const { atom_ids, fields, format, prefer: preferIn } = params;
   // Schema-side validation runs at registerTool boundary; defense-in-depth
   // here for in-process callers (tests, future programmatic callers).
   if (atom_ids === undefined) {
@@ -157,16 +211,15 @@ export async function getAtoms(
     throw new Error('get_atoms: atom_ids must be non-empty');
   }
   if (atom_ids.length > GET_ATOMS_MAX_IDS) {
-    throw new Error(
-      `get_atoms: atom_ids exceeds max ${GET_ATOMS_MAX_IDS} per call`,
-    );
+    throw new Error(`get_atoms: atom_ids exceeds max ${GET_ATOMS_MAX_IDS} per call`);
   }
   // V1.6 only ships 'minimal' — `format` is essentially a future-proofing
   // marker today.
   void format;
 
-  const fieldsSet =
-    fields !== undefined && fields.length > 0 ? new Set(fields) : undefined;
+  const prefer: GetAtomsPrefer = preferIn ?? 'as_requested';
+
+  const fieldsSet = fields !== undefined && fields.length > 0 ? new Set(fields) : undefined;
 
   const fetched = await storage.getByIds(atom_ids);
   const fetchedById = new Map<string, CaptureEvent>();
@@ -174,18 +227,22 @@ export async function getAtoms(
     fetchedById.set(e.id, e);
   }
 
+  const processOrder = buildProcessOrder(atom_ids, fetchedById, prefer);
+
   const atoms: GetAtomsAtom[] = [];
   const atomsDroppedIds: string[] = [];
   const warnings: string[] = [];
   let firstAtomOversize = false;
 
-  // Build the response in REQUESTED ORDER. Track the running envelope size
-  // by building a tentative object and checking JSON.stringify length —
-  // accurate but expensive. Keep tentative atoms in a list, recompute the
-  // envelope size after each addition, and drop+halt if the next atom
-  // would push us over the ceiling. This matches spec §2 step 3-5.
-  for (let i = 0; i < atom_ids.length; i++) {
-    const id = atom_ids[i]!;
+  // Build the response in PROCESS ORDER (which equals REQUESTED ORDER under
+  // `as_requested`, and equals [newest…oldest, then missing] under
+  // `newest_first`). Track the running envelope size by building a
+  // tentative object and checking JSON.stringify length — accurate but
+  // expensive. Keep tentative atoms in a list, recompute the envelope
+  // size after each addition, and drop+halt if the next atom would push
+  // us over the ceiling. Matches spec §2 step 3-5.
+  for (let i = 0; i < processOrder.length; i++) {
+    const id = processOrder[i]!;
     const ev = fetchedById.get(id);
     if (ev === undefined) {
       atomsDroppedIds.push(id);
@@ -199,13 +256,14 @@ export async function getAtoms(
     // Build a tentative result envelope to size-check. The envelope is
     // sized as the WORST-CASE final shape if we stop after this atom:
     // current `atomsDroppedIds` (real prior misses) PLUS every remaining
-    // requested ID (which would be drained on rollback per spec §2 step 4).
-    // This guarantees the actual final envelope — whether we keep going or
-    // roll back next iter — fits under the ceiling. Without the worst-case
-    // dropped list, an accepted near-ceiling prefix plus many missing or
-    // remaining UUIDs (~36 chars each + JSON quoting) can exceed 25k post-
-    // check (Cursor + Codex post-build review, 2026-05-10).
-    const worstCaseDroppedIds = atomsDroppedIds.concat(atom_ids.slice(i + 1));
+    // ID in the process order (which would be drained on rollback per
+    // spec §2 step 4). This guarantees the actual final envelope — whether
+    // we keep going or roll back next iter — fits under the ceiling.
+    // Without the worst-case dropped list, an accepted near-ceiling prefix
+    // plus many missing or remaining UUIDs (~36 chars each + JSON
+    // quoting) can exceed 25k post-check (Cursor + Codex post-build
+    // review, 2026-05-10).
+    const worstCaseDroppedIds = atomsDroppedIds.concat(processOrder.slice(i + 1));
     const tentative: GetAtomsResult = {
       schema_version: SCHEMA_VERSION,
       tool: 'get_atoms',
@@ -216,12 +274,12 @@ export async function getAtoms(
     };
     const envBytes = JSON.stringify(tentative).length;
     if (envBytes > GET_ATOMS_RESPONSE_BYTE_CEILING) {
-      // Roll back this atom AND every remaining requested ID per spec
-      // §2 step 4 — deterministic prefix drop in requested order.
+      // Roll back this atom AND every remaining ID per spec §2 step 4 —
+      // deterministic prefix drop in PROCESS order.
       atoms.pop();
       atomsDroppedIds.push(id);
-      for (let j = i + 1; j < atom_ids.length; j++) {
-        atomsDroppedIds.push(atom_ids[j]!);
+      for (let j = i + 1; j < processOrder.length; j++) {
+        atomsDroppedIds.push(processOrder[j]!);
       }
       // Detect the "first projected atom alone would exceed 25k" footgun
       // (spec §2 step 6) — surface a guidance warning.
@@ -278,6 +336,7 @@ export function registerGetAtoms(server: McpServer, storage: Storage): void {
         atom_ids: z.array(z.string()).min(1).max(GET_ATOMS_MAX_IDS),
         fields: z.array(z.string()).optional(),
         format: formatSchema.optional(),
+        prefer: preferSchema.optional(),
       },
       outputSchema: getAtomsOutputSchema,
       annotations: { readOnlyHint: true },

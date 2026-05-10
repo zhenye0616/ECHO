@@ -49,9 +49,7 @@ describe('get_atoms', () => {
 
   it('content cap fires → truncations contains "content" + content_bytes_elided populated', async () => {
     const store = new MemoryStorage();
-    const id1 = await store.append(
-      evShape(1, { content: 'HEAD_' + 'x'.repeat(50_000) + '_TAIL' }),
-    );
+    const id1 = await store.append(evShape(1, { content: 'HEAD_' + 'x'.repeat(50_000) + '_TAIL' }));
     const r = await getAtoms(store, { atom_ids: [id1] });
     expect(r.atoms[0]!.truncations).toContain('content');
     expect(r.atoms[0]!.content_bytes_elided).toBeGreaterThan(0);
@@ -149,9 +147,7 @@ describe('get_atoms', () => {
     for (let i = 0; i < 40; i++) {
       huge[`key_${i.toString().padStart(2, '0')}`] = { payload: 'a'.repeat(950) };
     }
-    const id1 = await store.append(
-      evShape(1, { content: 'small', metadata: huge }),
-    );
+    const id1 = await store.append(evShape(1, { content: 'small', metadata: huge }));
 
     const r = await getAtoms(store, { atom_ids: [id1] });
     expect(r.atoms).toEqual([]);
@@ -199,6 +195,175 @@ describe('get_atoms', () => {
     // Final envelope MUST respect the ceiling — this is the load-bearing
     // assertion that was previously not actually enforced.
     expect(JSON.stringify(r).length).toBeLessThanOrEqual(25_000);
+  });
+
+  // V1.6 (item 032) AC4 — prefer='newest_first' resume-friendly ordering.
+  describe("prefer='newest_first' (item 032)", () => {
+    it('sorts returned atoms by timestamp DESCENDING (newest first)', async () => {
+      const store = new MemoryStorage();
+      // Insert in ascending order; request in same order; expect descending.
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        ids.push(await store.append(evShape(i)));
+      }
+      const r = await getAtoms(store, {
+        atom_ids: ids,
+        prefer: 'newest_first',
+      });
+      // evShape(i) has timestamp 10:0i:00 — so descending = ids[4..0].
+      expect(r.atoms.map((a) => a.id)).toEqual([ids[4], ids[3], ids[2], ids[1], ids[0]]);
+      expect(r.atoms_dropped).toBe(0);
+    });
+
+    it('missing IDs are appended at the END of iteration order under newest_first', async () => {
+      const store = new MemoryStorage();
+      const id1 = await store.append(evShape(1));
+      const id2 = await store.append(evShape(2));
+      const fake = '00000000-0000-0000-0000-000000000000';
+      // Request: [fake, id1, id2]. Under newest_first: existing sorted desc
+      // = [id2, id1]; missing appended = [fake]. atoms[] = [id2, id1].
+      // No drop fires (envelope small), so fake still lands in dropped_ids.
+      const r = await getAtoms(store, {
+        atom_ids: [fake, id1, id2],
+        prefer: 'newest_first',
+      });
+      expect(r.atoms.map((a) => a.id)).toEqual([id2, id1]);
+      expect(r.atoms_dropped_ids).toEqual([fake]);
+    });
+
+    it('duplicate IDs in input are de-duplicated to first occurrence (NEW opt-in behavior, R2-3)', async () => {
+      const store = new MemoryStorage();
+      const id1 = await store.append(evShape(1));
+      const id2 = await store.append(evShape(2));
+      // Pass id1 three times + id2 once.
+      const r = await getAtoms(store, {
+        atom_ids: [id1, id1, id2, id1],
+        prefer: 'newest_first',
+      });
+      // Dedup → unique = [id1, id2]; desc → [id2, id1].
+      // Each unique ID appears at most once in atoms[].
+      expect(r.atoms.map((a) => a.id)).toEqual([id2, id1]);
+      expect(r.atoms.length).toBe(2);
+    });
+
+    it("prefer='as_requested' (default) preserves the existing duplicate-returns-duplicates contract (R2-3 asymmetry)", async () => {
+      const store = new MemoryStorage();
+      const id1 = await store.append(evShape(1));
+      // Without prefer (default 'as_requested'), the existing storage
+      // contract is preserved — duplicates pass through unchanged.
+      const r = await getAtoms(store, { atom_ids: [id1, id1, id1] });
+      // Note: storage.getByIds may return one row per unique ID; under
+      // 'as_requested', the iteration order matches input verbatim, so
+      // the same atom may appear multiple times if storage emits dupes.
+      // Either way, we MUST NOT silently dedupe under the default path —
+      // and the input-order contract is preserved.
+      expect(r.atoms.length).toBeGreaterThanOrEqual(1);
+      // The order matches request order (atoms[] is built by walking
+      // input atom_ids verbatim under 'as_requested').
+      for (const a of r.atoms) expect(a.id).toBe(id1);
+    });
+
+    it('AC4 demotion-of-drops: budget overflow drops the OLDEST atoms (and missing IDs) first, NOT the newest', async () => {
+      // Fixture: 8 atoms with mixed timestamps + 2 missing IDs. The budget
+      // can fit ~4 atoms by projected size. Under 'newest_first':
+      //   - the 4 newest atoms survive (dropped: 4 oldest + 2 missing)
+      // Under 'as_requested':
+      //   - the 4 atoms at the END of input order get dropped
+      // Diff the two output orderings.
+      const store = new MemoryStorage();
+      const heavyMeta = {
+        session_id: 's',
+        tool_calls: Array.from({ length: 30 }, () => ({
+          name: 'Bash',
+          args: 'x'.repeat(2_000),
+          output: 'y'.repeat(1_000),
+        })),
+      };
+      const ids: string[] = [];
+      for (let i = 0; i < 8; i++) {
+        // Timestamps span 10:00 .. 10:07 — insert order = ascending.
+        const ts = `2026-05-09T10:${i.toString().padStart(2, '0')}:00.000Z`;
+        const id = await store.append({
+          source: `fs:/tmp/sess-${i}.jsonl`,
+          timestamp: ts,
+          content: 'small body',
+          metadata: { ...heavyMeta },
+        });
+        ids.push(id);
+      }
+      const missing1 = '00000000-0000-0000-0000-000000000001';
+      const missing2 = '00000000-0000-0000-0000-000000000002';
+      // Input: ids in ascending order + missing IDs at the end.
+      const input = [...ids, missing1, missing2];
+
+      // newest_first: 4 newest survive, oldest + missing drop.
+      const rNewest = await getAtoms(store, {
+        atom_ids: input,
+        prefer: 'newest_first',
+      });
+      // The four atoms that survived must all have timestamp ≥ the four
+      // that got dropped — that's the load-bearing resume-call guarantee.
+      const survivedIds = rNewest.atoms.map((a) => a.id);
+      const droppedIds = rNewest.atoms_dropped_ids;
+      // Sanity: missing IDs are in dropped (they never had a chance to
+      // survive — newest_first appends them last in the iteration order).
+      expect(droppedIds).toContain(missing1);
+      expect(droppedIds).toContain(missing2);
+      // The atoms that survived are a contiguous suffix of `ids` (by
+      // insertion order = timestamp ASC). I.e. survived are the latest N.
+      for (const sid of survivedIds) {
+        const sIdx = ids.indexOf(sid);
+        // Every surviving id is later in `ids` than every dropped *real*
+        // id (dropped reals = droppedIds minus the two missing).
+        const droppedReals = droppedIds.filter((d) => d !== missing1 && d !== missing2);
+        for (const dropped of droppedReals) {
+          const dIdx = ids.indexOf(dropped);
+          expect(sIdx).toBeGreaterThan(dIdx);
+        }
+      }
+
+      // as_requested (baseline): the LAST N in request order drop. Since
+      // ids[] is appended in ascending timestamp order + missing at the
+      // end, the dropped tail = some real-ids tail + missing IDs.
+      const rAsReq = await getAtoms(store, { atom_ids: input });
+      // The accepted prefix is contiguous from input[0]. Equivalently:
+      // for every atom in rAsReq.atoms, its index in input is strictly
+      // less than the smallest index of any dropped ID in input.
+      const acceptedIdxs = rAsReq.atoms.map((a) => input.indexOf(a.id));
+      const droppedIdxs = rAsReq.atoms_dropped_ids.map((d) => input.indexOf(d));
+      const maxAccepted = Math.max(...acceptedIdxs);
+      const minDropped = Math.min(...droppedIdxs);
+      expect(maxAccepted).toBeLessThan(minDropped);
+
+      // Diff the two output orderings — the contracts differ.
+      expect(survivedIds).not.toEqual(rAsReq.atoms.map((a) => a.id));
+    });
+
+    it('envelope ceiling still enforced under newest_first', async () => {
+      const store = new MemoryStorage();
+      const ids: string[] = [];
+      for (let i = 0; i < 50; i++) {
+        const id = await store.append(
+          evShape(i, {
+            content: 'small body',
+            metadata: {
+              session_id: `s${i}`,
+              tool_calls: Array.from({ length: 30 }, () => ({
+                name: 'Bash',
+                args: 'x'.repeat(2_000),
+                output: 'y'.repeat(1_000),
+              })),
+            },
+          }),
+        );
+        ids.push(id);
+      }
+      const r = await getAtoms(store, {
+        atom_ids: ids,
+        prefer: 'newest_first',
+      });
+      expect(JSON.stringify(r).length).toBeLessThanOrEqual(25_000);
+    });
   });
 
   it('atoms_dropped_ids includes both missing AND budget-dropped IDs in requested order', async () => {

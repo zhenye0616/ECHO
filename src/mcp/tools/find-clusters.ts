@@ -53,7 +53,7 @@ export const PER_CLUSTER_ATOM_IDS_HARD_CAP = 200;
 
 export const FIND_CLUSTERS_DESCRIPTION =
   // discriminator one-liner per item 025 MCP best-practices
-  'Use when you need cross-source DISCOVERY of recent work threads — clusters of related events grouped by shared artifacts (files, repos, conversations) — but NOT the atom bodies. Pair with `get_atoms` to materialise bodies for any returned cluster\'s `atom_ids[]`.\n\n' +
+  "Use when you need cross-source DISCOVERY of recent work threads — clusters of related events grouped by shared artifacts (files, repos, conversations) — but NOT the atom bodies. Pair with `get_atoms` to materialise bodies for any returned cluster's `atom_ids[]`.\n\n" +
   // cost class
   'Cost: cheap. Typical < 10k chars even on full-day windows; the discovery counterpart to the targeted `get_atoms` body fetch. Hard envelope ceiling: 25k chars.\n\n' +
   // params
@@ -62,11 +62,11 @@ export const FIND_CLUSTERS_DESCRIPTION =
   '  • `since` / `until` control the **lookback window** (which atoms are considered).\n' +
   '  Pass `since=now-24h` for a 24h LOOKBACK; passing `window_hours=24` widens the cluster-gap, which is rarely what you want.\n\n' +
   // no-args resume
-  'NO-ARGS RESUME: when called with neither `since` nor `until`, the default 4h lookback auto-expands to 24h on a single retry if the 4h pass returned 0 clusters — covers "where did I leave off after a quiet stretch" without forcing the caller to pre-pick a span. Auto-expand fires a `[AUTO_EXPAND]`-prefixed warning so the implicit widen is visible.\n\n' +
+  "NO-ARGS RESUME: when called with neither `since` nor `until`, the default 4h lookback auto-expands to 24h on a single retry if the 4h pass returned 0 clusters OR only single-source-recent clusters (the calling session's own activity from the last 5 minutes); when the single-source-recent expand fires AND prior multi-source work exists in 24h, the single-source-recent cluster is demoted in rank so the prior work appears as clusters[0]. Auto-expand fires a `[AUTO_EXPAND] <trigger>`-prefixed warning (trigger: `empty` or `single-source-recent`) so the implicit widen is visible.\n\n" +
   // shape
   'RETURNS: per-cluster {cluster_id, rank, rank_reason, atom_ids[] (FULL, un-capped — feed straight to `get_atoms`), source_breakdown ({source_app: count}), time_range, label?, open_loop_hints? (capped at ' +
   String(SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP) +
-  ')}. No atom bodies. `result_caps` describes response-level budget application; per-cluster `atom_ids_truncated: true` + `atom_ids_total: N` fires if a single cluster\'s atom_ids[] would dominate the ceiling.';
+  ")}. No atom bodies. `result_caps` describes response-level budget application; per-cluster `atom_ids_truncated: true` + `atom_ids_total: N` fires if a single cluster's atom_ids[] would dominate the ceiling.";
 
 const formatSchema = z.enum(['skeleton']);
 
@@ -124,10 +124,7 @@ export interface FindClustersResult {
   warnings: string[];
 }
 
-function clipOpenLoopHintsArray<T>(
-  arr: readonly T[],
-  cap: number,
-): { kept: T[]; omitted: number } {
+function clipOpenLoopHintsArray<T>(arr: readonly T[], cap: number): { kept: T[]; omitted: number } {
   if (arr.length <= cap) return { kept: [...arr], omitted: 0 };
   const headN = Math.floor(cap / 2);
   const tailN = cap - headN;
@@ -138,10 +135,7 @@ function clipOpenLoopHintsArray<T>(
 }
 
 function projectCluster(c: Cluster): FindClustersCluster {
-  const hints = clipOpenLoopHintsArray(
-    c.open_loop_hints,
-    SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP,
-  );
+  const hints = clipOpenLoopHintsArray(c.open_loop_hints, SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP);
   // Per-cluster atom_ids hard cap. Keep head+tail so the consumer still
   // sees both ends of the cluster (relevant when the consumer paginates
   // get_atoms over the slice). Atom IDs are ~36 chars — even at the cap
@@ -154,10 +148,7 @@ function projectCluster(c: Cluster): FindClustersCluster {
   } else {
     const headN = Math.floor(PER_CLUSTER_ATOM_IDS_HARD_CAP / 2);
     const tailN = PER_CLUSTER_ATOM_IDS_HARD_CAP - headN;
-    atomIds = [
-      ...c.atom_ids.slice(0, headN),
-      ...c.atom_ids.slice(c.atom_ids.length - tailN),
-    ];
+    atomIds = [...c.atom_ids.slice(0, headN), ...c.atom_ids.slice(c.atom_ids.length - tailN)];
     atomIdsTruncated = true;
     atomIdsTotal = c.atom_ids.length;
   }
@@ -201,9 +192,7 @@ export async function findClusters(
     {
       ...(params.since !== undefined ? { since: params.since } : {}),
       ...(params.until !== undefined ? { until: params.until } : {}),
-      ...(params.window_hours !== undefined
-        ? { window_hours: params.window_hours }
-        : {}),
+      ...(params.window_hours !== undefined ? { window_hours: params.window_hours } : {}),
       limit: MAX_LIMIT,
       format,
     },
@@ -211,9 +200,7 @@ export async function findClusters(
   );
 
   const projectedClusters = rwc.clusters.map(projectCluster);
-  const perClusterCapFired = projectedClusters.some(
-    (c) => c.atom_ids_truncated === true,
-  );
+  const perClusterCapFired = projectedClusters.some((c) => c.atom_ids_truncated === true);
 
   // Apply the response-level envelope ceiling. Trim trailing clusters
   // (lowest-rank first; rwc.clusters is rank-ordered) until the
@@ -223,14 +210,10 @@ export async function findClusters(
   // FIND_CLUSTERS_RESPONSE_BYTE_CEILING was previously declared but
   // never enforced.)
   const CAP_WARNING_RESERVE_BYTES = 300;
-  const sizeBudget =
-    FIND_CLUSTERS_RESPONSE_BYTE_CEILING - CAP_WARNING_RESERVE_BYTES;
+  const sizeBudget = FIND_CLUSTERS_RESPONSE_BYTE_CEILING - CAP_WARNING_RESERVE_BYTES;
   let clusters = projectedClusters;
   let responseCapFired = false;
-  const buildResult = (
-    cs: FindClustersCluster[],
-    extraWarnings: string[],
-  ): FindClustersResult => ({
+  const buildResult = (cs: FindClustersCluster[], extraWarnings: string[]): FindClustersResult => ({
     schema_version: SCHEMA_VERSION,
     tool: 'find_clusters',
     query: {
@@ -250,16 +233,12 @@ export async function findClusters(
       // Previously only mirrored upstream — consumers relying on this
       // signal couldn't tell when atom_ids[] was clipped per-cluster or
       // when trailing clusters were dropped to fit the envelope.
-      truncated:
-        rwc.truncation.truncated || perClusterCapFired || responseCapFired,
+      truncated: rwc.truncation.truncated || perClusterCapFired || responseCapFired,
     },
     warnings: [...rwc.warnings, ...extraWarnings],
   });
 
-  while (
-    clusters.length > 0 &&
-    JSON.stringify(buildResult(clusters, [])).length > sizeBudget
-  ) {
+  while (clusters.length > 0 && JSON.stringify(buildResult(clusters, [])).length > sizeBudget) {
     clusters = clusters.slice(0, -1);
     responseCapFired = true;
   }
