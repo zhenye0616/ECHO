@@ -5079,6 +5079,103 @@ instances today). Strategist follow-up, not a backlog item — process
 meta. File once 030 ships and the pattern has at least one more
 confirmation cycle on a future spec.</p></li>
 </ul>
+<h4
+id="pdt-cross-tool-post-build-code-review-of-item-030-cursor-codex-independently-caught-2-p1s-the-claude-code-reviewer-subagent-missed">2026-05-10
+01:05 PDT — Cross-tool POST-BUILD code review of item 030 (Cursor +
+Codex independently caught 2 P1s the Claude code-reviewer subagent
+missed)</h4>
+<ul>
+<li><strong>Trigger:</strong> founder asked Claude Code (this session)
+to “get all the code review results for 030 from claude cursor and codex
+… understand all and validate all.” Cursor and Codex were each prompted
+with “030 just landing do a full code review” earlier (~00:36 and ~00:55
+PDT) on the worktree at <code>24cb42b</code>.</li>
+<li><strong>Query inputs (echo call 1):</strong>
+<code>search_memories</code> <code>query="030"</code>
+<code>source_app="cursor"</code>
+<code>since="2026-05-09T20:00:00"</code> <code>limit=10</code>.</li>
+<li><strong>Returned (call 1):</strong> 7 matches; top match (Cursor
+composer <code>c15c2eca-…</code>) was the post-build code-review reply —
+assistant text fully elided to blank lines (text_len=0 on 23 of 24
+assistant bubbles in the listed <code>assistant_bubble_ids</code>).
+Strategist had to fall back to direct Cursor SQLite extraction
+(<code>bubbleId:c15c2eca-…:4f5531d0-…</code> → 6,129 chars of full
+review body).</li>
+<li><strong>Query inputs (echo call 2):</strong>
+<code>search_memories</code> <code>query="030"</code>
+<code>source_app="codex"</code> <code>since="2026-05-09T20:00:00"</code>
+<code>limit=10</code>.</li>
+<li><strong>Returned (call 2):</strong> 5 matches; top match (Codex
+session <code>019e10a5-…</code>, turn 4) was post-build review but
+content cut off mid-sentence (“…going to run the new focused tests now
+and, if needed, a small reproduction for that edge.”). The verdict +
+findings list lived in turn 8 of the same JSONL, NOT surfaced by
+<code>search_memories</code> because the substring “030” appeared in
+earlier turns and the limit/ranking favored the discovery turn.
+Strategist fell back to direct JSONL parse to recover turns 7+8 in
+full.</li>
+<li><strong>Sources:</strong> <code>mcp__echo__search_memories</code>
+(cursor + codex), then direct fallback to
+<code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(cursorDiskKV) and
+<code>~/.codex/sessions/2026/05/09/rollout-…-019e10a5-….jsonl</code>.
+Also read worktree code at
+<code>/Users/zhenye/Desktop/Project_echo--mcp-toolkit-reshape-and-group-session/src/mcp/tools/{get-atoms,find-clusters}.ts</code>
+to validate the bugs.</li>
+<li><strong>Verdict:</strong> 🟡 partial — <code>search_memories</code>
+correctly found both reviewers’ sessions, but elision (Cursor: full
+assistant body collapsed; Codex: only the discovery-phase turn returned,
+not the verdict turn) blocked end-to-end review through MCP alone.
+SQLite + JSONL fallback was load-bearing.</li>
+<li><strong>Note (load-bearing finding for 030 itself):</strong>
+<strong>both Cursor and Codex independently caught the same TWO P1 bugs
+that the Claude code-reviewer subagent (the <code>.review.md</code>
+sidecar at <code>f9e826f</code>) missed.</strong>
+<ul>
+<li><strong>Bug 1 — <code>get_atoms</code> 25k ceiling not actually
+enforced.</strong> Tentative envelope at
+<code>src/mcp/tools/get-atoms.ts:201-208</code> builds with
+<code>atoms_dropped: 0, atoms_dropped_ids: []</code>; final envelope at
+<code>:234-241</code> returns the actual
+<code>atomsDroppedIds.length</code> and full UUID array. With ~36
+chars/UUID + JSON overhead, a near-ceiling accepted prefix plus many
+missing/dropped IDs can exceed 25k post-check. Both reviewers flagged
+this with file+line precision; Codex named it Finding 1, Cursor named it
+Issue 1.</li>
+<li><strong>Bug 2 — <code>FIND_CLUSTERS_RESPONSE_BYTE_CEILING</code>
+exported but never applied.</strong> Constant declared at
+<code>src/mcp/tools/find-clusters.ts:42</code>; the
+<code>findClusters</code> function (<code>:184-235</code>) returns all
+projected clusters with no <code>JSON.stringify(result).length</code>
+check. Both reviewers flagged this; Codex P1, Cursor Issue 2
+(Low/Medium).</li>
+<li><strong>Bug 3 — Codex-only — <code>result_caps.truncated</code>
+doesn’t reflect per-cluster cap firing.</strong>
+<code>find-clusters.ts:226-232</code> only mirrors
+<code>rwc.truncation.truncated</code>; the new per-cluster
+<code>atom_ids_truncated</code> clipping at <code>:152-163</code>
+doesn’t propagate to top-level. Codex P2; Cursor missed this one.</li>
+<li>The Claude code-reviewer subagent’s verdict was “merge with founder
+fixups” with the only fixup being a journal copy-paste. It missed all
+three real bugs. <strong>This is the second confirmation in 24 hours of
+the cross-tool-review-finds-things-single-tool-misses pattern</strong>
+(R1 spec review: Cursor + Codex caught 14 things complementary; today:
+Cursor + Codex caught 3 implementation bugs Claude-subagent
+missed).</li>
+</ul></li>
+<li><strong>Conjecture (observation-only):</strong> the cross-tool
+review pattern now has TWO independent confirmation cycles (R1 spec
+review + R2 code review). Promote
+<code>wiki/operating-model/cross-tool-spec-review.md</code> from
+“candidate” to “definite-after-030-ships”. Also worth a candidate
+journal-discipline / search-ergonomics entry: substring search ranking +
+per-turn surfacing meant the verdict turn (turn 8 of the Codex JSONL)
+didn’t surface in the top-5 <code>search_memories</code> response — a
+future “find the most-recent assistant verdict for X” might want a
+dedicated tool, OR
+<code>tail_session(source=…codex…jsonl, count=N)</code> might be the
+right path here (was not the strategist’s first instinct).</li>
+</ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
 Synthesis (filled at end of window)</h2>
