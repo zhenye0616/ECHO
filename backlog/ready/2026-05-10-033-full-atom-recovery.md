@@ -70,15 +70,21 @@ Demo bar: a Codex review turn elides mid-content; the strategist (or any AI clie
     "id": "<uuid>",
     "source": "fs:/...",
     "timestamp": "2026-05-10T22:00:36.612Z",
-    "content": "<verbatim full content from storage, no clipping>",
-    "metadata": { "<verbatim metadata, no per-key clipping, no projector reshape>" }
+    "content": "<VERBATIM full content from storage, no clipping>",
+    "metadata": { "<projected metadata, see scope rules below>" },
+    "truncations": []
   },
   "atom_size_bytes": <number — JSON.stringify(atom).length>,
   "warnings": []
 }
 ```
 
-The response shape deliberately omits a `truncations` field — its absence IS the contract. If the call returns 200, every field of `atom` is byte-for-byte identical to storage.
+**Scope of "verbatim" (load-bearing, addresses R1 Finding 1):**
+- **`content`: verbatim** — no `WIRE_SHAPE_CAPS.match_content` clip. This is the load-bearing fix for M1-3 (long-turn elision recovery — the elided field is always `content`).
+- **`metadata`: PROJECTED** — uses the existing `projectMatch` pipeline from `src/mcp/wire-shape/match.ts`, applying `WIRE_SHAPE_CAPS.metadata_value` per-key clipping AND the `tool_calls` → `trajectory` projector reshape. Why: Codex extractor stores `metadata.tool_calls` at **120-130KB per atom** (per `raw/internal/dogfooding/mcp-interactions-journal.md` line 737, "NEW Bug A2"); verbatim metadata would force the atom-too-large error path on every Codex atom — the exact M1-3 case `get_atom` is supposed to fix. `truncations` field on the returned atom reflects which metadata keys were projected (e.g., `["metadata.tool_calls:projected"]`); empty `truncations: []` means content was unclipped AND no metadata projection fired.
+- **`embedding`: EXCLUDED** (R1 Finding 3) — `CaptureEvent` carries optional `embedding?: number[]` (`src/storage/interface.ts:8`); embeddings are large (~1-2KB each, sometimes more), rarely useful for M1-3 recovery, and not what a consumer is trying to recover when they see `truncations: ["content"]`. The returned `atom` deliberately drops the field.
+
+**The contract is "content verbatim, metadata projected, embedding excluded."** A consumer who needs verbatim metadata is in a different use case (rare; out-of-scope for this item — V2+ if real demand surfaces).
 
 **Output shape (atom-too-large error):**
 ```json
@@ -90,12 +96,31 @@ The response shape deliberately omits a `truncations` field — its absence IS t
   "error_code": "atom_too_large_for_wire",
   "source": "fs:/Users/zhenye/.codex/sessions/.../rollout-*.jsonl",
   "warnings": [
-    "Atom JSON exceeds 25_000-byte MCP envelope ceiling; cannot transmit verbatim over MCP. Read source path directly to recover full content."
+    "Atom JSON exceeds 25_000-byte MCP envelope ceiling even with metadata projection; cannot transmit over MCP. Read source path directly to recover full content."
   ]
 }
 ```
 
-The `source` field is populated so the consumer knows WHERE to read JSONL — closes the loop on the rare case the escape hatch can't fit. The `error_code` is a stable string for programmatic handling.
+The `source` field is populated so the consumer knows WHERE to read JSONL — closes the loop on the rare case the escape hatch can't fit. After the R1 contract revision (content verbatim + metadata projected + embedding excluded), this error path fires only when `content` alone exceeds ~24KB (rare — typical chat turns are 5-15KB content).
+
+**Output shape (atom-not-found error, R1 Finding 4):**
+```json
+{
+  "schema_version": 1,
+  "tool": "get_atom",
+  "atom": null,
+  "atom_size_bytes": 0,
+  "error_code": "atom_not_found",
+  "source": null,
+  "warnings": [
+    "No atom with id=<uuid> exists in storage. Verify the id was obtained from a current find_clusters / search_memories / get_atoms / tail_session response — atom IDs are storage row IDs and cannot be guessed."
+  ]
+}
+```
+
+`atom_not_found` is a distinct error class from `atom_too_large_for_wire`. Consumers should branch on `error_code`:
+- `atom_too_large_for_wire` → read the `source` path directly (JSONL/SQLite fallback path exists; the atom DOES exist, just doesn't fit the wire).
+- `atom_not_found` → do NOT retry; the ID is wrong or stale. The atom doesn't exist in storage.
 
 ### AC2 — Hard envelope ceiling (no silent truncation)
 
@@ -109,19 +134,28 @@ Implementation note: this is similar to `get_atoms`' size check (`src/mcp/tools/
 
 Per item 025 MCP best-practices convention, `GET_ATOM_DESCRIPTION` must lead with the discriminator one-liner and explicitly call out cost class:
 
-> Use ONLY when `truncations: []` matters and you have a specific atom_id from `find_clusters` / `search_memories` / `get_atoms` / `tail_session`. The verbatim escape hatch — bypasses all WIRE_SHAPE_CAPS clipping. Pair this with the other retrieval tools (which clip content + metadata for budget reasons): use `find_clusters` + `get_atoms` for routine discovery, and reach for `get_atom` only when you need to verify a specific atom's full content.
+> Use ONLY when you observed non-empty `truncations` (especially `["content"]`) on a prior `search_memories` / `tail_session` / `get_atoms` response AND you need the verbatim content for that specific atom. The content-recovery escape hatch — bypasses `WIRE_SHAPE_CAPS.match_content` clipping for `content`, while keeping the existing metadata projection (per-key cap + `tool_calls` reshape) and excluding `embedding`. Pair this with the other retrieval tools (which clip content + metadata for budget reasons): use `find_clusters` + `get_atoms` for routine discovery, and reach for `get_atom` only when you need verbatim content for a specific atom.
 >
-> Cost: HIGH. A single atom can be 100KB+ unclipped (typical: Codex multi-finding review turns). If the atom exceeds the 25k MCP envelope ceiling, the tool returns `{atom: null, error_code: "atom_too_large_for_wire", source: "..."}` so you can read the source path directly. Do NOT call this tool in a tight loop — it's the escape hatch, not the discovery primitive.
+> Cost: HIGH. Typical Codex long-turn content is 5-15KB; with metadata projected to ~2KB, response fits the 25k ceiling. If the atom's content alone exceeds ~24KB (rare), the tool returns `{atom: null, error_code: "atom_too_large_for_wire", source: "..."}` so you can read the source path directly. If the atom ID doesn't exist in storage, returns `{atom: null, error_code: "atom_not_found"}` — do NOT retry, the ID is wrong or stale. Do NOT call `get_atom` in a tight loop — it's the escape hatch, not the discovery primitive.
 
-Description must also document the `error_code` field + the canonical recovery pattern (`if (response.error_code === "atom_too_large_for_wire") { /* read response.source directly */ }`).
+Description must also document the canonical recovery pattern:
+```js
+const r = await get_atom(id);
+if (r.error_code === "atom_too_large_for_wire") { /* read r.source directly */ }
+else if (r.error_code === "atom_not_found") { /* ID is stale; abort */ }
+else { /* r.atom is the content-verbatim recovery */ }
+```
+
+The discriminator wording (per R1 Finding 2) deliberately says "non-empty `truncations`" — NOT "`truncations: []` matters." The use case is recovery FROM clipping, not verification of unclipped responses.
 
 ### AC4 — Test coverage
 
-- **Unit test (verbatim recovery):** insert an atom with `content` = 5KB lorem ipsum + `metadata.tool_calls` = 8KB structured payload. Call `get_atom(id)`. Assert: response `atom.content` byte-for-byte equals input content; `atom.metadata.tool_calls` byte-for-byte equals input metadata.tool_calls (NOT projected); `atom_size_bytes` matches `JSON.stringify(response.atom).length`; no `truncations` field on the success shape.
-- **Unit test (envelope ceiling — atom-too-large):** insert an atom with `content` = 30KB. Call `get_atom(id)`. Assert: `atom: null`, `error_code: "atom_too_large_for_wire"`, `atom_size_bytes` ≈ 30_500 (within JSON overhead), `source` populated to the input atom's source path, `warnings[]` contains the documented recovery message.
-- **Unit test (envelope ceiling — atom-just-fits):** insert an atom with `content` = 22KB. Call `get_atom(id)`. Assert success path (atom returned verbatim, no error). Validates the size check is precise enough to land 22KB content under the 25k ceiling without spurious refusal.
-- **Unit test (missing ID):** call `get_atom("00000000-0000-0000-0000-000000000000")` (a UUID not in storage). Assert: `atom: null`, `error_code: "atom_not_found"`, distinct from the too-large error code so consumers can branch correctly. (This is a different error class — atom doesn't exist; consumer should not retry via JSONL fallback.)
-- **Integration test (round-trip from `truncations`):** insert an atom with content 5KB; call `search_memories` → assert returned match has `truncations: ["content"]` (because `WIRE_SHAPE_CAPS.match_content = 2_000` clips it); call `get_atom(match.id)` → assert content byte-for-byte matches input.
+- **Unit test (content verbatim + metadata projected):** insert an atom with `content` = 5KB lorem ipsum + `metadata = {tool_calls: <8KB structured payload>, session_id: "abc", git_state: {...}}`. Call `get_atom(id)`. Assert: response `atom.content` byte-for-byte equals input content (no clipping); `atom.metadata.tool_calls` is the PROJECTED shape (trajectory reshape per `projectMatch`) NOT the verbatim 8KB; `atom.metadata.session_id` and `atom.metadata.git_state` byte-for-byte equal input (small-key path doesn't fire `WIRE_SHAPE_CAPS.metadata_value` clipping); `atom.embedding` is NOT present (excluded); `atom.truncations` contains `"metadata.tool_calls:projected"`; `atom_size_bytes` matches `JSON.stringify(response.atom).length`.
+- **Unit test (Codex-realistic recovery — the primary use case):** insert an atom shaped like the typical Codex long-turn extractor output — `content` = 10KB chat turn (a multi-finding review body that would normally elide under `WIRE_SHAPE_CAPS.match_content = 2_000`) + `metadata.tool_calls` = 130KB raw payload (the documented Bug A2 scale from `mcp-interactions-journal.md:737`). Call `get_atom(id)`. Assert: response success path (NOT atom_too_large), `atom.content` byte-for-byte = input content (no clipping), `atom.metadata.tool_calls` is projected (so the 130KB doesn't blow the envelope), `atom.truncations` contains `"metadata.tool_calls:projected"`, response envelope `JSON.stringify(envelope).length < 25_000`. This is the load-bearing test that validates the contract revision from R1 Finding 1.
+- **Unit test (envelope ceiling — content-too-large):** insert an atom with `content` = 30KB (exceeds 25k even with metadata projected). Call `get_atom(id)`. Assert: `atom: null`, `error_code: "atom_too_large_for_wire"`, `atom_size_bytes` ≈ 30_500 (within JSON overhead), `source` populated, `warnings[]` contains the documented recovery message.
+- **Unit test (envelope ceiling — content-just-fits):** insert an atom with `content` = 22KB + minimal metadata (no tool_calls). Call `get_atom(id)`. Assert success path (atom returned verbatim, no error). Validates the size check is precise enough to land 22KB content under the 25k ceiling without spurious refusal.
+- **Unit test (missing ID):** call `get_atom("00000000-0000-0000-0000-000000000000")` (a UUID not in storage). Assert: `atom: null`, `error_code: "atom_not_found"` (distinct from `atom_too_large_for_wire`), `source: null`, `atom_size_bytes: 0`, `warnings[]` contains the documented "no atom with id=... exists" message.
+- **Integration test (round-trip from `truncations`):** insert an atom with content 5KB; call `search_memories` → assert returned match has `truncations: ["content"]` (because `WIRE_SHAPE_CAPS.match_content = 2_000` clips it); call `get_atom(match.id)` → assert `response.atom.content` byte-for-byte matches input.
 
 ### AC5 — Smoke test + MCP integration
 
@@ -145,9 +179,12 @@ Bump `tools/mcp-integration-smoke.sh`:
 
 - New file: `src/mcp/tools/get-atom.ts` (singular). Follow `src/mcp/tools/get-atoms.ts` for structure (zod schema, tool registration, response envelope).
 - `Storage.getByIds([id])` is the storage call — there's no `getById` single-ID variant on the interface; just call `getByIds([id])` and unwrap `result[0]` (or treat `result.length === 0` as `atom_not_found`).
+- **Metadata projection (per R1 Finding 1 contract revision):** import `projectMatch` from `src/mcp/wire-shape/match.ts` and use it for the metadata path, BUT bypass its content clipping. The simplest implementation: call `projectMatch(captureEvent)` to get the projected wire-shape match (content clipped + metadata projected + embedding stripped), then OVERWRITE `match.content` with `captureEvent.content` (the verbatim source). The `truncations` array carries over from `projectMatch` so consumers see exactly which metadata keys were projected. This pattern avoids duplicating the metadata projection logic; only the content-clipping decision differs.
+- **Embedding exclusion:** `projectMatch` already drops `embedding` from the wire shape, so the contract is achieved by reusing the projector. If a future refactor of `projectMatch` re-introduces embedding, this item's tests catch it.
 - `GET_ATOM_RESPONSE_BYTE_CEILING = 25_000` — export as a named constant for testability; same value as `GET_ATOMS_RESPONSE_BYTE_CEILING` but a separate constant so future tightening of one doesn't accidentally tighten the other.
-- Size check pattern: build the success envelope with the full atom inline, `JSON.stringify(envelope).length`, compare to ceiling, branch to error shape if over. Do NOT pre-size against the atom alone — the envelope overhead (schema_version, tool, atom_size_bytes, warnings) is ~120 bytes and matters at the boundary.
-- Error-shape envelope is small (~400 bytes) and always fits; no recursive size-check needed on the error path.
+- Size check pattern: build the success envelope with the verbatim-content + projected-metadata atom inline, `JSON.stringify(envelope).length`, compare to ceiling, branch to `atom_too_large_for_wire` shape if over. Do NOT pre-size against the atom alone — the envelope overhead (schema_version, tool, atom_size_bytes, warnings, truncations[]) is ~150 bytes and matters at the boundary.
+- Missing-ID detection: if `Storage.getByIds([id])` returns `[]`, branch to `atom_not_found` shape immediately. Don't do the projection or size check on a missing ID.
+- Error-shape envelopes (both `atom_too_large_for_wire` and `atom_not_found`) are small (~400 bytes) and always fit; no recursive size-check needed on the error paths.
 - Tool registration in `src/mcp/server.ts` (or wherever the other tools register — verify with `grep -l "find_clusters\|get_atoms" src/mcp/`); register `get_atom` alongside, with `readOnlyHint: true`, `outputSchema`, and the description from AC3.
 - Smoke test edits: keep them minimal (single tool-presence assertion + tool-count bump). Don't rewrite the smoke test architecture.
 
@@ -169,7 +206,32 @@ Per `wiki/operating-model/cross-tool-spec-review.md` "Strategist self-review che
 3. **Existing-behavior gate:** every "existing behavior" claim → `grep` confirms the implementation. ✅ `get_atoms`' size check at `get-atoms.ts:~217` (verified earlier in R2 cycle). Smoke test "tools/list 7 tools" at line 552 (verified).
 4. **Cross-reference gate:** AC ↔ Implementation Notes ↔ Out-of-Scope ↔ After Completion all cross-referenced consistently. ✅ All references to `get_atom` (singular) vs `get_atoms` (plural) reviewed; all references to `WIRE_SHAPE_CAPS.match_content` consistent; all references to envelope ceiling 25_000 consistent across AC2 + Implementation Notes.
 
-This spec is the first to apply the checklist before the first cross-tool review. Expecting R1 to find fewer Class B/C findings than the 6/6 findings caught on 032's R1+R2+R3.
+This spec was the first to apply the checklist before the first cross-tool review.
+
+# Review Round 1 — Cross-tool spec review (Cursor + Codex, 2026-05-10 16:00 PDT)
+
+The 4-gate self-review checklist was applied pre-commit; expectation was that R1 would find fewer Class B/C findings than 032's R1 (9 findings). Result: **R1 found 4 unique findings, 1 convergent + 3 single-source.** Class B/C count: **0** (the checklist worked for those classes). Class D (contract-vs-reality semantic gap) count: **1 — and it was the HIGH-severity load-bearing finding the checklist could not have caught.**
+
+**Divergent verdicts (first time in today's review cycles):**
+- **Cursor:** "Proceed (with two small nits)."
+- **Codex:** "Pushback. I would not send 033 to a builder yet."
+
+Per `wiki/operating-model/cross-tool-spec-review.md` "Verdict-convergence signal" — divergence on verdict is the substantive-disagreement signal. Strategist sided with Codex's harsher reading after validating the metadata-size claim against the dogfooding journal evidence (`mcp-interactions-journal.md:737` documents `metadata.tool_calls` at 120-130KB per Codex atom).
+
+**Findings:**
+
+- **R1-1 (Codex HIGH — Class D contract-vs-reality, load-bearing):** Original spec promised "verbatim metadata" + 25k ceiling + no chunking. But Codex's `metadata.tool_calls` is 120-130KB per atom → verbatim metadata always blows the envelope on the primary use case. The escape hatch was structurally non-functional for the exact M1-3 case it was supposed to fix. **Fixed:** Contract revised to "content verbatim, metadata projected (per `projectMatch` pipeline), embedding excluded." AC1 output shape + AC3 description + AC4 tests + Implementation Notes all updated coherently. The Codex-realistic test case (10KB content + 130KB tool_calls metadata → must succeed) added to AC4 as the load-bearing assertion.
+- **R1-2 (Codex Medium — Class F user-facing description drift):** AC3 description led with "Use ONLY when `truncations: []` matters" — inverted. The use case is recovery when `truncations` is NON-empty. **Fixed:** Description rewritten to "Use ONLY when you observed non-empty `truncations` (especially `['content']`) on a prior call AND you need the verbatim content."
+- **R1-3 (convergent — Codex Medium/Low + Cursor nit #1):** Spec didn't say whether `CaptureEvent.embedding` is included in the wire atom. **Fixed:** Explicitly excluded (per AC1 "Scope of verbatim" + Implementation Notes); achieved by reusing `projectMatch` which already drops it.
+- **R1-4 (convergent — Codex Low + Cursor nit #2):** `atom_not_found` error was tested in AC4 but not defined as a canonical error shape in AC1. **Fixed:** Full JSON shape added to AC1 alongside `atom_too_large_for_wire`; consumers can branch on `error_code` without guessing the envelope shape.
+
+**Pattern note (load-bearing for the operating-model wiki):**
+
+This is the **seventh cross-tool review cycle today** and the **first divergent-verdict cycle.** The checklist worked for Class B/C (paths, fields, internal contradictions, "existing behavior" claims) — those caught 0 findings in R1, down from 6 across 032's R1+R2+R3 cycles. But Class D (contract-vs-reality semantic gap) requires the reviewer to read the dogfooding evidence base and reason about whether the contract achieves its stated goal — that's outside the checklist's scope.
+
+**Conjecture (observation-only):** Class D findings might require a fifth gate: (e) for every load-bearing claim (the spec's "demo bar" or "load-bearing fix"), find the dogfooding evidence supporting it AND find the evidence that contradicts it (or could). The Codex finding here used journal line 737 as the contradicting evidence — the strategist had the same access but didn't look. **The checklist needs a "dogfooding evidence consultation" gate for load-bearing claims.** Not yet applying as a process change pending founder approval.
+
+**Disposition:** All 4 R1 findings addressed in this revision. The contract revision is substantive (changes the load-bearing promise), so expecting R2 to verify the revised contract still achieves the M1-3 demo bar (i.e., does "content verbatim + metadata projected" actually solve the elision use case that motivated this item).
 
 # References
 

@@ -954,6 +954,14 @@ href="#pdt-strategist-r3-internal-contradiction-cleanup-applied-both-reviewers-s
 id="toc-pdt-strategist-r3-internal-contradiction-cleanup-applied-both-reviewers-say-proceed-after-fixes">2026-05-10
 15:48 PDT — Strategist: R3 internal-contradiction cleanup applied (both
 reviewers say “proceed after fixes”)</a></li>
+<li><a href="#pdt-codex-r1-review-of-item-033-strategist-tail"
+id="toc-pdt-codex-r1-review-of-item-033-strategist-tail">2026-05-10
+15:56 PDT — Codex: R1 review of item 033 + strategist tail</a></li>
+<li><a
+href="#pdt-strategist-033-r1-synthesis-first-divergent-verdict-contract-revision"
+id="toc-pdt-strategist-033-r1-synthesis-first-divergent-verdict-contract-revision">2026-05-10
+16:05 PDT — Strategist: 033 R1 synthesis (FIRST divergent verdict) +
+contract revision</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -6648,6 +6656,186 @@ about what the substrate is enabling vs. what was originally planned
 cross-tool review pattern itself”). Worth a wiki promotion target:
 <code>wiki/operating-model/cross-tool-spec-review.md</code> is now
 over-determined.</li>
+</ol></li>
+</ul>
+<h3 id="pdt-codex-r1-review-of-item-033-strategist-tail">2026-05-10
+15:56 PDT — Codex: R1 review of item 033 + strategist tail</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (GPT-5.5)</li>
+<li><strong>Trigger:</strong> Founder said “032 is in flight review 033
+and tail claude session.”</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl", count=8)</code>
+via local MCP HTTP; read
+<code>backlog/ready/2026-05-10-033-full-atom-recovery.md</code>; read
+<code>src/storage/interface.ts</code>,
+<code>src/storage/sqlite.ts</code>,
+<code>src/capture/pipeline.ts</code>,
+<code>src/mcp/wire-shape/match.ts</code>,
+<code>src/mcp/tools/get-atoms.ts</code>, <code>src/mcp/server.ts</code>,
+smoke/test references; ran
+<code>tools/blocked.py --validate</code>.</li>
+<li><strong>Returned:</strong> Tail returned 8 turns from strategist
+session <code>e9954811</code>; newest turn <code>05c20647-...</code> at
+<code>2026-05-10T22:50:56.738Z</code> confirms item 033 landed at
+<code>7146c6e</code>, 032 was claimed/in flight at the time of capture,
+and 033 was ready/can run in parallel. Newest turn still had
+<code>truncations=["content","metadata.tool_calls:projected"]</code>,
+<code>bytes_elided=1932</code>,
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>,
+<code>warnings=[]</code>. <code>tools/blocked.py --validate</code>
+returned OK.</li>
+<li><strong>Sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>;
+backlog 033 spec; claimed/pending backlog paths for 032; code refs
+listed in query inputs. No other ECHO capture sources contributed.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO tail was the right
+strategist session and matched the artifact. Spec review verdict:
+<strong>pushback before claim</strong>. Main blocker: 033 promises “no
+JSONL fallback required” for Codex long-turn recovery while
+simultaneously requiring full verbatim metadata, forbidding
+projection/chunking, and enforcing a 25k ceiling. Existing dogfooding
+already shows Codex <code>metadata.tool_calls</code> can be 100KB+, so
+the tool can return <code>atom_too_large_for_wire</code> on the exact
+target class and still force JSONL fallback. Smaller fixes: clarify
+<code>embedding</code> exclusion/inclusion, mirror
+<code>atom_not_found</code> in AC1, and correct the description’s
+“<code>truncations: []</code> matters” discriminator.</li>
+<li><strong>Note:</strong> This disagrees with the lighter “proceed
+after optional micro-edits” framing seen in the same-round Cursor
+review: full metadata under a hard 25k ceiling is the load-bearing
+contradiction.</li>
+<li><strong>Conjecture:</strong> If the product goal is M1-3 content
+recovery, the narrow contract may need to be “full content + recovery
+metadata” rather than “full raw CaptureEvent metadata” unless chunked
+atom reads become in-scope.</li>
+</ul>
+<h3
+id="pdt-strategist-033-r1-synthesis-first-divergent-verdict-contract-revision">2026-05-10
+16:05 PDT — Strategist: 033 R1 synthesis (FIRST divergent verdict) +
+contract revision</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said “review pushback and cursor
+and codex” after both reviewer clients independently reviewed the new
+item 033 spec (<code>get_atom</code> full-atom recovery).</li>
+<li><strong>Query inputs (2 ECHO calls + 3 direct probes):</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=[&lt;codex JSONL&gt;], since='2026-05-10T22:40:02.464Z', timeout=30)</code>
+— returned Codex turns 17 (032 R3 proceed) + 18 (033 R1 PUSHBACK). Turn
+18 had <code>truncations: ["content"]</code> with
+<code>bytes_elided=2463</code>.</li>
+<li>Direct SQLite probe of Cursor <code>state.vscdb</code> composer
+<code>c15c2eca-...</code> → found bubble <code>4a65f0b1-...</code> (2538
+chars, 033 R1 review “Proceed with two small nits”).</li>
+<li>JSONL fallback via <code>jq</code> on Codex JSONL to recover turn 18
+elided middle.</li>
+<li>Direct journal read (<code>mcp-interactions-journal.md:737</code>)
+to validate Codex’s claim that <code>metadata.tool_calls</code> is
+120-130KB per Codex atom.</li>
+</ol></li>
+<li><strong>Returned:</strong> <strong>FIRST DIVERGENT VERDICT in
+today’s review cycles.</strong> Cursor: “Proceed (with two small nits —
+embedding scope, atom_not_found AC1 catalog).” Codex: “Pushback. I would
+not send 033 to a builder yet.” 4 unique findings — 2 convergent (R1-3
+embedding scope, R1-4 atom_not_found shape), 2 Codex-only (R1-1
+contract-vs-reality on verbatim metadata, R1-2 description discriminator
+inverted).</li>
+<li><strong>Sources:</strong> Codex JSONL <code>019e10a5-...</code> +
+Cursor <code>state.vscdb</code> (composer <code>c15c2eca-...</code>,
+bubble <code>4a65f0b1-...</code>) + dogfooding journal line 737 (Bug A2
+historical evidence) + spec file + <code>src/storage/interface.ts</code>
+(CaptureEvent.embedding field).</li>
+<li><strong>Verdict:</strong> ✅ right on synthesis. Strategist sided
+with Codex’s harsher reading on Finding 1 after validating the
+metadata-size claim against journal line 737
+(<code>metadata.tool_calls</code> confirmed 120-130KB per Codex atom —
+verbatim metadata + 25k ceiling structurally impossible on the primary
+M1-3 use case). Contract revised: “content verbatim, metadata projected
+(via existing <code>projectMatch</code> pipeline), embedding excluded.”
+All 4 R1 findings applied.</li>
+<li><strong>Note (load-bearing — first divergent-verdict signal
+validated):</strong> Per
+<code>wiki/operating-model/cross-tool-spec-review.md</code>
+“Verdict-convergence signal” section: “If one reviewer says ‘Proceed’
+and the other says ‘Pushback,’ there’s substantive disagreement worth
+surfacing to the founder.” That’s exactly today’s R1 cycle on 033.
+Strategist used the documented procedure: read both reviews in full
+(JSONL fallback for Codex’s elided content), validated the contested
+claim against the dogfooding evidence base, found Codex right, applied
+the harsher reading. The operating-model page’s prescription was
+correct.</li>
+<li><strong>Note (4-gate checklist outcome on first prospective
+use):</strong> R1 found 4 unique findings (down from 9 on 032’s R1).
+<strong>Class B/C count: 0</strong> (zero path-drift, zero internal
+contradictions, zero “existing behavior” claims wrong). <strong>Class D
+count: 1</strong> — the HIGH-severity contract-vs-reality finding the
+checklist could NOT have caught. <strong>Class F count: 1</strong>
+(description discriminator inverted). <strong>Other
+(scope-clarification): 2</strong> (embedding inclusion, atom_not_found
+shape). The checklist meaningfully reduced low-class-finding noise (0/3
+of 032’s R1 Class B+C+F type recurred); but Class D requires
+reviewer-level reading of dogfooding evidence to catch.</li>
+<li><strong>Note (proposed gate-5 — dogfooding evidence
+consultation):</strong> For every load-bearing claim in a spec (“demo
+bar,” “load-bearing fix,” “structural guarantee,” “no JSONL fallback
+required”), strategist should explicitly find:
+<ul>
+<li><ol type="a">
+<li>the dogfooding journal entry that motivated the claim, AND</li>
+</ol></li>
+<li><ol start="2" type="a">
+<li>the dogfooding journal entries that could contradict the claim
+(e.g., size constraints, latency bounds, capture-coverage gaps).</li>
+</ol></li>
+<li>If (b) yields evidence contradicting the claim’s feasibility, the
+claim must be revised or scoped narrower BEFORE the spec ships.</li>
+<li>Concrete example for 033: the original spec promised “no JSONL
+fallback for Codex long-turn recovery” (claim). Journal line 737
+documents Codex <code>metadata.tool_calls</code> at 120-130KB per atom
+(contradicts the verbatim+25k contract). A pre-commit consultation of
+line 737 would have caught R1-1 without requiring the cross-tool review
+cycle.</li>
+<li>Adding to the strategist self-review checklist as gate (e), pending
+founder approval.</li>
+</ul></li>
+<li><strong>Note (M1-3 fire rate accelerating):</strong> This is the
+<strong>fifth M1-3 incident in 24h.</strong> Codex turn 18 had
+<code>bytes_elided=2463</code> — recovered via <code>jq</code>. The fact
+that 033 IS the M1-3 fix and its own R1 review fired M1-3 is a darkly
+comic but real datapoint about the urgency. Once 033 ships, the M1-3
+friction is closed in-MCP; the JSONL fallback path becomes a
+fallback-of-last-resort instead of the routine recovery path it is
+today.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>First divergent-verdict cycle today.</strong> Cursor’s
+“Proceed” had 2 small nits; Codex’s “Pushback” had 4 findings including
+1 HIGH. The Cursor reviewer either didn’t validate the verbatim-metadata
+claim against journal line 737, or didn’t consider 130KB metadata
+realistic enough to flag. Codex (xhigh reasoning) did. <strong>Codex’s
+reasoning depth on contract-vs-reality questions is higher than Cursor’s
+on this kind of spec.</strong> Not a model judgment — a workflow
+pattern: Codex’s review style includes cross-checking claims against
+journal evidence; Cursor’s review style is more focused on spec-vs-code
+surface drift.</li>
+<li><strong>Asymmetric reviewer strengths might be worth
+documenting</strong> in the
+<code>wiki/operating-model/cross-tool-spec-review.md</code> “Findings
+classes” table. Cursor leans toward Class B/F (path drift, description
+drift). Codex leans toward Class D (contract-vs-reality, semantic gaps).
+Both catch convergent issues (Class C internal contradictions). This is
+a useful asymmetry for the founder choosing reviewers OR for the
+strategist deciding whether divergent verdicts need adjudication or
+alignment.</li>
+<li><strong>The R1 patches are substantive enough to warrant
+R2.</strong> Unlike 032 R1→R2 (where R2 was needed because the patch
+introduced regressions), 033 R2 is needed because the contract itself
+changed (verbatim everything → verbatim content + projected metadata).
+R2 should verify the revised contract still achieves the M1-3 demo bar —
+i.e., does the Codex-realistic test case (10KB content + 130KB
+tool_calls metadata) actually fit in 25k after projection?</li>
 </ol></li>
 </ul>
 <hr />
