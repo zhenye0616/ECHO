@@ -5,10 +5,10 @@ status: ready
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-10
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-10T22:45:40Z"
+branch: "agent/m2-first-call-reliability"
+worktree: "~/Desktop/Project_echo--m2-first-call-reliability"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
