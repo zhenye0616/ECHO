@@ -5,10 +5,10 @@ status: ready
 priority: HIGH
 estimate: 1.5-2.5d
 created: 2026-05-09
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-10T07:16:40Z"
+branch: "agent/mcp-toolkit-reshape-and-group-session"
+worktree: "~/Desktop/Project_echo--mcp-toolkit-reshape-and-group-session"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
@@ -33,9 +33,40 @@ spec_refs:
   - backlog/_followups.md
 blocked_by: []
 acceptance:
-  - "See **Acceptance Criteria** section in spec body — claiming builder copies the 10 bullets verbatim into this list at atomic-claim time. The body is the canonical source; this stub satisfies tooling (tools/blocked.py) but is not the contract."
+  - "find_clusters(window?, since?, until?, format?) ships at src/mcp/tools/find-clusters.ts with response shape per spec body §1. Behavior matches today's getRecentWorkContext({format:'skeleton'}) for same inputs EXCEPT atom_ids[] cap lift. Regression test: graph-membership equality (same set of clusters identified by full sorted atom_ids[] from un-clipped trace builder + matching ranks); NOT skeleton-wire equality, NOT cluster_id string equality. Cost target <10k chars on 24h lookback (since=now-24h)."
+  - "get_atoms(atom_ids[], fields?, format?) ships at src/mcp/tools/get-atoms.ts with response shape per spec body §2. Validates atom_ids[] non-empty and ≤50. Returns atoms in requested order. Per-atom truncations field per §4 rules. atoms_dropped + atoms_dropped_ids populated when response budget exceeded."
+  - "wait_for_new_turns(sources[], since, timeout?) ships at src/mcp/tools/wait-for-new-turns.ts with response shape per §3. Validates: sources non-empty ≤8; timeout default 30/max 60; since valid ISO8601. Polling 1s. sources[] accepts mixed literal paths + source_app names; source_app names resolve via PREFIX MAPPING (DIFFERENT from tail_session MRU exact-source). Strict-after boundary: returns turns with timestamp > since (post-filter since storage uses >=). Stateless: 3 parallel calls with disjoint sources independent of each other."
+  - "truncations: string[] field added to tail_session and search_memories responses per §4 rules. bytes_elided stays untouched (back-compat). Test: cap-hit produces truncations:['content']; non-hit produces []."
+  - "get_recent_work_context deprecation marker prepended to tool description per §5. Behavior unchanged. Test: tool registry response includes deprecation marker text."
+  - "Polling-fallback docs appended to wait_for_new_turns tool description per closing block."
+  - "Out-of-scope guardrail: this item does NOT remove get_recent_work_context, modify echo_ping, change SOURCE_APP_VALUES, add whoami, add SSE/push, or update wiki. If decomposition produces envelope sizes exceeding today's get_recent_work_context for common-case resume, STOP and surface via pending_review."
+  - "MCP best-practices compliance per item 025: new tool descriptions follow conventions (use-when discriminator one-liner; explicit cost class; explicit statelessness claim where relevant; explicit migration recipes where relevant)."
+  - "npm test passes; npm run lint passes; npm run typecheck passes. Realistic-density envelope test extended for find_clusters + get_atoms chain — assertion: bytes(find_clusters(since=now-24h, format='skeleton')) + bytes(get_atoms(materialized_ids, format='minimal')) ≤ bytes(get_recent_work_context(since=now-24h, format='minimal')), where materialized_ids = atom_ids the compound call materializes for rank-1 cluster at format='minimal'. Use fully-materialized fixture."
+  - "Run log appended with: (a) per-tool envelope measurements in chars; (b) wait_for_new_turns latency median + p95 wake time in ms over ≥10 trials with content landing at random offsets 0-30s; (c) one before/after cross-tool dogfooding journal entry showing same resume call old vs new toolkit; (d) any envelope/cost surprise observations for item 031 context."
 files_to_modify:
-  - "See **Files to modify** subsection at end of spec body — claiming builder copies the file list verbatim into this list at atomic-claim time."
+  - src/mcp/tools/find-clusters.ts
+  - src/mcp/tools/get-atoms.ts
+  - src/mcp/tools/wait-for-new-turns.ts
+  - src/mcp/tools/recent-work-context.ts
+  - src/mcp/tools/search-memories.ts
+  - src/mcp/tools/tail-session.ts
+  - src/mcp/wire-shape/match.ts
+  - src/mcp/util/source-app.ts
+  - src/storage/interface.ts
+  - src/storage/sqlite.ts
+  - src/storage/memory.ts
+  - src/mcp/server.ts
+  - src/trace/index.ts
+  - tests/mcp/find-clusters.test.ts
+  - tests/mcp/get-atoms.test.ts
+  - tests/mcp/wait-for-new-turns.test.ts
+  - tests/mcp/recent-work-context.test.ts
+  - tests/mcp/search-memories.test.ts
+  - tests/mcp/tail-session.test.ts
+  - tests/mcp/envelope-find-get-chain.test.ts
+  - tests/storage/get-by-ids.test.ts
+  - docs/mcp-integration.md
+  - raw/internal/agent-runs/<run-date>-2026-05-09-030-mcp-toolkit-reshape-and-group-session.md
 ---
 
 # MCP V1.6 reshape — atomic decomposition (`find_clusters` + `get_atoms`) + group session subscription (`wait_for_new_turns`); deprecate `get_recent_work_context`
