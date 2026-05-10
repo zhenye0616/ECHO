@@ -10,6 +10,21 @@ aliases:
 
 # MCP `get_recent_work_context` Tool
 
+> ⚠️ **DEPRECATED 2026-05-10 (V1.6, item [[2026-05-09-030-mcp-toolkit-reshape-and-group-session|030]]).** Replaced by the atomic toolkit [[mcp-find-clusters|`find_clusters`]] (cheap discovery) + [[mcp-get-atoms|`get_atoms`]] (targeted body-fetch). The tool is still advertised by the MCP server for one dogfooding cycle; removal is scheduled in item 031 after ≥1 week of post-merge dogfooding confirms the new toolkit covers all resume patterns including resume-after-gap (gated closed by item [[2026-05-10-032-m2-first-call-reliability|032]]'s auto-expand + strict-partition demotion).
+>
+> **Migration recipe:**
+> ```ts
+> // OLD:
+> const r = await get_recent_work_context({ format: 'minimal', limit: 20 });
+>
+> // NEW:
+> const c = await find_clusters();                                    // no-args; auto-expand handles gaps
+> const picked = c.clusters[0];                                       // top rank after 032 strict-partition demotion
+> const a = await get_atoms({ atom_ids: picked.atom_ids,
+>                             prefer: 'newest_first' });              // hydrate just that cluster
+> ```
+> See [[mcp-find-clusters]] + [[mcp-get-atoms]] for the new contract. The historical content below documents the deprecated tool as shipped for V1.5 reference.
+
 ## Definition
 
 `get_recent_work_context` is the MCP tool through which AI clients retrieve **clustered** ECHO context — coherent threads of work joined by shared artifact identity within a recent time window. It lives at `src/mcp/tools/recent-work-context.ts`, is registered against the [[mcp-server|local MCP server]] alongside [[mcp-search-memories|`search_memories`]] and `echo_ping`, and is the V1.5 magic primitive: when Cursor or Claude Code asks an open-ended question about recent work, this is the call that returns evidence already grouped into work threads.

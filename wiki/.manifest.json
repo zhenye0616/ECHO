@@ -2,9 +2,9 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "v1.5-shipped",
-    "generated": "2026-05-09",
-    "notes": "V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches promoted to wiki on 2026-05-09. Trace layer + retrieval reliability + envelope discipline + tail_session all shipped. See raw/internal/decisions/2026-05-06-v15-trace-layer-design.md and the V1.5 Complete block in docs/BACKLOG.md. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
+    "version": "v1.6-shipped",
+    "generated": "2026-05-10",
+    "notes": "V1.6 atomic MCP toolkit (items 030 + 032) promoted to wiki on 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination pattern). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') makes resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles. get_recent_work_context deprecated; item 033 (get_atom verbatim escape hatch) in flight. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
   },
   "principles/compose-not-capture.md": {
     "status": "shipped",
@@ -321,11 +321,53 @@
     "status": "shipped",
     "title": "MCP get_recent_work_context Tool",
     "link": "mcp-recent-work-context",
-    "summary": "V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays, window_hours inference, resolved open-loop hints, signal-bearing edges, outputSchema + structuredContent + readOnlyHint.",
+    "summary": "DEPRECATED V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays. Superseded 2026-05-10 by V1.6 atomic toolkit (find_clusters + get_atoms); removal scheduled in item 031 after ≥1 week of post-merge dogfooding.",
     "aliases": [
       "get_recent_work_context",
       "MCP get_recent_work_context tool",
       "Recent Work Context"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-find-clusters.md": {
+    "status": "shipped",
+    "title": "MCP find_clusters Tool",
+    "link": "mcp-find-clusters",
+    "summary": "V1.6 MCP discovery primitive — coherent work clusters as skeletons (atom_ids[], source_breakdown, ranks, open_loop_hints); cluster-gap controlled by window_hours; lookback by since/until. Item 032 adds no-args auto-expand (empty + single-source-recent triggers) and strict-partition demotion making prior-work clusters[0] a structural guarantee on resume-after-gap. Hard envelope ceiling 25kB; cheap.",
+    "aliases": [
+      "find_clusters",
+      "MCP find_clusters tool",
+      "Find Clusters",
+      "Cluster discovery"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-get-atoms.md": {
+    "status": "shipped",
+    "title": "MCP get_atoms Tool",
+    "link": "mcp-get-atoms",
+    "summary": "V1.6 MCP targeted body-fetch primitive — atom bodies by ID list (≤50), wire-shape projected through projectMatch; truncations[] trust signal on every atom; deterministic prefix-drop on 25kB overflow; item 032 adds prefer='newest_first' + missing-ID-end position + duplicate-collapse asymmetry for resume calls.",
+    "aliases": [
+      "get_atoms",
+      "MCP get_atoms tool",
+      "Get Atoms",
+      "Targeted body fetch"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-wait-for-new-turns.md": {
+    "status": "shipped",
+    "title": "MCP wait_for_new_turns Tool",
+    "link": "mcp-wait-for-new-turns",
+    "summary": "V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; default 30s timeout, max 120s; implements Goal A of the group-session pattern; falls back to repeated tail_session polls when long-poll isn't viable.",
+    "aliases": [
+      "wait_for_new_turns",
+      "MCP wait_for_new_turns tool",
+      "Group session subscription",
+      "Stateless long-poll"
     ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"
@@ -393,6 +435,20 @@
       "Work Trace",
       "Trace Layer",
       "WorkTrace"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
+  "architecture/group-session.md": {
+    "status": "shipped",
+    "title": "Group Session",
+    "link": "group-session",
+    "summary": "V1.6 cross-tool coordination pattern — AI clients work the same problem through ECHO's shared substrate via wait_for_new_turns subscriptions on each others' capture sources. Implements Goal A (synchronized human-driven); Goal C (autonomous group) deferred to V2+. First-call reliability gate (item 032) closes the resume-after-gap join pattern with structural guarantees.",
+    "aliases": [
+      "Group session",
+      "Cross-tool group session",
+      "Synchronized human-driven group",
+      "Goal A pattern"
     ],
     "topic": "Architecture",
     "subtopic": "System Architecture"

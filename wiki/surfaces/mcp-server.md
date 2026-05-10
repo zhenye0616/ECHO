@@ -41,16 +41,21 @@ Three reasons:
 
 ## Tools Currently Registered
 
-Four tools are registered per request (stateless transport — no session ties):
+Seven tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (`find_clusters` + `get_atoms`) plus the `wait_for_new_turns` group-session primitive; `get_recent_work_context` remains advertised for one dogfooding cycle before removal (item 031):
 
-| Tool | Purpose |
-|---|---|
-| [[mcp-search-memories\|`search_memories`]] | Retrieval over captured events — the V1 raw-event substring search tool |
-| [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 clustered context: atoms joined by shared artifact identity into coherent work threads |
-| [[mcp-tail-session\|`tail_session`]] | V1.5.4 cheap exact-fetch primitive — N most-recent atoms from a single named `source` (or auto-resolved by `source_app`) |
-| `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` |
+| Tool | Purpose | Cost class |
+|---|---|---|
+| [[mcp-search-memories\|`search_memories`]] | V1 raw-event substring/source-prefix/time-range search | medium |
+| [[mcp-tail-session\|`tail_session`]] | V1.5.4 cheap exact-fetch — N most-recent atoms from a single named `source` (or auto-resolved by `source_app`) | cheap |
+| [[mcp-find-clusters\|`find_clusters`]] | V1.6 discovery primitive — coherent work clusters as skeletons (`atom_ids[]`, source breakdown, ranks). Auto-expand triggers + strict-partition demotion shipped with item 032. | cheap |
+| [[mcp-get-atoms\|`get_atoms`]] | V1.6 targeted body-fetch — atom bodies by ID list (≤50); deterministic prefix-drop on envelope overflow; `prefer='newest_first'` for resume calls (item 032) | medium |
+| [[mcp-wait-for-new-turns\|`wait_for_new_turns`]] | V1.6 group-session subscription — stateless long-poll on watched sources (max 120s timeout). Implements Goal A of the [[group-session]] pattern. | blocks |
+| [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 compound clustered context. **DEPRECATED** by item 030; removal scheduled in item 031 after ≥1 week of dogfooding confirms the new toolkit covers all resume patterns. | medium |
+| `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` | trivial |
 
-`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search). `get_recent_work_context` closes the V1.5 magic gap — instead of returning a flat event list, it returns clusters of related atoms joined automatically by what the user has been touching. `tail_session` is the missing cheap counterpart: when an AI client wants "the last 3 turns from a specific Codex session," neither paraphrased substring search nor clustered-context retrieval is the right shape; `tail_session` returns exactly that, in < 10 kB typically.
+**The V1.6 atomic toolkit (`find_clusters` + `get_atoms` + `wait_for_new_turns`)** replaces the compound `get_recent_work_context` with a discovery → body-fetch → subscription chain. Consumers pay only for the bodies they hydrate; the discovery primitive stays under 10 kB even on full-day windows; resume calls after a multi-hour gap now reliably surface prior work as `clusters[0]` (item 032's first-call reliability gate). The `truncations: string[]` trust signal (item 030) appears on every atom-bearing response — `[]` means verbatim; `["content"]` means the wire-shape cap fired and recovery via `get_atom(id)` (item 033, in flight today) is warranted. `tail_session` remains the cheap "last N turns from this source" primitive — orthogonal to the cluster-based chain.
+
+`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search).
 
 ## Tool Registration Pattern
 
@@ -131,9 +136,13 @@ If MCP adoption stalls (low probability but non-zero), the desktop-AI ingestion 
 ## Related
 
 - [[mcp-search-memories]] — the V1 raw-event substring retrieval tool
-- [[mcp-recent-work-context]] — the V1.5 clustered-context tool
 - [[mcp-tail-session]] — the V1.5.4 cheap exact-fetch tool
-- [[work-trace]] — the layer that powers `get_recent_work_context`
+- [[mcp-find-clusters]] — the V1.6 discovery primitive
+- [[mcp-get-atoms]] — the V1.6 targeted body-fetch primitive
+- [[mcp-wait-for-new-turns]] — the V1.6 group-session subscription primitive
+- [[mcp-recent-work-context]] — the V1.5 clustered-context tool (deprecated by V1.6 atomic toolkit)
+- [[group-session]] — the synchronized human-driven group pattern (Goal A)
+- [[work-trace]] — the layer that powers `get_recent_work_context` and `find_clusters`
 - [[normalization]] — the layer that produces the atoms consumers see
 - [[storage]] — the substrate this server queries
 - [[local-daemon]] — the host process
