@@ -29,10 +29,7 @@ interface CallToolResultLike {
   isError?: boolean;
 }
 
-async function withClient<T>(
-  url: string,
-  fn: (client: Client) => Promise<T>,
-): Promise<T> {
+async function withClient<T>(url: string, fn: (client: Client) => Promise<T>): Promise<T> {
   const transport = new StreamableHTTPClientTransport(new URL(url));
   const client = new Client({ name: 'echo-test', version: '0.0.0' });
   await client.connect(transport);
@@ -143,13 +140,14 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Migration:');
   });
 
-  it('all seven tools are registered (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns)', async () => {
+  it('all eight tools are registered (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom)', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
     expect(names).toEqual([
       'echo_ping',
       'find_clusters',
+      'get_atom',
       'get_atoms',
       'get_recent_work_context',
       'search_memories',
@@ -246,9 +244,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       );
     }
 
-    async function callWith(
-      args: Record<string, unknown>,
-    ): Promise<RecentWorkContextResponse> {
+    async function callWith(args: Record<string, unknown>): Promise<RecentWorkContextResponse> {
       const result = (await withClient(handle!.url, async (c) =>
         c.callTool({
           name: 'get_recent_work_context',
@@ -256,9 +252,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
         }),
       )) as CallToolResultLike;
       expect(result.isError).toBeFalsy();
-      return JSON.parse(
-        result.content![0]!.text,
-      ) as RecentWorkContextResponse;
+      return JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
     }
 
     it('format omitted echoes "minimal" in response.query.format (item 025 cost-safer default)', async () => {
@@ -289,9 +283,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       expect(r.query.format).toBe('minimal');
 
       // The long atom should be truncated.
-      const longAtom = Object.values(r.atoms).find(
-        (a) => a.action.input?.startsWith('A'),
-      );
+      const longAtom = Object.values(r.atoms).find((a) => a.action.input?.startsWith('A'));
       expect(longAtom).toBeDefined();
       const droppedIn = LONG_INPUT.length - 500;
       const droppedOut = LONG_OUTPUT.length - 500;
@@ -312,9 +304,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       const r = await callWith({ since: SINCE, until: NOW, format: 'minimal' });
 
       // The short atom contains the SHORT_INPUT marker and should be untouched.
-      const shortAtom = Object.values(r.atoms).find(
-        (a) => a.action.input === SHORT_INPUT,
-      );
+      const shortAtom = Object.values(r.atoms).find((a) => a.action.input === SHORT_INPUT);
       expect(shortAtom).toBeDefined();
       expect(shortAtom!.action.input).toBe(SHORT_INPUT);
       expect(shortAtom!.action.output).toBe(SHORT_OUTPUT);
@@ -381,9 +371,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
   });
 
   describe('open-loop resolution (item 020)', () => {
-    async function callRwc(
-      args: Record<string, unknown>,
-    ): Promise<RecentWorkContextResponse> {
+    async function callRwc(args: Record<string, unknown>): Promise<RecentWorkContextResponse> {
       const result = (await withClient(handle!.url, async (c) =>
         c.callTool({
           name: 'get_recent_work_context',
@@ -391,9 +379,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
         }),
       )) as CallToolResultLike;
       expect(result.isError).toBeFalsy();
-      return JSON.parse(
-        result.content![0]!.text,
-      ) as RecentWorkContextResponse;
+      return JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
     }
 
     it('response shape: every cluster.open_loop_hints[i].resolved is a boolean', async () => {
@@ -444,8 +430,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       const minHints = minimal.clusters.flatMap((c) => c.open_loop_hints);
       expect(minHints.length).toBe(fullHints.length);
       // Per-hint resolved + resolved_by_atom_id are bit-for-bit identical.
-      const byKey = (h: { atom_id: string; kind: string }): string =>
-        `${h.atom_id}|${h.kind}`;
+      const byKey = (h: { atom_id: string; kind: string }): string => `${h.atom_id}|${h.kind}`;
       const fullByKey = new Map(fullHints.map((h) => [byKey(h), h]));
       for (const m of minHints) {
         const f = fullByKey.get(byKey(m));
@@ -457,9 +442,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
   });
 
   describe('cross-gap window + naive-timestamp guardrail (item 021)', () => {
-    async function callWith(
-      args: Record<string, unknown>,
-    ): Promise<RecentWorkContextResponse> {
+    async function callWith(args: Record<string, unknown>): Promise<RecentWorkContextResponse> {
       const result = (await withClient(handle!.url, async (c) =>
         c.callTool({
           name: 'get_recent_work_context',
@@ -467,9 +450,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
         }),
       )) as CallToolResultLike;
       expect(result.isError).toBeFalsy();
-      return JSON.parse(
-        result.content![0]!.text,
-      ) as RecentWorkContextResponse;
+      return JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
     }
 
     it('default behavior on a 24h since/until span uses inferred window_hours = 24, not 4', async () => {
@@ -568,10 +549,8 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       const tools = await withClient(handle.url, async (c) => c.listTools());
       const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
       expect(found).toBeDefined();
-      const schemaProps = (
-        (found!.inputSchema as { properties?: Record<string, unknown> })
-          .properties ?? {}
-      );
+      const schemaProps =
+        (found!.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
       expect(schemaProps['window_hours']).toBeDefined();
     });
 
@@ -641,8 +620,7 @@ describe('item 025: cost-safer defaults + structured output + readOnlyHint', () 
     return {
       source: `fs:${repoRoot}/.claude/projects/abc/${session}.jsonl`,
       timestamp: tsIso,
-      content:
-        'USER: '.padEnd(800, 'u') + '\n\nASSISTANT: ' + 'a'.padEnd(800, 'a'),
+      content: 'USER: '.padEnd(800, 'u') + '\n\nASSISTANT: ' + 'a'.padEnd(800, 'a'),
       metadata: {
         session_id: session,
         turn_index: turn,
@@ -673,9 +651,7 @@ describe('item 025: cost-safer defaults + structured output + readOnlyHint', () 
       }),
     )) as CallToolResultLike;
     expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse(
-      result.content![0]!.text,
-    ) as RecentWorkContextResponse;
+    const parsed = JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
     expect(parsed.query.format).toBe('minimal');
     const atomCount = Object.keys(parsed.atoms).length;
     expect(atomCount).toBeLessThanOrEqual(25);
@@ -726,9 +702,7 @@ describe('item 025: cost-safer defaults + structured output + readOnlyHint', () 
         arguments: { since: SINCE, until: NOW, format: 'full' },
       }),
     )) as CallToolResultLike;
-    const parsed = JSON.parse(
-      result.content![0]!.text,
-    ) as RecentWorkContextResponse;
+    const parsed = JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
     expect(parsed.query.format).toBe('full');
     const atom = Object.values(parsed.atoms)[0]!;
     // Full input/output are 800-char strings — well above the 500-char cap.
@@ -746,9 +720,9 @@ describe('item 025: cost-safer defaults + structured output + readOnlyHint', () 
       outputSchema?: unknown;
       annotations?: { readOnlyHint?: boolean };
     }
-    const found = tools.tools.find(
-      (t) => t.name === 'get_recent_work_context',
-    ) as ToolListEntry | undefined;
+    const found = tools.tools.find((t) => t.name === 'get_recent_work_context') as
+      | ToolListEntry
+      | undefined;
     expect(found).toBeDefined();
     expect(found?.outputSchema).toBeDefined();
     expect(found?.annotations?.readOnlyHint).toBe(true);
@@ -838,9 +812,7 @@ describe('storage-cap warning + raw-FS filter (item 022 Bugs B + C)', () => {
       });
     }
     const r = await getRecentWorkContext(store, { since: SINCE, until: UNTIL });
-    const capWarnings = r.warnings.filter((w) =>
-      w.includes('storage cap hit'),
-    );
+    const capWarnings = r.warnings.filter((w) => w.includes('storage cap hit'));
     expect(capWarnings).toHaveLength(1);
     expect(capWarnings[0]).toContain('Raise limit or narrow');
   });
@@ -856,9 +828,7 @@ describe('storage-cap warning + raw-FS filter (item 022 Bugs B + C)', () => {
       });
     }
     const r = await getRecentWorkContext(store, { since: SINCE, until: UNTIL });
-    const capWarnings = r.warnings.filter((w) =>
-      w.includes('storage cap hit'),
-    );
+    const capWarnings = r.warnings.filter((w) => w.includes('storage cap hit'));
     expect(capWarnings).toHaveLength(0);
   });
 
@@ -925,9 +895,7 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     'fixtures',
     'recent-work-context-realistic-claude-code.json',
   );
-  const fixture = JSON.parse(
-    readFileSync(FIXTURE_PATH, 'utf8'),
-  ) as RecentWorkContextResponse;
+  const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8')) as RecentWorkContextResponse;
 
   it('fixture preserves the post-026+027 regression shape', () => {
     // Sanity-guard the fixture so a future accidental edit (or a test that
@@ -979,10 +947,7 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     // contract; the second half (cluster-level edges + hint-body) is
     // checked below.
     const atomWithBody = Object.values(fixture.atoms).find(
-      (a) =>
-        a.artifacts.length > 0 &&
-        a.actors.length > 0 &&
-        a.provenance !== undefined,
+      (a) => a.artifacts.length > 0 && a.actors.length > 0 && a.provenance !== undefined,
     );
     expect(atomWithBody).toBeDefined();
     const skeleton = applySkeletonAtom(atomWithBody!);
@@ -991,9 +956,7 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     expect((skeleton as unknown as Record<string, unknown>).provenance).toBeUndefined();
     expect((skeleton as unknown as Record<string, unknown>).context).toBeUndefined();
     expect((skeleton as unknown as Record<string, unknown>).conversation).toBeUndefined();
-    expect(
-      (skeleton as unknown as Record<string, unknown>).open_loop_hints,
-    ).toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).open_loop_hints).toBeUndefined();
     // Affordances are retained.
     expect(skeleton.id).toBe(atomWithBody!.id);
     expect(skeleton.time).toEqual(atomWithBody!.time);
@@ -1012,22 +975,17 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     const skeleton = applySkeletonAtom(atomWithLongInput!);
     expect(skeleton.action.summary).toBeDefined();
     expect(skeleton.action.summary!.length).toBe(200);
-    expect(skeleton.action.summary!).toBe(
-      atomWithLongInput!.action.input!.slice(0, 200),
-    );
+    expect(skeleton.action.summary!).toBe(atomWithLongInput!.action.input!.slice(0, 200));
   });
 
   it('skeleton cluster drops edges body and reduces open_loop_hints to {atom_id, resolved}', () => {
     const cluster = fixture.clusters[0]!;
     const skeleton = applySkeletonCluster(cluster);
     expect((skeleton as unknown as Record<string, unknown>).edges).toBeUndefined();
-    expect((skeleton as unknown as Record<string, unknown>).anchor_artifacts)
-      .toBeUndefined();
+    expect((skeleton as unknown as Record<string, unknown>).anchor_artifacts).toBeUndefined();
     // Hint count is preserved — only the body is stripped, so a downstream
     // caller can decide whether to hydrate via search_memories.
-    expect(skeleton.open_loop_hints).toHaveLength(
-      cluster.open_loop_hints.length,
-    );
+    expect(skeleton.open_loop_hints).toHaveLength(cluster.open_loop_hints.length);
     for (const h of skeleton.open_loop_hints) {
       expect(Object.keys(h).sort()).toEqual(['atom_id', 'resolved']);
       expect(typeof h.resolved).toBe('boolean');
@@ -1084,10 +1042,7 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
         }),
       )) as { isError?: boolean; content?: { text: string }[] };
       expect(result.isError).toBeFalsy();
-      const parsed = JSON.parse(result.content![0]!.text) as Record<
-        string,
-        unknown
-      >;
+      const parsed = JSON.parse(result.content![0]!.text) as Record<string, unknown>;
       const atoms = parsed['atoms'] as Record<string, Record<string, unknown>>;
       for (const atom of Object.values(atoms)) {
         expect(atom['artifacts']).toBeUndefined();
@@ -1110,9 +1065,7 @@ describe("item 028: format='skeleton' on realistic-density fixture", () => {
     const handle = await startMcpServer(store, { port: 0 });
     try {
       const tools = await withClient(handle.url, async (c) => c.listTools());
-      const found = tools.tools.find(
-        (t) => t.name === 'get_recent_work_context',
-      );
+      const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
       expect(found?.description).toMatch(/skeleton/);
       expect(found?.description).toMatch(/minimal/);
       expect(found?.description).toMatch(/full/);
@@ -1304,8 +1257,7 @@ describe('no-args resume auto-expand (V1.5.7 polish 2026-05-09)', () => {
 
     expect(r.clusters.length).toBeGreaterThan(0);
     expect(r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'))).toBeUndefined();
-    const spanH =
-      (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
+    const spanH = (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
     expect(spanH).toBeCloseTo(4, 1);
   });
 
@@ -1327,8 +1279,7 @@ describe('no-args resume auto-expand (V1.5.7 polish 2026-05-09)', () => {
     // further widening. Consumer can read the warning and decide whether
     // to widen further with explicit since/until.
     expect(r.warnings.find((w) => w.startsWith('[AUTO_EXPAND]'))).toBeDefined();
-    const spanH =
-      (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
+    const spanH = (Date.parse(r.query.until) - Date.parse(r.query.since)) / 3_600_000;
     expect(spanH).toBeCloseTo(24, 1);
   });
 });
@@ -1344,9 +1295,7 @@ describe('truncation.source_breakdown (item 029)', () => {
   const UNTIL = '2026-05-09T22:00:00.000Z';
 
   function tsAt(minutesAfterSince: number): string {
-    return new Date(
-      Date.parse(SINCE) + minutesAfterSince * 60_000,
-    ).toISOString();
+    return new Date(Date.parse(SINCE) + minutesAfterSince * 60_000).toISOString();
   }
 
   function ccEventClustering(
@@ -1446,9 +1395,7 @@ describe('truncation.source_breakdown (item 029)', () => {
     // At least one of cursor/codex is missing from the cluster-level breakdown
     // — otherwise truncation didn't drop a sibling, and the test premise is
     // moot.
-    expect(
-      clusterSources.includes('cursor') && clusterSources.includes('codex'),
-    ).toBe(false);
+    expect(clusterSources.includes('cursor') && clusterSources.includes('codex')).toBe(false);
 
     // Window-wide source_breakdown surfaces every source that contributed
     // atoms in (since, until), regardless of whether their cluster survived

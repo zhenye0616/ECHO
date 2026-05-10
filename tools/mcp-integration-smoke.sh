@@ -92,7 +92,7 @@ curl -sS -o /dev/null \
   ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# --- 3. tools/list contains all seven tools with item-025/026/030 advertisements -
+# --- 3. tools/list contains all eight tools with item-025/026/030/033 advertisements -
 
 LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
@@ -137,6 +137,17 @@ for v16 in find_clusters get_atoms wait_for_new_turns; do
   fi
 done
 
+# V1.6.1 (item 033): get_atom — full-atom recovery escape hatch.
+for v161 in get_atom; do
+  if ! printf '%s' "$LIST_PAYLOAD" | grep -q "\"name\":\"$v161\""; then
+    log_err "tools/list response did not include $v161"
+    log_err "(item 033 may not have been picked up — has the daemon restarted since merge?)"
+    log_err "raw response:"
+    printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+  fi
+done
+
 # Items 025 + 026 + 030: tools/list must advertise seven tools with outputSchema +
 # readOnlyHint, plus the source_app enum on search_memories.
 LIST_FILE="$WORK/list-payload.json"
@@ -156,6 +167,7 @@ names = sorted(t.get("name") for t in tools)
 expected = [
     "echo_ping",
     "find_clusters",
+    "get_atom",
     "get_atoms",
     "get_recent_work_context",
     "search_memories",
@@ -512,6 +524,142 @@ case "$GITSCAN_CHECK" in
     ;;
 esac
 
+# --- 8b. get_atom round-trip (item 033) --------------------------------------
+#
+# Calls search_memories to obtain an atom id from the live store, then calls
+# get_atom(id) and asserts: success path (atom non-null, atom.id matches the
+# requested id, atom.content is a string, atom.truncations is an array). The
+# load-bearing contract — content is verbatim (no WIRE_SHAPE_CAPS.match_content
+# clip on the recovery call) — cannot be assert-equal'd against the original
+# from a black-box smoke (we have no pre-storage payload to compare to). The
+# unit test layer (tests/mcp/get-atom.test.ts) covers the verbatim-bytes
+# assertion. This sentinel fires only when the tool is wired up and live.
+# If the live store is empty, treat as benign.
+
+ATOM_ID_RESPONSE=$(curl -sS \
+  -X POST "$URL" \
+  -H "Accept: $ACCEPT" \
+  -H "Content-Type: application/json" \
+  ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
+  --data '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"search_memories","arguments":{"limit":1}}}')
+
+ATOM_ID_PAYLOAD=$(extract_payload "$ATOM_ID_RESPONSE")
+ATOM_ID_FILE="$WORK/atom-id-probe.json"
+printf '%s' "$ATOM_ID_PAYLOAD" > "$ATOM_ID_FILE"
+
+ATOM_ID=$(python3 - "$ATOM_ID_FILE" <<'PY' 2>/dev/null
+import json, sys
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
+if not raw:
+    print("")
+    sys.exit(0)
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError:
+    print("")
+    sys.exit(0)
+result = env.get("result") or env
+content = result.get("content") or []
+if not content:
+    print("")
+    sys.exit(0)
+try:
+    inner = json.loads(content[0]["text"])
+except (KeyError, json.JSONDecodeError):
+    print("")
+    sys.exit(0)
+matches = inner.get("matches") or []
+if not matches:
+    print("")
+    sys.exit(0)
+print(matches[0].get("id", ""))
+PY
+)
+
+if [ -z "$ATOM_ID" ]; then
+  log_ok "OK: get_atom round-trip skipped (live store empty)"
+else
+  GET_ATOM_RESPONSE=$(curl -sS \
+    -X POST "$URL" \
+    -H "Accept: $ACCEPT" \
+    -H "Content-Type: application/json" \
+    ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
+    --data "$(printf '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_atom","arguments":{"id":"%s"}}}' "$ATOM_ID")")
+
+  GET_ATOM_PAYLOAD=$(extract_payload "$GET_ATOM_RESPONSE")
+  GET_ATOM_FILE="$WORK/get-atom-payload.json"
+  printf '%s' "$GET_ATOM_PAYLOAD" > "$GET_ATOM_FILE"
+
+  GET_ATOM_CHECK=$(python3 - "$GET_ATOM_FILE" "$ATOM_ID" <<'PY' 2>&1
+import json, sys
+with open(sys.argv[1]) as f:
+    raw = f.read().strip()
+requested_id = sys.argv[2]
+if not raw:
+    print("EMPTY_PAYLOAD")
+    sys.exit(0)
+try:
+    env = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"PAYLOAD_NOT_JSON: {exc}")
+    sys.exit(0)
+result = env.get("result") or env
+content = result.get("content") or []
+if not content:
+    print("NO_CONTENT")
+    sys.exit(0)
+try:
+    inner = json.loads(content[0]["text"])
+except (KeyError, json.JSONDecodeError) as exc:
+    print(f"INNER_NOT_JSON: {exc}")
+    sys.exit(0)
+if inner.get("tool") != "get_atom":
+    print(f"WRONG_TOOL: {inner.get('tool')}")
+    sys.exit(0)
+if inner.get("schema_version") != 1:
+    print(f"WRONG_SCHEMA_VERSION: {inner.get('schema_version')}")
+    sys.exit(0)
+atom = inner.get("atom")
+ec = inner.get("error_code")
+if atom is None:
+    if ec == "atom_too_large_for_wire":
+        if not inner.get("source"):
+            print("ATOM_TOO_LARGE_MISSING_SOURCE")
+            sys.exit(0)
+        print(f"OK_TOO_LARGE: source={inner.get('source')}")
+        sys.exit(0)
+    print(f"UNEXPECTED_ERROR: error_code={ec}")
+    sys.exit(0)
+if atom.get("id") != requested_id:
+    print(f"ID_MISMATCH: got {atom.get('id')}, requested {requested_id}")
+    sys.exit(0)
+if not isinstance(atom.get("content"), str):
+    print(f"CONTENT_NOT_STRING: {type(atom.get('content')).__name__}")
+    sys.exit(0)
+if not isinstance(atom.get("truncations"), list):
+    print(f"TRUNCATIONS_NOT_LIST: {type(atom.get('truncations')).__name__}")
+    sys.exit(0)
+if "content" in atom["truncations"]:
+    print(f"CONTENT_IN_TRUNCATIONS: get_atom must filter 'content' from truncations after verbatim override")
+    sys.exit(0)
+print(f"OK_GET_ATOM: id={atom.get('id')} content_len={len(atom['content'])} truncations={atom['truncations']}")
+PY
+)
+
+  case "$GET_ATOM_CHECK" in
+    OK_GET_ATOM*|OK_TOO_LARGE*)
+      log_ok "OK: $GET_ATOM_CHECK"
+      ;;
+    *)
+      log_err "get_atom round-trip check: $GET_ATOM_CHECK"
+      log_err "raw response:"
+      printf '%s\n' "$GET_ATOM_RESPONSE" | sed 's/^/  /' >&2
+      exit 1
+      ;;
+  esac
+fi
+
 # --- 9. Stateless live-recovery probe (item 027) -----------------------------
 #
 # Reproduces Codex's "ECHO daemon restarted underneath me" recovery case: send
@@ -549,7 +697,7 @@ log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/list contains tail_session"
-log_ok "OK: tools/list 7 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
+log_ok "OK: tools/list 8 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"

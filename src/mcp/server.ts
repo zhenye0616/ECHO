@@ -5,6 +5,7 @@ import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
 import { registerFindClusters } from './tools/find-clusters.js';
+import { registerGetAtom } from './tools/get-atom.js';
 import { registerGetAtoms } from './tools/get-atoms.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
@@ -32,9 +33,7 @@ class BodyTooLargeError extends Error {
   }
 }
 
-async function readJsonBody(
-  req: import('node:http').IncomingMessage,
-): Promise<unknown> {
+async function readJsonBody(req: import('node:http').IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
@@ -98,6 +97,8 @@ export async function startMcpServer(
     registerFindClusters(mcp, storage);
     registerGetAtoms(mcp, storage);
     registerWaitForNewTurns(mcp, storage);
+    // V1.6 (item 033) — full-atom recovery escape hatch.
+    registerGetAtom(mcp, storage);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
