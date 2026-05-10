@@ -18,11 +18,7 @@ import type { CaptureEvent } from '../../src/storage/interface.js';
 
 const PROJECT_ECHO = '/Users/redacted/Desktop/Project_echo';
 
-function claudeCodeTurn(
-  i: number,
-  filePath: string,
-  ts: string,
-): Omit<CaptureEvent, 'id'> {
+function claudeCodeTurn(i: number, filePath: string, ts: string): Omit<CaptureEvent, 'id'> {
   // Mirror the shape claude_code/extractor produces: a USER+ASSISTANT pair
   // bag with a `files_referenced` artifact keying the cluster.
   return {
@@ -39,11 +35,7 @@ function claudeCodeTurn(
   };
 }
 
-function gitCommit(
-  i: number,
-  filePath: string,
-  ts: string,
-): Omit<CaptureEvent, 'id'> {
+function gitCommit(i: number, filePath: string, ts: string): Omit<CaptureEvent, 'id'> {
   return {
     source: `git:${PROJECT_ECHO}`,
     timestamp: ts,
@@ -67,9 +59,7 @@ describe('find_clusters', () => {
     const sharedFile = `${PROJECT_ECHO}/src/big.ts`;
     const N = 75;
     for (let i = 0; i < N; i++) {
-      const ts = `2026-05-09T10:${(i % 60).toString().padStart(2, '0')}:${(
-        Math.floor(i / 60)
-      )
+      const ts = `2026-05-09T10:${(i % 60).toString().padStart(2, '0')}:${Math.floor(i / 60)
         .toString()
         .padStart(2, '0')}.000Z`;
       await store.append(claudeCodeTurn(i, sharedFile, ts));
@@ -99,24 +89,14 @@ describe('find_clusters', () => {
     // Cluster A: 5 claude_code turns + 1 git commit, all on fileA
     for (let i = 0; i < 5; i++) {
       await store.append(
-        claudeCodeTurn(
-          100 + i,
-          fileA,
-          `2026-05-09T10:${i.toString().padStart(2, '0')}:00.000Z`,
-        ),
+        claudeCodeTurn(100 + i, fileA, `2026-05-09T10:${i.toString().padStart(2, '0')}:00.000Z`),
       );
     }
-    await store.append(
-      gitCommit(1, fileA, '2026-05-09T10:30:00.000Z'),
-    );
+    await store.append(gitCommit(1, fileA, '2026-05-09T10:30:00.000Z'));
     // Cluster B: 3 claude_code turns on fileB, separate file → separate component
     for (let i = 0; i < 3; i++) {
       await store.append(
-        claudeCodeTurn(
-          200 + i,
-          fileB,
-          `2026-05-09T11:${i.toString().padStart(2, '0')}:00.000Z`,
-        ),
+        claudeCodeTurn(200 + i, fileB, `2026-05-09T11:${i.toString().padStart(2, '0')}:00.000Z`),
       );
     }
 
@@ -326,9 +306,102 @@ describe('find_clusters', () => {
     // The signal is surfaced at result_caps.truncated.
     expect(r.result_caps.truncated).toBe(true);
     // Warning surfaced so the consumer knows what happened.
+    expect(r.warnings.some((w) => w.includes('[FIND_CLUSTERS_RESPONSE_CAP]'))).toBe(true);
+  });
+
+  // V1.6 (item 032) AC4 — integration test: 24h-spanning fixture where 4h
+  // has ONLY single-source-recent noise (calling session, 2 atoms last 5min)
+  // and prior 4-24h has a multi-source work session (claude_code + git + codex,
+  // 30+ min old). No-args find_clusters() must auto-expand with
+  // [AUTO_EXPAND] single-source-recent, demote noise, and surface prior
+  // work as clusters[0].
+  it('no-args 4h→24h auto-expand: single-source-recent trigger demotes noise, prior multi-source work surfaces at clusters[0]', async () => {
+    const now = new Date('2026-05-10T20:00:00.000Z');
+    const NOW_MS = now.getTime();
+    const store = new MemoryStorage();
+
+    // Single-source noise: 2 claude_code atoms within the last 5 minutes.
+    const noiseTs1 = new Date(NOW_MS - 2 * 60_000).toISOString();
+    const noiseTs2 = new Date(NOW_MS - 1 * 60_000).toISOString();
+    await store.append(claudeCodeTurn(900, `${PROJECT_ECHO}/src/active.ts`, noiseTs1));
+    await store.append(claudeCodeTurn(901, `${PROJECT_ECHO}/src/active.ts`, noiseTs2));
+
+    // Prior multi-source work session (~6h ago — outside 4h, inside 24h).
+    // claude_code + git + codex on a shared file → multi-source cluster.
+    const workTs = '2026-05-10T14:00:00.000Z';
+    const workFile = `${PROJECT_ECHO}/src/feature.ts`;
+    await store.append(claudeCodeTurn(800, workFile, workTs));
+    await store.append({
+      source: `git:${PROJECT_ECHO}`,
+      timestamp: '2026-05-10T14:05:00.000Z',
+      content: `commit deadbeef: edit ${workFile}`,
+      metadata: {
+        surface: 'git',
+        files_referenced: [workFile],
+        sha: 'deadbeef00',
+      },
+    });
+    await store.append({
+      source: `fs:/Users/redacted/.codex/sessions/sess-x.jsonl`,
+      timestamp: '2026-05-10T14:10:00.000Z',
+      content: `USER: where did we leave off on ${workFile}?\n\nASSISTANT: working on it`,
+      metadata: {
+        surface: 'codex',
+        files_referenced: [workFile],
+        cwd: PROJECT_ECHO,
+        session_id: 'sess-x',
+        turn_index: 0,
+      },
+    });
+
+    const r = await findClusters(store, {}, now);
+
+    // Auto-expand fired with the single-source-recent trigger.
     expect(
-      r.warnings.some((w) => w.includes('[FIND_CLUSTERS_RESPONSE_CAP]')),
+      r.warnings.some((w) => w.includes('[AUTO_EXPAND]') && w.includes('single-source-recent')),
     ).toBe(true);
+
+    // clusters[0] is the prior multi-source work — NOT the noise cluster.
+    expect(r.clusters.length).toBeGreaterThan(0);
+    const top = r.clusters[0]!;
+    const topSources = Object.keys(top.source_breakdown);
+    expect(topSources.length).toBeGreaterThan(1);
+
+    // Noise cluster is still present, ranked below the work cluster.
+    const noise = r.clusters.find(
+      (c) => Object.keys(c.source_breakdown).length === 1 && c.source_breakdown.claude_code === 2,
+    );
+    expect(noise).toBeDefined();
+    expect(noise!.rank).toBeGreaterThan(top.rank);
+
+    // Round-trip into get_atoms with prefer='newest_first': the newest
+    // atom of the prior work cluster (the codex turn at 14:10) should
+    // be in the returned atoms[], not dropped.
+    const { getAtoms } = await import('../../src/mcp/tools/get-atoms.js');
+    const atomsResp = await getAtoms(store, {
+      atom_ids: top.atom_ids,
+      prefer: 'newest_first',
+    });
+    expect(atomsResp.atoms.length).toBeGreaterThan(0);
+    // Confirm the newest atom (latest timestamp) made it into atoms[]
+    // — that is the resume-call contract.
+    const newestTimestamp = atomsResp.atoms[0]!.timestamp;
+    expect(newestTimestamp).toBe('2026-05-10T14:10:00.000Z');
+  });
+
+  it('no-args auto-expand warning carries the explicit trigger label (empty vs single-source-recent)', async () => {
+    // Empty-trigger path: nothing in 4h, prior content in 24h.
+    const now = new Date('2026-05-09T20:00:00.000Z');
+    const sixHoursAgo = '2026-05-09T14:00:00.000Z';
+    const store = new MemoryStorage();
+    await store.append(claudeCodeTurn(1, `${PROJECT_ECHO}/src/x.ts`, sixHoursAgo));
+
+    const r = await findClusters(store, {}, now);
+    expect(r.warnings.some((w) => w.includes('[AUTO_EXPAND]') && w.includes('empty'))).toBe(true);
+    // The empty-trigger path does NOT carry the single-source-recent label.
+    expect(
+      r.warnings.some((w) => w.includes('[AUTO_EXPAND]') && w.includes('single-source-recent')),
+    ).toBe(false);
   });
 
   it('open_loop_hints stays capped at SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP (50-cap reused)', async () => {

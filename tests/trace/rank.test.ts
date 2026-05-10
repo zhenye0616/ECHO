@@ -4,9 +4,7 @@ import { rankClusters, rankReasonsFor } from '../../src/trace/rank.js';
 import type { Cluster, Query } from '../../src/trace/types.js';
 import { makeAtom } from './fixtures/atoms.js';
 
-function buildAtomMap(
-  atoms: NormalizedContextEvent[],
-): Map<string, NormalizedContextEvent> {
+function buildAtomMap(atoms: NormalizedContextEvent[]): Map<string, NormalizedContextEvent> {
   return new Map(atoms.map((a) => [a.id, a]));
 }
 
@@ -54,9 +52,7 @@ describe('rankReasonsFor', () => {
       artifacts: [],
     });
     const c = makeCluster({ id: 'ctx_1', atom_ids: ['evt_old'] });
-    expect(rankReasonsFor(c, buildAtomMap([a]), QUERY)).not.toContain(
-      'recent_activity',
-    );
+    expect(rankReasonsFor(c, buildAtomMap([a]), QUERY)).not.toContain('recent_activity');
   });
 
   it('fires matches_artifact_hint when cluster touches the hint artifact', () => {
@@ -163,6 +159,183 @@ describe('rankClusters', () => {
     const cNoLoop = makeCluster({ id: 'ctx_plain', atom_ids: ['evt_b'] });
     const sorted = rankClusters([cNoLoop, cWithLoop], buildAtomMap([a, b]), QUERY);
     expect(sorted[0]!.cluster_id).toBe('ctx_loop');
+  });
+
+  // V1.6 (item 032) AC4 — strict-partition demotion. R2-2: a per-signal
+  // override (recent_activity=0) is insufficient because `hint` and
+  // `openLoop` sort AHEAD of `recent` in the existing 5-key chain; the
+  // demotion must be a NEW primary sort key that dominates the entire chain.
+  it('demoteSingleSourceRecent=true: single-source-recent cluster sorts BELOW non-single-source-recent clusters even when its hint+openLoop+recent signals dominate (strict partition, R2-2)', () => {
+    // The single-source-recent cluster has the strongest signals
+    // (matches_artifact_hint=1, has_open_loop=1, recent=1, large size).
+    // The two non-single-source-recent clusters have weak signals
+    // (hint=0, openLoop=0, recent=0, smaller size). Under the existing
+    // 5-key chain alone, the noise cluster would rank FIRST. The primary
+    // partition must override and place BOTH non-single-source-recent
+    // clusters AHEAD of the single-source-recent one.
+    const NOW = new Date('2026-05-10T20:00:00.000Z');
+    const NOW_MS = NOW.getTime();
+    const RECENT_TS = new Date(NOW_MS - 60_000).toISOString(); // 1 min ago — single-source-recent
+    const OLD_TS = '2026-05-10T15:00:00.000Z'; // 5h ago — old, multi-source
+
+    // Single-source-recent noise cluster (claude_code only, 20 atoms,
+    // recent timestamps). Carries the strongest rank signals.
+    const noiseAtoms = Array.from({ length: 20 }, (_, i) =>
+      makeAtom({
+        id: `noise_${i}`,
+        app: 'claude_code',
+        occurred_at: RECENT_TS,
+        artifacts: [{ provider: 'local_fs', type: 'file', id: 'r::hot.ts' }],
+        hints: ['TODO: still working'],
+      }),
+    );
+    const cNoise: Cluster = {
+      cluster_id: 'ctx_noise',
+      rank: 0,
+      rank_reason: [],
+      anchor_artifacts: [],
+      atom_ids: noiseAtoms.map((a) => a.id),
+      edges: [],
+      open_loop_hints: [
+        {
+          atom_id: 'noise_0',
+          kind: 'contains_todo',
+          text: 'TODO',
+          confidence: 'high',
+          resolved: false,
+        },
+      ],
+      source_breakdown: { claude_code: 20 },
+      time_range: { from: RECENT_TS, to: RECENT_TS },
+    };
+
+    // Two multi-source-old clusters (prior work). Weak signals:
+    // no hint, no open-loop, no recent_activity, small size (5 each).
+    const workA = makeAtom({
+      id: 'work_a1',
+      app: 'claude_code',
+      occurred_at: OLD_TS,
+      artifacts: [],
+    });
+    const workB = makeAtom({
+      id: 'work_a2',
+      app: 'git',
+      occurred_at: OLD_TS,
+      artifacts: [],
+    });
+    const workC = makeAtom({
+      id: 'work_b1',
+      app: 'cursor',
+      occurred_at: OLD_TS,
+      artifacts: [],
+    });
+    const workD = makeAtom({
+      id: 'work_b2',
+      app: 'git',
+      occurred_at: OLD_TS,
+      artifacts: [],
+    });
+    const cWorkA: Cluster = {
+      cluster_id: 'ctx_work_a',
+      rank: 0,
+      rank_reason: [],
+      anchor_artifacts: [],
+      atom_ids: [workA.id, workB.id],
+      edges: [],
+      open_loop_hints: [],
+      source_breakdown: { claude_code: 1, git: 1 },
+      time_range: { from: OLD_TS, to: OLD_TS },
+    };
+    const cWorkB: Cluster = {
+      cluster_id: 'ctx_work_b',
+      rank: 0,
+      rank_reason: [],
+      anchor_artifacts: [],
+      atom_ids: [workC.id, workD.id],
+      edges: [],
+      open_loop_hints: [],
+      source_breakdown: { cursor: 1, git: 1 },
+      time_range: { from: OLD_TS, to: OLD_TS },
+    };
+
+    const map = buildAtomMap([...noiseAtoms, workA, workB, workC, workD]);
+    const q: Query = {
+      since: '2026-05-10T10:00:00.000Z',
+      until: NOW.toISOString(),
+      artifact_hint: { provider: 'local_fs', type: 'file', id: 'r::hot.ts' },
+    };
+
+    // Baseline (no demotion): noise ranks FIRST because hint+openLoop+recent
+    // dominate the 5-key chain.
+    const baseline = rankClusters([cWorkA, cWorkB, cNoise], map, q);
+    expect(baseline[0]!.cluster_id).toBe('ctx_noise');
+
+    // With demotion: noise sorts STRICTLY BELOW both work clusters.
+    const demoted = rankClusters([cWorkA, cWorkB, cNoise], map, q, {
+      demoteSingleSourceRecent: true,
+      nowMs: NOW_MS,
+    });
+    expect(demoted[demoted.length - 1]!.cluster_id).toBe('ctx_noise');
+    // Both work clusters are ahead of noise — the strict partition
+    // guarantee (not just "noise dropped one rank").
+    const orderedIds = demoted.map((c) => c.cluster_id);
+    expect(orderedIds.indexOf('ctx_work_a')).toBeLessThan(orderedIds.indexOf('ctx_noise'));
+    expect(orderedIds.indexOf('ctx_work_b')).toBeLessThan(orderedIds.indexOf('ctx_noise'));
+  });
+
+  it('demoteSingleSourceRecent=true with ONLY single-source-recent clusters: existing 5-key chain decides tiebreaker (no synthetic empty)', () => {
+    // Degenerate input: every cluster is single-source-recent. The
+    // partition is uniform → existing 5-key chain orders within the
+    // partition. Larger cluster wins.
+    const NOW = new Date('2026-05-10T20:00:00.000Z');
+    const NOW_MS = NOW.getTime();
+    const RECENT_TS = new Date(NOW_MS - 60_000).toISOString();
+
+    const a1 = makeAtom({
+      id: 'a1',
+      app: 'claude_code',
+      occurred_at: RECENT_TS,
+      artifacts: [],
+    });
+    const a2 = makeAtom({
+      id: 'a2',
+      app: 'claude_code',
+      occurred_at: RECENT_TS,
+      artifacts: [],
+    });
+    const a3 = makeAtom({
+      id: 'a3',
+      app: 'claude_code',
+      occurred_at: RECENT_TS,
+      artifacts: [],
+    });
+    const big: Cluster = {
+      cluster_id: 'ctx_big',
+      rank: 0,
+      rank_reason: [],
+      anchor_artifacts: [],
+      atom_ids: ['a1', 'a2', 'a3'],
+      edges: [],
+      open_loop_hints: [],
+      source_breakdown: { claude_code: 3 },
+      time_range: { from: RECENT_TS, to: RECENT_TS },
+    };
+    const small: Cluster = {
+      ...big,
+      cluster_id: 'ctx_small',
+      atom_ids: ['a1'],
+      source_breakdown: { claude_code: 1 },
+    };
+    const q: Query = {
+      since: '2026-05-10T10:00:00.000Z',
+      until: NOW.toISOString(),
+    };
+    const sorted = rankClusters([small, big], buildAtomMap([a1, a2, a3]), q, {
+      demoteSingleSourceRecent: true,
+      nowMs: NOW_MS,
+    });
+    // Both single-source-recent — partition uniform. Larger wins.
+    expect(sorted.map((c) => c.cluster_id)).toEqual(['ctx_big', 'ctx_small']);
   });
 
   it('ties: larger cluster ranks higher', () => {

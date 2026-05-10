@@ -1,8 +1,34 @@
 import type { NormalizedContextEvent } from '../normalize/types.js';
+import { isSingleSourceRecent } from './auto-expand.js';
 import { artifactKey } from './cluster.js';
 import type { Cluster, Query, RankSignals } from './types.js';
 
 const RECENT_HOURS = 1;
+
+// V1.6 (item 032) — options for the no-args auto-expand demotion path.
+// When `demoteSingleSourceRecent` is true, a new PRIMARY sort key is added
+// BEFORE the existing 5-key chain (hint > openLoop > recent > size >
+// negMedianAge): single-source-recent clusters sort STRICTLY BELOW all
+// non-single-source-recent clusters. This is a strict partition, not a
+// per-signal nudge — an earlier R1 draft tried to neutralize the `recent`
+// signal alone, but `rank.ts`'s 5-key chain places `hint` + `openLoop`
+// AHEAD of `recent`, so a noise cluster carrying `matches_artifact_hint=1`
+// or `has_open_loop=1` would still outrank prior multi-source work. The
+// strict partition is the structural guarantee the demo bar requires
+// (clusters[0] = prior multi-source work whenever prior work exists in
+// 24h). See AC1 + R2-2 in the item 032 spec.
+//
+// Default `demoteSingleSourceRecent=false` preserves all existing rank
+// semantics for non-auto-expand callers (direct rankClusters consumers,
+// caller-specified since/until, the empty-trigger auto-expand path).
+export interface RankOptions {
+  demoteSingleSourceRecent?: boolean;
+  /** Required when demoteSingleSourceRecent=true. The reference instant
+   *  for the single-source-recent threshold. Pass the caller's `now` so
+   *  the predicate stays consistent with the auto-expand trigger that
+   *  set demote=true upstream. */
+  nowMs?: number;
+}
 
 export function rankReasonsFor(
   cluster: Cluster,
@@ -65,6 +91,12 @@ export function signalsFor(
 }
 
 interface SortKey {
+  /** V1.6 (item 032) — primary partition. 1 when cluster is single-source-
+   *  recent AND demoteSingleSourceRecent is true; 0 otherwise. Sorted
+   *  ASCENDING so non-single-source-recent clusters (key=0) come first.
+   *  When demoteSingleSourceRecent is false, every cluster's key is 0 and
+   *  this partition is a no-op — the existing 5-key chain decides order. */
+  singleSourceRecent: number;
   hint: number;
   openLoop: number;
   recent: number;
@@ -77,8 +109,11 @@ export function rankClusters(
   clusters: Cluster[],
   atomsById: Map<string, NormalizedContextEvent>,
   query: Query,
+  options: RankOptions = {},
 ): Cluster[] {
   const untilMs = Date.parse(query.until);
+  const demote = options.demoteSingleSourceRecent === true;
+  const nowMs = options.nowMs;
   const decorated: SortKey[] = clusters.map((c) => {
     const sig = signalsFor(c, atomsById, query);
     const ages: number[] = [];
@@ -97,7 +132,14 @@ export function rankClusters(
           ? ((ages[mid - 1] as number) + (ages[mid] as number)) / 2
           : (ages[mid] as number);
     }
+    // Primary partition only fires when the caller opts in AND nowMs is
+    // supplied. Without nowMs the predicate cannot evaluate recency, so
+    // we skip demotion (defensive: callers that pass demote=true without
+    // nowMs degenerate to no-op rather than throwing).
+    const partition =
+      demote && nowMs !== undefined && isSingleSourceRecent(c, atomsById, nowMs) ? 1 : 0;
     return {
+      singleSourceRecent: partition,
       hint: sig.matches_artifact_hint ? 1 : 0,
       openLoop: sig.has_open_loop ? 1 : 0,
       recent: sig.recent_activity ? 1 : 0,
@@ -108,6 +150,10 @@ export function rankClusters(
   });
 
   decorated.sort((a, b) => {
+    // V1.6 (item 032) — primary partition: single-source-recent clusters
+    // sort STRICTLY BELOW non-single-source-recent. Ascending: 0 first.
+    if (a.singleSourceRecent !== b.singleSourceRecent)
+      return a.singleSourceRecent - b.singleSourceRecent;
     if (a.hint !== b.hint) return b.hint - a.hint;
     if (a.openLoop !== b.openLoop) return b.openLoop - a.openLoop;
     if (a.recent !== b.recent) return b.recent - a.recent;
