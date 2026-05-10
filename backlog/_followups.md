@@ -45,6 +45,21 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 **Candidate backlog (founder/strategist):** Make caps and elision behavior obvious in tool docs or responses; consider `tail_session` pagination / cursor semantics for “next chunk of same turn”; consider a trusted-local “no elide” or debug shape; longer-term alignment with a `get_atom(id, fields?)`-style primitive (already hinted in the item 017 kill note). **Item 030's `truncations: string[]` field is the read-time trust mechanism that addresses this entry's core concern (closes the trust-bug part); `_followups.md` keeps the entry until 030 ships and the structural fix is verified end-to-end against the listed candidates.**
 
+### Multi-agent dev template + product thesis — held pending 030 live test
+
+**Status:** Held 2026-05-10 ~01:30 PDT. Today's cross-tool spec review of item 030 organically demonstrated a **4-role multi-agent development pattern** (strategist + 2 peer reviewers + implementer + founder-as-principal). Founder recognized the pattern is (a) extractable as a reusable template for their other projects AND (b) a credible product seed in its own right. Full conversation archive + extraction shape options + product-angle framing + trigger conditions live at `raw/internal/decisions/2026-05-10-multi-agent-dev-template-and-product-thesis.md` — read that note before reopening this entry.
+
+**Why held now:** Same reasoning as the coordination-layer hold (sister decision, same evening). 030 is the load-bearing V1.6 ship; splitting attention to template/product work would dilute it. The 4-role pattern was demonstrated on ONE spec cycle today — one data point isn't enough to extract a template; the next spec cycle (post-030) will reveal what's load-bearing vs convenience-of-the-day. Product angle requires market validation that doesn't exist yet.
+
+**Reopening criteria (any one fires):**
+1. Founder applies the pattern to a second project and finds themselves manually copying files (friction = trigger to extract).
+2. A third party asks "how do you set up a project to work this way?" (market-pull signal).
+3. The 4-role pattern fires on a second spec cycle with clear differential value (two confirmation cycles = enough to extract).
+4. Cohort feedback (post-V1 ship) validates the multi-agent dev workflow as differentiated.
+5. A paying-customer signal: ≥1 prospect flags the orchestration pattern as their reason to buy.
+6. Competitive landscape shifts (a competitor ships explicit multi-agent orchestration → defensive trigger).
+7. Brand-promise upgrade ("agents work as a team") tests well in launch artifacts.
+
 ### Coordination layer — held pending 030 live test
 
 **Status:** Held 2026-05-10 ~01:00 PDT. The general multi-agent coordination layer (artifact-state determinism, mutation log + watermarks, lease primitives) was brainstormed in detail today (strategist conversation, Claude Code session `71b36548-...`); founder narrowed scope twice and ultimately deferred. Full conversation archive + decision rationale + trigger conditions live at `raw/internal/decisions/2026-05-10-coordination-layer-defer-pending-030.md` — read that note before reopening this entry.
