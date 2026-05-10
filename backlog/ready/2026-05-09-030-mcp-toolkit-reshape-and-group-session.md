@@ -60,7 +60,7 @@ Net toolkit shape after this item ships:
 echo_ping              — liveness (unchanged)
 search_memories        — substring lookup (unchanged + truncations field)
 tail_session           — per-source recency (unchanged + truncations field)
-find_clusters          — NEW: cheap cross-source discovery (cluster IDs + atom_ids[] + source_breakdown, no atom bodies)
+find_clusters          — NEW: cheap cross-source discovery (cluster IDs + FULL atom_ids[] (with atom_ids_truncated paginator if a giant cluster overflows budget) + source_breakdown, no atom bodies)
 get_atoms              — NEW: targeted body fetch by IDs (with fields?, format?, truncations[])
 wait_for_new_turns     — NEW: stateless long-poll for group session
 get_recent_work_context — DEPRECATED in description; removed in item 031
@@ -175,7 +175,20 @@ Implementations:
 - `src/storage/sqlite.ts` — `SELECT * FROM events WHERE id IN (?...)` with parameterized binding (LIMIT enforcement from caller's atom_ids.length validation, max 50 per `get_atoms` contract).
 - `src/storage/memory.ts` — `events.filter(e => ids.includes(e.id))`.
 
-Order-preserving: `getByIds(['a','b','c'])` returns events in the same order as the input `ids[]` array. (SQLite default order is insertion order; memory impl uses a Map lookup. Both impls explicitly preserve input order.) This is what lets `get_atoms` honor the contract "atoms returned in the order requested."
+**Order-preserving (Codex review B, 2026-05-10 00:01 PDT):** `getByIds(['a','b','c'])` returns events in the same order as the input `ids[]` array. The naive impls do NOT achieve this — `events.filter(e => ids.includes(e.id))` preserves storage/insertion order; SQLite `WHERE id IN (?...)` returns rows in storage order too. **Both impls MUST explicitly reorder by input ids after fetch:**
+
+```ts
+// memory.ts impl:
+const found = new Map(events.filter(e => ids.includes(e.id)).map(e => [e.id, e]));
+return ids.map(id => found.get(id)).filter(Boolean) as CaptureEvent[];
+
+// sqlite.ts impl:
+const rows = db.prepare(`SELECT * FROM events WHERE id IN (${ids.map(() => '?').join(',')})`).all(ids);
+const byId = new Map(rows.map(r => [r.id, r]));
+return ids.map(id => byId.get(id)).filter(Boolean) as CaptureEvent[];
+```
+
+Missing IDs (in input but not in storage) are silently filtered out; `get_atoms` populates `atoms_dropped_ids` with those at the tool layer. This is what lets `get_atoms` honor the contract "atoms returned in the order requested."
 
 ### 3. `wait_for_new_turns(sources[], since, timeout?)` — stateless long-poll
 
@@ -224,7 +237,7 @@ Server-side cost: the Node event loop holds the request open; the poll loop is c
 Existing tools `tail_session` and `search_memories` get a `truncations: string[]` field on each returned atom (alongside the existing `bytes_elided` / `metadata_keys_projected` fields), with rules covering BOTH caps AND projections (per Codex review 2026-05-09 23:52 PDT):
 
 - `[]` ⟺ every returned field byte-for-byte identical to echo.db AND no projector reshaped any field.
-- `["content"]` ⟺ content body was clipped to `WIRE_SHAPE_CAPS.content`. Existing `content_bytes_elided` (or equivalent) counts the clip.
+- `["content"]` ⟺ content body was clipped to `WIRE_SHAPE_CAPS.match_content` (per `src/mcp/wire-shape/caps.ts:19` — exact key name; the historical "content" shorthand in earlier spec drafts was wrong). Existing `content_bytes_elided` (or equivalent) counts the clip.
 - `["metadata.<key>"]` ⟺ V1.5.6 per-key metadata cap fired on `<key>` (BYTE-LEVEL clip; value is lossy).
 - `["metadata.<key>:projected"]` ⟺ V1.5.6.1's projector reshaped the value (e.g. `tool_calls` → trajectory + histogram per `match.ts:79`'s `metadata_keys_projected`). Value is REFORMATTED, not clipped — semantically distinct from a cap. Consumer needing the original raw value reads the source file. The `:projected` suffix lets the consumer distinguish "this got clipped" from "this got rewritten by a known projector with a documented schema."
 - `["fields_omitted"]` ⟺ caller passed `fields?` and only a subset returned. (Distinguishes "cap fired" from "you didn't ask for it.")
@@ -244,14 +257,28 @@ Followed by a migration recipe that names the judgment step explicitly (not "bli
 ```
 Migration:
   OLD: get_recent_work_context(window_hours=24, format='minimal')
-  NEW: c = find_clusters(window_hours=24)
+       // window_hours=24 in the OLD shape was being misused as lookback —
+       // it actually controls cluster-gap (the temporal gap allowed between
+       // atoms in a single cluster). The default lookback was 4h via the
+       // V1.5.7 auto-expand path. Migration uses since= for explicit
+       // lookback, NOT window_hours=.
+
+  NEW: c = find_clusters(since=now-24h)        // explicit 24h lookback
+       // (omit since= to get find_clusters' V1.5.7-equivalent no-args
+       // semantics: 4h default, auto-expand to 24h if empty.)
+       //
        // Inspect c.clusters[]: each has rank, label, source_breakdown,
        // time_range, atom_ids[]. Pick the cluster matching your intent
        // (typically rank-1 for "where did I leave off", but read label +
        // source_breakdown before picking — the resume target may be a
        // sibling).
-       picked = c.clusters[0]   // or whichever matches intent
-       a = get_atoms(picked.atom_ids, format='minimal')
+       picked = c.clusters[0]                   // or whichever matches intent
+       //
+       // get_atoms accepts ≤50 ids per call. If picked.atom_ids.length > 50,
+       // partition into chunks and concat results:
+       //   chunks = chunk(picked.atom_ids, 50)
+       //   a = flatMap(chunks, ids => get_atoms(ids, format='minimal'))
+       a = get_atoms(picked.atom_ids, format='minimal')   // single call if ≤50
 ```
 
 The judgment-between-calls is the actual win of the decomposition. Picking `clusters[0]` blindly recreates the compound-tool's failure mode (wrong cluster surfaced, atom bodies wasted). The tool's behavior remains unchanged for the deprecation period — consumers can keep calling it, just see the deprecated marker in the tool registry.
@@ -266,6 +293,9 @@ use the polling pattern instead — works on any MCP client:
 
   last_ts = now
   while monitoring:
+      // find_clusters with explicit since= for lookback (NOT window_hours,
+      // which is cluster-gap; see §1). Default cluster-gap (4h) applies
+      // when window_hours= is omitted; that's typically what you want.
       result = find_clusters(since=last_ts, format='skeleton')
       if result.clusters:
           process(result.clusters)
@@ -291,7 +321,7 @@ This makes `wait_for_new_turns` an **optimization**, not load-bearing. If real M
 - Do NOT touch the `extractors-causal-metadata` branch.
 - Do NOT design or implement item 031 (get_recent_work_context removal). Scope of THIS item ends at "deprecation marker shipped."
 
-If the agent discovers `find_clusters` + `get_atoms` together produce envelope sizes that exceed today's `get_recent_work_context` for the common-case resume call, STOP and surface to founder via `pending_review/`. The decomposition's load-bearing claim is "two targeted calls cost less than one compound call"; if that fails empirically, the design needs revisit before completion. **Definition of "common-case resume":** founder's `get_recent_work_context()` no-args call (which today auto-resolves to `window_hours=24, limit=20, format='minimal'` via the V1.5.7 polish). The new equivalent: `find_clusters(window_hours=24)` followed by `get_atoms(top_cluster.atom_ids, format='minimal')`.
+If the agent discovers `find_clusters` + `get_atoms` together produce envelope sizes that exceed today's `get_recent_work_context` for the common-case resume call, STOP and surface to founder via `pending_review/`. The decomposition's load-bearing claim is "two targeted calls cost less than one compound call"; if that fails empirically, the design needs revisit before completion. **Definition of "common-case resume":** founder's `get_recent_work_context()` no-args call (which today auto-resolves to lookback=24h after the V1.5.7 empty-expand polish, with `limit=20, format='minimal'`). The new equivalent: `find_clusters(since=now-24h)` followed by `get_atoms(picked.atom_ids, format='minimal')` where `picked` is the cluster the consumer judges relevant per the migration recipe (NOT blind `clusters[0]`).
 
 ## After Completion (Strategist Notes)
 
@@ -316,7 +346,7 @@ The claiming builder lifts these into the frontmatter `acceptance:` field at ato
 
 2. **`get_atoms(atom_ids[], fields?, format?)` ships** at `src/mcp/tools/get-atoms.ts` with the response shape specified in **Implementation Direction §2**. Validates `atom_ids[]` is non-empty and ≤ 50 entries. Returns atoms in the order requested (preserves caller's intent). Per-atom `truncations` field follows the rules in **Implementation Direction §4**. `atoms_dropped` + `atoms_dropped_ids` populated when response budget would be exceeded.
 
-3. **`wait_for_new_turns(sources[], since, timeout?)` ships** at `src/mcp/tools/wait-for-new-turns.ts` with the response shape specified in **Implementation Direction §3**. Validates: `sources[]` is non-empty and ≤ 8; `timeout` defaults to 30, max 60; `since` is a valid ISO 8601 timestamp. Server-side polling interval is 1s (constant; no need for tunable). **`sources[]` accepts a mix of literal source paths (e.g. `fs:/Users/.../state.vscdb`) and source_app names (e.g. `cursor`, `claude_code`); source_app names resolve via the same logic `tail_session(source_app=...)` uses today (`buildSourceAppMap()` in `src/mcp/util/source-app.ts`).** **Stateless test:** a unit test fires 3 parallel `wait_for_new_turns` calls with disjoint `sources[]` against a controlled storage; asserts each call's response is independent of the others' presence (results identical to running each call alone). Reviewer additionally inspects code for module-level mutable state.
+3. **`wait_for_new_turns(sources[], since, timeout?)` ships** at `src/mcp/tools/wait-for-new-turns.ts` with the response shape specified in **Implementation Direction §3**. Validates: `sources[]` is non-empty and ≤ 8; `timeout` defaults to 30, max 60; `since` is a valid ISO 8601 timestamp. Server-side polling interval is 1s (constant; no need for tunable). **`sources[]` accepts a mix of literal source paths (e.g. `fs:/Users/.../state.vscdb`) and source_app names (e.g. `cursor`, `claude_code`); source_app names resolve via `buildSourceAppMap()` PREFIX MAPPING — matches ALL sessions of that app (e.g. `cursor` → `source LIKE 'fs:.../Cursor/%'`). Explicitly DIFFERENT from `tail_session(source_app=...)` MRU exact-source resolution; group session A wants "wake on any session of these apps."** **Strict-after boundary semantic:** `wait_for_new_turns` returns turns with `timestamp > since` (STRICT, not ≥). Today's `Storage.query` uses `timestamp >= @since` (`src/storage/sqlite.ts:105`, `src/storage/memory.ts:43`); the new tool MUST post-filter the storage result to drop turns at exactly `since` OR the daemon must add a strict-after query path. Without this, re-firing `wait_for_new_turns` with `since=last_returned_ts` would re-deliver the boundary turn on every wake. **Stateless test:** a unit test fires 3 parallel `wait_for_new_turns` calls with disjoint `sources[]` against a controlled storage; asserts each call's response is independent of the others' presence (results identical to running each call alone). Reviewer additionally inspects code for module-level mutable state.
 
 4. **`truncations: string[]` field added to `tail_session` and `search_memories` responses** per the rules in **Implementation Direction §4**. Existing `bytes_elided` field stays untouched (back-compat). Test: a tool call that hits the wire-shape cap produces `truncations: ["content"]`; a call that doesn't produces `truncations: []`.
 
