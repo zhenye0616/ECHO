@@ -877,6 +877,11 @@ id="toc-pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-c
 id="toc-pdt-first-real-resume-call-on-new-toolkit-post-030-merge">2026-05-10
 13:06 PDT — first real resume call on new toolkit post-030
 merge</a></li>
+<li><a
+href="#pdt-jsonl-fallback-evidence-sweep-during-m1m2-friction-revisit"
+id="toc-pdt-jsonl-fallback-evidence-sweep-during-m1m2-friction-revisit">2026-05-10
+13:30 PDT — JSONL-fallback-evidence sweep during M1/M2 friction
+revisit</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -5405,6 +5410,86 @@ most-recent atoms — the opposite of what a “where did I leave off”
 caller wants. Consider documenting “reverse atom_ids for resume-style
 queries” in the migration recipe. Backlog material, not designed
 here.</li>
+</ol></li>
+</ul>
+<h3
+id="pdt-jsonl-fallback-evidence-sweep-during-m1m2-friction-revisit">2026-05-10
+13:30 PDT — JSONL-fallback-evidence sweep during M1/M2 friction
+revisit</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder asked the strategist to verify
+whether AI clients are still bypassing ECHO and reading source JSONLs
+directly. Strategist ran 4 <code>search_memories</code> calls in
+parallel to gather evidence post-030 merge.</li>
+<li><strong>Query inputs (4 parallel calls):</strong>
+<ol type="1">
+<li><code>search_memories(query=".codex/sessions", since=2026-05-08T00:00:00Z, limit=5)</code></li>
+<li><code>search_memories(query=".claude/projects", since=2026-05-08T00:00:00Z, limit=5)</code></li>
+<li><code>search_memories(query="cursorDiskKV", since=2026-05-08T00:00:00Z, limit=5)</code></li>
+<li><code>search_memories(query="direct fallback", limit=5)</code> (no
+time filter)</li>
+</ol></li>
+<li><strong>Returned:</strong> Call 1 → 5 matches (all atoms reference
+<code>~/.codex/sessions/...</code> either in capture or commit content).
+Call 2 → 5 matches (multiple atoms referencing
+<code>~/.claude/projects/...</code>). Call 3 → 5 matches (commits
+documenting Cursor capture diagnosis + <code>cursorDiskKV</code> direct
+probe). Call 4 → 2 matches (commits about cross-tool review JSONL
+fallback). Total response ≈ 24 KB across the four; none truncated.
+Truncations field firing as expected on long commit-diff atoms
+(<code>["content"]</code> with <code>bytes_elided</code> 8k-100k).</li>
+<li><strong>Read sources:</strong> <code>source_breakdown</code> was
+implicit — substring search hits, sources mixed <code>git:</code>
+commits + <code>fs:/Users/zhenye/.claude/projects/...</code> JSONLs.
+Most evidence atoms were git commits (the friction was <em>narrated in
+commit messages</em> rather than living as separate atoms), which is
+itself a small dogfooding observation.</li>
+<li><strong>Verdict:</strong> ✅ right — confirmed three concrete
+JSONL-fallback patterns post-030: (1) token-count enrichment gap (atom
+<code>528a2274</code>, today 01:47 PDT — strategist explicitly read
+<code>~/.codex/sessions/.../rollout-*.jsonl</code> +
+<code>~/.claude/projects/.../&lt;session&gt;.jsonl</code> for usage
+data); (2) <code>search_memories</code> ranking surfaces discovery-turn
+over verdict-turn (atom <code>f50607f</code> documenting cross-tool
+review JSONL fallback); (3) Long-turn elision disputes documented in
+<code>_followups.md:38-46</code>. Plus a fourth pattern: subagent
+context-budget overflow forcing strategist to materialize ECHO responses
+to disk + jq probe (atom <code>32893af1</code>).</li>
+<li><strong>Note (load-bearing for M1 friction inventory):</strong>
+<strong>The four JSONL-fallback patterns are NOT closed by 030.</strong>
+030 closed the trust-bug part (<code>truncations: string[]</code>) but
+the underlying <em>retrieval-ergonomics</em> gaps that drive consumers
+to bypass ECHO are separate. Each pattern maps to a different fix: (1)
+extractor enrichment, (2) ranking semantics, (3) full-text recovery
+affordance, (4) consumer-side pagination or
+<code>format='compact'</code> for subagent dispatch.</li>
+<li><strong>Note (substring-search ranking finding worth
+keeping):</strong> Three of the four queries
+(<code>.codex/sessions</code>, <code>.claude/projects</code>,
+<code>cursorDiskKV</code>) were chosen as path-fragment substrings
+rather than semantic concepts (“where did I see JSONL fallback being
+discussed?”). Substring + recency-rank worked well here because the path
+fragments are rare in atom content. For semantic queries (“verdict”,
+“conclusion”, “JSONL fallback”), substring + top-5 + recency-rank loses
+important hits (the 2026-05-09 cross-tool review pattern). This is
+consistent with the M1-3 friction line in the inventory:
+<code>search_memories</code> is good for path-precise queries, weak for
+concept queries — and consumers don’t have a “by-concept” alternative
+today.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li>The token-count gap (<code>metadata.token_usage</code> enrichment)
+is a small, mechanical fix per extractor — likely 0.5d each × 3
+extractors. Could be a single bundled backlog item rather than
+three.</li>
+<li>The <code>search_memories</code> ranking issue is the deepest of the
+four — semantic ranking is a multi-week investment vs the others. Worth
+quarantining as M1-3 and revisiting after the cheaper M1 wins.</li>
+<li>Of the four, M1-1 (Cursor source_breakdown via item 029) is the only
+one already specced. The other three are net-new V1.6 candidates
+surfaced by the M1/M2 friction revisit.</li>
 </ol></li>
 </ul>
 <hr />
