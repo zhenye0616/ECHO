@@ -15,7 +15,7 @@ agent_notes: ""
 review_notes: ""
 spec_refs:
   - src/mcp/tools/get-atoms.ts  # sibling pattern; same Storage.getByIds backbone
-  - src/mcp/wire-shape/caps.ts  # WIRE_SHAPE_CAPS — the caps `get_atom` deliberately bypasses
+  - src/mcp/wire-shape/caps.ts  # WIRE_SHAPE_CAPS — `match_content` is bypassed for verbatim content; `metadata_value` still applied via projectMatch
   - src/mcp/wire-shape/match.ts  # projectMatch — reused for metadata projection (content-clip overridden with verbatim)
   - src/storage/interface.ts    # CaptureEvent + Storage.getByIds contract
   - tools/mcp-integration-smoke.sh  # tool-count assertion bumps 7 → 8
@@ -168,7 +168,7 @@ Bump `tools/mcp-integration-smoke.sh`:
 
 - **Do NOT extend `get_atoms` with a `full=true` flag.** Codex pushback #5 offered "`get_atom(id, full=true)` or equivalent" — the spec deliberately chooses a separate tool over a flag because: (a) batch + verbatim mode would invite consumers to pass 50 IDs and blow the budget; (b) it bisects the contract of `get_atoms` ("targeted body fetch with caps") with a different semantic ("verbatim escape hatch"); (c) the 030 atomic-decomposition principle says one tool, one purpose.
 - **Do NOT add range / offset / chunked parameters** (`offset`, `length`, `from_byte`). If an atom is too large for the envelope, return the error shape and let the caller read the source path. Chunked download is V2+ territory if real demand surfaces — for now, point at JSONL.
-- **Do NOT touch `WIRE_SHAPE_CAPS` constants.** This tool deliberately bypasses them; the other tools keep them intact for their cost-bounded use cases.
+- **Do NOT touch `WIRE_SHAPE_CAPS` constants.** This tool bypasses `WIRE_SHAPE_CAPS.match_content` (via the verbatim-content override in step 2 of Implementation Notes) but continues to honor `WIRE_SHAPE_CAPS.metadata_value` (applied by the reused `projectMatch`); other tools keep all caps intact for their cost-bounded use cases.
 - **Do NOT refactor `projectMatch` in `src/mcp/wire-shape/match.ts`.** `get_atom` REUSES `projectMatch` for the metadata-projection + embedding-strip pipeline and then overrides only its content-clip with verbatim content (see Implementation Notes). Do not change `projectMatch`'s behavior, signature, or output shape.
 - **Do NOT add metadata filtering / projection beyond what `projectMatch` already does** (no `fields[]` parameter, no extra per-key projection, no opt-out from the existing `tool_calls` → `trajectory` reshape). The escape hatch returns `projectMatch`'s metadata output unchanged; the only override is the content field.
 - **Do NOT touch `get_atoms` behavior.** The two tools coexist; `get_atoms` keeps its `truncations` signal + budget loop.
