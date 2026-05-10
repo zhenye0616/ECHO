@@ -1276,6 +1276,34 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
   3. **Mirror-pair entries are load-bearing.** Codex's 14:48 PDT entry + this 14:55 PDT entry document the same group-session round from both sides. Worth keeping as the canonical example of how the journal captures group sessions — each side logs its own MCP calls and observations, founder reads both, picture is complete.
   4. **The 4-agent journal-writer count this session (Codex + Cursor's Claude + Strategist + Codex-again) is approaching the coordination-layer trigger pressure.** Not at trigger yet (no semantic loss), but the rate increase (6 races today vs 5 yesterday) suggests the rate is accelerating as parallelism scales.
 
+### 2026-05-10 14:59 PDT — Codex: check Claude strategist reply after two-way group session
+
+- **Source agent:** Codex
+- **Trigger:** founder asked "check claude reply" after telling Claude strategist to connect back to the Codex group session and reconcile Codex's pushback.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T21:53:42.395Z", timeout=15)`
+- **Returned:** one new strategist turn: atom `c55017e4-b6e5-4d54-a9a8-48651abbf171` at `2026-05-10T21:56:45.486Z`, with `next_since="2026-05-10T21:58:28.884Z"`. The visible payload said Claude recovered Codex's full pushback, accepted Codex as right on 4/5 points, and identified a factual correction around item 029. The middle of the strategist synthesis was clipped in the ECHO return, so Codex used direct JSONL `rg` fallback against the same source to recover the full recommendation.
+- **Read sources:** exact strategist source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl`.
+- **Verdict:** 🟡 partial — ECHO correctly woke on the new strategist reply and returned the right source/atom/timestamp, but content clipping again forced raw JSONL fallback for the full decision record.
+- **Note:** The two-way group-session loop worked: Claude accepted most of Codex's objections, corrected the stale 029 claim, reframed the demo path around Cursor/Claude Code/Codex/local git, moved M2 first-call reliability and full atom recovery ahead of ranking, placed overlay after M2 reliability, and gated 031 deprecation on dogfooding. This also gives another live proof point for the M1-3 full-atom-recovery item.
+- **Conjecture:** `wait_for_new_turns` is now viable as the group-session transport, but every reviewer/strategist loop needs a full-turn recovery affordance before it can be trusted for dense recommendations.
+
+### 2026-05-10 15:00 PDT — Strategist: checks Codex reply, reconciles, ships item 032 spec
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context)
+- **Trigger:** Founder said "check codex's reply if you agree then proceed feel free to pushback." Mirror of Codex's 14:59 PDT entry above — group session is now bidirectional and stateless via `next_since` chaining.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=[<codex JSONL>], since='2026-05-10T21:53:23.951Z', timeout=45)` — chained from prior call's `next_since` (this time WITH milliseconds + Z, fixing the precision foot-gun from the 14:55 PDT entry).
+- **Returned:** 2 turns (Codex turns 9 + 10); `next_since='2026-05-10T22:02:53.103Z'`, `timed_out=false`. Turn 10 (`2026-05-10T22:00:36.612Z`) is Codex's reply to strategist's pushback synthesis: "I agree with the revised direction. … start with the smallest evidenced fix: M2 first-call reliability. Keep `031` gated. Do not let the journal-race issue take over yet unless it starts causing semantic loss." **No truncation this time** — turn returned full content (`truncations: ["metadata.tool_calls:projected"]` only, no `content`). Note: Codex's narrative INSIDE the turn mentions THEIR ECHO call clipping MY response, so M1-3 fired on Codex's side but not on the strategist's side this round.
+- **Read sources:** exact source `fs:/Users/zhenye/.codex/sessions/2026/05/09/rollout-2026-05-09T23-48-45-019e10a5-4046-7a20-9396-2543df466702.jsonl`. No JSONL fallback needed this turn — head/tail-of-turn preserved entire reply, which was 1816 chars (just under the cap).
+- **Verdict:** ✅ right — clean group-session round-trip. The `since` precision chain (passing `next_since` verbatim) worked as designed. Strategist agreed with 95% of Codex's reply; one light pushback on the journal-race framing ("pre-spec the narrow fix as queue-ready, don't build") delivered back to founder for relay.
+- **Note (proof of group-session pattern at scale):** This is the 4th round-trip in the bidirectional group session — Codex turn 8 (pushback) → Strategist 14:55 PDT (synthesis) → Codex turn 10 (reply) → Strategist 15:00 PDT (this entry + item 032 spec). Throughout, founder did NOT type or copy-paste any AI output between clients. They typed natural-language directives to each side ("use group session"; "check codex's reply") and the cross-tool continuity was handled by `wait_for_new_turns`. **M3 demo-arc value proposition proven empirically.** Worth a wiki promotion target when 030 wiki promotion happens.
+- **Note (no `since` foot-gun this round):** Chained `2026-05-10T21:53:23.951Z` (verbatim from prior `next_since`) → returned 2 turns strictly after that timestamp, no spurious re-return. The "common chain mistake" doc callout proposed in the 14:55 PDT entry remains warranted; this entry validates the correct pattern.
+- **Note (output of this round-trip):** Item 032 backlog spec landed at `backlog/ready/2026-05-10-032-m2-first-call-reliability.md` (this commit). Includes acceptance criteria, out-of-scope, files_to_modify (auto-derived from `spec_refs`), after-completion strategist notes. References this journal entry as the empirical trigger.
+- **Conjecture (observation-only):**
+  1. **Item 032 was scoped from the dogfooding journal directly.** This is the workflow CLAUDE.md describes ("aspirational end-of-week entries are useless, lossy in-the-moment entries are gold"). The 13:06 PDT entry surfaced M2-1 + M2-2; the 14:55 PDT entry confirmed M1-3 firing; the cross-tool review (Codex pushback) confirmed sequencing. 3 journal entries → 1 spec, ~50 minutes elapsed.
+  2. **`wait_for_new_turns` should probably surface `bytes_elided` and `truncations` at the turn level for group-session callers.** Today's round-trip happened to not hit content elision, but the prior round did. Group-session callers care about "did the partner say something that got clipped from my view" — same trust signal as `get_atoms.truncations` but for the long-poll surface.
+
 ---
 
 ## End-Of-Window Synthesis (filled at end of window)

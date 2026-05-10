@@ -16,14 +16,15 @@
 
 ## 🔨 Ready (specced, agents may claim)
 
-*(empty — V1.5 substrate items 016–028 all shipped 2026-05-06 → 2026-05-08; V1.5.6 / V1.5.6.1 / V1.5.7 patches landed as direct commits on top. V2 (hotkey overlay, ambient surfacing) and Wave 4 (GitHub + Slack adapters, audit page) not yet specced.)*
+*029 and 030 both shipped 2026-05-10 — see `backlog/complete/`. V1.6 friction-revisit (2026-05-10) opened 6 successor items; this row tracks the smallest-first per Codex pushback #5 sequencing.*
 
 | Priority | ID | Title | Estimate | Notes |
 |---|---|---|---|---|
-| HIGH | [2026-05-09-029-cursor-source-breakdown-falsification](../backlog/ready/2026-05-09-029-cursor-source-breakdown-falsification.md) | Cursor `source_breakdown` miss — 3-way falsification + targeted fix at the right layer | 1-1.5d | Recommended claimer: Cursor's Claude (Agent mode). Diagnoses capture/clustering/truncation as 3 candidate root causes; corrects 2026-05-08 V1.5.7 misdiagnosis. Decision note: `raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md`. |
-| HIGH | [2026-05-09-030-mcp-toolkit-reshape-and-group-session](../backlog/ready/2026-05-09-030-mcp-toolkit-reshape-and-group-session.md) | MCP V1.6 reshape — atomic decomposition (`find_clusters` + `get_atoms`) + group session subscription (`wait_for_new_turns`); deprecate `get_recent_work_context` | 1.5-2.5d | Strategist note + spec body in lieu of frontmatter. Merge order: 029 → 030 (overlapping touches on `src/trace/index.ts`). Companion item 031 (remove `get_recent_work_context` post-dogfooding) drafted post-shipping 030. Closes the elision trust bug logged in `_followups.md` "MCP retrieval — long-turn elision + envelope caps". |
+| HIGH | [2026-05-10-032-m2-first-call-reliability](../backlog/ready/2026-05-10-032-m2-first-call-reliability.md) | M2 first-call reliability — non-self auto-expand + resume-friendly `get_atoms` ordering | 0.5-1d | Smallest of the 6 V1.6 successor items; directly evidenced by the 2026-05-10 13:06 PDT real-call dogfooding entry. Both Codex + Strategist endorse shipping first. Unblocks the hotkey-overlay vertical slice (separate item, not yet specced). Item 031 (`get_recent_work_context` deprecation) sequenced AFTER this lands + ≥1 week dogfooding. |
 
-*Wave 4 (extension upgrade, GitHub adapter, Slack adapter, audit page, hotkey overlay UI) not yet specced. See `backlog/_followups.md` for the deferred fixups queue and the `wave-1-2-3-retrospective` operating-model lessons that should land in spec-template fixes before Wave 4 starts. Item 020 is the substrate prerequisite for the hotkey overlay; UI ships as a separate Wave 4 / V2 item.*
+*Six V1.6 successor items in flight (post-030 friction revisit, 2026-05-10): (1) 029 follow-ups [`_followups.md:375-381`], (2) **this item — 032 M2 reliability**, (3) full-atom recovery `get_atom(id, full=true)`, (4) hotkey overlay vertical slice, (5) search ranking / verdict-turn finding, (6) subagent dispatch compact/pagination, (7) 031 deprecation [gated]. See conversation archive for sequencing. Items 2–6 numbered 032–036; items 1 and 7 tracked elsewhere.*
+
+*V2 territory (Wave 4): GitHub adapter, Slack adapter, browser extension upgrade, audit page. Out of scope for V1 per 2026-05-10 founder scope reset.*
 
 ---
 
