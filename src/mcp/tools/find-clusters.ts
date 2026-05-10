@@ -210,10 +210,27 @@ export async function findClusters(
     now,
   );
 
-  const clusters = rwc.clusters.map(projectCluster);
-  const atomsReturned = clusters.reduce((sum, c) => sum + c.atom_ids.length, 0);
+  const projectedClusters = rwc.clusters.map(projectCluster);
+  const perClusterCapFired = projectedClusters.some(
+    (c) => c.atom_ids_truncated === true,
+  );
 
-  return {
+  // Apply the response-level envelope ceiling. Trim trailing clusters
+  // (lowest-rank first; rwc.clusters is rank-ordered) until the
+  // serialized envelope fits under the ceiling. Reserve headroom for the
+  // cap-fired warning so adding it post-trim doesn't push the envelope
+  // back over the ceiling. (Codex+Cursor post-build review 2026-05-10:
+  // FIND_CLUSTERS_RESPONSE_BYTE_CEILING was previously declared but
+  // never enforced.)
+  const CAP_WARNING_RESERVE_BYTES = 300;
+  const sizeBudget =
+    FIND_CLUSTERS_RESPONSE_BYTE_CEILING - CAP_WARNING_RESERVE_BYTES;
+  let clusters = projectedClusters;
+  let responseCapFired = false;
+  const buildResult = (
+    cs: FindClustersCluster[],
+    extraWarnings: string[],
+  ): FindClustersResult => ({
     schema_version: SCHEMA_VERSION,
     tool: 'find_clusters',
     query: {
@@ -222,16 +239,38 @@ export async function findClusters(
       window_hours: rwc.query.window_hours,
       format,
     },
-    clusters,
+    clusters: cs,
     result_caps: {
-      clusters_returned: clusters.length,
+      clusters_returned: cs.length,
       clusters_total: rwc.truncation.clusters_total,
-      atoms_returned: atomsReturned,
+      atoms_returned: cs.reduce((s, c) => s + c.atom_ids.length, 0),
       atoms_total_in_window: rwc.truncation.atoms_total_in_window,
-      truncated: rwc.truncation.truncated,
+      // truncated reflects ANY truncation: upstream (rwc cluster cap),
+      // per-cluster (atom_ids hard cap), or response-level (this trim).
+      // Previously only mirrored upstream — consumers relying on this
+      // signal couldn't tell when atom_ids[] was clipped per-cluster or
+      // when trailing clusters were dropped to fit the envelope.
+      truncated:
+        rwc.truncation.truncated || perClusterCapFired || responseCapFired,
     },
-    warnings: rwc.warnings,
-  };
+    warnings: [...rwc.warnings, ...extraWarnings],
+  });
+
+  while (
+    clusters.length > 0 &&
+    JSON.stringify(buildResult(clusters, [])).length > sizeBudget
+  ) {
+    clusters = clusters.slice(0, -1);
+    responseCapFired = true;
+  }
+
+  const extraWarnings = responseCapFired
+    ? [
+        `[FIND_CLUSTERS_RESPONSE_CAP] response trimmed from ${projectedClusters.length} to ${clusters.length} clusters to stay under the ${FIND_CLUSTERS_RESPONSE_BYTE_CEILING}-char hard ceiling — narrow \`since\`/\`until\` for full coverage.`,
+      ]
+    : [];
+
+  return buildResult(clusters, extraWarnings);
 }
 
 const findClustersOutputSchema = {

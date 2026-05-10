@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { findClusters } from '../../src/mcp/tools/find-clusters.js';
+import {
+  findClusters,
+  FIND_CLUSTERS_RESPONSE_BYTE_CEILING,
+} from '../../src/mcp/tools/find-clusters.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import { normalizeEvent } from '../../src/normalize/index.js';
 import { buildRecentWorkContext } from '../../src/trace/index.js';
@@ -251,6 +254,81 @@ describe('find_clusters', () => {
     expect(giant!.atom_ids_total).toBe(N);
     // Cap engaged but kept head + tail.
     expect(giant!.atom_ids.length).toBe(200);
+  });
+
+  it('REGRESSION (post-build review): per-cluster atom_ids cap firing lifts result_caps.truncated to true', async () => {
+    // Codex flagged: previously result_caps.truncated only mirrored the
+    // upstream rwc.truncation.truncated, so a per-cluster atom_ids hard
+    // cap firing produced atom_ids_truncated:true on the cluster but
+    // result_caps.truncated:false — consumers checking the top-level
+    // signal couldn't detect the partial coverage.
+    const store = new MemoryStorage();
+    const sharedFile = `${PROJECT_ECHO}/src/giant-truncation.ts`;
+    const N = 250; // > PER_CLUSTER_ATOM_IDS_HARD_CAP (200)
+    for (let i = 0; i < N; i++) {
+      const totalSeconds = i * 14;
+      const minute = Math.floor(totalSeconds / 60);
+      const second = totalSeconds % 60;
+      const ts = `2026-05-09T10:${minute
+        .toString()
+        .padStart(2, '0')}:${second.toString().padStart(2, '0')}.000Z`;
+      await store.append(claudeCodeTurn(i, sharedFile, ts));
+    }
+
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+    });
+
+    // Per-cluster cap fired AND that gets surfaced at result_caps.truncated.
+    expect(r.clusters.some((c) => c.atom_ids_truncated === true)).toBe(true);
+    expect(r.result_caps.truncated).toBe(true);
+  });
+
+  it('REGRESSION (post-build review): response-level envelope ceiling actually enforced — trailing clusters trimmed when total exceeds 25k', async () => {
+    // Cursor + Codex flagged: FIND_CLUSTERS_RESPONSE_BYTE_CEILING was
+    // declared but never applied. Build many clusters with high
+    // open-loop-hint density (each "?" turn contributes a hint) so the
+    // un-trimmed envelope exceeds 25k. (Pure atom_ids inflation can't
+    // cross 25k under MAX_LIMIT=500 + per-cluster-cap=200 — but
+    // realistic question-heavy sessions across many files do.)
+    const store = new MemoryStorage();
+    const CLUSTERS = 10;
+    const ATOMS_PER_CLUSTER = 60;
+    for (let cluster = 0; cluster < CLUSTERS; cluster++) {
+      const file = `${PROJECT_ECHO}/src/qheavy_${cluster}.ts`;
+      const hour = 10 + cluster;
+      for (let i = 0; i < ATOMS_PER_CLUSTER; i++) {
+        const totalSeconds = i * 14;
+        const minute = Math.floor(totalSeconds / 60);
+        const second = totalSeconds % 60;
+        const ts = `2026-05-09T${hour.toString().padStart(2, '0')}:${minute
+          .toString()
+          .padStart(2, '0')}:${second.toString().padStart(2, '0')}.000Z`;
+        const t = claudeCodeTurn(cluster * 1000 + i, file, ts);
+        // Question-ending content → triggers open_loop_hints, which
+        // (unlike atom_ids) can grow per cluster up to the hint cap.
+        t.content = `USER: still confused about ${file}?\n\nASSISTANT: not sure either, what about iteration ${i}?`;
+        await store.append(t);
+      }
+    }
+
+    const r = await findClusters(store, {
+      since: '2026-05-09T00:00:00.000Z',
+      until: '2026-05-10T00:00:00.000Z',
+    });
+
+    // Hard ceiling actually enforced.
+    const envelopeBytes = JSON.stringify(r).length;
+    expect(envelopeBytes).toBeLessThanOrEqual(FIND_CLUSTERS_RESPONSE_BYTE_CEILING);
+    // Some clusters were dropped to fit.
+    expect(r.clusters.length).toBeLessThan(CLUSTERS);
+    // The signal is surfaced at result_caps.truncated.
+    expect(r.result_caps.truncated).toBe(true);
+    // Warning surfaced so the consumer knows what happened.
+    expect(
+      r.warnings.some((w) => w.includes('[FIND_CLUSTERS_RESPONSE_CAP]')),
+    ).toBe(true);
   });
 
   it('open_loop_hints stays capped at SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP (50-cap reused)', async () => {

@@ -160,6 +160,47 @@ describe('get_atoms', () => {
     expect(r.warnings.some((w) => w.includes('first projected atom'))).toBe(true);
   });
 
+  it('REGRESSION (post-build review): final envelope respects 25k ceiling even with many missing IDs after a near-ceiling accepted prefix', async () => {
+    // Cursor + Codex flagged: previously the size check used a tentative
+    // envelope with `atoms_dropped: 0, atoms_dropped_ids: []` but the
+    // final envelope returned the real dropped-IDs array. With ~36-char
+    // UUIDs + JSON quoting/commas, a near-ceiling accepted prefix plus
+    // many missing IDs could push the final envelope over 25k.
+    const store = new MemoryStorage();
+    // Build 10 atoms whose projected bodies sit just under the ceiling
+    // collectively. Then request them interleaved with 40 missing UUIDs.
+    const realIds: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const id = await store.append(
+        evShape(i, {
+          content: 'small',
+          metadata: {
+            session_id: `s${i}`,
+            tool_calls: Array.from({ length: 30 }, () => ({
+              name: 'Bash',
+              args: 'x'.repeat(2_000),
+              output: 'y'.repeat(1_000),
+            })),
+          },
+        }),
+      );
+      realIds.push(id);
+    }
+    // 40 missing UUIDs (each 36 chars) interleaved at the END so they all
+    // get pushed to atoms_dropped_ids in the final response.
+    const missingIds = Array.from(
+      { length: 40 },
+      (_, i) => `00000000-0000-0000-0000-${i.toString().padStart(12, '0')}`,
+    );
+    const requested = [...realIds, ...missingIds];
+
+    const r = await getAtoms(store, { atom_ids: requested });
+
+    // Final envelope MUST respect the ceiling — this is the load-bearing
+    // assertion that was previously not actually enforced.
+    expect(JSON.stringify(r).length).toBeLessThanOrEqual(25_000);
+  });
+
   it('atoms_dropped_ids includes both missing AND budget-dropped IDs in requested order', async () => {
     const store = new MemoryStorage();
     const realIds: string[] = [];

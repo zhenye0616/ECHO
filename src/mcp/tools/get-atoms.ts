@@ -196,14 +196,22 @@ export async function getAtoms(
 
     // Tentatively add; check envelope.
     atoms.push(atom);
-    // Build a tentative result envelope to size-check. Cost: O(atoms_so_far)
-    // per loop iter; with cap=50 this is bounded.
+    // Build a tentative result envelope to size-check. The envelope is
+    // sized as the WORST-CASE final shape if we stop after this atom:
+    // current `atomsDroppedIds` (real prior misses) PLUS every remaining
+    // requested ID (which would be drained on rollback per spec §2 step 4).
+    // This guarantees the actual final envelope — whether we keep going or
+    // roll back next iter — fits under the ceiling. Without the worst-case
+    // dropped list, an accepted near-ceiling prefix plus many missing or
+    // remaining UUIDs (~36 chars each + JSON quoting) can exceed 25k post-
+    // check (Cursor + Codex post-build review, 2026-05-10).
+    const worstCaseDroppedIds = atomsDroppedIds.concat(atom_ids.slice(i + 1));
     const tentative: GetAtomsResult = {
       schema_version: SCHEMA_VERSION,
       tool: 'get_atoms',
       atoms,
-      atoms_dropped: 0,
-      atoms_dropped_ids: [],
+      atoms_dropped: worstCaseDroppedIds.length,
+      atoms_dropped_ids: worstCaseDroppedIds,
       warnings,
     };
     const envBytes = JSON.stringify(tentative).length;
