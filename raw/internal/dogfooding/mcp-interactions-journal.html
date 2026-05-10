@@ -161,17 +161,9 @@
       --muted: #5a5a5a;
       --label: #7a3e9d;
       --accent: #0a66c2;
-      --accent-soft: #e6f0fa;
       --code-bg: #eef1f4;
       --border: #d8dde2;
       --card-bg: #ffffff;
-      --date-tint: #f6f8fb;
-      --ok: #1f7a3a;
-      --ok-bg: #e7f5ec;
-      --partial: #a06a00;
-      --partial-bg: #fbf3df;
-      --wrong: #b3261e;
-      --wrong-bg: #fbe8e7;
     }
     html {
       line-height: 1.55;
@@ -393,52 +385,17 @@
       transform: translateY(-50%) rotate(90deg);
     }
 
-    /* Growing-section H2 (Aggregated learnings / End-Of-Window Synthesis /
-       Recommendations / Candidate Backlog Items) */
     summary.entry-summary.level-2 {
-      font-size: 1.32em;
+      font-size: 1.35em;
       font-weight: 650;
       margin-top: 0.4em;
-      padding: 0.7em 0.9em 0.7em 1.7em;
+      padding: 0.65em 0.9em 0.6em 1.7em;
       background: var(--card-bg);
       border-top: 1px solid var(--border);
       border-left: 4px solid var(--accent);
       border-radius: 0 3px 3px 0;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    /* Date H2 — calendar-flavored card, gradient tint, prominent left rail */
-    summary.entry-summary.level-2.date-summary {
-      font-size: 1.18em;
-      padding: 0.85em 1em 0.85em 2.5em;
-      background: linear-gradient(180deg, var(--card-bg) 0%, var(--date-tint) 100%);
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--accent);
-      border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      margin-top: 0.6em;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.55em;
-    }
-    summary.entry-summary.level-2.date-summary::before {
-      left: 0.7em;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.95em;
-    }
-    details.entry.date-card[open] > summary.entry-summary.level-2.date-summary::before {
-      transform: translateY(-50%) rotate(90deg);
-    }
-    /* Calendar glyph as a soft visual hook on date cards */
-    summary.entry-summary.level-2.date-summary > h2::before {
-      content: '📅 ';
-      margin-right: 0.15em;
-      opacity: 0.65;
-      font-weight: normal;
-    }
-
-    /* Plain H3 entry */
     summary.entry-summary.level-3 {
       font-size: 1.05em;
       font-weight: 600;
@@ -448,26 +405,6 @@
       border-radius: 0 3px 3px 0;
       box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    /* Date H3 — same date-summary treatment, slightly less prominent than H2 */
-    summary.entry-summary.level-3.date-summary {
-      font-size: 1.1em;
-      padding: 0.65em 0.9em 0.65em 2.3em;
-      background: linear-gradient(180deg, var(--card-bg) 0%, var(--date-tint) 100%);
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--accent);
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.55em;
-    }
-    summary.entry-summary.level-3.date-summary > h3::before {
-      content: '📅 ';
-      margin-right: 0.15em;
-      opacity: 0.65;
-      font-weight: normal;
-    }
-
     summary.entry-summary.level-4 {
       font-size: 0.98em;
       color: var(--muted);
@@ -475,49 +412,7 @@
       padding: 0.4em 0.4em 0.4em 1.5em;
       border-bottom: 1px dashed var(--border);
     }
-
     summary.entry-summary:hover { background: var(--code-bg); }
-    summary.entry-summary.date-summary:hover {
-      background: linear-gradient(180deg, var(--code-bg) 0%, var(--date-tint) 100%);
-    }
-
-    /* Date-summary meta row: TODAY badge / entry count / verdict roll-up */
-    .date-meta {
-      margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45em;
-      font-size: 0.78em;
-      font-weight: 500;
-    }
-    .date-badge.today {
-      background: var(--accent);
-      color: #fff;
-      padding: 0.18em 0.6em;
-      border-radius: 999px;
-      font-size: 0.78em;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-    .entry-count {
-      color: var(--muted);
-      background: var(--code-bg);
-      padding: 0.18em 0.6em;
-      border-radius: 999px;
-      font-variant-numeric: tabular-nums;
-    }
-    .verdict-row { display: inline-flex; gap: 0.3em; }
-    .verdict {
-      padding: 0.18em 0.5em;
-      border-radius: 999px;
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-      font-size: 0.96em;
-    }
-    .verdict.ok { color: var(--ok); background: var(--ok-bg); }
-    .verdict.partial { color: var(--partial); background: var(--partial-bg); }
-    .verdict.wrong { color: var(--wrong); background: var(--wrong-bg); }
 
     /* Reset the inner heading element (h2/h3/h4 that's now wrapped in <summary>)
        so it inherits summary styles instead of the base h3/h4 ones. */
@@ -548,80 +443,31 @@
     @media print {
       body { background: white; padding: 0; max-width: none; font-size: 11pt; }
       .entry-toolbar { display: none; }
-      .date-meta { display: none; }
       details.entry > * { display: block !important; }
       summary.entry-summary {
         list-style: none;
         padding-left: 0;
-        background: transparent !important;
+        background: transparent;
         box-shadow: none;
-        border: none;
       }
       summary.entry-summary::before { display: none; }
-      summary.entry-summary.level-2,
-      summary.entry-summary.level-3,
-      summary.entry-summary.date-summary {
-        background: transparent !important;
-        box-shadow: none;
-        border-left: none;
-      }
-      summary.entry-summary.date-summary > h2::before,
-      summary.entry-summary.date-summary > h3::before { content: ''; }
+      summary.entry-summary.level-2 { background: transparent; box-shadow: none; border-left: none; }
+      summary.entry-summary.level-3 { background: transparent; box-shadow: none; }
       nav#TOC { page-break-after: always; }
     }
   </style>
 
   <script>
-    /* 2026-05-09 redesign — date-grouped, weighted collapsibility.
-
-       Static H2 sections (How To Read / Interaction Schema / Quick-Fill
-       Template / What To Watch For / Interactions By Date label / Journal
-       Operating Notes) NEVER collapse — reference material that doesn't
-       grow with the project.
-
-       Growing H2 sections (Aggregated learnings / End-Of-Window Synthesis /
-       Recommendations / Candidate Backlog Items) DO collapse — they
-       accumulate as windows close.
-
-       Date H2 sections (`YYYY-MM-DD …`) become date cards — closed by
-       default, latest auto-opens, "TODAY" badge if the date matches the
-       local calendar day. Each card auto-renders an entry-count + verdict
-       roll-up (✅ / 🟡 / ❌) parsed from the H3 entries inside.
-
-       H3 and H4 entries collapse individually as before. */
     (function () {
-      var DATE_RE = /^(\d{4}-\d{2}-\d{2})\b/;
-      // Static section ids — these stay always-visible. Match by id rather
-      // than text so renaming a heading body doesn't accidentally flip
-      // a section into collapse mode.
-      var STATIC_H2_IDS = [
-        'how-to-read-this-journal',
-        'how-to-use-this-journal',
-        'interaction-schema',
-        'quick-fill-template',
-        'quick-fill-observation-template',
-        'what-to-watch-for',
-        'what-to-watch-for-from-item-018s-what-v1.5-will-teach-us',
-        'interactions-by-date',
-        'daily-entries',
-        'notes-on-running-this-journal',
-        'journal-operating-notes',
-      ];
-
       function init() {
         var body = document.body;
         if (!body || body.dataset.entriesWrapped === '1') return;
 
-        // Bottom-up so children get wrapped before parents claim siblings.
+        // Bottom-up: wrap H4 and H3 first. Then wrap selected H2 sections while
+        // leaving date H2 headings visible on the page surface.
         wrapHeadingLevel(4);
         wrapHeadingLevel(3);
         wrapHeadingLevel(2);
-        // Same-day H2/H3s get merged into one card; keeps the
-        // one-card-per-day promise even when the source MD authored a
-        // date-header followed by a sibling timestamped section.
-        mergeSameDayCards();
-        decorateDateCards();
-        openLatestDate();
         wrapTOC();
 
         installToolbar();
@@ -631,6 +477,8 @@
 
       function wrapHeadingLevel(level) {
         var tag = 'h' + level;
+        // Snapshot before mutating. Skip headings that are already inside a summary
+        // (defensive — shouldn't happen given bottom-up order) or inside the TOC.
         var headings = Array.prototype.filter.call(
           document.getElementsByTagName(tag),
           function (h) {
@@ -646,19 +494,15 @@
         for (var l = 1; l <= level; l++) stopTags['H' + l] = true;
 
         headings.forEach(function (heading) {
-          var isDate = DATE_RE.test((heading.textContent || '').trim());
-
           var details = document.createElement('details');
           details.className = 'entry level-' + level;
-          if (isDate) details.classList.add('date-card');
 
           var summary = document.createElement('summary');
           summary.className = 'entry-summary level-' + level;
-          if (isDate) summary.classList.add('date-summary');
 
           // Move heading element itself into the summary so its id and content
           // are preserved verbatim (TOC anchors keep working, screen readers
-          // still see an h2/h3/h4).
+          // still see an h3/h4).
           var parent = heading.parentNode;
           parent.insertBefore(details, heading);
           details.appendChild(summary);
@@ -676,126 +520,14 @@
         });
       }
 
-      // Wrap if (a) date-pattern (always — dates collapse into cards),
-      // OR (b) not in the static-id list (growing reference sections).
       function shouldWrapH2(heading) {
         var text = (heading.textContent || '').trim();
-        if (DATE_RE.test(text)) return true;
-        var id = heading.id || '';
-        if (STATIC_H2_IDS.indexOf(id) !== -1) return false;
-        // Anything else (Aggregated learnings, End-Of-Window, Candidate
-        // Backlog Items, Recommendations) is a growing section → wrap.
+        // Date sections should stay visible. They are the main scan surface.
+        if (/^\d{4}-\d{2}-\d{2}\b/.test(text)) return false;
+        // This is just the parent label for the date sequence; collapsing it
+        // would hide the whole journal body behind one affordance.
+        if (text === 'Interactions By Date') return false;
         return true;
-      }
-
-      // When two date-cards share the same date prefix (e.g., a date
-      // header at H2 followed by a timestamped block at H2 on the same
-      // day), demote the second to a level-3 entry inside the first.
-      function mergeSameDayCards() {
-        var cards = Array.prototype.slice.call(
-          document.querySelectorAll('details.entry.date-card')
-        );
-        var firstByDate = {};
-        cards.forEach(function (card) {
-          var heading = card.querySelector('summary > h2, summary > h3');
-          if (!heading) return;
-          var match = DATE_RE.exec((heading.textContent || '').trim());
-          if (!match) return;
-          var key = match[1];
-          if (firstByDate[key] && firstByDate[key] !== card) {
-            // Demote: drop the date-card affordance so the second reads
-            // as a regular entry, then re-parent inside the first card.
-            card.classList.remove('date-card');
-            card.classList.remove('level-2');
-            card.classList.add('level-3');
-            var summary = card.querySelector('summary.entry-summary');
-            if (summary) {
-              summary.classList.remove('date-summary');
-              summary.classList.remove('level-2');
-              summary.classList.add('level-3');
-            }
-            firstByDate[key].appendChild(card);
-          } else {
-            firstByDate[key] = card;
-          }
-        });
-      }
-
-      // Inject a meta line into each date card's summary: TODAY badge +
-      // entry count + verdict tally parsed from the entries inside.
-      function decorateDateCards() {
-        var cards = document.querySelectorAll('details.entry.date-card');
-        var todayKey = localTodayKey();
-        cards.forEach(function (card) {
-          var heading = card.querySelector('summary > h2, summary > h3');
-          if (!heading) return;
-          var match = DATE_RE.exec((heading.textContent || '').trim());
-          if (!match) return;
-          var dateKey = match[1];
-
-          // Count direct child entries (H3 collapsibles + nested non-date H2
-          // collapsibles that were demoted by mergeSameDayCards).
-          var entryEls = card.querySelectorAll(
-            ':scope > details.entry.level-3, :scope > details.entry.level-4'
-          );
-          var entryCount = entryEls.length;
-
-          // Verdict roll-up: scan the inner text once and tally verdict emoji.
-          var bodyText = card.textContent || '';
-          var verdicts = {
-            ok: (bodyText.match(/✅/g) || []).length,
-            partial: (bodyText.match(/🟡/g) || []).length,
-            wrong: (bodyText.match(/❌/g) || []).length,
-          };
-
-          var meta = document.createElement('span');
-          meta.className = 'date-meta';
-
-          var parts = [];
-          if (dateKey === todayKey) {
-            parts.push('<span class="date-badge today">TODAY</span>');
-          }
-          if (entryCount > 0) {
-            parts.push(
-              '<span class="entry-count">' + entryCount +
-              ' entr' + (entryCount === 1 ? 'y' : 'ies') + '</span>'
-            );
-          }
-          var verdictBadges = [];
-          if (verdicts.ok)
-            verdictBadges.push('<span class="verdict ok" title="right">✅ ' + verdicts.ok + '</span>');
-          if (verdicts.partial)
-            verdictBadges.push('<span class="verdict partial" title="partial">🟡 ' + verdicts.partial + '</span>');
-          if (verdicts.wrong)
-            verdictBadges.push('<span class="verdict wrong" title="wrong">❌ ' + verdicts.wrong + '</span>');
-          if (verdictBadges.length) {
-            parts.push(
-              '<span class="verdict-row">' + verdictBadges.join('') + '</span>'
-            );
-          }
-
-          if (parts.length === 0) return;
-          meta.innerHTML = parts.join('');
-          var summary = card.querySelector('summary.date-summary');
-          if (summary) summary.appendChild(meta);
-        });
-      }
-
-      // Open the most recently-dated card by default. Cards appear in
-      // document order; content authors append newest at the bottom of
-      // each file, so the LAST card is the most recent.
-      function openLatestDate() {
-        var cards = document.querySelectorAll('details.entry.date-card');
-        if (cards.length === 0) return;
-        cards[cards.length - 1].setAttribute('open', '');
-      }
-
-      function localTodayKey() {
-        var d = new Date();
-        var y = d.getFullYear();
-        var m = String(d.getMonth() + 1).padStart(2, '0');
-        var day = String(d.getDate()).padStart(2, '0');
-        return y + '-' + m + '-' + day;
       }
 
       function wrapTOC() {
@@ -821,7 +553,7 @@
         toolbar.innerHTML =
           '<button type="button" data-act="expand">Expand all</button>' +
           '<button type="button" data-act="collapse">Collapse all</button>' +
-          '<span class="hint">latest day opens by default · click any date to expand · ⌘F still searches collapsed entries on most browsers</span>';
+          '<span class="hint">click the index, summary sections, interactions, or calls to expand · date headings stay visible</span>';
         // Insert before the collapsible TOC (or, if no TOC, before the first body child).
         var anchor = document.querySelector('details.toc') || document.querySelector('nav#TOC') || document.body.firstChild;
         document.body.insertBefore(toolbar, anchor);
