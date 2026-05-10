@@ -1523,6 +1523,31 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 16:15 PDT — Strategist: 033 R2 review prep (Codex pushback discovery + Cursor-R2 negative search)
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — continuation of the post-/clear resume session
+- **Trigger:** Founder said "033 specing. codex and cursor pushed back again" — strategist needs both reviewer bodies before patching the R1-patched spec.
+- **Query inputs (1 codex tail + 1 cursor tail + 4 cursor searches):**
+  1. `tail_session(source_app='codex', count=5)` — auto-resolved to MRU Codex JSONL `019e10a5-...`; retrieved turn 19 (033 R2 review body) at `2026-05-10T23:05:11Z`.
+  2. `tail_session(source_app='cursor', count=5)` — auto-resolved to Cursor `state.vscdb` MRU session; returned the `isr-demo-mohsen` thread (unrelated project), NOT a 033 review.
+  3. `search_memories(query='033', source_app='cursor', since='2026-05-10T22:00:00Z')` — 0 matches.
+  4. `search_memories(query='full-atom recovery', source_app='cursor')` — 0 matches.
+  5. `search_memories(query='projectMatch', source_app='cursor', since='2026-05-10T20:00:00Z')` — 0 matches.
+  6. `search_memories(query='get_atom', source_app='cursor', since='2026-05-10T22:30:00Z')` — 0 matches.
+  7. `search_memories(query='033', source_app='cursor', since='2026-05-09T00:00:00Z', limit=20)` — 2 matches, both from R1 cycle (composer `c15c2eca-...`, mtime `2026-05-10T22:55:04Z` = 15:55 PDT), assistant bodies whitespace-collapsed in projection.
+- **Returned:** Codex R2: ~1162-char projected body with `truncations: ["content"]` + `bytes_elided=845` (M1-3 fired AGAIN — sixth incident in 24h, on the very session reviewing the M1-3 fix). Recovered enough from the 4 visible findings + cited line numbers (49/84/129/172/173/19) to act. Cursor: no R2 in capture — last 033-related Cursor turn was R1 at 15:55 PDT, BEFORE the 16:05 R1 patch landed.
+- **Read sources:** Codex JSONL `019e10a5-4046-7a20-9396-2543df466702.jsonl` (turn 19, 23:05:11Z); Cursor `state.vscdb` composer `c15c2eca-914a-4d9f-aceb-5d4c4dfac226` (last bubble `466ac89d-...`, mtime 2026-05-10T22:55:04Z — R1, not R2); direct file read of `backlog/ready/2026-05-10-033-full-atom-recovery.md` + `grep -nE` for stale old-contract terms.
+- **Verdict:** ✅ right on the substantive call (Codex R2 fully recovered, all 4 findings validated against file). 🟡 partial on the Cursor question — confirmed via thorough negative search that Cursor's R2 does not exist in capture; founder confirmed only Codex R2 exists, so the negative result was correct and not a capture-coverage failure.
+- **Note (M1-3 sixth incident in 24h):** The session that produced the R2 review of the M1-3 fix itself fired M1-3. Strategist could read visible head + tail + cited line numbers, so JSONL fallback wasn't strictly required for action — but the irony is operationally informative. Once 033 ships, this entire elision-recovery loop closes via `get_atom(<turn_19_id>)` instead of jq-against-JSONL.
+- **Note (search_memories negative-search pattern was correct):** Four progressively-broader Cursor searches all returned 0 matches in the R2 timeframe; the fifth (broadened to 2026-05-09 + limit=20) surfaced only R1 turns. The single-tool `tail_session(source_app='cursor')` had returned a different (unrelated) MRU session, which would have been misleading on its own — the multi-query search was the right way to disambiguate "Cursor's MRU isn't 033" vs "Cursor never reviewed R2."
+- **Note (Gate 4 failure on R1 patch — surfaced by Codex R2):** The R1 patch's self-review checklist claimed `Gate 4 (Cross-reference) ✅` but my post-R1-patch state had 5 stale cross-references using OLD contract vocabulary. All 5 were caught by Codex R2. The honest failure mode: I claimed ✅ before the R1 patch landed, when v1 contract was internally consistent; I did NOT re-run gate 4 after R1's contract-vocabulary revision. The gate as written doesn't mandate re-running after every patch. The R2 patch's commit message will record the post-patch grep so the discipline is verifiable in history. Proposed Gate 4 strengthening to `wiki/operating-model/cross-tool-spec-review.md` documented in the 033 spec's R2 history section, pending founder approval.
+- **Conjecture (observation-only):**
+  1. **Codex R2's 4 findings were ALL Class B (cross-reference drift), zero Class D.** Inverse of R1's class distribution. Pattern: R1 finds contract-vs-reality and description gaps; R2 finds dependent-section staleness from the R1 patch. Stronger argument for Gate 4 strengthening than the 16:05 gate-5 proposal — the checklist already has the right gate, just needs to be mandated post-patch as well as pre-commit.
+  2. **Cross-tool spec review producing differentiated value per reviewer per cycle.** Cursor R1 caught description nits (Class F), Codex R1 caught the load-bearing contract gap (Class D), Codex R2 caught dependent-section drift (Class B). Across 7 cycles today (032 R1-R3, 033 R1-R2), no reviewer caught the same class twice in a row. The pattern's value is robustly accumulating, not random.
+  3. **One-reviewer R2 was sufficient this time.** Codex's 4 findings were comprehensive enough that adding Cursor wouldn't have changed the patch. As the 4-gate checklist tightens, marginal value of dual-reviewer R2 may shrink. Don't change the process yet; flag for re-evaluation if R3-R5 of future items consistently show single-reviewer-sufficient outcomes.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
