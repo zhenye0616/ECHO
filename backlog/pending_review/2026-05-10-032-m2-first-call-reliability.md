@@ -9,9 +9,38 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-10T22:45:40Z"
 branch: "agent/m2-first-call-reliability"
 worktree: "~/Desktop/Project_echo--m2-first-call-reliability"
-head_sha: ""
+head_sha: "a16779ed368fea90f1ce19372b818cf9b9f6d239"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  AC1–AC4 all implemented + tested + green on the full suite (644 passed | 21 skipped).
+  Lint clean; typecheck clean.
+
+  Implementation surface:
+    - NEW src/trace/auto-expand.ts: SINGLE_SOURCE_RECENT_THRESHOLD_MS=300_000,
+      isSingleSourceRecent(), noUsefulCluster() — predicate operates on
+      NormalizedContextEvent.time.occurred_at per AC1.
+    - src/trace/rank.ts: optional RankOptions {demoteSingleSourceRecent, nowMs}
+      4th param; when on, a NEW primary sort key (singleSourceRecent asc) is
+      added BEFORE the existing 5-key chain — strict partition per R2-2.
+      Default false preserves all existing callers' behavior.
+    - src/mcp/tools/recent-work-context.ts: getRecentWorkContext no-args path
+      now extends auto-expand to fire on noUsefulCluster(4h) (covers both
+      empty AND all-single-source-recent). When trigger is single-source-recent,
+      24h response is re-ranked with demote=true + rank/rank_reason rewritten.
+      Warning is `[AUTO_EXPAND] <trigger> ...` per AC1.
+    - src/mcp/tools/get-atoms.ts: NEW `prefer: "as_requested" | "newest_first"`
+      parameter. newest_first: dedupes input to first occurrence (R2-3 NEW
+      behavior), sorts existing by CaptureEvent.timestamp DESC (stable, ties →
+      input order), appends missing IDs at end. Existing prefix-drop loop
+      operates on the new process order.
+    - Description strings (AC3): FIND_CLUSTERS_DESCRIPTION + recent-work-context
+      deprecation marker + GET_ATOMS_DESCRIPTION all updated in lockstep.
+
+  Test additions (AC4): 21 new test cases across 4 files. Predicate × 9,
+  rank strict-partition × 2, find-clusters chain × 2, get-atoms newest_first × 5.
+
+  No drift events caught; no founder-input blockers; no scope expansion.
+  Branch agent/m2-first-call-reliability pushed at SHA a16779ed.
 review_notes: ""
 spec_refs:
   - src/mcp/tools/find-clusters.ts
