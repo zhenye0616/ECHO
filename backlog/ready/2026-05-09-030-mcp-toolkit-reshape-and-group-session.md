@@ -1,10 +1,48 @@
+---
+id: 2026-05-09-030-mcp-toolkit-reshape-and-group-session
+title: MCP V1.6 reshape — atomic decomposition + group session subscription
+status: ready
+priority: HIGH
+estimate: 1.5-2.5d
+created: 2026-05-09
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+spec_refs:
+  - src/mcp/tools/recent-work-context.ts
+  - src/mcp/tools/search-memories.ts
+  - src/mcp/tools/tail-session.ts
+  - src/mcp/tools/echo-ping.ts
+  - src/mcp/util/source-app.ts
+  - src/mcp/wire-shape/match.ts
+  - src/storage/interface.ts
+  - src/storage/sqlite.ts
+  - src/storage/memory.ts
+  - src/trace/index.ts
+  - wiki/architecture/system-architecture.md
+  - wiki/architecture/storage.md
+  - wiki/surfaces/mcp-server.md
+  - backlog/complete/2026-05-08-027-mcp-stateless-transport.md
+  - backlog/complete/2026-05-08-028-rwc-envelope-skeleton-format.md
+  - backlog/complete/2026-05-09-029-cursor-source-breakdown-falsification.md
+  - backlog/_followups.md
+blocked_by: []
+acceptance:
+  - "See **Acceptance Criteria** section in spec body — claiming builder copies the 10 bullets verbatim into this list at atomic-claim time. The body is the canonical source; this stub satisfies tooling (tools/blocked.py) but is not the contract."
+files_to_modify:
+  - "See **Files to modify** subsection at end of spec body — claiming builder copies the file list verbatim into this list at atomic-claim time."
+---
+
 # MCP V1.6 reshape — atomic decomposition (`find_clusters` + `get_atoms`) + group session subscription (`wait_for_new_turns`); deprecate `get_recent_work_context`
 
-> **Strategist note (2026-05-09):** frontmatter intentionally omitted to keep the originating session a strategist conversation. The claiming builder will populate the standard frontmatter (`id`, `status`, `priority`, `estimate`, `created`, `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`, `review_notes`, `spec_refs`, `blocked_by`, `acceptance`, `files_to_modify`) at atomic-claim time, lifting the acceptance bullets verbatim from the **Acceptance Criteria** section below.
+> **Strategist origin note (2026-05-09):** spec emerged from a strategist brainstorm session (Claude Code session `71b36548-...`). Originally drafted with no frontmatter to keep that session a pure strategist conversation; revised to include canonical frontmatter after Codex's spec review (2026-05-09 23:52 PDT) flagged that `tools/blocked.py` exits with `no frontmatter (must start with '---')` and blocks the documented builder loop. The `acceptance:` and `files_to_modify:` lists are stubs pointing to the canonical body sections — claiming builder copies the body's 10 acceptance bullets and file list verbatim into the frontmatter at atomic-claim time.
 >
-> **Spec refs the claiming builder will need:** `src/mcp/tools/recent-work-context.ts`, `src/mcp/tools/search-memories.ts`, `src/mcp/tools/tail-session.ts`, `src/mcp/tools/echo-ping.ts`, `src/mcp/util/source-app.ts`, `src/mcp/wire-shape/`, `src/trace/index.ts`, `src/storage/`, `wiki/architecture/system-architecture.md`, `wiki/architecture/storage.md`, `wiki/surfaces/mcp-server.md`, `wiki/surfaces/mcp-recent-work-context.md`, `wiki/surfaces/mcp-search-memories.md`, `wiki/surfaces/mcp-tail-session.md`, `backlog/complete/2026-05-08-027-mcp-stateless-transport.md`, `backlog/complete/2026-05-08-028-rwc-envelope-skeleton-format.md`, `backlog/_followups.md` (the "MCP retrieval — long-turn elision + envelope caps" entry).
->
-> **Blocked by:** none. Can claim immediately. Item 029 (`backlog/ready/2026-05-09-029-cursor-source-breakdown-falsification.md`) is in flight in parallel; the two items touch overlapping surfaces (`src/trace/index.ts`, `src/mcp/tools/recent-work-context.ts`). 029 ships first OR 030's claimer rebases against 029's branch on completion. The merge order: 029 → 030. (The reverse order is OK if 029 surfaces a Phase-1 finding that materially changes 030's design — claimer of 030 should pause + check before merging.)
+> **Item 029 already shipped** (merged 2026-05-09 via commit `b50a843`; sidecar followups landed at `b46170c`). 030's claimer rebases on current `main` — no parallel-branch coordination needed. Cross-check 029's review_notes for any Phase-1 findings that materially change 030's design before claiming.
 >
 > **Companion item (post-shipping 030):** item 031 will *remove* `get_recent_work_context` after the 1–2 week dogfooding period. Spec drafted at completion of 030.
 
@@ -46,7 +84,7 @@ Five sub-deliverables, in dependency order:
 
 ### 1. `find_clusters(window?, since?, until?, format?)` — cheap discovery
 
-Returns the cluster shape from today's `get_recent_work_context` skeleton mode, but as a first-class tool.
+Returns the cluster shape from today's `get_recent_work_context` skeleton mode, but as a first-class tool. **Important parameter semantic:** `window_hours` in today's `get_recent_work_context` means **cluster-gap width** (the maximum temporal gap allowed between atoms in a single cluster), NOT lookback. The current default lookback is 4h via `since = until - DEFAULT_WINDOW_HOURS` in `recent-work-context.ts`. `find_clusters` MUST preserve this distinction: `window_hours?` controls cluster-gap (default 4h); `since?` / `until?` control lookback. **No-args behavior** mirrors today's V1.5.7 polish: `find_clusters()` with no since/until auto-resolves to `since=now-4h, until=now`, and if that returns empty, auto-expands to `since=now-24h` (per `NO_ARGS_AUTO_EXPAND_WINDOW_HOURS` constant). Migration recipes in this spec use `since=` for lookback, NOT `window_hours=` (a common source of confusion that Codex's review flagged at 2026-05-09 23:52 PDT).
 
 ```ts
 // Response shape (TypeScript-ish):
@@ -66,12 +104,12 @@ Returns the cluster shape from today's `get_recent_work_context` skeleton mode, 
       open_loop_hints?: { atom_id, resolved }[],  // body-less; just IDs+resolved flag
     }
   ],
-  truncation: {
-    clusters_returned: number,
-    clusters_total: number,
-    atoms_returned: number,
-    atoms_total_in_window: number,
-    truncated: boolean,
+  result_caps: {                     // renamed from `truncation` to avoid name-collision with
+    clusters_returned: number,       // the per-atom `truncations: string[]` field added in §4.
+    clusters_total: number,          // `result_caps` describes RESPONSE-LEVEL limit application
+    atoms_returned: number,          // (clusters/atoms dropped to fit response budget);
+    atoms_total_in_window: number,   // `truncations: string[]` describes per-FIELD clipping inside
+    truncated: boolean,              // an individual atom. Two different concepts; two different names.
   },
   warnings: string[],
 }
@@ -79,7 +117,9 @@ Returns the cluster shape from today's `get_recent_work_context` skeleton mode, 
 
 Cost target: < 10k chars typical, even on full-day windows. Same skeleton-format budget item 028 enforced.
 
-The cluster-builder logic in `src/trace/index.ts` is already this; this tool is a re-export of that logic with the skeleton wire shape.
+**`atom_ids[]` cap MUST be lifted (or substantially raised) for `find_clusters`.** Today's skeleton mode caps per-cluster `atom_ids[]` at 50 entries (item 028 Gap 4 — `recent-work-context.ts:226`) — but `atom_ids[]` is the load-bearing input to `get_atoms`. Capping atom_ids silently drops the tail of any cluster with >50 atoms; downstream `get_atoms(top_cluster.atom_ids)` would silently miss most of a large cluster. **Required:** `find_clusters` emits the FULL `atom_ids[]` per cluster (atom IDs are tiny — ~50 chars each; even 200 IDs is 10KB, within the per-cluster budget that today caps `open_loop_hints[]` and edges). The 50-cap stays for `open_loop_hints[]` only. If a cluster's `atom_ids[]` is so large it overflows the response budget on its own, surface via `result_caps.truncated: true` AND a per-cluster `atom_ids_truncated: true` flag (with `atom_ids_total: number`) so the consumer knows to either (a) narrow the window OR (b) accept partial coverage explicitly.
+
+The cluster-builder logic in `src/trace/index.ts` is already this; this tool is a re-export of that logic with the skeleton wire shape (modulo the atom_ids cap lift above).
 
 ### 2. `get_atoms(atom_ids[], fields?, format?)` — targeted fetch
 
@@ -90,7 +130,12 @@ Returns full bodies (capped per `WIRE_SHAPE_CAPS`) for a specified ID list.
 {
   atom_ids: string[],         // max 50 per call
   fields?: string[],          // optional projection — e.g., ["content", "metadata"]
-  format?: "minimal" | "full" // minimal = standard caps, full = no caps (may overflow envelope)
+  format?: "minimal"          // V1.6: minimal only — applies WIRE_SHAPE_CAPS to content + per-key metadata.
+                               // ("full" / verbatim mode is intentionally OUT OF SCOPE for v1 of get_atoms —
+                               //  the host's hard-max response size makes a "no caps" mode a footgun.
+                               //  Consumers needing absolute verbatim read the source path directly per
+                               //  §4 truncations recovery contract. A future debug-only "full" mode is
+                               //  a separate item if real demand surfaces.)
 }
 
 // Response:
@@ -104,7 +149,11 @@ Returns full bodies (capped per `WIRE_SHAPE_CAPS`) for a specified ID list.
       timestamp: string,
       content?: string,         // present unless caller's fields[] excluded
       metadata?: object,
-      truncations: string[],    // [] = verbatim; ["content"] = clipped; ["metadata.X"] = key-cap; ["fields_omitted"] = caller-projected
+      truncations: string[],    // [] = verbatim AND no projector reshaped; ["content"] = clipped;
+                                 // ["metadata.X"] = byte-cap on key X; ["metadata.X:projected"] =
+                                 // V1.5.6.1 projector reshaped key X (e.g. tool_calls → trajectory);
+                                 // ["fields_omitted"] = caller passed fields? excluding some.
+                                 // See §4 for full rules.
       content_bytes_elided?: number,  // present iff "content" in truncations
     }
   ],
@@ -114,6 +163,19 @@ Returns full bodies (capped per `WIRE_SHAPE_CAPS`) for a specified ID list.
 ```
 
 `atom_ids` are the load-bearing input — they come from `find_clusters` `atom_ids[]` or from `search_memories` match `id`. Atom IDs are persisted (echo.db row IDs); cluster IDs are deterministic-ephemeral (`system-architecture.md:140`) and would be the wrong primitive to base the targeted-fetch tool on.
+
+**Storage API gap (Codex review 2026-05-09 23:52 PDT):** today's `Storage` interface (`src/storage/interface.ts:38`) only exposes `append`, `query`, and `count`; `QueryFilter` has no `ids` filter. `get_atoms` requires a NEW storage method:
+
+```ts
+// src/storage/interface.ts — add:
+getByIds(ids: string[]): Promise<CaptureEvent[]>
+```
+
+Implementations:
+- `src/storage/sqlite.ts` — `SELECT * FROM events WHERE id IN (?...)` with parameterized binding (LIMIT enforcement from caller's atom_ids.length validation, max 50 per `get_atoms` contract).
+- `src/storage/memory.ts` — `events.filter(e => ids.includes(e.id))`.
+
+Order-preserving: `getByIds(['a','b','c'])` returns events in the same order as the input `ids[]` array. (SQLite default order is insertion order; memory impl uses a Map lookup. Both impls explicitly preserve input order.) This is what lets `get_atoms` honor the contract "atoms returned in the order requested."
 
 ### 3. `wait_for_new_turns(sources[], since, timeout?)` — stateless long-poll
 
@@ -130,14 +192,27 @@ Returns full bodies (capped per `WIRE_SHAPE_CAPS`) for a specified ID list.
   schema_version: 1,
   tool: "wait_for_new_turns",
   turns: [...same shape as tail_session.turns],
-  next_since: string,           // server's current timestamp; pass as `since` next call
-  timed_out: boolean,           // true if timeout fired with no new turns
-  truncations: string[],        // per-call (not per-turn — turns carry their own)
+                                 // Each turn carries its own `truncations: string[]` field
+                                 // per §4 rules. There is NO response-level truncations field —
+                                 // any clipping happens per-turn at the wire-shape projector,
+                                 // never at the response envelope (timeout returns empty turns[],
+                                 // not a truncated turns[]).
+  next_since: string,            // server's current timestamp; pass as `since` next call
+  timed_out: boolean,            // true if timeout fired with no new turns
 }
 ```
 
+**Source semantics (Codex review 2026-05-09 23:52 PDT — choose explicitly):** `sources[]` accepts mixed-type entries; each entry is normalized at call time:
+
+| Entry shape | Resolution | SQL effect |
+|---|---|---|
+| Literal source path (e.g. `fs:/Users/.../state.vscdb`, `git:/Users/.../repo`) | exact match | `source = '<path>'` |
+| Source-app name (e.g. `cursor`, `claude_code`, `codex`, `git`) | **prefix match** via `buildSourceAppMap()` | `source LIKE '<prefix>%'` — matches ALL sessions of that app, NOT just the most-recent |
+
+This is **deliberately different** from `tail_session(source_app=...)`, which resolves to the **most-recently-active exact source** for that app. Reasoning: group session A wants "wake me when ANY session of these apps writes new content" — the prefix-match semantic catches new Cursor composers, new CC sessions, etc. as they spawn. Single-source MRU resolution would miss them.
+
 Server behavior:
-- Polls echo.db every 1s internally, querying `WHERE source IN (...) AND timestamp > since LIMIT 20`.
+- Polls echo.db every 1s internally. Query shape: `WHERE (source IN (<exact_sources...>) OR source LIKE '<prefix1>%' OR source LIKE '<prefix2>%' ...) AND timestamp > since LIMIT 20`.
 - Returns immediately on any non-empty result.
 - Returns at `timeout` with empty `turns[]` and `next_since` set to server's current timestamp.
 - **No subscriber registry. No per-client state.** Each call is independent → stateless ✓ per item 027.
@@ -146,14 +221,15 @@ Server-side cost: the Node event loop holds the request open; the poll loop is c
 
 ### 4. `truncations: string[]` field — added to ALL atom-bearing responses
 
-Existing tools `tail_session` and `search_memories` get a `truncations: string[]` field on each returned atom (alongside the existing `bytes_elided` field), with rules:
+Existing tools `tail_session` and `search_memories` get a `truncations: string[]` field on each returned atom (alongside the existing `bytes_elided` / `metadata_keys_projected` fields), with rules covering BOTH caps AND projections (per Codex review 2026-05-09 23:52 PDT):
 
-- `[]` ⟺ every returned field byte-for-byte identical to echo.db.
+- `[]` ⟺ every returned field byte-for-byte identical to echo.db AND no projector reshaped any field.
 - `["content"]` ⟺ content body was clipped to `WIRE_SHAPE_CAPS.content`. Existing `content_bytes_elided` (or equivalent) counts the clip.
-- `["metadata.<key>"]` ⟺ V1.5.6 per-key metadata cap fired on `<key>`.
+- `["metadata.<key>"]` ⟺ V1.5.6 per-key metadata cap fired on `<key>` (BYTE-LEVEL clip; value is lossy).
+- `["metadata.<key>:projected"]` ⟺ V1.5.6.1's projector reshaped the value (e.g. `tool_calls` → trajectory + histogram per `match.ts:79`'s `metadata_keys_projected`). Value is REFORMATTED, not clipped — semantically distinct from a cap. Consumer needing the original raw value reads the source file. The `:projected` suffix lets the consumer distinguish "this got clipped" from "this got rewritten by a known projector with a documented schema."
 - `["fields_omitted"]` ⟺ caller passed `fields?` and only a subset returned. (Distinguishes "cap fired" from "you didn't ask for it.")
 
-The legacy `bytes_elided` field STAYS for backward compat (consumers may still rely on it); `truncations` is additive.
+The legacy `bytes_elided`, `metadata_keys_projected`, and `metadata_bytes_elided` fields STAY for backward compat (consumers may still rely on them); `truncations` is additive AND unifies the cap+projection trust signal in one place.
 
 ### 5. `get_recent_work_context` deprecation
 
@@ -163,16 +239,22 @@ In `src/mcp/tools/recent-work-context.ts`, prepend the tool description with:
 **[DEPRECATED 2026-05-09 — use `find_clusters` + `get_atoms` instead. This tool will be removed in item 031 after a 1-2 week dogfooding period. Migration recipe in description below.]**
 ```
 
-Followed by a 3-line migration recipe:
+Followed by a migration recipe that names the judgment step explicitly (not "blind clusters[0]"):
 
 ```
 Migration:
   OLD: get_recent_work_context(window_hours=24, format='minimal')
   NEW: c = find_clusters(window_hours=24)
-       a = get_atoms(c.clusters[0].atom_ids, format='minimal')
+       // Inspect c.clusters[]: each has rank, label, source_breakdown,
+       // time_range, atom_ids[]. Pick the cluster matching your intent
+       // (typically rank-1 for "where did I leave off", but read label +
+       // source_breakdown before picking — the resume target may be a
+       // sibling).
+       picked = c.clusters[0]   // or whichever matches intent
+       a = get_atoms(picked.atom_ids, format='minimal')
 ```
 
-The tool's behavior remains unchanged for the deprecation period — consumers can keep calling it, just see the deprecated marker in the tool registry.
+The judgment-between-calls is the actual win of the decomposition. Picking `clusters[0]` blindly recreates the compound-tool's failure mode (wrong cluster surfaced, atom bodies wasted). The tool's behavior remains unchanged for the deprecation period — consumers can keep calling it, just see the deprecated marker in the tool registry.
 
 ### Polling-fallback documentation for `wait_for_new_turns`
 
@@ -200,7 +282,7 @@ This makes `wait_for_new_turns` an **optimization**, not load-bearing. If real M
 
 - Do NOT touch `echo_ping`. (Strategist debate flagged it as borderline; resolution is "keep" — leave alone in this item. Removal would be a separate cosmetic item.)
 - Do NOT touch the source_app vocabulary (`SOURCE_APP_VALUES` stays at `cursor | claude_code | codex | git`).
-- Do NOT add a `whoami` MCP tool. (Mentioned in brainstorm as a footgun-prevention primitive; deferred — agents can pass `exclude_sources` on `wait_for_new_turns` if they want to exclude themselves.)
+- Do NOT add a `whoami` MCP tool. (Mentioned in brainstorm as a footgun-prevention primitive; deferred — agents that want to avoid tailing their own session simply omit their own source from `sources[]` at call site. If a structured `exclude_sources` parameter becomes load-bearing during dogfooding, file as a follow-up; not in scope for v1.)
 - Do NOT add push/SSE notifications, persistent subscriptions, or a multi-tenant filter to `wait_for_new_turns`. Stateless long-poll only.
 - Do NOT remove `get_recent_work_context` in this item — that's item 031, after dogfooding.
 - Do NOT change `WIRE_SHAPE_CAPS` values. Same caps; new tools, same projector.
@@ -230,7 +312,7 @@ Post-shipment, the strategist will:
 
 The claiming builder lifts these into the frontmatter `acceptance:` field at atomic-claim time. Each bullet is enforceable as written.
 
-1. **`find_clusters(window?, since?, until?, format?)` ships** at `src/mcp/tools/find-clusters.ts` with the response shape specified in **Implementation Direction §1**. Behavior matches today's `getRecentWorkContext({format:'skeleton'})` for the same inputs (regression test: same inputs → same cluster_ids and atom_ids; differences allowed only in field-level shape, not graph membership). Cost target: < 10k chars on a 24h window with default limits, asserted in tests.
+1. **`find_clusters(window?, since?, until?, format?)` ships** at `src/mcp/tools/find-clusters.ts` with the response shape specified in **Implementation Direction §1**. Behavior matches today's `getRecentWorkContext({format:'skeleton'})` for the same inputs. **Regression test (graph-membership equality, NOT cluster-id-string equality):** same inputs → same set of clusters where each cluster is identified by its sorted `atom_ids[]` set, AND ranks of corresponding clusters match. Do NOT assert string equality of `cluster_id` — those are deterministic-ephemeral hashes (`system-architecture.md:140`) and may flake if any input pre-processing differs by an implementation detail. Cost target: < 10k chars on a 24h window with default limits, asserted in tests.
 
 2. **`get_atoms(atom_ids[], fields?, format?)` ships** at `src/mcp/tools/get-atoms.ts` with the response shape specified in **Implementation Direction §2**. Validates `atom_ids[]` is non-empty and ≤ 50 entries. Returns atoms in the order requested (preserves caller's intent). Per-atom `truncations` field follows the rules in **Implementation Direction §4**. `atoms_dropped` + `atoms_dropped_ids` populated when response budget would be exceeded.
 
@@ -246,7 +328,7 @@ The claiming builder lifts these into the frontmatter `acceptance:` field at ato
 
 8. **MCP best-practices compliance per item 025:** new tool descriptions follow the established conventions (`use when X` discriminator one-liner; explicit cost class — cheap/medium/large; explicit statelessness claim where relevant; explicit migration recipes where relevant).
 
-9. **Tests overall:** `npm test` passes (full suite); `npm run lint` passes; `npm run typecheck` passes. New regression tests fail on a clean revert of each new tool's implementation. Realistic-density envelope test (item 028's precedent) extended to cover `find_clusters` + `get_atoms` chain — **assertion shape:** `bytes(find_clusters(window=24h, format='skeleton')) + bytes(get_atoms(top_cluster.atom_ids, format='minimal'))` ≤ `bytes(get_recent_work_context(window_hours=24, format='minimal'))` for the same effective query against the same fixture. The point: targeted dive saves bytes vs compound call.
+9. **Tests overall:** `npm test` passes (full suite); `npm run lint` passes; `npm run typecheck` passes. New regression tests fail on a clean revert of each new tool's implementation. Realistic-density envelope test (item 028's precedent) extended to cover `find_clusters` + `get_atoms` chain — **assertion shape (apples-to-apples):** `bytes(find_clusters(window=24h, format='skeleton')) + bytes(get_atoms(materialized_ids, format='minimal'))` ≤ `bytes(get_recent_work_context(window_hours=24, format='minimal'))`, where `materialized_ids` is **the same atom_id set the compound call materializes for the rank-1 cluster at `format='minimal'`** (NOT all atom_ids in the cluster — the compound call may already truncate atoms inside the cluster's atom_ids[] when computing its `atoms[id]` body map). Use a fully-materialized fixture (atom count ≤ compound's per-cluster atom limit) to make the comparison fair. The point: targeted dive saves bytes vs compound call ON THE SAME EFFECTIVE PAYLOAD.
 
 10. **Run log appended** to `raw/internal/agent-runs/<run-date>-2026-05-09-030-mcp-toolkit-reshape-and-group-session.md` with: (a) per-tool envelope measurements in chars (find_clusters skeleton vs today's `format='skeleton'` baseline; get_atoms minimal vs today's `format='minimal'`; the find+get chain total per the §9 assertion); (b) `wait_for_new_turns` latency measurement (median **and** p95 wake time **in milliseconds** when content lands during a wait, sampled over ≥10 trials with content landing at random offsets between 0 and 30s into the wait); (c) one before/after cross-tool dogfooding journal entry showing the same resume call via the old vs new toolkit (founder's "where did I leave off" shape); (d) any envelope/cost surprise observations for item 031's removal-decision context (i.e., flag whether anything in the new toolkit cost more than expected).
 
@@ -254,17 +336,23 @@ The claiming builder lifts these into the frontmatter `acceptance:` field at ato
 - `src/mcp/tools/find-clusters.ts` (NEW)
 - `src/mcp/tools/get-atoms.ts` (NEW)
 - `src/mcp/tools/wait-for-new-turns.ts` (NEW)
-- `src/mcp/tools/recent-work-context.ts` (modified: deprecation marker only)
+- `src/mcp/tools/recent-work-context.ts` (modified: deprecation marker; lift atom_ids[] cap if find_clusters reuses cluster-builder helpers)
 - `src/mcp/tools/search-memories.ts` (modified: add `truncations` field)
 - `src/mcp/tools/tail-session.ts` (modified: add `truncations` field)
-- `src/mcp/wire-shape/match.ts` (modified: emit `truncations` from the projector)
+- `src/mcp/wire-shape/match.ts` (modified: emit `truncations` covering both caps and projections)
+- `src/mcp/util/source-app.ts` (modified: expose source-prefix helper for `wait_for_new_turns`'s prefix-match resolution)
+- `src/storage/interface.ts` (modified: add `getByIds(ids[])` method to Storage interface — Codex review P1)
+- `src/storage/sqlite.ts` (modified: implement `getByIds` with `WHERE id IN (?...)`)
+- `src/storage/memory.ts` (modified: implement `getByIds` order-preserving)
 - `src/mcp/server.ts` (or wherever tool registration lives — register the 3 new tools)
+- `src/trace/index.ts` (potentially modified: if find_clusters needs distinct cluster-shape emission separate from recent-work-context's existing skeleton path; depends on how the claimer factors the shared logic)
 - `tests/mcp/find-clusters.test.ts` (NEW)
 - `tests/mcp/get-atoms.test.ts` (NEW)
 - `tests/mcp/wait-for-new-turns.test.ts` (NEW)
 - `tests/mcp/recent-work-context.test.ts` (modified: assert deprecation marker)
-- `tests/mcp/search-memories.test.ts` (modified: assert `truncations` field)
+- `tests/mcp/search-memories.test.ts` (modified: assert `truncations` field including projection markers)
 - `tests/mcp/tail-session.test.ts` (modified: assert `truncations` field)
 - `tests/mcp/envelope-find-get-chain.test.ts` (NEW: realistic-density chain assertion per item 028 precedent)
-- `docs/mcp-integration.md` (modified: document the new tools + migration recipe)
+- `tests/storage/get-by-ids.test.ts` (NEW: order-preservation + IN-clause correctness for both impls)
+- `docs/mcp-integration.md` (modified: document the new tools + migration recipe + source-app prefix-match semantics)
 - `raw/internal/agent-runs/<run-date>-2026-05-09-030-mcp-toolkit-reshape-and-group-session.md` (NEW)
