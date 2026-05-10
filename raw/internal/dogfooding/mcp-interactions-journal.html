@@ -866,7 +866,14 @@ id="toc-pdt-evaluation-cc-turn-14-artifact-worry-robustness-ladder-tail_session-
 </ul></li>
 <li><a href="#dogfooding-day-4-cross-tool-spec-review-iteration"
 id="toc-dogfooding-day-4-cross-tool-spec-review-iteration">2026-05-10 —
-dogfooding day 4 (cross-tool spec review iteration)</a></li>
+dogfooding day 4 (cross-tool spec review iteration)</a>
+<ul>
+<li><a
+href="#pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-call"
+id="toc-pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-call">2026-05-10
+01:30 PDT — [SYNTHESIZED] item 030 AC10c — old vs new resume call shape
+(NOT a real call)</a></li>
+</ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
 Synthesis (filled at end of window)</a></li>
@@ -5198,6 +5205,73 @@ checkbox-closed, head SHA bumped). Founder gates remain:
 <strong>No additional <code>mcp__echo__*</code> calls were made during
 the fixup phase — only direct file reads/edits/tests/git
 operations.</strong></p></li>
+</ul>
+<h3
+id="pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-call">2026-05-10
+01:30 PDT — [SYNTHESIZED] item 030 AC10c — old vs new resume call shape
+(NOT a real call)</h3>
+<ul>
+<li><strong>Trigger:</strong> Item 030 acceptance criterion #10c
+required “one before/after cross-tool dogfooding journal entry showing
+the same resume call old vs new toolkit.” This entry copies the
+synthesized comparison from the run log
+(<code>raw/internal/agent-runs/2026-05-10-2026-05-09-030-mcp-toolkit-reshape-and-group-session.md</code>
+lines 274-294), as the deferred-but-checked closure of AC10c during
+<code>/merge-and-cleanup</code>. <strong><code>[SYNTHESIZED]</code> tag
+is load-bearing:</strong> these are realistic-density fixture
+measurements, NOT outputs of a real founder “where did I leave off”
+call. A real before/after will land in this journal the next time the
+founder runs the new toolkit on a real morning resume. Per the journal’s
+“lossy in-the-moment honesty” preamble, future readers should treat
+synthesized entries as design proof, not field evidence.</li>
+<li><strong>Query inputs (OLD compound, fixture):</strong>
+<code>get_recent_work_context()</code> no-args (which auto-resolves to
+<code>since=now-24h, limit=20, format='minimal'</code> after V1.5.7
+empty-expand polish) on a 15-atom realistic-density fixture.</li>
+<li><strong>Query inputs (NEW chain, same fixture):</strong>
+<ol type="1">
+<li><code>find_clusters(since=now-24h)</code> → cheap discovery, no atom
+bodies</li>
+<li><code>get_atoms(picked.atom_ids, format='minimal')</code> where
+<code>picked</code> is the cluster the consumer judges relevant per the
+migration recipe (NOT blind <code>clusters[0]</code>)</li>
+</ol></li>
+<li><strong>Returned (OLD):</strong> 1 response, <strong>49,285
+chars</strong>. Tool-result budget OVERFLOWS the 25k interactive ceiling
+at minimum-realistic density. Founder cannot read it; AI client cannot
+consume it. Only the <code>format='skeleton'</code> ladder (V1.5.7
+polish) avoids the overflow — at the cost of dropping every atom
+body.</li>
+<li><strong>Returned (NEW):</strong> 2 responses, <strong>22,711 chars
+total</strong> (1,167 + 21,544). Fits the 25k budget with ~9% headroom.
+Each response has <code>truncations: []</code> (verbatim); per-cluster
+<code>atom_ids_truncated: false</code> (small fixture); response-level
+<code>result_caps.truncated: false</code>.</li>
+<li><strong>Sources:</strong> Synthetic fixture; no real capture
+surfaces contributed. Source breakdown is not meaningful for a
+synthesized entry.</li>
+<li><strong>Verdict:</strong> ✅ right (load-bearing acceptance bullet
+of item 030 — “decomposition saves bytes vs compound on the same
+effective payload” — empirically validated). The 54% envelope reduction
+matches the spec’s claim direction.</li>
+<li><strong>Note:</strong> The judgment-between-calls is the actual win
+of decomposition. The OLD compound call materialized every cluster’s
+bodies regardless of which cluster the founder cared about; the NEW
+chain materializes only the bodies for the cluster the founder picked.
+On the synthetic fixture this saves 26.6KB per call. On larger windows
+(24h+ with multiple workstreams), the savings ratio grows because
+un-picked clusters are increasingly off-target. The migration recipe in
+<code>recent-work-context.ts:24-53</code> names this judgment step
+explicitly to prevent consumers from blind-picking
+<code>clusters[0]</code> and losing the win.</li>
+<li><strong>Conjecture (observation-only):</strong> Worth watching
+whether real founder resume calls actually exercise the judgment step or
+default to <code>clusters[0]</code>. If the latter dominates, the
+decomposition’s load-bearing claim degrades to “compound but with worse
+ergonomics.” Item 031 (remove <code>get_recent_work_context</code>)
+should not land until ≥1 week of real founder use confirms the judgment
+step is exercised in practice. Logged here so the item-031 strategist
+conversation has a concrete signal to look for.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
