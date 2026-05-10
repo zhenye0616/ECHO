@@ -34,7 +34,70 @@ agent_notes: |
   Per the Reviewer Independence Rule, this builder is Claude Code (Opus
   4.7) — request review by strategist or another agent (Cursor/Codex)
   before founder merge.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-10 via founder reconciliation. Branch tip at merge: c12617b
+  (round-2 fixup commit, supersedes initial agent push 24cb42b).
+
+  Conflicts resolved:
+  - none — zero text conflicts on merge to current main, as predicted by the
+    review sidecar.
+
+  Fixups applied (pre-merge):
+  - (P1) get_atoms 25k envelope ceiling actually enforced — fixup commit c12617b
+    on agent branch (Cursor + Codex caught; subagent missed).
+  - (P1) FIND_CLUSTERS_RESPONSE_BYTE_CEILING actually enforced + warning surfaced
+    on trim — fixup commit c12617b.
+  - (P2) find_clusters.result_caps.truncated reflects per-cluster atom_ids cap
+    firing — fixup commit c12617b (Codex-only finding).
+  - (AC10c) Synthesized before/after dogfooding journal entry appended to
+    raw/internal/dogfooding/mcp-interactions-journal.md (clearly tagged
+    [SYNTHESIZED] per journal "lossy in-the-moment honesty" discipline) +
+    HTML twin regenerated. Real before/after will land when founder runs the
+    new toolkit on a real morning resume call.
+
+  Fixups deferred to follow-up items:
+  - none (founder picked option-a "yes" on the AC10c fixup during /merge-and-cleanup).
+
+  Verify: 625/625 tests pass (21 skipped); lint and typecheck clean post-merge.
+  Test count moved 622 → 625 vs initial agent push (3 regression tests added in
+  fixup commit c12617b — one per envelope-ceiling bug).
+
+  Round-1 reviewer: code-reviewer subagent (independent of builder Claude Code
+  Opus 4.7); verdict "merge with founder fixups" with one-line journal append
+  as the only fixup. **Round-1 missed all three real envelope-ceiling bugs**
+  that Cursor + Codex caught independently in the post-build review at ~01:00
+  PDT 2026-05-10. Cross-tool review pattern now has TWO independent
+  confirmation cycles (R1 spec review + R2 code review); promote
+  `wiki/operating-model/cross-tool-spec-review.md` from candidate to definite
+  in the post-merge wiki promotion pass.
+
+  Round-2 reviewer: same code-reviewer subagent re-spawned on the fixup diff;
+  verified the worst-case sizing math for get_atoms (subset on continue-path,
+  exact match on rollback-path), confirmed lowest-rank-first deterministic
+  trim for find_clusters with 300-byte warning headroom, and that all three
+  regression tests exercise the previously-buggy paths.
+
+  Cross-tool reviewers: Cursor's Claude (composer c15c2eca-…, ~00:36 PDT) and
+  Codex (session 019e10a5-…, turns 7+8, ~00:55 PDT) — both independently
+  caught the two P1 bugs; Codex alone caught the P2 result_caps mirroring bug.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Profile get_atoms deterministic-drop loop's O(n²) JSON.stringify(tentative)
+    cost on a 50-id large-body fixture; switch to a running-sum byte
+    approximation if profiling shows it dominates wall time.
+  - File item 031 (remove get_recent_work_context) after ≥1 week of real
+    dogfooding confirms the new toolkit covers all resume patterns AND
+    confirms consumers exercise the judgment-between-calls step (NOT blind
+    clusters[0]); deferred per AC10c synthesized-entry conjecture.
+  - Strategist promotes 3 new wiki pages (mcp-find-clusters, mcp-get-atoms,
+    mcp-wait-for-new-turns) + writes wiki/architecture/group-session.md +
+    updates mcp-server.md, mcp-recent-work-context.md, system-architecture.md,
+    backlog/_followups.md per item's "After Completion" §§1–7.
+  - Operating-model note for future builders: when a spec adds a Storage
+    interface method, the claiming agent should preemptively list the
+    wrapper-Storage adapter files (tools/{render,serve,stream}-*.ts) in
+    files_to_modify at claim time to avoid the drift-rule edge case
+    retroactively.
 spec_refs:
   - src/mcp/tools/recent-work-context.ts
   - src/mcp/tools/search-memories.ts
