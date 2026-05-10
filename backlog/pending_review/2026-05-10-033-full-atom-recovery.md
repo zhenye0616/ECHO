@@ -8,10 +8,35 @@ created: 2026-05-10
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-10T23:40:00Z"
 branch: "agent/full-atom-recovery"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--full-atom-recovery"
+head_sha: "a713cac7078494f12d60b552646428079a8c82f0"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented `get_atom(id)` per AC1-AC5 — content verbatim, metadata projected
+  (via reused `projectMatch`), embedding excluded, `"content"` filtered out of
+  truncations after the verbatim override (R2 Finding 1). Three exit shapes:
+  success, `atom_too_large_for_wire` (with `source` populated), `atom_not_found`
+  (distinct error class, short-circuited before projection).
+
+  Tests: 8 unit tests in `tests/mcp/get-atom.test.ts` covering all 6 AC4
+  scenarios + 2 housekeeping. Full suite: 633 passed, 21 skipped, 0 failed.
+  Typecheck + lint clean. Smoke test (`tools/mcp-integration-smoke.sh`) bumped
+  7→8 tools with `get_atom` presence check + live round-trip; verified passing
+  end-to-end against a fresh daemon (smoke selected an atom with content_len
+  4494 + truncations=['metadata.tool_calls:projected'] — verbatim content above
+  the match_content cap with `"content"` correctly absent from truncations).
+
+  Sister test `tests/mcp/tools/recent-work-context.test.ts:146-159` was
+  updated to expect 8 registered tools (it hardcodes the registration list as
+  a defensive assertion; updating it is a direct consequence of registering
+  the new tool). Logged in run notes for reviewer visibility.
+
+  Out-of-scope items honored: did NOT extend `get_atoms` with `full=true`,
+  did NOT touch `WIRE_SHAPE_CAPS`, did NOT refactor `projectMatch`, did NOT
+  add `get_atom` to the `get_recent_work_context` deprecation banner.
+
+  Branch: `agent/full-atom-recovery` at `a713cac7078494f12d60b552646428079a8c82f0`.
+  Run log: `raw/internal/agent-runs/2026-05-10-2026-05-10-033-full-atom-recovery.md`.
 review_notes: ""
 spec_refs:
   - src/mcp/tools/get-atoms.ts  # sibling pattern; same Storage.getByIds backbone
