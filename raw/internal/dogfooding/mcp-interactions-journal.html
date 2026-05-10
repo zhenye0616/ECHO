@@ -873,6 +873,10 @@ href="#pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-ca
 id="toc-pdt-synthesized-item-030-ac10c-old-vs-new-resume-call-shape-not-a-real-call">2026-05-10
 01:30 PDT — [SYNTHESIZED] item 030 AC10c — old vs new resume call shape
 (NOT a real call)</a></li>
+<li><a href="#pdt-first-real-resume-call-on-new-toolkit-post-030-merge"
+id="toc-pdt-first-real-resume-call-on-new-toolkit-post-030-merge">2026-05-10
+13:06 PDT — first real resume call on new toolkit post-030
+merge</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -5272,6 +5276,136 @@ ergonomics.” Item 031 (remove <code>get_recent_work_context</code>)
 should not land until ≥1 week of real founder use confirms the judgment
 step is exercised in practice. Logged here so the item-031 strategist
 conversation has a concrete signal to look for.</li>
+</ul>
+<h3
+id="pdt-first-real-resume-call-on-new-toolkit-post-030-merge">2026-05-10
+13:06 PDT — first real resume call on new toolkit post-030 merge</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said
+<code>use echo understand where we left off</code> after a long break —
+the canonical “where did I leave off” resume pattern. <strong>First
+field use of the new toolkit since item 030 merged earlier today
+(commits <code>e684a29</code> / <code>d996e78</code> /
+<code>a0dbbf7</code>).</strong> The synthesized entry above (01:30 PDT)
+said “a real before/after will land in this journal the next time the
+founder runs the new toolkit on a real morning resume” — this is that
+entry.</li>
+<li><strong>Query inputs (chain of 3 calls):</strong>
+<ol type="1">
+<li><code>find_clusters()</code> no-args → default 4h lookback</li>
+<li><code>find_clusters(since=2026-05-09T20:00:00, until=2026-05-10T20:00:00)</code>
+→ explicit 24h widening after the 4h window only returned this current
+session</li>
+<li><code>get_atoms(atom_ids=[10 ids], format='minimal')</code> → picked
+2 unresolved open-loop atoms + 8 most-recent atoms from the dominant
+cluster</li>
+</ol></li>
+<li><strong>Returned (call 1):</strong> 1 cluster, 2 atoms —
+<code>source_breakdown={claude_code: 2}</code>, label “discussion about
+Project_echo”. Both atoms were from THIS session (the user’s current
+prompt + the <code>find_clusters</code> call itself). Auto-expand did
+NOT fire because the 4h window had ≥1 cluster (just not the right one).
+<strong>Total: ~600 chars.</strong></li>
+<li><strong>Returned (call 2):</strong> 2 clusters, 67 atoms. Cluster 1
+(<code>ctx_b6c048b7</code>, rank 1,
+<code>["has_open_loop", "dense"]</code>): 60 atoms,
+<code>source_breakdown={claude_code: 42, git: 18}</code>, time range
+<code>05:40Z–09:39Z</code> (= ~22:40–02:39 PDT yesterday/today), 12
+open-loop hints (10 resolved, 2 unresolved: <code>2f73ce08</code> +
+<code>7fe38891</code>), label “discussion about Project_echo”. Cluster 2
+(<code>ctx_2c73a98c</code>, rank 2, <code>["dense"]</code>): 7 atoms,
+<code>source_breakdown={codex: 7}</code>, label “discussion about
+echo_wiki”. One warning: <code>[TZ]</code> warning because
+<code>since</code>/<code>until</code> lacked Z suffix (parsed as local
+time — harmless here but flagged). <strong>Total: ~5KB.</strong></li>
+<li><strong>Returned (call 3):</strong> 9 atoms returned in requested
+order;
+<code>atoms_dropped: 1, atoms_dropped_ids: ["d668a23a-9c33-4d02-badc-b301a7551917"]</code>
+— the 10th requested atom was deterministic-prefix-dropped because the
+cumulative envelope would have crossed the 25k ceiling. The 9 returned
+atoms surfaced: the LinkedIn post drafts (atom <code>2f73ce08</code>,
+the most-recent unresolved open loop), the <code>_followups.md</code>
+review (atom <code>7fe38891</code>), three git commit atoms
+(<code>f370089f</code> review-meta commit, <code>e921e3fa</code>
+review-sidecar commit, <code>d9eafd9b</code> journal fixup commit), the
+coordination-layer-defer decision note (atom <code>e7779b5a</code>), and
+the API-cost calculation (atom <code>dc02ab6c</code>). Several atoms had
+<code>truncations: ["content"]</code> (e.g. <code>f370089f</code> elided
+20231 chars of diff; <code>e921e3fa</code> elided 21911 chars of diff).
+<strong>Total response: ~24KB.</strong></li>
+<li><strong>Read sources:</strong> call 1 source_breakdown
+<code>{claude_code: 2}</code>; call 2 source_breakdown across both
+clusters <code>{claude_code: 42, git: 18, codex: 7}</code>; call 3 atoms
+drawn from
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/{6633a842,b1b1ef20,71b36548}.jsonl</code>
+and <code>git:/Users/zhenye/Desktop/Project_echo</code>. Cursor activity
+NOT present in the window (founder did not run Cursor between yesterday
+and now).</li>
+<li><strong>Verdict:</strong> ✅ right — the chain reconstructed the
+full picture: 030 merged with cross-tool fixups, journal/review fixup
+followups committed, conversation pivoted to a LinkedIn draft (the only
+true open loop), and item 031 + wiki promotion are still outstanding.
+Founder confirmed the summary was accurate.</li>
+<li><strong>Note (load-bearing for item 031):</strong> <strong>The
+judgment step was exercised.</strong> I did NOT blind-pick
+<code>clusters[0]</code> from call 2 — I read
+<code>source_breakdown</code> (<code>claude_code: 42, git: 18</code> =
+strategist work + commits) and <code>open_loop_hints</code> (12 hints, 2
+unresolved) before picking, then chose <code>atom_ids</code>
+deliberately (the 2 unresolved hints + 8 most-recent by atom_id
+ordering) rather than passing all 60. This is the first real-world data
+point for the conjecture above (“worth watching whether real founder
+resume calls exercise the judgment step”). Sample size = 1, but signal
+is positive.</li>
+<li><strong>Note (envelope-ceiling hit):</strong>
+<strong><code>get_atoms</code> hit the 25k ceiling on a normal-shaped
+real call</strong>, not a synthetic stress test. 10 atoms requested, 1
+dropped. The drop was the 10th in requested order
+(<code>d668a23a</code>), so I lost an unknown atom — but because I’d
+ordered open-loops first + recent-by-id, the dropped atom was likely a
+mid-cluster filler, not the load-bearing one. The drop was visible
+(<code>atoms_dropped_ids</code> populated), per the contract.
+<strong>This is the first real-world fire of the ceiling that the
+cross-tool review caught at <code>c12617b</code>.</strong> Without that
+fixup, the size check at <code>:201-208</code> would have used the
+tentative empty <code>atoms_dropped_ids: []</code>, and the response
+would have shipped over the 25k ceiling.</li>
+<li><strong>Note (no-args 4h lookback was wrong for this
+trigger):</strong> The first call’s 4h window only contained the current
+session itself. Auto-expand to 24h didn’t fire because the 4h pass
+returned ≥1 cluster (the current session). <strong>For a “where did I
+leave off” resume after a long gap, the no-args path is
+unreliable</strong> — it returns the session that’s calling the tool,
+which is uninformative. I had to widen manually with explicit
+<code>since</code>/<code>until</code>. Conjecture below.</li>
+<li><strong>Note (TZ warning):</strong> The <code>[TZ]</code> warning
+fired because I passed <code>since=2026-05-09T20:00:00</code> (no Z
+suffix). The warning text is clear and actionable. Worked correctly here
+(server parsed as local) but the warning is the right design.</li>
+<li><strong>Conjecture (observation-only, two threads):</strong>
+<ol type="1">
+<li><strong>Auto-expand may need a “non-self cluster” predicate, not
+just “≥1 cluster”.</strong> If the only cluster in the window is the
+current session (or <code>source_breakdown</code> only contains the
+calling AI client’s <code>claude_code</code> atoms from the last few
+minutes), it’s not a useful resume answer. A future tune: auto-expand if
+all returned atoms are within N minutes of <code>now</code> AND from a
+single source. Don’t design here; just an observation for the V1.6
+dogfooding queue.</li>
+<li><strong>For <code>get_atoms</code>, the deterministic-prefix-drop is
+correct, but the consumer-side ergonomics could improve.</strong> I
+happened to order my IDs intentionally (open-loops first), so the drop
+was tolerable. A naive consumer chaining
+<code>get_atoms(picked.atom_ids)</code> directly from
+<code>find_clusters</code> will get atoms in cluster-internal order
+(which is timestamp-ascending, ≈oldest-first), so the drop falls on the
+most-recent atoms — the opposite of what a “where did I leave off”
+caller wants. Consider documenting “reverse atom_ids for resume-style
+queries” in the migration recipe. Backlog material, not designed
+here.</li>
+</ol></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
