@@ -949,6 +949,11 @@ session</a></li>
 id="toc-pdt-strategist-r2-review-synthesis-micro-patch-applied">2026-05-10
 15:42 PDT — Strategist: R2 review synthesis + micro-patch
 applied</a></li>
+<li><a
+href="#pdt-strategist-r3-internal-contradiction-cleanup-applied-both-reviewers-say-proceed-after-fixes"
+id="toc-pdt-strategist-r3-internal-contradiction-cleanup-applied-both-reviewers-say-proceed-after-fixes">2026-05-10
+15:48 PDT — Strategist: R3 internal-contradiction cleanup applied (both
+reviewers say “proceed after fixes”)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -6511,6 +6516,138 @@ real bugs (1 demo-bar regression, 2 spec-correctness regressions).
 Compared to discovering them in a builder run or post-merge dogfooding,
 this is order-of-magnitude cheaper. <strong>R2 should be the default
 expectation after a spec patch, not an exception.</strong></li>
+</ol></li>
+</ul>
+<h3
+id="pdt-strategist-r3-internal-contradiction-cleanup-applied-both-reviewers-say-proceed-after-fixes">2026-05-10
+15:48 PDT — Strategist: R3 internal-contradiction cleanup applied (both
+reviewers say “proceed after fixes”)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said “both cursor and codex pushed
+back again.” Strategist polled both for R3 review of R2-patched
+spec.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=[&lt;codex JSONL&gt;], since='2026-05-10T22:34:06.644Z', timeout=30)</code>
+— returned Codex turn 16 (R3 review, NO content elision this round —
+turn was small enough to fit).</li>
+<li>Direct SQLite probe of Cursor <code>state.vscdb</code> composer
+<code>c15c2eca-...</code> → found new bubble <code>bc0e230e-...</code>
+(2217 chars, “Verdict: Proceed (hygiene only)”).</li>
+</ol></li>
+<li><strong>Returned:</strong> <strong>Codex R3 (turn 16):</strong>
+“Pushback, but small. Two fixes before proceed.” Both findings
+convergent with Cursor. <strong>Cursor R3 (bubble
+<code>bc0e230e</code>):</strong> “Verdict: Proceed (hygiene only — not a
+reason to block). Optionally apply a tiny spec-only edit.” 3 unique
+findings:
+<ul>
+<li><strong>R3-1 (convergent):</strong> Implementation Notes line ~123
+contradicted AC1’s strict-partition rule — still described “override
+<code>recent_activity</code> to false” from R1. Builder reading IN
+literally would have implemented the rejected weaker fix.</li>
+<li><strong>R3-2 (convergent):</strong> AC2 line 81 said
+<code>get_atoms</code> sorts by
+<code>NormalizedContextEvent.time.occurred_at</code> — wrong layer.
+<code>get_atoms</code> operates on <code>CaptureEvent</code> from
+storage; the field is <code>timestamp</code>. Same physical instant,
+different per-layer canonical name.</li>
+<li><strong>R3-3 (Cursor-only):</strong> Implementation Notes line ~125
+said <code>getByIds</code> returns request-order-aligned array with
+<code>null</code> entries for missing IDs. Actual contract:
+<code>getByIds</code> omits missing entirely. <code>get_atoms</code>
+already walks input list separately and pushes missing into
+<code>atoms_dropped_ids</code>.</li>
+</ul></li>
+<li><strong>Read sources:</strong> Codex JSONL <code>019e10a5-...</code>
++ Cursor <code>state.vscdb</code> (composer <code>c15c2eca-...</code>,
+bubble <code>bc0e230e-...</code>) + spec file +
+<code>src/storage/sqlite.ts:~161-183</code> (for R3-3 validation).</li>
+<li><strong>Verdict:</strong> ✅ right — strategist found all 3 R3
+findings, validated them, applied 4 targeted edits (3 fixes + 1
+stale-narrative cleanup in R1 historical section). Both reviewers’
+verdicts say “proceed after fixes”; fixes now landed.
+<code>tools/blocked.py --validate</code> clean.</li>
+<li><strong>Note (load-bearing — sixth cross-tool review cycle, SECOND
+consecutive cycle catching previous-patch regressions):</strong> R2
+caught R1-introduced regressions (fabricated names, wrong “existing
+behavior” claim). R3 caught R2-introduced regressions (Implementation
+Notes left stale when AC1 was updated; AC2 timestamp field crossed layer
+boundaries when fixing the field-name issue). <strong>Pattern is now
+well-attested: strategist patches that touch one section of a spec but
+not the cross-referencing sections of the same spec are a recurring
+failure mode.</strong> Two consecutive patch rounds → two consecutive
+cross-reference-drift bugs. Worth a discipline change.</li>
+<li><strong>Note (no content elision this round on either
+side):</strong> Codex turn 16 was small (~1.5KB) — no
+<code>truncations: ["content"]</code>, just
+<code>metadata.tool_calls:projected</code>. Cursor’s review bubble
+<code>bc0e230e-...</code> was 2217 chars and recoverable via SQLite. The
+M1-3 fire rate appears to scale with review-content length, not
+review-cycle count: dense multi-finding reviews elide; concise “small
+pushback after big patches are right” reviews don’t. Suggests R-rounds
+late in a cycle naturally avoid M1-3 because the surface area for
+findings shrinks.</li>
+<li><strong>Note (strategist self-review checklist proposed in 15:42 PDT
+entry was NOT applied to R2→R3 cycle):</strong> The 15:42 PDT entry
+conjectured a “spec patches should include a spec_refs validation gate”
+as a process change. Strategist did NOT apply that gate to the R2 patch
+before commit. Result: R2 introduced a NEW class of regression
+(cross-reference drift between AC and Implementation Notes within the
+same spec). The proposed checklist (a) every spec_refs path →
+<code>ls</code>; (b) every field name → <code>grep</code>; (c) every
+“existing behavior” claim → <code>grep</code> — would NOT have caught
+the R2→R3 regressions because those weren’t path/field/behavior claims;
+they were narrative descriptions in one section contradicting normative
+rules in another. <strong>The checklist needs a fourth gate:</strong>
+(d) after editing any AC, grep the rest of the spec (Implementation
+Notes, After Completion, R-sections) for stale references to the OLD
+wording. <strong>Adding this to the conjecture set, not yet applying as
+a process change pending founder decision.</strong></li>
+<li><strong>Note (verdict pattern):</strong> Both reviewers using
+“Proceed” or “After fixes: proceed” without major substantive findings
+is the cross-tool-review-converges-to-proceed signal. The spec has now
+gone through R1 (9 findings, major), R2 (3 findings, mixed regressions +
+missed details), R3 (3 findings, all wording-only). The finding curve is
+monotonic-decreasing in severity and count; that’s the pattern that
+suggests the next round would find 0-1 findings (or none). The spec is
+“claim-ready” by the contracted definition both reviewers used.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>Two consecutive patch-cycle regressions establishes a
+class.</strong> R1→R2 was hallucinated names (caught by external
+validation against code). R2→R3 was internal contradictions (caught by
+cross-reading the spec). Both are within-strategist-patch failure modes
+that no single-round review catches. <strong>The cross-tool review
+pattern’s value scales not just with the original spec quality but with
+the patch-cycle count</strong> — each patch round can introduce new
+bugs, and each review round catches them. This makes “merge after R1”
+actively unsafe for non-trivial specs.</li>
+<li><strong>Convergence on “proceed” is the load-bearing
+signal</strong>, not “no findings.” If both reviewers say “proceed
+(after small fixes)” the spec has reached the asymptote. If one says
+“proceed” and one says “pushback,” there’s substantive disagreement
+worth investigating. Today R3 had both saying “proceed” with only
+wording-tier findings — that’s the signal to claim.</li>
+<li><strong>The strategist self-review checklist proposed in the
+previous journal entry was insufficient.</strong> It targeted
+path/field/behavior claims (R1→R2 class) but not narrative-vs-normative
+cross-reference drift (R2→R3 class). Adding gate (d): after editing any
+AC, grep the rest of the spec for stale references to the pre-edit
+wording. Still pending founder approval to enshrine as process.</li>
+<li><strong>6 cross-tool review cycles today.</strong> R1 spec (Codex
+pushback), R1 spec review (Cursor + Codex), R2 (Cursor + Codex), R3
+(Cursor + Codex). Plus the prior 030 cycles (R1 spec ×3, R1 code
+review). Total: ~10 cross-tool review rounds across two specs today.
+<strong>Cross-tool review is the dominant process motif of the
+day</strong> — not the coding, not the building. That’s a real signal
+about what the substrate is enabling vs. what was originally planned
+(V1.6 was “ship 030 + dogfood”; observed is “ship 030 + dogfood the
+cross-tool review pattern itself”). Worth a wiki promotion target:
+<code>wiki/operating-model/cross-tool-spec-review.md</code> is now
+over-determined.</li>
 </ol></li>
 </ul>
 <hr />
