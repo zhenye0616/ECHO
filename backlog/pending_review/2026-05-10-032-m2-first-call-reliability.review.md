@@ -1,10 +1,11 @@
 ---
 item_id: 2026-05-10-032-m2-first-call-reliability
-verdict: merge as-is
+verdict: merge with founder fixups   # superseded from "merge as-is" after Codex cross-tool review found 2 AC3 description-drift violations
 reviewed_at: 2026-05-10T22:55:00Z
+post_codex_review_at: 2026-05-10T23:14:00Z
 test_counts: { passed: 644, failed: 0, skipped: 21 }
 worktree_head_verified: a16779ed368fea90f1ce19372b818cf9b9f6d239
-reviewer: code-reviewer subagent (independent of builder, ID 78D5AB0F-A8A3-4F01-BC2E-EB05961B2405)
+reviewer: code-reviewer subagent (initial verdict merge-as-is) + Codex (GPT-5.5, post-build cross-tool review) for AC3 description-drift catch
 ---
 
 ## Verdict
@@ -15,7 +16,19 @@ Implementation is faithful to the post-R3 spec across all four ACs. Worktree HEA
 
 ## Pre-merge fixups
 
-*None required.* Verdict is `merge as-is`.
+**Two AC3 description-drift fixes required before merge** (caught by Codex post-build review at 2026-05-10 16:14 PDT; strategist validated against worktree code at `a16779e`):
+
+- [ ] **(Medium) Patch `src/mcp/tools/recent-work-context.ts`** — both stale auto-expand-on-empty claims need to mention the new single-source-recent trigger + demotion.
+  - **Line 33-35** (migration recipe inside the deprecation marker): `"4h default, auto-expand to 24h if empty."` → e.g. `"4h default, auto-expands to 24h if the 4h pass returns 0 clusters OR only single-source-recent clusters (the calling session's own activity from the last 5 minutes); in the single-source-recent case, that noise cluster is demoted so prior multi-source work surfaces at clusters[0]."`
+  - **Line 95-99** (NO-ARGS RESUME paragraph in `RECENT_WORK_CONTEXT_DESCRIPTION`): same edit — replace `"auto-expands to 24h on a single retry if the 4h pass returns 0 clusters"` with `"auto-expands to 24h on a single retry if the 4h pass returns 0 clusters OR only single-source-recent clusters (the calling session's own ≤5-min activity), and demotes single-source-recent clusters below prior multi-source work in the 24h pass."`
+  - **Rationale:** `RECENT_WORK_CONTEXT_DESCRIPTION` is surfaced through MCP `tools/list` and is what consumer AI clients read. Two paragraphs say "expand on empty only"; one new paragraph at lines 50-58 says "expand on empty OR single-source-recent." A consumer reading the description gets contradictory contracts depending on which paragraph they parse first. AC3 ("Update user-facing description strings in lockstep with behavior") requires the stale paragraphs to be updated, not just additive.
+
+- [ ] **(Medium/Low) Patch `src/mcp/tools/get-atoms.ts`** — the generic DROP RULE paragraph and its mirror type comment still assert requested-order under all `prefer` modes.
+  - **Line 48** (DROP RULE paragraph in `GET_ATOMS_DESCRIPTION`): `"Atoms are appended in REQUESTED ORDER until the next atom would push the envelope over the ceiling… atoms_dropped_ids: string[] carry the omitted IDs in requested order."` → e.g. `"Atoms are appended in PROCESS ORDER (= requested order under prefer='as_requested'; = newest-first-then-missing under prefer='newest_first') until the next atom would push the envelope over the ceiling; that atom AND every remaining ID are dropped. atoms_dropped_ids carries the omitted IDs in that same process order."`
+  - **Line 89-90** (`GetAtomsResult.atoms_dropped_ids` doc comment): `"Requested IDs that didn't make it into atoms[], in requested order."` → e.g. `"Requested IDs that didn't make it into atoms[], in the iteration order used by the prefer mode (requested order under 'as_requested'; processed/newest-first order under 'newest_first'). Includes both missing IDs (not in storage) and budget-dropped IDs."`
+  - **Rationale:** The `prefer` bullet at line 44 correctly describes the new opt-in newest-first semantics, but the generic DROP RULE paragraph at line 48 contradicts it for callers using `newest_first`. Same AC3 lock-step violation as Finding 1. Type-comment at line 89-90 is internal-facing but tracks the description contract — patching both keeps the public contract and the type-doc honest.
+
+**Note on test coverage:** No test changes needed for these fixups. The existing test at `tests/mcp/get-atoms.test.ts:266-340` already exercises `newest_first` + dropped-IDs ordering; the description string is documentation, not behavior. Verify the patches via `npm run typecheck` + `npm test` post-edit.
 
 ## Expected merge conflicts
 
@@ -23,7 +36,9 @@ Implementation is faithful to the post-R3 spec across all four ACs. Worktree HEA
 
 ## Follow-up items (defer, do not block merge)
 
-- **Cross-tool post-build code review for item 032 (parallel to 030 pattern).** Ask Cursor's Claude + Codex to independently review the merged `a16779e` implementation against the spec; pattern's seventh confirmation cycle on whether single-tool implementation review misses things multi-tool spec review caught. Particular angles to ask them: (a) does the `noUsefulCluster` predicate handle 0-source `source_breakdown` correctly; (b) does the strict-partition primary key in `rank.ts` interact correctly with the existing `cluster_id` tiebreaker; (c) does the `as_requested` early-return in `get_atoms.ts:170-172` actually preserve dup-returns-dup semantics when the input has duplicates straddling missing IDs.
+- **Cross-tool post-build code review for item 032 (parallel to 030 pattern).** ✅ COMPLETED — Codex ran the review at 2026-05-10 16:14 PDT and caught 2 AC3 description-drift findings the Claude code-reviewer subagent missed (see "Pre-merge fixups" section above). Pattern's 7th confirmation cycle; 2nd implementation-review cycle where Codex post-build catches AC-class issues single-tool review missed. Optional remaining: ask Cursor for a third pass on the angles {(a) `noUsefulCluster` 0-source-breakdown handling, (b) strict-partition × existing `cluster_id` tiebreaker interaction, (c) `as_requested` early-return × duplicates straddling missing IDs} — Codex verified (a) explicitly; (b) and (c) remain single-tool-reviewed.
+
+- **Codify "AC3 ⇒ multi-tool implementation review required" in operating model.** Item 030 round-1 + item 032 round-1 both had single-tool Claude code-reviewer say `merge as-is` / `merge with founder fixups (only journal append)`; both had Codex/Cursor follow-up promote the verdict to add real fixups. Pattern is now stable enough across 2 items + 7 cycles to warrant a written rule rather than per-item judgment. Strategist task in the post-merge wiki pass: update `wiki/operating-model/cross-tool-spec-review.md` (or its successor; see 030's promote-from-candidate followup) to explicitly call out the AC3-class trigger.
 - **Strictness on `rank.ts` `demote=true` + `nowMs=undefined`** — currently silently no-ops. Consider `throw` for stricter contract. Non-blocker; only in-tree caller passes `nowMs` correctly.
 - **Strategist+founder dogfooding verification (After Completion §1 of spec).** Run the 2026-05-10 13:06 PDT chain again post-merge: no-args `find_clusters()` after a multi-hour gap. Log to `raw/internal/dogfooding/mcp-interactions-journal.md` whether `[AUTO_EXPAND] single-source-recent` fired, whether `clusters[0]` is prior work (not calling-session noise), and whether the newest atom landed in `get_atoms(prefer='newest_first')` response. This closes the empirical loop on the M2-1/M2-2 friction that motivated the item.
 - **Strategist wiki promotion for 032 (After Completion §2-§5 of spec).** Update `wiki/surfaces/mcp-find-clusters.md` (auto-expand triggers + demotion), `wiki/surfaces/mcp-get-atoms.md` (resume-call usage + missing-ID position), `wiki/architecture/group-session.md` (note first-call reliability gate closed for resume-after-gap), and move M2-1/M2-2 from `_followups.md` "biting" to a "Resolved" subsection with this item's merge SHA + dogfooding entry timestamp. Do this only after merge lands in `complete/`. **Predecessor dependency:** wiki/surfaces/mcp-find-clusters.md and wiki/surfaces/mcp-get-atoms.md don't exist yet — they were specced as 030's "After Completion" wiki promotion which is also pending. 032's promotion should happen after 030's promotion OR fold the 032 sections into the 030-promoted pages in a single pass.
@@ -31,30 +46,22 @@ Implementation is faithful to the post-R3 spec across all four ACs. Worktree HEA
 
 ## Open questions for founder
 
-*None.* Verdict is `merge as-is`; no design decisions blocking merge.
+*None.* Verdict is now `merge with founder fixups` (superseded from `merge as-is`); the two fixups are mechanical description-string edits, no design decisions blocking merge. Founder choice during `/merge-and-cleanup 032` C4: apply both as `yes` (recommended — AC3 is a load-bearing acceptance bullet), or `defer-as-followup` if you want to ship behavior now and patch descriptions in a fast-follow item.
 
-## Codex Cross-Tool Review — 2026-05-10 16:18 PDT
+## Strategist synthesis of Codex review (2026-05-10 23:14 PDT)
 
-### Verdict
+Both Codex findings validated against worktree code at `a16779e`:
 
-Small pre-merge fixup recommended, not a runtime rework. The implementation behavior matches AC1/AC2 in the load-bearing paths and the full suite passes when loopback binding is allowed, but AC3's "description strings in lockstep" is not fully closed.
+- **Finding 1 (recent-work-context.ts):** Confirmed. Lines 33-35 and 95-99 both still describe the empty-only auto-expand; lines 50-58 add the new behavior in a separate "RESUME-STYLE QUERIES (item 032)" block. The two views co-exist in the SAME `RECENT_WORK_CONTEXT_DESCRIPTION` string — an AI client reading the migration recipe (lines 26-48) gets the OLD contract; one reading the new resume-style block gets the NEW contract. AC3's "lock-step" requirement is violated.
 
-### Finding
+- **Finding 2 (get-atoms.ts):** Confirmed. Line 41 says "by default" (correct qualifier), line 44 describes `prefer` correctly, but line 48 (DROP RULE) and lines 89-90 (type comment) both still assert "requested order" without the prefer-mode qualifier. Under `newest_first`, processed order is timestamp-DESC + missing-suffix, and `atoms_dropped_ids` follows that processed order. Stale claim.
 
-- **P2 — `get_atoms` generic drop-rule docs still describe requested-order drops under all modes.** `src/mcp/tools/get-atoms.ts` correctly processes `prefer="newest_first"` in post-sort order and returns `atoms_dropped_ids` in that process order, but the user-facing `GET_ATOMS_DESCRIPTION` drop-rule paragraph still says atoms are appended in requested order and dropped IDs are carried "in requested order"; `GetAtomsResult.atoms_dropped_ids` has the same stale comment. That contradicts AC2's returned-order contract for `newest_first` and can mislead MCP clients reading tool descriptions. Fix: qualify the generic paragraph/comment as "process order" and define process order as requested order by default, newest-first order when `prefer="newest_first"`.
+**Pattern observation (load-bearing — 7th confirmation):** This is the **seventh independent confirmation cycle** of the cross-tool-review-finds-things-single-tool-misses pattern, and the **second time a single-tool Claude code-reviewer's `merge as-is` was promoted to `merge with founder fixups` by a Codex/Cursor follow-up** (first was item 030 round-1 + envelope-ceiling bugs). The pattern hypothesis from item 032's R3 process-change note now has explicit evidence on the IMPLEMENTATION-review side (not just spec-review): single-tool implementation review reliably misses AC3 description-drift class issues even when behavior tests pass. Worth queueing as a follow-up: codify "AC3 ⇒ multi-tool implementation review required" in the operating model.
 
-### Non-blocking note
-
-- `RECENT_WORK_CONTEXT_DEPRECATION_MARKER` and `RECENT_WORK_CONTEXT_DESCRIPTION` still contain old shorthand saying no-args auto-expand retries when the 4h pass is empty. The newer resume-style block documents the single-source-recent trigger, so this is less risky than the `get_atoms` contradiction, but it is another AC3 cleanup candidate while editing docs.
-
-### Verification
-
-- `npm test` in the default sandbox failed only on MCP wire tests with `listen EPERM: operation not permitted 127.0.0.1`.
-- `npm test` rerun with loopback binding allowed: 644 passed, 21 skipped.
-- `npm run lint`: clean.
-- `npm run typecheck`: clean.
-
----
+**Verified by Codex (non-findings, independently confirmed):**
+- `noUsefulCluster` correctly treats 0-source clusters as not single-source-recent (predicate does not trigger noise-only expand on degenerate input).
+- `rank.ts` strict partition is a real primary key BEFORE the existing hint/open-loop/recent/size/age chain and preserves old behavior when `demoteSingleSourceRecent=false`.
+- Full suite: 644 passed / 21 skipped, lint clean, typecheck clean (Codex reran outside sandbox after a loopback-binding EPERM hit the MCP wire tests; matches initial Claude reviewer's numbers exactly).
 
 ## Codex Cross-Tool Review (2026-05-10 16:14 PDT)
 
