@@ -45,7 +45,7 @@ export const GET_ATOMS_DESCRIPTION =
   // truncations
   'TRUST SIGNAL — `truncations: string[]` is on EVERY returned atom. `[]` ⟺ everything verbatim. `["content"]` ⟺ content was clipped to the wire-shape cap. `["metadata.<key>"]` ⟺ per-key cap fired (LOSSY — opaqued out). `["metadata.<key>:projected"]` ⟺ projector reshaped (REFORMATTED, not clipped — e.g. tool_calls → trajectory). `["fields_omitted"]` ⟺ caller passed `fields[]` excluding some.\n\n' +
   // drop rule
-  'DROP RULE — when the response would exceed 25k chars: deterministic prefix-drop. Atoms are appended in REQUESTED ORDER until the next atom would push the envelope over the ceiling; that atom AND every remaining requested ID are dropped (NOT a hole in the middle). `atoms_dropped: N` + `atoms_dropped_ids: string[]` carry the omitted IDs in requested order. Missing IDs (not in storage) are also reported in `atoms_dropped_ids`.\n\n' +
+  'DROP RULE — when the response would exceed 25k chars: deterministic prefix-drop. Atoms are appended in PROCESS ORDER (= requested order under `prefer="as_requested"` (default); = newest-first-then-missing under `prefer="newest_first"`) until the next atom would push the envelope over the ceiling; that atom AND every remaining ID in process order are dropped (NOT a hole in the middle). `atoms_dropped: N` + `atoms_dropped_ids: string[]` carry the omitted IDs in that same process order. Missing IDs (not in storage) are also reported in `atoms_dropped_ids`; under `prefer="newest_first"` they sort to the END of the process order so they are dropped first when the budget tightens.\n\n' +
   // when-too-big
   'If even a single projected atom alone would exceed 25k, the response is `{atoms: [], atoms_dropped: input_count, atoms_dropped_ids: [all]}` plus a warning telling the caller to retry with a narrower `fields[]` projection. We do NOT raise WIRE_SHAPE_CAPS to make this pass.';
 
@@ -86,8 +86,10 @@ export interface GetAtomsResult {
   tool: 'get_atoms';
   atoms: GetAtomsAtom[];
   atoms_dropped: number;
-  /** Requested IDs that didn't make it into `atoms[]`, in requested order.
-   *  Includes both missing IDs (not in storage) and budget-dropped IDs. */
+  /** Requested IDs that didn't make it into `atoms[]`, in the iteration order
+   *  used by the caller's `prefer` mode (requested order under "as_requested";
+   *  processed/newest-first order under "newest_first"). Includes both missing
+   *  IDs (not in storage) and budget-dropped IDs. */
   atoms_dropped_ids: string[];
   warnings: string[];
 }

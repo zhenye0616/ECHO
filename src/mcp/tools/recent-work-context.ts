@@ -32,7 +32,11 @@ export const RECENT_WORK_CONTEXT_DEPRECATION_MARKER =
   '\n' +
   '  NEW: c = find_clusters(since=now-24h)        // explicit 24h lookback\n' +
   "       // (omit since= to get find_clusters' V1.5.7-equivalent no-args\n" +
-  '       // semantics: 4h default, auto-expand to 24h if empty.)\n' +
+  '       // semantics: 4h default, auto-expand to 24h if the 4h pass\n' +
+  '       // returns 0 clusters OR only single-source-recent clusters (the\n' +
+  "       // calling session's own ≤5-min activity); in the single-source-\n" +
+  '       // recent case, the noise cluster is demoted in rank so prior\n' +
+  '       // multi-source work surfaces at clusters[0].)\n' +
   '       //\n' +
   '       // Inspect c.clusters[]: each has rank, label, source_breakdown,\n' +
   '       // time_range, atom_ids[]. Pick the cluster matching your intent\n' +
@@ -94,9 +98,15 @@ export const RECENT_WORK_CONTEXT_DESCRIPTION =
   'timezone (`Z` for UTC or `+HH:MM` offset); naive ISO strings are parsed as local ' +
   'server time, which is rarely what an AI client intends. NO-ARGS RESUME: when ' +
   'called with neither `since` nor `until`, the default 4h window auto-expands to ' +
-  '24h on a single retry if the 4h pass returns 0 clusters — covers "where did I ' +
-  'leave off after a quiet stretch" without forcing the caller to pre-pick a span. ' +
-  'Auto-expand fires a `[AUTO_EXPAND]`-prefixed warning so the implicit widen is visible.';
+  '24h on a single retry if the 4h pass returns 0 clusters OR only single-source-' +
+  "recent clusters (the calling session's own ≤5-min activity) — covers \"where " +
+  'did I leave off after a quiet stretch" or "the calling session\'s own noise is ' +
+  'the only thing in 4h" without forcing the caller to pre-pick a span. When the ' +
+  'single-source-recent trigger fires AND prior multi-source work exists in 24h, ' +
+  'the noise cluster is demoted below the prior work via a strict-partition rank ' +
+  'rule so clusters[0] is the resume target, not the calling session. Auto-expand ' +
+  'fires a `[AUTO_EXPAND]`-prefixed warning (`empty` or `single-source-recent` ' +
+  'trigger) so the implicit widen is visible.';
 
 // Cost-safer defaults (item 025): every retrieval today blew the consumer's
 // 25k-char tool-result budget on first try (dogfooding 2026-05-08 entries

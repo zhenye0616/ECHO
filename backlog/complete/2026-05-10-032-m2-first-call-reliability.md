@@ -42,12 +42,73 @@ agent_notes: |
   No drift events caught; no founder-input blockers; no scope expansion.
   Branch agent/m2-first-call-reliability pushed at SHA a16779ed.
 review_notes: |
-  Codex cross-tool post-build review (2026-05-10 16:14 PDT): fix AC3
-  description drift before merge. Runtime behavior looks correct and tests pass,
-  but `RECENT_WORK_CONTEXT_DESCRIPTION` still advertises empty-only no-args
-  auto-expand in two places, and `GET_ATOMS_DESCRIPTION` / result comments still
-  describe dropped-ID order as requested order even when `prefer="newest_first"`
-  uses processed order. See sidecar for full findings and verification.
+  Merged on 2026-05-10 via founder reconciliation. Branch tip at merge: a16779e.
+
+  Conflicts resolved:
+  - none — zero text conflicts on merge to current main, as predicted by the
+    review sidecar. (One transient pre-merge dirty-tree blocker: a 033 claim
+    landed on main from a parallel process between pre-flight pull and merge
+    attempt; resolved by syncing main and re-running the merge.)
+
+  Fixups applied (pre-merge, both per Codex post-build review 2026-05-10 16:14 PDT):
+  - (AC3 — Medium) src/mcp/tools/recent-work-context.ts:33-35 + :95-99 —
+    updated both stale "auto-expand to 24h if empty" paragraphs to mention the
+    new single-source-recent trigger AND the strict-partition rank demotion.
+    `RECENT_WORK_CONTEXT_DESCRIPTION` is surfaced through MCP tools/list, so
+    AC3 lock-step required it.
+  - (AC3 — Medium/Low) src/mcp/tools/get-atoms.ts:48 (DROP RULE) + :89-90 (type
+    comment on GetAtomsResult.atoms_dropped_ids) — qualified the "requested
+    order" claim by `prefer` mode. Under `prefer="newest_first"`, process
+    order is timestamp-DESC + missing-suffix, and `atoms_dropped_ids` follows
+    that processed order; the description and type comment now both reflect
+    that asymmetry.
+
+  Fixups deferred to follow-up items:
+  - none (founder approved both fixups during /merge-and-cleanup C4).
+
+  Verify: 644/644 tests pass (21 skipped); lint and typecheck clean post-merge.
+  Test count unchanged 644 → 644 vs initial agent push (description-string
+  edits don't affect behavior tests).
+
+  Round-1 reviewer: code-reviewer subagent (independent of builder, agent ID
+  78D5AB0F-A8A3-4F01-BC2E-EB05961B2405); initial verdict was "merge as-is"
+  with all 4 ACs marked Met. The subagent verified the load-bearing R2/R3
+  trap doors (strict-partition demotion + dup-collapse asymmetry + per-layer
+  canonical timestamp field discipline) but missed the AC3 description-drift
+  in two paragraphs of the deprecated-tool description string and one
+  paragraph + one type comment in get_atoms.
+
+  Round-2 reviewer: Codex (GPT-5.5) ran an independent post-build cross-tool
+  review at 16:14 PDT and caught both AC3 violations; verdict superseded to
+  "merge with founder fixups." Strategist validated both findings against
+  worktree code at a16779e before applying.
+
+  Pattern observation (7th confirmation cycle): cross-tool review pattern's
+  2nd implementation-review cycle where Codex/Cursor post-build catches AC-
+  class issues single-tool Claude code-reviewer missed (first was item 030
+  round-1 + envelope-ceiling bugs). Adding a "AC3 ⇒ multi-tool implementation
+  review required" rule to the operating model is queued as a follow-up.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Strategist+founder dogfooding verification: rerun the 2026-05-10 13:06 PDT
+    chain post-merge and confirm [AUTO_EXPAND] single-source-recent fires +
+    clusters[0] is prior work + newest atom survives get_atoms(prefer='newest_first').
+  - Stricter contract on rank.ts demote=true + nowMs=undefined (currently
+    silent no-op; consider throw).
+  - Strategist wiki promotion for 032 (mcp-find-clusters.md auto-expand
+    section, mcp-get-atoms.md resume-call usage, group-session.md first-call
+    reliability gate closed, _followups.md "Resolved" move). Note dependency
+    on 030's wiki promotion (also pending) — fold 032 into 030's pages in a
+    single strategist pass if not yet done.
+  - Re-evaluate item 031 (get_recent_work_context removal) readiness after
+    ≥1 week of post-merge dogfooding entries; both 030's judgment-step gate
+    AND 032's first-call-reliability gate now have shipped fixes.
+  - Operating-model rule: "AC3 ⇒ multi-tool implementation review required."
+    Codify in wiki/operating-model/cross-tool-spec-review.md (or its
+    successor; 030's promote-from-candidate followup owns the page).
+  - Optional Cursor third pass on (a) strict-partition × cluster_id
+    tiebreaker, (b) as_requested early-return × duplicates straddling missing
+    IDs (Codex verified (c) noUsefulCluster 0-source explicitly).
 spec_refs:
   - src/mcp/tools/find-clusters.ts
   - src/mcp/tools/recent-work-context.ts
