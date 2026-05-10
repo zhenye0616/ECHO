@@ -882,6 +882,31 @@ href="#pdt-jsonl-fallback-evidence-sweep-during-m1m2-friction-revisit"
 id="toc-pdt-jsonl-fallback-evidence-sweep-during-m1m2-friction-revisit">2026-05-10
 13:30 PDT — JSONL-fallback-evidence sweep during M1/M2 friction
 revisit</a></li>
+<li><a
+href="#pdt-cursor-claude-tail-strategist-cc-session-group-session-primitive-availability"
+id="toc-pdt-cursor-claude-tail-strategist-cc-session-group-session-primitive-availability">2026-05-10
+14:20 PDT — Cursor Claude: tail strategist CC session; group-session
+primitive availability</a></li>
+<li><a
+href="#pdt-codex-connect-to-claude-strategist-via-wait_for_new_turns"
+id="toc-pdt-codex-connect-to-claude-strategist-via-wait_for_new_turns">2026-05-10
+14:46 PDT — Codex: connect to Claude strategist via
+<code>wait_for_new_turns</code></a></li>
+<li><a
+href="#pdt-codex-check-for-claude-strategist-reply-after-reviewer-pushback"
+id="toc-pdt-codex-check-for-claude-strategist-reply-after-reviewer-pushback">2026-05-10
+14:53 PDT — Codex: check for Claude strategist reply after reviewer
+pushback</a></li>
+<li><a
+href="#pdt-cursor-claude-reconstruct-codex-group-session-mcp-chain"
+id="toc-pdt-cursor-claude-reconstruct-codex-group-session-mcp-chain">2026-05-09
+17:45 PDT — Cursor Claude: reconstruct Codex group-session MCP
+chain</a></li>
+<li><a
+href="#pdt-strategist-receives-codex-pushback-via-group-session-m1-3-fires-in-real-time"
+id="toc-pdt-strategist-receives-codex-pushback-via-group-session-m1-3-fires-in-real-time">2026-05-10
+14:55 PDT — Strategist: receives Codex pushback via group session; M1-3
+fires in real time</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -5490,6 +5515,304 @@ quarantining as M1-3 and revisiting after the cheaper M1 wins.</li>
 <li>Of the four, M1-1 (Cursor source_breakdown via item 029) is the only
 one already specced. The other three are net-new V1.6 candidates
 surfaced by the M1/M2 friction revisit.</li>
+</ol></li>
+</ul>
+<h3
+id="pdt-cursor-claude-tail-strategist-cc-session-group-session-primitive-availability">2026-05-10
+14:20 PDT — Cursor Claude: tail strategist CC session; group-session
+primitive availability</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder asked to use Echo to
+<strong>activate group session</strong> and <strong>connect to the
+Claude strategist session</strong>.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=5)</code></li>
+<li><strong>Returned:</strong> 5 turns (newest first). Latest USER
+~coordination hold / multi-agent template filing; prior turns ~reusable
+dev template + product thesis, ~four-role pattern (strategist CC
+<code>71b36548</code>, Cursor composer <code>c15c2eca</code>, Codex
+<code>019e10a5</code>, implementer CC), ~coordination-layer defer note
+(<code>85172e2</code>) + journal race framing.
+<strong><code>truncations</code></strong> present on turns
+(<code>["metadata.tool_calls:projected"]</code>,
+<code>["content"]</code> with <code>bytes_elided</code>) — confirms
+<strong>030-style wire</strong> on live daemon for this call path.</li>
+<li><strong>Read sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>
+<strong>only</strong> (explicit <code>source=</code> — avoids MRU
+picking a different CC window).</li>
+<li><strong>Verdict:</strong> ✅ right for <strong>pin strategist
+thread</strong> — Echo returned the correct JSONL and usable previews +
+trust signals.</li>
+<li><strong>Note (group session):</strong> Echo has <strong>no
+server-side “activate link”</strong> — connection is <strong>always
+per-call</strong>. <strong><code>wait_for_new_turns</code></strong> (030
+group-session A primitive: prefix <code>sources[]</code>, strict-after
+<code>since</code>, stateless long-poll + polling fallback in tool
+description) is <strong>not</strong> exposed in this Cursor session’s
+MCP descriptor folder snapshot (<code>echo_ping</code>,
+<code>search_memories</code>, <code>tail_session</code>,
+<code>get_recent_work_context</code> only) — if merged daemon exposes
+it, <strong>restart MCP client / refresh tools</strong> so
+<code>wait_for_new_turns</code> appears. Until then: <strong>repeat
+<code>tail_session(source=&lt;strategist jsonl&gt;)</code></strong> or
+<strong><code>find_clusters</code> + pick cluster by
+<code>source_breakdown</code></strong> for cross-source awareness; for
+<strong>wake-on-new</strong> without long-poll, use the <strong>polling
+loop</strong> from the 030 spec (sleep +
+<code>find_clusters(since=last_ts)</code>).</li>
+<li><strong>Conjecture (observation-only):</strong> founder workflow
+“group session” may mean <strong>pinned explicit <code>source=</code>
+tails for strategist + Cursor composer paths</strong> in agent prompts
+until <code>wait_for_new_turns</code> shows up in the registry.</li>
+</ul>
+<h3
+id="pdt-codex-connect-to-claude-strategist-via-wait_for_new_turns">2026-05-10
+14:46 PDT — Codex: connect to Claude strategist via
+<code>wait_for_new_turns</code></h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder asked Codex to “use echo and
+activate group session connect to the claude strategist session.” Goal
+was to test the newly merged 030 group-session primitive from Codex, not
+by reading Claude JSONL directly.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>initialize()</code> against
+<code>http://127.0.0.1:38478/mcp</code> — connectivity/protocol
+check.</li>
+<li><code>tools/list</code> — confirm daemon exposes 030 tools.</li>
+<li><code>tail_session(source_app="claude_code", count=8)</code> — first
+attempt to identify the active Claude Code lane.</li>
+<li><code>search_memories(source_app="claude_code", query="strategist", limit=10)</code>
+— find the actual strategist session after MRU was unrelated.</li>
+<li><code>search_memories(source_app="claude_code", query="030", limit=10)</code>
+— corroborate relevant ECHO/030 strategist context.</li>
+<li><code>search_memories(source_app="claude_code", query="Project_echo", limit=10)</code>
+— confirm Project_echo Claude sessions and candidate sources.</li>
+<li><code>wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T21:39:48.065Z", timeout=30)</code>
+— exact-source long-poll against the strategist session.</li>
+</ol></li>
+<li><strong>Returned:</strong> <code>tools/list</code> advertised all 7
+tools, including <code>find_clusters</code>, <code>get_atoms</code>, and
+<code>wait_for_new_turns</code>.
+<code>tail_session(source_app="claude_code")</code> returned 2 turns
+from an unrelated MRU Claude Code session for
+<code>isr-demo-mohsen</code>, proving MRU app resolution is not
+sufficient for “connect to strategist.” Search calls found the current
+Project_echo strategist source
+<code>e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>; top
+<code>strategist</code>/<code>030</code> hits showed the Magic Moments /
+M1-M2 friction revisit, item 030 merge state, and prior merge/review
+context. The <code>wait_for_new_turns</code> call returned immediately
+(<code>timed_out=false</code>) with 1 new turn: atom
+<code>2874a806-1206-4662-9700-2e1e90eb0328</code> at
+<code>2026-05-10T21:42:58.348Z</code>,
+<code>next_since="2026-05-10T21:47:00.370Z"</code>.</li>
+<li><strong>Read sources:</strong> exact strategist source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>;
+initial MRU tail read unrelated
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/bdb0905b-dd84-4f81-a50d-4030a00e54c5.jsonl</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — Codex connected through Echo to
+the live Claude strategist session without direct JSONL reads. The
+returned strategist turn contained the founder’s confirmation: Magic
+Moments adopted, token-count JSONL fallback dropped from friction,
+remaining JSONL fallback patterns kept, M1/M2 friction queue finalized,
+recommendation “Ladder A first, dogfood for 2 weeks, then decide on
+B.”</li>
+<li><strong>Note:</strong> This is the cleanest post-030 group-session
+result so far. Exact-source <code>wait_for_new_turns</code> worked as
+intended and avoided the MRU-source ambiguity that
+<code>tail_session(source_app="claude_code")</code> exposed. The
+workflow is still stateless: the caller must chain by passing
+<code>next_since</code> into the next <code>wait_for_new_turns</code>
+call; there is no durable server-side subscription.</li>
+<li><strong>Conjecture:</strong> Group-session clients should maintain a
+pinned source list once they identify collaborator sessions.
+<code>source_app</code> prefix matching is useful for “any Claude Code
+wrote something,” but exact sources are safer for “connect to this
+strategist session.”</li>
+</ul>
+<h3
+id="pdt-codex-check-for-claude-strategist-reply-after-reviewer-pushback">2026-05-10
+14:53 PDT — Codex: check for Claude strategist reply after reviewer
+pushback</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder asked “check claude reply” after
+Codex reviewed Claude’s Ladder A/B recommendation and pushed back on
+sequencing.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T21:47:00.370Z", timeout=10)</code></li>
+<li><code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl", count=2)</code>
+for sanity-check after timeout.</li>
+</ol></li>
+<li><strong>Returned:</strong> <code>wait_for_new_turns</code> returned
+<code>turns=[]</code>, <code>timed_out=true</code>,
+<code>next_since="2026-05-10T21:53:42.395Z"</code>. The exact
+<code>tail_session</code> returned the same two latest strategist turns
+as before; newest remains atom
+<code>2874a806-1206-4662-9700-2e1e90eb0328</code> at
+<code>2026-05-10T21:42:58.348Z</code> with Claude’s Ladder A
+recommendation. No reply to Codex’s pushback was visible yet.</li>
+<li><strong>Read sources:</strong> exact strategist source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO correctly reported no
+newer strategist turn after the pinned <code>next_since</code>, and tail
+confirmed the latest visible Claude response is unchanged.</li>
+<li><strong>Note:</strong> This validates the stateless polling loop
+ergonomics: after one group-session read, the caller can pass the
+returned <code>next_since</code> to cheaply check for updates without
+re-reading the whole thread.</li>
+<li><strong>Conjecture:</strong> A thin client wrapper should store
+<code>(source, next_since)</code> per linked session so “check Claude”
+becomes one call instead of requiring the human/agent to remember
+timestamps.</li>
+</ul>
+<h3
+id="pdt-cursor-claude-reconstruct-codex-group-session-mcp-chain">2026-05-09
+17:45 PDT — Cursor Claude: reconstruct Codex group-session MCP
+chain</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> founder asked how Codex connected to the
+Claude strategist session via “group session,” emphasizing it is a
+<strong>combination of MCP calls</strong>, not a single tool.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query="group session", source_app="codex", limit=15, since=2026-05-08T00:00:00Z)</code>;
+<code>search_memories(query="wait_for_new_turns", source_app="codex", limit=10, since=2026-05-08T00:00:00Z)</code>.</li>
+<li><strong>Returned:</strong> 1 match on first query; 3 on second — top
+hit the Codex rollout turn answering “use echo and activate group
+session…”; others were earlier 030 spec-review turns in the same
+session.</li>
+<li><strong>Read sources:</strong> per-match
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/09/rollout-2026-05-09T23-48-45-019e10a5-4046-7a20-9396-2543df466702.jsonl</code>
+only (no other <code>source_app</code> in result set).</li>
+<li><strong>Verdict:</strong> ✅ right — matches align with the detailed
+step list already logged under <strong>2026-05-10 14:46 PDT —
+Codex</strong> in this journal.</li>
+<li><strong>Note:</strong> Codex used <strong>StreamableHTTP
+MCP</strong> (<code>initialize</code> + <code>tools/list</code>), then
+<strong>discovery</strong> (<code>tail_session</code> by
+<code>source_app</code> showed MRU was wrong lane), then
+<strong><code>search_memories</code> ×3</strong> to locate the
+strategist JSONL, then <strong><code>wait_for_new_turns</code></strong>
+with an <strong>exact <code>sources[]</code> fs path</strong> and
+<strong><code>since</code></strong> from the latest known strategist
+turn; follow-up used another <strong><code>wait_for_new_turns</code> +
+<code>tail_session</code></strong> pair. No server-side “activate” —
+stateless chaining via <code>next_since</code>.</li>
+<li><strong>Conjecture:</strong> none</li>
+</ul>
+<h3
+id="pdt-strategist-receives-codex-pushback-via-group-session-m1-3-fires-in-real-time">2026-05-10
+14:55 PDT — Strategist: receives Codex pushback via group session; M1-3
+fires in real time</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder told strategist “use group session
+and connect to codex session. codex is connected already and pushed back
+on some of your suggestions.” Mirror operation of Codex’s 14:48 PDT
+entry above — strategist reads Codex’s pushback turn-by-turn, founder is
+the meta-reviewer who reconciles both sides.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>tail_session(source_app='codex', count=10)</code> —
+auto-resolved MRU codex session.</li>
+<li><code>wait_for_new_turns(sources=[&lt;codex JSONL&gt;], since='2026-05-10T21:50:11', timeout=45)</code>
+— long-poll for any further Codex reaction.</li>
+</ol></li>
+<li><strong>Returned (call 1):</strong> 10 turns from
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/09/rollout-2026-05-09T23-48-45-019e10a5-4046-7a20-9396-2543df466702.jsonl</code>.
+Most-recent turn (index 8, <code>2026-05-10T21:50:11.863Z</code>) was
+Codex’s 5-point pushback verdict on the strategist’s Ladder A path.
+<strong>Critical:</strong> atom carried
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>
+with <code>bytes_elided: 1043</code> — pushbacks 2 and 3 sat inside the
+elided middle. Pushback 1 head + pushbacks 4, 5 + recommended path
+preserved at head/tail.</li>
+<li><strong>Returned (call 2):</strong> Returned IMMEDIATELY with turn 8
+again (<code>timed_out=false</code>, single turn). Strategist passed
+<code>since='2026-05-10T21:50:11'</code> (no ms, no Z); turn 8 at
+<code>.863Z</code> was “strictly after” that under UTC parsing, so the
+poll matched it. <code>next_since='2026-05-10T21:53:23.951Z'</code>. Not
+a new turn — operator error on <code>since</code> precision.</li>
+<li><strong>Read sources:</strong> Call 1 <code>source_resolved</code>:
+codex <code>019e10a5-...</code> JSONL. JSONL fallback fired immediately
+via <code>jq</code> against the same file path to recover the elided
+pushbacks 2 and 3.</li>
+<li><strong>Verdict:</strong> 🟡 partial — strategist recovered Codex’s
+full 5-pushback list (4 from <code>tail_session</code> head/tail, 2 from
+JSONL fallback via <code>jq</code>). Group-session pattern worked:
+founder did NOT context-switch between two AI clients. But M1-3
+(long-turn elision) fired in real time, forcing external shell access to
+complete the read.</li>
+<li><strong>Note (second confirmed M1-3 incident in 24h, both involving
+Codex assistant turns):</strong> First incident 2026-05-09 ~01:55 PDT
+cross-tool review (Codex turn 8, verdict content elided); this is second
+(Codex turn 8 of same session, pushback content elided). Same pattern:
+Codex (model <code>gpt-5.5</code>, reasoning_effort <code>xhigh</code>,
+personality <code>pragmatic</code>) produces longer-than-Claude-Code
+assistant turns (multi-finding reviews, numbered pushback lists). ECHO’s
+<code>WIRE_SHAPE_CAPS.content</code> clips the middle. Head + tail
+preserved — verdict survives — but the per-finding reasoning between
+bullets is lost.</li>
+<li><strong>Note (Codex caught a factual error strategist
+made):</strong> Codex’s pushback #1: “Item 029 is stale — already in
+<code>backlog/complete/</code>, not <code>ready/</code>.” Strategist
+verified via <code>find backlog/ -name "*029*"</code> → confirmed Codex
+right. Strategist had asserted “029 in <code>ready/</code>” twice in the
+M1 inventory. This is the <strong>third independent confirmation
+cycle</strong> of cross-tool-review-finds-things-single-tool-misses (R1
+spec review, R2 code review, <strong>R3 strategic-sequencing+facts
+review</strong>). The pattern’s scope widens — cross-tool review applies
+to strategic conversation, not just code/spec.</li>
+<li><strong>Note (<code>since</code> precision foot-gun on
+<code>wait_for_new_turns</code>):</strong> Strategist passed
+<code>2026-05-10T21:50:11</code> (no ms, no Z) intending “wake on turns
+AFTER turn 8” but got turn 8 back because UTC-parsed
+<code>21:50:11.000Z &lt; 21:50:11.863Z</code>. Correct chain: pass the
+previous call’s <code>next_since</code> verbatim. Doc candidate: add a
+“common chain mistake” callout to <code>wait_for_new_turns</code>
+description.</li>
+<li><strong>Note (journal-race fired during this very entry):</strong>
+While drafting this entry, strategist hit two <code>Edit</code> mtime
+rejections in succession because Codex (14:46/14:53 PDT) and Cursor’s
+Claude (17:45 PDT) were both appending entries to the same file
+concurrently. Recovered by re-reading the tail and using the latest
+entry’s last line as a unique anchor. This is the <strong>6th instance
+today</strong> of the journal-write race condition catalogued in
+<code>raw/internal/decisions/2026-05-10-coordination-layer-defer-pending-030.md</code>
+Phase 5 — but the <strong>first time the mtime-guard protected against
+silent overwrite of a multi-paragraph entry</strong> rather than a
+single-line edit. Coordination-layer trigger #1 (“semantic loss”) did
+NOT fire (no entry was lost), but the friction is mounting.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>M1-3 priority bumps above M1-2.</strong> Full-text recovery
+(<code>get_atom(id, full=true)</code>) is mechanically easier than
+ranking AND it’s now the second proven mid-turn-elision incident.
+Codex’s pushback #5 agreed (full atom recovery as its own small item
+ahead of ranking).</li>
+<li><strong>Group session paid for itself in a strategic conversation,
+not just code/spec review.</strong> Prior uses were code/spec review;
+this is the first time the multi-tool continuity replaced
+founder-copy-paste mid-strategy. Strong data point for the M3 demo arc —
+the magic IS this continuity, even when each tool reaches different
+conclusions (Codex disagreed, strategist conceded 4/5).</li>
+<li><strong>Mirror-pair entries are load-bearing.</strong> Codex’s 14:48
+PDT entry + this 14:55 PDT entry document the same group-session round
+from both sides. Worth keeping as the canonical example of how the
+journal captures group sessions — each side logs its own MCP calls and
+observations, founder reads both, picture is complete.</li>
+<li><strong>The 4-agent journal-writer count this session (Codex +
+Cursor’s Claude + Strategist + Codex-again) is approaching the
+coordination-layer trigger pressure.</strong> Not at trigger yet (no
+semantic loss), but the rate increase (6 races today vs 5 yesterday)
+suggests the rate is accelerating as parallelism scales.</li>
 </ol></li>
 </ul>
 <hr />
