@@ -1076,6 +1076,63 @@ The `format: 'minimal'` parallel observation track will start once 019 ships. Fo
 
 ---
 
+## 2026-05-10 — dogfooding day 4 (cross-tool spec review iteration)
+
+#### 2026-05-10 00:30 PDT — Cross-tool spec review of item 030 (3 rounds, 25 findings, convergence) — META-ENTRY
+
+Multi-call meta-entry capturing the full cross-tool spec-review iteration on `backlog/ready/2026-05-09-030-mcp-toolkit-reshape-and-group-session.md`. Recorded as one entry (not per-call) because the *pattern* is the load-bearing observation, not any single call.
+
+**Note (meta-meta — this entry was lost TWICE during write):** strategist's first attempt to land this entry was silently overwritten by a parallel agent's concurrent write between the Edit and the `git add` (Edit returned success; pandoc regenerated `.html` from the post-overwrite `.md`; commit `25e7a11` shipped only `.html`, 16 ins / 284 del vs HEAD). Second attempt hit the Edit tool's mtime guard ("File has been modified since read") and was rejected. Re-recovered on third attempt. **This is the fourth + fifth demonstrated instance today** of the journal-write race-condition class — cumulative count today: (1) journal-write conflict during the Cursor-pushback round, (2) system-reminder-flagged spec-write conflict, (3) silent overwrite of this entry, (4) mtime-guard rejection of this entry's second attempt. Pattern is no longer noise; it's a real friction. Worth a separate journal-discipline candidate (e.g., write-via-append-only-diff + reconcile, OR a journal-edit lease primitive). The general "multi-agent coordination layer" the founder deferred earlier IS exactly the substrate this points at — but for V1.6, the narrower journal-specific fix is enough.
+
+- **Trigger:** strategist (Claude Code session `71b36548-...`) wrote spec 030 (commit `f0b9ae2`, ~22:00 PDT 2026-05-09). Founder routed it to Cursor + Codex iteratively for review; strategist applied combined fixes after each round; pattern repeated 3 times until convergence.
+
+- **Round 1 (commit `f0b9ae2` review) — 14 findings:**
+  | Reviewer | Calls | Findings | Verdict |
+  |---|---|---|---|
+  | Cursor's Claude (composer `c15c2eca-...`) | n/a (Cursor uploaded spec via own tooling; strategist tailed reply) | 8 — text/consistency: `get_atoms full` semantics, migration `clusters[0]` blind pick, `truncation` vs `truncations` naming, AC #1 cluster-id flake, AC #9 apples-to-apples, `exclude_sources` mismatch, etc. | "approve directionally; revise text before claim — not DOA" |
+  | Codex (session `019e10a5-...`) | 38 `exec_command` (read spec + probe codebase) | 6 — code-contract gaps: P0 `tools/blocked.py` rejects no-frontmatter; P1 `window_hours` is cluster-gap not lookback; P1 `find_clusters.atom_ids[]` capped at 50; P1 `get_atoms` needs `Storage.getByIds()` (doesn't exist); P1 `wait_for_new_turns` source semantics ambiguous; P2 `truncations: []` doesn't account for `metadata_keys_projected` | "do not send 030 to a builder as-is" |
+
+  → strategist applied all 14 fixes → commit `a66f468`.
+
+- **Round 2 (commit `a66f468` review) — 8 deduped findings:**
+  | Reviewer | Findings | Verdict |
+  |---|---|---|
+  | Cursor's Claude | 5 — AC #3 vs §3 source_app inconsistency (blocking), stop-condition `top_cluster` reintroduces blind pick, "What" §63 stale, chunking guidance missing, polling-fallback `window_hours` cross-ref | "approve for claim after editing AC #3" |
+  | Codex (12 `exec_command` re-review) | 5 — P1 `window_hours=24` still in migration + envelope guard, P1 `getByIds` order-preservation contradicts naive impls, P1 `wait_for_new_turns` strict-after vs storage's `>=`, P2 AC #3 source_app, P2 `WIRE_SHAPE_CAPS.content` typo (actual: `match_content`) | "P0 fixed; 5 remaining findings" |
+
+  → strategist deduped to 8 unique fixes → commit `6f165ce`.
+
+- **Round 3 (commit `6f165ce` review) — 3 patches (Codex applied directly):**
+  - Patch 1: `get_atoms` response budget + deterministic drop rule (closes envelope-overflow undefined-behavior gap; 25k ceiling matches existing convention verified across 4 tests in `tests/mcp/`).
+  - Patch 2: AC #1 regression test surface (closes a test-loophole that would have falsely passed against the clipped wire shape).
+  - Patch 3: 2 final `window_hours=24` residues missed in Round 2 sweep.
+  - Strategist validated each + committed → `17cd821`.
+
+- **Strategist's MCP calls (chronological):**
+  | # | Tool | Inputs | `bytes_elided` |
+  |---|---|---|---|
+  | 1 | `tail_session` | `source_app='cursor', count=5` | 0 (early; full-text issue not byte-clip) |
+  | 2 | `tail_session` | `source_app='cursor', count=3` | 0 (cached) |
+  | 3 | `tail_session` | `source_app='cursor', count=3` (post-amendment) | **~2429** |
+  | 4 | `tail_session` | `source_app='codex', count=5` (post-amendment) | **~3335 + ~1999** across 2 turns |
+  | 5 | `tail_session` | `source_app='cursor', count=3` (R2 verdict check) | (cached) |
+  | 6 | `tail_session` | `source_app='codex', count=3` (R2 verdict check) | **~1999** |
+
+- **Sources (load-bearing — MCP alone insufficient for 4/6 calls):**
+  - **Cursor SQLite probes** (`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`) — read full bubble text directly when `tail_session` elision blocked the review. Bubbles: `f28acde5...` (R1 Cursor review), `2b861c21...` + chain (R2 Cursor review).
+  - **Codex JSONL probes** (`~/.codex/sessions/2026/05/09/rollout-2026-05-09T23-48-45-019e10a5-4046-7a20-9396-2543df466702.jsonl`) — Python script extracted full assistant-message bodies. Recovered Codex R1 (3239 chars) + R2 reviews this way.
+  - **Storage (this repo) git log + blocked.py** — verified each commit landed (`f0b9ae2 → a66f468 → 6f165ce → 17cd821`) and `tools/blocked.py` exits 0 + selects 030 after each frontmatter change.
+
+- **Verdict:** ✅ **convergence achieved.** Findings trended **14 → 8 → 3** across 3 rounds, severity dropped from "P0 frontmatter blocks tooling" (R1) → "wording inconsistencies + 2 real edge cases" (R2) → "drop-rule + test-surface ambiguity + final cleanup" (R3). Spec is at `17cd821`, ready for builder claim. R4 likely surfaces only typos.
+
+- **Note (load-bearing meta-finding for V1.6+ operating model):** **The cross-tool review-and-revise loop is the load-bearing pattern, not any single tool.** Cursor reasoned about spec text; Codex probed the codebase. Findings were **complementary, not redundant** — barely any overlap in R1 (1 of 14 was found by both reviewers). Without two-reviewer setup, half the findings would have been missed. Each revision introduced 1-2 new wording bugs the next round caught — consistent across rounds. Convergence is detectable by finding-count + severity trending down; stop when findings become typo-class. Recommend: **for future high-stakes specs (V1.6+ items), default to two-reviewer + at-least-one-revision-cycle**.
+
+- **Note (MCP-elision blocker — repeat finding from 2026-05-09 14:04 PDT):** in 4 of 6 strategist `tail_session` calls during this review, the load-bearing review content was in the elided middle (1999–3335 chars). Strategist had to fall back to source-file reads (Cursor SQLite + Codex JSONL via Python). This is the same trust-bug class formalized in `_followups.md` "MCP retrieval — long-turn elision + envelope caps" and addressed structurally by item 030's `truncations: string[]` field. Today's session was the **third demonstrated instance** of the elision-blocker pattern across multi-day dogfooding — the `truncations` field is well-justified by repeated occurrence.
+
+- **Conjecture (observation-only — do not design fixes here):** worth a `wiki/operating-model/cross-tool-spec-review.md` page post-V1.6 documenting (a) the two-reviewer pattern (text + code complementary coverage), (b) the convergence-by-finding-count stop signal, (c) the SQLite/JSONL fallback for elision-blocked reviews, (d) the journal-write race-condition recovery pattern (cumulative 5 instances today). Strategist follow-up, not a backlog item — process meta. File once 030 ships and the pattern has at least one more confirmation cycle on a future spec.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
