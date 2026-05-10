@@ -18,7 +18,42 @@ import type {
 import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
 import { WIRE_SHAPE_CAPS } from '../wire-shape/caps.js';
 
+// V1.6 (item 030) deprecation marker. Removal is gated on item 031 after a
+// 1–2 week dogfooding period — keeping the tool callable in the meantime so
+// in-flight consumers don't break. Marker is text-only; no behavior change.
+export const RECENT_WORK_CONTEXT_DEPRECATION_MARKER =
+  '**[DEPRECATED 2026-05-09 — use `find_clusters` + `get_atoms` instead. ' +
+  'This tool will be removed in item 031 after a 1-2 week dogfooding period. ' +
+  'Migration recipe in description below.]**\n\n' +
+  'Migration:\n' +
+  '  OLD: get_recent_work_context(window_hours=24, format=\'minimal\')\n' +
+  '       // window_hours=24 in the OLD shape was being misused as lookback —\n' +
+  '       // it actually controls cluster-gap (the temporal gap allowed between\n' +
+  '       // atoms in a single cluster). The default lookback was 4h via the\n' +
+  '       // V1.5.7 auto-expand path. Migration uses since= for explicit\n' +
+  '       // lookback, NOT window_hours=.\n' +
+  '\n' +
+  '  NEW: c = find_clusters(since=now-24h)        // explicit 24h lookback\n' +
+  '       // (omit since= to get find_clusters\' V1.5.7-equivalent no-args\n' +
+  '       // semantics: 4h default, auto-expand to 24h if empty.)\n' +
+  '       //\n' +
+  '       // Inspect c.clusters[]: each has rank, label, source_breakdown,\n' +
+  '       // time_range, atom_ids[]. Pick the cluster matching your intent\n' +
+  '       // (typically rank-1 for "where did I leave off", but read label +\n' +
+  '       // source_breakdown before picking — the resume target may be a\n' +
+  '       // sibling).\n' +
+  '       picked = c.clusters[0]                   // or whichever matches intent\n' +
+  '       //\n' +
+  '       // get_atoms accepts ≤50 ids per call. If picked.atom_ids.length > 50,\n' +
+  '       // partition into chunks and concat results:\n' +
+  '       //   chunks = chunk(picked.atom_ids, 50)\n' +
+  '       //   a = flatMap(chunks, ids => get_atoms(ids, format=\'minimal\'))\n' +
+  '       a = get_atoms(picked.atom_ids, format=\'minimal\')   // single call if ≤50\n' +
+  '\n' +
+  '---\n\n';
+
 export const RECENT_WORK_CONTEXT_DESCRIPTION =
+  RECENT_WORK_CONTEXT_DEPRECATION_MARKER +
   "Retrieve clusters of related events from the user's captured ECHO memories — " +
   'joined by shared artifacts (files, repos, conversations) within a recent time window. ' +
   'Use when the user asks open-ended questions about recent work across their tools — ' +

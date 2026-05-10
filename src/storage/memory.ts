@@ -69,4 +69,22 @@ export class MemoryStorage implements Storage {
   async count(): Promise<number> {
     return this.events.length;
   }
+
+  async getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
+    if (ids.length === 0) return [];
+    // Re-order by input `ids[]` so the order-preserving contract holds
+    // regardless of insertion order. Missing ids are silently dropped
+    // here; get_atoms surfaces them in atoms_dropped_ids.
+    const wanted = new Set(ids);
+    const byId = new Map<EventId, CaptureEvent>();
+    for (const e of this.events) {
+      if (wanted.has(e.id)) byId.set(e.id, e);
+    }
+    const out: CaptureEvent[] = [];
+    for (const id of ids) {
+      const ev = byId.get(id);
+      if (ev !== undefined) out.push(ev);
+    }
+    return out;
+  }
 }

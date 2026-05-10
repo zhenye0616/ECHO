@@ -285,6 +285,8 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
     expect(r.matches).toHaveLength(1);
     expect(r.matches[0]!.content).toBe('short turn that fits well under the per-match cap');
     expect(r.matches[0]!.bytes_elided).toBeUndefined();
+    // V1.6 (item 030): truncations is always present (empty when nothing clipped).
+    expect(r.matches[0]!.truncations).toEqual([]);
   });
 
   it('content over cap is elided to head + marker + tail; bytes_elided reports dropped chars', async () => {
@@ -319,6 +321,8 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
     // original byte length.
     expect(typeof m.bytes_elided).toBe('number');
     expect(m.bytes_elided).toBeGreaterThan(0);
+    // V1.6 (item 030): content cap fired → truncations contains "content".
+    expect(m.truncations).toContain('content');
   });
 
   it('total response envelope stays under the consumer 25k budget on a 10× ~100KB-match fixture (the 15:54 PDT failure mode)', async () => {

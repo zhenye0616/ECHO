@@ -71,6 +71,11 @@ class StreamingStorage implements Storage {
   count(): Promise<number> {
     return this.inner.count();
   }
+
+  // V1.6 (item 030): delegate to inner. Required by Storage interface.
+  getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
+    return this.inner.getByIds(ids);
+  }
 }
 
 // ─── Pre-seeding: walk existing JSONLs, mark them processed-to-EOF ──────────

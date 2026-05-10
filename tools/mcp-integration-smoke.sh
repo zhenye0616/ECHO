@@ -92,7 +92,7 @@ curl -sS -o /dev/null \
   ${SESSION_HDR[@]+"${SESSION_HDR[@]}"} \
   --data '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-# --- 3. tools/list contains all four tools with item-025/026 advertisements -
+# --- 3. tools/list contains all seven tools with item-025/026/030 advertisements -
 
 LIST_RESPONSE=$(curl -sS \
   -X POST "$URL" \
@@ -126,7 +126,18 @@ if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"tail_session"'; then
   exit 1
 fi
 
-# Items 025 + 026: tools/list must advertise four tools with outputSchema +
+# V1.6 (item 030): three new tools — find_clusters / get_atoms / wait_for_new_turns
+for v16 in find_clusters get_atoms wait_for_new_turns; do
+  if ! printf '%s' "$LIST_PAYLOAD" | grep -q "\"name\":\"$v16\""; then
+    log_err "tools/list response did not include $v16"
+    log_err "(item 030 may not have been picked up — has the daemon restarted since merge?)"
+    log_err "raw response:"
+    printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+    exit 1
+  fi
+done
+
+# Items 025 + 026 + 030: tools/list must advertise seven tools with outputSchema +
 # readOnlyHint, plus the source_app enum on search_memories.
 LIST_FILE="$WORK/list-payload.json"
 printf '%s' "$LIST_PAYLOAD" > "$LIST_FILE"
@@ -142,7 +153,15 @@ except json.JSONDecodeError as exc:
 result = env.get("result") or env
 tools = result.get("tools") or []
 names = sorted(t.get("name") for t in tools)
-expected = ["echo_ping", "get_recent_work_context", "search_memories", "tail_session"]
+expected = [
+    "echo_ping",
+    "find_clusters",
+    "get_atoms",
+    "get_recent_work_context",
+    "search_memories",
+    "tail_session",
+    "wait_for_new_turns",
+]
 if names != expected:
     print(f"WRONG_TOOL_SET: got {names}, expected {expected}")
     sys.exit(0)
@@ -530,7 +549,7 @@ log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/list contains tail_session"
-log_ok "OK: tools/list 4 tools, each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
+log_ok "OK: tools/list 7 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"

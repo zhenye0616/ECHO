@@ -39,4 +39,10 @@ export interface Storage {
   append(event: Omit<CaptureEvent, 'id'>): Promise<EventId>;
   query(filter?: QueryFilter): Promise<CaptureEvent[]>;
   count(): Promise<number>;
+  // Order-preserving fetch by id list. Returns events in the order of the
+  // input `ids[]`; missing ids are silently filtered out (caller diffs the
+  // input vs output id sets if it cares about misses). Required by the
+  // V1.6 `get_atoms` MCP tool, which materialises atom bodies for ids the
+  // caller already obtained from `find_clusters` / `search_memories`.
+  getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]>;
 }

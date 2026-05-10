@@ -4,9 +4,12 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
+import { registerFindClusters } from './tools/find-clusters.js';
+import { registerGetAtoms } from './tools/get-atoms.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 import { registerTailSession } from './tools/tail-session.js';
+import { registerWaitForNewTurns } from './tools/wait-for-new-turns.js';
 
 const log = createLogger('mcp.server');
 
@@ -91,6 +94,10 @@ export async function startMcpServer(
     registerSearchMemories(mcp, storage);
     registerRecentWorkContext(mcp, storage);
     registerTailSession(mcp, storage);
+    // V1.6 (item 030) — atomic decomposition + group-session subscription.
+    registerFindClusters(mcp, storage);
+    registerGetAtoms(mcp, storage);
+    registerWaitForNewTurns(mcp, storage);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

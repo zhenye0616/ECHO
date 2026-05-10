@@ -68,6 +68,9 @@ export interface TailMatch {
   /** V1.5.6.1: keys reshaped to a smaller useful representation
    *  (e.g. `tool_calls` → name trajectory). Read at face value. */
   metadata_keys_projected?: string[];
+  /** V1.6 (item 030): additive trust signal — ALWAYS present (possibly
+   *  empty). See `ProjectedMatch.truncations` for the vocabulary. */
+  truncations: string[];
 }
 
 function clampCount(input: number | undefined): number {

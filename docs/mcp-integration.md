@@ -25,7 +25,7 @@ This is the V1 "killer demo" surface: you ask Cursor or Claude Code a question, 
    ```bash
    ./tools/mcp-integration-smoke.sh
    ```
-   Expect a sequence of `OK:` lines and exit `0` — including `OK: tools/list 4 tools` (item 026 added `tail_session`) and a final `OK: stale-session echo_ping recovery` line that proves the stateless transport from item 027 is in place. If it fails, see [Troubleshooting](#troubleshooting) below.
+   Expect a sequence of `OK:` lines and exit `0` — including `OK: tools/list 7 tools` (V1.6 item 030 added `find_clusters`, `get_atoms`, `wait_for_new_turns`) and a final `OK: stale-session echo_ping recovery` line that proves the stateless transport from item 027 is in place. If it fails, see [Troubleshooting](#troubleshooting) below.
 
 ## Cursor setup
 
@@ -97,11 +97,24 @@ You can confirm the tool is registered without sending a query by asking Claude 
 
 > *"List the MCP tools you have available."*
 
-All four should appear with their descriptions:
+All seven should appear with their descriptions:
 - `echo_ping` — connectivity check; returns pong + a timestamp.
 - `search_memories` — substring + filter retrieval over captured Cursor / Claude Code / Codex / git events.
-- `get_recent_work_context` — clustered recent-work trace across the captured tools.
+- `get_recent_work_context` — **DEPRECATED 2026-05-09 (item 030).** Use `find_clusters` + `get_atoms` instead; will be removed in item 031 after a 1-2 week dogfooding period. Behavior unchanged in the deprecation window.
 - `tail_session` — the cheap counterpart for known-source tail lookups: returns the N most-recent atoms for a single named source (or the most-recently-active session for a `source_app`) without clustering or substring filtering. Use this for "where did `<app>` leave off" instead of substring search; default `count=5`, max `20`, typical response `< 10k chars`. Composite cursor is shared with `search_memories` (a `next_cursor` from one is decodable by the other).
+- **V1.6 (item 030):**
+  - `find_clusters` — cheap cross-source DISCOVERY (no atom bodies). Returns clusters with FULL `atom_ids[]` (un-capped), `source_breakdown`, `time_range`, `label`. **`window_hours` controls cluster-gap; `since` controls lookback** (most-common foot-gun). No-args resume: 4h default → auto-expand to 24h on empty. Pair with `get_atoms`.
+  - `get_atoms` — targeted body fetch by id list (≤50 per call). Returns atoms in REQUESTED ORDER. Per-atom `truncations: string[]` is the V1.6 trust signal: `[]` = verbatim; `["content"]` = clipped; `["metadata.<k>"]` = per-key cap fired (LOSSY); `["metadata.<k>:projected"]` = projector reshaped (REFORMATTED). Deterministic prefix-drop on response budget overflow.
+  - `wait_for_new_turns` — stateless long-poll for group session A. Blocks until new turns land at any of N sources (max 8). Source-app names like `cursor` resolve via PREFIX MATCH (catches ALL sessions of that app — explicitly different from `tail_session(source_app=...)` MRU exact-source resolution). Strict-after `since` boundary. Polling-fallback recipe in the tool description for clients that can't hold long-running calls.
+
+## Source-app resolution: tail_session vs wait_for_new_turns (deliberate divergence)
+
+| Tool | `source_app` semantic | Why |
+|---|---|---|
+| `tail_session(source_app='cursor')` | MRU exact-source resolution — picks the most-recently-active Cursor session and tails ONLY that. | "Where did Cursor leave off" wants the freshest single thread, not a cross-session blend. |
+| `wait_for_new_turns(sources=['cursor'])` | PREFIX match — wakes on a new turn in ANY Cursor session. | Group session A wants to detect new sessions as they spawn, not just the one MRU at request time. |
+
+Pass a literal source path (e.g. `fs:/Users/.../state.vscdb`) to either tool for exact-source semantics regardless.
 
 ## `get_recent_work_context` response formats
 
