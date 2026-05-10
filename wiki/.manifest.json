@@ -614,5 +614,19 @@
     ],
     "topic": "Process",
     "subtopic": "Wave Retrospective"
+  },
+  "operating-model/cross-tool-spec-review.md": {
+    "status": "shipped",
+    "title": "Cross-Tool Spec Review",
+    "link": "cross-tool-spec-review",
+    "summary": "Multi-reviewer pattern (\u22652 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.",
+    "aliases": [
+      "Cross-Tool Spec Review",
+      "Cross-Tool Review",
+      "Multi-Reviewer Pattern",
+      "R1/R2/R3 Review Cycle"
+    ],
+    "topic": "Process",
+    "subtopic": "Cross-Tool Review"
   }
 }
