@@ -9,9 +9,31 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-10T07:16:40Z"
 branch: "agent/mcp-toolkit-reshape-and-group-session"
 worktree: "~/Desktop/Project_echo--mcp-toolkit-reshape-and-group-session"
-head_sha: ""
+head_sha: "24cb42bce0e04ed5002fcc0c870a3298302ad718"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  V1.6 MCP toolkit reshape complete. 3 new tools (find_clusters,
+  get_atoms, wait_for_new_turns) ship at the specified shapes; truncations
+  trust signal added to search/tail; deprecation marker prepended to
+  get_recent_work_context (behavior unchanged); Storage.getByIds added
+  for both backends with order-preservation tests.
+  
+  Empirical envelope check on a 15-atom realistic-density fixture:
+  compound get_recent_work_context = 49,285 chars (overflows 25k
+  ceiling); chain find_clusters + get_atoms = 22,711 chars (54% smaller,
+  fits the budget). wait_for_new_turns wake-overhead median 41ms / p95
+  96ms at pollIntervalMs=100 (production scales 10×).
+  
+  622 tests pass, lint clean, typecheck clean. Run log at
+  raw/internal/agent-runs/2026-05-10-2026-05-09-030-mcp-toolkit-reshape-and-group-session.md
+  has per-tool envelope numbers, latency table, before/after dogfooding
+  synthesis, and three founder-review questions (drift-rule edge cases
+  on tools/render-trace.ts + smoke-test.sh edits + commit-granularity
+  preference).
+  
+  Per the Reviewer Independence Rule, this builder is Claude Code (Opus
+  4.7) — request review by strategist or another agent (Cursor/Codex)
+  before founder merge.
 review_notes: ""
 spec_refs:
   - src/mcp/tools/recent-work-context.ts
