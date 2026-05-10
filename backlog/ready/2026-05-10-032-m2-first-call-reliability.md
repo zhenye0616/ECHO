@@ -18,7 +18,8 @@ spec_refs:
   - src/mcp/tools/recent-work-context.ts
   - src/mcp/tools/get-atoms.ts
   - src/trace/rank.ts
-  - src/normalize/event.ts  # CaptureEvent.occurred_at — the timestamp field referenced by AC1
+  - src/storage/interface.ts  # CaptureEvent.timestamp (raw storage layer)
+  - src/normalize/types.ts    # NormalizedContextEvent.time.occurred_at (the field used by trace + ranking; AC1 references this)
   - raw/internal/dogfooding/mcp-interactions-journal.md  # 2026-05-10 13:06 PDT entry — the empirical trigger
   - raw/internal/decisions/2026-05-10-coordination-layer-defer-pending-030.md  # M1/M2 vocab origin
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
@@ -46,7 +47,9 @@ Make the first `find_clusters()` + `get_atoms()` chain call **work usefully on i
 
 **Definition.** A cluster `C` is **single-source-recent** iff BOTH of these hold:
 - `C.source_breakdown` has exactly 1 key (single source-app), AND
-- The latest `CaptureEvent.occurred_at` of any atom in `C` is within `SINGLE_SOURCE_RECENT_THRESHOLD_MS` of `now` (default: 5 minutes / 300_000 ms).
+- The latest `NormalizedContextEvent.time.occurred_at` of any atom in `C` is within `SINGLE_SOURCE_RECENT_THRESHOLD_MS` of `now` (default: 5 minutes / 300_000 ms).
+
+(The trace builder operates on `NormalizedContextEvent`, not raw `CaptureEvent` — see `src/normalize/types.ts:19`. Storage's `CaptureEvent.timestamp` is the upstream wire timestamp; the normalized layer is where ranking and clustering happen.)
 
 **Predicate.** `no_useful_cluster(clusters)` is true iff **every** cluster in the returned set is single-source-recent. The empty set is vacuously true (preserves today's empty-only auto-expand behavior as a degenerate case).
 
@@ -56,21 +59,28 @@ Make the first `find_clusters()` + `get_atoms()` chain call **work usefully on i
 - If the user passed an explicit `since` or `until`, do NOT auto-expand (explicit-over-implicit per item 027). Return clusters as-is.
 - After the default 4h pass, if `no_useful_cluster(clusters_4h)` is true, fire the existing 24h auto-expand exactly once. Emit a `[AUTO_EXPAND]`-prefixed warning identifying the trigger as either `"empty"` (the existing case — 4h returned 0 clusters) or `"single-source-recent"` (the new case — 4h returned only single-source-recent clusters).
 
-**Demotion (load-bearing — addresses Codex review Cx1):**
-After the 24h pass returns its cluster set, if the set contains BOTH single-source-recent clusters AND non-single-source-recent clusters, **demote** all single-source-recent clusters by treating their `recent_activity` rank signal as 0 (instead of 1) during the `rank.ts` sort. Net effect: the prior multi-source work cluster outranks the calling-session noise cluster, so `clusters[0]` is the prior work — which is the demo bar.
+**Demotion (load-bearing — addresses Codex review Cx1 and R2-2):**
+After the 24h pass returns its cluster set, if the set contains BOTH single-source-recent clusters AND non-single-source-recent clusters, **demote** all single-source-recent clusters to rank STRICTLY BELOW all non-single-source-recent clusters, regardless of their other rank signals (`matches_artifact_hint`, `has_open_loop`, `recent_activity`, `size`, `negMedianAge`).
 
-If the 24h set contains only single-source-recent clusters (degenerate — the user genuinely has nothing else in 24h), return them with normal ranking; do not synthesize an empty response.
+**Why a strict partition, not a single-signal nudge:** `rank.ts:110-118` sorts on `hint > openLoop > recent > size > negMedianAge > cluster_id`. Forcing only `recent_activity=0` for single-source-recent clusters is insufficient because a noise cluster carrying `matches_artifact_hint=1` (e.g., the caller passed an `artifact_hint`) or `has_open_loop=1` would still outrank the prior multi-source work cluster. The demo bar requires `clusters[0]` to be prior work whenever prior work exists in 24h — that's a structural guarantee, not a per-signal nudge.
 
-The demotion happens ONLY when auto-expand fired with trigger `"single-source-recent"`. It does NOT apply to caller-specified `since`/`until` calls, and it does NOT apply to the empty-trigger auto-expand path. Implement as a `demoteSingleSourceRecent: boolean` flag passed into the rank function from the auto-expand call site.
+**Implementation contract.** Add a primary sort key in `rank.ts` BEFORE the existing 5-key chain: `isSingleSourceRecent ? 1 : 0` ascending (so non-single-source-recent clusters sort first). Tiebreak via the existing 5-key chain unchanged. The primary key is gated on a new `demoteSingleSourceRecent: boolean` parameter, default `false` (preserves all existing rank semantics for non-auto-expand calls). The `find-clusters.ts` call site passes `true` ONLY when the 24h auto-expand fired with trigger `"single-source-recent"`.
+
+If the 24h set contains only single-source-recent clusters (degenerate — the user genuinely has nothing else in 24h), the primary partition is uniform and the existing 5-key chain decides order. Do not synthesize an empty response.
+
+The demotion does NOT apply to:
+- Caller-specified `since`/`until` calls (explicit-over-implicit; user asked for a specific window, return everything they asked for in normal rank order)
+- The empty-trigger auto-expand path (no single-source-recent cluster exists in the 24h result by construction of the empty trigger)
+- Direct callers of `rank.ts` that pass `demoteSingleSourceRecent=false` (default)
 
 ### AC2 — Resume-friendly `get_atoms` ordering option
 
 In `src/mcp/tools/get-atoms.ts`, accept a new optional parameter `prefer: "as_requested" | "newest_first"` (default: `"as_requested"` to preserve current contract).
 
 When `prefer="newest_first"`:
-- **Sort key**: atom `CaptureEvent.occurred_at` descending (the same timestamp field used in AC1). Stable sort — ties resolve in original request order.
+- **Sort key**: atom `NormalizedContextEvent.time.occurred_at` descending (the same timestamp field used in AC1 — the trace/rank layer uses normalized events). Stable sort — ties resolve in original request order.
 - **Missing IDs (not in storage)**: have no timestamp to sort against. Append them at the END of the sorted list, preserving their relative request order. They still appear in `atoms_dropped_ids` per existing contract; the only change is their position in the iteration order, which determines drop priority.
-- **Duplicate IDs in input**: collapse to first occurrence. Subsequent duplicates are silently ignored (existing behavior — confirm preserved).
+- **Duplicate IDs in input (new opt-in behavior, addresses R2-3):** Under `prefer="newest_first"`, duplicate IDs in the input are de-duplicated to first occurrence BEFORE sorting. Each unique ID appears at most once in `atoms[]`. This is NEW behavior introduced with `prefer="newest_first"` — `prefer="as_requested"` (default) preserves the existing storage contract (`getByIds(readonly EventId[])` returns one entry per input ID, including duplicates as repeated entries). Document this asymmetry explicitly in the tool description so callers passing duplicates intentionally know to use the default.
 - The deterministic prefix-drop semantics are unchanged (drops fall on the END of the processed order). Under `newest_first`, that END is the OLDEST atom, then missing IDs — matching the resume-call intent.
 - Returned `atoms[]` are in the post-sort order (newest first, then any not-dropped older atoms); `atoms_dropped_ids` lists the dropped IDs in that same iteration order.
 - Document in the tool description that when the consumer has already ordered `atom_ids` intentionally, `prefer="newest_first"` will override that order — the consumer should pass `"as_requested"` (or omit `prefer`) in that case.
@@ -89,7 +99,7 @@ Per Cursor review Cu1, the tool descriptions must change with the behavior, not 
 
 - **Unit test (predicate):** `no_useful_cluster` against 4 fixture cases — (a) empty, (b) all clusters single-source-recent, (c) all clusters single-source-but-old (outside 5min), (d) mixed single-source-recent + multi-source. Returns true only for (a) and (b).
 - **Unit test (auto-expand trigger):** mock `getRecentWorkContext` to return single-source-recent-only at 4h and multi-source at 24h. Assert the 24h pass fires with warning prefix `"[AUTO_EXPAND] single-source-recent"`.
-- **Unit test (demotion):** rank input with one single-source-recent cluster (recent=1) and one multi-source older cluster (recent=0), `demoteSingleSourceRecent=true`. Assert post-rank order: multi-source first (was-recent=0 vs demoted single-source-recent's effective-recent=0; size/age tiebreaker decides). Compare against `demoteSingleSourceRecent=false` baseline on the same input — single-source-recent ranks first under baseline.
+- **Unit test (demotion — strict partition, addresses R2-2):** rank input with three clusters, where the single-source-recent cluster has the strongest signals (`matches_artifact_hint=1, has_open_loop=1, recent=1, size=20`) and two non-single-source-recent clusters have weak signals (`hint=0, openLoop=0, recent=0, size=5` each). With `demoteSingleSourceRecent=true`, assert post-rank order: BOTH non-single-source-recent clusters rank ahead of the single-source-recent cluster, regardless of its dominant signals. With `demoteSingleSourceRecent=false` (baseline), single-source-recent ranks first because its hint+openLoop signals dominate. The strict-partition guarantee is the contract — diff the two outputs.
 - **Unit test (get_atoms newest_first):** fixture with 8 atoms (mixed timestamps + 2 missing IDs); budget can only fit 4 atoms by size. With `prefer='newest_first'`: dropped IDs are the 2 oldest atoms + 2 missing IDs (newest-first order preserves the 4 newest). With `prefer='as_requested'` (baseline): dropped IDs are the last 4 in request order. Diff the two output orderings.
 - **Integration test (chain):** 24h-spanning fixture — first 4h has only single-source-recent (calling session noise: 2 `claude_code` atoms within the last 5 minutes); prior 4-24h has a multi-source work session (claude_code + git + codex, 30+ minutes old). Chain `find_clusters({})` → assert auto-expand warning fired with `single-source-recent` trigger, assert clusters[0] is the prior work session (not the noise cluster), assert noise cluster is present but ranked lower. Then `get_atoms(clusters[0].atom_ids, prefer='newest_first')` → assert newest atom of the prior work session is in the returned response (not dropped).
 
@@ -109,7 +119,7 @@ Per Cursor review Cu1, the tool descriptions must change with the behavior, not 
 - `find-clusters.ts` already has the `clusters.length === 0` empty-expand path with `[AUTO_EXPAND]` warning. Extend the predicate and the warning prefix; don't replace.
 - The `no_useful_cluster` predicate should be a pure function (no IO), unit-testable in isolation. Co-locate with `find-clusters.ts` or a new `src/trace/auto-expand.ts` per the existing module hygiene.
 - `SINGLE_SOURCE_RECENT_THRESHOLD_MS` default 5 minutes (300_000 ms) is judgment-bound by the AI-client's typical "I just sent a message + got a response" turnaround. Make it a named constant; don't hardcode in the predicate. The name is intentionally NOT `SELF_*` per Cx2.
-- Timestamp field is `CaptureEvent.occurred_at` (the normalized event time, set at capture-gate). Trace builder + ranking already use this field consistently; the predicate must use the same one for cluster-level "latest atom" comparison.
+- Timestamp field is `NormalizedContextEvent.time.occurred_at` (the normalized event time, populated during normalization from upstream `CaptureEvent.timestamp` or per-source overrides). Trace builder + ranking already use this field consistently; the predicate must use the same one for cluster-level "latest atom" comparison. NOT `CaptureEvent.timestamp` — that's the raw-storage upstream field; the trace layer doesn't see it directly.
 - Demotion is implemented in `src/trace/rank.ts` (the same file Codex Cx1 named): take a `demoteSingleSourceRecent: boolean` parameter, default false. When true, override `sig.recent_activity` to false for clusters where the `single-source-recent` predicate holds. The call site in `find-clusters.ts` passes `true` only after the single-source-recent auto-expand fires.
 - `get_atoms` `prefer` parameter: zod schema in the existing `inputSchema`; default `"as_requested"` to preserve back-compat for non-resume callers (search_memories pipeline, group-session subscribers, etc.). The `format` parameter is unchanged.
 - For the missing-ID position rule (AC2): `getByIds` returns the requested-order-aligned array with `null` entries for missing IDs. Pre-sort, replace nulls with sentinel "missing" markers and treat them as having `occurred_at = -Infinity` for ordering purposes. They land at the end of `newest_first` order, then get dropped first.
@@ -141,10 +151,23 @@ Both reviews + validation against code are in `raw/internal/dogfooding/mcp-inter
 
 **Cursor-only findings (3):**
 - **Cu1 (P1 — description-string lock-step)** — `FIND_CLUSTERS_DESCRIPTION` in `find-clusters.ts:64-65` and any `outputSchema` docs must update in lockstep with behavior. Added as AC3 (renumbered; old AC3 → AC3 absorbed into the same bullet).
-- **Cu2 (timestamp field unnamed)** — AC1 referenced "latest atom" without naming the field. Spec now uses `CaptureEvent.occurred_at` consistently, with rationale that trace + ranking already use this field; added to `spec_refs` (`src/normalize/event.ts`).
+- **Cu2 (timestamp field unnamed)** — AC1 referenced "latest atom" without naming the field. The R1 patch initially named `CaptureEvent.occurred_at` and added `src/normalize/event.ts` to `spec_refs` — both wrong (caught by R2-1, see below). The current spec uses `NormalizedContextEvent.time.occurred_at` (the field the trace + ranking layers actually use), with `spec_refs` pointing at `src/storage/interface.ts` + `src/normalize/types.ts`.
 - **Cu3 (resume_tail_source non-standard)** — kept in frontmatter (item 029 also uses it; effectively the emerging hint-field convention per Codex's spec-template improvements). Tools validate-tolerant. No-op for this revision.
 
-**Disposition:** All 9 findings addressed in this revision. No remaining findings warrant a R2 review unless founder spots something the reviewers missed.
+**Disposition:** All 9 findings addressed in this revision.
+
+# Review Round 2 — Post-patch verification (Cursor + Codex, 2026-05-10 15:32 PDT)
+
+The R1 patch was reviewed by both Cursor (composer `c15c2eca`, bubbles `f64ac5f7` + `823c123f`) and Codex (session `019e10a5-...`, turn 15). 3 new findings, all convergent or single-source — all applied in this revision. Pattern note: **fifth independent confirmation cycle** of cross-tool-review-finds-things-single-tool-misses, **first cycle where one reviewer caught issues introduced by the previous round's patch itself.**
+
+**Convergent (both caught):**
+- **R2-1 (Codex HIGH / Cursor nit) — Field naming was wrong.** R1's patch referenced `CaptureEvent.occurred_at` (doesn't exist) and added `src/normalize/event.ts` to `spec_refs` (doesn't exist). Storage's `CaptureEvent` has `.timestamp` (`src/storage/interface.ts:6`); the trace/rank layer operates on `NormalizedContextEvent.time.occurred_at` (`src/normalize/types.ts:19`). **Fixed:** AC1 + AC2 + Implementation Notes all reference `NormalizedContextEvent.time.occurred_at`; `spec_refs` updated to `src/storage/interface.ts` + `src/normalize/types.ts` with a per-file note explaining which timestamp lives where.
+
+**Codex-only:**
+- **R2-2 (Medium) — Demotion-by-`recent=0` insufficient.** `rank.ts:110-118` sorts `hint > openLoop > recent > size > negMedianAge`. The R1 fix only neutralized the `recent` signal, leaving the noise cluster able to outrank prior work via `hint` or `openLoop`. **Fixed:** AC1 demotion is now a strict partition — single-source-recent clusters sort STRICTLY BELOW all non-single-source-recent clusters via a new primary sort key in `rank.ts`, regardless of all other signals. The existing 5-key chain becomes the tiebreaker within each partition. Demo bar is now a structural guarantee.
+- **R2-3 (Medium/Low) — Duplicate-ID claim was factually wrong.** R1's AC2 said duplicate-ID-collapse was "existing behavior — confirm preserved." But storage's `getByIds(readonly EventId[])` doesn't dedupe at the contract level; duplicates ARE returned multiple times. **Fixed:** AC2 now declares dedup-to-first-occurrence as NEW opt-in behavior introduced with `prefer="newest_first"`. `prefer="as_requested"` (default) preserves the existing duplicate-returns-duplicates contract. The asymmetry is documented in the tool description.
+
+**Disposition:** All 3 R2 findings addressed. No R3 expected unless founder or a builder claims and surfaces an implementation-side gap.
 
 # References
 

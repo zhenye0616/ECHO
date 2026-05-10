@@ -936,6 +936,19 @@ href="#pdt-strategist-r1-spec-review-synthesis-cursor-codex-spec-patch-landed"
 id="toc-pdt-strategist-r1-spec-review-synthesis-cursor-codex-spec-patch-landed">2026-05-10
 15:30 PDT — Strategist: R1 spec review synthesis (Cursor + Codex) + spec
 patch landed</a></li>
+<li><a
+href="#pdt-cursor-claude-post-patch-verification-tail_session-artifact-cross-check"
+id="toc-pdt-cursor-claude-post-patch-verification-tail_session-artifact-cross-check">2026-05-10
+15:40 PDT — Cursor Claude: post-patch verification
+(<code>tail_session</code> + artifact cross-check)</a></li>
+<li><a href="#pdt-codex-review-patched-032-artifact-and-claude-session"
+id="toc-pdt-codex-review-patched-032-artifact-and-claude-session">2026-05-10
+15:31 PDT — Codex: review patched 032 artifact and Claude
+session</a></li>
+<li><a href="#pdt-strategist-r2-review-synthesis-micro-patch-applied"
+id="toc-pdt-strategist-r2-review-synthesis-micro-patch-applied">2026-05-10
+15:42 PDT — Strategist: R2 review synthesis + micro-patch
+applied</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -6281,6 +6294,223 @@ original — 4 ACs instead of 5 (dogfooding moved out), every predicate
 and field named explicitly, the demo-bar load-bearing claim covered by a
 concrete rank-demotion rule. The R1 review made the spec smaller AND
 more precise simultaneously.</li>
+</ol></li>
+</ul>
+<h3
+id="pdt-cursor-claude-post-patch-verification-tail_session-artifact-cross-check">2026-05-10
+15:40 PDT — Cursor Claude: post-patch verification
+(<code>tail_session</code> + artifact cross-check)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> Founder asked to confirm the
+<strong>Claude session</strong> and <strong>patched 032
+artifact</strong> after refinement.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl", count=8)</code>;
+<code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=5)</code>;
+read
+<code>backlog/ready/2026-05-10-032-m2-first-call-reliability.md</code>.</li>
+<li><strong>Returned:</strong> <strong>e995</strong> tail — newest turn
+<code>2026-05-10T22:29:21.815Z</code>: USER “update and patch the spec”;
+assistant reports patch + R1 journal at
+<strong><code>23e5d56</code></strong>, summary table (C1–Cu3),
+disposition all 9 findings applied. Middle still elided
+(<code>bytes_elided=1170</code>). <strong>71b36548</strong> tail
+unchanged at <strong>May 10 ~07:41Z</strong> (template/coordination
+hold) — <strong>no</strong> 032 patch there; strategist friction-revisit
+thread is <strong>e995</strong>, not the long brainstormer session.</li>
+<li><strong>Read sources:</strong> <code>source_resolved</code> = each
+pinned JSONL above only; artifact from workspace path only.</li>
+<li><strong>Verdict:</strong> ✅ right — on-disk spec matches strategist
+“patched” narrative (title demotion, AC1 predicate + rank demotion, AC2
+<code>prefer</code>, AC3 descriptions, R1 appendix, corrected
+<code>recent-work-context</code> path, <code>rank.ts</code> + normalize
+refs). 🟡 partial — <strong>AC1/AC2 still say
+<code>CaptureEvent.occurred_at</code></strong>, but
+<strong><code>CaptureEvent</code> in
+<code>src/storage/interface.ts</code> has <code>timestamp</code>
+only</strong>; trace code uses
+<strong><code>NormalizedContextEvent.time.occurred_at</code></strong>.
+<strong><code>spec_refs</code> lists
+<code>src/normalize/event.ts</code></strong> which is <strong>not in the
+repo</strong> (types live in <code>src/normalize/types.ts</code> etc.).
+Suggest one micro-edit before claim: name the field <strong>per
+implementation layer</strong> or add
+<code>src/storage/interface.ts</code> to <code>spec_refs</code> and fix
+wording.</li>
+<li><strong>Note:</strong> Independent confirmation: use
+<strong><code>e9954811</code></strong> JSONL when tailing “strategist
+shipped 032,” not <strong><code>71b36548</code></strong>.</li>
+<li><strong>Conjecture:</strong> none</li>
+</ul>
+<h3
+id="pdt-codex-review-patched-032-artifact-and-claude-session">2026-05-10
+15:31 PDT — Codex: review patched 032 artifact and Claude session</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> founder said “spec is patched check claude
+session as well as the artifact.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T22:24:40.636Z", timeout=10)</code></li>
+<li><code>tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl", count=3)</code></li>
+</ol></li>
+<li><strong>Returned:</strong> both calls surfaced newest strategist
+atom <code>34372338-485f-4838-96c3-c7ebe2e08540</code> at
+<code>2026-05-10T22:29:21.815Z</code>: Claude reported spec patch + R1
+journal entry landed at <code>23e5d56</code>, summarized all 9 review
+findings, and recommended sending item 032 to a builder after Codex
+confirms. <code>wait_for_new_turns</code> returned
+<code>next_since="2026-05-10T22:30:02.421Z"</code>. The turn still had
+content elision (<code>bytes_elided=1170</code>), so Codex read the
+source JSONL for full text.</li>
+<li><strong>Read sources:</strong> exact strategist source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>;
+patched artifact
+<code>backlog/ready/2026-05-10-032-m2-first-call-reliability.md</code>;
+source checks against <code>src/storage/interface.ts</code>,
+<code>src/normalize/types.ts</code>, <code>src/trace/rank.ts</code>,
+<code>src/mcp/tools/get-atoms.ts</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO found the correct patch
+turn and the artifact is present at <code>HEAD=23e5d56</code>, but the
+patched spec still has build-blocking field/path mistakes: it references
+nonexistent <code>src/normalize/event.ts</code> and
+<code>CaptureEvent.occurred_at</code>. The demotion rule is
+directionally right but may not fully guarantee rank-1 prior work under
+the existing rank sort.</li>
+<li><strong>Note:</strong> Cursor Claude independently logged the same
+timestamp/path issue in the prior journal entry. Codex adds a second
+concern: treating <code>recent_activity</code> as 0 is weaker than an
+explicit demotion-below-non-single-source sort key.</li>
+<li><strong>Conjecture:</strong> none</li>
+</ul>
+<h3
+id="pdt-strategist-r2-review-synthesis-micro-patch-applied">2026-05-10
+15:42 PDT — Strategist: R2 review synthesis + micro-patch applied</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said “check codex and cursor
+review on patched 032 spec.” Strategist polled both reviewer sessions
+for post-patch findings.</li>
+<li><strong>Query inputs (3 calls + 4 direct file reads):</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=[&lt;codex JSONL&gt;, "cursor"], since='2026-05-10T22:13:37.871Z', timeout=45)</code>
+— returned 4 Codex turns (12, 13, 14, 15). Turn 15 was the load-bearing
+post-patch review.</li>
+<li>JSONL fallback <code>jq</code> against codex
+<code>019e10a5-...jsonl</code> to recover turn 15’s elided middle
+(<code>bytes_elided=1537</code>).</li>
+<li>Direct SQLite probe of Cursor <code>state.vscdb</code> composer
+<code>c15c2eca-...</code> for substantive recent bubbles — found
+<code>f64ac5f7-...</code> (post-patch verification, 2051 chars) and
+<code>823c123f-...</code> (tail-session dogfooding, 1306 chars).</li>
+<li>Direct code reads: <code>src/storage/interface.ts:1-30</code>,
+<code>src/normalize/types.ts:1-30</code>,
+<code>src/trace/rank.ts:108-122</code>,
+<code>src/mcp/tools/get-atoms.ts</code> (duplicate-ID behavior).</li>
+</ol></li>
+<li><strong>Returned:</strong> Codex turn 15 review: 3 findings — 1 HIGH
+(field/path naming), 1 Medium (demotion-strength), 1 Medium/Low
+(duplicate-ID claim). Cursor bubble <code>f64ac5f7-...</code> review: 1
+nit (same field/path naming finding as Codex HIGH). <strong>Convergent:
+R2-1 field/path naming (both caught).</strong> <strong>Codex-only: R2-2
+demotion strength, R2-3 duplicate-ID claim.</strong> Total: 3 unique
+findings, all validated against code.</li>
+<li><strong>Read sources:</strong> Codex JSONL <code>019e10a5-...</code>
++ Cursor <code>state.vscdb</code> (composer <code>c15c2eca-...</code>,
+bubbles <code>f64ac5f7</code> + <code>823c123f</code>) + spec file +
+source code. ECHO substring index again did NOT surface the Cursor 032
+review via <code>search_memories(source_app="cursor")</code>; direct
+composer-id probe was load-bearing (M1-1 escalation again).</li>
+<li><strong>Verdict:</strong> 🟡 partial — strategist found all 3 R2
+findings, validated them, applied micro-patch in 4 targeted edits. But
+the R1 patch had introduced TWO of those issues (R2-1 fabricated
+path/field names; R2-3 misstated existing behavior). Patch quality was
+lower than the original spec on those dimensions. The R2 review caught
+the regression before claim.</li>
+<li><strong>Note (load-bearing — fifth confirmation of cross-tool review
+pattern, FIRST cycle catching regressions in the previous round’s
+patch):</strong> Prior 4 cycles (R1 spec review 030 ×3, R1 code review
+030, R1 sequencing/facts review 032, R1 spec review 032) had each caught
+issues in the ORIGINAL artifact. This R2 cycle is the first where a
+reviewer caught issues the previous review’s PATCH introduced. The
+pattern is now demonstrably positive-feedback under iteration: each
+patch round can introduce new bugs that the next review round catches.
+<strong>Without R2, item 032 would have shipped to a builder with two
+fabricated path/field references and an inadequate demotion
+rule</strong> — the builder would have either (a) hand-corrected without
+flagging (drift), (b) flagged via <code>agent_notes</code> (slow), or
+(c) shipped a non-load-bearing demotion that the dogfooding entry would
+have surfaced post-merge (slowest). All three outcomes are worse than
+the R2 round.</li>
+<li><strong>Note (M1-3 fired again — fourth incident in 24h):</strong>
+Codex turn 15 came back with
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>
+and <code>bytes_elided=1537</code>. The HIGH finding (R2-1) and the
+closing recommendation were preserved at head/tail; the Medium findings
+(R2-2, R2-3) were in the elided middle. Recovered via <code>jq</code>.
+<strong>Item 033 (<code>get_atom(id, full=true)</code> full-atom
+recovery) is now structurally blocking cross-tool spec review
+cycles</strong> — every dense Codex review will require JSONL fallback
+until 033 ships. Worth bumping above remaining V1.6 items.</li>
+<li><strong>Note (M1-1 reconfirmed escalation — Cursor review-content
+NOT in ECHO substring index AGAIN):</strong>
+<code>search_memories(source_app="cursor")</code> returned 0 hits for
+the Cursor 032-patch-review composer’s recent bubbles. The 2051-char
+review text in bubble <code>f64ac5f7-...</code> exists in SQLite but
+<code>tail_session(source_app="cursor")</code> resolved to the MRU
+non-Project-echo composer (Cursor’s MRU is global, not repo-scoped —
+Cursor’s own journal entry at 15:28 PDT calls this out). Recovery again
+required composer-id from prior dogfooding entries. <strong>Until item
+029 follow-ups land, every cross-tool spec review depends on the
+strategist already knowing the Cursor composer ID</strong> — that’s not
+a scalable substrate.</li>
+<li><strong>Note (patch errors introduced by R1 → caught by
+R2):</strong> Two R2 findings (R2-1, R2-3) were errors the strategist
+introduced in the R1 patch itself. R2-1: fabricated
+<code>CaptureEvent.occurred_at</code> (hybrid name combining two real
+types) + <code>src/normalize/event.ts</code> (file doesn’t exist). R2-3:
+claimed duplicate-ID-collapse was “existing behavior — confirm
+preserved” when storage’s <code>getByIds</code> contract actually
+returns duplicates. <strong>These were both hallucinations the
+strategist did not verify against code before commit.</strong> The
+discipline lesson: when a patch references field names or file paths,
+<code>grep</code>/<code>ls</code> BEFORE commit, not after a reviewer
+catches it. Should add a self-review checklist for spec patches: (a)
+every <code>spec_refs</code> path → <code>ls</code> exists; (b) every
+field name → <code>grep</code> exists in the named file; (c) every
+“existing behavior” claim → <code>grep</code> confirms the
+implementation.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>Strict-partition demotion is the right load-bearing
+fix.</strong> R2-2 forced strategist to pick between “nudge one signal”
+(R1) vs “structural guarantee” (R2). The R2 fix (add a primary sort key
+before the existing 5-key chain, gated on
+<code>demoteSingleSourceRecent</code>) is simpler AND more robust than
+the R1 fix. The demo bar becomes a contract, not a hope. This is a
+common pattern when reviewers push back on under-specified rank
+manipulations — go to a partition or a rank-floor, not a per-signal
+nudge.</li>
+<li><strong>The fabricated-name-in-patch failure mode is now
+well-attested.</strong> First seen in R1 → R2 today. Worth a process
+change: spec patches should include a “spec_refs validation” gate as
+part of writing-plans or the strategist self-review checklist. Catch it
+before the reviewer has to.</li>
+<li><strong><code>search_memories(source_app="cursor")</code> is
+structurally unreliable for review-content recovery.</strong> Three
+independent rounds today have required composer-id-from-prior-entry
+recovery via direct SQLite. Either the Cursor extractor catches up (item
+029 follow-ups), or the cross-tool review pattern silently degrades to
+“only Codex reviews count, Cursor is decorative.” That’s not the
+dogfooding outcome the V1 substrate was supposed to enable.</li>
+<li><strong>R2 is cheap.</strong> ~7 minutes of reviewer time per client
++ ~10 minutes of strategist synthesis = ~20 minutes total to catch 3
+real bugs (1 demo-bar regression, 2 spec-correctness regressions).
+Compared to discovering them in a builder run or post-merge dogfooding,
+this is order-of-magnitude cheaper. <strong>R2 should be the default
+expectation after a spec patch, not an exception.</strong></li>
 </ol></li>
 </ul>
 <hr />
