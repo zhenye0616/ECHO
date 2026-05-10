@@ -1304,6 +1304,88 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
   1. **Item 032 was scoped from the dogfooding journal directly.** This is the workflow CLAUDE.md describes ("aspirational end-of-week entries are useless, lossy in-the-moment entries are gold"). The 13:06 PDT entry surfaced M2-1 + M2-2; the 14:55 PDT entry confirmed M1-3 firing; the cross-tool review (Codex pushback) confirmed sequencing. 3 journal entries → 1 spec, ~50 minutes elapsed.
   2. **`wait_for_new_turns` should probably surface `bytes_elided` and `truncations` at the turn level for group-session callers.** Today's round-trip happened to not hit content elision, but the prior round did. Group-session callers care about "did the partner say something that got clipped from my view" — same trust signal as `get_atoms.truncations` but for the long-poll surface.
 
+### 2026-05-10 15:20 PDT — Codex: review Claude refinement on item 032
+
+- **Source agent:** Codex
+- **Trigger:** founder asked "review refinement from claude" after Codex reviewed item 032 and Claude combined Codex + Cursor spec-review findings.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T21:58:28.884Z", timeout=10)`
+  2. `wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T22:19:33.258Z", timeout=10)`
+- **Returned:** call 1 returned three strategist turns, newest atom `f8ef59b5-3b4c-4d5a-b893-3a42a5e23a3a` at `2026-05-10T22:17:44.846Z`, `next_since="2026-05-10T22:19:33.258Z"`. That turn combined Codex and Cursor reviews, validated nine findings, and concluded the spec needs patching before claim. The returned content was clipped (`bytes_elided=2896`), so Codex read the exact source JSONL to recover the full findings. Call 2 timed out with no newer strategist turn and `next_since="2026-05-10T22:19:53.518Z"`.
+- **Read sources:** exact strategist source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl`; local task file `backlog/ready/2026-05-10-032-m2-first-call-reliability.md` checked separately and had no local diff yet.
+- **Verdict:** 🟡 partial — ECHO correctly located Claude's latest synthesis and confirmed no later patch turn, but content elision again forced raw JSONL fallback for the middle of the review report.
+- **Note:** Claude has not yet landed a file-level refinement. The latest actionable state is a validated findings report plus "Patching now"; item 032 should not be sent to a builder until the actual spec patch lands and the self-only expansion/ranking behavior is made precise.
+- **Conjecture:** This is another direct M1-3 proof point: dense cross-review synthesis is exactly where group-session polling finds the right turn but needs a full-turn recovery path to support reviewer work without JSONL fallback.
+
+### 2026-05-10 15:28 PDT — Cursor Claude: `tail_session` for dogfooding (MRU vs explicit `source=`)
+
+- **Source agent:** Cursor's Claude
+- **Trigger:** Founder directed agents to **use ECHO `tail_session`** when continuing work — important for dogfooding traceability and source attribution.
+- **Query inputs:**
+  1. `tail_session(source_app="cursor", count=8)`
+  2. `tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl", count=5)`
+- **Returned:** (1) **8 turns**, `next_cursor` set; newest turn `2026-05-10T21:30:33.277Z` (ROI/isr-demo thread); turns also include Project_echo composer `c15c2eca-914a-4d9f-aceb-5d4c4dfac226` (032 review, Codex group-session, this instruction). (2) **5 turns** from strategist CC session `71b36548-…`; newest `2026-05-10T07:41:43.812Z` (hold coordination / template filing after `acfb6ec`). Several turns carried `truncations` (`content` and/or `metadata.tool_calls:projected`).
+- **Read sources:** (1) `source_resolved=fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb` **only** — Cursor lane is MRU-global across workspaces. (2) `source_resolved` = explicit Claude Code JSONL above **only**.
+- **Verdict:** 🟡 partial on (1), ✅ right on (2) — MRU `source_app=cursor` is correct for "what Cursor last did anywhere" but **wrong** as a sole signal for "this repo's thread"; explicit `source=` pins the strategist session without MRU bleed from other projects. (2) matched expected strategist tail.
+- **Note:** Reinforces journal pattern: for Project_echo dogfooding, pair **`tail_session(source=<echo/strategist jsonl>)`** (or `source_app` only when MRU is acceptable) so **Sources:** in the entry names real files, not just `state.vscdb`.
+- **Conjecture:** none
+
+### 2026-05-10 15:21 PDT — Codex: tail pinned Claude strategist session
+
+- **Source agent:** Codex
+- **Trigger:** founder asked "use echo to tail the claude session."
+- **Query inputs:**
+  1. `tail_session(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl", count=5)`
+- **Returned:** 5 most-recent turns from the pinned strategist session. Newest turn remained atom `f8ef59b5-3b4c-4d5a-b893-3a42a5e23a3a` at `2026-05-10T22:17:44.846Z`: Claude combined and validated Codex + Cursor spec-review findings for item 032, concluded the spec needs patching before claim, and ended with "Patching now." Older returned turns covered the 031 gate explanation, the journal-race pushback, the earlier Codex-pushback synthesis, and the Ladder A recommendation.
+- **Read sources:** exact strategist source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl`.
+- **Verdict:** 🟡 partial — ECHO tailed the correct session and returned the latest turn, but the newest turn was content-elided (`bytes_elided=2896`), so `tail_session` alone is not sufficient to inspect the full combined spec review.
+- **Note:** No newer Claude patch/refinement turn was visible in the tail beyond the already-known combined validation report. The live task file still needs a concrete spec diff before builder handoff.
+- **Conjecture:** `tail_session` is good for "what is the latest turn?" but not yet for "review the latest dense recommendation" unless paired with full-atom recovery or JSONL fallback.
+
+### 2026-05-10 15:24 PDT — Codex: check for Claude refinement after pushback
+
+- **Source agent:** Codex
+- **Trigger:** founder asked whether Codex can review what Claude sent back as refinement after Codex pushed back on item 032.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=["fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl"], since="2026-05-10T22:19:53.518Z", timeout=10)`
+- **Returned:** no newer turns; `timed_out=true`, `next_since="2026-05-10T22:24:40.636Z"`.
+- **Read sources:** exact strategist source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl`; local `backlog/ready/2026-05-10-032-m2-first-call-reliability.md` and `docs/BACKLOG.md` diffs were also checked and remained unchanged.
+- **Verdict:** ✅ right — ECHO correctly confirmed there is no post-pushback refinement turn visible yet.
+- **Note:** The only available Claude "refinement" remains the combined validation report from `2026-05-10T22:17:44.846Z`, which accepted/validated the review findings and said the spec needs patching before claim. There is no actual patched spec to review yet.
+- **Conjecture:** none
+
+### 2026-05-10 15:30 PDT — Strategist: R1 spec review synthesis (Cursor + Codex) + spec patch landed
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context)
+- **Trigger:** Founder said "review spec review by cursor and codex. combine and validate the findings." Strategist queried both reviewer sessions, recovered full review content (with M1-3 fallbacks where needed), validated load-bearing findings against code, then patched spec.
+- **Query inputs (4 calls + 2 direct file reads):**
+  1. `wait_for_new_turns(sources=[<codex JSONL>, "cursor"], since='2026-05-10T22:02:53.103Z', timeout=30)` — returned Codex turn 11 (review, content-elided at `bytes_elided=1708`); no Cursor turns matched (Cursor capture path doesn't surface review through `wait_for_new_turns` source-app prefix today — see notes below).
+  2. `search_memories(query="032", source_app="cursor", since='2026-05-10T21:00:00Z', limit=10)` — 0 matches. Cursor's review content is NOT in ECHO's substring index even though Cursor wrote it (M1-1 territory: Cursor extractor's `.text` reads return empty for the review composer's most-recent bubbles).
+  3. `tail_session(source_app="cursor", count=5)` — returned 5 turns but only earlier bubbles (with empty assistant text for the 032-review composer's most-recent bubbles).
+  4. Direct SQLite probe of `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` for composer `c15c2eca-...` (the Cursor 032-review composer per the earlier 17:45 PDT entry) → bubble `dc15993e-9ccf-4f03-9eb8-873ad8cc767c` had 4414 chars of text (the full review); newer bubbles (`86a6ec85-...` etc.) had empty `.text` (tool-call frames with content in `toolFormerData`).
+  5. JSONL fallback via `jq` on `~/.codex/sessions/.../019e10a5-...jsonl` for the full Codex review (recovered the 1708-char elided middle).
+  6. Direct code reads: `sed -n '100,140p' src/trace/rank.ts` (validate Codex Cx1 ranking claim) + `sed -n '55,80p' src/mcp/tools/find-clusters.ts` (validate Cursor Cu1 description-string claim) + `ls` on both candidate `recent-work-context.ts` paths (validate the path error).
+- **Returned:** Codex review (turn 11): 5 findings — 1 high (demo-bar ranking), 1 high (predicate ambiguity), 2 medium (missing-ID + dogfooding AC), 1 low (path). Cursor review (Cursor composer `c15c2eca-...` bubble `dc15993e-...`): 6 findings — 2 P1 (path + description-string lock-step), 3 P2 (predicate grammar, missing-ID, timestamp field), 1 P3 (resume_tail_source frontmatter). Total: 9 unique findings (3 convergent, 3 Codex-only, 3 Cursor-only).
+- **Read sources:** Codex `019e10a5-...jsonl` + Cursor `state.vscdb` (composer `c15c2eca-...`) + spec file + source code at `rank.ts`, `find-clusters.ts`, `recent-work-context.ts`, `get-atoms.ts`. The Cursor JSONL fallback was load-bearing — without it the strategist would have synthesized review from Codex alone and missed the 3 Cursor-only findings including the P1 description-string lock-step.
+- **Verdict:** ✅ right on the synthesis; 🔴 wrong on the Cursor capture path. Strategist combined + validated all 9 findings and applied all 9 patches to the spec in a single Write. `tools/blocked.py --validate` passes post-patch. But ECHO's M1-1 Cursor capture is biting harder than the spec narrative claimed — `search_memories` returned 0 matches for "032" in cursor source, and `tail_session(source_app="cursor")` didn't surface the relevant composer's review bubble. The actual content was recoverable only via direct SQLite probe with composer-id known from prior dogfooding entries.
+- **Note (M1-1 escalation — Cursor capture gap wider than item 029 admitted):** Item 029 (cursor source_breakdown falsification) shipped 2026-05-10 and narrowed the diagnosis to "source_breakdown clustering issue, not capture." Today's data refutes that narrowing in part: when Cursor's composer is actively streaming and its latest bubbles are tool-call frames (with content in `toolFormerData` not `.text`) or `agentKv:blob:` redacted-reasoning blobs, the Cursor extractor surfaces empty assistant text. The 4414-char review IS in SQLite (bubble `dc15993e-...`'s `.text` field), but ECHO didn't index it because the search-substring path didn't fire on that bubble. **The actual Cursor capture-rewrite work in item 029 follow-ups (`_followups.md:375-381`) is more urgent than the followups list suggested**, because R1 cross-tool spec review now structurally depends on Cursor producing readable review content, and the substrate isn't surfacing it.
+- **Note (M1-3 fired again on Codex review turn 11):** Codex's turn 11 came back with `truncations: ["content", "metadata.tool_calls:projected"]` and `bytes_elided: 1708`. The HIGH findings (Cx1, Cx2) were preserved at head/tail; the Medium and Low findings were in the elided middle. **Recovered via `jq` against the source JSONL.** This is now the **third M1-3 incident in 24 hours**, all involving long Codex assistant turns. Item 033 (full-atom recovery) urgency confirmed yet again.
+- **Note (load-bearing complementarity in R1 spec review):** Codex caught the demo-bar semantic bug (Cx1 — ranking favors recent_activity → self-cluster outranks prior work even after expand). Cursor caught the user-facing description-string drift (Cu1 — `FIND_CLUSTERS_DESCRIPTION` still promises empty-only expand). **Either reviewer alone would have shipped a worse spec.** Codex without Cursor: builder ships expand + demotion but `FIND_CLUSTERS_DESCRIPTION` lies to consumers. Cursor without Codex: builder ships expand without demotion + correct description, demo bar still breaks because ranking favors recent. Both are load-bearing; both are necessary. **This is the fourth independent confirmation cycle of cross-tool-review-finds-things-single-tool-misses, first cycle scoped to spec review.**
+- **Note (9 findings, all 9 applied — patches summarized):**
+  - C1: `spec_refs` path fixed (frontmatter + Implementation Notes both)
+  - C2: AC1 predicate rewritten as `single-source-recent iff (single-source-app) AND (latest atom within threshold)` + `no_useful_cluster = every cluster is single-source-recent` (vacuous truth for empty); per Cursor's specific fix proposal
+  - C3: AC2 specifies missing-IDs-at-end (preserving request order among themselves) + duplicate-IDs-collapsed-to-first
+  - Cx1 (HIGH): AC1 adds demotion rule — when auto-expand fires with `single-source-recent` trigger AND both single-source-recent + non-single-source-recent clusters exist in 24h, force `recent_activity=0` for single-source-recent clusters during rank. Demo bar now holds.
+  - Cx2: predicate renamed throughout from `non-self` / `self-only-recent` → `single-source-recent`; "Naming note" added to AC1 documenting that it's a heuristic, not identity. `SELF_CLUSTER_RECENT_THRESHOLD_MS` → `SINGLE_SOURCE_RECENT_THRESHOLD_MS`.
+  - Cx3: dogfooding AC moved from AC5 → After Completion as founder/strategist verification step
+  - Cu1: AC3 expanded — `FIND_CLUSTERS_DESCRIPTION` lines 64-65 + `outputSchema` docs + `recent-work-context.ts` migration banner all updated in lockstep
+  - Cu2: AC1 names `CaptureEvent.occurred_at` as the timestamp field; `src/normalize/event.ts` added to `spec_refs`
+  - Cu3: `resume_tail_source` kept in frontmatter (item 029 also uses it; effectively the emerging hint-field convention)
+- **Conjecture (observation-only):**
+  1. **R1 spec review pattern's positive-cost claim is now empirically defensible.** Codex pushback on the original draft, Cursor + Codex R1 spec review on the redraft = ~25 min of reviewer time across both clients, ~30 min of strategist synthesis + patch time = ~55 min total. Output: 9 buildable findings, all material to claimability, including 1 (Cx1) that would have shipped as a broken demo bar. Compare against the 030 R1 spec review (3 rounds, 25 findings, ~3 hours) — this round was 1/3 the cost on a smaller spec, returns proportional. The pattern scales down to single-item revisions, not just big ships.
+  2. **The Cursor-capture-path-doesn't-surface-review-content gap is going to fire repeatedly** until item 029's followups (cursor adapter narrow-emission enrichment, especially) land. Today: strategist had to know the composer ID from prior dogfooding entries to recover the review. Tomorrow's strategist (or builder) will not have that context and the cross-tool review will be silently incomplete. **Bump 029 follow-ups priority — they're now blocking cross-tool spec review reliability, not just substrate hygiene.**
+  3. **Spec quality is positive-feedback with cross-tool review.** This patched spec is substantially tighter than the original — 4 ACs instead of 5 (dogfooding moved out), every predicate and field named explicitly, the demo-bar load-bearing claim covered by a concrete rank-demotion rule. The R1 review made the spec smaller AND more precise simultaneously.
+
 ---
 
 ## End-Of-Window Synthesis (filled at end of window)
