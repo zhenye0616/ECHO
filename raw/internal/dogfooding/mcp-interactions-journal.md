@@ -1494,6 +1494,35 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 16:08 PDT — Claude Code: fresh-session resume after `/clear` ("use echo and resume from opening matter")
+
+- **Source agent:** Claude Code (Opus 4.7, 1M context) — new session post `/clear`, no prior conversational context
+- **Trigger:** Founder typed "use echo and resume from openingn matter" — asking the just-cleared session to rebuild "where did I leave off" purely from ECHO + filesystem, no in-conversation memory.
+- **Query inputs (2 ECHO calls + 1 fs read):**
+  1. `find_clusters(since='2026-05-09T00:00:00')` — explicit ~2-day lookback. Got `[TZ]` warning (no Z suffix); response otherwise complete.
+  2. `tail_session(source_app='claude_code', count=10)` — auto-resolved to MRU CC session `0e016476-...jsonl` to read the actual last-turn body.
+  3. Direct `Read` of `backlog/pending_review/2026-05-10-032-m2-first-call-reliability.review.md` to confirm the open matter's exact disposition.
+- **Returned:** 8 clusters, 275 atoms, `truncated:false`, `atoms_returned:275 / atoms_total_in_window:275`. Rank-1 cluster `ctx_b2f35070` (claude_code:123, git:54, time_range 2026-05-09T07:02Z → 2026-05-10T23:05Z, label "discussion about Project_echo," 30 open-loop hints visible + 14 omitted). `tail_session` returned 10 most-recent CC turns from session `0e016476-...`; turn-0 (2026-05-10T23:05:17Z) was the `/review-pending` on item 032 ending with "Reply with `/merge-and-cleanup 032` to proceed." That confirmed the resume target without needing to scan further clusters.
+- **Read sources:** `find_clusters` source_breakdown across all 8 clusters: claude_code:139, codex:39, cursor:43, git:54 — all four active sources contributed. `tail_session` source_resolved: `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/0e016476-52ea-4f06-a6af-166280d7eb26.jsonl`. Direct fs read: `backlog/pending_review/2026-05-10-032-m2-first-call-reliability.review.md` (35 lines, the untracked review sidecar shown in `git status`).
+- **Verdict:** ✅ right. Two-call recipe (`find_clusters` for breadth → `tail_session` for the exact last-turn body) reconstructed "where we left off" in <5s of wall-clock with no false starts. The fact that rank-1's `time_range.to` (`23:05:17Z`) and `tail_session` turn-0 `timestamp` matched exactly was the cheap consistency check that told me I had the right thread before reading the review sidecar.
+- **Note (post-030 toolkit behaving as designed for the resume-after-clear case):** This is the second post-merge resume call against the new toolkit (first was 2026-05-10 13:06 PDT, "first real resume call on new toolkit post-030 merge"). Both worked. The 13:06 call was after a multi-hour gap (auto-expand fired); this one was after a `/clear` (single-session reset, no time gap). Different friction, same toolkit, same shape, both worked. The strategist's prior recipe ("find_clusters first, then tail_session OR get_atoms") generalizes cleanly to the `/clear` recovery use-case which wasn't an explicit motivation when 030 was specced.
+- **Note (auto-expand did NOT fire this time and that's correct):** I passed `since='2026-05-09T00:00:00'` explicitly (≈2-day lookback) — the no-args auto-expand path was bypassed. The `[TZ]` warning fired because the since-string had no Z suffix. Both behaviors are documented in the `find_clusters` description and worked as advertised.
+- **Note (item 032 is the awaiting-founder matter; cross-tool review TBD):** Review sidecar verdict is `merge as-is`. Reviewer flagged one soft risk: implementation review was single-tool (Claude code-reviewer subagent only), and the 030 pattern showed single-tool implementation review missed three envelope-ceiling bugs that Cursor + Codex caught in a post-build cross-tool sweep. The reviewer's own recommendation in the verdict-summary turn was "run the cross-tool post-build review first (recommended given the spec's R3 hypothesis)." Awaiting founder's call on `/merge-and-cleanup 032` vs. cross-tool review first.
+- **Conjecture (observation-only):** For the `/clear`-recovery case specifically, the recipe `find_clusters(since=now-24h) → tail_session(source_app=<top cluster's source>, count=10)` is faster than `find_clusters → get_atoms(top_cluster.atom_ids[0:10])` because `tail_session` returns full turn bodies already-projected, while `get_atoms` requires choosing which atom IDs to materialize and may include git commits (low signal for "what was the chat conversation just before /clear?"). If this pattern recurs across founders/clients, worth documenting as a named recipe in `wiki/surfaces/mcp-find-clusters.md` post-promotion: "Recipe: resume after `/clear` or fresh session."
+
+### 2026-05-10 16:08 PDT — Codex: tail Claude review context for item 032 cross-tool review
+
+- **Source agent:** Codex (reviewer mode)
+- **Trigger:** Founder typed "use echo and tail the review claude agent and do your own round of review" — asking Codex to consult the Claude Code review context before running an independent cross-tool review.
+- **Query inputs:** `tail_session(source_app='claude_code', count=20)`
+- **Returned:** 2 turns, 0 clusters. MRU Claude Code session resolved to the strategist/review thread. The latest turn framed item 032 as awaiting founder decision; the adjacent turn said item 032 review had finished at 2026-05-10 16:05 PDT with verdict `merge as-is`, and the open decision was `/merge-and-cleanup 032` versus cross-tool review first.
+- **Sources:** `source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/5da2f3ac-ba8a-4625-a817-c13ece8f27c6.jsonl`; returned turn ids `9848ce71-51f7-4872-b1c9-a5af5610f05e`, `8a8d6deb-6f43-452f-a96b-db9a241fe4ab`. No Cursor/Codex/git sources contributed to this tail call.
+- **Verdict:** ✅ right
+- **Note:** `tail_session` did exactly what the prompt needed: it identified the active review target (`032`), the review sidecar path, the worktree head (`a16779e`), and the previous reviewer’s soft-risk framing without needing broader cluster retrieval.
+- **Conjecture:** For cross-tool review handoffs, a single `tail_session(source_app='claude_code')` call is enough when the founder names "the review Claude agent"; broader `find_clusters` is only needed if the MRU Claude session is not the review session.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*

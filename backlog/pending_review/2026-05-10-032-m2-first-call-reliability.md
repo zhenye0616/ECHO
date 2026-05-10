@@ -41,7 +41,13 @@ agent_notes: |
 
   No drift events caught; no founder-input blockers; no scope expansion.
   Branch agent/m2-first-call-reliability pushed at SHA a16779ed.
-review_notes: ""
+review_notes: |
+  Codex cross-tool post-build review (2026-05-10 16:14 PDT): fix AC3
+  description drift before merge. Runtime behavior looks correct and tests pass,
+  but `RECENT_WORK_CONTEXT_DESCRIPTION` still advertises empty-only no-args
+  auto-expand in two places, and `GET_ATOMS_DESCRIPTION` / result comments still
+  describe dropped-ID order as requested order even when `prefer="newest_first"`
+  uses processed order. See sidecar for full findings and verification.
 spec_refs:
   - src/mcp/tools/find-clusters.ts
   - src/mcp/tools/recent-work-context.ts

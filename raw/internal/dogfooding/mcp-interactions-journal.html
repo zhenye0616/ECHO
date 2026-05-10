@@ -962,6 +962,16 @@ href="#pdt-strategist-033-r1-synthesis-first-divergent-verdict-contract-revision
 id="toc-pdt-strategist-033-r1-synthesis-first-divergent-verdict-contract-revision">2026-05-10
 16:05 PDT — Strategist: 033 R1 synthesis (FIRST divergent verdict) +
 contract revision</a></li>
+<li><a
+href="#pdt-claude-code-fresh-session-resume-after-clear-use-echo-and-resume-from-opening-matter"
+id="toc-pdt-claude-code-fresh-session-resume-after-clear-use-echo-and-resume-from-opening-matter">2026-05-10
+16:08 PDT — Claude Code: fresh-session resume after <code>/clear</code>
+(“use echo and resume from opening matter”)</a></li>
+<li><a
+href="#pdt-codex-tail-claude-review-context-for-item-032-cross-tool-review"
+id="toc-pdt-codex-tail-claude-review-context-for-item-032-cross-tool-review">2026-05-10
+16:08 PDT — Codex: tail Claude review context for item 032 cross-tool
+review</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -6837,6 +6847,133 @@ R2 should verify the revised contract still achieves the M1-3 demo bar —
 i.e., does the Codex-realistic test case (10KB content + 130KB
 tool_calls metadata) actually fit in 25k after projection?</li>
 </ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-claude-code-fresh-session-resume-after-clear-use-echo-and-resume-from-opening-matter">2026-05-10
+16:08 PDT — Claude Code: fresh-session resume after <code>/clear</code>
+(“use echo and resume from opening matter”)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (Opus 4.7, 1M context) —
+new session post <code>/clear</code>, no prior conversational
+context</li>
+<li><strong>Trigger:</strong> Founder typed “use echo and resume from
+openingn matter” — asking the just-cleared session to rebuild “where did
+I leave off” purely from ECHO + filesystem, no in-conversation
+memory.</li>
+<li><strong>Query inputs (2 ECHO calls + 1 fs read):</strong>
+<ol type="1">
+<li><code>find_clusters(since='2026-05-09T00:00:00')</code> — explicit
+~2-day lookback. Got <code>[TZ]</code> warning (no Z suffix); response
+otherwise complete.</li>
+<li><code>tail_session(source_app='claude_code', count=10)</code> —
+auto-resolved to MRU CC session <code>0e016476-...jsonl</code> to read
+the actual last-turn body.</li>
+<li>Direct <code>Read</code> of
+<code>backlog/pending_review/2026-05-10-032-m2-first-call-reliability.review.md</code>
+to confirm the open matter’s exact disposition.</li>
+</ol></li>
+<li><strong>Returned:</strong> 8 clusters, 275 atoms,
+<code>truncated:false</code>,
+<code>atoms_returned:275 / atoms_total_in_window:275</code>. Rank-1
+cluster <code>ctx_b2f35070</code> (claude_code:123, git:54, time_range
+2026-05-09T07:02Z → 2026-05-10T23:05Z, label “discussion about
+Project_echo,” 30 open-loop hints visible + 14 omitted).
+<code>tail_session</code> returned 10 most-recent CC turns from session
+<code>0e016476-...</code>; turn-0 (2026-05-10T23:05:17Z) was the
+<code>/review-pending</code> on item 032 ending with “Reply with
+<code>/merge-and-cleanup 032</code> to proceed.” That confirmed the
+resume target without needing to scan further clusters.</li>
+<li><strong>Read sources:</strong> <code>find_clusters</code>
+source_breakdown across all 8 clusters: claude_code:139, codex:39,
+cursor:43, git:54 — all four active sources contributed.
+<code>tail_session</code> source_resolved:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/0e016476-52ea-4f06-a6af-166280d7eb26.jsonl</code>.
+Direct fs read:
+<code>backlog/pending_review/2026-05-10-032-m2-first-call-reliability.review.md</code>
+(35 lines, the untracked review sidecar shown in
+<code>git status</code>).</li>
+<li><strong>Verdict:</strong> ✅ right. Two-call recipe
+(<code>find_clusters</code> for breadth → <code>tail_session</code> for
+the exact last-turn body) reconstructed “where we left off” in &lt;5s of
+wall-clock with no false starts. The fact that rank-1’s
+<code>time_range.to</code> (<code>23:05:17Z</code>) and
+<code>tail_session</code> turn-0 <code>timestamp</code> matched exactly
+was the cheap consistency check that told me I had the right thread
+before reading the review sidecar.</li>
+<li><strong>Note (post-030 toolkit behaving as designed for the
+resume-after-clear case):</strong> This is the second post-merge resume
+call against the new toolkit (first was 2026-05-10 13:06 PDT, “first
+real resume call on new toolkit post-030 merge”). Both worked. The 13:06
+call was after a multi-hour gap (auto-expand fired); this one was after
+a <code>/clear</code> (single-session reset, no time gap). Different
+friction, same toolkit, same shape, both worked. The strategist’s prior
+recipe (“find_clusters first, then tail_session OR get_atoms”)
+generalizes cleanly to the <code>/clear</code> recovery use-case which
+wasn’t an explicit motivation when 030 was specced.</li>
+<li><strong>Note (auto-expand did NOT fire this time and that’s
+correct):</strong> I passed <code>since='2026-05-09T00:00:00'</code>
+explicitly (≈2-day lookback) — the no-args auto-expand path was
+bypassed. The <code>[TZ]</code> warning fired because the since-string
+had no Z suffix. Both behaviors are documented in the
+<code>find_clusters</code> description and worked as advertised.</li>
+<li><strong>Note (item 032 is the awaiting-founder matter; cross-tool
+review TBD):</strong> Review sidecar verdict is
+<code>merge as-is</code>. Reviewer flagged one soft risk: implementation
+review was single-tool (Claude code-reviewer subagent only), and the 030
+pattern showed single-tool implementation review missed three
+envelope-ceiling bugs that Cursor + Codex caught in a post-build
+cross-tool sweep. The reviewer’s own recommendation in the
+verdict-summary turn was “run the cross-tool post-build review first
+(recommended given the spec’s R3 hypothesis).” Awaiting founder’s call
+on <code>/merge-and-cleanup 032</code> vs. cross-tool review first.</li>
+<li><strong>Conjecture (observation-only):</strong> For the
+<code>/clear</code>-recovery case specifically, the recipe
+<code>find_clusters(since=now-24h) → tail_session(source_app=&lt;top cluster's source&gt;, count=10)</code>
+is faster than
+<code>find_clusters → get_atoms(top_cluster.atom_ids[0:10])</code>
+because <code>tail_session</code> returns full turn bodies
+already-projected, while <code>get_atoms</code> requires choosing which
+atom IDs to materialize and may include git commits (low signal for
+“what was the chat conversation just before /clear?”). If this pattern
+recurs across founders/clients, worth documenting as a named recipe in
+<code>wiki/surfaces/mcp-find-clusters.md</code> post-promotion: “Recipe:
+resume after <code>/clear</code> or fresh session.”</li>
+</ul>
+<h3
+id="pdt-codex-tail-claude-review-context-for-item-032-cross-tool-review">2026-05-10
+16:08 PDT — Codex: tail Claude review context for item 032 cross-tool
+review</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (reviewer mode)</li>
+<li><strong>Trigger:</strong> Founder typed “use echo and tail the
+review claude agent and do your own round of review” — asking Codex to
+consult the Claude Code review context before running an independent
+cross-tool review.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app='claude_code', count=20)</code></li>
+<li><strong>Returned:</strong> 2 turns, 0 clusters. MRU Claude Code
+session resolved to the strategist/review thread. The latest turn framed
+item 032 as awaiting founder decision; the adjacent turn said item 032
+review had finished at 2026-05-10 16:05 PDT with verdict
+<code>merge as-is</code>, and the open decision was
+<code>/merge-and-cleanup 032</code> versus cross-tool review first.</li>
+<li><strong>Sources:</strong>
+<code>source_resolved=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/5da2f3ac-ba8a-4625-a817-c13ece8f27c6.jsonl</code>;
+returned turn ids <code>9848ce71-51f7-4872-b1c9-a5af5610f05e</code>,
+<code>8a8d6deb-6f43-452f-a96b-db9a241fe4ab</code>. No Cursor/Codex/git
+sources contributed to this tail call.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> <code>tail_session</code> did exactly what
+the prompt needed: it identified the active review target
+(<code>032</code>), the review sidecar path, the worktree head
+(<code>a16779e</code>), and the previous reviewer’s soft-risk framing
+without needing broader cluster retrieval.</li>
+<li><strong>Conjecture:</strong> For cross-tool review handoffs, a
+single <code>tail_session(source_app='claude_code')</code> call is
+enough when the founder names “the review Claude agent”; broader
+<code>find_clusters</code> is only needed if the MRU Claude session is
+not the review session.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
