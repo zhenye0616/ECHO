@@ -5085,27 +5085,27 @@ id="pdt-cross-tool-post-build-code-review-of-item-030-cursor-codex-independently
 Codex independently caught 2 P1s the Claude code-reviewer subagent
 missed)</h4>
 <ul>
-<li><strong>Trigger:</strong> founder asked Claude Code (this session)
-to “get all the code review results for 030 from claude cursor and codex
-… understand all and validate all.” Cursor and Codex were each prompted
-with “030 just landing do a full code review” earlier (~00:36 and ~00:55
-PDT) on the worktree at <code>24cb42b</code>.</li>
-<li><strong>Query inputs (echo call 1):</strong>
+<li><p><strong>Trigger:</strong> founder asked Claude Code (this
+session) to “get all the code review results for 030 from claude cursor
+and codex … understand all and validate all.” Cursor and Codex were each
+prompted with “030 just landing do a full code review” earlier (~00:36
+and ~00:55 PDT) on the worktree at <code>24cb42b</code>.</p></li>
+<li><p><strong>Query inputs (echo call 1):</strong>
 <code>search_memories</code> <code>query="030"</code>
 <code>source_app="cursor"</code>
-<code>since="2026-05-09T20:00:00"</code> <code>limit=10</code>.</li>
-<li><strong>Returned (call 1):</strong> 7 matches; top match (Cursor
+<code>since="2026-05-09T20:00:00"</code> <code>limit=10</code>.</p></li>
+<li><p><strong>Returned (call 1):</strong> 7 matches; top match (Cursor
 composer <code>c15c2eca-…</code>) was the post-build code-review reply —
 assistant text fully elided to blank lines (text_len=0 on 23 of 24
 assistant bubbles in the listed <code>assistant_bubble_ids</code>).
 Strategist had to fall back to direct Cursor SQLite extraction
 (<code>bubbleId:c15c2eca-…:4f5531d0-…</code> → 6,129 chars of full
-review body).</li>
-<li><strong>Query inputs (echo call 2):</strong>
+review body).</p></li>
+<li><p><strong>Query inputs (echo call 2):</strong>
 <code>search_memories</code> <code>query="030"</code>
 <code>source_app="codex"</code> <code>since="2026-05-09T20:00:00"</code>
-<code>limit=10</code>.</li>
-<li><strong>Returned (call 2):</strong> 5 matches; top match (Codex
+<code>limit=10</code>.</p></li>
+<li><p><strong>Returned (call 2):</strong> 5 matches; top match (Codex
 session <code>019e10a5-…</code>, turn 4) was post-build review but
 content cut off mid-sentence (“…going to run the new focused tests now
 and, if needed, a small reproduction for that edge.”). The verdict +
@@ -5113,24 +5113,25 @@ findings list lived in turn 8 of the same JSONL, NOT surfaced by
 <code>search_memories</code> because the substring “030” appeared in
 earlier turns and the limit/ranking favored the discovery turn.
 Strategist fell back to direct JSONL parse to recover turns 7+8 in
-full.</li>
-<li><strong>Sources:</strong> <code>mcp__echo__search_memories</code>
+full.</p></li>
+<li><p><strong>Sources:</strong> <code>mcp__echo__search_memories</code>
 (cursor + codex), then direct fallback to
 <code>~/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
 (cursorDiskKV) and
 <code>~/.codex/sessions/2026/05/09/rollout-…-019e10a5-….jsonl</code>.
 Also read worktree code at
 <code>/Users/zhenye/Desktop/Project_echo--mcp-toolkit-reshape-and-group-session/src/mcp/tools/{get-atoms,find-clusters}.ts</code>
-to validate the bugs.</li>
-<li><strong>Verdict:</strong> 🟡 partial — <code>search_memories</code>
-correctly found both reviewers’ sessions, but elision (Cursor: full
-assistant body collapsed; Codex: only the discovery-phase turn returned,
-not the verdict turn) blocked end-to-end review through MCP alone.
-SQLite + JSONL fallback was load-bearing.</li>
-<li><strong>Note (load-bearing finding for 030 itself):</strong>
+to validate the bugs.</p></li>
+<li><p><strong>Verdict:</strong> 🟡 partial —
+<code>search_memories</code> correctly found both reviewers’ sessions,
+but elision (Cursor: full assistant body collapsed; Codex: only the
+discovery-phase turn returned, not the verdict turn) blocked end-to-end
+review through MCP alone. SQLite + JSONL fallback was
+load-bearing.</p></li>
+<li><p><strong>Note (load-bearing finding for 030 itself):</strong>
 <strong>both Cursor and Codex independently caught the same TWO P1 bugs
 that the Claude code-reviewer subagent (the <code>.review.md</code>
-sidecar at <code>f9e826f</code>) missed.</strong>
+sidecar at <code>f9e826f</code>) missed.</strong></p>
 <ul>
 <li><strong>Bug 1 — <code>get_atoms</code> 25k ceiling not actually
 enforced.</strong> Tentative envelope at
@@ -5163,7 +5164,7 @@ the cross-tool-review-finds-things-single-tool-misses pattern</strong>
 Cursor + Codex caught 3 implementation bugs Claude-subagent
 missed).</li>
 </ul></li>
-<li><strong>Conjecture (observation-only):</strong> the cross-tool
+<li><p><strong>Conjecture (observation-only):</strong> the cross-tool
 review pattern now has TWO independent confirmation cycles (R1 spec
 review + R2 code review). Promote
 <code>wiki/operating-model/cross-tool-spec-review.md</code> from
@@ -5174,7 +5175,29 @@ didn’t surface in the top-5 <code>search_memories</code> response — a
 future “find the most-recent assistant verdict for X” might want a
 dedicated tool, OR
 <code>tail_session(source=…codex…jsonl, count=N)</code> might be the
-right path here (was not the strategist’s first instinct).</li>
+right path here (was not the strategist’s first instinct).</p></li>
+<li><p><strong>Fixup outcome (added 2026-05-10 01:25 PDT, after fixup
+landed):</strong> strategist (this Claude Code session) implemented all
+three fixes + 3 regression tests on the agent branch in fixup commit
+<code>c12617b</code> (pushed to
+<code>origin/agent/mcp-toolkit-reshape-and-group-session</code>). Test
+counts moved from <code>622 pass / 21 skip / 0 fail</code> →
+<code>625 pass / 21 skip / 0 fail</code>; lint + typecheck clean. The
+<code>find_clusters</code> response-level cap was hard to hit with a
+synthetic fixture: pure <code>atom_ids</code> inflation can’t quite
+cross 25k under MAX_LIMIT=500 + per-cluster-cap=200 (max ~23.4KB on
+15×40 atoms with no hints), but realistic question-heavy sessions across
+many files DO cross it (10×60 fixture with question-ending content →
+~28KB un-trimmed → trims to ~24KB after dropping 5 of 10 clusters). The
+non-trivial fixture-search itself is a small data point: the
+response-level cap is genuinely a SAFETY NET in the current
+trace-builder regime, not a routine path. Review sidecar updated on
+<code>main</code> in commit <code>f50607f</code> (3 fixups
+checkbox-closed, head SHA bumped). Founder gates remain:
+<code>git push origin main</code> + move to <code>complete/</code>.
+<strong>No additional <code>mcp__echo__*</code> calls were made during
+the fixup phase — only direct file reads/edits/tests/git
+operations.</strong></p></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
