@@ -56,6 +56,9 @@ export interface SearchMatch {
    *  consumer can read the projected value at face value — it carries
    *  legitimate signal (workflow shape), not just a size hint. */
   metadata_keys_projected?: string[];
+  /** V1.6 (item 030): additive trust signal — ALWAYS present (possibly
+   *  empty). See `ProjectedMatch.truncations` for the vocabulary. */
+  truncations: string[];
 }
 
 export interface SearchResult {
@@ -221,6 +224,12 @@ export const searchMatchSchema = z.object({
   // RESHAPED to a smaller useful representation (e.g. tool_calls → name
   // trajectory). Distinct semantics from metadata_keys_elided.
   metadata_keys_projected: z.array(z.string()).optional(),
+  // V1.6 (item 030) — additive trust signal that unifies BOTH per-field
+  // caps AND projector reshapes in one place. ALWAYS present (possibly
+  // []). Vocabulary: "content" (content cap fired), "metadata.<k>" (per-
+  // key cap fired — value opaqued), "metadata.<k>:projected" (projector
+  // reshaped — value reformatted, not clipped).
+  truncations: z.array(z.string()),
 });
 
 // outputSchema for `tools/list` advertisement and structured-content

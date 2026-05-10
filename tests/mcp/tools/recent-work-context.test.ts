@@ -128,15 +128,33 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Retrieve clusters of related events');
   });
 
-  it('all four tools are registered', async () => {
+  // V1.6 (item 030): the deprecation marker must be PREPENDED so the
+  // first thing any consumer reads in tools/list is "use find_clusters +
+  // get_atoms instead." Removal is gated on item 031 after dogfooding.
+  it('item 030: tools/list description starts with the deprecation marker', async () => {
+    handle = await startMcpServer(store, { port: 0 });
+    const tools = await withClient(handle.url, async (c) => c.listTools());
+    const found = tools.tools.find((t) => t.name === 'get_recent_work_context');
+    expect(found).toBeDefined();
+    // Marker is text-only — call behavior is untouched (covered by every
+    // other test in this file).
+    expect(found?.description?.startsWith('**[DEPRECATED 2026-05-09')).toBe(true);
+    expect(found?.description).toContain('use `find_clusters` + `get_atoms` instead');
+    expect(found?.description).toContain('Migration:');
+  });
+
+  it('all seven tools are registered (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns)', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
     expect(names).toEqual([
       'echo_ping',
+      'find_clusters',
+      'get_atoms',
       'get_recent_work_context',
       'search_memories',
       'tail_session',
+      'wait_for_new_turns',
     ]);
   });
 

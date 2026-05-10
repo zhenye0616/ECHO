@@ -158,6 +158,31 @@ export class SqliteStorage implements Storage {
     return row.n;
   }
 
+  async getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
+    if (ids.length === 0) return [];
+    // Bind each id positionally — IN-list expansion isn't supported via
+    // named params in better-sqlite3. `WHERE id IN (?...)` returns rows in
+    // storage order, so we re-order by the input `ids[]` to satisfy the
+    // interface's order-preserving contract. Missing ids are silently
+    // dropped here; the get_atoms tool surfaces them in atoms_dropped_ids.
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(
+        `SELECT id, source, timestamp, content, metadata, embedding FROM events WHERE id IN (${placeholders})`,
+      )
+      .all(...ids) as EventRow[];
+    const byId = new Map<EventId, CaptureEvent>();
+    for (const row of rows) {
+      byId.set(row.id, rowToEvent(row));
+    }
+    const out: CaptureEvent[] = [];
+    for (const id of ids) {
+      const ev = byId.get(id);
+      if (ev !== undefined) out.push(ev);
+    }
+    return out;
+  }
+
   close(): void {
     if (!this.db.open) return;
     this.db.close();

@@ -99,6 +99,68 @@ describe('projectMatch — per-metadata-value cap', () => {
   });
 });
 
+describe('projectMatch — truncations vocabulary (V1.6 item 030)', () => {
+  it('is always present (empty array when nothing was clipped or projected)', () => {
+    const m = projectMatch(
+      ev({
+        content: 'small',
+        metadata: { session_id: 'abc', git_state: { branch: 'main' } },
+      }),
+    );
+    expect(m.truncations).toEqual([]);
+  });
+
+  it('content cap fires → truncations contains "content"', () => {
+    const big = 'a'.repeat(WIRE_SHAPE_CAPS.match_content + 100);
+    const m = projectMatch(ev({ content: big }));
+    expect(m.truncations).toContain('content');
+  });
+
+  it('per-key metadata cap fires → truncations contains "metadata.<key>"', () => {
+    const m = projectMatch(
+      ev({
+        metadata: { huge_key: { nested: 'x'.repeat(5_000) }, ok: 'small' },
+      }),
+    );
+    expect(m.truncations).toContain('metadata.huge_key');
+    expect(m.truncations).not.toContain('metadata.ok');
+  });
+
+  it('projector reshape (tool_calls) → truncations contains "metadata.<key>:projected" (NOT "metadata.<key>")', () => {
+    // Critical: the :projected suffix lets consumers distinguish
+    // "this got clipped" from "this got rewritten by a known projector
+    // with a documented schema."
+    const big_tool_calls = Array.from({ length: 30 }, () => ({
+      name: 'Bash',
+      args: 'a'.repeat(2_000),
+      output: 'b'.repeat(1_000),
+    }));
+    const m = projectMatch(ev({ metadata: { tool_calls: big_tool_calls } }));
+    expect(m.truncations).toContain('metadata.tool_calls:projected');
+    expect(m.truncations).not.toContain('metadata.tool_calls');
+  });
+
+  it('multiple events: content + projector + cap all emit distinct entries', () => {
+    const big_tool_calls = Array.from({ length: 30 }, () => ({
+      name: 'Bash',
+      args: 'a'.repeat(2_000),
+      output: 'b'.repeat(1_000),
+    }));
+    const m = projectMatch(
+      ev({
+        content: 'a'.repeat(WIRE_SHAPE_CAPS.match_content + 100),
+        metadata: {
+          tool_calls: big_tool_calls,
+          huge: { nested: 'x'.repeat(5_000) },
+        },
+      }),
+    );
+    expect(m.truncations.sort()).toEqual(
+      ['content', 'metadata.huge', 'metadata.tool_calls:projected'].sort(),
+    );
+  });
+});
+
 describe('projectMatch — realistic-density envelope', () => {
   it('10 matches, each carrying 100KB tool_calls (the 16:14 PDT failure mode), serialize under 25k bytes', () => {
     // Reproduce the live failure: substring-grep over a busy Codex window

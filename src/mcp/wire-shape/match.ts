@@ -53,6 +53,27 @@ export interface ProjectedMatch {
    *  the projected value at face value (e.g., the trajectory array is
    *  legitimate data, not a placeholder). */
   metadata_keys_projected?: string[];
+  /** V1.6 (item 030) — additive trust signal that unifies BOTH per-field
+   *  caps AND projector reshapes in one place. Always present (possibly
+   *  empty `[]` when nothing was clipped or reshaped) so consumers can do
+   *  `m.truncations.length === 0` without optional-chaining.
+   *
+   *  Vocabulary:
+   *    - `"content"` — content body was clipped to `match_content` cap.
+   *    - `"metadata.<key>"` — per-key byte cap fired on `<key>`; the value
+   *      is opaqued out (`{__elided:true, original_size:N}`). LOSSY.
+   *    - `"metadata.<key>:projected"` — projector reshaped `<key>` to a
+   *      smaller useful representation (e.g. tool_calls → trajectory). The
+   *      value is REFORMATTED, not clipped — semantically distinct from a
+   *      cap. Consumer needing the original raw value reads the source
+   *      file. (Today only `tool_calls` is projected; new projectors
+   *      add new `:projected` markers.)
+   *
+   *  The legacy `bytes_elided` / `metadata_keys_elided` /
+   *  `metadata_keys_projected` fields stay for back-compat; `truncations`
+   *  is additive AND distinguishes "this got clipped" from "this got
+   *  rewritten by a known projector with a documented schema." */
+  truncations: string[];
 }
 
 /** Project a raw CaptureEvent (storage row) onto the consumer-budget-safe
@@ -60,13 +81,20 @@ export interface ProjectedMatch {
  *  this to enforce the same envelope discipline. */
 export function projectMatch(e: CaptureEvent): ProjectedMatch {
   const content = clipString(e.content, WIRE_SHAPE_CAPS.match_content);
+  const truncations: string[] = [];
   const m: ProjectedMatch = {
     id: e.id,
     source: e.source,
     timestamp: e.timestamp,
     content: content.value,
+    // Filled in below; kept always-present (possibly []) so consumers can
+    // do `m.truncations.length === 0` without optional-chaining.
+    truncations,
   };
-  if (content.bytes_elided > 0) m.bytes_elided = content.bytes_elided;
+  if (content.bytes_elided > 0) {
+    m.bytes_elided = content.bytes_elided;
+    truncations.push('content');
+  }
   if (e.metadata !== undefined) {
     // Step 1: specialised pre-projection. tool_calls (and any future
     // shape-aware projections) get a useful summary instead of being
@@ -100,6 +128,14 @@ export function projectMatch(e: CaptureEvent): ProjectedMatch {
     if (totalElided > 0) m.metadata_bytes_elided = totalElided;
     if (md.keys_elided.length > 0) m.metadata_keys_elided = md.keys_elided;
     if (projectedKeys.length > 0) m.metadata_keys_projected = projectedKeys;
+
+    // V1.6 truncations vocabulary: emit one entry per per-key event.
+    // Cap-elision keys are LOSSY (`metadata.<k>`); projector keys are
+    // REFORMATTED (`metadata.<k>:projected`). Distinct so consumers can
+    // tell "the body got clipped" from "the body got rewritten by a
+    // known projector with a documented schema."
+    for (const k of md.keys_elided) truncations.push(`metadata.${k}`);
+    for (const k of projectedKeys) truncations.push(`metadata.${k}:projected`);
   }
   return m;
 }

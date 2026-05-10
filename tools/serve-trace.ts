@@ -97,6 +97,11 @@ class LiveStorage implements Storage {
   count(): Promise<number> {
     return this.inner.count();
   }
+
+  // V1.6 (item 030): delegate to inner. Required by Storage interface.
+  getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
+    return this.inner.getByIds(ids);
+  }
 }
 
 async function main(): Promise<void> {

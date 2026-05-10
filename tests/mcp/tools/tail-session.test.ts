@@ -394,6 +394,22 @@ describe('tailSession V1.5.6 — wire-shape projector envelope budget', () => {
     expect(t.content.startsWith('HEAD_SENTINEL_')).toBe(true);
     expect(t.content.endsWith('_TAIL_SENTINEL')).toBe(true);
     expect(t.bytes_elided).toBeGreaterThan(0);
+    // V1.6 (item 030): content cap fired → truncations contains "content".
+    expect(t.truncations).toContain('content');
+  });
+
+  it('V1.6 (item 030) — truncations is always present (empty when nothing clipped)', async () => {
+    const store = new MemoryStorage();
+    const exactSrc = 'fs:/tmp/clean.jsonl';
+    await store.append({
+      source: exactSrc,
+      timestamp: '2026-05-08T22:00:00.000Z',
+      content: 'small turn that fits',
+      metadata: { session_id: 'abc' },
+    });
+    const r = await tailSession(store, { source: exactSrc });
+    expect(r.turns).toHaveLength(1);
+    expect(r.turns[0]!.truncations).toEqual([]);
   });
 });
 
