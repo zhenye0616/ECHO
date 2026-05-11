@@ -1021,6 +1021,9 @@ href="#pdt-codex-retrieve-post-r1-claude-strategist-context-for-034-r2-spec-revi
 id="toc-pdt-codex-retrieve-post-r1-claude-strategist-context-for-034-r2-spec-review">2026-05-10
 22:25 PDT — Codex: retrieve post-R1 Claude strategist context for 034 R2
 spec review</a></li>
+<li><a href="#pdt-codex-monitoring-034-builder-handoff-via-echo"
+id="toc-pdt-codex-monitoring-034-builder-handoff-via-echo">2026-05-10
+22:41 PDT — Codex: monitoring 034 builder handoff via ECHO</a></li>
 <li><a
 href="#pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent"
 id="toc-pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent">2026-05-10
@@ -1036,6 +1039,25 @@ href="#pdt-codex-echo-corroboration-that-strategist-r2-refinement-for-034-landed
 id="toc-pdt-codex-echo-corroboration-that-strategist-r2-refinement-for-034-landed-no-further-wait">2026-05-10
 23:10 PDT — Codex: ECHO corroboration that strategist R2 refinement for
 034 landed (no further wait)</a></li>
+<li><a
+href="#pdt-codex-exact-source-claude-context-recovery-for-035-spec-review"
+id="toc-pdt-codex-exact-source-claude-context-recovery-for-035-spec-review">2026-05-10
+22:45 PDT — Codex: exact-source Claude context recovery for 035 spec
+review</a></li>
+<li><a
+href="#pdt-codex-echo-speccing-context-for-item-035-read-only-r1-spec-review"
+id="toc-pdt-codex-echo-speccing-context-for-item-035-read-only-r1-spec-review">2026-05-10
+23:55 PDT — Codex: ECHO speccing context for item 035 + read-only R1
+spec review</a></li>
+<li><a href="#pdt-codex-034-worktree-moves-while-echo-waits-stay-empty"
+id="toc-pdt-codex-034-worktree-moves-while-echo-waits-stay-empty">2026-05-10
+22:46 PDT — Codex: 034 worktree moves while ECHO waits stay
+empty</a></li>
+<li><a
+href="#pdt-strategist-035-r1-review-retrieval-combine-8-unique-findings-3-convergent-1-high"
+id="toc-pdt-strategist-035-r1-review-retrieval-combine-8-unique-findings-3-convergent-1-high">2026-05-10
+22:51 PDT — Strategist: 035 R1 review retrieval + combine (8 unique
+findings, 3 convergent, 1 HIGH)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7987,6 +8009,45 @@ capture cadence and fallback parsing work, the query should no longer
 need exact-source recovery.</li>
 </ul>
 <hr />
+<h3 id="pdt-codex-monitoring-034-builder-handoff-via-echo">2026-05-10
+22:41 PDT — Codex: monitoring 034 builder handoff via ECHO</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Founder asked Codex to “use echo and track
+live update in the claude builder thread” and to do a full code review
+once item 034 lands in <code>pending_review/</code>.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(query='034', source_app='claude_code', limit=10)</code>.</li>
+<li><code>tail_session(source_app='claude_code', count=10)</code>.</li>
+<li><code>wait_for_new_turns(sources=['claude_code'], since='2026-05-11T05:39:10Z', timeout_ms=60000)</code>,
+where <code>05:39:10Z</code> is 034’s <code>claimed_at</code>
+timestamp.</li>
+</ol></li>
+<li><strong>Returned:</strong> Search found prior 034 planning/routing
+turns. MRU Claude Code tail resolved to
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/a7449101-b5bb-44ee-a6db-6035410cb944.jsonl</code>,
+whose visible turn refused to claim 034 because
+<code>suggested_builder: cursor-claude</code>. The post-claim wait timed
+out with <code>turns: []</code>,
+<code>next_since: '2026-05-11T05:41:42.615Z'</code>.</li>
+<li><strong>Read sources:</strong> Claude Code JSONL matches under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>:
+session <code>a7449101-b5bb-44ee-a6db-6035410cb944</code>
+(routing/refusal turn, source-resolved by <code>tail_session</code>)
+plus prior strategist session
+<code>74a9e2c0-0e7c-464b-92b2-449652fbf113</code> and the same
+<code>a744...</code> session in <code>search_memories</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO correctly found the
+pre-claim Claude routing context, but no live post-claim Claude Code
+builder turn had landed yet.</li>
+<li><strong>Note:</strong> Local backlog state shows
+<code>backlog/claimed/2026-05-10-034-cursor-capture-coverage.md</code>
+with <code>claimed_at: '2026-05-11T05:39:10Z'</code>, so the active
+builder may be in Cursor’s Claude or in a not-yet-captured Claude Code
+turn. Continue polling ECHO and the backlog stage before reviewing.</li>
+</ul>
+<hr />
 <h3
 id="pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent">2026-05-10
 22:45 PDT — Strategist: 034 R2 review retrieval + combine (5 unique
@@ -8218,6 +8279,274 @@ checklist line.</li>
 (<code>maxGlobalDbFamilyMtime</code> vs chokidar timing) is explicitly
 optional; founder can green-light claim without another review
 round.</li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-exact-source-claude-context-recovery-for-035-spec-review">2026-05-10
+22:45 PDT — Codex: exact-source Claude context recovery for 035 spec
+review</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Founder asked for a spec review on item
+035 and explicitly asked to use ECHO to get the speccing context from
+Claude.</li>
+<li><strong>Tool and query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(query='035 tail_session repo-scoping workspace_id Cursor sessions workspace hash', source_app='claude_code', limit=8)</code></li>
+<li><code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl', count=8)</code></li>
+<li><code>get_atom(id='04624afd-684c-4dc8-8c2d-83a2b00924ba')</code></li>
+</ol></li>
+<li><strong>Returned shape:</strong> The scoped substring query returned
+0 matches. Exact-source <code>tail_session</code> returned Claude’s
+latest 035 speccing turn, but the content was elided around the AC
+recap. <code>get_atom</code> recovered the full 4362-byte atom: Claude
+drafted and pushed 035 as <code>09a6669</code>, framed it as M1-1
+sub-gap C, and summarized AC1-AC6 (<code>repo_path</code>, workspace
+resolver, <code>metadata_match</code>, repo-scoped tail, tests,
+dogfooding).</li>
+<li><strong>Verdict:</strong> right after exact-source recovery.</li>
+<li><strong>Note:</strong> The review found two stronger risks than the
+existing small-patch note: the spec’s 034 <code>spec_ref</code> now
+points to a moved file, and AC4’s resolver relies on optional
+<code>metadata.workspace_id</code> even though the current extractor
+only fills it after workspace DB events. Both are worth strategist
+disposition before claim.</li>
+<li><strong>Conjecture:</strong> The read-side resolver should use the
+resolved workspace DB’s composer list as a fallback or primary bridge to
+<code>composer_id</code>, then filter captured atoms by
+<code>composer_id</code>; that keeps 035 read-side while avoiding a hard
+dependency on optional historical <code>workspace_id</code>
+metadata.</li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-echo-speccing-context-for-item-035-read-only-r1-spec-review">2026-05-10
+23:55 PDT — Codex: ECHO speccing context for item 035 + read-only R1
+spec review</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (Cursor IDE)</li>
+<li><strong>Trigger:</strong> Founder asked for a spec review on
+<strong>035</strong> (<code>tail_session</code> repo-scoping) and to use
+ECHO to pull Claude/strategist speccing context.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(query='035 tail_session workspace', limit=20)</code></li>
+<li><code>search_memories(query='item 035', source_app='claude_code', limit=15)</code></li>
+<li><code>search_memories(query='2026-05-10-035-tail-session-repo-scoping', limit=10)</code></li>
+</ol></li>
+<li><strong>Returned:</strong> (1) <strong>0 matches</strong> —
+substring did not hit backlog path or commit message for that phrasing.
+(2) <strong>5 matches</strong> from
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>;
+top turn <code>04624afd-684c-4dc8-8c2d-83a2b00924ba</code>
+(<code>2026-05-11T05:42:28.968Z</code>) — user “spec 035 in parallel”,
+assistant recap: pushed <code>09a6669</code>, AC1–AC6 table shape,
+0.5–1d estimate, unblocks M1-1 A+B+C with 034+035,
+<code>files_referenced</code> includes
+<code>backlog/ready/2026-05-10-035-tail-session-repo-scoping.md</code> +
+<code>docs/BACKLOG.md</code> + <code>src/storage/interface.ts</code>;
+<code>bytes_elided: 1172</code> on content. (3) <strong>1 match</strong>
+— <code>git:/Users/zhenye/Desktop/Project_echo</code> commit
+<code>09a6669</code> (<code>2026-05-11T05:42:05.000Z</code>) with full
+035 spec commit message; <code>files_referenced</code> includes the 035
+backlog path. All <code>next_cursor: null</code>.</li>
+<li><strong>Read sources:</strong> <code>claude_code</code> →
+Project_echo Claude session JSONL above (model
+<code>claude-opus-4-7</code>, <code>git_state</code> at capture pointed
+at <code>09a6669</code> / <code>main</code>). <code>git</code> → same
+repo. <strong>No cursor</strong> or <strong>codex</strong> rows on
+queries (1) and (3); query (2) scoped
+<code>source_app=claude_code</code> only. Confirmed speccing narrative:
+035 specced in parallel with 034 claim (<code>cc30883</code>), evidence
+= four journal hits for sub-gap C.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO + Claude JSONL gave full
+strategist intent for 035; generic query (1) was too loose (0 hits).
+Filename query (3) relied on git atom, not claude_code body.</li>
+<li><strong>Note:</strong> R1 spec review (read
+<code>backlog/ready/2026-05-10-035-tail-session-repo-scoping.md</code> +
+<code>src/mcp/tools/tail-session.ts</code> +
+<code>src/storage/interface.ts</code>): spec is <strong>claimable with
+small R1 patches</strong> — see Codex→strategist findings: (a)
+<strong><code>source</code> + <code>repo_path</code> interaction
+unstated</strong> — should reject or define when explicit
+<code>source</code> is passed with <code>repo_path</code>; (b)
+<strong><code>file://</code> folder parsing</strong> — specify
+<code>fileURLToPath</code> + percent-decode, not only strip
+<code>file://</code>; (c) <strong><code>MemoryStorage</code>
+parity</strong> for <code>metadata_match</code> — AC5 unit tests cite
+memory fixtures; interface says all <code>query()</code> callers; add
+explicit dual-adapter acceptance; (d) <strong>MCP
+<code>outputSchema</code></strong> — add <code>repo_path</code>,
+<code>composer_resolved</code>, optional <code>warnings</code> shape to
+Zod + smoke assertion (spec already asks smoke for description); (e)
+<strong>multi-root / non-<code>file:</code> <code>folder</code></strong>
+— optional one-line out-of-scope (“unknown <code>folder</code> shape →
+skip”) to avoid silent null. No blocker on AC2–AC4 architecture.</li>
+<li><strong>Conjecture:</strong> After 035 ships, repeat
+<code>search_memories(query='repo_path tail_session', source_app='cursor')</code>
+on a dogfooding call that used the new param — validates capture+MCP
+index sees the new surface.</li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-034-worktree-moves-while-echo-waits-stay-empty">2026-05-10
+22:46 PDT — Codex: 034 worktree moves while ECHO waits stay empty</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Continuing the founder-requested live
+watch for item 034 after the first post-claim wait returned no builder
+turns.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:41:42.615Z', timeout_ms=60000)</code>.</li>
+<li><code>wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:43:06.982Z', timeout_ms=60000)</code>.</li>
+<li><code>wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:44:00.186Z', timeout_ms=60000)</code>.</li>
+<li><code>wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:44:52.550Z', timeout_ms=60000)</code>.</li>
+<li>Filesystem probes of the 034 worktree and backlog stage after each
+wait.</li>
+</ol></li>
+<li><strong>Returned:</strong> First wait woke on a strategist Claude
+turn about item 035
+(<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>,
+turn at <code>2026-05-11T05:42:28.968Z</code>), not the 034 builder.
+Later waits timed out empty with <code>turns: []</code> and successive
+<code>next_since</code> values through
+<code>2026-05-11T05:46:33.501Z</code>. Meanwhile the 034 worktree
+changed from clean claim state to
+<code>src/capture/extractors/cursor.ts</code> modified, growing from
+roughly <code>+175/-4</code> to <code>+296/-15</code>.</li>
+<li><strong>Read sources:</strong> ECHO read Claude Code and Cursor
+source-app prefixes through <code>wait_for_new_turns</code>; only the
+strategist Claude Code session surfaced. Filesystem read
+<code>/Users/zhenye/Desktop/Project_echo--cursor-capture-coverage</code>
+(<code>agent/cursor-capture-coverage</code>) and
+<code>backlog/claimed/2026-05-10-034-cursor-capture-coverage.md</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial — ECHO is useful for adjacent
+strategist activity, but did not surface the live 034 implementation
+turns while filesystem evidence shows the builder is actively
+editing.</li>
+<li><strong>Note:</strong> This is an in-flight observation, not a
+review finding. It is consistent with 034’s own motivation:
+Cursor/Claude builder activity can be happening while the current
+capture surface fails to expose incremental turns. Continue using both
+ECHO and local branch/backlog state until handoff.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-035-r1-review-retrieval-combine-8-unique-findings-3-convergent-1-high">2026-05-10
+22:51 PDT — Strategist: 035 R1 review retrieval + combine (8 unique
+findings, 3 convergent, 1 HIGH)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — same post-restart session</li>
+<li><strong>Trigger:</strong> Founder said “cursor and codex review just
+landed combine the finding and validate them” — third R1 combine cycle
+today. Goal: combine the two R1 findings into a single 035 R1
+patch.</li>
+<li><strong>Query inputs (3 ECHO calls + 1 SQLite probe):</strong>
+<ol type="1">
+<li><code>tail_session(source=&lt;codex jsonl&gt;, count=3)</code> —
+newest Codex turns including R1 review at
+<code>2026-05-11T05:46:08.980Z</code> (= 22:46 PDT). Captured with
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>,
+<code>bytes_elided: 1562</code>.</li>
+<li>SQLite probe:
+<code>bubbleId:d352562e-c958-417c-bbc4-a822c4fae3c4:* WHERE rowid &gt; 134191</code>
+— new Cursor bubbles since R2 of 034. Found 4497-char R1 review in
+bubble <code>bdb29bcb-0580-4b8f-a70e-60c7cd691350</code>.</li>
+<li>SQLite extract for bubble text → 4497 chars verbatim Cursor R1
+review recovered.</li>
+<li><code>get_atom(id='9d70156d-0b48-482e-b163-1b3aaed5fb0f')</code> —
+Codex R1 verbatim, <code>atom_size_bytes: 5441</code>. All 5 findings +
+verdict readable in full.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><strong>Codex R1 (5 findings):</strong> 1 HIGH
+(workspace_id-not-backfilled architecture bug), 3 Medium (stale
+spec_ref, source+repo_path undefined, MemoryStorage parity), 1 Low
+(file:// URL decoding).</li>
+<li><strong>Cursor R1 (3 Medium + 4 Low + acks):</strong> Med #1-3 =
+source+repo_path, file:// URL handling, MemoryStorage parity (3 converge
+with Codex). Lows = MCP wire-shape Zod additions, SQLite
+prepared-statement cache, pagination consistency, cosmetic checklist
+boxes.</li>
+</ul></li>
+<li><strong>Sources:</strong> Codex JSONL <code>019e1566-...</code>,
+atom <code>9d70156d-...</code> via <code>get_atom</code>. Cursor SQLite
+<code>cursorDiskKV</code> composer <code>d352562e-...</code>, bubble
+<code>bdb29bcb-...</code> via SQLite probe. <strong>THIRD consecutive
+review cycle requiring SQLite-probe workaround for Cursor</strong> (R1
+of 034, R2 of 034, R1 of 035 — all on the same composer for the same
+M1-1 sub-gap C reason).</li>
+<li><strong>Verdict:</strong> ✅ right on the combine. 8 unique findings
+dispositioned in the R1 patch. The HIGH finding (Codex #1) led to an
+architecture change in AC2-AC4 — instead of querying ECHO for
+<code>metadata.workspace_id</code>, the resolver now reads Cursor’s own
+workspace + global storage to derive a single authoritative
+<code>composer_id</code> and filters atoms by that. Eliminates
+dependence on best-effort metadata.workspace_id entirely.</li>
+<li><strong>Note (Codex HIGH validation against code):</strong> Verified
+at <code>src/capture/extractors/cursor.ts</code> line 556
+(<code>composerToWorkspace = new Map()</code> starts empty) + line 583
+(<code>if (ws !== undefined) metadata['workspace_id'] = ws</code> —
+populated conditionally). Codex’s reading is exactly right; the V1
+spec’s reliance on <code>metadata.workspace_id</code> would have
+silently dropped atoms captured before the workspace-watcher map
+populated. <strong>This is the kind of finding that justifies the
+cross-tool review discipline existing</strong> — a single-tool review by
+either reviewer alone would not have caught a HIGH-severity load-bearing
+bug; the multi-tool perspective surfaced it.</li>
+<li><strong>Note (the SIXTH consecutive M1-1 sub-gap C hit
+today):</strong> Counting: 16:08 PDT (Cursor MRU wrong), 22:11 PDT (R1
+of 034 — Cursor missing from ECHO), 22:25 PDT (corrective re-check —
+same), 22:45 PDT (R2 of 034 — same), 22:46 PDT (Codex side of 035 R1 —
+Codex captured but elided), 22:51 PDT (this entry — Cursor’s 035 R1
+missing from ECHO). The “≥3 hits before specing” gate I hedged in 034 is
+overwhelmed by 2x; the structural certainty is now load-bearing for the
+wiki promotion narrative.</li>
+<li><strong>Note (cross-tool divergence pattern now 5-cycle
+confirmed):</strong> R1 of 035 shows the SAME pattern: Codex catches
+implementation correctness (workspace_id-not-backfilled at startup,
+source+repo_path schema gap, stale spec_ref); Cursor catches contract
+clarity + wire-shape discipline (Zod schemas, prepared-statement cache,
+pagination, non-<code>file:</code> folder shapes). 5 consecutive cycles
+(030, 032, 033, 034 R1+R2, 035 R1) — pattern is structural. Worth
+promoting to <code>wiki/operating-model/cross-tool-spec-review.md</code>
+with concrete attribution: <strong>Codex as the
+implementation-correctness reviewer, Cursor as the contract-clarity
+reviewer</strong>.</li>
+<li><strong>Note (data point 5 for item 031 deprecation gate):</strong>
+<code>get_atom</code> worked cleanly on the elided Codex R1 turn (5441
+bytes envelope). This is the FOURTH successful M1-3 recovery in the
+post-033-merge window (20:05, 22:11, 22:45, 22:51 PDT). At 4 / 5+ for
+dimension 1 (recovery primitive). Dimension 2 (atoms exist) blocked on
+034+035.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>The HIGH finding pattern is informative for V1 demo
+narrative.</strong> The fix shape — “read Cursor’s own storage to derive
+the authoritative composer_id, don’t trust optional metadata” — is the
+<em>kind</em> of thing that would silently work in dev and silently fail
+in users’ hands when their Cursor instance hasn’t had a workspace-DB
+event recently. The cross-tool review caught it BEFORE the bug shipped,
+demonstrating the operating-model value. Worth surfacing in the V1
+launch narrative if appropriate.</li>
+<li><strong>R1 cycle is converging fast on 035.</strong> Both reviewers
+gave “claimable after this patch” verdicts; the convergent findings (3
+of 8) are tight. R2 should focus narrowly on the new architecture
+(composer-lookup-via-workspace-DB) since that’s the architecture change,
+not the original <code>metadata.workspace_id</code> design R1 was
+actually critiquing.</li>
+<li><strong>The SQLite-probe recovery chain is now so well-rehearsed
+(third consecutive use today) that it could be scripted.</strong> Three
+sessions, three identical chains. A one-shot bash helper
+<code>~/bin/cursor-mru-bubble.sh &lt;composer_id&gt; [rowid_after]</code>
+would compress the chain to one command — but that’s exactly the
+friction 035 is designed to eliminate at the MCP layer. Don’t
+pre-emptively automate the workaround; ship 035 and the workaround
+becomes vestigial.</li>
+</ol></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window

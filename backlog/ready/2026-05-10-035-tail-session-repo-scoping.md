@@ -15,11 +15,12 @@ agent_notes: ""
 review_notes: ""
 spec_refs:
   - src/mcp/tools/tail-session.ts                # Where the resolver currently picks the wrong composer for Cursor
-  - src/capture/extractors/cursor.ts             # workspace_id metadata is already populated here; this item is purely consumer-side
+  - src/capture/extractors/cursor.ts             # composer_id metadata is reliably populated (workspace_id is best-effort only — see R1 Finding 1)
   - src/storage/interface.ts                     # QueryFilter — extended with metadata_match for the storage-level equality filter
   - src/storage/sqlite.ts                        # SQL implementation; exclude_metadata_surface precedent for json_extract-based filtering
+  - src/storage/memory.ts                        # MemoryStorage — must implement metadata_match in parity with SQLite (R1 Finding from both reviewers)
   - tests/mcp/tools/tail-session.test.ts         # Existing tail_session tests (extend)
-  - backlog/ready/2026-05-10-034-cursor-capture-coverage.md  # Sibling M1-1 item (sub-gaps A+B); 035 closes sub-gap C
+  - 2026-05-10-034-cursor-capture-coverage       # Sibling M1-1 item (sub-gaps A+B); 035 closes sub-gap C — refer by ID only; the file's directory (ready/ → claimed/ → complete/) changes as 034 progresses
   - raw/internal/dogfooding/mcp-interactions-journal.md  # 4 in-the-moment hits today (16:08 / 22:11 / 22:25 / 22:45 PDT) showing M1-1 sub-gap C firing live during 034's own review cycles
 suggested_builder: any  # Pure MCP-resolver + storage work; not Cursor-domain specific. Either Cursor's Claude or another agent works.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
@@ -60,81 +61,113 @@ Behavior:
 
 - When `repo_path` is set AND `source_app === 'cursor'`: enter the workspace-resolved path (AC2-AC4 below).
 - When `repo_path` is set AND `source_app !== 'cursor'`: ignore `repo_path` with a `warnings[]` entry: `'tail_session: repo_path is currently honored only for source_app=cursor; ignored for <app>'`. Other apps (claude_code / codex / git) already encode the repo in their source path; no resolver work is needed. Future items may extend repo_path semantics to other apps if a concrete need surfaces.
+- When `repo_path` is set AND `source` is set (R1 Finding 3 from Codex / R1 Medium #1 from Cursor — both reviewers caught this): **reject** with `'tail_session: repo_path is incompatible with exact source; use source_app=cursor + repo_path, or omit repo_path'`. The existing "at most one of source/source_app" check stays; this rejection is additive. Reject (not warn-ignore) — combining "exact .vscdb path" with "repo disambiguation" has no coherent meaning.
 - When `repo_path` is set AND neither `source` nor `source_app` is set: reject with an explicit error (`'tail_session: repo_path requires source_app=cursor'`). Don't silently fan out to "search all cursor composers in this repo" — the no-args + repo_path combination is ambiguous and not load-bearing for the M1-1 demo.
 - When `repo_path` is unset: 100% backwards-compatible with today's behavior.
 - The parameter accepts an absolute path only. Relative paths reject with `'tail_session: repo_path must be absolute'`. Trailing slash normalized away (the resolver match is path-equality after `path.normalize`).
 
 Description string for the tool (added to `TAIL_SESSION_DESCRIPTION`): one sentence after the existing `source_app` paragraph — `'For source_app=cursor, optionally pass repo_path=<absolute repo root> to scope the tail to the Cursor composer active in that project. Without repo_path, the MRU resolution returns the most-recently-active Cursor composer globally (which is often a different project than the caller intends).'`
 
-### AC2 — Server-side workspace resolver
+**Zod input + output schema extension (R1 Low #4 from Cursor — per item 025 MCP wire-shape discipline):**
 
-Add a new helper next to the cursor source-resolution code in `tail-session.ts` (or a new `src/mcp/cursor-workspace-resolver.ts` if it grows past ~40 lines):
+- Input Zod schema: add `repo_path: z.string().optional()` to the existing `TailSessionParamsSchema`. Description string mirrors the prose above.
+- Output Zod schema: add `composer_resolved: z.string().optional()` to the existing `TailSessionResultSchema`. Populated only on the cursor + repo_path path. Document in the field's description.
+- `outputSchema` exposed via `tools/list` reflects both additions automatically once the schemas are updated; smoke (`tools/mcp-integration-smoke.sh`) gains a one-line assertion that the description string contains `repo_path` (protects against accidental description regression).
+
+### AC2 — Server-side workspace + composer resolver (R1 architecture change — Codex HIGH #1)
+
+**R1 architecture change:** the V1 spec relied on `metadata.workspace_id` to find the composer in ECHO storage. Codex R1 caught that `composerToWorkspace` (the source of `workspace_id` metadata in the extractor) starts empty at extractor start and is only populated by chokidar workspace-DB change events — atoms captured before that map is populated have NO `metadata.workspace_id`, so a `workspace_id` filter would silently drop them. The R1 patch removes the dependence on captured `workspace_id` metadata entirely; instead, the resolver reads Cursor's own workspace storage to derive a single authoritative `composer_id`, then filters ECHO atoms by `composer_id` (which **is** reliably populated by the extractor on every emitted atom — see `src/capture/extractors/cursor.ts` line 576).
+
+Add a single resolver helper (suggested name `resolveCursorComposerForRepoPath`; the implementer may split into smaller helpers as needed). Lives in `src/mcp/tools/tail-session.ts` or a new `src/mcp/cursor-workspace-resolver.ts` if it grows past ~80 lines.
 
 ```ts
-async function resolveCursorWorkspaceFromRepoPath(
+async function resolveCursorComposerForRepoPath(
   repoPath: string,
-): Promise<{ workspace_id: string; workspace_db_path: string } | null>;
+  globalDbPath: string,  // injected for testability — matches the extractor pattern
+  workspaceStorageDir: string,  // injected for testability
+): Promise<{ workspace_id: string; composer_id: string } | null>;
 ```
 
 Implementation:
 
-1. Normalize `repoPath` via `path.normalize` + strip trailing `/`.
-2. Read the contents of `~/Library/Application Support/Cursor/User/workspaceStorage/`.
-3. For each entry, read its `workspace.json` (skip if absent or unreadable; log warn).
-4. Parse the JSON for the `folder` field (Cursor stores `"folder": "file:///Users/.../<repo>"`). Strip the `file://` prefix.
-5. If the parsed folder matches the normalized `repoPath`, return `{workspace_id: <dir hash>, workspace_db_path: <full path to workspaceStorage/<hash>/state.vscdb>}`.
-6. Return `null` if no workspace matches (e.g., the caller's project isn't open in Cursor at all).
+1. **Normalize `repoPath`** via `path.normalize` + strip trailing `/`.
+2. **Scan `workspaceStorageDir`** (default `~/Library/Application Support/Cursor/User/workspaceStorage/`). For each `<hash>/workspace.json`:
+   - Skip if absent / unreadable / non-JSON (`log.warn` with the path; never throw).
+   - Parse the `folder` field. **Validate it starts with `file://`** — if not (e.g., remote workspaces, `vscode-remote://`, multi-root workspaces with no single folder), **skip the row** (R1 Finding 2 from Cursor). No comparison against raw non-`file:` shapes.
+   - Decode the URL via Node `fileURLToPath` (handles percent-encoding correctly per R1 Finding 5 from Codex / R1 Medium #2 from Cursor — e.g., `/Users/.../My%20Project` ↔ `/Users/.../My Project`). Manual `slice(7)` would mis-handle this.
+   - If the decoded folder matches normalized `repoPath`, this is the workspace.
+3. If no workspace matches → return `null`.
+4. **Resolve the most-recent composer in that workspace.** Open the workspace's `state.vscdb` read-only, read `ItemTable WHERE key = 'composer.composerData'`, parse JSON, extract `allComposers[]` (each entry has at minimum a `composerId` string; this matches the existing pattern in `refreshComposerWorkspaceMap`). Build the list of `composer_id`s.
+5. **Pick the most-recently-active composer.** Open the GLOBAL `state.vscdb` (the constant `globalDbPath`), query `cursorDiskKV` for rows where `key IN ('composerData:<id1>', 'composerData:<id2>', ...)` (parameterized — never string-interpolated). For each returned row, parse the JSON `value` and read `lastUpdatedAt` (number, millis since epoch; fallback to `createdAt` if `lastUpdatedAt` is missing — same shape as the strategist's 2026-05-10 22:20 PDT SQLite probe documented in the journal). Pick the composer with max `lastUpdatedAt`.
+6. Return `{workspace_id, composer_id}` of the picked composer.
 
-The Cursor `globalStorage/state.vscdb` workspace path is derived from `~` expansion at request time. The workspaceStorage prefix is hardcoded relative to `~/Library/Application Support/Cursor/User/workspaceStorage/` for V1 (matching the existing extractor constants). Cross-platform (Linux: `~/.config/Cursor/User/`, Windows: `%APPDATA%/Cursor/User/`) is **out of scope** — file an extension item if a non-macOS contributor reaches this gap.
+If the workspace exists but no composers are listed in `allComposers[]` (rare — empty workspace) → return `null`.
 
-If multiple workspaces match the same `repoPath` (rare — multiple workspace.json files pointing at the same folder), return the most-recently-modified one (`mtime` of the workspace's `state.vscdb`, or fallback to lexically first if mtimes are equal). The duplicate-workspace case is a Cursor-side anomaly; the deterministic choice is sufficient.
+If multiple workspaces match the same `repoPath` (rare anomaly) → pick the workspace whose `state.vscdb` has the highest `mtime` (most-recently-touched workspace wins). Lexically-first tiebreak if mtimes tie.
 
-### AC3 — `QueryFilter.metadata_match` storage extension
+The Cursor `globalStorage/state.vscdb` and `workspaceStorage/` paths are hardcoded for macOS. Cross-platform (Linux: `~/.config/Cursor/User/`, Windows: `%APPDATA%/Cursor/User/`) is **out of scope** — file an extension item if a non-macOS contributor reaches this gap.
 
-Extend `QueryFilter` in `src/storage/interface.ts` and `src/storage/sqlite.ts` with an optional positive-equality metadata filter:
+### AC3 — `QueryFilter.metadata_match` storage extension (BOTH adapters)
+
+Extend `QueryFilter` in `src/storage/interface.ts` with an optional positive-equality metadata filter, and implement it in **both** `src/storage/sqlite.ts` AND `src/storage/memory.ts` (R1 Finding 4 from Codex / R1 Medium #3 from Cursor — both reviewers caught the parity requirement; AC5's in-memory fixtures must exercise the same semantics as production SQLite):
 
 ```ts
 // Restrict results to rows whose JSON metadata matches the given key→value pairs
 // using string equality (each entry implies an AND clause). Mirrors the existing
 // exclude_metadata_surface pattern (which is set-membership on a single key);
 // this is general key/value equality across N keys. Used by tail_session's
-// repo_path filter to restrict cursor atoms to a specific workspace_id +
-// composer_id pair. Each entry value is matched with string equality
-// (json_extract returns the underlying type; storage normalises numeric/boolean
-// to JSON.stringify if needed — but for the M1-1 use case all values are strings).
+// repo_path filter to restrict cursor atoms to a specific composer_id (035's
+// only consumer in V1). Each entry value is matched with string equality.
 metadata_match?: Record<string, string>;
 ```
 
-Implementation in `src/storage/sqlite.ts`:
+**SQLite implementation in `src/storage/sqlite.ts`:**
 
 - For each `(key, value)` pair, emit `AND json_extract(metadata, '$.<key>') = ?`.
 - Use prepared-statement binding (no string interpolation of either keys or values).
-- **Key whitelist:** to prevent caller-supplied keys from probing arbitrary metadata fields, restrict to a known-safe set: `['workspace_id', 'composer_id', 'session_id']`. Any other key in the input rejects the query at the storage seam with a clear error. The whitelist is enforced in the storage adapter, NOT the MCP tool — defense in depth.
-- Empty `metadata_match: {}` is a no-op (no filter applied; equivalent to omitted parameter).
-- Applies to both `query()` and any downstream tools that take `QueryFilter`.
+- **Key whitelist:** to prevent caller-supplied keys from probing arbitrary metadata fields, restrict to a known-safe set: `['workspace_id', 'composer_id', 'session_id']`. Any other key in the input rejects the query at the storage seam with a clear error. Whitelist enforced in the storage adapter, NOT the MCP tool — defense in depth.
+- **Prepared-statement cache (R1 Low #5 from Cursor):** if the SQLite adapter uses a prepared-statement cache keyed by SQL text, the dynamic `metadata_match` clause changes the SQL text per call shape (different key sets → different SQL). Either include the sorted-keys signature in the cache key OR generate prepared statements on demand without caching the metadata_match variants. Implementer's call — document the choice in a one-line code comment so a future reader knows whether to expect cache misses on varied call shapes.
+
+**MemoryStorage implementation in `src/storage/memory.ts`:**
+
+- Filter `events` in memory by walking each event's `metadata` object and checking every required key/value match.
+- Same whitelist enforcement at the entry of the function (throw before iterating).
+- Same `{}` no-op semantics.
+
+Empty `metadata_match: {}` is a no-op (no filter applied; equivalent to omitted parameter) in both adapters.
 
 This is a **generic** filter that other tools may use in the future. Item 035's only consumer is `tail_session`'s repo-scoping path.
 
-### AC4 — `tail_session` workspace-scoped resolution path
+### AC4 — `tail_session` workspace-scoped resolution path (R1 simplified — no `metadata.workspace_id` dependency)
 
 Inside `tail_session`, when `source_app === 'cursor' && repo_path !== undefined`:
 
-1. Call `resolveCursorWorkspaceFromRepoPath(repo_path)`. If `null`, return `{turns: [], next_cursor: null, source_resolved: null, warnings: ['tail_session: no Cursor workspace matches repo_path=<path>; verify the project is open in Cursor and workspaceStorage has been populated']}`.
-2. With the resolved `workspace_id`, query storage for the newest atom in `fs:/Users/.../globalStorage/state.vscdb` source whose `metadata.workspace_id` matches: `storage.query({source_prefix: <vscdb prefix>, metadata_match: {workspace_id: resolved.workspace_id}, exclude_metadata_surface: ['fs'], limit: 1})`. Extract the atom's `metadata.composer_id`.
-3. If no atom is found (composer captured 0 atoms for this workspace), return the same empty-result + warning shape.
-4. Tail the resolved composer: `tailExactSource(storage, source='fs:/Users/.../globalStorage/state.vscdb', count, before)` BUT with an additional `metadata_match: {composer_id: <resolved composer_id>}` filter applied via the storage extension above. (Refactor `tailExactSource` to optionally accept and pass through `metadata_match`.)
-5. Return the result with `source_resolved` populated as the `.vscdb` path AND a new optional field `composer_resolved: <composer_id>` so the caller can verify the right composer was picked.
+1. Call `resolveCursorComposerForRepoPath(repo_path)` (AC2). If `null`, return `{turns: [], next_cursor: null, source_resolved: null, warnings: ['tail_session: no Cursor composer matches repo_path=<path>; verify the project is open in Cursor and the workspace has at least one composer']}`.
+2. Tail the resolved composer: `tailExactSource(storage, source='fs:/Users/.../globalStorage/state.vscdb', count, before)` with an additional `metadata_match: {composer_id: resolved.composer_id}` filter passed through. (Refactor `tailExactSource` to optionally accept and pass through `metadata_match`.)
+3. **Pagination consistency (R1 Low #6 from Cursor):** the existing `before` / `emitCursor` rules continue to apply unchanged — the `metadata_match` filter is added to the same query that constructs the pagination cursor. Repo-filtered tails paginate exactly like non-repo-filtered tails; the cursor encodes `(timestamp, id)` regardless of metadata filters.
+4. Return the result with `source_resolved` populated as the `.vscdb` path AND a new optional field `composer_resolved: <composer_id>` so the caller can verify the right composer was picked.
 
 The `source_app_resolved` field stays as `'cursor'`. No changes to other source_app paths.
 
+**Why this is simpler than the V1 design:** V1 (pre-R1) had a 4-step resolver chain that included an ECHO query filtered by `metadata.workspace_id`. R1 (Codex HIGH #1) showed `metadata.workspace_id` is best-effort only — it may be absent on atoms captured before the extractor's workspace-watch map was populated. The new design queries Cursor's own storage to derive the composer_id directly, then only relies on `metadata.composer_id` (which the extractor populates on every emitted atom — line 576 of `src/capture/extractors/cursor.ts`).
+
 ### AC5 — Test coverage
 
-- **Unit test (workspace resolver):** mock-fs fixture with three `workspaceStorage/<hash>/workspace.json` files, two pointing at unrelated repos and one pointing at `/tmp/test-repo`. Assert `resolveCursorWorkspaceFromRepoPath('/tmp/test-repo')` returns the correct `workspace_id` + path. Counter-test: `resolveCursorWorkspaceFromRepoPath('/tmp/no-such-repo')` returns `null`. Edge case: workspace.json malformed JSON or missing `folder` field — skip gracefully, log warn, don't crash.
-- **Unit test (QueryFilter.metadata_match):** storage-layer test with three atoms in memory: A (workspace_id='WS1'), B (workspace_id='WS2'), C (workspace_id='WS1', composer_id='COMP-X'). Assert `query({metadata_match: {workspace_id: 'WS1'}})` returns A+C in newest-first order; `query({metadata_match: {workspace_id: 'WS1', composer_id: 'COMP-X'}})` returns only C. Whitelist-rejection test: `query({metadata_match: {arbitrary_field: 'X'}})` throws a clear error at storage seam.
-- **Integration test (tail_session repo-scoped):** seed storage with 6 cursor atoms across 3 composers in 2 workspaces (`WS-PROJECT-ECHO`: composer A with 3 atoms, composer B with 1 atom; `WS-OTHER`: composer C with 2 atoms; mixed timestamps such that the most-recent atom is in `WS-OTHER`). Also seed the mock-fs with the workspaceStorage files. Call `tail_session(source_app='cursor', repo_path='/tmp/project-echo', count=5)`. Assert returned turns are all from composer A (newest-first, count=3), `source_resolved=<vscdb-path>`, `composer_resolved='A'`, `source_app_resolved='cursor'`. Counter-test: same setup, no `repo_path` — assert returned turns include the wrong-project composer C's most-recent atom at position 0 (proves the gap is present without 035 and absent with it).
-- **Unit test (parameter validation):** `tail_session(source_app='claude_code', repo_path='/tmp/repo')` returns a warning + ignores repo_path. `tail_session(repo_path='/tmp/repo')` (no source_app, no source) rejects with the documented error. `tail_session(source_app='cursor', repo_path='relative/path')` rejects with the absolute-path error.
+- **Unit test (workspace + composer resolver):** mock-fs fixture with three `workspaceStorage/<hash>/workspace.json` files, two pointing at unrelated repos and one pointing at `/tmp/test-repo` (URL-encoded as `file:///tmp/test-repo`). Mock workspace state.vscdb for the matching hash with `composer.composerData = {allComposers: [{composerId: 'C1'}, {composerId: 'C2'}]}`. Mock global state.vscdb with `composerData:C1` (`lastUpdatedAt: 100`) and `composerData:C2` (`lastUpdatedAt: 200`). Assert `resolveCursorComposerForRepoPath('/tmp/test-repo', ...)` returns `{workspace_id: <hash>, composer_id: 'C2'}` (max lastUpdatedAt wins). Counter-tests:
+  - `resolveCursorComposerForRepoPath('/tmp/no-such-repo', ...)` returns `null`.
+  - URL-decoding test: workspace.json `folder: 'file:///tmp/My%20Project'` matches `repoPath='/tmp/My Project'` (R1 Findings on URL handling).
+  - Non-`file:` workspace.json `folder: 'vscode-remote://...'` is skipped (no match).
+  - workspace.json malformed JSON or missing `folder` field — skip gracefully, log warn, don't crash.
+  - Workspace exists but `allComposers[]` is empty — returns `null`.
+- **Unit test (QueryFilter.metadata_match) — RUN AGAINST BOTH SQLiteStorage AND MemoryStorage:** storage-layer test with three atoms: A (composer_id='COMP-1'), B (composer_id='COMP-2'), C (composer_id='COMP-1', session_id='S-X'). Assert `query({metadata_match: {composer_id: 'COMP-1'}})` returns A+C in newest-first order; `query({metadata_match: {composer_id: 'COMP-1', session_id: 'S-X'}})` returns only C. Whitelist-rejection test: `query({metadata_match: {arbitrary_field: 'X'}})` throws a clear error at storage seam. Use a parameterised test loop (`describe.each`) so the same fixtures run against both adapter implementations — protects against drift.
+- **Integration test (tail_session repo-scoped):** seed BOTH the mock-fs workspaceStorage AND the mock global state.vscdb consistent with two workspaces:
+  - workspace `WS-PROJECT-ECHO` (folder `file:///tmp/project-echo`): composers `A` (3 atoms in storage, lastUpdatedAt: 500) and `B` (1 atom, lastUpdatedAt: 200).
+  - workspace `WS-OTHER` (folder `file:///tmp/other`): composer `C` (2 atoms, lastUpdatedAt: 800 — newest globally).
+  
+  Call `tail_session(source_app='cursor', repo_path='/tmp/project-echo', count=5)`. Assert returned turns are all from composer A (newest-first, count=3), `source_resolved=<vscdb-path>`, `composer_resolved='A'`, `source_app_resolved='cursor'`. Counter-test: same setup, no `repo_path` — assert returned turns include the wrong-project composer C's most-recent atom at position 0 (proves the gap is present without 035 and absent with it).
+- **Unit test (parameter validation):** `tail_session(source_app='claude_code', repo_path='/tmp/repo')` returns a warning + ignores repo_path. `tail_session(repo_path='/tmp/repo')` (no source_app, no source) rejects with the documented error. `tail_session(source='fs:/some/path', repo_path='/tmp/repo')` rejects with the "incompatible with exact source" error (R1 Finding 3 from Codex / R1 Medium #1 from Cursor). `tail_session(source_app='cursor', repo_path='relative/path')` rejects with the absolute-path error.
 
-Total expected test additions: 6-9 new test cases.
+Total expected test additions: 9-12 new test cases (the dual-adapter parity adds ~3 vs the V1 spec's 6-9 count).
 
 ### AC6 — Dogfooding verification (post-merge, founder/strategist)
 
@@ -183,13 +216,55 @@ Two consecutive successful dogfooding runs (different days, different cross-proj
 
 # Cross-tool review checklist (pre-claim)
 
-- [ ] **Gate 1 — Diff vs precedent.** Compared against 030 (atomic toolkit decomposition — `tail_session` extended in-place per the pattern), 032 (explicit-over-implicit parameter additions — `repo_path` is opt-in, no-args path unchanged), 034 (capture-layer counterpart in M1-1 — 035 stays read-side only). The `metadata_match` storage extension mirrors the existing `exclude_metadata_surface` shape.
-- [ ] **Gate 2 — Out-of-scope drift.** Eight "do NOT" rules covering find_clusters/search_memories extensions, new tools, capture-layer changes, other source_apps, caller-identity, cross-platform paths, caching, multi-repo queries.
-- [ ] **Gate 3 — Falsifiable ACs.** AC5 has 4 falsifiable test families. AC6 has a counter-test that proves the gap is present without 035 (sanity check against accidental no-op). AC4 step 4's composer_id filter is testable in isolation (skip the workspace_id step, verify composer_id alone works).
-- [ ] **Gate 4 — Cross-reference consistency.** All references use symbol names (no line numbers). M1-1 sub-gap C taxonomy lines up with the 2026-05-10 dogfooding journal entries (16:08 / 22:11 / 22:25 / 22:45 PDT). Sibling items 034 (M1-1 A+B), 029 (cursor capture diagnosis correction), 031 (deprecation gate) all referenced with current IDs.
+- [x] **Gate 1 — Diff vs precedent.** Compared against 030 (atomic toolkit decomposition — `tail_session` extended in-place per the pattern), 032 (explicit-over-implicit parameter additions — `repo_path` is opt-in, no-args path unchanged), 034 (capture-layer counterpart in M1-1 — 035 stays read-side only). The `metadata_match` storage extension mirrors the existing `exclude_metadata_surface` shape; post-R1, the Zod schema discipline mirrors item 025's wire-shape standards.
+- [x] **Gate 2 — Out-of-scope drift.** Eight "do NOT" rules covering find_clusters/search_memories extensions, new tools, capture-layer changes, other source_apps, caller-identity, cross-platform paths, caching, multi-repo queries.
+- [x] **Gate 3 — Falsifiable ACs.** Post-R1: AC5 has 5 falsifiable test families. AC6 has a counter-test that proves the gap is present without 035 (sanity check against accidental no-op). The new dual-adapter parity test (SQLite + MemoryStorage via `describe.each`) protects against the V1-design risk where AC4 silently behaved differently on in-memory vs prod storage. AC2 step 4-5 separation makes "workspace resolves but no composers exist" and "composers exist but lastUpdatedAt-pick fails" testable independently.
+- [x] **Gate 4 — Cross-reference consistency.** All references use symbol names (no line numbers). M1-1 sub-gap C taxonomy lines up with the 2026-05-10 dogfooding journal entries (16:08 / 22:11 / 22:25 / 22:45 PDT). Sibling items 034 (M1-1 A+B), 029 (cursor capture diagnosis correction), 031 (deprecation gate) referenced by ID only (not directory path — per R1 Finding 2 from Codex, paths drift as items move through `ready/ → claimed/ → complete/`).
 
 # Review history
 
-*This spec is V1 (initial draft). If cross-tool review surfaces revisions, append R1 / R2 / etc. sections here per the operating-model convention.*
+## R1 — 2026-05-10 22:46 PDT (Codex) + 22:47 PDT (Cursor, recovered via SQLite probe AGAIN) — patched 2026-05-10 23:00 PDT by strategist
 
-**Pre-R1 strategist note:** 035 was specced in parallel with 034 implementation (per founder direction 2026-05-10 22:55 PDT) precisely because the M1-1 sub-gap C evidence reached structural certainty during 034's own review cycles (4 in-the-moment dogfooding hits today). Skipping the "≥3 hits before specing" gate that the 034 spec hedged is deliberate; the gate was a precaution, not a requirement.
+**Recovery shape:** Same M1-1 sub-gap A + C firing for the THIRD consecutive review cycle. Codex's R1 turn was captured-but-elided (atom `9d70156d-...`, `bytes_elided: 1562`), recovered via `get_atom` (5441 bytes envelope, `atom_size_bytes: 5441`). Cursor's R1 (4497 chars in bubble `bdb29bcb-...`) was NOT captured by ECHO at all — recovered via the same SQLite-probe chain (rowid > 134191 from R2 of 034). **This is the SIXTH time today the very gap 035 fixes bit during 035's own review** (or its sibling 034's). The dogfooding loop is now structurally unmissable.
+
+**R1 findings + dispositions (8 unique, 3 convergent):**
+
+| # | Reviewer | Severity | Finding | Disposition in R1 patch |
+|---|---|---|---|---|
+| 1 | Codex | **HIGH** | **AC4's V1 design relied on `metadata.workspace_id`, but the extractor's `composerToWorkspace` map starts empty and is only populated by chokidar workspace-DB events.** Bubbles captured before the map populates have no `workspace_id`, so a workspace_id filter would silently drop them. | **Fixed (architecture change).** AC2 + AC4 rewritten to derive `composer_id` directly from Cursor's own storage (workspace `state.vscdb` `allComposers[]` + global `state.vscdb` `composerData:<id>.lastUpdatedAt` → pick max). Atoms are filtered by `metadata.composer_id`, which the extractor reliably populates on every emitted atom (line 576 of `src/capture/extractors/cursor.ts`). The dependence on best-effort `workspace_id` is eliminated. |
+| 2 | Codex | Medium | `spec_refs` pointed at `backlog/ready/2026-05-10-034-cursor-capture-coverage.md`, but 034 already moved to `backlog/claimed/`. Future moves to `complete/` would break the ref again. | **Fixed.** `spec_refs` now references 034 by **ID only** (no directory path); a builder following the spec can `find backlog -name '<id>*.md'` to locate it regardless of pipeline state. |
+| 3 | Codex | Medium | `source + repo_path` combination was undefined — schema only rejected `source + source_app`. | **Fixed.** AC1 adds explicit rejection: "tail_session: repo_path is incompatible with exact source". AC5 parameter-validation test covers it. |
+| 4 | Codex (Med #4) + Cursor (Med #3) | Medium | **`metadata_match` storage filter must live on the `Storage` contract, not just SQLite.** `MemoryStorage` exists at `src/storage/memory.ts` and AC5's in-memory fixtures will silently diverge from production unless both adapters implement the same semantics. | **Fixed.** AC3 split into SQLite + MemoryStorage sections, both must implement `metadata_match` + the key whitelist. AC5 test uses `describe.each` to run the same fixtures against both adapters — drift protection. |
+| 5 | Codex (Low #5) + Cursor (Med #2) | Medium | `file://` prefix stripping was specified as manual `slice(7)`, but percent-encoded paths (e.g., `My%20Project`) would fail. Also non-`file:` shapes (remote, multi-root) shouldn't be compared at all. | **Fixed.** AC2 step 2 uses Node `fileURLToPath` for percent-decoding AND validates `folder.startsWith('file://')` — non-`file:` shapes are skipped (logged, never crash). |
+| 6 | Cursor | Low | MCP wire-shape — `outputSchema` / Zod must be extended for `repo_path` (input) and `composer_resolved` (output) per item 025 patterns. | **Fixed.** AC1 grows a "Zod input + output schema extension" sub-paragraph spelling out the additions; smoke gains a one-line description-contains-`repo_path` assertion. |
+| 7 | Cursor | Low | `metadata_match` adds a dynamic SQL clause; the SQLite adapter's prepared-statement cache must either include the metadata_match signature in its cache key OR avoid caching the dynamic variants. | **Fixed.** AC3's SQLite implementation paragraph adds the prepared-statement-cache guidance as an explicit "document the choice" note. |
+| 8 | Cursor | Low | Pagination consistency for repo-scoped tails — the `before` / `emitCursor` rules must apply unchanged on repo-filtered pages. | **Fixed.** AC4 step 3 makes the pagination guarantee explicit: "the existing `before` / `emitCursor` rules continue to apply unchanged — the `metadata_match` filter is added to the same query that constructs the pagination cursor." |
+| Cursor (cosmetic) | — | The four `# Cross-tool review checklist` boxes were still `[ ]`; strategist should tick them post-review. | **Done.** All four boxes now `[x]` with R1 patch notes inline. |
+
+**Strategist self-finding (added during R1 patch authoring):**
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 9 | Low | The R1 cycle is itself the SIXTH consecutive M1-1 dogfooding hit today; the structural certainty of the gap is now documented and load-bearing for the wiki promotion. | **Added implicitly.** Review-history-recovery-shape paragraph above cites the count; no further Context section change needed beyond R2's already-added one-sentence note on 034. |
+
+**Convergence analysis:**
+
+R1 of 035 shows the **same cross-tool divergence pattern** the journal has been documenting since 030 / 032 / 033 / 034:
+- **Codex specializes in implementation correctness** (the load-bearing HIGH on workspace_id-not-backfilled is unambiguously Codex's domain — it required reading the extractor's startup-order semantics carefully).
+- **Cursor specializes in contract clarity + wire-shape discipline** (Zod schemas, prepared-statement cache, pagination consistency, non-`file:` folder shapes).
+- **Both reviewers converged on three findings** (source+repo_path, MemoryStorage parity, file:// URL decoding) — high-value convergence, different prescription depths (Cursor's was more thorough on URL decoding; Codex's was more focused on the parity issue).
+
+Post-R1 promote-to-wiki recommendation: the convergence-at-severity + divergence-at-prescription + R1-recovery-via-SQLite-probe-from-second-reviewer pattern is now a 5-cycle (030, 032, 033, 034 R1+R2, 035 R1) confirmed signature. Promote to `wiki/operating-model/cross-tool-spec-review.md` post-035 as the canonical example.
+
+### Validation after R1 patch
+
+- `tools/blocked.py --validate` — passes (run after final commit below).
+- AC1 + AC2 + AC4 architecture is now coherent — no more dependency on the optional `metadata.workspace_id`. The single resolver derives a single `composer_id` from Cursor's own storage; that composer_id is reliably present on every captured atom.
+- AC3 + AC5 parity contract closes the silent-divergence risk between in-memory tests and production SQLite.
+- All four cross-tool review gates marked done with R1 patch notes inline.
+
+### What R2 should focus on
+
+- Whether the Cursor `composerData:<id>` row's `lastUpdatedAt` field is guaranteed to be populated, or whether some composers might have `createdAt` only (the R1 patch hedges with a fallback, but R2 should validate against real Cursor data — the strategist's 22:00 PDT SQLite probe confirmed `lastUpdatedAt` exists, but a different Cursor version might omit it).
+- Whether the dual-adapter parity test pattern (`describe.each` over [SQLiteStorage, MemoryStorage]) is the established convention in this repo or whether the codebase has a different parametrize-by-adapter idiom worth matching.
+- Re-test the recovery pattern: does ECHO still need the SQLite probe for Cursor's R2? Expected YES — 035 still in `ready/`, not built.

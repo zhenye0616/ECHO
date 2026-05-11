@@ -1732,6 +1732,21 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 22:41 PDT — Codex: monitoring 034 builder handoff via ECHO
+
+- **Source agent:** Codex
+- **Trigger:** Founder asked Codex to "use echo and track live update in the claude builder thread" and to do a full code review once item 034 lands in `pending_review/`.
+- **Query inputs:**
+  1. `search_memories(query='034', source_app='claude_code', limit=10)`.
+  2. `tail_session(source_app='claude_code', count=10)`.
+  3. `wait_for_new_turns(sources=['claude_code'], since='2026-05-11T05:39:10Z', timeout_ms=60000)`, where `05:39:10Z` is 034's `claimed_at` timestamp.
+- **Returned:** Search found prior 034 planning/routing turns. MRU Claude Code tail resolved to `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/a7449101-b5bb-44ee-a6db-6035410cb944.jsonl`, whose visible turn refused to claim 034 because `suggested_builder: cursor-claude`. The post-claim wait timed out with `turns: []`, `next_since: '2026-05-11T05:41:42.615Z'`.
+- **Read sources:** Claude Code JSONL matches under `~/.claude/projects/-Users-zhenye-Desktop-Project-echo/`: session `a7449101-b5bb-44ee-a6db-6035410cb944` (routing/refusal turn, source-resolved by `tail_session`) plus prior strategist session `74a9e2c0-0e7c-464b-92b2-449652fbf113` and the same `a744...` session in `search_memories`.
+- **Verdict:** 🟡 partial — ECHO correctly found the pre-claim Claude routing context, but no live post-claim Claude Code builder turn had landed yet.
+- **Note:** Local backlog state shows `backlog/claimed/2026-05-10-034-cursor-capture-coverage.md` with `claimed_at: '2026-05-11T05:39:10Z'`, so the active builder may be in Cursor's Claude or in a not-yet-captured Claude Code turn. Continue polling ECHO and the backlog stage before reviewing.
+
+---
+
 ### 2026-05-10 22:45 PDT — Strategist: 034 R2 review retrieval + combine (5 unique findings, 2 convergent)
 
 - **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context)
@@ -1784,6 +1799,79 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — ECHO + filesystem agree the R2 strategist refinement is already landed; **no blocking wait** for a future Claude turn unless founder wants optional R3.
 - **Note:** Substring search on the backlog filename surfaced the **git** capture of the R2 commit body (large elision) rather than a dedicated “spec markdown” atom; still sufficient to confirm patch presence. Minor spec inconsistency remains: cross-tool checklist Gate 3 still mentions `__disable*` pair for AC3 revert while R2 body replaces repoll disable with `__testHooks` — builder should follow AC3 body, not the stale checklist line.
 - **Conjecture:** Optional R3 focus in spec (`maxGlobalDbFamilyMtime` vs chokidar timing) is explicitly optional; founder can green-light claim without another review round.
+
+---
+
+### 2026-05-10 22:45 PDT — Codex: exact-source Claude context recovery for 035 spec review
+
+- **Source agent:** Codex
+- **Trigger:** Founder asked for a spec review on item 035 and explicitly asked to use ECHO to get the speccing context from Claude.
+- **Tool and query inputs:**
+  1. `search_memories(query='035 tail_session repo-scoping workspace_id Cursor sessions workspace hash', source_app='claude_code', limit=8)`
+  2. `tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl', count=8)`
+  3. `get_atom(id='04624afd-684c-4dc8-8c2d-83a2b00924ba')`
+- **Returned shape:** The scoped substring query returned 0 matches. Exact-source `tail_session` returned Claude's latest 035 speccing turn, but the content was elided around the AC recap. `get_atom` recovered the full 4362-byte atom: Claude drafted and pushed 035 as `09a6669`, framed it as M1-1 sub-gap C, and summarized AC1-AC6 (`repo_path`, workspace resolver, `metadata_match`, repo-scoped tail, tests, dogfooding).
+- **Verdict:** right after exact-source recovery.
+- **Note:** The review found two stronger risks than the existing small-patch note: the spec's 034 `spec_ref` now points to a moved file, and AC4's resolver relies on optional `metadata.workspace_id` even though the current extractor only fills it after workspace DB events. Both are worth strategist disposition before claim.
+- **Conjecture:** The read-side resolver should use the resolved workspace DB's composer list as a fallback or primary bridge to `composer_id`, then filter captured atoms by `composer_id`; that keeps 035 read-side while avoiding a hard dependency on optional historical `workspace_id` metadata.
+
+---
+
+### 2026-05-10 23:55 PDT — Codex: ECHO speccing context for item 035 + read-only R1 spec review
+
+- **Source agent:** Codex (Cursor IDE)
+- **Trigger:** Founder asked for a spec review on **035** (`tail_session` repo-scoping) and to use ECHO to pull Claude/strategist speccing context.
+- **Query inputs:**
+  1. `search_memories(query='035 tail_session workspace', limit=20)`
+  2. `search_memories(query='item 035', source_app='claude_code', limit=15)`
+  3. `search_memories(query='2026-05-10-035-tail-session-repo-scoping', limit=10)`
+- **Returned:** (1) **0 matches** — substring did not hit backlog path or commit message for that phrasing. (2) **5 matches** from `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl`; top turn `04624afd-684c-4dc8-8c2d-83a2b00924ba` (`2026-05-11T05:42:28.968Z`) — user "spec 035 in parallel", assistant recap: pushed `09a6669`, AC1–AC6 table shape, 0.5–1d estimate, unblocks M1-1 A+B+C with 034+035, `files_referenced` includes `backlog/ready/2026-05-10-035-tail-session-repo-scoping.md` + `docs/BACKLOG.md` + `src/storage/interface.ts`; `bytes_elided: 1172` on content. (3) **1 match** — `git:/Users/zhenye/Desktop/Project_echo` commit `09a6669` (`2026-05-11T05:42:05.000Z`) with full 035 spec commit message; `files_referenced` includes the 035 backlog path. All `next_cursor: null`.
+- **Read sources:** `claude_code` → Project_echo Claude session JSONL above (model `claude-opus-4-7`, `git_state` at capture pointed at `09a6669` / `main`). `git` → same repo. **No cursor** or **codex** rows on queries (1) and (3); query (2) scoped `source_app=claude_code` only. Confirmed speccing narrative: 035 specced in parallel with 034 claim (`cc30883`), evidence = four journal hits for sub-gap C.
+- **Verdict:** 🟡 partial — ECHO + Claude JSONL gave full strategist intent for 035; generic query (1) was too loose (0 hits). Filename query (3) relied on git atom, not claude_code body.
+- **Note:** R1 spec review (read `backlog/ready/2026-05-10-035-tail-session-repo-scoping.md` + `src/mcp/tools/tail-session.ts` + `src/storage/interface.ts`): spec is **claimable with small R1 patches** — see Codex→strategist findings: (a) **`source` + `repo_path` interaction unstated** — should reject or define when explicit `source` is passed with `repo_path`; (b) **`file://` folder parsing** — specify `fileURLToPath` + percent-decode, not only strip `file://`; (c) **`MemoryStorage` parity** for `metadata_match` — AC5 unit tests cite memory fixtures; interface says all `query()` callers; add explicit dual-adapter acceptance; (d) **MCP `outputSchema`** — add `repo_path`, `composer_resolved`, optional `warnings` shape to Zod + smoke assertion (spec already asks smoke for description); (e) **multi-root / non-`file:` `folder`** — optional one-line out-of-scope ("unknown `folder` shape → skip") to avoid silent null. No blocker on AC2–AC4 architecture.
+- **Conjecture:** After 035 ships, repeat `search_memories(query='repo_path tail_session', source_app='cursor')` on a dogfooding call that used the new param — validates capture+MCP index sees the new surface.
+
+---
+
+### 2026-05-10 22:46 PDT — Codex: 034 worktree moves while ECHO waits stay empty
+
+- **Source agent:** Codex
+- **Trigger:** Continuing the founder-requested live watch for item 034 after the first post-claim wait returned no builder turns.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:41:42.615Z', timeout_ms=60000)`.
+  2. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:43:06.982Z', timeout_ms=60000)`.
+  3. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:44:00.186Z', timeout_ms=60000)`.
+  4. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:44:52.550Z', timeout_ms=60000)`.
+  5. Filesystem probes of the 034 worktree and backlog stage after each wait.
+- **Returned:** First wait woke on a strategist Claude turn about item 035 (`fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl`, turn at `2026-05-11T05:42:28.968Z`), not the 034 builder. Later waits timed out empty with `turns: []` and successive `next_since` values through `2026-05-11T05:46:33.501Z`. Meanwhile the 034 worktree changed from clean claim state to `src/capture/extractors/cursor.ts` modified, growing from roughly `+175/-4` to `+296/-15`.
+- **Read sources:** ECHO read Claude Code and Cursor source-app prefixes through `wait_for_new_turns`; only the strategist Claude Code session surfaced. Filesystem read `/Users/zhenye/Desktop/Project_echo--cursor-capture-coverage` (`agent/cursor-capture-coverage`) and `backlog/claimed/2026-05-10-034-cursor-capture-coverage.md`.
+- **Verdict:** 🟡 partial — ECHO is useful for adjacent strategist activity, but did not surface the live 034 implementation turns while filesystem evidence shows the builder is actively editing.
+- **Note:** This is an in-flight observation, not a review finding. It is consistent with 034's own motivation: Cursor/Claude builder activity can be happening while the current capture surface fails to expose incremental turns. Continue using both ECHO and local branch/backlog state until handoff.
+
+---
+
+### 2026-05-10 22:51 PDT — Strategist: 035 R1 review retrieval + combine (8 unique findings, 3 convergent, 1 HIGH)
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same post-restart session
+- **Trigger:** Founder said "cursor and codex review just landed combine the finding and validate them" — third R1 combine cycle today. Goal: combine the two R1 findings into a single 035 R1 patch.
+- **Query inputs (3 ECHO calls + 1 SQLite probe):**
+  1. `tail_session(source=<codex jsonl>, count=3)` — newest Codex turns including R1 review at `2026-05-11T05:46:08.980Z` (= 22:46 PDT). Captured with `truncations: ["content", "metadata.tool_calls:projected"]`, `bytes_elided: 1562`.
+  2. SQLite probe: `bubbleId:d352562e-c958-417c-bbc4-a822c4fae3c4:* WHERE rowid > 134191` — new Cursor bubbles since R2 of 034. Found 4497-char R1 review in bubble `bdb29bcb-0580-4b8f-a70e-60c7cd691350`.
+  3. SQLite extract for bubble text → 4497 chars verbatim Cursor R1 review recovered.
+  4. `get_atom(id='9d70156d-0b48-482e-b163-1b3aaed5fb0f')` — Codex R1 verbatim, `atom_size_bytes: 5441`. All 5 findings + verdict readable in full.
+- **Returned:**
+  - **Codex R1 (5 findings):** 1 HIGH (workspace_id-not-backfilled architecture bug), 3 Medium (stale spec_ref, source+repo_path undefined, MemoryStorage parity), 1 Low (file:// URL decoding).
+  - **Cursor R1 (3 Medium + 4 Low + acks):** Med #1-3 = source+repo_path, file:// URL handling, MemoryStorage parity (3 converge with Codex). Lows = MCP wire-shape Zod additions, SQLite prepared-statement cache, pagination consistency, cosmetic checklist boxes.
+- **Sources:** Codex JSONL `019e1566-...`, atom `9d70156d-...` via `get_atom`. Cursor SQLite `cursorDiskKV` composer `d352562e-...`, bubble `bdb29bcb-...` via SQLite probe. **THIRD consecutive review cycle requiring SQLite-probe workaround for Cursor** (R1 of 034, R2 of 034, R1 of 035 — all on the same composer for the same M1-1 sub-gap C reason).
+- **Verdict:** ✅ right on the combine. 8 unique findings dispositioned in the R1 patch. The HIGH finding (Codex #1) led to an architecture change in AC2-AC4 — instead of querying ECHO for `metadata.workspace_id`, the resolver now reads Cursor's own workspace + global storage to derive a single authoritative `composer_id` and filters atoms by that. Eliminates dependence on best-effort metadata.workspace_id entirely.
+- **Note (Codex HIGH validation against code):** Verified at `src/capture/extractors/cursor.ts` line 556 (`composerToWorkspace = new Map()` starts empty) + line 583 (`if (ws !== undefined) metadata['workspace_id'] = ws` — populated conditionally). Codex's reading is exactly right; the V1 spec's reliance on `metadata.workspace_id` would have silently dropped atoms captured before the workspace-watcher map populated. **This is the kind of finding that justifies the cross-tool review discipline existing** — a single-tool review by either reviewer alone would not have caught a HIGH-severity load-bearing bug; the multi-tool perspective surfaced it.
+- **Note (the SIXTH consecutive M1-1 sub-gap C hit today):** Counting: 16:08 PDT (Cursor MRU wrong), 22:11 PDT (R1 of 034 — Cursor missing from ECHO), 22:25 PDT (corrective re-check — same), 22:45 PDT (R2 of 034 — same), 22:46 PDT (Codex side of 035 R1 — Codex captured but elided), 22:51 PDT (this entry — Cursor's 035 R1 missing from ECHO). The "≥3 hits before specing" gate I hedged in 034 is overwhelmed by 2x; the structural certainty is now load-bearing for the wiki promotion narrative.
+- **Note (cross-tool divergence pattern now 5-cycle confirmed):** R1 of 035 shows the SAME pattern: Codex catches implementation correctness (workspace_id-not-backfilled at startup, source+repo_path schema gap, stale spec_ref); Cursor catches contract clarity + wire-shape discipline (Zod schemas, prepared-statement cache, pagination, non-`file:` folder shapes). 5 consecutive cycles (030, 032, 033, 034 R1+R2, 035 R1) — pattern is structural. Worth promoting to `wiki/operating-model/cross-tool-spec-review.md` with concrete attribution: **Codex as the implementation-correctness reviewer, Cursor as the contract-clarity reviewer**.
+- **Note (data point 5 for item 031 deprecation gate):** `get_atom` worked cleanly on the elided Codex R1 turn (5441 bytes envelope). This is the FOURTH successful M1-3 recovery in the post-033-merge window (20:05, 22:11, 22:45, 22:51 PDT). At 4 / 5+ for dimension 1 (recovery primitive). Dimension 2 (atoms exist) blocked on 034+035.
+- **Conjecture (observation-only):**
+  1. **The HIGH finding pattern is informative for V1 demo narrative.** The fix shape — "read Cursor's own storage to derive the authoritative composer_id, don't trust optional metadata" — is the *kind* of thing that would silently work in dev and silently fail in users' hands when their Cursor instance hasn't had a workspace-DB event recently. The cross-tool review caught it BEFORE the bug shipped, demonstrating the operating-model value. Worth surfacing in the V1 launch narrative if appropriate.
+  2. **R1 cycle is converging fast on 035.** Both reviewers gave "claimable after this patch" verdicts; the convergent findings (3 of 8) are tight. R2 should focus narrowly on the new architecture (composer-lookup-via-workspace-DB) since that's the architecture change, not the original `metadata.workspace_id` design R1 was actually critiquing.
+  3. **The SQLite-probe recovery chain is now so well-rehearsed (third consecutive use today) that it could be scripted.** Three sessions, three identical chains. A one-shot bash helper `~/bin/cursor-mru-bubble.sh <composer_id> [rowid_after]` would compress the chain to one command — but that's exactly the friction 035 is designed to eliminate at the MCP layer. Don't pre-emptively automate the workaround; ship 035 and the workaround becomes vestigial.
 
 ---
 
