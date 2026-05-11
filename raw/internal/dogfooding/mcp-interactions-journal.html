@@ -977,6 +977,11 @@ href="#pdt-strategist-033-r2-review-prep-codex-pushback-discovery-cursor-r2-nega
 id="toc-pdt-strategist-033-r2-review-prep-codex-pushback-discovery-cursor-r2-negative-search">2026-05-10
 16:15 PDT — Strategist: 033 R2 review prep (Codex pushback discovery +
 Cursor-R2 negative search)</a></li>
+<li><a
+href="#pdt-strategist-echo-daemon-down-econnrefused-launchctl-kickstart-echo_ping-verify"
+id="toc-pdt-strategist-echo-daemon-down-econnrefused-launchctl-kickstart-echo_ping-verify">2026-05-10
+19:45 PDT — Strategist: ECHO daemon down (ECONNREFUSED) → launchctl
+kickstart → echo_ping verify</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7083,6 +7088,106 @@ changed the patch. As the 4-gate checklist tightens, marginal value of
 dual-reviewer R2 may shrink. Don’t change the process yet; flag for
 re-evaluation if R3-R5 of future items consistently show
 single-reviewer-sufficient outcomes.</li>
+</ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-echo-daemon-down-econnrefused-launchctl-kickstart-echo_ping-verify">2026-05-10
+19:45 PDT — Strategist: ECHO daemon down (ECONNREFUSED) → launchctl
+kickstart → echo_ping verify</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder pasted MCP client log:
+<code>ECONNREFUSED 127.0.0.1:38478 SSE error … [V2 FSM] connection:connect_failure</code>.
+ECHO MCP daemon was unreachable from Cursor / Claude Code.</li>
+<li><strong>Query inputs (1 ECHO call + 4 shell probes):</strong>
+<ol type="1">
+<li><code>lsof -i :38478</code> — no rows. Port unbound.</li>
+<li><code>ps aux | grep -E "echo|daemon|vite-node"</code> — only
+<code>vite-node tools/serve-trace.ts</code> (unrelated, Thursday 3pm
+start; trace-serving tool, NOT the daemon).</li>
+<li><code>ls -lat ~/Library/Application\ Support/ECHO/</code> —
+<code>echo.db</code> last-write <code>May 10 16:30</code>; no
+<code>.pid</code> file.</li>
+<li><code>launchctl list | grep echo</code> —
+<code>com.echo.daemon</code> present, status <code>-</code>, last exit
+code <code>0</code> (clean shutdown, not crash).</li>
+<li><code>launchctl kickstart -k "gui/$(id -u)/com.echo.daemon"</code> —
+daemon restarted (pid 83748 npm wrapper → pid 83761 node
+listening).</li>
+<li><code>mcp__echo__echo_ping</code> via MCP — response:
+<code>{pong: true, ts: "2026-05-11T02:45:37.853Z"}</code>. End-to-end
+verified.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<code>{pong: true, ts: "2026-05-11T02:45:37.853Z"}</code> (= 2026-05-10
+19:45:37 PDT). Daemon fully responsive on MCP transport.</li>
+<li><strong>Read sources:</strong> N/A for ping (the tool doesn’t query
+storage); diagnosis used filesystem + process state + launchd state, NOT
+ECHO capture.</li>
+<li><strong>Verdict:</strong> ✅ right — diagnostic chain converged in
+&lt;60s; root cause framed (clean shutdown, not crash) without
+spelunking; restart was the 1-line <code>launchctl kickstart -k</code>
+documented in <code>scripts/launchd/install.sh:23</code> (the same line
+the install script runs after <code>bootstrap</code>).</li>
+<li><strong>Note (clean shutdown, not crash):</strong>
+<code>last exit code = 0</code> is load-bearing diagnostic — it means
+systemd-equivalent (launchd) saw the daemon exit gracefully, not be
+signal-killed. Three plausible causes for a graceful exit at
+~16:30-19:43 PDT: (a) system sleep/login-window switch that bootouted
+the agent (most likely), (b) a manual <code>launchctl bootout</code>,
+(c) the daemon process self-exited cleanly for some internal reason
+(unlikely — <code>src/daemon/index.ts</code> doesn’t have a
+self-shutdown path under normal operation). Not investigating further
+unless this recurs.</li>
+<li><strong>Note (the unrelated long-running vite-node):</strong>
+<code>tools/serve-trace.ts</code> pid 81866 has been running since
+Thursday at 3pm — a trace-serving tool, NOT the MCP daemon. Worth
+flagging because process-listing alone might lead a future strategist to
+think ECHO is “running” when only the trace tool is. The diagnostic
+signal is the port binding (<code>lsof -i :38478</code>), not the
+process name.</li>
+<li><strong>Note (launchctl ergonomics + dogfooding
+observation):</strong> The one-line
+<code>launchctl kickstart -k "gui/$(id -u)/com.echo.daemon"</code> is
+the recovery primitive. Worth documenting in
+<code>wiki/architecture/local-daemon.md</code> post-V1 as the “if MCP
+clients ECONNREFUSED, run this” recipe — current page focuses on boot
+order, not recovery. Not blocking; add to the strategist
+<code>_followups.md</code> list once.</li>
+<li><strong>Note (dogfooding-window inflection):</strong> This is the
+<strong>first time the daemon went down during active
+dogfooding</strong>. Daemons go down; it’s expected. The cost was ~2min
+of strategist time to diagnose + restart, and zero data loss (storage is
+durable). The pattern that worked:
+<code>lsof → ps → ls (mtime) → launchctl list (exit code) → launchctl kickstart → echo_ping verify</code>.
+Worth keeping as a runbook recipe.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li>The clean-exit + ~3-hour gap pattern smells like system sleep. macOS
+putting the laptop to sleep can bootout <code>LaunchAgents</code> if
+KeepAlive isn’t set with the right <code>RunAtLoad</code> +
+<code>KeepAlive: true</code> semantics. Worth verifying the plist’s
+KeepAlive structure — if <code>KeepAlive: true</code> is set as a
+boolean, sleep should auto-revive; if it’s set as
+<code>KeepAlive: { Crashed: true }</code>, then a clean exit on sleep
+would NOT trigger relaunch.</li>
+<li>If recurrence is high, consider adding a watchdog tool to the V1.6.x
+backlog: a tiny script that pings <code>127.0.0.1:38478/mcp</code> every
+N minutes and re-kickstarts if it fails. Probably not needed if the
+plist KeepAlive is configured correctly.</li>
+<li>Founder’s mental model question: did the daemon go down during the
+wiki promotion work (16:30-16:45 PDT) or after? <code>echo.db</code>
+mtime 16:30 is suspicious — it’s the same minute the founder reconciled
+the 032 merge. Possibly the daemon was already down by the time I
+committed <code>390a3a0</code> at 16:42 PDT, but I never noticed because
+the wiki-promotion work didn’t call ECHO MCP at all (only filesystem
+reads + writes). Operational reminder: strategist work that doesn’t
+query ECHO doesn’t surface daemon outages — only client tool calls do.
+Worth flagging that the post-merge ECHO daemon-restart step in
+<code>/merge-and-cleanup</code> (C9b per 030’s merge commit message)
+should be VERIFIED, not just attempted.</li>
 </ol></li>
 </ul>
 <hr />
