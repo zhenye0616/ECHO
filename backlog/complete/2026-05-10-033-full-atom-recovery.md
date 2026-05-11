@@ -37,7 +37,45 @@ agent_notes: |
 
   Branch: `agent/full-atom-recovery` at `a713cac7078494f12d60b552646428079a8c82f0`.
   Run log: `raw/internal/agent-runs/2026-05-10-2026-05-10-033-full-atom-recovery.md`.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-10 (PDT, 2026-05-11T02:48Z) via founder reconciliation.
+  Verdict from /review-pending sidecar: merge as-is (zero pre-merge fixups,
+  zero predicted conflicts).
+
+  Conflicts resolved: none — clean merge. main had not touched any of the
+  five files this branch added/modified (src/mcp/server.ts, src/mcp/tools/
+  get-atom.ts, tests/mcp/get-atom.test.ts, tests/mcp/tools/recent-work-
+  context.test.ts, tools/mcp-integration-smoke.sh) since merge-base.
+
+  Fixups applied: none.
+
+  Fixups deferred to follow-up items:
+  - Dead-code manual `id` validation at src/mcp/tools/get-atom.ts:103-107
+    (redundant with zod min(1)); defer pending decision on direct (non-MCP)
+    caller contract.
+  - Incidental Prettier reformatting in tests/mcp/tools/recent-work-context
+    .test.ts + src/mcp/server.ts:36-38 — whitespace-only, no semantic
+    impact. Suggest enabling pre-commit Prettier across repo to prevent
+    recurrence.
+
+  Verify (post-merge, project root):
+  - 652 passed | 21 skipped | 0 failed (vitest, 41 files + 1 skipped file)
+  - lint: clean (eslint --max-warnings 0)
+  - typecheck: clean (tsc --noEmit)
+
+  Follow-up items (non-blocking, strategist domain):
+  - Create wiki/surfaces/mcp-get-atom.md (new per-tool page mirroring
+    mcp-find-clusters.md / mcp-get-atoms.md convention).
+  - Bump tool count 7 → 8 in wiki/surfaces/mcp-server.md and
+    wiki/architecture/system-architecture.md "MCP toolkit" section.
+  - Update wiki/operating-model/cross-tool-spec-review.md "Findings classes"
+    + "Cost / value" sections to reference get_atom as the in-MCP recovery
+    primitive (replaces "use JSONL/SQLite fallback" language).
+  - Move M1-3 from raw/internal/_followups.md "biting" → "Resolved" subsection
+    with this merge SHA + dogfooding-verification entry timestamp.
+  - Re-evaluate item 031 (get_recent_work_context deprecation) readiness:
+    033 closes the M1-3 dependency that implicitly blocked comfortable
+    deprecation.
 spec_refs:
   - src/mcp/tools/get-atoms.ts  # sibling pattern; same Storage.getByIds backbone
   - src/mcp/wire-shape/caps.ts  # WIRE_SHAPE_CAPS — `match_content` is bypassed for verbatim content; `metadata_value` still applied via projectMatch
