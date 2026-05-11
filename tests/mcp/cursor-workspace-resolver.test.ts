@@ -16,7 +16,13 @@ import { resolveCursorComposerForRepoPath } from '../../src/mcp/cursor-workspace
 interface WorkspaceFixture {
   hash: string;
   workspaceJson: string | null; // raw bytes; null skips writing the file
-  composers?: Array<{ composerId: string }>; // if undefined, no state.vscdb is created
+  composers?: Array<{ composerId: string }>; // legacy `allComposers[]` shape; if undefined, no state.vscdb is created
+  // Post-migration shape (2026-05-11 fix-up): explicit override of the
+  // composer.composerData JSON value. When set, `composers` is ignored and
+  // this raw object is written verbatim. Lets tests exercise the migrated
+  // shape (`selectedComposerIds[]` / `lastFocusedComposerIds[]`) or any future
+  // shape variation without re-baking the fixture builder.
+  composerDataOverride?: Record<string, unknown>;
 }
 
 interface GlobalComposerFixture {
@@ -45,13 +51,15 @@ function buildFixture(opts: {
     if (ws.workspaceJson !== null) {
       writeFileSync(join(dir, 'workspace.json'), ws.workspaceJson);
     }
-    if (ws.composers !== undefined) {
+    if (ws.composers !== undefined || ws.composerDataOverride !== undefined) {
       const db = new Database(join(dir, 'state.vscdb'));
       try {
         db.prepare('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)').run();
+        const composerDataValue =
+          ws.composerDataOverride ?? { allComposers: ws.composers };
         db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)').run(
           'composer.composerData',
-          JSON.stringify({ allComposers: ws.composers }),
+          JSON.stringify(composerDataValue),
         );
       } finally {
         db.close();
@@ -275,5 +283,64 @@ describe('resolveCursorComposerForRepoPath', () => {
       fixture.workspaceStorageDir,
     );
     expect(resolved).toEqual({ workspace_id: 'WS-NORM', composer_id: 'N1' });
+  });
+
+  // 2026-05-11 fix-up: Cursor's current workspace composer registry shape
+  // is `selectedComposerIds[]` + `lastFocusedComposerIds[]` with a migration
+  // flag — `allComposers[]` is the legacy shape. The resolver must read both.
+  // Surfaced during 035 AC6 dogfooding when Project_echo's workspace
+  // (`hasMigratedMultipleComposers: true`) returned 0 composers.
+  it('reads the post-migration shape (selectedComposerIds[] / lastFocusedComposerIds[])', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-MIGRATED',
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/migrated-repo' }),
+          composerDataOverride: {
+            selectedComposerIds: ['MIG-1'],
+            lastFocusedComposerIds: ['MIG-1'],
+            hasMigratedComposerData: true,
+            hasMigratedMultipleComposers: true,
+          },
+        },
+      ],
+      globalComposers: [{ composerId: 'MIG-1', lastUpdatedAt: 100 }],
+    });
+    const resolved = resolveCursorComposerForRepoPath(
+      '/tmp/migrated-repo',
+      fixture.globalDbPath,
+      fixture.workspaceStorageDir,
+    );
+    expect(resolved).toEqual({ workspace_id: 'WS-MIGRATED', composer_id: 'MIG-1' });
+  });
+
+  it('unions allComposers[] with the migrated arrays (defense-in-depth)', () => {
+    // A mid-migration workspace could theoretically expose both shapes
+    // simultaneously. The resolver should treat the composer id set as a
+    // union — every id from either shape is a valid candidate; the picker
+    // then chooses max lastUpdatedAt across the union.
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-MIXED',
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/mixed-repo' }),
+          composerDataOverride: {
+            allComposers: [{ composerId: 'LEGACY-1' }],
+            selectedComposerIds: ['MIG-2'],
+            lastFocusedComposerIds: ['MIG-2', 'LEGACY-1'],
+          },
+        },
+      ],
+      globalComposers: [
+        { composerId: 'LEGACY-1', lastUpdatedAt: 50 },
+        { composerId: 'MIG-2', lastUpdatedAt: 200 },
+      ],
+    });
+    const resolved = resolveCursorComposerForRepoPath(
+      '/tmp/mixed-repo',
+      fixture.globalDbPath,
+      fixture.workspaceStorageDir,
+    );
+    expect(resolved).toEqual({ workspace_id: 'WS-MIXED', composer_id: 'MIG-2' });
   });
 });

@@ -723,13 +723,35 @@ function refreshComposerWorkspaceMap(
       return;
     }
     if (typeof parsed !== 'object' || parsed === null) return;
+    // Cursor's workspace composer registry has two shapes (see
+    // src/mcp/cursor-workspace-resolver.ts:listComposerIdsForWorkspace for
+    // the same union pattern + the empirical 2026-05-11 finding that drove
+    // both code paths to handle the post-migration shape). Legacy:
+    // `allComposers[].composerId`. Current: `selectedComposerIds[]` +
+    // `lastFocusedComposerIds[]` (with `hasMigratedMultipleComposers: true`).
+    // Pre-fix this code only read the legacy shape, so every migrated
+    // workspace's atoms shipped without `metadata.workspace_id` populated
+    // — which is the deeper cause of the R1 reliability concern that drove
+    // item 035 to derive composer_id from Cursor's storage directly rather
+    // than from captured-atom metadata.
     const allComposers = (parsed as Record<string, unknown>)['allComposers'];
-    if (!Array.isArray(allComposers)) return;
-    for (const c of allComposers) {
-      if (typeof c === 'object' && c !== null) {
-        const id = (c as Record<string, unknown>)['composerId'];
-        if (typeof id === 'string') {
-          map.set(id, workspaceId);
+    if (Array.isArray(allComposers)) {
+      for (const c of allComposers) {
+        if (typeof c === 'object' && c !== null) {
+          const id = (c as Record<string, unknown>)['composerId'];
+          if (typeof id === 'string') {
+            map.set(id, workspaceId);
+          }
+        }
+      }
+    }
+    for (const key of ['selectedComposerIds', 'lastFocusedComposerIds'] as const) {
+      const arr = (parsed as Record<string, unknown>)[key];
+      if (Array.isArray(arr)) {
+        for (const id of arr) {
+          if (typeof id === 'string') {
+            map.set(id, workspaceId);
+          }
         }
       }
     }

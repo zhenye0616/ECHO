@@ -176,16 +176,37 @@ function listComposerIdsForWorkspace(workspaceDbPath: string): string[] {
       return [];
     }
     if (typeof parsed !== 'object' || parsed === null) return [];
+    // Cursor's workspace composer registry has two shapes empirically observed
+    // in 2026:
+    //   - Legacy:  `allComposers: [{composerId: string, ...}, ...]`
+    //   - Current: `selectedComposerIds: string[]` + `lastFocusedComposerIds: string[]`
+    //              with `hasMigratedMultipleComposers: true` as the migration marker.
+    // 035's initial implementation only read the legacy shape; the AC6 dogfooding
+    // on 2026-05-11 found Project_echo's workspace exclusively uses the current
+    // shape, returning 0 composers and breaking the resolver's primary path. The
+    // fix unions both shapes — workspaces written before the migration still
+    // surface their legacy `allComposers[]`; post-migration workspaces (the common
+    // case) surface via the selected/focused arrays. A workspace exposing both
+    // shapes (theoretically possible mid-migration) gets the union.
+    const ids = new Set<string>();
     const allComposers = (parsed as Record<string, unknown>)['allComposers'];
-    if (!Array.isArray(allComposers)) return [];
-    const ids: string[] = [];
-    for (const c of allComposers) {
-      if (typeof c === 'object' && c !== null) {
-        const id = (c as Record<string, unknown>)['composerId'];
-        if (typeof id === 'string' && id.length > 0) ids.push(id);
+    if (Array.isArray(allComposers)) {
+      for (const c of allComposers) {
+        if (typeof c === 'object' && c !== null) {
+          const id = (c as Record<string, unknown>)['composerId'];
+          if (typeof id === 'string' && id.length > 0) ids.add(id);
+        }
       }
     }
-    return ids;
+    for (const key of ['selectedComposerIds', 'lastFocusedComposerIds'] as const) {
+      const arr = (parsed as Record<string, unknown>)[key];
+      if (Array.isArray(arr)) {
+        for (const id of arr) {
+          if (typeof id === 'string' && id.length > 0) ids.add(id);
+        }
+      }
+    }
+    return [...ids];
   } finally {
     db.close();
   }
