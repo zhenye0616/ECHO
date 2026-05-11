@@ -19,9 +19,37 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-11T08:35:11Z"
 branch: "agent/cursor-multicluster-continuation"
 worktree: "~/Desktop/Project_echo--cursor-multicluster-continuation"
-head_sha: ""
+head_sha: "cf74360"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  AC1 + AC3 implemented. Replaced the V1.5.7 silent fast-forward in
+  extractCursorTurns with continuation-atom emission per the spec
+  contract: walk back to preceding user, emit a CursorTurn mirroring
+  the normal shape with is_continuation:true and
+  continuation_of_assistant_bubble_id:<checkpoint>; both metadata keys
+  flow through handleGlobalChange and are omitted on normal turns.
+  Defensive guard logs continuation_no_preceding_user when no preceding
+  user exists. log.info('continuation_atom', ...) breadcrumb fires
+  before each emission.
+
+  6 new AC3 tests added (single continuation, empty short-circuit,
+  cont+fresh turn, multi-composer, defensive guard, end-to-end via
+  triggerRepoll seam). Replaced 2 obsolete pre-036 tests that asserted
+  the V1.5.7 silent-skip behavior the spec explicitly overturns.
+
+  Full suite 704 passed / 21 skipped (no new skips outside the existing
+  describe.skip quarantine), lint clean, typecheck clean. Branch
+  agent/cursor-multicluster-continuation @ cf74360 pushed to origin.
+  Two files modified: src/capture/extractors/cursor.ts (+118),
+  tests/capture/extractors/cursor.test.ts (+216). No new dependencies,
+  no normalize-adapter change, no MCP wire-surface change. Run log:
+  raw/internal/agent-runs/2026-05-11-2026-05-11-036-cursor-multicluster-continuation.md
+
+  Note for reviewer: the suggested_builder hint was cursor-claude; the
+  spec body itself carved out "any builder is acceptable since this is
+  pure extractor logic, no Cursor-IPC", so Claude Code took the claim.
+  Founder can unwind by moving back to ready/ if Cursor's Claude was
+  preferred for the dogfooding pattern.
 review_notes: ""
 ---
 
