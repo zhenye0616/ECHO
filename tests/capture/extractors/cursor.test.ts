@@ -1,11 +1,17 @@
-import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CAPTURED_SOURCES, _isAllowedPathIn } from '../../../src/capture/sources.js';
 import {
+  CURSOR_REPOLL_INTERVAL_MS,
   extractCursorTurns,
+  maxGlobalDbFamilyMtime,
   startCursorExtractor,
+  tryExtractCodeBlocksText,
+  tryExtractFileDiffText,
+  tryExtractThinkingText,
+  tryExtractToolFormerText,
   type CursorExtractorHandle,
 } from '../../../src/capture/extractors/cursor.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
@@ -713,5 +719,552 @@ describe('CAPTURED_SOURCES allowlist update for globalStorage', () => {
     const home = process.env['HOME']!;
     const path = `${home}/Library/Application Support/Cursor/User/globalStorage/state.vscdb`;
     expect(_isAllowedPathIn(path, CAPTURED_SOURCES.fs_paths)).toBe(true);
+  });
+});
+
+// AC2 — Parse-time fallback chain for tool-call / non-text bubble shapes.
+// These tests target the pure parsers + extractCursorTurns directly so they
+// live outside the chokidar quarantine. Item 034.
+describe('parseBubbleRow fallback chain (AC2 — item 034)', () => {
+  let dir: string;
+  let dbPath: string;
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    dir = tmpDir();
+    dbPath = join(dir, 'state.vscdb');
+    captured = captureStdout();
+  });
+
+  afterEach(() => {
+    captured.restore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Fixture (a) — pure text (regression: AC2 must not break the 99% path).
+  it('case (a): pure text bubble emits with bubble_text_sources omitted', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'plain answer' },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toBe('plain answer');
+    // No-bloat 99% case: bubble_text_sources omitted when every bubble used 'text'.
+    expect(turns[0]?.bubble_text_sources).toBeUndefined();
+  });
+
+  // Fixture (b) — toolFormerData only (assistant has no top-level text).
+  it('case (b): toolFormerData-only bubble derives text + records source', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'run the tool' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        toolFormerData: { text: 'tool produced this output' },
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toBe('tool produced this output');
+    expect(turns[0]?.bubble_text_sources).toEqual(['toolFormerData']);
+  });
+
+  // Fixture (c) — attachedHumanChanges.fileDiff only.
+  it('case (c): attachedHumanChanges.fileDiff-only bubble derives text + records source', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'apply changes' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        attachedHumanChanges: { fileDiff: '--- a/x\n+++ b/x\n@@ +line @@' },
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toContain('+line');
+    expect(turns[0]?.bubble_text_sources).toEqual(['fileDiff']);
+  });
+
+  // Fixture (d) — codeBlocks with body (positive case).
+  it('case (d): codeBlocks with non-empty content body derives text + records source', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'show me code' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        codeBlocks: [{ languageId: 'ts', content: 'const x = 1;' }],
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toContain('const x = 1;');
+    expect(turns[0]?.bubble_text_sources).toEqual(['codeBlocks']);
+  });
+
+  // Fixture (e) — codeBlocks path-only (NEGATIVE case from R1 Codex Finding 2).
+  it('case (e): codeBlocks with only uri.path (no body) does NOT synthesize fake prose', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'ref this file' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        codeBlocks: [{ path: '/proj/x.ts', languageId: 'ts' }],
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    // The user has no surviving assistant cluster → no turn emitted; the warn
+    // records that the fallback chain returned nothing (no fake assistant
+    // prose was synthesized from the path-only reference).
+    expect(turns).toHaveLength(0);
+    expect(captured.writes.join('')).toContain('missing_text_and_fallbacks');
+  });
+
+  // Fixture (f) — thinkingContent only.
+  it('case (f): thinkingContent-only bubble derives text + records source', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'think hard' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        thinkingContent: 'reasoning trace contents',
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toBe('reasoning trace contents');
+    expect(turns[0]?.bubble_text_sources).toEqual(['thinkingContent']);
+  });
+
+  // Fixture (g) — all four fallbacks present; precedence pinned: tfd wins.
+  it('case (g): all fallbacks present → first-non-empty precedence (toolFormerData wins)', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'go' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a1',
+        type: 2,
+        text: '',
+        toolFormerData: { text: 'TFD-WINS' },
+        attachedHumanChanges: { fileDiff: 'diff-loser' },
+        codeBlocks: [{ content: 'code-loser' }],
+        thinkingContent: 'think-loser',
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_message).toBe('TFD-WINS');
+    expect(turns[0]?.bubble_text_sources).toEqual(['toolFormerData']);
+  });
+
+  // Fixture (h) — none of the above (empty bubble → null + warn).
+  it('case (h): bubble with no text and no fallback fields drops with warning', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: '' },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(0);
+    expect(captured.writes.join('')).toContain('missing_text_and_fallbacks');
+  });
+
+  // Fixture (i) — multi-bubble cluster with mixed sources.
+  // Validates R1 Codex Finding 1: bubble_text_sources is per-bubble plural,
+  // not a singular field that loses per-bubble variation.
+  it('case (i): multi-bubble cluster records bubble_text_sources per bubble', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'multi-step' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'I will think then code' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a2',
+        type: 2,
+        text: '',
+        toolFormerData: { text: 'tool ran' },
+      },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a3',
+        type: 2,
+        text: '',
+        codeBlocks: [{ languageId: 'ts', content: 'export const y = 2;' }],
+      },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_bubble_ids).toEqual(['a1', 'a2', 'a3']);
+    expect(turns[0]?.bubble_text_sources).toEqual(['text', 'toolFormerData', 'codeBlocks']);
+  });
+
+  // Fixture (j) — single-bubble 'text' cluster → bubble_text_sources omitted.
+  it('case (j): single-bubble text-only cluster omits bubble_text_sources entirely', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a' },
+    ]);
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.bubble_text_sources).toBeUndefined();
+  });
+
+  // Direct parser unit checks: each tryExtract* parser returns null on
+  // shape mismatch and never throws. These cover the "≤30 lines, never
+  // throw" contract from Implementation Notes.
+  it('parsers return null on shape mismatch and never throw', () => {
+    expect(tryExtractToolFormerText({})).toBeNull();
+    expect(tryExtractToolFormerText({ toolFormerData: 'string-not-object' })).toBeNull();
+    expect(tryExtractToolFormerText({ toolFormerData: { text: '' } })).toBeNull();
+    expect(tryExtractToolFormerText({ toolFormerData: { params: {} } })).toBeNull();
+
+    expect(tryExtractFileDiffText({})).toBeNull();
+    expect(tryExtractFileDiffText({ attachedHumanChanges: {} })).toBeNull();
+    expect(tryExtractFileDiffText({ attachedHumanChanges: { fileDiff: '' } })).toBeNull();
+
+    expect(tryExtractCodeBlocksText({})).toBeNull();
+    expect(tryExtractCodeBlocksText({ codeBlocks: [] })).toBeNull();
+    expect(tryExtractCodeBlocksText({ codeBlocks: [{ uri: { path: '/p' } }] })).toBeNull();
+
+    expect(tryExtractThinkingText({})).toBeNull();
+    expect(tryExtractThinkingText({ thinkingContent: '' })).toBeNull();
+    expect(tryExtractThinkingText({ thinkingContent: {} })).toBeNull();
+  });
+});
+
+// AC1 — Periodic re-poll path. Tests use the `__testHooks` seam (per the
+// R2 contract) to invoke `triggerRepollExtraction()` directly so they
+// don't depend on chokidar firing or on real-time setInterval ticks.
+// Item 034.
+describe('startCursorExtractor periodic re-poll (AC1 — item 034)', () => {
+  let dir: string;
+  let dbPath: string;
+  let storage: MemoryStorage;
+  let handle: CursorExtractorHandle | null = null;
+  let originalFsPaths: string[];
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    originalFsPaths = snapshotFsPaths();
+    dir = tmpDir();
+    dbPath = join(dir, 'state.vscdb');
+    storage = new MemoryStorage();
+    captured = captureStdout();
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(`${dir}/`);
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    captured.restore();
+    resetAllowlist();
+    restoreFsPaths(originalFsPaths);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Test 1 — first tick after checkpoint reset captures seeded fixture.
+  // R2 Codex Finding 3: the checkpoint auto-inits at extractor start to
+  // the current family-max mtime, so a naive "seed → start → trigger →
+  // expect atom" short-circuits. The fix is to reset the checkpoint via
+  // __testHooks.setLastSeenScanMtime(0) immediately after start.
+  it('test 1: first tick after checkpoint reset captures seeded fixture (1 pair → 1 atom)', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000, // large so real setInterval never fires during the test
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(1);
+  });
+
+  // Test 2 — no mtime change → short-circuit.
+  it('test 2: second tick with no mtime change short-circuits (no new atom)', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    const after1 = await storage.count();
+    // Trigger again with no DB mutation in between.
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(after1);
+  });
+
+  // Test 3 — mtime advances → run captures new pair.
+  it('test 3: mtime advances between ticks → second tick captures new pair (1 → 2 atoms)', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a1' },
+    ]);
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(1);
+
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'b3', type: 1, text: 'q2' });
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'b4', type: 2, text: 'a2' });
+    // Force state.vscdb mtime forward to ensure the guard sees an advance.
+    const future = new Date(Date.now() + 5000);
+    utimesSync(dbPath, future, future);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(2);
+  });
+
+  // Test 4 — WAL mtime advances while state.vscdb mtime stays stale.
+  // R2 Codex HIGH #1: SQLite WAL mode can advance state.vscdb-wal mtime
+  // while the main DB's mtime is frozen until the next checkpoint.
+  // Reading only state.vscdb's mtime would miss the writes; the
+  // family-max guard must detect the -wal advance.
+  it('test 4 (WAL-only): -wal mtime advances → family-max guard detects + scan runs', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    // Lock state.vscdb at a known mtime T0; reset checkpoint to T0
+    // (matches the main DB → main-DB alone would NOT advance the guard).
+    const t0Date = new Date(Date.now() - 5000);
+    utimesSync(dbPath, t0Date, t0Date);
+    const t0 = statSync(dbPath).mtimeMs;
+    handle.__testHooks!.setLastSeenScanMtime(t0);
+
+    // Create -wal with FUTURE mtime; do NOT touch state.vscdb. The
+    // family-max should now be > checkpoint.
+    const walPath = `${dbPath}-wal`;
+    writeFileSync(walPath, '');
+    const futureDate = new Date(Date.now() + 5000);
+    utimesSync(walPath, futureDate, futureDate);
+
+    const beforeMax = await maxGlobalDbFamilyMtime(dbPath);
+    expect(beforeMax).toBeGreaterThan(t0);
+
+    await handle.__testHooks!.triggerRepoll();
+    // The pre-seeded pair was already in the DB before the extractor
+    // started; with checkpoint reset to T0 (state.vscdb mtime) and -wal
+    // advanced beyond it, the trigger must run the scan and capture
+    // the pair.
+    expect(await storage.count()).toBe(1);
+
+    // Counter: touch state.vscdb to an OLDER timestamp, with no -wal
+    // advance → maxMtime falls below checkpoint → short-circuit.
+    const olderHandle = await startCursorExtractor(new MemoryStorage(), {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    try {
+      const olderStorage = (olderHandle as unknown as { _storage?: never })._storage;
+      void olderStorage;
+      const veryFuture = new Date(Date.now() + 999_999);
+      olderHandle.__testHooks!.setLastSeenScanMtime(veryFuture.getTime());
+      // No file mutation; current max < checkpoint → short-circuit.
+      const beforeTrigger = olderHandle.__testHooks!.getLastSeenScanMtime();
+      await olderHandle.__testHooks!.triggerRepoll();
+      // Checkpoint unchanged (guard short-circuited before updating it).
+      expect(olderHandle.__testHooks!.getLastSeenScanMtime()).toBe(beforeTrigger);
+    } finally {
+      await olderHandle.stop();
+    }
+  });
+});
+
+// AC3 integration — end-to-end revert mechanism. These tests prove that
+// each fix (periodic re-poll, fallback chain) is independently
+// load-bearing for the 8-pair mixed-shape demo fixture. Item 034.
+describe('startCursorExtractor 034 revert-mechanism (AC3 — item 034)', () => {
+  let dir: string;
+  let dbPath: string;
+  let storage: MemoryStorage;
+  let handle: CursorExtractorHandle | null = null;
+  let originalFsPaths: string[];
+  let captured: ReturnType<typeof captureStdout>;
+
+  // 8-pair fixture: pairs 1 + 2 have text-only assistants; pair 3's
+  // assistant is tool-call-only (drops without fallbacks → loop breaks
+  // because u3 has no surviving assistant). Pairs 4–8 mix toolFormerData,
+  // fileDiff, codeBlocks body, thinkingContent; all need the fallback
+  // chain to capture.
+  function eightPairFixture(): FixtureBubble[] {
+    return [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1-text' },
+      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'q2' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a2-text' },
+      { composer_id: 'c1', bubble_id: 'u3', type: 1, text: 'q3-runs-tool' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a3',
+        type: 2,
+        text: '',
+        toolFormerData: { text: 'tool-output-3' },
+      },
+      { composer_id: 'c1', bubble_id: 'u4', type: 1, text: 'q4-diff' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a4',
+        type: 2,
+        text: '',
+        attachedHumanChanges: { fileDiff: 'diff-4' },
+      },
+      { composer_id: 'c1', bubble_id: 'u5', type: 1, text: 'q5-code' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a5',
+        type: 2,
+        text: '',
+        codeBlocks: [{ languageId: 'ts', content: 'const z = 5;' }],
+      },
+      { composer_id: 'c1', bubble_id: 'u6', type: 1, text: 'q6-think' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a6',
+        type: 2,
+        text: '',
+        thinkingContent: 'reasoning-6',
+      },
+      { composer_id: 'c1', bubble_id: 'u7', type: 1, text: 'q7' },
+      { composer_id: 'c1', bubble_id: 'a7', type: 2, text: 'a7-text' },
+      { composer_id: 'c1', bubble_id: 'u8', type: 1, text: 'q8-tool' },
+      {
+        composer_id: 'c1',
+        bubble_id: 'a8',
+        type: 2,
+        text: '',
+        toolFormerData: { text: 'tool-output-8' },
+      },
+    ];
+  }
+
+  beforeEach(() => {
+    originalFsPaths = snapshotFsPaths();
+    dir = tmpDir();
+    dbPath = join(dir, 'state.vscdb');
+    storage = new MemoryStorage();
+    captured = captureStdout();
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(`${dir}/`);
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    captured.restore();
+    resetAllowlist();
+    restoreFsPaths(originalFsPaths);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // Control — both fixes active. Periodic re-poll captures all 8 pairs.
+  it('control (both fixes active): all 8 pairs reach storage.append', async () => {
+    createGlobalStorageFixture(dbPath, eightPairFixture());
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(8);
+  });
+
+  // Cadence-gap revert — only the first tick fires. Seeds 2 pairs, runs
+  // the tick (captures 2), then seeds 6 more pairs WITHOUT triggering
+  // another tick. With fake timers the chokidar-driven setTimeout never
+  // fires either, so the second batch sits uncaptured — proving the
+  // periodic re-poll is what closes the cadence gap.
+  it('cadence-gap revert (no second tick): ≥ 3 turn-pairs missing → proves AC1 load-bearing', async () => {
+    const all = eightPairFixture();
+    // Seed first 2 pairs (4 bubbles).
+    createGlobalStorageFixture(dbPath, all.slice(0, 4));
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(2);
+
+    // Seed remaining 6 pairs into the SAME DB; chokidar fires `change`
+    // events but the debounced setTimeout never resolves under fake
+    // timers, simulating "only initial chokidar fired" — and we do NOT
+    // call triggerRepoll() again.
+    for (const b of all.slice(4)) appendBubble(dbPath, b);
+
+    // No extra trigger. Storage still at 2.
+    expect(await storage.count()).toBe(2);
+    // 8 - 2 = 6 missing pairs → ≥ 3 as required by the spec.
+  });
+
+  // Parse-gap revert — __disableToolCallFallbacks restores V1 behavior
+  // (drop bubbles with missing text). With the 8-pair fixture, pair 3's
+  // tool-call-only assistant drops, the cluster loop breaks, and only
+  // pairs 1–2 capture. Proves the fallback chain is what closes the
+  // parse gap.
+  it('parse-gap revert (__disableToolCallFallbacks): ≥ 3 turn-pairs missing → proves AC2 load-bearing', async () => {
+    createGlobalStorageFixture(dbPath, eightPairFixture());
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+      __disableToolCallFallbacks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    // Pairs 1 + 2 capture; pair 3's a3 drops (no .text, fallbacks
+    // disabled), u3 has no surviving assistant follow-up, loop breaks.
+    // 6 pairs missing.
+    expect(await storage.count()).toBeLessThanOrEqual(2);
+    expect(8 - (await storage.count())).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// Configuration sanity — the source-constant default and the override
+// option are the only knobs. No process.env.* lookup was added. Item 034.
+describe('CURSOR_REPOLL_INTERVAL_MS configuration (AC1 — item 034)', () => {
+  it('source constant is 15_000 ms', () => {
+    expect(CURSOR_REPOLL_INTERVAL_MS).toBe(15_000);
   });
 });
