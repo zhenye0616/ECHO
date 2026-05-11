@@ -50,7 +50,29 @@ agent_notes: |
   pure extractor logic, no Cursor-IPC", so Claude Code took the claim.
   Founder can unwind by moving back to ready/ if Cursor's Claude was
   preferred for the dogfooding pattern.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-11 via founder reconciliation (verdict: merge as-is).
+
+  Conflicts resolved: none — clean ort merge against main @ 1072f41.
+  c496a36 (cursor trace diagnostics) and 036's extractCursorTurns changes
+  were in different functions; no textual overlap.
+
+  Fixups applied: none (sidecar listed zero pre-merge fixups).
+  Fixups deferred to follow-up items: none.
+
+  Verify: 704/704 tests pass (21 skipped, all in pre-existing
+  describe.skip quarantine); lint and typecheck clean post-merge.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Founder/strategist: schedule AC4 dogfooding within 60s of next
+    Cursor agent-mode session (≥3 tool calls in one turn → search for
+    verdict-phrase → target ≥90% capture rate).
+  - Strategist: after merge + ≥1 week of dogfooding evidence, trigger
+    the 031 deprecation gate per spec's "After Completion" #6.
+
+  Code reviewer: superpowers:code-reviewer subagent (see
+  2026-05-11-036-cursor-multicluster-continuation.review.md in this
+  commit's tree for full review — sidecar consumed by /merge-and-cleanup).
 ---
 
 # Context
