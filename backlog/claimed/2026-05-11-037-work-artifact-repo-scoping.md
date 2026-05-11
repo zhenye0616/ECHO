@@ -22,9 +22,9 @@ blocked_by: []
 suggested_builder: any  # Single coherent change across capture + storage + 4 retrieval tools — any builder agent; Cursor extractor work is the most domain-specific piece but the 035 pattern is already proven on the Cursor side
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-11T23:15:00Z"
+branch: "agent/work-artifact-repo-scoping"
 worktree: ""
 head_sha: ""
 pr_url: ""
