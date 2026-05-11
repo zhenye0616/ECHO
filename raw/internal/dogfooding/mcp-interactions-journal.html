@@ -1001,6 +1001,16 @@ href="#pdt-strategist-dogfooding-during-spec-authoring-for-034-m1-1-cursor-captu
 id="toc-pdt-strategist-dogfooding-during-spec-authoring-for-034-m1-1-cursor-capture-coverage">2026-05-10
 20:15 PDT — Strategist: dogfooding during spec authoring for 034 (M1-1
 Cursor capture coverage)</a></li>
+<li><a
+href="#pdt-codex-retrieve-claude-strategist-session-for-034-spec-review"
+id="toc-pdt-codex-retrieve-claude-strategist-session-for-034-spec-review">2026-05-10
+22:01 PDT — Codex: retrieve Claude strategist session for 034 spec
+review</a></li>
+<li><a
+href="#pdt-strategist-retrieve-codex-cursor-r1-reviews-for-034-mirror-of-codex-2201-entry"
+id="toc-pdt-strategist-retrieve-codex-cursor-r1-reviews-for-034-mirror-of-codex-2201-entry">2026-05-10
+22:11 PDT — Strategist: retrieve Codex + Cursor R1 reviews for 034
+(mirror of Codex 22:01 entry)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7568,6 +7578,183 @@ IDs.</strong> This is consistent with the V1 demo bar (which is about
 <em>AI clients</em> reaching for ECHO, not strategists writing specs).
 Don’t over-rotate the spec authoring workflow to ECHO; let it surface
 where it’s the obvious primitive.</li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-retrieve-claude-strategist-session-for-034-spec-review">2026-05-10
+22:01 PDT — Codex: retrieve Claude strategist session for 034 spec
+review</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Founder asked Codex to “connect to the
+claude strategist session and do a spec review” for the ready item
+<code>2026-05-10-034-cursor-capture-coverage</code>.</li>
+<li><strong>Query inputs (4 ECHO calls + 1 blocked local-connect
+attempt):</strong>
+<ol type="1">
+<li>Node <code>fetch</code> attempt to call
+<code>search_memories(query='034 Cursor capture coverage mid-stream bubble cadence tool-call bubble parsing', source_app='claude_code', limit=5)</code>
+failed before reaching ECHO: Codex sandbox
+<code>connect EPERM 127.0.0.1:38478</code>.</li>
+<li>Same <code>search_memories(...)</code> call after localhost approval
+returned 0 matches.</li>
+<li><code>search_memories(query='M1-1 Cursor', limit=3)</code> returned
+the strategist turn plus two git commits.</li>
+<li><code>get_atom(id='59e4a198-86ea-4f6f-ad33-b94646ce7665')</code>
+recovered the full strategist turn after the search result had
+<code>truncations: ['content', 'metadata.tool_calls:projected']</code>.</li>
+<li><code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl', count=5)</code>
+tailed the exact strategist session.</li>
+</ol></li>
+<li><strong>Returned:</strong> Exact query returned 0; broader query
+returned 3 matches: one Claude Code strategist atom
+(<code>59e4a198...</code>, turn 3, session <code>74a9e2c0...</code>)
+plus git commits <code>884d7be</code> and <code>951bf12</code>.
+<code>get_atom</code> returned the strategist turn verbatim,
+<code>atom_size_bytes: 6081</code>, with only
+<code>metadata.tool_calls:projected</code> remaining in
+<code>truncations</code>. <code>tail_session</code> returned 4 turns
+from the exact source (<code>2b38c7a3...</code>,
+<code>0bfa3f41...</code>, <code>1339f700...</code>,
+<code>59e4a198...</code>), covering post-033 resume, M1/M2 gap analysis,
+and item-034 specing.</li>
+<li><strong>Read sources:</strong> Claude Code JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>;
+git atoms from <code>git:/Users/zhenye/Desktop/Project_echo</code> for
+commits <code>951bf12</code> and <code>884d7be</code>. The blocked Node
+attempt read no ECHO source.</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO found the correct Claude
+strategist session and <code>get_atom</code> removed the only
+load-bearing elision before review.</li>
+<li><strong>Note:</strong> The exact source-app query was too specific
+and returned 0; the shorter project vocabulary query
+(<code>M1-1 Cursor</code>) was enough to route to the right session. The
+<code>get_atom</code> recovery primitive worked exactly for the
+cross-tool review case it was built for: a truncated strategist turn
+became readable without JSONL shell fallback.</li>
+<li><strong>Conjecture (observation-only):</strong> For cross-tool spec
+review, a two-step pattern is emerging: broad
+<code>search_memories</code> to identify the reviewer/strategist source,
+then exact <code>tail_session</code> or <code>get_atom</code> for
+context. Highly-specific search phrases still miss because the substring
+layer requires verbatim overlap.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-retrieve-codex-cursor-r1-reviews-for-034-mirror-of-codex-2201-entry">2026-05-10
+22:11 PDT — Strategist: retrieve Codex + Cursor R1 reviews for 034
+(mirror of Codex 22:01 entry)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — same post-restart session</li>
+<li><strong>Trigger:</strong> Founder said “use echo and retrieve spec
+review from cursor and codex” — strategist is the synthesis point that
+combines cross-tool findings into a single R1 patch. This entry mirrors
+Codex’s 22:01 PDT entry from the strategist side of the same review
+cycle.</li>
+<li><strong>Query inputs (4 ECHO calls):</strong>
+<ol type="1">
+<li><code>search_memories(query='034 cursor-capture-coverage', source_app='cursor', since='2026-05-10T20:00:00Z')</code>
+— 0 matches.</li>
+<li><code>search_memories(query='034 cursor-capture-coverage', source_app='codex', since='2026-05-10T20:00:00Z')</code>
+— 0 matches (too specific).</li>
+<li><code>tail_session(source_app='codex', count=5)</code> —
+auto-resolved to Codex review session <code>019e1566-...jsonl</code>;
+returned 2 turns covering Codex’s review + post-revert findings.</li>
+<li><code>tail_session(source_app='cursor', count=5)</code> —
+auto-resolved to <strong><code>isr-demo-mohsen</code> composer
+(<code>09bc3a08-...</code>)</strong> — UNRELATED project. Sub-gap C bit
+immediately.</li>
+<li><code>get_atom(id='76fd2340-aa6b-4c1d-8794-494bb649b61d')</code> —
+recover Codex’s verbatim 5-finding review post-revert.
+<code>atom_size_bytes: 4029</code>. 570 elided content chars + 1402
+elided metadata bytes recovered.</li>
+<li><code>get_atom(id='f9cba2bd-984c-4441-ae76-4f3761d32ce8')</code> —
+recover Codex’s pre-revert R1-patch narrative.
+<code>atom_size_bytes: 5826</code>. 1639 elided content chars
+recovered.</li>
+</ol></li>
+<li><strong>Returned (Codex side):</strong> 5 R1 findings recovered
+verbatim — three Medium (singular <code>bubble_text_source</code>
+doesn’t carry per-bubble fallback info; <code>codeBlocks</code> fallback
+can fake assistant prose from path-only context; periodic-repoll test
+plan risks landing inside the quarantined chokidar lifecycle suite), two
+Low (post-merge smoke ownership is founder/strategist not builder; stale
+<code>agentKv:</code>/<code>bubbleId</code> streaming-continuation
+comment contradicts the corrected 2026-05-09 diagnosis). All findings
+carry file:line citations. Codex’s R1 patch was made then reverted per
+founder’s “do not patch, leave for strategist combine” instruction.</li>
+<li><strong>Returned (Cursor side):</strong> <strong>No Cursor R1 review
+exists.</strong> <code>tail_session(source_app='cursor')</code> resolved
+to the global-MRU Cursor composer, which today is the
+<code>isr-demo-mohsen</code> project’s ROI debugging thread — completely
+unrelated to Project_echo. <strong>This is M1-1 sub-gap C firing
+live</strong> during exactly the cross-tool spec review pattern that
+motivated it. Recovery required no MCP-level fix; the strategist
+accepted that Cursor’s R1 doesn’t exist and proceeded with
+single-reviewer R1.</li>
+<li><strong>Sources:</strong> Codex turns from
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-2026-05-10T21-57-58-019e1566-...jsonl</code>;
+Cursor MRU resolved to <code>isr-demo-mohsen</code> composer in the
+global <code>state.vscdb</code>; no Project_echo Cursor activity
+surfaced. Both <code>get_atom</code> recoveries used the V1.6.1 in-MCP
+escape hatch — no JSONL fallback.</li>
+<li><strong>Verdict:</strong> 🟡 partial — Codex side fully recovered
+with all 5 findings actionable; Cursor side is structurally missing
+because of a documented gap (sub-gap C of item 034 itself) that the spec
+explicitly defers to item 035 candidate. The strategist now has enough
+to draft an R1 patch on Codex’s findings alone, with the option to ship
+single-reviewer if founder accepts.</li>
+<li><strong>Note (the strategist’s first single-reviewer R1 cycle
+today):</strong> Items 030 / 032 / 033 all had Cursor + Codex review
+pairs. This is the <strong>first</strong> spec cycle where Cursor’s R1
+is missing not because of process choice but because the substrate gap
+prevents it. The cross-tool-spec-review pattern
+(<code>wiki/operating-model/cross-tool-spec-review.md</code>) is
+structurally dependent on <code>tail_session(source_app='cursor')</code>
+landing on a Project_echo composer — when Cursor’s MRU is global, the
+pattern degrades to single-reviewer. <strong>The very item under review
+(034) is what would close this gap; the dogfooding is circular but
+informative.</strong></li>
+<li><strong>Note (sub-gap C just became more urgent):</strong> The 16:08
+PDT M1-1 escalation entry plus this 22:11 entry are now two consecutive
+instances of <code>tail_session(source_app='cursor')</code> failing the
+cross-tool review pattern. Item 035 candidate (<code>tail_session</code>
+repo-scoping / <code>workspace_id</code> filter) should be filed
+alongside or right after 034 ships — not waiting for “≥3 dogfooding
+entries surface the resolver-layer gap as still-load-bearing” as 034’s
+spec hedged. The 034 spec itself is the third entry.</li>
+<li><strong>Note (data point 2 of 5+ for item 031’s deprecation
+gate):</strong> This is the second post-033-merge real-world use of
+<code>get_atom</code> for recovery (first was the 20:05 PDT
+live-dogfooding entry). Recovery worked cleanly on both Codex turns — no
+<code>atom_too_large_for_wire</code> errors, both atoms well under the
+25 kB ceiling. The pattern’s reliability is accumulating in line with
+the 031 gate’s “≥1 week of dogfooding evidence” requirement.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>Single-reviewer R1 may be sufficient when one reviewer’s
+findings are comprehensive.</strong> Codex’s 5 findings cover the spec’s
+three load-bearing surfaces (metadata shape AC2 / test plan AC3 /
+Implementation Notes ownership). Cursor’s traditional value-add has been
+description-string nits + cross-reference catches; with the strategist
+4-gate self-review applied pre-commit, Cursor’s role may be marginal on
+tight specs. Worth A/B comparing on the next 2-3 items: ship one with
+single-reviewer R1 (this item), one with both, measure quality
+delta.</li>
+<li><strong><code>get_atom</code> for cross-tool review is now the
+obvious primitive.</strong> Codex’s 22:01 PDT entry mirrors this exactly
+— same recovery pattern, same kind of elided turn, same recovery
+success. Two independent sessions converged on the same recipe within 10
+minutes of each other. Worth promoting “Recipe: cross-tool R1 review
+recovery” to <code>wiki/surfaces/mcp-get-atom.md</code> post-034.</li>
+<li><strong>Codex’s “do not patch, leave the review for strategist to
+combine” pattern is the right operating norm.</strong> Reviewers find
+issues; the strategist combines + judges. Prevents R1 patches stepping
+on each other when both reviewers run in parallel. This pattern emerged
+organically from the founder’s instruction — worth codifying in
+<code>wiki/operating-model/cross-tool-spec-review.md</code>.</li>
+</ol></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
