@@ -9,9 +9,65 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-11T05:39:10Z"
 branch: "agent/cursor-capture-coverage"
 worktree: "~/Desktop/Project_echo--cursor-capture-coverage"
-head_sha: ""
+head_sha: "c00a7e7a1eaf10c1cb0e3d7567203ec8895a624b"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  AC1 + AC2 + AC3 implemented and shipped on agent/cursor-capture-coverage
+  (head c00a7e7). AC4 + AC5 are post-merge / strategist scope per spec.
+
+  AC1 — periodic re-poll with WAL-family mtime guard. New
+  CURSOR_REPOLL_INTERVAL_MS = 15_000 source constant; CursorExtractorOptions
+  .repollIntervalMs override; no env var. New maxGlobalDbFamilyMtime() helper
+  (MAX of state.vscdb, -wal, -shm — load-bearing per R2 Codex HIGH #1; the
+  WAL-only mtime test is AC1 Test 4). triggerRepollExtraction() bypasses
+  scheduleGlobalChange's debounce guard and calls schedule(() =>
+  handleGlobalChange('repoll')) directly. handleGlobalChange now takes
+  reason: 'repoll' | 'chokidar', logged once at function entry; chokidar
+  dispatch path stays log-free. setInterval lifecycle is unref()'d.
+
+  AC2 — tool-call fallback chain. Four top-level pure parsers
+  (tryExtractToolFormerText / tryExtractFileDiffText /
+  tryExtractCodeBlocksText / tryExtractThinkingText), exported for tests,
+  ≤30 lines each, never throw. codeBlocks body guard from R1 Codex Finding 2
+  (rejects path-only entries; requires entry.content OR entry.code body).
+  parseBubbleRow extended with first-non-empty fallback precedence.
+  CursorTurn gains optional bubble_text_sources?: BubbleTextSource[],
+  parallel to assistant_bubble_ids, present only when ≥1 bubble used a
+  fallback parser, omitted when every bubble used primary 'text' (no-bloat
+  99% case). Stale streaming-continuation comment in extractCursorTurns
+  updated per R1 Codex Finding 5 (one-line semantic update; no logic change
+  to the fast-forward branch).
+
+  AC3 — 17 new test cases. 10 AC2 fixture cases (a-j) including the
+  codeBlocks path-only NEGATIVE case, the all-fallbacks-precedence pin,
+  and the multi-bubble mixed-source cluster. 4 AC1 unit tests via the
+  __testHooks seam: first-tick-after-checkpoint-reset, no-mtime-change
+  short-circuit, mtime-advance, and the WAL-only mtime test (R2 Codex
+  HIGH #1) plus older-state.vscdb counter. 3 AC3 integration tests with
+  the 8-pair mixed-shape fixture: control (8 captured), cadence-revert
+  (≥3 missing → AC1 load-bearing), parse-revert (≥3 missing → AC2
+  load-bearing). All new tests live OUTSIDE the existing describe.skip
+  chokidar quarantine block (which stays unchanged per item 023).
+
+  Verification: vitest 671 passed | 21 skipped (existing) | 0 failed; tsc
+  --noEmit clean; eslint --max-warnings 0 clean; prettier --check matches
+  the 52-file pre-existing baseline (my new file ran through
+  prettier --write, no new regression).
+
+  Two soft notes for the reviewer (full detail in run log):
+    1. AC3 cadence-revert test uses triggerRepoll() rather than literal
+       handleGlobalChange('chokidar') — behavioral equivalence; the
+       __testHooks contract pins exactly 3 methods.
+    2. tryExtractToolFormerText precedence (text → result → rawArgs →
+       stringified params) is inferred; AC4 dogfooding will surface if
+       real-world toolFormerData shapes need re-tuning.
+
+  One housekeeping commit landed on main before the claim:
+  d53c18b — journal sync of two pre-existing Codex dogfooding entries
+  (2026-05-10 22:34 + 23:10 PDT) that were uncommitted in the working
+  tree, blocking git pull --rebase. Pure journal sync.
+
+  Run log: raw/internal/agent-runs/2026-05-10-2026-05-10-034-cursor-capture-coverage.md
 review_notes: ""
 spec_refs:
   - src/capture/extractors/cursor.ts          # Chokidar/debounce loop + parseBubbleRow (the two gaps)
