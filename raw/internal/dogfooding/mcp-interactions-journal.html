@@ -1076,6 +1076,11 @@ both reviewers + combined verdict</a></li>
 <li><a href="#pdt-cursor-resume-lookup-after-claude-restart"
 id="toc-pdt-cursor-resume-lookup-after-claude-restart">2026-05-10 23:17
 PDT — Cursor resume lookup after Claude restart</a></li>
+<li><a
+href="#pdt-strategist-034-ac4-dogfooding-diagnosis-of-cursor-multi-cluster-gap-item-036-candidate-filed"
+id="toc-pdt-strategist-034-ac4-dogfooding-diagnosis-of-cursor-multi-cluster-gap-item-036-candidate-filed">2026-05-10
+23:30 PDT — Strategist: 034 AC4 dogfooding + diagnosis of Cursor
+multi-cluster gap (item 036 candidate filed)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -8847,6 +8852,155 @@ showed an older, interrupted 034 dogfooding investigation. The useful
 resume answer needs both: continue/finish 034 live dogfooding if
 resuming that terminal, and know that 035 is now pending review with AC6
 founder dogfooding after merge.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-034-ac4-dogfooding-diagnosis-of-cursor-multi-cluster-gap-item-036-candidate-filed">2026-05-10
+23:30 PDT — Strategist: 034 AC4 dogfooding + diagnosis of Cursor
+multi-cluster gap (item 036 candidate filed)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder ran
+<code>launchctl kickstart</code> post-034 merge then started a fresh
+agent-mode Cursor conversation (composer <code>4f02b335-...</code>)
+asking “use echo and undersntand where we left off in this session.”
+Strategist ran the AC4 dogfooding recipe in this session (can’t drive
+Cursor, but can probe post-hoc).</li>
+<li><strong>Query inputs (3 ECHO calls + 4 SQLite probes):</strong>
+<ol type="1">
+<li><code>echo_ping</code> — verify daemon up post-kickstart. ✅
+<code>pong: true, ts: 2026-05-11T06:16:26.598Z</code>.</li>
+<li><code>search_memories(query='scheduleGlobalChange debounceTimer')</code>
+— backfill check on previously-uncaptured d352562e R1 review. 0 matches
+(V1.5.7 fast-forward blocking backfill on hostile checkpoint — this
+composer’s checkpoint lands mid-cluster).</li>
+<li>SQLite: composers active in last 1200s → found fresh composer
+<code>4f02b335</code> with
+<code>lastUpdatedAt: 2026-05-10 23:17:28 PDT</code>, 27 bubbles.</li>
+<li>SQLite: echo.db atoms for <code>4f02b335</code> → ONE atom captured,
+40,601 chars, <code>assistant_bubble_ids[]</code> length 10,
+<code>bubble_text_sources: ["text","toolFormerData"×7,"text","toolFormerData"]</code>.</li>
+<li>SQLite: full bubble layout in composer (1 USER at rowid 134495 + 26
+assistant bubbles at rowids 134501-134601).</li>
+<li>SQLite: eligible-bubble count (text non-empty OR toolFormerData OR
+fileDiff OR thinkingContent) = 21 of 26 (5 truly-empty bubbles).</li>
+<li><code>search_memories(query='use echo and undersntand where we left off', source_app='cursor')</code>
+— AC4 substring search. ✅ Returned 1 match,
+<code>composer_id: 4f02b335</code>, <code>bubble_text_sources</code>
+populated, 40k+ char content.</li>
+</ol></li>
+<li><strong>Returned:</strong> 034’s two specific fixes (AC1 periodic
+re-poll + AC2 toolFormerData fallback) <strong>empirically
+validate</strong> for the first user→assistant cluster. The plural
+<code>bubble_text_sources[]</code> array correctly carries
+<code>["text","toolFormerData"×7,"text","toolFormerData"]</code> (8 of
+10 bubbles used the new fallback path; without 034, those would’ve been
+silently dropped from capture). Demo bar substring search works:
+founder’s question phrase surfaces via ECHO. <strong>But:</strong> the
+captured atom contains only 11 of 26 bubbles in the composer — capture
+rate 10/21 = 47.6% (P1 territory per AC4 strategic-re-evaluation
+thresholds).</li>
+<li><strong>Sources:</strong> Cursor SQLite <code>cursorDiskKV</code>
+composer <code>4f02b335-...</code> (fresh composer, founder’s “where we
+left off” conversation); ECHO <code>echo.db</code> (1 atom captured for
+that composer); Cursor SQLite global state.vscdb for the eligible-bubble
+count.</li>
+<li><strong>Verdict:</strong> 🟡 <strong>partial pass — 034’s two fixes
+work as designed, but a third gap (V1.5.7 streaming-continuation drop)
+is now structurally preventing the ≥90% threshold on agent-mode
+composers.</strong></li>
+<li><strong>Note (the diagnosis — multi-cluster pattern):</strong>
+Walking the bubble layout chronologically: rowid 134495 (USER “use echo
+and undersntand…”) → rowids 134501-134535 (11 consecutive assistants: 1
+TEXT intro, 7 TOOL calls, 1 EMPTY, 2 more TOOL, 1 TEXT analysis “ECHO
+found two recent work threads…”, 1 TOOL). 034’s first cadence tick fired
+here; captured the 10 eligible bubbles as ONE atom. Then rowids
+134542-134601 (15 more consecutive assistants — all still answering the
+SAME user question; the agent is mid-stream): 3 TEXT bubbles (“There are
+two overlapping threads…”, “I’m appending a short dogfooding journal
+entry…”, “ECHO says the latest real state is: <code>034</code> landed
+and was merged as <code>7362d88</code>…”) plus 8 TOOL bubbles plus 4
+EMPTY placeholders. 034’s second cadence tick saw
+<code>lastSeenMap[4f02b335] = 70975526</code> (assistant); V1.5.7’s
+fast-forward at <code>extractCursorTurns</code> lines 402-409 silently
+skipped all 15. <strong>The verdict turn (“ECHO says the latest real
+state is…”) was lost</strong> — that’s the “what did Cursor conclude”
+content that strategists actually want for cross-tool review.</li>
+<li><strong>Note (NOT a 034 bug; a known gap V1.5.7 left
+behind):</strong> 034’s Out-of-Scope explicitly preserved the V1.5.7
+streaming-continuation fast-forward (“That fix stays”). The intent was
+to avoid scope creep. Empirically, V1.5.7 was designed for a different
+problem (suppressing 902K orphan_assistant_bubble warnings on
+already-captured turns where Cursor wrote streaming continuations). The
+same logic now defeats 034’s intent on agent-mode composers, where
+partial captures + follow-on bubbles are typical. Filed as item 036
+candidate in <code>backlog/_followups.md</code> under “From 034 merge”
+with three spec-shape options (continuation atom emission /
+hold-pairing-open / update-in-place re-emission — strategist lean:
+Option A, append-only-friendly).</li>
+<li><strong>Note (concrete content loss from THIS session):</strong>
+Three TEXT bubbles in composer <code>4f02b335</code> carry substantive
+content that never made it into echo.db: bubble <code>e6676c74</code>
+(“There are two overlapping threads: the visible Claude terminal was
+mid-dogfooding item 034…”), bubble <code>b2f4f9e0</code> (“I’m appending
+a short dogfooding journal entry for this resume lookup…”), bubble
+<code>8265c39b</code> (“ECHO says the latest real state is:
+<code>034</code> landed and was merged as <code>7362d88</code>. The
+active…”). The first one is Cursor’s analysis of overlapping work
+threads; the third is the <strong>verdict turn answering the founder’s
+question</strong>. Both would be searchable via
+<code>search_memories(query=&lt;phrase&gt;, source_app='cursor')</code>
+post-036.</li>
+<li><strong>Note (workaround for AC4 dogfooding):</strong> To get a
+clean ≥90% measurement on 034 alone, use a non-agent-mode Cursor
+composer (regular chat without tool calls). Each user message gets ONE
+assistant cluster → no follow-on bubbles → no V1.5.7 fast-forward path
+engaged. Single-cluster turns hit 034’s demo bar reliably. The
+cross-tool spec review pattern (the load-bearing use case) is agent-mode
+by nature, so 036 is needed for the structural demo.</li>
+<li><strong>Note (035 merged at <code>a78e514</code> while this
+diagnosis was running):</strong> Both M1-1 items now in
+<code>backlog/complete/</code>. 035’s AC6 dogfooding (verify
+<code>tail_session(source_app='cursor', repo_path='/Users/zhenye/Desktop/Project_echo')</code>
+resolves to the correct composer) is a separate verification path — not
+blocked by the 036 gap, since <code>repo_path</code> resolution uses
+Cursor’s workspaceStorage + composer registry, not the
+streaming-continuation extraction logic. Test tomorrow on a different
+juxtaposition (e.g., switch to Cursor’s <code>isr-demo-mohsen</code>
+window briefly, then call
+<code>tail_session(source_app='cursor', repo_path='&lt;Project_echo&gt;')</code>
+to verify it returns Project_echo’s composer not the global-MRU
+one).</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>034 + 035 + 036 is the natural M1-1 trilogy.</strong>
+Originally framed as “sub-gaps A+B+C” (cadence / parse / resolver), the
+empirical sub-gap D (multi-cluster streaming-continuation) is now the
+fourth. 036 closes it. The trilogy becomes a tetralogy.</li>
+<li><strong>The V1.5.7 fast-forward was an asymmetric fix.</strong> It
+correctly handled “Cursor wrote more bubbles into an already-captured
+cluster” (silently skip — those continuation bubbles weren’t new turns).
+But it also handles “Cursor wrote more bubbles after our partial
+capture, those bubbles ARE new content” — and silently skips those too.
+The symmetry-break is the bug. Item 036 should distinguish the two cases
+by checking whether the prior atom’s <code>assistant_bubble_ids[]</code>
+covers the “expected” cluster or whether new bubbles imply a fresh
+continuation.</li>
+<li><strong>For V1 launch, the workaround (use non-agent-mode for
+dogfooding) is acceptable.</strong> For the founder’s actual workflow
+(cross-tool spec review = agent mode), 036 is load-bearing. Spec it
+next. <strong>Predicted scope: 1-1.5d</strong> (extractor-logic change,
+no new MCP surface, no storage changes). Builder agent: any (similar
+level to 034, possibly Cursor’s Claude continuing the pattern).</li>
+<li><strong>The “data point N for item 031 dogfooding gate” counter is
+finally meaningful again.</strong> Today’s substring-search hit
+(<code>use echo and undersntand</code> → 1 match) is data point 5 of 5+
+for dimension 1 (recovery primitive works). But dimension 2 (atoms exist
+for queries to hit) is now scoped to “atoms exist for cluster 1 of a
+multi-cluster turn.” That’s a partial close on dimension 2; 036 closes
+it fully.</li>
+</ol></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
