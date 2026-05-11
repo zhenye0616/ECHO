@@ -154,8 +154,10 @@ interface ParsedBubble {
 
 interface CursorDiskKVRow {
   key: string;
-  value: string;
+  value: string | null;
 }
+
+const missingComposerHeaderWarnedKeys = new Set<string>();
 
 function parseBubbleKey(key: string): { composer_id: string; bubble_id: string } | null {
   if (!key.startsWith(BUBBLE_KEY_PREFIX)) return null;
@@ -177,6 +179,7 @@ function parseComposerKey(key: string): string | null {
 function parseComposerRow(row: CursorDiskKVRow): ComposerInfo | null {
   const composer_id = parseComposerKey(row.key);
   if (composer_id === null) return null;
+  if (row.value === null) return null;
   let value: unknown;
   try {
     value = JSON.parse(row.value);
@@ -419,6 +422,10 @@ function parseBubbleRow(
 ): ParsedBubble | null {
   const parsedKey = parseBubbleKey(row.key);
   if (parsedKey === null) return null;
+  if (row.value === null) {
+    log.debug('empty_bubble_skipped', { key: row.key, reason: 'sql_null_value' });
+    return null;
+  }
   let value: unknown;
   try {
     value = JSON.parse(row.value);
@@ -511,10 +518,18 @@ function parseBubbleRow(
   }
   const order = composer.bubbleOrder.get(parsedKey.bubble_id);
   if (order === undefined) {
-    log.warn('unrecognized_bubble_shape', {
-      key: row.key,
-      reason: 'not_in_composer_headers',
-    });
+    if (!missingComposerHeaderWarnedKeys.has(row.key)) {
+      missingComposerHeaderWarnedKeys.add(row.key);
+      log.warn('unrecognized_bubble_shape', {
+        key: row.key,
+        reason: 'not_in_composer_headers',
+      });
+    } else {
+      log.debug('bubble_not_in_composer_headers_skipped', {
+        key: row.key,
+        reason: 'not_in_composer_headers',
+      });
+    }
     return null;
   }
   const parsed: ParsedBubble = {
@@ -790,11 +805,7 @@ export async function extractCursorTurns(
     // raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md);
     // chat turns remain in `bubbleId:` / `composerData:`.
     let i = startIdx;
-    if (
-      checkpoint !== undefined &&
-      i < bubbles.length &&
-      bubbles[i]!.role === 'assistant'
-    ) {
+    if (checkpoint !== undefined && i < bubbles.length && bubbles[i]!.role === 'assistant') {
       const continuationStart = i;
       const continuationCluster: ParsedBubble[] = [];
       while (i < bubbles.length && bubbles[i]!.role === 'assistant') {

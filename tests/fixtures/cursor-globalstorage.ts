@@ -69,7 +69,11 @@ function bubbleValue(b: FixtureBubble): string {
   return JSON.stringify(v);
 }
 
-function composerValue(composer_id: string, createdAt: number, headers: { bubbleId: string; type: number }[]): string {
+function composerValue(
+  composer_id: string,
+  createdAt: number,
+  headers: { bubbleId: string; type: number }[],
+): string {
   return JSON.stringify({
     composerId: composer_id,
     createdAt,
@@ -109,9 +113,9 @@ export function appendBubble(dbPath: string, b: FixtureBubble): void {
       bubbleValue(b),
     );
     const composerKey = `composerData:${b.composer_id}`;
-    const existing = db
-      .prepare('SELECT value FROM cursorDiskKV WHERE key = ?')
-      .get(composerKey) as { value: string } | undefined;
+    const existing = db.prepare('SELECT value FROM cursorDiskKV WHERE key = ?').get(composerKey) as
+      | { value: string }
+      | undefined;
     if (existing !== undefined) {
       const composer = JSON.parse(existing.value) as {
         composerId: string;
@@ -134,7 +138,7 @@ export function appendBubble(dbPath: string, b: FixtureBubble): void {
   }
 }
 
-export function appendRawCursorDiskKVRow(dbPath: string, key: string, value: string): void {
+export function appendRawCursorDiskKVRow(dbPath: string, key: string, value: string | null): void {
   const db = new Database(dbPath);
   try {
     db.prepare('INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)').run(key, value);

@@ -283,7 +283,12 @@ describe('extractCursorTurns (pure)', () => {
 
     // Second tick — Cursor wrote 2 more assistant bubbles; checkpoint is
     // now at `a3` (the cluster-last from tick 1).
-    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'verdict: ECHO works' });
+    appendBubble(dbPath, {
+      composer_id: 'c1',
+      bubble_id: 'a4',
+      type: 2,
+      text: 'verdict: ECHO works',
+    });
     appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a5', type: 2, text: 'final summary' });
     turns = await extractCursorTurns(dbPath, new Map([['c1', checkpoint]]));
     expect(turns).toHaveLength(1);
@@ -470,6 +475,20 @@ describe('extractCursorTurns (pure)', () => {
     expect(log).toContain('unknown_type');
   });
 
+  it('skips SQL NULL bubble values without warning', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    appendRawCursorDiskKVRow(dbPath, 'bubbleId:c1:b-null', null);
+
+    const turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    const log = captured.writes.join('');
+    expect(log).not.toContain('not_object');
+    expect(log).not.toContain('unrecognized_bubble_shape');
+  });
+
   it('warns when a bubble has no parent composerData row', async () => {
     // A bubble row with a composer_id that has no corresponding composerData entry
     // should be dropped with `unrecognized_bubble_shape: no_composer_row`.
@@ -485,6 +504,30 @@ describe('extractCursorTurns (pure)', () => {
     const turns = await extractCursorTurns(dbPath, new Map());
     expect(turns).toHaveLength(1);
     expect(captured.writes.join('')).toContain('no_composer_row');
+  });
+
+  it('warns only once per bubble key when a bubble is absent from composer headers', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c-header-once', bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id: 'c-header-once', bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    appendRawCursorDiskKVRow(
+      dbPath,
+      'bubbleId:c-header-once:b-orphan-header',
+      JSON.stringify({
+        _v: 3,
+        type: 2,
+        text: 'contentful but not in header',
+        bubbleId: 'b-orphan-header',
+      }),
+    );
+
+    await extractCursorTurns(dbPath, new Map());
+    await extractCursorTurns(dbPath, new Map());
+
+    const log = captured.writes.join('');
+    const occurrences = log.match(/not_in_composer_headers/g) ?? [];
+    expect(occurrences).toHaveLength(1);
   });
 });
 
@@ -1246,8 +1289,18 @@ describe('startCursorExtractor periodic re-poll (AC1 — item 034)', () => {
     expect(await storage.count()).toBe(1);
 
     // Cursor writes 2 more assistant bubbles into the same cluster.
-    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'tick-2 verdict turn' });
-    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a5', type: 2, text: 'tick-2 final summary' });
+    appendBubble(dbPath, {
+      composer_id: 'c1',
+      bubble_id: 'a4',
+      type: 2,
+      text: 'tick-2 verdict turn',
+    });
+    appendBubble(dbPath, {
+      composer_id: 'c1',
+      bubble_id: 'a5',
+      type: 2,
+      text: 'tick-2 final summary',
+    });
     // Force the family-max mtime forward so the guard advances.
     const future = new Date(Date.now() + 5000);
     utimesSync(dbPath, future, future);
