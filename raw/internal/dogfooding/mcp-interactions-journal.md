@@ -1977,7 +1977,21 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
-## End-Of-Window Synthesis (filled at end of window)
+## 2026-05-11 — dogfooding day 5
+
+### 00:07 PDT — pre-/clear resume lookup (Claude Code)
+
+- **Source agent:** Claude Code
+- **Trigger:** Founder said "use echo and understand where we left off before i clear the context" — resume-style lookup before deliberately wiping conversation context.
+- **Query inputs:** `find_clusters()` (no args → 4h default lookback, 4h cluster-gap). Then `get_atoms(atom_ids=[49 ids from clusters[0]], format='minimal', prefer='newest_first')`.
+- **Returned:** 3 clusters; rank-1 `ctx_3ed95896` label "discussion about Project_echo" with `source_breakdown={git:23, claude_code:36}`, time_range 2026-05-10 20:08 PDT → 2026-05-11 00:05 PDT, 59 atom_ids, 13 open_loop_hints (12 resolved, 1 unresolved → `cc11fd03`, which is literally the last assistant turn asking founder whether to journal the fixup or hold). Rank-2 was a 2-atom Cursor cluster from 23:16 PDT; rank-3 a Codex cluster around 22:06–23:02 PDT (echo_wiki work, unrelated). `get_atoms` returned 8 atoms verbatim under the 25k envelope, dropped 42 ids to `atoms_dropped_ids[]` (prefix-drop on overflow; `newest_first` ensured the freshest survived).
+- **Read sources:** `source_breakdown={git:23, claude_code:36}` for the picked cluster. All claude_code atoms from the same session jsonl `74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl`; git atoms from `git:/Users/zhenye/Desktop/Project_echo` (today's commits: `a5d287b` fixup, `e8c06f1` journal, `a78e514` 035 merge, `276b4a5` review verdict, `6743d2b` review sidecar). Notably absent: zero Cursor atoms in the rank-1 cluster despite Cursor agent-mode work happening in the same window — consistent with the 036 multi-cluster gap logged yesterday (composer `4f02b335`'s bubbles got partially captured under the V1.5.7 fast-forward and didn't appear as atoms in this lookup's window).
+- **Verdict:** ✅ right — rank-1 was unambiguously the right cluster; the unresolved open_loop_hint pointed straight at the actual last-turn question; `newest_first` prefix-drop kept the four most-recent atoms which had everything needed for the summary.
+- **Note (positive):** This is the cleanest resume lookup of the dogfooding period — the `newest_first` knob from item 032 is doing exactly what it was specced for. Four newest atoms gave full arc (fixup landed + AC6 result + open loops + tree-clean status) without spilling. No need for `search_memories` follow-up.
+- **Note (negative — same 036 signal):** The four Cursor atoms from composer `4f02b335` that recorded the AC6 founder/Cursor exchanges (the test setup chat and verdict turns) didn't land in the rank-1 cluster. The cluster's claude_code:36 + git:23 came entirely from the Claude Code session and git, not from Cursor. If the founder had wiped the Claude Code session JSONL and only kept Cursor atoms, this resume lookup would have returned much less. Confirms 036 is load-bearing for cross-tool resume — single-source resume still works fine.
+- **Conjecture (observation-only):** The `rank_reason: ["recent_activity","has_open_loop","dense"]` signal triad seems well-calibrated for resume calls — the unresolved open-loop hint (`cc11fd03`) was a precise pointer to the actual last decision-point. Worth checking whether *all* future resume calls reliably surface the truly-open question via this hint, or whether `cc11fd03` was lucky (it was the literal last turn, so trivially the most-recent). A weaker test: a resume call after a 6h gap where the truly-open question is 3 turns back rather than the last turn.
+
+
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 

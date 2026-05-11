@@ -1082,9 +1082,13 @@ id="toc-pdt-strategist-034-ac4-dogfooding-diagnosis-of-cursor-multi-cluster-gap-
 23:30 PDT — Strategist: 034 AC4 dogfooding + diagnosis of Cursor
 multi-cluster gap (item 036 candidate filed)</a></li>
 </ul></li>
-<li><a href="#end-of-window-synthesis-filled-at-end-of-window"
-id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
-Synthesis (filled at end of window)</a></li>
+<li><a href="#dogfooding-day-5" id="toc-dogfooding-day-5">2026-05-11 —
+dogfooding day 5</a>
+<ul>
+<li><a href="#pdt-pre-clear-resume-lookup-claude-code"
+id="toc-pdt-pre-clear-resume-lookup-claude-code">00:07 PDT — pre-/clear
+resume lookup (Claude Code)</a></li>
+</ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
 <li><a href="#journal-operating-notes"
@@ -9003,8 +9007,73 @@ it fully.</li>
 </ol></li>
 </ul>
 <hr />
-<h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
-Synthesis (filled at end of window)</h2>
+<h2 id="dogfooding-day-5">2026-05-11 — dogfooding day 5</h2>
+<h3 id="pdt-pre-clear-resume-lookup-claude-code">00:07 PDT — pre-/clear
+resume lookup (Claude Code)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
+<li><strong>Trigger:</strong> Founder said “use echo and understand
+where we left off before i clear the context” — resume-style lookup
+before deliberately wiping conversation context.</li>
+<li><strong>Query inputs:</strong> <code>find_clusters()</code> (no args
+→ 4h default lookback, 4h cluster-gap). Then
+<code>get_atoms(atom_ids=[49 ids from clusters[0]], format='minimal', prefer='newest_first')</code>.</li>
+<li><strong>Returned:</strong> 3 clusters; rank-1
+<code>ctx_3ed95896</code> label “discussion about Project_echo” with
+<code>source_breakdown={git:23, claude_code:36}</code>, time_range
+2026-05-10 20:08 PDT → 2026-05-11 00:05 PDT, 59 atom_ids, 13
+open_loop_hints (12 resolved, 1 unresolved → <code>cc11fd03</code>,
+which is literally the last assistant turn asking founder whether to
+journal the fixup or hold). Rank-2 was a 2-atom Cursor cluster from
+23:16 PDT; rank-3 a Codex cluster around 22:06–23:02 PDT (echo_wiki
+work, unrelated). <code>get_atoms</code> returned 8 atoms verbatim under
+the 25k envelope, dropped 42 ids to <code>atoms_dropped_ids[]</code>
+(prefix-drop on overflow; <code>newest_first</code> ensured the freshest
+survived).</li>
+<li><strong>Read sources:</strong>
+<code>source_breakdown={git:23, claude_code:36}</code> for the picked
+cluster. All claude_code atoms from the same session jsonl
+<code>74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>; git atoms from
+<code>git:/Users/zhenye/Desktop/Project_echo</code> (today’s commits:
+<code>a5d287b</code> fixup, <code>e8c06f1</code> journal,
+<code>a78e514</code> 035 merge, <code>276b4a5</code> review verdict,
+<code>6743d2b</code> review sidecar). Notably absent: zero Cursor atoms
+in the rank-1 cluster despite Cursor agent-mode work happening in the
+same window — consistent with the 036 multi-cluster gap logged yesterday
+(composer <code>4f02b335</code>’s bubbles got partially captured under
+the V1.5.7 fast-forward and didn’t appear as atoms in this lookup’s
+window).</li>
+<li><strong>Verdict:</strong> ✅ right — rank-1 was unambiguously the
+right cluster; the unresolved open_loop_hint pointed straight at the
+actual last-turn question; <code>newest_first</code> prefix-drop kept
+the four most-recent atoms which had everything needed for the
+summary.</li>
+<li><strong>Note (positive):</strong> This is the cleanest resume lookup
+of the dogfooding period — the <code>newest_first</code> knob from item
+032 is doing exactly what it was specced for. Four newest atoms gave
+full arc (fixup landed + AC6 result + open loops + tree-clean status)
+without spilling. No need for <code>search_memories</code>
+follow-up.</li>
+<li><strong>Note (negative — same 036 signal):</strong> The four Cursor
+atoms from composer <code>4f02b335</code> that recorded the AC6
+founder/Cursor exchanges (the test setup chat and verdict turns) didn’t
+land in the rank-1 cluster. The cluster’s claude_code:36 + git:23 came
+entirely from the Claude Code session and git, not from Cursor. If the
+founder had wiped the Claude Code session JSONL and only kept Cursor
+atoms, this resume lookup would have returned much less. Confirms 036 is
+load-bearing for cross-tool resume — single-source resume still works
+fine.</li>
+<li><strong>Conjecture (observation-only):</strong> The
+<code>rank_reason: ["recent_activity","has_open_loop","dense"]</code>
+signal triad seems well-calibrated for resume calls — the unresolved
+open-loop hint (<code>cc11fd03</code>) was a precise pointer to the
+actual last decision-point. Worth checking whether <em>all</em> future
+resume calls reliably surface the truly-open question via this hint, or
+whether <code>cc11fd03</code> was lucky (it was the literal last turn,
+so trivially the most-recent). A weaker test: a resume call after a 6h
+gap where the truly-open question is 3 turns back rather than the last
+turn.</li>
+</ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
 <ul>
