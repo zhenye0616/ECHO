@@ -1758,6 +1758,35 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 22:34 PDT — Codex: wait for Claude R2 refinement landing via `wait_for_new_turns`
+
+- **Source agent:** Codex
+- **Trigger:** Founder asked "use echo and wait for claude new's round of refinement lands" after Codex R2 review was handed off for strategist/Claude combination.
+- **Tool and query inputs:**
+  1. `wait_for_new_turns(sources=['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl'], since='2026-05-11T05:23:02.752Z', timeout=30)`
+  2. `wait_for_new_turns(sources=['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl'], since='2026-05-11T05:33:55.772Z', timeout=30)`
+- **Returned shape:** First wait returned one turn, `d0975a31-e45a-4e38-8b89-bbd7e2cc8bc0` at `2026-05-11T05:24:55.100Z`, which was a capability-clarification turn rather than the spec refinement. Second wait returned one turn, `6562d980-167c-4735-9ce5-47db4f1d6017` at `2026-05-11T05:33:56.686Z`, containing Claude's R2 combine summary: Cursor R2 and Codex R2 recovered, spec validated, R2 patch committed and pushed as `7b8e286`, with recommendation to skip R3.
+- **Verdict:** right.
+- **Note:** `wait_for_new_turns` did the right thing when chained from the first call's `next_since`: it woke once on an irrelevant but real Claude turn, then woke again on the desired R2 refinement turn. The returned content was truncated, but the landed commit SHA and outcome were visible without needing `get_atom`.
+- **Conjecture:** For this workflow, exact-source `wait_for_new_turns` plus a quick content classification is enough to watch the strategist session; `tail_session` / `get_atom` should be reserved for full-text recovery after the wait wakes.
+
+---
+
+### 2026-05-10 23:10 PDT — Codex: ECHO corroboration that strategist R2 refinement for 034 landed (no further wait)
+
+- **Source agent:** Codex (Cursor IDE, gpt-5.5)
+- **Trigger:** Founder asked to use ECHO and wait for Claude's new refinement round on item 034; verify whether the combined R2 patch is in the canonical spec + store.
+- **Query inputs:**
+  1. `search_memories(query='2026-05-10-034-cursor-capture-coverage', limit=15)`
+  2. `find_clusters(since='2026-05-09T00:00:00Z', until='2026-05-11T23:59:59Z', window_hours=24, format='skeleton')`
+- **Returned:** (1) **8 matches**; top match `git:/Users/zhenye/Desktop/Project_echo` commit `7b8e286` with subject `spec: 034 R2 patch — combined Codex (4) + Cursor (3) + strategist findings` and `files_referenced` including `backlog/ready/2026-05-10-034-cursor-capture-coverage.md`; second match Codex rollout atom `742d4ff3-...` (R2 review, content elided 2320 bytes); third `493e1e6` R1 patch; remaining matches Claude/Codex/git context for the same review arc. `next_cursor: null`. (2) **9 clusters** returned; `result_caps`: `atoms_total_in_window=382`, `atoms_returned=314`, `truncated=true`. Rank-1 cluster `ctx_8c25395e`, `rank_reason: ['has_open_loop','dense']`, label **"discussion about Project_echo"**, `source_breakdown={claude_code: 178, git: 90}`, `atom_ids_truncated=true`, `atom_ids_total=268`. Warnings array empty.
+- **Read sources:** `search_memories` per-match prefixes: `git:/Users/zhenye/Desktop/Project_echo`, `fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-2026-05-10T21-57-58-019e1566-2c12-7212-a1fd-00a9dfdf800f.jsonl`, `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl`; **cursor app absent** from this query's hit list (expected for substring on backlog path + git message). `find_clusters` rank-1 breakdown is claude_code+git only for that cluster window. Workspace file read in same turn: `backlog/ready/2026-05-10-034-cursor-capture-coverage.md` contains full **R2** review-history block (WAL family-max mtime, set-union capture rate, `__testHooks` / `exposeTestHooks`, AC3 manual `handleGlobalChange('chokidar')` wording).
+- **Verdict:** ✅ right — ECHO + filesystem agree the R2 strategist refinement is already landed; **no blocking wait** for a future Claude turn unless founder wants optional R3.
+- **Note:** Substring search on the backlog filename surfaced the **git** capture of the R2 commit body (large elision) rather than a dedicated “spec markdown” atom; still sufficient to confirm patch presence. Minor spec inconsistency remains: cross-tool checklist Gate 3 still mentions `__disable*` pair for AC3 revert while R2 body replaces repoll disable with `__testHooks` — builder should follow AC3 body, not the stale checklist line.
+- **Conjecture:** Optional R3 focus in spec (`maxGlobalDbFamilyMtime` vs chokidar timing) is explicitly optional; founder can green-light claim without another review round.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*

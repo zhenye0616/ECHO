@@ -1026,6 +1026,16 @@ href="#pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-conver
 id="toc-pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent">2026-05-10
 22:45 PDT — Strategist: 034 R2 review retrieval + combine (5 unique
 findings, 2 convergent)</a></li>
+<li><a
+href="#pdt-codex-wait-for-claude-r2-refinement-landing-via-wait_for_new_turns"
+id="toc-pdt-codex-wait-for-claude-r2-refinement-landing-via-wait_for_new_turns">2026-05-10
+22:34 PDT — Codex: wait for Claude R2 refinement landing via
+<code>wait_for_new_turns</code></a></li>
+<li><a
+href="#pdt-codex-echo-corroboration-that-strategist-r2-refinement-for-034-landed-no-further-wait"
+id="toc-pdt-codex-echo-corroboration-that-strategist-r2-refinement-for-034-landed-no-further-wait">2026-05-10
+23:10 PDT — Codex: ECHO corroboration that strategist R2 refinement for
+034 landed (no further wait)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -8107,6 +8117,107 @@ shape in <code>wiki/architecture/system-architecture.md</code> (or
 “Bubble-granular capture rate” pattern, so future M1-* items inherit the
 correct shape without re-deriving.</li>
 </ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-wait-for-claude-r2-refinement-landing-via-wait_for_new_turns">2026-05-10
+22:34 PDT — Codex: wait for Claude R2 refinement landing via
+<code>wait_for_new_turns</code></h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Founder asked “use echo and wait for
+claude new’s round of refinement lands” after Codex R2 review was handed
+off for strategist/Claude combination.</li>
+<li><strong>Tool and query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl'], since='2026-05-11T05:23:02.752Z', timeout=30)</code></li>
+<li><code>wait_for_new_turns(sources=['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl'], since='2026-05-11T05:33:55.772Z', timeout=30)</code></li>
+</ol></li>
+<li><strong>Returned shape:</strong> First wait returned one turn,
+<code>d0975a31-e45a-4e38-8b89-bbd7e2cc8bc0</code> at
+<code>2026-05-11T05:24:55.100Z</code>, which was a
+capability-clarification turn rather than the spec refinement. Second
+wait returned one turn,
+<code>6562d980-167c-4735-9ce5-47db4f1d6017</code> at
+<code>2026-05-11T05:33:56.686Z</code>, containing Claude’s R2 combine
+summary: Cursor R2 and Codex R2 recovered, spec validated, R2 patch
+committed and pushed as <code>7b8e286</code>, with recommendation to
+skip R3.</li>
+<li><strong>Verdict:</strong> right.</li>
+<li><strong>Note:</strong> <code>wait_for_new_turns</code> did the right
+thing when chained from the first call’s <code>next_since</code>: it
+woke once on an irrelevant but real Claude turn, then woke again on the
+desired R2 refinement turn. The returned content was truncated, but the
+landed commit SHA and outcome were visible without needing
+<code>get_atom</code>.</li>
+<li><strong>Conjecture:</strong> For this workflow, exact-source
+<code>wait_for_new_turns</code> plus a quick content classification is
+enough to watch the strategist session; <code>tail_session</code> /
+<code>get_atom</code> should be reserved for full-text recovery after
+the wait wakes.</li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-echo-corroboration-that-strategist-r2-refinement-for-034-landed-no-further-wait">2026-05-10
+23:10 PDT — Codex: ECHO corroboration that strategist R2 refinement for
+034 landed (no further wait)</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (Cursor IDE, gpt-5.5)</li>
+<li><strong>Trigger:</strong> Founder asked to use ECHO and wait for
+Claude’s new refinement round on item 034; verify whether the combined
+R2 patch is in the canonical spec + store.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories(query='2026-05-10-034-cursor-capture-coverage', limit=15)</code></li>
+<li><code>find_clusters(since='2026-05-09T00:00:00Z', until='2026-05-11T23:59:59Z', window_hours=24, format='skeleton')</code></li>
+</ol></li>
+<li><strong>Returned:</strong> (1) <strong>8 matches</strong>; top match
+<code>git:/Users/zhenye/Desktop/Project_echo</code> commit
+<code>7b8e286</code> with subject
+<code>spec: 034 R2 patch — combined Codex (4) + Cursor (3) + strategist findings</code>
+and <code>files_referenced</code> including
+<code>backlog/ready/2026-05-10-034-cursor-capture-coverage.md</code>;
+second match Codex rollout atom <code>742d4ff3-...</code> (R2 review,
+content elided 2320 bytes); third <code>493e1e6</code> R1 patch;
+remaining matches Claude/Codex/git context for the same review arc.
+<code>next_cursor: null</code>. (2) <strong>9 clusters</strong>
+returned; <code>result_caps</code>:
+<code>atoms_total_in_window=382</code>, <code>atoms_returned=314</code>,
+<code>truncated=true</code>. Rank-1 cluster <code>ctx_8c25395e</code>,
+<code>rank_reason: ['has_open_loop','dense']</code>, label
+<strong>“discussion about Project_echo”</strong>,
+<code>source_breakdown={claude_code: 178, git: 90}</code>,
+<code>atom_ids_truncated=true</code>, <code>atom_ids_total=268</code>.
+Warnings array empty.</li>
+<li><strong>Read sources:</strong> <code>search_memories</code>
+per-match prefixes: <code>git:/Users/zhenye/Desktop/Project_echo</code>,
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-2026-05-10T21-57-58-019e1566-2c12-7212-a1fd-00a9dfdf800f.jsonl</code>,
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>;
+<strong>cursor app absent</strong> from this query’s hit list (expected
+for substring on backlog path + git message). <code>find_clusters</code>
+rank-1 breakdown is claude_code+git only for that cluster window.
+Workspace file read in same turn:
+<code>backlog/ready/2026-05-10-034-cursor-capture-coverage.md</code>
+contains full <strong>R2</strong> review-history block (WAL family-max
+mtime, set-union capture rate, <code>__testHooks</code> /
+<code>exposeTestHooks</code>, AC3 manual
+<code>handleGlobalChange('chokidar')</code> wording).</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO + filesystem agree the R2
+strategist refinement is already landed; <strong>no blocking
+wait</strong> for a future Claude turn unless founder wants optional
+R3.</li>
+<li><strong>Note:</strong> Substring search on the backlog filename
+surfaced the <strong>git</strong> capture of the R2 commit body (large
+elision) rather than a dedicated “spec markdown” atom; still sufficient
+to confirm patch presence. Minor spec inconsistency remains: cross-tool
+checklist Gate 3 still mentions <code>__disable*</code> pair for AC3
+revert while R2 body replaces repoll disable with
+<code>__testHooks</code> — builder should follow AC3 body, not the stale
+checklist line.</li>
+<li><strong>Conjecture:</strong> Optional R3 focus in spec
+(<code>maxGlobalDbFamilyMtime</code> vs chokidar timing) is explicitly
+optional; founder can green-light claim without another review
+round.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
