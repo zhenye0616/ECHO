@@ -1101,6 +1101,16 @@ PDT — Codex resumes Claude’s Cursor root-cause investigation</a></li>
 <li><a href="#pdt-codex-reviews-claude-written-036-spec"
 id="toc-pdt-codex-reviews-claude-written-036-spec">01:21 PDT — Codex
 reviews Claude-written 036 spec</a></li>
+<li><a
+href="#pdt-cross-session-resume-after-036-shipped-claude-code-spec-author-returning"
+id="toc-pdt-cross-session-resume-after-036-shipped-claude-code-spec-author-returning">13:27
+PDT — cross-session resume after 036 shipped (Claude Code, spec-author
+returning)</a></li>
+<li><a
+href="#pdt-036-ac4-dogfooding-run-1-claude-code-cursor-agent-mode-review-of-034035036"
+id="toc-pdt-036-ac4-dogfooding-run-1-claude-code-cursor-agent-mode-review-of-034035036">13:39
+PDT — 036 AC4 dogfooding run #1 (Claude Code + Cursor agent-mode review
+of 034/035/036)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -9257,6 +9267,216 @@ workflows, <code>find_clusters</code> remains a useful fallback after
 substring search misses, but the spec itself should still be read from
 the backlog file because backlog writes are the authoritative source of
 ready-item content.</li>
+</ul>
+<h3
+id="pdt-cross-session-resume-after-036-shipped-claude-code-spec-author-returning">13:27
+PDT — cross-session resume after 036 shipped (Claude Code, spec-author
+returning)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (spec-author session, the
+one that wrote 036 in <code>a54c911</code>)</li>
+<li><strong>Trigger:</strong> Founder asked “use echo and summarize
+where we left off across sessions” — a deliberate cross-session lookup
+after a multi-hour gap during which 036 was claimed, built, reviewed,
+and merged in a different agent loop, and a separate Claude Code session
+53fe5b30 investigated warning noise.</li>
+<li><strong>Query inputs:</strong>
+<code>find_clusters(since='2026-05-10T20:27:08')</code> (17h lookback,
+intentionally <code>since=</code> not <code>window_hours=</code>; missed
+the <code>Z</code> suffix → <code>[TZ]</code> warning fired but parsed
+correctly as local PDT);
+<code>get_atoms(atom_ids=[7 ids picked from clusters 1-3, one per session/actor], format='minimal', prefer='newest_first')</code>.</li>
+<li><strong>Returned:</strong> 6 clusters. Rank 1
+<code>ctx_93ca0c89</code> <code>{git:30, claude_code:54}</code>
+2026-05-10 22:12 → 2026-05-11 01:57 PDT (Project_echo main arc: spec →
+claim → build → merge → followups); 19 open-loop hints (17 resolved, 2
+genuinely unresolved: <code>a465abf7</code> = warning-demote question in
+session 53fe5b30, plus <code>cc11fd03</code> which is actually resolved
+by 036 having shipped but the hint heuristic doesn’t see the
+cross-session resolution). Rank 2-3 <code>{cursor:2}</code> two-atom
+clusters from <code>558e2738</code> (036 review) + <code>fd8d6827</code>
+(earlier <code>repo_path</code> question). Rank 4
+<code>ctx_85d2ed2b</code> <code>{codex:11}</code> 22:06 → 01:31 PDT
+(parallel Codex echo_wiki + Codex CLI investigation). Rank 5
+<code>{cursor:3}</code> <code>4f02b335</code> (yesterday’s load-bearing
+test composer). Rank 6 <code>{cursor:1}</code> singleton.</li>
+<li><strong>Read sources:</strong> <code>source_breakdown</code> per
+cluster matched expected per-tool distribution. Notable: the rank-1
+cluster’s <code>claude_code:54</code> merged my spec-author turns AND
+session <code>53fe5b30</code>’s later warning-investigation turns under
+one thread via shared file artifacts (cursor.ts, backlog dir) — correct
+merge. Cross-tool fan-out (Codex VSCode review, Codex CLI investigation,
+Cursor 558e2738 review, Cursor fd8d6827 earlier, Cursor 4f02b335
+yesterday) all separately clustered — no false-merging.</li>
+<li><strong>Verdict:</strong> ✅ right — every distinct session/actor
+surfaced as its own cluster or sub-thread, atom bodies confirmed each
+actor’s verdict (Codex VSCode: Proceed + AC3 nit; Cursor 558e2738:
+Proceed + same AC3 nit, convergent across reviewers; Codex CLI: agrees
+warnings are noise + root cause = continuation fast-forward = 036;
+session 53fe5b30: warning-demote question held for founder call).
+<code>prefer='newest_first'</code> ensured the freshest atoms survived
+prefix-drop on overflow.</li>
+<li><strong>Note (positive — strong cross-session signal):</strong> ECHO
+surfaced TWO parallel cross-tool 036 reviews (Codex VSCode + Cursor
+558e2738) that ran while my context was cleared, AND Codex CLI’s
+independent root-cause investigation, AND session 53fe5b30’s warning
+investigation — none of which would have been recoverable from my own
+conversation history. First time cross-tool resume worked WITHOUT a
+Cursor capture gap (consistent with 036 having shipped and the daemon
+picking up new code).</li>
+<li><strong>Note (negative — 036 not yet observable in cross-session
+pull):</strong> the Cursor 558e2738 review atom <code>05423ab8</code>
+was captured WITHOUT <code>is_continuation</code> metadata
+(single-cluster atom; <code>assistant_bubble_ids</code> length 24).
+Correct behavior for that capture window since it was a single-tick
+capture, but a fresh agent-mode dogfooding run is still needed to verify
+continuation atoms emit with <code>is_continuation: true</code> +
+<code>continuation_of_assistant_bubble_id</code> populated. AC4 remains
+pending.</li>
+<li><strong>Note (process):</strong> the journal between 00:07 PDT (my
+pre-/clear entry) and 01:21 PDT now carries 5 NEW entries from parallel
+agents (Cursor 558e2738 review, Codex CLI investigation, Codex VSCode
+review, plus 2 others) — they all logged in-the-moment per the
+discipline. Cross-tool, cross-window in-moment logging is firing
+organically without coordination.</li>
+<li><strong>Conjecture:</strong> the <code>cc11fd03</code> open-loop
+hint flagged “unresolved” in rank-1’s hints is actually fully resolved
+by 036 having shipped — the original question (“journal the fixup or
+hold”) was overtaken by the next action. The hint-resolution heuristic
+likely keys on same-conversation continuation and doesn’t see
+cross-session resolutions. Worth a follow-up data point for
+ranking-tuning work.</li>
+</ul>
+<h3
+id="pdt-036-ac4-dogfooding-run-1-claude-code-cursor-agent-mode-review-of-034035036">13:39
+PDT — 036 AC4 dogfooding run #1 (Claude Code + Cursor agent-mode review
+of 034/035/036)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (strategist running the
+AC4 verification harness) + Cursor (agent-mode, captured composer
+<code>32952945-c8e3-45e0-82c9-6b76a265eac2</code>)</li>
+<li><strong>Trigger:</strong> Founder fired a Cursor agent-mode
+code-review prompt covering 034 + 035 + 036 (the merged M1-1 wave).
+Strategist (this session) waited for capture quiescence, then ran the
+AC4 chain.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>wait_for_new_turns(sources=['cursor'], since='2026-05-11T20:39:34Z', timeout=60)</code>
+— first call client-timed-out before server’s 60s window; subsequent
+calls with <code>timeout=25/30/45</code> returned
+<code>timed_out: true</code> with empty turns[] (because the activity
+landed at 20:38:59Z, BEFORE the 20:39:34Z cutoff — Cursor responded
+faster than the strategist set the cutoff).</li>
+<li><code>find_clusters(since='2026-05-11T20:39:34Z')</code> — confirmed
+no activity in window (cutoff was set after the burst).</li>
+<li>SQLite probe of echo.db:
+<code>SELECT composer, COUNT(*), MIN/MAX(timestamp) WHERE source LIKE 'fs:%Cursor%' AND timestamp &gt;= '2026-05-11T15:00:00Z'</code>
+— surfaced composer <code>32952945</code> with 6 atoms emitted in a 56
+ms burst at 20:38:59Z (single cadence tick captured all turns).</li>
+<li><code>search_memories(query='No critical or important implementation bugs found', source_app='cursor')</code>
+— returned the last continuation atom in the chain.</li>
+<li><code>tail_session(source_app='cursor', repo_path='/Users/zhenye/Desktop/Project_echo', count=3)</code>
+— resolved composer <code>558e2738</code> (from earlier today’s
+036-review session), NOT the new <code>32952945</code>. See “Note (035
+freshness)” below.</li>
+<li>SQLite ground truth on Cursor’s globalStorage:
+<code>SELECT COUNT(*) FROM cursorDiskKV WHERE key LIKE 'bubbleId:32952945:%' AND type = 2</code>
+→ <strong>69 assistant bubbles</strong>.</li>
+</ol></li>
+<li><strong>Returned (the 6 atoms for composer <code>32952945</code>,
+all sharing
+<code>user_bubble_id: ead73cea-401b-438b-821e-9c37a957e88a</code>, the
+single user-message):</strong> | # | atom id (prefix) |
+<code>is_continuation</code> |
+<code>continuation_of_assistant_bubble_id</code> (prefix) | bubbles |
+content chars | |—|—|—|—|—|—| | 1 | <code>ccbc4f1e</code> | — | — | 12 |
+138,140 | | 2 | <code>a36bcb92</code> | ✅ true | <code>a2a4ce0a</code>
+| 18 | 90,944 | | 3 | <code>e6cc7762</code> | ✅ true |
+<code>46d05582</code> | 23 | 101,965 | | 4 | <code>d69f4f2b</code> | ✅
+true | <code>9a40fd23</code> | 8 | 5,064 | | 5 | <code>37fb409f</code> |
+✅ true | <code>ff27140f</code> | 5 | 3,142 | | 6 |
+<code>00d98caf</code> | ✅ true | <code>252ad60e</code> | 2 | 2,861 |
+Sum of <code>|assistant_bubble_ids|</code> across the 6 atoms = 68.
+SQLite ground truth = 69. <strong>Capture rate = 68/69 = 98.55
+%.</strong></li>
+<li><strong>Read sources:</strong> all 6 atoms from
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(composer <code>32952945-c8e3-45e0-82c9-6b76a265eac2</code>). The
+<code>search_memories</code> match’s source was the same.
+<code>tail_session</code> returned
+<code>source_resolved: fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>,
+<code>composer_resolved: 558e2738-...</code> (wrong composer — see
+freshness note). SQLite ground truth was direct probe of Cursor’s
+globalStorage state.vscdb.</li>
+<li><strong>Verdict:</strong> ✅ right — AC4 demo bar passed at 98.55 %
+(well above the 90 % threshold). M1-1 sub-gap D is empirically +
+structurally closed. Per the spec’s “two consecutive successful
+dogfooding runs on different days” rule, one more clean run on
+2026-05-12 closes M1-1 entirely.</li>
+<li><strong>Note (the load-bearing positive):</strong> the LAST
+continuation atom (atom 6, <code>00d98caf</code>, only 2 bubbles, 2,861
+chars) carries Cursor’s actual verdict text <em>“No critical or
+important implementation bugs found across the combined 034/035/036
+wave.”</em> — and
+<code>search_memories(query=&lt;phrase from that atom&gt;, source_app='cursor')</code>
+returns exactly that atom. Pre-036, this verdict-turn content would have
+been silently dropped by the V1.5.7 streaming-continuation fast-forward.
+The continuation chain (<code>is_continuation: true</code> +
+<code>continuation_of_assistant_bubble_id</code>) is the demo bar made
+concrete: end-of-stream content is now ECHO-recoverable.</li>
+<li><strong>Note (process: founder used a different prompt than the
+suggested canary one):</strong> strategist had suggested a
+“TROLLEYBUS-VERDICT-Q4” canary phrase to make the search query trivially
+distinctive; founder ran a real-shaped code-review prompt instead.
+<code>search_memories(query='TROLLEYBUS-VERDICT-Q4')</code> returned 0
+matches (correct — Cursor was never told to emit that phrase). The
+fallback (search for actual verdict text in atom 6) was the
+operationally cleaner verification anyway — a real distinctive phrase
+from the captured response. Lesson: don’t insist on canaries when the
+AC4 demo bar can be verified with the actual response content.</li>
+<li><strong>Note (negative — 035 freshness gap surfaced):</strong>
+<code>tail_session(source_app='cursor', repo_path='/Users/zhenye/Desktop/Project_echo')</code>
+resolved to <code>558e2738</code> (earlier session) NOT the new
+<code>32952945</code>. Looking at echo.db, all 6 atoms for
+<code>32952945</code> have <code>workspace_id: ""</code> (empty) —
+Cursor hadn’t bound this composer to a workspace’s composerData registry
+yet when the atoms emitted, OR the founder fired Cursor in a
+window/workspace that hadn’t synced to disk. 035’s resolver reads
+composerData + workspaceStorage at query time, so a fresh composer that
+hasn’t registered yet won’t resolve via repo_path. This is a 035
+freshness gap, not a 036 bug. Worth a follow-up data point for whether
+035 should optionally fall back to “newest cursor activity globally
+regardless of repo binding” when the explicit repo lookup misses recent
+composers. Filed as a candidate observation; not a backlog item yet
+(need one more confirmation cycle).</li>
+<li><strong>Note (Cursor’s review surfaced two findings worth
+bookmarking):</strong>
+<ol type="1">
+<li><strong>Medium — extractor <code>workspace_id</code> emission path
+missing tests.</strong> Resolver has tests but the extractor’s
+<code>composerToWorkspace</code> binding path for the
+migrated-composer-registry shape (<code>selectedComposerIds</code>) is
+uncovered. Empirical correlate: this AC4 run’s
+<code>workspace_id: ""</code> for <code>32952945</code> would be exactly
+the kind of regression these missing tests should catch.</li>
+<li><strong>Low — AC log-field name divergence.</strong> Item 034’s spec
+said the tick log field should be <code>tick_reason</code>;
+implementation logs <code>{ reason }</code>. Already in
+<code>_followups.md</code> from the 034 merge (line ~422), so this is a
+re-confirmation, not new.</li>
+</ol></li>
+<li><strong>Conjecture (observation-only):</strong> the 6-atom
+continuation chain emitted in a 56 ms burst at a single cadence tick
+suggests Cursor’s agent had ALREADY finished streaming all 69 bubbles
+BEFORE the daemon’s next tick fired. The daemon then captured everything
+in one walk, segmenting it into 6 atoms via the natural continuation
+boundaries (each prior tick’s checkpoint became the join key for the
+next). This is the “post-hoc multi-cluster recovery” path; the “live
+mid-stream multi-cluster” path (where Cursor is still streaming when the
+cadence ticks) is structurally similar but the latency between atoms
+would be 15s+ instead of milliseconds. Both work; a future stress test
+could verify the live-mid-stream case shows the same continuation chain
+shape.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
