@@ -1011,6 +1011,11 @@ href="#pdt-strategist-retrieve-codex-cursor-r1-reviews-for-034-mirror-of-codex-2
 id="toc-pdt-strategist-retrieve-codex-cursor-r1-reviews-for-034-mirror-of-codex-2201-entry">2026-05-10
 22:11 PDT — Strategist: retrieve Codex + Cursor R1 reviews for 034
 (mirror of Codex 22:01 entry)</a></li>
+<li><a
+href="#pdt-strategist-corrected-cursor-r1-review-found-via-sqlite-workspace-hash-probe-m1-1-sub-gap-a-firing-live"
+id="toc-pdt-strategist-corrected-cursor-r1-review-found-via-sqlite-workspace-hash-probe-m1-1-sub-gap-a-firing-live">2026-05-10
+22:25 PDT — Strategist: CORRECTED — Cursor R1 review found via SQLite +
+workspace-hash probe (M1-1 sub-gap A firing live)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7754,6 +7759,178 @@ issues; the strategist combines + judges. Prevents R1 patches stepping
 on each other when both reviewers run in parallel. This pattern emerged
 organically from the founder’s instruction — worth codifying in
 <code>wiki/operating-model/cross-tool-spec-review.md</code>.</li>
+</ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-corrected-cursor-r1-review-found-via-sqlite-workspace-hash-probe-m1-1-sub-gap-a-firing-live">2026-05-10
+22:25 PDT — Strategist: CORRECTED — Cursor R1 review found via SQLite +
+workspace-hash probe (M1-1 sub-gap A firing live)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said “check cursor again cursor
+did review dive deeper” — pushing back on the 22:11 PDT entry’s “Cursor
+side structurally missing” verdict. The founder knew Cursor had
+reviewed; the strategist’s MCP-only search missed it. Diving deeper with
+content-driven search + direct SQLite probe.</li>
+<li><strong>Query inputs (3 ECHO calls + 3 direct SQLite
+probes):</strong>
+<ol type="1">
+<li><code>search_memories(query='bubble_text_source', source_app='cursor')</code>
+— 0 matches.</li>
+<li><code>search_memories(query='M1-1 Cursor capture', source_app='cursor')</code>
+— 0 matches.</li>
+<li><code>search_memories(query='cursor-capture-coverage', source_app='cursor')</code>
+— 0 matches.</li>
+<li><strong>Bash:
+<code>grep -l "Project_echo" workspaceStorage/*/workspace.json</code></strong>
+— resolved Project_echo workspace hash to
+<code>a8bc68a00c4ea9c5abb926cd2c42a906</code>.</li>
+<li><strong>SQLite:
+<code>SELECT composerId, lastUpdatedAt, bubble_count FROM composerData WHERE lastUpdatedAt &gt; 2026-05-10 19:00:00 ORDER BY lastUpdatedAt DESC LIMIT 10</code></strong>
+— surfaced composer <code>d352562e-c958-417c-bbc4-a822c4fae3c4</code>
+with <code>lastUpdatedAt = 2026-05-10 21:58:16 PDT</code> (15 bubbles
+total, last update 13 min before this entry).</li>
+<li><strong>SQLite: bubble-by-bubble probe of composer
+<code>d352562e</code></strong> — 1 user bubble (62 chars, “connect to
+the claude strategist session and do a spec review”), 13 assistant
+bubbles with <code>text_len=0</code> (mostly thinking/tool frames), and
+<strong>1 large assistant bubble
+<code>9d219e89-720a-421e-85ab-b9fee3a3c41d</code> with 5009 chars of
+review prose</strong> in <code>.text</code> field.</li>
+</ol></li>
+<li><strong>Returned:</strong> <strong>Cursor’s full R1 review recovered
+(5009 chars, verbatim)</strong>. 5 distinct findings + verdict:
+<ul>
+<li><strong>Issue 1 (HIGH):</strong> <strong>Repoll vs
+<code>scheduleGlobalChange</code> debounce conflict.</strong>
+<code>scheduleGlobalChange</code> short-circuits when
+<code>debounceTimer !== null</code>, so any repoll tick that fires
+during a 300 ms debounce window gets DROPPED. AC1’s test plan
+(<code>repollIntervalMs: 50</code>, “≥ 2 handleGlobalChange runs in 200
+ms”) directly conflicts with my spec’s “simplest implementation:
+interval calls <code>scheduleGlobalChange()</code>” guidance. Either (a)
+spell out AC1 clock story (advance timers past debounce boundaries
+between assertions), or (b) define a repoll entry path that bypasses the
+debounce guard with explicit mtime gate. <strong>Cursor caught a
+load-bearing implementation bug Codex missed entirely.</strong></li>
+<li><strong>Issue 2 (Medium):</strong> Env vs options for
+<code>CURSOR_REPOLL_INTERVAL_MS</code>. AC1 names the constant but only
+<code>CursorExtractorOptions.repollIntervalMs</code> as override.
+Clarify whether daemon reads env var or options is the sole knob.</li>
+<li><strong>Minor 1:</strong> AC3 “revert one fix” — say whether
+test-only flag, conditional compilation, or temporary test double; all
+are valid, pick one to avoid review debate.</li>
+<li><strong>Minor 2:</strong> <code>tick_reason</code> logging —
+chokidar path today doesn’t log per-trigger reason; ensure spec means
+“first schedule that leads to <code>handleGlobalChange</code>” logs
+reason, not every <code>dispatch</code> call.</li>
+<li><strong>Minor 3:</strong> Strategic-re-evaluation thresholds (90% /
+60-89% / &lt;60%) — define numerator/denominator once (e.g. bubbles in
+SQLite vs atoms appended) so two strategists don’t score the same run
+differently.</li>
+<li><strong>Line-number drift:</strong> Spec cites
+<code>parseBubbleRow</code> at 182-247; actual range is 190-247. Point
+builder at symbol names, not stale ranges. (Overlaps with Codex Finding
+5’s “remove fragile line references” suggestion.)</li>
+<li><strong>Verdict:</strong> “Approve for claim after a short R1 patch
+on repoll + debounce + AC1 test timing and interval configuration. No
+blocker on overall direction or scope.”</li>
+</ul></li>
+<li><strong>Sources:</strong> Cursor SQLite <code>state.vscdb</code>
+cursorDiskKV table, composer
+<code>d352562e-c958-417c-bbc4-a822c4fae3c4</code>, bubble
+<code>9d219e89-720a-421e-85ab-b9fee3a3c41d</code>. Workspace hash
+<code>a8bc68a00c4ea9c5abb926cd2c42a906</code> mapped to
+<code>/Users/zhenye/Desktop/Project_echo</code> via
+<code>workspace.json</code>. Cursor’s MCP daemon does NOT include
+<code>wait_for_new_turns</code> in its tool surface (per Cursor’s own
+response: “I cannot join or sync with a separate Claude strategist chat
+session from here”), so Cursor reviewed independently of the strategist
+session.</li>
+<li><strong>Verdict:</strong> 🔴 <strong>ECHO failed twice on the same
+gap.</strong> (1) <code>tail_session(source_app='cursor')</code>
+resolved to wrong composer (sub-gap C — global MRU). (2)
+<strong><code>search_memories</code> returned 0 matches across all three
+queries even though the 5009-char Cursor review existed in
+SQLite</strong> (sub-gap A — capture cadence; bubble never made it into
+echo.db). The strategist’s previous 22:11 PDT verdict “Cursor side
+structurally missing” was WRONG — Cursor reviewed, ECHO didn’t capture.
+<strong>This is the strongest possible empirical evidence for 034: the
+very gap 034 fixes prevented the strategist from seeing Cursor’s review
+via ECHO, on the cycle reviewing 034 itself.</strong></li>
+<li><strong>Note (correction to 22:11 PDT entry):</strong> The previous
+entry’s “first single-reviewer R1 cycle” framing was wrong. Cursor DID
+review — the strategist’s discovery chain was inadequate. The recovery
+pattern that worked: (a) <code>grep workspace.json</code> for
+project-name → workspace hash, (b) SQLite probe on
+<code>composerData</code> filtered by
+<code>lastUpdatedAt &gt; recent_cutoff</code> → composer ID, (c) SQLite
+probe on <code>bubbleId:&lt;composer&gt;:*</code> ordered by rowid DESC
+→ latest bubble text. This is <strong>the very recovery chain item 035 /
+034 should make unnecessary</strong> by surfacing workspace-scoped
+Cursor tails through MCP.</li>
+<li><strong>Note (load-bearing cross-tool divergence — strongest data
+point in the journal):</strong> Codex caught 5 spec-clarity issues.
+Cursor caught 5 different issues, one of which (Issue 1:
+repoll-vs-debounce) is a <strong>load-bearing implementation correctness
+bug</strong> that would have broken AC1 on day one of building.
+<strong>Codex found contract clarity; Cursor found implementation
+correctness.</strong> This is the cleanest example yet of differentiated
+reviewer value — the kind that justifies cross-tool review existing as a
+discipline. Worth promoting to
+<code>wiki/operating-model/cross-tool-spec-review.md</code> “Findings
+classes” with concrete attribution: Cursor as the
+implementation-correctness reviewer when the spec touches existing
+in-repo code paths Cursor’s own code-reading model can trace.</li>
+<li><strong>Note (M1-1 evidence is now overwhelming):</strong> Three
+independent failure modes captured in one session: (a)
+<code>tail_session(source_app='cursor')</code> returned wrong project
+(sub-gap C, 22:11 PDT entry), (b)
+<code>search_memories(source_app='cursor', query=&lt;5+ different queries&gt;)</code>
+returned 0 on existing content (sub-gap A, this entry), (c)
+<code>parseBubbleRow</code> would have dropped at least 12 of the 14
+Cursor review bubbles even if cadence had fired — text_len=0 across the
+thinking/tool frames (sub-gap B, latent until cadence is fixed).
+<strong>All three sub-gaps are firing on the same composer.</strong> 034
+closes A+B; 035 must close C. This is no longer a probabilistic “≥3
+dogfooding entries” gate — it’s a structural certainty.</li>
+<li><strong>Note (data point 2 was overcounted):</strong> Yesterday’s
+count “data point 1 of 5+ for item 031’s deprecation gate” — the 20:05
+PDT and 22:11 PDT entries both used <code>get_atom</code> successfully.
+But this 22:25 entry shows the gate has TWO dimensions, not one: (a)
+<code>get_atom</code> works when atoms exist (verified twice), AND (b)
+atoms exist when content was written (NOT verified — fired negative on
+the very Cursor review under inspection). The 031 deprecation can only
+fire when BOTH dimensions hold. Until 034 ships, the gate is
+structurally further away than the 20:05 PDT optimistic accounting
+suggested.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>Cross-tool review without group-session coordination is
+still differentiated.</strong> Cursor explicitly said “I cannot join or
+sync with a separate Claude strategist chat session” — it didn’t have
+access to the strategist’s reasoning chain. Yet its independent
+code-read found a HIGH issue Codex (which DID consult the strategist)
+missed. The 4-role multi-agent pattern
+(<code>raw/internal/decisions/2026-05-10-multi-agent-dev-template-and-product-thesis.md</code>)
+is robust to even this much asymmetry — reviewers don’t need to be in
+lockstep to add value, possibly the opposite.</li>
+<li><strong>The SQLite-probe-with-workspace-hash recovery chain (used
+here) is the right item-035 specification target.</strong> A new MCP
+tool <code>cursor_sessions_for_workspace(repo_path)</code> returning
+ranked <code>{composer_id, lastUpdatedAt, bubble_count}</code> would
+have collapsed this entire discovery chain into one call. Spec it when
+034 ships.</li>
+<li><strong>“Cursor did review” / “I missed Cursor’s review” is itself a
+great pre-V1-launch demo moment.</strong> The founder caught the
+strategist’s incomplete finding by remembering that Cursor was used; the
+strategist had to drop to SQLite to recover. Post-034 + 035, that exact
+founder gesture becomes a single MCP call. The user-facing felt-magic
+isn’t “ECHO has Cursor’s data”; it’s “ECHO surfaces Cursor’s data
+without me remembering which composer it’s in.” Worth holding for V1
+narrative.</li>
 </ol></li>
 </ul>
 <hr />
