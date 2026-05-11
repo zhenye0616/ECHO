@@ -867,15 +867,19 @@ describe('parseBubbleRow fallback chain (AC2 — item 034)', () => {
     expect(turns[0]?.bubble_text_sources).toEqual(['toolFormerData']);
   });
 
-  // Fixture (h) — none of the above (empty bubble → null + warn).
-  it('case (h): bubble with no text and no fallback fields drops with warning', async () => {
+  // Fixture (h) — none of the above (empty bubble → silently dropped at
+  // debug level, NOT warn). Cursor ships placeholder/cancelled bubbles
+  // with no content fields; warning on these spams the log without
+  // surfacing anything actionable. Real parser gaps (case (e)) still warn.
+  it('case (h): bubble with no text and no fallback fields drops silently (no warn)', async () => {
     createGlobalStorageFixture(dbPath, [
       { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
       { composer_id: 'c1', bubble_id: 'a1', type: 2, text: '' },
     ]);
     const turns = await extractCursorTurns(dbPath, new Map());
     expect(turns).toHaveLength(0);
-    expect(captured.writes.join('')).toContain('missing_text_and_fallbacks');
+    expect(captured.writes.join('')).not.toContain('missing_text_and_fallbacks');
+    expect(captured.writes.join('')).not.toContain('unrecognized_bubble_shape');
   });
 
   // Fixture (i) — multi-bubble cluster with mixed sources.

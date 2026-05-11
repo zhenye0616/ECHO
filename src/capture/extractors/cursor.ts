@@ -44,6 +44,13 @@ export interface ReferencedFile {
   language?: string;
 }
 
+export interface CursorToolCall {
+  name: string;
+  args?: string;
+  output?: string;
+  is_error?: boolean;
+}
+
 // Tier-A context extracted from the bubble rows. Only the fields with content
 // in real Cursor data are surfaced here (probed empirically against a live
 // install: many bubble fields like `gitDiffs`, `toolResults`, `relevantFiles`
@@ -85,6 +92,19 @@ export interface CursorTurn {
   // Present only when at least one bubble used a fallback parser; omitted
   // when every bubble used primary `'text'` (the 99% no-Agent-mode case).
   bubble_text_sources?: BubbleTextSource[];
+  // Set when any bubble in the assistant cluster came from a
+  // `toolFormerData` frame — gives parity with CC/Codex `had_tool_use`.
+  had_tool_use?: boolean;
+  // One entry per `toolFormerData` bubble in the cluster, in order. Cursor's
+  // toolFormerData object doesn't carry a stable tool-name field across all
+  // shapes — best-effort name; raw `rawArgs`/`params` → args; `result`/`text`
+  // → output. Omitted when there are no tool bubbles.
+  tool_calls?: CursorToolCall[];
+  // Concatenated text of every `thinkingContent` bubble in the cluster.
+  // Mirrors CC/Codex `metadata.thinking`. Omitted when there are no
+  // thinking bubbles. The text also stays in `assistant_message` to avoid
+  // a content-shape break for existing consumers.
+  thinking?: string;
 }
 
 interface ComposerInfo {
@@ -114,6 +134,10 @@ interface ParsedBubble {
   // index gives a stable, monotonically increasing key for sort + checkpoint logic.
   createdAt: number;
   context: BubbleContext;
+  // Populated only when `text_source === 'toolFormerData'`. The raw frame
+  // is kept so the cluster builder can derive a structured `tool_calls[]`
+  // entry without re-parsing the bubble row a second time.
+  toolFormerData?: Record<string, unknown>;
 }
 
 interface CursorDiskKVRow {
@@ -232,6 +256,12 @@ export function tryExtractToolFormerText(v: Record<string, unknown>): string | n
   const rawArgs = o['rawArgs'];
   if (typeof rawArgs === 'string' && rawArgs.length > 0) return rawArgs;
   const params = o['params'];
+  // Newer Cursor tool-frames (e.g. `edit_file_v2`) store `params` as a
+  // pre-stringified JSON blob, not an object. Without the string branch,
+  // bubbles where every other text-bearing field is empty drop as
+  // `missing_text_and_fallbacks` even though `params` carries the full
+  // tool args. Empirically observed 2026-05-11.
+  if (typeof params === 'string' && params.length > 0) return params;
   if (typeof params === 'object' && params !== null) {
     let s: string;
     try {
@@ -301,7 +331,66 @@ export function tryExtractThinkingText(v: Record<string, unknown>): string | nul
     const txt = (t as Record<string, unknown>)['text'];
     if (typeof txt === 'string' && txt.length > 0) return txt;
   }
+  // Companion shape observed empirically on `capabilityType: 30` bubbles
+  // (2026-05-11): assistant bubble has empty `text`, no `thinkingContent`,
+  // but reasoning lives at `v.thinking.text` (Cursor's wrapper around the
+  // Claude extended-thinking signed payload). Without this fallback,
+  // thinking-only bubbles in this mode drop as `missing_text_and_fallbacks`.
+  const th = v['thinking'];
+  if (typeof th === 'string' && th.length > 0) return th;
+  if (typeof th === 'object' && th !== null) {
+    const txt = (th as Record<string, unknown>)['text'];
+    if (typeof txt === 'string' && txt.length > 0) return txt;
+  }
   return null;
+}
+
+// True if `value` carries anything we'd want a parser to look at: a
+// non-empty string, a non-empty array, or an object with any populated
+// key. Used to distinguish "real parser gap" from "empty placeholder
+// bubble" in the missing-text logging path.
+function hasNonEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string') return value.length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return false;
+}
+
+// Returns true if `codeBlocks` is a non-empty array, regardless of whether
+// any entry carries a body. A path-only `codeBlocks` array is still a real
+// content field the parser deliberately refused — that's a warn-worthy
+// "parser gap" signal, not an "empty placeholder bubble" one.
+function hasNonEmptyCodeBlocks(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0;
+}
+
+// Cursor user input authored via the Lexical editor lands as a JSON string
+// at `v.richText`. A structurally-empty tree (one empty paragraph) means
+// the user opened the composer but typed nothing — not a parser gap.
+function hasNonEmptyRichText(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return value.length > 0;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return false;
+  const root = (parsed as Record<string, unknown>)['root'];
+  if (typeof root !== 'object' || root === null) return false;
+  const children = (root as Record<string, unknown>)['children'];
+  if (!Array.isArray(children) || children.length === 0) return false;
+  // Lexical's idle state: a single paragraph with an empty children array.
+  // Anything richer than that is treated as real authored content.
+  for (const child of children) {
+    if (typeof child !== 'object' || child === null) continue;
+    const c = child as Record<string, unknown>;
+    if (typeof c['text'] === 'string' && (c['text'] as string).length > 0) return true;
+    const inner = c['children'];
+    if (Array.isArray(inner) && inner.length > 0) return true;
+  }
+  return false;
 }
 
 interface ParseBubbleOptions {
@@ -381,11 +470,25 @@ function parseBubbleRow(
   }
 
   if (parsedText === null || textSource === null) {
-    log.warn('unrecognized_bubble_shape', {
-      key: row.key,
-      reason:
-        options.disableFallbacks === true ? 'missing_text' : 'missing_text_and_fallbacks',
-    });
+    // Distinguish "bubble had content keys we couldn't parse" (real parser
+    // gap → warn) from "bubble shipped with no content at all" (mid-stream
+    // placeholder, cancelled compose, or empty richText user bubble → debug,
+    // not actionable). The cheap heuristic: if every text-bearing field is
+    // empty/absent, downgrade to debug.
+    const hasAnyContentField =
+      hasNonEmpty(v['toolFormerData']) ||
+      hasNonEmpty(v['thinkingContent']) ||
+      hasNonEmpty(v['thinking']) ||
+      hasNonEmpty(v['attachedHumanChanges']) ||
+      hasNonEmptyRichText(v['richText']) ||
+      hasNonEmptyCodeBlocks(v['codeBlocks']);
+    const reason =
+      options.disableFallbacks === true ? 'missing_text' : 'missing_text_and_fallbacks';
+    if (hasAnyContentField) {
+      log.warn('unrecognized_bubble_shape', { key: row.key, reason });
+    } else {
+      log.debug('empty_bubble_skipped', { key: row.key, reason });
+    }
     return null;
   }
 
@@ -402,7 +505,7 @@ function parseBubbleRow(
     });
     return null;
   }
-  return {
+  const parsed: ParsedBubble = {
     composer_id: parsedKey.composer_id,
     bubble_id: parsedKey.bubble_id,
     role: type === TYPE_USER ? 'user' : 'assistant',
@@ -415,6 +518,76 @@ function parseBubbleRow(
       deletedFiles: extractDeletedFiles(v),
     },
   };
+  if (textSource === 'toolFormerData') {
+    const tfd = v['toolFormerData'];
+    if (typeof tfd === 'object' && tfd !== null) {
+      parsed.toolFormerData = tfd as Record<string, unknown>;
+    }
+  }
+  return parsed;
+}
+
+// Cursor's toolFormerData frames vary across tool kinds (built-in edits,
+// shell, agentic). No single field name is reliable, so we walk a short
+// preference list per slot and stringify object payloads as JSON. Returns
+// null only if both args AND output came up empty — i.e. nothing useful to
+// surface.
+function toolFormerToToolCall(tfd: Record<string, unknown>): CursorToolCall | null {
+  const nameField =
+    tfd['name'] ??
+    tfd['toolName'] ??
+    tfd['tool'] ??
+    (typeof tfd['type'] === 'string' ? tfd['type'] : undefined);
+  const name = typeof nameField === 'string' && nameField.length > 0 ? nameField : 'tool';
+
+  let args: string | undefined;
+  const rawArgs = tfd['rawArgs'];
+  if (typeof rawArgs === 'string' && rawArgs.length > 0) {
+    args = rawArgs;
+  } else {
+    const params = tfd['params'];
+    if (typeof params === 'object' && params !== null) {
+      try {
+        const s = JSON.stringify(params);
+        if (s.length > 2) args = s;
+      } catch {
+        // unstringifiable — leave args undefined
+      }
+    }
+  }
+
+  let output: string | undefined;
+  const result = tfd['result'];
+  if (typeof result === 'string' && result.length > 0) {
+    output = result;
+  } else if (typeof result === 'object' && result !== null) {
+    try {
+      const s = JSON.stringify(result);
+      if (s.length > 2) output = s;
+    } catch {
+      // unstringifiable — fall through to text
+    }
+  }
+  if (output === undefined) {
+    const direct = tfd['text'];
+    if (typeof direct === 'string' && direct.length > 0) output = direct;
+  }
+
+  let is_error: boolean | undefined;
+  const err = tfd['isError'] ?? tfd['is_error'] ?? tfd['error'];
+  if (typeof err === 'boolean') {
+    is_error = err;
+  } else if (typeof err === 'string' || (typeof err === 'object' && err !== null)) {
+    is_error = true;
+  }
+
+  if (args === undefined && output === undefined && is_error === undefined) return null;
+
+  const call: CursorToolCall = { name };
+  if (args !== undefined) call.args = args;
+  if (output !== undefined) call.output = output;
+  if (is_error !== undefined) call.is_error = is_error;
+  return call;
 }
 
 function dedupReferencedFiles(values: ReferencedFile[]): ReferencedFile[] {
@@ -653,6 +826,27 @@ export async function extractCursorTurns(
       if (sources.some((s) => s !== 'text')) {
         turn.bubble_text_sources = sources;
       }
+      const toolCalls: CursorToolCall[] = [];
+      const thinkingParts: string[] = [];
+      for (const b of assistantCluster) {
+        if (b.text_source === 'toolFormerData' && b.toolFormerData !== undefined) {
+          const call = toolFormerToToolCall(b.toolFormerData);
+          if (call !== null) toolCalls.push(call);
+        } else if (b.text_source === 'thinkingContent' && b.text.length > 0) {
+          thinkingParts.push(b.text);
+        }
+      }
+      if (toolCalls.length > 0) {
+        turn.tool_calls = toolCalls;
+        turn.had_tool_use = true;
+      } else if (sources.some((s) => s === 'toolFormerData')) {
+        // A toolFormerData bubble existed but produced no derivable structured
+        // call (rare — usually a malformed frame). Still flag the turn.
+        turn.had_tool_use = true;
+      }
+      if (thinkingParts.length > 0) {
+        turn.thinking = thinkingParts.join('\n\n');
+      }
       turns.push(turn);
       i = j;
     }
@@ -772,6 +966,15 @@ export interface CursorExtractorOptions {
   // `CURSOR_REPOLL_INTERVAL_MS`). No environment variable is read — the
   // source constant and this option are the only knobs.
   repollIntervalMs?: number;
+  // Run one full scan synchronously at startup, before resolving the
+  // handle. Without this, the extractor sets `lastSeenScanMtime` to the
+  // current DB mtime and waits for chokidar/repoll to detect a change —
+  // which means an empty-storage caller (like `serve-trace`) sees zero
+  // Cursor turns until the user types into Cursor again. Mirrors the
+  // CC/Codex JSONL extractors' boot-scan semantics. Production daemons
+  // can stay default-off (they keep checkpoint state in storage) but
+  // dev-time live viewers should set this true.
+  scanOnStart?: boolean;
   // Test-only: populate `CursorExtractorHandle.__testHooks`. Production
   // callers leave this unset; the hooks field stays `undefined`.
   exposeTestHooks?: true;
@@ -853,6 +1056,9 @@ export async function startCursorExtractor(
       if (turn.bubble_text_sources !== undefined) {
         metadata['bubble_text_sources'] = turn.bubble_text_sources;
       }
+      if (turn.had_tool_use === true) metadata['had_tool_use'] = true;
+      if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
+      if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
       const candidate = {
         source: `fs:${globalDbPath}`,
         timestamp: new Date(turn.assistant_created_at).toISOString(),
@@ -945,6 +1151,11 @@ export async function startCursorExtractor(
   await new Promise<void>((resolve) => {
     watcher.once('ready', () => resolve());
   });
+
+  if (options.scanOnStart === true) {
+    schedule(() => handleGlobalChange('repoll'));
+    await processing;
+  }
 
   log.info('started', { globalDbPath, workspacePrefix, repollIntervalMs });
 

@@ -7,9 +7,11 @@
 import { SOURCE_MARKERS } from '../src/capture/extractors/_shared.js';
 import type { CaptureEvent, Storage } from '../src/storage/interface.js';
 
+export type RenderLane = 'cc' | 'codex' | 'cursor';
+
 export interface RenderRow {
   id: string;
-  lane: 'cc' | 'codex';
+  lane: RenderLane;
   ts: string;
   sid: string;
   turn: number;
@@ -77,7 +79,11 @@ export function formatGeneratedAt(): string {
 
 export function toRow(event: CaptureEvent, full: boolean): RenderRow | null {
   const md = (event.metadata ?? {}) as Record<string, unknown>;
-  const lane: 'cc' | 'codex' = event.source.includes(SOURCE_MARKERS.codex) ? 'codex' : 'cc';
+  const lane: RenderLane = event.source.includes(SOURCE_MARKERS.codex)
+    ? 'codex'
+    : event.source.includes(SOURCE_MARKERS.cursor)
+      ? 'cursor'
+      : 'cc';
   const sid = ((md['session_id'] as string) ?? '????????').slice(0, 8);
   const turn = Number(md['turn_index'] ?? 0);
 
@@ -182,7 +188,7 @@ const TEMPLATE = `<!doctype html>
   :root {
     --bg: #0d1117; --panel: #161b22; --panel2: #1c232b;
     --fg: #e6edf3; --dim: #8b949e; --dimmer: #6e7681;
-    --cc: #4ec9d6; --codex: #c586c0; --tool: #d7ba7d; --branch: #6cc24a; --model: #ce9178;
+    --cc: #4ec9d6; --codex: #c586c0; --cursor: #f0a868; --tool: #d7ba7d; --branch: #6cc24a; --model: #ce9178;
     --border: #30363d; --accent: #58a6ff; --pulse: #3fb950;
     --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -197,17 +203,18 @@ const TEMPLATE = `<!doctype html>
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
   header h1 .sub { color: var(--dim); font-weight: 400; margin-left: 0; font-size: 12px; }
   .stats { color: var(--dim); font-size: 12px; margin-bottom: 10px; }
-  .stats .cc { color: var(--cc); } .stats .codex { color: var(--codex); }
+  .stats .cc { color: var(--cc); } .stats .codex { color: var(--codex); } .stats .cursor { color: var(--cursor); }
   .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .filters input, .filters select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; font-size: 12px; font-family: var(--sans); }
   .filters input[type=text] { min-width: 280px; }
   .filters label { color: var(--dim); font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
-  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: calc(100vh - 110px); }
+  .columns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; height: calc(100vh - 110px); }
   .col { overflow-y: auto; padding: 8px 12px; }
-  .col.cc { border-right: 1px solid var(--border); }
+  .col.cc, .col.codex { border-right: 1px solid var(--border); }
   .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 4px 0 8px 0; padding: 4px 0; position: sticky; top: 0; background: var(--bg); }
   .col.cc h2 { color: var(--cc); }
   .col.codex h2 { color: var(--codex); }
+  .col.cursor h2 { color: var(--cursor); }
   .session { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 10px; background: rgba(255,255,255,.015); overflow: hidden; }
   .session-head { padding: 6px 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; cursor: pointer; background: rgba(88,166,255,.04); border-bottom: 1px solid var(--border); user-select: none; }
   .session-head:hover { background: rgba(88,166,255,.08); }
@@ -276,6 +283,7 @@ const TEMPLATE = `<!doctype html>
 <div class="columns">
   <div class="col cc"><h2>Claude Code</h2><div id="list-cc"></div></div>
   <div class="col codex"><h2>Codex</h2><div id="list-codex"></div></div>
+  <div class="col cursor"><h2>Cursor</h2><div id="list-cursor"></div></div>
 </div>
 
 <script>
@@ -293,8 +301,11 @@ const TEMPLATE = `<!doctype html>
   function refreshStats(){
     const cc = ROWS.filter(r => r.lane==='cc').length;
     const cx = ROWS.filter(r => r.lane==='codex').length;
+    const cu = ROWS.filter(r => r.lane==='cursor').length;
     document.getElementById('stats').innerHTML =
-      '<span class="cc">CC: ' + cc + '</span> &nbsp;·&nbsp; <span class="codex">Codex: ' + cx + '</span>';
+      '<span class="cc">CC: ' + cc + '</span> &nbsp;·&nbsp; ' +
+      '<span class="codex">Codex: ' + cx + '</span> &nbsp;·&nbsp; ' +
+      '<span class="cursor">Cursor: ' + cu + '</span>';
   }
 
   function refreshRepoOptions(){
@@ -424,22 +435,26 @@ const TEMPLATE = `<!doctype html>
     const repo = document.getElementById('repoFilter').value;
     const toolOnly = document.getElementById('toolOnly').checked;
     const hideTool = document.getElementById('hideTool').checked;
-    const cc = []; const cx = [];
+    const cc = []; const cx = []; const cu = [];
     for (const r of ROWS) {
       if (!passes(r, q, repo, toolOnly, hideTool)) continue;
-      if (r.lane === 'cc') cc.push(r); else cx.push(r);
+      if (r.lane === 'cc') cc.push(r);
+      else if (r.lane === 'codex') cx.push(r);
+      else if (r.lane === 'cursor') cu.push(r);
     }
     const ccGroups = groupBySession(cc);
     const cxGroups = groupBySession(cx);
+    const cuGroups = groupBySession(cu);
     const collapsedSids = new Set(
       Array.from(document.querySelectorAll('.session.collapsed'))
         .map(s => s.getAttribute('data-sid'))
     );
     document.getElementById('list-cc').innerHTML = ccGroups.length ? ccGroups.map(g => sessionHtml(g, collapsedSids)).join('') : '<div class="empty">no matches</div>';
     document.getElementById('list-codex').innerHTML = cxGroups.length ? cxGroups.map(g => sessionHtml(g, collapsedSids)).join('') : '<div class="empty">no matches</div>';
+    document.getElementById('list-cursor').innerHTML = cuGroups.length ? cuGroups.map(g => sessionHtml(g, collapsedSids)).join('') : '<div class="empty">no matches</div>';
     document.getElementById('counts').textContent =
-      'showing ' + cc.length + ' / ' + cx.length + ' turns · ' +
-      ccGroups.length + ' / ' + cxGroups.length + ' sessions';
+      'showing ' + cc.length + ' / ' + cx.length + ' / ' + cu.length + ' turns · ' +
+      ccGroups.length + ' / ' + cxGroups.length + ' / ' + cuGroups.length + ' sessions';
   }
 
   document.body.addEventListener('click', (e) => {

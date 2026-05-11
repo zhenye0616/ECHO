@@ -18,6 +18,7 @@ import { createInterface } from 'node:readline';
 
 import { startClaudeCodeExtractor } from '../src/capture/extractors/claude-code.js';
 import { startCodexExtractor } from '../src/capture/extractors/codex.js';
+import { startCursorExtractor } from '../src/capture/extractors/cursor.js';
 import type {
   CaptureEvent,
   EventId,
@@ -115,6 +116,7 @@ async function main(): Promise<void> {
   console.log(`  starting extractors…`);
   const cc = await startClaudeCodeExtractor(storage);
   const cx = await startCodexExtractor(storage);
+  const cu = await startCursorExtractor(storage, { scanOnStart: true });
 
   console.log(`  draining boot scan…`);
   await waitForDrain(storage);
@@ -197,6 +199,7 @@ async function main(): Promise<void> {
     });
     await cc.stop();
     await cx.stop();
+    await cu.stop();
     process.exit(0);
   }
 

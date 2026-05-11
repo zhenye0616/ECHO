@@ -38,7 +38,40 @@ agent_notes: |
   not buildable from this run.
 
   Branch `agent/tail-session-repo-scoping` pushed; head_sha 51fdf45.
-review_notes: ""
+review_notes: |
+  Merged 2026-05-11 via founder reconciliation. Reviewer (Claude code-reviewer
+  subagent) verdict: merge as-is. Sidecar at
+  backlog/pending_review/<id>.review.md (consumed in this merge).
+
+  Conflicts resolved: none — clean three-way merge. Branch base fc52f22 was
+  pre-034; main was post-034 (6743d2b). 034's modified files
+  (src/capture/extractors/cursor.ts, tests/capture/extractors/cursor.test.ts,
+  tests/fixtures/cursor-globalstorage.ts) did not intersect this branch's
+  set, so no code conflicts arose.
+
+  Fixups applied: none (verdict was merge as-is; reviewer surfaced 0
+  pre-merge fixups).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 698/698 tests pass (21 pre-existing skips, 1 file skipped); lint
+  and typecheck clean post-merge. Test count above worktree's 679 reflects
+  034's tests now visible after the three-way merge.
+
+  Follow-up items (non-blocking, filed in backlog/_followups.md):
+  - AC6 dogfooding verification (post-merge founder/strategist; two
+    consecutive successful runs on different days close M1-1 sub-gap C).
+  - Wiki promotion pass per the After-Completion section: surfaces/
+    mcp-tail-session.md, operating-model/cross-tool-spec-review.md,
+    backlog/_followups.md resolved subsection.
+  - Plan item 031 deprecation-removal strategist conversation ~1 week
+    after 035 dogfooding lands.
+  - Linux/Windows path-resolver shim when a non-macOS contributor needs it
+    (per Out-of-Scope rule 6).
+  - Resolver-caching audit after AC6 dogfooding produces real timing data
+    (spec expectation: < 10ms; confirm before adding cache).
+  - Tighten "no cursor atoms" warning at src/mcp/tools/tail-session.ts:242
+    when resolver succeeds but storage is empty for that composer.
 spec_refs:
   - src/mcp/tools/tail-session.ts                # Where the resolver currently picks the wrong composer for Cursor
   - src/capture/extractors/cursor.ts             # composer_id metadata is reliably populated (workspace_id is best-effort only — see R1 Finding 1)

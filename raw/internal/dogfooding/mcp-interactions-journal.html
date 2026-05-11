@@ -1088,6 +1088,19 @@ dogfooding day 5</a>
 <li><a href="#pdt-pre-clear-resume-lookup-claude-code"
 id="toc-pdt-pre-clear-resume-lookup-claude-code">00:07 PDT — pre-/clear
 resume lookup (Claude Code)</a></li>
+<li><a
+href="#pdt-cursor-asks-to-use-echo-for-claude-written-spec-review"
+id="toc-pdt-cursor-asks-to-use-echo-for-claude-written-spec-review">00:20
+PDT — Cursor asks to use ECHO for Claude-written spec review</a></li>
+<li><a href="#pdt-cursor-reviews-claude-written-036-spec"
+id="toc-pdt-cursor-reviews-claude-written-036-spec">01:18 PDT — Cursor
+reviews Claude-written 036 spec</a></li>
+<li><a href="#pdt-codex-resumes-claudes-cursor-root-cause-investigation"
+id="toc-pdt-codex-resumes-claudes-cursor-root-cause-investigation">01:20
+PDT — Codex resumes Claude’s Cursor root-cause investigation</a></li>
+<li><a href="#pdt-codex-reviews-claude-written-036-spec"
+id="toc-pdt-codex-reviews-claude-written-036-spec">01:21 PDT — Codex
+reviews Claude-written 036 spec</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -9073,6 +9086,177 @@ whether <code>cc11fd03</code> was lucky (it was the literal last turn,
 so trivially the most-recent). A weaker test: a resume call after a 6h
 gap where the truly-open question is 3 turns back rather than the last
 turn.</li>
+</ul>
+<h3
+id="pdt-cursor-asks-to-use-echo-for-claude-written-spec-review">00:20
+PDT — Cursor asks to use ECHO for Claude-written spec review</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder said “ues echo and review the spec
+claude just wrote” from the Cursor IDE.</li>
+<li><strong>Query inputs:</strong> <code>tail_session()</code> with no
+source/source_app/count args, using auto-resolution to the
+most-recently-active captured app session.</li>
+<li><strong>Returned:</strong> 3 turns from
+<code>source_app_resolved=claude_code</code>, source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/53fe5b30-de6c-4ad9-8499-2718d754ef2b.jsonl</code>;
+latest turn was Claude wiring Cursor into the live trace setup
+(<code>tools/_trace_render.ts</code> +
+<code>tools/serve-trace.ts</code>), not the spec-writing turn. Repo
+state then showed the new ready spec
+<code>backlog/ready/2026-05-11-036-cursor-multicluster-continuation.md</code>.</li>
+<li><strong>Sources:</strong> tail source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/53fe5b30-de6c-4ad9-8499-2718d754ef2b.jsonl</code>;
+resolved app <code>claude_code</code>; no cluster source_breakdown
+because this was a tail lookup, not <code>find_clusters</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> ECHO correctly found the latest Claude Code
+session but not the exact spec-writing turn; the actionable review
+target was recovered from the backlog board/spec files. This is
+acceptable for this request because the spec had already landed in
+<code>backlog/ready/</code>.</li>
+<li><strong>Conjecture:</strong> For “spec Claude just wrote” requests,
+a targeted
+<code>search_memories(query='&lt;spec id or title&gt;', source_app='claude_code')</code>
+may be a better second step after a broad tail when the latest turn is
+unrelated.</li>
+</ul>
+<h3 id="pdt-cursor-reviews-claude-written-036-spec">01:18 PDT — Cursor
+reviews Claude-written 036 spec</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder said “claude just spec 036 use
+echo to retrieve context and review the spec reply with proceed to
+pushback.”</li>
+<li><strong>Query inputs:</strong> <code>find_clusters()</code> no args;
+<code>get_atoms(atom_ids=['1ecfd998-...','270a08d9-...'], format='minimal', prefer='as_requested')</code>
+for the Cursor cluster tied to composer <code>4f02b335</code>;
+<code>search_memories(query='Cursor multi-cluster continuation capture', source_app='claude_code', limit=5)</code>.</li>
+<li><strong>Returned:</strong> <code>find_clusters</code> returned 6
+clusters. Rank-1 <code>ctx_11709209</code> was Project_echo with
+<code>source_breakdown={git:23, claude_code:49}</code> and zero Cursor
+atoms; rank-6 <code>ctx_5c1b72e7</code> was the relevant Cursor composer
+<code>4f02b335</code> with 2 atoms. <code>get_atoms</code> returned both
+Cursor atoms: the first was the partial “use echo and understand where
+we left off” atom with <code>assistant_bubble_ids</code> ending at
+checkpoint <code>70975526...</code>,
+<code>truncations=['content']</code>, and
+<code>bubble_text_sources</code> present; the second was the follow-up
+“scope of 034 and 035” atom. The targeted Claude Code substring search
+returned 0 matches.</li>
+<li><strong>Sources:</strong>
+<code>find_clusters.source_breakdown</code>: rank-1
+<code>{git:23, claude_code:49}</code>, rank-6 <code>{cursor:2}</code>.
+Cursor atom source
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>,
+composer <code>4f02b335-4b1d-4bd1-a9fa-2e0d76ae5e56</code>. Backlog spec
+reviewed from
+<code>backlog/ready/2026-05-11-036-cursor-multicluster-continuation.md</code>.</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> ECHO surfaced exactly the empirical shape 036
+is meant to fix: Project_echo resume context is still dominated by
+git/Claude Code, while the Cursor composer exists only as a small
+sibling cluster and its load-bearing verdict bubbles are absent from
+atoms after the assistant checkpoint. The 0-hit targeted Claude search
+was not blocking because the ready spec file carried the full review
+target.</li>
+<li><strong>Conjecture:</strong> For newly-written specs, ECHO should be
+used as context retrieval, but spec review should still anchor on the
+backlog file when present; the capture gap being reviewed can itself
+make the latest Cursor/Claude turn incomplete.</li>
+</ul>
+<h3 id="pdt-codex-resumes-claudes-cursor-root-cause-investigation">01:20
+PDT — Codex resumes Claude’s Cursor root-cause investigation</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder said “claude has been
+invesitgating the cursor issue. i want you to retireve that context
+using echo and have your own investigation on the root cause.”</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app='claude_code', count=20)</code>;
+<code>search_memories(source_app='claude_code', query='cursor', limit=20)</code>;
+<code>find_clusters(since='2026-05-10T00:00:00-07:00', format='skeleton')</code>.</li>
+<li><strong>Returned:</strong> <code>tail_session</code> returned 12
+recent turns from the active Claude Code session, including live-trace
+Cursor wiring, <code>scanOnStart</code>, metadata enrichment,
+thinking/toolFormerData parser fixes, and current
+<code>not_object</code>/<code>not_in_composer_headers</code> warning
+investigation. <code>search_memories</code> returned 20 Claude Code
+matches with <code>next_cursor</code> present, mostly the same
+Cursor-debugging thread plus older 035/036 context.
+<code>find_clusters</code> returned 10 clusters / 259 atom ids; rank-1
+<code>ctx_9e1582d9</code> label “discussion about Project_echo”, rank
+reasons <code>["recent_activity","has_open_loop","dense"]</code>,
+<code>source_breakdown={git:71, claude_code:126}</code>; cursor-only
+clusters also appeared lower in rank.</li>
+<li><strong>Read sources:</strong> tail source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/53fe5b30-de6c-4ad9-8499-2718d754ef2b.jsonl</code>;
+search matches from the same Claude Code session plus earlier session
+<code>74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl</code>; cluster source
+breakdowns included <code>git</code>, <code>claude_code</code>,
+<code>codex</code>, and <code>cursor</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — recovered the exact Claude
+investigation arc and the current unresolved warning categories quickly
+enough to continue independently.</li>
+<li><strong>Note:</strong> The best retrieval shape was
+<code>tail_session(source_app='claude_code')</code> plus targeted
+literal search. The skeleton cluster was useful as a sanity check but
+too broad for the immediate task; it confirmed Cursor atoms exist but
+are ranked separately from the Claude/git work thread.</li>
+<li><strong>Conjecture:</strong> For “continue another AI client’s
+investigation” requests,
+<code>tail_session(source_app=&lt;client&gt;)</code> should be the
+default first call; <code>find_clusters</code> is better as a
+second-pass cross-source check.</li>
+</ul>
+<h3 id="pdt-codex-reviews-claude-written-036-spec">01:21 PDT — Codex
+reviews Claude-written 036 spec</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder asked Codex to “use echo to
+retrieve context and review the spec” for Claude’s newly written item
+036, then reply with proceed/pushback.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query='036 Cursor multi-cluster continuation capture V1.5.7 fast-forward 4f02b335', source_app='claude_code', limit=5)</code>;
+<code>tail_session(source_app='claude_code', count=5)</code>;
+<code>search_memories(query='ECHO says the latest real state 034 landed 7362d88 continuation atom multi-cluster', limit=10)</code>;
+<code>find_clusters()</code> default 4h window;
+<code>get_atoms(atom_ids=['1ecfd998-c90b-4eeb-b8eb-ab995f5966f3','270a08d9-de10-4960-b32c-88d749b2e342'], format='minimal', prefer='newest_first')</code>.</li>
+<li><strong>Returned:</strong> Both targeted
+<code>search_memories</code> calls returned 0 matches.
+<code>tail_session</code> resolved to the latest Claude Code session
+<code>53fe5b30-...</code>, but that session was a later Cursor
+parser-warning investigation, not the 036 spec-writing turn.
+<code>find_clusters</code> returned 6 clusters; rank 6 was the relevant
+Cursor cluster for composer <code>4f02b335-...</code> with 2 atoms.
+<code>get_atoms</code> showed the load-bearing 034 AC4 atom captured
+only the first cluster (<code>assistant_bubble_ids</code> length 10,
+<code>bubble_text_sources</code> populated) and a second later atom for
+“scope of 034 and 035”; the later verdict bubbles described in the
+journal/spec were not present in the captured atom body.</li>
+<li><strong>Sources:</strong> <code>search_memories</code> per-match
+source list was empty for both searches. <code>tail_session</code>
+source was
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/53fe5b30-de6c-4ad9-8499-2718d754ef2b.jsonl</code>.
+<code>find_clusters</code> source breakdowns included rank 1
+<code>{git:23, claude_code:49}</code>, rank 2 <code>{cursor:2}</code>,
+ranks 3-4 <code>{cursor:1}</code>, rank 5 <code>{codex:8}</code>, and
+rank 6 <code>{cursor:2}</code> for composer <code>4f02b335</code>.
+<code>get_atoms</code> sources were
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+for both fetched atoms.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> ECHO did not retrieve the spec directly by
+title or distinctive lost verdict phrase. It did recover the relevant
+Cursor source cluster by clustering, and the atom metadata independently
+confirms the same shape 036 is designed to fix: first-cluster capture
+works, continuation bubbles after the assistant checkpoint are absent
+from captured atoms.</li>
+<li><strong>Conjecture:</strong> For “review the spec Claude just wrote”
+workflows, <code>find_clusters</code> remains a useful fallback after
+substring search misses, but the spec itself should still be read from
+the backlog file because backlog writes are the authoritative source of
+ready-item content.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
