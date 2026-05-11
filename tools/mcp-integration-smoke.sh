@@ -126,6 +126,18 @@ if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"tail_session"'; then
   exit 1
 fi
 
+# Item 035: tail_session description must advertise the `repo_path` parameter
+# so the cross-tool spec-review pattern can find the Cursor repo-scoping
+# escape hatch in tools/list without reading source. Tolerates either the
+# native JSON form (when content is inline) or the SSE-escaped form.
+if ! printf '%s' "$LIST_PAYLOAD" | grep -qE '(repo_path|repo\\\\_path)'; then
+  log_err "tools/list tail_session description does not mention repo_path"
+  log_err "(item 035 may not have been picked up — has the daemon restarted since merge?)"
+  log_err "raw response:"
+  printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
 # V1.6 (item 030): three new tools — find_clusters / get_atoms / wait_for_new_turns
 for v16 in find_clusters get_atoms wait_for_new_turns; do
   if ! printf '%s' "$LIST_PAYLOAD" | grep -q "\"name\":\"$v16\""; then
@@ -697,6 +709,7 @@ log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
 log_ok "OK: tools/list contains tail_session"
+log_ok "OK: tools/list tail_session description mentions repo_path (item 035)"
 log_ok "OK: tools/list 8 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"

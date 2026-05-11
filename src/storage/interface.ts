@@ -25,6 +25,18 @@ export interface QueryFilter {
   // normalizer throws away — they otherwise dominate storage's newest-N and
   // starve real conversation/git atoms out of the trace input.
   exclude_metadata_surface?: string[];
+  // Restrict rows to those whose JSON metadata matches the given key→value
+  // pairs using string equality; each entry implies an AND clause. Mirrors
+  // `exclude_metadata_surface` (set-membership on a single key); this is
+  // general key/value equality across N keys. Empty `{}` is a no-op
+  // (treated as if omitted). Item 035's only consumer is `tail_session`'s
+  // repo-scoping path, where `composer_id` restricts the cursor `.vscdb`
+  // tail to a specific workspace's composer. To prevent caller-supplied
+  // keys from probing arbitrary metadata fields, the storage layer
+  // enforces a whitelist — see METADATA_MATCH_KEY_WHITELIST. Any key
+  // outside the whitelist causes the query to throw at the storage seam
+  // (defense in depth — independent of any MCP-tool-level validation).
+  metadata_match?: Record<string, string>;
   // Composite-key cursor pagination boundary: returns rows strictly older than
   // (timestamp, id) under the storage `(timestamp DESC, id DESC)` ordering.
   // Defined for descending queries only — passing `before` together with
@@ -34,6 +46,18 @@ export interface QueryFilter {
   // composite cursor was designed to close.
   before?: { timestamp: string; id: string };
 }
+
+// Whitelist of metadata keys callers may reach via `QueryFilter.metadata_match`.
+// Enforced inside both storage adapters (SQLite + Memory) so adding a future
+// MCP tool that forwards `metadata_match` cannot accidentally probe arbitrary
+// JSON paths. Adding a key here is a deliberate decision — current consumers
+// are tail_session's repo-scoping (composer_id) + integration test helpers
+// (workspace_id, session_id).
+export const METADATA_MATCH_KEY_WHITELIST: ReadonlySet<string> = new Set([
+  'workspace_id',
+  'composer_id',
+  'session_id',
+]);
 
 export interface Storage {
   append(event: Omit<CaptureEvent, 'id'>): Promise<EventId>;

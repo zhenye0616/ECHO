@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { CaptureEvent, EventId, QueryFilter, Storage } from './interface.js';
+import {
+  METADATA_MATCH_KEY_WHITELIST,
+  type CaptureEvent,
+  type EventId,
+  type QueryFilter,
+  type Storage,
+} from './interface.js';
 
 export class MemoryStorage implements Storage {
   private readonly events: CaptureEvent[] = [];
@@ -31,6 +37,25 @@ export class MemoryStorage implements Storage {
         ? new Set(filter.exclude_metadata_surface)
         : undefined;
 
+    // Parity with SqliteStorage: whitelist-validate at the entry of the
+    // function (throw before scanning events). Empty `{}` is a no-op.
+    let metadataMatchEntries: Array<[string, string]> | undefined;
+    if (filter?.metadata_match !== undefined) {
+      const keys = Object.keys(filter.metadata_match);
+      for (const key of keys) {
+        if (!METADATA_MATCH_KEY_WHITELIST.has(key)) {
+          throw new Error(
+            `QueryFilter.metadata_match key "${key}" is not on the whitelist (${[
+              ...METADATA_MATCH_KEY_WHITELIST,
+            ].join(', ')})`,
+          );
+        }
+      }
+      if (keys.length > 0) {
+        metadataMatchEntries = keys.map((k) => [k, filter.metadata_match![k]!] as [string, string]);
+      }
+    }
+
     // Filter first (full pass), then sort by (timestamp, id) in the requested
     // order, then truncate. Sorting before truncation preserves "keep the
     // newest N" semantics regardless of insertion order. Tie-break on `id`
@@ -50,6 +75,18 @@ export class MemoryStorage implements Storage {
       if (excludeSurfaces !== undefined) {
         const surface = (event.metadata as { surface?: unknown } | undefined)?.surface;
         if (typeof surface === 'string' && excludeSurfaces.has(surface)) continue;
+      }
+      if (metadataMatchEntries !== undefined) {
+        const md = event.metadata as Record<string, unknown> | undefined;
+        let skip = false;
+        for (const [k, v] of metadataMatchEntries) {
+          const got = md?.[k];
+          if (typeof got !== 'string' || got !== v) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
       }
       filtered.push(event);
     }

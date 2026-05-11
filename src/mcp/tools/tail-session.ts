@@ -1,20 +1,20 @@
+import { isAbsolute } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { QueryFilter, Storage } from '../../storage/interface.js';
+import {
+  resolveCursorComposerForRepoPath,
+  type CursorComposerResolution,
+} from '../cursor-workspace-resolver.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch } from '../wire-shape/match.js';
-import {
-  CursorDecodeError,
-  decodeCursor,
-  emitCursor,
-  type DecodedCursor,
-} from './_cursor.js';
+import { CursorDecodeError, decodeCursor, emitCursor, type DecodedCursor } from './_cursor.js';
 import { searchMatchSchema } from './search-memories.js';
 
 export type { SourceApp };
 
 export const TAIL_SESSION_DESCRIPTION =
-  'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Calling with neither `source` nor `source_app` auto-resolves to the most-recently-active source_app across all apps (last 24h) — the ergonomic shape for "where did I leave off" resume calls without picking an app upfront. Default count=5, max 20; typical response < 10k chars. Use this for "where did <app> leave off" lookups instead of substring search.';
+  'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Calling with neither `source` nor `source_app` auto-resolves to the most-recently-active source_app across all apps (last 24h) — the ergonomic shape for "where did I leave off" resume calls without picking an app upfront. For source_app=cursor, optionally pass repo_path=<absolute repo root> to scope the tail to the Cursor composer active in that project. Without repo_path, the MRU resolution returns the most-recently-active Cursor composer globally (which is often a different project than the caller intends). Default count=5, max 20; typical response < 10k chars. Use this for "where did <app> leave off" lookups instead of substring search.';
 
 // V1.5.7 polish (2026-05-09): no-args fallback look-back window. When the
 // caller passes neither `source` nor `source_app`, we scan the four known
@@ -32,6 +32,10 @@ export interface TailSessionParams {
   source_app?: SourceApp;
   count?: number;
   cursor?: string;
+  /** V1.6 (item 035): absolute repo root path. Honored only when
+   *  `source_app === 'cursor'`; for other apps the parameter is ignored
+   *  with a warning (their source paths already encode the project). */
+  repo_path?: string;
 }
 
 export interface TailSessionResult {
@@ -42,6 +46,10 @@ export interface TailSessionResult {
    *  `source_app` was passed and the no-args fallback resolved one. Lets
    *  the caller see which app the implicit resume picked. */
   source_app_resolved?: SourceApp;
+  /** V1.6 (item 035): set when `source_app='cursor'` + `repo_path` are
+   *  both passed and the workspace + composer resolver succeeded. Lets
+   *  the caller verify the correct composer was picked. */
+  composer_resolved?: string;
   warnings: string[];
 }
 
@@ -107,10 +115,7 @@ const EXCLUDED_SURFACES_FOR_TAIL = ['fs'] as const;
 // under the app's prefix, IGNORING fs-watcher meta-events. Returns the source
 // string of the newest non-fs row, or null if no eligible atoms exist under
 // the prefix.
-async function resolveNewestSourceForApp(
-  storage: Storage,
-  prefix: string,
-): Promise<string | null> {
+async function resolveNewestSourceForApp(storage: Storage, prefix: string): Promise<string | null> {
   const rows = await storage.query({
     source_prefix: prefix,
     exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
@@ -168,13 +173,40 @@ async function resolveNewestSourceAppGlobal(
   return { source_app: best.source_app, source: best.source };
 }
 
+export interface TailSessionInjections {
+  /** Injection seam for the Cursor workspace + composer resolver. Tests
+   *  override this to point at mock-fs fixtures; production callers pass
+   *  the live `resolveCursorComposerForRepoPath` (the default). */
+  resolveCursorComposer?: (repoPath: string) => CursorComposerResolution | null;
+}
+
 export async function tailSession(
   storage: Storage,
   params: TailSessionParams,
   now: Date = new Date(),
+  injections: TailSessionInjections = {},
 ): Promise<TailSessionResult> {
-  const { source, source_app, count, cursor } = params;
+  const { source, source_app, count, cursor, repo_path } = params;
   const countApplied = clampCount(count);
+
+  // Parameter-validation gates for `repo_path` (item 035, AC1). These run
+  // BEFORE branching so the same errors surface on the unit-level call
+  // (no MCP wire) and the wire path identically.
+  if (repo_path !== undefined) {
+    if (source !== undefined) {
+      // R1 Finding 3 (Codex) + R1 Med #1 (Cursor): combining an exact
+      // source path with the repo_path resolver has no coherent meaning.
+      throw new Error(
+        'tail_session: repo_path is incompatible with exact source; use source_app=cursor + repo_path, or omit repo_path',
+      );
+    }
+    if (source_app === undefined) {
+      throw new Error('tail_session: repo_path requires source_app=cursor');
+    }
+    if (!isAbsolute(repo_path)) {
+      throw new Error('tail_session: repo_path must be absolute');
+    }
+  }
 
   let before: DecodedCursor | undefined;
   if (cursor !== undefined) {
@@ -183,6 +215,47 @@ export async function tailSession(
 
   // source_app branch: resolve the newest session for that app, then tail it.
   if (source_app !== undefined) {
+    // Cursor repo-scoped path (item 035, AC4). Honored only when
+    // source_app === 'cursor' AND repo_path is set; other apps' source
+    // paths already encode the project, so a repo_path is meaningless
+    // for them — warn-ignore.
+    if (source_app === 'cursor' && repo_path !== undefined) {
+      const resolver = injections.resolveCursorComposer ?? resolveCursorComposerForRepoPath;
+      const resolved = resolver(repo_path);
+      if (resolved === null) {
+        return {
+          turns: [],
+          next_cursor: null,
+          source_resolved: null,
+          warnings: [
+            `tail_session: no Cursor composer matches repo_path=${repo_path}; verify the project is open in Cursor and the workspace has at least one composer`,
+          ],
+        };
+      }
+      const prefix = buildSourceAppMap()['cursor'];
+      const resolvedSource = await resolveNewestSourceForApp(storage, prefix);
+      if (resolvedSource === null) {
+        return {
+          turns: [],
+          next_cursor: null,
+          source_resolved: null,
+          warnings: ['no captured sessions found for source_app=cursor'],
+        };
+      }
+      const tail = await tailExactSource(storage, resolvedSource, countApplied, before, {
+        composer_id: resolved.composer_id,
+      });
+      return { ...tail, composer_resolved: resolved.composer_id };
+    }
+    const warnings: string[] = [];
+    if (repo_path !== undefined && source_app !== 'cursor') {
+      // Non-cursor source_app + repo_path: warn-ignore. The parameter is
+      // currently meaningful only for cursor; future items may extend
+      // semantics if a concrete need surfaces.
+      warnings.push(
+        `tail_session: repo_path is currently honored only for source_app=cursor; ignored for ${source_app}`,
+      );
+    }
     const prefix = buildSourceAppMap()[source_app];
     const resolved = await resolveNewestSourceForApp(storage, prefix);
     if (resolved === null) {
@@ -190,10 +263,14 @@ export async function tailSession(
         turns: [],
         next_cursor: null,
         source_resolved: null,
-        warnings: [`no captured sessions found for source_app=${source_app}`],
+        warnings: [...warnings, `no captured sessions found for source_app=${source_app}`],
       };
     }
-    return tailExactSource(storage, resolved, countApplied, before);
+    const tail = await tailExactSource(storage, resolved, countApplied, before);
+    if (warnings.length > 0) {
+      return { ...tail, warnings: [...warnings, ...tail.warnings] };
+    }
+    return tail;
   }
 
   // exact-source branch.
@@ -223,12 +300,7 @@ export async function tailSession(
       ],
     };
   }
-  const tail = await tailExactSource(
-    storage,
-    resolved.source,
-    countApplied,
-    before,
-  );
+  const tail = await tailExactSource(storage, resolved.source, countApplied, before);
   // Surface the implicit pick on the response so the caller can see which
   // app the resume landed on without inspecting `source_resolved`'s prefix.
   return { ...tail, source_app_resolved: resolved.source_app };
@@ -239,6 +311,7 @@ async function tailExactSource(
   exactSource: string,
   countApplied: number,
   before: DecodedCursor | undefined,
+  metadataMatch?: Record<string, string>,
 ): Promise<TailSessionResult> {
   // Overfetch one extra row so we can emit a cursor when there are more rows
   // beyond `countApplied` — same pattern as search-memories' emitCursor.
@@ -251,6 +324,7 @@ async function tailExactSource(
     limit: countApplied + 1,
   };
   if (before !== undefined) filter.before = before;
+  if (metadataMatch !== undefined) filter.metadata_match = metadataMatch;
 
   const rows = await storage.query(filter);
   // Storage already orders by (timestamp DESC, id DESC); emitCursor relies
@@ -278,6 +352,12 @@ const tailSessionOutputSchema = {
   next_cursor: z.string().nullable(),
   source_resolved: z.string().nullable(),
   source_app_resolved: z.enum(SOURCE_APP_VALUES).optional(),
+  composer_resolved: z
+    .string()
+    .optional()
+    .describe(
+      'Cursor composerId picked by the repo_path resolver. Populated only when source_app=cursor + repo_path were both passed and the workspace was found.',
+    ),
   warnings: z.array(z.string()),
 };
 
@@ -294,15 +374,13 @@ const tailSessionInputZodObject = z
     source_app: z.enum(SOURCE_APP_VALUES).optional(),
     count: z.number().int().min(1).optional(),
     cursor: z.string().optional(),
+    repo_path: z.string().optional(),
   })
-  .refine(
-    (v) => !(v.source !== undefined && v.source_app !== undefined),
-    {
-      message:
-        'tail_session: pass at most one of `source` or `source_app` (passing both is rejected; neither triggers a no-args fallback that auto-resolves the freshest source_app across all apps in the last 24h)',
-      path: ['source'],
-    },
-  );
+  .refine((v) => !(v.source !== undefined && v.source_app !== undefined), {
+    message:
+      'tail_session: pass at most one of `source` or `source_app` (passing both is rejected; neither triggers a no-args fallback that auto-resolves the freshest source_app across all apps in the last 24h)',
+    path: ['source'],
+  });
 
 export function registerTailSession(server: McpServer, storage: Storage): void {
   server.registerTool(
@@ -321,6 +399,12 @@ export function registerTailSession(server: McpServer, storage: Storage): void {
         source_app: z.enum(SOURCE_APP_VALUES).optional(),
         count: z.number().int().min(1).optional(),
         cursor: z.string().optional(),
+        repo_path: z
+          .string()
+          .optional()
+          .describe(
+            'Absolute filesystem path to a repo root (item 035). Honored only for source_app=cursor — scopes the tail to the Cursor composer active in that project. Ignored with a warning for other source_apps. Rejected when combined with `source`, when no `source_app` is supplied, or when the path is not absolute.',
+          ),
       },
       outputSchema: tailSessionOutputSchema,
       annotations: { readOnlyHint: true },
@@ -331,8 +415,7 @@ export function registerTailSession(server: McpServer, storage: Storage): void {
       const xorResult = tailSessionInputZodObject.safeParse(input ?? {});
       if (!xorResult.success) {
         const message =
-          xorResult.error.issues[0]?.message ??
-          'tail_session input failed validation';
+          xorResult.error.issues[0]?.message ?? 'tail_session input failed validation';
         return {
           isError: true,
           content: [{ type: 'text', text: message }],
@@ -349,6 +432,17 @@ export function registerTailSession(server: McpServer, storage: Storage): void {
           // deliberately omit `structuredContent` because the success
           // outputSchema's nullable strings cannot represent the error
           // variant (matches search-memories' contract).
+          return {
+            isError: true,
+            content: [{ type: 'text', text: err.message }],
+          };
+        }
+        // Item 035: repo_path parameter-validation errors thrown from
+        // `tailSession` (incompatible-with-source, requires-source_app,
+        // must-be-absolute) surface through the same `isError` envelope
+        // as the cursor-decode case so callers see a clear message
+        // instead of a JSON-RPC fault.
+        if (err instanceof Error && err.message.startsWith('tail_session: ')) {
           return {
             isError: true,
             content: [{ type: 'text', text: err.message }],
