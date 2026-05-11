@@ -52,11 +52,13 @@ export interface QueryFilter {
 // MCP tool that forwards `metadata_match` cannot accidentally probe arbitrary
 // JSON paths. Adding a key here is a deliberate decision — current consumers
 // are tail_session's repo-scoping (composer_id) + integration test helpers
-// (workspace_id, session_id).
+// (workspace_id, session_id) + item 037's work-artifact (repo) scoping across
+// all four retrieval tools (repo_root).
 export const METADATA_MATCH_KEY_WHITELIST: ReadonlySet<string> = new Set([
   'workspace_id',
   'composer_id',
   'session_id',
+  'repo_root',
 ]);
 
 export interface Storage {

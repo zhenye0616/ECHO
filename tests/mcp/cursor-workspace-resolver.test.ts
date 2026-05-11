@@ -3,7 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveCursorComposerForRepoPath } from '../../src/mcp/cursor-workspace-resolver.js';
+import {
+  normaliseRepoPath,
+  resolveCursorComposerForRepoPath,
+  resolveRepoRootForWorkspaceId,
+} from '../../src/mcp/cursor-workspace-resolver.js';
 
 // Build a temp-dir fixture that mirrors the real Cursor layout:
 //
@@ -342,5 +346,129 @@ describe('resolveCursorComposerForRepoPath', () => {
       fixture.workspaceStorageDir,
     );
     expect(resolved).toEqual({ workspace_id: 'WS-MIXED', composer_id: 'MIG-2' });
+  });
+});
+
+// Item 037 / AC1 — the INVERSE direction (`workspace_id → repo_root`) needed
+// by the Cursor extractor to write `metadata.repo_root` at capture time.
+// Reuses the same `buildFixture` workspaceStorage layout from above.
+describe('resolveRepoRootForWorkspaceId (item 037 / AC1)', () => {
+  let fixture: Fixture | undefined;
+
+  afterEach(() => {
+    fixture?.cleanup();
+    fixture = undefined;
+  });
+
+  it('returns the absolute folder path for a workspace_id with a valid file:// folder URI', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-TARGET',
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/echo-test-repo' }),
+          composers: [{ composerId: 'C1' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'C1', lastUpdatedAt: 1 }],
+    });
+    const resolved = resolveRepoRootForWorkspaceId('WS-TARGET', fixture.workspaceStorageDir);
+    expect(resolved).toBe('/tmp/echo-test-repo');
+  });
+
+  it('URL-decodes percent-encoded folder paths (parity with the forward direction)', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-SPACES',
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/My%20Project' }),
+          composers: [{ composerId: 'SP1' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'SP1', lastUpdatedAt: 1 }],
+    });
+    expect(resolveRepoRootForWorkspaceId('WS-SPACES', fixture.workspaceStorageDir)).toBe(
+      '/tmp/My Project',
+    );
+  });
+
+  it('returns null when the workspace_id has no workspace.json on disk', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-A',
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/A' }),
+          composers: [{ composerId: 'A' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'A', lastUpdatedAt: 1 }],
+    });
+    expect(resolveRepoRootForWorkspaceId('WS-NONEXISTENT', fixture.workspaceStorageDir)).toBeNull();
+  });
+
+  it('returns null when workspace.json has no folder field', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-NO-FOLDER',
+          workspaceJson: JSON.stringify({ otherField: 1 }),
+          composers: [{ composerId: 'A' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'A', lastUpdatedAt: 1 }],
+    });
+    expect(resolveRepoRootForWorkspaceId('WS-NO-FOLDER', fixture.workspaceStorageDir)).toBeNull();
+  });
+
+  it('returns null when folder is non-file:// (remote workspace)', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-REMOTE',
+          workspaceJson: JSON.stringify({ folder: 'vscode-remote://ssh-remote+host/x' }),
+          composers: [{ composerId: 'A' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'A', lastUpdatedAt: 1 }],
+    });
+    expect(resolveRepoRootForWorkspaceId('WS-REMOTE', fixture.workspaceStorageDir)).toBeNull();
+  });
+
+  it('strips the trailing slash so the result matches `metadata.repo_root` shape', () => {
+    fixture = buildFixture({
+      workspaces: [
+        {
+          hash: 'WS-TRAILING',
+          // workspace.json writers occasionally include a trailing slash; the
+          // resolver normalises so retrieval-side path-equality holds.
+          workspaceJson: JSON.stringify({ folder: 'file:///tmp/trailing-repo/' }),
+          composers: [{ composerId: 'T1' }],
+        },
+      ],
+      globalComposers: [{ composerId: 'T1', lastUpdatedAt: 1 }],
+    });
+    expect(resolveRepoRootForWorkspaceId('WS-TRAILING', fixture.workspaceStorageDir)).toBe(
+      '/tmp/trailing-repo',
+    );
+  });
+});
+
+// Item 037 / AC6 (R2 normalization): `normaliseRepoPath` is the shared
+// helper used by all four retrieval tools and the extractor. The forward
+// resolver already relies on it (since its first ship); the export is new.
+describe('normaliseRepoPath (item 037 export)', () => {
+  it('strips a single trailing slash', () => {
+    expect(normaliseRepoPath('/Users/zhenye/Desktop/Project_echo/')).toBe(
+      '/Users/zhenye/Desktop/Project_echo',
+    );
+  });
+
+  it('is a no-op for paths without a trailing slash', () => {
+    expect(normaliseRepoPath('/Users/zhenye/Desktop/Project_echo')).toBe(
+      '/Users/zhenye/Desktop/Project_echo',
+    );
+  });
+
+  it('preserves the root "/" (does not strip it to empty)', () => {
+    expect(normaliseRepoPath('/')).toBe('/');
   });
 });

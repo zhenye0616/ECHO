@@ -22,8 +22,11 @@ export interface CursorComposerResolution {
 // Strip one trailing separator (mirrors `path.normalize` for paths with a
 // trailing slash — Node's normalize keeps the slash). The resolver compares
 // paths by exact string equality after decoding the workspace.json `folder`
-// URL, so the inputs must be normalised the same way.
-function normaliseRepoPath(p: string): string {
+// URL, so the inputs must be normalised the same way. Exported (item 037)
+// so all four retrieval tools normalise `repo_path` to the same shape that
+// capture writes to `metadata.repo_root` — without this, a caller-supplied
+// `/path/` would silently miss the stored `/path`.
+export function normaliseRepoPath(p: string): string {
   const n = pathNormalize(p);
   if (n.length > 1 && (n.endsWith('/') || n.endsWith('\\'))) {
     return n.slice(0, -1);
@@ -309,4 +312,68 @@ export function resolveCursorComposerForRepoPath(
   const picked = pickMostRecentlyActiveComposer(globalDbPath, composerIds);
   if (picked === null) return null;
   return { workspace_id: ws.workspaceHash, composer_id: picked };
+}
+
+/**
+ * Item 037 / AC1 — INVERSE of `resolveCursorComposerForRepoPath`.
+ *
+ * Given a workspace_id (the workspaceStorage subdir hash that the Cursor
+ * extractor already maps composers to via `refreshComposerWorkspaceMap`),
+ * read `<workspaceStorageDir>/<workspace_id>/workspace.json` and return its
+ * `folder` URI decoded to an absolute filesystem path (normalised — no
+ * trailing slash). Mirrors Claude Code's `metadata.repo_root` shape (no
+ * `file://` prefix, no trailing slash) so a single `metadata_match` key
+ * works across all source_apps.
+ *
+ * Returns `null` when:
+ *   - the workspace subdir doesn't exist, OR
+ *   - workspace.json is missing / unreadable / non-JSON / lacks a `folder`
+ *     field, OR
+ *   - `folder` doesn't start with `file://` (remote / multi-root workspaces),
+ *     OR
+ *   - the URL is malformed (`fileURLToPath` throws).
+ *
+ * Each failure mode warn-logs through the same `mcp.cursor-resolver` channel
+ * as `findWorkspaceForRepoPath` so debugging is uniform.
+ */
+export function resolveRepoRootForWorkspaceId(
+  workspace_id: string,
+  workspaceStorageDir: string = DEFAULT_CURSOR_WORKSPACE_STORAGE_DIR,
+): string | null {
+  const workspaceJsonPath = join(workspaceStorageDir, workspace_id, 'workspace.json');
+  let raw: string;
+  try {
+    raw = readFileSync(workspaceJsonPath, 'utf8');
+  } catch {
+    // Missing / unreadable workspace.json — silent (matches
+    // findWorkspaceForRepoPath's quiet-skip discipline; many entries are
+    // legitimately scratch dirs without a folder mapping).
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    log.warn('workspace_json_not_json', {
+      path: workspaceJsonPath,
+      message: (err as Error).message,
+    });
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const folder = (parsed as Record<string, unknown>)['folder'];
+  if (typeof folder !== 'string') return null;
+  if (!folder.startsWith('file://')) return null;
+  let decoded: string;
+  try {
+    decoded = fileURLToPath(folder);
+  } catch (err) {
+    log.warn('workspace_folder_url_invalid', {
+      path: workspaceJsonPath,
+      folder,
+      message: (err as Error).message,
+    });
+    return null;
+  }
+  return normaliseRepoPath(decoded);
 }
