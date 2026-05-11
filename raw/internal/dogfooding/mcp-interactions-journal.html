@@ -985,6 +985,17 @@ kickstart → echo_ping verify</a></li>
 <li><a href="#pdt-codex-mcp-smoke-check-after-daemon-recovery"
 id="toc-pdt-codex-mcp-smoke-check-after-daemon-recovery">2026-05-10
 19:48 PDT — Codex: MCP smoke check after daemon recovery</a></li>
+<li><a
+href="#pdt-strategist-post-restart-resume-via-echo-find_clusters-get_atoms"
+id="toc-pdt-strategist-post-restart-resume-via-echo-find_clusters-get_atoms">2026-05-10
+20:03 PDT — Strategist: post-restart resume via ECHO (find_clusters →
+get_atoms)</a></li>
+<li><a
+href="#pdt-strategist-033-m1-3-closure-live-dogfooding-get_atoms-elision-confirm-get_atom-verbatim-recovery-twice"
+id="toc-pdt-strategist-033-m1-3-closure-live-dogfooding-get_atoms-elision-confirm-get_atom-verbatim-recovery-twice">2026-05-10
+20:05 PDT — Strategist: 033 M1-3 closure live dogfooding
+(<code>get_atoms</code> elision-confirm → <code>get_atom</code> verbatim
+recovery, twice)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7257,6 +7268,234 @@ entry is now verified by the project smoke script rather than only
 blocking Node’s direct localhost <code>fetch</code>; <code>curl</code>
 could reach the same endpoint and produced the detail needed for this
 entry.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-post-restart-resume-via-echo-find_clusters-get_atoms">2026-05-10
+20:03 PDT — Strategist: post-restart resume via ECHO (find_clusters →
+get_atoms)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — fresh session after restart following the
+<code>d3f8e60</code> V1.6.1 promotion commit. No in-conversation memory;
+rebuilt context purely from ECHO.</li>
+<li><strong>Trigger:</strong> Founder typed “resume from last session
+state using echo” — first restart-recovery call against the V1.6.1
+daemon (8-tool surface). Validates that the cross-session resume recipe
+(<code>find_clusters</code> → <code>get_atoms</code> with
+<code>prefer='newest_first'</code>) still works post-restart, and
+surfaces the prior session’s hand-off crib.</li>
+<li><strong>Query inputs (2 ECHO calls):</strong>
+<ol type="1">
+<li><code>find_clusters()</code> — no args. Tested the auto-expand path
+against a freshly-restarted session whose own activity is ≤5 min old
+(single-source-recent demotion path).</li>
+<li><code>get_atoms(atom_ids=&lt;35 ids from clusters[0]&gt;, format='minimal', prefer='newest_first')</code>
+— fetched rank-1 cluster bodies newest-first so the resume crib (latest
+turn) would land first under prefix-drop overflow.</li>
+</ol></li>
+<li><strong>Returned:</strong> <code>find_clusters</code> returned 2
+clusters in a 4h window (since=<code>2026-05-10T23:01:14Z</code>,
+until=<code>2026-05-11T03:01:14Z</code>), <code>truncated:false</code>.
+Rank-1 <code>ctx_121f205e</code> (label “discussion about Project_echo”,
+git:17 + claude_code:18, time_range 23:03:55Z → 03:00:47Z, 35 atoms, 5
+open-loop hints all resolved). Rank-2 <code>ctx_6b43a892</code>
+(codex:5, the 033 Codex review thread including <code>e3574b51</code>).
+<code>get_atoms</code> returned 8 atoms in newest-first order; 27
+dropped under prefix-drop budget (correctly — newest survived). Top atom
+<code>e829e226</code> (timestamp 03:00:47Z) was the prior session’s
+verbatim resume crib including the full step-by-step dogfooding plan for
+033.</li>
+<li><strong>Sources:</strong> <code>find_clusters</code>
+source_breakdown: <code>{git: 17, claude_code: 18}</code> for rank-1,
+<code>{codex: 5}</code> for rank-2. Both Claude Code session
+(<code>5da2f3ac-...jsonl</code>) and Codex
+(<code>019e10a5-...jsonl</code>) plus git surfaced. No Cursor in the 4h
+window (no Cursor activity since the R1 15:55 PDT turn earlier today).
+<code>get_atoms</code> returned atoms from
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/5da2f3ac-...jsonl</code>
++ <code>git:/Users/zhenye/Desktop/Project_echo</code>. The 27 dropped
+atoms were the oldest git commits + earlier turn IDs; the
+resume-relevant 8 atoms (most-recent CC turns + most-recent git commits)
+all survived.</li>
+<li><strong>Verdict:</strong> ✅ right — resume reconstructed in 2
+calls. The strategist’s pre-restart crib (atom <code>e829e226</code>,
+03:00:47Z) made step-by-step pickup unambiguous;
+<code>prefer='newest_first'</code> worked exactly as documented (newest
+survived overflow; missing/older IDs dropped at end). Auto-expand did
+NOT fire because the 4h window had ≥1 non-single-source-recent cluster
+(rank-1 spans the whole afternoon-evening of activity).</li>
+<li><strong>Note (the resume-crib pattern is now demonstrably
+reliable):</strong> Third post-030-toolkit resume call (after 2026-05-10
+13:06 PDT and 16:08 PDT). First <strong>post-restart</strong> call (the
+prior two were post-/clear). Same two-call recipe. The strategist’s
+deliberate practice of leaving a verbatim “Plan: (a) call X, (b) call Y,
+(c) verify Z” crib in the last turn before restart pays off —
+<code>find_clusters</code> + <code>get_atoms</code> newest-first
+surfaces it as <code>atoms[0]</code> regardless of how many other atoms
+are in the window.</li>
+<li><strong>Note (cluster IDs differ between calls — expected and
+harmless):</strong> Crib predicted rank-2 cluster
+<code>ctx_01b0a5d0</code>, but the post-restart call returned
+<code>ctx_6b43a892</code> for the same logical Codex-review cluster.
+Cluster IDs are computed per-call from the atom set in the window, so
+they don’t roundtrip. What matters is that the same atom IDs
+(<code>e3574b51</code>, <code>7f023c05</code> for the elided-content
+test) appear in the rank-2 cluster, which they did. The crib should have
+named atom IDs, not cluster IDs — minor lesson for future cribs.</li>
+<li><strong>Conjecture (observation-only):</strong> The newest-first
+<code>get_atoms</code> ordering is the right default for resume-style
+queries — pre-restart context decays in usefulness backwards from “right
+before restart.” For the 35-atom resume case, the 27 dropped older atoms
+were correctly the lower-value drops (git commits the agent could
+re-derive from <code>git log</code> if needed). If this pattern recurs
+in further resume calls, worth promoting from “opt-in via
+<code>prefer=</code> flag” mention in description to a named “Recipe:
+post-restart resume” in
+<code>wiki/surfaces/mcp-get-atoms.md</code>.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-033-m1-3-closure-live-dogfooding-get_atoms-elision-confirm-get_atom-verbatim-recovery-twice">2026-05-10
+20:05 PDT — Strategist: 033 M1-3 closure live dogfooding
+(<code>get_atoms</code> elision-confirm → <code>get_atom</code> verbatim
+recovery, twice)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — the same post-restart session executing the prior-turn
+dogfooding plan</li>
+<li><strong>Trigger:</strong> Founder typed “start the live dogfooding
+after 033 landed” — executing the planned M1-3 end-to-end-in-MCP closure
+test. Two specific Codex turns are known-elided from the 033 review
+cycle: <code>e3574b51-...</code> (R2 review, 845 content chars elided +
+~25 kB metadata bytes elided) and <code>7f023c05-...</code> (R1 review,
+2463 content chars elided + <strong>140 597 metadata bytes
+elided</strong> — the worst real-world metadata stressor in
+capture).</li>
+<li><strong>Query inputs (3 ECHO calls):</strong>
+<ol type="1">
+<li><code>get_atoms(atom_ids=['e3574b51-...', '7f023c05-...'], format='minimal')</code>
+— confirm both still surface as elided through the budget-bounded
+retrieval path.</li>
+<li><code>get_atom(id='e3574b51-...')</code> — main test: verbatim
+content recovery via V1.6.1 escape hatch for the R2 review turn.</li>
+<li><code>get_atom(id='7f023c05-...')</code> — metadata-projection
+stress test: 140 kB raw <code>metadata.tool_calls</code> needs to
+project down under the 25 kB envelope.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><code>get_atoms</code> confirmation: <code>e3574b51</code> returned
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>,
+<code>content_bytes_elided: 845</code>,
+<code>metadata_bytes_elided: 25 572</code>. <code>7f023c05</code>
+returned
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>,
+<code>content_bytes_elided: 2463</code>,
+<code>metadata_bytes_elided: 140 597</code>. Both confirmed elided as
+expected.</li>
+<li><code>get_atom(e3574b51)</code>: <code>atom_size_bytes: 4383</code>.
+Content <strong>verbatim</strong> (the elided 845 chars now visible —
+Finding 1’s full body reads “…explicitly remove <code>\"content\"</code>
+from <code>truncations</code> and drop <code>bytes_elided</code> after
+overwriting content, and AC4 should assert <code>\"content\"</code> is
+not present”).
+<code>truncations: ["metadata.tool_calls:projected"]</code> —
+<code>"content"</code> correctly absent (R2 Finding 1 fix verified).
+<code>metadata.tool_calls</code> projected to 10-string array +
+<code>tool_calls_by_name</code> summary. No <code>embedding</code>
+field. Envelope under 25 kB ceiling by ~5×.</li>
+<li><code>get_atom(7f023c05)</code>: <code>atom_size_bytes: 6664</code>.
+Content <strong>verbatim</strong> (all 2463 elided chars recovered —
+Findings 2/3/4 readable in full).
+<code>truncations: ["metadata.tool_calls:projected"]</code>. 140 kB raw
+<code>metadata.tool_calls</code> projected to a 50-string
+<code>tool_calls</code> array + <code>tool_calls_truncated: true</code>
+flag +
+<code>tool_calls_by_name: {exec_command:47, apply_patch:2, write_stdin:1}</code>
+summary. No <code>embedding</code> field. <strong>~21×
+compression</strong> (140 kB metadata → 6.6 kB wire envelope) — exactly
+the R1 contract design.</li>
+</ul></li>
+<li><strong>Sources:</strong> Both atoms from
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/09/rollout-2026-05-09T23-48-45-019e10a5-...jsonl</code>
+(Codex VSCode session, gpt-5.5 / xhigh reasoning, the 033 R1+R2 reviewer
+thread). <code>get_atoms</code> projector applied wire-shape caps +
+per-key metadata cap. <code>get_atom</code> bypassed content cap (escape
+hatch path) + reused <code>projectMatch</code> for metadata (R1
+contract). No JSONL fallback used.</li>
+<li><strong>Verdict:</strong> ✅ right — all five R2 acceptance signals
+verified on both atoms (verbatim content / <code>"content"</code> absent
+from <code>truncations</code> /
+<code>metadata.tool_calls:projected</code> present / no
+<code>embedding</code> / envelope &lt; 25 kB). M1-3 (Codex long-turn
+content recovery for elided turns) now closes <strong>end-to-end
+in-MCP</strong> with a single tool call. No shell, no JSONL grep, no
+composer-id context, no daemon restart needed.</li>
+<li><strong>Note (R2 Finding 1 truncations-correctness fix verified on
+the wire):</strong> The R2 review caught that the R1 implementation plan
+would have left <code>"content"</code> in <code>truncations</code> after
+the verbatim content override, lying about elision. Both
+<code>get_atom</code> calls returned
+<code>truncations: ["metadata.tool_calls:projected"]</code> —
+<code>"content"</code> correctly stripped. The high-priority R2 finding
+is empirically resolved on production traffic.</li>
+<li><strong>Note (metadata-projection stress validates the R1
+envelope-fit hypothesis):</strong> Codex R1’s own pushback (Finding 1 of
+<code>7f023c05</code>) was “the spec promises no JSONL fallback for
+Codex long-turn recovery, but also requires verbatim metadata, forbids
+chunking, hard-fails over 25k, and existing Codex turns can carry
+120-130 kB <code>metadata.tool_calls</code>.” The R1 patch’s resolution
+was: project metadata, keep content verbatim. The post-merge dogfooding
+now empirically validates that path: the <strong>same atom</strong> that
+Codex flagged as a 25 k-envelope risk (140 k raw metadata) recovers
+cleanly at 6.6 k wire size. The R1 contract revision was correct.</li>
+<li><strong>Note (typed MCP surface, not curl):</strong> Both
+<code>get_atom</code> calls were dispatched through the Claude Code
+typed MCP client (after
+<code>ToolSearch select:mcp__echo__get_atom</code>). The prior
+strategist session’s curl-against-loopback fallback (mentioned in atom
+<code>6a208f35</code>) was unnecessary post-restart —
+<code>get_atom</code> registered in the deferred tools list and loaded
+cleanly. Cross-tool integration (Claude Code MCP client → ECHO daemon →
+V1.6.1 <code>get_atom</code> handler) verified end-to-end.</li>
+<li><strong>Note (cost class confirmed):</strong> Description says
+“Cost: HIGH. Typical Codex long-turn content is 5-15KB; with metadata
+projected to ~2KB, response fits the 25k ceiling.” Observed: 4.3 kB on
+the small case, 6.6 kB on the 140 k-metadata stressor. Description’s
+“5-15KB” headline is conservative — actual wire size lower in both
+observed cases because metadata projection compresses harder than the
+description’s “~2KB” estimate on real Codex tool_calls payloads.
+Description still safe and accurate.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>The 25 kB envelope ceiling has substantial headroom for
+<code>get_atom</code>.</strong> Worst-case observed: 6.6 kB on a 140
+k-metadata atom. The <code>atom_too_large_for_wire</code> error path may
+be exercised rarely in practice — possibly only for atoms whose
+<strong>content alone</strong> exceeds ~24 kB (which would be a Codex
+turn with no tool_calls and a very long prose body, or a captured doc
+with no metadata to project away). Worth a 1-week observation window
+before deciding whether <code>atom_too_large_for_wire</code> deserves
+further engineering attention (e.g., a <code>content_chunk_offset</code>
+parameter) or whether it’s a rare-enough escape valve.</li>
+<li><strong>The seventh incident of M1-3 in 24h elided this same R2
+review turn</strong> (entry above at 16:15 PDT noted “sixth incident in
+24h”). The M1-3-on-the-M1-3-review-turn loop now closes in one tool
+call. Worth tracking whether the dogfooding-window M1-3-incidence-rate
+trends down once <code>get_atom</code> is in routine reviewer rotation.
+Hypothesis: it won’t — atoms will keep eliding under wire-shape caps —
+but reviewer-friction-per-incident drops from “shell out to jq” to “one
+MCP call”.</li>
+<li><strong>Item 031
+(<code>mcp-deprecation-remove get_recent_work_context</code>) gate is
+now structurally one dogfooding-evidence cycle away.</strong> The V1.6.1
+escape hatch closes the last “I need verbatim content” pattern that
+didn’t have an <code>mcp__echo__*</code> answer. Once
+<code>get_atom</code> shows up in 5+ resume/review cycles without
+finding edge cases that require JSONL fallback, item 031’s “≥1 week of
+dogfooding evidence” gate is met. This entry is data point 1 of 5+.</li>
+</ol></li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
