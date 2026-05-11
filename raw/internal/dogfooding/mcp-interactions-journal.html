@@ -1058,6 +1058,11 @@ href="#pdt-strategist-035-r1-review-retrieval-combine-8-unique-findings-3-conver
 id="toc-pdt-strategist-035-r1-review-retrieval-combine-8-unique-findings-3-convergent-1-high">2026-05-10
 22:51 PDT — Strategist: 035 R1 review retrieval + combine (8 unique
 findings, 3 convergent, 1 HIGH)</a></li>
+<li><a
+href="#pdt-claude-code-builderwatcher-live-tracking-034-parallel-reviewers-via-echo"
+id="toc-pdt-claude-code-builderwatcher-live-tracking-034-parallel-reviewers-via-echo">2026-05-10
+22:58 PDT — Claude Code (builder→watcher): live-tracking 034 parallel
+reviewers via ECHO</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -8547,6 +8552,63 @@ friction 035 is designed to eliminate at the MCP layer. Don’t
 pre-emptively automate the workaround; ship 035 and the workaround
 becomes vestigial.</li>
 </ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-claude-code-builderwatcher-live-tracking-034-parallel-reviewers-via-echo">2026-05-10
+22:58 PDT — Claude Code (builder→watcher): live-tracking 034 parallel
+reviewers via ECHO</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (builder for 034, now
+watching reviewers)</li>
+<li><strong>Trigger:</strong> Founder said “both codex and claude
+reviewer are reviewing in parallel; live track them using echo then wait
+till two reviewer finish; combine and validate findings.” Item 034 just
+landed in <code>pending_review/</code> at commit <code>34b1f16</code>;
+head sha for the branch is <code>c00a7e7</code>.</li>
+<li><strong>Query inputs (first probe):</strong>
+<ol type="1">
+<li><code>echo_ping(message='live-tracking 034 reviewers')</code> → pong
+at <code>2026-05-11T05:58:45.897Z</code> (connectivity OK).</li>
+<li><code>search_memories(query='2026-05-10-034-cursor-capture-coverage', since='2026-05-11T05:55:00Z', limit=15)</code>.</li>
+</ol></li>
+<li><strong>Returned:</strong> <strong>2 matches</strong> since 05:55
+UTC. (1) my own session jsonl <code>a7449101-…</code> reflecting the
+just-completed handoff text (<code>source_app=claude_code</code>, last
+activity 2026-05-11T05:56:40.872Z, 1081-char content elision, 81 tool
+calls including the 6 <code>TaskCreate</code>/<code>TaskUpdate</code>
+calls, repo head <code>34b1f16</code>). (2) git commit
+<code>34b1f16</code> itself (“review: 034…”) with full diff captured at
+18012-byte elision. <code>next_cursor: null</code>.</li>
+<li><strong>Sources:</strong> per-match source-prefixes:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>
+(1 atom — my session),
+<code>git:/Users/zhenye/Desktop/Project_echo</code> (1 atom — the review
+commit). <strong>Cursor and Codex completely absent from this 4-minute
+window</strong> — expected if reviewers haven’t started writing yet
+(both their sessions are typed by SQLite/jsonl appends, which lag a few
+seconds at minimum behind their first turn). The other Claude Code
+project sessions (incl. the strategist’s <code>74a9e2c0-…</code> thread)
+also absent — either idle or unwritten within the window.</li>
+<li><strong>Verdict:</strong> ✅ right (negative result is correct —
+reviewers haven’t produced atoms yet). Establishes the baseline so the
+next probe in ~30-60s can detect new reviewer atoms by diffing the
+source-prefix list.</li>
+<li><strong>Note:</strong>
+<code>search_memories(query=&lt;item-id&gt;, since=…)</code> is the
+right shape for “watch a specific work item across all sources” —
+<code>source_app</code> would have pinned to one app and missed the
+cross-tool fan-out. The 81-tool-call list on my own session is also
+useful — it confirms ECHO captured the FULL builder loop end-to-end
+(Read/Edit/Bash/TaskCreate/TaskUpdate), which is the kind of in-session
+fidelity the M1-1 fixes were designed to preserve.</li>
+<li><strong>Conjecture (observation only):</strong> This is exactly the
+workflow <code>wait_for_new_turns</code> would simplify if it were
+exposed in this Claude Code session — chained
+<code>since=next_since</code> calls would wake on the FIRST reviewer
+atom rather than requiring my own polling cadence. Currently only
+<code>tail_session</code> + <code>search_memories</code> are available
+here; polling cadence is mine to manage.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window

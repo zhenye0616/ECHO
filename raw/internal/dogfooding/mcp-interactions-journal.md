@@ -1875,6 +1875,21 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 22:58 PDT — Claude Code (builder→watcher): live-tracking 034 parallel reviewers via ECHO
+
+- **Source agent:** Claude Code (builder for 034, now watching reviewers)
+- **Trigger:** Founder said "both codex and claude reviewer are reviewing in parallel; live track them using echo then wait till two reviewer finish; combine and validate findings." Item 034 just landed in `pending_review/` at commit `34b1f16`; head sha for the branch is `c00a7e7`.
+- **Query inputs (first probe):**
+  1. `echo_ping(message='live-tracking 034 reviewers')` → pong at `2026-05-11T05:58:45.897Z` (connectivity OK).
+  2. `search_memories(query='2026-05-10-034-cursor-capture-coverage', since='2026-05-11T05:55:00Z', limit=15)`.
+- **Returned:** **2 matches** since 05:55 UTC. (1) my own session jsonl `a7449101-…` reflecting the just-completed handoff text (`source_app=claude_code`, last activity 2026-05-11T05:56:40.872Z, 1081-char content elision, 81 tool calls including the 6 `TaskCreate`/`TaskUpdate` calls, repo head `34b1f16`). (2) git commit `34b1f16` itself ("review: 034…") with full diff captured at 18012-byte elision. `next_cursor: null`.
+- **Sources:** per-match source-prefixes: `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/` (1 atom — my session), `git:/Users/zhenye/Desktop/Project_echo` (1 atom — the review commit). **Cursor and Codex completely absent from this 4-minute window** — expected if reviewers haven't started writing yet (both their sessions are typed by SQLite/jsonl appends, which lag a few seconds at minimum behind their first turn). The other Claude Code project sessions (incl. the strategist's `74a9e2c0-…` thread) also absent — either idle or unwritten within the window.
+- **Verdict:** ✅ right (negative result is correct — reviewers haven't produced atoms yet). Establishes the baseline so the next probe in ~30-60s can detect new reviewer atoms by diffing the source-prefix list.
+- **Note:** `search_memories(query=<item-id>, since=…)` is the right shape for "watch a specific work item across all sources" — `source_app` would have pinned to one app and missed the cross-tool fan-out. The 81-tool-call list on my own session is also useful — it confirms ECHO captured the FULL builder loop end-to-end (Read/Edit/Bash/TaskCreate/TaskUpdate), which is the kind of in-session fidelity the M1-1 fixes were designed to preserve.
+- **Conjecture (observation only):** This is exactly the workflow `wait_for_new_turns` would simplify if it were exposed in this Claude Code session — chained `since=next_since` calls would wake on the FIRST reviewer atom rather than requiring my own polling cadence. Currently only `tail_session` + `search_memories` are available here; polling cadence is mine to manage.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
