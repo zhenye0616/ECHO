@@ -15,10 +15,10 @@ blocked_by: []
 suggested_builder: cursor-claude  # Per founder memory "delegate Cursor-domain work to Cursor's Claude" (deliberate dogfooding pattern); any builder is acceptable since this is pure extractor logic, no Cursor-IPC
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-11T08:35:11Z"
+branch: "agent/cursor-multicluster-continuation"
+worktree: "~/Desktop/Project_echo--cursor-multicluster-continuation"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
