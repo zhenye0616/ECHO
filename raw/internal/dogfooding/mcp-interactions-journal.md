@@ -1935,6 +1935,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 23:17 PDT — Cursor resume lookup after Claude restart
+
+- **Trigger:** Founder asked Cursor to "use echo and understand where we left off in this session" after the prior Claude Code session was interrupted/restarted.
+- **Query inputs:**
+  1. `find_clusters()` no args.
+  2. `get_atoms(atom_ids=<rank-1 Project_echo cluster ids>, format='minimal', prefer='newest_first')`.
+  3. `tail_session(count=8)` no source, auto-resolved to latest Claude Code source.
+- **Returned:** `find_clusters` returned 2 clusters: rank-1 `ctx_4fc8bfc2` labeled "discussion about Project_echo" with 49 atoms (`source_breakdown={git:24, claude_code:25}`), rank-2 `ctx_bcd3e63a` labeled "discussion about echo_wiki" with 10 Codex atoms. `get_atoms` returned 7 newest atoms before envelope drop, top atom commit `6743d2b` moving item 035 to `pending_review`; most useful Claude turn recommended testing item 034 first and item 035 AC6 after 035 lands. `tail_session` returned one latest Claude Code turn from source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6fec6b04-4538-4e73-a7bd-d7532aaedf0f.jsonl`: item 035 implemented and handed off, branch `agent/tail-session-repo-scoping` at `51fdf45`, full suite 679/700 with 21 pre-existing skips.
+- **Sources:** `source_breakdown={git:24, claude_code:25}` for rank-1 cluster; `source_breakdown={codex:10}` for rank-2 cluster; tail source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6fec6b04-4538-4e73-a7bd-d7532aaedf0f.jsonl`; git atoms from `git:/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** ✅ right.
+- **Note:** ECHO correctly surfaced the later cross-source state (035 finished) while the visible terminal still showed an older, interrupted 034 dogfooding investigation. The useful resume answer needs both: continue/finish 034 live dogfooding if resuming that terminal, and know that 035 is now pending review with AC6 founder dogfooding after merge.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*

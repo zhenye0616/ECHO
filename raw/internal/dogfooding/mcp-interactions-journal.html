@@ -1073,6 +1073,9 @@ href="#pdt-claude-code-builderwatcher-dive-deeper-round-located-both-reviewers-c
 id="toc-pdt-claude-code-builderwatcher-dive-deeper-round-located-both-reviewers-combined-verdict">2026-05-10
 23:05 PDT — Claude Code (builder→watcher): dive-deeper round; located
 both reviewers + combined verdict</a></li>
+<li><a href="#pdt-cursor-resume-lookup-after-claude-restart"
+id="toc-pdt-cursor-resume-lookup-after-claude-restart">2026-05-10 23:17
+PDT — Cursor resume lookup after Claude restart</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -8801,6 +8804,49 @@ elided. The full Codex review body is recoverable via
 reading the source JSONL directly. For “merge as-is” decisions this
 doesn’t matter; for divergence resolution it would.</li>
 </ol></li>
+</ul>
+<hr />
+<h3 id="pdt-cursor-resume-lookup-after-claude-restart">2026-05-10 23:17
+PDT — Cursor resume lookup after Claude restart</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked Cursor to “use echo and
+understand where we left off in this session” after the prior Claude
+Code session was interrupted/restarted.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>find_clusters()</code> no args.</li>
+<li><code>get_atoms(atom_ids=&lt;rank-1 Project_echo cluster ids&gt;, format='minimal', prefer='newest_first')</code>.</li>
+<li><code>tail_session(count=8)</code> no source, auto-resolved to
+latest Claude Code source.</li>
+</ol></li>
+<li><strong>Returned:</strong> <code>find_clusters</code> returned 2
+clusters: rank-1 <code>ctx_4fc8bfc2</code> labeled “discussion about
+Project_echo” with 49 atoms
+(<code>source_breakdown={git:24, claude_code:25}</code>), rank-2
+<code>ctx_bcd3e63a</code> labeled “discussion about echo_wiki” with 10
+Codex atoms. <code>get_atoms</code> returned 7 newest atoms before
+envelope drop, top atom commit <code>6743d2b</code> moving item 035 to
+<code>pending_review</code>; most useful Claude turn recommended testing
+item 034 first and item 035 AC6 after 035 lands.
+<code>tail_session</code> returned one latest Claude Code turn from
+source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6fec6b04-4538-4e73-a7bd-d7532aaedf0f.jsonl</code>:
+item 035 implemented and handed off, branch
+<code>agent/tail-session-repo-scoping</code> at <code>51fdf45</code>,
+full suite 679/700 with 21 pre-existing skips.</li>
+<li><strong>Sources:</strong>
+<code>source_breakdown={git:24, claude_code:25}</code> for rank-1
+cluster; <code>source_breakdown={codex:10}</code> for rank-2 cluster;
+tail source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6fec6b04-4538-4e73-a7bd-d7532aaedf0f.jsonl</code>;
+git atoms from <code>git:/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> ECHO correctly surfaced the later
+cross-source state (035 finished) while the visible terminal still
+showed an older, interrupted 034 dogfooding investigation. The useful
+resume answer needs both: continue/finish 034 live dogfooding if
+resuming that terminal, and know that 035 is now pending review with AC6
+founder dogfooding after merge.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
