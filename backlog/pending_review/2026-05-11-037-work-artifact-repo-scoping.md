@@ -25,10 +25,48 @@ suggested_builder: any  # Single coherent change across capture + storage + 4 re
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-11T23:15:00Z"
 branch: "agent/work-artifact-repo-scoping"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--work-artifact-repo-scoping/"
+head_sha: "08815e2208e6cb5d9eb3bb357fd54b42066eb0c7"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  AC1-AC6 all green. 4 commits on `agent/work-artifact-repo-scoping`
+  (e5f1019 AC1+AC2 / 68705a2 AC3 / 4a4fc9c AC4+AC5 / 08815e2 AC6).
+  HEAD: 08815e2.
+
+  Test summary: 296 tests pass + 11 skipped across the 9 touched test
+  files. typecheck clean, lint clean. 45 new tests added overall (7 for
+  AC1 cursor extractor + 9 for the new resolver helper + 6 AC3 + 3 AC4
+  find_clusters + 3 AC4 recent_work_context + 4 AC5 + 13 AC6 +
+  miscellaneous test-update touches).
+
+  Two intentional deviations from spec wording (both noted in code
+  comments + the run log):
+  1. AC1 cache lives in the `startCursorExtractor` closure (per-extractor
+     instance), not module-level. Spec wording said module-level; the
+     warn-dedup Set IS module-level for consistency with existing
+     `missingComposerHeaderWarnedKeys` pattern; the cache stays closure-
+     scoped to prevent vitest cross-worker contamination. Production
+     behaviour identical (one extractor per daemon process).
+  2. Added a new test hook `__testHooks.refreshWorkspaceMap(path)` to
+     `startCursorExtractor` so AC1 integration tests can bypass
+     chokidar's flaky FSEvents-based delivery on macOS. Production
+     callers never invoke it.
+
+  AC6 update notes: dropped the obsolete "non-cursor source_app +
+  repo_path warn-ignore" test from the item-035 block (that contract
+  is replaced by AC6 #1). Updated 2 other 035 tests to match the new
+  warning wording + generalised error message.
+
+  Full-suite vitest run shows 6 failures unrelated to this item:
+  - 1 trace/build.test.ts perf test under parallel load
+  - 5 git-watcher.test.ts timeouts under parallel load (1 of which is
+    pre-existing on baseline — verified via `git stash` + isolated
+    re-run).
+  All 6 pass cleanly in isolation.
+
+  AC7 dogfooding is the founder's post-merge run per spec section #5
+  ("merge ships after one clean run; second-run-on-different-day
+  closes M1-2-A").
 review_notes: ""
 ---
 
