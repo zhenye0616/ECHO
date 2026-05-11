@@ -1890,6 +1890,51 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 22:59 PDT — Codex: 034 handoff reached pending_review; review started
+
+- **Source agent:** Codex
+- **Trigger:** Continuation of founder request to track item 034 through ECHO and start a full independent code review once it landed in `pending_review/`.
+- **Query inputs:**
+  1. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:46:33.501Z', timeout_ms=60000)`.
+  2. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:48:25.610Z', timeout_ms=60000)`.
+  3. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:49:19.373Z', timeout_ms=60000)`.
+  4. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:50:07.735Z', timeout_ms=60000)`.
+  5. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:51:43.130Z', timeout_ms=60000)`.
+  6. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:52:37.636Z', timeout_ms=60000)`.
+  7. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:53:09.256Z', timeout_ms=60000)`.
+  8. `wait_for_new_turns(sources=['claude_code','cursor'], since='2026-05-11T05:54:09.496Z', timeout_ms=60000)`.
+  9. Filesystem/git probes of `/Users/zhenye/Desktop/Project_echo--cursor-capture-coverage`, `agent/cursor-capture-coverage`, and the backlog stage.
+- **Returned:** Most waits timed out empty. One wait woke on strategist Claude Code turn `60a59664-12eb-435b-90f5-a23379715696` at `2026-05-11T05:53:08.335Z`, about 035 R1 review combine, not 034 implementation. Filesystem/git showed the 034 worktree moving from active edits to a clean pushed branch at `c00a7e7a1eaf10c1cb0e3d7567203ec8895a624b`, then main commit `34b1f16` moved 034 to `backlog/pending_review/` with filled `head_sha` and `agent_notes`.
+- **Read sources:** ECHO read Claude Code and Cursor source-app prefixes; only strategist Claude Code session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl` surfaced. Cursor source produced no live turns in these waits. Filesystem/git read branch `agent/cursor-capture-coverage`, main `34b1f16`, and pending-review item `backlog/pending_review/2026-05-10-034-cursor-capture-coverage.md`.
+- **Verdict:** 🟡 partial — ECHO did not expose the live 034 builder thread during the implementation window, but did expose adjacent strategist activity and, combined with git/backlog state, gave enough timing to start the review exactly at handoff.
+- **Note:** The missing live builder turns are not being treated as a 034 code finding; this is dogfooding signal about pre-034 capture behavior. Formal code review started against branch head `c00a7e7` after `34b1f16` landed.
+
+---
+
+### 2026-05-10 23:05 PDT — Claude Code (builder→watcher): dive-deeper round; located both reviewers + combined verdict
+
+- **Source agent:** Claude Code (same builder session as 22:58 PDT entry above)
+- **Trigger:** Founder pushed back on my first probe — "dive deeper, two sessions are reviewing 034 that you just finished. they are currently reviewing live." First probe missed both reviewers because (a) Cursor's synthesized timestamps fall under `since='2026-05-11T05:55:00Z'`, and (b) `tail_session(source_app='cursor')` resolved to a non-Project_echo MRU composer (M1-1 sub-gap C — item 035 territory — firing live on the watch task itself).
+- **Query inputs:**
+  1. `tail_session(source_app='cursor', count=5)` → resolved to `state.vscdb` (single shared family), top atom from composer `09bc3a08-…` (`isr-demo-mohsen` project, NOT Project_echo). Third atom is Project_echo composer `d352562e-…` at mtime `1778478960961` (~05:56 UTC) but with synthesized timestamp `2026-05-09T21:42:58.243Z`.
+  2. `search_memories(query='review 034', source_app='cursor', limit=10)` → 0 matches. (`since=null`.)
+  3. `search_memories(query='cursor-capture-coverage', source_app='cursor', limit=5)` → 0 matches.
+  4. `search_memories(query='c00a7e7', limit=8)` → **4 matches**. (a) Claude Code session `47c69fb2-29a9-47ce-b457-fe759323110c.jsonl` at `2026-05-11T06:01:48.443Z` running `/review-pending` for 034 — files_referenced includes `2026-05-10-034-cursor-capture-coverage.review.md`. (b) git commit `afbaa2c` ("journal: sync Claude Code … live-tracking 034 reviewers") at `2026-05-11T06:01:14Z`. (c) my own builder session at `05:56:40.872Z`. (d) git commit `34b1f16` review handoff at `05:56:11Z`.
+  5. `search_memories(query='034', source_app='codex', limit=10)` → **top match:** Codex session `019e14eb-04f8-7120-b6fb-f578f7de3704.jsonl` at `2026-05-11T06:02:18.434Z` containing the full Codex code-review turn (169 tool calls; content elided 5568 chars in middle; visible head + tail show **"No functional blockers found in the capture implementation. AC1/AC2/AC3 behavior is otherwise covered…"** + verification block).
+  6. `tail_session(source='fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-2026-05-10T19-43-27-019e14eb-04f8-7120-b6fb-f578f7de3704.jsonl', count=3)` → confirmed same atom is turn_index 2 (latest); session opened at 02:46 UTC with `echo mcp` smoke check, pivoted to 034 review at 06:02.
+  7. `search_memories(query='tick_reason', source_app='codex', limit=3)` → 1 match — same Codex review atom (confirms phrase is in the elided middle); query-irrelevance of the elision is a tool limitation, not a content gap.
+- **Returned shape — Claude reviewer:** Untracked sidecar at `backlog/pending_review/2026-05-10-034-cursor-capture-coverage.review.md` carries `verdict: merge as-is`, `head_sha_verified: c00a7e7a…`, `test_counts: { passed: 671, failed: 0, skipped: 21 }`, full AC-status table mapping every AC to a file+line citation, zero pre-merge fixups, zero expected conflicts, 5 deferred follow-ups (AC4/AC5 strategist scope; `triggerRepoll` race self-coalescing; `reason` vs `tick_reason` cosmetic; `safeMtimeMs`/`maxGlobalDbFamilyMtime` asymmetry).
+- **Returned shape — Codex reviewer:** Visible content shows: implementation review concluded "No functional blockers found"; AC1/AC2/AC3 behavior covered; branch stays in scope (only `cursor.ts`, `cursor.test.ts`, cursor fixture); test run `38 passed / 11 skipped` (file) + `671 passed / 21 skipped` (full suite, outside sandbox); `tsc --noEmit`, `eslint --max-warnings 0`, `git diff --check cc30883..c00a7e7` all clean; **two visible findings:** (1) logging field-name mismatch — spec text "tick_reason" vs implementation `reason`; (2) `tests/capture/extractors/cursor.test.ts:1226` uses `triggerRepoll()` for cadence-revert test rather than literal `handleGlobalChange('chokidar')`. Both already appear in Claude's deferred follow-up list.
+- **Read sources:** `search_memories` hits — `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/` (multiple — strategist `74a9e2c0`, reviewer `47c69fb2`, my session `a7449101`), `fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-…019e14eb-…` (Codex reviewer), `fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (Project_echo composer `d352562e`; isr-demo-mohsen composer `09bc3a08` — MRU resolver misroute), `git:/Users/zhenye/Desktop/Project_echo` (commits `afbaa2c`, `34b1f16`). Direct SQLite probe to disambiguate Cursor MRU was **denied** (out of scope per "use echo" instruction); fell back to ECHO-only paths.
+- **Verdict:** ✅ right (after correction). The first probe's negative result was due to two known bugs ECHO has — `since` filter using synthesized timestamps for Cursor bubbles; `tail_session(source_app='cursor')` resolving to MRU-by-synthesized-timestamp not by mtime. Both reviewers were live and producing content; ECHO's `search_memories` with a distinctive token (`c00a7e7`, `034`) and no `since` filter found them within ~30 seconds of probing.
+- **Note (cross-reviewer convergence):** Two completely independent reviewers (Claude Code via `/review-pending` slash command; Codex via `wait_for_new_turns` + direct code review) converged on **merge as-is**. The only visible Codex findings are a subset of Claude's deferred follow-ups. Zero divergence at HIGH/Medium severity. The cross-tool review pattern produced a clean "both agree" shape for a well-specced item that landed within the contract — distinct from the R1+R2 spec-review convergence-at-severity-divergence-at-prescription pattern.
+- **Conjecture (observation only):**
+  1. `search_memories(query='<distinctive sha or token>', no since filter)` is more robust than `since=`-windowed queries against Cursor sources, because Cursor's synthesized timestamps lag actual mtimes by hours to days. Until item 035 ships (resolver-layer fix), substring-on-distinctive-token is the right fall-back. 034 (cadence+parse) and 035 (resolver) are complementary: 034 makes content land in the index; 035 makes the index findable in MRU lookups.
+  2. The `c00a7e7` token (commit SHA) acted as a "watermark" — every atom that touched the implementation referenced it, which let me locate both reviewers in one search. Watermark-probe shape is worth promoting to a generic cross-reviewer tracking recipe.
+  3. ECHO's content elision is unconditional regardless of query; even when I searched for `tick_reason`, the elided middle stayed elided. The full Codex review body is recoverable via `get_atom` (not exposed to this Claude Code session) or by reading the source JSONL directly. For "merge as-is" decisions this doesn't matter; for divergence resolution it would.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
