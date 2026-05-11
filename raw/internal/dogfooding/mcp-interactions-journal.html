@@ -1111,6 +1111,34 @@ href="#pdt-036-ac4-dogfooding-run-1-claude-code-cursor-agent-mode-review-of-0340
 id="toc-pdt-036-ac4-dogfooding-run-1-claude-code-cursor-agent-mode-review-of-034035036">13:39
 PDT — 036 AC4 dogfooding run #1 (Claude Code + Cursor agent-mode review
 of 034/035/036)</a></li>
+<li><a href="#pdt-cursor-connects-to-active-claude-brainstorm-session"
+id="toc-pdt-cursor-connects-to-active-claude-brainstorm-session">14:46
+PDT — Cursor connects to active Claude brainstorm session</a></li>
+<li><a href="#pdt-codex-investigates-cursor-to-claude-repo-gating-miss"
+id="toc-pdt-codex-investigates-cursor-to-claude-repo-gating-miss">14:56
+PDT — Codex investigates Cursor-to-Claude repo-gating miss</a></li>
+<li><a
+href="#pdt-codex-validates-claudes-collapsed-root-cause-synthesis"
+id="toc-pdt-codex-validates-claudes-collapsed-root-cause-synthesis">15:23
+PDT — Codex validates Claude’s collapsed root-cause synthesis</a></li>
+<li><a
+href="#pdt-cursor-connects-to-codex-claude-code-root-cause-investigation"
+id="toc-pdt-cursor-connects-to-codex-claude-code-root-cause-investigation">15:24
+PDT — Cursor connects to Codex + Claude Code root-cause
+investigation</a></li>
+<li><a
+href="#pdt-claude-code-full-body-recovery-of-linkedin-draft-v2-turn-search_memories-get_atom-escape-hatch"
+id="toc-pdt-claude-code-full-body-recovery-of-linkedin-draft-v2-turn-search_memories-get_atom-escape-hatch">15:28
+PDT — Claude Code: full-body recovery of LinkedIn-draft v2 turn
+(search_memories → get_atom escape hatch)</a></li>
+<li><a
+href="#pdt-claude-code-retrieve-linkedin-post-brainstorm-context-from-2-days-ago-post-clear-cross-session-resume"
+id="toc-pdt-claude-code-retrieve-linkedin-post-brainstorm-context-from-2-days-ago-post-clear-cross-session-resume">15:25
+PDT — Claude Code: retrieve LinkedIn-post brainstorm context from ~2
+days ago (post-/clear cross-session resume)</a></li>
+<li><a href="#pdt-codex-validates-claudes-speccing-scope-split"
+id="toc-pdt-codex-validates-claudes-speccing-scope-split">15:38 PDT —
+Codex validates Claude’s speccing-scope split</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -9477,6 +9505,381 @@ cadence ticks) is structurally similar but the latency between atoms
 would be 15s+ instead of milliseconds. Both work; a future stress test
 could verify the live-mid-stream case shows the same continuation chain
 shape.</li>
+</ul>
+<h3 id="pdt-cursor-connects-to-active-claude-brainstorm-session">14:46
+PDT — Cursor connects to active Claude brainstorm session</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder said “connect to claude brainstorm
+session using echo” from Cursor.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app='claude_code', count=10)</code>; then
+<code>wait_for_new_turns(sources=['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/bdb0905b-dd84-4f81-a50d-4030a00e54c5.jsonl'], since='2026-05-11T21:46:41.405Z', timeout=30)</code>.</li>
+<li><strong>Returned:</strong> <code>tail_session</code> returned 10
+turns from Claude Code session <code>bdb0905b-...</code> in repo
+<code>/Users/zhenye/Desktop/Projects/isr-demo-mohsen</code>. Latest
+turn: Claude consolidated the brainstorm into a locked-session-config
+design with bandwidth ceiling plus two surface knobs
+(<code>SPATIAL</code> / <code>TEMPORAL</code>) and advanced per-parent
+ROI/BG sub-knobs. <code>wait_for_new_turns</code> timed out with
+<code>turns=[]</code>,
+<code>next_since='2026-05-11T21:47:40.985Z'</code>.</li>
+<li><strong>Sources:</strong> Tail source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/bdb0905b-dd84-4f81-a50d-4030a00e54c5.jsonl</code>;
+metadata repo root
+<code>/Users/zhenye/Desktop/Projects/isr-demo-mohsen</code>; source_app
+<code>claude_code</code>; exact-source long-poll on the same JSONL. No
+cluster source_breakdown because this used tail + wait, not
+<code>find_clusters</code>.</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> ECHO connected to the intended Claude
+brainstorm session immediately. The current state is a design waiting on
+founder confirmation: expose two surface knobs under the bandwidth
+ceiling, with advanced ROI/BG controls under each knob inside the locked
+session config panel; preserve ratios when the ceiling changes.</li>
+<li><strong>Conjecture:</strong> For “connect to active Claude session”
+requests, <code>tail_session(source_app='claude_code')</code> plus
+exact-source <code>wait_for_new_turns</code> is the right pair: tail
+gives state, wait gives live handoff without guessing a source path
+manually.</li>
+</ul>
+<h3 id="pdt-codex-investigates-cursor-to-claude-repo-gating-miss">14:56
+PDT — Codex investigates Cursor-to-Claude repo-gating miss</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5</li>
+<li><strong>Trigger:</strong> Founder reported that Cursor was asked to
+connect to the Claude brainstorm session “in current repo” but ECHO
+returned the ISR repo brainstorm; founder expected recent repo-scoping
+work to gate by work artifact.</li>
+<li><strong>Query inputs:</strong> <code>tools/list</code>;
+<code>tail_session(source_app='cursor', repo_path='/Users/zhenye/Desktop/Project_echo', count=8)</code>;
+<code>tail_session(source_app='claude_code', count=8)</code>;
+<code>tail_session(source_app='claude_code', repo_path='/Users/zhenye/Desktop/Project_echo', count=8)</code>;
+<code>search_memories(query='connect to claude brainstorm session', source_app='cursor', limit=5)</code>;
+<code>search_memories(source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', limit=5)</code>;
+<code>tail_session(source_app='cursor', count=20)</code>;
+<code>search_memories(source_app='cursor', since='2026-05-11T21:40:00Z', limit=20)</code>.</li>
+<li><strong>Returned:</strong> <code>tools/list</code> advertises
+<code>repo_path</code> only as <code>tail_session</code>’s Cursor
+scoping escape hatch.
+<code>tail_session(source_app='claude_code', repo_path=...)</code>
+returned a warning:
+<code>repo_path is currently honored only for source_app=cursor; ignored for claude_code</code>.
+Current <code>claude_code</code> global tail now resolves to
+Project_echo session <code>95d30e5e-...</code>, but Cursor’s prior 14:46
+call had resolved to ISR session <code>bdb0905b-...</code> because it
+passed no repo constraint.
+<code>tail_session(source_app='cursor', repo_path=Project_echo)</code>
+resolved old composer <code>558e2738-...</code>;
+<code>tail_session(source_app='cursor')</code> resolved ISR composer
+<code>001a960e-...</code>;
+<code>search_memories(source_app='cursor', since=21:40Z)</code> returned
+0.</li>
+<li><strong>Sources:</strong> MCP reads from
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>,
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>,
+and
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/bdb0905b-dd84-4f81-a50d-4030a00e54c5.jsonl</code>.
+Direct follow-up probes (not MCP) confirmed Cursor raw DB contains the
+founder prompt under composer <code>558e2738-...</code>, but ECHO
+storage has no captured Cursor atom matching
+<code>connect to claude brainstorm</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong for the founder’s intended
+work-artifact boundary, even though the ungated Cursor call was
+mechanically allowed.</li>
+<li><strong>Note:</strong> Root cause on the retrieval side: item 035
+implemented repo scoping only for <code>source_app='cursor'</code>; for
+<code>claude_code</code>, <code>codex</code>, and <code>git</code>, the
+code intentionally warn-ignores <code>repo_path</code>. The spec
+assumption (“other apps already encode the repo in their source path”)
+is insufficient because the MRU resolver never converts the caller’s
+current repo into a Claude/Codex repo filter. Separate capture
+observation: the exact Cursor turn is present in Cursor’s DB but not yet
+in ECHO storage, so MCP could not tail that Cursor session
+directly.</li>
+<li><strong>Conjecture:</strong> Work-artifact scoping should be a
+first-class retrieval parameter across <code>tail_session</code> and
+<code>search_memories</code>, backed by captured
+<code>metadata.repo_root</code> / <code>metadata.cwd</code> /
+<code>git:</code> source matching, not a Cursor-only composer
+resolver.</li>
+</ul>
+<h3
+id="pdt-codex-validates-claudes-collapsed-root-cause-synthesis">15:23
+PDT — Codex validates Claude’s collapsed root-cause synthesis</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5</li>
+<li><strong>Trigger:</strong> Founder asked to combine Claude’s findings
+with Codex’s root-cause investigation and validate them.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', since='2026-05-11T21:40:00Z', limit=12)</code>;
+<code>search_memories(query='root cause', source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', since='2026-05-11T21:40:00Z', limit=12)</code>;
+<code>search_memories(query='repo_path', source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', since='2026-05-11T21:40:00Z', limit=12)</code>;
+<code>search_memories(source_app='cursor', since='2026-05-11T21:40:00Z', limit=12)</code>;
+<code>get_atom(id='b2eebe82-a132-4600-adf6-c3b6af7aa16d')</code>.</li>
+<li><strong>Returned:</strong> Claude’s full synthesis atom says 7
+issues collapse to RC1 (work-artifact captured but not retrievable), RC2
+(retrieval tools each re-compose query/filter/project/resolver ad hoc),
+RC3 (timezone warnings are non-blocking), plus standalone mid-stream
+capture timing. <code>get_atom</code> returned the full 7.6 KB content
+without content truncation.
+<code>search_memories(source_app='cursor', since=21:40Z)</code> still
+returned 0.</li>
+<li><strong>Sources:</strong> Claude Code source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>;
+Cursor MCP search over
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>.
+Direct validation (not MCP) read
+<code>src/capture/extractors/claude-code.ts</code>,
+<code>src/capture/extractors/codex.ts</code>,
+<code>src/capture/extractors/cursor.ts</code>,
+<code>src/mcp/tools/tail-session.ts</code>,
+<code>src/mcp/tools/search-memories.ts</code>,
+<code>src/mcp/tools/wait-for-new-turns.ts</code>,
+<code>src/mcp/util/iso8601.ts</code>, and live <code>echo.db</code>
+counts.</li>
+<li><strong>Verdict:</strong> 🟡 partial — Claude’s RC1/RC2/RC3 framing
+is directionally right and code-backed, but one claim overstates the
+fix: Cursor atoms do not currently carry
+<code>metadata.repo_root</code>, so adding repo_root filtering alone
+would fix Claude/Codex/Git repo bleed but not the Cursor freshness gap
+unless Cursor capture/resolution also writes or derives
+repo/work-artifact metadata.</li>
+<li><strong>Note:</strong> Live storage confirms Claude Code and Codex
+atoms already carry many <code>repo_root</code> values (including
+Project_echo), while Cursor atoms have 0 <code>repo_root</code> and 0
+non-empty <code>workspace_id</code> in current ECHO storage. The exact
+Cursor prompt still exists in Cursor’s DB but not as an ECHO event.</li>
+<li><strong>Conjecture:</strong> The robust backlog item should be
+“work-artifact scoping across retrieval” with two subparts: (1)
+first-class repo/work-artifact filter in storage/retrieval tools for
+sources that already emit <code>repo_root</code>; (2) Cursor repo
+attribution that does not depend on a stale/fresh composer resolver
+alone.</li>
+</ul>
+<h3
+id="pdt-cursor-connects-to-codex-claude-code-root-cause-investigation">15:24
+PDT — Cursor connects to Codex + Claude Code root-cause
+investigation</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / GPT-5.5</li>
+<li><strong>Trigger:</strong> Founder asked Cursor to connect to both
+Codex and Claude Code for the known-gaps root-cause investigation, with
+extra attention on Cursor-specific gaps.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source_app='claude_code', count=10)</code>;
+<code>tail_session(source_app='codex', count=10)</code>;
+<code>search_memories(source_app='claude_code', query='known gaps root cause cursor', limit=10)</code>;
+<code>search_memories(source_app='codex', query='known gaps root cause cursor', limit=10)</code>;
+<code>search_memories(source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', query='2.5 root causes', limit=10)</code>;
+<code>search_memories(..., query='repo_root'/'workspace_id'/'connect to the cursor session')</code>;
+exact
+<code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl', count=8)</code>;
+exact
+<code>tail_session(source='fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T14-46-28-019e1901-7c02-7f92-9e9b-ab5bdfc92d27.jsonl', count=5)</code>;
+<code>get_atom(id='b2eebe82-a132-4600-adf6-c3b6af7aa16d')</code>;
+<code>wait_for_new_turns(sources=[Claude exact source, Codex exact source], since='2026-05-11T22:24:29.273Z', timeout=30)</code>.</li>
+<li><strong>Returned:</strong> Global Claude tail initially resolved to
+newer ISR subagent work, confirming global MRU bleed. Codex tail
+returned the active Project_echo investigation
+<code>019e1901-...</code>, whose latest verdict validates Claude’s
+synthesis but tightens RC1: <code>repo_root</code> is captured for
+Claude Code/Codex, not Cursor. Project_echo-scoped Claude search found
+<code>95d30e5e-...</code> atom <code>b2eebe82</code>, and
+<code>get_atom</code> recovered the full 7.6 KB synthesis: 7 issues
+collapse to RC1 work-artifact captured but not retrievable, RC2 ad-hoc
+retrieval-tool composition, RC3 TZ warning semantics, plus standalone
+capture timing. Exact-source wait timed out with <code>turns=[]</code>,
+so no newer verdict landed after Codex’s 22:24Z validation.</li>
+<li><strong>Sources:</strong> Claude exact source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>;
+Codex exact source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T14-46-28-019e1901-7c02-7f92-9e9b-ab5bdfc92d27.jsonl</code>;
+global Claude tail also surfaced ISR subagent source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/1b6dae38-5f0e-4dde-91dd-c9d75aefa979/subagents/agent-aa60501ef24bcb621.jsonl</code>,
+which was irrelevant but diagnostically useful. Cursor search surface
+returned 0 for the fresh Cursor prompt after 21:40Z in prior Codex
+validation.</li>
+<li><strong>Verdict:</strong> 🟡 partial.</li>
+<li><strong>Note:</strong> ECHO can connect to both human-specified
+sessions once the exact sources are known, but the first-hop discovery
+still demonstrates the bug being investigated: app-level MRU is global,
+not repo-aware. Cursor-specific delta: unlike Claude Code/Codex, Cursor
+atoms currently lack <code>repo_root</code>; the observed current
+storage state also has empty/nonexistent <code>workspace_id</code> for
+fresh Cursor activity, so a pure <code>metadata.repo_root</code>
+retrieval fix would not solve Cursor unless Cursor first gains reliable
+repo/work-artifact attribution.</li>
+<li><strong>Conjecture:</strong> Split the fix into a shared retrieval
+contract plus a Cursor attribution subproblem: first-class
+repo/work-artifact filters for Claude/Codex/Git where the signal already
+exists, and a Cursor-specific fallback that derives repo from active
+window/workspace/composer rather than relying only on delayed
+composer↔︎workspace registry binding.</li>
+</ul>
+<h3
+id="pdt-claude-code-full-body-recovery-of-linkedin-draft-v2-turn-search_memories-get_atom-escape-hatch">15:28
+PDT — Claude Code: full-body recovery of LinkedIn-draft v2 turn
+(search_memories → get_atom escape hatch)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
+<li><strong>Trigger:</strong> After resurfacing the LinkedIn brainstorm,
+founder said “lets continue that drafting.” The prior
+<code>search_memories</code> call had returned the drafting turn but
+with no follow-up turns; needed to know whether the v1 drafts were the
+live state or whether a later turn had superseded them, then materialize
+whichever was canonical without content elision.</li>
+<li><strong>Query inputs:</strong> (1)
+<code>get_atom(id='1f6ac5d0-...')</code> to fetch verbatim content of
+the turn-14 v1-drafts atom (3.4 KB content, no truncations on this atom
+in prior search call but used <code>get_atom</code> for safety against
+the wire cap). (2)
+<code>search_memories(query='linkedin', source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6633a842-724a-4a9f-a14d-2a3467d02459.jsonl', limit=10)</code>
+to find any follow-up turns in the same session. (3)
+<code>get_atom(id='2f73ce08-...')</code> on the discovered turn-15 atom
+(had <code>truncations:["content"]</code> with 2833 bytes elided in the
+search result).</li>
+<li><strong>Returned:</strong> (1) Full 4.7 KB atom, no truncations. (2)
+2 matches scoped to the session — turn 14 ($400/mo, 21×, v1 drafts) and
+turn 15 ($220/mo, 38×, equation-framed v2 drafts). Turn 15 was the
+founder’s course correction with the “skillset × token-fluency × token
+output − token cost” framing plus the RLHF-labeler insight; this was the
+canonical “where we left off” state, not turn 14. (3) Full 5.6 KB atom,
+no truncations — both v2 drafts intact, closing question “Which do you
+want — long, short, or a hybrid?” recovered.</li>
+<li><strong>Sources:</strong>
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6633a842-724a-4a9f-a14d-2a3467d02459.jsonl</code>
+turns 14 and 15. Single-session scope; no cross-source contribution
+needed because the entire drafting thread lived in one Claude Code
+conversation.</li>
+<li><strong>Verdict:</strong> ✅ right — the 3-call chain (1× search to
+find follow-ups + 2× get_atom for verbatim bodies) correctly recovered
+the actually-canonical drafts. Without the second
+<code>search_memories</code> scoped to the session JSONL, the answer
+would have stopped at the stale v1 drafts and been substantively wrong
+on numbers ($400→$220) and angle (subsidy reframe → equation
+reframe).</li>
+<li><strong>Note:</strong> Good positive datapoint for the escape-hatch
+shape: <code>search_memories</code> (small wire-cap, content-elided for
+budget) for discovery, then <code>get_atom</code> per-id for verbatim
+recovery once the canonical atom is identified. The pattern of “search
+broadly → re-search scoped to a specific session → get_atom for bodies”
+is becoming a recognizable cross-session-resume recipe; second time it
+has surfaced in this journal (the first being 2026-05-10 13:07 PDT).
+Also: turn 14’s content actually had <code>truncations:[]</code> in the
+original search response, so <code>get_atom</code> on it was defensive
+overhead; the real win was the <code>get_atom</code> on turn 15 where
+2.8 KB of the second draft would have been lost.</li>
+<li><strong>Conjecture:</strong> The “search → scope-to-session →
+get_atom” pattern is structurally similar to the
+<code>find_clusters → get_atoms</code> recipe but for single-thread
+conversational recovery rather than cross-source clustering. Worth
+noting as a recognized retrieval pattern in the search-memories
+docstring or migration notes; not a tool change. Adjacent observation:
+an LLM doing cross-session resume would benefit from
+<code>search_memories</code> always emitting per-match
+<code>metadata.session_id</code> and <code>metadata.turn_index</code> in
+the projected metadata (it already does), so the scope-narrowing
+follow-up call is mechanically trivial. Current behavior is already
+correct on this front.</li>
+</ul>
+<h3
+id="pdt-claude-code-retrieve-linkedin-post-brainstorm-context-from-2-days-ago-post-clear-cross-session-resume">15:25
+PDT — Claude Code: retrieve LinkedIn-post brainstorm context from ~2
+days ago (post-/clear cross-session resume)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code</li>
+<li><strong>Trigger:</strong> Founder, in a fresh Claude Code session
+post-<code>/clear</code>, asked “can you retrieve the context regarding
+the linkedin post brainstorming from couple days ago using echo?” —
+single-shot cross-session resume, no other context loaded.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories(query='LinkedIn post', since='2026-05-07T00:00:00', limit=20)</code>.
+Single call; no follow-up <code>get_atoms</code> needed.</li>
+<li><strong>Returned:</strong> 3 matches, <code>next_cursor=null</code>,
+one warning
+<code>[TZ] input.since lacks a TZ specifier and was parsed as local time</code>.
+Top match was the canonical drafting turn
+(<code>fs:.../6633a842-...jsonl</code> turn 14, 2026-05-10 09:30:39 PDT)
+containing the founder prompt verbatim (“good insight i am thinking of
+making a linkedin post…”) and both <code>~$1,944 subsidy / 21×</code>
+drafts (long + short). Two corroborating atoms: a 2026-05-10 13:07 PDT
+resume-from-ECHO turn (<code>fs:.../e9954811-...jsonl</code>) that
+explicitly named LinkedIn as the open loop, and a <code>git:</code>
+commit (bf73f2c) about the 030-merge resume journal entry. Two atoms had
+heavy content truncation (16578 + 594 bytes elided) but the third — the
+actual drafting turn — came through intact at ~3.4 KB content.</li>
+<li><strong>Sources:</strong> per-match prefixes —
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/6633a842-724a-4a9f-a14d-2a3467d02459.jsonl</code>
+(Claude Code, the drafting session, turn 14);
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e9954811-3f27-4d3e-b372-7aa9d87d390f.jsonl</code>
+(Claude Code, the 2026-05-10 13:07 PDT resume session, turn 0);
+<code>git:/Users/zhenye/Desktop/Project_echo</code> (commit bf73f2c).
+All three sources are <code>claude_code</code> + <code>git</code>; Codex
+and Cursor produced no matches in the 4-day window — consistent with the
+founder having only drafted in Claude Code.</li>
+<li><strong>Verdict:</strong> ✅ right — single literal-substring search
+recovered both the founder’s intent prompt and the assistant’s
+two-variant draft in one call, with corroborating “still an open loop”
+context from the next-day resume. No iteration needed.</li>
+<li><strong>Note:</strong> This is a good case of
+<code>search_memories</code> working exactly as documented: the founder
+used a memorable exact-token query (“LinkedIn post”), and the underlying
+content carries that literal substring in both the user prompt and the
+assistant’s draft headers. Cross-session resume across
+<code>/clear</code> worked transparently — the answering session has
+zero shared in-memory context with the drafting session, only the ECHO
+atoms. The <code>claude_code → claude_code</code> resume path is now
+repeatedly working; this is the third such cross-session retrieval
+pattern recorded in the journal.</li>
+<li><strong>Conjecture:</strong> None for retrieval — this is a positive
+data point that the existing tool shape is sufficient when the query
+token actually appears in the captured content. Adjacent observation
+worth noting: the 16.5 KB elision on the git-commit atom means a future
+caller wanting the full forensic body would need a
+<code>get_atoms</code> follow-up — fine for this call (drafting turn was
+intact) but a foot-gun if the elided atom had been the canonical one.
+The existing prefix-drop ordering work covers this in principle; just
+flagging that <code>search_memories</code> results can be content-elided
+in ways that <code>find_clusters → get_atoms</code> would not be.</li>
+</ul>
+<h3 id="pdt-codex-validates-claudes-speccing-scope-split">15:38 PDT —
+Codex validates Claude’s speccing-scope split</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5</li>
+<li><strong>Trigger:</strong> Founder asked for a proceed-or-pushback
+verdict on Claude’s proposed backlog/spec split for the work-artifact
+scoping investigation.</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl', count=8)</code>;
+<code>get_atom(id='6ea98435-0a13-4e26-8d0d-dcbc07c41ded')</code>.</li>
+<li><strong>Returned:</strong> Claude’s latest atom proposed 2 items
+plus 1 follow-up: <code>037</code> work-artifact/repo scoping end-to-end
+(Cursor repo attribution plus <code>repo_path</code> across
+<code>search_memories</code>, <code>find_clusters</code>,
+<code>wait_for_new_turns</code>, and generalized
+<code>tail_session</code>); <code>038</code> MCP toolkit atomicity
+refactor (unbundle <code>wait_for_new_turns</code> bodies, DRY
+metadata-surface exclusion, rename atom tools, resolve
+<code>tail_session</code> convention-vs-primitive); and a smaller
+timezone schema-rejection follow-up.</li>
+<li><strong>Sources:</strong> Claude Code source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>.
+The tail result was truncated; <code>get_atom</code> recovered the full
+proposal body.</li>
+<li><strong>Verdict:</strong> ✅ right.</li>
+<li><strong>Note:</strong> The split matches the validated root causes:
+the user-facing miss needs one end-to-end work-artifact item because
+retrieval-side repo filtering and Cursor-side repo attribution are
+mutually dependent; the MCP atomicity/refactor work is separable and
+should not block the bug fix. The timezone warning behavior is
+orthogonal and should remain a follow-up unless folded in as a tiny
+opportunistic cleanup.</li>
+<li><strong>Conjecture:</strong> The main spec risk is drift: item 037
+should stay surgical and avoid absorbing the broader RC2 toolkit
+refactor. Its acceptance criteria should explicitly cover fresh Cursor
+composer attribution, not only already-bound workspace/composer registry
+cases.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
