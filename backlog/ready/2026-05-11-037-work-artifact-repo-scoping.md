@@ -77,21 +77,21 @@ After this item ships, **any retrieval call from a known repo can scope its resu
 
 ### AC1 — Cursor extractor writes `metadata.repo_root`
 
-**Surface:** `src/capture/extractors/cursor.ts` `processCandidate` call site (the metadata-build block currently spanning roughly lines 1130-1175; anchor on the comment containing `composer_id: turn.composer_id`).
+**Surface:** `src/capture/extractors/cursor.ts` `processCandidate` call site (the metadata-build block currently spanning roughly lines 1130-1175; anchor on the comment containing `composer_id: turn.composer_id`). Also: a NEW helper export in `src/mcp/cursor-workspace-resolver.ts`.
+
+**R1 correction (Codex + Cursor concurrence):** `src/mcp/cursor-workspace-resolver.ts:299` exports `resolveCursorComposerForRepoPath` only — i.e., the resolver runs `repo_path → workspace → composer`. AC1 needs the **inverse direction**: `composer_id` or `workspace_id` → `repo_root`. That helper does NOT exist today and must be added.
 
 **Contract:**
 
-1. For every captured Cursor turn, attempt to resolve `repo_root` at extraction time via the same workspace registry the 035 resolver consults (`src/mcp/cursor-workspace-resolver.ts`). The flow is: `composer_id` → `composerToWorkspace.get(composer_id)` (already in `cursor.ts` ~line 1136) → `workspace_id` → workspaceStorage lookup → `folder` URI → `fileURLToPath` → absolute path.
-2. When the resolution succeeds, write `metadata['repo_root'] = <resolved absolute path>`. Mirror Claude Code's contract: an absolute filesystem path, no trailing slash, no `file://` prefix.
-3. **Fresh composer fallback (closes 035 freshness gap explicitly).** When the workspace-registry resolution fails (fresh composer with no workspace binding yet), attempt a best-effort attribution via attached-file path walking:
-   - Read `turn.context.referencedFiles` (or whichever shape `flattenContextFiles` returns) — same source `files_referenced` is derived from at `cursor.ts` ~line 1149.
-   - For each absolute path in the set, walk upward looking for a `.git` directory. Collect the nearest-ancestor `.git` parent for each file.
-   - If all files share a single common `.git` ancestor → use it as `repo_root`. If multiple distinct candidates → omit (ambiguous, refuse to guess).
-   - If no `files_referenced` at all → omit.
-   - Cache the per-composer result in a module-level `Map<composer_id, string | null>` so subsequent turns of the same fresh composer don't re-walk. Once the workspace registry binds the composer (typically a few turns later), the registry path takes priority for fresh turns (cache is invalidated when the workspace lookup first returns a non-undefined value for that composer).
-4. When BOTH resolution paths (registry + file-walk fallback) fail, `repo_root` is omitted (not written as empty string or `null`). The atom is still captured; only the repo annotation is missing. Downstream filters that pass `repo_path` simply won't match this atom — same semantics as a Claude Code atom that genuinely lacks `repo_root`. The user-visible failure (cross-repo bleed-through) is closed for the common case (file-attached agent-mode turns); truly-zero-file fresh turns degrade gracefully.
-5. The `workspace_id` write (today's conditional `if (ws !== undefined) metadata['workspace_id'] = ws`) stays as-is. Both fields can coexist; retrieval prefers `repo_root` (see AC6) and falls back to `workspace_id`/`composer_id` for atoms captured before this item shipped.
-6. No new file system permissions beyond what the .git walk requires (read-only `stat` on a small ancestor chain). The workspace registry is already read at extraction time today for `workspace_id`; the new write reuses the same data without a second probe.
+1. **Add a new exported helper** in `src/mcp/cursor-workspace-resolver.ts` — suggested name `resolveRepoRootForWorkspaceId(workspace_id: string, workspaceStorageDir?: string): string | null`. It reuses the existing `workspace.json` discovery + `fileURLToPath` + `normaliseRepoPath` chain (lines 26-32, internal helpers in the same file), but takes a `workspace_id` and returns the matched `folder` URI as an absolute path. Returns `null` when no workspace.json folder URI exists for the given workspace_id.
+2. For every captured Cursor turn, the extractor attempts repo attribution in **two stages**:
+   - **Stage 1 (registry path):** if `composerToWorkspace.get(composer_id)` returns a `workspace_id`, call the new `resolveRepoRootForWorkspaceId(workspace_id)` helper. On success, the resolved absolute path is the `repo_root`.
+   - **Stage 2 (file-walk fallback):** if Stage 1 returns null AND `turn.context.referencedFiles` (or the input to `flattenContextFiles`) has at least one absolute path, walk upward from each file looking for the nearest `.git` ancestor directory. If all files share a single common `.git` ancestor → use it as `repo_root`. Multiple distinct candidates → leave unset (ambiguous). Zero files → leave unset.
+3. When EITHER stage resolves, write `metadata['repo_root'] = <resolved absolute path>`. Mirror Claude Code's contract: absolute filesystem path, no trailing slash, no `file://` prefix.
+4. **Cache discipline (R1 correction):** cache POSITIVE results only in a module-level `Map<composer_id, string>`. **Never cache `null`** — a negative outcome must remain re-attemptable because (a) a later turn in the same composer may bring `files_referenced` that weren't present on the first turn, and (b) the workspace registry may bind the composer at any tick. On every turn, the lookup order is: cache hit → return cached path; cache miss → run Stage 1 (registry) → run Stage 2 (file-walk) → if either resolves, populate cache. The negative-cache freeze flagged in R1 (Codex + Cursor finding 3) is closed by this rule.
+5. When BOTH stages fail, `repo_root` is omitted (not written as empty string or `null`). The atom is still captured; only the repo annotation is missing. Downstream filters that pass `repo_path` simply won't match this atom — same semantics as a Claude Code atom that genuinely lacks `repo_root`. The user-visible failure (cross-repo bleed-through) is closed for the common case (registry-bound + file-attached agent-mode turns); truly-zero-file fresh turns degrade gracefully and re-attempt on every tick.
+6. The `workspace_id` write (today's conditional `if (ws !== undefined) metadata['workspace_id'] = ws`) stays as-is. Both fields can coexist; retrieval prefers `repo_root` (see AC6) and falls back to `workspace_id`/`composer_id` for atoms captured before this item shipped.
+7. No new file system permissions beyond what the .git walk requires (read-only `stat` on a small ancestor chain) and the new `resolveRepoRootForWorkspaceId` requires (read on `workspaceStorage/<hash>/workspace.json`). Both are already permitted at extraction time for the existing 035 resolver.
 
 **Tests:**
 
@@ -159,25 +159,29 @@ After this item ships, **any retrieval call from a known repo can scope its resu
 
 1. Drop the warn-ignore at line 251 (`tail_session: repo_path is currently honored only for source_app=cursor; ignored for ${source_app}`).
 2. For `source_app === 'claude_code' | 'codex' | 'git'` + `repo_path`: thread `metadata_match: {repo_root: repo_path}` through to the storage.query inside `resolveNewestSourceForApp` AND inside `tailExactSource`. The MRU resolver now picks the newest source for that app **within the specified repo**, not globally.
-3. For `source_app === 'cursor'` + `repo_path`: keep the existing composer↔workspace resolver as the primary path (covers the 035 contract + atoms captured before AC1 lands). Additionally, after the composer is resolved, the tail's storage.query inherits `metadata_match: {composer_id: <resolved>}` as today — no change to the Cursor branch's resolver behavior. Once AC1 ships, fresh Cursor atoms carry `repo_root` directly; for those atoms the same query also returns by repo_root match (both predicates AND together with no contradiction).
-4. **Note 2 (git source):** Git atoms carry `repo_root` in metadata today (git extractor — verify by inspection) AND encode the repo in their `source` field (`git:/Users/zhenye/Desktop/Project_echo`). For backward compatibility with atoms captured before AC1, when `source_app === 'git'` + `repo_path`, the source-path encoding remains the authoritative filter; `metadata_match: {repo_root: repo_path}` is additive (both must hold). Tests assert this combined-filter shape.
+3. **For `source_app === 'cursor'` + `repo_path`: two-phase fallback (R1 correction, Codex + Cursor finding #1, #4).** The repo_root metadata path is the PRIMARY recovery; the composer↔workspace resolver becomes a LEGACY fallback.
+   - **Phase 1 (primary):** issue the tail query with `metadata_match: {repo_root: repo_path}` against the Cursor source prefix. This recovers all post-AC1 atoms (including fresh-composer atoms) directly. The composer↔workspace resolver is NOT consulted on this path.
+   - **Phase 2 (legacy fallback):** if Phase 1 returns 0 atoms AND no fresh post-AC1 atoms could exist (e.g., the storage contains only pre-AC1 atoms for that repo) — call `resolveCursorComposerForRepoPath(repo_path)` per 035, then issue the tail query with `metadata_match: {composer_id: <resolved>}`. The `composer_resolved` field surfaces only when Phase 2 fires (so the caller can see when legacy fallback was used).
+   - **Critical: predicates are NEVER ANDed.** Phase 1 uses ONLY `repo_root`; Phase 2 uses ONLY `composer_id`. ANDing them would exclude legacy atoms (no `repo_root`) and fresh atoms (no resolved `composer_id` route) simultaneously — the failure mode Codex finding #4 + Cursor finding #1 both flagged.
+4. **Note 2 (git source) — R1 correction (Cursor finding #5):** Git atoms carry `repo_root` in metadata for post-AC1 captures AND encode the repo in their `source` field (`git:/Users/zhenye/Desktop/Project_echo`). For back-compat with atoms captured before AC1 may have lacked `repo_root`, when `source_app === 'git'` + `repo_path`, the recovery is **two-path OR**, not AND: a row matches if EITHER `metadata.repo_root === repo_path` OR the source-path encoding matches `git:${repo_path}`. The storage layer's `OR` semantics over two `metadata_match` queries is achieved by issuing two queries and UNIONing the result set at the tool layer (cheaper than adding an OR primitive to `QueryFilter`). Tests assert both paths recover correctly and no double-counting on atoms that satisfy both predicates.
 5. Input validation: today's `repo_path requires source_app=cursor` reject at line 205 is loosened to allow any source_app. The `repo_path requires source_app` check (must have ONE of `source_app` or `source` set) stays in place.
-6. Test: 6 unit tests (each source_app × {with, without} repo_path on a mixed-repo fixture).
+6. Test: 8 unit tests — (each of 4 source_app) × {with, without} repo_path on a mixed-repo fixture; PLUS one fresh-Cursor-composer test asserting Phase 1 recovers the atom via `metadata.repo_root` without ever calling `resolveCursorComposerForRepoPath`; PLUS one legacy-Cursor-atom test asserting Phase 2 fires when Phase 1 returns 0 and `composer_resolved` is set.
 
 ### AC7 — Dogfooding verification
 
 **Procedure** (post-merge, runs once on the founder's daily-workflow stack; per the 036 pattern, two consecutive runs on different days close the verification):
 
-1. Founder opens Cursor in Project_echo. Fresh Cursor agent-mode turn.
-2. From the Claude Code session in Project_echo, run all four retrieval tools with `repo_path='/Users/zhenye/Desktop/Project_echo'`:
+1. Founder opens Cursor in Project_echo. **Critical: this must be a fresh agent-mode turn on a composer that does NOT yet have a workspace binding** — this is the load-bearing case AC1's Stage 1 fails on and Stage 2 (or post-AC1 Phase 1 query) must cover. (R1 correction, Cursor finding #7.)
+2. From the Claude Code session in Project_echo, run ALL FIVE retrieval tools with `repo_path='/Users/zhenye/Desktop/Project_echo'`:
    - `tail_session(source_app='claude_code', repo_path=...)` → resolves to a Claude Code session in Project_echo (NOT ISR demo)
    - `tail_session(source_app='codex', repo_path=...)` → resolves to a Codex session in Project_echo
-   - `tail_session(source_app='cursor', repo_path=...)` → resolves to the active Cursor composer in Project_echo (NOT a fresh-composer fall-through to an older session)
+   - `tail_session(source_app='cursor', repo_path=...)` → resolves to the active Cursor composer in Project_echo via Phase 1 (`metadata.repo_root` match). **The `composer_resolved` field MUST be absent** on this call — its presence would indicate legacy Phase 2 fallback fired, which means AC1's repo_root write didn't land for this fresh composer (regression).
    - `search_memories(query='<distinctive token>', repo_path=...)` → returns only Project_echo atoms
    - `find_clusters(repo_path=...)` → returns clusters whose `source_breakdown` only references atoms with the matching `repo_root`
+   - **`wait_for_new_turns(sources=['cursor', 'claude_code'], since=<now>, repo_path=...)`** (R1 correction, Codex finding #6) → next captured turn from either app in Project_echo wakes the call; turns from a sibling project do NOT wake it. Assert with two parallel agent-mode turns (one in Project_echo, one in another repo) — only the Project_echo one returns.
 3. Repeat with `repo_path='/Users/zhenye/Desktop/Projects/isr-demo-mohsen'` from the same Project_echo terminal — every result set returns ISR demo content. Cross-project bleed-through is zero.
 4. Negative case: `tail_session(source_app='claude_code', repo_path='/tmp/nonexistent-repo')` returns `turns: []` cleanly with a `warnings: ['no captured sessions found for source_app=claude_code in repo=...']` advisory (NOT a silent empty response — caller should see the empty-set was intentional).
-5. Demo bar AC: ≥ 4 of 5 calls in step 2 return correct repo content; the 5th (find_clusters) may legitimately surface clusters with mixed source_breakdown if multiple repos share a git remote — this is acceptable per Out-of-Scope rule 3.
+5. Demo bar AC: ≥ 5 of 6 calls in step 2 return correct repo content; the 6th (find_clusters) may legitimately surface clusters with mixed source_breakdown if multiple repos share a git remote — this is acceptable per Out-of-Scope rule 3.
 6. Log the dogfooding run as a standard journal entry per CLAUDE.md template; both Markdown + HTML twin updated in the same commit.
 
 # Out of Scope (Don't Drift)
@@ -194,7 +198,7 @@ After this item ships, **any retrieval call from a known repo can scope its resu
 # Implementation Notes
 
 - **Suggested commit shape:** 4 commits — (a) AC1 Cursor extractor + tests; (b) AC2 storage whitelist + tests; (c) AC3-AC6 retrieval tools + tests; (d) AC7 dogfooding journal entry + HTML twin. Each commit independently passes `npm test`, lint, typecheck. The reviewer can stage their read incrementally.
-- **The 035 resolver is the right reference.** `src/mcp/cursor-workspace-resolver.ts` already does `composer_id → workspace_id → folder URI → fileURLToPath → absolute path`. AC1 reuses this exact chain at extraction time. Do not reimplement; import.
+- **The 035 resolver is the structural reference; the function direction is INVERTED for this item.** `src/mcp/cursor-workspace-resolver.ts:299` only exports `resolveCursorComposerForRepoPath` — the direction `repoPath → workspace → composer`. AC1 needs the **inverse direction** (`workspace_id → repo_root`), which is NOT exported today. The new helper `resolveRepoRootForWorkspaceId(workspace_id, workspaceStorageDir?)` lives in the same file, reuses the same workspace.json + `fileURLToPath` + `normaliseRepoPath` internals (file lines 26-32 + the `workspaceStorage` discovery used by `findWorkspaceForRepoPath` at line 54). Do not reimplement those helpers; export them or call them directly from the new function. (R1 correction — Codex finding #2 + Cursor finding #2.)
 - **Cursor extractor concurrency:** the metadata-build block runs inside the cadence-tick handler; the workspace registry is read into `composerToWorkspace` once per tick. Resolving `repo_root` inside the same map lookup adds no new I/O.
 - **AC3-AC5 share a near-identical 6-line change** per tool (params + Zod + validation + storage.query field). If a builder agent prefers a tiny shared helper (`assertAbsolutePath(value, fieldName)`), one file at `src/mcp/util/repo-path.ts` is OK; otherwise inline is also acceptable. Reviewer's call — no preference.
 - **Dogfooding cadence:** AC7 deliberately doesn't gate on the second run; the merge ships after one clean run. The second-run-on-a-different-day closes M1-2-A in the broader plan (see "After Completion" #2).
@@ -220,4 +224,26 @@ After this item ships, **any retrieval call from a known repo can scope its resu
 
 # Review history
 
-(filled at R1 review)
+## R1 — 2026-05-11 15:48 PDT (Codex) + 15:50 PDT (Cursor) — patched 2026-05-11 ~16:00 PDT by strategist
+
+Cross-tool R1 review against the as-shipped spec (commit `9f58263`). Codex and Cursor each ran independent reads and produced findings with no coordination between them; convergence was strong (5 findings overlapped on the same load-bearing flaw).
+
+**Sources:**
+- Codex review: `~/.codex/sessions/2026/05/11/rollout-2026-05-11T14-46-28-019e1901-...jsonl` assistant message #23 (the 2393-char Findings block).
+- Cursor review: composer `558e2738`, assistant bubble `447d756f-8863-4e53-bcda-a904e4833e97` (~3500 chars).
+
+**Findings dispositioned:**
+
+| # | Severity | Source | Finding | Spec patch |
+|---|---|---|---|---|
+| 1 | HIGH | Codex + Cursor | AC6 kept composer↔workspace resolver as Cursor's PRIMARY path, contradicting AC1's goal of closing the 035 freshness gap. Fresh composers still fall through. | AC6 rewritten: two-phase fallback with `metadata.repo_root` as Phase 1 (primary, no resolver call), composer resolver as Phase 2 legacy fallback only. `composer_resolved` is surfaced only when Phase 2 fires. |
+| 2 | HIGH | Codex + Cursor | AC1 said "reuse the 035 resolver" but the existing `resolveCursorComposerForRepoPath` runs the WRONG direction (`repoPath → composer`). The inverse direction (`workspace_id → repo_root`) does not exist as an exported function. | AC1 + Implementation Notes patched: spec now explicitly calls for a new exported `resolveRepoRootForWorkspaceId(workspace_id, workspaceStorageDir?)` helper, reusing the existing workspace.json discovery + `fileURLToPath` + `normaliseRepoPath` internals. |
+| 3 | MEDIUM | Codex + Cursor | AC1's fresh-composer fallback cache used `Map<composer_id, string \| null>`, which freezes a negative outcome — later turns with file context would never re-walk. | AC1 contract item #4 rewritten: cache POSITIVE results only. Negative outcomes remain re-attemptable on every tick. |
+| 4 | MEDIUM | Codex | AC6 said `metadata_match: {repo_root, composer_id}` predicates AND together "with no contradiction" — actually ANDing excludes both (a) legacy atoms without `repo_root` AND (b) fresh atoms without resolved `composer_id`. | Subsumed by Finding 1's two-phase rewrite. The spec now explicitly states predicates are NEVER ANDed across phases. |
+| 5 | MEDIUM | Cursor | AC6 Note 2 (git source) said source-path encoding + metadata_match are "both must hold" (AND), which would drop old git atoms without `repo_root`. | AC6 Note 2 rewritten: two-path OR (a row matches if EITHER predicate holds), implemented as a two-query UNION at the tool layer. |
+| 6 | MEDIUM | Codex | AC7 dogfooding step #2 listed only 4 tools, omitting `wait_for_new_turns` even though AC5 adds `repo_path` there. | AC7 step #2 expanded from 5 calls to 6, including a `wait_for_new_turns(sources=['cursor','claude_code'], repo_path=...)` assertion with a parallel-agent-mode setup. Demo bar updated from "≥4 of 5" to "≥5 of 6". |
+| 7 | LOW | Cursor | AC7 should explicitly require the fresh-Cursor-composer case in the demo (the load-bearing closure of the 035 freshness gap). | AC7 step #1 strengthened: explicitly states the test must use a fresh composer without workspace binding. Step #2's Cursor tail check adds: `composer_resolved` MUST be absent (its presence would mean Phase 2 fired, indicating AC1's repo_root write didn't land — regression). |
+
+**No further reviewer findings.** Both reviewers' verdicts: pushback until findings patched. With this R1 patch applied, the spec is claimable.
+
+**Cross-tool concurrence on R1**: Findings 1+2 (the two HIGH severity items, which together would have made the spec ship without actually closing its load-bearing goal) were independently raised by BOTH Codex and Cursor with the same diagnosis and the same fix shape (`repo_root` first, composer resolver second). Strong validation that the R1 patch's structural rewrite of AC6 is the right shape.
