@@ -449,3 +449,11 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
   **Strategic priority:** HIGH — without 036, the M1-1 capture-coverage demo bar (≥90% on agent-mode composers) is structurally unreachable, which means the V1.6.x "ECHO captures Cursor review content" narrative is incomplete. Spec next, parallel with item 031 deprecation conversation, or as the immediate-next-item after the 034+035 wiki promotion lands.
 
+
+---
+
+## From 036 merge (2026-05-11)
+
+- **AC4 dogfooding (founder / strategist)** — schedule within 60 s of next Cursor agent-mode session: ≥ 3 tool calls in a single turn, then `mcp__echo__search_memories(query=<verdict-phrase>, source_app='cursor')` should return ≥ 1 match. Target ≥ 90 % capture rate per 034's formula. Log to `raw/internal/dogfooding/mcp-interactions-journal.md`.
+- **031 deprecation gate (strategist)** — after 036 merge + ≥ 1 week of post-merge agent-mode dogfooding evidence, trigger the 031 deprecation conversation per the gating rule in this file's 031 entry. ETA ~2026-05-18.
+- **Wiki promotion (strategist)** — promote 036's "After Completion" notes to `wiki/capture/cursor-extractor.md` (Multi-cluster continuation atoms subsection) and `wiki/capture/per-app/cursor-collected-data.md` (two new metadata rows: `is_continuation`, `continuation_of_assistant_bubble_id`).
