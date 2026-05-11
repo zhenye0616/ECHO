@@ -3,7 +3,13 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import type { CaptureEvent, EventId, QueryFilter, Storage } from './interface.js';
+import {
+  METADATA_MATCH_KEY_WHITELIST,
+  type CaptureEvent,
+  type EventId,
+  type QueryFilter,
+  type Storage,
+} from './interface.js';
 import { canonicalizeTimestamps, migrate } from './migrate.js';
 import { createLogger } from '../logging/index.js';
 
@@ -118,7 +124,40 @@ export class SqliteStorage implements Storage {
       params['before_ts'] = filter.before.timestamp;
       params['before_id'] = filter.before.id;
     }
-    if (filter?.exclude_metadata_surface !== undefined && filter.exclude_metadata_surface.length > 0) {
+    if (filter?.metadata_match !== undefined) {
+      // Whitelist enforcement lives at the storage seam (NOT only the MCP
+      // tool) so even direct storage callers can't probe arbitrary JSON
+      // paths. Empty `{}` is a no-op (no clause added). Each entry binds
+      // its value through a named placeholder — no string interpolation
+      // of either keys (which are whitelisted, then literal-baked into
+      // the SQL text) or values.
+      for (const key of Object.keys(filter.metadata_match)) {
+        if (!METADATA_MATCH_KEY_WHITELIST.has(key)) {
+          throw new Error(
+            `QueryFilter.metadata_match key "${key}" is not on the whitelist (${[
+              ...METADATA_MATCH_KEY_WHITELIST,
+            ].join(', ')})`,
+          );
+        }
+      }
+      // Sorted key iteration: keeps the generated SQL text deterministic
+      // across call shapes that pass the same key set in different
+      // orders, so the prepared-statement cache below keys cleanly.
+      // Note: the cache is keyed on the FULL `sql` text, so each distinct
+      // metadata_match key combination produces its own cached prepared
+      // statement. That is fine in practice — the whitelist is tiny (3
+      // keys ⇒ at most 7 non-empty subsets) so the cache size is bounded.
+      const matchKeys = Object.keys(filter.metadata_match).sort();
+      matchKeys.forEach((key, i) => {
+        const placeholder = `__metadata_match_${i}`;
+        clauses.push(`json_extract(metadata, '$.${key}') = @${placeholder}`);
+        params[placeholder] = filter.metadata_match![key];
+      });
+    }
+    if (
+      filter?.exclude_metadata_surface !== undefined &&
+      filter.exclude_metadata_surface.length > 0
+    ) {
       // SQL parameter binding doesn't support IN-list expansion directly with
       // better-sqlite3 named params, so the clause is built with positional
       // placeholders and the list is encoded into params under indexed names.

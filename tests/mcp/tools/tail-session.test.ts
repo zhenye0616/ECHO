@@ -4,10 +4,7 @@ import { homedir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startMcpServer, type McpServerHandle } from '../../../src/mcp/server.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
-import {
-  tailSession,
-  type TailSessionResult,
-} from '../../../src/mcp/tools/tail-session.js';
+import { tailSession, type TailSessionResult } from '../../../src/mcp/tools/tail-session.js';
 import { encodeCursor } from '../../../src/mcp/tools/_cursor.js';
 import type { CaptureEvent } from '../../../src/storage/interface.js';
 import { captureStdout } from '../../fixtures/stdout.js';
@@ -23,10 +20,7 @@ interface CallToolResultLike {
   isError?: boolean;
 }
 
-async function withClient<T>(
-  url: string,
-  fn: (client: Client) => Promise<T>,
-): Promise<T> {
+async function withClient<T>(url: string, fn: (client: Client) => Promise<T>): Promise<T> {
   const transport = new StreamableHTTPClientTransport(new URL(url));
   const client = new Client({ name: 'echo-test', version: '0.0.0' });
   await client.connect(transport);
@@ -41,11 +35,13 @@ async function callTailSession(
   url: string,
   args: Record<string, unknown>,
 ): Promise<CallToolResultLike> {
-  return withClient(url, async (client) =>
-    (await client.callTool({
-      name: 'tail_session',
-      arguments: args,
-    })) as CallToolResultLike,
+  return withClient(
+    url,
+    async (client) =>
+      (await client.callTool({
+        name: 'tail_session',
+        arguments: args,
+      })) as CallToolResultLike,
   );
 }
 
@@ -84,11 +80,7 @@ describe('tailSession (handler-level)', () => {
     expect(result.turns).toHaveLength(3);
     expect(result.turns.every((t) => t.source === 'fs:A')).toBe(true);
     // Newest-first: indices 9, 8, 7
-    expect(result.turns.map((t) => t.content)).toEqual([
-      'A turn 9',
-      'A turn 8',
-      'A turn 7',
-    ]);
+    expect(result.turns.map((t) => t.content)).toEqual(['A turn 9', 'A turn 8', 'A turn 7']);
     expect(result.next_cursor).not.toBeNull();
     expect(result.source_resolved).toBe('fs:A');
     expect(result.warnings).toEqual([]);
@@ -120,9 +112,7 @@ describe('tailSession (handler-level)', () => {
 
     expect(result.source_resolved).toBe(`${codexPrefix}rollout-Z.jsonl`);
     expect(result.turns).toHaveLength(2);
-    expect(result.turns.every((t) => t.source === `${codexPrefix}rollout-Z.jsonl`)).toBe(
-      true,
-    );
+    expect(result.turns.every((t) => t.source === `${codexPrefix}rollout-Z.jsonl`)).toBe(true);
     // Newest-first within Z: indices 2, 1
     expect(result.turns.map((t) => t.content)).toEqual([
       `${codexPrefix}rollout-Z.jsonl turn 2`,
@@ -161,9 +151,7 @@ describe('tailSession (handler-level)', () => {
     expect(result.turns).toEqual([]);
     expect(result.next_cursor).toBeNull();
     expect(result.source_resolved).toBeNull();
-    expect(result.warnings).toEqual([
-      'no captured sessions found for source_app=codex',
-    ]);
+    expect(result.warnings).toEqual(['no captured sessions found for source_app=codex']);
   });
 
   it('count clamping: count: 100 is silently clamped to 20 (not rejected)', async () => {
@@ -254,9 +242,9 @@ describe('tailSession Bug B — fs-watcher meta-events must be excluded', () => 
     // We get the 3 extractor turns back, NEVER any fs-watcher events.
     expect(result.turns).toHaveLength(3);
     expect(result.turns.every((t) => t.content.startsWith('EXTRACTOR_TURN_'))).toBe(true);
-    expect(
-      result.turns.every((t) => (t.metadata as { surface?: string }).surface !== 'fs'),
-    ).toBe(true);
+    expect(result.turns.every((t) => (t.metadata as { surface?: string }).surface !== 'fs')).toBe(
+      true,
+    );
   });
 
   it('source_app: when ONLY fs-watcher events exist under the prefix, source resolution returns empty + warning (does not fall back to fs noise)', async () => {
@@ -281,9 +269,7 @@ describe('tailSession Bug B — fs-watcher meta-events must be excluded', () => 
     // as a truly empty store.
     expect(result.source_resolved).toBeNull();
     expect(result.turns).toEqual([]);
-    expect(result.warnings).toEqual([
-      'no captured sessions found for source_app=codex',
-    ]);
+    expect(result.warnings).toEqual(['no captured sessions found for source_app=codex']);
   });
 
   it('exact source: same exclusion applies — explicit `source=` path returns extractor atoms, not fs noise', async () => {
@@ -354,9 +340,7 @@ describe('tailSession V1.5.6 — wire-shape projector envelope budget', () => {
     expect(envelopeBytes).toBeLessThan(25_000);
     // V1.5.6.1: tool_calls is now PROJECTED to a name trajectory (workflow
     // shape), not opaqued out.
-    expect(
-      r.turns.every((t) => t.metadata_keys_projected?.includes('tool_calls')),
-    ).toBe(true);
+    expect(r.turns.every((t) => t.metadata_keys_projected?.includes('tool_calls'))).toBe(true);
     expect(
       r.turns.every(
         (t) =>
@@ -364,9 +348,7 @@ describe('tailSession V1.5.6 — wire-shape projector envelope budget', () => {
           (t.metadata!['tool_calls'] as string[]).every((n) => n === 'Bash'),
       ),
     ).toBe(true);
-    expect(r.turns.every((t) => t.metadata?.['tool_calls_by_name'] !== undefined)).toBe(
-      true,
-    );
+    expect(r.turns.every((t) => t.metadata?.['tool_calls_by_name'] !== undefined)).toBe(true);
     // Per-KEY semantics: small structured neighbours pass verbatim.
     expect(r.turns.every((t) => t.metadata?.['session_id'] === 'sess-x')).toBe(true);
     expect(r.turns.every((t) => t.metadata?.['git_state'] !== undefined)).toBe(true);
@@ -762,9 +744,9 @@ describe('tail_session (MCP wire — registered tool, schema validation, isError
     });
     handle = await startMcpServer(storage, { port: 0 });
 
-    const partial = Buffer.from(
-      JSON.stringify({ timestamp: '2026-04-25T10:00:00.000Z' }),
-    ).toString('base64');
+    const partial = Buffer.from(JSON.stringify({ timestamp: '2026-04-25T10:00:00.000Z' })).toString(
+      'base64',
+    );
     const res = await callTailSession(handle.url, {
       source: 'fs:A',
       cursor: partial,
@@ -772,6 +754,20 @@ describe('tail_session (MCP wire — registered tool, schema validation, isError
     expect(res.isError).toBe(true);
     expect(res.structuredContent).toBeUndefined();
     expect(res.content?.[0]?.text).toMatch(/missing or non-string `id`/);
+  });
+
+  it('item 035: tools/list description advertises repo_path so callers can find the Cursor scoping escape hatch', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+    const desc = await withClient(handle.url, async (client) => {
+      const list = (await client.listTools()) as {
+        tools: Array<{ name: string; description?: string }>;
+      };
+      const tool = list.tools.find((t) => t.name === 'tail_session');
+      expect(tool).toBeDefined();
+      return tool!.description ?? '';
+    });
+    expect(desc).toMatch(/repo_path/);
   });
 
   it('cursor reuse across tools: a search_memories cursor shape is decodable by tail_session (composite cursor is shared)', async () => {
@@ -790,14 +786,8 @@ describe('tail_session (MCP wire — registered tool, schema validation, isError
     handle = await startMcpServer(storage, { port: 0 });
 
     // First page (newest 3): 9, 8, 7
-    const page1 = parseStructured(
-      await callTailSession(handle.url, { source: 'fs:A', count: 3 }),
-    );
-    expect(page1.turns.map((t) => t.content)).toEqual([
-      'A turn 9',
-      'A turn 8',
-      'A turn 7',
-    ]);
+    const page1 = parseStructured(await callTailSession(handle.url, { source: 'fs:A', count: 3 }));
+    expect(page1.turns.map((t) => t.content)).toEqual(['A turn 9', 'A turn 8', 'A turn 7']);
     expect(page1.next_cursor).not.toBeNull();
 
     // Second page using a freshly-constructed composite cursor over the
@@ -813,10 +803,175 @@ describe('tail_session (MCP wire — registered tool, schema validation, isError
         cursor: constructed,
       }),
     );
-    expect(page2.turns.map((t) => t.content)).toEqual([
-      'A turn 6',
-      'A turn 5',
-      'A turn 4',
+    expect(page2.turns.map((t) => t.content)).toEqual(['A turn 6', 'A turn 5', 'A turn 4']);
+  });
+});
+
+// Item 035 — repo_path scoping for Cursor (M1-1 sub-gap C).
+//
+// All resolver work is read-side: the cursor extractor already populates
+// `metadata.composer_id` on every emitted atom, so the test stores atoms
+// with the same shape and exercises the resolver via the `injections`
+// seam (mock resolver returns the picked composer_id without touching
+// any real Cursor storage). The integration test seeds two synthetic
+// workspaces — Project_echo (target) and a more-recently-active "other"
+// project — and asserts that the repo-scoped path returns the target
+// composer while the no-repo_path path resolves to the other (the broken
+// pre-035 behavior that motivates this item).
+describe('tailSession (handler-level) — item 035 repo_path scoping', () => {
+  const CURSOR_SOURCE = `fs:${homedir()}/Library/Application Support/Cursor/User/globalStorage/state.vscdb`;
+
+  it("source_app=cursor + repo_path: returns only the resolved composer's atoms; composer_resolved set on response", async () => {
+    const store = new MemoryStorage();
+    // composer A — 3 atoms, owned by Project_echo
+    for (let i = 0; i < 3; i++) {
+      await store.append({
+        source: CURSOR_SOURCE,
+        timestamp: `2026-05-10T10:00:0${i}.000Z`,
+        content: `A turn ${i}`,
+        metadata: { composer_id: 'COMP-A' },
+      });
+    }
+    // composer C — 2 atoms, owned by an unrelated project, more recent
+    for (let i = 0; i < 2; i++) {
+      await store.append({
+        source: CURSOR_SOURCE,
+        timestamp: `2026-05-10T12:00:0${i}.000Z`,
+        content: `C turn ${i}`,
+        metadata: { composer_id: 'COMP-C' },
+      });
+    }
+    const result = await tailSession(
+      store,
+      { source_app: 'cursor', repo_path: '/tmp/project-echo', count: 5 },
+      new Date(),
+      {
+        resolveCursorComposer: (rp) => {
+          expect(rp).toBe('/tmp/project-echo');
+          return { workspace_id: 'WS-PROJECT-ECHO', composer_id: 'COMP-A' };
+        },
+      },
+    );
+    expect(result.source_resolved).toBe(CURSOR_SOURCE);
+    expect(result.composer_resolved).toBe('COMP-A');
+    expect(result.turns.map((t) => t.content)).toEqual(['A turn 2', 'A turn 1', 'A turn 0']);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('counter-test (no repo_path): MRU resolution returns the wrong-project composer at position 0 — proves the gap exists without 035', async () => {
+    const store = new MemoryStorage();
+    for (let i = 0; i < 3; i++) {
+      await store.append({
+        source: CURSOR_SOURCE,
+        timestamp: `2026-05-10T10:00:0${i}.000Z`,
+        content: `A turn ${i}`,
+        metadata: { composer_id: 'COMP-A' },
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      await store.append({
+        source: CURSOR_SOURCE,
+        timestamp: `2026-05-10T12:00:0${i}.000Z`,
+        content: `C turn ${i}`,
+        metadata: { composer_id: 'COMP-C' },
+      });
+    }
+    const result = await tailSession(store, { source_app: 'cursor', count: 5 });
+    // Without 035, the same `.vscdb` source is resolved AND no composer
+    // filter is applied — so the freshest atom across all composers comes
+    // back first. The "wrong project" content appears at position 0.
+    expect(result.composer_resolved).toBeUndefined();
+    expect(result.turns[0]!.content).toBe('C turn 1');
+  });
+
+  it('resolver returns null → empty turns + advisory warning, no isError', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: CURSOR_SOURCE,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'A turn 0',
+      metadata: { composer_id: 'COMP-A' },
+    });
+    const result = await tailSession(
+      store,
+      { source_app: 'cursor', repo_path: '/tmp/no-such', count: 5 },
+      new Date(),
+      { resolveCursorComposer: () => null },
+    );
+    expect(result.turns).toEqual([]);
+    expect(result.source_resolved).toBeNull();
+    expect(result.warnings).toEqual([
+      'tail_session: no Cursor composer matches repo_path=/tmp/no-such; verify the project is open in Cursor and the workspace has at least one composer',
     ]);
+  });
+
+  it("non-cursor source_app + repo_path: warn-ignores repo_path (still returns the app's tail)", async () => {
+    const store = new MemoryStorage();
+    const HOME = homedir();
+    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
+    await store.append({
+      source: `${codexPrefix}rollout-Z.jsonl`,
+      timestamp: '2026-05-10T12:00:00.000Z',
+      content: 'codex turn',
+    });
+    const result = await tailSession(store, {
+      source_app: 'codex',
+      repo_path: '/tmp/anything',
+      count: 5,
+    });
+    expect(result.turns.map((t) => t.content)).toEqual(['codex turn']);
+    expect(result.warnings).toContain(
+      'tail_session: repo_path is currently honored only for source_app=cursor; ignored for codex',
+    );
+  });
+});
+
+describe('tailSession (handler-level) — item 035 parameter validation', () => {
+  it('repo_path without source_app rejects with the requires-source_app error', async () => {
+    const store = new MemoryStorage();
+    await expect(tailSession(store, { repo_path: '/tmp/anywhere' })).rejects.toThrow(
+      'tail_session: repo_path requires source_app=cursor',
+    );
+  });
+
+  it('repo_path combined with exact source rejects with the incompatible-with-exact-source error', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      tailSession(store, { source: 'fs:/some/path', repo_path: '/tmp/anywhere' }),
+    ).rejects.toThrow(/repo_path is incompatible with exact source/);
+  });
+
+  it('repo_path that is not absolute rejects with the absolute-path error', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      tailSession(store, { source_app: 'cursor', repo_path: 'relative/path' }),
+    ).rejects.toThrow('tail_session: repo_path must be absolute');
+  });
+});
+
+describe('tail_session (MCP wire) — item 035 repo_path validation surfaces as isError', () => {
+  let handle: McpServerHandle | undefined;
+  let stdoutCapture: ReturnType<typeof captureStdout>;
+  beforeEach(() => {
+    stdoutCapture = captureStdout();
+  });
+  afterEach(async () => {
+    if (handle !== undefined) {
+      await handle.stop();
+      handle = undefined;
+    }
+    stdoutCapture.restore();
+  });
+
+  it('repo_path with relative path: wire returns isError envelope, no structuredContent', async () => {
+    const storage = new MemoryStorage();
+    handle = await startMcpServer(storage, { port: 0 });
+    const res = await callTailSession(handle.url, {
+      source_app: 'cursor',
+      repo_path: 'relative/path',
+    });
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    expect(res.content?.[0]?.text).toMatch(/must be absolute/);
   });
 });
