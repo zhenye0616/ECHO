@@ -4,12 +4,22 @@ export interface FixtureBubble {
   composer_id: string;
   bubble_id: string;
   type: 1 | 2; // 1=user, 2=assistant — Cursor's wire encoding
-  text: string;
+  // Primary text. Set to '' or undefined to exercise the AC2 fallback chain
+  // in parseBubbleRow (the fixture marshals `text: ''` only when explicitly
+  // an empty string; `undefined` causes the field to be omitted entirely).
+  text?: string;
   // Optional context-bearing fields. When set, the fixture marshals them into
   // the same wire shape Cursor uses, so the parser can be tested end-to-end.
-  codeBlocks?: { path: string; languageId?: string }[];
+  // `codeBlocks` accepts either path-only entries (legacy referenced-files
+  // shape) or body-bearing entries (for the AC2 codeBlocks fallback test).
+  codeBlocks?: { path?: string; languageId?: string; content?: string; code?: string }[];
   attachedFileCodeChunksUris?: string[];
   deletedFiles?: string[];
+  // AC2 fallback shapes. When set, marshaled into the bubble's JSON value
+  // verbatim so parseBubbleRow's fallback parsers see realistic shapes.
+  toolFormerData?: Record<string, unknown>;
+  attachedHumanChanges?: Record<string, unknown>;
+  thinkingContent?: string | Record<string, unknown>;
 }
 
 export interface FixtureOptions {
@@ -34,13 +44,16 @@ function bubbleValue(b: FixtureBubble): string {
   const v: Record<string, unknown> = {
     _v: 3,
     type: b.type,
-    text: b.text,
     bubbleId: b.bubble_id,
   };
+  if (b.text !== undefined) v['text'] = b.text;
   if (b.codeBlocks !== undefined) {
     v['codeBlocks'] = b.codeBlocks.map((c) => {
-      const block: Record<string, unknown> = { uri: { path: c.path } };
+      const block: Record<string, unknown> = {};
+      if (c.path !== undefined) block['uri'] = { path: c.path };
       if (c.languageId !== undefined) block['languageId'] = c.languageId;
+      if (c.content !== undefined) block['content'] = c.content;
+      if (c.code !== undefined) block['code'] = c.code;
       return block;
     });
   }
@@ -50,6 +63,9 @@ function bubbleValue(b: FixtureBubble): string {
   if (b.deletedFiles !== undefined) {
     v['deletedFiles'] = b.deletedFiles.map((p) => ({ uri: { path: p } }));
   }
+  if (b.toolFormerData !== undefined) v['toolFormerData'] = b.toolFormerData;
+  if (b.attachedHumanChanges !== undefined) v['attachedHumanChanges'] = b.attachedHumanChanges;
+  if (b.thinkingContent !== undefined) v['thinkingContent'] = b.thinkingContent;
   return JSON.stringify(v);
 }
 
