@@ -5,10 +5,10 @@ status: ready
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-10
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-11T06:05:00Z"
+branch: "agent/tail-session-repo-scoping"
+worktree: "/Users/zhenye/Desktop/Project_echo--tail-session-repo-scoping"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
