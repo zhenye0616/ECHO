@@ -996,6 +996,11 @@ id="toc-pdt-strategist-033-m1-3-closure-live-dogfooding-get_atoms-elision-confir
 20:05 PDT — Strategist: 033 M1-3 closure live dogfooding
 (<code>get_atoms</code> elision-confirm → <code>get_atom</code> verbatim
 recovery, twice)</a></li>
+<li><a
+href="#pdt-strategist-dogfooding-during-spec-authoring-for-034-m1-1-cursor-capture-coverage"
+id="toc-pdt-strategist-dogfooding-during-spec-authoring-for-034-m1-1-cursor-capture-coverage">2026-05-10
+20:15 PDT — Strategist: dogfooding during spec authoring for 034 (M1-1
+Cursor capture coverage)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7496,6 +7501,73 @@ didn’t have an <code>mcp__echo__*</code> answer. Once
 finding edge cases that require JSONL fallback, item 031’s “≥1 week of
 dogfooding evidence” gate is met. This entry is data point 1 of 5+.</li>
 </ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-dogfooding-during-spec-authoring-for-034-m1-1-cursor-capture-coverage">2026-05-10
+20:15 PDT — Strategist: dogfooding during spec authoring for 034 (M1-1
+Cursor capture coverage)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — same post-restart session</li>
+<li><strong>Trigger:</strong> Founder said “start the specing and we can
+dogfooding during the specing process. lets close the cursor gap and
+leave the hardest till the end” — opening discovery for M1-1 spec, with
+ECHO used as the substrate for evidence gathering (not just code
+reads).</li>
+<li><strong>Query inputs (1 ECHO call):</strong>
+<ol type="1">
+<li><code>search_memories(query='cursor agentKv toolFormerData')</code>
+— initial probe for prior Cursor-capture-gap evidence atoms.</li>
+</ol></li>
+<li><strong>Returned:</strong> 0 matches.
+<code>total_returned: 0, limit_applied: 10, next_cursor: null</code>.
+The query string is too specific — no atom contains all three terms
+verbatim in the substring index.</li>
+<li><strong>Sources:</strong> N/A (zero matches; the daemon scanned
+every source but no atom matched).</li>
+<li><strong>Verdict:</strong> ❌ wrong — but in a way that VALIDATES the
+spec’s premise. The 4 prior journal entries flagging M1-1 escalation
+(14:50 / 15:00 / 16:08 PDT) all describe Cursor’s review-content as
+missing from the substring index. This call confirms the same gap from
+the opposite direction: even strategic-context atoms (the journal
+entries themselves) don’t surface when the query is too specific. Item
+034 AC2 fixes this at the source — captures that today don’t make it
+into the index will, post-034, be searchable.</li>
+<li><strong>Note (substring-search-as-discovery is a brittle pattern for
+M1 specing):</strong> The right primitive for “what do we already know
+about this friction?” is <strong>time-bounded <code>find_clusters</code>
+over recent strategist conversations + targeted file reads</strong>
+(which is what I fell back on). Substring search only fires when the
+query keywords appear verbatim in atom content; conceptual discovery
+(<code>"what did we say about Cursor capture gaps?"</code>) requires
+semantic ranking — exactly the M1-2 friction we’re saving for last.
+<strong>Dogfooding observation: M1-1 and M1-2 are coupled in this way —
+fixing capture-coverage (M1-1) increases the surface area where M1-2
+ranking matters, because more content becomes searchable but not
+necessarily findable.</strong> Worth flagging for the M1-2 strategist
+conversation when it lands.</li>
+<li><strong>Note (parameter-type strictness caught a
+bug-in-the-moment):</strong> First attempt passed
+<code>limit: '5'</code> (string) — server rejected with
+<code>"expected": "number", "code": "invalid_type"</code>. Zod schema
+validation working as designed. Retried with omitted <code>limit</code>
+(took default 10). Minor reminder that MCP parameter shapes are
+strict.</li>
+<li><strong>Conjecture (observation-only):</strong> The strategist’s
+actual discovery chain for this spec was: (a) <code>Bash grep</code>
+against <code>backlog/</code> + <code>wiki/</code> (substring on M1- /
+Magic patterns) — found taxonomy origin instantly; (b) <code>Read</code>
+on three key files (diagnosis-correction note, 029 spec, extractor
+source) — fast filesystem ops; (c) <strong>one</strong> ECHO call (this
+one) for “are there other atoms I’m missing?” — returned 0 matches but
+the negative result was informative. <strong>For specing workflows, ECHO
+is a secondary discovery surface; filesystem + <code>grep</code> remain
+primary because specs cite file paths + line numbers, not atom
+IDs.</strong> This is consistent with the V1 demo bar (which is about
+<em>AI clients</em> reaching for ECHO, not strategists writing specs).
+Don’t over-rotate the spec authoring workflow to ECHO; let it surface
+where it’s the obvious primitive.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window

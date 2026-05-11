@@ -1629,6 +1629,21 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 20:15 PDT — Strategist: dogfooding during spec authoring for 034 (M1-1 Cursor capture coverage)
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same post-restart session
+- **Trigger:** Founder said "start the specing and we can dogfooding during the specing process. lets close the cursor gap and leave the hardest till the end" — opening discovery for M1-1 spec, with ECHO used as the substrate for evidence gathering (not just code reads).
+- **Query inputs (1 ECHO call):**
+  1. `search_memories(query='cursor agentKv toolFormerData')` — initial probe for prior Cursor-capture-gap evidence atoms.
+- **Returned:** 0 matches. `total_returned: 0, limit_applied: 10, next_cursor: null`. The query string is too specific — no atom contains all three terms verbatim in the substring index.
+- **Sources:** N/A (zero matches; the daemon scanned every source but no atom matched).
+- **Verdict:** ❌ wrong — but in a way that VALIDATES the spec's premise. The 4 prior journal entries flagging M1-1 escalation (14:50 / 15:00 / 16:08 PDT) all describe Cursor's review-content as missing from the substring index. This call confirms the same gap from the opposite direction: even strategic-context atoms (the journal entries themselves) don't surface when the query is too specific. Item 034 AC2 fixes this at the source — captures that today don't make it into the index will, post-034, be searchable.
+- **Note (substring-search-as-discovery is a brittle pattern for M1 specing):** The right primitive for "what do we already know about this friction?" is **time-bounded `find_clusters` over recent strategist conversations + targeted file reads** (which is what I fell back on). Substring search only fires when the query keywords appear verbatim in atom content; conceptual discovery (`"what did we say about Cursor capture gaps?"`) requires semantic ranking — exactly the M1-2 friction we're saving for last. **Dogfooding observation: M1-1 and M1-2 are coupled in this way — fixing capture-coverage (M1-1) increases the surface area where M1-2 ranking matters, because more content becomes searchable but not necessarily findable.** Worth flagging for the M1-2 strategist conversation when it lands.
+- **Note (parameter-type strictness caught a bug-in-the-moment):** First attempt passed `limit: '5'` (string) — server rejected with `"expected": "number", "code": "invalid_type"`. Zod schema validation working as designed. Retried with omitted `limit` (took default 10). Minor reminder that MCP parameter shapes are strict.
+- **Conjecture (observation-only):** The strategist's actual discovery chain for this spec was: (a) `Bash grep` against `backlog/` + `wiki/` (substring on M1- / Magic patterns) — found taxonomy origin instantly; (b) `Read` on three key files (diagnosis-correction note, 029 spec, extractor source) — fast filesystem ops; (c) **one** ECHO call (this one) for "are there other atoms I'm missing?" — returned 0 matches but the negative result was informative. **For specing workflows, ECHO is a secondary discovery surface; filesystem + `grep` remain primary because specs cite file paths + line numbers, not atom IDs.** This is consistent with the V1 demo bar (which is about *AI clients* reaching for ECHO, not strategists writing specs). Don't over-rotate the spec authoring workflow to ECHO; let it surface where it's the obvious primitive.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*
