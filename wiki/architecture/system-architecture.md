@@ -83,9 +83,9 @@ LAYER 2 ─ ECHO DAEMON (one local Node process; binds to 127.0.0.1 only)
    │   ┌──────────────────┐                                              │
    │   │  MCP server      │   tools: echo_ping, search_memories,         │
    │   │  HTTP @ loopback │     tail_session, find_clusters, get_atoms,  │
-   │   │  :38478          │     wait_for_new_turns, get_recent_work_     │
-   │   │                  │     context (deprecated); listens on         │
-   │   │                  │   127.0.0.1:38478 only                       │
+   │   │  :38478          │     get_atom, wait_for_new_turns,            │
+   │   │                  │     get_recent_work_context (deprecated);    │
+   │   │                  │   listens on 127.0.0.1:38478 only            │
    │   └────────┬─────────┘                                              │
    │            │                                                        │
    └────────────┼────────────────────────────────────────────────────────┘
@@ -142,9 +142,9 @@ A pure, in-process module that turns normalized atoms into *clusters* — connec
 
 ### 8. MCP server
 
-The single retrieval interface. HTTP/SSE on `127.0.0.1:38478` (loopback only — not reachable from network). Exposes tools registered with the `@modelcontextprotocol/sdk`. As of V1.6 (item 030, shipped 2026-05-10), seven tools: `echo_ping` (connectivity check), [[mcp-search-memories|`search_memories`]] (raw event search), [[mcp-tail-session|`tail_session`]] (cheap exact-fetch by source), [[mcp-find-clusters|`find_clusters`]] + [[mcp-get-atoms|`get_atoms`]] (the V1.6 atomic decomposition — discovery skeleton + targeted body-fetch), [[mcp-wait-for-new-turns|`wait_for_new_turns`]] (stateless long-poll for [[group-session|group sessions]]), and [[mcp-recent-work-context|`get_recent_work_context`]] (deprecated V1.5 compound — replaced by `find_clusters` + `get_atoms`; removal pending item 031). Any MCP-speaking client (Cursor, Claude Code, Codex CLI, Claude Desktop, Cline, Continue, custom scripts via curl) can call these. See [[mcp-server]].
+The single retrieval interface. HTTP/SSE on `127.0.0.1:38478` (loopback only — not reachable from network). Exposes tools registered with the `@modelcontextprotocol/sdk`. As of V1.6.1 (item 033, shipped 2026-05-10), **eight tools**: `echo_ping` (connectivity check), [[mcp-search-memories|`search_memories`]] (raw event search), [[mcp-tail-session|`tail_session`]] (cheap exact-fetch by source), [[mcp-find-clusters|`find_clusters`]] + [[mcp-get-atoms|`get_atoms`]] (V1.6 atomic decomposition — discovery skeleton + targeted body-fetch), [[mcp-get-atom|`get_atom`]] (V1.6.1 verbatim escape hatch — content-verbatim recovery for `truncations: ["content"]` responses), [[mcp-wait-for-new-turns|`wait_for_new_turns`]] (stateless long-poll for [[group-session|group sessions]]), and [[mcp-recent-work-context|`get_recent_work_context`]] (deprecated V1.5 compound — replaced by `find_clusters` + `get_atoms`; removal pending item 031). Any MCP-speaking client (Cursor, Claude Code, Codex CLI, Claude Desktop, Cline, Continue, custom scripts via curl) can call these. See [[mcp-server]].
 
-The V1.5 → V1.6 toolkit shift is the architectural pivot from **compound** retrieval (one tool, clusters + bodies bundled) to **atomic** retrieval (separate discovery and body-fetch primitives). Atomic decomposition lets consumers pay only for the bodies they hydrate, makes envelope-overflow handling per-tool, and unblocks the [[group-session]] pattern that requires stateless cross-tool coordination over the shared substrate. Item 032's first-call reliability gate (auto-expand triggers + strict-partition demotion) made resume-after-gap a **structural** guarantee on the new toolkit — `clusters[0]` is prior multi-source work, not calling-session noise.
+The V1.5 → V1.6 toolkit shift is the architectural pivot from **compound** retrieval (one tool, clusters + bodies bundled) to **atomic** retrieval (separate discovery, body-fetch, and verbatim-recovery primitives). Atomic decomposition lets consumers pay only for the bodies they hydrate, makes envelope-overflow handling per-tool, and unblocks the [[group-session]] pattern that requires stateless cross-tool coordination over the shared substrate. Item 032's first-call reliability gate (auto-expand triggers + strict-partition demotion) made resume-after-gap a **structural** guarantee on the new toolkit — `clusters[0]` is prior multi-source work, not calling-session noise. Item 033's `get_atom` closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — the `truncations: string[]` trust signal added in 030 is now actionable through MCP alone, no shell or JSONL fallback required.
 
 ## The Data Shape
 

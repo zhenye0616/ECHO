@@ -1573,6 +1573,21 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 
 ---
 
+### 2026-05-10 19:48 PDT — Codex: MCP smoke check after daemon recovery
+
+- **Source agent:** Codex
+- **Trigger:** Founder said "check again" then clarified "echo mcp"; Codex checked whether the local ECHO MCP server was reachable and serving the expected V1.6 tool surface.
+- **Query inputs:**
+  1. `./tools/mcp-integration-smoke.sh` against `http://127.0.0.1:38478/mcp`: `initialize`, `tools/list`, `search_memories(limit=3)`, `get_recent_work_context({})`, `get_recent_work_context(since=now-24h, until=now)`, `search_memories(source_prefix='git:', since=now-24h, until=now, limit=50)`, stale-session `echo_ping(message='after-restart')`.
+  2. Follow-up curl probes for journaling detail: `echo_ping(message='codex-detail-probe')`, `search_memories(limit=3)`, `get_recent_work_context({})`, `get_recent_work_context(since='2026-05-10T02:48:08Z', until='2026-05-11T02:48:08Z')`, `search_memories(source_prefix='git:', since='2026-05-10T02:48:08Z', until='2026-05-11T02:48:08Z', limit=50)`.
+  3. One Node `fetch` probe attempted the same detail read but failed before reaching ECHO: `connect EPERM 127.0.0.1:38478` from the Codex sandbox.
+- **Returned:** Smoke passed end-to-end: `tools/list` showed 7 tools (`echo_ping`, `search_memories`, `get_recent_work_context`, `tail_session`, `find_clusters`, `get_atoms`, `wait_for_new_turns`) with `outputSchema` + `readOnlyHint`; `source_app` enum present; stale-session `echo_ping` recovered. Detail probes: `search_memories(limit=3)` returned 3 matches; default `get_recent_work_context` returned 1 cluster / 20 atoms with top label "work on Project_echo" and rank reasons `["recent_activity","has_open_loop","dense"]`; 24h context returned 1 cluster / 20 atoms, `window_hours=24`, widest cluster span 21.1h, top label "discussion about Project_echo"; git scan returned 45 matches and all timestamps ended in `Z`.
+- **Read sources:** `tools/list` and `echo_ping` do not query storage. `search_memories(limit=3)` returned source counts `{git: 2, claude_code: 1}` from `git:/Users/zhenye/Desktop/Project_echo` and Claude Code JSONL under `~/.claude/projects/-Users-zhenye-Desktop-Project-echo/`. Default context truncation source breakdown was `{git: 18, claude_code: 18, codex: 5}`; top cluster breakdown was `{git: 18, claude_code: 16}`. 24h top cluster source breakdown was `{git: 45, claude_code: 76}`. Git scan read 45 `git:` matches from `git:/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** ✅ right — MCP is reachable on port 38478, the expected seven-tool V1.6 surface is present, stateless stale-session recovery works, and live storage probes returned cross-source data.
+- **Note:** The immediately preceding daemon-recovery entry is now verified by the project smoke script rather than only `echo_ping`. The only operational wrinkle was Codex sandbox blocking Node's direct localhost `fetch`; `curl` could reach the same endpoint and produced the detail needed for this entry.
+
+---
+
 ## End-Of-Window Synthesis (filled at end of window)
 
 *To be written by the founder + strategist together at end of window. Sections to cover:*

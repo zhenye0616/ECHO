@@ -982,6 +982,9 @@ href="#pdt-strategist-echo-daemon-down-econnrefused-launchctl-kickstart-echo_pin
 id="toc-pdt-strategist-echo-daemon-down-econnrefused-launchctl-kickstart-echo_ping-verify">2026-05-10
 19:45 PDT — Strategist: ECHO daemon down (ECONNREFUSED) → launchctl
 kickstart → echo_ping verify</a></li>
+<li><a href="#pdt-codex-mcp-smoke-check-after-daemon-recovery"
+id="toc-pdt-codex-mcp-smoke-check-after-daemon-recovery">2026-05-10
+19:48 PDT — Codex: MCP smoke check after daemon recovery</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7189,6 +7192,71 @@ Worth flagging that the post-merge ECHO daemon-restart step in
 <code>/merge-and-cleanup</code> (C9b per 030’s merge commit message)
 should be VERIFIED, not just attempted.</li>
 </ol></li>
+</ul>
+<hr />
+<h3 id="pdt-codex-mcp-smoke-check-after-daemon-recovery">2026-05-10
+19:48 PDT — Codex: MCP smoke check after daemon recovery</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Founder said “check again” then clarified
+“echo mcp”; Codex checked whether the local ECHO MCP server was
+reachable and serving the expected V1.6 tool surface.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>./tools/mcp-integration-smoke.sh</code> against
+<code>http://127.0.0.1:38478/mcp</code>: <code>initialize</code>,
+<code>tools/list</code>, <code>search_memories(limit=3)</code>,
+<code>get_recent_work_context({})</code>,
+<code>get_recent_work_context(since=now-24h, until=now)</code>,
+<code>search_memories(source_prefix='git:', since=now-24h, until=now, limit=50)</code>,
+stale-session <code>echo_ping(message='after-restart')</code>.</li>
+<li>Follow-up curl probes for journaling detail:
+<code>echo_ping(message='codex-detail-probe')</code>,
+<code>search_memories(limit=3)</code>,
+<code>get_recent_work_context({})</code>,
+<code>get_recent_work_context(since='2026-05-10T02:48:08Z', until='2026-05-11T02:48:08Z')</code>,
+<code>search_memories(source_prefix='git:', since='2026-05-10T02:48:08Z', until='2026-05-11T02:48:08Z', limit=50)</code>.</li>
+<li>One Node <code>fetch</code> probe attempted the same detail read but
+failed before reaching ECHO: <code>connect EPERM 127.0.0.1:38478</code>
+from the Codex sandbox.</li>
+</ol></li>
+<li><strong>Returned:</strong> Smoke passed end-to-end:
+<code>tools/list</code> showed 7 tools (<code>echo_ping</code>,
+<code>search_memories</code>, <code>get_recent_work_context</code>,
+<code>tail_session</code>, <code>find_clusters</code>,
+<code>get_atoms</code>, <code>wait_for_new_turns</code>) with
+<code>outputSchema</code> + <code>readOnlyHint</code>;
+<code>source_app</code> enum present; stale-session
+<code>echo_ping</code> recovered. Detail probes:
+<code>search_memories(limit=3)</code> returned 3 matches; default
+<code>get_recent_work_context</code> returned 1 cluster / 20 atoms with
+top label “work on Project_echo” and rank reasons
+<code>["recent_activity","has_open_loop","dense"]</code>; 24h context
+returned 1 cluster / 20 atoms, <code>window_hours=24</code>, widest
+cluster span 21.1h, top label “discussion about Project_echo”; git scan
+returned 45 matches and all timestamps ended in <code>Z</code>.</li>
+<li><strong>Read sources:</strong> <code>tools/list</code> and
+<code>echo_ping</code> do not query storage.
+<code>search_memories(limit=3)</code> returned source counts
+<code>{git: 2, claude_code: 1}</code> from
+<code>git:/Users/zhenye/Desktop/Project_echo</code> and Claude Code
+JSONL under
+<code>~/.claude/projects/-Users-zhenye-Desktop-Project-echo/</code>.
+Default context truncation source breakdown was
+<code>{git: 18, claude_code: 18, codex: 5}</code>; top cluster breakdown
+was <code>{git: 18, claude_code: 16}</code>. 24h top cluster source
+breakdown was <code>{git: 45, claude_code: 76}</code>. Git scan read 45
+<code>git:</code> matches from
+<code>git:/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — MCP is reachable on port 38478,
+the expected seven-tool V1.6 surface is present, stateless stale-session
+recovery works, and live storage probes returned cross-source data.</li>
+<li><strong>Note:</strong> The immediately preceding daemon-recovery
+entry is now verified by the project smoke script rather than only
+<code>echo_ping</code>. The only operational wrinkle was Codex sandbox
+blocking Node’s direct localhost <code>fetch</code>; <code>curl</code>
+could reach the same endpoint and produced the detail needed for this
+entry.</li>
 </ul>
 <hr />
 <h2 id="end-of-window-synthesis-filled-at-end-of-window">End-Of-Window

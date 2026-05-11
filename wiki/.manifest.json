@@ -2,9 +2,9 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "v1.6-shipped",
+    "version": "v1.6.1-shipped",
     "generated": "2026-05-10",
-    "notes": "V1.6 atomic MCP toolkit (items 030 + 032) promoted to wiki on 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination pattern). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') makes resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles. get_recent_work_context deprecated; item 033 (get_atom verbatim escape hatch) in flight. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
+    "notes": "V1.6.1 closes the V1.6 atomic MCP toolkit with item 033 (mcp-get-atom — verbatim escape hatch + Magic Moment M1-3 closure end-to-end in-MCP). Eight-tool toolkit shipped: search_memories + tail_session + find_clusters + get_atoms + get_atom + wait_for_new_turns + echo_ping (plus deprecated get_recent_work_context pending item 031 removal). 030+032 promoted earlier 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') made resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles; updated with 033's R1 divergent-verdict + R2 Gate 4 self-failure + recovery-primitive cost reduction. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
   },
   "principles/compose-not-capture.md": {
     "status": "shipped",
@@ -354,6 +354,21 @@
       "MCP get_atoms tool",
       "Get Atoms",
       "Targeted body fetch"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-get-atom.md": {
+    "status": "shipped",
+    "title": "MCP get_atom Tool",
+    "link": "mcp-get-atom",
+    "summary": "V1.6.1 MCP verbatim escape hatch (singular — counterpart to get_atoms plural). Returns one atom with content verbatim (no match_content clip) + metadata projected via reused projectMatch (per-key cap + tool_calls reshape) + embedding excluded. Three exit shapes: success / atom_too_large_for_wire (with source populated for JSONL fallback) / atom_not_found (distinct error). Closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context required. R2 truncations-correctness fix: 'content' filtered from returned truncations after verbatim override.",
+    "aliases": [
+      "get_atom",
+      "MCP get_atom tool",
+      "Get Atom",
+      "Verbatim escape hatch",
+      "Full-atom recovery"
     ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"

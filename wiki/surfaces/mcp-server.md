@@ -41,7 +41,7 @@ Three reasons:
 
 ## Tools Currently Registered
 
-Seven tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (`find_clusters` + `get_atoms`) plus the `wait_for_new_turns` group-session primitive; `get_recent_work_context` remains advertised for one dogfooding cycle before removal (item 031):
+Eight tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (`find_clusters` + `get_atoms` + `get_atom`) plus the `wait_for_new_turns` group-session primitive; `get_recent_work_context` remains advertised for one dogfooding cycle before removal (item 031):
 
 | Tool | Purpose | Cost class |
 |---|---|---|
@@ -49,11 +49,12 @@ Seven tools are registered per request (stateless transport — no session ties)
 | [[mcp-tail-session\|`tail_session`]] | V1.5.4 cheap exact-fetch — N most-recent atoms from a single named `source` (or auto-resolved by `source_app`) | cheap |
 | [[mcp-find-clusters\|`find_clusters`]] | V1.6 discovery primitive — coherent work clusters as skeletons (`atom_ids[]`, source breakdown, ranks). Auto-expand triggers + strict-partition demotion shipped with item 032. | cheap |
 | [[mcp-get-atoms\|`get_atoms`]] | V1.6 targeted body-fetch — atom bodies by ID list (≤50); deterministic prefix-drop on envelope overflow; `prefer='newest_first'` for resume calls (item 032) | medium |
+| [[mcp-get-atom\|`get_atom`]] | V1.6.1 verbatim escape hatch (singular) — content verbatim + metadata projected + embedding excluded; recovery primitive for `truncations: ["content"]` responses (item 033) | high |
 | [[mcp-wait-for-new-turns\|`wait_for_new_turns`]] | V1.6 group-session subscription — stateless long-poll on watched sources (max 120s timeout). Implements Goal A of the [[group-session]] pattern. | blocks |
 | [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 compound clustered context. **DEPRECATED** by item 030; removal scheduled in item 031 after ≥1 week of dogfooding confirms the new toolkit covers all resume patterns. | medium |
 | `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` | trivial |
 
-**The V1.6 atomic toolkit (`find_clusters` + `get_atoms` + `wait_for_new_turns`)** replaces the compound `get_recent_work_context` with a discovery → body-fetch → subscription chain. Consumers pay only for the bodies they hydrate; the discovery primitive stays under 10 kB even on full-day windows; resume calls after a multi-hour gap now reliably surface prior work as `clusters[0]` (item 032's first-call reliability gate). The `truncations: string[]` trust signal (item 030) appears on every atom-bearing response — `[]` means verbatim; `["content"]` means the wire-shape cap fired and recovery via `get_atom(id)` (item 033, in flight today) is warranted. `tail_session` remains the cheap "last N turns from this source" primitive — orthogonal to the cluster-based chain.
+**The V1.6 atomic toolkit (`find_clusters` + `get_atoms` + `get_atom` + `wait_for_new_turns`)** replaces the compound `get_recent_work_context` with a discovery → body-fetch → verbatim-recovery → subscription chain. Consumers pay only for the bodies they hydrate; the discovery primitive stays under 10 kB even on full-day windows; resume calls after a multi-hour gap reliably surface prior work as `clusters[0]` (item 032's first-call reliability gate). The `truncations: string[]` trust signal (item 030) appears on every atom-bearing response — `[]` means verbatim; `["content"]` means the wire-shape cap fired and recovery via [[mcp-get-atom|`get_atom(id)`]] (item 033, shipped 2026-05-10) is warranted. `get_atom` closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context. `tail_session` remains the cheap "last N turns from this source" primitive — orthogonal to the cluster-based chain.
 
 `echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search).
 
@@ -139,6 +140,7 @@ If MCP adoption stalls (low probability but non-zero), the desktop-AI ingestion 
 - [[mcp-tail-session]] — the V1.5.4 cheap exact-fetch tool
 - [[mcp-find-clusters]] — the V1.6 discovery primitive
 - [[mcp-get-atoms]] — the V1.6 targeted body-fetch primitive
+- [[mcp-get-atom]] — the V1.6.1 verbatim escape hatch (singular)
 - [[mcp-wait-for-new-turns]] — the V1.6 group-session subscription primitive
 - [[mcp-recent-work-context]] — the V1.5 clustered-context tool (deprecated by V1.6 atomic toolkit)
 - [[group-session]] — the synchronized human-driven group pattern (Goal A)

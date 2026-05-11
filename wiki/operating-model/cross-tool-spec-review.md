@@ -67,6 +67,8 @@ After ~10 cycles across items 030 and 032, findings fall into these classes:
 
 Class A and Class F are tool-leaning. Classes B, C, E are convergent. Class D is the highest-stakes — load-bearing semantic gaps that a single-reviewer pass usually rationalizes.
 
+**Recovery primitive for elided reviewer responses (V1.6.1, item 033):** Cross-tool review on dense multi-finding turns (Codex `xhigh` reasoning regularly produces these) routinely fires the `truncations: ["content"]` trust signal on `tail_session` / `search_memories` / `get_atoms` responses — the strategist would historically read the source JSONL via `jq` / SQLite to recover the full pushback list. [[mcp-get-atom|`get_atom(id)`]] now returns the verbatim atom content through MCP in one call, no shell or composer-id required. Use it whenever a reviewer's response comes back elided. This closes Magic Moment M1-3 end-to-end — the cross-tool review pattern is no longer structurally dependent on JSONL/SQLite shell access for elision recovery.
+
 ## The strategist self-review checklist
 
 Two consecutive patch cycles in May 2026 (R1→R2, R2→R3 on item 032) introduced regressions that the next review caught. The patches fell into two classes:
@@ -113,8 +115,10 @@ Documented cycles in `raw/internal/dogfooding/mcp-interactions-journal.md`:
 - **Item 032 R1 spec review** (2026-05-10 15:00 PDT, Cursor + Codex): 9 findings — 3 convergent, 3 Codex-only (including the Class D demo-bar ranking gap), 3 Cursor-only (including the Class F `FIND_CLUSTERS_DESCRIPTION` drift).
 - **Item 032 R2** (15:32 PDT, Cursor + Codex): caught two regressions the R1 patch introduced (Class B hallucinated names; AC-vs-existing-behavior contradiction). One Class D strengthening on the demotion rule.
 - **Item 032 R3** (15:39 PDT, Cursor + Codex): caught two cross-reference drifts the R2 patch introduced (Class C). Both reviewers converged on "Proceed."
+- **Item 033 R1 spec review** (2026-05-10 16:00 PDT, Cursor + Codex): 4 findings, **first divergent-verdict cycle** of the day. Cursor: "Proceed (two small nits)." Codex: "Pushback. I would not send 033 to a builder yet." Strategist sided with Codex's harsher reading after validating the contested metadata-size claim against journal line 737 (Codex `metadata.tool_calls` documented at 120-130KB per atom — falsifying the v1 contract's "verbatim metadata" promise). One Class D contract-vs-reality finding the 4-gate checklist could not have caught; 0 Class B/C findings (the checklist worked for those classes).
+- **Item 033 R2** (16:05 PDT, Codex only — Cursor R2 did not occur): "Pushback, but narrow" — 4 Class B dependent-section drifts from R1's contract revision (Goal §49, AC2 §129, Out-of-Scope §172-173, spec_refs §19) plus 1 HIGH truncations-correctness bug in Implementation Notes. The strategist's `Gate 4 ✅` claim from the pre-R1 self-review was honest at the time but **not re-run after the R1 patch** — this exposed the gap that Gate 4 as written doesn't mandate re-running after contract-revision patches. Proposed strengthening: mandatory re-grep for the OLD contract's load-bearing terms after every contract-revision patch, with the grep recorded in the commit message. Self-caught two additional `deliberately bypasses` drifts during claimability check (the regex was incomplete), reinforcing the proposal. **All 5 R2 findings + 2 self-caught extras fixed in `43138e4` + `c5b2e2d`.**
 
-Pattern note: by the end of the day, **the cross-tool review pattern was being applied per-patch, not per-item.** Each R+1 cycle caught regressions the previous patch round introduced. The cost was ~20 min per cycle; the value was 3-9 findings each.
+Pattern note: by the end of the day, **the cross-tool review pattern was being applied per-patch, not per-item.** Each R+1 cycle caught regressions the previous patch round introduced. The cost was ~20 min per cycle; the value was 3-9 findings each. **Class distribution shifts predictably across rounds:** R1 surfaces Class D (contract-vs-reality) and Class F (description drift); R2 surfaces Class B (dependent-section drift from R1's patch); R3 surfaces Class C (AC-vs-Implementation contradictions from R2's patch). No reviewer caught the same class twice in a row across the eight cycles documented above — the differentiated value per reviewer per cycle is robustly accumulating, not random.
 
 ## Cost / value
 
@@ -130,6 +134,8 @@ Compared alternatives:
 - **Discover-in-post-merge-dogfooding:** ~50x the cost. Bug ships, eventually surfaces in a real call, requires unwind or backwards-compatible patching.
 
 The pattern's value scales positively with patch-cycle depth. Each cycle catches the previous cycle's introduced bugs.
+
+**Cost reduction from V1.6.1 recovery primitive:** Pre-033, dense Codex pushback turns routinely fired `truncations: ["content"]`; the strategist would shell out to `jq` against the JSONL or SQLite-probe Cursor's `state.vscdb` to recover the elided middle. Per-cycle overhead: ~3 minutes per elided turn, ~1-3 turns per cycle. Post-033, [[mcp-get-atom|`get_atom(<elided_atom_id>)`]] returns the verbatim content in one MCP call — net cost reduction ≈ 5-9 minutes per cycle on dense-finding rounds. The recovery primitive doesn't change the review cadence, just removes the per-elision friction tax.
 
 ## Related
 
