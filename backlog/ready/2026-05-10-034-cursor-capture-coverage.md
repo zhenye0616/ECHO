@@ -45,6 +45,7 @@ Evidence base (in date order):
 - Journal 2026-05-10 14:50 PDT: M1-1 escalation #1 — `search_memories` 0 hits on cursor 032 review (Gap B effect).
 - Journal 2026-05-10 15:00 PDT: M1-1 escalation #2 — cursor extractor's `.text` reads return empty for review composer's most-recent bubbles (Gap B narrowed).
 - Journal 2026-05-10 16:08 PDT: M1-1 reconfirmed — `tail_session(source_app='cursor')` resolved to unrelated MRU project. That third sub-gap (resolver layer, not capture) is **separately scoped to item 035 candidate** and explicitly out-of-scope here (see "Out of Scope" below).
+- **Journal 2026-05-10 22:01 / 22:11 / 22:25 PDT (R1 round dogfooding loop, closed empirically in real time):** Cursor's full 5009-char R1 review of THIS spec never made it into ECHO's substring index — the very gap 034 fixes prevented the strategist from seeing the review via ECHO. Recovery required the SQLite-probe chain (grep `workspace.json` → `composerData WHERE lastUpdatedAt > cutoff` → bubble probe). The dogfooding closed the loop on the spec's own review cycle; the load-bearing observation is that M1-1 is firing live on cross-tool review itself, not just on past incidents.
 
 # Goal
 
@@ -59,10 +60,10 @@ Close the capture-layer coverage gaps so a cross-tool spec review producing Curs
 **Entry path contract (NEW, additive — does not modify `scheduleGlobalChange`):**
 
 Add a new function (suggested name `triggerRepollExtraction()` — implementer may rename) that:
-1. Reads current `state.vscdb` mtime (via `safeMtimeMs`).
-2. Short-circuits if mtime has not advanced beyond `lastSeenScanMtime` (closure-local checkpoint, initialized by reading the mtime once at extractor start so the first poll tick is not a spurious scan).
-3. Calls `schedule(() => handleGlobalChange())` **DIRECTLY** — bypassing `scheduleGlobalChange()`'s `debounceTimer` guard. This is intentional: the debounce guard is correct for coalescing fast chokidar bursts (and stays unchanged), but the periodic poll is a separate trigger source whose ticks must NOT be silently dropped by a pending chokidar debounce.
-4. Updates `lastSeenScanMtime` to the read mtime AFTER the `schedule()` call returns (not after the extraction completes — the `processing` chain guarantees serialization even if multiple ticks land before the prior scan finishes).
+1. Reads the **max mtime across the global DB family** — i.e., `MAX(safeMtimeMs(state.vscdb), safeMtimeMs(state.vscdb-wal), safeMtimeMs(state.vscdb-shm))`. **Load-bearing per R2 Finding 1 from Codex:** SQLite WAL mode can advance the `-wal` file's mtime while the main `state.vscdb` file's mtime stays stale until the next WAL checkpoint (which may be minutes away under sustained writes). Reading only the main DB's mtime would make the poll miss the exact writes it's meant to recover. The three files are already grouped as one family elsewhere in the extractor (`isGlobalDbFamily` predicate) — reuse the same set here. A small helper `async function maxGlobalDbFamilyMtime(globalDbPath: string): Promise<number>` next to `safeMtimeMs` keeps the call sites tidy.
+2. Short-circuits if the family-max mtime has not advanced beyond `lastSeenScanMtime` (closure-local checkpoint, initialized by reading the family-max mtime once at extractor start so the first poll tick is not a spurious scan).
+3. Calls `schedule(() => handleGlobalChange('repoll'))` **DIRECTLY** — bypassing `scheduleGlobalChange()`'s `debounceTimer` guard. This is intentional: the debounce guard is correct for coalescing fast chokidar bursts (and stays unchanged), but the periodic poll is a separate trigger source whose ticks must NOT be silently dropped by a pending chokidar debounce.
+4. Updates `lastSeenScanMtime` to the read family-max mtime AFTER the `schedule()` call returns (not after the extraction completes — the `processing` chain guarantees serialization even if multiple ticks land before the prior scan finishes).
 
 **Loop machinery:**
 
@@ -114,13 +115,38 @@ The streaming-continuation comment in `extractCursorTurns` (the block immediatel
 
 ### AC3 — Test coverage
 
-Three test families. **All AC3 tests live OUTSIDE the existing `describe.skip('startCursorExtractor (lifecycle + integration)', ...)` quarantined block in `tests/capture/extractors/cursor.test.ts`** — that block is the chokidar/FSEvents-lifecycle quarantine from item 2026-05-08-023, and adding tests inside it would inherit the flake. AC3 tests target **pure functions and the new `triggerRepollExtraction` entry path**, NOT the chokidar watcher.
+Three test families. **All AC3 tests live OUTSIDE the existing `describe.skip('startCursorExtractor (lifecycle + integration)', ...)` quarantined block in `tests/capture/extractors/cursor.test.ts`** — that block is the chokidar/FSEvents-lifecycle quarantine from item 2026-05-08-023, and adding tests inside it would inherit the flake. AC3 tests target **pure functions and the new `triggerRepollExtraction` entry path via `__testHooks`** (see test-seam contract below), NOT the chokidar watcher.
 
-- **AC1 — Periodic re-poll:** unit test against `triggerRepollExtraction` directly (NOT against `setInterval` or chokidar — both are out-of-scope for this test). Use `vi.useFakeTimers()`. Fixture: an in-memory SQLite fixture seeded with one user→assistant pair. Test 1: invoke `triggerRepollExtraction` once, advance the `processing` chain, assert one atom appended. Test 2: invoke `triggerRepollExtraction` twice in a row with no mtime change between calls — assert ONE extraction ran (second short-circuited on mtime-guard), one atom appended. Test 3: invoke once, write a new bubble pair to SQLite (mtime advances), invoke again — assert TWO extractions ran, two atoms appended. **Do not call `scheduleGlobalChange()` in these tests** — the repoll entry path is separate from the chokidar debounce by contract (R1 Finding 1 from Cursor).
+**Test-seam contract (R2 Finding 4 from Codex + R2 Medium #2 from Cursor — both reviewers caught this):** `triggerRepollExtraction` lives inside `startCursorExtractor` as a closure-local function and is NOT exported. To make AC3 tests reachable, `CursorExtractorHandle` gains an **optional `__testHooks` field**, populated only when a new `exposeTestHooks?: true` option is set in `CursorExtractorOptions` (production callers do not set this; the field stays `undefined`). The `__testHooks` shape:
+
+```ts
+interface CursorExtractorTestHooks {
+  /** Invoke the repoll entry path once. Resolves after the scheduled extraction completes. */
+  triggerRepoll(): Promise<void>;
+  /** Read the current checkpoint (for assertions). */
+  getLastSeenScanMtime(): number;
+  /** Override the checkpoint. Tests use this to bypass auto-init so the FIRST repoll tick can fire. */
+  setLastSeenScanMtime(value: number): void;
+}
+```
+
+The double-underscore prefix marks the field as test-only. The handle's production surface (`stop`) is unchanged. This replaces the R1 `__disableRepollExtraction` flag entirely (tests just don't call `triggerRepoll`), but **`__disableToolCallFallbacks?: boolean` stays** as an option flag because the AC2 parsers are closure-local pure functions and there's no other clean way to hook them off for the revert test.
+
+**Test plan:**
+
+- **AC1 — Periodic re-poll:** unit test against `handle.__testHooks!.triggerRepoll()` directly. Use `vi.useFakeTimers()`. Fixture: an in-memory SQLite fixture, seeded **before** the extractor starts. **Ordering for "first tick captures new bubbles" (R2 Finding 3 from Codex):** because `lastSeenScanMtime` auto-initializes at extractor start to the current family-max mtime, a naive "seed → start → trigger → expect atom" test would short-circuit on the mtime guard. The fix: tests call `handle.__testHooks!.setLastSeenScanMtime(0)` immediately after `startCursorExtractor` returns, **then** invoke `triggerRepoll` — that path correctly detects the fixture's mtime as "advanced beyond 0" and runs the scan. Test cases:
+  - **Test 1 (first tick after checkpoint-reset):** seed 1 pair, start extractor, set checkpoint to 0, trigger repoll, assert 1 atom appended.
+  - **Test 2 (no mtime change between ticks):** trigger again immediately, assert short-circuit (no new atom).
+  - **Test 3 (mtime advances between ticks):** write a new pair (mtime advances), trigger again, assert 2 total atoms.
+  - **Test 4 (WAL mtime only — R2 Finding 1 from Codex):** seed initial state. Touch the `.vscdb-wal` file's mtime (e.g., `utimes('state.vscdb-wal', now, now)`) WITHOUT touching `state.vscdb`. Trigger repoll. Assert the family-max-mtime guard detects the advance and runs the scan even though `state.vscdb` mtime is unchanged. Counter-test: touch only `state.vscdb` with an OLDER timestamp, assert short-circuit (mtime did not advance).
+  - **Do not call `scheduleGlobalChange()` in these tests** — the repoll entry path is separate from the chokidar debounce by contract.
 - **AC2 — Tool-call extraction:** fixture rows with each fallback shape: (a) pure `text`, (b) `toolFormerData` only, (c) `attachedHumanChanges.fileDiff` only, (d) `codeBlocks` with non-empty `content` body (positive case), (e) `codeBlocks` with `uri.path` only and no body (path-only — negative case, MUST drop or fall through to next parser, per R1 Finding 2 from Codex), (f) `thinkingContent` only, (g) all four fallbacks present (assert first-non-empty precedence wins), (h) none of the above (assert `null` + warning, no atom emitted). Verify `metadata.bubble_text_sources[]` matches the expected per-bubble source on cases (b)-(g). Additional fixture (i): multi-bubble assistant cluster where bubble 1 = `'text'`, bubble 2 = `'toolFormerData'`, bubble 3 = `'codeBlocks'` (with body) → assert `bubble_text_sources: ['text', 'toolFormerData', 'codeBlocks']`. Fixture (j): single-bubble cluster with `'text'` only → assert `bubble_text_sources` field is **omitted** from metadata (no-bloat 99% case).
-- **AC3 — Integration (revert-mechanism: test-only options flags):** end-to-end against a synthetic SQLite fixture mimicking an agent-mode composer with 8 bubble pairs (mixed text + tool-call). Implementer adds two test-only flags to `CursorExtractorOptions`: `__disableRepollExtraction?: boolean` and `__disableToolCallFallbacks?: boolean` (double-underscore prefix marks them as test-only; not documented for production use). With both fixes active (both flags false/undefined), assert all 8 user/assistant turn-pairs reach `storage.append`. With `__disableRepollExtraction: true` AND only initial chokidar fired, assert at least 3 pairs are missing (cadence-gap test). With `__disableToolCallFallbacks: true` AND both fixes' codepaths active for cadence, assert at least 3 pairs are missing from atoms whose source bubbles only had `toolFormerData` / `fileDiff` / etc. (parse-gap test). Both tests prove the corresponding fix is load-bearing.
+- **AC3 — Integration (revert-mechanism via test seams):** end-to-end against a synthetic SQLite fixture mimicking an agent-mode composer with 8 bubble pairs (mixed text + tool-call). The "revert" mechanism uses the test seams precisely (R2 Cursor minor #3 — "chokidar fired" wording fix):
+  - **Both fixes active (control):** start extractor with `exposeTestHooks: true`. Reset checkpoint to 0. Trigger repoll. Assert all 8 user/assistant turn-pairs reach `storage.append`.
+  - **Cadence-gap revert (proves AC1 load-bearing):** start extractor with `exposeTestHooks: true` AND do NOT call `triggerRepoll` after seeding additional bubbles. Manually invoke a SINGLE `handleGlobalChange('chokidar')` after seeding the FIRST 2 pairs to simulate one chokidar dispatch tick. Then seed the remaining 6 pairs and DO NOT trigger another scan. Assert ≥ 3 turn-pairs are missing — proves the new repoll path is what closes the cadence gap (the single chokidar tick covered only the first 2 pairs).
+  - **Parse-gap revert (proves AC2 load-bearing):** start extractor with `exposeTestHooks: true` AND `__disableToolCallFallbacks: true`. Reset checkpoint and trigger repoll. Assert ≥ 3 turn-pairs are missing from atoms whose source bubbles relied on `toolFormerData` / `fileDiff` / etc. — proves the AC2 fallback chain is what closes the parse gap.
 
-Total expected test additions: 10-14 new test cases. Full suite must remain green (zero new failures, zero new skips outside the new tests). The existing `describe.skip('startCursorExtractor (lifecycle + integration)')` block stays quarantined as-is — do NOT attempt to fix it as part of 034.
+Total expected test additions: 11-15 new test cases. Full suite must remain green (zero new failures, zero new skips outside the new tests). The existing `describe.skip('startCursorExtractor (lifecycle + integration)')` block stays quarantined as-is — do NOT attempt to fix it as part of 034.
 
 ### AC4 — Dogfooding verification (post-merge, written by founder or strategist)
 
@@ -134,12 +160,16 @@ After merge + daemon kickstart, founder or strategist (NOT the builder agent) ru
 
 **Strategist also runs `tools/mcp-integration-smoke.sh`** at the same time to confirm no regression in the broader 8-tool MCP surface. Build/smoke ownership is founder/strategist territory (R1 Finding 4 from Codex — explicitly NOT a builder task post-merge).
 
-**Capture-rate calculation (R1 Finding from Cursor — numerator/denominator pinned):**
+**Capture-rate calculation (R1 Finding from Cursor, R2 HIGH from both reviewers — numerator/denominator must count the same unit):**
 
-`Capture rate = N_atoms / N_eligible_bubbles` where:
+The R1 formula `N_atoms / N_eligible_bubbles` was wrong: it mixed grains. The extractor emits one atom per user→assistant cluster with `assistant_bubble_id` pointing at only the **last** bubble in the cluster, while `assistant_bubble_ids[]` lists every bubble in that cluster. At perfect 100% capture, a single 3-bubble cluster scores 1 distinct `assistant_bubble_id` vs 3 eligible — ratio 1/3, triggering a spurious P1. Fixed by widening the numerator to a set union:
 
-- `N_atoms` = count of distinct `assistant_bubble_id` values in `echo.db` for the test composer (query: atoms where `metadata.composer_id === <test_composer_id>` over the test window).
+`Capture rate = |captured_bubble_ids| / N_eligible_bubbles` where:
+
+- `captured_bubble_ids` = the **set union** of `metadata.assistant_bubble_ids[]` arrays across all atoms in `echo.db` where `metadata.composer_id === <test_composer_id>` over the test window. Each bubble id appears at most once in the union (deduplicate if multiple atoms list it — should not happen given extractor semantics, but the union shape is robust to it).
 - `N_eligible_bubbles` = count of assistant bubbles in `cursorDiskKV` for the same composer (key prefix `bubbleId:<composer_id>:`, JSON `type === 2`) where **at least one** of `{ .text non-empty, .toolFormerData non-empty, .attachedHumanChanges.fileDiff non-empty, .codeBlocks has body, .thinkingContent non-empty }` would parse. Truly-empty assistant bubbles (all fields empty) are excluded from the denominator since 034 doesn't claim to capture those.
+
+At perfect 100% capture, every eligible bubble's id appears in some atom's `assistant_bubble_ids[]` (because every cluster of assistant bubbles between two user bubbles is emitted as a single atom carrying the full id list). Ratio = 1.0. Partial captures correctly produce ratios in (0, 1).
 
 Strategic re-evaluation thresholds (against this exact calculation):
 - ≥ 90 %: M1-1 capture friction is empirically closed.
@@ -171,7 +201,8 @@ Folded into "After Completion" section below. Not a builder-agent acceptance —
 - For AC2 — the `tryExtract*` helpers are top-level functions next to `parseBubbleRow`, exported for test access. Each parser is ≤ 30 lines and treats every shape mismatch as `return null` — never throw. The parser is the boundary; throws here would crash the extractor mid-tick.
 - `metadata.bubble_text_sources[]` is omitted entirely when every bubble in the cluster used primary `'text'` (the 99% case). When present, the array length always equals `assistant_bubble_ids.length` — no implicit defaulting; consumers can read the array directly without cross-referencing.
 - Test isolation: `tests/capture/extractors/cursor.test.ts` already drives the extractor against in-memory SQLite fixtures (review the existing test file before adding new ones — there's likely a `makeBubbleRow()` or `seedDb()` helper to reuse). The periodic-poll tests use `vi.useFakeTimers()` AND target `triggerRepollExtraction` directly. **Do NOT** add tests inside the `describe.skip('startCursorExtractor (lifecycle + integration)')` quarantine block — that block stays quarantined per item 023.
-- Configuration knobs: `CURSOR_REPOLL_INTERVAL_MS` is the source-level default constant (exported for tests); `CursorExtractorOptions.repollIntervalMs` is the only runtime override; no environment variable is read. The two test-only `CursorExtractorOptions.__disableRepollExtraction` / `__disableToolCallFallbacks` flags exist for AC3's revert-mechanism tests only; double-underscore-prefix marks them as test-only.
+- Configuration knobs: `CURSOR_REPOLL_INTERVAL_MS` is the source-level default constant (exported for tests); `CursorExtractorOptions.repollIntervalMs` is the only runtime override; no environment variable is read.
+- Test seams (R2 patch — replaces R1's `__disable*` flags pair): `CursorExtractorOptions.exposeTestHooks?: true` gates the `__testHooks` field on `CursorExtractorHandle`, populated with `triggerRepoll() / getLastSeenScanMtime() / setLastSeenScanMtime(n)` (see AC3 test-seam contract). The `__disableToolCallFallbacks?: boolean` option stays for the AC2 parse-gap revert test (the parsers are closure-local pure functions, no other clean hook). Double-underscore prefix marks these as test-only; not documented for production use.
 
 # After Completion (Strategist Notes)
 
@@ -232,9 +263,54 @@ Folded into "After Completion" section below. Not a builder-agent acceptance —
 - Spec line-number drift — all stale refs stripped or symbol-replaced.
 - Out-of-Scope drift check — all 8 do-not-touch rules still hold post-patch; no new in-scope surface introduced that wasn't called out.
 
-### What R2 should focus on
+### What R2 should focus on (pre-R2 prompt — kept here for historical record; R2 outcomes recorded below)
 
 - Whether the `triggerRepollExtraction` / `scheduleGlobalChange` split is the right architecture, or whether the spec should mandate refactoring `scheduleGlobalChange` to accept a `forcePassThrough: boolean` parameter instead (the two-function approach is cleaner; pinning explicitly to head off R2 churn).
 - Whether the `__disable*` test-only flags should live on `CursorExtractorOptions` or in a separate `CursorExtractorTestSeams` type (test-flag-on-production-type is a known minor smell; current choice keeps the test surface concentrated, but pinning for R2 acknowledgment).
 - Whether `bubble_text_sources[]` should be present when every bubble used `'text'` (current spec omits it for no-bloat) — counter-argument: presence-always makes consumer code simpler. Pinning for R2 explicit acknowledgment.
 - Re-test the R1 recovery pattern: does ECHO now (post-034 spec patch) surface this turn? Expected NO — 034 isn't implemented yet; the SQLite-probe workaround remains load-bearing until 034 ships.
+
+## R2 — 2026-05-10 22:27 PDT (Codex) + 22:30 PDT (Cursor, recovered via SQLite probe again) — patched 2026-05-10 22:45 PDT by strategist
+
+**Recovery shape:** Same M1-1 sub-gap A + C firing again. Codex's R2 turn was captured-but-elided (`atom 742d4ff3`, `bytes_elided: 2320`), recovered cleanly via `get_atom`. Cursor's R2 (4975 chars in bubble `95ff18b2-d838-4b58-bcea-9608df002879`, composer `d352562e`) **was not captured by ECHO at all** — repeated the R1 recovery chain (SQLite probe with rowid > R1's bubble). Second consecutive review cycle where the M1-1 gap bit the strategist on the very spec that fixes it. The R2 cross-tool spec review pattern continues to depend on a SQLite-probe workaround until 034 ships.
+
+**R2 architecture decisions confirmed (both reviewers acked, kept as-is):**
+
+- Two-function `triggerRepollExtraction` / `scheduleGlobalChange` split — kept.
+- `__disable*` and `exposeTestHooks` on `CursorExtractorOptions` (vs separate `CursorExtractorTestSeams` type) — acceptable for current repo size; not blocking.
+- `bubble_text_sources[]` omitted when every bubble used `'text'` — kept (no-bloat 99% case wins).
+
+**R2 findings + dispositions (5 unique, 2 convergent):**
+
+| # | Reviewer | Severity | Finding | Disposition in R2 patch |
+|---|---|---|---|---|
+| 1 | Codex | **HIGH** | **AC1 mtime guard watches only `state.vscdb`, but SQLite WAL mode can advance `state.vscdb-wal` mtime while main DB mtime is stale.** Existing `isGlobalDbFamily` already groups the three files. The poll could miss the exact writes it's meant to recover. | **Fixed (load-bearing).** AC1 step 1 now requires `MAX(safeMtimeMs(state.vscdb, -wal, -shm))` via new `maxGlobalDbFamilyMtime()` helper. AC3 Test 4 added: touch `-wal` mtime only, assert family-max guard detects advance. |
+| 2 | Codex | **HIGH** | **AC4 capture-rate formula undercounts perfect multi-bubble captures** — `N_atoms` (distinct `assistant_bubble_id`) vs `N_eligible_bubbles` mixes grains; 3-bubble cluster captured perfectly scores 1/3. (Cursor R2 caught this independently as their Critical finding.) | **Fixed (load-bearing).** AC4 numerator changed to `|captured_bubble_ids|` = set union of `metadata.assistant_bubble_ids[]` across atoms for the test composer. At 100% capture, ratio = 1.0. The 90/60/<60 thresholds now reflect actual capture coverage. |
+| 3 | Codex | Medium | AC3's first repoll test contradicts checkpoint initialization — checkpoint auto-inits at extractor start to current mtime, so "seed → start → trigger → expect atom" short-circuits. | **Fixed.** AC3 Test 1 now explicitly resets the checkpoint via `__testHooks.setLastSeenScanMtime(0)` after extractor start, then triggers repoll. Ordering pinned in the test plan. |
+| 4 | Both (Codex Med #4, Cursor Med #2) | Medium | **Test seam still underspecified — `triggerRepollExtraction` is closure-local; `CursorExtractorHandle` exposes only `stop`. Tests can't reach it.** Cursor recommended `__testHooks` on the handle. | **Fixed.** AC3 introduces `CursorExtractorTestHooks` interface (`triggerRepoll() / getLastSeenScanMtime() / setLastSeenScanMtime(n)`), exposed via `handle.__testHooks` when `CursorExtractorOptions.exposeTestHooks: true` is set. R1's `__disableRepollExtraction` flag dropped (tests just don't call `triggerRepoll`); `__disableToolCallFallbacks` stays for AC2 parse-gap revert (parsers are closure-local, no other clean hook). |
+| 5 | Cursor | Low | AC3's "only initial chokidar fired" is a misnomer — integration tests don't actually start chokidar (it lives in the quarantined block). | **Fixed.** AC3 cadence-gap revert test now reads: "Manually invoke a SINGLE `handleGlobalChange('chokidar')` after seeding the FIRST 2 pairs to simulate one chokidar dispatch tick." No reference to real chokidar firing. |
+
+**Strategist self-finding (added during R2 patch authoring, was R1 Finding 12 deferred):**
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 6 | Low | The R1 dogfooding loop is a load-bearing piece of empirical evidence for 034 that future readers will want surfaced outside the journal | **Added.** Context section now includes a one-sentence reference to the 22:01/22:11/22:25 PDT R1 round, framing it as "M1-1 firing live on cross-tool review itself." |
+
+**Convergence analysis (worth promoting to `wiki/operating-model/cross-tool-spec-review.md`):**
+
+- **Both reviewers converged on the AC4 capture-rate formula bug** at HIGH/Critical severity, with different recommended fixes. Convergence on severity + divergence on prescription is the right shape — strategist picked Option B (set union) because it preserves bubble-granularity in the threshold while eliminating the grain mismatch.
+- **Both reviewers converged on the test-seam exposure problem** at Medium severity. Cursor recommended `__testHooks` on the handle; Codex recommended "exported/internal test harness, not production `CursorExtractorOptions.__disable*` flags." Strategist combined: kept `__disableToolCallFallbacks` (parsers are closure-local with no other hook) but moved repoll-trigger access to `handle.__testHooks` per Cursor's specific shape.
+- **Codex caught two findings Cursor missed** (WAL mtime guard, checkpoint-init test ordering) — both implementation correctness. **Cursor caught one finding Codex missed** (the AC3 "chokidar fired" misnomer) — language clarity. Same pattern as R1: Codex specializes in implementation correctness, Cursor in language/contract clarity. Two independent confirmation cycles now — pattern is no longer single-observation.
+
+### Validation after R2 patch
+
+- `tools/blocked.py --validate` — passes (run after final commit below).
+- No new in-scope surface; all 4 gates still hold.
+- AC4 formula now mathematically consistent (numerator/denominator both per-bubble-id, set-union shape).
+- Test plan now buildable: every test references either a pure function (parsers), an exported helper (`maxGlobalDbFamilyMtime`), or a publicly-named seam (`handle.__testHooks`, `CursorExtractorOptions.__disableToolCallFallbacks`).
+
+### What R3 (if needed) should focus on
+
+- This spec is now claimable per both reviewers' verdicts. R3 is OPTIONAL — strategist's call after founder review of this R2 patch.
+- If R3 happens: validate the `maxGlobalDbFamilyMtime` helper's interaction with chokidar's awaitWriteFinish: false (chokidar may fire on `-wal` writes before they're durably synced; the mtime read is async vs chokidar's notification, so a tick that finds advanced mtime should always see consistent SQLite state at scan time).
+- If R3 doesn't happen: founder green-lights claim; Cursor's Claude picks up item 034 as the builder agent per the project's Cursor-domain delegation pattern.

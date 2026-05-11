@@ -1016,6 +1016,16 @@ href="#pdt-strategist-corrected-cursor-r1-review-found-via-sqlite-workspace-hash
 id="toc-pdt-strategist-corrected-cursor-r1-review-found-via-sqlite-workspace-hash-probe-m1-1-sub-gap-a-firing-live">2026-05-10
 22:25 PDT — Strategist: CORRECTED — Cursor R1 review found via SQLite +
 workspace-hash probe (M1-1 sub-gap A firing live)</a></li>
+<li><a
+href="#pdt-codex-retrieve-post-r1-claude-strategist-context-for-034-r2-spec-review"
+id="toc-pdt-codex-retrieve-post-r1-claude-strategist-context-for-034-r2-spec-review">2026-05-10
+22:25 PDT — Codex: retrieve post-R1 Claude strategist context for 034 R2
+spec review</a></li>
+<li><a
+href="#pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent"
+id="toc-pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent">2026-05-10
+22:45 PDT — Strategist: 034 R2 review retrieval + combine (5 unique
+findings, 2 convergent)</a></li>
 </ul></li>
 <li><a href="#end-of-window-synthesis-filled-at-end-of-window"
 id="toc-end-of-window-synthesis-filled-at-end-of-window">End-Of-Window
@@ -7931,6 +7941,171 @@ founder gesture becomes a single MCP call. The user-facing felt-magic
 isn’t “ECHO has Cursor’s data”; it’s “ECHO surfaces Cursor’s data
 without me remembering which composer it’s in.” Worth holding for V1
 narrative.</li>
+</ol></li>
+</ul>
+<hr />
+<h3
+id="pdt-codex-retrieve-post-r1-claude-strategist-context-for-034-r2-spec-review">2026-05-10
+22:25 PDT — Codex: retrieve post-R1 Claude strategist context for 034 R2
+spec review</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked Codex to do another
+read-only review after Claude/strategist refined item 034. Need the
+latest strategist context without patching the spec, per founder
+instruction that the strategist will combine findings.</li>
+<li><strong>Tool and query inputs:</strong>
+<ol type="1">
+<li><code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/74a9e2c0-0e7c-464b-92b2-449652fbf113.jsonl', count=5)</code></li>
+<li><code>search_memories(query='two-function forcePassThrough __disable bubble_text_sources R2 reviewers', source_app='claude_code', limit=5)</code></li>
+</ol></li>
+<li><strong>Returned shape:</strong> <code>tail_session</code> returned
+5 Claude Code turns and correctly surfaced the latest post-R1 strategist
+turn <code>776d6bbf-12dc-416a-a802-ded5a979f8c5</code>, including commit
+<code>493e1e6</code>, the R1 patch summary, and the four intended R2
+focus points. The exact phrase <code>search_memories</code> query
+returned <code>matches: []</code>.</li>
+<li><strong>Verdict:</strong> partial.</li>
+<li><strong>Note:</strong> Exact-source <code>tail_session</code>
+remains the reliable recovery path for the strategist session. Substring
+search still failed on a distinctive R2-review phrase even though the
+turn exists, which is expected pre-034 implementation and reinforces
+that the SQLite/session-source workaround remains load-bearing for
+cross-tool review.</li>
+<li><strong>Conjecture:</strong> Post-034 dogfooding should repeat this
+same exact phrase search against the Cursor and Claude review turns. If
+capture cadence and fallback parsing work, the query should no longer
+need exact-source recovery.</li>
+</ul>
+<hr />
+<h3
+id="pdt-strategist-034-r2-review-retrieval-combine-5-unique-findings-2-convergent">2026-05-10
+22:45 PDT — Strategist: 034 R2 review retrieval + combine (5 unique
+findings, 2 convergent)</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context)</li>
+<li><strong>Trigger:</strong> Founder said “cursor just finished but you
+can run wait for new turn on codex. once both land you can review” —
+second-round cross-tool review on the R1-patched spec, with one reviewer
+done and one still running. Goal: combine R2 findings into a single R2
+patch.</li>
+<li><strong>Query inputs (5 ECHO calls + 2 SQLite probes):</strong>
+<ol type="1">
+<li>SQLite probe:
+<code>bubbleId:d352562e-c958-417c-bbc4-a822c4fae3c4:*</code> ORDER BY
+rowid DESC — Cursor’s MRU bubble in the Project_echo composer (since
+R1’s bubble id was the previous max-rowid in the same composer).</li>
+<li>SQLite extract:
+<code>SELECT text FROM cursorDiskKV WHERE key = 'bubbleId:...:95ff18b2-...'</code>
+— 4975-char Cursor R2 review body.</li>
+<li><code>wait_for_new_turns(sources=[&lt;codex jsonl&gt;], since=2026-05-11T05:09:24.811Z, timeout=60)</code>
+— long-poll for Codex’s R2 turn. <strong>Result: harness-level
+timeout</strong> (not the server’s graceful 60s-empty response — the MCP
+client’s enclosing transport gave up first). Codex’s R2 turn HAD already
+landed at this point; the harness timeout was a client-layer issue, not
+a daemon issue.</li>
+<li><code>tail_session(source=&lt;codex jsonl&gt;, count=3)</code> —
+fallback exact-source tail after wait_for_new_turns timeout. Returned 3
+most-recent Codex turns including the R2 review at
+<code>2026-05-11T05:27:13.820Z</code> (= 22:27 PDT), captured with
+<code>truncations: ["content", "metadata.tool_calls:projected"]</code>,
+<code>bytes_elided: 2320</code>.</li>
+<li><code>get_atom(id='742d4ff3-87be-44c3-b5c5-b9dbc7eba213')</code> —
+recover Codex R2 verbatim. <code>atom_size_bytes: 6219</code>. All 4
+findings readable in full.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><strong>Cursor R2 (4975 chars, NOT in ECHO):</strong> Verdict “Ready
+to claim after one formula fix.” Critical = capture-rate formula bug; 1
+Medium (test seam exposure); 2 Low (chokidar-fired wording; R1 Finding
+12 deferral framing). Acknowledgments table approving R1’s 3
+architecture decisions (two-function split / <code>__disable*</code>
+location / <code>bubble_text_sources</code> omission).</li>
+<li><strong>Codex R2 (recovered via get_atom):</strong> 4 findings — 2
+HIGH (WAL mtime guard at AC1; capture-rate formula at AC4) + 2 Medium
+(checkpoint-init test ordering; test seam exposure). Codex’s HIGH #2
+converges with Cursor’s Critical on the capture-rate bug. Codex’s MEDIUM
+#4 converges with Cursor’s Medium on test seams.</li>
+</ul></li>
+<li><strong>Sources:</strong> Cursor SQLite <code>cursorDiskKV</code>,
+composer <code>d352562e-c958-417c-bbc4-a822c4fae3c4</code>, bubble
+<code>95ff18b2-d838-4b58-bcea-9608df002879</code>. Codex JSONL
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/10/rollout-2026-05-10T21-57-58-019e1566-...jsonl</code>,
+turn 2 atom <code>742d4ff3-...</code>. SQLite-probe workaround required
+AGAIN for Cursor (M1-1 sub-gap A firing for the SECOND consecutive
+review cycle on the very spec that fixes it).</li>
+<li><strong>Verdict:</strong> ✅ right on the combine. All 5 unique R2
+findings dispositioned in the patch. 2 HIGH/Critical findings =
+load-bearing fixes (WAL mtime guard + capture-rate formula). 2 MEDIUM =
+test ordering + test seam. 1 LOW = wording. R1 Finding 12 (Context meta)
+promoted from “deferred” to “added” as a one-sentence reference.</li>
+<li><strong>Note (<code>wait_for_new_turns</code> harness timeout —
+operational learning):</strong> The harness-level timeout was an
+MCP-client transport thing, not the daemon. The server-side 60s
+graceful-empty response (the documented contract) was never reached.
+Workaround: fall back to <code>tail_session</code> immediately on
+<code>wait_for_new_turns</code> timeout; if the reviewer turn already
+landed, tail catches it cheaply. If it hasn’t landed yet, poll-loop via
+<code>tail_session(since=last_ts)</code> is the fallback recipe (per
+<code>wait_for_new_turns</code> description). Worth flagging — possibly
+the MCP client’s request-timeout setting deserves tuning, or
+<code>wait_for_new_turns</code> should default to
+<code>timeout=30</code> for safer client compatibility.</li>
+<li><strong>Note (cross-tool divergence — second confirmation
+cycle):</strong> R1 already showed Codex finding contract clarity,
+Cursor finding implementation correctness. R2 shows both reviewers
+<strong>converging on the two HIGH-severity issues with different
+prescriptions</strong> (different fix shapes for the formula bug;
+different seam mechanisms for the test exposure). <strong>Convergence on
+severity + divergence on prescription is the high-value cross-tool
+review shape</strong> — strategist’s combine job is to pick the
+prescription that’s most coherent with the rest of the spec. R2 picked
+Option B for the formula (set union on
+<code>assistant_bubble_ids[]</code>), and Cursor’s
+<code>__testHooks</code> shape for the test seam. Worth promoting to
+<code>wiki/operating-model/cross-tool-spec-review.md</code> as a named
+pattern.</li>
+<li><strong>Note (M1-1 firing again, SECOND consecutive review
+cycle):</strong> The R1 dogfooding loop (Cursor’s review missing from
+ECHO → SQLite recovery) repeated exactly. Cursor’s 4975-char R2 review
+never entered ECHO’s substring index. The same recovery chain worked.
+<strong>The M1-1 evidence base now includes two consecutive
+in-the-moment captures of the very gap 034 fixes biting on the spec’s
+own review cycle.</strong> This is structural evidence, not anecdotal —
+promotion to the spec’s <code>Context</code> section is now justified
+and applied in the R2 patch.</li>
+<li><strong>Note (data points 3, 4 for item 031 deprecation
+gate):</strong> <code>get_atom</code> worked cleanly on the elided Codex
+R2 turn (6219 bytes envelope, all metadata projected, content verbatim).
+This is the third successful M1-3 recovery in the post-033-merge window.
+But the 22:25 PDT entry’s earlier caveat stands: the gate has TWO
+dimensions, and 034 is still pre-implementation, so the second dimension
+(atoms exist) remains structurally unsolved for Cursor. Item 031 is at
+data point 3 of 5+ on dimension 1, but dimension 2 is blocked on
+034.</li>
+<li><strong>Conjecture (observation-only):</strong>
+<ol type="1">
+<li><strong>R2 cycle is reaching diminishing returns on this
+spec.</strong> 5 unique findings, all dispositioned in the patch. Both
+reviewers’ verdicts are “claimable after this patch.” R3 is OPTIONAL;
+the strategist’s call is whether one more round adds enough marginal
+value to justify the cycle time. Pinning a recommendation: <strong>skip
+R3 unless founder wants the extra round.</strong></li>
+<li><strong>The “harness timeout vs server timeout” learning is broadly
+applicable.</strong> Any MCP client integrating
+<code>wait_for_new_turns</code> should verify both timeout paths (server
+graceful-empty vs client-transport-abort). Worth adding to the
+<code>wait_for_new_turns</code> tool description as a “common foot-gun”
+callout.</li>
+<li><strong>The set-union capture-rate formula generalizes.</strong> The
+R1 formula’s grain mismatch (one-atom-per-cluster vs per-bubble
+denominator) would have applied to any future capture-coverage spec
+measuring bubble-granular completeness. Worth surfacing the formula
+shape in <code>wiki/architecture/system-architecture.md</code> (or
+<code>wiki/operating-model/</code> if it crosses items) as a named
+“Bubble-granular capture rate” pattern, so future M1-* items inherit the
+correct shape without re-deriving.</li>
 </ol></li>
 </ul>
 <hr />
