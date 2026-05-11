@@ -105,6 +105,18 @@ export interface CursorTurn {
   // thinking bubbles. The text also stays in `assistant_message` to avoid
   // a content-shape break for existing consumers.
   thinking?: string;
+  // True when this turn is a continuation of a prior atom's assistant
+  // cluster for the same user message (Cursor wrote more bubbles after the
+  // prior capture tick's checkpoint). Omitted (not `false`) on normal turns
+  // to preserve the no-bloat property on the 99% case where this never
+  // fires. See item 036 (M1-1 sub-gap D).
+  is_continuation?: true;
+  // The assistant bubble id that the prior atom's `assistant_bubble_id`
+  // pointed at — i.e., the checkpoint value at the moment this continuation
+  // was emitted. Consumer join key: `continuation_of_assistant_bubble_id`
+  // here ↔ `assistant_bubble_id` on the prior atom. Always present when
+  // `is_continuation: true`; always absent otherwise.
+  continuation_of_assistant_bubble_id?: string;
 }
 
 interface ComposerInfo {
@@ -760,19 +772,21 @@ export async function extractCursorTurns(
       startIdx = ix + 1;
     }
 
-    // Gap 2 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): when
-    // the checkpoint lands on an assistant bubble (Cursor streamed more
-    // assistant bubbles into a turn that ECHO already captured at an
-    // earlier partial state), treat them as a streaming continuation and
-    // silently fast-forward to the next user bubble. Pre-fix: each tick
-    // emitted ~250 orphan_assistant_bubble warnings × 1232 minutes of
-    // activity = 902,716 spam warnings on the OLD bubble layer that was
-    // already captured. Post-fix: silent fast-forward; next REAL user
-    // turn after the continuation captures cleanly. Item 034 closes the
-    // remaining gap (continuation bubbles are now captured by the
-    // periodic re-poll path + tool-call fallback chain). `agentKv:blob:`
-    // is content-addressed dedupe storage, not a chat-schema replacement
-    // (per 2026-05-09 diagnosis correction in
+    // M1-1 sub-gap D (item 036): when the checkpoint lands on an assistant
+    // bubble (Cursor streamed more assistant bubbles into a turn ECHO
+    // already captured at an earlier partial state), emit a continuation
+    // turn for the new bubbles instead of silently skipping them. The
+    // continuation turn carries `is_continuation: true` and
+    // `continuation_of_assistant_bubble_id: <checkpoint>` as the join key
+    // back to the prior atom. The `user_message` text is the original user
+    // bubble's text (walked back through `bubbles[]` for this composer) so
+    // a query for the user's question matches both the prior and the
+    // continuation atoms — consumers that want a deduped logical-turn view
+    // group on `metadata.user_bubble_id`. Pre-036 (V1.5.7): silent
+    // fast-forward dropped these bubbles entirely; agent-mode runs lost
+    // 15+ post-checkpoint bubbles per cluster, including the verdict turn.
+    // `agentKv:blob:` remains content-addressed dedupe storage, not a
+    // chat-schema replacement (per 2026-05-09 diagnosis correction in
     // raw/internal/decisions/2026-05-09-cursor-capture-diagnosis-correction.md);
     // chat turns remain in `bubbleId:` / `composerData:`.
     let i = startIdx;
@@ -781,7 +795,76 @@ export async function extractCursorTurns(
       i < bubbles.length &&
       bubbles[i]!.role === 'assistant'
     ) {
-      while (i < bubbles.length && bubbles[i]!.role === 'assistant') i += 1;
+      const continuationStart = i;
+      const continuationCluster: ParsedBubble[] = [];
+      while (i < bubbles.length && bubbles[i]!.role === 'assistant') {
+        continuationCluster.push(bubbles[i]!);
+        i += 1;
+      }
+      // continuationCluster.length ≥ 1 by the entry condition above.
+      let userBubble: ParsedBubble | undefined;
+      for (let k = continuationStart - 1; k >= 0; k -= 1) {
+        if (bubbles[k]!.role === 'user') {
+          userBubble = bubbles[k]!;
+          break;
+        }
+      }
+      if (userBubble === undefined) {
+        // Defensive guard — would mean every prior bubble in the composer
+        // is also assistant, which doesn't match any observed Cursor flow.
+        // Falls back to the prior silent-skip behavior (i is already past
+        // the cluster).
+        log.warn('continuation_no_preceding_user', { composer_id, checkpoint });
+      } else {
+        const last = continuationCluster[continuationCluster.length - 1]!;
+        const sources = continuationCluster.map((b) => b.text_source);
+        log.info('continuation_atom', {
+          composer_id,
+          continuation_of_assistant_bubble_id: checkpoint,
+          n_new_bubbles: continuationCluster.length,
+        });
+        const turn: CursorTurn = {
+          composer_id,
+          user_bubble_id: userBubble.bubble_id,
+          assistant_bubble_id: last.bubble_id,
+          assistant_bubble_ids: continuationCluster.map((b) => b.bubble_id),
+          user_message: userBubble.text,
+          assistant_message: continuationCluster.map((b) => b.text).join('\n\n'),
+          assistant_created_at: last.createdAt,
+          mtime,
+          is_continuation: true,
+          continuation_of_assistant_bubble_id: checkpoint,
+        };
+        const context = buildTurnContext(userBubble, continuationCluster);
+        if (context !== undefined) turn.context = context;
+        if (sources.some((s) => s !== 'text')) {
+          turn.bubble_text_sources = sources;
+        }
+        const toolCalls: CursorToolCall[] = [];
+        const thinkingParts: string[] = [];
+        for (const b of continuationCluster) {
+          if (b.text_source === 'toolFormerData' && b.toolFormerData !== undefined) {
+            const call = toolFormerToToolCall(b.toolFormerData);
+            if (call !== null) toolCalls.push(call);
+          } else if (b.text_source === 'thinkingContent' && b.text.length > 0) {
+            thinkingParts.push(b.text);
+          }
+        }
+        if (toolCalls.length > 0) {
+          turn.tool_calls = toolCalls;
+          turn.had_tool_use = true;
+        } else if (sources.some((s) => s === 'toolFormerData')) {
+          turn.had_tool_use = true;
+        }
+        if (thinkingParts.length > 0) {
+          turn.thinking = thinkingParts.join('\n\n');
+        }
+        turns.push(turn);
+      }
+      // `i` is already past the continuation cluster — fall through to the
+      // main user→assistant loop below in case more turns arrive in the
+      // same bubbles[] (rare: a third user message landing in the same
+      // tick).
     }
     while (i < bubbles.length) {
       const cur = bubbles[i]!;
@@ -1059,6 +1142,13 @@ export async function startCursorExtractor(
       if (turn.had_tool_use === true) metadata['had_tool_use'] = true;
       if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
       if (turn.thinking !== undefined) metadata['thinking'] = turn.thinking;
+      if (turn.is_continuation === true) {
+        metadata['is_continuation'] = true;
+        if (turn.continuation_of_assistant_bubble_id !== undefined) {
+          metadata['continuation_of_assistant_bubble_id'] =
+            turn.continuation_of_assistant_bubble_id;
+        }
+      }
       const candidate = {
         source: `fs:${globalDbPath}`,
         timestamp: new Date(turn.assistant_created_at).toISOString(),

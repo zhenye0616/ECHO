@@ -251,48 +251,163 @@ describe('extractCursorTurns (pure)', () => {
     expect(captured.writes.join('')).toContain('orphan_assistant_bubble');
   });
 
-  // Gap 2 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): when the
-  // checkpoint lands inside an extended assistant cluster (Cursor streamed
-  // more assistant bubbles after ECHO captured an earlier partial state),
-  // the new bubbles should NOT be flagged as orphans. Pre-fix: ~250 spam
-  // warnings per chokidar event × 1232 minutes = 902,716 warnings on the
-  // same already-captured composers. Post-fix: silent fast-forward, no
-  // warnings, and any subsequent REAL user turn captures cleanly.
-  it('streaming continuation: assistant bubbles after the checkpoint are silently fast-forwarded (Gap 2)', async () => {
+  // M1-1 sub-gap D (item 036): when the checkpoint lands inside an
+  // extended assistant cluster, the new bubbles surface as a continuation
+  // atom carrying `is_continuation: true` and
+  // `continuation_of_assistant_bubble_id: <checkpoint>`. Pre-036 (V1.5.7)
+  // silently fast-forwarded these bubbles, dropping ~50% of agent-mode
+  // capture rate (10/21 on the load-bearing 4f02b335 composer). Post-036
+  // the bubbles surface as atoms; consumers that want a deduped logical-
+  // turn view group on `metadata.user_bubble_id`.
+
+  // AC3 Test 1 — the load-bearing case: continuation followed by an
+  // append. Verifies the continuation atom carries the right id-set, the
+  // original user_message, the join key, and that the `lastSeenMap`
+  // checkpoint advances to the cluster-last bubble for the next tick.
+  it('continuation: emits continuation atom for new assistant bubbles after the checkpoint', async () => {
+    // First tick — empty checkpoint, full single-cluster turn.
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
-      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1-partial' },
-      // Cursor extends the cluster after ECHO captured the partial state:
-      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a1-extended-1' },
-      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'a1-extended-2' },
-      // A second user turn arrives after the extended cluster:
-      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'q2' },
-      { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'a2' },
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'fix the verdict turn' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'thinking...' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'still working...' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'partial answer' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+    let turns = await extractCursorTurns(dbPath, new Map());
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.assistant_bubble_ids).toEqual(['a1', 'a2', 'a3']);
+    expect(turns[0]?.is_continuation).toBeUndefined();
+    expect(turns[0]?.continuation_of_assistant_bubble_id).toBeUndefined();
+    const checkpoint = turns[0]!.assistant_bubble_id;
+    expect(checkpoint).toBe('a3');
+
+    // Second tick — Cursor wrote 2 more assistant bubbles; checkpoint is
+    // now at `a3` (the cluster-last from tick 1).
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'verdict: ECHO works' });
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a5', type: 2, text: 'final summary' });
+    turns = await extractCursorTurns(dbPath, new Map([['c1', checkpoint]]));
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({
+      composer_id: 'c1',
+      user_bubble_id: 'u1',
+      assistant_bubble_id: 'a5',
+      assistant_bubble_ids: ['a4', 'a5'],
+      user_message: 'fix the verdict turn',
+      assistant_message: 'verdict: ECHO works\n\nfinal summary',
+      is_continuation: true,
+      continuation_of_assistant_bubble_id: 'a3',
+    });
+  });
+
+  // AC3 Test 2 — empty short-circuit. Checkpoint at the cluster-last
+  // bubble: nothing new, zero turns, zero warnings.
+  it('continuation: checkpoint at cluster-last bubble emits 0 turns and 0 warnings', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a2' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'a3' },
     ];
     createGlobalStorageFixture(dbPath, bubbles);
 
-    // ECHO captured the partial state at a1 (single-asst cluster). Now
-    // re-extracting with that checkpoint: a2 + a3 are extension bubbles
-    // (silently skipped, not orphaned), and the q2/a4 turn is captured.
-    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a1']]));
-    expect(turns).toHaveLength(1);
-    expect(turns[0]?.user_bubble_id).toBe('u2');
-    expect(turns[0]?.assistant_bubble_id).toBe('a4');
-    // CRITICAL: zero orphan warnings for the streaming-continuation bubbles.
-    expect(captured.writes.join('')).not.toContain('orphan_assistant_bubble');
+    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a3']]));
+    expect(turns).toHaveLength(0);
+    const out = captured.writes.join('');
+    expect(out).not.toContain('orphan_assistant_bubble');
+    expect(out).not.toContain('continuation_atom');
+    expect(out).not.toContain('continuation_no_preceding_user');
   });
 
-  it('streaming continuation: empty store (no user after extension) emits zero turns + zero warnings', async () => {
+  // AC3 Test 3 — continuation followed by a fresh user→assistant pair in
+  // the same tick. Both atoms must surface, in chronological order.
+  it('continuation: emits continuation atom AND the following fresh user→assistant turn', async () => {
     const bubbles: FixtureBubble[] = [
-      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q' },
-      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'partial' },
-      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'extended' },
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'q1' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'a1-prior' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'a1-continuation' },
+      { composer_id: 'c1', bubble_id: 'u2', type: 1, text: 'q2' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'a2' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles);
+
+    const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a1']]));
+    expect(turns).toHaveLength(2);
+    // Continuation atom comes first (a2.createdAt < a3.createdAt).
+    expect(turns[0]).toMatchObject({
+      user_bubble_id: 'u1',
+      assistant_bubble_id: 'a2',
+      assistant_bubble_ids: ['a2'],
+      is_continuation: true,
+      continuation_of_assistant_bubble_id: 'a1',
+    });
+    expect(turns[1]).toMatchObject({
+      user_bubble_id: 'u2',
+      assistant_bubble_id: 'a3',
+      assistant_bubble_ids: ['a3'],
+    });
+    expect(turns[1]?.is_continuation).toBeUndefined();
+    expect(turns[1]?.continuation_of_assistant_bubble_id).toBeUndefined();
+  });
+
+  // AC3 Test 4 — two composers, each with the multi-cluster shape.
+  // Continuation atoms are emitted per-composer, no cross-pollination.
+  it('continuation: independent per composer in a single tick', async () => {
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'cA', bubble_id: 'uA', type: 1, text: 'qA' },
+      { composer_id: 'cA', bubble_id: 'aA1', type: 2, text: 'A1' },
+      { composer_id: 'cA', bubble_id: 'aA2', type: 2, text: 'A2-cont' },
+      { composer_id: 'cB', bubble_id: 'uB', type: 1, text: 'qB' },
+      { composer_id: 'cB', bubble_id: 'aB1', type: 2, text: 'B1' },
+      { composer_id: 'cB', bubble_id: 'aB2', type: 2, text: 'B2-cont' },
+    ];
+    createGlobalStorageFixture(dbPath, bubbles, {
+      composers: { cA: { createdAt: 100 }, cB: { createdAt: 200 } },
+    });
+
+    const turns = await extractCursorTurns(
+      dbPath,
+      new Map([
+        ['cA', 'aA1'],
+        ['cB', 'aB1'],
+      ]),
+    );
+    expect(turns).toHaveLength(2);
+    const byComposer = new Map(turns.map((t) => [t.composer_id, t]));
+    expect(byComposer.get('cA')).toMatchObject({
+      user_bubble_id: 'uA',
+      assistant_bubble_id: 'aA2',
+      is_continuation: true,
+      continuation_of_assistant_bubble_id: 'aA1',
+    });
+    expect(byComposer.get('cB')).toMatchObject({
+      user_bubble_id: 'uB',
+      assistant_bubble_id: 'aB2',
+      is_continuation: true,
+      continuation_of_assistant_bubble_id: 'aB1',
+    });
+  });
+
+  // AC3 Test 5 — defensive guard: composer with only assistant bubbles
+  // (truly anomalous; doesn't match any observed Cursor flow). The
+  // continuation branch logs `continuation_no_preceding_user` and falls
+  // back to silent skip; no turn emitted.
+  it('continuation: defensive guard logs warn when no preceding user bubble exists', async () => {
+    // Hand-craft the fixture by writing only assistant rows. The composer
+    // header carries only assistant entries.
+    const bubbles: FixtureBubble[] = [
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'orphan-1' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'orphan-2' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'orphan-3' },
     ];
     createGlobalStorageFixture(dbPath, bubbles);
 
     const turns = await extractCursorTurns(dbPath, new Map([['c1', 'a1']]));
     expect(turns).toHaveLength(0);
-    expect(captured.writes.join('')).not.toContain('orphan_assistant_bubble');
+    const out = captured.writes.join('');
+    expect(out).toContain('continuation_no_preceding_user');
+    // The first-pass orphan-warn is scoped to the no-checkpoint branch;
+    // here the checkpoint exists, so we expect only the new guard warn.
+    expect(out).not.toContain('orphan_assistant_bubble');
   });
 
   it('first-pass orphans (no checkpoint) still warn loudly — fix is scoped to the streaming-continuation case', async () => {
@@ -1105,6 +1220,53 @@ describe('startCursorExtractor periodic re-poll (AC1 — item 034)', () => {
     } finally {
       await olderHandle.stop();
     }
+  });
+
+  // AC3 Test 6 (item 036) — end-to-end via the triggerRepoll seam: a
+  // continuation cluster that arrives between two repoll ticks surfaces
+  // as a SECOND atom whose metadata carries `is_continuation: true` and
+  // `continuation_of_assistant_bubble_id: <prior atom's
+  // assistant_bubble_id>`. Pre-036 the post-checkpoint bubbles were
+  // silently dropped; the second atom never appeared.
+  it('item 036: continuation cluster between ticks emits a second atom with continuation metadata', async () => {
+    createGlobalStorageFixture(dbPath, [
+      { composer_id: 'c1', bubble_id: 'u1', type: 1, text: 'walk through the change' },
+      { composer_id: 'c1', bubble_id: 'a1', type: 2, text: 'starting...' },
+      { composer_id: 'c1', bubble_id: 'a2', type: 2, text: 'mid-stream' },
+      { composer_id: 'c1', bubble_id: 'a3', type: 2, text: 'tick-1 last bubble' },
+    ]);
+    handle = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+    });
+    handle.__testHooks!.setLastSeenScanMtime(0);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(1);
+
+    // Cursor writes 2 more assistant bubbles into the same cluster.
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a4', type: 2, text: 'tick-2 verdict turn' });
+    appendBubble(dbPath, { composer_id: 'c1', bubble_id: 'a5', type: 2, text: 'tick-2 final summary' });
+    // Force the family-max mtime forward so the guard advances.
+    const future = new Date(Date.now() + 5000);
+    utimesSync(dbPath, future, future);
+    await handle.__testHooks!.triggerRepoll();
+    expect(await storage.count()).toBe(2);
+
+    const events = await storage.query({ source: `fs:${dbPath}` });
+    events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    expect(events).toHaveLength(2);
+    const first = events[0]!.metadata as Record<string, unknown>;
+    const second = events[1]!.metadata as Record<string, unknown>;
+    expect(first['is_continuation']).toBeUndefined();
+    expect(first['continuation_of_assistant_bubble_id']).toBeUndefined();
+    expect(first['assistant_bubble_id']).toBe('a3');
+    expect(second['is_continuation']).toBe(true);
+    expect(second['continuation_of_assistant_bubble_id']).toBe('a3');
+    expect(second['assistant_bubble_id']).toBe('a5');
+    expect(second['user_bubble_id']).toBe('u1');
+    expect(second['assistant_bubble_ids']).toEqual(['a4', 'a5']);
   });
 });
 
