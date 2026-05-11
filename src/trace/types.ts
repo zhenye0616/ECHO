@@ -17,6 +17,11 @@ export interface Query {
   window_hours?: number;
   limit?: number;
   format?: ResponseFormat;
+  /** Item 037 / AC4: optional work-artifact (repo) scope. The trace
+   *  builder itself does not filter on this — storage applies the
+   *  metadata_match — but the value rides through Query → QueryEcho so
+   *  callers can see what scoped their result set. */
+  repo_path?: string;
 }
 
 export interface QueryEcho {
@@ -25,6 +30,9 @@ export interface QueryEcho {
   artifact_hint: ArtifactHint | null;
   format: ResponseFormat;
   window_hours: number;
+  /** Item 037 / AC4: the normalised `repo_path` that scoped this
+   *  response. `null` when omitted by the caller. */
+  repo_path: string | null;
 }
 
 export type EdgeKind = 'shared_artifact';

@@ -21,6 +21,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
 import { isoString } from '../util/iso8601.js';
+import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch, type ProjectedMatch } from '../wire-shape/match.js';
 
@@ -80,6 +81,14 @@ export interface WaitForNewTurnsParams {
   sources: string[];
   since: string;
   timeout?: number;
+  /** Item 037 / AC5: absolute repo root path. When set, every per-source
+   *  poll inherits a `metadata_match: {repo_root: normalize(repo_path)}`
+   *  AND filter, so the long-poll wakes only on new turns in the named
+   *  repo. For `sources` containing `'git'` or a `git:` prefix entry,
+   *  matches `metadata.repo_root` only — legacy git atoms without that
+   *  metadata are out of scope (callers use `source_prefix='git:<path>'`
+   *  on the discovery tools or omit `repo_path` to widen). */
+  repo_path?: string;
 }
 
 // Turn shape on the wire = same as ProjectedMatch. Aliased rather than
@@ -126,13 +135,22 @@ async function pollOnce(
   storage: Storage,
   resolved: ResolvedSources,
   since: string,
+  normalisedRepoPath: string | null,
 ): Promise<CaptureEvent[]> {
-  const filterCommon: Pick<QueryFilter, 'since' | 'limit' | 'exclude_metadata_surface'> = {
+  const filterCommon: Pick<
+    QueryFilter,
+    'since' | 'limit' | 'exclude_metadata_surface' | 'metadata_match'
+  > = {
     since,
     limit: WAIT_PER_POLL_LIMIT_PER_SOURCE,
     // Same fs-watcher meta-event exclusion as tail_session / search_memories
     // (Bug B 2026-05-08): user-facing tail content, not capture-impl detail.
     exclude_metadata_surface: ['fs'],
+    // Item 037 / AC5: repo-scoping. AND-joined with the source/prefix
+    // filter on each per-source query below.
+    ...(normalisedRepoPath !== null
+      ? { metadata_match: { repo_root: normalisedRepoPath } }
+      : {}),
   };
   const queries: Promise<CaptureEvent[]>[] = [];
   for (const exact of resolved.exact) {
@@ -201,6 +219,14 @@ export async function waitForNewTurns(
     throw new Error('wait_for_new_turns: since must be a valid ISO 8601 timestamp');
   }
 
+  // Item 037 / AC5: validate + normalise repo_path before the poll loop
+  // so a bad input fails immediately rather than after the first timeout.
+  let normalisedRepoPath: string | null = null;
+  if (params.repo_path !== undefined) {
+    assertAbsoluteRepoPath('wait_for_new_turns', params.repo_path);
+    normalisedRepoPath = normaliseRepoPath(params.repo_path);
+  }
+
   let timeoutSec = params.timeout ?? WAIT_DEFAULT_TIMEOUT_SECONDS;
   if (timeoutSec > WAIT_MAX_TIMEOUT_SECONDS) timeoutSec = WAIT_MAX_TIMEOUT_SECONDS;
   if (timeoutSec < 0) timeoutSec = 0;
@@ -229,14 +255,14 @@ export async function waitForNewTurns(
   // Initial poll first (no wait) — common case is "content is already
   // there"; the long-poll's whole point is to NOT round-trip the wait
   // when there's nothing newer than `since`.
-  let rows = await pollOnce(storage, resolved, params.since);
+  let rows = await pollOnce(storage, resolved, params.since, normalisedRepoPath);
   while (rows.length === 0 && now().getTime() < deadlineMs) {
     // Sleep then re-poll. Cap the sleep at remaining-time so we don't
     // overshoot the deadline by up to one poll interval.
     const remaining = deadlineMs - now().getTime();
     if (remaining <= 0) break;
     await sleep(Math.min(pollIntervalMs, remaining));
-    rows = await pollOnce(storage, resolved, params.since);
+    rows = await pollOnce(storage, resolved, params.since, normalisedRepoPath);
   }
 
   // next_since is the server's current clock when we return — caller
@@ -292,6 +318,12 @@ export function registerWaitForNewTurns(server: McpServer, storage: Storage): vo
           .min(0)
           .max(WAIT_MAX_TIMEOUT_SECONDS)
           .optional(),
+        repo_path: z
+          .string()
+          .optional()
+          .describe(
+            'Item 037: absolute filesystem path to a repo root. When set, each per-source poll is AND-filtered by `metadata.repo_root = normalize(repo_path)`. For `sources` containing `git` or a `git:` prefix entry, matches `metadata.repo_root` only — legacy git atoms without that metadata are out of scope (omit `repo_path` to widen).',
+          ),
       },
       outputSchema: waitOutputSchema,
       annotations: { readOnlyHint: true },

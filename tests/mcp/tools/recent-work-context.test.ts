@@ -1433,3 +1433,75 @@ describe('truncation.source_breakdown (item 029)', () => {
     expect(r.truncation.source_breakdown!['cursor']).toBe(2);
   });
 });
+
+// Item 037 / AC4 — repo_path filter end-to-end through getRecentWorkContext.
+describe('getRecentWorkContext repo_path (item 037 / AC4)', () => {
+  it('filters: atoms outside the repo_path scope are absent from the trace input', async () => {
+    // Use the SAME ccEvent helper as the rest of this file — its
+    // metadata shape (session_id + repo_root + files_referenced +
+    // git_state) is what the trace normalizer expects. Adding atoms
+    // for a SECOND repo and asserting they don't surface confirms the
+    // metadata_match wired through to storage.
+    const store = new MemoryStorage();
+    // Target repo: 3 turns in s1 (REPO_ROOT). Other repo: 2 turns.
+    await store.append(ccEvent('s-target-1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }));
+    await store.append(ccEvent('s-target-2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }));
+    await store.append(ccEvent('s-target-3', 2, tsPlus(60), [TYPES_PATH], { user: 'q3', assistant: 'a3' }));
+    const other = '/Users/x/Desktop/Other';
+    await store.append({
+      source: 'fs:/Users/zhen/.claude/projects/abc/s-other.jsonl',
+      timestamp: tsPlus(50),
+      content: 'USER: o\n\nASSISTANT: o',
+      metadata: {
+        session_id: 's-other',
+        turn_index: 0,
+        repo_root: other,
+        files_referenced: [`${other}/x.ts`],
+        git_state: { origin_url: 'https://github.com/x/other' },
+      },
+    });
+    // Baseline: no repo_path → both repos surface.
+    const baseline = await getRecentWorkContext(store, {
+      since: SINCE,
+      until: NOW,
+      limit: 100,
+      format: 'full',
+    });
+    expect(Object.keys(baseline.atoms).length).toBeGreaterThanOrEqual(3);
+
+    // With repo_path: only target-repo atoms surface.
+    const filtered = await getRecentWorkContext(store, {
+      since: SINCE,
+      until: NOW,
+      limit: 100,
+      format: 'full',
+      repo_path: REPO_ROOT,
+    });
+    expect(filtered.query.repo_path).toBe(REPO_ROOT);
+    expect(Object.keys(filtered.atoms).length).toBeGreaterThan(0);
+    // Strictly fewer atoms than baseline (the other-repo atom is gone).
+    expect(Object.keys(filtered.atoms).length).toBeLessThan(Object.keys(baseline.atoms).length);
+  });
+
+  it('rejects non-absolute repo_path with a clear error', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      getRecentWorkContext(store, { repo_path: 'relative/path' }),
+    ).rejects.toThrow(/repo_path must be absolute/);
+  });
+
+  it('trailing-slash normalises (path-equality semantic against stored no-slash repo_root)', async () => {
+    const store = new MemoryStorage();
+    await store.append(ccEvent('s-t1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }));
+    await store.append(ccEvent('s-t2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }));
+    const r = await getRecentWorkContext(store, {
+      since: SINCE,
+      until: NOW,
+      limit: 100,
+      format: 'full',
+      repo_path: `${REPO_ROOT}/`,
+    });
+    expect(r.query.repo_path).toBe(REPO_ROOT);
+    expect(Object.keys(r.atoms).length).toBeGreaterThan(0);
+  });
+});

@@ -75,6 +75,10 @@ export interface FindClustersParams {
   until?: string;
   window_hours?: number;
   format?: 'skeleton';
+  /** Item 037 / AC4: absolute repo root path. Pass-through to the
+   *  underlying `recent_work_context` query; scopes the candidate set
+   *  cross-source by `metadata.repo_root`. Echoed in `query.repo_path`. */
+  repo_path?: string;
 }
 
 export interface FindClustersCluster {
@@ -109,6 +113,9 @@ export interface FindClustersResult {
     until: string;
     window_hours: number;
     format: 'skeleton';
+    /** Item 037 / AC4: echoes the normalised `repo_path` filter applied
+     *  (cross-source `metadata.repo_root` match). `null` when not passed. */
+    repo_path: string | null;
   };
   clusters: FindClustersCluster[];
   /** RESPONSE-LEVEL budget application — distinct from per-FIELD clipping
@@ -193,6 +200,11 @@ export async function findClusters(
       ...(params.since !== undefined ? { since: params.since } : {}),
       ...(params.until !== undefined ? { until: params.until } : {}),
       ...(params.window_hours !== undefined ? { window_hours: params.window_hours } : {}),
+      // Item 037 / AC4: pass-through. recent_work_context's
+      // `getRecentWorkContext` validates + normalises; we just forward the
+      // raw value. The normalised form rides through rwc.query.repo_path
+      // and is re-surfaced in find_clusters' own envelope below.
+      ...(params.repo_path !== undefined ? { repo_path: params.repo_path } : {}),
       limit: MAX_LIMIT,
       format,
     },
@@ -221,6 +233,10 @@ export async function findClusters(
       until: rwc.query.until,
       window_hours: rwc.query.window_hours,
       format,
+      // Item 037 / AC4: surface the same normalised path the underlying
+      // storage filter saw, so callers see what scoped their result set
+      // (and can detect a trailing-slash normalisation).
+      repo_path: rwc.query.repo_path,
     },
     clusters: cs,
     result_caps: {
@@ -260,6 +276,7 @@ const findClustersOutputSchema = {
     until: z.string(),
     window_hours: z.number(),
     format: z.literal('skeleton'),
+    repo_path: z.string().nullable(),
   }),
   clusters: z.array(z.record(z.string(), z.unknown())),
   result_caps: z.object({
@@ -282,17 +299,38 @@ export function registerFindClusters(server: McpServer, storage: Storage): void 
         until: isoString.optional(),
         window_hours: z.number().min(0.1).max(168).optional(),
         format: formatSchema.optional(),
+        repo_path: z
+          .string()
+          .optional()
+          .describe(
+            'Item 037: absolute filesystem path to a repo root. When set, scopes the cluster candidate set to atoms whose `metadata.repo_root` matches (cross-source — find_clusters has no source_app gate). Legacy git atoms without that metadata are out of scope when passed; reach them via `source_prefix=git:<path>` on `search_memories`/`wait_for_new_turns`, or `tail_session(source_app=git, repo_path=...)` which has the two-path OR fallback.',
+          ),
       },
       outputSchema: findClustersOutputSchema,
       annotations: { readOnlyHint: true },
     },
     async (input) => {
       const params = input as FindClustersParams;
-      const result = await findClusters(storage, params);
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        structuredContent: result as unknown as Record<string, unknown>,
-      };
+      try {
+        const result = await findClusters(storage, params);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          structuredContent: result as unknown as Record<string, unknown>,
+        };
+      } catch (err) {
+        // Item 037 / AC4: repo_path validation errors thrown from the
+        // underlying `getRecentWorkContext` surface via `isError`.
+        if (
+          err instanceof Error &&
+          err.message.startsWith('get_recent_work_context: ')
+        ) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: err.message }],
+          };
+        }
+        throw err;
+      }
     },
   );
 }

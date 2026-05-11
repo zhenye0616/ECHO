@@ -66,6 +66,7 @@ describe('buildRecentWorkContext', () => {
       artifact_hint: null,
       format: 'full',
       window_hours: 4,
+      repo_path: null,
     });
   });
 

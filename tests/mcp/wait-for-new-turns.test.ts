@@ -222,3 +222,86 @@ describe('wait_for_new_turns — turns carry per-atom truncations field', () => 
     expect(r.turns[0]!.truncations).toEqual([]);
   });
 });
+
+// Item 037 / AC5 — repo_path filter.
+describe('wait_for_new_turns repo_path (item 037 / AC5)', () => {
+  it('AC5: baseline (no repo_path) returns all matching turns', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/A',
+      timestamp: '2026-05-09T10:01:00.000Z',
+      content: 'turn',
+      metadata: { repo_root: '/repo-a' },
+    });
+    const r = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 30 },
+    );
+    expect(r.turns).toHaveLength(1);
+  });
+
+  it('AC5: filters per-source results by metadata.repo_root', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/A',
+      timestamp: '2026-05-09T10:01:00.000Z',
+      content: 'in repo a',
+      metadata: { repo_root: '/repo-a' },
+    });
+    await store.append({
+      source: 'fs:/A',
+      timestamp: '2026-05-09T10:02:00.000Z',
+      content: 'in repo b',
+      metadata: { repo_root: '/repo-b' },
+    });
+    const r = await waitForNewTurns(
+      store,
+      {
+        sources: ['fs:/A'],
+        since: '2026-05-09T10:00:00.000Z',
+        timeout: 0,
+        repo_path: '/repo-a',
+      },
+      { pollIntervalMs: 30 },
+    );
+    expect(r.turns.map((t) => t.content)).toEqual(['in repo a']);
+  });
+
+  it('AC5: rejects non-absolute repo_path with a clear error', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      waitForNewTurns(
+        store,
+        {
+          sources: ['fs:/A'],
+          since: '2026-05-09T10:00:00.000Z',
+          timeout: 0,
+          repo_path: 'relative',
+        },
+        { pollIntervalMs: 30 },
+      ),
+    ).rejects.toThrow(/repo_path must be absolute/);
+  });
+
+  it('AC5: trailing-slash normalises to no-slash form', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/A',
+      timestamp: '2026-05-09T10:01:00.000Z',
+      content: 'normalised',
+      metadata: { repo_root: '/Users/x/Project_echo' },
+    });
+    const r = await waitForNewTurns(
+      store,
+      {
+        sources: ['fs:/A'],
+        since: '2026-05-09T10:00:00.000Z',
+        timeout: 0,
+        repo_path: '/Users/x/Project_echo/',
+      },
+      { pollIntervalMs: 30 },
+    );
+    expect(r.turns.map((t) => t.content)).toEqual(['normalised']);
+  });
+});
