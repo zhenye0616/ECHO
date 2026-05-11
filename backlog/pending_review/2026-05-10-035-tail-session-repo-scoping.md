@@ -9,9 +9,35 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-11T06:05:00Z"
 branch: "agent/tail-session-repo-scoping"
 worktree: "/Users/zhenye/Desktop/Project_echo--tail-session-repo-scoping"
-head_sha: ""
+head_sha: "51fdf45b83274833cced73a5bb811ce8ef620a70"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented AC1-AC5 of item 035 read-side-only per the R1-patched spec.
+  - AC1: `tail_session` now accepts `repo_path?: string` (Zod input + output
+    `composer_resolved?: string`); description string extended; three
+    validation gates throw plain `tail_session: …` errors that the wire
+    handler surfaces via isError (same pattern as CursorDecodeError).
+    Smoke script asserts the tools/list description mentions `repo_path`.
+  - AC2: new `src/mcp/cursor-workspace-resolver.ts` derives a single
+    `composer_id` from Cursor's own workspaceStorage + globalStorage —
+    eliminates the R1-found dependency on best-effort `metadata.workspace_id`.
+    Node `fileURLToPath` for percent-decode; non-`file:` shapes skipped.
+  - AC3: `QueryFilter.metadata_match` lives in BOTH SqliteStorage (json_extract
+    + prepared-statement cache keyed on SQL text, documented inline) and
+    MemoryStorage with the same `[workspace_id, composer_id, session_id]`
+    whitelist enforced at the storage seam. Empty `{}` is a no-op in both.
+  - AC4: cursor + repo_path path resolves via AC2, tails the cursor `.vscdb`
+    with `metadata_match: {composer_id}`, returns `composer_resolved`.
+    Pagination unchanged (composite cursor; metadata_match adds to the same
+    query). Non-cursor source_app + repo_path warn-ignores.
+  - AC5: 18 new tests — 8 resolver, 10 dual-adapter parity via `describe.each`,
+    9 tail_session unit/integration + 1 wire-level isError. Full suite:
+    679 pass / 21 skipped. Lint + typecheck clean.
+
+  AC6 dogfooding verification is the post-merge founder/strategist step —
+  not buildable from this run.
+
+  Branch `agent/tail-session-repo-scoping` pushed; head_sha 51fdf45.
 review_notes: ""
 spec_refs:
   - src/mcp/tools/tail-session.ts                # Where the resolver currently picks the wrong composer for Cursor
