@@ -68,7 +68,43 @@ agent_notes: |
   tree, blocking git pull --rebase. Pure journal sync.
 
   Run log: raw/internal/agent-runs/2026-05-10-2026-05-10-034-cursor-capture-coverage.md
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-10 PDT (2026-05-11T06:08Z) via founder reconciliation.
+  Verdict from /review-pending sidecar: merge as-is (zero pre-merge fixups,
+  zero predicted conflicts). Both Codex and Claude code-reviewer subagents
+  converged independently on merge-as-is (per journal entry at 5ed252a).
+
+  Conflicts resolved: none — clean merge. main had not touched any of the
+  three files this branch modified (src/capture/extractors/cursor.ts,
+  tests/capture/extractors/cursor.test.ts, tests/fixtures/cursor-
+  globalstorage.ts) since merge-base cc30883.
+
+  Fixups applied: none.
+
+  Fixups deferred to follow-up items: none mandatory (all reviewer
+  follow-ups are post-merge or non-blocking; see backlog/_followups.md
+  "From 034 merge" section below).
+
+  Verify (post-merge, project root):
+  - 671 passed | 21 skipped | 0 failed (vitest, 41 files + 1 skipped file)
+  - lint: clean (eslint --max-warnings 0)
+  - typecheck: clean (tsc --noEmit)
+
+  Follow-up items (non-blocking):
+  - AC4 dogfooding (founder/strategist): two Cursor agent-mode review
+    sessions + capture-rate formula → mcp-interactions-journal.md. If
+    real-world toolFormerData shapes don't match the inferred precedence
+    (text → result → rawArgs → stringified params), file a narrow re-tune
+    item.
+  - AC5 strategist wiki promotion: wiki/capture/cursor-extractor.md cadence
+    + bubble-shape subsections; wiki/capture/per-app/cursor-collected-data
+    .md bubble_text_sources field row; flip "Cursor capture-cadence gap"
+    in _followups.md to resolved.
+  - triggerRepoll race self-coalescing (inFlight guard) — non-blocking;
+    correctness already holds via lastSeenMap idempotence.
+  - Cosmetic: log-field name divergence (`reason` vs R1's `tick_reason`).
+  - safeMtimeMs vs maxGlobalDbFamilyMtime stat-failure asymmetry (legacy
+    helper returns Date.now() on failure; new helper returns 0).
 spec_refs:
   - src/capture/extractors/cursor.ts          # Chokidar/debounce loop + parseBubbleRow (the two gaps)
   - src/normalize/adapters/cursor.ts          # Adapter narrow-emission (already a separate _followups item; OUT OF SCOPE here)
