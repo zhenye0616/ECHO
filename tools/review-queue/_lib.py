@@ -14,8 +14,16 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import jsonschema
-import yaml
+try:
+    import jsonschema
+    import yaml
+except ImportError:
+    import sys as _sys
+
+    if _sys.platform == "darwin" and os.environ.get("ECHO_RQ_ARCH_RETRIED") != "1":
+        os.environ["ECHO_RQ_ARCH_RETRIED"] = "1"
+        os.execvp("arch", ["arch", "-arm64", _sys.executable, *_sys.argv])
+    raise
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"

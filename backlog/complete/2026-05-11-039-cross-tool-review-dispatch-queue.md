@@ -36,6 +36,37 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Pure protocol + helper scripts + slash-command prompts; no app-specific knowledge needed. Strategist (Claude Code) is acceptable since the strategist is the producer side of the queue; an independent builder is fine since the protocol is fully specced below.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
+review_notes: |
+  Merged on 2026-05-12 (UTC 08:57) via founder reconciliation under /merge-and-cleanup.
+
+  Conflicts resolved:
+  - none — 22 net-new files only; zero modifications to existing main-side files; --no-ff clean.
+
+  Fixups applied (both optional, both taken):
+  - tools/review-queue/_lib.py: added arch-aware re-exec guard around the jsonschema/yaml import
+    so Rosetta-x86_64 parent shells cannot break the runtime path of combine.py/request.py.
+    Closes Codex implementation-monitor finding #1 permanently.
+  - backlog/.../2026-05-11-039-...md (this file, AC4 test list): removed the stale
+    "combined.md exists, no --force: error" bullet and replaced it with the impl's actual
+    no-op-on-existing behavior + a one-line note explaining why (errors would crash every
+    /loop 10m tick after a round completes). Closes Codex implementation-monitor finding #2.
+
+  Fixups deferred to follow-up items:
+  - none — the two recommended fixups were both applied inline at merge time.
+
+  Verify: 782/782 tests pass (21 skipped); npm lint and tsc --noEmit both clean post-fixup.
+
+  Follow-up items (non-blocking, filed in backlog/_followups.md):
+  - Watcher-state executable test: convert prose-level (b)-branch assertion in
+    review-queue-watch.md into an integration test that drives the slash-command body
+    and asserts r{N+1}/request.md + next_round: <N+1>. Closes Codex R4 L1 with full
+    falsifiability. V1.6+.
+  - e2e.test.ts cleanup wording: explicit in-test comment that the fresh tmp persistence
+    in r1Dir is a no-op artifact (the reviewer's later success cleans it), not a coverage
+    gap. Polish-only.
+  - AC6b post-merge dogfooding: first qualifying spec through the queue end-to-end with
+    zero dispatch messages — the founder's documented "loop-close gate." Per spec
+    §After Completion §5.
 ---
 
 # Context
@@ -407,7 +438,7 @@ Tests at `tests/review-queue/combine.test.ts`:
 - One response missing, past timeout: `combined_verdict: single_reviewer_timeout`, `escalated_to_founder: true`.
 - Both responses missing, past timeout: `combined_verdict: no_responses`, `escalated_to_founder: true` (R2 patch — Cursor L3).
 - **No eligible rounds at all: combine.py exits 0, no output (except status line), no commits** (R2 patch — Codex M2).
-- `combined.md` exists, no `--force`: error.
+- `combined.md` already exists: round is ineligible, combine.py treats it as a no-op and exits 0 (operationally correct under `/loop 10m` driving — errors would crash every tick after a round completes). Stale RC2/RC3 wording "exists, no `--force`: error" removed in merge fixup; the rest of AC4 already implies the no-op behavior.
 - Orphan `.tmp.*` files older than 30 min are cleaned up; younger ones left alone.
 - `cross_ref` override: convergent table groups findings explicitly cross-referenced even if `where` sections don't overlap.
 - **AC3.5 state-machine fixtures (R4 patch — Codex R4 L1):** three explicit fixtures covering each branch:
