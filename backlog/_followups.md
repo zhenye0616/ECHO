@@ -556,3 +556,22 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 - **✅ Cross-out: 039 R4 LOW #1 closed by 040.** The 039 followup line 505 ("Watcher-state executable test") is now resolved by 040's merge. Test fixture at `tests/review-queue/watcher-state.test.ts` constructs a real r1 dir, runs the real `combine.py`, then runs the real `dispatch-next-round.py` (spawning the real `request.py` as a subprocess, NOT mocked), and asserts the load-bearing AC3.5 (b) post-conditions executably. Strategist promoting 039 to wiki should reference this as the canonical evidence the (b)-branch transition is no longer prose-only.
 
 - **✅ Cross-out: AC6b loop-close gate empirically closed by 040.** The 039 followup "AC6b post-merge dogfooding" entry is now resolved. 040 was the FIRST qualifying spec to traverse the new file-backed queue end-to-end with **zero founder→reviewer dispatch messages**. Three rounds of cross-tool review converged in 53 min wall-clock; full ready→pending_review in ~4 hours. Two friction cases surfaced (Codex sandbox + Cursor YAML emission) but both are session-bootstrap / emission-validation defects, not per-round dispatch messages. The strategist (Claude Code) interacted with the founder exactly twice in this entire cycle: (a) the post-039 reconciliation push acknowledgement, and (b) when the founder invoked `/review-pending`. AC6b empirical criterion met. The next operational gap (`reviewer-background-execution`) is filed as 041 candidate above — that's the difference between "AC6b passes on the strict reading" and "founder never touches reviewer agents."
+
+## From 041 merge (2026-05-12)
+
+- **AC3 founder smoke verification (founder, immediate)** — run `tools/review-queue/smoke-test-codex-runner.sh` once. ~1-5 min, $0.05-$0.50 LLM cost. Spec AC3 phrasing: "verified by AC5 running successfully end-to-end on the founder's actual machine — not by inspection of the wrapper file." Builder correctly deferred per Option 2 in the in-session escalation; the smoke proves the wrapper + launchd plist + commit-reviewer-response helper work as an integrated unit. **Do this before invoking the launchd install for the first time.**
+
+- **AC7 wiki residue (strategist, post-merge wiki promotion)** — `wiki/operating-model/cross-tool-spec-review.md:140` has `get_atom(<elided_atom_id>)` placeholder. Builder honored AGENT_INSTRUCTIONS rule 6 (no wiki edits from builders); fix at strategist's next wiki promotion pass. Search-replace `<elided_atom_id>` → `<id>` or restructure the example to match the `get_atom({id: ...})` schema.
+
+- **AC8 empirical measurement (strategist, next qualifying spec)** — count founder activations during the next post-041 spec's review cycle. Pre-041 baseline measured: ~5 per 3-round cycle during 040 (initial Codex terminal command + Codex re-fires after sandbox correction + Cursor chat pastes). Target post-041: 0–1. Record measurement in the next item's `review_notes` at merge time. If count >1, file 042 with the specific friction observed.
+
+- **combine.py reviewer-finding-enumeration audit** — empirically observed twice during 041's review rounds:
+  - R1: combine.py folded Codex M4 + Cursor M2 into one "convergent" row even though they were different findings at the same anchor (variable-name normativity vs synthetic item_id whitelist).
+  - R2: combine.py dropped Cursor L1 (AC2 Label vs kickstart target) entirely from both tables, AND double-listed Cursor L2 (AC1 invalid env var) across convergent + divergent.
+  Strategist's manual read of `<reviewer>.md` files was the safety net both times. Needs a backlog item to fix the finding-enumeration logic (suggested: stricter convergence match-key + a "missing findings" audit pass that compares input findings to output rows). Priority: MED (queue still works correctly; this is friction on the hands-off pattern that 041+ depends on).
+
+- **✅ Cross-out: 040 follow-up "🔴 NEXT GAP — Reviewer background execution" closed by 041 merge.** Strict-reading AC6b kept passing; the activation-friction half is now structurally addressed (pending AC8 empirical confirmation).
+
+- **✅ Cross-out: AC0 Codex recipe failure on macOS** — 041 AC3 pins the corrected invocation (`--sandbox danger-full-access`, no `--ask-for-approval`, `<` redirection) in the wrapper script.
+
+- **✅ Cross-out: AC3 reviewer-emission validation gap** — 041 AC4 ships `tools/review-queue/commit-reviewer-response.sh` with mechanical validate-before-commit + invalid-file MV-aside on failure; both reviewer slash-commands rewired.

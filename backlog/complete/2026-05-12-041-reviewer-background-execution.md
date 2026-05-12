@@ -52,7 +52,71 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Pure shell + launchd plist + reviewer-prompt rewrite + doc cleanup. Builder must have macOS to verify the launchd plist works end-to-end (AC2 install + AC5 smoke).
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: null
+review_notes: |
+  Merged on 2026-05-12 (UTC ~22:25) via founder reconciliation under /merge-and-cleanup.
+
+  Conflicts resolved:
+  - none — git merge-tree confirmed clean; 11 files (4 modified, 7 net-new);
+    all branch-only changes; no main-side overlap.
+
+  Fixups applied:
+  - none — sidecar verdict `merge as-is` with empty pre-merge fixups list.
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify post-merge:
+  - `npm test -- tests/review-queue/`: 47 pass + 1 known pre-existing red
+    (`tests/review-queue/concurrency.test.ts:133` — orphan-cleanup test-fixture
+    clock-mismatch; already reclassified MED in 040 followups; NOT a 041 regression).
+  - `npm run lint`: clean.
+  - `npm run typecheck`: clean.
+  - Review-queue suite grew 46 → 47 (one new file `tests/review-queue/commit-reviewer-response.test.ts`
+    with 2 it() blocks covering both valid-commits + malformed-rejects paths per AC4).
+
+  Cross-tool review history (3 rounds, narrow class, R3-converged at spec_commit_sha e8edb29):
+  - R1: 8+1 findings → 5 spec patches (1 combine.py fold of two different findings)
+  - R2: 6 findings → 5 spec patches (1 manually-surfaced after combine.py omitted Cursor L1;
+    1 combine.py duplicate-fold of Cursor L2)
+  - R3: 0 findings; both reviewers `proceed`; convergence declared
+
+  Operating-model observation: combine.py had 2 classification anomalies in 2 rounds (R1 fold,
+  R2 drop + double-list). Filed as follow-up below.
+
+  AC6b empirical signal (preliminary, pending AC8 measurement on next post-041 spec):
+  - Strict reading: no founder→reviewer dispatch messages between rounds, same as 040.
+  - Activation reading: founder still physically activated reviewers each round during 041
+    BUILD (same friction 041 is solving). The post-041 measurement (AC8) on the FIRST
+    qualifying spec is what proves whether the launchd job actually drops activations to ≤1.
+
+  Builder agent_notes flags (all non-blocking, transcribed for audit trail):
+  1. AC3 end-to-end verification deferred to founder post-merge per spec phrasing
+     ("verified by AC5 on the founder's actual machine"). Founder runs
+     `tools/review-queue/smoke-test-codex-runner.sh` to close. ~1-5 min, $0.05-$0.50 LLM cost.
+  2. AC7 wiki residue: one match at `wiki/operating-model/cross-tool-spec-review.md:140`
+     (placeholder `get_atom(<elided_atom_id>)`) left untouched per AGENT_INSTRUCTIONS rule 6
+     (no wiki edits from builders). Routed to strategist post-merge wiki promotion.
+  3. AC4 test count is +2 not +1 — one test file with 2 it() blocks (valid + malformed paths)
+     because AC4's own Test list enumerates both paths. Net review-queue total 47.
+
+  Follow-up items (non-blocking, queued in _followups.md at C10):
+  1. **AC3 founder smoke verification** — run `tools/review-queue/smoke-test-codex-runner.sh`
+     once before relying on the launchd job in steady state.
+  2. **AC7 wiki residue** — strategist edits `wiki/operating-model/cross-tool-spec-review.md:140`
+     from `get_atom(<elided_atom_id>)` to `get_atom(<id>)` (or equivalent) during post-merge wiki
+     promotion.
+  3. **AC8 empirical measurement** — count founder activations during the next qualifying spec's
+     review cycle. Pre-041 baseline: ~5 per 3-round cycle. Target: 0-1. Record result in next
+     item's review_notes.
+  4. **combine.py reviewer-finding-enumeration audit** — combine.py had 2 classification
+     anomalies in 041's 2 substantive review rounds (R1 fold of two different findings into
+     one row; R2 dropped Cursor L1 entirely + double-listed Cursor L2). Strategist's manual
+     read of <reviewer>.md is the safety net for now; needs its own backlog item to fix the
+     combine.py finding-grouping logic.
+
+  Decay curve: 8→6→0 (same shape as 040). Fourth confirming structural-reform-trajectory data
+  point alongside 037, 038, 040 — heuristic ready to lock into `backlog/README.md` post-041
+  wiki promotion.
 ---
 
 ## Why this now
