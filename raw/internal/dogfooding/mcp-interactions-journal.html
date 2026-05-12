@@ -1142,6 +1142,11 @@ id="toc-pdt-cursor-connects-to-claude-strategist-mid-conversation-to-discuss-038
 PDT — Cursor connects to Claude strategist mid-conversation to discuss
 038 direction</a></li>
 <li><a
+href="#pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed"
+id="toc-pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed">20:57
+PDT — Cursor R3 review on 038 spec (narrow polish; 5 findings; 0 HIGH;
+PROCEED)</a></li>
+<li><a
 href="#pdt-cursor-r2-review-on-038-spec-narrow-pushback-8-findings-0-high"
 id="toc-pdt-cursor-r2-review-on-038-spec-narrow-pushback-8-findings-0-high">20:42
 PDT — Cursor R2 review on 038 spec (narrow pushback; 8 findings; 0
@@ -9971,6 +9976,72 @@ sufficient context-rehydration for the second voice; no need for
 with extra cluster envelope cost). For “join a live strategy convo in
 another tool” use cases, two scoped <code>search_memories</code> calls +
 no <code>get_atom</code> chase is the cheapest viable shape.</li>
+</ul>
+<h3
+id="pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed">20:57
+PDT — Cursor R3 review on 038 spec (narrow polish; 5 findings; 0 HIGH;
+PROCEED)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / Claude Opus 4.7 (R3
+reviewer, second voice)</li>
+<li><strong>Trigger:</strong> Founder asked for R3 cross-tool review
+after R2 patches landed (commit <code>39711dc</code>). Per the 037 decay
+pattern (R1→R2→R3 = 7→8→5 findings, R3 verdict was “proceed after one
+tiny wording patch”), R3 fires after R2 architecturally clears.</li>
+<li><strong>Query inputs:</strong> Zero ECHO MCP calls. Same shape as
+the 20:42 PDT R2 review — the spec file is the canonical artifact. R3
+reviewer reads the on-disk spec, the R2 review history table for
+changelog context, and earlier review-history sections for cross-AC
+consistency checks.</li>
+<li><strong>Returned:</strong> N/A — no MCP calls. Journal-discipline
+note: third consecutive review cycle on 038 with zero ECHO calls. The
+“spec is sufficient context” property of the cross-tool review pattern
+is now robustly demonstrated.</li>
+<li><strong>Sources:</strong> N/A.</li>
+<li><strong>Verdict:</strong> N/A — journal-discipline entry, not a
+tool-invocation observation.</li>
+<li><strong>Note (R3 findings shape):</strong> 5 findings (2 MED + 3
+LOW; zero HIGH). All wording or test-gap polish. R3 verdict:
+<strong>PROCEED after applying 5 narrow patches inline</strong>; no
+further architectural concerns. Top MED: (1) Goal table has 7 rows but
+text claims 8 tools — <code>recent_work_context</code> missing from the
+table view per R2 Codex HIGH #1’s registration-stays correction; (2) AC3
+contract #8 has shim function-call test but no MCP-server integration
+test for the registered tool path through the shim. 3 LOWs: (3) R2 sweep
+incomplete — 5 stale pre-R2 claims survive in non-AC sections (spec_refs
+line 17, Implementation Notes line 252, Goal table search_memories
+Surface column, Migration ergonomics line 257, AC0 contract #3 reference
+to renamed field); (4) AC1 <code>sources ≤ 8</code> cardinality cap
+still unjustified (survived from R1); (5) AC1 #5 wording imprecision +
+test count drift “at least 10” vs enumerated 15.</li>
+<li><strong>Note (decay curve observation):</strong> 038’s R1→R2→R3 =
+10→14→5 findings. R2 count increased over R1 (uncommon) because R2
+surfaced two new HIGH architectural issues that R1 patches hadn’t fully
+thought through (the registration-vs-file gate distinction; the
+bare-source cross-repo leak in composition). R3 dropped to 5 with zero
+HIGH — proper post-architecture-settled decay. Total findings across 3
+rounds: 29 dispositioned (vs 037’s 20 dispositioned across 3 rounds).
+038 was a bigger structural reform; the higher finding count is
+appropriate. Cross-tool reviewer division-of-labor held: Codex tends to
+catch implementability/calendar/code-grounded; Cursor tends to catch
+coherence/role-split/test-gap/wording precision.</li>
+<li><strong>Conjecture (worth recording outside the journal):</strong>
+cross-tool review cycles for substantive structural reform (037, 038)
+appear to need <strong>3 rounds reliably</strong>. R1 catches the
+load-bearing architectural drift; R2 catches the second-order
+implications that R1 patches didn’t fully think through; R3 cleans the
+sweep incompleteness. By R3 the architecture is genuinely settled.
+Narrow-feature items (032, 033, 035) typically settle in 1-2 rounds.
+Worth adding to <code>backlog/README.md</code> or
+<code>docs/AGENT_INSTRUCTIONS.md</code> as a
+“expect-N-rounds-for-X-shape” review-budget heuristic so future
+strategist sessions can plan accordingly. Filing this as a candidate
+observation for the dogfooding-driven docs work; not a backlog item yet
+(needs one more structural-reform case to confirm the pattern).</li>
+<li><strong>Recommendation:</strong> apply 5 patches inline; run a Codex
+R3 parallel read (expect 2-4 orthogonal findings on parameter-shape /
+implementability that Cursor missed, per 037 R3 pattern); after both R3s
+land cleanly, 038 is claimable.</li>
 </ul>
 <h3
 id="pdt-cursor-r2-review-on-038-spec-narrow-pushback-8-findings-0-high">20:42
