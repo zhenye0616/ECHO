@@ -1,0 +1,24 @@
+---
+item_id: 2026-05-12-042-reviewer-emission-yaml-validation
+round: 3
+reviewer: codex
+artifact_sha: 89dbb58f64cc98175c11c34ad9fc74a0aacac15a
+completed_at: 2026-05-12T23:56:42Z
+verdict: proceed_after_patches
+findings:
+  - severity: low
+    where: "AC4 - queue-errors.md append, lines 132-136"
+    finding: >-
+      The spec says the new row should match the existing format used by
+      push-with-retry.sh, but the installed helper writes UTC machine lines
+      like `2026-05-12T09:34:22Z PUSH-RACE-FALLBACK: ... sha=...`, and the
+      current raw/internal/queue-errors.md follows that shape. The sample row
+      here is a Markdown bullet with local PDT time and no event token. Patch
+      AC4 to either use the actual existing queue-errors format or explicitly
+      say this escalation row intentionally uses the local-time human-artifact
+      format; otherwise builders/tests have two incompatible targets.
+---
+
+# Codex review
+
+One low implementability ambiguity remains. The R3 focus items otherwise line up: AC2 now requires staging `combined.md` with `raw/internal/queue-errors.md`, AC2a/AC2b assert clean post-combine fixture status, the `spec_refs` schema line no longer mentions `reason`, and Out of Scope describes the two optional properties plus one enum value.
