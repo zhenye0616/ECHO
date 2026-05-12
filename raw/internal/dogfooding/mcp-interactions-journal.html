@@ -1221,6 +1221,11 @@ href="#pdt-codex-r2-review-of-039-rc2-response-file-committed-before-journal"
 id="toc-pdt-codex-r2-review-of-039-rc2-response-file-committed-before-journal">00:30
 PDT — Codex R2 review of 039 RC2 — response file committed before
 journal</a></li>
+<li><a
+href="#pdt-strategist-claude-code-9b575b57-039-r2-retrieval-combine-rc3-patch-r2combined.md-proto-write"
+id="toc-pdt-strategist-claude-code-9b575b57-039-r2-retrieval-combine-rc3-patch-r2combined.md-proto-write">2026-05-12
+00:50 PDT — Strategist (Claude Code 9b575b57): 039 R2 retrieval +
+combine + RC3 patch + r2/combined.md proto-write</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11434,6 +11439,142 @@ followed exactly: response file written and committed first
 (<code>29794f4</code>), then this journal entry. The only unrelated
 untracked file left in the worktree was
 <code>.claude/scheduled_tasks.lock</code>, and it was not touched.</li>
+</ul>
+<h3
+id="pdt-strategist-claude-code-9b575b57-039-r2-retrieval-combine-rc3-patch-r2combined.md-proto-write">2026-05-12
+00:50 PDT — Strategist (Claude Code 9b575b57): 039 R2 retrieval +
+combine + RC3 patch + r2/combined.md proto-write</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — same session that drafted 039 RC1 + RC2; now combining R2
+reviews into RC3.</li>
+<li><strong>Trigger:</strong> Founder said “both in flight” at 00:02 PDT
+after dispatching R2 to Codex + Cursor (last manual dispatch per
+bootstrap moment). Background poll task <code>bbgocvo5v</code> (with
+content-length-on-new-bubble stability gate intended to fix the R1
+rowid-only bug) <strong>timed out at 30 min with a second-order polling
+bug</strong>: latched onto Cursor’s first new rowid (136968, a tool
+frame at length 0) instead of tracking max-content-length across ALL new
+bubbles. Cursor actually streamed its 4693-char review to bubble 137045.
+Founder said “both landed” based on direct observation; strategist
+confirmed via SQLite probe.</li>
+<li><strong>Query inputs (4 ECHO calls + 2 SQLite probes + 2 background
+poll attempts + filesystem reads):</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['codex','cursor'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code>
+— same sources as R1 (Codex JSONL <code>019e1acc</code>; Cursor composer
+<code>1c0493dd</code> Phase 2 legacy).</li>
+<li>Background bash poll (<code>bbgocvo5v</code>) — FAILED: latched on
+rowid 136968 (length-0 tool frame) instead of max-content-length across
+new bubbles. <strong>Lesson for V1 queue:</strong> poll on
+<code>MAX(length(json_extract(value,'$.text'))) over all bubbles WHERE rowid &gt; baseline AND &lt;stable for 30s&gt;</code>,
+not on a specific new rowid. Filed as a §AC5 test addition in RC3.</li>
+<li>SQLite probe:
+<code>SELECT rowid, length(json_extract(value,'$.text')) FROM cursorDiskKV WHERE rowid &gt; 136958 ORDER BY rowid ASC</code>
+— 21 new bubbles, most tool frames (length 0); actual review at rowid
+137045 (4693 chars).</li>
+<li><code>search_memories(source=&lt;codex_jsonl&gt;, since=07:02Z, limit=3)</code>
+— Codex R2 atoms <code>7a06d431</code> + <code>a801eb50</code> (turns
+3-4). Codex bootstrap-wrote its response file at
+<code>backlog/reviews/.../r2/codex.md</code> committed locally as
+<code>29794f4</code>, journal at <code>f09d773</code>.</li>
+<li><strong><code>Read backlog/reviews/.../r2/codex.md</code></strong>
+(5350 bytes) +
+<strong><code>Read backlog/reviews/.../r2/cursor.md</code></strong>
+(17381 bytes) — <strong>both reviewers had bootstrap-written response
+files at the canonical queue path</strong> before the queue scripts
+exist. <strong>The filesystem read became the primary retrieval
+mechanism</strong>; ECHO was used only for timestamps + commit SHA
+recovery.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><strong>Codex R2 (4 findings, verdict
+<code>proceed_after_patches</code>):</strong> AC0 Codex command shape
+(use <code>codex exec</code> not <code>codex --watch</code>); AC4
+no-rounds-to-combine path; AC4 <code>where</code> match key normalized
+shape; AC2 race-loser same-SHA assertion.</li>
+<li><strong>Cursor R2 (10 findings, verdict
+<code>proceed_after_patches</code>):</strong> 2 HIGH (strategist /loop
+body needs AC; AC0 keyboard-automation drift). 5 MED + 3 LOW.</li>
+<li><strong>Combined verdict:
+<code>proceed_after_patches</code></strong> (within
+<code>{proceed*}</code> boundary; no founder escalation).</li>
+<li><strong>Live integration test of R1 M5 fix (section-granularity
+<code>where</code> match key):</strong> Cursor R2 H1 cited three
+sections
+(<code>§Implementation Notes "Strategist watcher" + §AC3 + §AC4</code>);
+Codex’s R2 findings concentrated at §AC0 + §AC4. Section-granularity
+match correctly collapsed AC4 findings as convergent. <strong>Codex’s M3
+finding itself named the next improvement: normalized
+<code>primary_where_section</code> + <code>related_where_sections</code>
++ <code>cross_ref</code> override</strong> — accepted in RC3. R1 M5 fix
+passed its live test AND produced its own R2 improvement.
+Review-history-as-evolutionary-record property working.</li>
+</ul></li>
+<li><strong>Sources:</strong> Codex source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T23-07-43-019e1acc-...jsonl</code>
+turns 3-4. Cursor source
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+composer <code>1c0493dd</code> bubble <code>195706b0</code> (still Phase
+2 legacy fallback). <strong>Bootstrap-written canonical-path files:
+<code>backlog/reviews/.../r2/{codex.md,cursor.md}</code> at commits
+<code>29794f4</code> + <code>2f27a27</code> (both committed locally;
+neither pushed — conservative “no-push-without-explicit-ask”
+pre-queue-ship behavior).</strong> Strategist proto-wrote
+<code>r2/combined.md</code> as further dogfood validation of the file
+shape.</li>
+<li><strong>Verdict:</strong> ✅ right on combine; all 14 R2 findings
+dispositioned in RC3 (this commit). 🟢 substrate-positive — <strong>the
+strongest design-validation signal yet</strong>: both reviewers used the
+canonical queue file shape spontaneously, with correct commit message
+format
+(<code>review-r&lt;N&gt;: &lt;reviewer&gt; on &lt;item_id&gt;</code>),
+correct response-file-before-journal ordering, and correct atomic-write
+intent (despite the queue scripts not existing yet).</li>
+<li><strong>Note (the design-validation moment):</strong> Both R2
+reviewers wrote response files at the canonical queue path. The spec
+specifies this path; reviewers found it natural enough to use without
+helper scripts. <strong>The file shape passed live ergonomics.</strong>
+Promoted to §Review History R2 round entry: “Bootstrap-write success —
+reviewers can write canonical files manually without the queue
+scripts.”</li>
+<li><strong>Note (cross-reviewer journal-race PREVENTED this
+time):</strong> Codex and Cursor both committed their R2 journal entries
+cleanly in separate commits, with response files committed FIRST. The
+§Implementation Notes invariant from R1 (journal-after-response-commit)
+held. R1 = race observed → invariant created → R2 = race prevented. The
+rule works.</li>
+<li><strong>Note (poll bug informs the queue):</strong> My background
+poll’s “latch on first new rowid” pattern was wrong — Cursor’s R2
+streamed into a series of bubbles (mostly empty tool frames) with the
+substantive review landing at a later rowid. Promoted into §AC5 test
+list: “watcher must use max-content-length-across-new-bubbles, not
+first-new-rowid stability.”</li>
+<li><strong>Note (zero-ECHO-call held at R2 for both
+reviewers):</strong> Cursor explicit <code>echo_calls: 0</code>; Codex
+used minimal ECHO + chose not to chase via <code>get_atom</code>.
+<strong>Both reviewers used §Review History block as primary
+R1-context</strong> — proves the “review-history-in-spec-body” property
+empirically. Strong evidence the queue stays ECHO-optional in steady
+state.</li>
+<li><strong>Note (conservative push behavior — design
+implication):</strong> Both reviewers committed locally but did not
+push. Per §“Out of Scope” #4 (R1 patch — Codex L6), reviewer queue
+commits ARE operational and should auto-push. The conservative call is
+correct safety-first behavior pre-queue-shipping; once 039 ships and AC3
+step 5 wires <code>push-with-retry.sh</code> into the reviewer prompts,
+pushes become automatic. The fact that reviewers held back manually
+validates the AC3 step 5 design (don’t trust reviewer prompts to push
+without an explicit retry helper).</li>
+<li><strong>Conjecture (observation-only):</strong> R3 should be
+polish-only per 038 decay curve (10→14→5). RC3’s biggest changes (new
+AC3.5 watcher AC; AC0 drift removal; queue-errors.log carve-out;
+normalized <code>where</code> match-key; three separate schemas;
+orphan-tmp integration test in AC6a) are all polish-or-disambiguation
+level. <strong>Convergence prediction:</strong> if both R3 verdicts are
+<code>proceed*</code> with only LOW findings, declare convergence and
+039 is claim-ready. Expected R3 yield: 3-6 findings.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
