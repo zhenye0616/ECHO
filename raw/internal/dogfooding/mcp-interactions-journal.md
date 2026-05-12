@@ -2691,6 +2691,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The latest turn was exactly the strategist framing requested. Hydration was again required because the newest tail was clipped.
 - **Conjecture:** The repeated clipped-tail pattern suggests the live-tail composition wants a small client-side recipe: resolve MRU → search limit 1-3 → hydrate newest clipped atom automatically.
 
+### 2026-05-12 14:16 PDT — Codex checks Claude's final 041 pre-spec response
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "check claude stragetist response one last time before claude proceeds to speccing".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:4})`
+  3. `get_atom({id:'5342c89d-1aaa-4733-a39a-993d5ccba774'})`
+- **Returned:** MRU resolved to the same Claude Code source. `search_memories` returned 4 atoms, newest timestamp `2026-05-12T21:12:46.637Z`, top atom clipped by 1,590 chars. `get_atom({id})` returned the newest atom verbatim (4,829 bytes, `truncations: ["metadata.tool_calls:projected"]`). Latest Claude turn had retrieved Codex's diagnosis, accepted the validation amendment, and proposed a seven-AC 041 matrix: wrapper, launchd docs, verified Codex invocation, reviewer YAML validation pre-commit, synthetic request smoke, Cursor degradation policy, scoped `atom_id`→`id` audit.
+- **Sources:** source_breakdown={claude_code:4}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms requested or returned.
+- **Verdict:** ✅ right
+- **Note:** Claude's proposed AC list now incorporates the prior Codex amendment. Remaining pre-spec risk is implementation shape for AC4: "validate before commit" should be made mechanically hard to bypass, not just added as reviewer-prompt prose.
+- **Conjecture:** A small commit/push helper for reviewer responses may be a better AC4 substrate than asking each reviewer prompt to remember validation + git steps independently.
+
 ### 2026-05-12 14:20 PDT — Strategist (Claude Code) tails Codex for diagnosis on 041 framing
 
 - **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same session driving 040 merge + 041 strategist conversation

@@ -1322,6 +1322,9 @@ id="toc-pdt-codex-tails-claude-after-stale-codex-correction">2026-05-12
 <li><a href="#pdt-codex-reads-latest-claude-turn-on-041-shape"
 id="toc-pdt-codex-reads-latest-claude-turn-on-041-shape">2026-05-12
 14:07 PDT — Codex reads latest Claude turn on 041 shape</a></li>
+<li><a href="#pdt-codex-checks-claudes-final-041-pre-spec-response"
+id="toc-pdt-codex-checks-claudes-final-041-pre-spec-response">2026-05-12
+14:16 PDT — Codex checks Claude’s final 041 pre-spec response</a></li>
 <li><a
 href="#pdt-strategist-claude-code-tails-codex-for-diagnosis-on-041-framing"
 id="toc-pdt-strategist-claude-code-tails-codex-for-diagnosis-on-041-framing">2026-05-12
@@ -12713,6 +12716,42 @@ was clipped.</li>
 suggests the live-tail composition wants a small client-side recipe:
 resolve MRU → search limit 1-3 → hydrate newest clipped atom
 automatically.</li>
+</ul>
+<h3 id="pdt-codex-checks-claudes-final-041-pre-spec-response">2026-05-12
+14:16 PDT — Codex checks Claude’s final 041 pre-spec response</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive repo session)</li>
+<li><strong>Trigger:</strong> Founder asked: “check claude stragetist
+response one last time before claude proceeds to speccing”.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:4})</code></li>
+<li><code>get_atom({id:'5342c89d-1aaa-4733-a39a-993d5ccba774'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU resolved to the same Claude Code
+source. <code>search_memories</code> returned 4 atoms, newest timestamp
+<code>2026-05-12T21:12:46.637Z</code>, top atom clipped by 1,590 chars.
+<code>get_atom({id})</code> returned the newest atom verbatim (4,829
+bytes, <code>truncations: ["metadata.tool_calls:projected"]</code>).
+Latest Claude turn had retrieved Codex’s diagnosis, accepted the
+validation amendment, and proposed a seven-AC 041 matrix: wrapper,
+launchd docs, verified Codex invocation, reviewer YAML validation
+pre-commit, synthetic request smoke, Cursor degradation policy, scoped
+<code>atom_id</code>→<code>id</code> audit.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:4}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Cursor/Codex/git atoms requested or returned.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> Claude’s proposed AC list now incorporates
+the prior Codex amendment. Remaining pre-spec risk is implementation
+shape for AC4: “validate before commit” should be made mechanically hard
+to bypass, not just added as reviewer-prompt prose.</li>
+<li><strong>Conjecture:</strong> A small commit/push helper for reviewer
+responses may be a better AC4 substrate than asking each reviewer prompt
+to remember validation + git steps independently.</li>
 </ul>
 <h3
 id="pdt-strategist-claude-code-tails-codex-for-diagnosis-on-041-framing">2026-05-12
