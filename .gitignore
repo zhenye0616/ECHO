@@ -24,6 +24,9 @@ raw/internal/dogfooding/**/full-response.json
 # Per-user Claude Code settings — never check in
 .claude/settings.local.json
 
+# Claude Code scheduler/loop runtime lock — transient process state
+.claude/scheduled_tasks.lock
+
 # Node / TypeScript
 node_modules/
 dist/
