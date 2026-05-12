@@ -66,6 +66,15 @@ mkdir -p "$SMOKE_WORK/.claude/commands" \
 cp "$REPO_ROOT/.claude/commands/review-queue-codex.md" "$SMOKE_WORK/.claude/commands/"
 cp "$REPO_ROOT/.claude/commands/review-queue-cursor.md" "$SMOKE_WORK/.claude/commands/"
 cp -R "$REPO_ROOT/tools/review-queue/." "$SMOKE_WORK/tools/review-queue/"
+# Copy .gitignore so the smoke repo's `git add -A` ignores Python bytecode
+# caches (__pycache__/, *.pyc) and other build artifacts copied above.
+# Without this, validate.py's bytecode generation makes the worktree dirty
+# mid-pipeline → push-with-retry's pull-rebase fails. Defensive: the helper
+# also sets PYTHONDONTWRITEBYTECODE=1 (commit-reviewer-response.sh).
+cp "$REPO_ROOT/.gitignore" "$SMOKE_WORK/.gitignore"
+# Remove any __pycache__/ that hitched a ride from the founder's filesystem
+# (gitignored in main, but `cp -R` doesn't filter by gitignore).
+find "$SMOKE_WORK/tools/review-queue" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Synthetic backlog/ready stub so request.py find_artifact (when invoked
 # downstream) resolves; same shape as the 040 R2 fixture preamble fix.

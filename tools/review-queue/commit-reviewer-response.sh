@@ -68,8 +68,14 @@ else
   exit 2
 fi
 
+# PYTHONDONTWRITEBYTECODE=1 prevents validate.py from writing .pyc files
+# to __pycache__/ next to its source. Without this, repeated helper
+# invocations regenerate bytecode caches which then dirty the worktree
+# (especially in fresh-clone contexts like the AC5 smoke), making the
+# subsequent push-with-retry's `git pull --rebase` fail with "uncommitted
+# changes". Surfaced post-041-merge during AC5 smoke (2026-05-12).
 set +e
-VALIDATE_STDERR="$("${PY[@]}" "$VALIDATOR" reviewer "$REVIEWER_PATH" 2>&1 >/dev/null)"
+VALIDATE_STDERR="$(PYTHONDONTWRITEBYTECODE=1 "${PY[@]}" "$VALIDATOR" reviewer "$REVIEWER_PATH" 2>&1 >/dev/null)"
 VALIDATE_RC=$?
 set -e
 
