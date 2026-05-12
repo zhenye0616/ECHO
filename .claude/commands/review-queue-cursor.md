@@ -52,7 +52,7 @@ Read the artifact plus any inline embeds in the `request.md` body. Apply your re
 
 Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` only.
 
-## Step 5 — Write cursor.md atomically and push
+## Step 5 — Write cursor.md atomically and commit via the validation helper
 
 ```python
 import os, uuid
@@ -64,15 +64,19 @@ except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
+Then commit + push via the validation helper (AC4 of item 041 — mechanically enforces `reviewer.schema.json` before any git operation):
+
 ```bash
-git add "<dir>/cursor.md"
-git commit -m "review-r<N>: cursor on <item_id>"
-tools/review-queue/push-with-retry.sh "review-r<N>: cursor on <item_id>"
+tools/review-queue/commit-reviewer-response.sh "$dir/cursor.md" cursor "$N" "$item_id"
 ```
+
+On validation failure the helper quarantines the file to `<path>.invalid.<ISO-ts>` and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`; on success it commits with message `review-r<N>: cursor on <item_id>` and pushes via `push-with-retry.sh`.
 
 Operational push; no founder approval needed per §"Out of Scope" #4.
 
 ## Step 6 — Log to the dogfooding journal AFTER commit
+
+Run this step **only after `commit-reviewer-response.sh` exits 0**. If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
 Append a 6-field journal entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md, referencing the committed response file. Regenerate the HTML twin. **Never as part of the handshake** — journal is observation-only.
 
