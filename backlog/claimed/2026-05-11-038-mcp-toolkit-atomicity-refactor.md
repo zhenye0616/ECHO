@@ -25,10 +25,10 @@ blocked_by:
 suggested_builder: any  # Pure MCP-server refactor; no app-specific knowledge needed. Largest risk is the find_clusters / recent_work_context untangle (cluster engine factor-out).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-12T04:11:42Z"
+branch: "agent/mcp-toolkit-atomicity-refactor"
+worktree: "~/Desktop/Project_echo--mcp-toolkit-atomicity-refactor"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
