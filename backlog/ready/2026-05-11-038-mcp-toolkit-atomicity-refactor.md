@@ -94,26 +94,44 @@ Every workflow that today goes through `tail_session` has a 1- or 2-call composi
 
 # In Scope (Acceptance Criteria)
 
+### AC0 — Expand `search_memories` with `source` (exact) + `metadata_match` parameters (R1 correction — Codex + Cursor convergent finding)
+
+**R1 correction context:** R1 reviewers (Codex + Cursor) caught that the original 038 spec assumed `search_memories(source_prefix=X, limit=N)` was a drop-in replacement for `tail_session(source=X, count=N)`. It isn't. `tail_session.ts:321` uses **exact** `source` match; `search_memories.ts:141` uses **`source_prefix` (LIKE)**. Sibling-source over-inclusion is possible. Also, today's `tail_session` exposes `metadata_match: {composer_id}` for 037's Cursor Phase 2 fallback; `search_memories.ts:86` has no metadata-filter parameter at the tool layer. Without AC0, AC2's kill-tail_session decision silently regresses both exact-source tailing AND 037's Cursor legacy fallback.
+
+**Surface:** `src/mcp/tools/search-memories.ts` — `SearchMemoriesParams` interface + Zod input schema + handler body.
+
+**Contract:**
+
+1. Add `source?: string` to `SearchMemoriesParams`. Zod: `z.string().optional()`. When set, forwards to `storage.query({source: source, ...})` for exact-source matching. Mutually compatible with `source_prefix`: if both are passed, `source` wins (the more-specific predicate); document this in the tool description with the same "explicit-over-implicit" precedent (today `source_prefix` wins over `source_app`).
+2. Add `metadata_match?: Record<string, string>` to `SearchMemoriesParams`. Zod: `z.record(z.string(), z.string()).optional()`. Forwards to `storage.query({metadata_match: <input>, ...})`. **Storage seam enforces the whitelist** (`METADATA_MATCH_KEY_WHITELIST` already there per 035 + 037 extension).
+3. **Tool-layer isError on non-whitelisted keys (R1 refinement — Cursor #1).** Before calling `storage.query`, the tool handler validates: every key in `metadata_match` must be in `METADATA_MATCH_KEY_WHITELIST`. Non-whitelisted key → MCP isError envelope with message `search_memories: metadata_match contains non-whitelisted key '${key}'; allowed: workspace_id, composer_id, session_id, repo_root`. This is **defense-in-depth on top of** the storage-seam whitelist; the tool-layer check produces a clean, source-attributed error rather than letting the storage error bubble up unattributed.
+4. `query_echo` block surfaces both new fields: `source: string | null` + `metadata_match: Record<string, string> | null`. Caller can verify which filters fired.
+5. Description string update: extend `SEARCH_MEMORIES_DESCRIPTION` to document the new parameters + the composition patterns they unlock (`echo_resolve_mru → search_memories(source=<resolved>)` for tail; `search_memories(metadata_match={composer_id: X})` for 037's Cursor Phase 2 fallback).
+6. **Scope-bound (R1 refinement — Cursor #2):** `metadata_match` is exposed ONLY on `search_memories` in 038. NOT on `find_clusters` or `wait_for_new_turns`. Those tools today don't need it; widening their surface for a hypothetical future need is YAGNI.
+7. Tests: 6 new unit tests — (a) `source` exact match filters correctly; (b) `source_prefix` + `source` together: `source` wins; (c) `metadata_match: {composer_id: X}` filters correctly; (d) `metadata_match` with non-whitelisted key returns isError; (e) `query_echo` carries both new fields; (f) backward compat — calls without the new parameters behave identically to today.
+
 ### AC1 — Add `echo_resolve_mru` primitive
 
 **Surface:** new file `src/mcp/tools/echo-resolve-mru.ts`; registered in `src/mcp/server.ts`.
 
 **Contract:**
 
-1. Input shape (Zod schema):
-   - `source_app?: SourceApp` — when set, resolves the newest source under that app's prefix.
-   - `sources?: string[]` — when set, resolves the newest source from each of the named prefixes (or named source_apps; same prefix-vs-app handling as `wait_for_new_turns.ts:108` `resolveSources`). Returns an array.
+1. Input shape (Zod schema) — **R1 correction (Cursor R1 #5)**: collapsed to single input axis `sources: string[]` (no `source_app` parameter). This matches `wait_for_new_turns.ts:108` `resolveSources` exactly — entries can be either source-app names (`'cursor' | 'claude_code' | 'codex' | 'git'`) → PREFIX MATCH, OR literal source paths → EXACT match. Single axis avoids the "every retrieval tool has a different what-sources parameter" anti-pattern.
+   - `sources: string[]` — required, non-empty, ≤ 8. Mixed entry types accepted (same parsing as `wait_for_new_turns`'s `resolveSources`).
    - `repo_path?: string` — optional repo-scoping filter; absolute path; mirrors 037's contract (normalize via the shared `normaliseRepoPath` helper exported from `cursor-workspace-resolver.ts`). When set, only sources whose newest non-fs atom carries `metadata.repo_root === normalize(repo_path)` are eligible.
-   - At least ONE of `source_app` or `sources` must be set. Reject with isError otherwise.
-   - `source_app` + `sources` together: reject (caller must pick one).
-2. Output shape:
-   - On single-source resolution (`source_app` path): `{ source: string | null, source_app_resolved?: SourceApp, repo_path?: string }`. `source` is the resolved path; null when no eligible atoms exist.
-   - On multi-source resolution (`sources` path): `{ sources: Record<string, string | null>, repo_path?: string }`. Each requested prefix/app maps to its resolved newest source or null.
-   - Always carry `warnings: string[]` (empty unless TZ-naive `since` was passed via a future extension, or repo_path-with-no-matches advisory fires).
-3. Mechanism: query `storage.query({ source_prefix: <prefix>, exclude_metadata_surface: ['fs'], metadata_match: repo_path ? {repo_root: normalize(repo_path)} : undefined, limit: 1 })` and return the source field of the row. The fs-exclusion uses the new shared helper from AC5.
-4. **Cursor branch parity (037 cooperation):** when `source_app === 'cursor'` + `repo_path` are passed, mirror 037's AC6 two-phase semantics — Phase 1 by `metadata.repo_root` directly; Phase 2 falls back to `resolveCursorComposerForRepoPath(repo_path)` only when Phase 1 returns 0 atoms. Surface `composer_resolved` in the output when Phase 2 fires. No predicates ANDed.
-5. **Tools/list description:** explicitly state this is an IDs-only primitive — bodies are NOT fetched here. Document the canonical composition pattern (`echo_resolve_mru → search_memories` for tail, `echo_resolve_mru → wait_for_new_turns` for live watching).
-6. Tests: 8 unit tests — (each of 4 source_app) × {with, without} repo_path; one fresh-Cursor-composer Phase 1 test; one legacy-Cursor-atom Phase 2 test; one `sources` multi-resolution test; one validation test (neither `source_app` nor `sources` set → isError).
+2. Output shape — single unified shape regardless of input cardinality:
+   - `{ sources: Record<string, string | null>, repo_path?: string, warnings: string[], cursor_phase2?: Record<string, { composer_resolved: string }> }`
+   - `sources` keys are the input strings verbatim (so caller can do `result.sources[<key>]`). Values are the resolved source path or null when no eligible atoms exist for that key.
+   - `cursor_phase2` (NEW, R1 refinement — Cursor R1 #10 closure): per-key map populated ONLY for input entries that triggered Phase 2 legacy fallback. Caller can detect legacy-Cursor-atom recovery per-key.
+   - `warnings: string[]` always present.
+3. Mechanism: for each input entry, resolve to a prefix (via `resolveSources` shape) then query `storage.query({ source_prefix: <prefix>, exclude_metadata_surface: ['fs'], metadata_match: repo_path ? {repo_root: normalize(repo_path)} : undefined, limit: 1 })` and return the row's `source` field. The fs-exclusion uses the new shared helper from AC5.
+4. **Cursor branch parity (037 cooperation):** when an input entry resolves to the Cursor prefix AND `repo_path` is passed, mirror 037's AC6 two-phase semantics — Phase 1 by `metadata.repo_root` directly; Phase 2 falls back to `resolveCursorComposerForRepoPath(repo_path)` only when Phase 1 returns 0 atoms. Populate `cursor_phase2[<input key>]` only when Phase 2 fires. No predicates ANDed across phases (per 037's R1+R2+R3 invariants).
+5. **Tools/list description:** explicitly state this is an IDs-only primitive — bodies are NOT fetched here. Document the canonical composition patterns:
+   - Tail: `echo_resolve_mru(sources=['cursor'], repo_path=X)` → `search_memories(source=<resolved>, limit=N)` (using AC0's new exact-source filter)
+   - 037 Cursor Phase 2 fallback: when `cursor_phase2[<key>]` is populated, the caller follows with `search_memories(metadata_match={composer_id: <composer_resolved>}, limit=N)` to recover legacy atoms (using AC0's new `metadata_match` parameter)
+   - Live watch: `echo_resolve_mru → wait_for_new_turns`
+6. Tests: at least 10 unit tests — (each of 4 source_app names as `sources` entries) × {with, without} repo_path = 8 cases; one fresh-Cursor-composer Phase 1 test (asserts `cursor_phase2` is absent on the result); one legacy-Cursor-atom Phase 2 test (asserts `cursor_phase2[<key>]` is populated); one mixed-source-app `sources=['cursor', 'claude_code', 'git:/path']` test; one validation test (empty `sources` array → isError); one absolute-path validation for `repo_path` (R1 cooperation with 037).
+7. **R1 refinement — Cursor R1 #8:** fixture atoms in the test set MUST include `metadata.repo_root` populated per 037's AC1 capture-side contract for at least 2 source_apps (claude_code + codex), to exercise the 037 cooperation path end-to-end. A Cursor fresh-composer fixture should also write `metadata.repo_root` (per 037's AC1 file-walk fallback).
 
 ### AC2 — Kill `tail_session`
 
@@ -121,28 +139,36 @@ Every workflow that today goes through `tail_session` has a 1- or 2-call composi
 
 **Contract:**
 
-1. The exact-source mode (`tail_session({source: X, count: N})`) has no replacement tool — callers compose `search_memories({source_prefix: X, limit: N})` directly. The semantics are identical: descending by timestamp, projected bodies via `projectMatch`, cursor-pagination via `next_cursor`.
-2. The compound modes (`source_app`, no-args fallback, repo_path resolution) are replaced by `echo_resolve_mru → search_memories` two-call composition.
-3. `tools/list` no longer advertises `tail_session`. Callers receiving a missing-tool error from an MCP client SDK update.
-4. Any internal callers of `tailSession()` function (verify none today): N/A — this tool is only consumed via the MCP protocol surface. The `searchMatchSchema` import from `tail-session.ts` (used by callers) is moved to `search-memories.ts` where it originated (cross-check `search-memories.ts:211` — schema actually lives there; tail just re-exported. So this is a no-op on the consumer side except for the import-path bookkeeping).
-5. Description-text references to `tail_session` in OTHER tools' descriptions removed: `wait-for-new-turns.ts:44, 53`, `get-atoms.ts:36`. Replace with the new composition pattern (or omit references).
-6. Tests: 0 new unit tests (removal is structural); 1 integration test asserts `tools/list` no longer contains `tail_session`.
+1. The exact-source mode (`tail_session({source: X, count: N})`) replaces to `search_memories({source: X, limit: N})` using **AC0's new exact-source filter** (R1 correction). The semantics are now identical: descending by timestamp, projected bodies via `projectMatch`, cursor-pagination via `next_cursor`, exact source-string match (NOT prefix LIKE — that was the R1 bug).
+2. The compound modes (`source_app`, no-args fallback, repo_path resolution) are replaced by `echo_resolve_mru → search_memories(source=<resolved>)` two-call composition.
+3. The Cursor Phase 2 legacy fallback (037 AC6) is replaced by `echo_resolve_mru → search_memories(metadata_match={composer_id: <cursor_phase2 result>})` using AC0's new `metadata_match` parameter — closes the R1-identified gap where the kill-tail_session decision originally lost this filter.
+4. `tools/list` no longer advertises `tail_session`. Callers receiving a missing-tool error from an MCP client SDK update.
+5. Any internal callers of `tailSession()` function (verify none today): N/A — this tool is only consumed via the MCP protocol surface. The `searchMatchSchema` import from `tail-session.ts` (used by callers) is moved to `search-memories.ts` where it originated (cross-check `search-memories.ts:211` — schema actually lives there; tail just re-exported. So this is a no-op on the consumer side except for the import-path bookkeeping). **R1 refinement — Cursor R1 #9:** pre-merge grep-verify: `grep -rn "from.*['\"].*tail-session" src/` returns zero hits before the merge ships.
+6. Description-text references to `tail_session` in OTHER tools' descriptions removed: `wait-for-new-turns.ts:44, 53`, `get-atoms.ts:36`. Replace with the new composition pattern (or omit references).
+7. Tests: 0 new unit tests (removal is structural); 1 integration test asserts `tools/list` no longer contains `tail_session`; 1 integration test asserts the new composition (`echo_resolve_mru → search_memories(source=X)`) recovers the same atoms today's `tail_session(source_app=X)` does on a fixture set.
 
-### AC3 — Kill `recent_work_context`; factor cluster engine into a shared internal helper
+### AC3 — Remove `recent_work_context` from MCP surface; factor cluster engine into a shared internal helper (file deletion deferred per R1 correction)
 
-**Surface:** delete `src/mcp/tools/recent-work-context.ts` as a registered MCP tool (line 601 `registerTool` removed); rewrite `src/mcp/tools/find-clusters.ts:190` to call a new internal helper directly.
+**R1 correction context (Codex + Cursor convergent finding):** the original 038 spec claimed the 031 deprecation gate was "well-open." R1 reviewers caught that's wrong by calendar: the gate is *≥1 week post-030 dogfooding* (= 2026-05-17, 6 days from 2026-05-11). Codex pushed back hard: *"strategist cannot infer founder consent for the override."* AC3 is split: 038 does the cluster-engine factor-out + removes `recent_work_context` from `tools/list` (no longer user-facing). **Actual file deletion is deferred to a follow-up item that fires 2026-05-17 (post-calendar-gate) OR when founder explicitly overrides earlier.**
+
+**Surface:** `src/mcp/tools/recent-work-context.ts` (file stays in-tree, MCP-tool registration removed); rewrite `src/mcp/tools/find-clusters.ts:190` to call a new internal helper directly; new internal file `src/mcp/internal/cluster-engine.ts`.
 
 **Contract:**
 
-1. The cluster discovery engine (today the body of `getRecentWorkContext` in `recent-work-context.ts:~143–479`: time-window resolution, fs-exclusion, no-args 4h→24h auto-expand, cluster building via `src/trace/cluster.ts`, single-source-recent demotion via `rankClusters`, warnings) is factored into a new internal module — suggested location `src/mcp/internal/cluster-engine.ts`. The engine is NOT exposed as an MCP tool; it's a strategy-internal helper for `find_clusters`.
-2. `find_clusters.ts:190` rewrites the call from `getRecentWorkContext(...)` to the new internal helper. The wire-level `find_clusters` tool surface (input shape, output shape, warnings) is unchanged — only the internal callee changes.
-3. The 031 deprecation gate (founder direction 2026-05-09: gated removal of `recent_work_context` after ≥1 week of post-030 dogfooding) fires concurrently with this AC. The gate has been open since 030 shipped 2026-05-08 (~3 days). Empirical signal: no journal entries since 2026-05-09 cite `get_recent_work_context` by name — the deprecation has been silent in practice.
-4. `tools/list` no longer advertises `recent_work_context` / `get_recent_work_context`.
-5. All public exports from `recent-work-context.ts` that other modules depend on (verify by `grep -rn "from.*recent-work-context"`) are either (a) moved to the new internal cluster-engine module, OR (b) inlined at their single call site. Specifically:
-   - `getRecentWorkContext` function → moved into the internal engine
+1. The cluster discovery engine (today the body of `getRecentWorkContext` in `recent-work-context.ts:~143–479`: time-window resolution, fs-exclusion, no-args 4h→24h auto-expand, cluster building via `src/trace/cluster.ts`, single-source-recent demotion via `rankClusters`, warnings, **AND the `repo_path` → `metadata_match: {repo_root}` forwarding added by 037's AC4 at line ~379**) is factored into a new internal module — suggested location `src/mcp/internal/cluster-engine.ts`. The engine is NOT exposed as an MCP tool; it's a strategy-internal helper for `find_clusters`.
+2. **R1 correction (Cursor R1 #4):** the cluster-engine factor-out MUST inherit 037's repo_path forwarding verbatim. The new internal engine accepts the same `repo_path?: string` parameter (already normalized by the calling tool) and threads it as `metadata_match: {repo_root: repo_path}` into its internal `storage.query` call. Without this, 038 silently regresses `find_clusters(repo_path=X)` to global behavior.
+3. `find_clusters.ts:190` rewrites the call from `getRecentWorkContext(...)` to the new internal helper. The wire-level `find_clusters` tool surface (input shape, output shape, warnings, including the `repo_path` parameter added by 037) is unchanged — only the internal callee changes.
+4. The MCP registration of `recent_work_context` is REMOVED (`server.ts` import + `registerTool` call dropped). `tools/list` no longer advertises `recent_work_context` / `get_recent_work_context`.
+5. **The file `src/mcp/tools/recent-work-context.ts` stays in-tree as a no-op shell.** Its public exports remain available so that internal code (the new cluster engine) can be implemented either as a refactor-in-place OR as a parallel file. Builder's choice on shape; the constraint is: zero MCP-tool surface area, zero behavior regression on `find_clusters`.
+6. **A new follow-up item `2026-05-17-XXX-recent-work-context-file-removal.md` is filed in `_followups.md` at AC3 implementation time** (not in 038's scope to file it, but the spec records the intent). The follow-up:
+   - Triggers 2026-05-17 (calendar gate satisfied) OR earlier on founder explicit override.
+   - Scope: delete the `recent-work-context.ts` file, move any remaining shared exports (e.g. `hasTzMarker` re-export at line 344) to their canonical locations, update any imports.
+   - Includes a **founder-consent receipt section** (Cursor R1 refinement #3 format): cites original 031 gate criterion, empirical signal (zero `get_recent_work_context` calls in journal since 2026-05-09), and decision date.
+7. All public exports from `recent-work-context.ts` that other modules depend on (verify by `grep -rn "from.*recent-work-context"`):
+   - `getRecentWorkContext` function → moved into the internal engine (the old file may re-export it as a transition, or callers update — builder's choice)
    - `hasTzMarker` re-export at line 344 → callers should import directly from `src/mcp/util/iso8601.ts` (already the canonical location)
    - `TZ_NAIVE_WARNING` re-export → same as above
-6. Tests: existing `recent-work-context.test.ts` tests are renamed and re-rooted on the new internal engine — they test the same behavior (auto-expand, demotion, fs-exclusion), just at a different seam. `find_clusters.test.ts` gets one additional test asserting the internal engine integration works end-to-end with the same shape.
+8. Tests: existing `recent-work-context.test.ts` tests are renamed and re-rooted on the new internal engine — they test the same behavior (auto-expand, demotion, fs-exclusion, **and 037's repo_path forwarding**), just at a different seam. `find_clusters.test.ts` gets one additional test asserting the internal engine integration works end-to-end with the same shape, including a regression test for `find_clusters({repo_path: X})` returning identical results to post-037 behavior.
 
 ### AC4 — Unbundle `wait_for_new_turns` bodies
 
@@ -172,7 +198,7 @@ Every workflow that today goes through `tail_session` has a 1- or 2-call composi
 1. New exported constant or function (suggested: `export const EXCLUDE_FS_SURFACE: readonly string[] = ['fs'] as const;` plus a helper builder `export function withFsExclusion<F extends QueryFilter>(f: Omit<F, 'exclude_metadata_surface'>): F { return { ...f, exclude_metadata_surface: ['fs'] } as F; }`). Builder's choice on shape; the constraint is: ONE definition site, all callers reach through it.
 2. The Bug B regression (2026-05-08 — new tool ships without fs-exclusion → fs-watcher events dominate results) is structurally impossible after AC5: a new retrieval tool that wants the fs-watcher exclusion must import the helper; one that doesn't import it explicitly is making an explicit "include fs surfaces" choice (rare, but legitimate for fs-watcher diagnostics).
 3. The 4 today-sites are reduced to 3 surviving (tail-session.ts and recent-work-context.ts go away in AC2 + AC3). All 3 surviving sites + 1 new site (AC1's `echo_resolve_mru`) + 1 internal engine site (AC3's cluster engine) = 5 call sites total, all reaching through the new helper.
-4. Tests: 1 unit test asserting the helper's output shape matches today's hardcoded `{exclude_metadata_surface: ['fs']}`. No other behavior change to verify.
+4. Tests: 1 unit test asserting the helper's output shape matches today's hardcoded `{exclude_metadata_surface: ['fs']}`. PLUS **1 grep-scan integration test (R1 refinement — Cursor R1 #7)**: a test that scans `src/mcp/tools/*.ts` (excluding the helper file itself) for the string literal `exclude_metadata_surface: ['fs']` and FAILS if any hit is found. Closes the structural-impossibility loop: the Bug B regression (a new tool ships re-hardcoding the constant) is now caught by CI, not by post-merge dogfooding.
 
 ### AC6 — Dogfooding verification
 
@@ -197,7 +223,7 @@ Every workflow that today goes through `tail_session` has a 1- or 2-call composi
 
 # Implementation Notes
 
-- **Suggested commit shape:** 5 commits — (a) AC5 DRY helper (smallest, lands first as foundation); (b) AC1 `echo_resolve_mru` + tests (depends on AC5); (c) AC3 cluster engine factor-out + `find_clusters` rewrite + delete `recent_work_context` + tests; (d) AC2 delete `tail_session` + description-text cleanup in sibling tools + tests; (e) AC4 unbundle `wait_for_new_turns` + tests. Each commit independently passes `npm test`, lint, typecheck — the reviewer can stage their read incrementally.
+- **Suggested commit shape (R1 reordered):** 6 commits — (a) AC5 DRY helper (smallest, lands first as foundation); (b) **AC0 `search_memories` source + metadata_match expansion** (R1 addition; foundation for AC2's composition replacement); (c) AC1 `echo_resolve_mru` + tests (depends on AC0 + AC5); (d) AC3 cluster engine factor-out + `find_clusters` rewrite + REMOVE recent_work_context MCP registration (file stays in-tree per R1 split); (e) AC2 delete `tail_session` + description-text cleanup in sibling tools + grep-verify (R1 refinement) + tests; (f) AC4 unbundle `wait_for_new_turns` + tests. Each commit independently passes `npm test`, lint, typecheck.
 - **AC3 is the largest engineering item.** The cluster engine in `recent-work-context.ts:~143–479` is ~340 lines tightly coupled to its public function signature. Factor-out requires: pulling out the time-window-resolution + cluster-build + rank pipeline as an internal helper; routing today's 2 callers (`find-clusters.ts:190` + the now-removed MCP tool wrapper) cleanly. The single-source-recent demotion (item 032) and no-args auto-expand semantics MUST be preserved verbatim — the new internal helper has the same behavior, just a different module boundary.
 - **AC1 + AC2 are bounded by AC3's completion.** `echo_resolve_mru` is the replacement for `tail_session`'s compound modes; both can be specced independently but the builder should land AC3's factor-out first to ensure no shared cluster-engine state gets re-imported into the new resolver.
 - **No new dependencies.** Everything is internal refactor + one new MCP tool registration. The `node:path` + Zod + storage-interface imports are all already present.
@@ -225,4 +251,33 @@ Every workflow that today goes through `tail_session` has a 1- or 2-call composi
 
 # Review history
 
-(filled at R1 review)
+## R1 — 2026-05-11 ~16:55 PDT (Codex) + ~17:05 PDT (Cursor) + ~20:05 PDT (direction-call round both reviewers) — patched 2026-05-11 ~20:15 PDT by strategist
+
+Cross-tool R1 review against the as-shipped 038 spec (commit `568a2b9`, local-only). Codex and Cursor each ran independent reads + a follow-up direction-call round after I asked for input on (A/B) (search_memories expansion vs keep tail_session thin wrapper) + (a/b/c) (031 gate deferral / override / hold). Combined: **10 findings dispositioned (2 convergent HIGH-impact + 7 unique + 1 direction-call call)**.
+
+**Sources:**
+- Codex R1: rollout `019e1955` asst #18 (3 findings, pushback verdict)
+- Codex direction-call: rollout `019e1955` asst #24 (verdict on A/B + 031 gate)
+- Cursor R1: composer `459e6f6d` bubble `3d272155` (3 MED + 4 LOW = 7 findings, PROCEED-with-patches verdict)
+- Cursor direction-call: composer `459e6f6d` bubble `16ee13b2` (agrees with A + b-with-receipt)
+
+**Findings dispositioned:**
+
+| # | Severity | Source | Finding | Spec patch |
+|---|---|---|---|---|
+| 1 | MED (Codex) / MED (Cursor) | Codex + Cursor (convergent, code-grounded) | AC2 claimed `tail_session(source=X)` ≡ `search_memories(source_prefix=X)` reverse-chrono. False: `tail-session.ts:321` uses exact source match; `search-memories.ts:141` uses LIKE prefix. Sibling-source over-inclusion risk. Also: `search_memories` lacks `metadata_match` exposure required for 037 Cursor Phase 2 fallback. | **NEW AC0** added (foundation): expand `search_memories` with `source?: string` (exact) + `metadata_match?: Record<string, string>` (whitelisted at storage seam, tool-layer isError on non-whitelisted keys per Cursor R1 refinement). AC2 rewritten to use AC0's new filters in the composition. |
+| 2 | MED (Codex) / MED (Cursor) | Codex + Cursor (convergent) | 031 deprecation gate (≥1 week post-030 dogfooding) fires **2026-05-17**, NOT today. Spec's "well-open" claim was wrong by calendar (6 days early). Codex pushback: strategist cannot infer founder consent for override. | **AC3 split (option a)**: 038 removes `recent_work_context` from MCP `tools/list` registration AND factors out the cluster engine to internal helper, BUT leaves the file in-tree as a no-op shell. New follow-up item filed for 2026-05-17 (calendar gate) OR earlier founder explicit override; includes founder-consent receipt section per Cursor R1 refinement #3 format. |
+| 3 | MED (Codex) | Codex (subsumed under #1) | `echo_resolve_mru → search_memories` composition silently lost 037's Cursor Phase 2 metadata-filter capability. | Closed by AC0's `metadata_match` parameter. AC1 + AC2 contracts now show the explicit composition pattern using `metadata_match: {composer_id: <phase 2 result>}`. |
+| 4 | MED (Cursor) | Cursor R1 #1 | `echo_resolve_mru` had two mutually-exclusive input axes (`source_app` XOR `sources`) — same "every retrieval tool has different parameter shape" anti-pattern. | AC1 collapsed to single axis `sources: string[]` (matches `wait_for_new_turns.ts:108`). Single unified output shape `{sources: Record<string, string|null>, cursor_phase2?: Record<string, {composer_resolved: string}>, repo_path?, warnings}`. |
+| 5 | MED (Cursor) | Cursor R1 #4 | AC3 cluster engine factor-out spec OMITTED `repo_path` forwarding — would have silently regressed 037's `find_clusters(repo_path=X)` path. | AC3 contract #2 added: new internal engine MUST inherit 037's repo_path → metadata_match: {repo_root} forwarding verbatim. New regression test asserts post-038 `find_clusters({repo_path})` matches post-037 behavior. |
+| 6 | LOW (Codex) | Codex R1 #4 | AC1 said "8 unit tests" but listed 12+ cases. | Corrected to "at least 10 unit tests" with explicit enumeration. |
+| 7 | LOW (Cursor) | Cursor R1 #2 | AC5 "Bug B structurally impossible" claim had no failing test. | AC5 contract #4 extended with grep-scan integration test: scans `src/mcp/tools/*.ts` (excluding helper file) for `exclude_metadata_surface: ['fs']` string; fails if hit. CI-enforced, not dogfood-only. |
+| 8 | LOW (Cursor) | Cursor R1 #6 | AC1 test fixtures didn't require post-037 `metadata.repo_root` shape — 037 cooperation not actually exercised. | AC1 contract #7 added: test fixtures MUST include `metadata.repo_root` populated per 037's AC1 contract for ≥2 source_apps; Cursor fresh-composer fixture also writes repo_root via 037's file-walk fallback. |
+| 9 | LOW (Cursor) | Cursor R1 #7 | AC2 description claimed `searchMatchSchema` "lives" in `search-memories.ts:211` — builder should verify by grep before merge. | AC2 contract #5 extended with pre-merge grep-verify: `grep -rn "from.*['\"].*tail-session" src/` returns zero hits before the merge ships. |
+| 10 | DIRECTION | Codex + Cursor | The A/B (search_memories expansion vs keep thin tail wrapper) and (a/b/c) (031 gate handling) decisions I asked for input on. | Codex + Cursor unanimous on (A); split on 031 — Cursor agrees with (b) if documented, Codex pushes back to require explicit founder consent. Strategist defaults to **(a) — file deletion deferred** per Codex's no-inferring-consent rule; founder can upgrade to (b) by approving the override explicitly. |
+
+**Convergence quality:** 2 of the 5 substantive findings (1 + 2) were independently raised by both reviewers with the same diagnosis. Both convergent findings were load-bearing — Finding 1 caught a code-wrong claim Cursor itself made at round-4 of the pre-spec strategy phase (then re-verified at code-level by Codex during R1); Finding 2 caught a calendar error I'd carried over from my own 16:33 PDT journal entry. The cross-tool review pattern delivered the same kind of structural validation it did on 037.
+
+**Decay pattern starts here:** 038 R1 = 10 findings (2 convergent). Expect R2 to add 3-5 implementation-disambiguation findings per the 037 pattern. Worth running R2 because AC0 (new parameter on `search_memories`) deserves independent re-verification at the implementation-detail level.
+
+**Status:** spec is post-R1-patched. Route to R2 review (Codex + Cursor independent reads) before claim.
