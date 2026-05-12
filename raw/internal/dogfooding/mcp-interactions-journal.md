@@ -2449,6 +2449,26 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note (process):** Cursor's R3 response and journal commits had already landed on `origin/main` while this review was running (`2908f42`, `a4d3aa0`, `d05ee94`). Codex reviewed the same `e45a97b` spec artifact, committed on top of current main, then pushed successfully after `git pull --rebase origin main`.
 - **Conjecture (observation-only):** R4 should be a small RC4 patch: add a three-way watcher outcome (`converge` vs `patch-and-next-round` vs `defer/escalate`), add an R2-derived match-key fixture, and decide whether `queue-errors.log` is local-only or trackable. If Cursor R4 stays LOW/zero and Codex R4 verifies those two mechanics, 039 is builder-claim ready.
 
+### 2026-05-12 01:15 PDT — Strategist (Claude Code 9b575b57): 039 R3 combine + RC4 patch + r3/combined.md + queue-errors.md seed
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same session that drafted RC1+RC2+RC3.
+- **Trigger:** Founder said "both in flight" at 00:54 PDT then "actually cursor is done" at 00:56 PDT. Strategist killed AND-gated R3 poll, started Codex-only watcher; Codex landed at 01:03 PDT. Both reviewer commits already on `origin/main` (Cursor pushed at 00:53–00:55; Codex pushed at 01:03). Reviewer push behavior matured at R3 vs R2 — both now operational-push directly.
+- **Query inputs (1 ECHO call + filesystem reads):**
+  1. `echo_resolve_mru({sources:['codex','cursor'], repo_path:'/Users/zhenye/Desktop/Project_echo'})` — same sources as R1+R2.
+  2. `Read backlog/reviews/.../r3/{codex.md,cursor.md}` directly from canonical queue path. Filesystem retrieval was primary, again.
+  3. Codex-only background watcher (`bhyk66wb3`) caught task_complete count 5→6 at 01:03:23 PDT.
+- **Returned:**
+  - **Codex R3 (3 findings: 2 MED + 1 LOW; `proceed_after_patches`):** M1 (load-bearing — AC3.5 state machine conflates accepted-inline with convergence; counter-example: RC3's own R2→R3 transition); M2 (cross-ref R2 M3 — normalized `where` still over-collapses under "primary appears in related" rule); L3 (`queue-errors.log` gitignored).
+  - **Cursor R3 (5 findings, all LOW; `proceed_after_patches`):** L1 frontmatter triggers list; L2 AC6b narrative; L3 one-round-per-tick clarification; L4 session-bootstrap clarification; L5 journal-pointer parenthetical.
+  - **Combined verdict: `proceed_after_patches`** (within `{proceed*}`; no escalation).
+- **Sources:** Codex JSONL turn 5 (R3); Cursor wrote response via direct file edit (no new bubbles since R3 baseline 137180) — **filesystem at canonical queue path was load-bearing retrieval**; ECHO substring index irrelevant.
+- **Verdict:** ✅ right on combine; 8 R3 findings dispositioned in RC4. 🟢 substrate-positive — reviewer push behavior matured (both auto-push now); zero-ECHO-call reviewer property held; canonical-queue-path filesystem retrieval validated as primary mechanism for R3 too.
+- **Note (strongest catch yet — recursive review-history-as-evolutionary-record):** Codex R3 M1 was found by Codex reading prior rounds' §Review History in the spec body and noticing that RC3's watcher would have skipped THIS VERY ROUND if its logic had been implemented as drafted. **The bug was caught BY the round it would have prevented.** Strongest empirical evidence that the queue's "documented review history" property is load-bearing for design correctness — prior rounds become test fixtures for the watcher's future correctness.
+- **Note (R3 finding distribution was clean):** None of R3's 8 findings shared `primary_where_section` at exact-sub-anchor specificity — cleanest divergent round in the cycle. Exercises the new match-key rule's UNDER-collapse property; multi-section path still tested only by R2 fixture (Cursor R2 H1's 3-section `where`).
+- **Note (cross_ref override used in practice):** Codex R3 M2's `cross_ref: { round: 2, reviewer: codex, finding_index: 3 }` is the first explicit cross-round cross-ref in the cycle. Match-key handled it correctly as canonical override.
+- **Note (reviewer push maturation curve):** R2 reviewers committed locally / did not push (conservative). R3 reviewers committed AND pushed (operational). Canonical pattern now empirically established. The progressive-trust maturation matches the queue's design intent — once `push-with-retry.sh` is wired into reviewer prompts (AC3 step 5), this becomes automatic.
+- **Conjecture (observation-only):** R4 is the verification round per the new AC3.5 step 3 (b) branch — the very logic RC4 patches. Expected R4 yield: ≤ 3 LOWs. **If both R4 verdicts are `proceed` OR `proceed_after_patches` with only LOWs → convergence declared; 039 claim-ready.** Per 038 decay curve, R4 should be the final polish round. If R4 catches a new HIGH or MED, structural revision needed.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

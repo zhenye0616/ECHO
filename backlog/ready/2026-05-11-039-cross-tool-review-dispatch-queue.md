@@ -1,6 +1,6 @@
 ---
 id: 2026-05-11-039-cross-tool-review-dispatch-queue
-title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC3 / R2-patched)
+title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC4 / R3-patched)
 status: ready
 priority: HIGH
 estimate: 1.5-2d
@@ -112,7 +112,7 @@ artifact_sha: <SHA the reviewer actually read>
                                          # MUST equal request.spec_commit_sha; on mismatch, reviewer ABORTS this run
                                          # and re-fetches the spec at request.spec_commit_sha (R1 patch — Cursor M3).
                                          # If SHA drift is genuine (strategist patched mid-round), reviewer appends a
-                                         # one-line "sha-drift, retrying at <sha>" entry to raw/internal/queue-errors.log
+                                         # one-line "sha-drift, retrying at <sha>" entry to raw/internal/queue-errors.md
                                          # (NOT the journal — R2 patch Cursor M3 option b) and waits for next loop tick.
 completed_at: 2026-05-12T07:15:00Z       # ISO-8601 UTC
 verdict: proceed                         # in <reviewer>.md: one of {proceed, proceed_after_patches, pushback}
@@ -155,6 +155,8 @@ combined_verdict: proceed_after_patches  # strategist's roll-up of the two revie
                                          # (e.g., proceed + pushback → pushback; proceed + proceed → proceed; etc.)
 escalated_to_founder: false              # true if combined_verdict crosses the {proceed*, pushback} boundary
                                          # OR if combined_verdict = single_reviewer_timeout
+                                         # OR if combined_verdict = no_responses (R3 patch — Cursor R3 L1:
+                                         # all three escalation triggers listed for canonical-template clarity)
 ---
 
 # Combined findings table
@@ -218,15 +220,15 @@ done
 
 # Second push attempt failed — leave the local commit unpushed; log to queue-errors so founder sees it.
 # Per §Implementation Notes JOURNAL-AS-QUEUE PROHIBITION (R2 patch — Cursor M3 option b):
-# queue error logs land in raw/internal/queue-errors.log, NOT in the dogfooding journal.
+# queue error logs land in raw/internal/queue-errors.md, NOT in the dogfooding journal.
 sha=$(git rev-parse HEAD)
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "${ts} PUSH-RACE-FALLBACK: ${CONTEXT} sha=${sha}" \
-  >> raw/internal/queue-errors.log
+  >> raw/internal/queue-errors.md
 exit 1
 ```
 
-The strategist watcher (AC3.5 step 1) detects unpushed commits during its `git pull` step and surfaces them to founder via the `queue-errors.log` tail. Founder periodically scans `raw/internal/queue-errors.log` (or the watcher can append a one-line journal entry "see queue-errors.log for push-race fallbacks since <timestamp>" on a daily schedule — outside the queue handshake, so still observation-layer).
+The strategist watcher (AC3.5 step 1) detects unpushed commits during its `git pull` step and surfaces them to founder via the `queue-errors.md` tail. Founder periodically scans `raw/internal/queue-errors.md` (or the watcher can append a one-line journal entry "see queue-errors.md for push-race fallbacks since <timestamp>" on a daily schedule — **not a queue artifact; observation-only pointer outside the handshake — R3 patch Cursor R3 L5**).
 
 **Round monotonicity:** Round numbers are monotonically increasing; `r{N+1}/` is only created after `r{N}/combined.md` exists.
 
@@ -322,10 +324,13 @@ A slash-command file at `.claude/commands/review-queue-watch.md` that defines th
 2. **Run `tools/review-queue/combine.py`** for any rounds where (a) both reviewer responses exist AND `combined.md` does not, OR (b) timeout fired (per AC4). `combine.py` writes the draft `combined.md` for each eligible round.
 3. **For each fresh `combined.md` produced this tick:**
    - **If `escalated_to_founder: true`** (divergent verdicts crossing the {proceed*, pushback} boundary, or `single_reviewer_timeout`, or `no_responses`): append a journal entry citing the queue path; exit. **Founder will see and act on next session.** The strategist does NOT attempt to adjudicate divergence — that's the §"Out of Scope" #7 boundary.
-   - **Else (combined_verdict within {proceed*, pushback}):** the strategist autonomously dispositions findings. For each row in the convergent + divergent tables, fill the `Disposition` column based on the strategist's judgment of the spec direction. Commit the disposition update to `combined.md` via push-with-retry. Then:
-     - **If all dispositions are "accepted" (no follow-ups, no deferred items):** apply the patches to the spec file inline. Commit the spec patch via push-with-retry. Set `next_round: null` in `combined.md` (convergence declared); exit.
-     - **Else:** apply the accepted patches; defer the rest as named follow-up items. Commit the spec patch via push-with-retry. Run `tools/review-queue/request.py <item_id> <N+1>` to write `r{N+1}/request.md` with `focus_hints` carried forward from this round's deferred items. Commit + push the request file via push-with-retry.
-4. **Exit.** One round per tick (combine + disposition + patch + next-request, OR convergence-declare); next tick picks up the next eligible round.
+   - **Else (combined_verdict within {proceed*, pushback}):** the strategist autonomously dispositions findings. For each row in the convergent + divergent tables, fill the `Disposition` column based on the strategist's judgment of the spec direction. Commit the disposition update to `combined.md` via push-with-retry. Then **(R3 patch — Codex R3 M1, load-bearing structural fix):**
+     - **(a) Zero patches applied** (verdict was `proceed` with no actionable findings, OR a `pushback` where all findings deferred to follow-ups outside the round): set `next_round: null` in `combined.md`; commit + push the final update via push-with-retry. **Convergence declared without verification** because no spec changes need verifying.
+     - **(b) Patches applied — verification round needed (DEFAULT for any spec change):** apply patches to the spec file inline. Commit the spec patch via push-with-retry. Run `tools/review-queue/request.py <item_id> <N+1>` with `focus_hints` citing what was patched (the strategist must list at minimum: each load-bearing finding's section, the disposition's chosen prescription, and any falsifiable claim worth re-checking). Commit + push `r{N+1}/request.md` via push-with-retry. Set `next_round: <N+1>` in this round's `combined.md`; commit + push that update. **This is the default branch.** RC3's own R2→R3 transition is the canonical example: all R2 findings accepted inline with zero deferred follow-ups, but R3 was correctly needed to verify the patches landed cleanly (and R3 then caught this very bug in AC3.5 — the structural review-history value working as designed).
+     - **(c) Patches applied — verification explicitly waived (rare):** strategist's-call when patches are mechanical (typo fixes, comment-only changes, link updates) AND no reviewer requested a verification round AND no finding was load-bearing. Strategist writes a one-line "verification waived; rationale: <…>" into combined.md and sets `next_round: null`. **Use sparingly — when in doubt, run a verification round.** This branch is for the edge case where another round would be pure overhead; the default is (b).
+
+The "accepted-without-follow-ups" condition does NOT imply convergence. **Accepted-without-follow-ups is orthogonal to whether the patches need verification.** R2 accepted all 14 findings inline with zero follow-ups; the patches were substantive enough that R3 verification was required (and necessary — R3 caught Codex M1 = this very fix). Builder MUST implement the (a)/(b)/(c) split correctly; AC4 tests cover all three branches.
+4. **Exit.** **One round per tick** when driven from `/review-queue-watch` (R3 patch — Cursor R3 L3): `combine.py` processes at most one newly-eligible round per invocation, then this tick handles disposition + patch + next-request (or convergence-declare) for that single round. Next tick picks up the next eligible round. This makes the tick body deterministic in scope; long ticks are avoided by serializing rounds across ticks rather than batching them. (Builder note: `combine.py` MAY be invoked with `--all` or similar outside the `/loop` body for one-shot batch processing, but the watcher-driven path is one-round-per-tick.)
 
 **The key word from RC2 that R2 H1 caught — "manually" in AC4 step 3 — is now bound to "the strategist agent autonomously dispositions"** (R2 patch — Cursor H1). The disposition step is judgment work, but the strategist agent does it inside the `/loop` tick without founder input. Founder input is only required when `escalated_to_founder: true`, per the verdict roll-up table in AC4.
 
@@ -351,9 +356,11 @@ Each finding's `where` field is parsed into:
 - `primary_where_section`: the first `§<Section>` (or `§<Section><sub-section>`) reference in the `where` string. Required.
 - `related_where_sections`: a list of any additional `§<Section>` references. Optional.
 
-Two findings are **convergent on (where)** if their `primary_where_section` matches OR if one's `primary_where_section` appears in the other's `related_where_sections`. The explicit `cross_ref` field (R1 patch, M5) is the canonical override: when a reviewer marks `cross_ref: { round, reviewer, finding_index }`, that pair is treated as convergent regardless of `where` overlap.
+Two findings are **convergent on (where)** if their `primary_where_section` matches **EXACTLY at full sub-anchor specificity** (R3 patch — Codex R3 M2: `§AC4 combine logic` matches `§AC4 combine logic` but NOT bare `§AC4` alone — sub-anchor specificity must agree). `related_where_sections` is **observational only** — it helps the strategist read the finding's full context but does NOT trigger convergence. The explicit `cross_ref` field (R1 patch, M5) IS the canonical override: when a reviewer marks `cross_ref: { round, reviewer, finding_index }`, the pair is convergent regardless of `where` overlap.
 
-This normalization closes Codex's R2 M3: raw free-form `where` strings under-collapse (different wording for the same section) and section-token-overlap matching over-collapses (broad findings collide on shared sections). The primary-section anchor + cross-ref override matches the live R1 + R2 distribution.
+This normalization closes Codex's R2 M3 + R3 M2: raw free-form `where` strings under-collapse (different wording for the same section); section-token-overlap matching over-collapses (broad findings collide); the "primary appears in related" rule from RC3 still over-collapses against multi-section findings whose primary anchor is a structural section (e.g., a 3-section `where` like Cursor R2 H1's `§Implementation Notes "Strategist watcher" + §AC3 + §AC4` should NOT converge with single-section `§AC4 combine logic` findings just because they share a section token). The full-sub-anchor exact-match rule + cross_ref override is the falsifiable shape.
+
+**Fixture test against R2's actual findings (R3 patch — Codex R3 M2):** `tests/review-queue/combine.test.ts` includes a fixture pulled from R2's real combined.md. Cursor R2 H1 (`primary_where_section: §Implementation Notes "Strategist watcher"`, `related_where_sections: [§AC3, §AC4]`) MUST NOT converge with Codex R2 M2 (`primary_where_section: §AC4 combine.py polling semantics`) or Codex R2 M3 (`primary_where_section: §AC4 combine logic`). The match-key fix is verified against live distribution; builder must implement parse+match such that this fixture passes.
 
 Severity disagreement (HIGH vs MED on the same `where`) is recorded but not treated as divergent at the queue layer — the strategist dispositions both findings in `combined.md`.
 
@@ -391,7 +398,7 @@ Tests at `tests/review-queue/concurrency.test.ts` covering:
 - Two strategist invocations writing the same `request.md` concurrently: second writer sees `FileExistsError` on `os.link`, exits cleanly. (Same-SHA = idempotent; different-SHA = error per AC2.)
 - Two reviewer invocations writing the same `codex.md` concurrently: `os.link` is atomic; first writer wins via successful link, second writer sees `FileExistsError`, drops its temp, exits.
 - A reviewer crashes after writing `codex.md.<uuid>.tmp` but before `os.link`: the orphan `.tmp.<uuid>` file is cleaned up by combine.py on its next poll (≥ 30 min old).
-- Two reviewers push to `origin/main` concurrently: `push-with-retry.sh` (`git pull --rebase + retry once`) resolves the race; if both attempts fail, the helper writes a `PUSH-RACE-FALLBACK` line to `raw/internal/queue-errors.log` (NOT the journal — per R2 patch Cursor M3 option b) and the unpushed commit waits for the next loop tick.
+- Two reviewers push to `origin/main` concurrently: `push-with-retry.sh` (`git pull --rebase + retry once`) resolves the race; if both attempts fail, the helper writes a `PUSH-RACE-FALLBACK` line to `raw/internal/queue-errors.md` (NOT the journal — per R2 patch Cursor M3 option b) and the unpushed commit waits for the next loop tick.
 - Strategist `combined.md` push and `patch + next-request` push use the same `push-with-retry.sh` helper (R2 patch — Cursor M2 uniformity).
 - **Same-SHA idempotency assertion (R2 patch — Codex L5):** `request.py` race-loser test asserts the `FileExistsError` path reads the existing `request.md` and EXPLICITLY confirms same-SHA before exit 0 (NOT just `FileExistsError → exit 0` blindly).
 - Watcher polling: combine.py running on a `/loop 10m` cadence detects "round complete" within one poll interval (deterministically — both response files exist on `origin/main`).
@@ -420,11 +427,12 @@ Other failure modes (push race, SHA drift, missing reviewer) are covered at unit
 
 **AC6b — Post-merge real-use validation (follow-up; NOT a 039 blocker).**
 
-Filed as a separate post-merge item after 039 lands: the strategist authors the **next item that would have gone through ≥1 cross-tool spec-review round** (Cursor L2 — not just "next item"; many backlog items are bugfix/doc that skip review). Runs `request.py` to create r1/request.md. Founder has pre-configured all three polling primitives per AC0 (Claude Code `/loop` for strategist watcher; reviewer-client loops for Codex + Cursor). Reviewers poll, read at request SHA, respond. Strategist `/loop` invokes `combine.py`, dispositions findings, patches spec, commits patch, runs `request.py` for r2/. Repeats until convergence. Item is claimable.
+Filed as a separate post-merge item after 039 lands: the strategist authors the **next item that would have gone through ≥1 cross-tool spec-review round** (Cursor L2 — not just "next item"; many backlog items are bugfix/doc that skip review). Runs `request.py` to create r1/request.md. Founder has pre-configured all three polling primitives per AC0 (Claude Code `/loop 10m /review-queue-watch` for the strategist watcher per AC3.5; reviewer-client loops for Codex + Cursor). Reviewers poll, read at request SHA, respond. **Strategist `/loop /review-queue-watch` tick** runs `combine.py`, autonomously dispositions findings (AC3.5 step 3 case b/c — see AC3.5 for the full tick body), patches spec, commits patch, runs `request.py` for r2/. Repeats until AC3.5 step 3 case (a) or (c) fires (convergence declared with `next_round: null`). Item is then claimable by an agent. (R3 patch — Cursor R3 L2: narrative now cites `/review-queue-watch` + AC3.5 explicitly so post-merge dogfooding instructions match the shipped protocol, not the older "combine.py + manual disposition" reading.)
 
 **AC6b success criteria (measured post-merge):**
 
-- Founder messages during the full R1→R_final cycle: **0 dispatch messages**, ≤ 2 judgment messages (for substantive divergence per §"Out of Scope" #7).
+- **Session bootstrap is out of scope for the counted interval (R3 patch — Cursor R3 L4):** the one-time founder action of pasting the Cursor self-loop prompt at session start, running `/loop 10m ...` once in each Claude Code session, and configuring the `cron`/`launchd` Codex schedule is **not counted as a dispatch message** — it's session setup, analogous to opening the IDE. The counted interval starts at `r1/request.md` land (the strategist writing the first request) and ends at `combined.md` declaring `next_round: null`. **Pasting a self-loop prompt once per Cursor session is one-time setup, not a per-round dispatch.**
+- Founder messages during the counted interval: **0 dispatch messages**, ≤ 2 judgment messages (for substantive divergence per §"Out of Scope" #7).
 - Total wall-clock time for one full round, gated by `request.class`:
   - `class: narrow` → ≤ 30 min per round (R1 patch — Cursor M4: budget locked at r1 time, not retroactively).
   - `class: structural-reform` → ≤ 2 hours per round.
@@ -450,11 +458,12 @@ Dogfooding entry in the journal at the end of AC6b with the actual measured numb
 
 - **JOURNAL-AS-QUEUE PROHIBITION (R1 patch — promoted from §"Out of Scope" #2 to an Implementation Notes invariant; Cursor reviewer-note + Codex live-fire; R2 patch — Cursor M3 option b carve-out):** Reviewer prompts MUST NOT write to the dogfooding journal as part of the queue handshake. Journal entries reference the response file AFTER the response file is committed. The journal is the observation log; the queue is the message bus. Conflating them produces cross-reviewer journal-edit races (observed live during 039 R1: Codex's R1 reviewer turn was unable to commit its journal entry because Cursor had uncommitted journal edits on the same file at the same time — Codex correctly refused to resolve the race).
 
-  **R2 patch — queue error logs go to `raw/internal/queue-errors.log`, NOT the journal.** The push-race-fallback log line (`tools/review-queue/push-with-retry.sh`), sha-drift retries (AC3 step 3), and orphan-tmp-cleanup warnings (AC4) all land in `raw/internal/queue-errors.log`. This file is structurally distinct from the journal:
+  **R2 patch — queue error logs go to `raw/internal/queue-errors.md`, NOT the journal.** The push-race-fallback log line (`tools/review-queue/push-with-retry.sh`), sha-drift retries (AC3 step 3), and orphan-tmp-cleanup warnings (AC4) all land in `raw/internal/queue-errors.md`. This file is structurally distinct from the journal:
     - **Purpose:** queue's emergency-failure-path observability. One purpose per file (matches the "no shared write surface" principle that the journal invariant exists to protect).
-    - **Format:** one-line append-only `${ts} ${CONTEXT}: ${detail}` entries. No structured frontmatter; no narrative; no markdown sections.
+    - **Format (R3 patch — Codex R3 L3):** one-line append-only `${ts} ${CONTEXT}: ${detail}` entries. **`.md` extension (NOT `.log`)** — the project's `.gitignore` ignores `*.log`, which would leave the file local-only and break the "founder periodically scans" + "multiple writers append independently" claims. The `.md` extension matches the existing `raw/internal/` MD/HTML pairing convention and ensures the file is repo-visible by default. No markdown sections / frontmatter required; the file body is plain-text append-only lines.
     - **Read protocol:** strategist watcher (AC3.5 step 1) tails this on startup and surfaces unpushed work to founder; founder reviews periodically.
     - **Conflict-free:** since reviewer pushes and strategist pushes log independently with timestamps, multiple writers never need to coordinate.
+    - **Repo-tracked from day one:** builder commits `raw/internal/queue-errors.md` with a single seed line documenting the file's purpose (e.g., `2026-05-12T00:00:00Z SEED: queue-errors.md — queue emergency-failure-path append-only log (R3 patch — Codex R3 L3)`). All subsequent appends go below the seed line.
 
 - **Bootstrap moment (now complete):** This very spec (039) went through R1 cross-tool review using the *pre-queue* manual dispatch on 2026-05-11 23:35–23:50 PDT (Codex + Cursor R1 reviews journaled). Item 040+ uses the queue. The R1 cycle itself produced the convergent + load-bearing-singleton findings folded into this RC2 patch.
 
@@ -537,7 +546,7 @@ After this item ships and ≥3 specs have gone through the queue end-to-end via 
 | 2 | HIGH | Cursor R2 H2 (drift catch) | §AC0 step 4 — Cursor fallback keyboard-automation violates §Out of Scope #1 | accepted — DELETED keyboard-automation + detached-Cursor-process options; only paste-once-self-loop + explicit manual-paste degradation remain | §AC0 step 3-4 |
 | 3 | MED | Codex R2 M1 | §AC0 step 2 — Codex CLI command shape not concrete (`codex --watch` doesn't exist) | accepted — concrete `codex exec -C ... --sandbox workspace-write --ask-for-approval never -` recipe via cron/launchd | §AC0 step 2 |
 | 4 | MED | Cursor R2 M2 | §Architecture push-race + §AC3-5 + §AC4-3 — retry pattern asymmetric across 3 push types | accepted — shared `tools/review-queue/push-with-retry.sh` helper applied to reviewer responses, strategist combined.md, and strategist patch+next-request | §Architecture push-race, §AC3 step 5, §AC3.5 step 3, §AC4 step 3 |
-| 5 | MED | Cursor R2 M3 | §Architecture push-race FALLBACK vs §Impl Notes JOURNAL-AS-QUEUE PROHIBITION tension | accepted — option (b): queue error logs go to `raw/internal/queue-errors.log` (NOT the journal); invariant preserved absolutely | §Architecture push-race, §Impl Notes JOURNAL-AS-QUEUE PROHIBITION carve-out |
+| 5 | MED | Cursor R2 M3 | §Architecture push-race FALLBACK vs §Impl Notes JOURNAL-AS-QUEUE PROHIBITION tension | accepted — option (b): queue error logs go to `raw/internal/queue-errors.md` (NOT the journal); invariant preserved absolutely | §Architecture push-race, §Impl Notes JOURNAL-AS-QUEUE PROHIBITION carve-out |
 | 6 | MED | Codex R2 M2 | §AC4 combine.py — "no rounds to combine" success path undefined | accepted — explicit "exit 0, no commit, status line for scheduler" step added | §AC4 step 4 |
 | 7 | MED | Codex R2 M3 | §AC4 combine logic — section-granularity `where` matching under/over-collapse risk | accepted — normalized `primary_where_section` + `related_where_sections` shape; `cross_ref` is canonical override | §AC4 combine logic |
 | 8 | MED | Cursor R2 M4 | §AC6a happy-path only — missing failure-mode integration test | accepted (option a) — added orphan-tmp-cleanup × combine.py interaction test inline as step 4-5 | §AC6a |
@@ -552,13 +561,48 @@ After this item ships and ≥3 specs have gone through the queue end-to-end via 
 
 **Convergence near; R3 should be polish-only.** Both R2 verdicts were `proceed_after_patches` and within the `{proceed*}` boundary. RC3 patch closed:
 - The two HIGHs (strategist /loop body AC; keyboard-automation drift removal) — both load-bearing for AC6b measurability.
-- All 7 MEDs, including the JOURNAL-AS-QUEUE PROHIBITION carve-out which preserves the R1 invariant absolutely (queue errors → `queue-errors.log`, not journal).
+- All 7 MEDs, including the JOURNAL-AS-QUEUE PROHIBITION carve-out which preserves the R1 invariant absolutely (queue errors → `queue-errors.md`, not journal).
 - All 5 LOWs, including the dropped `prior_round_atoms` field and the explicit same-SHA idempotency assertion in `request.py`.
 
 **Suggested R3 focus_hints:**
 1. Verify §AC3.5 watcher slash-command body is implementable end-to-end (strategist `/loop` tick: pull → combine.py → disposition → patch → next-request → exit). Especially: the "strategist agent autonomously dispositions findings" step — does it work as a `/loop` body in CC's harness?
 2. Verify the §AC4 normalized `primary_where_section` + `related_where_sections` match key against R2's own findings (live integration test continues — R2 produced multi-section `where` values; R3 dispositions should land cleanly under the normalized shape).
-3. Verify `raw/internal/queue-errors.log` is a real, non-journal file with no existing collision (and that the §Implementation Notes carve-out is unambiguous).
+3. Verify `raw/internal/queue-errors.md` is a real, non-journal file with no existing collision (and that the §Implementation Notes carve-out is unambiguous).
 4. Drift watch: did RC3 reintroduce any of the surface area R1+R2 cut? (Cursor R2's drift watch found one item — keyboard automation — fixed in RC3; R3 should run the same check.)
 
 If R3 verdicts are both `proceed` or `proceed_after_patches` with only LOW findings, **declare convergence and the spec is claim-ready**.
+
+## R3 — 2026-05-12 00:43–01:03 PDT (cross-tool spec review on RC3 @ commit `e45a97b`)
+
+**Reviewers:** Codex (response at `backlog/reviews/.../r3/codex.md`, commit `0a501ad`) + Cursor (response at `backlog/reviews/.../r3/cursor.md`, commit `2908f42`).
+**Verdicts:** Codex `proceed_after_patches` (3 findings: 2 MED + 1 LOW) + Cursor `proceed_after_patches` (5 LOW only) → **combined_verdict: `proceed_after_patches`** (within `{proceed*}` boundary; no founder escalation).
+**Round dispatched manually** — last manual dispatch before AC3.5 ships. Both reviewers pushed their response + journal commits to origin/main directly this round (R2's conservative "no-push-without-explicit-ask" stance relaxed once the canonical commit pattern was empirically established; per §"Out of Scope" #4 reviewer queue commits are operational, not founder-gated).
+
+**Live integration test of R2 normalized-where-match-key fix:** R3 reviewers' findings exercise the new shape. Cursor R3 L1 + L2 + L4 + L5 are single-section `primary_where_section` findings; Codex R3 M1 + M2 + L3 also single-section. **None of R3's findings exercise the multi-section `related_where_sections` path**, so R3 cannot fully validate the parser's behavior on multi-section `where` strings. The R2 fixture (Cursor R2 H1's 3-section `where`) remains the canonical test case — Codex R3 M2 demands that fixture become a non-collapse-assertion in the AC4 test suite. Promoted into AC4 fixture-level guard.
+
+**Live observation — Codex R3 M1 caught a bug in AC3.5 by reflecting on the process executing live:** RC3's R2→R3 transition is itself the counterexample for AC3.5's "all dispositions accepted → convergence declared" branch. Codex correctly identified that the watcher state machine missing the "patches applied → verification round needed (DEFAULT)" branch would have skipped R3 entirely, missing this very catch. The review-history-as-evolutionary-record property is now firing recursively: a finding caught by reading prior rounds proves that prior rounds were necessary. Promoted to load-bearing structural fix in RC4 AC3.5 step 3 (a)/(b)/(c) branches.
+
+### Findings dispositioned (8 total: 2 MED / 6 LOW)
+
+| # | Severity | Source | Where | Disposition | Section patched |
+|---|---|---|---|---|---|
+| 1 | MED | Codex R3 M1 (load-bearing — caught AC3.5 state-machine bug live) | §AC3.5 step 3 — convergence branch / `next_round` | accepted — split into (a) zero-patches → convergence, (b) patches applied → verification round (DEFAULT), (c) verification explicitly waived (rare); explicit note that accepted-without-follow-ups is orthogonal to needing verification | §AC3.5 step 3 |
+| 2 | MED | Codex R3 M2 (cross-ref Codex R2 M3) | §AC4 combine logic `primary_where_section` / `related_where_sections` over-collapse risk | accepted — exact full-sub-anchor match only; `related_where_sections` observational-only (no convergence trigger); `cross_ref` is canonical override; R2 fixture (Cursor R2 H1 3-section vs Codex R2 M2/M3 single-section AC4) becomes a non-collapse-assertion in `combine.test.ts` | §AC4 combine logic |
+| 3 | LOW | Codex R3 L3 | §Architecture push-race / §Impl Notes `raw/internal/queue-errors.log` | accepted — renamed `.log` → `.md` throughout spec (matches raw/internal/ MD/HTML pattern; avoids `*.log` gitignore); builder commits a seed line so the file is tracked from day one | §Architecture push-race, §Impl Notes, §reviewer.md frontmatter SHA-drift note |
+| 4 | LOW | Cursor R3 L1 | §combined.md frontmatter comment | accepted — `escalated_to_founder: true` triggers list now includes `no_responses` alongside `{proceed*, pushback}` boundary and `single_reviewer_timeout` | §combined.md frontmatter |
+| 5 | LOW | Cursor R3 L2 | §AC6b narrative cite `/review-queue-watch` + AC3.5 | accepted — AC6b body rewritten to cite `/review-queue-watch` and AC3.5 step 3 b/c branches (matches the shipped protocol, not the older "combine.py + manual disposition" reading) | §AC6b |
+| 6 | LOW | Cursor R3 L3 | §AC3.5 step 4 "one round per tick" vs step 3 "for each fresh combined.md" | accepted (option a) — step 4 explicitly specifies `combine.py` processes at most one newly-eligible round per tick when driven from `/review-queue-watch`; `--all` flag noted as out-of-band batch option | §AC3.5 step 4 |
+| 7 | LOW | Cursor R3 L4 | §AC6b — session bootstrap (AC0 setup) implicit in dispatch-message count | accepted — explicit AC6b clause: "session bootstrap is out of scope for the counted interval; counted interval starts at r1/request.md land" | §AC6b success criteria |
+| 8 | LOW | Cursor R3 L5 | §Architecture push-race — journal pointer parenthetical | accepted — parenthetical "not a queue artifact; observation-only pointer outside the handshake" added next to journal pointer | §Architecture push-race |
+
+### Convergence call
+
+**Needs R4 — verification round per AC3.5 step 3 case (b) (the new default branch).** Both R3 verdicts were `proceed_after_patches`; both within `{proceed*}` boundary; no founder escalation. RC4 patch closed all 8 R3 findings inline (no deferred-to-followup items). Per Codex R3 M1's own fix: **accepted-inline ≠ convergence**; R4 verifies that RC4's structural changes (AC3.5 state-machine split + AC4 exact sub-anchor + queue-errors.md rename) land correctly.
+
+**Suggested R4 focus_hints:**
+1. **Verify AC3.5 step 3 (a)/(b)/(c) branch split** is mechanically correct and unambiguous. The (b) "DEFAULT for any spec change" wording must be plain enough that builders implementing the state machine don't accidentally collapse it back to "patches applied + no follow-ups → convergence" (the bug Codex R3 M1 caught).
+2. **Verify AC4 exact-sub-anchor match + R2 fixture test is implementable.** Walk through the fixture: parser splits Cursor R2 H1's `where` into `primary: §Implementation Notes "Strategist watcher"` + `related: [§AC3, §AC4]`; Codex R2 M2's into `primary: §AC4 combine.py polling semantics` + `related: []`. These DO NOT match on exact sub-anchor; convergence requires `cross_ref` override.
+3. **Verify `raw/internal/queue-errors.md` placeholder commit** is reasonable (a single seed line) AND doesn't accidentally trigger any other repo machinery (manifest, wiki index, blocked.py, etc.).
+4. **Drift watch (RC4):** did RC4 reintroduce any prior-round cuts? Particularly: did the AC3.5 step 3 (b)-default reintroduce any path where "convergence declared without verification" can happen unintentionally?
+
+**Convergence prediction:** R4 should be `proceed` or `proceed_after_patches` with only LOW findings on both sides. Per 038 decay curve (10→14→5), R3 already at 8 findings; R4 should drop further (target: ≤ 3 findings). **If both R4 verdicts are `proceed` OR both `proceed_after_patches` with only LOWs → declare convergence; 039 is claim-ready.**
