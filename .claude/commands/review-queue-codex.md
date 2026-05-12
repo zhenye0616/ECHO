@@ -53,7 +53,7 @@ Read `/tmp/echo-rq-artifact.md` plus any inline embeds in the `request.md` body.
 
 Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Use the per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` — never `divergent` / `single_reviewer_timeout` / `no_responses` (those are combined-only).
 
-## Step 5 — Write codex.md atomically and push
+## Step 5 — Write codex.md atomically and commit via the validation helper
 
 Write to a unique temp file, then `os.link` it into place (no overwrite). If `FileExistsError`, someone else (a retry of yours, or a parallel codex agent) wrote first — drop your temp and skip this candidate.
 
@@ -67,17 +67,19 @@ except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
-Then commit + push via the shared helper:
+Then commit + push via the validation helper (AC4 of item 041 — mechanically enforces `reviewer.schema.json` before any git operation):
 
 ```bash
-git add "<dir>/codex.md"
-git commit -m "review-r<N>: codex on <item_id>"
-tools/review-queue/push-with-retry.sh "review-r<N>: codex on <item_id>"
+tools/review-queue/commit-reviewer-response.sh "$dir/codex.md" codex "$N" "$item_id"
 ```
+
+The helper runs `tools/review-queue/validate.py reviewer <path>`; on failure it quarantines the malformed file to `<path>.invalid.<ISO-ts>` (so the next poll regenerates rather than skipping the round forever) and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`. On success it `git add`s the file, commits with message `review-r<N>: codex on <item_id>`, and pushes via `push-with-retry.sh`.
 
 This is an **operational push**, not a ship push — it does not need founder approval per §"Out of Scope" #4 of the 039 spec.
 
 ## Step 6 — Log to the dogfooding journal AFTER commit
+
+Run this step **only after `commit-reviewer-response.sh` exits 0** (validation passed, commit + push succeeded). If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
 Append a 6-field entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md discipline. The entry references the committed response file; it does **not** coordinate the queue. Then regenerate the HTML twin.
 
