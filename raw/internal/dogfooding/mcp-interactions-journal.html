@@ -1190,6 +1190,11 @@ href="#pdt-codex-connects-to-current-claude-strategist-session-for-cross-tool-re
 id="toc-pdt-codex-connects-to-current-claude-strategist-session-for-cross-tool-review-friction-context">23:10
 PDT — Codex connects to current Claude strategist session for cross-tool
 review friction context</a></li>
+<li><a
+href="#pdt-strategist-claude-code-9b575b57-codexs-039-rc1-recommendation-retrieval-jsonl-probe-verification"
+id="toc-pdt-strategist-claude-code-9b575b57-codexs-039-rc1-recommendation-retrieval-jsonl-probe-verification">23:33
+PDT — Strategist (Claude Code 9b575b57): Codex’s 039 RC1 recommendation
+retrieval + JSONL-probe verification</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -10786,6 +10791,108 @@ windows without the founder manually typing into both.</li>
 <li><strong>Conjecture:</strong> The next useful dogfooding test is
 whether a canned trigger or scheduled reviewer loop can run a full R1→R4
 spec-review cycle while preserving reviewer independence.</li>
+</ul>
+<h3
+id="pdt-strategist-claude-code-9b575b57-codexs-039-rc1-recommendation-retrieval-jsonl-probe-verification">23:33
+PDT — Strategist (Claude Code 9b575b57): Codex’s 039 RC1 recommendation
+retrieval + JSONL-probe verification</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — this session, drafting item 039.</li>
+<li><strong>Trigger:</strong> Founder said “codex review came back” —
+pull Codex’s recommendation on cut-1-vs-cut-2 for the cross-tool review
+dispatch problem. Prior round in the same session (“codex’s
+recommendation came back” 5 min earlier) returned only Codex’s
+orientation turn; founder clarified “use echo again if still not found
+use source jsonl and investitgate this bug” — leading to a JSONL-probe
+that confirmed Codex’s prompt was “understand,” not “recommend,” and
+Codex correctly stopped at orientation. Founder then asked Codex for the
+actual recommendation; this entry covers the retrieval of that second
+turn.</li>
+<li><strong>Query inputs (3 ECHO calls + 1 fallback bash):</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['codex'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code>
+(called twice across the cycle) — resolved to Codex source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T23-07-43-019e1acc-...jsonl</code>
+with
+<code>filter={repo_path:'/Users/zhenye/Desktop/Project_echo'}</code>.</li>
+<li><code>search_memories({source:&lt;desc.source&gt;, limit:5})</code>
+— returned 2 atoms: turn_index 0 (orientation, <code>b4cf9484</code>,
+23:12 PDT) + turn_index 1 (recommendation, <code>2a7f7f9b</code>, 23:25
+PDT). The recommendation atom carried
+<code>truncations: ["content"]</code> with 520 bytes elided across the
+load-bearing “I would do this:” enumeration.</li>
+<li><code>get_atom({id:'2a7f7f9b-b8b1-4d67-bbfa-e7afa1ac4d11'})</code> —
+<code>atom_size_bytes: 3997</code>. Recovered Codex’s full 5-point
+recommendation verbatim, including the previously-elided “Add a small
+repo-backed review queue” mechanic (item / round / commit_sha /
+artifact_path / reviewer-poll / structured review files / strategist
+watches both).</li>
+<li>(Mid-cycle bash:) raw JSONL probe via <code>jq</code> on the same
+rollout file when the first retrieval returned only the orientation turn
+— confirmed the JSONL had
+<code>task_started → user_message → 8 agent_message → task_complete</code>
+(one completed turn, no second user prompt). This was the “investigate
+this bug” step that proved ECHO was faithful to the JSONL and the
+missing recommendation was a prompt-shape issue, not a capture
+issue.</li>
+</ol></li>
+<li><strong>Returned (Codex’s recommendation, verbatim core):</strong>
+Codex agrees with strategist’s diagnosis but sharpens cut 2 from
+“scheduled reviewer prompts” → <strong>“file-backed durable queue at
+<code>backlog/reviews/&lt;item&gt;/r&lt;N&gt;/{request,codex,cursor,combined}.md</code>”</strong>.
+Pull-based polling only (push-based GUI ping explicitly rejected as
+brittle). Journal stays observation-only — never the message bus.
+Founder gate shrinks to judgment + <code>git push origin main</code>.
+Cut 1 (canned trigger prompt) drops out as a workaround for
+missing-queue, redundant once queue exists.</li>
+<li><strong>Sources:</strong> Codex source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T23-07-43-019e1acc-63cb-7953-88a3-4ef24ba655c9.jsonl</code>
+(post-037 <code>metadata.repo_root</code> plumbing — Phase 1 resolution,
+no Cursor-legacy fallback needed for Codex’s source type). One ECHO
+source path, three ECHO calls; one direct JSONL read for the
+bug-investigation step. No <code>find_clusters</code> call; no cluster
+<code>source_breakdown</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — <code>echo_resolve_mru</code> +
+<code>search_memories</code> returned the right atom,
+<code>get_atom</code> recovered the elided middle that contained the
+load-bearing prescription. Two sequential rounds on the same Codex
+source surfaced the orientation→recommendation arc cleanly.</li>
+<li><strong>Note (positive — <code>echo_resolve_mru</code> +
+<code>get_atom</code> escape hatch held for cross-tool strategist
+retrieval on a 4000-byte atom):</strong> This is the canonical post-038
+cross-tool-recommendation-retrieval shape. Three calls total, no SQLite
+probe needed, no workspace-hash chain (would have been required
+pre-035/037/038). The cost is now ~3 calls per “fetch another reviewer’s
+structured recommendation” cycle. Worth baselining as the spec for what
+the 039 review-queue layer should preserve when reviewers write
+structured <code>&lt;reviewer&gt;.md</code> files — the file-based queue
+is OPTIONAL syntactic sugar over today’s working ECHO pattern, not a
+replacement for it.</li>
+<li><strong>Note (process — the “bug” was a prompt-shape mismatch, not a
+capture gap):</strong> The intermediate JSONL probe found that the first
+“recommendation came back” was actually only Codex’s orientation turn.
+Codex did exactly what the founder’s literal prompt asked
+(“understand”), not what the founder expected (“recommend”). ECHO
+faithfully captured the orientation; there was no missing content to
+recover. This is a positive proof for the substrate: ECHO refused to
+hallucinate a recommendation that didn’t exist, and the JSONL probe
+confirmed ECHO was consistent with ground truth byte-for-byte
+(<code>byte_offset:366018</code> matched file size
+<code>366018</code>).</li>
+<li><strong>Conjecture (observation-only):</strong> The “scoped
+reviewer-loop prompts” idea is what Codex correctly rejects as too
+narrow. The right primitive is the <strong>request/response file
+pair</strong>, not the prompt. A reviewer can run any prompt as long as
+it produces the canonical <code>&lt;reviewer&gt;.md</code> shape. This
+decouples the queue from any single reviewer’s harness — a future third
+reviewer (e.g., Claude Code in another worktree, or a Gemini agent, or a
+code-review-specialized subagent) can join the queue without changing
+the protocol. Worth surfacing as a property of the spec (“queue is
+reviewer-harness-agnostic; reviewer prompts are pluggable per-client”).
+Filed in 039 RC1 spec body, §“Out of Scope” item 5
+(reviewer-harness-agnostic property), and §“Architecture” reviewer file
+shape.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
