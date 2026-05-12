@@ -21,10 +21,9 @@ fi
 
 SMOKE_WORK="$(mktemp -d -t echo-rq-smoke-work)"
 SMOKE_ORIGIN="$(mktemp -d -t echo-rq-smoke-origin)"
-SMOKE_HOME="$(mktemp -d -t echo-rq-smoke-home)"
 
 cleanup() {
-  rm -rf "$SMOKE_WORK" "$SMOKE_ORIGIN" "$SMOKE_HOME"
+  rm -rf "$SMOKE_WORK" "$SMOKE_ORIGIN"
 }
 trap cleanup EXIT
 
@@ -126,20 +125,29 @@ git -C "$SMOKE_WORK" commit -m "smoke: synthetic request" >/dev/null
 git -C "$SMOKE_WORK" push origin main >/dev/null
 
 # --- Run the wrapper with env override --------------------------------------
+# We override ECHO_REVIEW_QUEUE_REPO_ROOT (to point the wrapper at the tmp
+# smoke repo) but NOT HOME — `codex exec` looks up its ChatGPT auth at
+# `$HOME/.codex/auth.json`; overriding HOME to a tmpdir breaks auth with a
+# 401 from the OpenAI API. The smoke's isolation guarantees are about the
+# smoke REPO's remote config (asserted below), not HOME isolation; the
+# wrapper's log file ($HOME/Library/Logs/echo-review-queue-codex.log) is
+# the same file launchd writes to in steady state, so smoke runs leave
+# real audit-trail entries in the production log — desirable.
 echo "smoke: invoking run-codex-reviewer.sh against $SMOKE_WORK"
 set +e
-ECHO_REVIEW_QUEUE_REPO_ROOT="$SMOKE_WORK" HOME="$SMOKE_HOME" "$WRAPPER"
+ECHO_REVIEW_QUEUE_REPO_ROOT="$SMOKE_WORK" "$WRAPPER"
 WRAPPER_RC=$?
 set -e
 echo "smoke: wrapper rc=$WRAPPER_RC"
 
 CODEX_RESPONSE="$SMOKE_WORK/backlog/reviews/$ITEM_ID/r1/codex.md"
+WRAPPER_LOG="$HOME/Library/Logs/echo-review-queue-codex.log"
 
 fail() {
   echo "smoke FAIL: $1" >&2
-  if [ -f "$SMOKE_HOME/Library/Logs/echo-review-queue-codex.log" ]; then
+  if [ -f "$WRAPPER_LOG" ]; then
     echo "--- wrapper log (last 50 lines) ---" >&2
-    tail -n 50 "$SMOKE_HOME/Library/Logs/echo-review-queue-codex.log" >&2
+    tail -n 50 "$WRAPPER_LOG" >&2
   fi
   exit 1
 }
