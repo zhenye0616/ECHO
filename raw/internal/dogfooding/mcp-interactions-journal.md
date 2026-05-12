@@ -2719,6 +2719,35 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Codex's tail (turn 4) was clipped on `search_memories`; required the now-canonical resolve → search → hydrate sequence Codex itself documented as a gap (Gap #2 in today's framing). The clipped portion contained the load-bearing AC list — would have produced a worse synthesis without hydration. Same pattern as Codex experienced 3× today.
 - **Conjecture:** Cross-tool diagnosis loop is now empirically symmetric — strategist can read Codex through ECHO using the same MRU→search→hydrate recipe that Codex uses to read strategist. Two-way memory parity is the substrate for AC6b's "queue self-driving" property; without it, Codex's diagnosis would have been invisible to the strategist until founder pasted it in chat. Worth recording in the cross-tool-spec-review wiki page when 039 wiki promotion lands.
 
+### 2026-05-12 14:25 PDT — Codex waits for Claude to finish 041 speccing, then hydrates the landed turn
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "use echo to wait for the claude to finish speccign then you can review the spec as soon as it lands".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `wait_for_new_turns({sources:['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl'], repo_path:'/Users/zhenye/Desktop/Project_echo', since:'2026-05-12T21:21:58.886Z', timeout:60})`
+  3. `get_atoms({atom_ids:['9ed83f95-8adc-4b79-a60a-6f7edd89f2c9'], prefer:'newest_first'})`
+  4. `get_atom({id:'9ed83f95-8adc-4b79-a60a-6f7edd89f2c9'})`
+- **Returned:** MRU resolved to the same Claude Code source as the prior 041 checks. `wait_for_new_turns` returned one new turn, `9ed83f95-8adc-4b79-a60a-6f7edd89f2c9`, timestamped `2026-05-12T21:22:03.470Z`. `get_atoms` showed the turn was clipped by 1,466 chars; `get_atom({id})` returned the full body. Claude accepted Codex's AC4 helper pushback, drafted 041, pushed the spec at `8b409de`, and dispatched R1 at `5a8ee1d`.
+- **Sources:** source_breakdown={claude_code:1}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; local follow-up reads used `backlog/ready/2026-05-12-041-reviewer-background-execution.md` and the existing reviewer prompt files.
+- **Verdict:** ✅ right
+- **Note:** `wait_for_new_turns` worked as the desired "tell me when Claude lands the spec" primitive. Hydration was still necessary because the landed turn's clipped tail omitted part of the commit/dispatch detail.
+- **Conjecture:** This is the exact operator loop 041 is trying to reduce: live wait + hydrate is good enough for a human-in-the-loop strategist today, but background reviewer activation needs the same reliability without founder polling.
+
+### 2026-05-12 14:46 PDT — Cursor R1 on 041; hydrate strategist via Claude Code MRU tail
+
+- **Source agent:** Cursor's Claude (interactive review)
+- **Trigger:** Founder asked to use ECHO to connect to Claude strategist context and perform R1 spec review on item `2026-05-12-041-reviewer-background-execution`.
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', query:'041 reviewer background', limit:8})`
+  3. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:6})`
+- **Returned:** (1) MRU resolved to `fs:.../d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl` with `repo_path` filter. (2) **0 matches** for substring query `041 reviewer background`. (3) **6 matches**, timestamps `2026-05-12T21:04:56Z` … `2026-05-12T21:24:31Z`; newest turns include strategist polling for `r1/codex.md` and amended AC4 (commit helper + mechanical validation). Several atoms carried `content` truncation (`bytes_elided` up to ~3.4k); review still used `request.md` + full spec file as canonical.
+- **Read sources:** source_breakdown={claude_code:0} on query (2); source_breakdown={claude_code:6} on tail (3); exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms returned.
+- **Verdict:** 🟡 partial — MRU + tail worked; free-text substring missed strategist prose that still contained "041" in other forms.
+- **Note:** Same clip pattern as earlier entries: tail without `query` recovers recent strategist state; naive substring queries are brittle for cross-tool resume.
+- **Conjecture:** For resume prompts, prefer no-arg tail + optional `get_atom` on top id when `bytes_elided` > 0.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

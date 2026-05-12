@@ -1330,6 +1330,16 @@ href="#pdt-strategist-claude-code-tails-codex-for-diagnosis-on-041-framing"
 id="toc-pdt-strategist-claude-code-tails-codex-for-diagnosis-on-041-framing">2026-05-12
 14:20 PDT — Strategist (Claude Code) tails Codex for diagnosis on 041
 framing</a></li>
+<li><a
+href="#pdt-codex-waits-for-claude-to-finish-041-speccing-then-hydrates-the-landed-turn"
+id="toc-pdt-codex-waits-for-claude-to-finish-041-speccing-then-hydrates-the-landed-turn">2026-05-12
+14:25 PDT — Codex waits for Claude to finish 041 speccing, then hydrates
+the landed turn</a></li>
+<li><a
+href="#pdt-cursor-r1-on-041-hydrate-strategist-via-claude-code-mru-tail"
+id="toc-pdt-cursor-r1-on-041-hydrate-strategist-via-claude-code-mru-tail">2026-05-12
+14:46 PDT — Cursor R1 on 041; hydrate strategist via Claude Code MRU
+tail</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12800,6 +12810,88 @@ Two-way memory parity is the substrate for AC6b’s “queue self-driving”
 property; without it, Codex’s diagnosis would have been invisible to the
 strategist until founder pasted it in chat. Worth recording in the
 cross-tool-spec-review wiki page when 039 wiki promotion lands.</li>
+</ul>
+<h3
+id="pdt-codex-waits-for-claude-to-finish-041-speccing-then-hydrates-the-landed-turn">2026-05-12
+14:25 PDT — Codex waits for Claude to finish 041 speccing, then hydrates
+the landed turn</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive repo session)</li>
+<li><strong>Trigger:</strong> Founder asked: “use echo to wait for the
+claude to finish speccign then you can review the spec as soon as it
+lands”.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>wait_for_new_turns({sources:['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl'], repo_path:'/Users/zhenye/Desktop/Project_echo', since:'2026-05-12T21:21:58.886Z', timeout:60})</code></li>
+<li><code>get_atoms({atom_ids:['9ed83f95-8adc-4b79-a60a-6f7edd89f2c9'], prefer:'newest_first'})</code></li>
+<li><code>get_atom({id:'9ed83f95-8adc-4b79-a60a-6f7edd89f2c9'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU resolved to the same Claude Code
+source as the prior 041 checks. <code>wait_for_new_turns</code> returned
+one new turn, <code>9ed83f95-8adc-4b79-a60a-6f7edd89f2c9</code>,
+timestamped <code>2026-05-12T21:22:03.470Z</code>.
+<code>get_atoms</code> showed the turn was clipped by 1,466 chars;
+<code>get_atom({id})</code> returned the full body. Claude accepted
+Codex’s AC4 helper pushback, drafted 041, pushed the spec at
+<code>8b409de</code>, and dispatched R1 at <code>5a8ee1d</code>.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:1}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; local
+follow-up reads used
+<code>backlog/ready/2026-05-12-041-reviewer-background-execution.md</code>
+and the existing reviewer prompt files.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> <code>wait_for_new_turns</code> worked as the
+desired “tell me when Claude lands the spec” primitive. Hydration was
+still necessary because the landed turn’s clipped tail omitted part of
+the commit/dispatch detail.</li>
+<li><strong>Conjecture:</strong> This is the exact operator loop 041 is
+trying to reduce: live wait + hydrate is good enough for a
+human-in-the-loop strategist today, but background reviewer activation
+needs the same reliability without founder polling.</li>
+</ul>
+<h3
+id="pdt-cursor-r1-on-041-hydrate-strategist-via-claude-code-mru-tail">2026-05-12
+14:46 PDT — Cursor R1 on 041; hydrate strategist via Claude Code MRU
+tail</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude (interactive
+review)</li>
+<li><strong>Trigger:</strong> Founder asked to use ECHO to connect to
+Claude strategist context and perform R1 spec review on item
+<code>2026-05-12-041-reviewer-background-execution</code>.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', query:'041 reviewer background', limit:8})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:6})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> (1) MRU resolved to
+<code>fs:.../d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code> with
+<code>repo_path</code> filter. (2) <strong>0 matches</strong> for
+substring query <code>041 reviewer background</code>. (3) <strong>6
+matches</strong>, timestamps <code>2026-05-12T21:04:56Z</code> …
+<code>2026-05-12T21:24:31Z</code>; newest turns include strategist
+polling for <code>r1/codex.md</code> and amended AC4 (commit helper +
+mechanical validation). Several atoms carried <code>content</code>
+truncation (<code>bytes_elided</code> up to ~3.4k); review still used
+<code>request.md</code> + full spec file as canonical.</li>
+<li><strong>Read sources:</strong> source_breakdown={claude_code:0} on
+query (2); source_breakdown={claude_code:6} on tail (3); exact JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Cursor/Codex/git atoms returned.</li>
+<li><strong>Verdict:</strong> 🟡 partial — MRU + tail worked; free-text
+substring missed strategist prose that still contained “041” in other
+forms.</li>
+<li><strong>Note:</strong> Same clip pattern as earlier entries: tail
+without <code>query</code> recovers recent strategist state; naive
+substring queries are brittle for cross-tool resume.</li>
+<li><strong>Conjecture:</strong> For resume prompts, prefer no-arg tail
++ optional <code>get_atom</code> on top id when
+<code>bytes_elided</code> &gt; 0.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
