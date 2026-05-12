@@ -2634,6 +2634,19 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and the r3 artifact is claim-ready from Codex's side.
 - **Note:** Plain `python3` schema validation hit the known `jsonschema`/`rpds` architecture mismatch; `arch -arm64 python3` validated successfully. The first `push-with-retry.sh` attempt was blocked by unrelated local journal/Cursor artifacts, so those local changes were preserved, the Codex response push was retried through the helper, and the local changes were restored afterward.
 
+### 2026-05-12 13:33 PDT — Codex connects to current Claude Code session via ECHO
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "use echo and connect to current claude session".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})`
+- **Returned:** MRU resolved to one `claude_code` descriptor with `filter.repo_path`; `search_memories` returned 8 atoms, newest timestamp `2026-05-12T20:30:20.745Z`, turn range `57-64`, top atom about summarizing what item 040 accomplished and the gaps it exposed. `warnings: []`; several returned atoms carried `truncations: ["content"]` and/or `metadata.tool_calls:projected`.
+- **Sources:** source_breakdown={claude_code:8}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms requested or returned.
+- **Verdict:** ✅ right
+- **Note:** Post-038 resolver composition found the current repo-scoped Claude Code strategist session cleanly and avoided older Claude sessions from the same project. The returned bodies were enough to identify the active context even though some long turns were clipped.
+- **Conjecture:** For this "connect to Claude" workflow, surfacing the resolved source path/session id is useful enough that clients should probably narrate it briefly before using the tail.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
