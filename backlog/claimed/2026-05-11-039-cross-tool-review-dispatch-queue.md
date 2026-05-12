@@ -1,10 +1,13 @@
 ---
 id: 2026-05-11-039-cross-tool-review-dispatch-queue
 title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC5 / R4-patched — CONVERGED, claim-ready)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1.5-2d
 created: 2026-05-11
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-12T08:20:00Z"
+branch: "agent/cross-tool-review-dispatch-queue"
 spec_refs:
   - CLAUDE.md                                                  # "Reviewer independence rule" + founder gate at substantive-conflict + push-to-main only
   - backlog/README.md                                          # Pipeline definition; atomic claim mechanic; founder gate semantics
