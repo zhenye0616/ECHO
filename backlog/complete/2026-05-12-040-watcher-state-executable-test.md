@@ -40,7 +40,59 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Pure helper-script extraction + integration test; no app-specific knowledge. Strategist-as-builder (Claude Code) is fine — this is the strategist's own dispatch path being hardened. An independent builder is also fine.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: null
+review_notes: |
+  Merged on 2026-05-12 (UTC ~19:00) via founder reconciliation under /merge-and-cleanup.
+
+  Conflicts resolved:
+  - none — `git merge-tree` confirmed clean; 5 net-new/branch-only files (`dispatch-next-round.py`,
+    `test-dispatch-next-round.sh`, `watcher-state.test.ts`, `.claude/commands/review-queue-watch.md`
+    Step 3 rewrite, `tests/review-queue/_helpers.ts` 4-line `dispatchScript()` export).
+
+  Fixups applied:
+  - Test-name correction in this review_notes block (sidecar's only fixup): the 1 post-merge test
+    failure is `tests/review-queue/concurrency.test.ts:133` (orphan-cleanup), NOT
+    `tests/capture/extractors/{codex,claude-code}.test.ts` as agent_notes above claimed. The
+    extractor tests actually pass 74/74. The "not a regression" certification stands —
+    `concurrency.test.ts:133` reproduces on `main` HEAD `1c2e2a4` pre-merge (sidecar reviewer
+    independently verified) and 040's branch did NOT touch `concurrency.test.ts` or
+    `tools/review-queue/combine.py`. Filed as Follow-up #1 in `backlog/_followups.md`.
+
+  Fixups deferred to follow-up items:
+  - none — the test-name correction is captured here; no other fixups in sidecar.
+
+  Verify: 785/807 tests pass (1 pre-existing fail in concurrency.test.ts:133 orphan-cleanup;
+  21 skipped). Lint clean. Typecheck clean. Review-queue suite: 46/46 (was 42/42 at 039 merge).
+
+  Cross-tool review history (3 rounds, narrow class, R3-converged at spec_commit_sha 784698f):
+  - R1: 8 findings → 5 spec patches (2 convergent-on-direction pairs)
+  - R2: 6 findings → 3 spec patches (1 convergent pair + 1 fold)
+  - R3: 0 findings; both reviewers `proceed`; convergence declared
+
+  AC6b empirical verdict — **PASSING (loop-close gate fired clean)**:
+  - 040 was the FIRST spec to traverse the new file-backed queue end-to-end.
+  - Spec draft → R1 dispatch → R1 reviewer responses → R1 combine + disposition + 5 patches →
+    R2 dispatch → R2 responses → R2 combine + 3 patches → R3 dispatch → R3 responses →
+    R3 convergence → claim → build → push to pending_review → /review-pending → merge-and-cleanup:
+    all ran without a single founder→reviewer dispatch message.
+  - Two friction cases surfaced (Codex sandbox + Cursor YAML emission); both filed as session-
+    bootstrap / emission-validation defects in `_followups.md`, neither counted as dispatch msgs.
+  - Wall-clock: R1 → R3 in 53 minutes; full ready→pending_review in ~4 hours.
+  - The 039 loop-close gate is empirically closed. Founder activated reviewers (Codex via
+    terminal command + Cursor via chat paste) ~5 times in session-bootstrap; the "next gap"
+    (`reviewer background execution`) is filed as 041 candidate in `_followups.md`.
+
+  Follow-up items (non-blocking, filed in _followups.md at C10):
+  1. **HIGH:** `tests/review-queue/concurrency.test.ts:133` orphan-cleanup is a real bug in
+     `tools/review-queue/combine.py`'s orphan-cleanup path (stale `.tmp.*` files older than
+     30 min not removed despite test/spec saying they should be). Pre-existing on main since
+     039 merge. Should not stay silently red.
+  2. **MED:** Watcher-state observability (V1.6+) — `dispatch-next-round.py` has good test
+     coverage of (a)/(b)/(c) terminal transitions, but the slash-command body's invocation
+     path is still human-audited. Consider a higher-level integration test that exercises the
+     slash-command body end-to-end. Not load-bearing.
+  3. (Already filed pre-merge in _followups.md) **041 candidate** —
+     `reviewer-background-execution`: founder still physically activates Codex (terminal
+     command) and Cursor (chat paste) per session/round. Next operational gap.
 ---
 
 ## Why this now
