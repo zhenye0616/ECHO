@@ -14,7 +14,7 @@ findings:
     finding: "The Goal paragraph quotes the extracted sequence as `request.py … && git add r{N+1}/request.md && set next_round=…`, but AC1 (b) describes only `request.py` then editing `r{N}/combined.md`. Clarify whether staging `r{N+1}/request.md` is inside the helper (and whether any `git commit` semantics move with it) or remains separate lines in the slash-command — AC2 prose and AC3 fixtures depend on that boundary."
   - severity: low
     where: "§AC3 — fixture 1 — assertions bullet on `r1/combined.md`"
-    finding: ""Body is unchanged byte-for-byte except for that single frontmatter field" reads as if only one scalar changes; in practice the entire YAML frontmatter block may reformat. Prefer wording like: markdown body below the closing `---` unchanged; `next_round` in frontmatter is the only semantic delta (and schema-validates)."
+    finding: '"Body is unchanged byte-for-byte except for that single frontmatter field" reads as if only one scalar changes; in practice the entire YAML frontmatter block may reformat. Prefer wording like: markdown body below the closing `---` unchanged; `next_round` in frontmatter is the only semantic delta (and schema-validates).'
   - severity: nit
     where: "request.md focus_hints — helper vs watcher factoring"
     finding: "The split is right: the helper should execute idempotent file mutations and race semantics; the strategist still fills the Disposition column and reads the (a)/(b)/(c) narrative. No need to fold disposition prose into code."
