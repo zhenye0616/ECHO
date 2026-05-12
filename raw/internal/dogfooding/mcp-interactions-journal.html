@@ -1316,6 +1316,9 @@ href="#pdt-codex-combines-claudes-040-gap-summary-with-local-investigation"
 id="toc-pdt-codex-combines-claudes-040-gap-summary-with-local-investigation">2026-05-12
 13:39 PDT — Codex combines Claude’s 040 gap summary with local
 investigation</a></li>
+<li><a href="#pdt-codex-tails-claude-after-stale-codex-correction"
+id="toc-pdt-codex-tails-claude-after-stale-codex-correction">2026-05-12
+13:49 PDT — Codex tails Claude after stale-Codex correction</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12630,6 +12633,42 @@ orphan.</li>
 mismatch is a small client-memory hazard: prior docs/examples often say
 <code>atom_id</code>, while the live tool schema uses <code>id</code>.
 Tool descriptions or docs should keep one name consistently.</li>
+</ul>
+<h3 id="pdt-codex-tails-claude-after-stale-codex-correction">2026-05-12
+13:49 PDT — Codex tails Claude after stale-Codex correction</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive repo session)</li>
+<li><strong>Trigger:</strong> Founder asked: “tail claude”.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:6})</code></li>
+<li><code>get_atom({id:'9f6dd218-fee8-41fc-8300-60d631666fab'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU resolved to the same Claude Code
+source as prior entries. <code>search_memories</code> returned 6 atoms,
+newest timestamp <code>2026-05-12T20:45:38.228Z</code>, turn range
+61-66. Top atom was clipped by 299 chars; <code>get_atom({id})</code>
+returned it verbatim (3,174 bytes,
+<code>truncations: ["metadata.tool_calls:projected"]</code> only).
+Latest Claude turn accepted Codex’s correction: orphan-cleanup should be
+reclassified from HIGH production bug to MED test-fixture clock-mismatch
+fix, and it flagged the <code>get_atom</code> <code>id</code> vs
+<code>atom_id</code> naming mismatch as doc hygiene.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:6}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Cursor/Codex/git atoms requested or returned.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> Tail path found the newest strategist turn
+cleanly. The extra <code>get_atom</code> call was worth it because the
+clipped tail omitted the precise explanation of why the cleanup logic is
+correct and the test fixture is wrong.</li>
+<li><strong>Conjecture:</strong> Tail callers should automatically
+hydrate the newest atom when <code>search_memories</code> reports
+<code>truncations: ["content"]</code> and the user asked for a live tail
+rather than broad discovery.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

@@ -2663,6 +2663,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** ECHO recovered Claude's exact summary and `get_atom` was necessary to remove the clipping. Local investigation mostly confirmed Claude's high-level gap list, but corrected one classification: the orphan-cleanup failure is a deterministic test-time mismatch (`mtime` based on real clock while `combine.py --now` uses a fake clock), not yet proven as a production `combine.py` cleanup bug. A controlled fixture with mtime older than the fake `--now` did delete the orphan.
 - **Conjecture:** The `get_atom` schema mismatch is a small client-memory hazard: prior docs/examples often say `atom_id`, while the live tool schema uses `id`. Tool descriptions or docs should keep one name consistently.
 
+### 2026-05-12 13:49 PDT — Codex tails Claude after stale-Codex correction
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "tail claude".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:6})`
+  3. `get_atom({id:'9f6dd218-fee8-41fc-8300-60d631666fab'})`
+- **Returned:** MRU resolved to the same Claude Code source as prior entries. `search_memories` returned 6 atoms, newest timestamp `2026-05-12T20:45:38.228Z`, turn range 61-66. Top atom was clipped by 299 chars; `get_atom({id})` returned it verbatim (3,174 bytes, `truncations: ["metadata.tool_calls:projected"]` only). Latest Claude turn accepted Codex's correction: orphan-cleanup should be reclassified from HIGH production bug to MED test-fixture clock-mismatch fix, and it flagged the `get_atom` `id` vs `atom_id` naming mismatch as doc hygiene.
+- **Sources:** source_breakdown={claude_code:6}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms requested or returned.
+- **Verdict:** ✅ right
+- **Note:** Tail path found the newest strategist turn cleanly. The extra `get_atom` call was worth it because the clipped tail omitted the precise explanation of why the cleanup logic is correct and the test fixture is wrong.
+- **Conjecture:** Tail callers should automatically hydrate the newest atom when `search_memories` reports `truncations: ["content"]` and the user asked for a live tail rather than broad discovery.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
