@@ -1226,6 +1226,11 @@ href="#pdt-strategist-claude-code-9b575b57-039-r2-retrieval-combine-rc3-patch-r2
 id="toc-pdt-strategist-claude-code-9b575b57-039-r2-retrieval-combine-rc3-patch-r2combined.md-proto-write">2026-05-12
 00:50 PDT — Strategist (Claude Code 9b575b57): 039 R2 retrieval +
 combine + RC3 patch + r2/combined.md proto-write</a></li>
+<li><a
+href="#pdt-cursor-r3-review-of-039-rc3-polish-round-queue-response-pushed-operational-commit"
+id="toc-pdt-cursor-r3-review-of-039-rc3-polish-round-queue-response-pushed-operational-commit">01:08
+PDT — Cursor R3 review of 039 RC3 — polish round; queue response pushed
+(operational commit)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11575,6 +11580,55 @@ orphan-tmp integration test in AC6a) are all polish-or-disambiguation
 level. <strong>Convergence prediction:</strong> if both R3 verdicts are
 <code>proceed*</code> with only LOW findings, declare convergence and
 039 is claim-ready. Expected R3 yield: 3-6 findings.</li>
+</ul>
+<h3
+id="pdt-cursor-r3-review-of-039-rc3-polish-round-queue-response-pushed-operational-commit">01:08
+PDT — Cursor R3 review of 039 RC3 — polish round; queue response pushed
+(operational commit)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude — R3 reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at HEAD <code>e45a97b</code> (RC3 / R2-patched). Response file committed
++ pushed at <code>2908f42</code> to
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r3/cursor.md</code>
+(<code>review-r3: cursor on 2026-05-11-039-cross-tool-review-dispatch-queue</code>).</li>
+<li><strong>Trigger:</strong> Strategist canned R3 dispatch: read
+§Review History (R2 ten findings dispositioned in RC3); focus (1) AC3.5
+vs AC6b “0 dispatch messages” / R2 H1 closure, (2) AC0
+keyboard-automation removal, (3) <code>queue-errors.log</code> carve-out
+vs JOURNAL-AS-QUEUE PROHIBITION, (4) drift watch on AC3.5 coupling;
+write <code>r3/cursor.md</code>; commit; <strong>push</strong>
+(operational commit); log after commit; verdict
+<code>proceed_after_patches</code> if only LOWs.</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+<code>Read</code> full RC3 spec (~565 lines), <code>Write</code> +
+<code>git commit</code> + <code>git push origin main</code>.</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic. Verdict on RC3:
+<code>proceed_after_patches</code> with <strong>5 LOW findings</strong>
+(doc/clarity only): (L1) <code>combined.md</code> template comment omits
+<code>no_responses</code> in <code>escalated_to_founder</code> line;
+(L2) AC6b narrative still says combine-only flow vs full AC3.5 watcher
+tick; (L3) AC3.5 “For each fresh combined.md” vs “one round per tick” —
+constrain combine.py or allow multi-round; (L4) AC6b should explicitly
+exempt one-time loop setup from dispatch-message count; (L5) optional
+clarity on daily journal pointer vs queue-errors (not a violation).</li>
+<li><strong>Read sources:</strong> Filesystem-only. Spec:
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+@ <code>e45a97bc6bea2fd0abde68113fe140a9e82943b9</code>. Response:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r3/cursor.md</code>
+@ <code>2908f429…</code> (full SHA <code>2908f42</code> on push).</li>
+<li><strong>Verdict:</strong> ✅ right — R2 H1 closed in spec (§AC3.5
+autonomous disposition); R2 H2 stuck (§AC0 rejects keyboard automation);
+<code>raw/internal/queue-errors.log</code> carve-out is unambiguous and
+preserves journal-not-queue; AC3.5 adds expected coupling (multi-commit
+rounds + push-with-retry) without out-of-scope drift. R3 yield = 5 LOWs
+(within predicted 3–6).</li>
+<li><strong>Note:</strong> Third consecutive zero-ECHO Cursor reviewer
+cycle on 039 (R1 + R2 + R3); §Review History + inline spec body remain
+sufficient context.</li>
+<li><strong>Conjecture (observation-only):</strong> R4 can be
+typo/template pass + AC6b wording; then declare convergence per Review
+History R2 convergence call.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
