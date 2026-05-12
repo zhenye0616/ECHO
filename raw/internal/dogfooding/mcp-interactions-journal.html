@@ -1340,6 +1340,9 @@ href="#pdt-cursor-r1-on-041-hydrate-strategist-via-claude-code-mru-tail"
 id="toc-pdt-cursor-r1-on-041-hydrate-strategist-via-claude-code-mru-tail">2026-05-12
 14:46 PDT — Cursor R1 on 041; hydrate strategist via Claude Code MRU
 tail</a></li>
+<li><a href="#pdt-codex-r1-on-041-reviewer-background-execution"
+id="toc-pdt-codex-r1-on-041-reviewer-background-execution">2026-05-12
+14:30 PDT — Codex R1 on 041 reviewer background execution</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12892,6 +12895,45 @@ substring queries are brittle for cross-tool resume.</li>
 <li><strong>Conjecture:</strong> For resume prompts, prefer no-arg tail
 + optional <code>get_atom</code> on top id when
 <code>bytes_elided</code> &gt; 0.</li>
+</ul>
+<h3 id="pdt-codex-r1-on-041-reviewer-background-execution">2026-05-12
+14:30 PDT — Codex R1 on 041 reviewer background execution</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive review-queue
+response)</li>
+<li><strong>Trigger:</strong> Founder asked to commit and push after
+Codex reviewed the newly-landed
+<code>2026-05-12-041-reviewer-background-execution</code> spec.</li>
+<li><strong>Query inputs:</strong> Read
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/request.md</code>;
+reviewed
+<code>backlog/ready/2026-05-12-041-reviewer-background-execution.md</code>
+at spec commit <code>8b409de1166153883b0898c236649d221331f34e</code>;
+checked <code>.claude/commands/review-queue-codex.md</code> for the
+existing “skip if codex.md exists” retry behavior and
+<code>tools/review-queue/schemas/reviewer.schema.json</code> for
+reviewer frontmatter.</li>
+<li><strong>Returned:</strong> Wrote and committed
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/codex.md</code>
+as <code>60c8640</code>, verdict <code>proceed_after_patches</code>.
+Findings: two HIGH issues (AC4 validation-failure retry deadlock; AC5
+smoke isolation can touch real origin or fail without
+<code>.git</code>), two MED issues (contradictory <code>npm test</code>
+expectation; AC1/AC5 repo-root env contract missing), and one LOW issue
+(<code>RunAtLoad:false</code> vs <code>launchctl load</code> smoke
+wording).</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>8b409de1166153883b0898c236649d221331f34e</code>; request path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/codex.md</code>;
+no new ECHO MCP calls for this write beyond the earlier logged Claude
+wait/hydration.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> The response cross-references Cursor’s first
+finding where both reviewers converged on the AC1/AC5 repo-root
+mismatch. The additional Codex-only blocker is the AC4
+invalid-final-file retry deadlock.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

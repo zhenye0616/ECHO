@@ -2748,6 +2748,16 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Same clip pattern as earlier entries: tail without `query` recovers recent strategist state; naive substring queries are brittle for cross-tool resume.
 - **Conjecture:** For resume prompts, prefer no-arg tail + optional `get_atom` on top id when `bytes_elided` > 0.
 
+### 2026-05-12 14:30 PDT — Codex R1 on 041 reviewer background execution
+
+- **Source agent:** Codex (interactive review-queue response)
+- **Trigger:** Founder asked to commit and push after Codex reviewed the newly-landed `2026-05-12-041-reviewer-background-execution` spec.
+- **Query inputs:** Read `backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/request.md`; reviewed `backlog/ready/2026-05-12-041-reviewer-background-execution.md` at spec commit `8b409de1166153883b0898c236649d221331f34e`; checked `.claude/commands/review-queue-codex.md` for the existing "skip if codex.md exists" retry behavior and `tools/review-queue/schemas/reviewer.schema.json` for reviewer frontmatter.
+- **Returned:** Wrote and committed `backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/codex.md` as `60c8640`, verdict `proceed_after_patches`. Findings: two HIGH issues (AC4 validation-failure retry deadlock; AC5 smoke isolation can touch real origin or fail without `.git`), two MED issues (contradictory `npm test` expectation; AC1/AC5 repo-root env contract missing), and one LOW issue (`RunAtLoad:false` vs `launchctl load` smoke wording).
+- **Sources:** Artifact SHA `8b409de1166153883b0898c236649d221331f34e`; request path `backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/request.md`; response path `backlog/reviews/2026-05-12-041-reviewer-background-execution/r1/codex.md`; no new ECHO MCP calls for this write beyond the earlier logged Claude wait/hydration.
+- **Verdict:** ✅ right
+- **Note:** The response cross-references Cursor's first finding where both reviewers converged on the AC1/AC5 repo-root mismatch. The additional Codex-only blocker is the AC4 invalid-final-file retry deadlock.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
