@@ -1,13 +1,30 @@
 ---
 id: 2026-05-11-039-cross-tool-review-dispatch-queue
 title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC5 / R4-patched — CONVERGED, claim-ready)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1.5-2d
 created: 2026-05-11
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-12T08:20:00Z"
 branch: "agent/cross-tool-review-dispatch-queue"
+head_sha: "cd02160a7781a2f037702959c34075cb67b0bc78"
+agent_notes: |
+  All AC0–AC6a implemented and tested. AC6b is post-merge per spec §After Completion §5.
+  42/42 review-queue tests pass; npm test (782 pass / 21 skipped); typecheck + lint clean.
+
+  Key choices: Python scripts shelled out from vitest (matches tools/blocked.py convention; spec calls
+  for .py); jsonschema validation in Python (no new Node deps); combine.py leaves next_round=null and
+  the watcher slash-command owns the AC3.5 (a)/(b)/(c) post-combine state machine. tests/review-queue/
+  _helpers.ts auto-resolves `arch -arm64 python3` on the founder's x86_64-Rosetta-node session — the
+  one founder-machine-specific quirk in the test harness.
+
+  R2 fixture in combine.test.ts asserts Cursor R2 H1's 3-section `where` does NOT collapse with
+  Codex R2 M2/M3's single-section AC4 — the Codex R3 M2 fix verified against live distribution.
+
+  Worktree at ~/Desktop/Project_echo--cross-tool-review-dispatch-queue/ stays in place per protocol
+  (founder removes after merge). Branch agent/cross-tool-review-dispatch-queue at SHA
+  cd02160a7781a2f037702959c34075cb67b0bc78.
 spec_refs:
   - CLAUDE.md                                                  # "Reviewer independence rule" + founder gate at substantive-conflict + push-to-main only
   - backlog/README.md                                          # Pipeline definition; atomic claim mechanic; founder gate semantics
