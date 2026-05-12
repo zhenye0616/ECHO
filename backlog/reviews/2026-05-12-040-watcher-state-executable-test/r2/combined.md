@@ -4,8 +4,8 @@ round: 2
 combined_at: '2026-05-12T09:47:41Z'
 codex_response: codex.md
 cursor_response: cursor.md
-patch_commit_sha: null
-next_round: null
+patch_commit_sha: 784698f
+next_round: 3
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
