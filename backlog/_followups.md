@@ -559,7 +559,16 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 ## From 041 merge (2026-05-12)
 
-- **AC3 founder smoke verification (founder, immediate)** — run `tools/review-queue/smoke-test-codex-runner.sh` once. ~1-5 min, $0.05-$0.50 LLM cost. Spec AC3 phrasing: "verified by AC5 running successfully end-to-end on the founder's actual machine — not by inspection of the wrapper file." Builder correctly deferred per Option 2 in the in-session escalation; the smoke proves the wrapper + launchd plist + commit-reviewer-response helper work as an integrated unit. **Do this before invoking the launchd install for the first time.**
+- **✅ AC3 founder smoke verification CLOSED 2026-05-12 ~23:05 PDT.** Founder ran `tools/review-queue/install-codex-reviewer-launchd.sh --smoke` which executed both: (1) `launchctl kickstart -k` → wrapper-fired tick against production repo (rc=0, 46s, "no codex reviews to write"); (2) `smoke-test-codex-runner.sh` against isolated tmpdir + local bare origin → **`smoke OK: codex.md produced, validated, committed; hard isolation assertions all passed`**.
+
+  Took **3 post-merge fixups** to get clean (all operational test/helper bugs surfaced by AC5; none changed production semantics):
+  1. `50c2e81` — drop `HOME=$SMOKE_HOME` override in smoke (was preventing `codex` from finding `~/.codex/auth.json` → 401);
+  2. `aec75fd` — make `cd` in 3 queue slash-commands respect `ECHO_REVIEW_QUEUE_REPO_ROOT` (was hardcoded `~/Desktop/Project_echo`; smoke ran against PROD not tmpdir);
+  3. `c63dad9` — `PYTHONDONTWRITEBYTECODE=1` in `commit-reviewer-response.sh` + smoke copies `.gitignore` + removes `__pycache__/` (was tracking .pyc files; validate.py regenerated them mid-pipeline → push-with-retry's `git pull --rebase` failed with "unstaged changes"; Codex's LLM judgment recovered the first time; the fix removes the need for recovery).
+
+  **The launchd job is now installed, verified, and ticking every 10 min unattended.** Founder-side Codex activations: 0 going forward.
+
+  Operational observation: `launchctl list | grep com.echo.review-queue-codex` shows last exit `126` from an earlier failed install attempt; subsequent kickstart-fired ticks succeed (rc=0). The `126` appears stale — launchctl seems to preserve the worst-recent exit even after subsequent successes. Not a runtime issue; the wrapper's own log (`~/Library/Logs/echo-review-queue-codex.log`) is authoritative for tick state.
 
 - **AC7 wiki residue (strategist, post-merge wiki promotion)** — `wiki/operating-model/cross-tool-spec-review.md:140` has `get_atom(<elided_atom_id>)` placeholder. Builder honored AGENT_INSTRUCTIONS rule 6 (no wiki edits from builders); fix at strategist's next wiki promotion pass. Search-replace `<elided_atom_id>` → `<id>` or restructure the example to match the `get_atom({id: ...})` schema.
 
