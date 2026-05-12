@@ -29,9 +29,36 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-12T04:11:42Z"
 branch: "agent/mcp-toolkit-atomicity-refactor"
 worktree: "~/Desktop/Project_echo--mcp-toolkit-atomicity-refactor"
-head_sha: ""
+head_sha: "09f0e77081620a21e1c12de00d66d1c442827b97"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All six ACs (AC0–AC5) landed as one coherent merge on agent/mcp-toolkit-atomicity-refactor at
+  09f0e77. Net surface: 8 tools stay 8 tools during 038's window (-tail_session, +echo_resolve_mru);
+  the 2026-05-17 follow-up takes it to 7 by dropping recent_work_context.
+  
+  Highlights:
+  - AC5: shared withFsExclusion helper + CI grep-scan test that fails on any inline
+    `exclude_metadata_surface: [...]` literal outside the helper file.
+  - AC0: search_memories expanded with `source` (exact) + `metadata_match` (whitelisted, dynamic-
+    interpolation isError). 3-way precedence (source > source_prefix > source_app); repo_path /
+    metadata_match.repo_root merge with conflict-isError.
+  - AC1: echo_resolve_mru returns search_memories-ready descriptors {source, filter, phase?}.
+    Cursor two-phase (Phase 1 metadata.repo_root, Phase 2 legacy composer); git two-path OR port.
+  - AC3: cluster engine factored to src/mcp/internal/cluster-engine.ts; recent_work_context becomes
+    a thin wrapper (skeleton transform + MCP-tool registration stay per R2 Codex HIGH #1).
+    find_clusters imports the engine directly. Shim + registered-handler integration tests.
+  - AC2: tail_session.ts + its test file deleted; comment + description sweep so
+    `rg "tail[_-]session" src/mcp/` returns zero hits. Net -1860 lines.
+  - AC4: wait_for_new_turns returns turn_ids only (no bodies). Envelope shrinks dramatically;
+    caller composes get_atoms(turn_ids) or get_atom(turn_ids[i]) for body fetch.
+  
+  Verified: npm test (740 passed | 21 skipped), npm run typecheck (clean),
+  npm run lint (clean). Full run log at
+  raw/internal/agent-runs/2026-05-12-2026-05-11-038-mcp-toolkit-atomicity-refactor.md.
+  
+  AC6 dogfooding is post-merge work per the spec (founder merges, restarts daemon, then journals
+  a real workflow citing the post-038 tool names). Strategist files the 2026-05-17 follow-up
+  removing recent_work_context per AC3 After Completion notes #6.
 review_notes: ""
 ---
 
