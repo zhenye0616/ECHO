@@ -1354,6 +1354,9 @@ id="toc-pdt-codex-r2-on-041-reviewer-background-execution">2026-05-12
 <li><a href="#pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29"
 id="toc-pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29">2026-05-12
 15:22 PDT — Cursor R3 on 041; verify R2 patches at e8edb29</a></li>
+<li><a href="#pdt-codex-r3-on-041-reviewer-background-execution"
+id="toc-pdt-codex-r3-on-041-reviewer-background-execution">2026-05-12
+14:46 PDT — Codex R3 on 041 reviewer background execution</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13058,6 +13061,40 @@ clipped tail beyond checklist confirmation.</li>
 <code>proceed</code> with <strong>zero</strong> schema findings
 (claim-ready bar once Codex R3 also <code>proceed</code>).</li>
 <li><strong>Conjecture:</strong> none.</li>
+</ul>
+<h3 id="pdt-codex-r3-on-041-reviewer-background-execution">2026-05-12
+14:46 PDT — Codex R3 on 041 reviewer background execution</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive review-queue
+response)</li>
+<li><strong>Trigger:</strong> Founder asked to repeat the same process
+for R3 and commit/push when done.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r3/request.md</code>;
+reviewed
+<code>backlog/ready/2026-05-12-041-reviewer-background-execution.md</code>
+at <code>e8edb298c998e290ed7e5e16810a5e927ec22e8a</code>; read
+<code>r2/combined.md</code>; validated Cursor R3; command-checked local
+support for <code>git init -b main</code> and
+<code>git init --bare -b main</code>.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r3/codex.md</code>
+as <code>24e9440</code>, verdict <code>proceed</code>, findings
+<code>[]</code>. R2 patches all landed: AC1 strict mode + bad-root
+diagnostic, AC2 launchd Label, AC5 <code>main</code> branch
+initialization + deterministic isolation assertions, and the
+minimal-copy grep hint.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>e8edb298c998e290ed7e5e16810a5e927ec22e8a</code>; request path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r3/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r3/codex.md</code>;
+no new ECHO MCP calls for this write beyond the prior Cursor/strategist
+tail already logged by Cursor.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> Both reviewers are now <code>proceed</code>
+with zero findings in R3, satisfying the R3 request’s claim-ready bar
+from the review queue’s perspective.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
