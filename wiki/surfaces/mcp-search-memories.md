@@ -30,15 +30,24 @@ The substring-not-semantic clarification was added in item 022 after dogfooding 
 
 ```ts
 {
-  query?:         string,                                              // case-insensitive substring match on content
-  source_app?:    'cursor' | 'claude_code' | 'codex' | 'git',          // app-scoped enum (item 025)
-  source_prefix?: string,                                              // path-precise filter; wins on conflict with source_app
-  since?:         ISO8601,                                             // events with timestamp >= since
-  until?:         ISO8601,                                             // events with timestamp <  until
-  limit?:         number,                                              // default 10, clamped to [1, 50]
-  cursor?:        string,                                              // opaque base64 from prior next_cursor (item 025)
+  query?:           string,                                              // case-insensitive substring match on content
+  source?:          string,                                              // EXACT-match source (item 038); wins on conflict with source_prefix / source_app
+  source_prefix?:   string,                                              // path-precise prefix filter; wins on conflict with source_app
+  source_app?:      'cursor' | 'claude_code' | 'codex' | 'git',          // app-scoped enum (item 025)
+  repo_path?:       string,                                              // item 037 — absolute repo root; AND-filter on `metadata.repo_root === normalize(repo_path)` across all source_apps
+  metadata_match?:  { [key: string]: string },                           // item 038 — AND-joined metadata-equality filter; allowed keys: workspace_id, composer_id, session_id, repo_root (storage whitelist)
+  since?:           ISO8601,                                             // events with timestamp >= since
+  until?:           ISO8601,                                             // events with timestamp <  until
+  limit?:           number,                                              // default 10, clamped to [1, 50]
+  cursor?:          string,                                              // opaque base64 from prior next_cursor (item 025)
 }
 ```
+
+**Three-way source selection precedence (item 038):** `source` (exact) > `source_prefix` (LIKE) > `source_app` (canonical app prefix). The most-specific axis wins; losing axes are ignored, NOT errored. The descriptor returned by [[mcp-echo-resolve-mru|`echo_resolve_mru`]] carries `source` (exact) + `filter.metadata_match` + optional `filter.repo_path` — spread directly into `search_memories` for the canonical compose pattern.
+
+**`repo_path` (item 037)** AND-filters on `metadata.repo_root === normalize(repo_path)`. Works across all four source_apps (Cursor's pre-AC1 legacy composers lack `metadata.repo_root` — the legacy resolver in `echo_resolve_mru` returns `metadata_match: {composer_id: <resolved>}` instead; `search_memories` then uses that). For `source_app=git`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix=git:<path>`.
+
+**`metadata_match` (item 038)** is the canonical override path for arbitrary equality filters on storage-whitelisted metadata keys (`workspace_id`, `composer_id`, `session_id`, `repo_root`). Non-whitelisted keys → isError. Passing BOTH `repo_path` and `metadata_match.repo_root` with conflicting values is rejected (isError); same value is fine. The Cursor Phase 2 legacy fallback path passes `{composer_id: <resolved>}` WITHOUT `repo_path` (legacy atoms predate the repo_root capture write).
 
 **Output envelope:**
 
@@ -159,6 +168,9 @@ The clean long-term fix — server-side `content_contains` in `QueryFilter` so t
 ## Related
 
 - [[mcp-server]] — the host this tool is registered on
-- [[storage]] — the substrate it queries
+- [[mcp-echo-resolve-mru]] — the resolver primitive whose descriptor spreads into `search_memories` (canonical post-038 compose pattern)
+- [[storage]] — the substrate it queries (METADATA_MATCH_KEY_WHITELIST documents `metadata_match` allowed keys)
 - [[capture-pipeline]] — produces the events this tool retrieves
 - [[clipboard-and-launch]] — the Pull side of which this is the V1 realization
+- [[work-artifact-first-class]] — the principle behind `repo_path` (item 037)
+- [[atomic-primitives-compose]] — the principle behind `source`+`metadata_match` (item 038)

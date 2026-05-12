@@ -31,15 +31,16 @@ Goal C is deferred because (a) it requires write-back to AI clients (none of the
 
 Goal A uses three existing/added MCP tools end-to-end, no new transport:
 
-1. **[[mcp-tail-session|`tail_session`]]** — discover the other participant's session source (auto-resolves via `source_app`), grab the latest turn, capture its `source_resolved` for the watch.
-2. **[[mcp-wait-for-new-turns|`wait_for_new_turns`]]** — block on the discovered source(s) until a new turn lands. Stateless long-poll, max 120s timeout, falls back to repeated `tail_session` calls if needed.
-3. **[[mcp-find-clusters|`find_clusters`]] + [[mcp-get-atoms|`get_atoms`]]** — when joining a group session mid-flight, hydrate the prior turns via the discovery → body-fetch chain.
+1. **[[mcp-echo-resolve-mru|`echo_resolve_mru`]]** — discover the other participant's session source (resolves via `source_app` + optional `repo_path`); returns a `search_memories`-ready descriptor; `desc.source` is the watched-source string. Replaces V1.5's `tail_session` for source-discovery (item 038).
+2. **[[mcp-search-memories|`search_memories`]]** — using the descriptor: `search_memories({source: desc.source, ...desc.filter, limit: N})` grabs the latest turn(s) in reverse-chrono. Replaces V1.5's `tail_session` for the cheap recency-only fetch.
+3. **[[mcp-wait-for-new-turns|`wait_for_new_turns`]]** — block on the discovered source(s) until a new turn lands. Stateless long-poll, max 60s timeout (item 038 lowered from 120s); post-038 IDs-only contract (callers compose `get_atoms`/`get_atom` for bodies). Falls back to repeated `search_memories` reverse-chrono polls if long-poll isn't viable.
+4. **[[mcp-find-clusters|`find_clusters`]] + [[mcp-get-atoms|`get_atoms`]]** — when joining a group session mid-flight, hydrate the prior turns via the discovery → body-fetch chain.
 
 No new state, no new transport. The group-session pattern is a *protocol over existing primitives*, not a new MCP capability.
 
 ## First-Call Reliability Gate (item 032)
 
-Group-session continuation calls (subsequent `wait_for_new_turns` rounds against a known session) work cleanly because the consumer already has the watched-source string from the prior `tail_session` resolve. The friction was on the **first call** — when a participant tries to join a group by asking ECHO "where did the strategist leave off?" via a no-args `find_clusters()`, the strategist's own recent activity in the calling session would historically outrank the prior multi-source thread, returning calling-session noise as `clusters[0]`.
+Group-session continuation calls (subsequent `wait_for_new_turns` rounds against a known session) work cleanly because the consumer already has the watched-source string from the prior `echo_resolve_mru` resolve. The friction was on the **first call** — when a participant tries to join a group by asking ECHO "where did the strategist leave off?" via a no-args `find_clusters()`, the strategist's own recent activity in the calling session would historically outrank the prior multi-source thread, returning calling-session noise as `clusters[0]`.
 
 Item [[2026-05-10-032-m2-first-call-reliability|032]] closed this gate:
 
@@ -99,7 +100,7 @@ Across items 030 + 032 + 033 (today's spec work), this pattern produced 8 review
 ## Related
 
 - [[mcp-wait-for-new-turns]] — the subscription primitive
-- [[mcp-tail-session]] — session discovery
+- [[mcp-echo-resolve-mru]] — session discovery (post-038, replaces `tail_session`)
 - [[mcp-find-clusters]] + [[mcp-get-atoms]] — mid-session hydration
 - [[cross-tool-spec-review]] — the canonical use case (operating-model)
 - [[storage]] — the shared transcript substrate

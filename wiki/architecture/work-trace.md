@@ -255,7 +255,7 @@ If perf regresses under real dogfooding load: profile, propose a cache item; do 
 - **No trace viewer / UI.** Visual surface for traces is V2.
 - **No cross-cluster joining.** A single response = a single graph build.
 - **No GitHub / Slack adapters.** Source set stays at four (claude-code + codex + cursor + git) for V1.5 ship; Wave 4 adapters are a parallel thread.
-- **No `search_memories` change.** That tool's contract stays as-is. (Item 017 — "wire normalized atoms into `search_memories`" — was killed 2026-05-09; the V1.5 retrieval surface ([[mcp-search-memories|substring]] + [[mcp-tail-session|exact tail]] + [[mcp-recent-work-context|clustered]]) covers the use case via tool composition. Rationale + reopen criteria in `backlog/_followups.md` under "Killed (won't ship)".)
+- **No `search_memories` change.** That tool's contract stays as-is. (Item 017 — "wire normalized atoms into `search_memories`" — was killed 2026-05-09; the V1.5 retrieval surface ([[mcp-search-memories|substring]] + [[mcp-echo-resolve-mru|MRU resolver]] + [[mcp-recent-work-context|clustered]]) covers the use case via tool composition. Rationale + reopen criteria in `backlog/_followups.md` under "Killed (won't ship)".)
 
 ## What V1.5 Will Teach Us
 

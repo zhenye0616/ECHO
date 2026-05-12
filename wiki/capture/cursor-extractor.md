@@ -92,9 +92,32 @@ Workspace-DB events are not debounced — they only update the inference map, wh
     assistant_bubble_ids: string[],       // every assistant bubble that followed the user
     mtime: number,
     workspace_id?: string,                // best-effort
+    repo_root?: string,                   // item 037 — Stage 1: workspace.json folder URI;
+                                          //   Stage 2 fallback: file-walk via files_referenced.
+                                          //   Omitted when neither resolution succeeds.
+    is_continuation?: true,                                  // item 036 — present only on continuation atoms
+    continuation_of_assistant_bubble_id?: string,            // item 036 — set iff is_continuation === true
   },
 }
 ```
+
+## Multi-cluster continuation atoms (item 036)
+
+Cursor sometimes emits post-checkpoint assistant bubbles BEFORE the next user bubble — the pattern is "user → assistant cluster → checkpoint → more assistant bubbles → user." Pre-036, the second cluster was silently dropped (47.6% capture rate on a measured composer; 15 of 26 assistant bubbles invisible). Post-036, the extractor emits **continuation atoms** for these post-checkpoint bubbles:
+
+- **When continuation atoms fire:** after a user bubble + its initial assistant cluster has been processed, if Cursor writes additional `type=2` bubbles before the next `type=1` user bubble, those new bubbles emit as a continuation atom.
+- **Identity:** continuation atoms carry `metadata.is_continuation: true` and `metadata.continuation_of_assistant_bubble_id` pointing at the last bubble of the original cluster (the join key).
+- **Consumer join pattern:** group atoms by `metadata.user_bubble_id` for a deduplicated logical-turn view. Continuation atoms share the same `user_bubble_id` as the original cluster they extend; downstream consumers can re-stitch the logical turn by walking `assistant_bubble_ids[]` ∪ continuation atom contents.
+- **Why a separate atom, not in-place mutation:** the substrate is append-only ([[storage]] contract). Re-emitting the original cluster with extra bubbles would violate that; continuation atoms preserve append-only semantics while restoring capture coverage.
+
+## Work-artifact (repo) attribution (item 037)
+
+Each emitted atom carries `metadata.repo_root` when the extractor can resolve it. Two-stage resolution:
+
+1. **Stage 1 (preferred):** parse Cursor's per-workspace `workspace.json` `folder` field (e.g., `file:///Users/zhenye/Desktop/Project_echo`), `fileURLToPath` + percent-decode → absolute path. This is the canonical signal Cursor itself uses for workspace binding.
+2. **Stage 2 (fallback):** when `workspace.json` isn't available (fresh composer, no workspace binding yet), file-walk via `files_referenced` in the bubble's `context` field. Walk to the nearest `.git` ancestor; if it's unambiguous (single `.git` parent across all `files_referenced` entries), use that path as `repo_root`. If ambiguous (multiple `.git` ancestors), omit.
+
+`metadata.repo_root` is the substrate-side half of [[work-artifact-first-class]]. Retrieval consumers (`search_memories`, `find_clusters`, `wait_for_new_turns`, `echo_resolve_mru`) AND-filter by this field when callers pass `repo_path` — cross-project bleed is structurally impossible for atoms post-037. Pre-037 atoms (legacy composers) lack this field; [[mcp-echo-resolve-mru|`echo_resolve_mru`]]'s Phase 2 legacy fallback recovers them via the workspace-hash → composer-id chain.
 
 The `fs:` source prefix is reused (rather than introducing a `cursor:` kind) so [[capture-gate]]'s source-handling logic stays unchanged. The two paths in `CAPTURED_SOURCES.fs_paths` (workspaceStorage from item 009, globalStorage from item 010) capture different signals from the same app. Each accepted turn updates `lastSeenMap` so the next pass resumes correctly.
 

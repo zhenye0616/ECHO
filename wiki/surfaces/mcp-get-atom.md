@@ -82,7 +82,7 @@ Magic Moment M1-3 (long-turn elision still requires JSONL fallback for full-text
   atom_size_bytes: 0,
   error_code: 'atom_not_found',
   source: null,
-  warnings: ['No atom with id=<uuid> exists in storage. Verify the id was obtained from a current find_clusters / search_memories / get_atoms / tail_session response — atom IDs are storage row IDs and cannot be guessed.'],
+  warnings: ['No atom with id=<uuid> exists in storage. Verify the id was obtained from a current find_clusters / search_memories / get_atoms / wait_for_new_turns response — atom IDs are storage row IDs and cannot be guessed.'],
 }
 ```
 
@@ -125,7 +125,7 @@ After the R1 contract revision (content verbatim + metadata projected + embeddin
 
 ## When to Call `get_atom`
 
-Use ONLY when you observed **non-empty `truncations`** (especially `["content"]`) on a prior `search_memories` / `tail_session` / `get_atoms` / `wait_for_new_turns` response AND you need the verbatim content for that specific atom.
+Use ONLY when you observed **non-empty `truncations`** (especially `["content"]`) on a prior `search_memories` / `get_atoms` / `wait_for_new_turns` response AND you need the verbatim content for that specific atom.
 
 Do NOT call `get_atom` in a tight loop — it's the escape hatch, not the discovery primitive. Pair with [[mcp-find-clusters|`find_clusters`]] + [[mcp-get-atoms|`get_atoms`]] for routine discovery and body-fetch, reach for `get_atom` only when recovery is required.
 
@@ -142,5 +142,5 @@ Do NOT call `get_atom` in a tight loop — it's the escape hatch, not the discov
 - [[mcp-server]] — the host transport
 - [[mcp-get-atoms]] — the batch counterpart (with caps)
 - [[mcp-find-clusters]] — the discovery primitive that produces atom IDs
-- [[mcp-search-memories]] + [[mcp-tail-session]] + [[mcp-wait-for-new-turns]] — sibling atom-bearing tools that carry the `truncations` trust signal pointing here
+- [[mcp-search-memories]] + [[mcp-wait-for-new-turns]] + [[mcp-get-atoms]] — sibling atom-bearing tools that carry the `truncations` trust signal pointing here
 - [[cross-tool-spec-review]] — the operating-model pattern this tool unblocks (no more JSONL fallback for elision recovery)

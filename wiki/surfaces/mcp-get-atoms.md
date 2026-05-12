@@ -13,7 +13,7 @@ aliases:
 
 ## Definition
 
-`get_atoms` is the **targeted body-fetch** primitive in the V1.6 atomic MCP toolkit. It takes a list of atom IDs (≤50 per call) and returns their bodies — projected through the same wire-shape pipeline as [[mcp-search-memories|`search_memories`]] and [[mcp-tail-session|`tail_session`]], with per-content cap and per-key metadata cap. Lives at `src/mcp/tools/get-atoms.ts`. Shipped 2026-05-10 as item [[2026-05-09-030-mcp-toolkit-reshape-and-group-session|030]] (V1.6); resume-call usage (`prefer='newest_first'` + missing-ID position semantics) added by item [[2026-05-10-032-m2-first-call-reliability|032]].
+`get_atoms` is the **targeted body-fetch** primitive in the V1.6 atomic MCP toolkit. It takes a list of atom IDs (≤50 per call) and returns their bodies — projected through the same wire-shape pipeline as [[mcp-search-memories|`search_memories`]], with per-content cap and per-key metadata cap. Lives at `src/mcp/tools/get-atoms.ts`. Shipped 2026-05-10 as item [[2026-05-09-030-mcp-toolkit-reshape-and-group-session|030]] (V1.6); resume-call usage (`prefer='newest_first'` + missing-ID position semantics) added by item [[2026-05-10-032-m2-first-call-reliability|032]]; **item 038 made `get_atoms` the canonical body-fetch composer for [[mcp-wait-for-new-turns|`wait_for_new_turns`]]'s IDs-only response**.
 
 ## Why It Exists
 
@@ -109,7 +109,7 @@ For full verbatim atom recovery (when `truncations` reports content was clipped)
 - [[mcp-server]] — the host transport
 - [[mcp-find-clusters]] — the discovery counterpart
 - [[mcp-recent-work-context]] — the deprecated V1.5 predecessor (`get_recent_work_context`)
-- [[mcp-tail-session]] — sibling cheap exact-fetch primitive (by source instead of by ID list)
+- [[mcp-echo-resolve-mru]] — sibling V1.6 RC2 resolver primitive (returns descriptors composing into `search_memories`/`wait_for_new_turns`)
 - [[mcp-search-memories]] — sibling substring search
 - [[storage]] — the substrate `getByIds` queries
 - [[normalized-context-event]] — the atom shape

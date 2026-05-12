@@ -99,6 +99,32 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
+  "principles/work-artifact-first-class.md": {
+    "status": "shipped",
+    "title": "Work Artifact First Class",
+    "link": "work-artifact-first-class",
+    "summary": "Repo as a first-class retrieval predicate. Every capture surface writes metadata.repo_root; every project-scoped retrieval tool accepts repo_path; cross-project bleed is structurally impossible. Landed via item 037.",
+    "aliases": [
+      "Work Artifact First Class",
+      "work-artifact-first-class",
+      "Repo Scoping as Retrieval Predicate"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Retrieval Discipline"
+  },
+  "principles/atomic-primitives-compose.md": {
+    "status": "shipped",
+    "title": "Atomic Primitives, Compose",
+    "link": "atomic-primitives-compose",
+    "summary": "Each MCP tool does one thing. Compound 'do everything in one call' tools are anti-patterns. The V1.6 toolkit ships 8 atomic primitives composing via 1-2 extra MCP calls. Formalized via item 038.",
+    "aliases": [
+      "Atomic Primitives Compose",
+      "atomic-primitives-compose",
+      "MCP Atomicity Principle"
+    ],
+    "topic": "Architecture",
+    "subtopic": "MCP Toolkit Discipline"
+  },
   "surfaces/browser-extension.md": {
     "status": "shipped",
     "title": "Browser Extension",
@@ -308,7 +334,7 @@
     "status": "shipped",
     "title": "MCP search_memories Tool",
     "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, V1.5.6 wire-shape projection, V1.5.7 fs-watcher exclusion + TZ-naive warning, outputSchema + structuredContent + readOnlyHint.",
+    "summary": "V1 MCP retrieval tool — case-insensitive substring + filters; source_app enum + post-038 source (exact) + metadata_match (whitelisted keys workspace_id/composer_id/session_id/repo_root); post-037 repo_path; composite-cursor pagination; wire-shape projection.",
     "aliases": [
       "search_memories",
       "MCP search_memories tool",
@@ -317,11 +343,25 @@
     "topic": "Form Factor",
     "subtopic": "MCP Server"
   },
+  "surfaces/mcp-echo-resolve-mru.md": {
+    "status": "shipped",
+    "title": "MCP echo_resolve_mru Tool",
+    "link": "mcp-echo-resolve-mru",
+    "summary": "V1.6 RC2 MRU resolver — returns search_memories-ready descriptors {source, filter, phase?}; Cursor two-phase fallback (Phase 1 metadata.repo_root, Phase 2 legacy composer↔workspace registry); replaces tail_session compound modes. Item 038.",
+    "aliases": [
+      "echo_resolve_mru",
+      "MCP echo_resolve_mru tool",
+      "Echo Resolve MRU",
+      "MRU Resolver"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
   "surfaces/mcp-recent-work-context.md": {
     "status": "shipped",
     "title": "MCP get_recent_work_context Tool",
     "link": "mcp-recent-work-context",
-    "summary": "DEPRECATED V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays. Superseded 2026-05-10 by V1.6 atomic toolkit (find_clusters + get_atoms); removal scheduled in item 031 after ≥1 week of post-merge dogfooding.",
+    "summary": "DEPRECATED V1.5 MCP tool; survives in item 038 as a thin re-export shim. Cluster engine canonical home moved to src/mcp/internal/cluster-engine.ts; MCP-tool registration removal scheduled in the 2026-05-17 follow-up.",
     "aliases": [
       "get_recent_work_context",
       "MCP get_recent_work_context tool",
@@ -377,25 +417,12 @@
     "status": "shipped",
     "title": "MCP wait_for_new_turns Tool",
     "link": "mcp-wait-for-new-turns",
-    "summary": "V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; default 30s timeout, max 120s; implements Goal A of the group-session pattern; falls back to repeated tail_session polls when long-poll isn't viable.",
+    "summary": "V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; post-038 IDs-only contract (returns turn_ids: string[], callers compose get_atoms/get_atom); post-037 repo_path; max 60s timeout; implements Goal A of group-session.",
     "aliases": [
       "wait_for_new_turns",
       "MCP wait_for_new_turns tool",
       "Group session subscription",
       "Stateless long-poll"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-tail-session.md": {
-    "status": "shipped",
-    "title": "MCP tail_session Tool",
-    "link": "mcp-tail-session",
-    "summary": "V1.5.4 MCP cheap exact-fetch primitive — N most-recent atoms from a single named source (or auto-resolved newest session via source_app); shared composite cursor with search_memories, fs-watcher exclusion, V1.5.6 wire-shape projection, < 10kB typical response.",
-    "aliases": [
-      "tail_session",
-      "MCP tail_session tool",
-      "Tail Session"
     ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"
@@ -431,7 +458,7 @@
     "status": "shipped",
     "title": "Artifact Identity (the join-key contract)",
     "link": "artifact-identity",
-    "summary": "Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing \u2014 powers cross-source cluster joins.",
+    "summary": "Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing — powers cross-source cluster joins.",
     "aliases": [
       "Artifact Identity",
       "Artifact Identity Policy",
@@ -578,9 +605,9 @@
   "capture/per-app/cursor-collected-data.md": {
     "status": "shipped",
     "capture_status": "degraded",
-    "title": "Cursor \u2014 Collected Data Reference",
+    "title": "Cursor — Collected Data Reference",
     "link": "cursor-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from Cursor's legacy bubbleId: / composerData: schema, where it lives, and what it becomes in CaptureEvent. Capture degraded since 2026-05-01 \u2014 agentKv: migration not yet implemented.",
+    "summary": "Field-by-field record of what ECHO reads from Cursor's legacy bubbleId: / composerData: schema, where it lives, and what it becomes in CaptureEvent. Capture degraded since 2026-05-01 — agentKv: migration not yet implemented.",
     "aliases": [
       "Cursor Data Collection",
       "What ECHO Collects from Cursor",
@@ -591,7 +618,7 @@
   },
   "capture/per-app/codex-collected-data.md": {
     "status": "shipped",
-    "title": "Codex \u2014 Collected Data Reference",
+    "title": "Codex — Collected Data Reference",
     "link": "codex-collected-data",
     "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; text, cwd, config, tool calls, reasoning summaries, git state, and ignored fields.",
     "aliases": [
@@ -604,7 +631,7 @@
   },
   "capture/per-app/claude-code-collected-data.md": {
     "status": "shipped",
-    "title": "Claude Code \u2014 Collected Data Reference",
+    "title": "Claude Code — Collected Data Reference",
     "link": "claude-code-collected-data",
     "summary": "Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.",
     "aliases": [
@@ -677,7 +704,7 @@
     "status": "shipped",
     "title": "Wave 1-2-3 Retrospective",
     "link": "wave-1-2-3-retrospective",
-    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off \u2014 and where they didn't.",
+    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.",
     "aliases": [
       "Wave 1-2-3 Retrospective",
       "Substrate Wave Retrospective",
@@ -690,7 +717,7 @@
     "status": "shipped",
     "title": "Cross-Tool Spec Review",
     "link": "cross-tool-spec-review",
-    "summary": "Multi-reviewer pattern (\u22652 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.",
+    "summary": "Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.",
     "aliases": [
       "Cross-Tool Spec Review",
       "Cross-Tool Review",

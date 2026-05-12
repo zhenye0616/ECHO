@@ -41,22 +41,29 @@ Three reasons:
 
 ## Tools Currently Registered
 
-Eight tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (`find_clusters` + `get_atoms` + `get_atom`) plus the `wait_for_new_turns` group-session primitive; `get_recent_work_context` remains advertised for one dogfooding cycle before removal (item 031):
+Eight tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (item 030: `find_clusters` + `get_atoms`), then to V1.6 RC2's full atomicity refactor (item 038: kill `tail_session`'s compound modes, add `echo_resolve_mru` resolver primitive, unbundle `wait_for_new_turns` bodies, DRY `exclude_metadata_surface`). `get_recent_work_context` survives as a thin re-export shim until the 2026-05-17 follow-up removes its MCP-tool registration.
 
 | Tool | Purpose | Cost class |
 |---|---|---|
-| [[mcp-search-memories\|`search_memories`]] | V1 raw-event substring/source-prefix/time-range search | medium |
-| [[mcp-tail-session\|`tail_session`]] | V1.5.4 cheap exact-fetch — N most-recent atoms from a single named `source` (or auto-resolved by `source_app`) | cheap |
-| [[mcp-find-clusters\|`find_clusters`]] | V1.6 discovery primitive — coherent work clusters as skeletons (`atom_ids[]`, source breakdown, ranks). Auto-expand triggers + strict-partition demotion shipped with item 032. | cheap |
-| [[mcp-get-atoms\|`get_atoms`]] | V1.6 targeted body-fetch — atom bodies by ID list (≤50); deterministic prefix-drop on envelope overflow; `prefer='newest_first'` for resume calls (item 032) | medium |
-| [[mcp-get-atom\|`get_atom`]] | V1.6.1 verbatim escape hatch (singular) — content verbatim + metadata projected + embedding excluded; recovery primitive for `truncations: ["content"]` responses (item 033) | high |
-| [[mcp-wait-for-new-turns\|`wait_for_new_turns`]] | V1.6 group-session subscription — stateless long-poll on watched sources (max 120s timeout). Implements Goal A of the [[group-session]] pattern. | blocks |
-| [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 compound clustered context. **DEPRECATED** by item 030; removal scheduled in item 031 after ≥1 week of dogfooding confirms the new toolkit covers all resume patterns. | medium |
-| `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }` | trivial |
+| [[mcp-search-memories\|`search_memories`]] | V1 raw-event search — substring/source-prefix/time-range; **item 038 added `source` (exact-match) + `metadata_match` (allowed keys: `workspace_id`, `composer_id`, `session_id`, `repo_root`); item 037 added `repo_path`**. The descriptor returned by `echo_resolve_mru` spreads directly into this tool's parameters. | medium |
+| [[mcp-echo-resolve-mru\|`echo_resolve_mru`]] | V1.6 RC2 MRU resolver — returns `search_memories`-ready descriptors `{source, filter, phase?}`; one descriptor per requested source-app or literal source; Cursor two-phase fallback (Phase 1 `metadata.repo_root`, Phase 2 legacy composer↔workspace registry; `phase: 'cursor_legacy'` encoded when Phase 2 fires); cross-project bleed structurally impossible. **Replaces `tail_session`'s compound modes (item 038).** | cheap |
+| [[mcp-find-clusters\|`find_clusters`]] | V1.6 discovery primitive — coherent work clusters as skeletons (`atom_ids[]`, source breakdown, ranks). Auto-expand triggers + strict-partition demotion shipped with item 032; **item 037 added `repo_path` parameter**. Cluster engine factored out (item 038); now imports `src/mcp/internal/cluster-engine.ts` directly. | cheap |
+| [[mcp-get-atoms\|`get_atoms`]] | V1.6 targeted body-fetch — atom bodies by ID list (≤50); deterministic prefix-drop on envelope overflow; `prefer='newest_first'` for resume calls (item 032). | medium |
+| [[mcp-get-atom\|`get_atom`]] | V1.6.1 verbatim escape hatch (singular) — content verbatim + metadata projected + embedding excluded; recovery primitive for `truncations: ["content"]` responses (item 033). **Kept in 038** (Codex round-4 evidence — `get-atom.ts:139` is the only verbatim path; killing it would reopen the M1-3 recovery gap). | high |
+| [[mcp-wait-for-new-turns\|`wait_for_new_turns`]] | V1.6 group-session subscription — stateless long-poll on watched sources (max 60s default; max 120s ceiling). **Item 038 changed contract: returns `turn_ids: string[]` only (no bodies). Callers compose `get_atoms(turn_ids)` or `get_atom(turn_ids[i])` for body fetch.** Item 037 added `repo_path`. Implements Goal A of the [[group-session]] pattern. | blocks |
+| [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 compound clustered context. **DEPRECATED by item 030; survives in 038 as a thin re-export shim** (cluster engine canonical home moved to `src/mcp/internal/cluster-engine.ts`; MCP-tool registration stays until the 2026-05-17 follow-up). Removal pending dogfooding-evidence-based founder consent receipt. | medium |
+| `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }`. | trivial |
 
-**The V1.6 atomic toolkit (`find_clusters` + `get_atoms` + `get_atom` + `wait_for_new_turns`)** replaces the compound `get_recent_work_context` with a discovery → body-fetch → verbatim-recovery → subscription chain. Consumers pay only for the bodies they hydrate; the discovery primitive stays under 10 kB even on full-day windows; resume calls after a multi-hour gap reliably surface prior work as `clusters[0]` (item 032's first-call reliability gate). The `truncations: string[]` trust signal (item 030) appears on every atom-bearing response — `[]` means verbatim; `["content"]` means the wire-shape cap fired and recovery via [[mcp-get-atom|`get_atom(id)`]] (item 033, shipped 2026-05-10) is warranted. `get_atom` closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context. `tail_session` remains the cheap "last N turns from this source" primitive — orthogonal to the cluster-based chain.
+**The post-038 atomic toolkit** is 8 tools, each with one purpose, composing cleanly per the [[atomic-primitives-compose]] principle. The canonical compose patterns:
 
-`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range search).
+- **Tail (cheap recency-only fetch):** `echo_resolve_mru({sources:['cursor'], repo_path:X})` → `search_memories({source: desc.source, ...desc.filter, limit:N})`.
+- **Live-watch:** `echo_resolve_mru({sources:['claude_code'], repo_path:X})` → `wait_for_new_turns({sources:[desc.source], repo_path:desc.filter.repo_path, since:now})` (note: `wait_for_new_turns` ignores `metadata_match` — wait is for new turns, legacy Cursor atoms are out of scope).
+- **Discovery + body-fetch:** `find_clusters({repo_path:X})` → `get_atoms({atom_ids: clusters[0].atom_ids, prefer:'newest_first'})`.
+- **Verbatim recovery:** any `truncations: ["content"]` response → `get_atom(id)` for the verbatim body.
+
+The `truncations: string[]` trust signal (item 030) appears on every atom-bearing response — `[]` means verbatim; `["content"]` means the wire-shape cap fired and recovery via `get_atom(id)` is warranted. `get_atom` closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context.
+
+`echo_ping` exists as a wiring smoke test for users adding ECHO to a new MCP client. `search_memories` closes the V1 killer-demo loop (raw substring + source-prefix + time-range + post-038 `source` exact + `metadata_match`).
 
 ## Tool Registration Pattern
 
@@ -136,13 +143,15 @@ If MCP adoption stalls (low probability but non-zero), the desktop-AI ingestion 
 
 ## Related
 
-- [[mcp-search-memories]] — the V1 raw-event substring retrieval tool
-- [[mcp-tail-session]] — the V1.5.4 cheap exact-fetch tool
-- [[mcp-find-clusters]] — the V1.6 discovery primitive
-- [[mcp-get-atoms]] — the V1.6 targeted body-fetch primitive
-- [[mcp-get-atom]] — the V1.6.1 verbatim escape hatch (singular)
-- [[mcp-wait-for-new-turns]] — the V1.6 group-session subscription primitive
-- [[mcp-recent-work-context]] — the V1.5 clustered-context tool (deprecated by V1.6 atomic toolkit)
+- [[mcp-search-memories]] — V1 raw-event search; post-038 accepts `source` exact + `metadata_match` + `repo_path`
+- [[mcp-echo-resolve-mru]] — V1.6 RC2 MRU resolver; replaces `tail_session` compound modes
+- [[mcp-find-clusters]] — V1.6 discovery primitive
+- [[mcp-get-atoms]] — V1.6 targeted body-fetch primitive
+- [[mcp-get-atom]] — V1.6.1 verbatim escape hatch (singular)
+- [[mcp-wait-for-new-turns]] — V1.6 group-session subscription; post-038 IDs-only contract
+- [[mcp-recent-work-context]] — V1.5 clustered-context tool (deprecated; shim until 2026-05-17)
+- [[atomic-primitives-compose]] — the principle the toolkit is built on
+- [[work-artifact-first-class]] — the sibling principle (`repo_path` end-to-end)
 - [[group-session]] — the synchronized human-driven group pattern (Goal A)
 - [[work-trace]] — the layer that powers `get_recent_work_context` and `find_clusters`
 - [[normalization]] — the layer that produces the atoms consumers see

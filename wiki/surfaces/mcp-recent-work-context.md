@@ -10,7 +10,7 @@ aliases:
 
 # MCP `get_recent_work_context` Tool
 
-> ⚠️ **DEPRECATED 2026-05-10 (V1.6, item [[2026-05-09-030-mcp-toolkit-reshape-and-group-session|030]]).** Replaced by the atomic toolkit [[mcp-find-clusters|`find_clusters`]] (cheap discovery) + [[mcp-get-atoms|`get_atoms`]] (targeted body-fetch). The tool is still advertised by the MCP server for one dogfooding cycle; removal is scheduled in item 031 after ≥1 week of post-merge dogfooding confirms the new toolkit covers all resume patterns including resume-after-gap (gated closed by item [[2026-05-10-032-m2-first-call-reliability|032]]'s auto-expand + strict-partition demotion).
+> ⚠️ **DEPRECATED 2026-05-10 (V1.6, item [[2026-05-09-030-mcp-toolkit-reshape-and-group-session|030]]); SURVIVES IN ITEM 038 AS A THIN RE-EXPORT SHIM.** Replaced by the atomic toolkit [[mcp-find-clusters|`find_clusters`]] (cheap discovery) + [[mcp-get-atoms|`get_atoms`]] (targeted body-fetch). **Post-038 status:** the cluster engine canonical home moved to `src/mcp/internal/cluster-engine.ts`; `recent-work-context.ts` is now a ≤10-line re-export shim that preserves the MCP-tool registration. The registered handler still works identically (regression-tested via integration test); removal of the MCP-tool registration is scheduled in the **2026-05-17 follow-up** item, gated on founder-consent receipt drafted from journal evidence (zero `get_recent_work_context` calls since 2026-05-09).
 >
 > **Migration recipe:**
 > ```ts

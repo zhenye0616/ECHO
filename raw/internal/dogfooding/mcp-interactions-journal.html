@@ -1256,6 +1256,21 @@ href="#pdt-strategist-claude-code-9b575b57-039-r4-combine-rc5-polish-convergence
 id="toc-pdt-strategist-claude-code-9b575b57-039-r4-combine-rc5-polish-convergence-declared-r4combined.md">2026-05-12
 01:20 PDT — Strategist (Claude Code 9b575b57): 039 R4 combine + RC5
 polish + <strong>CONVERGENCE DECLARED</strong> + r4/combined.md</a></li>
+<li><a
+href="#pdt-codex-monitor-initial-echo-connection-for-active-claude-builder-watch-on-039"
+id="toc-pdt-codex-monitor-initial-echo-connection-for-active-claude-builder-watch-on-039">2026-05-12
+01:29 PDT — Codex monitor: initial ECHO connection for active Claude
+builder watch on 039</a></li>
+<li><a
+href="#pdt-codex-monitor-worktree-scoped-claude-lookup-for-039-implementation-session"
+id="toc-pdt-codex-monitor-worktree-scoped-claude-lookup-for-039-implementation-session">2026-05-12
+01:31 PDT — Codex monitor: worktree-scoped Claude lookup for 039
+implementation session</a></li>
+<li><a
+href="#pdt-codex-monitor-broad-claude-code-freshness-check-during-039-implementation"
+id="toc-pdt-codex-monitor-broad-claude-code-freshness-check-during-039-implementation">2026-05-12
+01:39 PDT — Codex monitor: broad Claude Code freshness check during 039
+implementation</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12019,6 +12034,117 @@ manual-review flow (last time); merge to main; THEN AC6b kicks off on
 the next-up qualifying spec (the FIRST spec to go through the queue
 end-to-end with zero dispatch messages). 039 is the queue’s bootstrap;
 040+ is the queue’s steady state.</li>
+</ul>
+<h3
+id="pdt-codex-monitor-initial-echo-connection-for-active-claude-builder-watch-on-039">2026-05-12
+01:29 PDT — Codex monitor: initial ECHO connection for active Claude
+builder watch on 039</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked Codex to use ECHO to connect
+to the Claude builder session and monitor implementation progress for
+claimed item
+<code>2026-05-11-039-cross-tool-review-dispatch-queue</code>.</li>
+<li><strong>Query inputs:</strong> Initial sandboxed local MCP HTTP
+attempt failed with <code>EPERM 127.0.0.1:38478</code>; retried with
+local-network approval. Calls:
+<code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code>,
+then
+<code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})</code>.</li>
+<li><strong>Returned:</strong> 1 resolved Claude Code source; 8 atoms
+from that exact source. Top atom timestamp
+<code>2026-05-12T08:25:50.499Z</code>, turn_index 16, content truncated;
+it was a strategist/founder workflow-analysis turn after 039 became
+claim-ready, not implementation work.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:8}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code>;
+no Cursor/Codex/git atoms in this call.</li>
+<li><strong>Verdict:</strong> 🟡 partial</li>
+<li><strong>Note:</strong> Repo-scoped MRU against the main repo found
+the strategist/founder Claude session, not the claimed implementation
+worktree session. Local git showed the active item is claimed and the
+implementation worktree has untracked <code>tools/review-queue/</code>,
+<code>tests/review-queue/</code>, and
+<code>backlog/reviews/.gitkeep</code>; next monitoring call should
+resolve against
+<code>/Users/zhenye/Desktop/Project_echo--cross-tool-review-dispatch-queue</code>
+or long-poll all <code>claude_code</code> turns with repo scoping
+adjusted.</li>
+<li><strong>Conjecture:</strong> The builder’s capture metadata likely
+uses the worktree path as <code>repo_root</code>, so main-repo
+<code>repo_path</code> is the wrong first filter for implementation
+monitoring.</li>
+</ul>
+<h3
+id="pdt-codex-monitor-worktree-scoped-claude-lookup-for-039-implementation-session">2026-05-12
+01:31 PDT — Codex monitor: worktree-scoped Claude lookup for 039
+implementation session</h3>
+<ul>
+<li><strong>Trigger:</strong> Follow-up to the partial MRU hit above;
+Codex tried to resolve the active builder session by the claimed
+worktree path.</li>
+<li><strong>Query inputs:</strong> Initial sandboxed local MCP HTTP
+attempt again failed with <code>EPERM 127.0.0.1:38478</code>; retried
+with local-network approval. Calls:
+<code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo--cross-tool-review-dispatch-queue'})</code>;
+because that returned null, also
+<code>search_memories({source_app:'claude_code', query:'review-queue', limit:10})</code>
+as a broad fallback.</li>
+<li><strong>Returned:</strong> <code>echo_resolve_mru</code> returned
+<code>claude_code: null</code> for the worktree repo path. Broad
+fallback returned 4 atoms, all from the prior strategist session
+<code>9b575b57</code>, newest <code>2026-05-12T08:10:38.134Z</code>; no
+implementation-worktree Claude source surfaced.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:4}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code>;
+no atoms with
+<code>repo_root=/Users/zhenye/Desktop/Project_echo--cross-tool-review-dispatch-queue</code>.</li>
+<li><strong>Verdict:</strong> ❌ wrong for the user’s monitoring
+goal</li>
+<li><strong>Note:</strong> ECHO did not expose the active implementation
+session via either main-repo or worktree repo scoping. Local
+filesystem/git status still shows implementation progress in the
+worktree, so monitoring needs a hybrid path: use ECHO for any later
+captured Claude turns, and use git/worktree inspection for immediate
+progress.</li>
+<li><strong>Conjecture:</strong> Either the builder has not yet produced
+a captured assistant turn after claiming, or its session metadata is not
+carrying the worktree repo root. This is a capture/discoverability gap,
+not necessarily a builder issue.</li>
+</ul>
+<h3
+id="pdt-codex-monitor-broad-claude-code-freshness-check-during-039-implementation">2026-05-12
+01:39 PDT — Codex monitor: broad Claude Code freshness check during 039
+implementation</h3>
+<ul>
+<li><strong>Trigger:</strong> After local worktree inspection found
+active implementation progress and several possible AC mismatches, Codex
+checked whether ECHO had captured newer Claude Code turns from the
+builder.</li>
+<li><strong>Query inputs:</strong>
+<code>search_memories({source_app:'claude_code', since:'2026-05-12T08:25:50.499Z', limit:10})</code>.</li>
+<li><strong>Returned:</strong> 6 atoms, all from the strategist/founder
+session, newest timestamp <code>2026-05-12T08:38:25.255Z</code>. Top
+atom was a wiki-freshness strategy turn; none were
+implementation-worktree builder turns.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:6}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code>;
+no distinct implementation session surfaced.</li>
+<li><strong>Verdict:</strong> 🟡 partial</li>
+<li><strong>Note:</strong> ECHO is fresh for the strategist session but
+still not useful for the builder monitor. Worktree inspection remains
+the reliable source for implementation progress. Local issues observed
+outside ECHO: focused review-queue tests pass with
+<code>--cache=false</code>, normal Vitest run exits nonzero due the
+untracked <code>node_modules</code> symlink cache write, direct Python
+shebang execution fails on <code>jsonschema</code> architecture
+mismatch, and current tests diverge from at least one AC around
+<code>combined.md</code> existing / orphan tmp cleanup.</li>
+<li><strong>Conjecture:</strong> The monitoring gap is specifically
+source discovery / repo-root association for the builder session, not
+global Claude Code capture staleness.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

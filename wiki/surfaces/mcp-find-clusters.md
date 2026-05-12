@@ -37,6 +37,8 @@ V1.5's `get_recent_work_context` ([[mcp-recent-work-context|deprecated since 030
   until?:        ISO8601,       // lookback end; default now
   window_hours?: number,        // [0.1, 168] — cluster-gap, NOT lookback (see below)
   format?:       'skeleton',    // only 'skeleton' shipped in V1.6 — no atom bodies
+  repo_path?:    string,        // item 037 — absolute repo root; AND-filters atoms by metadata.repo_root === normalize(repo_path)
+                                //   uniformly across all source_apps (see [[work-artifact-first-class]])
 }
 ```
 
@@ -111,14 +113,17 @@ Documented in the `find_clusters` tool description verbatim (V1.6.1). See [[mcp-
 
 - **No atom bodies.** That's [[mcp-get-atoms|`get_atoms`]].
 - **No substring search.** That's [[mcp-search-memories|`search_memories`]].
-- **No exact tail by source.** That's [[mcp-tail-session|`tail_session`]].
+- **No MRU resolution.** That's [[mcp-echo-resolve-mru|`echo_resolve_mru`]] (post-038 replacement for `tail_session`'s compound modes).
 - **No persisted clusters table.** Computed on every call; cluster IDs are deterministic-ephemeral.
 
 ## Related
 
 - [[mcp-server]] — the host transport
 - [[mcp-get-atoms]] — the body-fetch counterpart
+- [[mcp-echo-resolve-mru]] — sibling V1.6 RC2 resolver primitive (post-038)
+- [[mcp-search-memories]] — substring search sibling
 - [[mcp-recent-work-context]] — the deprecated V1.5 predecessor (`get_recent_work_context`)
-- [[mcp-tail-session]] — sibling cheap exact-fetch primitive
 - [[work-trace]] — the clustering algorithm
+- [[work-artifact-first-class]] — the principle behind `repo_path` (item 037)
+- [[atomic-primitives-compose]] — the principle behind discovery / body-fetch / resolver separation
 - [[group-session]] — cross-tool review pattern that uses this tool

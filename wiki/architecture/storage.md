@@ -42,12 +42,20 @@ interface QueryFilter {
   order?: 'asc' | 'desc';              // default 'desc' — keeps newest when limit is hit (item 021)
   exclude_metadata_surface?: string[]; // drop rows whose metadata.surface ∈ this set (item 022)
   before?: { timestamp: string; id: string }; // descending-only page boundary (item 025)
+  repo_path?: string;                  // item 037 — AND-filter on metadata.repo_root === normalize(repo_path)
+  metadata_match?: { [key: string]: string }; // item 038 — AND-joined equality filter on whitelisted keys
 }
 ```
 
 Three operations, no others. There is no `update`, no `delete`. Forgetting (when it ships) will be implemented as a tombstone row, not as in-place deletion.
 
 `source_prefix` was added in wave 3 to support [[mcp-search-memories]], which needs to filter by family of sources (e.g., `domain:` vs `app:` vs `fs:`). It is mutually exclusive with `source` — supplying both throws. Both implementations honor the field with the same semantics: the event's `source` string must `startsWith` the filter value.
+
+`repo_path` (added in item 037) is the work-artifact scoping predicate. When set, the storage layer AND-filters rows by `metadata.repo_root === normalize(repo_path)` via SQL `json_extract` (sqlite) or array predicate (memory). Implements the substrate-side half of [[work-artifact-first-class]]; cross-project bleed is structurally impossible when this filter is passed.
+
+`metadata_match` (added in item 038) is the arbitrary-key metadata-equality predicate, AND-joined across keys. **`METADATA_MATCH_KEY_WHITELIST`** restricts allowed keys to `workspace_id`, `composer_id`, `session_id`, and `repo_root` (added by item 037). Non-whitelisted keys → caller-layer isError (the storage seam itself accepts any keys; the MCP tool layer enforces the whitelist before reaching storage to prevent dynamic-interpolation attacks). The Cursor Phase 2 legacy fallback path in [[mcp-echo-resolve-mru|`echo_resolve_mru`]] uses `{composer_id: <resolved>}` WITHOUT `repo_path` (legacy atoms predate the repo_root capture write); the descriptor encodes `phase: 'cursor_legacy'` so consumers can tell.
+
+**Conflict rule:** passing both `repo_path` and `metadata_match.repo_root` with conflicting values throws synchronously at the storage seam. Same value is fine. The sqlite implementation uses prepared-statement caching keyed on SQL text (which includes the whitelisted metadata_match keys, NOT values), so the prepared-statement pool size is bounded by `2^|whitelist|` regardless of dataset size.
 
 `order` (added in item 021) defaulted to ASC pre-021, which silently dropped the **newest** events when `limit` was hit — every existing caller's intent was "give me the recent N events," but ASC + LIMIT returned the oldest N. The default is now `'desc'` (newest-first selection); callers that genuinely need oldest-first (e.g., turn-pair reconstruction in extractors) pass `order: 'asc'` explicitly. Trace-layer callers re-sort ASC in memory after fetch since cluster determinism and forward-only resolution scans require ascending order. See [[work-trace]] for the trace-side adjustment.
 

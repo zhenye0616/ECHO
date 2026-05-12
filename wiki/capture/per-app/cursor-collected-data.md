@@ -118,6 +118,9 @@ No chat content is read from workspace DBs.
     assistant_bubble_ids:  ["<UUID>", "<UUID>", ...],   // every assistant bubble in the cluster
     mtime:                 <ms epoch when state.vscdb was last touched>,
     workspace_id?:         "<workspace hash — best-effort>",
+    repo_root?:            "<absolute repo path — item 037>",  // see "Repo attribution" below
+    is_continuation?:      true,                                // item 036 — present only on continuation atoms
+    continuation_of_assistant_bubble_id?: "<UUID>",             // item 036 — pointer to the original cluster's last bubble
     context?: {
       attached_files?:     ["<path>", ...],            // dedup'd, in order
       referenced_files?:   [{ path, language? }, ...], // dedup'd by path
@@ -128,6 +131,24 @@ No chat content is read from workspace DBs.
 ```
 
 `context` is omitted entirely if all three sub-arrays would be empty. Each sub-key is omitted if its array would be empty. So a "pure chat" turn with no file references gets a clean event without an empty `context` block.
+
+### Repo attribution — `metadata.repo_root` (item 037)
+
+Each emitted atom carries `metadata.repo_root` when the extractor can resolve it. Two-stage resolution:
+
+1. **Stage 1 (preferred):** parse Cursor's per-workspace `workspace.json` `folder` field (e.g., `file:///Users/zhenye/Desktop/Project_echo`), `fileURLToPath` + percent-decode → absolute path.
+2. **Stage 2 (fallback):** when `workspace.json` isn't available (fresh composer without workspace binding), file-walk via `files_referenced` in the bubble's context. Walk to the nearest `.git` ancestor; use the path if it's unambiguous (single `.git` parent across all referenced files); omit if ambiguous.
+
+`repo_root` is the substrate-side half of [[work-artifact-first-class]]. Pre-037 atoms (legacy composers, captured 2026-05-09 and earlier) lack this field; [[mcp-echo-resolve-mru|`echo_resolve_mru`]]'s Phase 2 legacy fallback recovers them via the workspace-hash → composer-id chain.
+
+### Continuation atoms — `is_continuation` + `continuation_of_assistant_bubble_id` (item 036)
+
+When Cursor writes post-checkpoint assistant bubbles before the next user bubble (a frequent pattern in agent mode), those bubbles emit as separate continuation atoms instead of being silently dropped:
+
+- `metadata.is_continuation: true` — present only on continuation atoms (absent / undefined on normal atoms).
+- `metadata.continuation_of_assistant_bubble_id: "<UUID>"` — set iff `is_continuation === true`; points to the last bubble of the original cluster (the join key for stitching the logical turn).
+
+Consumer join pattern: group atoms by `metadata.user_bubble_id` for a deduplicated logical-turn view; continuation atoms share `user_bubble_id` with their original cluster.
 
 ## Empirically: what's actually populated in real Cursor data?
 

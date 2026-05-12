@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 55 pages · 53 shipped · 2 planned
+**Status:** 57 pages · 55 shipped · 2 planned
 
 ---
 
@@ -38,9 +38,11 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Architecture
 
+- [[atomic-primitives-compose|Atomic Primitives, Compose]] — Each MCP tool does one thing. Compound 'do everything in one call' tools are anti-patterns. The V1.6 toolkit ships 8 atomic primitives composing via 1-2 extra MCP calls. Formalized via item 038.
 - [[compose-not-capture|Compose, Don't Capture]] — ECHO ingests from tools that already capture; never builds its own capture surface for what others provide
 - [[layer-above-saas|Layer Above SaaS]] — ECHO is additive to existing tools, never a replacement. The connective tissue between apps.
 - [[sandboxed-capture|Sandboxed Capture]] — Capture enforced as code via the single gate chokepoint, now exercised in production by all four V1 capture surfaces.
+- [[work-artifact-first-class|Work Artifact First Class]] — Repo as a first-class retrieval predicate. Every capture surface writes metadata.repo_root; every project-scoped retrieval tool accepts repo_path; cross-project bleed is structurally impossible. Landed via item 037.
 
 ### Brand & Positioning
 
@@ -112,13 +114,13 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[browser-extension|Browser Extension]] — Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.
 - [[hotkey-overlay|Hotkey Overlay]] *(planned)* — System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.
 - [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.
+- [[mcp-echo-resolve-mru|MCP echo_resolve_mru Tool]] — V1.6 RC2 MRU resolver — returns search_memories-ready descriptors {source, filter, phase?}; Cursor two-phase fallback (Phase 1 metadata.repo_root, Phase 2 legacy composer↔workspace registry); replaces tail_session compound modes. Item 038.
 - [[mcp-find-clusters|MCP find_clusters Tool]] — V1.6 MCP discovery primitive — coherent work clusters as skeletons (atom_ids[], source_breakdown, ranks, open_loop_hints); cluster-gap controlled by window_hours; lookback by since/until. Item 032 adds no-args auto-expand (empty + single-source-recent triggers) and strict-partition demotion making prior-work clusters[0] a structural guarantee on resume-after-gap. Hard envelope ceiling 25kB; cheap.
 - [[mcp-get-atom|MCP get_atom Tool]] — V1.6.1 MCP verbatim escape hatch (singular — counterpart to get_atoms plural). Returns one atom with content verbatim (no match_content clip) + metadata projected via reused projectMatch (per-key cap + tool_calls reshape) + embedding excluded. Three exit shapes: success / atom_too_large_for_wire (with source populated for JSONL fallback) / atom_not_found (distinct error). Closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context required. R2 truncations-correctness fix: 'content' filtered from returned truncations after verbatim override.
 - [[mcp-get-atoms|MCP get_atoms Tool]] — V1.6 MCP targeted body-fetch primitive — atom bodies by ID list (≤50), wire-shape projected through projectMatch; truncations[] trust signal on every atom; deterministic prefix-drop on 25kB overflow; item 032 adds prefer='newest_first' + missing-ID-end position + duplicate-collapse asymmetry for resume calls.
-- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — DEPRECATED V1.5 MCP tool returning clusters joined by shared artifact identity; three-format ladder (full | minimal | skeleton), V1.5.7 per-cluster bounds on skeleton arrays. Superseded 2026-05-10 by V1.6 atomic toolkit (find_clusters + get_atoms); removal scheduled in item 031 after ≥1 week of post-merge dogfooding.
-- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring (filter-before-slice) + filters; source_app enum (cursor | claude_code | codex | git), composite-cursor pagination, V1.5.6 wire-shape projection, V1.5.7 fs-watcher exclusion + TZ-naive warning, outputSchema + structuredContent + readOnlyHint.
-- [[mcp-tail-session|MCP tail_session Tool]] — V1.5.4 MCP cheap exact-fetch primitive — N most-recent atoms from a single named source (or auto-resolved newest session via source_app); shared composite cursor with search_memories, fs-watcher exclusion, V1.5.6 wire-shape projection, < 10kB typical response.
-- [[mcp-wait-for-new-turns|MCP wait_for_new_turns Tool]] — V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; default 30s timeout, max 120s; implements Goal A of the group-session pattern; falls back to repeated tail_session polls when long-poll isn't viable.
+- [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — DEPRECATED V1.5 MCP tool; survives in item 038 as a thin re-export shim. Cluster engine canonical home moved to src/mcp/internal/cluster-engine.ts; MCP-tool registration removal scheduled in the 2026-05-17 follow-up.
+- [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring + filters; source_app enum + post-038 source (exact) + metadata_match (whitelisted keys workspace_id/composer_id/session_id/repo_root); post-037 repo_path; composite-cursor pagination; wire-shape projection.
+- [[mcp-wait-for-new-turns|MCP wait_for_new_turns Tool]] — V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; post-038 IDs-only contract (returns turn_ids: string[], callers compose get_atoms/get_atom); post-037 repo_path; max 60s timeout; implements Goal A of group-session.
 
 ---
 
