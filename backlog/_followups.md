@@ -472,3 +472,30 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
   - Draft new principle page `wiki/principles/work-artifact-first-class.md`.
 - **Item 038 (RC2: MCP toolkit atomicity refactor)** is already in flight on `backlog/ready/` (see `2026-05-11-038-mcp-toolkit-atomicity-refactor.md` — the 5-6-primitive reform shape from the 3-way root-cause investigation). 037 was the prerequisite RC1 closure.
 - **TZ-naive rejection (RC3)** stays in this file as a 30-LOC follow-up; rolls into 038 if convenient (same retrieval-tool surface), otherwise standalone.
+
+---
+
+## From 038 merge (2026-05-12)
+
+- **Strategist files `2026-05-17-XXX-recent-work-context-final-removal.md`** per 038 AC3 After-Completion #6. The 2026-05-17 calendar gate fires; the item covers:
+  - Delete the re-export shim at `src/mcp/tools/recent-work-context.ts`.
+  - Remove `registerRecentWorkContext` import + call in `src/mcp/server.ts`.
+  - **Critical — re-home `SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP`** before deleting the shim. Today `src/mcp/tools/find-clusters.ts:35` imports it from the shim file. Move to `src/mcp/internal/cluster-engine.ts` (canonical home) OR a new `src/mcp/util/cluster-caps.ts`. Without this, deleting the shim breaks `find_clusters` at compile time.
+  - Update `tools/mcp-integration-smoke.sh`: drop the `get_recent_work_context` references; update tool count from 8 to 7; add an "tools/list MUST NOT include recent_work_context" assertion (post-removal invariant, mirroring the 038-shape for tail_session).
+  - Update `docs/mcp-integration.md`: drop the `get_recent_work_context` line; update "All eight" → "All seven".
+  - **Founder-consent receipt section** (Cursor R1 refinement #3 format): cite original 031 gate criterion (≥1 week post-030 dogfooding from 2026-05-08 = 2026-05-15 calendar gate; conservative 2026-05-17 = ≥1 week post-034+035 from 2026-05-10), empirical signal at draft time (`grep -c "get_recent_work_context\|getRecentWorkContext" raw/internal/dogfooding/mcp-interactions-journal.md` — expected zero since 2026-05-09), and the decision date.
+
+- **AC6 dogfooding (founder, post-merge)** — restart ECHO daemon (today's kickstart returned non-running per `launchctl list` — may need manual `npm run daemon` start), then run a real daily workflow citing post-038 tool names: `echo_resolve_mru({sources: ['cursor'], repo_path: X})` → `search_memories({source: desc.source, ...desc.filter})` for tail; `wait_for_new_turns({sources: [...], since: now})` → `get_atoms(turn_ids)` for live watch. Demo bar per spec §AC6: ≤2 MCP calls per logical workflow step on the post-038 toolkit. Instinctive `tail_session(...)` muscle-memory hitting missing-tool error is the empirical migration-cost signal — log to journal.
+
+- **ECHO daemon launchd status check (founder, immediate)** — `launchctl kickstart -k gui/$(id -u)/com.echo.daemon` returned exit 0 at 038 merge time but `launchctl list | grep echo` showed `-	1	com.echo.daemon` (loaded, last exit 1, not running). Either the launchd plist needs fixing OR daemon should be restarted manually (`npm run daemon` from `~/Desktop/Project_echo`). Until restarted, the next dogfooding call will run against pre-038 code (still advertising `tail_session`).
+
+- **Cursor R4 LOW V2+ hardening note** — `src/mcp/tools/echo-resolve-mru.ts:117-119` Cursor Phase 2 picks the global newest cursor source (no composer-id scoping in the query), then attaches `metadata_match.composer_id` to the descriptor. This is a faithful port of pre-existing `main:src/mcp/tools/tail-session.ts:351-358` behavior — single-Cursor-install assumption holds for V1 indie-AI-builder cohort. Track for V2+ multi-Cursor-install hardening; not a 038 drift.
+
+- **Wiki promotion (strategist, post-dogfooding)** — promote 038's "After Completion" notes:
+  - Update `wiki/surfaces/mcp-server.md` — toolkit shape after 038 is 8 tools; after the 2026-05-17 follow-up it becomes 7. Document `echo_resolve_mru` as the canonical MRU resolver returning search-ready descriptors. Document the IDs-only contract on `wait_for_new_turns`. Document the descriptor-spread compose pattern (`echo_resolve_mru → search_memories(source=desc.source, ...desc.filter)`).
+  - DELETE `wiki/surfaces/mcp-tail-session.md` if it exists post-035 promotion.
+  - Draft new principle page `wiki/principles/atomic-primitives-compose.md` — the principle that surfaces from RC2, contrasted with the deferred e2e tools.
+
+- **Spec-template enhancement candidate** — AC2's grep-scan invariant scope (`rg "tail[_-]session" src/mcp/`) missed references in `tools/` + `docs/` that Codex R4 caught post-build. Future spec-templates with "kill a tool" semantics should consider scoping grep-scan invariants to project root OR explicit-enumerated dirs (tools/, docs/, .github/) so CI scripts + documentation drift get caught at spec-time, not post-build.
+
+- **Cross-tool review pattern observation** (Cursor R3 commentary in 038 review history): structural reforms (037, 038) consistently need 3 review rounds (R1 catches load-bearing drift, R2 catches second-order implications, R3 cleans sweep incompleteness). Narrow features (032, 033, 035) settle in 1-2. Two data points so far; one more confirming case would lock the pattern as a heuristic for `backlog/README.md` or `docs/AGENT_INSTRUCTIONS.md`.
