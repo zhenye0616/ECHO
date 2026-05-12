@@ -2586,6 +2586,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** First automated Cursor-side queue tick on 040 R1 after file-backed protocol; codex response for same round may still be pending for combine.
 - **Conjecture:** (optional) If helper keeps `git add`/`commit` in slash-command only, trim Goal’s quoted shell one-liner so Goal and AC1 (b) agree.
 
+### 2026-05-12 02:32 PDT — Codex `review-queue` tick: R1 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Trigger:** Execute one Codex-side review queue tick after `git pull --rebase origin main`; first pending Codex response was `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/request.md` (no `codex.md` / `combined.md` yet).
+- **Query inputs:** `git show 4c6d98f9b4eab66f3c42a406bb99003a4e24b60e:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r1/request.md` frontmatter + focus_hints; read `tools/review-queue/schemas/reviewer.schema.json`, `.claude/commands/review-queue-watch.md`, `tools/review-queue/request.py`, `tools/review-queue/_lib.py`, `tools/review-queue/combine.py`, `tools/review-queue/schemas/combined.schema.json`, and existing `tests/review-queue/combine.test.ts`.
+- **Returned:** Wrote `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/codex.md`, verdict `proceed_after_patches`, 3 MED + 1 LOW (combined.md in-place atomicity vs create-only `_lib.atomic_link_write`; missing helper `--spec-sha` pass-through for race-loser tests; undefined `pushback` + no-patches branch; post-helper git staging/commit boundary ambiguity). Committed + pushed as `c944d7d` on `main`.
+- **Sources:** Artifact at SHA `4c6d98f9b4eab66f3c42a406bb99003a4e24b60e` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; queue response path `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the file-backed queue selected the expected missing Codex response, anchored review to the requested spec SHA, and push-with-retry landed the response cleanly.
+- **Note:** `tools/review-queue/validate.py reviewer ...` failed under the default Python architecture on the known `rpds` arm64/x86_64 mismatch; rerunning as `arch -arm64 python3 tools/review-queue/validate.py ...` validated the response. This was a local validation environment wrinkle, not a queue handshake failure.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

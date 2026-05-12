@@ -1281,6 +1281,11 @@ href="#pdt-cursor-review-queue-cursor-tick-r1-on-item-2026-05-12-040-watcher-sta
 id="toc-pdt-cursor-review-queue-cursor-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">02:19
 PDT — Cursor <code>review-queue-cursor</code> tick: R1 on item
 2026-05-12-040 (watcher-state executable test)</a></li>
+<li><a
+href="#pdt-codex-review-queue-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-codex-review-queue-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">2026-05-12
+02:32 PDT — Codex <code>review-queue</code> tick: R1 on item
+2026-05-12-040 (watcher-state executable test)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12303,6 +12308,52 @@ be pending for combine.</li>
 <li><strong>Conjecture:</strong> (optional) If helper keeps
 <code>git add</code>/<code>commit</code> in slash-command only, trim
 Goal’s quoted shell one-liner so Goal and AC1 (b) agree.</li>
+</ul>
+<h3
+id="pdt-codex-review-queue-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">2026-05-12
+02:32 PDT — Codex <code>review-queue</code> tick: R1 on item
+2026-05-12-040 (watcher-state executable test)</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+after <code>git pull --rebase origin main</code>; first pending Codex
+response was
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/request.md</code>
+(no <code>codex.md</code> / <code>combined.md</code> yet).</li>
+<li><strong>Query inputs:</strong>
+<code>git show 4c6d98f9b4eab66f3c42a406bb99003a4e24b60e:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r1/request.md</code> frontmatter + focus_hints; read
+<code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>.claude/commands/review-queue-watch.md</code>,
+<code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>tools/review-queue/combine.py</code>,
+<code>tools/review-queue/schemas/combined.schema.json</code>, and
+existing <code>tests/review-queue/combine.test.ts</code>.</li>
+<li><strong>Returned:</strong> Wrote
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/codex.md</code>,
+verdict <code>proceed_after_patches</code>, 3 MED + 1 LOW (combined.md
+in-place atomicity vs create-only <code>_lib.atomic_link_write</code>;
+missing helper <code>--spec-sha</code> pass-through for race-loser
+tests; undefined <code>pushback</code> + no-patches branch; post-helper
+git staging/commit boundary ambiguity). Committed + pushed as
+<code>c944d7d</code> on <code>main</code>.</li>
+<li><strong>Sources:</strong> Artifact at SHA
+<code>4c6d98f9b4eab66f3c42a406bb99003a4e24b60e</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+queue response path
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the file-backed queue selected
+the expected missing Codex response, anchored review to the requested
+spec SHA, and push-with-retry landed the response cleanly.</li>
+<li><strong>Note:</strong>
+<code>tools/review-queue/validate.py reviewer ...</code> failed under
+the default Python architecture on the known <code>rpds</code>
+arm64/x86_64 mismatch; rerunning as
+<code>arch -arm64 python3 tools/review-queue/validate.py ...</code>
+validated the response. This was a local validation environment wrinkle,
+not a queue handshake failure.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
