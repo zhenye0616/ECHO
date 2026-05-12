@@ -2691,6 +2691,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The latest turn was exactly the strategist framing requested. Hydration was again required because the newest tail was clipped.
 - **Conjecture:** The repeated clipped-tail pattern suggests the live-tail composition wants a small client-side recipe: resolve MRU → search limit 1-3 → hydrate newest clipped atom automatically.
 
+### 2026-05-12 14:20 PDT — Strategist (Claude Code) tails Codex for diagnosis on 041 framing
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same session driving 040 merge + 041 strategist conversation
+- **Trigger:** Founder asked: "use echo to retrieve context from codex" — strategist needed Codex's substantive read on the 041 framing turn that Codex had retrieved at 14:07 PDT but not yet diagnosed in any committed artifact.
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['codex'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.codex/sessions/2026/05/12/rollout-2026-05-12T13-31-05-019e1de2-d35f-7702-a21b-85a183841796.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:5})`
+  3. `get_atom({id:'050f6068-ee1e-4a59-acc9-462b4fb289d2'})` — top atom was clipped by 541 chars; needed verbatim.
+- **Returned:** MRU resolved to today's repo-scoped Codex session (rollout 13:31:05); search returned 5 atoms spanning turn indices 0-4 of that session. Top atom (turn_index 4, 21:08Z) is Codex's diagnosis of the 041 framing — agrees with launchd + wrapper + Cursor-as-degraded + narrow scope, but **pushes back on deferring reviewer output validation**: 041 must require Codex reviewer to validate `codex.md` before commit, otherwise malformed artifacts get pushed silently. Suggested 7 ACs. `get_atom` recovered the full 3,860-byte atom verbatim with `truncations: ["metadata.tool_calls:projected"]` only.
+- **Sources:** source_breakdown={codex:5}; exact JSONL `fs:/Users/zhenye/.codex/sessions/2026/05/12/rollout-2026-05-12T13-31-05-019e1de2-d35f-7702-a21b-85a183841796.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Claude/git atoms requested or returned.
+- **Verdict:** ✅ right
+- **Note:** Codex's tail (turn 4) was clipped on `search_memories`; required the now-canonical resolve → search → hydrate sequence Codex itself documented as a gap (Gap #2 in today's framing). The clipped portion contained the load-bearing AC list — would have produced a worse synthesis without hydration. Same pattern as Codex experienced 3× today.
+- **Conjecture:** Cross-tool diagnosis loop is now empirically symmetric — strategist can read Codex through ECHO using the same MRU→search→hydrate recipe that Codex uses to read strategist. Two-way memory parity is the substrate for AC6b's "queue self-driving" property; without it, Codex's diagnosis would have been invisible to the strategist until founder pasted it in chat. Worth recording in the cross-tool-spec-review wiki page when 039 wiki promotion lands.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
