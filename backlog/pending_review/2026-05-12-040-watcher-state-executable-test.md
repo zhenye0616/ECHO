@@ -1,15 +1,33 @@
 ---
 id: 2026-05-12-040-watcher-state-executable-test
 title: Watcher post-combine state machine — executable test of AC3.5 (b) (closes Codex R4 LOW #1)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.5d
 created: 2026-05-12
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-12T10:06:48Z"
 branch: "agent/watcher-state-executable-test"
-head_sha: null
-agent_notes: null
+head_sha: "942a2cfb2c1be815591330088c812e499839c567"
+pr_url: null
+agent_notes: |
+  AC1-AC5 satisfied; AC6 is observed-not-implemented (records at merge).
+  - Helper tools/review-queue/dispatch-next-round.py extracted: file
+    mutations only, atomic os.replace for in-place combined.md updates,
+    idempotent at same state, race-loser exit-2 forwarded from request.py.
+  - .claude/commands/review-queue-watch.md Step 3 rewritten with two
+    explicit git block variants (dispatch vs. terminal).
+  - tests/review-queue/watcher-state.test.ts adds 4 fixtures:
+    (b)+ load-bearing transition, (a)- terminal no-op, (b) race-loser
+    (idempotent same-SHA + exit-2 different-SHA), (c) waiver idempotent.
+  - tools/review-queue/test-dispatch-next-round.sh shell smoke covers (b) end-to-end.
+  - Review-queue suite: 46/46 (was 42/42). typecheck + lint clean.
+  - Full npm test: 784 pass / 21 skipped / 2 fail. The 2 failures are
+    pre-existing flake in tests/capture/extractors/{codex,claude-code}.test.ts
+    (jsonl waitFor timeouts under concurrent load); both pass 74/74 when
+    run alone on main, and 78/78 when bundled with this item's new tests.
+    Spec predicted 784 passing — matches exactly. Not a regression.
+  - Run log: raw/internal/agent-runs/2026-05-12-2026-05-12-040-watcher-state-executable-test.md
 spec_refs:
   - backlog/complete/2026-05-11-039-cross-tool-review-dispatch-queue.md   # Parent item; AC3.5 prose lives in its slash-commands; R4 LOW #1 is the gap this closes
   - .claude/commands/review-queue-watch.md                                # Lines 33-73 — the (a)/(b)/(c) prose being made executable
