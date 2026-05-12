@@ -1291,6 +1291,11 @@ href="#pdt-cursor-review-queue-cursor-tick-r2-on-item-2026-05-12-040-watcher-sta
 id="toc-pdt-cursor-review-queue-cursor-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:44
 PDT — Cursor <code>review-queue-cursor</code> tick: R2 on item
 2026-05-12-040 (watcher-state executable test)</a></li>
+<li><a
+href="#pdt-codex-review-queue-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-codex-review-queue-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:47
+PDT — Codex <code>review-queue</code> tick: R2 on item 2026-05-12-040
+(watcher-state executable test)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12394,6 +12399,52 @@ boundary, AC3 wording) landed; remaining gaps are small shell/ops polish
 in AC2.</li>
 <li><strong>Note:</strong> Confirms 040 remains multi-round (narrow
 class) per heuristic; not convergence yet at R2 for Cursor.</li>
+</ul>
+<h3
+id="pdt-codex-review-queue-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:47
+PDT — Codex <code>review-queue</code> tick: R2 on item 2026-05-12-040
+(watcher-state executable test)</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+after <code>git pull --rebase origin main</code>; first pending Codex
+response was
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/request.md</code>
+(no <code>codex.md</code> / <code>combined.md</code> yet).</li>
+<li><strong>Query inputs:</strong>
+<code>git show 8a6b863d09db0619a6430ea8fd565be0f09150a5:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r2/request.md</code> frontmatter + focus_hints; read
+<code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>.claude/commands/review-queue-cursor.md</code>,
+<code>claude.md</code>, <code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>.claude/commands/review-queue-watch.md</code>,
+<code>tools/review-queue/schemas/combined.schema.json</code>,
+<code>tools/review-queue/combine.py</code>, and
+<code>tests/review-queue/combine.test.ts</code>.</li>
+<li><strong>Returned:</strong> Wrote
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/codex.md</code>,
+verdict <code>proceed_after_patches</code>, 2 MED + 1 LOW (tmpdir
+fixture lacks the backlog artifact <code>request.py</code> needs;
+AC1/AC3 disagree on frontmatter preservation vs semantic YAML
+reserialization; AC2 git block is not copy-paste safe for terminal
+branches). Committed + pushed as <code>eee270d</code> on
+<code>main</code>.</li>
+<li><strong>Sources:</strong> Artifact at SHA
+<code>8a6b863d09db0619a6430ea8fd565be0f09150a5</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+queue response path
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and push-with-retry landed the response cleanly before this journal
+write.</li>
+<li><strong>Note:</strong> Default Python schema validation hit the
+known <code>jsonschema</code>/<code>rpds</code> architecture mismatch;
+<code>arch -arm64 python3</code> validated the reviewer frontmatter
+successfully. Codex and Cursor both flagged AC2 terminal-branch
+git-block polish in R2.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

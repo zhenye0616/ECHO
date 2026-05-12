@@ -2605,6 +2605,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — R1 convergent patches (os.replace, pushback tuple, `--spec-sha`, helper vs git boundary, AC3 wording) landed; remaining gaps are small shell/ops polish in AC2.
 - **Note:** Confirms 040 remains multi-round (narrow class) per heuristic; not convergence yet at R2 for Cursor.
 
+### 02:47 PDT — Codex `review-queue` tick: R2 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Trigger:** Execute one Codex-side review queue tick after `git pull --rebase origin main`; first pending Codex response was `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/request.md` (no `codex.md` / `combined.md` yet).
+- **Query inputs:** `git show 8a6b863d09db0619a6430ea8fd565be0f09150a5:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r2/request.md` frontmatter + focus_hints; read `tools/review-queue/schemas/reviewer.schema.json`, `.claude/commands/review-queue-cursor.md`, `claude.md`, `tools/review-queue/request.py`, `tools/review-queue/_lib.py`, `.claude/commands/review-queue-watch.md`, `tools/review-queue/schemas/combined.schema.json`, `tools/review-queue/combine.py`, and `tests/review-queue/combine.test.ts`.
+- **Returned:** Wrote `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/codex.md`, verdict `proceed_after_patches`, 2 MED + 1 LOW (tmpdir fixture lacks the backlog artifact `request.py` needs; AC1/AC3 disagree on frontmatter preservation vs semantic YAML reserialization; AC2 git block is not copy-paste safe for terminal branches). Committed + pushed as `eee270d` on `main`.
+- **Sources:** Artifact at SHA `8a6b863d09db0619a6430ea8fd565be0f09150a5` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; queue response path `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and push-with-retry landed the response cleanly before this journal write.
+- **Note:** Default Python schema validation hit the known `jsonschema`/`rpds` architecture mismatch; `arch -arm64 python3` validated the reviewer frontmatter successfully. Codex and Cursor both flagged AC2 terminal-branch git-block polish in R2.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
