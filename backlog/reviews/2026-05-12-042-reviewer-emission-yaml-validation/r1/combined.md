@@ -5,7 +5,7 @@ combined_at: '2026-05-12T23:42:58Z'
 codex_response: codex.md
 cursor_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 2
 combined_verdict: single_reviewer_timeout
 escalated_to_founder: true
 ---
