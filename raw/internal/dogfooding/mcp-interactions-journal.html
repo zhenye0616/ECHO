@@ -1185,6 +1185,11 @@ href="#pdt-strategist-claude-code-95d30e5e-ac6-post-merge-dogfooding-replay-4-pr
 id="toc-pdt-strategist-claude-code-95d30e5e-ac6-post-merge-dogfooding-replay-4-pre-fix-failure-workflows-on-the-post-038-toolkit">22:35
 PDT — Strategist (Claude Code 95d30e5e): AC6 post-merge dogfooding —
 replay 4 pre-fix failure workflows on the post-038 toolkit</a></li>
+<li><a
+href="#pdt-codex-connects-to-current-claude-strategist-session-for-cross-tool-review-friction-context"
+id="toc-pdt-codex-connects-to-current-claude-strategist-session-for-cross-tool-review-friction-context">23:10
+PDT — Codex connects to current Claude strategist session for cross-tool
+review friction context</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -10739,6 +10744,48 @@ creates an asymmetry: the same composer will continue to resolve via
 Phase 2 for its lifetime unless Cursor opens a new composer post-merge.
 The expected long-term shape is Phase 1 dominant; Phase 2 surfaces as a
 back-compat path for pre-AC1 atoms.</li>
+</ul>
+<h3
+id="pdt-codex-connects-to-current-claude-strategist-session-for-cross-tool-review-friction-context">23:10
+PDT — Codex connects to current Claude strategist session for cross-tool
+review friction context</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5</li>
+<li><strong>Trigger:</strong> Founder asked Codex to “connect to claude
+strategist session” and understand the current discussion.</li>
+<li><strong>Query inputs:</strong> Initial sandboxed Node MCP client
+attempt failed before reaching the daemon
+(<code>connect EPERM 127.0.0.1:38478</code>). Successful calls via
+<code>curl</code>: <code>initialize</code>;
+<code>notifications/initialized</code>;
+<code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code>;
+<code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:16})</code>;
+<code>get_atom({id:'f0f30d83-4222-4af4-990a-a121febf1d2d'})</code>.</li>
+<li><strong>Returned:</strong> Resolver found the active Claude Code
+Project_echo strategist session
+<code>9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code> with
+<code>filter={repo_path:'/Users/zhenye/Desktop/Project_echo'}</code>.
+Search returned 2 matches, newest at
+<code>2026-05-12T06:01:01.881Z</code> (23:01 PDT) with content
+truncated; <code>get_atom(f0f30d83...)</code> recovered the full 5.9 KB
+latest turn.</li>
+<li><strong>Read sources:</strong> Exact Claude Code source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code>,
+scoped by <code>repo_path=/Users/zhenye/Desktop/Project_echo</code>. No
+cluster <code>source_breakdown</code> because this used resolver +
+search + atom fetch, not <code>find_clusters</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO recovered the active
+Claude strategist thread and the current decision point.</li>
+<li><strong>Note:</strong> The discussion is not about merging. It is
+about removing founder-as-dispatcher friction from cross-tool spec
+review: Codex and Cursor already provide differentiated review value,
+strategist can combine reviews, and
+<code>wait_for_new_turns</code>/<code>echo_resolve_mru</code> cover
+read-side recovery; the remaining bottleneck is triggering reviewer
+windows without the founder manually typing into both.</li>
+<li><strong>Conjecture:</strong> The next useful dogfooding test is
+whether a canned trigger or scheduled reviewer loop can run a full R1→R4
+spec-review cycle while preserving reviewer independence.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
