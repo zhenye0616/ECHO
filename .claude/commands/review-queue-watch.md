@@ -45,32 +45,54 @@ git commit -m "review-r<N>: disposition on <item_id>"
 tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 ```
 
-After dispositioning, decide which branch fires:
+After dispositioning, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
 #### (a) Zero patches applied → convergence
 
-If the verdict was `proceed` with no actionable findings, OR a `pushback` where all findings deferred to follow-ups outside this round, leave `next_round: null` in `combined.md` and commit the final update. **Convergence declared without verification** — no spec changes need verifying.
+Verdict was `proceed` with no actionable findings, OR a `pushback` where all findings deferred to follow-ups outside this round. No spec changes need verifying.
+
+```bash
+tools/review-queue/dispatch-next-round.py <item_id> <N> \
+  --verdict={proceed,pushback} --patches-applied=false \
+  --class=<request.class> --focus-hints=""
+git add backlog/reviews/<item_id>/r<N>/combined.md
+git commit -m "review-r<N>: terminal on <item_id>"
+tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
+```
 
 #### (b) Patches applied → verification round (DEFAULT for any spec change)
 
-Apply the patches to the spec file inline. Commit the spec patch via `push-with-retry.sh`. Then run:
+Apply the patches to the spec file inline FIRST, then commit the spec patch via `push-with-retry.sh` so the patched commit is what r<N+1> pins via `--spec-sha`. Then run the helper followed by the dispatch git block:
 
 ```bash
-tools/review-queue/request.py <item_id> <N+1> \
+tools/review-queue/dispatch-next-round.py <item_id> <N> \
+  --verdict=proceed_after_patches --patches-applied=true \
   --class=<request.class> \
   --focus-hints="Verify: <list each load-bearing finding's section + the disposition's prescription + any falsifiable claim worth re-checking>"
-git add backlog/reviews/<item_id>/r<N+1>/request.md
-git commit -m "review-r<N+1>: request on <item_id>"
-tools/review-queue/push-with-retry.sh "request: r<N+1> on <item_id>"
+git add backlog/reviews/<item_id>/r<N>/combined.md \
+        backlog/reviews/<item_id>/r<N+1>/request.md
+git commit -m "review-r<N+1>: dispatch on <item_id>"
+tools/review-queue/push-with-retry.sh "dispatch: r<N+1> on <item_id>"
 ```
 
-Then set `next_round: <N+1>` in this round's `combined.md`; commit + push that update via `push-with-retry.sh`.
-
-**This is the default branch.** Accepted-without-follow-ups is **orthogonal** to whether patches need verification.
+The helper invokes `request.py` to write `r<N+1>/request.md`, then in-place atomic-updates `r<N>/combined.md` to set `next_round: <N+1>`. **This is the default branch.** Accepted-without-follow-ups is **orthogonal** to whether patches need verification.
 
 #### (c) Patches applied — verification explicitly waived (rare)
 
-Strategist's-call when patches are mechanical (typo fixes, comment-only changes, link updates) AND no reviewer requested a verification round AND no finding was load-bearing. Write a one-line `verification waived; rationale: <...>` into combined.md and set `next_round: null`. **Use sparingly** — when in doubt, run a verification round.
+Strategist's-call when patches are mechanical (typo fixes, comment-only changes, link updates) AND no reviewer requested a verification round AND no finding was load-bearing. **Use sparingly** — when in doubt, run a verification round.
+
+```bash
+tools/review-queue/dispatch-next-round.py <item_id> <N> \
+  --verdict=proceed_after_patches --patches-applied=false \
+  --class=<request.class> --focus-hints="<one-line rationale for waiving verification>"
+git add backlog/reviews/<item_id>/r<N>/combined.md
+git commit -m "review-r<N>: terminal on <item_id>"
+tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
+```
+
+The helper appends a `verification waived; rationale: <focus-hints>` line into the body of `combined.md` and leaves `next_round: null`.
+
+**Helper / watcher boundary.** `dispatch-next-round.py` performs file mutations only — it never runs `git add`, `git commit`, or `git push`. The per-branch git block above stages and commits the artifacts that actually exist. The two block shapes (dispatch vs. terminal) are not collapsible: `git add` against a non-existent path errors with non-zero exit on (a)/(c), and the commit/push messages must align with the branch's actual state so `git log --grep` matches.
 
 ## Step 4 — Exit
 
