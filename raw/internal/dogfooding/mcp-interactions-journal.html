@@ -1246,6 +1246,11 @@ href="#pdt-cursor-r4-review-of-039-rc4-verification-round-proceed-zero-findings"
 id="toc-pdt-cursor-r4-review-of-039-rc4-verification-round-proceed-zero-findings">02:05
 PDT — Cursor R4 review of 039 RC4 — verification round;
 <code>proceed</code> zero findings</a></li>
+<li><a
+href="#pdt-codex-r4-review-of-039-rc4-verification-round-low-only-stale-test-wording"
+id="toc-pdt-codex-r4-review-of-039-rc4-verification-round-low-only-stale-test-wording">01:15
+PDT — Codex R4 review of 039 RC4 — verification round; LOW-only stale
+test wording</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11834,6 +11839,65 @@ candidate once Codex R4 matches (<code>proceed*</code> + no
 HIGH/MED).</li>
 <li><strong>Note:</strong> Fourth consecutive zero-ECHO Cursor review on
 039 when §Review History + spec body suffice.</li>
+</ul>
+<h3
+id="pdt-codex-r4-review-of-039-rc4-verification-round-low-only-stale-test-wording">01:15
+PDT — Codex R4 review of 039 RC4 — verification round; LOW-only stale
+test wording</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5 — R4 reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at artifact <code>c364ac2</code> (RC4 / R3-patched). Response file
+committed + pushed as <code>96a4b1d</code>
+(<code>review-r4: codex on 2026-05-11-039-cross-tool-review-dispatch-queue</code>).</li>
+<li><strong>Trigger:</strong> Strategist R4 dispatch: verify AC3.5 step
+3 (a)/(b)/(c) branch split, AC4 exact-sub-anchor match key against the
+R2 fixture, <code>raw/internal/queue-errors.md</code> seed/tracking
+behavior, and drift. Write canonical <code>r4/codex.md</code>, commit,
+push via
+<code>git pull --rebase origin main &amp;&amp; git push origin main</code>,
+then log.</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+Filesystem and CLI probes only: read RC4 §Review History, AC3.5, AC4,
+AC4 test list, push-race/Implementation Notes
+<code>queue-errors.md</code> block, R3 combined.md, Cursor R4 response,
+<code>.gitignore</code>, and <code>raw/internal/queue-errors.md</code>;
+ran <code>python3 tools/blocked.py --validate</code>,
+<code>python3 tools/wiki_index.py --check</code>,
+<code>git check-ignore -v raw/internal/queue-errors.md</code>,
+<code>git ls-files raw/internal/queue-errors.md</code>, then
+committed/pushed the response.</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic. Verdict on RC4:
+<code>proceed_after_patches</code> with <strong>2 LOW findings</strong>:
+(L1) AC3.5 branch split is correct, but the tests do not explicitly
+cover the load-bearing “patches applied + no deferred follow-ups -&gt;
+next verification round” case despite text saying AC4 tests cover all
+three branches. (L2) AC4’s normative exact-sub-anchor rule and R2
+fixture are correct, but an older test bullet still says “primary or
+related section overlap,” contradicting the new rule.</li>
+<li><strong>Sources:</strong> Filesystem-only. Spec:
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+@ <code>c364ac2216b850a3a53e6a9ace1d06adb81e90d8</code>. Cursor R4
+comparison:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r4/cursor.md</code>
+@ <code>bca3d7a</code>. Codex response:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r4/codex.md</code>
+@ <code>96a4b1d</code>. <code>raw/internal/queue-errors.md</code> is
+tracked and not ignored; blocked/wiki checks pass.</li>
+<li><strong>Verdict:</strong> ✅ right on the protocol verification: R3
+M1 and M2 are closed in the normative spec text, and
+<code>queue-errors.md</code> is repo-visible. 🟡 partial on final
+polish: two stale test-wording spots remain. Both are LOW; no
+architecture rework and no drift.</li>
+<li><strong>Note (division-of-labor held):</strong> Cursor R4 reported
+<code>proceed</code> with zero findings, focused on role/scope
+coherence. Codex R4 found only implementability/documentation-test
+cleanup. This is the expected R4 decay shape.</li>
+<li><strong>Conjecture (observation-only):</strong> RC5 can be a tiny
+test-wording patch: add the watcher branch fixture and update the stale
+AC4 overlap test bullet. If applied, 039 should be claim-ready without
+another full review round unless the strategist wants a final mechanical
+confirmation.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
