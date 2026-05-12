@@ -1362,6 +1362,11 @@ href="#pdt-codex-checks-landed-041-against-strategist-claude-context"
 id="toc-pdt-codex-checks-landed-041-against-strategist-claude-context">2026-05-12
 15:31 PDT — Codex checks landed 041 against strategist Claude
 context</a></li>
+<li><a
+href="#pdt-codex-hydrates-claudes-deeper-041-smoke-diagnosis-and-traces-the-next-root-cause"
+id="toc-pdt-codex-hydrates-claudes-deeper-041-smoke-diagnosis-and-traces-the-next-root-cause">2026-05-12
+15:39 PDT — Codex hydrates Claude’s deeper 041 smoke diagnosis and
+traces the next root cause</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13153,6 +13158,71 @@ make the Codex reviewer prompt derive its repo root from
 instead of hardcoding <code>~/Desktop/Project_echo</code>; the Cursor
 prompt can stay production-oriented unless the team wants symmetric
 testability.</li>
+</ul>
+<h3
+id="pdt-codex-hydrates-claudes-deeper-041-smoke-diagnosis-and-traces-the-next-root-cause">2026-05-12
+15:39 PDT — Codex hydrates Claude’s deeper 041 smoke diagnosis and
+traces the next root cause</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive post-merge
+diagnosis)</li>
+<li><strong>Trigger:</strong> Founder said Claude had found a deeper
+issue and asked Codex to understand the context, dive deep, and find the
+root cause.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:10})</code></li>
+<li><code>wait_for_new_turns({sources:['fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl'], repo_path:'/Users/zhenye/Desktop/Project_echo', since:'2026-05-12T22:29:41.663Z', timeout:10})</code></li>
+<li><code>get_atom({id:'2ae639ca-d458-4b9d-84f8-2d83777a6a4c'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> <code>search_memories</code> initially
+showed Claude’s <code>50c2e81</code> HOME-auth fix.
+<code>wait_for_new_turns</code> then returned one newer Claude turn,
+<code>2ae639ca-d458-4b9d-84f8-2d83777a6a4c</code>, timestamp
+<code>2026-05-12T22:34:29.429Z</code>; <code>get_atom({id})</code>
+hydrated it. Claude identified the deeper isolation leak: the wrapper’s
+<code>ECHO_REVIEW_QUEUE_REPO_ROOT=$SMOKE_WORK</code> was defeated by
+slash-command bodies that hardcoded
+<code>cd ~/Desktop/Project_echo</code>; fixed at <code>aec75fd</code> by
+making codex/cursor/watch prompts cd through
+<code>${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}</code>.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:10} for the
+tail search; exact JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; local
+follow-up reads used
+<code>.claude/commands/review-queue-{codex,cursor,watch}.md</code>,
+<code>tools/review-queue/smoke-test-codex-runner.sh</code>,
+<code>.gitignore</code>, and the live smoke tmpdir.</li>
+<li><strong>Verdict:</strong> ✅ right for the deeper isolation issue;
+🟡 partial for final smoke readiness</li>
+<li><strong>Note:</strong> After <code>aec75fd</code>, the smoke no
+longer ran in production: nested Codex operated inside
+<code>$SMOKE_WORK</code>, found the synthetic request, wrote
+<code>r1/codex.md</code>, and reached
+<code>commit-reviewer-response.sh</code>. The next failure is a
+smoke-fixture bug, not the same isolation bug: the smoke script copies
+<code>tools/review-queue/.</code> into a fresh git repo but does not
+copy <code>.gitignore</code>; because the production checkout has an
+ignored
+<code>tools/review-queue/__pycache__/_lib.cpython-310.pyc</code>, the
+fresh smoke repo accidentally tracks that bytecode file during
+<code>git add -A</code>. Running the Python validator rewrites the
+bytecode, leaving a tracked unstaged modification. Then
+<code>push-with-retry.sh</code> runs
+<code>git pull --rebase origin main</code> and Git refuses because the
+worktree is dirty. Root cause: AC5 smoke fixture construction copies
+ignored runtime artifacts without the ignore rules that would keep them
+untracked.</li>
+<li><strong>Conjecture:</strong> Fix the smoke fixture by either copying
+<code>.gitignore</code> before the initial <code>git add -A</code>,
+pruning <code>__pycache__/</code> and <code>*.pyc</code> after copying
+<code>tools/review-queue</code>, or running validator calls with
+<code>PYTHONDONTWRITEBYTECODE=1</code>. The cleanest production-safe fix
+is copy <code>.gitignore</code> plus prune runtime caches, so the smoke
+repo’s tracked set matches production intent and
+<code>push-with-retry.sh</code> starts from a clean tree.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
