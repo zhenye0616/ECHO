@@ -2575,6 +2575,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
   - **Tool-availability drift:** When wiki pages get deleted (`mcp-tail-session.md`), the deferred-tool registry may need to be re-emitted; or the MCP server should return a clearer "tool deprecated" message instead of `-32602`. Worth a backlog item if it bites a second reviewer/strategist.
   - **Skeleton-format under-attribution:** Even skeleton format returned 30 atoms; raising `limit` would have pulled in codex/cursor atoms but cost token budget. The right primitive here might be "give me one cluster, fully labeled with per-source counts, even if I can only see 5 atoms" — a deliberate-truncation mode where attribution beats density.
 
+### 02:19 PDT — Cursor `review-queue-cursor` tick: R1 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Source agent:** Cursor (review-queue loop; not an ECHO MCP call).
+- **Trigger:** Execute one tick per `.claude/commands/review-queue-cursor.md` after `git pull --rebase origin main`; first pending round was `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/request.md` (no `cursor.md` / `combined.md` yet).
+- **Query inputs:** `git show 4c6d98f9b4eab66f3c42a406bb99003a4e24b60e:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r1/request.md` frontmatter + focus_hints.
+- **Returned:** Wrote `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/cursor.md`, verdict `proceed_after_patches`, 2 MED + 1 LOW + 1 nit (AC1 (a) vs watcher (a) pushback-deferred tuple; Goal vs AC1 (b) on whether `git add r{N+1}/request.md` is inside the helper; AC3 body vs frontmatter wording; nit affirms helper-vs-watcher split). Committed + pushed as `636eb5d` on `main`.
+- **Read sources:** Artifact at SHA `4c6d98f9b4eab66f3c42a406bb99003a4e24b60e` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; watcher excerpt `.claude/commands/review-queue-watch.md` Step 3 (a)/(b)/(c); `tools/review-queue/request.py` race-loser comment; queue response path `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/cursor.md`. No `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — spec is directionally sound for 039 AC3.5 falsifiability; patches requested are narrow clarifications before builder work.
+- **Note:** First automated Cursor-side queue tick on 040 R1 after file-backed protocol; codex response for same round may still be pending for combine.
+- **Conjecture:** (optional) If helper keeps `git add`/`commit` in slash-command only, trim Goal’s quoted shell one-liner so Goal and AC1 (b) agree.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

@@ -1276,6 +1276,11 @@ href="#pdt-strategist-review-pending-prep-rehydrate-codexs-r2r3r4-reviewer-findi
 id="toc-pdt-strategist-review-pending-prep-rehydrate-codexs-r2r3r4-reviewer-findings-before-implementation-review-of-039">2026-05-12
 01:46 PDT — Strategist review-pending prep: rehydrate Codex’s R2/R3/R4
 reviewer findings before implementation review of 039</a></li>
+<li><a
+href="#pdt-cursor-review-queue-cursor-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-cursor-review-queue-cursor-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">02:19
+PDT — Cursor <code>review-queue-cursor</code> tick: R1 on item
+2026-05-12-040 (watcher-state executable test)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12257,6 +12262,47 @@ might be “give me one cluster, fully labeled with per-source counts,
 even if I can only see 5 atoms” — a deliberate-truncation mode where
 attribution beats density.</li>
 </ul></li>
+</ul>
+<h3
+id="pdt-cursor-review-queue-cursor-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">02:19
+PDT — Cursor <code>review-queue-cursor</code> tick: R1 on item
+2026-05-12-040 (watcher-state executable test)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor (review-queue loop; not an
+ECHO MCP call).</li>
+<li><strong>Trigger:</strong> Execute one tick per
+<code>.claude/commands/review-queue-cursor.md</code> after
+<code>git pull --rebase origin main</code>; first pending round was
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/request.md</code>
+(no <code>cursor.md</code> / <code>combined.md</code> yet).</li>
+<li><strong>Query inputs:</strong>
+<code>git show 4c6d98f9b4eab66f3c42a406bb99003a4e24b60e:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r1/request.md</code> frontmatter + focus_hints.</li>
+<li><strong>Returned:</strong> Wrote
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/cursor.md</code>,
+verdict <code>proceed_after_patches</code>, 2 MED + 1 LOW + 1 nit (AC1
+(a) vs watcher (a) pushback-deferred tuple; Goal vs AC1 (b) on whether
+<code>git add r{N+1}/request.md</code> is inside the helper; AC3 body vs
+frontmatter wording; nit affirms helper-vs-watcher split). Committed +
+pushed as <code>636eb5d</code> on <code>main</code>.</li>
+<li><strong>Read sources:</strong> Artifact at SHA
+<code>4c6d98f9b4eab66f3c42a406bb99003a4e24b60e</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+watcher excerpt <code>.claude/commands/review-queue-watch.md</code> Step
+3 (a)/(b)/(c); <code>tools/review-queue/request.py</code> race-loser
+comment; queue response path
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r1/cursor.md</code>.
+No <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — spec is directionally sound for
+039 AC3.5 falsifiability; patches requested are narrow clarifications
+before builder work.</li>
+<li><strong>Note:</strong> First automated Cursor-side queue tick on 040
+R1 after file-backed protocol; codex response for same round may still
+be pending for combine.</li>
+<li><strong>Conjecture:</strong> (optional) If helper keeps
+<code>git add</code>/<code>commit</code> in slash-command only, trim
+Goal’s quoted shell one-liner so Goal and AC1 (b) agree.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
