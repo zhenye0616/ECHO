@@ -2,3 +2,5 @@
 2026-05-12T09:33:00Z ERROR 040-r1-cursor-yaml-malformed: cursor.md emitted finding-value starting with `""` (parses as empty YAML scalar + trailing unquoted text); combine.py raised yaml.parser.ParserError at line 16 col 16. Strategist inline-patched: outer `"..."` → outer `...` to preserve embedded `"` literally. Reviewer content semantically unchanged. Followup filed under "From 040 r1 live-test (2026-05-12)" in backlog/_followups.md — 039 reviewer prompt should add a `python3 -c "yaml.safe_load(...)"` validate-on-emission gate before commit.
 2026-05-12T09:34:22Z PUSH-RACE-FALLBACK: strategist yaml-fix: r1 cursor.md on 040 sha=c8866a6588aadf65c0aaf424dc0ccf87464c2a4b
 2026-05-12T09:48:41Z PUSH-RACE-FALLBACK: disposition: r2 on 2026-05-12-040 sha=f7a396c56c2290014fcf6f547d4f3bb08c6af2c5
+2026-05-12T09:58:45Z PUSH-RACE-FALLBACK: review-r3: codex on 2026-05-12-040-watcher-state-executable-test sha=a412b7b0f216e6fb961db1947170f49071da2dca
+2026-05-12T10:01:55Z PUSH-RACE-FALLBACK: review-r3: cursor on 2026-05-12-040-watcher-state-executable-test sha=1c6cfc1a0a211b8cf93d681eb3f52a95d6dc6c0d

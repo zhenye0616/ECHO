@@ -2614,6 +2614,26 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and push-with-retry landed the response cleanly before this journal write.
 - **Note:** Default Python schema validation hit the known `jsonschema`/`rpds` architecture mismatch; `arch -arm64 python3` validated the reviewer frontmatter successfully. Codex and Cursor both flagged AC2 terminal-branch git-block polish in R2.
 
+### 02:53 PDT — Cursor `review-queue-cursor` tick: R3 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Source agent:** Cursor (review-queue loop; not an ECHO MCP call).
+- **Trigger:** One tick per `.claude/commands/review-queue-cursor.md`; pending round `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/request.md` (RC3 after R2 dispositions).
+- **Query inputs:** `git show 784698ff0742e1f3cd3dcf260261354706a11068:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r3/request.md` focus_hints; skim `r2/{cursor,codex}.md` for R2 intent.
+- **Returned:** Wrote `r3/cursor.md`, verdict `proceed`, **zero findings** — R2 patches (AC3 `backlog/ready` stub preamble; AC1 semantic idempotency + cosmetic YAML; AC2 dual git blocks + aligned push strings) verified; optional note that non-binding implementation hints still mention link-rename generically while AC1 forbids `os.link` for `combined.md`.
+- **Read sources:** Artifact SHA `784698ff0742e1f3cd3dcf260261354706a11068` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; response `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/cursor.md`. No ECHO MCP calls this tick.
+- **Verdict:** ✅ right — RC3 reads claim-ready for 040; 040 now 3 Cursor reviewer rounds (R1→R3) on-queue per heuristic note in spec §After Completion.
+- **Note:** Second-pass `proceed` per `r3/request.md` focus_hints when no new load-bearing findings.
+
+### 03:01 PDT — Codex `review-queue` tick: R3 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Source agent:** Codex (review-queue loop; not an ECHO MCP call).
+- **Trigger:** Execute one Codex-side review queue tick after `git pull --rebase origin main`; first pending Codex response was `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/request.md`.
+- **Query inputs:** `git show 784698ff0742e1f3cd3dcf260261354706a11068:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r3/request.md` focus_hints; checked `tools/review-queue/schemas/reviewer.schema.json`, `tools/review-queue/request.py`, `tools/review-queue/_lib.py`, `.claude/commands/review-queue-watch.md`, `tests/review-queue/combine.test.ts`, `tools/review-queue/schemas/{request,combined}.schema.json`, and prior 040 queue context already embedded in files.
+- **Returned:** Wrote `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/codex.md`, verdict `proceed`, zero findings. Committed + pushed as `a412b7b` on `main`.
+- **Read sources:** Artifact SHA `784698ff0742e1f3cd3dcf260261354706a11068` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; queue response path `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and the r3 artifact is claim-ready from Codex's side.
+- **Note:** Plain `python3` schema validation hit the known `jsonschema`/`rpds` architecture mismatch; `arch -arm64 python3` validated successfully. The first `push-with-retry.sh` attempt was blocked by unrelated local journal/Cursor artifacts, so those local changes were preserved, the Codex response push was retried through the helper, and the local changes were restored afterward.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

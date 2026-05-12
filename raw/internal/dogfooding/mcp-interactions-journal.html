@@ -1296,6 +1296,16 @@ href="#pdt-codex-review-queue-tick-r2-on-item-2026-05-12-040-watcher-state-execu
 id="toc-pdt-codex-review-queue-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:47
 PDT — Codex <code>review-queue</code> tick: R2 on item 2026-05-12-040
 (watcher-state executable test)</a></li>
+<li><a
+href="#pdt-cursor-review-queue-cursor-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-cursor-review-queue-cursor-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test">02:53
+PDT — Cursor <code>review-queue-cursor</code> tick: R3 on item
+2026-05-12-040 (watcher-state executable test)</a></li>
+<li><a
+href="#pdt-codex-review-queue-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-codex-review-queue-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test">03:01
+PDT — Codex <code>review-queue</code> tick: R3 on item 2026-05-12-040
+(watcher-state executable test)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12445,6 +12455,84 @@ known <code>jsonschema</code>/<code>rpds</code> architecture mismatch;
 <code>arch -arm64 python3</code> validated the reviewer frontmatter
 successfully. Codex and Cursor both flagged AC2 terminal-branch
 git-block polish in R2.</li>
+</ul>
+<h3
+id="pdt-cursor-review-queue-cursor-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test">02:53
+PDT — Cursor <code>review-queue-cursor</code> tick: R3 on item
+2026-05-12-040 (watcher-state executable test)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor (review-queue loop; not an
+ECHO MCP call).</li>
+<li><strong>Trigger:</strong> One tick per
+<code>.claude/commands/review-queue-cursor.md</code>; pending round
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/request.md</code>
+(RC3 after R2 dispositions).</li>
+<li><strong>Query inputs:</strong>
+<code>git show 784698ff0742e1f3cd3dcf260261354706a11068:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r3/request.md</code> focus_hints; skim
+<code>r2/{cursor,codex}.md</code> for R2 intent.</li>
+<li><strong>Returned:</strong> Wrote <code>r3/cursor.md</code>, verdict
+<code>proceed</code>, <strong>zero findings</strong> — R2 patches (AC3
+<code>backlog/ready</code> stub preamble; AC1 semantic idempotency +
+cosmetic YAML; AC2 dual git blocks + aligned push strings) verified;
+optional note that non-binding implementation hints still mention
+link-rename generically while AC1 forbids <code>os.link</code> for
+<code>combined.md</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>784698ff0742e1f3cd3dcf260261354706a11068</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+response
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/cursor.md</code>.
+No ECHO MCP calls this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — RC3 reads claim-ready for 040;
+040 now 3 Cursor reviewer rounds (R1→R3) on-queue per heuristic note in
+spec §After Completion.</li>
+<li><strong>Note:</strong> Second-pass <code>proceed</code> per
+<code>r3/request.md</code> focus_hints when no new load-bearing
+findings.</li>
+</ul>
+<h3
+id="pdt-codex-review-queue-tick-r3-on-item-2026-05-12-040-watcher-state-executable-test">03:01
+PDT — Codex <code>review-queue</code> tick: R3 on item 2026-05-12-040
+(watcher-state executable test)</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (review-queue loop; not an ECHO
+MCP call).</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+after <code>git pull --rebase origin main</code>; first pending Codex
+response was
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong>
+<code>git show 784698ff0742e1f3cd3dcf260261354706a11068:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r3/request.md</code> focus_hints; checked
+<code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>.claude/commands/review-queue-watch.md</code>,
+<code>tests/review-queue/combine.test.ts</code>,
+<code>tools/review-queue/schemas/{request,combined}.schema.json</code>,
+and prior 040 queue context already embedded in files.</li>
+<li><strong>Returned:</strong> Wrote
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/codex.md</code>,
+verdict <code>proceed</code>, zero findings. Committed + pushed as
+<code>a412b7b</code> on <code>main</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>784698ff0742e1f3cd3dcf260261354706a11068</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+queue response path
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r3/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and the r3 artifact is claim-ready from Codex’s side.</li>
+<li><strong>Note:</strong> Plain <code>python3</code> schema validation
+hit the known <code>jsonschema</code>/<code>rpds</code> architecture
+mismatch; <code>arch -arm64 python3</code> validated successfully. The
+first <code>push-with-retry.sh</code> attempt was blocked by unrelated
+local journal/Cursor artifacts, so those local changes were preserved,
+the Codex response push was retried through the helper, and the local
+changes were restored afterward.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
