@@ -1180,6 +1180,11 @@ Codex connects to Claude for 038 direction</a></li>
 <li><a href="#pdt-codex-reviews-claudes-combined-038-finding"
 id="toc-pdt-codex-reviews-claudes-combined-038-finding">16:37 PDT —
 Codex reviews Claude’s combined 038 finding</a></li>
+<li><a
+href="#pdt-strategist-claude-code-95d30e5e-ac6-post-merge-dogfooding-replay-4-pre-fix-failure-workflows-on-the-post-038-toolkit"
+id="toc-pdt-strategist-claude-code-95d30e5e-ac6-post-merge-dogfooding-replay-4-pre-fix-failure-workflows-on-the-post-038-toolkit">22:35
+PDT — Strategist (Claude Code 95d30e5e): AC6 post-merge dogfooding —
+replay 4 pre-fix failure workflows on the post-038 toolkit</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -10631,6 +10636,109 @@ add a resolver primitive, and keep <code>get_atom</code> until a true
 replacement such as
 <code>get_atoms({ids:[id], mode:'verbatim_content'})</code> exists and
 is dogfooded.</li>
+</ul>
+<h3
+id="pdt-strategist-claude-code-95d30e5e-ac6-post-merge-dogfooding-replay-4-pre-fix-failure-workflows-on-the-post-038-toolkit">22:35
+PDT — Strategist (Claude Code 95d30e5e): AC6 post-merge dogfooding —
+replay 4 pre-fix failure workflows on the post-038 toolkit</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code 95d30e5e (the session
+that drove the entire RC1+RC2 wave; strategist, post daemon-restart on
+commit <code>b3042b0</code>).</li>
+<li><strong>Trigger:</strong> Founder direction “this requires real
+dogfooding. same pattern as before the fixes.” Replay each of the four
+MCP workflows whose failures earlier today (14:46–16:00 PDT) exposed
+RC1+RC2 and motivated 037+038. The post-merge daemon (PID 39500,
+vite-node, MCP on :38478) loaded the new toolkit;
+<code>mcp__echo__tail_session</code> returns <code>Tool not found</code>
+(post-038 invariant); <code>mcp__echo__echo_resolve_mru</code> schema
+loaded via ToolSearch.</li>
+<li><strong>Query inputs (4 workflows):</strong>
+<ol type="1">
+<li><strong>Cursor in this repo:</strong>
+<code>echo_resolve_mru({sources: ['cursor'], repo_path: '/Users/zhenye/Desktop/Project_echo'})</code>
+→
+<code>search_memories({source: &lt;desc.source&gt;, metadata_match: {composer_id: &lt;desc.filter.metadata_match.composer_id&gt;}, limit: 3})</code></li>
+<li><strong>Codex in this repo:</strong>
+<code>echo_resolve_mru({sources: ['codex'], repo_path: '/Users/zhenye/Desktop/Project_echo'})</code>
+→
+<code>search_memories({source: &lt;desc.source&gt;, repo_path: '/Users/zhenye/Desktop/Project_echo', limit: 2})</code></li>
+<li><strong>Claude Code in this repo:</strong>
+<code>echo_resolve_mru({sources: ['claude_code'], repo_path: '/Users/zhenye/Desktop/Project_echo'})</code>
+(descriptor only — sufficient to verify resolution)</li>
+<li><strong>Cross-project bleed test:</strong>
+<code>echo_resolve_mru({sources: ['claude_code', 'codex'], repo_path: '/Users/zhenye/Desktop/Projects/isr-demo-mohsen'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ol type="1">
+<li>Cursor descriptor: <code>source=fs:.../state.vscdb</code>,
+<code>filter={metadata_match: {composer_id: '459e6f6d-6b11-4fac-9ca2-b6a5b36fb38a'}}</code>,
+<strong><code>phase: 'cursor_legacy'</code></strong> (Phase 2 fallback
+fired — <code>459e6f6d</code> predates AC1’s file-walk capture-side
+fix). Compose recovered 3 atoms from the fresh “Discussion on project
+038 direction” composer — top match (id <code>46c7dcf4</code>, 23:16Z)
+was Cursor’s R4 code review verdict (“PROCEED to merge”).
+<strong>Pre-fix expected</strong>: would have resolved to old
+<code>558e2738</code> “Specification review and pushback” composer.</li>
+<li>Codex descriptor: <code>source=fs:.../019e1955-...jsonl</code>,
+<code>filter={repo_path: '/Users/zhenye/Desktop/Project_echo'}</code>
+(Phase 1 via <code>metadata.repo_root</code>). Compose recovered 2
+atoms: Codex R4 code review of 038 (HIGH on smoke + LOW on docs) + R3
+spec review. <strong>Pre-fix expected</strong>: would have resolved to
+ISR demo Codex <code>019e18f5</code>.</li>
+<li>Claude Code descriptor:
+<code>source=fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>
+(THIS session),
+<code>filter={repo_path: '/Users/zhenye/Desktop/Project_echo'}</code>.
+<strong>Pre-fix expected</strong>: Cursor’s
+<code>tail_session(source_app='claude_code')</code> call at 14:46 PDT
+resolved to ISR demo <code>bdb0905b</code> instead — root cause of the
+whole investigation.</li>
+<li>ISR scope: returns Claude Code <code>bdb0905b-...jsonl</code> +
+Codex <code>019e18f5-...jsonl</code> — both ISR-correct sources; ZERO
+Project_echo atoms in the result set. Cross-project bleed-through
+structurally impossible.</li>
+</ol></li>
+<li><strong>Sources:</strong> Claude Code source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>
+(this strategist session). Cursor source
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+(resolved via Phase 2 composer↔︎workspace registry for the fresh
+composer). Codex sources
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T16-17-54-019e1955-...jsonl</code>
+(Project_echo strategist) and
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T14-33-28-019e18f5-...jsonl</code>
+(ISR demo). Cross-project:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Projects-isr-demo-mohsen/bdb0905b-...jsonl</code>.
+All four workflows resolved to the EXPECTED post-fix session for their
+respective repo input.</li>
+<li><strong>Verdict:</strong> ✅ right — 4 of 4 workflows produce
+post-fix correct results. RC1+RC2 closed end-to-end on the live
+daemon.</li>
+<li><strong>Note:</strong> This is “the same pattern as before the
+fixes” verbatim — the very calls whose failures at 14:46–16:00 PDT
+motivated the wave. The 035 freshness gap, the cross-project MRU bleed,
+and the Cursor-only repo_path scope ALL produce correct results now. The
+Cursor descriptor’s <code>phase: 'cursor_legacy'</code> field on
+<code>459e6f6d</code> is the visible signal that Phase 2 legacy fallback
+worked: the composer was created BEFORE today’s AC1 capture-side fix
+shipped, so its atoms lack <code>metadata.repo_root</code>; the
+composer↔︎workspace registry resolver (035’s machinery, now repurposed as
+Phase 2) found it correctly. Going forward, fresh composers created
+post-AC1-merge will resolve via Phase 1 directly without needing the
+legacy fallback.</li>
+<li><strong>Conjecture:</strong> This is one clean dogfooding run on the
+cross-project surface. The spec’s “two consecutive runs on different
+days” pattern (per 036 precedent) calls for one more confirming run on
+2026-05-12 or later before M1-2-A is considered empirically closed.
+Worth journal-anchoring this entry as the canonical “post-038 dogfooding
+workflow shape” so the second-day run mirrors it. Also worth observing
+that Phase 2 firing for <code>459e6f6d</code> (a composer created
+mid-038-review cycle, before AC1 shipped) is the correct behavior but
+creates an asymmetry: the same composer will continue to resolve via
+Phase 2 for its lifetime unless Cursor opens a new composer post-merge.
+The expected long-term shape is Phase 1 dominant; Phase 2 surfaces as a
+back-compat path for pre-AC1 atoms.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
