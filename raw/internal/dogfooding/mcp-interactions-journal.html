@@ -1372,6 +1372,11 @@ href="#pdt-codex-checks-claudes-smoke-run-review-and-finds-a-stale-ac5-assertion
 id="toc-pdt-codex-checks-claudes-smoke-run-review-and-finds-a-stale-ac5-assertion">2026-05-12
 15:55 PDT — Codex checks Claude’s smoke-run review and finds a stale AC5
 assertion</a></li>
+<li><a
+href="#pdt-claude-code-resumes-session-calls-find_clusters-then-get_atoms-to-rehydrate"
+id="toc-pdt-claude-code-resumes-session-calls-find_clusters-then-get_atoms-to-rehydrate">2026-05-12
+16:09 PDT — Claude Code resumes session, calls find_clusters then
+get_atoms to rehydrate</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13283,6 +13288,57 @@ reviewer tick and keep the smoke’s HEAD assertion. Option A matches
 current prompt behavior; Option B better preserves the earlier “journal
 is observation-only, not queue handshake” invariant and avoids extra
 journal push races.</li>
+</ul>
+<h3
+id="pdt-claude-code-resumes-session-calls-find_clusters-then-get_atoms-to-rehydrate">2026-05-12
+16:09 PDT — Claude Code resumes session, calls find_clusters then
+get_atoms to rehydrate</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (Opus 4.7, fresh session
+post-<code>/clear</code>)</li>
+<li><strong>Trigger:</strong> Founder asked “use echo and see where we
+left off last session” — canonical no-args resume call.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>find_clusters({})</code> — no since/until/window_hours,
+exercises the no-args resume path</li>
+<li><code>get_atoms({atom_ids:[30 ids from clusters[0].atom_ids], prefer:'newest_first', format:'minimal'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> <code>find_clusters</code> → 13 clusters
+total, 160 atoms in 4h window. Rank-1 cluster <code>ctx_4182883a</code>
+labeled “work on Project_echo” with
+<code>source_breakdown={git:45, claude_code:39}</code> and 11 open-loop
+hints (10 resolved + 1 unresolved on <code>ca09ad87</code>).
+<code>get_atoms</code> (newest_first) returned the most recent 8 atoms
+before envelope budget; 22 older atoms dropped (acceptable for resume
+intent).</li>
+<li><strong>Sources:</strong> rank-1 cluster mixed claude_code
+(<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>,
+today’s session) + git
+(<code>git:/Users/zhenye/Desktop/Project_echo</code>). Top atom was a
+23:08Z assistant message summarizing 041’s “State as of now” table (item
+041 merged at <code>0f5dd3c</code>, 3 followups merged at
+<code>50c2e81</code>/<code>aec75fd</code>/<code>c63dad9</code>, AC3+AC5
+closed at <code>5729328</code>, launchd installed, next launchd-tick at
+~23:10Z). Rank-2 was Codex’s parallel 041 review work; rank-3 cross-tool
+spec-review chatter; rank-4 a single-snapshot Cursor burst.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> No-args resume hit the target on first call —
+rank-1 cluster’s label + source_breakdown + open_loop_hints were enough
+signal to pick it without inspecting any other cluster.
+<code>prefer:'newest_first'</code> correctly surfaced the most recent
+assistant turn (the “State as of now” summary) at position 1; that turn
+alone was sufficient to brief the founder. Did not need to fan out to
+other clusters or retry with <code>since=</code>. The deterministic
+prefix-drop dropped 22 older atoms — acceptable since the freshest 8
+covered the full open-loop state including the unanswered “dispatch AC8
+measurement?” question.</li>
+<li><strong>Conjecture:</strong> No-args resume on a freshly-saved
+session is the cheapest, highest-signal use of
+<code>find_clusters</code> so far. The 24h auto-expand never had to fire
+because 4h was already dense (84 atoms in rank-1). Worth a future audit:
+how does rank quality degrade when the session gap exceeds 4h
+cluster-gap and auto-expand to 24h is needed?</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
