@@ -1367,6 +1367,11 @@ href="#pdt-codex-hydrates-claudes-deeper-041-smoke-diagnosis-and-traces-the-next
 id="toc-pdt-codex-hydrates-claudes-deeper-041-smoke-diagnosis-and-traces-the-next-root-cause">2026-05-12
 15:39 PDT — Codex hydrates Claude’s deeper 041 smoke diagnosis and
 traces the next root cause</a></li>
+<li><a
+href="#pdt-codex-checks-claudes-smoke-run-review-and-finds-a-stale-ac5-assertion"
+id="toc-pdt-codex-checks-claudes-smoke-run-review-and-finds-a-stale-ac5-assertion">2026-05-12
+15:55 PDT — Codex checks Claude’s smoke-run review and finds a stale AC5
+assertion</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13223,6 +13228,61 @@ pruning <code>__pycache__/</code> and <code>*.pyc</code> after copying
 is copy <code>.gitignore</code> plus prune runtime caches, so the smoke
 repo’s tracked set matches production intent and
 <code>push-with-retry.sh</code> starts from a clean tree.</li>
+</ul>
+<h3
+id="pdt-codex-checks-claudes-smoke-run-review-and-finds-a-stale-ac5-assertion">2026-05-12
+15:55 PDT — Codex checks Claude’s smoke-run review and finds a stale AC5
+assertion</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive post-merge
+review)</li>
+<li><strong>Trigger:</strong> Founder asked Codex to check Claude’s
+review of the Codex smoke-test turn and do an independent review.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:10})</code></li>
+<li><code>get_atom({id:'d2328aef-ce39-4e06-bb0f-c12ee7340765'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> Claude’s latest hydrated turn reviewed
+the full smoke log after <code>c63dad9</code>, identified the bytecode
+fix as landed, listed four non-blocking gaps, and recommended one more
+clean <code>tools/review-queue/smoke-test-codex-runner.sh</code> run
+before launchd install. Local <code>main</code> was at
+<code>c63dad9</code> with unrelated dirty strategist wiki files.</li>
+<li><strong>Sources:</strong> exact Claude JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; local
+review read
+<code>tools/review-queue/{smoke-test-codex-runner.sh,run-codex-reviewer.sh,commit-reviewer-response.sh,push-with-retry.sh,validate.py}</code>
+and <code>.claude/commands/review-queue-codex.md</code>; fresh smoke log
+source was <code>~/Library/Logs/echo-review-queue-codex.log</code>.</li>
+<li><strong>Verdict:</strong> partial</li>
+<li><strong>Note:</strong> Claude was right that <code>c63dad9</code>
+fixes the bytecode-dirtying root cause: the helper uses
+<code>PYTHONDONTWRITEBYTECODE=1</code>, the smoke copies
+<code>.gitignore</code>, and copied <code>__pycache__/</code>
+directories are pruned. The fresh clean-path smoke then exposed a
+different gap: nested Codex successfully wrote and pushed
+<code>review-r1: codex on 2026-05-12-999-smoke-test-synthetic</code>
+(<code>371e89d</code> in the smoke repo), then Step 6 logged the
+observation and pushed a second commit,
+<code>dogfood: log codex smoke review</code> (<code>2a4c5d7</code>). The
+wrapper returned <code>rc=0</code>, but AC5 smoke failed because
+<code>smoke-test-codex-runner.sh</code> still asserts that
+<code>HEAD</code> must be the reviewer-response commit. That assertion
+is stale if Step 6 is expected to commit the journal after the response
+commit. If Step 6 is not expected to commit/push, the prompt itself is
+ambiguous and production may produce post-review journal pushes outside
+the response helper.</li>
+<li><strong>Conjecture:</strong> Fix the contract before installing
+launchd: either (A) define the queue tick as two commits and update AC5
+to assert the reviewer commit is in history and the final worktree is
+clean, or (B) remove/disable Step 6 journal writes from the unattended
+reviewer tick and keep the smoke’s HEAD assertion. Option A matches
+current prompt behavior; Option B better preserves the earlier “journal
+is observation-only, not queue handshake” invariant and avoids extra
+journal push races.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
