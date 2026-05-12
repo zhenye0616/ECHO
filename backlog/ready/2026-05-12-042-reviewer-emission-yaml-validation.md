@@ -59,37 +59,73 @@ This item also serves the **AC8 empirical test** carried forward from 041: it is
 
 ### AC2 — combine.py defensive parse on round read
 
-**Implementation.** Identify every call site in `combine.py` where a reviewer-response file is loaded (today: via `_lib.parse_frontmatter`). Wrap each in `try/except ValueError as exc` (the typed exception now raised after AC1's `_lib` wrap — combine.py imports from `_lib`, so the catch is local and obvious). On catch:
+**Implementation — two-phase.** Identify every call site in `combine.py` where a reviewer-response file is loaded (today: via `_lib.parse_frontmatter`). Restructure as a collect-then-emit pass so multi-failure rounds produce a single combined.md that lists all malformed responses:
 
-1. Compose a `combined.md` for this round with frontmatter fields:
+1. **Phase 1 — collect.** Iterate every reviewer-response file expected for this round (`r<N>/codex.md`, `r<N>/cursor.md`, future reviewers). For each, attempt `_lib.parse_frontmatter`. On `ValueError` (the typed exception now raised after AC1's `_lib` wrap), record a `(path, parse_error_string)` tuple in a `malformed_responses` list. On success, proceed with normal merging logic.
+2. **Phase 2 — emit (only if `malformed_responses` is non-empty).** Compose a `combined.md` for this round with frontmatter fields:
+   - `combined_verdict: malformed_reviewer_response` (new enum value — see AC3)
    - `escalated_to_founder: true`
-   - `reason: malformed_reviewer_response`
-   - `offending_response: <relative path from repo root>`
-   - `parse_error: <the stringified ValueError>`
-   - `convergent: []`
-   - `divergent: []`
-   - `verdict: escalated`
+   - `offending_response: <repo-root-relative path>` **if `len(malformed_responses) == 1`** — string shape, e.g. `backlog/reviews/<item_id>/r<N>/cursor.md`
+   - `offending_response: [<path1>, <path2>, ...]` **if `len(malformed_responses) >= 2`** — array-of-strings shape, every path repo-root-relative
+   - `parse_error: <stringified ValueError>` **if `len == 1`** — single string
+   - `parse_error: [<err1>, <err2>, ...]` **if `len >= 2`** — array of strings, index-aligned with `offending_response`
+   - `codex_response: codex.md | null` (per existing schema — independent of malformed status; null only when literally absent)
+   - `cursor_response: cursor.md | null` (same)
+   - `patch_commit_sha: null`
    - `next_round: null`
-2. Body text: a short human-readable explanation ("Reviewer response at `<path>` failed YAML parse with: `<msg>`. Reviewer must regenerate. Strategist + founder: see `raw/internal/queue-errors.md` for the full incident log and the regeneration handshake.").
-3. Write atomically (`os.link` from a `combined.md.<pid>.tmp` per the existing pattern in combine.py).
-4. Commit + `push-with-retry.sh` (existing helper).
-5. Exit 0 (watcher tick proceeds; combine.py's "one round per tick" property holds; the next tick will skip this round because `combined.md` exists and is terminal).
+3. **Body text:** a short human-readable explanation enumerating each malformed response and its error (e.g. "Reviewer response at `backlog/reviews/<item_id>/r<N>/cursor.md` failed YAML parse with: `<msg>`. Reviewer must regenerate. Strategist + founder: see `raw/internal/queue-errors.md` for the full incident log and the regeneration handshake.").
+4. **Write atomically** (`os.link` from a `combined.md.<pid>.tmp` per the existing pattern in combine.py).
+5. **Commit + `push-with-retry.sh`** (existing helper).
+6. **Exit 0** (watcher tick proceeds; combine.py's "one round per tick" property holds; the next tick will skip this round because `combined.md` exists and is terminal).
+
+**Builder note on path base.** All `offending_response` paths in `combined.md` frontmatter, in test fixtures, and in error messages MUST be **repo-root-relative** (e.g. `backlog/reviews/2026-05-12-042-.../r1/cursor.md`). The shorter item-directory-relative form (`r1/cursor.md`) is forbidden; pick this base consistently so builders + downstream consumers don't have to guess. AC2a and AC2b fixture assertions verify exact path strings.
 
 **Test.** New file `tests/review-queue/combine-malformed-response.test.ts`:
-- **AC2a** — fixture round with `r1/request.md` valid + `r1/codex.md` valid + `r1/cursor.md` malformed (same 040 R1 pattern). Invoke `combine.py` against the round. Assert: exit 0, `r1/combined.md` exists, frontmatter has `escalated_to_founder: true` + `reason: malformed_reviewer_response` + `offending_response: r1/cursor.md`, no Python traceback on stderr.
-- **AC2b** — fixture round with **both** reviewer responses malformed. Same assertions, but `offending_response` is a list of both paths (or whichever shape AC2's schema lands on — see AC3).
+- **AC2a** — fixture round with `r1/request.md` valid + `r1/codex.md` valid + `r1/cursor.md` malformed (same 040 R1 pattern). Invoke `combine.py` against the round. Assert: exit 0, `r1/combined.md` exists, frontmatter has `combined_verdict: "malformed_reviewer_response"` + `escalated_to_founder: true` + `offending_response: "backlog/reviews/<item_id>/r1/cursor.md"` (string shape, repo-root-relative — NOT `r1/cursor.md`), `parse_error` is a string, no Python traceback on stderr.
+- **AC2b** — fixture round with **both** `codex.md` AND `cursor.md` malformed. Assert: `offending_response` is a list of length 2 with both repo-root-relative paths in stable iteration order (codex first per the reviewer enum order), `parse_error` is a list of length 2 index-aligned with `offending_response`. Combine.py must have parsed (and recorded errors for) BOTH files, not short-circuited on the first.
 
-### AC3 — Schema addition (one field, one enum value)
+### AC3 — Schema additions to `combined.schema.json` (existing schema, additive only)
 
-**Implementation.** Add to `tools/review-queue/schemas/combined.schema.json`:
-- `escalated_to_founder: { type: boolean }` if not present.
-- `reason: { type: string, enum: [..., "malformed_reviewer_response"] }` — append to the existing enum or introduce if absent.
-- `offending_response: { oneOf: [{ type: string }, { type: array, items: { type: string } }] }` — captures both AC2a (single) and AC2b (list) cases.
-- `parse_error: { type: string }`.
+**Context.** The current `tools/review-queue/schemas/combined.schema.json` (frozen by 039) has:
+- A `combined_verdict` field (string, enum: `proceed | proceed_after_patches | pushback | divergent | single_reviewer_timeout | no_responses`)
+- An `escalated_to_founder` field (boolean) — already present
+- `additionalProperties: false` at the top level — meaning any new field must be declared explicitly
 
-If `combined.schema.json` doesn't currently allow `escalated_to_founder` / `reason`, this is a strict superset addition — no existing valid combined.md becomes invalid.
+**Implementation.** Three additive changes to the schema, no removals, no renames:
 
-**Test.** Pre-existing `validate.py combined <fixture>` schema test will fail until the schema lands. Update one fixture or add one.
+1. **Append `malformed_reviewer_response` to the `combined_verdict` enum.** New enum becomes: `proceed | proceed_after_patches | pushback | divergent | single_reviewer_timeout | no_responses | malformed_reviewer_response`. Strict superset — every existing valid combined.md remains valid.
+
+2. **Declare two new optional properties under `properties:`:**
+   - `offending_response`:
+     ```json
+     "offending_response": {
+       "oneOf": [
+         { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" },
+         { "type": "array", "items": { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" }, "minItems": 2 }
+       ]
+     }
+     ```
+     The pattern enforces repo-root-relative path shape (closes Finding 3). `minItems: 2` on the array variant prevents the single-failure case from sneaking through as a 1-element list — AC2's string-vs-array choice is canonical.
+   - `parse_error`:
+     ```json
+     "parse_error": {
+       "oneOf": [
+         { "type": "string" },
+         { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+       ]
+     }
+     ```
+     Same shape discipline as `offending_response`. Array index alignment with `offending_response` is a runtime invariant enforced by combine.py (not the schema).
+
+3. **No change to `required`** — both new fields are optional at the schema level. They MUST be present when `combined_verdict == "malformed_reviewer_response"`, but that conditional is enforced by `combine.py` emission logic (and tested in AC2a/AC2b), not by jsonschema (which can't express conditional required-ness cleanly without `if/then`).
+
+**No new `reason` field.** Earlier draft introduced a `reason` field separate from `combined_verdict`; reviewer's Finding 1 correctly identified this as redundant. The enum value `malformed_reviewer_response` carries the reason; no separate `reason` key.
+
+**Test.** Update `tests/review-queue/schemas.test.ts` to add one fixture per shape:
+- Fixture #1 — `combined_verdict: malformed_reviewer_response` + `offending_response: "backlog/reviews/.../r1/cursor.md"` (string) + `parse_error: "<msg>"` (string) → must validate.
+- Fixture #2 — same + array variants (length 2) → must validate.
+- Fixture #3 — array variant with length 1 → must FAIL (the `minItems: 2` gate).
+- Fixture #4 — `offending_response: "r1/cursor.md"` (item-relative, not repo-root) → must FAIL (the pattern gate).
 
 ### AC4 — queue-errors.md append on AC2 escalation
 
@@ -128,8 +164,8 @@ The Codex reviewer launchd job is already installed (per 041 AC2); Cursor remain
 | AC | New test file | New it() blocks | Notes |
 |---|---|---|---|
 | AC1 | `tests/review-queue/yaml-error-handling.test.ts` | 2 (AC1a + AC1b) | Real cursor.md fixtures from 040 R1 + a second YAML-failure-mode fixture |
-| AC2 | `tests/review-queue/combine-malformed-response.test.ts` | 2 (AC2a + AC2b) | Real round fixture; assert escalation stub, not traceback |
-| AC3 | Update `tests/review-queue/schemas.test.ts` fixture | 0 new files | Schema-level coverage |
+| AC2 | `tests/review-queue/combine-malformed-response.test.ts` | 2 (AC2a + AC2b) | Real round fixture; assert escalation stub uses `combined_verdict` field + repo-root-relative `offending_response` paths; AC2b verifies the two-phase collect (BOTH files parsed before emit) |
+| AC3 | Update `tests/review-queue/schemas.test.ts` fixtures | 0 new files | 4 fixtures: valid string, valid array(≥2), invalid array(1) → reject, invalid item-relative path → reject |
 | AC4 | Folded into AC2's tests | 0 new files | queue-errors.md row check |
 
 Net: +2 test files, +4 it()/test() blocks. Existing review-queue suite was 47 at 041 merge → should be 51 at 042 merge.
