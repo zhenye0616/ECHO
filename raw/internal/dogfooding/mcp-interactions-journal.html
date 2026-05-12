@@ -1357,6 +1357,11 @@ id="toc-pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29">2026-05-12
 <li><a href="#pdt-codex-r3-on-041-reviewer-background-execution"
 id="toc-pdt-codex-r3-on-041-reviewer-background-execution">2026-05-12
 14:46 PDT — Codex R3 on 041 reviewer background execution</a></li>
+<li><a
+href="#pdt-codex-checks-landed-041-against-strategist-claude-context"
+id="toc-pdt-codex-checks-landed-041-against-strategist-claude-context">2026-05-12
+15:31 PDT — Codex checks landed 041 against strategist Claude
+context</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13095,6 +13100,59 @@ tail already logged by Cursor.</li>
 <li><strong>Note:</strong> Both reviewers are now <code>proceed</code>
 with zero findings in R3, satisfying the R3 request’s claim-ready bar
 from the review queue’s perspective.</li>
+</ul>
+<h3
+id="pdt-codex-checks-landed-041-against-strategist-claude-context">2026-05-12
+15:31 PDT — Codex checks landed 041 against strategist Claude
+context</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive post-merge
+check)</li>
+<li><strong>Trigger:</strong> Founder said 041 had landed and asked
+Codex to connect to strategist Claude, then do its own checking.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})</code></li>
+<li><code>get_atom({id:'52804c5b-8df6-4a3e-a50b-e38e467feb40'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU resolved to the same strategist
+Claude Code session as the 041 review loop. The newest tail atom
+(<code>2026-05-12T22:28:41.438Z</code>) diagnosed the first post-merge
+smoke failure: <code>smoke-test-codex-runner.sh</code> had overridden
+<code>HOME</code>, so <code>codex exec</code> could not see
+<code>~/.codex/auth.json</code>; the full hydrated atom recommended
+dropping the <code>HOME</code> override. Local <code>main</code> already
+contained that fix as <code>50c2e81</code>.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:8}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; local
+follow-up reads used
+<code>tools/review-queue/smoke-test-codex-runner.sh</code>,
+<code>tools/review-queue/run-codex-reviewer.sh</code>,
+<code>.claude/commands/review-queue-codex.md</code>,
+<code>.claude/commands/review-queue-cursor.md</code>, and
+<code>docs/review-queue-setup.md</code>.</li>
+<li><strong>Verdict:</strong> 🟡 partial</li>
+<li><strong>Note:</strong> ECHO found the strategist’s latest diagnosis
+correctly, but independent smoke verification exposed a second gap after
+the HOME fix: <code>.claude/commands/review-queue-codex.md</code> still
+hardcodes <code>cd ~/Desktop/Project_echo</code>. The wrapper launches
+Codex with <code>ECHO_REVIEW_QUEUE_REPO_ROOT=$SMOKE_WORK</code>, but the
+prompt moves the nested Codex tick back to production, where it sees no
+pending smoke request. Result: wrapper rc=0, but AC5 smoke fails because
+<code>$SMOKE_WORK/backlog/reviews/2026-05-12-999-smoke-test-synthetic/r1/codex.md</code>
+is never produced. Static checks: <code>npm run typecheck</code> clean,
+<code>npm run lint</code> clean,
+<code>npm test -- tests/review-queue/</code> = 47 pass + 1 known
+pre-existing <code>concurrency.test.ts:133</code> failure.</li>
+<li><strong>Conjecture:</strong> 041 needs one more operational fix:
+make the Codex reviewer prompt derive its repo root from
+<code>${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}</code>
+instead of hardcoding <code>~/Desktop/Project_echo</code>; the Cursor
+prompt can stay production-oriented unless the team wants symmetric
+testability.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

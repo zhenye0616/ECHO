@@ -2804,6 +2804,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right
 - **Note:** Both reviewers are now `proceed` with zero findings in R3, satisfying the R3 request's claim-ready bar from the review queue's perspective.
 
+### 2026-05-12 15:31 PDT — Codex checks landed 041 against strategist Claude context
+
+- **Source agent:** Codex (interactive post-merge check)
+- **Trigger:** Founder said 041 had landed and asked Codex to connect to strategist Claude, then do its own checking.
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})`
+  3. `get_atom({id:'52804c5b-8df6-4a3e-a50b-e38e467feb40'})`
+- **Returned:** MRU resolved to the same strategist Claude Code session as the 041 review loop. The newest tail atom (`2026-05-12T22:28:41.438Z`) diagnosed the first post-merge smoke failure: `smoke-test-codex-runner.sh` had overridden `HOME`, so `codex exec` could not see `~/.codex/auth.json`; the full hydrated atom recommended dropping the `HOME` override. Local `main` already contained that fix as `50c2e81`.
+- **Sources:** source_breakdown={claude_code:8}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; local follow-up reads used `tools/review-queue/smoke-test-codex-runner.sh`, `tools/review-queue/run-codex-reviewer.sh`, `.claude/commands/review-queue-codex.md`, `.claude/commands/review-queue-cursor.md`, and `docs/review-queue-setup.md`.
+- **Verdict:** 🟡 partial
+- **Note:** ECHO found the strategist's latest diagnosis correctly, but independent smoke verification exposed a second gap after the HOME fix: `.claude/commands/review-queue-codex.md` still hardcodes `cd ~/Desktop/Project_echo`. The wrapper launches Codex with `ECHO_REVIEW_QUEUE_REPO_ROOT=$SMOKE_WORK`, but the prompt moves the nested Codex tick back to production, where it sees no pending smoke request. Result: wrapper rc=0, but AC5 smoke fails because `$SMOKE_WORK/backlog/reviews/2026-05-12-999-smoke-test-synthetic/r1/codex.md` is never produced. Static checks: `npm run typecheck` clean, `npm run lint` clean, `npm test -- tests/review-queue/` = 47 pass + 1 known pre-existing `concurrency.test.ts:133` failure.
+- **Conjecture:** 041 needs one more operational fix: make the Codex reviewer prompt derive its repo root from `${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}` instead of hardcoding `~/Desktop/Project_echo`; the Cursor prompt can stay production-oriented unless the team wants symmetric testability.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
