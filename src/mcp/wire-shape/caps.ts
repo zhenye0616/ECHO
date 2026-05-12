@@ -1,5 +1,5 @@
-// Declarative caps for every wire-shape decision across the three MCP
-// retrieval tools (search_memories, tail_session, get_recent_work_context).
+// Declarative caps for every wire-shape decision across the MCP retrieval
+// tools (search_memories, get_recent_work_context, get_atoms, etc.).
 // Single source of truth — every retrieval tool that surfaces atoms over the
 // wire imports from here, so a future addition / tightening only needs to
 // touch one number.
@@ -12,13 +12,13 @@
 // per-key-clipped metadata + envelope/marker overhead fits in the 25k
 // consumer tool-result budget with headroom.
 export const WIRE_SHAPE_CAPS = {
-  /** Per-match `content` clip (search_memories, tail_session). Surfaced by
+  /** Per-match `content` clip (search_memories, get_atoms). Surfaced by
    *  Bug A1 (2026-05-08 15:54 PDT) — single Codex turn JSONL is ~100KB;
    *  without this cap, three matches blew the budget by 12.7×. 1KB head +
    *  1KB tail leaves room for marker + envelope. */
   match_content: 2_000,
 
-  /** Per-metadata-VALUE clip (search_memories, tail_session). Surfaced by
+  /** Per-metadata-VALUE clip (search_memories, get_atoms). Surfaced by
    *  Bug A2 (2026-05-08 16:14 PDT) — codex extractor stores raw tool_calls
    *  payloads in metadata at 120-130KB per atom, so Bug A1's content cap
    *  alone left envelopes at 305k. Capping per-key (not per total

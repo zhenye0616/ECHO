@@ -1,15 +1,15 @@
 // Item 037 / AC3-AC6: shared `repo_path` parameter validation + normalization
-// for the four retrieval tools (`search_memories`, `find_clusters` /
-// `recent_work_context`, `wait_for_new_turns`, `tail_session`). Centralised
-// here so a future tightening of the contract (e.g. symlink resolution,
-// Windows path canonicalisation, multi-root workspace handling) touches one
-// file instead of four.
+// for the retrieval tools (`search_memories`, `find_clusters` /
+// `recent_work_context`, `wait_for_new_turns`, `echo_resolve_mru`).
+// Centralised here so a future tightening of the contract (e.g. symlink
+// resolution, Windows path canonicalisation, multi-root workspace handling)
+// touches one file instead of four.
 //
 // Two concerns separated:
 //   - validation: caller passed a non-absolute string → throw a clear
 //     `<tool>: repo_path must be absolute` Error. The MCP envelope handler
-//     converts this to `isError: true` per the existing pattern in
-//     `tail-session.ts`.
+//     converts this to `isError: true` per the consistent error-prefix
+//     pattern across retrieval tools.
 //   - normalization: align caller path shape with the stored
 //     `metadata.repo_root` shape (no trailing slash; structural normalize
 //     only — NO symlink resolution, NO canonicalization). Required because
@@ -29,8 +29,7 @@ export { normaliseRepoPath };
 /**
  * Throw a structured Error when `repo_path` is set but not absolute. The
  * message is prefixed with `<toolName>: ` so the existing MCP envelope
- * handlers (`tail-session.ts` lines 444-449, `search-memories.ts` lines
- * 278-289) recognise it and emit `isError: true` instead of a JSON-RPC
+ * handlers recognise it and emit `isError: true` instead of a JSON-RPC
  * fault. `toolName` is the tool's snake_case identifier.
  */
 export function assertAbsoluteRepoPath(toolName: string, repo_path: string): void {

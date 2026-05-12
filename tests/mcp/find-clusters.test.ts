@@ -514,3 +514,45 @@ describe('find_clusters', () => {
     expect(clipped!.open_loop_hints.length).toBeLessThanOrEqual(30);
   });
 });
+
+// Item 038 / AC3 regression test: find_clusters{repo_path} must still scope
+// the candidate set to atoms with matching metadata.repo_root after the
+// cluster engine moved to internal/. Mirrors the post-037 contract verbatim.
+describe('Item 038 / AC3 — find_clusters({repo_path}) inherits 037 forwarding', () => {
+  it('cross-source scopes by metadata.repo_root through the new internal engine', async () => {
+    const store = new MemoryStorage();
+    const repoA = PROJECT_ECHO;
+    const repoB = '/Users/redacted/Desktop/Other_repo';
+    // Three atoms in repoA + two atoms in repoB, all in the cluster window.
+    for (let i = 0; i < 3; i++) {
+      const ts = `2026-05-09T10:0${i}:00.000Z`;
+      const ev = claudeCodeTurn(i, `${repoA}/src/x.ts`, ts);
+      (ev.metadata as Record<string, unknown>)['repo_root'] = repoA;
+      await store.append(ev);
+    }
+    for (let i = 0; i < 2; i++) {
+      const ts = `2026-05-09T10:1${i}:00.000Z`;
+      const ev = claudeCodeTurn(100 + i, `${repoB}/src/y.ts`, ts);
+      (ev.metadata as Record<string, unknown>)['repo_root'] = repoB;
+      // Adjust source so the find_clusters trace input picks both as cc atoms.
+      ev.source = `fs:/Users/redacted/.claude/projects/-Users-redacted-Desktop-Other-repo/sess-${100 + i}.jsonl`;
+      await store.append(ev);
+    }
+
+    const rA = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+      repo_path: repoA,
+    });
+    expect(rA.query.repo_path).toBe(repoA);
+    const allAtomIdsA = rA.clusters.flatMap((c) => c.atom_ids);
+    // RepoB atoms must not appear in the repo_path=repoA cluster set.
+    // Build the inclusion check by checking that none of the repoB atom
+    // signatures (sourced from .claude/projects/-Users-redacted-Desktop-Other-repo)
+    // surface — we sanity-check that the atoms_returned count is bounded
+    // by the repoA fixture size.
+    expect(rA.result_caps.atoms_returned).toBeGreaterThan(0);
+    expect(rA.result_caps.atoms_returned).toBeLessThanOrEqual(3);
+    expect(allAtomIdsA.length).toBeLessThanOrEqual(3);
+  });
+});
