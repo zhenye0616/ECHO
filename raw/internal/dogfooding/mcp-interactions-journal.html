@@ -1286,6 +1286,11 @@ href="#pdt-codex-review-queue-tick-r1-on-item-2026-05-12-040-watcher-state-execu
 id="toc-pdt-codex-review-queue-tick-r1-on-item-2026-05-12-040-watcher-state-executable-test">2026-05-12
 02:32 PDT — Codex <code>review-queue</code> tick: R1 on item
 2026-05-12-040 (watcher-state executable test)</a></li>
+<li><a
+href="#pdt-cursor-review-queue-cursor-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test"
+id="toc-pdt-cursor-review-queue-cursor-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:44
+PDT — Cursor <code>review-queue-cursor</code> tick: R2 on item
+2026-05-12-040 (watcher-state executable test)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12354,6 +12359,41 @@ arm64/x86_64 mismatch; rerunning as
 <code>arch -arm64 python3 tools/review-queue/validate.py ...</code>
 validated the response. This was a local validation environment wrinkle,
 not a queue handshake failure.</li>
+</ul>
+<h3
+id="pdt-cursor-review-queue-cursor-tick-r2-on-item-2026-05-12-040-watcher-state-executable-test">02:44
+PDT — Cursor <code>review-queue-cursor</code> tick: R2 on item
+2026-05-12-040 (watcher-state executable test)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor (review-queue loop; not an
+ECHO MCP call).</li>
+<li><strong>Trigger:</strong> One tick per
+<code>.claude/commands/review-queue-cursor.md</code>; pending round
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/request.md</code>
+(RC2 artifact after R1 dispositions).</li>
+<li><strong>Query inputs:</strong>
+<code>git show 8a6b863d09db0619a6430ea8fd565be0f09150a5:backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+read <code>r2/request.md</code> focus_hints; skim
+<code>r1/{cursor,codex}.md</code> for R1 intent only.</li>
+<li><strong>Returned:</strong> Wrote <code>r2/cursor.md</code>, verdict
+<code>proceed_after_patches</code>, 1 MED + 1 LOW + 1 nit — AC2 example
+<code>git add</code> block is not copy-paste safe when
+<code>r{N+1}/request.md</code> is absent on (a)/(c); push-with-retry
+example string uses <code>N+1</code> while terminal-branch commit uses
+<code>N</code>; idempotency vs YAML wording nit. Committed + pushed as
+<code>55f9b6c</code> on <code>main</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>8a6b863d09db0619a6430ea8fd565be0f09150a5</code> path
+<code>backlog/ready/2026-05-12-040-watcher-state-executable-test.md</code>;
+queue response
+<code>backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/cursor.md</code>.
+No ECHO MCP calls this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — R1 convergent patches
+(os.replace, pushback tuple, <code>--spec-sha</code>, helper vs git
+boundary, AC3 wording) landed; remaining gaps are small shell/ops polish
+in AC2.</li>
+<li><strong>Note:</strong> Confirms 040 remains multi-round (narrow
+class) per heuristic; not convergence yet at R2 for Cursor.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

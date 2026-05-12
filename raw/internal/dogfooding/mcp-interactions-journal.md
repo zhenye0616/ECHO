@@ -2595,6 +2595,16 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — the file-backed queue selected the expected missing Codex response, anchored review to the requested spec SHA, and push-with-retry landed the response cleanly.
 - **Note:** `tools/review-queue/validate.py reviewer ...` failed under the default Python architecture on the known `rpds` arm64/x86_64 mismatch; rerunning as `arch -arm64 python3 tools/review-queue/validate.py ...` validated the response. This was a local validation environment wrinkle, not a queue handshake failure.
 
+### 02:44 PDT — Cursor `review-queue-cursor` tick: R2 on item 2026-05-12-040 (watcher-state executable test)
+
+- **Source agent:** Cursor (review-queue loop; not an ECHO MCP call).
+- **Trigger:** One tick per `.claude/commands/review-queue-cursor.md`; pending round `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/request.md` (RC2 artifact after R1 dispositions).
+- **Query inputs:** `git show 8a6b863d09db0619a6430ea8fd565be0f09150a5:backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; read `r2/request.md` focus_hints; skim `r1/{cursor,codex}.md` for R1 intent only.
+- **Returned:** Wrote `r2/cursor.md`, verdict `proceed_after_patches`, 1 MED + 1 LOW + 1 nit — AC2 example `git add` block is not copy-paste safe when `r{N+1}/request.md` is absent on (a)/(c); push-with-retry example string uses `N+1` while terminal-branch commit uses `N`; idempotency vs YAML wording nit. Committed + pushed as `55f9b6c` on `main`.
+- **Read sources:** Artifact SHA `8a6b863d09db0619a6430ea8fd565be0f09150a5` path `backlog/ready/2026-05-12-040-watcher-state-executable-test.md`; queue response `backlog/reviews/2026-05-12-040-watcher-state-executable-test/r2/cursor.md`. No ECHO MCP calls this tick.
+- **Verdict:** ✅ right — R1 convergent patches (os.replace, pushback tuple, `--spec-sha`, helper vs git boundary, AC3 wording) landed; remaining gaps are small shell/ops polish in AC2.
+- **Note:** Confirms 040 remains multi-round (narrow class) per heuristic; not convergence yet at R2 for Cursor.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
