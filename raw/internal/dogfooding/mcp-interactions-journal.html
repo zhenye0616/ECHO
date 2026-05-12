@@ -1251,6 +1251,11 @@ href="#pdt-codex-r4-review-of-039-rc4-verification-round-low-only-stale-test-wor
 id="toc-pdt-codex-r4-review-of-039-rc4-verification-round-low-only-stale-test-wording">01:15
 PDT — Codex R4 review of 039 RC4 — verification round; LOW-only stale
 test wording</a></li>
+<li><a
+href="#pdt-strategist-claude-code-9b575b57-039-r4-combine-rc5-polish-convergence-declared-r4combined.md"
+id="toc-pdt-strategist-claude-code-9b575b57-039-r4-combine-rc5-polish-convergence-declared-r4combined.md">2026-05-12
+01:20 PDT — Strategist (Claude Code 9b575b57): 039 R4 combine + RC5
+polish + <strong>CONVERGENCE DECLARED</strong> + r4/combined.md</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11898,6 +11903,122 @@ test-wording patch: add the watcher branch fixture and update the stale
 AC4 overlap test bullet. If applied, 039 should be claim-ready without
 another full review round unless the strategist wants a final mechanical
 confirmation.</li>
+</ul>
+<h3
+id="pdt-strategist-claude-code-9b575b57-039-r4-combine-rc5-polish-convergence-declared-r4combined.md">2026-05-12
+01:20 PDT — Strategist (Claude Code 9b575b57): 039 R4 combine + RC5
+polish + <strong>CONVERGENCE DECLARED</strong> + r4/combined.md</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (Opus 4.7,
+1M context) — same session that drafted RC1+RC2+RC3+RC4.</li>
+<li><strong>Trigger:</strong> Founder said “clean up the background task
+and both are in flight” at 01:10 PDT. Strategist killed stale R3 poll
+(<code>bvp21dyof</code>), started R4 poll (<code>bsvt07psq</code>) with
+<strong>three-layer detection</strong>: (1) file-presence at canonical
+queue path (primary — Cursor R3 wrote response file without observable
+bubble turns), (2) Codex JSONL task_complete count, (3) Cursor bubble
+max-content-length-across-new-bubbles + 30s stability (R2-bug-fixed
+fallback). Cursor R4 file detected at 01:12:36 (60s after baseline);
+Codex R4 file detected at 01:14:52 (3:16 after baseline). Both via
+file-presence path — the corrected detection layer worked.</li>
+<li><strong>Query inputs (1 ECHO call + filesystem reads only):</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['codex','cursor'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code>
+— same sources as R1+R2+R3.</li>
+<li><code>Read backlog/reviews/.../r4/{codex.md,cursor.md}</code> from
+canonical queue path.</li>
+<li><code>git pull --rebase origin main</code> — already up-to-date
+(both reviewers pushed their R4 commits directly).</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li><strong>Codex R4 (2 LOW findings only; verdict
+<code>proceed_after_patches</code>):</strong>
+<ul>
+<li>L1: AC4 test list missing fixture for AC3.5 (b) state-machine branch
+(the load-bearing case Codex R3 M1 caught).</li>
+<li>L2 (cross-ref Codex R3 M2): AC4 stale “primary or related section
+overlap” test bullet contradicts the RC4 exact-sub-anchor rule.</li>
+</ul></li>
+<li><strong>Cursor R4 (ZERO findings; verdict
+<code>proceed</code>):</strong> Full structural ratification. Reviewer
+notes: “RC4 satisfies the R3 verification round. Recommend strategist
+declare convergence once Codex R4 matches (<code>proceed*</code> + no
+HIGH/MED), per §Review History R3 convergence prediction.”</li>
+<li><strong>Combined verdict:
+<code>proceed_after_patches</code></strong> (within
+<code>{proceed*}</code> boundary; no founder escalation).
+<strong>Termination via AC3.5 step 3 (c) explicit waiver:</strong> Codex
+R4 reviewer notes explicitly waived next round (<em>“If the strategist
+patches the two stale test-wording spots above, I would expect a final
+converge/claim call rather than another substantive review round”</em>);
+patches mechanical test-wording; both reviewers within
+<code>{proceed*}</code> with Cursor at zero findings.</li>
+</ul></li>
+<li><strong>Sources:</strong> Codex source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T23-07-43-019e1acc-...jsonl</code>
+turn 6 (R4 review). Cursor source
+<code>fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb</code>
+composer <code>1c0493dd</code>. Both reviewer responses pushed directly
+to <code>origin/main</code> as <code>bca3d7a</code> (cursor) +
+<code>96a4b1d</code> (codex). <strong>Filesystem retrieval at canonical
+queue path was the primary mechanism for all 4 rounds</strong> — ECHO
+substring index played supporting role only.</li>
+<li><strong>Verdict:</strong> ✅ right on combine; 2 R4 findings
+dispositioned in RC5 (small polish patches). 🎉 <strong>CONVERGENCE
+DECLARED</strong> after 4 rounds; 039 is claim-ready.</li>
+<li><strong>Note (4-round decay summary):</strong> R1 (18 findings: 8
+HIGH + 7 MED + 3 LOW) → R2 (14: 2 HIGH + 7 MED + 5 LOW) → R3 (8: 2 MED +
+6 LOW) → R4 (2 LOW). Total 42 findings across 4 rounds; zero residual
+HIGH/MED at convergence. <strong>Decay curve aggressive vs 038’s
+(10→14→5):</strong> 039’s structural reform was larger but the §Review
+History block + bootstrap-write pattern + recursive
+review-history-as-evolutionary-record property kept the cycle tight
+enough to converge in same number of rounds. Empirical evidence that the
+queue’s “review history is canonical context” property is load-bearing
+for cycle efficiency.</li>
+<li><strong>Note (the cycle’s design-validation pattern, final
+synthesis):</strong> Every property the queue was supposed to deliver
+was tested live during its own R1→R4 review cycle:
+<ul>
+<li><strong>Zero-ECHO-call reviewer property:</strong> held from R1
+onwards (both reviewers ECHO-optional once §Review History exists).</li>
+<li><strong>Bootstrap-write pattern:</strong> validated; reviewers wrote
+canonical-path files from R2 onwards without queue scripts.</li>
+<li><strong>Progressive-trust reviewer push behavior:</strong> matured
+from local-only commits (R2) → operational pushes (R3+R4) — matches
+queue’s design intent.</li>
+<li><strong>Recursive review-history-as-evolutionary-record:</strong>
+Codex R3 M1 found AC3.5 state-machine bug BY READING PRIOR ROUNDS — the
+cycle’s strongest empirical signal that documented review history is
+load-bearing for design correctness, not just observability.</li>
+<li><strong>Convergent-on-direction divergent-on-prescription:</strong>
+held all 4 rounds; founder escalation never fired (escalated_to_founder:
+true triggered exactly zero times across the cycle).</li>
+<li><strong>JOURNAL-AS-QUEUE PROHIBITION invariant:</strong> R1 observed
+live race → invariant created RC2 → R2+R3+R4 races prevented.</li>
+<li><strong>AC3.5 (a)/(b)/(c) termination paths:</strong> all three
+exercised across the cycle. (b) verification-default fired at R3 (after
+R2 patch); (c) explicit-waiver fires at R4 (final round).</li>
+</ul></li>
+<li><strong>Note (cycle stats for the operating-model retro):</strong> 4
+rounds × ~2-3 dispatches per round = ~10 manual dispatches (last manual
+cycle per bootstrap moment). Wall-clock R1→convergence ≈ 2 hours. Once
+039 ships and AC3 step 5 wires <code>push-with-retry.sh</code> into
+reviewer prompts AND <code>/loop</code> schedules trigger automatically,
+the next spec’s R1→convergence should drop to ZERO founder dispatch
+messages (AC6b success criterion) and the wall-clock budget per round
+drops to 30 min narrow / 2 hours structural-reform per
+<code>class</code> field.</li>
+<li><strong>Conjecture (observation-only):</strong> 039 is now
+claim-ready. Any agent may atomically claim from
+<code>backlog/ready/</code> → <code>backlog/claimed/</code>.
+<strong>Suggested follow-up sequence post-claim:</strong> builder
+implements AC0-AC5 (~1.5-2 days); founder reviews via the existing
+manual-review flow (last time); merge to main; THEN AC6b kicks off on
+the next-up qualifying spec (the FIRST spec to go through the queue
+end-to-end with zero dispatch messages). 039 is the queue’s bootstrap;
+040+ is the queue’s steady state.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

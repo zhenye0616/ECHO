@@ -1,6 +1,6 @@
 ---
 id: 2026-05-11-039-cross-tool-review-dispatch-queue
-title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC4 / R3-patched)
+title: Cross-tool review dispatch queue — file-backed protocol; founder out of dispatch loop (RC5 / R4-patched — CONVERGED, claim-ready)
 status: ready
 priority: HIGH
 estimate: 1.5-2d
@@ -381,7 +381,7 @@ The table is commutative on `(codex.verdict, cursor.verdict)` — `(proceed_afte
 Tests at `tests/review-queue/combine.test.ts`:
 
 - Both responses present, no `where`-convergent findings: divergent table populated, convergent table empty.
-- Both responses present, all findings `where`-convergent (primary or related section overlap): convergent table populated correctly.
+- Both responses present, all findings exact-primary-convergent OR explicitly cross-referenced (R4 patch — Codex R4 L2: stale "primary or related section overlap" wording corrected to match the RC4 exact-sub-anchor rule): convergent table populated correctly. R2 fixture (Cursor R2 H1's 3-section `where` vs Codex R2 M2's single-section `§AC4 combine.py polling semantics`) is the canonical non-convergence assertion.
 - Both responses present, verdicts cross `{proceed*, pushback}` boundary: `combined_verdict: divergent`, `escalated_to_founder: true`.
 - One response missing, within timeout: combine.py exits 0 without writing combined.md (waiter state).
 - One response missing, past timeout: `combined_verdict: single_reviewer_timeout`, `escalated_to_founder: true`.
@@ -390,6 +390,10 @@ Tests at `tests/review-queue/combine.test.ts`:
 - `combined.md` exists, no `--force`: error.
 - Orphan `.tmp.*` files older than 30 min are cleaned up; younger ones left alone.
 - `cross_ref` override: convergent table groups findings explicitly cross-referenced even if `where` sections don't overlap.
+- **AC3.5 state-machine fixtures (R4 patch — Codex R4 L1):** three explicit fixtures covering each branch:
+  - **(a) Zero patches → convergence:** combined.md with all findings deferred / verdict = proceed; assert `next_round: null` and NO new `r{N+1}/request.md` created.
+  - **(b) Patches applied → verification round DEFAULT:** combined.md with all findings accepted inline + zero deferred follow-ups (the load-bearing case Codex R3 M1 caught); assert `request.py` ran for `r{N+1}/`, `r{N+1}/request.md` exists, AND `next_round: <N+1>` in this round's combined.md. **This fixture closes Codex R3 M1 with a falsifiable test** — the state machine MUST set `next_round: <N+1>`, NOT `null`, in this case.
+  - **(c) Explicit waiver → convergence with rationale:** combined.md with patches applied + explicit "verification waived; rationale: <...>" line; assert `next_round: null` AND NO new request.md created.
 
 ## AC5 — Race + timeout behavior (covered as integration tests against AC1-AC4)
 
@@ -606,3 +610,33 @@ If R3 verdicts are both `proceed` or `proceed_after_patches` with only LOW findi
 4. **Drift watch (RC4):** did RC4 reintroduce any prior-round cuts? Particularly: did the AC3.5 step 3 (b)-default reintroduce any path where "convergence declared without verification" can happen unintentionally?
 
 **Convergence prediction:** R4 should be `proceed` or `proceed_after_patches` with only LOW findings on both sides. Per 038 decay curve (10→14→5), R3 already at 8 findings; R4 should drop further (target: ≤ 3 findings). **If both R4 verdicts are `proceed` OR both `proceed_after_patches` with only LOWs → declare convergence; 039 is claim-ready.**
+
+## R4 — 2026-05-12 01:11–01:14 PDT (cross-tool spec review on RC4 @ commit `c364ac2`) — **CONVERGED**
+
+**Reviewers:** Codex (response at `backlog/reviews/.../r4/codex.md`) + Cursor (response at `backlog/reviews/.../r4/cursor.md`).
+**Verdicts:** Codex `proceed_after_patches` (2 findings: 2 LOW only) + **Cursor `proceed` (ZERO findings)** → **combined_verdict: `proceed_after_patches`** (within `{proceed*}` boundary; no founder escalation).
+**Round dispatched manually** — last manual dispatch in the cycle.
+**Termination path: AC3.5 step 3 (c) — explicit waiver.** Codex R4 reviewer notes explicitly waived the next verification round: *"If the strategist patches the two stale test-wording spots above, I would expect a final converge/claim call rather than another substantive review round."* Both patches are mechanical test-wording (one AC4 test bullet reworded; one AC4 fixture added for the AC3.5 (b) branch). Cursor R4 zero findings + Codex R4 explicit waiver + both verdicts within `{proceed*}` = convergence triggered. `next_round: null`.
+
+### Findings dispositioned (2 total: 0 HIGH / 0 MED / 2 LOW)
+
+| # | Severity | Source | Where | Disposition | Section patched |
+|---|---|---|---|---|---|
+| 1 | LOW | Codex R4 L1 | §AC4 test list — missing fixture for AC3.5 (b) state-machine branch | accepted — added three explicit AC3.5 state-machine fixtures (a)/(b)/(c) to AC4 test list; (b) is the falsifiable load-bearing case from Codex R3 M1 | §AC4 test list |
+| 2 | LOW | Codex R4 L2 (cross-ref Codex R3 M2) | §AC4 test bullet "all findings `where`-convergent (primary or related section overlap)" — stale wording from RC3 | accepted — reworded to "exact-primary-convergent OR explicitly cross-referenced"; cites R2 fixture as canonical non-convergence assertion | §AC4 test list |
+
+### Convergence call
+
+**CONVERGED. 039 is claim-ready.**
+
+- Both R4 verdicts within `{proceed*}` boundary (Cursor `proceed`, Codex `proceed_after_patches`).
+- Codex's 2 LOWs are mechanical test-wording polish — applied inline in RC5.
+- Codex R4 explicitly waived the next verification round.
+- Cursor R4's zero findings + drift-watch-clean signals structural stability.
+- AC3.5 step 3 (c) "explicit waiver" path correctly fires here: patches are mechanical, both reviewers signal claim-ready.
+
+**4-round decay curve:** R1 (18 findings: 5 HIGH-conv + 3 HIGH-singleton + 7 MED + 3 LOW) → R2 (14: 2 HIGH + 7 MED + 5 LOW) → R3 (8: 2 MED + 6 LOW) → R4 (2 LOW). Total 42 findings dispositioned across 4 rounds; zero residual HIGH/MED at convergence; only 2 LOW polish patches at the final round.
+
+**Builder claim instructions:** any agent may now atomically claim this item from `backlog/ready/` → `backlog/claimed/`. Suggested builder: any agent (pure protocol + helper scripts + slash-command prompts; no app-specific knowledge needed). The strategist (Claude Code) is acceptable since the queue's producer-side work is what they do, but reviewer-independence preservation is preserved structurally regardless (Codex + Cursor remain separate reviewer voices at runtime).
+
+**Bootstrap completed:** This very spec went through R1→R4 cross-tool review using the *pre-queue* manual dispatch (last manual cycle per "Bootstrap moment" §Implementation Notes). Item 040+ uses the queue once built. The R1→R4 cycle itself produced the empirical evidence base in §Context bullets 1-3.

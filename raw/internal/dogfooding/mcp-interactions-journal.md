@@ -2490,6 +2490,34 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note (division-of-labor held):** Cursor R4 reported `proceed` with zero findings, focused on role/scope coherence. Codex R4 found only implementability/documentation-test cleanup. This is the expected R4 decay shape.
 - **Conjecture (observation-only):** RC5 can be a tiny test-wording patch: add the watcher branch fixture and update the stale AC4 overlap test bullet. If applied, 039 should be claim-ready without another full review round unless the strategist wants a final mechanical confirmation.
 
+### 2026-05-12 01:20 PDT — Strategist (Claude Code 9b575b57): 039 R4 combine + RC5 polish + **CONVERGENCE DECLARED** + r4/combined.md
+
+- **Source agent:** Strategist / Claude Code (Opus 4.7, 1M context) — same session that drafted RC1+RC2+RC3+RC4.
+- **Trigger:** Founder said "clean up the background task and both are in flight" at 01:10 PDT. Strategist killed stale R3 poll (`bvp21dyof`), started R4 poll (`bsvt07psq`) with **three-layer detection**: (1) file-presence at canonical queue path (primary — Cursor R3 wrote response file without observable bubble turns), (2) Codex JSONL task_complete count, (3) Cursor bubble max-content-length-across-new-bubbles + 30s stability (R2-bug-fixed fallback). Cursor R4 file detected at 01:12:36 (60s after baseline); Codex R4 file detected at 01:14:52 (3:16 after baseline). Both via file-presence path — the corrected detection layer worked.
+- **Query inputs (1 ECHO call + filesystem reads only):**
+  1. `echo_resolve_mru({sources:['codex','cursor'], repo_path:'/Users/zhenye/Desktop/Project_echo'})` — same sources as R1+R2+R3.
+  2. `Read backlog/reviews/.../r4/{codex.md,cursor.md}` from canonical queue path.
+  3. `git pull --rebase origin main` — already up-to-date (both reviewers pushed their R4 commits directly).
+- **Returned:**
+  - **Codex R4 (2 LOW findings only; verdict `proceed_after_patches`):**
+    - L1: AC4 test list missing fixture for AC3.5 (b) state-machine branch (the load-bearing case Codex R3 M1 caught).
+    - L2 (cross-ref Codex R3 M2): AC4 stale "primary or related section overlap" test bullet contradicts the RC4 exact-sub-anchor rule.
+  - **Cursor R4 (ZERO findings; verdict `proceed`):** Full structural ratification. Reviewer notes: "RC4 satisfies the R3 verification round. Recommend strategist declare convergence once Codex R4 matches (`proceed*` + no HIGH/MED), per §Review History R3 convergence prediction."
+  - **Combined verdict: `proceed_after_patches`** (within `{proceed*}` boundary; no founder escalation). **Termination via AC3.5 step 3 (c) explicit waiver:** Codex R4 reviewer notes explicitly waived next round (*"If the strategist patches the two stale test-wording spots above, I would expect a final converge/claim call rather than another substantive review round"*); patches mechanical test-wording; both reviewers within `{proceed*}` with Cursor at zero findings.
+- **Sources:** Codex source `fs:/Users/zhenye/.codex/sessions/2026/05/11/rollout-2026-05-11T23-07-43-019e1acc-...jsonl` turn 6 (R4 review). Cursor source `fs:/Users/zhenye/Library/Application Support/Cursor/User/globalStorage/state.vscdb` composer `1c0493dd`. Both reviewer responses pushed directly to `origin/main` as `bca3d7a` (cursor) + `96a4b1d` (codex). **Filesystem retrieval at canonical queue path was the primary mechanism for all 4 rounds** — ECHO substring index played supporting role only.
+- **Verdict:** ✅ right on combine; 2 R4 findings dispositioned in RC5 (small polish patches). 🎉 **CONVERGENCE DECLARED** after 4 rounds; 039 is claim-ready.
+- **Note (4-round decay summary):** R1 (18 findings: 8 HIGH + 7 MED + 3 LOW) → R2 (14: 2 HIGH + 7 MED + 5 LOW) → R3 (8: 2 MED + 6 LOW) → R4 (2 LOW). Total 42 findings across 4 rounds; zero residual HIGH/MED at convergence. **Decay curve aggressive vs 038's (10→14→5):** 039's structural reform was larger but the §Review History block + bootstrap-write pattern + recursive review-history-as-evolutionary-record property kept the cycle tight enough to converge in same number of rounds. Empirical evidence that the queue's "review history is canonical context" property is load-bearing for cycle efficiency.
+- **Note (the cycle's design-validation pattern, final synthesis):** Every property the queue was supposed to deliver was tested live during its own R1→R4 review cycle:
+  - **Zero-ECHO-call reviewer property:** held from R1 onwards (both reviewers ECHO-optional once §Review History exists).
+  - **Bootstrap-write pattern:** validated; reviewers wrote canonical-path files from R2 onwards without queue scripts.
+  - **Progressive-trust reviewer push behavior:** matured from local-only commits (R2) → operational pushes (R3+R4) — matches queue's design intent.
+  - **Recursive review-history-as-evolutionary-record:** Codex R3 M1 found AC3.5 state-machine bug BY READING PRIOR ROUNDS — the cycle's strongest empirical signal that documented review history is load-bearing for design correctness, not just observability.
+  - **Convergent-on-direction divergent-on-prescription:** held all 4 rounds; founder escalation never fired (escalated_to_founder: true triggered exactly zero times across the cycle).
+  - **JOURNAL-AS-QUEUE PROHIBITION invariant:** R1 observed live race → invariant created RC2 → R2+R3+R4 races prevented.
+  - **AC3.5 (a)/(b)/(c) termination paths:** all three exercised across the cycle. (b) verification-default fired at R3 (after R2 patch); (c) explicit-waiver fires at R4 (final round).
+- **Note (cycle stats for the operating-model retro):** 4 rounds × ~2-3 dispatches per round = ~10 manual dispatches (last manual cycle per bootstrap moment). Wall-clock R1→convergence ≈ 2 hours. Once 039 ships and AC3 step 5 wires `push-with-retry.sh` into reviewer prompts AND `/loop` schedules trigger automatically, the next spec's R1→convergence should drop to ZERO founder dispatch messages (AC6b success criterion) and the wall-clock budget per round drops to 30 min narrow / 2 hours structural-reform per `class` field.
+- **Conjecture (observation-only):** 039 is now claim-ready. Any agent may atomically claim from `backlog/ready/` → `backlog/claimed/`. **Suggested follow-up sequence post-claim:** builder implements AC0-AC5 (~1.5-2 days); founder reviews via the existing manual-review flow (last time); merge to main; THEN AC6b kicks off on the next-up qualifying spec (the FIRST spec to go through the queue end-to-end with zero dispatch messages). 039 is the queue's bootstrap; 040+ is the queue's steady state.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
