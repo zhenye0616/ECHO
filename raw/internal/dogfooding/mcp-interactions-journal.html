@@ -1209,6 +1209,14 @@ id="toc-pdt-strategist-claude-code-9b575b57-039-r1-retrieval-combine-rc2-patch-l
 PDT — Strategist (Claude Code 9b575b57): 039 R1 retrieval + combine +
 RC2 patch landed</a></li>
 </ul></li>
+<li><a href="#section" id="toc-section">2026-05-12</a>
+<ul>
+<li><a
+href="#pdt-cursor-r2-review-of-039-rc2-first-bootstrap-write-of-a-queue-response-file-before-the-queue-exists"
+id="toc-pdt-cursor-r2-review-of-039-rc2-first-bootstrap-write-of-a-queue-response-file-before-the-queue-exists">00:14
+PDT — Cursor R2 review of 039 RC2 — first bootstrap-write of a queue
+response file before the queue exists</a></li>
+</ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
 <li><a href="#journal-operating-notes"
@@ -11187,6 +11195,156 @@ cleanly on no-rounds-to-combine); (4) verify section-granularity
 match-key choice doesn’t over-collapse against R1’s actual findings. Per
 038 decay curve (10→14→5 across R1→R3), expect R2 yield ~6–10 findings,
 mostly disambiguation; no architectural rework expected.</li>
+</ul>
+<h2 id="section">2026-05-12</h2>
+<h3
+id="pdt-cursor-r2-review-of-039-rc2-first-bootstrap-write-of-a-queue-response-file-before-the-queue-exists">00:14
+PDT — Cursor R2 review of 039 RC2 — first bootstrap-write of a queue
+response file before the queue exists</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude (Opus 4.7) — R2
+reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at HEAD <code>556b978</code> (RC2 / R1-patched). Response file committed
+at <code>2f27a279</code> to
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2/cursor.md</code>.</li>
+<li><strong>Trigger:</strong> Strategist’s canned R2 dispatch prompt:
+“R2 cross-tool spec review of
+backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md at HEAD
+on /Users/zhenye/Desktop/Project_echo (commit 556b978, RC2 /
+R1-patched). Read §Review History first — your R1 verdict was
+proceed_after_patches with 15 findings; all dispositioned. … R2 focus
+angles: (1) confirm §Goal coherence story now closes — does the
+strategist /loop mandate actually deliver 0 dispatch messages under
+AC6b? (2) verify §Architecture push-race semantics are scope-coherent …
+(3) verify single_reviewer_timeout/divergent split internally consistent
+(was M1 in R1); (4) verify AC6a synthetic e2e test covers failure modes
+R1 H2-H4 named; (5) any out-of-scope drift the RC2 patch introduced. Do
+NOT patch — structured review only. Log to dogfooding journal per
+CLAUDE.md (AFTER committing your response file — RC2 §Implementation
+Notes promoted journal-not-queue to an invariant).”</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+Filesystem reads only:
+<code>Read backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+(full 443-line file at RC2),
+<code>Read raw/internal/dogfooding/mcp-interactions-journal.md</code>
+(template + recent entries to find correct append point);
+<code>Shell git log --oneline -5 &amp;&amp; git rev-parse HEAD</code>
+(verify HEAD at 556b978); <code>Shell ls backlog/reviews/</code> (verify
+queue directory does not exist on disk — confirming bootstrap mode);
+<code>Shell mkdir -p backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2 &amp;&amp; Write cursor.md &amp;&amp; git add &amp;&amp; git commit</code>
+(write + commit response file at canonical path). Response file
+committed at <code>2f27a279</code>; no push (per Cursor system rules, no
+push without explicit user ask).</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic. Filesystem probes
+produced: (a) the queue directory tree did NOT exist on disk pre-R2
+(RC2’s §Implementation Notes “Bootstrap moment (now complete)” treats
+039 R1 as the last pre-queue manual-dispatch; R2 is the first round to
+bootstrap-eat-the-dogfood by writing the response file at the spec’d
+path even though the queue ships in 039 itself); (b) the §Review History
+block at l.405-442 of RC2 fully dispositioned all 15 R1 findings, with
+explicit §Section patched for each, making prior-round atom retrieval
+via ECHO unnecessary (the spec carries the R1 history inline).</li>
+<li><strong>Sources:</strong> Filesystem-only; no ECHO source
+resolution. Spec artifact:
+<code>/Users/zhenye/Desktop/Project_echo/backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at commit <code>556b978</code>. Response file written to
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2/cursor.md</code>
+and committed at <code>2f27a279</code>. No <code>find_clusters</code> /
+<code>search_memories</code> / <code>tail_session</code> /
+<code>echo_resolve_mru</code> / <code>wait_for_new_turns</code> /
+<code>get_atom</code> calls — for the second time in a row (R1 + R2),
+Cursor’s reviewer cycle was zero-ECHO-call.</li>
+<li><strong>Verdict:</strong> ✅ right — the RC2 §Review History block +
+the load-bearing §Implementation Notes patches gave Cursor enough
+context to confirm R1 fixes landed AND surface new R2 findings (10
+total: 2 HIGH, 4 MED, 4 LOW) without rehydrating any R1 atom. Verdict on
+RC2: <code>proceed_after_patches</code> (down from R1
+<code>pushback</code>-equivalent severity), with the strategist
+<code>/loop</code> body AC gap being the only structural-load-bearing
+remaining issue.</li>
+<li><strong>Note (positive — §Review History block is a forward-test of
+<code>combined.md</code> shape):</strong> The §Review History section in
+RC2 (l.405-442) functions as a manually-written <code>combined.md</code>
+for the R1 round. It carries: reviewer atom IDs, both verdicts, the
+strategist’s roll-up logic, a 15-row dispositions table with
+severity/source/where/§-patched columns, and a convergence call with R2
+focus_hints. Reading it told me everything I needed to know about R1
+without an ECHO call. <strong>This is strong evidence that the
+file-backed queue’s <code>combined.md</code> shape is reviewer-ergonomic
+in practice</strong> — the structure made dispositions verifiable, the
+convergence call set R2 expectations, and the focus_hints anchored R2
+attention. Bootstrap-grade evidence for the queue’s design.</li>
+<li><strong>Note (positive — bootstrap dogfood reveals the file-shape is
+ergonomic for actual review):</strong> Writing my R2 review at the
+canonical queue path
+(<code>backlog/reviews/&lt;item&gt;/r2/cursor.md</code>) before the
+queue ships is the first real test of the §Architecture file shape under
+live review. Findings: the frontmatter <code>findings</code> list with
+<code>severity</code>/<code>where</code>/<code>finding</code>/optional
+<code>cross_ref</code> cleanly contained all 10 findings; the
+<code>where</code> field’s section-granularity granularity (per R1 M5
+fix) was natural to write (e.g., “§AC0 step 4 (Cursor fallback)” /
+“§Architecture push-race + §AC3 + §AC4”); the optional
+<code>cross_ref</code> field worked as designed — R2 H1 cross-references
+R1 H1 (round=1, reviewer=cursor, finding_index=1), making the R2/R1
+linkage explicit and machine-readable for combine.py. <strong>No
+friction found in the file shape during real use.</strong> One ambiguity
+surfaced and filed as a LOW finding: <code>prior_round_atoms</code>
+field name claims “embed inline” but holds pointers only — the §Review
+History block IS the actual inline embed, and the field as-shaped can’t
+fulfill its stated purpose.</li>
+<li><strong>Note (process — JOURNAL-AS-QUEUE PROHIBITION invariant
+enforced this turn):</strong> This is the first cross-tool review round
+where the dispatch prompt explicitly cited the RC2-promoted
+journal-not-queue invariant. Sequence followed: (1) Write response file
+→ (2) <code>git add &amp;&amp; git commit</code> (commit SHA
+<code>2f27a279</code>, no push) → (3) THEN write this journal entry →
+(4) commit journal MD+HTML separately. No cross-reviewer journal-edit
+race possible because the response file commit was a single-file atomic
+commit on a path no other reviewer touches. If Codex R2 lands
+simultaneously, the two commits won’t conflict (different files). If
+both reviewers race to append to the journal post-commit, the journal
+commits still conflict (same file) — that’s the residual journal-edit
+race the invariant exists to bound, and resolution is “second writer
+pulls, rebases, retries” per the AC3-step-5 push-race pattern (which I
+flagged at MED R2 finding #3 as needing to be applied uniformly to
+strategist + reviewer pushes).</li>
+<li><strong>Note (negative — R2 H1 strategist /loop body gap):</strong>
+RC2’s H1 fix mandates strategist
+<code>/loop 10m /review-queue-watch</code> but no AC specs what
+<code>.claude/commands/review-queue-watch.md</code> actually does per
+tick. AC3 specs the two reviewer slash commands; AC4 specs
+<code>combine.py</code> (mechanical) with “Strategist then fills
+disposition column manually” — that “manually” is the unresolved word.
+If “manually” = “founder types into strategist window,” AC6b’s “0
+dispatch messages” goal is unreachable; if “manually” = “strategist
+agent autonomously dispositions inside the same /loop tick,” the
+workflow needs an AC. This is the load-bearing R2 finding and filed at
+HIGH in the response file with the proposed AC body (pull / combine /
+read combined.md / if escalated: journal+exit / else: disposition +
+patch + commit/push + run request.py for r{N+1}). Same load-bearing
+structural gap class as my R1 H1.</li>
+<li><strong>Note (negative — R2 H2 AC0 drift back into rejected
+territory):</strong> AC0 step 4’s “OS-level keyboard automation” Cursor
+fallback option directly contradicts §“Out of Scope” #1 (“Push-based GUI
+pinging”). The “cron-launched detached Cursor process” option is
+borderline same. Codex’s RC1 recommendation explicitly rejected GUI
+pinging as brittle UI-integration. Filed at HIGH in the response file
+with the resolution (delete keyboard-automation option; keep
+paste-once-self-loop preferred; degrade cleanly to manual-paste if
+neither works).</li>
+<li><strong>Conjecture (observation-only):</strong> If R3 closes R2 H1
+(strategist /loop body AC) and R2 H2 (AC0 GUI drift deletion), the spec
+should be R4-final-polish only. The §Review History block’s growing
+detail (R1 + R2 dispositions in one place) makes the spec
+self-documenting for future readers, and the bootstrap response file at
+<code>backlog/reviews/.../r2/cursor.md</code> becomes a living
+proof-of-concept for the queue’s design. Worth a property check at the
+V1 retro: did the queue’s “documented review history” property (§Review
+History inside the spec) reduce the need for archeology when someone
+asks “why does the queue look like this”? Bootstrap evidence suggests
+yes; want N=3+ shipped specs through the queue to confirm.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
