@@ -57,7 +57,7 @@ Behavior:
 - **(a) verdict ∈ {proceed, pushback} AND patches-applied=false** → no-op success (exit 0). Asserts `next_round` is already `null` in `r{N}/combined.md`; emits nothing else. (R1 patch — convergent Codex M3 + Cursor M1: the watcher's (a) branch covers both `proceed` and `pushback`-with-all-deferred-to-followups; the helper's (a) tuple matches.)
 - **(b) patches-applied=true** → invokes `request.py <item_id> <N+1> --class=<class> --focus-hints=<str> [--spec-sha=<sha>]`; on its success, **in-place atomic-updates** `r{N}/combined.md` to set `next_round: <N+1>` in the frontmatter (preserving formatting + body): read existing content, set the frontmatter field, write the new content to a temp file in the same directory, then `os.replace(tmp, final)` (atomic rename, overwrite-allowed). Schema-validate the after-state against `combined.schema.json`. Returns exit 0 on success. **Do NOT use the create-only `os.link` pattern from `request.py`** — `combined.md` already exists at helper invocation time, so create-only writes raise `FileExistsError`. (R1 patch — Codex M1: makes the atomicity strategy explicit and distinct from `request.py`'s pattern.)
 - **(c) verdict=proceed_after_patches AND patches-applied=false (explicit waiver)** → in-place atomic-updates `r{N}/combined.md` to append the literal `verification waived; rationale: <inherited from --focus-hints>` line into the body (NOT a frontmatter field — the existing prose puts it in the body), via the same `os.replace`-based pattern as (b); leaves `next_round: null`. Returns exit 0.
-- **Idempotency.** All three branches are idempotent: re-invoking the helper at the same `--spec-sha` with the same arguments is a no-op (already-set `next_round`, already-appended waiver line, or already-existing `r{N+1}/request.md` at the same SHA — all detected by reading the current state before writing). The combined.md mutation in (b)/(c) **never reformats** the YAML frontmatter or markdown body beyond the one targeted change; if a re-read shows the target state already in place, return 0 without writing.
+- **Idempotency.** All three branches are idempotent: re-invoking the helper at the same `--spec-sha` with the same arguments is a no-op (already-set `next_round`, already-appended waiver line, or already-existing `r{N+1}/request.md` at the same SHA — all detected by reading the current state before writing). The combined.md mutation in (b)/(c) makes **no unintended semantic edits on any field other than the targeted one**; YAML cosmetic reformatting of unrelated keys is permitted but should be minimized (e.g., prefer `ruamel.yaml` round-trip if byte-stability of unrelated keys matters, otherwise PyYAML's stdlib emitter is fine — AC3 fixture 1's assertions check semantic invariants only). If a re-read shows the target state already in place, return 0 without writing. (R2 patch — Codex M2 + Cursor NIT, folded: weakens the R1-introduced "never reformats" clause to match AC3 fixture 1's accepted-cosmetic-reformat framing.)
 - **Race-loser semantics** mirror `request.py`'s §AC2: if `r{N+1}/request.md` already exists at the same `spec_commit_sha`, exit 0 idempotent; at a different SHA, exit 2 with diagnostic.
 
 **AC2 — Watcher slash-command updated to call the helper.** `.claude/commands/review-queue-watch.md` Step 3 (the (a)/(b)/(c) post-disposition prose) is rewritten so the actual file-mutation steps are a single `dispatch-next-round.py` invocation. The strategist's judgment (filling in the `Disposition` column) is preserved verbatim — the helper executes the dispositioned decision; it does not auto-decide. The committed-spec-patch step (the `git add <spec_file> && git commit` for inline-applied patches in case (b)) stays separate and BEFORE the helper invocation, since the helper depends on the patched SHA being the `spec_commit_sha` for r{N+1}.
@@ -65,18 +65,31 @@ Behavior:
 **Helper / watcher boundary (R1 patch — convergent Codex L4 + Cursor M2):**
 
 - The helper performs **file mutations only**: invokes `request.py` (which writes `r{N+1}/request.md` atomically) and in-place atomic-updates `r{N}/combined.md`. It does **not** run `git add`, `git commit`, or `git push`.
-- After the helper returns 0, the watcher slash-command runs a **single git block** that stages and commits both artifacts in one commit:
+- After the helper returns 0, the watcher slash-command runs a **single branch-specific git block** that stages and commits the artifacts that actually exist. Two explicit variants — do NOT collapse to one (R2 patch — convergent Codex L3 + Cursor M4: `git add <missing-path>` errors with non-zero exit on (a)/(c) where `r{N+1}/request.md` doesn't exist):
+
+  **(b) — verification round dispatched:**
   ```bash
   git add backlog/reviews/<item_id>/r<N>/combined.md \
-          backlog/reviews/<item_id>/r<N+1>/request.md   # absent in case (a)/(c)
-  git commit -m "review-r<N+1>: dispatch on <item_id>"  # or "review-r<N>: terminal on <item_id>" for (a)/(c)
+          backlog/reviews/<item_id>/r<N+1>/request.md
+  git commit -m "review-r<N+1>: dispatch on <item_id>"
   tools/review-queue/push-with-retry.sh "dispatch: r<N+1> on <item_id>"
   ```
+
+  **(a) and (c) — terminal (no next round):**
+  ```bash
+  git add backlog/reviews/<item_id>/r<N>/combined.md
+  git commit -m "review-r<N>: terminal on <item_id>"
+  tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
+  ```
+
+  (R2 patch — Cursor L5: commit + push messages must align with the branch's actual state — `r{N+1}` for the dispatch branch, `r{N}` for terminal branches — so `git log --grep` and operational greps match the commit history.)
 - Rationale: a single git boundary keeps the queue's commit history readable (one commit per state transition) and makes the helper's tests purely filesystem-level (no git ops to mock). Mirrors the 039 pattern where the reviewer slash-commands handle their own git block separately from the `_lib.py` atomic-write helper.
 
 **AC3 — Executable (b) test.** New file `tests/review-queue/watcher-state.test.ts` (or appended to existing `combine.test.ts` — builder's call) with at least three fixtures:
 
-1. **(b) positive — load-bearing transition.** Construct an item directory + r1/{request.md, codex.md, cursor.md} where both reviewers landed `proceed_after_patches` on a convergent HIGH finding. Run `combine.py` (drives the existing input shape). Run `dispatch-next-round.py <item_id> 1 --verdict=proceed_after_patches --patches-applied=true --class=narrow --focus-hints="<canned>" --spec-sha=<fixture-sha>`. Assertions:
+**Fixture preamble (applies to all fixtures, R2 patch — Codex M1):** the test tmpdir layout must mirror `request.py find_artifact()`'s search path. Each fixture creates `<tmpdir>/backlog/ready/<item_id>.md` (an empty-bodied stub backlog item file) alongside the `<tmpdir>/backlog/reviews/<item_id>/r1/` directory. Without this, `request.py` (invoked transitively via the helper for (b)) raises `FileNotFoundError: no backlog item file for <item_id>` and the fixture fails before `r2/request.md` is written. The stub need not be a valid spec; `find_artifact()` only checks file existence.
+
+1. **(b) positive — load-bearing transition.** Construct an item directory `<tmpdir>/backlog/ready/<item_id>.md` (stub per preamble) + `<tmpdir>/backlog/reviews/<item_id>/r1/{request.md, codex.md, cursor.md}` where both reviewers landed `proceed_after_patches` on a convergent HIGH finding. Run `combine.py` (drives the existing input shape). Run `dispatch-next-round.py <item_id> 1 --verdict=proceed_after_patches --patches-applied=true --class=narrow --focus-hints="<canned>" --spec-sha=<fixture-sha>`. Assertions:
    - `backlog/reviews/<item_id>/r2/request.md` exists.
    - That file's `spec_commit_sha` matches `<fixture-sha>` exactly (the `--spec-sha` pass-through to `request.py` removes the need for the test fixture to be a real git repo with a pinnable HEAD).
    - `backlog/reviews/<item_id>/r1/combined.md` frontmatter now reads `next_round: 2`; the **markdown body below the closing `---` is unchanged**; `next_round` in the frontmatter is the only semantic delta (R1 patch — Cursor L7: the prior "byte-for-byte" claim was too strong because YAML serializers may reformat the frontmatter block; the load-bearing invariant is the markdown body + the schema-valid after-state). The combined.md after-state schema-validates against `combined.schema.json`.
