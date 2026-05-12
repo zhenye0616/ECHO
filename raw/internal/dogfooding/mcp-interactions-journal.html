@@ -1348,6 +1348,9 @@ href="#pdt-cursor-r2-on-041-verify-r1-patches-via-strategist-tail"
 id="toc-pdt-cursor-r2-on-041-verify-r1-patches-via-strategist-tail">2026-05-12
 15:10 PDT — Cursor R2 on 041; verify R1 patches via strategist
 tail</a></li>
+<li><a href="#pdt-codex-r2-on-041-reviewer-background-execution"
+id="toc-pdt-codex-r2-on-041-reviewer-background-execution">2026-05-12
+14:40 PDT — Codex R2 on 041 reviewer background execution</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12978,6 +12981,45 @@ AC4 <code>mv</code> retry unblock) were validated against live
 <code>tools/review-queue/push-with-retry.sh</code> and AC prose, not
 only ECHO.</li>
 <li><strong>Conjecture:</strong> optional none.</li>
+</ul>
+<h3 id="pdt-codex-r2-on-041-reviewer-background-execution">2026-05-12
+14:40 PDT — Codex R2 on 041 reviewer background execution</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive review-queue
+response)</li>
+<li><strong>Trigger:</strong> Founder asked to repeat the R2 review
+process and commit/push when done.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/request.md</code>;
+reviewed
+<code>backlog/ready/2026-05-12-041-reviewer-background-execution.md</code>
+at <code>59bcdc1c8b9c1e35607f0387c7489afbae52a5ea</code>; read
+<code>r1/combined.md</code>,
+<code>tools/review-queue/push-with-retry.sh</code>,
+<code>.claude/commands/review-queue-codex.md</code>, and the reviewer
+schema; checked local <code>git init</code> default branch
+behavior.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/codex.md</code>
+as <code>bf5399c</code>, verdict <code>proceed_after_patches</code>.
+Findings: one MED issue that AC5 must force the smoke repo onto
+<code>main</code> because <code>push-with-retry.sh</code> hardcodes
+<code>origin main</code> while this machine’s plain
+<code>git init</code> defaults to <code>master</code>; two LOW issues
+around the race-prone production-origin sanity check and invalid
+repo-root diagnostics.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>59bcdc1c8b9c1e35607f0387c7489afbae52a5ea</code>; request path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/codex.md</code>;
+no new ECHO MCP calls for this write beyond the prior Cursor/strategist
+tail already logged by Cursor.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> R1’s high-severity issues are resolved. The
+remaining Codex concern is narrow but code-grounded: the smoke test must
+match the hardcoded <code>origin main</code> contract in the existing
+push helper.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

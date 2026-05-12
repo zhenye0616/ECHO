@@ -2771,6 +2771,16 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Second-order checks from `focus_hints` (bare origin + `push-with-retry.sh`, AC4 `mv` retry unblock) were validated against live `tools/review-queue/push-with-retry.sh` and AC prose, not only ECHO.
 - **Conjecture:** optional none.
 
+### 2026-05-12 14:40 PDT — Codex R2 on 041 reviewer background execution
+
+- **Source agent:** Codex (interactive review-queue response)
+- **Trigger:** Founder asked to repeat the R2 review process and commit/push when done.
+- **Query inputs:** Pulled `origin/main`; read `backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/request.md`; reviewed `backlog/ready/2026-05-12-041-reviewer-background-execution.md` at `59bcdc1c8b9c1e35607f0387c7489afbae52a5ea`; read `r1/combined.md`, `tools/review-queue/push-with-retry.sh`, `.claude/commands/review-queue-codex.md`, and the reviewer schema; checked local `git init` default branch behavior.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/codex.md` as `bf5399c`, verdict `proceed_after_patches`. Findings: one MED issue that AC5 must force the smoke repo onto `main` because `push-with-retry.sh` hardcodes `origin main` while this machine's plain `git init` defaults to `master`; two LOW issues around the race-prone production-origin sanity check and invalid repo-root diagnostics.
+- **Sources:** Artifact SHA `59bcdc1c8b9c1e35607f0387c7489afbae52a5ea`; request path `backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/request.md`; response path `backlog/reviews/2026-05-12-041-reviewer-background-execution/r2/codex.md`; no new ECHO MCP calls for this write beyond the prior Cursor/strategist tail already logged by Cursor.
+- **Verdict:** ✅ right
+- **Note:** R1's high-severity issues are resolved. The remaining Codex concern is narrow but code-grounded: the smoke test must match the hardcoded `origin main` contract in the existing push helper.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
