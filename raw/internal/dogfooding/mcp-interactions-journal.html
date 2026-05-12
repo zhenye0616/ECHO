@@ -1142,6 +1142,16 @@ id="toc-pdt-cursor-connects-to-claude-strategist-mid-conversation-to-discuss-038
 PDT — Cursor connects to Claude strategist mid-conversation to discuss
 038 direction</a></li>
 <li><a
+href="#pdt-cursor-checks-claudes-implementation-direction-synthesis-on-038-r1-agree-on-ab"
+id="toc-pdt-cursor-checks-claudes-implementation-direction-synthesis-on-038-r1-agree-on-ab">20:04
+PDT — Cursor checks Claude’s implementation-direction synthesis on 038
+R1 (agree on A+b)</a></li>
+<li><a
+href="#pdt-codex-checks-claude-code-implementation-direction-claim-on-038"
+id="toc-pdt-codex-checks-claude-code-implementation-direction-claim-on-038">20:09
+PDT — Codex checks Claude Code implementation-direction claim on
+038</a></li>
+<li><a
 href="#pdt-cursor-reviews-claudes-combined-finding-synthesis-on-038-direction-proceed-verdict"
 id="toc-pdt-cursor-reviews-claudes-combined-finding-synthesis-on-038-direction-proceed-verdict">16:33
 PDT — Cursor reviews Claude’s combined-finding synthesis on 038
@@ -9956,6 +9966,155 @@ sufficient context-rehydration for the second voice; no need for
 with extra cluster envelope cost). For “join a live strategy convo in
 another tool” use cases, two scoped <code>search_memories</code> calls +
 no <code>get_atom</code> chase is the cheapest viable shape.</li>
+</ul>
+<h3
+id="pdt-cursor-checks-claudes-implementation-direction-synthesis-on-038-r1-agree-on-ab">20:04
+PDT — Cursor checks Claude’s implementation-direction synthesis on 038
+R1 (agree on A+b)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / Claude Opus 4.7 (strategist,
+second voice)</li>
+<li><strong>Trigger:</strong> Founder, after both Codex + Cursor R1
+reviews on 038 landed and Claude synthesized them into two open
+decisions, asked “check claude code claim on implementation direction,
+you can agree or pushback.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>tail_session(source_app='claude_code', count=5)</code> —
+initial pull of recent CC state; top atom (Claude’s R1 synthesis turn
+23) carried <code>truncations: ["content"]</code> with 2883 bytes elided
+on the load-bearing A/B + a/b/c decision framing.</li>
+<li><code>get_atom(id='f02a71b8-283f-4c81-a132-77a72c58f1a7')</code> —
+escape-hatch verbatim recovery of the full 5796-byte synthesis turn. No
+truncations on the recovered atom.</li>
+</ol></li>
+<li><strong>Returned:</strong> Claude’s R1 synthesis lists 10 findings
+(3 MED-convergent, 4 MED-Cursor-only, 3 LOW). Two architectural
+decisions surfaced: <strong>A/B</strong> — (A) expand
+<code>search_memories</code> with <code>source</code> exact +
+<code>metadata_match</code> exposure to cover the
+kill-<code>tail_session</code> gap, vs (B) keep
+<code>tail_session</code> exact-source as a thin wrapper.
+<strong>a/b/c</strong> — (a) defer <code>recent_work_context</code>
+deletion to 2026-05-17 follow-up, (b) founder explicit override now
+based on empirical silence, (c) hold 038 until 2026-05-17. Claude leans
+(A) + (b). Backlog state changed since the 16:51 review: 037 moved
+<code>claimed/</code> → <code>pending_review/</code>; 038 still in
+<code>ready/</code>.</li>
+<li><strong>Sources:</strong> Both calls hit
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>
+exclusively (single-session question; no cross-source needed). The R1
+synthesis atom (<code>f02a71b8</code>, captured 23:57:01Z = 16:57 PDT, 3
+hours before this read) cited the Codex source <code>019e1955</code>
+asst #18 and Cursor composer <code>459e6f6d</code> bubble
+<code>3d272155</code> for its R1 source materials. Good source-trace
+hygiene by Claude — verifiable.</li>
+<li><strong>Verdict:</strong> ✅ right — <code>tail_session</code>
+correctly surfaced the canonical synthesis turn at the top despite the
+global MRU resolver path. The exact-source tail pattern from the 16:33
+PDT entry would have been cheaper (1 call, no truncation, no
+<code>get_atom</code> follow-up) but I didn’t remember the session UUID
+and the <code>source_app</code> MRU path was good enough since this is
+now the canonical Project_echo CC session of the day.</li>
+<li><strong>Note (load-bearing positive — the <code>tail_session</code>
+→ <code>get_atom</code> escape hatch worked exactly as
+documented):</strong> R1 review synthesis was 5.8 KB raw content;
+<code>tail_session</code>’s <code>projectMatch</code> clipped it at 2.5
+KB (saving 2883 bytes by elision). The truncation marker
+<code>["content"]</code> made the gap visible; <code>get_atom</code>
+retrieved verbatim without truncation. This is the third recorded
+instance of the “search/tail truncates → get_atom recovers” recipe
+(2026-05-10 13:07, 2026-05-11 15:28, today 20:04). Empirically
+validating Codex’s R1 finding that <code>get_atom</code> is the verbatim
+escape hatch and CANNOT be removed (<code>get-atom.ts:139</code>
+evidence). If 038’s Option D had kept <code>get_atom</code> killed,
+today’s review couldn’t have completed cleanly.</li>
+<li><strong>Note (process — my own R4 finding was code-wrong):</strong>
+R1 by Codex correctly caught that my round-4 claim
+<em>“<code>tail_session(source=X, count=N)</code> is functionally
+<code>search_memories(source_prefix=X, limit=N)</code>
+reverse-chrono”</em> was falsifiable and false —
+<code>tail-session.ts:321</code> uses exact <code>source</code> match,
+<code>search-memories.ts:141</code> uses prefix LIKE. The same Cursor
+SQLite globalStorage path is a prefix of EVERY Cursor source, so a
+<code>source_prefix=</code> query would over-include. The
+kill-<code>tail_session</code> direction stands, but ONLY if
+<code>search_memories</code> gets <code>source</code> (exact) +
+<code>metadata_match</code> parameters added — which is what Claude’s
+(A) does. The R1 process worked: I made a falsifiable structural claim,
+Codex re-read the code, my claim broke, the spec direction got patched.
+This is exactly the cross-tool review pattern catching the kind of
+armchair-architecting bias that one strategist reading code alone would
+have shipped.</li>
+<li><strong>Note (positive — convergent vs divergent R1
+patterns):</strong> Codex caught Findings 1, 2, 3, 6 (code-grounded
+technical gaps + count error); Cursor caught Findings 1, 2, 4, 5, 7, 8,
+9, 10 (scope-coherence + test-gap + editorial). Codex caught 4 findings,
+Cursor caught 8, with 2 convergent (1, 2). The convergent findings are
+both MED — exactly the high-severity-convergent pattern that flagged the
+load-bearing flaws on 037 R1. The divergent findings split orthogonally
+(Codex: implementability; Cursor: substrate coherence) — same
+division-of-labor noted on 037.</li>
+<li><strong>Conjecture:</strong> After (A)+(b)+the small patches land,
+038 should run an R2 cross-tool pass. Predicted R2 yield: 3-5 findings
+(037 decay curve was 7→8→5). Most likely R2 hits: edge cases in
+<code>search_memories</code>’s new <code>source</code> exact filter
+interacting with <code>next_cursor</code> pagination (cursor-encoded for
+source_prefix queries may not survive a switch to exact-source
+semantics); ambiguity on whether <code>source</code> +
+<code>source_prefix</code> can combine (probably mutually exclusive);
+whether <code>metadata_match</code> non-whitelisted-key rejection
+happens at MCP tool layer or only at storage seam. None architectural —
+pure implementation disambiguation, same shape as 037’s R2.</li>
+</ul>
+<h3
+id="pdt-codex-checks-claude-code-implementation-direction-claim-on-038">20:09
+PDT — Codex checks Claude Code implementation-direction claim on
+038</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5 (strategist
+reviewer)</li>
+<li><strong>Trigger:</strong> Founder asked: “check claude code claim on
+implementation direction, you can agree or pushback.”</li>
+<li><strong>Query inputs:</strong>
+<code>tail_session(source='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl', count=12)</code>;
+<code>search_memories(query='implementation direction', source_prefix='fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/', limit=8)</code>;
+<code>get_atom(atom_id='f02a71b8-283f-4c81-a132-77a72c58f1a7')</code>
+which returned an argument-validation error because the live tool
+expects <code>id</code>; corrected to
+<code>get_atom(id='f02a71b8-283f-4c81-a132-77a72c58f1a7')</code>.</li>
+<li><strong>Returned:</strong> Exact-source tail returned 12 Claude Code
+turns; newest atom <code>f02a71b8</code> was Claude’s R1 synthesis but
+truncated in the projected tail. The literal
+<code>search_memories</code> query returned one non-load-bearing older
+subagent match, so it was not useful for the verdict. Corrected
+<code>get_atom(id=...)</code> recovered the full 5.8 KB synthesis:
+Claude accepts the R1 pushbacks, proposes path (A) to expand
+<code>search_memories</code> with exact <code>source</code> +
+<code>metadata_match</code>, and asks founder to choose the 031 gate
+handling with a lean toward explicit override.</li>
+<li><strong>Sources:</strong> Tail + corrected atom fetch read the
+active Claude Code Project_echo source
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/95d30e5e-7154-476d-9e28-faaecbfce1cd.jsonl</code>.
+The search fallback’s single hit was not used for the implementation
+verdict.</li>
+<li><strong>Verdict:</strong> 🟡 partial/right — ECHO retrieved the
+right Claude claim, and Claude’s implementation direction (A) is
+technically right. The founder-override part is a decision request, not
+an implementation fact; absent explicit founder approval, the spec
+should defer <code>recent_work_context</code> deletion rather than bake
+in the override.</li>
+<li><strong>Note:</strong> This is another example where exact-source
+tail found the right turn but projection truncation required
+<code>get_atom</code> for a defensible review. It also exposed a small
+caller-memory footgun: older notes used <code>atom_id</code>, while the
+live <code>get_atom</code> schema expects <code>id</code>.</li>
+<li><strong>Conjecture:</strong> If 038 adds exact <code>source</code> +
+whitelisted <code>metadata_match</code> to <code>search_memories</code>,
+<code>echo_resolve_mru</code> should return a search-ready descriptor
+(<code>source</code> plus optional <code>metadata_match</code>) rather
+than only prose fields like <code>composer_resolved</code>; otherwise
+the Cursor legacy fallback remains easy for clients to mis-compose.</li>
 </ul>
 <h3
 id="pdt-cursor-reviews-claudes-combined-finding-synthesis-on-038-direction-proceed-verdict">16:33
