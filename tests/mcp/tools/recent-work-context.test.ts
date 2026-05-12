@@ -140,18 +140,18 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Migration:');
   });
 
-  it('all eight tools are registered (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom)', async () => {
+  it('all eight tools are registered (item 038: -tail_session, +echo_resolve_mru — tool count stays at 8 until the 2026-05-17 follow-up drops recent_work_context)', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
     expect(names).toEqual([
       'echo_ping',
+      'echo_resolve_mru',
       'find_clusters',
       'get_atom',
       'get_atoms',
       'get_recent_work_context',
       'search_memories',
-      'tail_session',
       'wait_for_new_turns',
     ]);
   });
@@ -1444,9 +1444,15 @@ describe('getRecentWorkContext repo_path (item 037 / AC4)', () => {
     // metadata_match wired through to storage.
     const store = new MemoryStorage();
     // Target repo: 3 turns in s1 (REPO_ROOT). Other repo: 2 turns.
-    await store.append(ccEvent('s-target-1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }));
-    await store.append(ccEvent('s-target-2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }));
-    await store.append(ccEvent('s-target-3', 2, tsPlus(60), [TYPES_PATH], { user: 'q3', assistant: 'a3' }));
+    await store.append(
+      ccEvent('s-target-1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }),
+    );
+    await store.append(
+      ccEvent('s-target-2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }),
+    );
+    await store.append(
+      ccEvent('s-target-3', 2, tsPlus(60), [TYPES_PATH], { user: 'q3', assistant: 'a3' }),
+    );
     const other = '/Users/x/Desktop/Other';
     await store.append({
       source: 'fs:/Users/zhen/.claude/projects/abc/s-other.jsonl',
@@ -1485,15 +1491,17 @@ describe('getRecentWorkContext repo_path (item 037 / AC4)', () => {
 
   it('rejects non-absolute repo_path with a clear error', async () => {
     const store = new MemoryStorage();
-    await expect(
-      getRecentWorkContext(store, { repo_path: 'relative/path' }),
-    ).rejects.toThrow(/repo_path must be absolute/);
+    await expect(getRecentWorkContext(store, { repo_path: 'relative/path' })).rejects.toThrow(
+      /repo_path must be absolute/,
+    );
   });
 
   it('trailing-slash normalises (path-equality semantic against stored no-slash repo_root)', async () => {
     const store = new MemoryStorage();
     await store.append(ccEvent('s-t1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }));
-    await store.append(ccEvent('s-t2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }));
+    await store.append(
+      ccEvent('s-t2', 1, tsPlus(45), [TYPES_PATH], { user: 'q2', assistant: 'a2' }),
+    );
     const r = await getRecentWorkContext(store, {
       since: SINCE,
       until: NOW,
@@ -1503,5 +1511,100 @@ describe('getRecentWorkContext repo_path (item 037 / AC4)', () => {
     });
     expect(r.query.repo_path).toBe(REPO_ROOT);
     expect(Object.keys(r.atoms).length).toBeGreaterThan(0);
+  });
+});
+
+// Item 038 / AC3 shim integration tests.
+//
+// The cluster-engine internals moved to `src/mcp/internal/cluster-engine.ts`;
+// `src/mcp/tools/recent-work-context.ts` is now a wrapper that re-exports
+// `getRecentWorkContext` from the engine AND keeps the MCP-tool registration.
+// Both surfaces must remain functionally identical to pre-038 behavior until
+// the 2026-05-17 follow-up removes the registration.
+describe('Item 038 / AC3 — recent_work_context shim parity', () => {
+  it('(a) shim re-export produces identical output to direct internal-engine call', async () => {
+    const { getRecentWorkContext: engineGetRecentWorkContext } =
+      await import('../../../src/mcp/internal/cluster-engine.js');
+    const store = new MemoryStorage();
+    await store.append(ccEvent('s-t1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }));
+    await store.append(
+      ccEvent('s-t2', 1, tsPlus(45), [SQLITE_PATH], { user: 'q2', assistant: 'a2' }),
+    );
+
+    const viaShim = await getRecentWorkContext(
+      store,
+      { since: SINCE, until: NOW, limit: 100, format: 'full' },
+      new Date(NOW),
+    );
+    const viaEngine = await engineGetRecentWorkContext(
+      store,
+      { since: SINCE, until: NOW, limit: 100, format: 'full' },
+      new Date(NOW),
+    );
+
+    expect(viaShim.clusters.length).toBe(viaEngine.clusters.length);
+    expect(viaShim.clusters.map((c) => c.cluster_id)).toEqual(
+      viaEngine.clusters.map((c) => c.cluster_id),
+    );
+    expect(Object.keys(viaShim.atoms).sort()).toEqual(Object.keys(viaEngine.atoms).sort());
+    expect(viaShim.warnings).toEqual(viaEngine.warnings);
+    expect(viaShim.query).toEqual(viaEngine.query);
+  });
+
+  it('(b) MCP-tool-registration handler still surfaces get_recent_work_context via tools/list with the unchanged description', async () => {
+    const { restore: restoreStdout } = captureStdout();
+    let handle: McpServerHandle | null = null;
+    try {
+      const store = new MemoryStorage();
+      await store.append(
+        ccEvent('s-t1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }),
+      );
+      handle = await startMcpServer(store, { port: 0 });
+
+      const tools = await withClient(handle.url, async (client) => client.listTools());
+      const advertised = tools.tools.find((t) => t.name === 'get_recent_work_context');
+      expect(advertised).toBeDefined();
+      // Description starts with the DEPRECATED marker (the load-bearing
+      // signal that the tool surface still exists for the 031 gate).
+      expect(advertised!.description).toContain('[DEPRECATED');
+      expect(advertised!.description).toContain('find_clusters');
+    } finally {
+      if (handle !== null) await handle.stop();
+      restoreStdout();
+    }
+  });
+
+  it('(b) MCP-tool-registration handler returns the same RecentWorkContextResponse shape as a direct shim call', async () => {
+    const { restore: restoreStdout } = captureStdout();
+    let handle: McpServerHandle | null = null;
+    try {
+      const store = new MemoryStorage();
+      await store.append(
+        ccEvent('s-t1', 0, tsPlus(30), [TYPES_PATH], { user: 'q', assistant: 'a' }),
+      );
+      await store.append(
+        ccEvent('s-t2', 1, tsPlus(45), [SQLITE_PATH], { user: 'q2', assistant: 'a2' }),
+      );
+      handle = await startMcpServer(store, { port: 0 });
+
+      const result = (await withClient(handle.url, async (client) =>
+        client.callTool({
+          name: 'get_recent_work_context',
+          arguments: { since: SINCE, until: NOW, limit: 100, format: 'full' },
+        }),
+      )) as CallToolResultLike;
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content![0]!.text) as RecentWorkContextResponse;
+      // Top-level envelope shape unchanged.
+      expect(parsed.schema_version).toBe(1);
+      expect(parsed.tool).toBe('get_recent_work_context');
+      expect(Array.isArray(parsed.clusters)).toBe(true);
+      expect(parsed.atoms).toBeDefined();
+      expect(parsed.truncation).toBeDefined();
+      expect(Array.isArray(parsed.warnings)).toBe(true);
+    } finally {
+      if (handle !== null) await handle.stop();
+      restoreStdout();
+    }
   });
 });

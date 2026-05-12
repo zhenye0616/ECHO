@@ -33,7 +33,7 @@ export const GET_ATOMS_DESCRIPTION =
   // discriminator one-liner per item 025
   "Use when you have a specific list of atom IDs (from `find_clusters.clusters[].atom_ids[]` or `search_memories.matches[].id`) and want their bodies. The targeted body-fetch counterpart to `find_clusters`' cheap discovery.\n\n" +
   // cost class
-  'Cost: medium. Each returned atom passes through the same wire-shape projector as `search_memories` / `tail_session` (per-content cap, per-key metadata cap, projector reshapes). Hard envelope ceiling: 25k chars; deterministic prefix-drop on overflow (see below).\n\n' +
+  'Cost: medium. Each returned atom passes through the same wire-shape projector as `search_memories` (per-content cap, per-key metadata cap, projector reshapes). Hard envelope ceiling: 25k chars; deterministic prefix-drop on overflow (see below).\n\n' +
   // shape
   'PARAMETERS:\n' +
   '  • `atom_ids: string[]` — required. Non-empty, ≤ ' +

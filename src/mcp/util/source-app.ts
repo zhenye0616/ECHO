@@ -1,10 +1,9 @@
 // Shared source-app vocabulary + FS-prefix mapping for MCP retrieval tools.
 //
-// Originally lived twice — `search-memories.ts` had a module-level IIFE,
-// `tail-session.ts` had a `buildSourceAppMap()` function — with identical
-// path layouts. Drift-risk if (e.g.) the codex sessions path moved without
-// updating both sites. Lifted here so `search_memories`, `tail_session`,
-// and any future source_app-bearing tool share one source of truth.
+// Originally lived in multiple per-tool modules with identical path layouts.
+// Drift-risk if (e.g.) the codex sessions path moved without updating both
+// sites. Lifted here so every source_app-bearing tool (search_memories,
+// wait_for_new_turns, echo_resolve_mru, etc.) shares one source of truth.
 
 import { homedir } from 'node:os';
 

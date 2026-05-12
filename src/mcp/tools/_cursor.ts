@@ -1,7 +1,6 @@
-// Composite-cursor encode/decode helpers shared by `search_memories` and
-// `tail_session`. Single source of truth: both tools accept the same
-// {timestamp, id} shape so a `next_cursor` from one tool is interchangeable
-// with the other if a consumer wires them together. Extracted from
+// Composite-cursor encode/decode helpers shared across MCP retrieval tools.
+// Single source of truth: callers accept the same {timestamp, id} shape so
+// `next_cursor` is portable across paginating tools. Extracted from
 // `search-memories.ts` per item 026 acceptance ("MUST extract them to a
 // shared module ... that refactor is part of 026's scope").
 
@@ -56,9 +55,9 @@ export function decodeCursor(raw: string): DecodedCursor {
 }
 
 /** Slice an overfetched (limit + 1) result list and emit a next_cursor when
- *  the extra row was present. Shared by `search_memories` and `tail_session`
- *  — both pass `limit + 1` (or `count + 1`) to storage so a non-null cursor
- *  comes from the LAST kept row rather than the dropped overflow row. */
+ *  the extra row was present. Paginating callers pass `limit + 1` to storage
+ *  so a non-null cursor comes from the LAST kept row rather than the dropped
+ *  overflow row. */
 export function emitCursor(
   rows: CaptureEvent[],
   limitApplied: number,

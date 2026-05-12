@@ -118,21 +118,34 @@ if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"get_recent_work_context"'; t
   exit 1
 fi
 
-if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"tail_session"'; then
-  log_err "tools/list response did not include tail_session"
-  log_err "(item 026 may not have been picked up — has the daemon restarted since merge?)"
+# Item 038: tail_session was killed; echo_resolve_mru is its replacement
+# (IDs-only MRU resolver primitive that composes with search_memories).
+if ! printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"echo_resolve_mru"'; then
+  log_err "tools/list response did not include echo_resolve_mru"
+  log_err "(item 038 may not have been picked up — has the daemon restarted since merge?)"
   log_err "raw response:"
   printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
   exit 1
 fi
 
-# Item 035: tail_session description must advertise the `repo_path` parameter
-# so the cross-tool spec-review pattern can find the Cursor repo-scoping
-# escape hatch in tools/list without reading source. Tolerates either the
-# native JSON form (when content is inline) or the SSE-escaped form.
+# Item 038: tail_session MUST be absent from tools/list (post-038 invariant).
+# A daemon still advertising tail_session is running pre-038 code.
+if printf '%s' "$LIST_PAYLOAD" | grep -q '"name":"tail_session"'; then
+  log_err "tools/list still advertises tail_session (item 038 removed it)"
+  log_err "(daemon is running pre-038 code — kickstart required after merge)"
+  log_err "raw response:"
+  printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+# Item 037 + 038: echo_resolve_mru description must mention `repo_path` so
+# the cross-tool spec-review pattern can discover the work-artifact scoping
+# in tools/list without reading source. 037 added repo_path uniformly across
+# retrieval tools; echo_resolve_mru inherits it. Tolerates either the native
+# JSON form (when content is inline) or the SSE-escaped form.
 if ! printf '%s' "$LIST_PAYLOAD" | grep -qE '(repo_path|repo\\\\_path)'; then
-  log_err "tools/list tail_session description does not mention repo_path"
-  log_err "(item 035 may not have been picked up — has the daemon restarted since merge?)"
+  log_err "tools/list response does not mention repo_path"
+  log_err "(items 037 + 038 may not have been picked up — has the daemon restarted since merge?)"
   log_err "raw response:"
   printf '%s\n' "$LIST_RESPONSE" | sed 's/^/  /' >&2
   exit 1
@@ -178,12 +191,12 @@ tools = result.get("tools") or []
 names = sorted(t.get("name") for t in tools)
 expected = [
     "echo_ping",
+    "echo_resolve_mru",
     "find_clusters",
     "get_atom",
     "get_atoms",
     "get_recent_work_context",
     "search_memories",
-    "tail_session",
     "wait_for_new_turns",
 ]
 if names != expected:
@@ -708,9 +721,10 @@ fi
 log_ok "OK: $URL"
 log_ok "OK: tools/list contains search_memories"
 log_ok "OK: tools/list contains get_recent_work_context"
-log_ok "OK: tools/list contains tail_session"
-log_ok "OK: tools/list tail_session description mentions repo_path (item 035)"
-log_ok "OK: tools/list 8 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
+log_ok "OK: tools/list contains echo_resolve_mru (item 038)"
+log_ok "OK: tools/list does NOT contain tail_session (item 038 removed it)"
+log_ok "OK: tools/list mentions repo_path (items 037 + 038 work-artifact scoping)"
+log_ok "OK: tools/list 8 tools (V1.6 item 030: + find_clusters, get_atoms, wait_for_new_turns; item 033: + get_atom; item 038: -tail_session +echo_resolve_mru), each with outputSchema + readOnlyHint, source_app enum present, defaults advertised"
 log_ok "OK: tools/call search_memories returned matches+limit_applied"
 log_ok "OK: tools/call get_recent_work_context returned clusters+truncation"
 log_ok "OK: $EDGE_CHECK"

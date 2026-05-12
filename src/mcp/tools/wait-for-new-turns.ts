@@ -11,8 +11,9 @@
 //   - Each call is independent — the storage poll is the only shared resource.
 //   - No module-level mutable state in this file (asserted by spec §3 test).
 //
-// Source semantics (deliberately different from tail_session, spec §3):
-//   - tail_session(source_app=...) → MRU exact-source resolution.
+// Source semantics (deliberately different from echo_resolve_mru's MRU pick):
+//   - echo_resolve_mru(sources=[<source_app>]) → MRU exact-source resolution
+//     for "where did I leave off" lookups.
 //   - wait_for_new_turns(sources=[<source_app>]) → PREFIX match across ALL
 //     sessions of that app (catches new Cursor composers, new CC sessions,
 //     etc. as they spawn — group session A wants to wake on ANY new turn).
@@ -20,10 +21,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { withFsExclusion } from '../util/fs-exclusion.js';
 import { isoString } from '../util/iso8601.js';
 import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
-import { projectMatch, type ProjectedMatch } from '../wire-shape/match.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -36,13 +37,13 @@ export const WAIT_PER_POLL_LIMIT_PER_SOURCE = 20;
 export const WAIT_MAX_RETURNED_TURNS = 20;
 
 // Recognised source_app names that resolve via PREFIX MATCH (different
-// from tail_session's MRU exact-source resolution). Sources NOT in this
+// from echo_resolve_mru's MRU exact-source resolution). Sources NOT in this
 // set are treated as literal source paths (exact match).
 const SOURCE_APP_SET = new Set<string>(SOURCE_APP_VALUES);
 
 export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   // discriminator one-liner per item 025
-  'Use when you want to BLOCK until new captured atoms land at any of N sources — the missing primitive for group session A (synchronized human-driven multi-agent conversation). Pair with `tail_session` / `find_clusters` for the discovery side.\n\n' +
+  'Use when you want to BLOCK until new captured atoms land at any of N sources — the missing primitive for group session A (synchronized human-driven multi-agent conversation). Pair with `echo_resolve_mru` / `search_memories` / `find_clusters` for the discovery side.\n\n' +
   // cost class
   'Cost: medium-blocking (server holds the request open up to `timeout` seconds, polling storage every 1s; cheap on the daemon, but the call duration is the latency cost). Stateless: no subscriber registry, no per-client state, every call is independent (per item 027).\n\n' +
   // params
@@ -51,24 +52,28 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   String(WAIT_MAX_SOURCES) +
   '. Mixed entry types accepted:\n' +
   '      • Literal source path (e.g. `fs:/Users/.../state.vscdb`, `git:/Users/.../repo`) → EXACT match.\n' +
-  '      • Source-app name (`cursor` | `claude_code` | `codex` | `git`) → PREFIX MATCH (matches ALL sessions of that app — explicitly DIFFERENT from `tail_session(source_app=...)` which resolves to the MRU exact source). Group session A wants "wake on any session of these apps."\n' +
-  '  • `since: string` — required. ISO 8601 timestamp; only return turns with timestamp STRICTLY AFTER this (`> since`, not `>=`). Pass the previous call\'s `next_since` to chain.\n' +
+  '      • Source-app name (`cursor` | `claude_code` | `codex` | `git`) → PREFIX MATCH (matches ALL sessions of that app — explicitly DIFFERENT from `echo_resolve_mru(sources=[<app>])` which resolves to the MRU exact source). Group session A wants "wake on any session of these apps."\n' +
+  "  • `since: string` — required. ISO 8601 timestamp; only return turns with timestamp STRICTLY AFTER this (`> since`, not `>=`). Pass the previous call's `next_since` to chain.\n" +
   '  • `timeout?: number` — seconds; default ' +
   String(WAIT_DEFAULT_TIMEOUT_SECONDS) +
   ', max ' +
   String(WAIT_MAX_TIMEOUT_SECONDS) +
   '.\n\n' +
-  // behavior
-  'BEHAVIOR: polls echo.db every 1s. Returns immediately on any non-empty result; returns at `timeout` with empty `turns[]` and `next_since` set to the server\'s current timestamp.\n\n' +
+  // behavior — IDs-only contract (item 038 / AC4)
+  "BEHAVIOR: polls echo.db every 1s. Returns immediately on any non-empty result; returns at `timeout` with empty `turn_ids[]` and `next_since` set to the server's current timestamp.\n\n" +
+  'RESPONSE (item 038 / AC4 — IDs-only): the response now carries `turn_ids: string[]` instead of body-projected `turns[]`. The envelope shrinks dramatically (no body projection in the wait response); the caller composes one extra MCP call per wake (`get_atoms(turn_ids)` for cost-bounded summaries, or `get_atom(turn_ids[i])` for verbatim of one atom) to fetch bodies. No parallel-vocabulary deprecation window — the bodies-bundled shape is removed in the same release that ships the IDs-only shape.\n\n' +
+  // canonical wake → fetch pattern
+  'CANONICAL COMPOSITION:\n' +
+  '  const w = await wait_for_new_turns({sources: [...], since: last});\n' +
+  '  if (!w.timed_out) {\n' +
+  '    const atoms = await get_atoms(w.turn_ids);  // summary bodies\n' +
+  '    last = w.next_since;\n' +
+  '  }\n\n' +
   // polling fallback
   'POLLING FALLBACK: if your MCP client has issues with long-running calls (timeout limits, no streaming), poll instead — works on any MCP client:\n' +
   '\n' +
   '  last_ts = now\n' +
   '  while monitoring:\n' +
-  '      // find_clusters with explicit since= for lookback (NOT window_hours,\n' +
-  '      // which is cluster-gap; see find_clusters description). Default\n' +
-  '      // cluster-gap (4h) applies when window_hours= is omitted; that\'s\n' +
-  '      // typically what you want.\n' +
   '      result = find_clusters(since=last_ts, format="skeleton")\n' +
   '      if result.clusters:\n' +
   '          process(result.clusters)\n' +
@@ -91,15 +96,14 @@ export interface WaitForNewTurnsParams {
   repo_path?: string;
 }
 
-// Turn shape on the wire = same as ProjectedMatch. Aliased rather than
-// `extends`-empty-interface'd because the latter trips
-// @typescript-eslint/no-empty-object-type and is semantically identical.
-export type WaitForNewTurnsTurn = ProjectedMatch;
-
 export interface WaitForNewTurnsResult {
   schema_version: 1;
   tool: 'wait_for_new_turns';
-  turns: WaitForNewTurnsTurn[];
+  /** Item 038 / AC4: IDs only. The caller composes `get_atoms(turn_ids)` or
+   *  `get_atom(turn_ids[i])` for body fetch. Atomic separation: the wait
+   *  envelope shrinks dramatically (no body projection), and the wake
+   *  outcome is cheap to consume even when bodies are not needed. */
+  turn_ids: string[];
   next_since: string;
   timed_out: boolean;
   warnings: string[];
@@ -113,7 +117,7 @@ interface ResolvedSources {
 /** Split mixed `sources[]` into exact source paths vs source-app prefixes.
  *  Source-app names resolve to FS prefixes via `buildSourceAppMap()` —
  *  prefix match catches ALL sessions of that app (deliberately different
- *  from `tail_session(source_app=...)`'s MRU exact-source resolution). */
+ *  from `echo_resolve_mru`'s MRU exact-source resolution). */
 export function resolveSources(sources: readonly string[]): ResolvedSources {
   const sourceAppMap = buildSourceAppMap();
   const exact: string[] = [];
@@ -137,21 +141,18 @@ async function pollOnce(
   since: string,
   normalisedRepoPath: string | null,
 ): Promise<CaptureEvent[]> {
+  // Item 038 / AC5: route the fs-watcher exclusion through the shared helper
+  // so a re-hardcoded inline literal is caught by the CI grep-scan.
   const filterCommon: Pick<
     QueryFilter,
     'since' | 'limit' | 'exclude_metadata_surface' | 'metadata_match'
-  > = {
+  > = withFsExclusion({
     since,
     limit: WAIT_PER_POLL_LIMIT_PER_SOURCE,
-    // Same fs-watcher meta-event exclusion as tail_session / search_memories
-    // (Bug B 2026-05-08): user-facing tail content, not capture-impl detail.
-    exclude_metadata_surface: ['fs'],
     // Item 037 / AC5: repo-scoping. AND-joined with the source/prefix
     // filter on each per-source query below.
-    ...(normalisedRepoPath !== null
-      ? { metadata_match: { repo_root: normalisedRepoPath } }
-      : {}),
-  };
+    ...(normalisedRepoPath !== null ? { metadata_match: { repo_root: normalisedRepoPath } } : {}),
+  });
   const queries: Promise<CaptureEvent[]>[] = [];
   for (const exact of resolved.exact) {
     queries.push(storage.query({ ...filterCommon, source: exact }));
@@ -185,11 +186,9 @@ async function pollOnce(
   return all.slice(0, WAIT_MAX_RETURNED_TURNS);
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ISO_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
 
 export interface WaitForNewTurnsOptions {
   /** Override the 1s default poll interval. Used by tests to keep them
@@ -211,9 +210,7 @@ export async function waitForNewTurns(
     throw new Error('wait_for_new_turns: sources must be a non-empty array');
   }
   if (params.sources.length > WAIT_MAX_SOURCES) {
-    throw new Error(
-      `wait_for_new_turns: sources exceeds max ${WAIT_MAX_SOURCES} per call`,
-    );
+    throw new Error(`wait_for_new_turns: sources exceeds max ${WAIT_MAX_SOURCES} per call`);
   }
   if (params.since === undefined || !ISO_RE.test(params.since)) {
     throw new Error('wait_for_new_turns: since must be a valid ISO 8601 timestamp');
@@ -242,7 +239,7 @@ export async function waitForNewTurns(
     return {
       schema_version: SCHEMA_VERSION,
       tool: 'wait_for_new_turns',
-      turns: [],
+      turn_ids: [],
       next_since: now().toISOString(),
       timed_out: true,
       warnings: ['wait_for_new_turns: no sources resolved to a query'],
@@ -275,30 +272,20 @@ export async function waitForNewTurns(
   return {
     schema_version: SCHEMA_VERSION,
     tool: 'wait_for_new_turns',
-    turns: rows.map(projectMatch),
+    turn_ids: rows.map((r) => r.id),
     next_since,
     timed_out,
     warnings: [],
   };
 }
 
-const waitTurnSchema = z.object({
-  id: z.string(),
-  source: z.string(),
-  timestamp: z.string(),
-  content: z.string(),
-  bytes_elided: z.number().int().nonnegative().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  metadata_bytes_elided: z.number().int().nonnegative().optional(),
-  metadata_keys_elided: z.array(z.string()).optional(),
-  metadata_keys_projected: z.array(z.string()).optional(),
-  truncations: z.array(z.string()),
-});
-
+// Item 038 / AC4: turn_ids only on the wire — bodies are NOT bundled into
+// the wake envelope. Caller composes `get_atoms(turn_ids)` for summaries or
+// `get_atom(turn_ids[i])` for one verbatim atom.
 const waitOutputSchema = {
   schema_version: z.literal(1),
   tool: z.literal('wait_for_new_turns'),
-  turns: z.array(waitTurnSchema),
+  turn_ids: z.array(z.string()),
   next_since: z.string(),
   timed_out: z.boolean(),
   warnings: z.array(z.string()),
@@ -312,12 +299,7 @@ export function registerWaitForNewTurns(server: McpServer, storage: Storage): vo
       inputSchema: {
         sources: z.array(z.string()).min(1).max(WAIT_MAX_SOURCES),
         since: isoString,
-        timeout: z
-          .number()
-          .int()
-          .min(0)
-          .max(WAIT_MAX_TIMEOUT_SECONDS)
-          .optional(),
+        timeout: z.number().int().min(0).max(WAIT_MAX_TIMEOUT_SECONDS).optional(),
         repo_path: z
           .string()
           .optional()

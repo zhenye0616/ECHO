@@ -1,13 +1,13 @@
 // Single wire-shape projection point for the atom-shape MCP retrieval
-// tools (search_memories, tail_session). Both call `projectMatch` so that
-// adding a new cap, a new elided field, or a new metadata convention
-// touches one file instead of N retrieval tools. Closes Bug A1, Bug A2,
-// and the tail-session content-cap reach-gap surfaced 2026-05-08.
+// tools (search_memories, get_atoms). Callers go through `projectMatch` so
+// that adding a new cap, a new elided field, or a new metadata convention
+// touches one file. Closes Bug A1, Bug A2, and the content-cap reach-gap
+// surfaced 2026-05-08.
 //
 // Why a separate projector for matches (vs the cluster-shape projector
 // inside recent-work-context.ts): the trace tool returns
 // NormalizedContextEvent atoms (post-`normalizeEvent`) inside cluster
-// envelopes; the search/tail tools return raw CaptureEvent rows directly.
+// envelopes; the atom-shape tools return raw CaptureEvent rows directly.
 // Different shapes, different surface area, different lifecycle stage.
 // Sharing a caps table (./caps.ts) is the right unit of reuse; sharing a
 // projector function is not.
@@ -77,8 +77,8 @@ export interface ProjectedMatch {
 }
 
 /** Project a raw CaptureEvent (storage row) onto the consumer-budget-safe
- *  wire shape. Caller-agnostic: search_memories and tail_session both call
- *  this to enforce the same envelope discipline. */
+ *  wire shape. Caller-agnostic: every atom-shape retrieval tool calls this
+ *  to enforce the same envelope discipline. */
 export function projectMatch(e: CaptureEvent): ProjectedMatch {
   const content = clipString(e.content, WIRE_SHAPE_CAPS.match_content);
   const truncations: string[] = [];

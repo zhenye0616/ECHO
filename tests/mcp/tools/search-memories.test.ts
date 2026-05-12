@@ -1,10 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  searchMemories,
-  type SearchResult,
-} from '../../../src/mcp/tools/search-memories.js';
+import { searchMemories, type SearchResult } from '../../../src/mcp/tools/search-memories.js';
 import { startMcpServer, type McpServerHandle } from '../../../src/mcp/server.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import type { CaptureEvent } from '../../../src/storage/interface.js';
@@ -20,10 +17,7 @@ interface CallToolResultLike {
   isError?: boolean;
 }
 
-async function withClient<T>(
-  url: string,
-  fn: (client: Client) => Promise<T>,
-): Promise<T> {
+async function withClient<T>(url: string, fn: (client: Client) => Promise<T>): Promise<T> {
   const transport = new StreamableHTTPClientTransport(new URL(url));
   const client = new Client({ name: 'echo-test', version: '0.0.0' });
   await client.connect(transport);
@@ -188,11 +182,13 @@ describe('searchMemories (pure handler)', () => {
       query: 'auth',
       source_app: null,
       source_prefix: 'cursor-chat:',
+      source: null,
       since: '2026-04-26T00:00:00.000Z',
       until: null,
       cursor: null,
       limit: 3,
       repo_path: null,
+      metadata_match: null,
     });
   });
 
@@ -235,9 +231,8 @@ describe('searchMemories (pure handler)', () => {
     // SEARCH_MEMORIES_DESCRIPTION is exported; the e2e test below also
     // verifies it via tools/list, but a unit-level assertion makes the
     // intent explicit.
-    const { SEARCH_MEMORIES_DESCRIPTION } = await import(
-      '../../../src/mcp/tools/search-memories.js'
-    );
+    const { SEARCH_MEMORIES_DESCRIPTION } =
+      await import('../../../src/mcp/tools/search-memories.js');
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/case-insensitive literal substring/);
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/NOT a semantic/);
   });
@@ -335,9 +330,7 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
       await store.append({
         source: `fs:codex-${i}.jsonl`,
         timestamp: `2026-05-08T22:00:${i.toString().padStart(2, '0')}.000Z`,
-        content:
-          `JSON-RPC turn ${i} ` +
-          'x'.repeat(100_000), // 100KB body, like the real Codex turns
+        content: `JSON-RPC turn ${i} ` + 'x'.repeat(100_000), // 100KB body, like the real Codex turns
       });
     }
 
@@ -389,23 +382,18 @@ describe('searchMemories Bug A — per-match content envelope cap', () => {
     expect(envelopeBytes).toBeLessThan(25_000);
     // V1.5.6.1: tool_calls is now PROJECTED to a name trajectory (workflow
     // shape), not opaqued out. Distinct from the per-key elision path.
-    expect(
-      r.matches.every((m) => m.metadata_keys_projected?.includes('tool_calls')),
-    ).toBe(true);
-    expect(r.matches.every((m) => typeof m.metadata_bytes_elided === 'number')).toBe(
-      true,
-    );
+    expect(r.matches.every((m) => m.metadata_keys_projected?.includes('tool_calls'))).toBe(true);
+    expect(r.matches.every((m) => typeof m.metadata_bytes_elided === 'number')).toBe(true);
     // Trajectory survives — every match carries the 30-entry exec_command
     // workflow as a string array and a sibling histogram.
     expect(
-      r.matches.every((m) =>
-        Array.isArray(m.metadata?.['tool_calls']) &&
-        (m.metadata!['tool_calls'] as string[]).length === 30,
+      r.matches.every(
+        (m) =>
+          Array.isArray(m.metadata?.['tool_calls']) &&
+          (m.metadata!['tool_calls'] as string[]).length === 30,
       ),
     ).toBe(true);
-    expect(r.matches.every((m) => m.metadata?.['tool_calls_by_name'] !== undefined)).toBe(
-      true,
-    );
+    expect(r.matches.every((m) => m.metadata?.['tool_calls_by_name'] !== undefined)).toBe(true);
     // Per-KEY semantics: small structured metadata neighbours pass verbatim.
     expect(r.matches.every((m) => m.metadata?.['session_id'] !== undefined)).toBe(true);
     expect(r.matches.every((m) => m.metadata?.['git_state'] !== undefined)).toBe(true);
@@ -456,9 +444,9 @@ describe('searchMemories Gap 3 — fs-watcher meta-events must be excluded', () 
     // matching prefix). Post-fix: returns only the 2 extractor turns.
     expect(r.total_returned).toBe(2);
     expect(r.matches.every((m) => m.content.startsWith('EXTRACTOR_TURN_'))).toBe(true);
-    expect(
-      r.matches.every((m) => (m.metadata as { surface?: string }).surface !== 'fs'),
-    ).toBe(true);
+    expect(r.matches.every((m) => (m.metadata as { surface?: string }).surface !== 'fs')).toBe(
+      true,
+    );
   });
 
   it('no source_app: fs exclusion still applies (whole-store substring search)', async () => {
@@ -559,7 +547,7 @@ describe('search_memories (end-to-end via MCP server)', () => {
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const found = tools.tools.find((t) => t.name === 'search_memories');
     expect(found).toBeDefined();
-    expect(found?.description).toContain('Search the user\'s captured ECHO memories');
+    expect(found?.description).toContain("Search the user's captured ECHO memories");
   });
 
   it('invokes search_memories and returns filtered, DESC-sorted results', async () => {
@@ -676,9 +664,7 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
     const props = found?.inputSchema?.properties ?? {};
     expect(props['source_app']).toBeDefined();
     const sourceApp = props['source_app'] as { enum?: string[] };
-    expect(new Set(sourceApp.enum)).toEqual(
-      new Set(['cursor', 'claude_code', 'codex', 'git']),
-    );
+    expect(new Set(sourceApp.enum)).toEqual(new Set(['cursor', 'claude_code', 'codex', 'git']));
   });
 
   it('tools/call returns both content (text JSON) and structuredContent with matching JSON', async () => {
@@ -887,11 +873,7 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
       }),
     )) as CallToolResultLike;
     const p1 = JSON.parse(first.content![0]!.text) as SearchResult;
-    expect(p1.matches.map((m) => m.content)).toEqual([
-      'event-7',
-      'event-6',
-      'event-5',
-    ]);
+    expect(p1.matches.map((m) => m.content)).toEqual(['event-7', 'event-6', 'event-5']);
     expect(p1.next_cursor).not.toBeNull();
 
     const second = (await withClient(handle.url, async (c) =>
@@ -905,11 +887,7 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
       }),
     )) as CallToolResultLike;
     const p2 = JSON.parse(second.content![0]!.text) as SearchResult;
-    expect(p2.matches.map((m) => m.content)).toEqual([
-      'event-4',
-      'event-3',
-      'event-2',
-    ]);
+    expect(p2.matches.map((m) => m.content)).toEqual(['event-4', 'event-3', 'event-2']);
     expect(p2.query_echo.until).toBe('2026-01-01T00:08:00.000Z');
     expect(p2.query_echo.cursor).toBe(p1.next_cursor);
   });
@@ -947,9 +925,9 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
       c.callTool({
         name: 'search_memories',
         arguments: {
-          cursor: Buffer.from(
-            JSON.stringify({ timestamp: '2026-05-08T12:00:00.000Z' }),
-          ).toString('base64'),
+          cursor: Buffer.from(JSON.stringify({ timestamp: '2026-05-08T12:00:00.000Z' })).toString(
+            'base64',
+          ),
         },
       }),
     )) as ResultWithStructured;
@@ -959,9 +937,8 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
   });
 
   it('description mentions source_app, cursor, and three-tool integration', async () => {
-    const { SEARCH_MEMORIES_DESCRIPTION } = await import(
-      '../../../src/mcp/tools/search-memories.js'
-    );
+    const { SEARCH_MEMORIES_DESCRIPTION } =
+      await import('../../../src/mcp/tools/search-memories.js');
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/source_app/);
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/cursor.*claude_code.*codex.*git|next_cursor/);
   });
@@ -1049,9 +1026,9 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
 
   it('AC3: rejects non-absolute repo_path with a clear error', async () => {
     const store = new MemoryStorage();
-    await expect(
-      searchMemories(store, { repo_path: 'relative/path' }),
-    ).rejects.toThrow(/repo_path must be absolute/);
+    await expect(searchMemories(store, { repo_path: 'relative/path' })).rejects.toThrow(
+      /repo_path must be absolute/,
+    );
   });
 
   it('AC3: repo_path with trailing slash normalises before storage lookup', async () => {
@@ -1089,15 +1066,247 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
         return inner.query(filter as Parameters<typeof inner.query>[0]);
       },
     };
-    const { searchMemories } = await import(
-      '../../../src/mcp/tools/search-memories.js'
-    );
-    const r = await searchMemories(
-      recording as unknown as Parameters<typeof searchMemories>[0],
-      { query: 'needle', limit: 4 },
-    );
+    const { searchMemories } = await import('../../../src/mcp/tools/search-memories.js');
+    const r = await searchMemories(recording as unknown as Parameters<typeof searchMemories>[0], {
+      query: 'needle',
+      limit: 4,
+    });
     expect(calls.every((c) => c['limit'] === undefined)).toBe(true);
     expect(r.total_returned).toBeGreaterThan(0);
     expect(r.matches.every((m) => m.content.includes('needle'))).toBe(true);
+  });
+});
+
+// Item 038 / AC0: `source` (exact) + `metadata_match` expansion.
+//
+// Tests cover the 3-way precedence rule, the storage whitelist defense, the
+// repo_path/repo_root merge precedence + conflict, the next_cursor invariant
+// over the new exact filter, and backward compat (calls without the new
+// params behave identically to today).
+describe('searchMemories — AC0 source (exact) + metadata_match', () => {
+  function seedSiblingSources(): Promise<MemoryStorage> {
+    const store = new MemoryStorage();
+    // Two sibling sources sharing a common prefix; an exact-source filter
+    // must hit only one of them, while a prefix filter hits both.
+    const ts = (i: number): string => new Date(Date.UTC(2026, 4, 11, 10, i, 0)).toISOString();
+    return (async (): Promise<MemoryStorage> => {
+      for (let i = 0; i < 4; i++) {
+        await store.append({
+          source: 'fs:/Users/x/.codex/sessions/rollout-A.jsonl',
+          timestamp: ts(i),
+          content: `A turn ${i}`,
+          metadata: { session_id: 'A', repo_root: '/Users/x/proj-a' },
+        });
+      }
+      for (let i = 0; i < 4; i++) {
+        await store.append({
+          source: 'fs:/Users/x/.codex/sessions/rollout-B.jsonl',
+          timestamp: ts(10 + i),
+          content: `B turn ${i}`,
+          metadata: { session_id: 'B', repo_root: '/Users/x/proj-b' },
+        });
+      }
+      return store;
+    })();
+  }
+
+  it('(a) `source` exact filters to a single sibling source (prefix would have caught both)', async () => {
+    const store = await seedSiblingSources();
+    const r = await searchMemories(store, {
+      source: 'fs:/Users/x/.codex/sessions/rollout-A.jsonl',
+      limit: 50,
+    });
+    expect(r.total_returned).toBe(4);
+    expect(r.matches.every((m) => m.source === 'fs:/Users/x/.codex/sessions/rollout-A.jsonl')).toBe(
+      true,
+    );
+  });
+
+  it('(b) `source` + `source_prefix` together: `source` wins (more-specific)', async () => {
+    const store = await seedSiblingSources();
+    // source_prefix would normally catch both rollouts; source wins.
+    const r = await searchMemories(store, {
+      source: 'fs:/Users/x/.codex/sessions/rollout-A.jsonl',
+      source_prefix: 'fs:/Users/x/.codex/sessions/',
+      limit: 50,
+    });
+    expect(r.total_returned).toBe(4);
+    expect(r.matches.every((m) => m.source === 'fs:/Users/x/.codex/sessions/rollout-A.jsonl')).toBe(
+      true,
+    );
+  });
+
+  it('(c) `source` + `source_prefix` + `source_app` together: `source` wins', async () => {
+    const store = await seedSiblingSources();
+    const r = await searchMemories(store, {
+      source: 'fs:/Users/x/.codex/sessions/rollout-A.jsonl',
+      source_prefix: 'fs:/Users/x/.codex/sessions/',
+      source_app: 'codex',
+      limit: 50,
+    });
+    expect(r.total_returned).toBe(4);
+    expect(r.matches.every((m) => m.source === 'fs:/Users/x/.codex/sessions/rollout-A.jsonl')).toBe(
+      true,
+    );
+    expect(r.query_echo.source_app).toBe('codex');
+    expect(r.query_echo.source_prefix).toBe('fs:/Users/x/.codex/sessions/');
+    expect(r.query_echo.source).toBe('fs:/Users/x/.codex/sessions/rollout-A.jsonl');
+  });
+
+  it('(d) `metadata_match: {composer_id: X}` filters correctly', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/cursor/state.vscdb',
+      timestamp: '2026-05-11T10:00:00.000Z',
+      content: 'composer A turn 0',
+      metadata: { composer_id: 'comp-A' },
+    });
+    await store.append({
+      source: 'fs:/cursor/state.vscdb',
+      timestamp: '2026-05-11T10:01:00.000Z',
+      content: 'composer B turn 0',
+      metadata: { composer_id: 'comp-B' },
+    });
+    const r = await searchMemories(store, {
+      metadata_match: { composer_id: 'comp-A' },
+    });
+    expect(r.total_returned).toBe(1);
+    expect(r.matches[0]!.content).toBe('composer A turn 0');
+  });
+
+  it('(e) non-whitelisted metadata_match key → isError with dynamically-interpolated whitelist message', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/anything',
+      timestamp: '2026-05-11T10:00:00.000Z',
+      content: 'x',
+    });
+    let caught: Error | null = null;
+    try {
+      await searchMemories(store, {
+        metadata_match: { not_on_whitelist: 'foo' },
+      });
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toContain('search_memories: ');
+    expect(caught!.message).toContain('not_on_whitelist');
+    // Dynamic interpolation: each whitelist key surfaces in the message.
+    expect(caught!.message).toContain('workspace_id');
+    expect(caught!.message).toContain('composer_id');
+    expect(caught!.message).toContain('session_id');
+    expect(caught!.message).toContain('repo_root');
+  });
+
+  it('(f) query_echo carries both new fields verbatim', async () => {
+    const store = await seedSiblingSources();
+    const r = await searchMemories(store, {
+      source: 'fs:/Users/x/.codex/sessions/rollout-A.jsonl',
+      metadata_match: { session_id: 'A' },
+    });
+    expect(r.query_echo.source).toBe('fs:/Users/x/.codex/sessions/rollout-A.jsonl');
+    expect(r.query_echo.metadata_match).toEqual({ session_id: 'A' });
+  });
+
+  it('(g) backward compat: calls without the new params behave identically (query_echo.source + metadata_match are null)', async () => {
+    const store = await seedSiblingSources();
+    const r = await searchMemories(store, {
+      source_prefix: 'fs:/Users/x/.codex/sessions/',
+      limit: 50,
+    });
+    expect(r.total_returned).toBe(8);
+    expect(r.query_echo.source).toBeNull();
+    expect(r.query_echo.metadata_match).toBeNull();
+  });
+
+  it('(h) `repo_path` + conflicting `metadata_match.repo_root` → isError', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/x',
+      timestamp: '2026-05-11T10:00:00.000Z',
+      content: 'x',
+      metadata: { repo_root: '/Users/x/proj-a' },
+    });
+    let caught: Error | null = null;
+    try {
+      await searchMemories(store, {
+        repo_path: '/Users/x/proj-a',
+        metadata_match: { repo_root: '/Users/x/proj-b' },
+      });
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    expect(caught!.message).toMatch(
+      /search_memories: metadata_match\.repo_root conflicts with repo_path/,
+    );
+  });
+
+  it('(i) `repo_path` + non-conflicting `metadata_match: {composer_id: X}` → merged correctly (both flow to storage)', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/cursor/state.vscdb',
+      timestamp: '2026-05-11T10:00:00.000Z',
+      content: 'matching atom',
+      metadata: { repo_root: '/Users/x/proj-a', composer_id: 'comp-A' },
+    });
+    await store.append({
+      source: 'fs:/cursor/state.vscdb',
+      timestamp: '2026-05-11T10:01:00.000Z',
+      content: 'wrong composer',
+      metadata: { repo_root: '/Users/x/proj-a', composer_id: 'comp-B' },
+    });
+    await store.append({
+      source: 'fs:/cursor/state.vscdb',
+      timestamp: '2026-05-11T10:02:00.000Z',
+      content: 'wrong repo',
+      metadata: { repo_root: '/Users/x/proj-b', composer_id: 'comp-A' },
+    });
+    const r = await searchMemories(store, {
+      repo_path: '/Users/x/proj-a',
+      metadata_match: { composer_id: 'comp-A' },
+    });
+    expect(r.total_returned).toBe(1);
+    expect(r.matches[0]!.content).toBe('matching atom');
+  });
+
+  it('(j) next_cursor pagination works with `source` exact filter (source-agnostic)', async () => {
+    const store = new MemoryStorage();
+    // 12 atoms in one source; paginate at limit=5 → 3 pages.
+    for (let i = 0; i < 12; i++) {
+      await store.append({
+        source: 'fs:/x.jsonl',
+        timestamp: new Date(Date.UTC(2026, 4, 11, 10, i, 0)).toISOString(),
+        content: `turn-${i}`,
+      });
+    }
+    const p1 = await searchMemories(store, {
+      source: 'fs:/x.jsonl',
+      limit: 5,
+    });
+    expect(p1.matches).toHaveLength(5);
+    expect(p1.next_cursor).not.toBeNull();
+    const p2 = await searchMemories(store, {
+      source: 'fs:/x.jsonl',
+      limit: 5,
+      cursor: p1.next_cursor!,
+    });
+    expect(p2.matches).toHaveLength(5);
+    expect(p2.next_cursor).not.toBeNull();
+    const p3 = await searchMemories(store, {
+      source: 'fs:/x.jsonl',
+      limit: 5,
+      cursor: p2.next_cursor!,
+    });
+    expect(p3.matches).toHaveLength(2);
+    expect(p3.next_cursor).toBeNull();
+    // Coverage is the union of all three pages, no duplicates.
+    const seen = new Set<string>([
+      ...p1.matches.map((m) => m.id),
+      ...p2.matches.map((m) => m.id),
+      ...p3.matches.map((m) => m.id),
+    ]);
+    expect(seen.size).toBe(12);
   });
 });

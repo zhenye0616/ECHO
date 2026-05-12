@@ -38,7 +38,7 @@ export const GET_ATOM_RESPONSE_BYTE_CEILING = 25_000;
 
 export const GET_ATOM_DESCRIPTION =
   // discriminator one-liner
-  'Use ONLY when you observed non-empty `truncations` (especially `["content"]`) on a prior `search_memories` / `tail_session` / `get_atoms` response AND you need the verbatim content for that specific atom. ' +
+  'Use ONLY when you observed non-empty `truncations` (especially `["content"]`) on a prior `search_memories` / `get_atoms` response AND you need the verbatim content for that specific atom. ' +
   'The content-recovery escape hatch — bypasses `WIRE_SHAPE_CAPS.match_content` clipping for `content`, while keeping the existing metadata projection (per-key cap + `tool_calls` reshape) and excluding `embedding`. ' +
   'Pair this with the other retrieval tools (which clip content + metadata for budget reasons): use `find_clusters` + `get_atoms` for routine discovery, and reach for `get_atom` only when you need verbatim content for a specific atom.\n\n' +
   // cost class
@@ -92,7 +92,7 @@ export type GetAtomResult = GetAtomSuccessResult | GetAtomErrorResult;
 
 const NOT_FOUND_WARNING = (id: string): string =>
   `No atom with id=${id} exists in storage. ` +
-  'Verify the id was obtained from a current find_clusters / search_memories / get_atoms / tail_session response — ' +
+  'Verify the id was obtained from a current find_clusters / search_memories / get_atoms response — ' +
   'atom IDs are storage row IDs and cannot be guessed.';
 
 const TOO_LARGE_WARNING =

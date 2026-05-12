@@ -59,7 +59,71 @@ agent_notes: |
   AC6 dogfooding is post-merge work per the spec (founder merges, restarts daemon, then journals
   a real workflow citing the post-038 tool names). Strategist files the 2026-05-17 follow-up
   removing recent_work_context per AC3 After Completion notes #6.
-review_notes: ""
+review_notes: |
+  Merged 2026-05-12 via founder reconciliation. Reviewer flow:
+  /review-pending (Claude subagent) → cross-tool external reviews
+  (Codex R4 at rollout-019e1955 asst #40; Cursor R4 at composer
+  459e6f6d bubble 98bb6695) → strategist sidecar upgraded from
+  "merge as-is" to "merge with founder fixups" reflecting Codex's
+  catch of two pre-merge fix surfaces outside the spec's grep-scan
+  scope.
+
+  Conflicts resolved: none — clean ort merge against main @ 174da87.
+  037 + followups landed before 038 was claimed; the branch was
+  fully up-to-date with main at merge time. Net delta +1898 / -2514
+  across 23 files all within src/mcp/ and tests/mcp/, plus 2 fixup
+  files (tools/mcp-integration-smoke.sh + docs/mcp-integration.md).
+
+  Fixups applied (Codex R4 findings, founder-approved per fixup):
+  - tools/mcp-integration-smoke.sh — replaced 6 tail_session checks
+    with echo_resolve_mru checks; added an explicit "tail_session
+    MUST be absent" assertion (post-038 invariant; failure means
+    the daemon is running pre-038 code); repurposed the item-035
+    repo_path-mention assertion to cite items 037 + 038. Expected
+    tool set + final OK log messages updated.
+  - docs/mcp-integration.md — "All seven" → "All eight"; deleted
+    the tail_session description; added echo_resolve_mru description
+    with search-ready descriptor shape; rewrote the Source-app
+    resolution section as `echo_resolve_mru vs wait_for_new_turns`;
+    added a new `### Canonical composition patterns (post-038)`
+    code block with the four canonical recipes.
+
+  Fixups deferred to follow-up items: none.
+
+  Verify post-merge:
+  - npm test: 740 passed | 21 skipped (matches agent_notes count
+    exactly; one flaky failure on first run cleared on re-run —
+    chokidar timing per agent_notes' known quarantine; not a 038
+    regression).
+  - npm run typecheck: clean.
+  - npm run lint: clean.
+  - bash -n tools/mcp-integration-smoke.sh: syntax clean.
+  - grep -rn "tail_session" src/mcp/ → 0 hits.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Strategist files 2026-05-17-XXX-recent-work-context-final-removal
+    per AC3 After-Completion #6. MUST account for re-homing
+    SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP currently imported by
+    find-clusters.ts:35 from the shim, before deleting the shim.
+    Founder-consent receipt section drafted from journal evidence
+    (zero get_recent_work_context calls since 2026-05-09).
+  - Cursor R4 LOW V2+ hardening note: echo-resolve-mru.ts:117-119
+    Cursor Phase 2 picks global newest cursor source then attaches
+    metadata_match.composer_id (faithful port of pre-existing
+    tail-session.ts:351-358 single-Cursor-install assumption; not
+    038 drift).
+  - AC6 dogfooding (post-merge): restart daemon, run a real workflow
+    citing post-038 tool names (echo_resolve_mru, search_memories
+    (source=X), wait_for_new_turns → get_atoms composition).
+  - Spec-template enhancement candidate: AC2's grep-scan invariant
+    scope (src/mcp/) missed tools/ + docs/ references that Codex
+    R4 caught. Future spec-templates should consider scoping
+    grep-scan invariants to project root or enumerated dirs.
+
+  Code reviewer: superpowers:code-reviewer subagent (sidecar at
+  backlog/pending_review/<id>.review.md, consumed in this merge).
+  Cross-tool R4 verdicts: Codex pushback patched in C4 fixups;
+  Cursor PROCEED.
 ---
 
 # Context

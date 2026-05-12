@@ -1,6 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import {
+  METADATA_MATCH_KEY_WHITELIST,
+  type CaptureEvent,
+  type QueryFilter,
+  type Storage,
+} from '../../storage/interface.js';
+import { withFsExclusion } from '../util/fs-exclusion.js';
 import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
 import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
@@ -8,26 +14,19 @@ import { projectMatch } from '../wire-shape/match.js';
 import { CursorDecodeError, decodeCursor, emitCursor } from './_cursor.js';
 // Re-export for any pre-existing callers / tests that imported the cursor
 // helpers from search-memories. New callers should import from `_cursor.ts`.
-export {
-  CursorDecodeError,
-  decodeCursor,
-  encodeCursor,
-  type DecodedCursor,
-} from './_cursor.js';
+export { CursorDecodeError, decodeCursor, encodeCursor, type DecodedCursor } from './_cursor.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
-  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Prefer `source_app` (`cursor` | `claude_code` | `codex` | `git`) for app-scoped queries; falls through to the FS-encoded `source_prefix` if you need a path-precise filter (e.g. a single Codex rollout JSONL). When both `source_app` and `source_prefix` are passed, `source_prefix` wins (explicit-over-implicit). Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Pass `repo_path=<absolute repo root>` (item 037) to scope results to atoms whose capture-side `metadata.repo_root` matches — works across all four source_apps. For `source_app='git'`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix='git:<path>'`. For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
+  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Three-way source selection (more-specific wins): `source` (exact match — single session JSONL or git repo encoding) > `source_prefix` (LIKE — path-precise filter, e.g. a single workspaceStorage subdir) > `source_app` (`cursor` | `claude_code` | `codex` | `git`, expands to the canonical FS-encoded prefix). All three are independently optional and may co-occur; the most-specific wins. Free-text `query` is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Pass `repo_path=<absolute repo root>` (item 037) to scope results to atoms whose capture-side `metadata.repo_root` matches — works across all four source_apps. For `source_app='git'`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix='git:<path>'`. Pass `metadata_match={key: value, ...}` (item 038) for an arbitrary AND-joined metadata-equality filter — allowed keys are the storage whitelist (`workspace_id`, `composer_id`, `session_id`, `repo_root`). The canonical compose pattern is `echo_resolve_mru → search_memories(source=desc.source, ...desc.filter)` for tail; the legacy Cursor Phase 2 fallback uses `metadata_match: {composer_id: <resolved>}` WITHOUT `repo_path` (legacy atoms predate the repo_root capture write). Passing BOTH `repo_path` and `metadata_match.repo_root` with conflicting values is rejected (isError). For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
 
 // V1.5.6 (2026-05-08): per-match content + per-key metadata caps live in
-// the shared `src/mcp/wire-shape/` projector. `projectMatch` enforces both
-// in a single call site; `search_memories` and `tail_session` go through
-// the same projector so a future cap tightening only touches one file.
-// Bugs A1, A2, and the tail-session content-cap reach-gap close together.
+// the shared `src/mcp/wire-shape/` projector. `projectMatch` enforces them
+// in a single call site so a future cap tightening only touches one file.
 
-// Resolved once at module load via os.homedir(); same map as tail_session.
+// Resolved once at module load via os.homedir().
 const SOURCE_APP_MAP = buildSourceAppMap();
 
 export interface SearchMatch {
@@ -71,6 +70,12 @@ export interface SearchResult {
     query: string | null;
     source_app: SourceApp | null;
     source_prefix: string | null;
+    /** Item 038 / AC0: the exact-match `source` filter, when set. The 3-way
+     *  precedence (`source` > `source_prefix` > `source_app`) is resolved
+     *  inside the handler — query_echo surfaces ALL three input fields
+     *  verbatim so the caller can see which one(s) were passed and which
+     *  ended up applied. */
+    source: string | null;
     since: string | null;
     until: string | null;
     cursor: string | null;
@@ -80,6 +85,11 @@ export interface SearchResult {
      *  the normalised form lets the caller see what actually filtered
      *  storage (e.g. a trailing-slash input vs. the stored shape). */
     repo_path: string | null;
+    /** Item 038 / AC0: the caller-supplied `metadata_match`, verbatim
+     *  (BEFORE merge with `repo_path`'s implicit `metadata_match.repo_root`).
+     *  Lets the caller verify which metadata-equality keys were forwarded
+     *  to storage. `null` when not passed. */
+    metadata_match: Record<string, string> | null;
   };
   /** V1.5.7 (Gap 6): non-blocking advisories. Mirrors
    *  `RecentWorkContextResponse.warnings`. Today emits the TZ-naive
@@ -93,6 +103,11 @@ export interface SearchMemoriesParams {
   query?: string;
   source_app?: SourceApp;
   source_prefix?: string;
+  /** Item 038 / AC0: exact-source filter. Most specific of the 3-way source
+   *  axis; when set, `source_prefix` and `source_app` are ignored. Used by
+   *  the descriptor-spread composition (`search_memories(source: desc.source,
+   *  ...desc.filter)`) where `echo_resolve_mru` returns an exact path. */
+  source?: string;
   since?: string;
   until?: string;
   cursor?: string;
@@ -101,6 +116,13 @@ export interface SearchMemoriesParams {
    *  When set, restricts results to atoms whose `metadata.repo_root` equals
    *  `normaliseRepoPath(repo_path)`. Joins AND with other filters. */
   repo_path?: string;
+  /** Item 038 / AC0: arbitrary metadata-equality predicate. Each key/value
+   *  pair AND-joins as `metadata[key] === value`. Allowed keys are the
+   *  storage whitelist (`workspace_id`, `composer_id`, `session_id`,
+   *  `repo_root`); non-whitelisted keys → isError at the tool layer
+   *  (defense-in-depth on top of the storage-seam check). Conflicts on
+   *  `repo_root` with `repo_path` → isError. */
+  metadata_match?: Record<string, string>;
 }
 
 function clampLimit(input: number | undefined): number {
@@ -126,23 +148,80 @@ export async function searchMemories(
   storage: Storage,
   params: SearchMemoriesParams,
 ): Promise<SearchResult> {
-  const { query, source_app, source_prefix, since, until, cursor, limit, repo_path } = params;
+  const {
+    query,
+    source_app,
+    source_prefix,
+    source,
+    since,
+    until,
+    cursor,
+    limit,
+    repo_path,
+    metadata_match,
+  } = params;
   const limitApplied = clampLimit(limit);
 
   // Item 037 / AC3: validate + normalise repo_path before any storage call.
   // Throwing here surfaces through the MCP envelope handler as `isError`
-  // (same pattern as tail_session's repo_path rejects).
+  // (same pattern as the historical `search_memories: ` error prefix).
   let normalisedRepoPath: string | null = null;
   if (repo_path !== undefined) {
     assertAbsoluteRepoPath('search_memories', repo_path);
     normalisedRepoPath = normaliseRepoPath(repo_path);
   }
 
-  // source_prefix wins on conflict (explicit-over-implicit escape hatch). Both
-  // are echoed in query_echo so callers can see which one ended up applied.
-  let effectivePrefix: string | undefined = source_prefix;
-  if (effectivePrefix === undefined && source_app !== undefined) {
+  // Item 038 / AC0: 3-way source precedence — `source` (exact) wins over
+  // `source_prefix` (LIKE) wins over `source_app` (LIKE on canonical app
+  // prefix). The losing axes are ignored, NOT merged or errored. All three
+  // are echoed in `query_echo` so the caller can see what they passed and
+  // (by elimination) which one was applied.
+  let effectiveSource: string | undefined;
+  let effectivePrefix: string | undefined;
+  if (source !== undefined) {
+    effectiveSource = source;
+  } else if (source_prefix !== undefined) {
+    effectivePrefix = source_prefix;
+  } else if (source_app !== undefined) {
     effectivePrefix = SOURCE_APP_MAP[source_app];
+  }
+
+  // Item 038 / AC0: validate + merge `metadata_match`. The storage seam ALSO
+  // enforces the whitelist (defense-in-depth — see `METADATA_MATCH_KEY_WHITELIST`
+  // in storage/interface.ts); the tool-layer check produces a clean, source-
+  // attributed isError envelope instead of letting the storage error bubble up.
+  let mergedMetadataMatch: Record<string, string> | undefined;
+  if (metadata_match !== undefined) {
+    for (const key of Object.keys(metadata_match)) {
+      if (!METADATA_MATCH_KEY_WHITELIST.has(key)) {
+        // Dynamic whitelist interpolation (R2 #7): the error message can never
+        // drift behind the constant if the whitelist is extended.
+        throw new Error(
+          `search_memories: metadata_match contains non-whitelisted key '${key}'; allowed: ${Array.from(
+            METADATA_MATCH_KEY_WHITELIST,
+          ).join(', ')}`,
+        );
+      }
+    }
+    mergedMetadataMatch = { ...metadata_match };
+  }
+  if (normalisedRepoPath !== null) {
+    // Merge precedence with `repo_path`'s implicit `metadata_match.repo_root`.
+    // Conflict on the `repo_root` key (caller passed both with different
+    // values) → isError. Equal values are silently merged (idempotent).
+    if (
+      mergedMetadataMatch !== undefined &&
+      mergedMetadataMatch['repo_root'] !== undefined &&
+      mergedMetadataMatch['repo_root'] !== normalisedRepoPath
+    ) {
+      throw new Error(
+        'search_memories: metadata_match.repo_root conflicts with repo_path; pass one or the other',
+      );
+    }
+    mergedMetadataMatch = {
+      ...(mergedMetadataMatch ?? {}),
+      repo_root: normalisedRepoPath,
+    };
   }
 
   let before: { timestamp: string; id: string } | undefined;
@@ -150,23 +229,18 @@ export async function searchMemories(
     before = decodeCursor(cursor);
   }
 
-  // Gap 3 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): the V1.5.6
-  // Bug B fs-watcher exclusion landed in tail-session.ts and
-  // recent-work-context.ts but NOT here. The cursor lane was the visible
-  // failure (extractor stale + fs-watcher noise dominating), but the same
-  // contract violation applies to every source_app — search_memories returns
-  // user-facing content, not the fs-watcher meta-stream. Mirror the
-  // recent-work-context.ts:171 / tail-session.ts:94-99 discipline.
-  const filter: QueryFilter = {
-    exclude_metadata_surface: ['fs'],
-  };
+  // Gap 3 (V1.5.7, surfaced 2026-05-08 17:01 PDT v1.5-livetest): every
+  // retrieval tool excludes fs-watcher meta-events (`metadata.surface ===
+  // 'fs'`). Item 038 / AC5 centralised that exclusion in `withFsExclusion`
+  // so a new tool re-hardcoding the inline literal is caught structurally
+  // by the `tests/mcp/util/fs-exclusion.test.ts` grep-scan.
+  const filter: QueryFilter = withFsExclusion({});
+  if (effectiveSource !== undefined) filter.source = effectiveSource;
   if (effectivePrefix !== undefined) filter.source_prefix = effectivePrefix;
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
   if (before !== undefined) filter.before = before;
-  if (normalisedRepoPath !== null) {
-    filter.metadata_match = { repo_root: normalisedRepoPath };
-  }
+  if (mergedMetadataMatch !== undefined) filter.metadata_match = mergedMetadataMatch;
 
   // Two paths through the result list, two overfetch sites — keep them legible
   // so the next reader doesn't collapse them into one and re-introduce item
@@ -218,19 +292,21 @@ export async function searchMemories(
       query: query ?? null,
       source_app: source_app ?? null,
       source_prefix: source_prefix ?? null,
+      source: source ?? null,
       since: since ?? null,
       until: until ?? null,
       cursor: cursor ?? null,
       limit: limitApplied,
       repo_path: normalisedRepoPath,
+      metadata_match: metadata_match ?? null,
     },
     warnings,
   };
 }
 
 // Single source-of-truth Zod shape for a captured atom in MCP tool responses.
-// Exported so `tail_session` (item 026) and any future retrieval tool reuse
-// the exact same type — keeps consumers stable when ECHO adds a tool.
+// Exported so any future retrieval tool can reuse the exact same atom shape —
+// keeps consumers stable when ECHO adds a tool.
 export const searchMatchSchema = z.object({
   id: z.string(),
   source: z.string(),
@@ -267,11 +343,13 @@ const searchMemoriesOutputSchema = {
     query: z.string().nullable(),
     source_app: z.enum(SOURCE_APP_VALUES).nullable(),
     source_prefix: z.string().nullable(),
+    source: z.string().nullable(),
     since: z.string().nullable(),
     until: z.string().nullable(),
     cursor: z.string().nullable(),
     limit: z.number(),
     repo_path: z.string().nullable(),
+    metadata_match: z.record(z.string(), z.string()).nullable(),
   }),
   // V1.5.7 (Gap 6): non-blocking advisories. Always present (possibly empty).
   warnings: z.array(z.string()),
@@ -286,6 +364,12 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
         query: z.string().optional(),
         source_app: z.enum(SOURCE_APP_VALUES).optional(),
         source_prefix: z.string().optional(),
+        source: z
+          .string()
+          .optional()
+          .describe(
+            'Item 038 / AC0: exact-source filter. 3-way precedence — `source` (exact) > `source_prefix` (LIKE) > `source_app` (canonical app prefix); the most-specific wins. The losing axes are ignored, NOT errored.',
+          ),
         since: isoString.optional(),
         until: isoString.optional(),
         cursor: z.string().optional(),
@@ -294,7 +378,13 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
           .string()
           .optional()
           .describe(
-            'Item 037: absolute filesystem path to a repo root. When set, scopes the result set to atoms whose `metadata.repo_root` (written at capture time for claude_code, codex, and cursor; reachable across all four source_apps) equals the normalised path. For `source_app=git`, matches `metadata.repo_root` only — legacy git atoms without that metadata are reachable via `source_prefix=git:<path>`.',
+            'Item 037: absolute filesystem path to a repo root. When set, scopes the result set to atoms whose `metadata.repo_root` (written at capture time for claude_code, codex, and cursor; reachable across all four source_apps) equals the normalised path. For `source_app=git`, matches `metadata.repo_root` only — legacy git atoms without that metadata are reachable via `source_prefix=git:<path>`. Conflicts on `repo_root` with an explicit `metadata_match` entry → isError.',
+          ),
+        metadata_match: z
+          .record(z.string(), z.string())
+          .optional()
+          .describe(
+            'Item 038 / AC0: arbitrary metadata-equality predicate, AND-joined. Allowed keys are the storage whitelist (`workspace_id`, `composer_id`, `session_id`, `repo_root`); non-whitelisted keys → isError. The Cursor Phase 2 legacy fallback path passes `{composer_id: <resolved>}` without `repo_path` (legacy atoms predate the repo_root capture write).',
           ),
       },
       outputSchema: searchMemoriesOutputSchema,
@@ -317,8 +407,8 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
           };
         }
         // Item 037 / AC3: repo_path validation errors surface through the
-        // same `isError` envelope (matches tail_session's contract at
-        // lines 444-449).
+        // same `isError` envelope (one consistent pattern across retrieval
+        // tools — see `src/mcp/util/repo-path.ts`).
         if (err instanceof Error && err.message.startsWith('search_memories: ')) {
           return {
             isError: true,

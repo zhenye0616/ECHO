@@ -97,24 +97,49 @@ You can confirm the tool is registered without sending a query by asking Claude 
 
 > *"List the MCP tools you have available."*
 
-All seven should appear with their descriptions:
+All eight should appear with their descriptions:
 - `echo_ping` — connectivity check; returns pong + a timestamp.
-- `search_memories` — substring + filter retrieval over captured Cursor / Claude Code / Codex / git events.
-- `get_recent_work_context` — **DEPRECATED 2026-05-09 (item 030).** Use `find_clusters` + `get_atoms` instead; will be removed in item 031 after a 1-2 week dogfooding period. Behavior unchanged in the deprecation window.
-- `tail_session` — the cheap counterpart for known-source tail lookups: returns the N most-recent atoms for a single named source (or the most-recently-active session for a `source_app`) without clustering or substring filtering. Use this for "where did `<app>` leave off" instead of substring search; default `count=5`, max `20`, typical response `< 10k chars`. Composite cursor is shared with `search_memories` (a `next_cursor` from one is decodable by the other).
+- `search_memories` — substring + filter retrieval over captured Cursor / Claude Code / Codex / git events. **V1.6 (item 038): expanded** with `source` (exact match), `metadata_match` (whitelisted: `workspace_id`, `composer_id`, `session_id`, `repo_root`), and a 3-way `source` > `source_prefix` > `source_app` precedence. Pairs with `echo_resolve_mru` for tail patterns.
+- `get_recent_work_context` — **DEPRECATED 2026-05-09 (item 030); STILL REGISTERED as of item 038 (2026-05-11).** Use `find_clusters` + `get_atoms` instead; will be removed in the 2026-05-17 follow-up after the calendar gate fires. Behavior unchanged in the deprecation window. Item 038 factored its cluster engine into `src/mcp/internal/cluster-engine.ts` and made the tool file a re-export shim — internal refactor only; surface unchanged.
 - **V1.6 (item 030):**
-  - `find_clusters` — cheap cross-source DISCOVERY (no atom bodies). Returns clusters with FULL `atom_ids[]` (un-capped), `source_breakdown`, `time_range`, `label`. **`window_hours` controls cluster-gap; `since` controls lookback** (most-common foot-gun). No-args resume: 4h default → auto-expand to 24h on empty. Pair with `get_atoms`.
+  - `find_clusters` — cheap cross-source DISCOVERY (no atom bodies). Returns clusters with FULL `atom_ids[]` (un-capped), `source_breakdown`, `time_range`, `label`. **`window_hours` controls cluster-gap; `since` controls lookback** (most-common foot-gun). No-args resume: 4h default → auto-expand to 24h on empty. Pair with `get_atoms`. Item 037 added `repo_path` for work-artifact scoping; item 038 rewired internals to call the shared cluster engine.
   - `get_atoms` — targeted body fetch by id list (≤50 per call). Returns atoms in REQUESTED ORDER. Per-atom `truncations: string[]` is the V1.6 trust signal: `[]` = verbatim; `["content"]` = clipped; `["metadata.<k>"]` = per-key cap fired (LOSSY); `["metadata.<k>:projected"]` = projector reshaped (REFORMATTED). Deterministic prefix-drop on response budget overflow.
-  - `wait_for_new_turns` — stateless long-poll for group session A. Blocks until new turns land at any of N sources (max 8). Source-app names like `cursor` resolve via PREFIX MATCH (catches ALL sessions of that app — explicitly different from `tail_session(source_app=...)` MRU exact-source resolution). Strict-after `since` boundary. Polling-fallback recipe in the tool description for clients that can't hold long-running calls.
+  - `wait_for_new_turns` — stateless long-poll for group session A. Blocks until new turns land at any of N sources (max 8). Source-app names like `cursor` resolve via PREFIX MATCH (catches ALL sessions of that app). Strict-after `since` boundary. **V1.6 (item 038): returns `turn_ids: string[]` only** — the body-bundling was unbundled; caller composes `get_atoms(turn_ids)` for summary or `get_atom(turn_ids[i])` for verbatim. Envelope shrinks dramatically; client-timeout failure mode mitigated. Polling-fallback recipe in the tool description for clients that can't hold long-running calls.
+- **V1.6 (item 033):**
+  - `get_atom` — verbatim-content escape hatch (one atom at a time). `content: ev.content` returned uncapped; metadata still projected via `projectMatch`. Use when a prior `search_memories` / `get_atoms` / (post-038) `echo_resolve_mru` returned `truncations: ["content"]` and you need the full body.
+- **V1.6 (item 038):**
+  - `echo_resolve_mru` — IDs-only MRU resolver primitive. Input: `sources: string[]` (≤8, mixed source-app names + literal source paths) + optional `repo_path`. Output: search-ready **descriptors** per source: `{source, filter: {metadata_match?, repo_path?}, phase?: 'cursor_legacy'}`. Replaces `tail_session`'s compound modes (`source_app`, no-args, repo-scoped); compose with `search_memories(source=desc.source, ...desc.filter, limit=N)` for tail patterns. The `...desc.filter` spread carries through repo/composer scoping cleanly — no cross-repo leak.
 
-## Source-app resolution: tail_session vs wait_for_new_turns (deliberate divergence)
+## Source-app resolution: echo_resolve_mru vs wait_for_new_turns (deliberate divergence)
 
-| Tool | `source_app` semantic | Why |
+| Tool | `source_app` (or `sources[]` entry) semantic | Why |
 |---|---|---|
-| `tail_session(source_app='cursor')` | MRU exact-source resolution — picks the most-recently-active Cursor session and tails ONLY that. | "Where did Cursor leave off" wants the freshest single thread, not a cross-session blend. |
+| `echo_resolve_mru(sources=['cursor'], repo_path=X)` | MRU exact-source resolution — picks the most-recently-active Cursor session for the given repo and returns a search-ready descriptor. | "Where did Cursor leave off in this repo" wants the freshest single thread, not a cross-session blend. |
 | `wait_for_new_turns(sources=['cursor'])` | PREFIX match — wakes on a new turn in ANY Cursor session. | Group session A wants to detect new sessions as they spawn, not just the one MRU at request time. |
 
 Pass a literal source path (e.g. `fs:/Users/.../state.vscdb`) to either tool for exact-source semantics regardless.
+
+### Canonical composition patterns (post-038)
+
+```
+// "Where did I leave off in cursor for this repo"
+r = echo_resolve_mru({sources: ['cursor'], repo_path: X});
+if (r.sources['cursor']) {
+  d = r.sources['cursor'];
+  search_memories({source: d.source, ...d.filter, limit: 5});
+}
+
+// "Tail an exact session"
+search_memories({source: 'fs:/path/to/session.jsonl', limit: N});
+
+// "Wait for next Cursor turn in this repo, then fetch summary"
+{turn_ids} = wait_for_new_turns({sources: ['cursor'], repo_path: X, since: now});
+get_atoms(turn_ids, format: 'minimal');
+
+// "Find related work threads"
+{clusters} = find_clusters({since: now-4h, repo_path: X});
+get_atoms(clusters[0].atom_ids);
+```
 
 ## `get_recent_work_context` response formats
 

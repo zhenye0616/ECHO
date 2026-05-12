@@ -27,12 +27,12 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Storage } from '../../storage/interface.js';
 import type { Cluster, ResponseFormat } from '../../trace/types.js';
+// Item 038 / AC3: find_clusters calls the canonical cluster engine directly
+// (skeleton wire-shape constants still come from the deprecated tool shim
+// — they describe the MCP-tool surface, not the engine).
+import { getRecentWorkContext, MAX_LIMIT } from '../internal/cluster-engine.js';
 import { isoString } from '../util/iso8601.js';
-import {
-  getRecentWorkContext,
-  MAX_LIMIT,
-  SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP,
-} from './recent-work-context.js';
+import { SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP } from './recent-work-context.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -303,7 +303,7 @@ export function registerFindClusters(server: McpServer, storage: Storage): void 
           .string()
           .optional()
           .describe(
-            'Item 037: absolute filesystem path to a repo root. When set, scopes the cluster candidate set to atoms whose `metadata.repo_root` matches (cross-source — find_clusters has no source_app gate). Legacy git atoms without that metadata are out of scope when passed; reach them via `source_prefix=git:<path>` on `search_memories`/`wait_for_new_turns`, or `tail_session(source_app=git, repo_path=...)` which has the two-path OR fallback.',
+            "Item 037: absolute filesystem path to a repo root. When set, scopes the cluster candidate set to atoms whose `metadata.repo_root` matches (cross-source — find_clusters has no source_app gate). Legacy git atoms without that metadata are out of scope when passed; reach them via `source_prefix=git:<path>` on `search_memories`/`wait_for_new_turns`, or `echo_resolve_mru(sources=['git'], repo_path=...)` which has the two-path OR fallback.",
           ),
       },
       outputSchema: findClustersOutputSchema,
@@ -320,10 +320,7 @@ export function registerFindClusters(server: McpServer, storage: Storage): void 
       } catch (err) {
         // Item 037 / AC4: repo_path validation errors thrown from the
         // underlying `getRecentWorkContext` surface via `isError`.
-        if (
-          err instanceof Error &&
-          err.message.startsWith('get_recent_work_context: ')
-        ) {
+        if (err instanceof Error && err.message.startsWith('get_recent_work_context: ')) {
           return {
             isError: true,
             content: [{ type: 'text', text: err.message }],
