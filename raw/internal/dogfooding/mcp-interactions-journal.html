@@ -1231,6 +1231,11 @@ href="#pdt-cursor-r3-review-of-039-rc3-polish-round-queue-response-pushed-operat
 id="toc-pdt-cursor-r3-review-of-039-rc3-polish-round-queue-response-pushed-operational-commit">01:08
 PDT — Cursor R3 review of 039 RC3 — polish round; queue response pushed
 (operational commit)</a></li>
+<li><a
+href="#pdt-codex-r3-review-of-039-rc3-queue-response-committed-and-pushed"
+id="toc-pdt-codex-r3-review-of-039-rc3-queue-response-committed-and-pushed">00:59
+PDT — Codex R3 review of 039 RC3 — queue response committed and
+pushed</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11630,6 +11635,76 @@ sufficient context.</li>
 <li><strong>Conjecture (observation-only):</strong> R4 can be
 typo/template pass + AC6b wording; then declare convergence per Review
 History R2 convergence call.</li>
+</ul>
+<h3
+id="pdt-codex-r3-review-of-039-rc3-queue-response-committed-and-pushed">00:59
+PDT — Codex R3 review of 039 RC3 — queue response committed and
+pushed</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5 — R3 reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at artifact <code>e45a97b</code> (RC3 / R2-patched). Response file
+committed and pushed at <code>0a501ad</code> to
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r3/codex.md</code>.</li>
+<li><strong>Trigger:</strong> Strategist canned R3 dispatch: read
+§Review History first; verify (1) §AC3.5 watcher body implementability
+as a <code>/loop</code> tick, (2) §AC4 normalized
+<code>primary_where_section</code> + <code>related_where_sections</code>
+against R2 findings, (3) <code>raw/internal/queue-errors.log</code> as a
+non-journal file with no collision, and (4) drift reintroduction. Write
+canonical <code>r3/codex.md</code>; commit;
+<code>git pull --rebase origin main &amp;&amp; git push origin main</code>;
+log after committing.</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+Filesystem and CLI probes only: read RC3 §Review History, AC3.5, AC4,
+push-race/queue-errors block, Cursor R2/R3 response files, R2
+<code>combined.md</code>, <code>.claude/commands/*.md</code>,
+<code>.gitignore</code>; checked <code>claude --help</code>,
+<code>git check-ignore -v raw/internal/queue-errors.log</code>,
+<code>git diff --name-only e45a97b..HEAD</code>, and pushed via
+<code>git pull --rebase origin main &amp;&amp; git push origin main</code>.</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic. Verdict on RC3:
+<code>proceed_after_patches</code> with <strong>3 findings</strong>:
+(M1) AC3.5’s watcher state machine conflates “all dispositions accepted”
+with convergence even though RC3’s own R2 accepted all findings but
+still correctly requested R3; also needs to commit the final
+<code>combined.md</code> <code>next_round</code> update. (M2) the
+normalized <code>where</code> rule still needs an R2 fixture or it can
+over-collapse Cursor H1’s related <code>§AC4</code> with Codex’s two
+distinct AC4 findings. (L3) <code>raw/internal/queue-errors.log</code>
+has no path collision and is non-journal, but <code>.gitignore</code>’s
+<code>*.log</code> makes it local/untracked unless the spec declares
+that or adds an exception/rename.</li>
+<li><strong>Sources:</strong> Filesystem-only. Spec:
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+@ <code>e45a97bc6bea2fd0abde68113fe140a9e82943b9</code>. Cursor R3
+comparison:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r3/cursor.md</code>
+@ <code>2908f42</code>. Codex response:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r3/codex.md</code>
+@ <code>0a501ad</code>. No <code>echo_resolve_mru</code>,
+<code>search_memories</code>, <code>get_atom</code>,
+<code>find_clusters</code>, <code>tail_session</code>, or
+<code>wait_for_new_turns</code> calls.</li>
+<li><strong>Verdict:</strong> ✅ right on zero-ECHO reviewer path and
+operational queue push. 🟡 partial on RC3 convergence: the broad
+direction is claim-close, but Codex found two MED implementability
+issues that Cursor’s LOW-only R3 pass did not catch. The division of
+labor held again: Cursor caught wording/session-bootstrap polish; Codex
+caught state-machine and parser-test ambiguity.</li>
+<li><strong>Note (process):</strong> Cursor’s R3 response and journal
+commits had already landed on <code>origin/main</code> while this review
+was running (<code>2908f42</code>, <code>a4d3aa0</code>,
+<code>d05ee94</code>). Codex reviewed the same <code>e45a97b</code> spec
+artifact, committed on top of current main, then pushed successfully
+after <code>git pull --rebase origin main</code>.</li>
+<li><strong>Conjecture (observation-only):</strong> R4 should be a small
+RC4 patch: add a three-way watcher outcome (<code>converge</code> vs
+<code>patch-and-next-round</code> vs <code>defer/escalate</code>), add
+an R2-derived match-key fixture, and decide whether
+<code>queue-errors.log</code> is local-only or trackable. If Cursor R4
+stays LOW/zero and Codex R4 verifies those two mechanics, 039 is
+builder-claim ready.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
