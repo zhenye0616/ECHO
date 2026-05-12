@@ -7,11 +7,13 @@ You are running one tick of the **strategist** watcher loop. Invoked from the st
 ## Step 1 — Pull origin/main first
 
 ```bash
-cd ~/Desktop/Project_echo
+cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
 git pull --rebase origin main
 # Surface unpushed work / queue errors (push-with-retry.sh fallback target)
 tail -n 5 raw/internal/queue-errors.md 2>/dev/null || true
 ```
+
+(Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset in the strategist's own Claude Code session → defaults to the production repo. The 041 reviewer wrapper script + AC5 smoke set it explicitly so the launchd reviewer ticks and tests use the right tree. Strategist watcher ticks always run against production.)
 
 The tail surfaces any push-race fallbacks since the last tick so you can flag them in this turn's narration if action is needed. The file itself is repo-tracked, append-only, and uses the `.md` extension to avoid `*.log` gitignore.
 

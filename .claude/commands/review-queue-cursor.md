@@ -9,9 +9,11 @@ Bind the variable `MY_REVIEWER=cursor` for this prompt. See `.claude/commands/re
 ## Step 1 — Pull origin/main first
 
 ```bash
-cd ~/Desktop/Project_echo
+cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
 git pull --rebase origin main
 ```
+
+(Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset → defaults to the production repo. The 041 wrapper script + AC5 smoke set it explicitly so the launchd job and tests use the right tree.)
 
 This catches any new request directories AND ensures you are reviewing against the up-to-date spec. **Mandatory** — without it, you may write a review against a stale artifact.
 
