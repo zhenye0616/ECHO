@@ -5,9 +5,9 @@ status: ready
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-12
-claimed_by: null
-claimed_at: null
-branch: null
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-12T11:30:00Z"
+branch: "agent/reviewer-background-execution"
 head_sha: null
 agent_notes: null
 spec_refs:
