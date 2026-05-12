@@ -2677,6 +2677,20 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Tail path found the newest strategist turn cleanly. The extra `get_atom` call was worth it because the clipped tail omitted the precise explanation of why the cleanup logic is correct and the test fixture is wrong.
 - **Conjecture:** Tail callers should automatically hydrate the newest atom when `search_memories` reports `truncations: ["content"]` and the user asked for a live tail rather than broad discovery.
 
+### 2026-05-12 14:07 PDT — Codex reads latest Claude turn on 041 shape
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "get the latest turn on my claude and give me your thoughts".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:3})`
+  3. `get_atom({id:'f2585dac-ad7f-43d7-8279-9e99358c6b58'})`
+- **Returned:** MRU resolved to the same Claude Code source as prior entries. `search_memories` returned 3 atoms, newest timestamp `2026-05-12T21:04:56.500Z`, top atom clipped by 3,468 chars. `get_atom({id})` returned the newest atom verbatim (6,248 bytes, `truncations: []`). Latest Claude turn proposed 041 defaults: Codex via launchd plist + wrapper script + log file; Cursor policy default to graceful degradation rather than replacement; keep 041 narrow (activation mechanism, setup doc cleanup, `atom_id`→`id` audit), with larger reviewer-harness abstraction deferred.
+- **Sources:** source_breakdown={claude_code:3}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms requested or returned.
+- **Verdict:** ✅ right
+- **Note:** The latest turn was exactly the strategist framing requested. Hydration was again required because the newest tail was clipped.
+- **Conjecture:** The repeated clipped-tail pattern suggests the live-tail composition wants a small client-side recipe: resolve MRU → search limit 1-3 → hydrate newest clipped atom automatically.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

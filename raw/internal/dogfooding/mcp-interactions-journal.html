@@ -1319,6 +1319,9 @@ investigation</a></li>
 <li><a href="#pdt-codex-tails-claude-after-stale-codex-correction"
 id="toc-pdt-codex-tails-claude-after-stale-codex-correction">2026-05-12
 13:49 PDT — Codex tails Claude after stale-Codex correction</a></li>
+<li><a href="#pdt-codex-reads-latest-claude-turn-on-041-shape"
+id="toc-pdt-codex-reads-latest-claude-turn-on-041-shape">2026-05-12
+14:07 PDT — Codex reads latest Claude turn on 041 shape</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12669,6 +12672,42 @@ correct and the test fixture is wrong.</li>
 hydrate the newest atom when <code>search_memories</code> reports
 <code>truncations: ["content"]</code> and the user asked for a live tail
 rather than broad discovery.</li>
+</ul>
+<h3 id="pdt-codex-reads-latest-claude-turn-on-041-shape">2026-05-12
+14:07 PDT — Codex reads latest Claude turn on 041 shape</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive repo session)</li>
+<li><strong>Trigger:</strong> Founder asked: “get the latest turn on my
+claude and give me your thoughts”.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:3})</code></li>
+<li><code>get_atom({id:'f2585dac-ad7f-43d7-8279-9e99358c6b58'})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU resolved to the same Claude Code
+source as prior entries. <code>search_memories</code> returned 3 atoms,
+newest timestamp <code>2026-05-12T21:04:56.500Z</code>, top atom clipped
+by 3,468 chars. <code>get_atom({id})</code> returned the newest atom
+verbatim (6,248 bytes, <code>truncations: []</code>). Latest Claude turn
+proposed 041 defaults: Codex via launchd plist + wrapper script + log
+file; Cursor policy default to graceful degradation rather than
+replacement; keep 041 narrow (activation mechanism, setup doc cleanup,
+<code>atom_id</code>→<code>id</code> audit), with larger
+reviewer-harness abstraction deferred.</li>
+<li><strong>Sources:</strong> source_breakdown={claude_code:3}; exact
+JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Cursor/Codex/git atoms requested or returned.</li>
+<li><strong>Verdict:</strong> ✅ right</li>
+<li><strong>Note:</strong> The latest turn was exactly the strategist
+framing requested. Hydration was again required because the newest tail
+was clipped.</li>
+<li><strong>Conjecture:</strong> The repeated clipped-tail pattern
+suggests the live-tail composition wants a small client-side recipe:
+resolve MRU → search limit 1-3 → hydrate newest clipped atom
+automatically.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
