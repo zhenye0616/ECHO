@@ -457,3 +457,18 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 - **AC4 dogfooding (founder / strategist)** — schedule within 60 s of next Cursor agent-mode session: ≥ 3 tool calls in a single turn, then `mcp__echo__search_memories(query=<verdict-phrase>, source_app='cursor')` should return ≥ 1 match. Target ≥ 90 % capture rate per 034's formula. Log to `raw/internal/dogfooding/mcp-interactions-journal.md`.
 - **031 deprecation gate (strategist)** — after 036 merge + ≥ 1 week of post-merge agent-mode dogfooding evidence, trigger the 031 deprecation conversation per the gating rule in this file's 031 entry. ETA ~2026-05-18.
 - **Wiki promotion (strategist)** — promote 036's "After Completion" notes to `wiki/capture/cursor-extractor.md` (Multi-cluster continuation atoms subsection) and `wiki/capture/per-app/cursor-collected-data.md` (two new metadata rows: `is_continuation`, `continuation_of_assistant_bubble_id`).
+
+---
+
+## From 037 merge (2026-05-11)
+
+- **Inline comment in `src/mcp/util/repo-path.ts`** near `assertAbsoluteRepoPath` documenting that the `<toolName>: ` error-prefix convention is load-bearing — `find-clusters.ts:317-321` and similar isError envelope wrappers depend on it for validation-error → MCP-isError conversion. Coupling-by-string-prefix is fragile; the comment makes it discoverable.
+- **(Optional) `findGitAncestor` deep-path latency observability** — instrument with a max-depth counter in dev mode so a future regression on deeply-nested file paths is observable. Today's Stage 2 file-walk uses up to N synchronous `statSync` calls per turn before the cache populates; acceptable today, deserves a hook.
+- **AC7 dogfooding (founder)** — owed post-merge per spec section §AC7. Run all six retrieval calls with `repo_path=/Users/zhenye/Desktop/Project_echo` from a fresh Cursor agent-mode turn (no workspace binding); confirm `composer_resolved` is ABSENT on the Cursor `tail_session` call (its presence indicates AC1's repo_root write didn't land for fresh composers — regression). Repeat with `repo_path=/Users/zhenye/Desktop/Projects/isr-demo-mohsen` to confirm zero cross-project bleed-through. Log to dogfooding journal. Second-day run on a different day closes M1-2-A.
+- **Wiki promotion (strategist, post-dogfooding)** — promote 037's "After Completion" §1 notes:
+  - Update `wiki/surfaces/mcp-tail-session.md` — `repo_path` is no longer Cursor-only; document the uniform parameter across all source_apps.
+  - Create `wiki/surfaces/mcp-search-memories.md` (currently absent — `tools/list` is today's only authoritative shape source). Document `repo_path` from the start.
+  - Update `wiki/architecture/storage.md` — `METADATA_MATCH_KEY_WHITELIST` now includes `repo_root`; document the work-artifact-as-first-class-retrieval-predicate rationale.
+  - Draft new principle page `wiki/principles/work-artifact-first-class.md`.
+- **Item 038 (RC2: MCP toolkit atomicity refactor)** is already in flight on `backlog/ready/` (see `2026-05-11-038-mcp-toolkit-atomicity-refactor.md` — the 5-6-primitive reform shape from the 3-way root-cause investigation). 037 was the prerequisite RC1 closure.
+- **TZ-naive rejection (RC3)** stays in this file as a 30-LOC follow-up; rolls into 038 if convenient (same retrieval-tool surface), otherwise standalone.
