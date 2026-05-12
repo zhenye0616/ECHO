@@ -1343,6 +1343,11 @@ tail</a></li>
 <li><a href="#pdt-codex-r1-on-041-reviewer-background-execution"
 id="toc-pdt-codex-r1-on-041-reviewer-background-execution">2026-05-12
 14:30 PDT — Codex R1 on 041 reviewer background execution</a></li>
+<li><a
+href="#pdt-cursor-r2-on-041-verify-r1-patches-via-strategist-tail"
+id="toc-pdt-cursor-r2-on-041-verify-r1-patches-via-strategist-tail">2026-05-12
+15:10 PDT — Cursor R2 on 041; verify R1 patches via strategist
+tail</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12934,6 +12939,45 @@ wait/hydration.</li>
 finding where both reviewers converged on the AC1/AC5 repo-root
 mismatch. The additional Codex-only blocker is the AC4
 invalid-final-file retry deadlock.</li>
+</ul>
+<h3
+id="pdt-cursor-r2-on-041-verify-r1-patches-via-strategist-tail">2026-05-12
+15:10 PDT — Cursor R2 on 041; verify R1 patches via strategist tail</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude (interactive
+review-queue R2)</li>
+<li><strong>Trigger:</strong> Founder asked to repeat the R1 flow for R2
+(ECHO hydrate + spec verification), then commit and push
+<code>r2/cursor.md</code>.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU same JSONL as prior 041 entries. Tail
+returned <strong>8</strong> atoms; newest id
+<code>71bbebb7-2369-4ae1-a776-05fdfe7ba0d4</code>
+(<code>2026-05-12T21:34:42.604Z</code>) — strategist combined R1
+(<code>proceed_after_patches</code>), patched spec, armed R2 poll; body
+clipped (<code>bytes_elided</code> 2354). Canonical review artifacts:
+<code>r2/request.md</code> (<code>spec_commit_sha</code>
+<code>59bcdc1c8b9c1e35607f0387c7489afbae52a5ea</code>) +
+<code>backlog/ready/2026-05-12-041-reviewer-background-execution.md</code>
+(verified <strong>0</strong>-byte diff vs that SHA in workspace).</li>
+<li><strong>Read sources:</strong> source_breakdown={claude_code:8};
+exact JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Codex/Cursor/git atoms in query.</li>
+<li><strong>Verdict:</strong> ✅ right — tail matched strategist
+disposition + R2 dispatch; clip did not block R2 because
+<code>request.md</code> + on-disk spec held full patch text.</li>
+<li><strong>Note:</strong> Second-order checks from
+<code>focus_hints</code> (bare origin + <code>push-with-retry.sh</code>,
+AC4 <code>mv</code> retry unblock) were validated against live
+<code>tools/review-queue/push-with-retry.sh</code> and AC prose, not
+only ECHO.</li>
+<li><strong>Conjecture:</strong> optional none.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

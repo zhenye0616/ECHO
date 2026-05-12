@@ -2758,6 +2758,19 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right
 - **Note:** The response cross-references Cursor's first finding where both reviewers converged on the AC1/AC5 repo-root mismatch. The additional Codex-only blocker is the AC4 invalid-final-file retry deadlock.
 
+### 2026-05-12 15:10 PDT — Cursor R2 on 041; verify R1 patches via strategist tail
+
+- **Source agent:** Cursor's Claude (interactive review-queue R2)
+- **Trigger:** Founder asked to repeat the R1 flow for R2 (ECHO hydrate + spec verification), then commit and push `r2/cursor.md`.
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})`
+- **Returned:** MRU same JSONL as prior 041 entries. Tail returned **8** atoms; newest id `71bbebb7-2369-4ae1-a776-05fdfe7ba0d4` (`2026-05-12T21:34:42.604Z`) — strategist combined R1 (`proceed_after_patches`), patched spec, armed R2 poll; body clipped (`bytes_elided` 2354). Canonical review artifacts: `r2/request.md` (`spec_commit_sha` `59bcdc1c8b9c1e35607f0387c7489afbae52a5ea`) + `backlog/ready/2026-05-12-041-reviewer-background-execution.md` (verified **0**-byte diff vs that SHA in workspace).
+- **Read sources:** source_breakdown={claude_code:8}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Codex/Cursor/git atoms in query.
+- **Verdict:** ✅ right — tail matched strategist disposition + R2 dispatch; clip did not block R2 because `request.md` + on-disk spec held full patch text.
+- **Note:** Second-order checks from `focus_hints` (bare origin + `push-with-retry.sh`, AC4 `mv` retry unblock) were validated against live `tools/review-queue/push-with-retry.sh` and AC prose, not only ECHO.
+- **Conjecture:** optional none.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
