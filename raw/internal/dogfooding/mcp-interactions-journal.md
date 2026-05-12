@@ -2647,6 +2647,22 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Post-038 resolver composition found the current repo-scoped Claude Code strategist session cleanly and avoided older Claude sessions from the same project. The returned bodies were enough to identify the active context even though some long turns were clipped.
 - **Conjecture:** For this "connect to Claude" workflow, surfacing the resolved source path/session id is useful enough that clients should probably narrate it briefly before using the tail.
 
+### 2026-05-12 13:39 PDT — Codex combines Claude's 040 gap summary with local investigation
+
+- **Source agent:** Codex (interactive repo session)
+- **Trigger:** Founder asked: "combine claude's finding and do your own investigation on currnet gaps".
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', query:'gap', limit:5})`
+  3. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', query:'040 accomplished', limit:3})`
+  4. `get_atom({atom_id:'058e803d-765b-4977-8213-f29f326c6801'})` — wrong argument shape.
+  5. `get_atom({id:'058e803d-765b-4977-8213-f29f326c6801'})`
+- **Returned:** MRU resolved to the same Claude Code source as the 13:33 entry. Query `'gap'` returned 5 atoms; top atom `058e803d-765b-4977-8213-f29f326c6801` was the 040 gap summary, clipped by `search_memories` with `bytes_elided: 6219`. Query `'040 accomplished'` returned that same top atom. The first `get_atom` call errored with MCP `-32602` because the live schema expects `id`, not `atom_id`. The corrected `get_atom({id})` returned the full 9,005-byte atom verbatim with `truncations: []`.
+- **Sources:** source_breakdown={claude_code:5} for the gap query; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Cursor/Codex/git atoms requested or returned. Local follow-up reads used `backlog/_followups.md`, `docs/BACKLOG.md`, `tools/review-queue/combine.py`, `tests/review-queue/concurrency.test.ts`, `docs/review-queue-setup.md`, reviewer prompts, and queue tests.
+- **Verdict:** ✅ right
+- **Note:** ECHO recovered Claude's exact summary and `get_atom` was necessary to remove the clipping. Local investigation mostly confirmed Claude's high-level gap list, but corrected one classification: the orphan-cleanup failure is a deterministic test-time mismatch (`mtime` based on real clock while `combine.py --now` uses a fake clock), not yet proven as a production `combine.py` cleanup bug. A controlled fixture with mtime older than the fake `--now` did delete the orphan.
+- **Conjecture:** The `get_atom` schema mismatch is a small client-memory hazard: prior docs/examples often say `atom_id`, while the live tool schema uses `id`. Tool descriptions or docs should keep one name consistently.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
