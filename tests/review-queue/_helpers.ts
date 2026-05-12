@@ -60,3 +60,7 @@ export function requestScript(): string {
 export function combineScript(): string {
   return join(REPO, 'tools/review-queue/combine.py');
 }
+
+export function dispatchScript(): string {
+  return join(REPO, 'tools/review-queue/dispatch-next-round.py');
+}
