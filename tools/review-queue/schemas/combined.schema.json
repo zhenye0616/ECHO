@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://echo.local/review-queue/combined.schema.json",
+  "title": "review-queue combined.md frontmatter",
+  "description": "Schema for backlog/reviews/<item_id>/r<N>/combined.md frontmatter (strategist roll-up). Verdict enum extends the per-reviewer enum with combined-only values.",
+  "type": "object",
+  "required": [
+    "item_id",
+    "round",
+    "combined_at",
+    "codex_response",
+    "cursor_response",
+    "combined_verdict",
+    "escalated_to_founder"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}-\\d{3}-[a-z][a-z0-9-]*$"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "combined_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "codex_response": {
+      "type": ["string", "null"]
+    },
+    "cursor_response": {
+      "type": ["string", "null"]
+    },
+    "patch_commit_sha": {
+      "type": ["string", "null"],
+      "pattern": "^([0-9a-f]{7,40})?$"
+    },
+    "next_round": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "combined_verdict": {
+      "type": "string",
+      "enum": [
+        "proceed",
+        "proceed_after_patches",
+        "pushback",
+        "divergent",
+        "single_reviewer_timeout",
+        "no_responses"
+      ]
+    },
+    "escalated_to_founder": {
+      "type": "boolean"
+    }
+  }
+}
