@@ -50,19 +50,22 @@ Make reviewer execution truly **hands-off** for the founder while preserving the
 ## Acceptance Criteria
 
 **AC1 — Codex reviewer wrapper script.** `tools/review-queue/run-codex-reviewer.sh` exists with chmod +x. Owns:
-- `cd ~/Desktop/Project_echo` (cwd discipline)
+- **Working repo via env var**: the wrapper derives its working repo from `${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}`. Default = production repo path. The launchd plist (AC2) does NOT set this env var, so launchd-driven ticks run against production unchanged. The smoke test (AC5) sets this env var to a tmpdir, isolating smoke from production. **Variable name + default are normative** — builders must not hardcode the path elsewhere in the wrapper. (R1 patch — convergent Codex H2 + Cursor M1: the original wrapper hardcoded `~/Desktop/Project_echo`, which collided with AC5's tmpdir requirement; copied-repo smoke could have pushed to the real origin.)
+- `cd "$ECHO_REVIEW_QUEUE_REPO_ROOT"` (cwd discipline, derived from the env var above)
 - PATH augmentation so `codex` is findable in launchd's reduced env
-- The verified canonical invocation: `codex exec -C ~/Desktop/Project_echo --sandbox danger-full-access - < ~/Desktop/Project_echo/.claude/commands/review-queue-codex.md`
+- The verified canonical invocation: `codex exec -C "$ECHO_REVIEW_QUEUE_REPO_ROOT" --sandbox danger-full-access - < "$ECHO_REVIEW_QUEUE_REPO_ROOT/.claude/commands/review-queue-codex.md"`
 - Stdout + stderr appended to `~/Library/Logs/echo-review-queue-codex.log` (rotated at 10MB via standard log-rotation idiom or accepted as append-only with a one-line note that founder may truncate manually)
 - Exit code passthrough from `codex exec`
-- One-line preamble logged on each tick: `[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start`
+- One-line preamble logged on each tick: `[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start ECHO_REVIEW_QUEUE_REPO_ROOT=$ECHO_REVIEW_QUEUE_REPO_ROOT`
 
 The wrapper is **idempotent** — running it twice in close succession is safe (each invocation does at most one review tick per the canonical reviewer prompt's "one review per tick" rule).
 
 **AC2 — launchd plist + install/status/uninstall scripts.**
-- `tools/review-queue/install-codex-reviewer-launchd.sh` writes `~/Library/LaunchAgents/com.echo.review-queue-codex.plist` with: 600-second `StartInterval` (10 min), `ProgramArguments` pointing to the AC1 wrapper, `StandardOutPath` + `StandardErrorPath` pointing to the AC1 log, `WorkingDirectory` = repo root, `RunAtLoad: false` (founder explicitly fires the smoke first via `launchctl load`), `KeepAlive: false` (one-shot per tick).
+- `tools/review-queue/install-codex-reviewer-launchd.sh` writes `~/Library/LaunchAgents/com.echo.review-queue-codex.plist` with: 600-second `StartInterval` (10 min), `ProgramArguments` pointing to the AC1 wrapper, **`StandardOutPath` and `StandardErrorPath` set to `/dev/null`** (R1 patch — Cursor L4: AC1 wrapper owns unified logging; routing launchd's stream-capture to the same file would double-log with launchd's timestamps interleaving with the wrapper's preamble), `WorkingDirectory` = repo root, `RunAtLoad: false`, `KeepAlive: false` (one-shot per tick).
+- **Loading + uninstalling** (R1 patch — convergent Cursor L5 + Codex L3 cleanup, pulled into AC2 from Implementation Hints): the install script uses macOS Sonoma+ semantics by default: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.echo.review-queue-codex.plist`. Detect macOS version via `sw_vers -productVersion`; if < 14.0, fall back to `launchctl load -w <plist>`. The uninstall script symmetrically uses `launchctl bootout gui/$(id -u) <plist>` (Sonoma+) or `launchctl unload <plist>` (older). Both versions of the pair are normative in this AC, not just in the hints.
+- **Smoke trigger** (R1 patch — Codex L3): because `RunAtLoad: false`, `bootstrap`/`load` alone does NOT fire the job. The install script's `--smoke` flag runs `launchctl kickstart -k gui/$(id -u)/com.echo.review-queue-codex` after bootstrap to fire one explicit tick for verification. (Without `--smoke`, the job waits for its first `StartInterval` boundary.)
 - `tools/review-queue/status-codex-reviewer-launchd.sh` runs `launchctl list | grep com.echo.review-queue-codex` and tails the last 10 log lines for at-a-glance verification.
-- `tools/review-queue/uninstall-codex-reviewer-launchd.sh` runs `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.echo.review-queue-codex.plist` (or `launchctl unload` if bootout unavailable on the founder's macOS version) and `rm -f` the plist.
+- `tools/review-queue/uninstall-codex-reviewer-launchd.sh` runs the version-gated bootout/unload pair above and `rm -f` the plist.
 
 All three scripts are idempotent — re-running install is safe (overwrites plist, re-bootstraps); re-running uninstall is safe (no-op if already gone).
 
@@ -76,7 +79,7 @@ commit-reviewer-response.sh <reviewer.md path> <reviewer name: codex|cursor> <ro
 
 Behavior:
 1. Run `python3 tools/review-queue/validate.py reviewer <path>`. The existing validator wraps `yaml.safe_load` on the frontmatter + `jsonschema` validation against `tools/review-queue/schemas/reviewer.schema.json`.
-2. **On validation failure**: exit non-zero. Print the validator's stderr verbatim. Do NOT `git add`, do NOT `git commit`, do NOT push. The malformed `<reviewer>.md` stays in the worktree; the reviewer agent is expected to regenerate it. Append a one-line entry to `raw/internal/queue-errors.md`: `<ISO-ts> VALIDATION-FAIL: <reviewer> r<N> on <item_id> path=<path> diagnostic=<validator stderr first line>`. This makes background-runtime validation failures auditable without requiring the strategist to be watching in real time.
+2. **On validation failure** (R1 patch — Codex H1 load-bearing fix to the unattended-retry deadlock): exit non-zero. Print the validator's stderr verbatim. Do NOT `git add`, do NOT `git commit`, do NOT push. **Move the malformed file aside**: `mv <path> <path>.invalid.<ISO-ts>` (e.g., `r1/cursor.md` → `r1/cursor.md.invalid.2026-05-12T22:45:00Z`). This is **critical**: the canonical reviewer prompt's polling step skips any round where `<reviewer>.md` already exists (`if [ -f "$dir/cursor.md" ]; then continue; fi`), so leaving the malformed file at the canonical path would block ALL future reviewer ticks on that round forever. Renaming it out of the way unblocks the next tick to regenerate. Append a one-line entry to `raw/internal/queue-errors.md`: `<ISO-ts> VALIDATION-FAIL: <reviewer> r<N> on <item_id> moved_to=<path>.invalid.<ISO-ts> diagnostic=<validator stderr first line>`. This makes background-runtime validation failures auditable AND retryable without requiring the strategist to be watching in real time.
 3. **On validation success**: `git add <path>` → `git commit -m "review-r<N>: <reviewer> on <item_id>"` → `tools/review-queue/push-with-retry.sh "review-r<N>: <reviewer> on <item_id>"`.
 
 Both `.claude/commands/review-queue-codex.md` Step 5+6 and `.claude/commands/review-queue-cursor.md` Step 5+6 are rewritten to invoke this helper:
@@ -87,13 +90,18 @@ tools/review-queue/commit-reviewer-response.sh "$dir/<reviewer>.md" <reviewer> "
 
 instead of the current inline `git add ... && git commit ... && push-with-retry.sh ...` sequence. The journal-logging step (Step 6 in the current prose) remains after the commit, unchanged in spirit but now triggered only after a successful helper exit. **Validation is mechanically unbypassable for any reviewer that uses the canonical commit path.** A future reviewer plugs into the same helper by invoking it; the helper handles validation + commit + push uniformly across reviewers.
 
-**AC5 — Synthetic-request smoke test.** `tools/review-queue/smoke-test-codex-runner.sh` exists:
-1. Creates a tmpdir (`mktemp -d`) and copies the repo into it (or uses worktree-style symlinks where safe).
-2. Generates a synthetic `r1/request.md` mirroring the canonical shape (item_id from a small whitelist; spec_commit_sha = HEAD; class=narrow; both reviewers requested).
-3. Runs `tools/review-queue/run-codex-reviewer.sh` against the tmpdir (or against a `--repo-root` test override the wrapper accepts as an env var).
-4. Asserts `r1/codex.md` is created **AND** validates against `reviewer.schema.json`.
+**AC5 — Synthetic-request smoke test.** `tools/review-queue/smoke-test-codex-runner.sh` exists. (R1 patch — convergent Codex H2 + Cursor M1 + Cursor M2: isolation must be real, not best-effort.)
+
+1. **Isolated test repo with local bare origin** (load-bearing for safety): `mktemp -d` two directories — one for the working repo (`$SMOKE_WORK`), one for a bare origin (`$SMOKE_ORIGIN`). `git init --bare "$SMOKE_ORIGIN"`. Copy the project files into `$SMOKE_WORK` (or initialize a minimal subset: `.claude/commands/`, `tools/review-queue/`, `backlog/`, `raw/internal/`). `git init "$SMOKE_WORK" && cd "$SMOKE_WORK" && git remote add origin "$SMOKE_ORIGIN"`. Make an initial commit + push so the bare origin has the baseline. **No path through which smoke artifacts can reach the real GitHub origin** — even if `push-with-retry.sh` fires, it pushes to the local bare repo.
+2. **Pinned synthetic item_id**: the synthetic `r1/request.md` uses item_id `2026-05-12-999-smoke-test-synthetic` (R1 patch — Cursor M2 folded with C2: pinned, deterministic, named in this spec so smoke is reproducible). Spec_commit_sha = HEAD of `$SMOKE_WORK`; class=narrow; both reviewers requested. Write a stub `backlog/ready/2026-05-12-999-smoke-test-synthetic.md` in `$SMOKE_WORK` so `request.py find_artifact()` resolves (mirrors 040 R2 fixture preamble fix).
+3. **Run the wrapper with the env override**: `ECHO_REVIEW_QUEUE_REPO_ROOT="$SMOKE_WORK" tools/review-queue/run-codex-reviewer.sh`. The env var derived from AC1 makes the wrapper operate on the smoke repo, never the production repo.
+4. **Assertions**:
+   - `$SMOKE_WORK/backlog/reviews/2026-05-12-999-smoke-test-synthetic/r1/codex.md` is created.
+   - That file validates against `reviewer.schema.json` (re-uses the AC4 validator).
+   - The smoke commit on `$SMOKE_WORK`'s main branch is at HEAD (proves `commit-reviewer-response.sh` ran end-to-end through validate → commit → push to bare origin).
+   - The **real** GitHub origin has zero new commits attributable to the smoke run (sanity check; `git fetch origin && git rev-list HEAD..origin/main | wc -l` on the production repo should equal what it was pre-smoke).
 5. Exits 0 on success, non-zero with diagnostic on failure.
-6. Cleans up the tmpdir.
+6. Cleans up both tmpdirs.
 
 The AC2 install script offers to run AC5 automatically post-install with a `--smoke` flag; founder may decline if they want to install-now-verify-later.
 
@@ -148,7 +156,7 @@ When this item lands in `backlog/complete/`:
 - `.claude/commands/review-queue-cursor.md` (modified) — same
 - `docs/review-queue-setup.md` (rewritten) — launchd primary recipe + Cursor degradation policy + AC7 audit incorporated
 - `tests/review-queue/commit-reviewer-response.test.ts` (new, optional but recommended) — integration test: valid response commits + pushes; malformed YAML rejects with non-zero exit + queue-errors.md row
-- `npm test` — full suite, expect 786+1 = 787 pass / 21 skipped (existing 46 review-queue tests + 1 new AC4 integration test); concurrency.test.ts:133 remains pre-existing red until separately fixed (out of scope)
+- **Acceptance: focused review-queue suite + typecheck + lint clean.** `npm test -- tests/review-queue/` passes; the new AC4 integration test adds +1 to the review-queue baseline (was 46 at 040 merge, becomes 47). `npm run typecheck` clean; `npm run lint` clean. **Full `npm test` is NOT a 041 acceptance** — `tests/review-queue/concurrency.test.ts:133` (orphan-cleanup test-fixture clock-mismatch bug) remains pre-existing red until its separate test-fix item lands. (R1 patch — convergent Codex M2 + Cursor NIT: original wording hard-coded "787 pass" while also acknowledging concurrency:133 is red; mutually exclusive. Removed the scalar, replaced with "+1 vs baseline" framing per Cursor's code-rot concern. Full-suite green is a non-goal of 041 — that's the concurrency-test-fix item's job.)
 - `npm run typecheck` — clean
 - `npm run lint` — clean
 
