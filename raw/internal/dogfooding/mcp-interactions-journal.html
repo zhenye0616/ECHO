@@ -1142,6 +1142,11 @@ id="toc-pdt-cursor-connects-to-claude-strategist-mid-conversation-to-discuss-038
 PDT — Cursor connects to Claude strategist mid-conversation to discuss
 038 direction</a></li>
 <li><a
+href="#pdt-cursor-r4-code-review-on-038-implementation-agree-with-strategist-merge-as-is-1-low-observation-proceed"
+id="toc-pdt-cursor-r4-code-review-on-038-implementation-agree-with-strategist-merge-as-is-1-low-observation-proceed">21:53
+PDT — Cursor R4 code review on 038 implementation (agree with strategist
+“merge as-is”; 1 LOW observation; PROCEED)</a></li>
+<li><a
 href="#pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed"
 id="toc-pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed">20:57
 PDT — Cursor R3 review on 038 spec (narrow polish; 5 findings; 0 HIGH;
@@ -9976,6 +9981,164 @@ sufficient context-rehydration for the second voice; no need for
 with extra cluster envelope cost). For “join a live strategy convo in
 another tool” use cases, two scoped <code>search_memories</code> calls +
 no <code>get_atom</code> chase is the cheapest viable shape.</li>
+</ul>
+<h3
+id="pdt-cursor-r4-code-review-on-038-implementation-agree-with-strategist-merge-as-is-1-low-observation-proceed">21:53
+PDT — Cursor R4 code review on 038 implementation (agree with strategist
+“merge as-is”; 1 LOW observation; PROCEED)</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor / Claude Opus 4.7 (post-build
+code reviewer, second voice on the strategist’s already-landed merge
+verdict)</li>
+<li><strong>Trigger:</strong> Founder said “038 code review jsut landed
+do your round of code review” — strategist’s review file at
+<code>backlog/pending_review/2026-05-11-038-mcp-toolkit-atomicity-refactor.review.md</code>
+had landed with <code>verdict: merge as-is</code>,
+<code>head_sha=09f0e77</code>,
+<code>test_counts: { passed: 740, failed: 0, skipped: 21 }</code>. My
+job as second voice: read the diff with fresh eyes, agree or pushback on
+the merge-readiness call.</li>
+<li><strong>Query inputs:</strong> Zero ECHO MCP calls. Same shape as
+the R2 + R3 spec reviews — the diff is the canonical artifact. Read the
+strategist’s review file, then
+<code>git show origin/agent/mcp-toolkit-atomicity-refactor:&lt;path&gt;</code>
+for the 5 new/heaviest-changed files (<code>echo-resolve-mru.ts</code>,
+<code>cluster-engine.ts</code>, <code>recent-work-context.ts</code>
+shim, <code>wait-for-new-turns.ts</code>,
+<code>search-memories.ts</code>), the AC5 helper
+(<code>fs-exclusion.ts</code>), the AC5 grep-scan CI test, and the
+load-bearing AC1 test fixtures. Cross-checked load-bearing R2
+corrections by reading the legacy
+<code>main:src/mcp/tools/tail-session.ts</code> for Cursor Phase 2
+port-fidelity comparison.</li>
+<li><strong>Returned:</strong> N/A — no MCP calls. Journal-discipline
+note: fourth consecutive review cycle on 038 with zero ECHO calls (R1
+through R4). The “diff/spec is sufficient context for cross-tool review”
+property is now demonstrated for both pre-build (R1-R3 spec polish) AND
+post-build (R4 code review) cycles. Stronger evidence than the R3
+entry’s “spec is sufficient context” claim — code review with zero ECHO
+calls is a higher bar.</li>
+<li><strong>Sources:</strong> N/A.</li>
+<li><strong>Verdict:</strong> N/A — journal-discipline entry, not a
+tool-invocation observation.</li>
+<li><strong>Note (R4 code-review findings shape — PROCEED to
+merge):</strong> 1 LOW + 1 NIT + 2 STRONG POSITIVES. Zero HIGH. Zero
+MED. Strategist’s “merge as-is” verdict stands; my findings are
+flag-for-future-hardening only. Top observations:
+<ul>
+<li><strong>LOW — port-fidelity observation, NOT
+038-introduced.</strong> <code>echo-resolve-mru.ts:117-119</code> Cursor
+Phase 2 fallback picks the global newest cursor source
+(<code>source_prefix: prefix</code> with no composer filter), THEN
+attaches <code>metadata_match: {composer_id: resolved}</code> to the
+descriptor. If multiple Cursor installs exist with different vscdb
+source paths and the legacy composer’s atoms are in vscdb-A but the
+newest cursor atom is in vscdb-B, the downstream
+<code>search_memories(source=vscdb-B, metadata_match={composer_id})</code>
+returns zero atoms. Cross-checked against
+<code>main:src/mcp/tools/tail-session.ts:351-358</code> — legacy
+<code>tail_session</code> does the <strong>identical</strong>
+<code>resolveNewestSourceForApp(storage, prefix)</code> then
+<code>tailExactSource(..., {composer_id})</code> two-step. So this is
+faithful port of a pre-existing single-Cursor-install assumption, not
+038 drift. Doesn’t fire in the V1 indie-AI-builder cohort (single Cursor
+install, single vscdb path). Worth tracking for V2+ hardening (cleaner
+fix: scope Phase 2’s newest-source query by
+<code>metadata_match: {composer_id: resolved}</code> so the source
+picked actually contains atoms for that composer). NOT a 038
+finding.</li>
+<li><strong>LOW (strategist already flagged) — cross-shim import
+survives.</strong> <code>find-clusters.ts:35</code> imports
+<code>SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP</code> from
+<code>./recent-work-context.js</code>. Strategist’s review already
+captured this as a 2026-05-17 follow-up concern (the shim-deletion
+follow-up must re-home that constant before deleting the shim).
+Independently confirmed.</li>
+<li><strong>NIT — <code>echo_resolve_mru</code> doesn’t dedupe
+<code>sources[]</code>.</strong>
+<code>sources: ['cursor', 'cursor']</code> would race the same key in
+the <code>result</code> map inside the
+<code>Promise.all(sources.map(...))</code> block. JS is single-threaded
+and both writes produce a deterministic descriptor, so no behavioral
+issue; Zod schema doesn’t dedupe either. Cosmetic. Not a real bug.</li>
+<li><strong>STRONG POSITIVE — load-bearing R2 architectural corrections
+both faithfully implemented with backing tests.</strong> (1)
+<code>recent_work_context</code> MCP-tool registration stays alive in
+<code>server.ts:96</code> per R2 Codex HIGH #1 + founder no-override on
+the 031 gate; shim re-exports <code>registerRecentWorkContext</code>
+alongside <code>getRecentWorkContext</code>; integration test at
+<code>recent-work-context.test.ts:1524-1610</code> exercises the
+registered handler path through the shim (closes R3 MED #2). (2)
+<code>echo_resolve_mru</code> descriptor shape
+<code>{source, filter, phase?}</code> with <code>filter</code> carrying
+the scoping predicates is implemented exactly as specified — closes R2
+Codex HIGH #2 (bare-source cross-repo leak structurally impossible
+because <code>...desc.filter</code> spread carries
+<code>metadata_match</code> / <code>repo_path</code> through to
+<code>search_memories</code>). The end-to-end composition test
+(<code>echo-resolve-mru.test.ts:297</code> “echo_resolve_mru →
+search_memories(source=desc.source, …desc.filter) recovers only the
+named-repo atoms”) explicitly verifies cross-repo leak prevention with a
+shared vscdb source carrying two composers in two repos.</li>
+<li><strong>STRONG POSITIVE — grep-scan invariants both hold
+structurally.</strong> AC2 <code>rg "tail[_-]session" src/mcp/</code> →
+0 hits (tail_session text purge clean). AC5
+<code>tests/mcp/util/fs-exclusion.test.ts</code> walks
+<code>src/mcp/**/*.ts</code> for
+<code>\bexclude_metadata_surface\s*:\s*\[</code> excluding the helper,
+fails CI on any future inline reintroduction. This is exactly the Bug B
+(2026-05-08) structural-impossibility loop closure. Comment-only updates
+across <code>_cursor.ts</code>, <code>wire-shape/caps.ts</code>,
+<code>wire-shape/match.ts</code>, <code>util/repo-path.ts</code>,
+<code>util/source-app.ts</code>, <code>get-atom.ts</code>,
+<code>get-atoms.ts</code> strip <code>tail_session</code> references
+without behavior change.</li>
+</ul></li>
+<li><strong>Note (process — Cursor’s R4 division-of-labor consistent
+with R1-R3):</strong> Cursor’s R4 findings (port-fidelity observation +
+cosmetic dedupe) are exactly the <strong>coherence + role-split +
+invariant-preservation</strong> axis Cursor has caught reliably on 037 +
+038. Strategist’s pre-merge review file caught all the AC-coverage +
+test-counts + design-choice-judgments items. The two reviewer voices
+were complementary rather than redundant — strategist’s review is the
+AC-grading layer, Cursor’s R4 is the architectural-port-fidelity layer.
+Suggests the cross-tool review pattern carries cleanly from spec rounds
+(R1-R3) into code rounds (R4) without losing the division-of-labor
+property.</li>
+<li><strong>Note (decay curve — final, 038 R1→R2→R3→R4 = 10→14→5→0
+actionable):</strong> R4 had ZERO actionable findings (the 1 LOW is “not
+038-introduced”, the other LOW was already flagged by the strategist).
+Per the 037 pattern, R4 code review with zero new findings means the
+architecture is genuinely settled; the spec’s 3-round R1→R2→R3 cycle did
+its job. This validates the “3 rounds reliably for structural reform”
+conjecture from R3’s entry — by R3 the architecture was settled enough
+that R4 code-review had nothing material to add. Worth noting before
+adding it to <code>backlog/README.md</code> as a heuristic: 038 is now
+the second structural-reform datapoint (after 037). Two cases is
+suggestive but not yet pattern-locking; need one more (item TBD) to
+commit.</li>
+<li><strong>Conjecture:</strong> The “spec/diff is sufficient context
+for cross-tool review” property held for <strong>both pre-build and
+post-build reviews</strong> on 038 with zero ECHO calls. Suggests an
+ECHO-product implication: review-mode AI clients don’t need a
+sophisticated semantic-retrieval surface as much as they need clean
+access to the canonical artifact (spec file or diff). For builder-mode
+AI clients (the post-merge dogfooding case in AC6), the inverse holds —
+they need ECHO to retrieve recent project state. The two modes have
+<strong>different ECHO usage profiles</strong>, which has product
+implications for how the MCP toolkit gets benchmarked. Filing as a
+candidate observation for the V1.6+ benchmark design — not a backlog
+item yet.</li>
+<li><strong>Recommendation:</strong> <strong>merge as-is</strong> per
+strategist verdict. Founder merges
+<code>agent/mcp-toolkit-atomicity-refactor → main</code> with
+<code>git merge --no-ff</code>, runs the AC6 dogfooding workflow
+(restart daemon → real workflow citing post-038 tool names → journal
+entry), then strategist files the
+<code>2026-05-17-XXX-recent-work-context-final-removal.md</code>
+follow-up post-merge per AC3 After-Completion #6 (which must account for
+the <code>find-clusters.ts:35</code> shim-constant import as the
+strategist’s review already noted).</li>
 </ul>
 <h3
 id="pdt-cursor-r3-review-on-038-spec-narrow-polish-5-findings-0-high-proceed">20:57
