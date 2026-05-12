@@ -1,13 +1,13 @@
 ---
 id: 2026-05-12-040-watcher-state-executable-test
 title: Watcher post-combine state machine — executable test of AC3.5 (b) (closes Codex R4 LOW #1)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.5d
 created: 2026-05-12
-claimed_by: null
-claimed_at: null
-branch: null
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-12T10:06:48Z"
+branch: "agent/watcher-state-executable-test"
 head_sha: null
 agent_notes: null
 spec_refs:
