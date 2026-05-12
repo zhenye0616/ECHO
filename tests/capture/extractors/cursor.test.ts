@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CAPTURED_SOURCES, _isAllowedPathIn } from '../../../src/capture/sources.js';
 import {
@@ -1485,5 +1486,348 @@ describe('startCursorExtractor 034 revert-mechanism (AC3 — item 034)', () => {
 describe('CURSOR_REPOLL_INTERVAL_MS configuration (AC1 — item 034)', () => {
   it('source constant is 15_000 ms', () => {
     expect(CURSOR_REPOLL_INTERVAL_MS).toBe(15_000);
+  });
+});
+
+// Item 037 / AC1 — repo_root resolution end-to-end through
+// `startCursorExtractor`. Uses the `__resolveRepoRootForWorkspaceId` and
+// `__resolveRepoRootFromFiles` injection seams so tests don't need to
+// hand-build workspace.json fixtures or a real .git directory; the
+// helpers' own correctness is covered by tests/mcp/cursor-workspace-
+// resolver.test.ts (Stage 1) and a small isolated check below (Stage 2).
+describe('startCursorExtractor repo_root resolution (item 037 / AC1)', () => {
+  let dir: string;
+  let dbPath: string;
+  let storage: MemoryStorage;
+  let handle: CursorExtractorHandle | null = null;
+  let originalFsPaths: string[];
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    originalFsPaths = snapshotFsPaths();
+    dir = tmpDir();
+    dbPath = join(dir, 'state.vscdb');
+    storage = new MemoryStorage();
+    captured = captureStdout();
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(`${dir}/`);
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    captured.restore();
+    resetAllowlist();
+    restoreFsPaths(originalFsPaths);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  async function startWithInjections(opts: {
+    resolveStage1?: (workspace_id: string, dir: string) => string | null;
+    resolveStage2?: (files: readonly string[]) => string | null;
+  }): Promise<CursorExtractorHandle> {
+    const h = await startCursorExtractor(storage, {
+      globalDbPath: dbPath,
+      workspacePrefix: `${dir}/workspaceStorage/`,
+      repollIntervalMs: 60_000,
+      exposeTestHooks: true,
+      ...(opts.resolveStage1 !== undefined
+        ? { __resolveRepoRootForWorkspaceId: opts.resolveStage1 }
+        : {}),
+      ...(opts.resolveStage2 !== undefined
+        ? { __resolveRepoRootFromFiles: opts.resolveStage2 }
+        : {}),
+    });
+    h.__testHooks!.setLastSeenScanMtime(0);
+    return h;
+  }
+
+  it('Stage 1: composer with workspace binding resolves repo_root via registry', async () => {
+    const composer_id = 'ac1-stage1-comp';
+    // Bind composer → workspace_id via the workspace.json watcher path.
+    const wsDir = join(dir, 'workspaceStorage', 'WS-A');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(
+      join(wsDir, 'workspace.json'),
+      JSON.stringify({ folder: 'file:///tmp/echo-test-repo' }),
+    );
+    // Seed the workspace state.vscdb with composer.composerData so the
+    // chokidar 'change' fires refreshComposerWorkspaceMap. Bare new
+    // Database creates an empty file; the actual ItemTable row is what
+    // refreshComposerWorkspaceMap reads.
+    const wsDb = new Database(join(wsDir, 'state.vscdb'));
+    wsDb.exec('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)');
+    wsDb
+      .prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)')
+      .run(
+        'composer.composerData',
+        JSON.stringify({ allComposers: [{ composerId: composer_id }] }),
+      );
+    wsDb.close();
+
+    createGlobalStorageFixture(dbPath, [
+      { composer_id, bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+
+    let stage1Calls = 0;
+    let stage2Calls = 0;
+    handle = await startWithInjections({
+      resolveStage1: (wid) => {
+        stage1Calls += 1;
+        return wid === 'WS-A' ? '/tmp/echo-test-repo' : null;
+      },
+      resolveStage2: () => {
+        stage2Calls += 1;
+        return null;
+      },
+    });
+    // Bypass chokidar timing by directly invoking the workspace-map
+    // refresh hook (chokidar's FSEvents-based delivery is flaky within
+    // a short test-wait budget on macOS).
+    await handle.__testHooks!.refreshWorkspaceMap(join(wsDir, 'state.vscdb'));
+    await handle.__testHooks!.triggerRepoll();
+
+    const atoms = await storage.query({});
+    expect(atoms.length).toBe(1);
+    expect(atoms[0]!.metadata?.['repo_root']).toBe('/tmp/echo-test-repo');
+    expect(atoms[0]!.metadata?.['workspace_id']).toBe('WS-A');
+    expect(stage1Calls).toBeGreaterThanOrEqual(1);
+    // Stage 2 not called when Stage 1 succeeded.
+    expect(stage2Calls).toBe(0);
+  });
+
+  it('Stage 2: fresh composer with no binding falls back to file-walk and caches', async () => {
+    const composer_id = 'ac1-stage2-fresh-comp';
+    createGlobalStorageFixture(dbPath, [
+      {
+        composer_id,
+        bubble_id: 'b1',
+        type: 1,
+        text: 'q',
+        attachedFileCodeChunksUris: ['/tmp/echo-test-repo/src/foo.ts'],
+      },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+
+    let stage2Calls = 0;
+    handle = await startWithInjections({
+      // No workspace binding ever set up → Stage 1 never runs.
+      resolveStage2: (files) => {
+        stage2Calls += 1;
+        if (files.length > 0 && files[0]!.startsWith('/tmp/echo-test-repo/')) {
+          return '/tmp/echo-test-repo';
+        }
+        return null;
+      },
+    });
+    await handle.__testHooks!.triggerRepoll();
+
+    const atomsAfterTick1 = await storage.query({});
+    expect(atomsAfterTick1.length).toBe(1);
+    expect(atomsAfterTick1[0]!.metadata?.['repo_root']).toBe('/tmp/echo-test-repo');
+    expect(stage2Calls).toBe(1);
+
+    // Cache prevents re-walk on the next turn for the same composer.
+    appendBubble(dbPath, {
+      composer_id,
+      bubble_id: 'b3',
+      type: 1,
+      text: 'q2',
+      attachedFileCodeChunksUris: ['/tmp/echo-test-repo/src/foo.ts'],
+    });
+    appendBubble(dbPath, { composer_id, bubble_id: 'b4', type: 2, text: 'a2' });
+    const f = new Date(Date.now() + 5000);
+    utimesSync(dbPath, f, f);
+    await handle.__testHooks!.triggerRepoll();
+
+    const atomsAfterTick2 = await storage.query({});
+    expect(atomsAfterTick2.length).toBe(2);
+    // Both atoms carry repo_root.
+    for (const a of atomsAfterTick2) {
+      expect(a.metadata?.['repo_root']).toBe('/tmp/echo-test-repo');
+    }
+    // Stage 2 was NOT re-invoked on turn 2 (cache hit). Strict equality
+    // proves the cache short-circuited the file-walk.
+    expect(stage2Calls).toBe(1);
+  });
+
+  it('Stage 2: ambiguous files (two distinct .git ancestors) → metadata omits repo_root', async () => {
+    const composer_id = 'ac1-stage2-ambig';
+    createGlobalStorageFixture(dbPath, [
+      {
+        composer_id,
+        bubble_id: 'b1',
+        type: 1,
+        text: 'q',
+        attachedFileCodeChunksUris: ['/tmp/repoA/x.ts', '/tmp/repoB/y.ts'],
+      },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startWithInjections({
+      resolveStage2: () => null, // ambiguous → null (production behavior)
+    });
+    await handle.__testHooks!.triggerRepoll();
+    const atoms = await storage.query({});
+    expect(atoms.length).toBe(1);
+    expect(atoms[0]!.metadata).not.toHaveProperty('repo_root');
+  });
+
+  it('Both stages fail: no binding + empty files_referenced → repo_root omitted (no warn)', async () => {
+    const composer_id = 'ac1-both-fail-clean';
+    createGlobalStorageFixture(dbPath, [
+      { composer_id, bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startWithInjections({
+      resolveStage2: () => null,
+    });
+    await handle.__testHooks!.triggerRepoll();
+    const atoms = await storage.query({});
+    expect(atoms.length).toBe(1);
+    expect(atoms[0]!.metadata).not.toHaveProperty('repo_root');
+    // No warn — the no-binding case is the routine pre-binding state.
+    const stdout = captured.writes.join('');
+    expect(stdout).not.toContain('cursor_repo_root_resolution_failed');
+  });
+
+  it('Cache invalidation: binding lands AFTER initial file-walk → registry overrides cache', async () => {
+    const composer_id = 'ac1-cache-invalidate';
+    // First tick: file-walk resolves to /tmp/from-files; no binding.
+    createGlobalStorageFixture(dbPath, [
+      {
+        composer_id,
+        bubble_id: 'b1',
+        type: 1,
+        text: 'q',
+        attachedFileCodeChunksUris: ['/tmp/from-files/x.ts'],
+      },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+
+    // Set up a workspace.json so a later chokidar 'change' on its state.vscdb
+    // wires composer → workspace_id, after which Stage 1 must win.
+    const wsDir = join(dir, 'workspaceStorage', 'WS-LATE');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(
+      join(wsDir, 'workspace.json'),
+      JSON.stringify({ folder: 'file:///tmp/from-registry' }),
+    );
+
+    handle = await startWithInjections({
+      resolveStage1: () => '/tmp/from-registry',
+      resolveStage2: () => '/tmp/from-files',
+    });
+    await handle.__testHooks!.triggerRepoll();
+    const atomsAfterTick1 = await storage.query({});
+    expect(atomsAfterTick1[0]!.metadata?.['repo_root']).toBe('/tmp/from-files');
+
+    // Now bind composer → workspace_id by writing the workspace's state.vscdb
+    // with composer.composerData and invoking the workspace-map refresh hook.
+    const wsDb = new Database(join(wsDir, 'state.vscdb'));
+    wsDb.exec('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)');
+    wsDb
+      .prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)')
+      .run(
+        'composer.composerData',
+        JSON.stringify({ allComposers: [{ composerId: composer_id }] }),
+      );
+    wsDb.close();
+    await handle.__testHooks!.refreshWorkspaceMap(join(wsDir, 'state.vscdb'));
+
+    // Emit a second turn; with the binding now wired, Stage 1 should win.
+    appendBubble(dbPath, {
+      composer_id,
+      bubble_id: 'b3',
+      type: 1,
+      text: 'q2',
+      attachedFileCodeChunksUris: ['/tmp/from-files/x.ts'],
+    });
+    appendBubble(dbPath, { composer_id, bubble_id: 'b4', type: 2, text: 'a2' });
+    const f = new Date(Date.now() + 5000);
+    utimesSync(dbPath, f, f);
+    await handle.__testHooks!.triggerRepoll();
+
+    const atomsAfterTick2 = await storage.query({});
+    expect(atomsAfterTick2.length).toBe(2);
+    const newest = atomsAfterTick2.find((a) => a.metadata?.['user_bubble_id'] === 'b3');
+    expect(newest).toBeDefined();
+    // Registry priority: Stage 1's result overwrote the Stage 2 cache.
+    expect(newest!.metadata?.['repo_root']).toBe('/tmp/from-registry');
+  });
+
+  it('Warn dedup: binding present + Stage 1 fails + no files → warn fires AT MOST once per composer', async () => {
+    const composer_id = 'ac1-warn-dedup-unique-x9q7';
+    // Bind composer to a workspace whose Stage 1 will return null (folder
+    // URI malformed, mocked here as null).
+    const wsDir = join(dir, 'workspaceStorage', 'WS-MAL');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(join(wsDir, 'workspace.json'), JSON.stringify({ folder: 'not-a-file-uri' }));
+    const wsDb = new Database(join(wsDir, 'state.vscdb'));
+    wsDb.exec('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)');
+    wsDb
+      .prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)')
+      .run(
+        'composer.composerData',
+        JSON.stringify({ allComposers: [{ composerId: composer_id }] }),
+      );
+    wsDb.close();
+
+    createGlobalStorageFixture(dbPath, [
+      { composer_id, bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startWithInjections({
+      resolveStage1: () => null,
+      resolveStage2: () => null,
+    });
+    await handle.__testHooks!.refreshWorkspaceMap(join(wsDir, 'state.vscdb'));
+    await handle.__testHooks!.triggerRepoll();
+
+    // Emit a second turn for the same composer — the dedup must suppress
+    // the warn on the repeat resolution failure.
+    appendBubble(dbPath, { composer_id, bubble_id: 'b3', type: 1, text: 'q2' });
+    appendBubble(dbPath, { composer_id, bubble_id: 'b4', type: 2, text: 'a2' });
+    const f2 = new Date(Date.now() + 5000);
+    utimesSync(dbPath, f2, f2);
+    await handle.__testHooks!.triggerRepoll();
+
+    const stdout = captured.writes.join('');
+    const matches = stdout.match(/cursor_repo_root_resolution_failed/g);
+    expect(matches?.length ?? 0).toBe(1);
+  });
+
+  it('workspace_id write contract is preserved alongside repo_root', async () => {
+    // Regression: AC1 added a SIBLING write, not a replacement. The
+    // workspace_id write at line ~1144 must still fire when bound.
+    const composer_id = 'ac1-ws-id-regression';
+    const wsDir = join(dir, 'workspaceStorage', 'WS-COEXIST');
+    mkdirSync(wsDir, { recursive: true });
+    writeFileSync(
+      join(wsDir, 'workspace.json'),
+      JSON.stringify({ folder: 'file:///tmp/coexist-repo' }),
+    );
+    const wsDb = new Database(join(wsDir, 'state.vscdb'));
+    wsDb.exec('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)');
+    wsDb
+      .prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)')
+      .run(
+        'composer.composerData',
+        JSON.stringify({ allComposers: [{ composerId: composer_id }] }),
+      );
+    wsDb.close();
+    createGlobalStorageFixture(dbPath, [
+      { composer_id, bubble_id: 'b1', type: 1, text: 'q' },
+      { composer_id, bubble_id: 'b2', type: 2, text: 'a' },
+    ]);
+    handle = await startWithInjections({
+      resolveStage1: () => '/tmp/coexist-repo',
+    });
+    await handle.__testHooks!.refreshWorkspaceMap(join(wsDir, 'state.vscdb'));
+    await handle.__testHooks!.triggerRepoll();
+    const atom = (await storage.query({}))[0]!;
+    expect(atom.metadata?.['workspace_id']).toBe('WS-COEXIST');
+    expect(atom.metadata?.['repo_root']).toBe('/tmp/coexist-repo');
   });
 });

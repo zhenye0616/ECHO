@@ -13,6 +13,7 @@ import type {
   ResponseFormat,
 } from '../../trace/types.js';
 import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
+import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
 import { WIRE_SHAPE_CAPS } from '../wire-shape/caps.js';
 
 // V1.6 (item 030) deprecation marker. Removal is gated on item 031 after a
@@ -305,6 +306,13 @@ export interface RecentWorkContextParams {
   limit?: number;
   window_hours?: number;
   format?: ResponseFormat;
+  /** Item 037 / AC4: absolute repo root path. When set, scopes the
+   *  candidate event set to atoms whose `metadata.repo_root` matches —
+   *  cross-source (no source_app gating). Legacy git atoms without
+   *  repo_root metadata are out of scope when this is set; callers
+   *  needing them can use `tail_session(source_app='git')` with its
+   *  two-path OR or pass `source_prefix='git:<path>'` to other tools. */
+  repo_path?: string;
 }
 
 export function truncateForMinimal(s: string | undefined): string | undefined {
@@ -374,6 +382,7 @@ async function runRecentWorkContextPass(
   windowHours: number,
   format: ResponseFormat,
   artifactHint: ArtifactHint | undefined,
+  normalisedRepoPath: string | null,
 ): Promise<RecentWorkContextResponse> {
   const storageCap = limit * STORAGE_OVERFETCH;
   const events = await storage.query({
@@ -387,6 +396,12 @@ async function runRecentWorkContextPass(
     // the same `fs:/Users/...` source prefix carry richer per-extractor metadata
     // (no `surface: 'fs'`), so they are unaffected.
     exclude_metadata_surface: ['fs'],
+    // Item 037 / AC4: cross-source repo scoping. Storage matches
+    // metadata.repo_root by string equality — git atoms without that
+    // metadata are not in the filtered set (see AC6 Note 3).
+    ...(normalisedRepoPath !== null
+      ? { metadata_match: { repo_root: normalisedRepoPath } }
+      : {}),
   });
 
   const query: Query = {
@@ -398,6 +413,9 @@ async function runRecentWorkContextPass(
   };
   if (artifactHint !== undefined) {
     query.artifact_hint = artifactHint;
+  }
+  if (normalisedRepoPath !== null) {
+    query.repo_path = normalisedRepoPath;
   }
 
   const response = buildRecentWorkContext(events, query, normalizeEvent);
@@ -430,6 +448,13 @@ export async function getRecentWorkContext(
   // exceed the consumer's 25k-char tool-result budget on first call.
   const format: ResponseFormat = params.format ?? 'minimal';
 
+  // Item 037 / AC4: validate + normalise repo_path before either pass.
+  let normalisedRepoPath: string | null = null;
+  if (params.repo_path !== undefined) {
+    assertAbsoluteRepoPath('get_recent_work_context', params.repo_path);
+    normalisedRepoPath = normaliseRepoPath(params.repo_path);
+  }
+
   const sinceMs = Date.parse(since);
   const untilMs = Date.parse(until);
   const windowHours = inferWindowHours(sinceMs, untilMs, params.window_hours);
@@ -442,6 +467,7 @@ export async function getRecentWorkContext(
     windowHours,
     format,
     params.artifact_hint,
+    normalisedRepoPath,
   );
 
   // V1.5.7 polish (2026-05-09) + item 032 (2026-05-10): no-args auto-expand
@@ -487,6 +513,7 @@ export async function getRecentWorkContext(
         expandedWindowHours,
         format,
         params.artifact_hint,
+        normalisedRepoPath,
       );
 
       // Apply the rank demotion ONLY when the single-source-recent trigger
@@ -506,6 +533,9 @@ export async function getRecentWorkContext(
         };
         if (params.artifact_hint !== undefined) {
           queryEcho.artifact_hint = params.artifact_hint;
+        }
+        if (normalisedRepoPath !== null) {
+          queryEcho.repo_path = normalisedRepoPath;
         }
         const reranked = rankClusters(response.clusters, atomsById24h, queryEcho, {
           demoteSingleSourceRecent: true,
@@ -609,13 +639,35 @@ export function registerRecentWorkContext(server: McpServer, storage: Storage): 
         limit: z.number().optional(),
         window_hours: z.number().min(0.1).max(168).optional(),
         format: formatSchema.optional(),
+        repo_path: z
+          .string()
+          .optional()
+          .describe(
+            'Item 037: absolute filesystem path to a repo root. When set, scopes the candidate event set to atoms whose `metadata.repo_root` matches (cross-source). Legacy git atoms without that metadata are out of scope when this is passed; reach them via `source_prefix=git:<path>` or `tail_session(source_app=git, repo_path=...)`.',
+          ),
       },
       outputSchema: recentWorkContextOutputSchema,
       annotations: { readOnlyHint: true },
     },
     async (input) => {
       const params = input as RecentWorkContextParams;
-      const full = await getRecentWorkContext(storage, params);
+      let full: RecentWorkContextResponse;
+      try {
+        full = await getRecentWorkContext(storage, params);
+      } catch (err) {
+        // Item 037 / AC4: repo_path validation errors surface via the
+        // MCP envelope's `isError` flag, matching tail_session's pattern.
+        if (
+          err instanceof Error &&
+          err.message.startsWith('get_recent_work_context: ')
+        ) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: err.message }],
+          };
+        }
+        throw err;
+      }
       // Apply skeleton at the wire boundary so the in-process function
       // signature stays narrow. SkeletonResponse and RecentWorkContextResponse
       // both serialize to a JSON object that validates against the permissive

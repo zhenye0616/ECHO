@@ -192,6 +192,7 @@ describe('searchMemories (pure handler)', () => {
       until: null,
       cursor: null,
       limit: 3,
+      repo_path: null,
     });
   });
 
@@ -963,6 +964,109 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
     );
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/source_app/);
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/cursor.*claude_code.*codex.*git|next_cursor/);
+  });
+
+  // Item 037 / AC3 — repo_path filter.
+  it('AC3: repo_path filters results to atoms whose metadata.repo_root matches', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/cursor/a',
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'in project_echo',
+      metadata: { repo_root: '/Users/x/Desktop/Project_echo' },
+    });
+    await store.append({
+      source: 'fs:/cursor/a',
+      timestamp: '2026-05-10T11:00:00.000Z',
+      content: 'in another repo',
+      metadata: { repo_root: '/Users/x/Desktop/Other' },
+    });
+    await store.append({
+      source: 'fs:/cursor/a',
+      timestamp: '2026-05-10T12:00:00.000Z',
+      content: 'no repo metadata',
+    });
+    const r = await searchMemories(store, {
+      repo_path: '/Users/x/Desktop/Project_echo',
+    });
+    expect(r.matches.map((m) => m.content)).toEqual(['in project_echo']);
+    expect(r.query_echo.repo_path).toBe('/Users/x/Desktop/Project_echo');
+  });
+
+  it('AC3: query_echo.repo_path is null when not passed (baseline)', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/cursor/a',
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'baseline',
+    });
+    const r = await searchMemories(store, {});
+    expect(r.query_echo.repo_path).toBeNull();
+  });
+
+  it('AC3: repo_path joins AND with source_app', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: `fs:${process.env['HOME']}/Library/Application Support/Cursor/sess-A`,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'cursor in repo',
+      metadata: { repo_root: '/r1' },
+    });
+    await store.append({
+      source: `fs:${process.env['HOME']}/.claude/projects/sess-B`,
+      timestamp: '2026-05-10T11:00:00.000Z',
+      content: 'claude_code in repo',
+      metadata: { repo_root: '/r1' },
+    });
+    const r = await searchMemories(store, {
+      source_app: 'claude_code',
+      repo_path: '/r1',
+    });
+    expect(r.matches.map((m) => m.content)).toEqual(['claude_code in repo']);
+  });
+
+  it('AC3: repo_path joins AND with since/until', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/x',
+      timestamp: '2026-05-09T10:00:00.000Z',
+      content: 'too old',
+      metadata: { repo_root: '/r1' },
+    });
+    await store.append({
+      source: 'fs:/x',
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'in window',
+      metadata: { repo_root: '/r1' },
+    });
+    const r = await searchMemories(store, {
+      since: '2026-05-10T00:00:00.000Z',
+      until: '2026-05-11T00:00:00.000Z',
+      repo_path: '/r1',
+    });
+    expect(r.matches.map((m) => m.content)).toEqual(['in window']);
+  });
+
+  it('AC3: rejects non-absolute repo_path with a clear error', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      searchMemories(store, { repo_path: 'relative/path' }),
+    ).rejects.toThrow(/repo_path must be absolute/);
+  });
+
+  it('AC3: repo_path with trailing slash normalises before storage lookup', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:/x',
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'in repo',
+      metadata: { repo_root: '/Users/x/Project_echo' },
+    });
+    const r = await searchMemories(store, {
+      repo_path: '/Users/x/Project_echo/',
+    });
+    expect(r.matches.map((m) => m.content)).toEqual(['in repo']);
+    expect(r.query_echo.repo_path).toBe('/Users/x/Project_echo');
   });
 
   it('substring-query path: storage is NOT called with filter.limit', async () => {

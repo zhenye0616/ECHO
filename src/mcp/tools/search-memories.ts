@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
 import { hasTzMarker, isoString, TZ_NAIVE_WARNING } from '../util/iso8601.js';
+import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch } from '../wire-shape/match.js';
 import { CursorDecodeError, decodeCursor, emitCursor } from './_cursor.js';
@@ -15,7 +16,7 @@ export {
 } from './_cursor.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
-  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Prefer `source_app` (`cursor` | `claude_code` | `codex` | `git`) for app-scoped queries; falls through to the FS-encoded `source_prefix` if you need a path-precise filter (e.g. a single Codex rollout JSONL). When both `source_app` and `source_prefix` are passed, `source_prefix` wins (explicit-over-implicit). Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
+  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Prefer `source_app` (`cursor` | `claude_code` | `codex` | `git`) for app-scoped queries; falls through to the FS-encoded `source_prefix` if you need a path-precise filter (e.g. a single Codex rollout JSONL). When both `source_app` and `source_prefix` are passed, `source_prefix` wins (explicit-over-implicit). Free-text query is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Pass `repo_path=<absolute repo root>` (item 037) to scope results to atoms whose capture-side `metadata.repo_root` matches — works across all four source_apps. For `source_app='git'`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix='git:<path>'`. For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
@@ -74,6 +75,11 @@ export interface SearchResult {
     until: string | null;
     cursor: string | null;
     limit: number;
+    /** Item 037 / AC3: the normalised form (post `normaliseRepoPath`) of
+     *  the caller-supplied `repo_path` — `null` when not passed. Echoing
+     *  the normalised form lets the caller see what actually filtered
+     *  storage (e.g. a trailing-slash input vs. the stored shape). */
+    repo_path: string | null;
   };
   /** V1.5.7 (Gap 6): non-blocking advisories. Mirrors
    *  `RecentWorkContextResponse.warnings`. Today emits the TZ-naive
@@ -91,6 +97,10 @@ export interface SearchMemoriesParams {
   until?: string;
   cursor?: string;
   limit?: number;
+  /** Item 037 / AC3: work-artifact (repo) scoping. Absolute repo root path.
+   *  When set, restricts results to atoms whose `metadata.repo_root` equals
+   *  `normaliseRepoPath(repo_path)`. Joins AND with other filters. */
+  repo_path?: string;
 }
 
 function clampLimit(input: number | undefined): number {
@@ -116,8 +126,17 @@ export async function searchMemories(
   storage: Storage,
   params: SearchMemoriesParams,
 ): Promise<SearchResult> {
-  const { query, source_app, source_prefix, since, until, cursor, limit } = params;
+  const { query, source_app, source_prefix, since, until, cursor, limit, repo_path } = params;
   const limitApplied = clampLimit(limit);
+
+  // Item 037 / AC3: validate + normalise repo_path before any storage call.
+  // Throwing here surfaces through the MCP envelope handler as `isError`
+  // (same pattern as tail_session's repo_path rejects).
+  let normalisedRepoPath: string | null = null;
+  if (repo_path !== undefined) {
+    assertAbsoluteRepoPath('search_memories', repo_path);
+    normalisedRepoPath = normaliseRepoPath(repo_path);
+  }
 
   // source_prefix wins on conflict (explicit-over-implicit escape hatch). Both
   // are echoed in query_echo so callers can see which one ended up applied.
@@ -145,6 +164,9 @@ export async function searchMemories(
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
   if (before !== undefined) filter.before = before;
+  if (normalisedRepoPath !== null) {
+    filter.metadata_match = { repo_root: normalisedRepoPath };
+  }
 
   // Two paths through the result list, two overfetch sites — keep them legible
   // so the next reader doesn't collapse them into one and re-introduce item
@@ -200,6 +222,7 @@ export async function searchMemories(
       until: until ?? null,
       cursor: cursor ?? null,
       limit: limitApplied,
+      repo_path: normalisedRepoPath,
     },
     warnings,
   };
@@ -248,6 +271,7 @@ const searchMemoriesOutputSchema = {
     until: z.string().nullable(),
     cursor: z.string().nullable(),
     limit: z.number(),
+    repo_path: z.string().nullable(),
   }),
   // V1.5.7 (Gap 6): non-blocking advisories. Always present (possibly empty).
   warnings: z.array(z.string()),
@@ -266,6 +290,12 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
         until: isoString.optional(),
         cursor: z.string().optional(),
         limit: z.number().optional(),
+        repo_path: z
+          .string()
+          .optional()
+          .describe(
+            'Item 037: absolute filesystem path to a repo root. When set, scopes the result set to atoms whose `metadata.repo_root` (written at capture time for claude_code, codex, and cursor; reachable across all four source_apps) equals the normalised path. For `source_app=git`, matches `metadata.repo_root` only — legacy git atoms without that metadata are reachable via `source_prefix=git:<path>`.',
+          ),
       },
       outputSchema: searchMemoriesOutputSchema,
       annotations: { readOnlyHint: true },
@@ -281,6 +311,15 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
           // deliberately omit `structuredContent` because the success
           // outputSchema's `next_cursor: nullable string` cannot represent
           // the error variant.
+          return {
+            isError: true,
+            content: [{ type: 'text', text: err.message }],
+          };
+        }
+        // Item 037 / AC3: repo_path validation errors surface through the
+        // same `isError` envelope (matches tail_session's contract at
+        // lines 444-449).
+        if (err instanceof Error && err.message.startsWith('search_memories: ')) {
           return {
             isError: true,
             content: [{ type: 'text', text: err.message }],

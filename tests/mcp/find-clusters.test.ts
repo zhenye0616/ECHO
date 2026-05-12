@@ -404,6 +404,92 @@ describe('find_clusters', () => {
     ).toBe(false);
   });
 
+  // Item 037 / AC4 — repo_path scoping.
+  it('AC4: repo_path passes through to recent_work_context and scopes the candidate set', async () => {
+    const store = new MemoryStorage();
+    const targetRepo = '/Users/x/Desktop/Project_echo';
+    const otherRepo = '/Users/x/Desktop/Other';
+    const targetFile = `${targetRepo}/src/a.ts`;
+    const otherFile = `${otherRepo}/src/b.ts`;
+    // 3 turns in target repo (one cluster), 3 in other repo.
+    for (let i = 0; i < 3; i++) {
+      const ts = `2026-05-09T10:${(i * 5).toString().padStart(2, '0')}:00.000Z`;
+      await store.append({
+        source: `fs:/Users/redacted/.claude/projects/-Users-x-Desktop-Project-echo/sess-${i}.jsonl`,
+        timestamp: ts,
+        content: `USER: q${i}\n\nASSISTANT: a${i}`,
+        metadata: {
+          surface: 'claude_code',
+          repo_root: targetRepo,
+          files_referenced: [targetFile],
+          cwd: targetRepo,
+          session_id: `sess-${i}`,
+        },
+      });
+      await store.append({
+        source: `fs:/Users/redacted/.claude/projects/-Users-x-Desktop-Other/sess-${i + 100}.jsonl`,
+        timestamp: ts,
+        content: `USER: q${i}\n\nASSISTANT: a${i}`,
+        metadata: {
+          surface: 'claude_code',
+          repo_root: otherRepo,
+          files_referenced: [otherFile],
+          cwd: otherRepo,
+          session_id: `sess-${i + 100}`,
+        },
+      });
+    }
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+      repo_path: targetRepo,
+    });
+    expect(r.query.repo_path).toBe(targetRepo);
+    // No cluster should reference the other repo's atoms.
+    const allAtomIds = r.clusters.flatMap((c) => c.atom_ids);
+    const matching = await store.getByIds(allAtomIds);
+    expect(matching.length).toBeGreaterThan(0);
+    for (const a of matching) {
+      expect(a.metadata?.['repo_root']).toBe(targetRepo);
+    }
+  });
+
+  it('AC4: query.repo_path is null in baseline (no repo_path passed)', async () => {
+    const store = new MemoryStorage();
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+    });
+    expect(r.query.repo_path).toBeNull();
+  });
+
+  it('AC4: trailing-slash repo_path normalises to no-slash form', async () => {
+    const store = new MemoryStorage();
+    const targetRepo = '/Users/x/Project_echo';
+    for (let i = 0; i < 2; i++) {
+      const ts = `2026-05-09T10:${(i * 5).toString().padStart(2, '0')}:00.000Z`;
+      await store.append({
+        source: `fs:/Users/redacted/.claude/projects/sess-${i}.jsonl`,
+        timestamp: ts,
+        content: `USER: q${i}\n\nASSISTANT: a${i}`,
+        metadata: {
+          surface: 'claude_code',
+          repo_root: targetRepo,
+          files_referenced: [`${targetRepo}/a.ts`],
+          cwd: targetRepo,
+          session_id: `sess-${i}`,
+        },
+      });
+    }
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+      repo_path: `${targetRepo}/`,
+    });
+    expect(r.query.repo_path).toBe(targetRepo);
+    expect(r.clusters.length).toBeGreaterThan(0);
+  });
+
   it('open_loop_hints stays capped at SKELETON_CLUSTER_OPEN_LOOP_HINTS_CAP (50-cap reused)', async () => {
     // Synthesize many open-loop hints by using "?" turn endings (the
     // ends_with_question hint trigger). Cluster size doesn't have to

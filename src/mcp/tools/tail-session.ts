@@ -1,11 +1,12 @@
 import { isAbsolute } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { QueryFilter, Storage } from '../../storage/interface.js';
+import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
 import {
   resolveCursorComposerForRepoPath,
   type CursorComposerResolution,
 } from '../cursor-workspace-resolver.js';
+import { normaliseRepoPath } from '../util/repo-path.js';
 import { buildSourceAppMap, SOURCE_APP_VALUES, type SourceApp } from '../util/source-app.js';
 import { projectMatch } from '../wire-shape/match.js';
 import { CursorDecodeError, decodeCursor, emitCursor, type DecodedCursor } from './_cursor.js';
@@ -14,7 +15,7 @@ import { searchMatchSchema } from './search-memories.js';
 export type { SourceApp };
 
 export const TAIL_SESSION_DESCRIPTION =
-  'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Calling with neither `source` nor `source_app` auto-resolves to the most-recently-active source_app across all apps (last 24h) — the ergonomic shape for "where did I leave off" resume calls without picking an app upfront. For source_app=cursor, optionally pass repo_path=<absolute repo root> to scope the tail to the Cursor composer active in that project. Without repo_path, the MRU resolution returns the most-recently-active Cursor composer globally (which is often a different project than the caller intends). Default count=5, max 20; typical response < 10k chars. Use this for "where did <app> leave off" lookups instead of substring search.';
+  'Tail the N most-recent captured atoms for a single named source — the cheap counterpart to search_memories (substring) and get_recent_work_context (clustered). Pass `source` for an exact path-precise tail, or `source_app` (one of cursor/claude_code/codex/git) to auto-resolve the most-recently-active session for that app. Calling with neither `source` nor `source_app` auto-resolves to the most-recently-active source_app across all apps (last 24h) — the ergonomic shape for "where did I leave off" resume calls without picking an app upfront. Pass `repo_path=<absolute repo root>` (item 037) to scope the tail to that repo across ALL source_apps (cursor/claude_code/codex/git). For source_app=cursor + repo_path, the resolver uses a two-phase fallback: phase 1 matches `metadata.repo_root` directly (post-AC1 atoms incl. fresh composers); phase 2 falls back to the legacy composer↔workspace resolver only if phase 1 returns 0 atoms (`composer_resolved` is set when phase 2 fires). For source_app=git + repo_path, two-path OR: either `metadata.repo_root` matches OR the source encodes `git:<repo_path>` — recovers legacy git atoms by path even when they pre-date the repo_root metadata write. Default count=5, max 20; typical response < 10k chars. Use this for "where did <app> leave off" lookups instead of substring search.';
 
 // V1.5.7 polish (2026-05-09): no-args fallback look-back window. When the
 // caller passes neither `source` nor `source_app`, we scan the four known
@@ -189,23 +190,30 @@ export async function tailSession(
   const { source, source_app, count, cursor, repo_path } = params;
   const countApplied = clampCount(count);
 
-  // Parameter-validation gates for `repo_path` (item 035, AC1). These run
-  // BEFORE branching so the same errors surface on the unit-level call
-  // (no MCP wire) and the wire path identically.
+  // Parameter-validation gates for `repo_path`. Item 035 introduced
+  // the parameter as Cursor-only; item 037 generalises it across all
+  // four source_apps. Combining `repo_path` with an exact `source` still
+  // has no coherent meaning (the exact path already pins down a single
+  // session) — keep that reject.
+  let normalisedRepoPath: string | undefined;
   if (repo_path !== undefined) {
     if (source !== undefined) {
-      // R1 Finding 3 (Codex) + R1 Med #1 (Cursor): combining an exact
-      // source path with the repo_path resolver has no coherent meaning.
       throw new Error(
-        'tail_session: repo_path is incompatible with exact source; use source_app=cursor + repo_path, or omit repo_path',
+        'tail_session: repo_path is incompatible with exact source; pass `source_app` (cursor|claude_code|codex|git) + repo_path, or omit repo_path',
       );
     }
     if (source_app === undefined) {
-      throw new Error('tail_session: repo_path requires source_app=cursor');
+      throw new Error(
+        'tail_session: repo_path requires source_app (cursor|claude_code|codex|git)',
+      );
     }
     if (!isAbsolute(repo_path)) {
       throw new Error('tail_session: repo_path must be absolute');
     }
+    // Item 037 / AC6 #2: normalise BEFORE any metadata_match issuance —
+    // captured `metadata.repo_root` is stored no-trailing-slash, so
+    // `/path/` would silently miss `/path` without this.
+    normalisedRepoPath = normaliseRepoPath(repo_path);
   }
 
   let before: DecodedCursor | undefined;
@@ -215,45 +223,39 @@ export async function tailSession(
 
   // source_app branch: resolve the newest session for that app, then tail it.
   if (source_app !== undefined) {
-    // Cursor repo-scoped path (item 035, AC4). Honored only when
-    // source_app === 'cursor' AND repo_path is set; other apps' source
-    // paths already encode the project, so a repo_path is meaningless
-    // for them — warn-ignore.
-    if (source_app === 'cursor' && repo_path !== undefined) {
-      const resolver = injections.resolveCursorComposer ?? resolveCursorComposerForRepoPath;
-      const resolved = resolver(repo_path);
-      if (resolved === null) {
-        return {
-          turns: [],
-          next_cursor: null,
-          source_resolved: null,
-          warnings: [
-            `tail_session: no Cursor composer matches repo_path=${repo_path}; verify the project is open in Cursor and the workspace has at least one composer`,
-          ],
-        };
+    // Item 037 / AC6: `repo_path` is now first-class across all four
+    // source_apps. The shape varies per app:
+    //   - cursor:        two-phase (repo_root metadata first; composer
+    //                    fallback only when phase 1 returns 0 atoms)
+    //   - claude_code, codex: simple metadata_match on repo_root
+    //   - git:           two-path OR (metadata.repo_root OR exact
+    //                    `git:<repo_path>` source encoding) — tail_session-
+    //                    specific because the MRU resolver depends on it
+    //                    to surface legacy git atoms (per AC6 Note 2).
+    if (normalisedRepoPath !== undefined) {
+      if (source_app === 'cursor') {
+        return tailCursorRepoScoped(
+          storage,
+          normalisedRepoPath,
+          repo_path!,
+          countApplied,
+          before,
+          injections,
+        );
       }
-      const prefix = buildSourceAppMap()['cursor'];
-      const resolvedSource = await resolveNewestSourceForApp(storage, prefix);
-      if (resolvedSource === null) {
-        return {
-          turns: [],
-          next_cursor: null,
-          source_resolved: null,
-          warnings: ['no captured sessions found for source_app=cursor'],
-        };
+      if (source_app === 'git') {
+        return tailGitRepoScopedTwoPath(storage, normalisedRepoPath, countApplied, before);
       }
-      const tail = await tailExactSource(storage, resolvedSource, countApplied, before, {
-        composer_id: resolved.composer_id,
-      });
-      return { ...tail, composer_resolved: resolved.composer_id };
-    }
-    const warnings: string[] = [];
-    if (repo_path !== undefined && source_app !== 'cursor') {
-      // Non-cursor source_app + repo_path: warn-ignore. The parameter is
-      // currently meaningful only for cursor; future items may extend
-      // semantics if a concrete need surfaces.
-      warnings.push(
-        `tail_session: repo_path is currently honored only for source_app=cursor; ignored for ${source_app}`,
+      // claude_code / codex: simple metadata_match flow. The MRU resolver
+      // for the newest source under the app's prefix runs WITH the
+      // repo_root filter, so the picked session is the most-recent one in
+      // the named repo (not globally newest across all repos).
+      return tailAppRepoScoped(
+        storage,
+        source_app,
+        normalisedRepoPath,
+        countApplied,
+        before,
       );
     }
     const prefix = buildSourceAppMap()[source_app];
@@ -263,14 +265,10 @@ export async function tailSession(
         turns: [],
         next_cursor: null,
         source_resolved: null,
-        warnings: [...warnings, `no captured sessions found for source_app=${source_app}`],
+        warnings: [`no captured sessions found for source_app=${source_app}`],
       };
     }
-    const tail = await tailExactSource(storage, resolved, countApplied, before);
-    if (warnings.length > 0) {
-      return { ...tail, warnings: [...warnings, ...tail.warnings] };
-    }
-    return tail;
+    return tailExactSource(storage, resolved, countApplied, before);
   }
 
   // exact-source branch.
@@ -304,6 +302,184 @@ export async function tailSession(
   // Surface the implicit pick on the response so the caller can see which
   // app the resume landed on without inspecting `source_resolved`'s prefix.
   return { ...tail, source_app_resolved: resolved.source_app };
+}
+
+// Item 037 / AC6 — `source_app='cursor'` + `repo_path` two-phase fallback.
+// Phase 1 (PRIMARY) issues a metadata_match query on the new `repo_root`
+// field. Phase 2 (LEGACY FALLBACK) fires only if Phase 1 returned 0 atoms,
+// reaching through the composer↔workspace resolver from item 035.
+// Predicates are NEVER ANDed across phases — each phase uses ONLY its own
+// filter — so legacy atoms without `repo_root` are recovered cleanly and
+// post-AC1 atoms (including fresh composers) are recovered without
+// touching the resolver.
+async function tailCursorRepoScoped(
+  storage: Storage,
+  normalisedRepoPath: string,
+  rawRepoPath: string,
+  countApplied: number,
+  before: DecodedCursor | undefined,
+  injections: TailSessionInjections,
+): Promise<TailSessionResult> {
+  const prefix = buildSourceAppMap()['cursor'];
+  // Phase 1: repo_root metadata match.
+  const phase1Source = await resolveNewestSourceForRepoRoot(
+    storage,
+    prefix,
+    normalisedRepoPath,
+  );
+  if (phase1Source !== null) {
+    return tailExactSource(storage, phase1Source, countApplied, before, {
+      repo_root: normalisedRepoPath,
+    });
+  }
+  // Phase 2: legacy composer fallback. Predicates are NEVER ANDed across
+  // phases — Phase 2 uses ONLY composer_id, no repo_root.
+  const resolver = injections.resolveCursorComposer ?? resolveCursorComposerForRepoPath;
+  const resolved = resolver(rawRepoPath);
+  if (resolved === null) {
+    return {
+      turns: [],
+      next_cursor: null,
+      source_resolved: null,
+      warnings: [
+        `tail_session: no Cursor composer or repo_root atoms match repo_path=${rawRepoPath}; verify the project is open in Cursor and the workspace has at least one composer`,
+      ],
+    };
+  }
+  const resolvedSource = await resolveNewestSourceForApp(storage, prefix);
+  if (resolvedSource === null) {
+    return {
+      turns: [],
+      next_cursor: null,
+      source_resolved: null,
+      warnings: ['no captured sessions found for source_app=cursor'],
+    };
+  }
+  const tail = await tailExactSource(storage, resolvedSource, countApplied, before, {
+    composer_id: resolved.composer_id,
+  });
+  // composer_resolved is set ONLY when Phase 2 fired — its presence is a
+  // legacy-fallback marker for the AC7 dogfooding check (its absence on a
+  // fresh-composer call means AC1's repo_root write landed correctly).
+  return { ...tail, composer_resolved: resolved.composer_id };
+}
+
+// Item 037 / AC6 — claude_code / codex + repo_path: simple metadata_match
+// flow. The MRU resolver runs with the repo_root filter so we pick the
+// newest source for that app **within the named repo**.
+async function tailAppRepoScoped(
+  storage: Storage,
+  source_app: 'claude_code' | 'codex',
+  normalisedRepoPath: string,
+  countApplied: number,
+  before: DecodedCursor | undefined,
+): Promise<TailSessionResult> {
+  const prefix = buildSourceAppMap()[source_app];
+  const resolvedSource = await resolveNewestSourceForRepoRoot(
+    storage,
+    prefix,
+    normalisedRepoPath,
+  );
+  if (resolvedSource === null) {
+    return {
+      turns: [],
+      next_cursor: null,
+      source_resolved: null,
+      warnings: [
+        `no captured sessions found for source_app=${source_app} in repo=${normalisedRepoPath}`,
+      ],
+    };
+  }
+  return tailExactSource(storage, resolvedSource, countApplied, before, {
+    repo_root: normalisedRepoPath,
+  });
+}
+
+// Item 037 / AC6 Note 2 — git + repo_path two-path OR. A row matches if
+// EITHER `metadata.repo_root === repo_path` (post-AC1 atoms) OR
+// `source === git:<repo_path>` (legacy git atoms captured before the
+// repo_root metadata write). Implemented as a two-query UNION at the tool
+// layer (cheaper than adding OR to QueryFilter); dedup by atom id.
+async function tailGitRepoScopedTwoPath(
+  storage: Storage,
+  normalisedRepoPath: string,
+  countApplied: number,
+  before: DecodedCursor | undefined,
+): Promise<TailSessionResult> {
+  const sourceEncoding = `git:${normalisedRepoPath}`;
+  // Path 1: metadata_match (newest source under the git prefix that has
+  // repo_root metadata for our repo). For path 1's source-resolution we
+  // can rely on metadata_match alone since the git source prefix is
+  // `git:`.
+  // Path 2: exact-source `git:<repo_path>`.
+  // We overfetch each by countApplied+1 to drive the cursor emission.
+  const filter1: QueryFilter = {
+    source_prefix: 'git:',
+    metadata_match: { repo_root: normalisedRepoPath },
+    exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
+    limit: countApplied + 1,
+  };
+  const filter2: QueryFilter = {
+    source: sourceEncoding,
+    exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
+    limit: countApplied + 1,
+  };
+  if (before !== undefined) {
+    filter1.before = before;
+    filter2.before = before;
+  }
+  const [rows1, rows2] = await Promise.all([storage.query(filter1), storage.query(filter2)]);
+  // Dedup by id; storage returns (timestamp DESC, id DESC), so re-sorting
+  // the merged set preserves that ordering.
+  const seen = new Set<string>();
+  const merged: CaptureEvent[] = [];
+  for (const r of [...rows1, ...rows2]) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    merged.push(r);
+  }
+  merged.sort((a, b) => {
+    if (a.timestamp < b.timestamp) return 1;
+    if (a.timestamp > b.timestamp) return -1;
+    if (a.id < b.id) return 1;
+    if (a.id > b.id) return -1;
+    return 0;
+  });
+  const { kept, next_cursor } = emitCursor(merged, countApplied);
+  const warnings: string[] = [];
+  if (kept.length === 0 && before === undefined) {
+    warnings.push(
+      `no captured git atoms found for repo=${normalisedRepoPath} (checked both metadata.repo_root and source=git:<path>)`,
+    );
+  }
+  // source_resolved is the encoded git source — meaningful since the
+  // two-path OR returns rows from BOTH the legacy encoding and post-AC1
+  // metadata; pinning the resolution to the canonical `git:<path>` form
+  // gives the caller a stable handle for follow-up tail calls.
+  return {
+    turns: kept.map(toMatch),
+    next_cursor,
+    source_resolved: sourceEncoding,
+    warnings,
+  };
+}
+
+// Item 037 / AC6 — like `resolveNewestSourceForApp` but also AND-filters on
+// `metadata.repo_root === repoRoot`, so the MRU pick is the newest source
+// under the app's prefix that has a captured atom in the named repo.
+async function resolveNewestSourceForRepoRoot(
+  storage: Storage,
+  prefix: string,
+  repoRoot: string,
+): Promise<string | null> {
+  const rows = await storage.query({
+    source_prefix: prefix,
+    metadata_match: { repo_root: repoRoot },
+    exclude_metadata_surface: [...EXCLUDED_SURFACES_FOR_TAIL],
+    limit: 1,
+  });
+  if (rows.length === 0) return null;
+  return rows[0]!.source;
 }
 
 async function tailExactSource(
@@ -403,7 +579,7 @@ export function registerTailSession(server: McpServer, storage: Storage): void {
           .string()
           .optional()
           .describe(
-            'Absolute filesystem path to a repo root (item 035). Honored only for source_app=cursor — scopes the tail to the Cursor composer active in that project. Ignored with a warning for other source_apps. Rejected when combined with `source`, when no `source_app` is supplied, or when the path is not absolute.',
+            'Absolute filesystem path to a repo root. Generalised across all four source_apps (item 037; item 035 introduced this Cursor-only). source_app=cursor uses a two-phase fallback (repo_root metadata first, composer↔workspace resolver only if phase 1 returns 0 atoms). source_app=git uses a two-path OR (metadata.repo_root OR source=`git:<path>`) so legacy git atoms by path are recoverable. source_app=claude_code|codex match metadata.repo_root directly. Rejected when combined with `source`, when no `source_app` is supplied, or when the path is not absolute.',
           ),
       },
       outputSchema: tailSessionOutputSchema,

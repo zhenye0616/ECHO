@@ -67,7 +67,21 @@ agent_notes: |
   AC7 dogfooding is the founder's post-merge run per spec section #5
   ("merge ships after one clean run; second-run-on-different-day
   closes M1-2-A").
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-11 (PDT) via founder reconciliation; clean merge, zero conflicts.
+
+  Conflicts resolved: none. Reviewer's predicted conflicts (docs/BACKLOG.md, claimed→pending_review path, dogfooding journal) did not materialize — the agent's branch never touched those files (backlog state moves happen in the main repo on main, not on the worktree branch).
+
+  Fixups applied: none. Both sidecar pre-merge fixups were no-ops on this clean merge (BACKLOG.md was already main's version; item file already at backlog/pending_review/).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 750/750 tests pass (21 skipped, 0 failed); lint and typecheck clean post-merge. Disclosed-unrelated parallel-load flakes (git-watcher × 5, trace/build × 1) did not reproduce.
+
+  Follow-up items (non-blocking):
+  - Add an inline comment in src/mcp/util/repo-path.ts near assertAbsoluteRepoPath documenting that the '<toolName>: ' error-prefix convention is load-bearing for envelope conversion in find-clusters.ts and similar isError wrappers.
+  - (Optional) Instrument findGitAncestor with a max-depth counter in dev mode for future deep-path latency observability.
+  - AC7 dogfooding owed by founder; second-day run closes M1-2-A. Then queue wiki promotion items per "After Completion" §1 (mcp-tail-session, mcp-search-memories, storage, principles/work-artifact-first-class).
 ---
 
 # Context

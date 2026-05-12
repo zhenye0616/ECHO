@@ -1,9 +1,11 @@
+import { statSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute, dirname as pathDirname } from 'node:path';
 import Database from 'better-sqlite3';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { createLogger } from '../../logging/index.js';
+import { resolveRepoRootForWorkspaceId } from '../../mcp/cursor-workspace-resolver.js';
 import type { Storage } from '../../storage/interface.js';
 import { processCandidate } from '../pipeline.js';
 import { dedupStrings } from './_shared.js';
@@ -158,6 +160,126 @@ interface CursorDiskKVRow {
 }
 
 const missingComposerHeaderWarnedKeys = new Set<string>();
+
+// Item 037 / AC1: dedup the `cursor_repo_root_resolution_failed` warn one
+// per composer_id, so a composer that legitimately can't be repo-attributed
+// (binding present + folder URI missing + zero files) does not flood the
+// log on every poll tick. Same shape as `missingComposerHeaderWarnedKeys`
+// above (per 9d00369).
+const repoRootResolutionFailedWarnedComposers = new Set<string>();
+
+// Item 037 / AC1 Stage 2: walk upward from `filePath` looking for the
+// nearest `.git` ancestor directory or file (git worktrees use a `.git`
+// FILE that points at the main repo's .git dir; we treat both as
+// repo-root markers). Returns the absolute parent path on hit, or null
+// when we reach filesystem root without finding `.git`. Read-only — no
+// new permissions beyond the existing `stat` capability the resolver
+// already requires.
+function findGitAncestor(filePath: string): string | null {
+  if (!isAbsolute(filePath)) return null;
+  let dir = pathDirname(filePath);
+  // Walk up to filesystem root. `pathDirname('/')` returns '/' (and
+  // `pathDirname('C:\\')` returns 'C:\\' on Windows) — bail when the
+  // parent equals the current dir.
+  while (true) {
+    try {
+      // Either a .git directory (regular repo) or a .git file (submodule /
+      // worktree) marks the root. We do not distinguish: both anchor the
+      // repo's working tree at this directory.
+      statSync(`${dir}/.git`);
+      return dir;
+    } catch {
+      // .git does not exist at this level — keep walking.
+    }
+    const parent = pathDirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+// Item 037 / AC1 Stage 2: given an array of files referenced in a turn,
+// resolve to a single repo_root if (and only if) every file with a `.git`
+// ancestor agrees on the same ancestor. Returns null when:
+//   - the array is empty, OR
+//   - no file has a `.git` ancestor, OR
+//   - two or more files have distinct `.git` ancestors (ambiguous —
+//     refuse to guess; the turn captures fine without repo attribution).
+function resolveRepoRootFromFiles(files: readonly string[]): string | null {
+  const ancestors = new Set<string>();
+  for (const f of files) {
+    const a = findGitAncestor(f);
+    if (a !== null) ancestors.add(a);
+  }
+  if (ancestors.size === 1) {
+    return [...ancestors][0]!;
+  }
+  return null;
+}
+
+// Item 037 / AC1: per-turn repo_root resolution. The decision tree (AC1 #4)
+// is intentionally explicit because three prior review rounds (R1/R2/R3)
+// found load-bearing ambiguity in earlier paraphrases.
+//
+//   a. composerToWorkspace has a workspace_id → run Stage 1.
+//     a.i.  Stage 1 returns non-null → authoritative; OVERWRITE cache; return.
+//     a.ii. Stage 1 returns null     → DO NOT cache; fall through to Stage 2.
+//   b. no binding → check cache; hit → return cached; miss → fall through.
+//   c. Stage 2 (file-walk).
+//     c.i.  success → populate cache; return.
+//     c.ii. failure → DO NOT cache; return undefined.
+//
+// Invariant: the cache only ever holds resolved absolute paths. `undefined`
+// (this function's null return) and a missing cache entry are the same
+// "try again next tick" signal.
+//
+// Warn dedup: `cursor_repo_root_resolution_failed` fires AT MOST once per
+// composer_id, AND only when Stage 1 produced a definite failure (binding
+// present but folder URI absent / malformed) AND Stage 2 also returned
+// null. The "no binding" case is the common-and-expected pre-binding
+// state and does not warn.
+function resolveCursorRepoRootForTurn(
+  composer_id: string,
+  workspace_id: string | undefined,
+  filesReferenced: readonly string[],
+  workspaceStorageDir: string,
+  cache: Map<string, string>,
+  resolveStage1: (workspace_id: string, workspaceStorageDir: string) => string | null,
+  resolveStage2: (files: readonly string[]) => string | null,
+): string | undefined {
+  let stage1Failed = false;
+  if (workspace_id !== undefined) {
+    const stage1 = resolveStage1(workspace_id, workspaceStorageDir);
+    if (stage1 !== null) {
+      cache.set(composer_id, stage1);
+      return stage1;
+    }
+    // Binding present but Stage 1 could not decode the folder URI. Mark for
+    // the dedup-warn below if Stage 2 also fails. Do not cache null and do
+    // not return — fall through.
+    stage1Failed = true;
+  } else {
+    const cached = cache.get(composer_id);
+    if (cached !== undefined) return cached;
+  }
+  const stage2 = resolveStage2(filesReferenced);
+  if (stage2 !== null) {
+    cache.set(composer_id, stage2);
+    return stage2;
+  }
+  // Both stages failed. Warn only when Stage 1 had a binding to work with
+  // (the surprising case) — pre-binding turns hitting the file-walk fallback
+  // are routine and not worth a warn.
+  if (stage1Failed) {
+    if (!repoRootResolutionFailedWarnedComposers.has(composer_id)) {
+      repoRootResolutionFailedWarnedComposers.add(composer_id);
+      log.warn('cursor_repo_root_resolution_failed', {
+        composer_id,
+        reason: 'workspace_binding_unresolvable_and_no_unambiguous_files',
+      });
+    }
+  }
+  return undefined;
+}
 
 function parseBubbleKey(key: string): { composer_id: string; bubble_id: string } | null {
   if (!key.startsWith(BUBBLE_KEY_PREFIX)) return null;
@@ -1075,6 +1197,14 @@ export interface CursorExtractorOptions {
   // Test-only: skip parseBubbleRow's fallback chain so the AC3 parse-gap
   // revert test can prove the chain is what closes the parse gap.
   __disableToolCallFallbacks?: boolean;
+  // Item 037 / AC1 test-only injection seams. Tests pass spies to count
+  // resolver invocations (proving the cache prevents re-walks on repeat
+  // composers). Production callers leave both unset and the defaults run.
+  __resolveRepoRootForWorkspaceId?: (
+    workspace_id: string,
+    workspaceStorageDir: string,
+  ) => string | null;
+  __resolveRepoRootFromFiles?: (files: readonly string[]) => string | null;
 }
 
 export interface CursorExtractorTestHooks {
@@ -1087,6 +1217,12 @@ export interface CursorExtractorTestHooks {
   // auto-init-at-start so the FIRST repoll tick can fire against a
   // pre-seeded fixture.
   setLastSeenScanMtime(value: number): void;
+  // Item 037 / AC1: synchronously invoke the workspace-map refresh path
+  // that chokidar normally drives. Tests use this to bind a composer →
+  // workspace_id without depending on macOS FSEvents timing (which can
+  // miss a utimes touch within the test's 200-300ms wait budget on a
+  // busy machine). Production callers never invoke this hook.
+  refreshWorkspaceMap(workspaceDbPath: string): Promise<void>;
 }
 
 export interface CursorExtractorHandle {
@@ -1107,6 +1243,24 @@ export async function startCursorExtractor(
 
   const lastSeenMap = await backfillLastSeenMap(storage, globalDbPath);
   const composerToWorkspace = new Map<string, string>();
+  // Item 037 / AC1: positive-only repo_root cache keyed by composer_id.
+  // Cache discipline (R3 decision tree, AC1 #4):
+  //   - registry binding present → ALWAYS run Stage 1 (writes overwrite the
+  //     cache; Stage 1 null does NOT cache anything and falls through to
+  //     Stage 2)
+  //   - no binding → cache hit short-circuits (avoids re-walking files on
+  //     repeat composers); cache miss falls through to Stage 2
+  //   - Stage 2 success → populate cache; failure → leave cache as-is so
+  //     the next tick retries
+  // The cache is per-extractor instance (not module-level) so test setups
+  // don't leak state across vitest workers. Production behavior is
+  // identical to a module-level cache: a single long-running extractor
+  // instance owns capture for the lifetime of the daemon process.
+  const repoRootCache = new Map<string, string>();
+  const resolveRepoRootForWs =
+    options.__resolveRepoRootForWorkspaceId ?? resolveRepoRootForWorkspaceId;
+  const resolveRepoRootFromFilesInj =
+    options.__resolveRepoRootFromFiles ?? resolveRepoRootFromFiles;
 
   let processing: Promise<void> = Promise.resolve();
   let stopped = false;
@@ -1142,11 +1296,35 @@ export async function startCursorExtractor(
         mtime: turn.mtime,
       };
       if (ws !== undefined) metadata['workspace_id'] = ws;
+      // Item 037 / AC1: compute filesReferenced before repo_root resolution
+      // because Stage 2's file-walk fallback needs the same list. The
+      // metadata['files_referenced'] write below stays on `turn.context`
+      // guard so we don't mint an empty array on context-less turns.
+      let filesReferenced: string[] = [];
       if (turn.context !== undefined) {
         metadata['context'] = turn.context;
-        const filesReferenced = flattenContextFiles(turn.context);
+        filesReferenced = flattenContextFiles(turn.context);
         if (filesReferenced.length > 0) metadata['files_referenced'] = filesReferenced;
       }
+      // Item 037 / AC1: two-stage repo_root resolution.
+      //   Stage 1 (preferred): registry binding via composerToWorkspace +
+      //     resolveRepoRootForWorkspaceId. Reads workspace.json directly so
+      //     fresh composers don't need a separate composer↔workspace
+      //     round-trip at retrieval time.
+      //   Stage 2 (fallback): file-walk for .git ancestor on
+      //     `files_referenced`. Closes the 035 freshness gap for composers
+      //     whose chokidar binding hasn't fired yet.
+      // See AC1 #4 for the full decision tree.
+      const repoRoot = resolveCursorRepoRootForTurn(
+        turn.composer_id,
+        ws,
+        filesReferenced,
+        workspacePrefix,
+        repoRootCache,
+        resolveRepoRootForWs,
+        resolveRepoRootFromFilesInj,
+      );
+      if (repoRoot !== undefined) metadata['repo_root'] = repoRoot;
       if (turn.bubble_text_sources !== undefined) {
         metadata['bubble_text_sources'] = turn.bubble_text_sources;
       }
@@ -1279,6 +1457,10 @@ export async function startCursorExtractor(
       getLastSeenScanMtime: () => lastSeenScanMtime,
       setLastSeenScanMtime: (value: number) => {
         lastSeenScanMtime = value;
+      },
+      refreshWorkspaceMap: async (workspaceDbPath: string): Promise<void> => {
+        schedule(() => handleWorkspaceChange(workspaceDbPath));
+        await processing;
       },
     };
   }

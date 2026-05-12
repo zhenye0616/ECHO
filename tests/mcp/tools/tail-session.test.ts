@@ -884,7 +884,7 @@ describe('tailSession (handler-level) — item 035 repo_path scoping', () => {
     expect(result.turns[0]!.content).toBe('C turn 1');
   });
 
-  it('resolver returns null → empty turns + advisory warning, no isError', async () => {
+  it('resolver returns null AND no repo_root atoms → empty turns + advisory warning (item 037 wording)', async () => {
     const store = new MemoryStorage();
     await store.append({
       source: CURSOR_SOURCE,
@@ -900,37 +900,19 @@ describe('tailSession (handler-level) — item 035 repo_path scoping', () => {
     );
     expect(result.turns).toEqual([]);
     expect(result.source_resolved).toBeNull();
+    // Item 037 wording: Phase 1 (repo_root metadata) also tried; warning
+    // reflects the two-phase miss.
     expect(result.warnings).toEqual([
-      'tail_session: no Cursor composer matches repo_path=/tmp/no-such; verify the project is open in Cursor and the workspace has at least one composer',
+      'tail_session: no Cursor composer or repo_root atoms match repo_path=/tmp/no-such; verify the project is open in Cursor and the workspace has at least one composer',
     ]);
-  });
-
-  it("non-cursor source_app + repo_path: warn-ignores repo_path (still returns the app's tail)", async () => {
-    const store = new MemoryStorage();
-    const HOME = homedir();
-    const codexPrefix = `fs:${HOME}/.codex/sessions/`;
-    await store.append({
-      source: `${codexPrefix}rollout-Z.jsonl`,
-      timestamp: '2026-05-10T12:00:00.000Z',
-      content: 'codex turn',
-    });
-    const result = await tailSession(store, {
-      source_app: 'codex',
-      repo_path: '/tmp/anything',
-      count: 5,
-    });
-    expect(result.turns.map((t) => t.content)).toEqual(['codex turn']);
-    expect(result.warnings).toContain(
-      'tail_session: repo_path is currently honored only for source_app=cursor; ignored for codex',
-    );
   });
 });
 
-describe('tailSession (handler-level) — item 035 parameter validation', () => {
-  it('repo_path without source_app rejects with the requires-source_app error', async () => {
+describe('tailSession (handler-level) — item 037 parameter validation', () => {
+  it('repo_path without source_app rejects with the requires-source_app error (item 037: generalised across apps)', async () => {
     const store = new MemoryStorage();
     await expect(tailSession(store, { repo_path: '/tmp/anywhere' })).rejects.toThrow(
-      'tail_session: repo_path requires source_app=cursor',
+      /repo_path requires source_app/,
     );
   });
 
@@ -973,5 +955,270 @@ describe('tail_session (MCP wire) — item 035 repo_path validation surfaces as 
     expect(res.isError).toBe(true);
     expect(res.structuredContent).toBeUndefined();
     expect(res.content?.[0]?.text).toMatch(/must be absolute/);
+  });
+});
+
+// Item 037 / AC6 — repo_path generalised across source_apps.
+describe('tailSession (item 037 / AC6) — repo_path generalised across source_apps', () => {
+  const HOME = homedir();
+  const CURSOR_PREFIX = `fs:${HOME}/Library/Application Support/Cursor/`;
+  const CC_PREFIX = `fs:${HOME}/.claude/projects/`;
+  const CODEX_PREFIX = `fs:${HOME}/.codex/sessions/`;
+  const TARGET = '/Users/x/Desktop/Project_echo';
+  const OTHER = '/Users/x/Desktop/Other';
+
+  async function seedMixedRepo(store: MemoryStorage): Promise<void> {
+    // For each of cursor/claude_code/codex/git, seed 2 atoms in TARGET
+    // repo + 2 atoms in OTHER repo (other is more recent so without
+    // repo_path the MRU picks the wrong project).
+    for (let i = 0; i < 2; i++) {
+      const targetTs = `2026-05-10T10:0${i}:00.000Z`;
+      const otherTs = `2026-05-10T12:0${i}:00.000Z`;
+      await store.append({
+        source: `${CURSOR_PREFIX}User/globalStorage/state.vscdb`,
+        timestamp: targetTs,
+        content: `cursor target ${i}`,
+        metadata: { repo_root: TARGET, composer_id: `comp-target-${i}` },
+      });
+      await store.append({
+        source: `${CURSOR_PREFIX}User/globalStorage/state.vscdb`,
+        timestamp: otherTs,
+        content: `cursor other ${i}`,
+        metadata: { repo_root: OTHER, composer_id: `comp-other-${i}` },
+      });
+      await store.append({
+        source: `${CC_PREFIX}-Users-x-Desktop-Project-echo/sess-${i}.jsonl`,
+        timestamp: targetTs,
+        content: `cc target ${i}`,
+        metadata: { repo_root: TARGET },
+      });
+      await store.append({
+        source: `${CC_PREFIX}-Users-x-Desktop-Other/sess-${i}.jsonl`,
+        timestamp: otherTs,
+        content: `cc other ${i}`,
+        metadata: { repo_root: OTHER },
+      });
+      await store.append({
+        source: `${CODEX_PREFIX}rollout-target-${i}.jsonl`,
+        timestamp: targetTs,
+        content: `codex target ${i}`,
+        metadata: { repo_root: TARGET },
+      });
+      await store.append({
+        source: `${CODEX_PREFIX}rollout-other-${i}.jsonl`,
+        timestamp: otherTs,
+        content: `codex other ${i}`,
+        metadata: { repo_root: OTHER },
+      });
+      await store.append({
+        source: `git:${TARGET}`,
+        timestamp: targetTs,
+        content: `git target ${i}`,
+        metadata: { repo_root: TARGET },
+      });
+      await store.append({
+        source: `git:${OTHER}`,
+        timestamp: otherTs,
+        content: `git other ${i}`,
+        metadata: { repo_root: OTHER },
+      });
+    }
+  }
+
+  // Matrix tests: 4 source_apps × {with, without} repo_path on the mixed-repo fixture.
+  it('matrix: source_app=claude_code, no repo_path → MRU picks the freshest session (other repo)', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, { source_app: 'claude_code', count: 5 });
+    expect(r.turns[0]!.content.startsWith('cc other')).toBe(true);
+  });
+
+  it('matrix: source_app=claude_code, with repo_path → scoped to target repo', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, {
+      source_app: 'claude_code',
+      repo_path: TARGET,
+      count: 5,
+    });
+    for (const t of r.turns) {
+      expect(t.content.startsWith('cc target')).toBe(true);
+    }
+  });
+
+  it('matrix: source_app=codex, no repo_path → MRU picks the freshest session (other repo)', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, { source_app: 'codex', count: 5 });
+    expect(r.turns[0]!.content.startsWith('codex other')).toBe(true);
+  });
+
+  it('matrix: source_app=codex, with repo_path → scoped to target repo', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, {
+      source_app: 'codex',
+      repo_path: TARGET,
+      count: 5,
+    });
+    for (const t of r.turns) {
+      expect(t.content.startsWith('codex target')).toBe(true);
+    }
+  });
+
+  it('matrix: source_app=cursor, no repo_path → MRU picks the freshest atom (other repo)', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, { source_app: 'cursor', count: 5 });
+    expect(r.turns[0]!.content.startsWith('cursor other')).toBe(true);
+  });
+
+  it('matrix: source_app=cursor, with repo_path → Phase 1 wins via metadata.repo_root; composer_resolved absent', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(
+      store,
+      { source_app: 'cursor', repo_path: TARGET, count: 5 },
+      new Date(),
+      // Inject a resolver that, if called, would point at the WRONG repo;
+      // Phase 1 must succeed without consulting the resolver.
+      {
+        resolveCursorComposer: () => {
+          throw new Error('Phase 2 resolver should not be called on this fixture');
+        },
+      },
+    );
+    for (const t of r.turns) {
+      expect(t.content.startsWith('cursor target')).toBe(true);
+    }
+    expect(r.composer_resolved).toBeUndefined();
+  });
+
+  it('matrix: source_app=git, no repo_path → MRU picks the freshest (other repo)', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, { source_app: 'git', count: 5 });
+    expect(r.turns[0]!.content.startsWith('git other')).toBe(true);
+  });
+
+  it('matrix: source_app=git, with repo_path → two-path OR returns target-repo atoms (both metadata + source paths)', async () => {
+    const store = new MemoryStorage();
+    await seedMixedRepo(store);
+    const r = await tailSession(store, {
+      source_app: 'git',
+      repo_path: TARGET,
+      count: 5,
+    });
+    for (const t of r.turns) {
+      expect(t.content.startsWith('git target')).toBe(true);
+    }
+    // source_resolved is the canonical `git:<path>` form.
+    expect(r.source_resolved).toBe(`git:${TARGET}`);
+  });
+
+  // Fresh-Cursor-composer test: Phase 1 only.
+  it('fresh-Cursor-composer (post-AC1): Phase 1 recovers via metadata.repo_root WITHOUT calling resolveCursorComposerForRepoPath', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: `${CURSOR_PREFIX}User/globalStorage/state.vscdb`,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'fresh comp turn',
+      metadata: { repo_root: TARGET, composer_id: 'comp-fresh' },
+    });
+    let resolverCalls = 0;
+    const r = await tailSession(
+      store,
+      { source_app: 'cursor', repo_path: TARGET, count: 5 },
+      new Date(),
+      {
+        resolveCursorComposer: () => {
+          resolverCalls += 1;
+          return null;
+        },
+      },
+    );
+    expect(r.turns.map((t) => t.content)).toEqual(['fresh comp turn']);
+    expect(r.composer_resolved).toBeUndefined();
+    expect(resolverCalls).toBe(0);
+  });
+
+  // Legacy-Cursor-atom test: Phase 1 finds 0, Phase 2 fires.
+  it('legacy-Cursor-atom (pre-AC1, no repo_root): Phase 2 fires; composer_resolved is set', async () => {
+    const store = new MemoryStorage();
+    const cursorSource = `${CURSOR_PREFIX}User/globalStorage/state.vscdb`;
+    // No repo_root metadata — pre-AC1 atom shape.
+    await store.append({
+      source: cursorSource,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'legacy comp turn',
+      metadata: { composer_id: 'COMP-LEGACY' },
+    });
+    const r = await tailSession(
+      store,
+      { source_app: 'cursor', repo_path: TARGET, count: 5 },
+      new Date(),
+      {
+        resolveCursorComposer: () => ({
+          workspace_id: 'WS-X',
+          composer_id: 'COMP-LEGACY',
+        }),
+      },
+    );
+    expect(r.turns.map((t) => t.content)).toEqual(['legacy comp turn']);
+    expect(r.composer_resolved).toBe('COMP-LEGACY');
+  });
+
+  // Trailing-slash normalisation.
+  it('trailing-slash repo_path normalises to the no-slash form against stored metadata.repo_root', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: `${CC_PREFIX}-Users-x-Project-echo/sess-1.jsonl`,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'normalised',
+      metadata: { repo_root: '/Users/x/Project_echo' },
+    });
+    const r = await tailSession(store, {
+      source_app: 'claude_code',
+      repo_path: '/Users/x/Project_echo/',
+      count: 5,
+    });
+    expect(r.turns.map((t) => t.content)).toEqual(['normalised']);
+  });
+
+  // Git two-path OR — both routes return the same atom without duplication.
+  it('git two-path OR: an atom satisfying BOTH predicates (source=git:<path> AND metadata.repo_root) is returned exactly once', async () => {
+    const store = new MemoryStorage();
+    // One atom that matches BOTH the source encoding AND the repo_root
+    // metadata. The two-query union must dedup by atom id.
+    await store.append({
+      source: `git:${TARGET}`,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'satisfies both',
+      metadata: { repo_root: TARGET },
+    });
+    const r = await tailSession(store, {
+      source_app: 'git',
+      repo_path: TARGET,
+      count: 5,
+    });
+    expect(r.turns.map((t) => t.content)).toEqual(['satisfies both']);
+  });
+
+  // Git legacy-only test: an atom with source=git:<path> but NO
+  // metadata.repo_root still surfaces (the OR's second predicate covers it).
+  it('git two-path OR: legacy atom with source=git:<path> but no metadata.repo_root still surfaces', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: `git:${TARGET}`,
+      timestamp: '2026-05-10T10:00:00.000Z',
+      content: 'legacy git',
+      // no metadata.repo_root
+    });
+    const r = await tailSession(store, {
+      source_app: 'git',
+      repo_path: TARGET,
+      count: 5,
+    });
+    expect(r.turns.map((t) => t.content)).toEqual(['legacy git']);
   });
 });

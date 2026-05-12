@@ -201,6 +201,7 @@ export function buildRecentWorkContext(
       artifact_hint: query.artifact_hint ?? null,
       format: query.format ?? 'full',
       window_hours: windowHours,
+      repo_path: query.repo_path ?? null,
     },
     clusters: truncated.clusters,
     atoms: atomsMap,
