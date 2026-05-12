@@ -8,8 +8,36 @@ created: 2026-05-12
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-12T11:30:00Z"
 branch: "agent/reviewer-background-execution"
-head_sha: null
-agent_notes: null
+head_sha: "90c77b305283853a357a425481c59a44afce5e00"
+agent_notes: |
+  AC1, AC2, AC4, AC5, AC6, AC7 implemented end-to-end on branch
+  agent/reviewer-background-execution. Focused tests pass (47 pass + 1 known
+  pre-existing red on concurrency.test.ts:133, out of 041 scope per spec).
+  Typecheck + lint clean.
+
+  Three flags for review:
+
+  1. **AC3 end-to-end verification deferred to founder** (founder choice
+     in-session). Wrapper pins --sandbox danger-full-access with < redirection
+     and no --ask-for-approval flag, matching the spec. Founder runs
+     tools/review-queue/smoke-test-codex-runner.sh post-merge to close the
+     verification gap.
+
+  2. **AC7 wiki residue.** One match
+     (wiki/operating-model/cross-tool-spec-review.md:140 — placeholder
+     `get_atom(<elided_atom_id>)`) left untouched. Builder honored
+     AGENT_INSTRUCTIONS rule 6 (no wiki edits) and routed this to the
+     strategist's After Completion §2 wiki promotion step. Non-wiki paths
+     handled (backlog/_followups.md:410 corrected; docs/review-queue-setup.md
+     now has an explicit get_atom param-name section).
+
+  3. **AC4 test count is +2, not +1.** AC4's Test list enumerates both paths
+     (valid commits + malformed rejects), so the test file naturally has 2 it()
+     blocks. Net review-queue total: 47 passes (was 46 at 040 merge). Happy
+     to consolidate if reviewer prefers.
+
+  AC8 (observational) is the strategist's empirical check on the next
+  qualifying spec post-merge.
 spec_refs:
   - backlog/complete/2026-05-11-039-cross-tool-review-dispatch-queue.md   # Parent operating-model item; AC0 sandbox recipe broken on this machine; AC3 reviewer-emission validation gap surfaced post-040
   - backlog/complete/2026-05-12-040-watcher-state-executable-test.md      # AC6b loop-close gate fired clean BUT founder still physically activated reviewers ~5×/cycle; 041 closes the activation-friction half of the gap
