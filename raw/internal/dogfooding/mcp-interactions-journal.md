@@ -2548,6 +2548,33 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** ECHO is fresh for the strategist session but still not useful for the builder monitor. Worktree inspection remains the reliable source for implementation progress. Local issues observed outside ECHO: focused review-queue tests pass with `--cache=false`, normal Vitest run exits nonzero due the untracked `node_modules` symlink cache write, direct Python shebang execution fails on `jsonschema` architecture mismatch, and current tests diverge from at least one AC around `combined.md` existing / orphan tmp cleanup.
 - **Conjecture:** The monitoring gap is specifically source discovery / repo-root association for the builder session, not global Claude Code capture staleness.
 
+### 2026-05-12 01:46 PDT — Strategist review-pending prep: rehydrate Codex's R2/R3/R4 reviewer findings before implementation review of 039
+
+- **Source agent:** Strategist / Claude Code (new session, `/review-pending` invocation post-builder-push of `cd02160` for 039)
+- **Trigger:** Founder directed: "first connect to codex reviewer session using echo and during the review process pay attention to what codex suggested." Goal was to load Codex's prior cross-tool spec-review findings as the rubric input to the implementation-review subagent.
+- **Query inputs:**
+  1. `search_memories({query:'Codex review 039 cross-tool review dispatch queue'})` — default limit 10.
+  2. `search_memories({query:'codex R4 039'})` — narrower.
+  3. `get_recent_work_context({format:'skeleton', window_hours:12, limit:30})` — broad fall-back.
+  4. `tail_session({source_app:'codex', count:20})` — attempted.
+- **Returned:**
+  - Calls 1 + 2: `{matches:[], total_returned:0}` for both. Zero substring hits despite "039" appearing thousands of times across the captured corpus.
+  - Call 3: 1 cluster `ctx_82c8223c` (rank: recent_activity + has_open_loop + dense), 30 atoms; warnings: `limit dropped 3 entire cluster(s)`. The cluster surfaced the full git-commit timeline of the 039 R1→R4 cycle (review-r2 cursor + codex, review-r3 cursor + codex, review-r4 cursor + codex, R2/R3/R4 patch commits, dogfood-log commits, claim commit, and the eventual `review:` pending_review move).
+  - Call 4: `MCP error -32602: Tool tail_session not found` — the tool is enumerated in the deferred-tool list and ToolSearch returned a full schema, but the live MCP server rejected the call.
+- **Read sources:**
+  - Calls 1 + 2: substring index, no hits → no source attribution.
+  - Call 3: `source_breakdown={claude_code:36, codex:9, git:27, cursor:18}` cluster-wide; cluster `ctx_82c8223c` itself was `{claude_code:35, git:27}` — codex/cursor atoms fell outside the top cluster despite being topically central. Exact JSONL refs: `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl` (strategist) + `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/7ccac1be-f92f-4204-906b-e621b395e29e.jsonl` (builder session — only one atom surfaced, an "agent claim" turn).
+  - Call 4: N/A — tool absent.
+  - Fallback retrieval: `Read` of `backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r{2,3,4}/codex.md` — the canonical filesystem path was the actual source of Codex's findings for the rubric.
+- **Verdict:** 🟡 partial — `get_recent_work_context` surfaced the right cluster but its top-30 atoms cap dropped codex/cursor reviewer atoms in favor of claude_code + git, exactly the source-diversity bias signal §What To Watch For predicts. The 4-character item-id substring "039" failed in `search_memories` again (continued M1-1A indexing gap). Filesystem retrieval of canonical queue files closed the gap in zero ambiguity, confirming 039's own design intent: **the queue files ARE the canonical artifact; ECHO is context-recovery-only**.
+- **Note:** Three independent observations from a single review-prep call:
+  1. **`tail_session` is enumerated but not callable.** Wiki/git status shows `wiki/surfaces/mcp-tail-session.md` is deleted; the deferred-tool registry and the live MCP server are out of sync. The Codex monitor entries above (01:29/01:31/01:39 PDT) reached the same workflow stage without trying tail_session — possibly because Codex CLI's MCP client filters by live capability, while Claude Code's deferred-tool registry doesn't.
+  2. **Source-diversity bias on rank.** The top cluster aggregated 35 strategist Claude Code turns + 27 git commits but only surfaced 1 builder atom and 0 reviewer-app atoms despite the cycle's center being the cross-tool reviewer cycle. Rank weighting `dense` privileges the more-loquacious actor (strategist session has many turns per round; reviewers commit-and-quit). Confirms `source_breakdown` is non-optional reading.
+  3. **Canonical queue files made ECHO supplementary, not load-bearing.** The implementation-review rubric was built from `backlog/reviews/.../r{2,3,4}/codex.md` directly; ECHO confirmed the cycle timeline but contributed nothing the filesystem hadn't already.
+- **Conjecture:** Two operating-model takeaways, both observation-only — backlog candidates if they recur:
+  - **Tool-availability drift:** When wiki pages get deleted (`mcp-tail-session.md`), the deferred-tool registry may need to be re-emitted; or the MCP server should return a clearer "tool deprecated" message instead of `-32602`. Worth a backlog item if it bites a second reviewer/strategist.
+  - **Skeleton-format under-attribution:** Even skeleton format returned 30 atoms; raising `limit` would have pulled in codex/cursor atoms but cost token budget. The right primitive here might be "give me one cluster, fully labeled with per-source counts, even if I can only see 5 atoms" — a deliberate-truncation mode where attribution beats density.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

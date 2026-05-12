@@ -1271,6 +1271,11 @@ href="#pdt-codex-monitor-broad-claude-code-freshness-check-during-039-implementa
 id="toc-pdt-codex-monitor-broad-claude-code-freshness-check-during-039-implementation">2026-05-12
 01:39 PDT — Codex monitor: broad Claude Code freshness check during 039
 implementation</a></li>
+<li><a
+href="#pdt-strategist-review-pending-prep-rehydrate-codexs-r2r3r4-reviewer-findings-before-implementation-review-of-039"
+id="toc-pdt-strategist-review-pending-prep-rehydrate-codexs-r2r3r4-reviewer-findings-before-implementation-review-of-039">2026-05-12
+01:46 PDT — Strategist review-pending prep: rehydrate Codex’s R2/R3/R4
+reviewer findings before implementation review of 039</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -12145,6 +12150,113 @@ mismatch, and current tests diverge from at least one AC around
 <li><strong>Conjecture:</strong> The monitoring gap is specifically
 source discovery / repo-root association for the builder session, not
 global Claude Code capture staleness.</li>
+</ul>
+<h3
+id="pdt-strategist-review-pending-prep-rehydrate-codexs-r2r3r4-reviewer-findings-before-implementation-review-of-039">2026-05-12
+01:46 PDT — Strategist review-pending prep: rehydrate Codex’s R2/R3/R4
+reviewer findings before implementation review of 039</h3>
+<ul>
+<li><strong>Source agent:</strong> Strategist / Claude Code (new
+session, <code>/review-pending</code> invocation post-builder-push of
+<code>cd02160</code> for 039)</li>
+<li><strong>Trigger:</strong> Founder directed: “first connect to codex
+reviewer session using echo and during the review process pay attention
+to what codex suggested.” Goal was to load Codex’s prior cross-tool
+spec-review findings as the rubric input to the implementation-review
+subagent.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>search_memories({query:'Codex review 039 cross-tool review dispatch queue'})</code>
+— default limit 10.</li>
+<li><code>search_memories({query:'codex R4 039'})</code> —
+narrower.</li>
+<li><code>get_recent_work_context({format:'skeleton', window_hours:12, limit:30})</code>
+— broad fall-back.</li>
+<li><code>tail_session({source_app:'codex', count:20})</code> —
+attempted.</li>
+</ol></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>Calls 1 + 2: <code>{matches:[], total_returned:0}</code> for both.
+Zero substring hits despite “039” appearing thousands of times across
+the captured corpus.</li>
+<li>Call 3: 1 cluster <code>ctx_82c8223c</code> (rank: recent_activity +
+has_open_loop + dense), 30 atoms; warnings:
+<code>limit dropped 3 entire cluster(s)</code>. The cluster surfaced the
+full git-commit timeline of the 039 R1→R4 cycle (review-r2 cursor +
+codex, review-r3 cursor + codex, review-r4 cursor + codex, R2/R3/R4
+patch commits, dogfood-log commits, claim commit, and the eventual
+<code>review:</code> pending_review move).</li>
+<li>Call 4: <code>MCP error -32602: Tool tail_session not found</code> —
+the tool is enumerated in the deferred-tool list and ToolSearch returned
+a full schema, but the live MCP server rejected the call.</li>
+</ul></li>
+<li><strong>Read sources:</strong>
+<ul>
+<li>Calls 1 + 2: substring index, no hits → no source attribution.</li>
+<li>Call 3:
+<code>source_breakdown={claude_code:36, codex:9, git:27, cursor:18}</code>
+cluster-wide; cluster <code>ctx_82c8223c</code> itself was
+<code>{claude_code:35, git:27}</code> — codex/cursor atoms fell outside
+the top cluster despite being topically central. Exact JSONL refs:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9b575b57-2f81-4b04-ad0d-80b7aa17f132.jsonl</code>
+(strategist) +
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/7ccac1be-f92f-4204-906b-e621b395e29e.jsonl</code>
+(builder session — only one atom surfaced, an “agent claim” turn).</li>
+<li>Call 4: N/A — tool absent.</li>
+<li>Fallback retrieval: <code>Read</code> of
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r{2,3,4}/codex.md</code>
+— the canonical filesystem path was the actual source of Codex’s
+findings for the rubric.</li>
+</ul></li>
+<li><strong>Verdict:</strong> 🟡 partial —
+<code>get_recent_work_context</code> surfaced the right cluster but its
+top-30 atoms cap dropped codex/cursor reviewer atoms in favor of
+claude_code + git, exactly the source-diversity bias signal §What To
+Watch For predicts. The 4-character item-id substring “039” failed in
+<code>search_memories</code> again (continued M1-1A indexing gap).
+Filesystem retrieval of canonical queue files closed the gap in zero
+ambiguity, confirming 039’s own design intent: <strong>the queue files
+ARE the canonical artifact; ECHO is context-recovery-only</strong>.</li>
+<li><strong>Note:</strong> Three independent observations from a single
+review-prep call:
+<ol type="1">
+<li><strong><code>tail_session</code> is enumerated but not
+callable.</strong> Wiki/git status shows
+<code>wiki/surfaces/mcp-tail-session.md</code> is deleted; the
+deferred-tool registry and the live MCP server are out of sync. The
+Codex monitor entries above (01:29/01:31/01:39 PDT) reached the same
+workflow stage without trying tail_session — possibly because Codex
+CLI’s MCP client filters by live capability, while Claude Code’s
+deferred-tool registry doesn’t.</li>
+<li><strong>Source-diversity bias on rank.</strong> The top cluster
+aggregated 35 strategist Claude Code turns + 27 git commits but only
+surfaced 1 builder atom and 0 reviewer-app atoms despite the cycle’s
+center being the cross-tool reviewer cycle. Rank weighting
+<code>dense</code> privileges the more-loquacious actor (strategist
+session has many turns per round; reviewers commit-and-quit). Confirms
+<code>source_breakdown</code> is non-optional reading.</li>
+<li><strong>Canonical queue files made ECHO supplementary, not
+load-bearing.</strong> The implementation-review rubric was built from
+<code>backlog/reviews/.../r{2,3,4}/codex.md</code> directly; ECHO
+confirmed the cycle timeline but contributed nothing the filesystem
+hadn’t already.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> Two operating-model takeaways, both
+observation-only — backlog candidates if they recur:
+<ul>
+<li><strong>Tool-availability drift:</strong> When wiki pages get
+deleted (<code>mcp-tail-session.md</code>), the deferred-tool registry
+may need to be re-emitted; or the MCP server should return a clearer
+“tool deprecated” message instead of <code>-32602</code>. Worth a
+backlog item if it bites a second reviewer/strategist.</li>
+<li><strong>Skeleton-format under-attribution:</strong> Even skeleton
+format returned 30 atoms; raising <code>limit</code> would have pulled
+in codex/cursor atoms but cost token budget. The right primitive here
+might be “give me one cluster, fully labeled with per-source counts,
+even if I can only see 5 atoms” — a deliberate-truncation mode where
+attribution beats density.</li>
+</ul></li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
