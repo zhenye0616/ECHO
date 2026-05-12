@@ -1216,6 +1216,11 @@ href="#pdt-cursor-r2-review-of-039-rc2-first-bootstrap-write-of-a-queue-response
 id="toc-pdt-cursor-r2-review-of-039-rc2-first-bootstrap-write-of-a-queue-response-file-before-the-queue-exists">00:14
 PDT — Cursor R2 review of 039 RC2 — first bootstrap-write of a queue
 response file before the queue exists</a></li>
+<li><a
+href="#pdt-codex-r2-review-of-039-rc2-response-file-committed-before-journal"
+id="toc-pdt-codex-r2-review-of-039-rc2-response-file-committed-before-journal">00:30
+PDT — Codex R2 review of 039 RC2 — response file committed before
+journal</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11345,6 +11350,90 @@ V1 retro: did the queue’s “documented review history” property (§Review
 History inside the spec) reduce the need for archeology when someone
 asks “why does the queue look like this”? Bootstrap evidence suggests
 yes; want N=3+ shipped specs through the queue to confirm.</li>
+</ul>
+<h3
+id="pdt-codex-r2-review-of-039-rc2-response-file-committed-before-journal">00:30
+PDT — Codex R2 review of 039 RC2 — response file committed before
+journal</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex / GPT-5 — R2 reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at artifact <code>556b978</code> (RC2 / R1-patched). Response file
+committed at <code>29794f4</code> to
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2/codex.md</code>.</li>
+<li><strong>Trigger:</strong> Founder resumed the interrupted R2 review
+prompt and asked to “check my usage again and resume.” The active R2
+dispatch asked Codex to verify: (1) <code>os.link</code> no-overwrite
+atomicity for same-SHA request idempotency and reviewer response race
+losers; (2) AC0 polling primitive concreteness, naming actual Codex CLI
+commands where R1 left candidates open; (3) <code>combine.py</code> as a
+<code>/loop 10m</code> body in the no-rounds-to-combine state; (4)
+whether section-granularity <code>where</code> matching over-collapses
+against the R1 finding distribution. Explicit instruction: do not patch
+the spec; write structured review; log after committing the response
+file.</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+Filesystem and CLI probes only: <code>git log --oneline -5</code>,
+<code>git rev-parse 556b978</code>,
+<code>git diff --name-only 556b978..HEAD</code> (confirmed HEAD had
+advanced only by Cursor’s R2 response + journal commits; the spec
+remained the <code>556b978</code> artifact), direct reads of the RC2
+spec and Cursor’s R2 response file, a local Python <code>os.link</code>
+destination-exists probe, <code>command -v codex</code>,
+<code>codex --help</code>, <code>codex exec --help</code>, and
+<code>codex review --help</code>.</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic. Local probes
+produced: (a) <code>os.link(tmp, final)</code> raises
+<code>FileExistsError</code> when <code>final</code> exists and
+preserves existing bytes, so the no-overwrite atomicity story is
+mechanically sound; (b) the local Codex CLI has <code>exec</code> but no
+<code>--watch</code>, making <code>codex --watch</code> an unbuildable
+candidate; (c)
+<code>codex exec -C /Users/zhenye/Desktop/Project_echo --sandbox workspace-write --ask-for-approval never -</code>
+is the concrete scheduler-invoked command shape to document; (d) AC4
+covers one-response waiter state but not empty-queue/no-eligible-round
+success; (e) Cursor R2’s own multi-section <code>where</code> value
+demonstrates that raw string equality and any-section overlap are both
+fragile combine keys.</li>
+<li><strong>Sources:</strong> Filesystem-only; no
+<code>echo_resolve_mru</code>, <code>search_memories</code>,
+<code>get_atom</code>, <code>find_clusters</code>,
+<code>tail_session</code>, or <code>wait_for_new_turns</code> calls.
+Spec artifact:
+<code>/Users/zhenye/Desktop/Project_echo/backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at commit <code>556b978fc9ee308e5ffef610f104d8bee96ef722</code>. Cursor
+comparison response:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2/cursor.md</code>
+at <code>2f27a279</code>. Codex response:
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r2/codex.md</code>
+at <code>29794f4</code>.</li>
+<li><strong>Verdict:</strong> ✅ right on the no-ECHO reviewer path and
+on the RC2 response-file-first invariant. Codex verdict on the spec:
+<code>proceed_after_patches</code> with 4 findings (3 MED, 1 LOW). R1’s
+load-bearing <code>os.link</code> catch is closed; remaining gaps are
+implementability polish around Codex polling, empty-queue combine
+behavior, normalized <code>where</code> matching, and the same-SHA
+race-loser assertion for <code>request.py</code>.</li>
+<li><strong>Note (positive — atomicity check became concrete):</strong>
+The R2 focus asked for mechanical verification rather than another
+abstract review. The local Python probe confirmed the exact failure mode
+the spec relies on: destination exists → <code>FileExistsError</code>,
+destination content unchanged. That makes the atomic-response race path
+buildable with ordinary Python stdlib semantics. The sharper point is
+not the primitive; it is the post-<code>FileExistsError</code>
+idempotency decision in <code>request.py</code>, which must read the
+existing <code>request.md</code> and compare artifact SHA.</li>
+<li><strong>Note (negative — Codex polling candidate still too
+loose):</strong> AC0 still lists <code>codex --watch</code>, but this
+installed CLI does not support it. The buildable command is
+<code>codex exec</code> under an external scheduler. This is the main
+Codex-specific R2 finding because it converts a candidate into a
+falsifiable implementation command.</li>
+<li><strong>Note (process — journal invariant held):</strong> Sequence
+followed exactly: response file written and committed first
+(<code>29794f4</code>), then this journal entry. The only unrelated
+untracked file left in the worktree was
+<code>.claude/scheduled_tasks.lock</code>, and it was not touched.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
