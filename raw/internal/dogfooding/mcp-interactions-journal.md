@@ -2860,6 +2860,16 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** No-args resume hit the target on first call — rank-1 cluster's label + source_breakdown + open_loop_hints were enough signal to pick it without inspecting any other cluster. `prefer:'newest_first'` correctly surfaced the most recent assistant turn (the "State as of now" summary) at position 1; that turn alone was sufficient to brief the founder. Did not need to fan out to other clusters or retry with `since=`. The deterministic prefix-drop dropped 22 older atoms — acceptable since the freshest 8 covered the full open-loop state including the unanswered "dispatch AC8 measurement?" question.
 - **Conjecture:** No-args resume on a freshly-saved session is the cheapest, highest-signal use of `find_clusters` so far. The 24h auto-expand never had to fire because 4h was already dense (84 atoms in rank-1). Worth a future audit: how does rank quality degrade when the session gap exceeds 4h cluster-gap and auto-expand to 24h is needed?
 
+### 2026-05-12 16:52 PDT — Codex R2 on 042 reviewer-emission YAML validation
+
+- **Source agent:** Codex (review-queue loop; not an ECHO MCP call).
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r2/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R2 request and reviewer schema; reviewed `backlog/ready/2026-05-12-042-reviewer-emission-yaml-validation.md` at `ac48694d5e2617054c5d30940859f48d9b979beb`; checked current `tools/review-queue/{combine.py,_lib.py,validate.py,commit-reviewer-response.sh,push-with-retry.sh}` and review-queue tests for code-grounded gaps.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r2/codex.md` as `54dfed2`, verdict `proceed_after_patches`. Findings: one MED issue that AC4's tracked `queue-errors.md` append must be committed/staged with malformed-response `combined.md` or otherwise leave a dirty local success path; one LOW issue that stale `reason` / "AC3's four" prose conflicts with the patched AC3 contract.
+- **Sources:** Artifact SHA `ac48694d5e2617054c5d30940859f48d9b979beb`; request path `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r2/request.md`; response path `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r2/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** The main remaining implementation risk is operational cleanliness: `raw/internal/queue-errors.md` is tracked, while current `combine.py` only stages `combined.md` on its git path.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
