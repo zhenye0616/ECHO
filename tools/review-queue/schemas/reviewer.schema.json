@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://echo.local/review-queue/reviewer.schema.json",
+  "title": "review-queue <reviewer>.md frontmatter",
+  "description": "Schema for backlog/reviews/<item_id>/r<N>/<reviewer>.md frontmatter (reviewer -> strategist). Verdict enum is per-reviewer (excludes the combined-only values divergent / single_reviewer_timeout / no_responses).",
+  "type": "object",
+  "required": [
+    "item_id",
+    "round",
+    "reviewer",
+    "artifact_sha",
+    "completed_at",
+    "verdict",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}-\\d{3}-[a-z][a-z0-9-]*$"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reviewer": {
+      "type": "string",
+      "enum": ["codex", "cursor"]
+    },
+    "artifact_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "completed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["proceed", "proceed_after_patches", "pushback"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "where", "finding"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["high", "medium", "low", "nit"]
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cross_ref": {
+            "type": "object",
+            "required": ["round", "reviewer", "finding_index"],
+            "additionalProperties": false,
+            "properties": {
+              "round": {"type": "integer", "minimum": 1},
+              "reviewer": {"type": "string", "enum": ["codex", "cursor"]},
+              "finding_index": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}
