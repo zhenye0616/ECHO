@@ -1241,6 +1241,11 @@ href="#pdt-strategist-claude-code-9b575b57-039-r3-combine-rc4-patch-r3combined.m
 id="toc-pdt-strategist-claude-code-9b575b57-039-r3-combine-rc4-patch-r3combined.md-queue-errors.md-seed">2026-05-12
 01:15 PDT — Strategist (Claude Code 9b575b57): 039 R3 combine + RC4
 patch + r3/combined.md + queue-errors.md seed</a></li>
+<li><a
+href="#pdt-cursor-r4-review-of-039-rc4-verification-round-proceed-zero-findings"
+id="toc-pdt-cursor-r4-review-of-039-rc4-verification-round-proceed-zero-findings">02:05
+PDT — Cursor R4 review of 039 RC4 — verification round;
+<code>proceed</code> zero findings</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -11793,6 +11798,42 @@ are <code>proceed</code> OR <code>proceed_after_patches</code> with only
 LOWs → convergence declared; 039 claim-ready.</strong> Per 038 decay
 curve, R4 should be the final polish round. If R4 catches a new HIGH or
 MED, structural revision needed.</li>
+</ul>
+<h3
+id="pdt-cursor-r4-review-of-039-rc4-verification-round-proceed-zero-findings">02:05
+PDT — Cursor R4 review of 039 RC4 — verification round;
+<code>proceed</code> zero findings</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude — R4 reviewer on
+<code>backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md</code>
+at HEAD <code>c364ac2</code> (RC4 / R3-patched). Response file committed
++ pushed as <code>bca3d7a94672a50296c3a39235178d5e17d36c16</code>
+(<code>review-r4: cursor on 2026-05-11-039-cross-tool-review-dispatch-queue</code>).</li>
+<li><strong>Trigger:</strong> Strategist R4 dispatch: verify AC3.5
+(a)/(b)/(c) vs §Out of Scope #7 and AC6b zero-dispatch; confirm five
+Cursor R3 LOWs absorbed; drift watch (RC4 state machine, fixture,
+<code>queue-errors.md</code>, seed); exclusivity of (a) vs (b) +
+<code>request.py</code>; write <code>r4/cursor.md</code>; push; log
+after commit.</li>
+<li><strong>Query inputs:</strong> <strong>ZERO ECHO calls.</strong>
+<code>Read</code> spec (AC3.5, AC6b, push-race, Review History R3),
+<code>Glob</code> <code>queue-errors.md</code>, <code>Grep</code>
+<code>tools/blocked.py</code>; <code>Write</code> +
+<code>git commit</code> + <code>git push</code>.</li>
+<li><strong>Returned:</strong> N/A — no MCP traffic.</li>
+<li><strong>Read sources:</strong> Filesystem-only. Spec @
+<code>c364ac2216b850a3a53e6a9ace1d06adb81e90d8</code>. Response
+<code>backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r4/cursor.md</code>
+@ <code>bca3d7a94672a50296c3a39235178d5e17d36c16</code>.
+<code>raw/internal/queue-errors.md</code> SEED present.</li>
+<li><strong>Verdict:</strong> ✅ right — R3 LOWs verified in RC4 text;
+(a)/(b)/(c) honors #7; no keyboard-automation regression;
+<code>queue-errors.md</code> + seed consistent. <strong>Cursor R4
+verdict <code>proceed</code>, zero findings.</strong> Convergence
+candidate once Codex R4 matches (<code>proceed*</code> + no
+HIGH/MED).</li>
+<li><strong>Note:</strong> Fourth consecutive zero-ECHO Cursor review on
+039 when §Review History + spec body suffice.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

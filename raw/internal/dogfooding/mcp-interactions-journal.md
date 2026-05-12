@@ -2469,6 +2469,16 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note (reviewer push maturation curve):** R2 reviewers committed locally / did not push (conservative). R3 reviewers committed AND pushed (operational). Canonical pattern now empirically established. The progressive-trust maturation matches the queue's design intent — once `push-with-retry.sh` is wired into reviewer prompts (AC3 step 5), this becomes automatic.
 - **Conjecture (observation-only):** R4 is the verification round per the new AC3.5 step 3 (b) branch — the very logic RC4 patches. Expected R4 yield: ≤ 3 LOWs. **If both R4 verdicts are `proceed` OR `proceed_after_patches` with only LOWs → convergence declared; 039 claim-ready.** Per 038 decay curve, R4 should be the final polish round. If R4 catches a new HIGH or MED, structural revision needed.
 
+### 02:05 PDT — Cursor R4 review of 039 RC4 — verification round; `proceed` zero findings
+
+- **Source agent:** Cursor's Claude — R4 reviewer on `backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md` at HEAD `c364ac2` (RC4 / R3-patched). Response file committed + pushed as `bca3d7a94672a50296c3a39235178d5e17d36c16` (`review-r4: cursor on 2026-05-11-039-cross-tool-review-dispatch-queue`).
+- **Trigger:** Strategist R4 dispatch: verify AC3.5 (a)/(b)/(c) vs §Out of Scope #7 and AC6b zero-dispatch; confirm five Cursor R3 LOWs absorbed; drift watch (RC4 state machine, fixture, `queue-errors.md`, seed); exclusivity of (a) vs (b) + `request.py`; write `r4/cursor.md`; push; log after commit.
+- **Query inputs:** **ZERO ECHO calls.** `Read` spec (AC3.5, AC6b, push-race, Review History R3), `Glob` `queue-errors.md`, `Grep` `tools/blocked.py`; `Write` + `git commit` + `git push`.
+- **Returned:** N/A — no MCP traffic.
+- **Read sources:** Filesystem-only. Spec @ `c364ac2216b850a3a53e6a9ace1d06adb81e90d8`. Response `backlog/reviews/2026-05-11-039-cross-tool-review-dispatch-queue/r4/cursor.md` @ `bca3d7a94672a50296c3a39235178d5e17d36c16`. `raw/internal/queue-errors.md` SEED present.
+- **Verdict:** ✅ right — R3 LOWs verified in RC4 text; (a)/(b)/(c) honors #7; no keyboard-automation regression; `queue-errors.md` + seed consistent. **Cursor R4 verdict `proceed`, zero findings.** Convergence candidate once Codex R4 matches (`proceed*` + no HIGH/MED).
+- **Note:** Fourth consecutive zero-ECHO Cursor review on 039 when §Review History + spec body suffice.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
