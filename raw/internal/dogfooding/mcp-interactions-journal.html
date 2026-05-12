@@ -1351,6 +1351,9 @@ tail</a></li>
 <li><a href="#pdt-codex-r2-on-041-reviewer-background-execution"
 id="toc-pdt-codex-r2-on-041-reviewer-background-execution">2026-05-12
 14:40 PDT — Codex R2 on 041 reviewer background execution</a></li>
+<li><a href="#pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29"
+id="toc-pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29">2026-05-12
+15:22 PDT — Cursor R3 on 041; verify R2 patches at e8edb29</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13020,6 +13023,41 @@ tail already logged by Cursor.</li>
 remaining Codex concern is narrow but code-grounded: the smoke test must
 match the hardcoded <code>origin main</code> contract in the existing
 push helper.</li>
+</ul>
+<h3 id="pdt-cursor-r3-on-041-verify-r2-patches-at-e8edb29">2026-05-12
+15:22 PDT — Cursor R3 on 041; verify R2 patches at e8edb29</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude (interactive
+review-queue R3)</li>
+<li><strong>Trigger:</strong> Founder asked to repeat the same flow for
+R3, then commit and push <code>r3/cursor.md</code>.</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})</code></li>
+<li><code>search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> MRU same strategist JSONL. Tail
+<strong>8</strong> atoms; newest
+<code>3f0e1069-bdc0-4db8-93b9-edbb98d4e541</code>
+(<code>2026-05-12T21:43:54.918Z</code>) summarizes R2 combine
+(<code>proceed_after_patches</code>), five patches queued for R3
+(<code>focus_hints</code>), combine.py anomaly audit note; body clipped
+(<code>bytes_elided</code> 1722). Canonical artifacts:
+<code>r3/request.md</code> (<code>spec_commit_sha</code>
+<code>e8edb298c998e290ed7e5e16810a5e927ec22e8a</code>) + on-disk ready
+spec (<strong>0</strong>-byte <code>git diff</code> vs that SHA).</li>
+<li><strong>Read sources:</strong> source_breakdown={claude_code:8};
+exact JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl</code>;
+repo filter <code>/Users/zhenye/Desktop/Project_echo</code>; no
+Codex/Cursor/git atoms in query.</li>
+<li><strong>Verdict:</strong> ✅ right — tail matched R3 dispatch; spec
+verification against <code>e8edb29</code> did not depend on hydrating
+clipped tail beyond checklist confirmation.</li>
+<li><strong>Note:</strong> R3 reviewer response is verdict
+<code>proceed</code> with <strong>zero</strong> schema findings
+(claim-ready bar once Codex R3 also <code>proceed</code>).</li>
+<li><strong>Conjecture:</strong> none.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

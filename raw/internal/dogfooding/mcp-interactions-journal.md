@@ -2781,6 +2781,19 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right
 - **Note:** R1's high-severity issues are resolved. The remaining Codex concern is narrow but code-grounded: the smoke test must match the hardcoded `origin main` contract in the existing push helper.
 
+### 2026-05-12 15:22 PDT — Cursor R3 on 041; verify R2 patches at e8edb29
+
+- **Source agent:** Cursor's Claude (interactive review-queue R3)
+- **Trigger:** Founder asked to repeat the same flow for R3, then commit and push `r3/cursor.md`.
+- **Query inputs:**
+  1. `echo_resolve_mru({sources:['claude_code'], repo_path:'/Users/zhenye/Desktop/Project_echo'})`
+  2. `search_memories({source:'fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl', repo_path:'/Users/zhenye/Desktop/Project_echo', limit:8})`
+- **Returned:** MRU same strategist JSONL. Tail **8** atoms; newest `3f0e1069-bdc0-4db8-93b9-edbb98d4e541` (`2026-05-12T21:43:54.918Z`) summarizes R2 combine (`proceed_after_patches`), five patches queued for R3 (`focus_hints`), combine.py anomaly audit note; body clipped (`bytes_elided` 1722). Canonical artifacts: `r3/request.md` (`spec_commit_sha` `e8edb298c998e290ed7e5e16810a5e927ec22e8a`) + on-disk ready spec (**0**-byte `git diff` vs that SHA).
+- **Read sources:** source_breakdown={claude_code:8}; exact JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d64c2d57-ec0a-45de-88dd-a7a05c866f59.jsonl`; repo filter `/Users/zhenye/Desktop/Project_echo`; no Codex/Cursor/git atoms in query.
+- **Verdict:** ✅ right — tail matched R3 dispatch; spec verification against `e8edb29` did not depend on hydrating clipped tail beyond checklist confirmation.
+- **Note:** R3 reviewer response is verdict `proceed` with **zero** schema findings (claim-ready bar once Codex R3 also `proceed`).
+- **Conjecture:** none.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
