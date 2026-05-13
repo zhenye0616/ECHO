@@ -1407,6 +1407,9 @@ id="toc-pdt---codex-r2-on-043-per-round-reviewer-roster">2026-05-12
 <li><a href="#pdt---codex-r3-on-043-per-round-reviewer-roster"
 id="toc-pdt---codex-r3-on-043-per-round-reviewer-roster">2026-05-12
 23:44 PDT - Codex R3 on 043 per-round reviewer roster</a></li>
+<li><a href="#pdt---codex-r4-on-043-per-round-reviewer-roster"
+id="toc-pdt---codex-r4-on-043-per-round-reviewer-roster">2026-05-12
+23:56 PDT - Codex R4 on 043 per-round reviewer roster</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13710,6 +13713,50 @@ and pushed exactly one reviewer response before journaling.</li>
 the end-to-end third-reviewer path still crosses a hardcoded helper
 boundary and the codex-only requested round still conflicts with the
 static combined schema.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-043-per-round-reviewer-roster">2026-05-12
+23:56 PDT - Codex R4 on 043 per-round reviewer roster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code> with
+autostash preservation for a pre-existing dirty
+<code>queue-errors.md</code> append; read the R4 request, reviewer
+schema, Cursor-side queue command, pinned artifact
+<code>backlog/ready/2026-05-13-043-per-round-reviewer-roster.md</code>
+at <code>7f96cd066cb5089b51fe24f6f13170ea32a6e93c</code>, R3
+review/combined context, current <code>combine.py</code>, schemas,
+<code>request.py</code>, <code>dispatch-next-round.py</code>,
+<code>validate.py</code>, and
+<code>commit-reviewer-response.sh</code>.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r4/codex.md</code>
+as <code>f154f8e</code>, verdict <code>proceed_after_patches</code>.
+Findings: AC2/AC7 still need an explicit codex-missing
+timeout/default-deploy contract, and AC6l needs a legal
+one-<code>cross_ref</code> fixture plus union-find-style transitive
+cross-ref merging.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>7f96cd066cb5089b51fe24f6f13170ea32a6e93c</code>; request path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r4/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r4/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and pushed exactly one reviewer response before journaling.</li>
+<li><strong>Note:</strong> R4 is converging: two patchable findings
+instead of another broad pushback. Operational wrinkle: a parallel
+watcher wrote R4 combined/disposition changes in the shared worktree
+before the response push completed, exposing the dirty-tree race that
+043 is already trying to reduce.</li>
+<li><strong>Conjecture:</strong> The next verification round should be
+close to terminal if it checks exactly the two new falsifiers:
+codex-missing after the default timeout and a chained three-reviewer
+cross-ref convergence fixture that validates under the existing
+one-object <code>cross_ref</code> schema.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
