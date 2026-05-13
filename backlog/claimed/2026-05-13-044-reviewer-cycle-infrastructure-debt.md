@@ -6,9 +6,9 @@ priority: HIGH
 estimate: 1-1.5d
 created: 2026-05-13
 spec_commit_sha: ""
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-13T20:55:03Z"
+branch: "agent/reviewer-cycle-infrastructure-debt"
 head_sha: ""
 agent_notes: ""
 requested_reviewers: ["codex", "codex-ops"]
