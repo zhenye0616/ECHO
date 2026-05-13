@@ -91,8 +91,14 @@ The new gate (the `python3 -c "..."` check) is the load-bearing addition. Withou
 5. Remove the module-level `REVIEWERS = ("codex", "cursor")` constant entirely.
 
 **Test (`tests/review-queue/n-reviewer-framework.test.ts`):**
-- **AC1a — Cursor exits no-op when not requested.** Fixture: a round with `requested_reviewers: [codex]` only. Invoke `.claude/commands/review-queue-cursor.md`'s Step 2 logic (extract into a testable shell function or invoke directly via env-var-driven harness). Assert: exits 0 with stderr "tick: no cursor reviews to write" and `r1/cursor.md` does NOT exist.
-- **AC1b — Codex-only round becomes eligible immediately.** Same fixture; after `r1/codex.md` is written, invoke `combine.py` immediately (no timeout flag); assert: combined.md is written, `combined_verdict` reflects codex's verdict, `cursor_response: null`, `escalated_to_founder: false`.
+- **AC1a — Cursor exits no-op when not in requested_reviewers.** Fixture: a round with `requested_reviewers: [codex]` only. Invoke `.claude/commands/review-queue-cursor.md`'s Step 2 logic (extract into a testable shell function or invoke directly via env-var-driven harness). Assert: exits 0 with stderr "tick: no cursor reviews to write" and `r1/cursor.md` does NOT exist.
+- **AC1b — Codex-only-requested round eligible immediately after codex.md lands.** Same fixture as AC1a; after `r1/codex.md` is written, invoke `combine.py` immediately (no `--timeout-hours` flag); assert: `combined.md` is written, `combined_verdict` reflects codex's verdict, `cursor_response: null`, `escalated_to_founder: false`.
+
+**The required×mode×timeout matrix (Codex R1 HIGH #1 resolution).** Three additional test cases enumerate the eligibility×verdict behavior for the four cells of the matrix that matter in practice. The fixture toggles `reviewers.json` per case (each test uses `config_path` to bypass cache and load a custom config).
+
+- **AC1c — Required cursor missing BEFORE timeout, codex present.** Fixture: `reviewers.json` with `cursor: required=true, mode=ide, timeout_hours=2`; round dispatched with `requested_reviewers: [codex, cursor]`; codex.md present with verdict `proceed`; cursor.md ABSENT; round's `requested_at` is < 2h ago. Invoke `combine.py` (no `--timeout-hours` override). Assert: **NOT eligible** — `combine.py` prints `no rounds to combine` and exits 0; no `combined.md` written.
+- **AC1d — Required cursor missing AFTER timeout, codex present.** Same fixture as AC1c but `requested_at` is > 2h ago (use `--now=<future-iso>` flag to simulate). Invoke `combine.py`. Assert: **eligible** — `combined.md` written, `combined_verdict: partial_responses`, `escalated_to_founder: true`, `cursor_response: null`, body enumerates codex's `proceed` verdict explicitly.
+- **AC1e — Optional cursor missing, codex present (non-blocking).** Fixture: `reviewers.json` with `cursor: required=false, mode=ide, timeout_hours=2`; round dispatched with `requested_reviewers: [codex, cursor]`; codex.md present with verdict `proceed`; cursor.md ABSENT; round's `requested_at` is 5 minutes ago (well before any timeout). Invoke `combine.py`. Assert: **eligible immediately** — `combined.md` written, `combined_verdict: proceed` (not partial_responses — optional missing doesn't escalate), `escalated_to_founder: false`, `cursor_response: null`. **This is the empirical close on Codex R1 HIGH #1**: the same physical state (codex present, cursor absent, before timeout) yields different outcomes depending on `cursor.required`, with NO ambiguity in the implementation.
 
 ### AC2 — `reviewers.json` as single source of truth (runtime metadata only)
 
@@ -113,7 +119,7 @@ New file `tools/review-queue/reviewers.json`:
     {
       "name": "cursor",
       "mode": "ide",
-      "required": false,
+      "required": true,
       "timeout_hours": 2,
       "slash_command": "review-queue-cursor"
     }
@@ -121,20 +127,41 @@ New file `tools/review-queue/reviewers.json`:
 }
 ```
 
-Field semantics:
+Field semantics — ONE rule for eligibility×verdict (resolves R1 HIGH #1 ambiguity):
+
 - `name` (required, string): the slug. MUST match `^[a-z][a-z0-9-]*$` and be unique across the list.
+
 - `mode` (required, enum `headless | ide`): determines launchd-plumbing applicability. `headless` reviewers ARE installed as launchd jobs; `ide` reviewers are user-triggered inside the IDE and never installed as launchd jobs.
-- `required` (required, bool): whether `combine.py` waits for this reviewer to land before computing a non-`partial_responses` verdict. Default deploy: codex=required, cursor=optional.
-- `timeout_hours` (required, number | null): for `mode: ide` reviewers, the wait time before `combine.py` declares `partial_responses` for an absent reviewer. `null` for `mode: headless` (launchd ticks every 10 min; effective timeout is the missing-reviewer-timeout convention).
+
+- `required` (required, bool):
+    - **`required: true` + `mode: headless`:** `combine.py` waits indefinitely for this reviewer's response. Headless reviewers tick every ~10 min via launchd, so "indefinitely" is bounded in practice. A missing required headless reviewer past, say, 24h is operationally a queue stall — out of scope for 043 (separate observability concern).
+    - **`required: true` + `mode: ide`:** `combine.py` waits up to `timeout_hours` for this reviewer. If absent past timeout, combine emits `combined_verdict: partial_responses` with `escalated_to_founder: true`; the body enumerates present reviewers' verdicts. This is current Cursor behavior; **AC7's "default deploy unchanged" depends on this.**
+    - **`required: false`:** Combine treats absence as non-blocking. Eligibility is computed against the required-only set; the optional reviewer is included in the verdict roll-up if-and-only-if its response is present at combine time. Any late-landing response after `combined.md` exists is rejected by AC4's race guard (the response is unwritten by the reviewer prompt's pre-`os.link` check). `timeout_hours` on an optional reviewer is semantically meaningless — the value is allowed in `reviewers.json` but ignored by `combine.py`.
+
+- `timeout_hours` (required, number | null):
+    - For `required: true` + `mode: ide` reviewers: positive number, meaningful (used by combine).
+    - For `required: true` + `mode: headless` reviewers: must be `null` (the launchd tick-cadence is the de facto timing layer).
+    - For `required: false` reviewers: present but ignored by combine; conventionally `null` for headless and the same `2` as before for cursor if we ever toggle cursor to optional.
+
 - `slash_command` (required, string): the `.claude/commands/<slash_command>.md` file this reviewer reads. Convention is `review-queue-<name>` but explicit reference allows future variants.
+
+**Default `reviewers.json` deploy values (preserves current behavior — AC7-load-bearing):**
+- `codex`: `required: true, mode: headless, timeout_hours: null` — exactly current codex behavior.
+- `cursor`: `required: true, mode: ide, timeout_hours: 2` — exactly current cursor behavior (combine waits up to 2h for cursor.md; emits `partial_responses` past timeout). **`required: true` on cursor is the right default per Codex R1 HIGH #1.** Toggling cursor to `required: false` would be a separate speed-decision item, not bundled in 043.
 
 New file `tools/review-queue/_reviewers.py`:
 ```python
 """_reviewers.py — load + validate reviewers.json. Single import point."""
 from __future__ import annotations
 import json
+import re
 from pathlib import Path
 from typing import NamedTuple
+
+_SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+_VALID_MODES = ("headless", "ide")
+_REQUIRED_FIELDS = ("name", "mode", "required", "timeout_hours", "slash_command")
+
 
 class Reviewer(NamedTuple):
     name: str
@@ -143,25 +170,75 @@ class Reviewer(NamedTuple):
     timeout_hours: float | None
     slash_command: str
 
+
 _CACHED: tuple[Reviewer, ...] | None = None
+
 
 def load_reviewers(config_path: Path | None = None) -> tuple[Reviewer, ...]:
     global _CACHED
     if _CACHED is not None and config_path is None:
         return _CACHED
     path = config_path or Path(__file__).parent / "reviewers.json"
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    reviewers = tuple(Reviewer(**r) for r in raw["reviewers"])
-    # Validation: unique slugs; slug pattern; required fields
-    seen = set()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"reviewers.json: invalid JSON: {e}") from e
+    if "reviewers" not in raw or not isinstance(raw["reviewers"], list):
+        raise ValueError("reviewers.json: top-level 'reviewers' array is required")
+
+    reviewers: list[Reviewer] = []
+    for i, r in enumerate(raw["reviewers"]):
+        if not isinstance(r, dict):
+            raise ValueError(f"reviewers.json[{i}]: entry must be an object")
+        # Convert TypeError (missing/extra field) → ValueError with field name in message.
+        try:
+            rev = Reviewer(**r)
+        except TypeError as e:
+            missing = set(_REQUIRED_FIELDS) - set(r.keys())
+            extra = set(r.keys()) - set(_REQUIRED_FIELDS)
+            msg = f"reviewers.json[{i}] (name={r.get('name', '<unknown>')!r}): {e}"
+            if missing:
+                msg += f"; missing required fields: {sorted(missing)}"
+            if extra:
+                msg += f"; unknown fields: {sorted(extra)}"
+            raise ValueError(msg) from e
+        reviewers.append(rev)
+
+    seen: set[str] = set()
     for r in reviewers:
         if not _SLUG_RE.match(r.name):
-            raise ValueError(f"reviewers.json: invalid slug '{r.name}'")
+            raise ValueError(
+                f"reviewers.json: invalid slug {r.name!r} — must match {_SLUG_RE.pattern}"
+            )
         if r.name in seen:
-            raise ValueError(f"reviewers.json: duplicate slug '{r.name}'")
+            raise ValueError(f"reviewers.json: duplicate slug {r.name!r}")
         seen.add(r.name)
-        if r.mode not in ("headless", "ide"):
-            raise ValueError(f"reviewers.json: invalid mode '{r.mode}' for '{r.name}'")
+        if r.mode not in _VALID_MODES:
+            raise ValueError(
+                f"reviewers.json: invalid mode {r.mode!r} for {r.name!r} — must be one of {_VALID_MODES}"
+            )
+        # mode↔timeout_hours contract (resolves R1 HIGH #1 with explicit enforcement).
+        if r.mode == "headless" and r.timeout_hours is not None:
+            raise ValueError(
+                f"reviewers.json: {r.name!r} has mode=headless but timeout_hours={r.timeout_hours!r}; "
+                f"headless reviewers must have timeout_hours=null"
+            )
+        if r.mode == "ide":
+            if r.timeout_hours is None:
+                raise ValueError(
+                    f"reviewers.json: {r.name!r} has mode=ide but timeout_hours=null; "
+                    f"ide reviewers must have a positive numeric timeout_hours"
+                )
+            if not isinstance(r.timeout_hours, (int, float)) or r.timeout_hours <= 0:
+                raise ValueError(
+                    f"reviewers.json: {r.name!r} has invalid timeout_hours {r.timeout_hours!r}; "
+                    f"must be a positive number"
+                )
+        if not isinstance(r.required, bool):
+            raise ValueError(
+                f"reviewers.json: {r.name!r} 'required' must be a bool, got {type(r.required).__name__}"
+            )
+
     if config_path is None:
         _CACHED = reviewers
     return reviewers
@@ -190,9 +267,10 @@ REVIEWERS = ("codex", "cursor")
 **`reviewer.schema.json` enum.** Stays explicit `["codex", "cursor"]`. Adding a new reviewer adds one enum value (one-line schema change) + one row in `reviewers.json`. Both edits land in the same PR. The schema explicitness is deliberate per Codex pushback HIGH #5.
 
 **Test (`n-reviewer-framework.test.ts`):**
-- **AC2a — Invalid reviewers.json rejected.** Fixtures with: duplicate slug, missing required field, invalid mode value, invalid slug pattern (uppercase, leading digit). Each fixture: `_reviewers.py` raises `ValueError` with a clear message; calling tool exits 1 with the message on stderr.
+- **AC2a — Invalid reviewers.json rejected.** Fixtures with: duplicate slug, missing required field, extra field, invalid mode value, invalid slug pattern (uppercase, leading digit, special char), non-bool `required`. Each fixture: `_reviewers.py` raises `ValueError` (NOT `TypeError`) with a clear message that includes the reviewer name and the specific violation; calling tool exits 1 with the message on stderr.
 - **AC2b — Cached load is idempotent.** Call `load_reviewers()` twice without `config_path`; assert returns the same tuple object (cache hit; not re-read).
 - **AC2c — Explicit config_path bypasses cache.** Call `load_reviewers(config_path=<fixture>)`; assert returns fixture contents AND module cache untouched.
+- **AC2d — `mode` × `timeout_hours` contract enforced.** Six fixtures testing the cross-field validation: (i) `mode=headless + timeout_hours=2` rejected; (ii) `mode=headless + timeout_hours=null` accepted; (iii) `mode=ide + timeout_hours=null` rejected; (iv) `mode=ide + timeout_hours=2` accepted; (v) `mode=ide + timeout_hours=0` rejected; (vi) `mode=ide + timeout_hours="2"` (string, not number) rejected. Each rejection's error message names both the reviewer slug AND the offending field.
 
 ### AC3 — Helper scripts accept reviewer slug; codex-specific scripts become 5-line drivers
 
@@ -239,33 +317,60 @@ exec "$(dirname "$0")/_install_reviewer_launchd.sh" codex "$@"
 - **AC3b — REVIEWER_NAME missing fails clearly.** Invoke `_run_reviewer.sh` without `REVIEWER_NAME`; assert exit non-zero, stderr matches `/REVIEWER_NAME env var required/`.
 - **AC3c — REVIEWER_NAME not in reviewers.json fails clearly.** Set `REVIEWER_NAME=ghost`; assert exit non-zero, stderr matches `/ghost not found in reviewers.json/i`.
 
-### AC4 — Late-response race fix in `commit-reviewer-response.sh`
+### AC4 — Late-response race fix in reviewer prompts (NOT the commit helper)
 
-**Implementation.** Per Codex pushback HIGH #6: the current path `validate.py → os.link → commit-push` has a race window. A reviewer can:
-1. Scan and find round X eligible (no `combined.md` yet).
-2. Run Codex review (3-5 min).
-3. Meanwhile, combine.py's watcher tick declares the round `partial_responses` because timeout elapsed.
-4. Reviewer's `commit-reviewer-response.sh` runs `os.link` and pushes a response that contradicts the now-existing `combined.md` (which has `escalated_to_founder: true` already).
+**Implementation.** Per Codex R1 HIGH #2: the original v1 of this AC placed the race guard inside `commit-reviewer-response.sh`. But the prompt-side path is:
 
-The race becomes more frequent with shorter optional-reviewer timeouts (a separate 043-follow-up concern, but the race-fix lands here regardless).
-
-**Fix.** In `commit-reviewer-response.sh`, between `validate.py` exit-0 and `os.link`:
-
-```bash
-# AC4: late-response race guard. If combined.md was written between our scan and
-# this commit attempt, our response is now stale — abort cleanly without committing
-# or pushing. The round is terminal-from-this-reviewer's-POV; the next request.md
-# for r<N+1> (if any) is what we should be looking at instead.
-ROUND_DIR="$(dirname "$RESPONSE_PATH")"
-if [ -f "$ROUND_DIR/combined.md" ]; then
-  echo "commit-reviewer-response: combined.md already exists at $ROUND_DIR — round is terminal; skipping commit" >&2
-  rm -f "$RESPONSE_PATH"  # remove the unstaged response file; nothing to commit
-  exit 0
-fi
+```
+1. Reviewer writes content to /tmp file.
+2. Reviewer does os.link(/tmp/file, r<N>/<reviewer>.md) — atomic, in the PROMPT body.
+3. Reviewer shells out to commit-reviewer-response.sh — the helper sees r<N>/<reviewer>.md and validates/commits.
 ```
 
-**Test (`n-reviewer-framework.test.ts`):**
-- **AC4a — Late-response aborts cleanly.** Fixture: a round with `r1/codex.md.tmp` staged (validation passed). Write a fake `r1/combined.md` to disk to simulate the race. Invoke `commit-reviewer-response.sh r1/codex.md codex 1 <item_id>`. Assert: exits 0, no commit landed, `r1/codex.md` does NOT exist, stderr contains "combined.md already exists".
+`commit-reviewer-response.sh` doesn't OWN the `os.link`; it operates on the already-linked file. Putting the race guard inside the helper would delete a file that combine.py may have already observed and referenced in `combined.md` — making the queue inconsistent.
+
+**Correct fix location: the reviewer prompts' Step 5, immediately before the `os.link` call.** Update `.claude/commands/review-queue-{codex,cursor}.md` Step 5 Python snippet from:
+
+```python
+import os, uuid
+tmp = f"{final}.{uuid.uuid4().hex}.tmp"
+with open(tmp, "w") as f: f.write(content)
+try:
+    os.link(tmp, final); os.unlink(tmp)
+except FileExistsError:
+    os.unlink(tmp); raise SystemExit(0)
+```
+
+…to:
+
+```python
+import os, uuid
+# AC4: late-response race guard. The os.link is atomic, but the window between
+# "Codex started reviewing" and "Codex is about to link" is minutes long. If
+# combined.md was written during that window, our response is stale — discard
+# it without linking. The round is already terminal from this reviewer's POV;
+# next tick will see r<N+1>/request.md if there is one.
+round_dir = os.path.dirname(final)
+if os.path.exists(os.path.join(round_dir, "combined.md")):
+    raise SystemExit(0)
+tmp = f"{final}.{uuid.uuid4().hex}.tmp"
+with open(tmp, "w") as f: f.write(content)
+try:
+    os.link(tmp, final); os.unlink(tmp)
+except FileExistsError:
+    os.unlink(tmp); raise SystemExit(0)
+```
+
+The guard is process-local atomic-stat (`os.path.exists` reads the directory entry, which is atomic on POSIX). Race window between the `exists` check and the subsequent `os.link` is microseconds; an `os.link` race with combine.py's `os.link` writing combined.md is handled by combine.py's existing atomic-write pattern (it links its own temp into place; if combined.md materializes between our exists-check and our os.link of reviewer.md, the worst case is the reviewer.md gets written and combine.py rejects on next tick — same recovery as 041 AC4 quarantine semantics, no data loss).
+
+**No change to `commit-reviewer-response.sh`.** AC4 is now a pure prompt-side change.
+
+**Test (`tests/review-queue/n-reviewer-framework.test.ts`):**
+- **AC4a — Late-response aborts before linking.** Fixture: extract the reviewer Step 5 Python snippet into a testable form (either a small Python helper at `tools/review-queue/_atomic_write.py` that the prompts import, or a parametrized Python invocation the test can drive directly). Create the fixture round directory with `r1/combined.md` already written; invoke the extracted snippet with `final=r1/codex.md`; assert: exits 0, `r1/codex.md` does NOT exist (no link happened), the fixture's combined.md unchanged.
+- **AC4b — No race condition when combined.md absent.** Same fixture but without combined.md. Assert: `r1/codex.md` exists after invocation; no tmp files left behind.
+- **AC4c — Race-with-os.link is handled by FileExistsError fall-through.** Stress test: pre-create `r1/codex.md` (simulating "another reviewer ticked between our check and our link"). Assert: exits 0 cleanly without raising.
+
+**Optional refactor (NOT required by AC4):** extracting the Step 5 Python block into `tools/review-queue/_atomic_write.py` would make this testable without spawning the full reviewer prompt. The builder MAY choose to do this; the spec does not require it.
 
 ### AC5 — `offending_response` regex widening for hyphenated slugs
 
@@ -275,9 +380,16 @@ This is the only schema-pattern fix in 043. Adding a reviewer with a hyphenated 
 
 **Test.** Update `tests/review-queue/schemas.test.ts` with one new fixture: `offending_response: backlog/reviews/.../r1/codex-arch.md` (hyphenated) → validates cleanly.
 
-### AC6 — N-way verdict roll-up with explicit semantics
+### AC6 — N-way verdict roll-up + full build_combined generalization
 
-**Implementation.** Replace `compute_combined_verdict(codex_v, cursor_v)` at `combine.py:85` with:
+**Context (Codex R1 HIGH #3).** Generalizing only `find_eligible_rounds` and `compute_combined_verdict` is insufficient. `combine.py:build_combined` is the function that actually discovers reviewer responses on disk, reads their findings, cross-references findings across reviewers, and writes the per-reviewer fields into `combined.md`. Current `build_combined` hardcodes:
+- **Discovery:** opens exactly `codex.md` and `cursor.md` (hardcoded names at `combine.py:276-304`).
+- **Per-reviewer field write:** `codex_response: <path>` and `cursor_response: <path>` (fixed field names at `combine.py:306-380`).
+- **Cross-reference matching:** pairwise codex×cursor matching by `where` anchor (one nested loop hardcoded for two reviewers).
+
+A 3rd reviewer's response would be **silently ignored** by `build_combined` even if `find_eligible_rounds` and `compute_combined_verdict` know about it. AC6 must generalize ALL THREE phases.
+
+**Implementation (Phase 1: compute_combined_verdict).** Replace `compute_combined_verdict(codex_v, cursor_v)` at `combine.py:85` with:
 
 ```python
 def compute_combined_verdict(
@@ -355,14 +467,86 @@ Strategist: dispose this round based on present-reviewer findings; founder ratif
 
 This is the "explicit semantics" half of Codex pushback MED #7 — present reviewers' actual verdicts are visible, not hidden behind a flat enum.
 
+**Implementation (Phase 2: build_combined response discovery and per-reviewer field write).** Replace the hardcoded codex.md/cursor.md handling at `combine.py:276-304` and `:306-380` with a loop over `request.requested_reviewers`. Concrete refactor:
+
+```python
+# OLD (hardcoded — combine.py:276-304):
+codex_path = round_dir / "codex.md"
+cursor_path = round_dir / "cursor.md"
+codex_fm, codex_body = _lib.parse_frontmatter(codex_path) if codex_path.exists() else (None, None)
+cursor_fm, cursor_body = _lib.parse_frontmatter(cursor_path) if cursor_path.exists() else (None, None)
+# … later, hardcoded field writes:
+combined_fm["codex_response"] = "codex.md" if codex_fm else None
+combined_fm["cursor_response"] = "cursor.md" if cursor_fm else None
+
+# NEW (loop — driven by requested_reviewers from the round's request.md):
+requested = request_fm["requested_reviewers"]  # list of reviewer slugs
+responses = {}  # {reviewer_slug: (frontmatter_dict | None, body_str | None)}
+for slug in requested:
+    path = round_dir / f"{slug}.md"
+    if path.exists():
+        try:
+            responses[slug] = _lib.parse_frontmatter(path)
+        except ValueError:
+            # 042 AC2 handles malformed; that path emits malformed_reviewer_response.
+            # build_combined for the normal path doesn't see malformed files.
+            raise
+    else:
+        responses[slug] = (None, None)
+# … later, dynamic field writes:
+for slug in requested:
+    combined_fm[f"{slug}_response"] = f"{slug}.md" if responses[slug][0] is not None else None
+```
+
+**Implementation (Phase 3: cross-reference matching for findings).** Replace the pairwise codex×cursor cross-ref logic with N-way "group findings by `where` anchor." Concrete refactor:
+
+```python
+# OLD (pairwise hardcoded):
+for c_finding in codex_findings:
+    matching = next((u for u in cursor_findings if u["where"] == c_finding["where"]), None)
+    if matching:
+        convergent.append({"codex": c_finding, "cursor": matching})
+    else:
+        divergent.append({"reviewer": "codex", **c_finding})
+
+# NEW (N-way group-by-anchor):
+findings_by_anchor: dict[str, dict[str, dict]] = {}  # {where: {reviewer_slug: finding}}
+for slug, (fm, _body) in responses.items():
+    if fm is None:
+        continue
+    for f in fm.get("findings", []):
+        anchor = f["where"]
+        findings_by_anchor.setdefault(anchor, {})[slug] = f
+
+convergent = []  # findings present in 2+ reviewers at same anchor
+divergent = []   # findings present in only 1 reviewer
+for anchor, by_reviewer in findings_by_anchor.items():
+    if len(by_reviewer) >= 2:
+        convergent.append({"anchor": anchor, "by_reviewer": by_reviewer})
+    else:
+        slug, f = next(iter(by_reviewer.items()))
+        divergent.append({"reviewer": slug, "anchor": anchor, **f})
+```
+
+This N-way grouping preserves the convergent/divergent distinction (currently load-bearing for the strategist disposition step) AND scales cleanly to any number of reviewers. For the default 2-reviewer deploy, behavior is identical to current pairwise logic.
+
+**Combined.md table rendering.** Currently the body has two tables with `Source: codex | cursor`. Generalize to:
+- For convergent rows: `Source` column lists ALL reviewers that flagged the anchor (e.g., `codex, cursor` or `codex, codex-arch, cursor`).
+- For divergent rows: `Source` column is a single reviewer slug.
+
+No changes to the table column structure beyond `Source` being a comma-list when multiple reviewers converge.
+
 **Test (`n-reviewer-framework.test.ts`):**
-- **AC6a — Unanimous proceed:** verdicts `{codex: proceed, cursor: proceed}`, required `{codex}`, requested `{codex, cursor}` → returns `("proceed", False)`.
-- **AC6b — Unanimous proceed_after_patches:** verdicts `{codex: proceed_after_patches}`, required `{codex}`, requested `{codex}` → returns `("proceed_after_patches", False)`.
-- **AC6c — Optional missing, required present:** verdicts `{codex: proceed, cursor: None}`, required `{codex}`, requested `{codex, cursor}` → returns `("proceed", False)`. (Optional missing doesn't escalate.)
-- **AC6d — Required missing, optional present:** verdicts `{codex: None, cursor: proceed}`, required `{codex}`, requested `{codex, cursor}` → returns `("partial_responses", True)`. Body lists cursor's `proceed` verdict.
-- **AC6e — proceed-vs-pushback divergence:** verdicts `{codex: proceed, cursor: pushback}`, required `{codex, cursor}`, requested `{codex, cursor}` → returns `("divergent", True)`.
+- **AC6a — Unanimous proceed (2 reviewers):** verdicts `{codex: proceed, cursor: proceed}`, required `{codex, cursor}`, requested `{codex, cursor}` → returns `("proceed", False)`.
+- **AC6b — Unanimous proceed_after_patches (1 reviewer required, 1 requested):** verdicts `{codex: proceed_after_patches}`, required `{codex}`, requested `{codex}` → returns `("proceed_after_patches", False)`.
+- **AC6c — Optional cursor missing, required codex present:** verdicts `{codex: proceed, cursor: None}`, required `{codex}`, requested `{codex, cursor}` → returns `("proceed", False)`. (Tests `required: false` semantics from AC2 field semantics.)
+- **AC6d — Required cursor missing past timeout, optional headless present:** verdicts `{codex: None, cursor: proceed}`, required `{codex}`, requested `{codex, cursor}` → returns `("partial_responses", True)`. Body lists cursor's `proceed` verdict.
+- **AC6e — proceed-vs-pushback divergence (2 required):** verdicts `{codex: proceed, cursor: pushback}`, required `{codex, cursor}`, requested `{codex, cursor}` → returns `("divergent", True)`.
 - **AC6f — Mixed proceed variants without pushback:** verdicts `{codex: proceed, cursor: proceed_after_patches}`, required `{codex, cursor}`, requested `{codex, cursor}` → returns `("proceed_after_patches", False)`. (Stricter wins.)
 - **AC6g — No responses:** verdicts `{codex: None, cursor: None}`, required `{codex}`, requested `{codex, cursor}` → returns `("no_responses", True)`.
+- **AC6h — 3 requested reviewers, all unanimous proceed (load-bearing N-way test):** synthetic 3rd reviewer `codex-arch` added to fixture `reviewers.json`; round dispatched with `requested_reviewers: [codex, cursor, codex-arch]`; all three responses present with unanimous `proceed`. Assert: `combined_verdict: proceed`, `escalated_to_founder: false`, `combined.md` frontmatter contains `codex_response: codex.md` + `cursor_response: cursor.md` + `codex-arch_response: codex-arch.md`, **`build_combined` was called with the 3-reviewer set** (verified by patching `responses` dict at test boundary and asserting all three slugs are keys). **This is the falsification test for Codex R1 HIGH #3** — proves build_combined is truly generalized, not just compute_combined_verdict.
+- **AC6i — 3 requested reviewers, convergent finding across all 3:** same fixture as AC6h but all three reviewers flag the same `where` anchor with similar findings. Assert: convergent table row has `Source: codex, cursor, codex-arch` (comma-list) and divergent table is empty.
+- **AC6j — 3 requested reviewers, one diverges:** same fixture, codex+cursor flag anchor X with finding A; codex-arch flags anchor X with finding A AND anchor Y with finding B. Assert: convergent has anchor X with all three; divergent has anchor Y with `Source: codex-arch` only.
 
 ### AC7 — Default deploy proven byte-identical via fixture test
 
@@ -391,12 +575,12 @@ Test runs:
 
 | AC | New test file (or update) | New it() blocks | Notes |
 |---|---|---|---|
-| AC1 | `tests/review-queue/n-reviewer-framework.test.ts` | 2 (AC1a, AC1b) | Tests reviewer prompt + combine.py honor `requested_reviewers` |
-| AC2 | Same file | 3 (AC2a invalid-config; AC2b cache idempotent; AC2c explicit-path) | reviewers.json validation + caching |
+| AC1 | `tests/review-queue/n-reviewer-framework.test.ts` | 5 (AC1a, AC1b + AC1c/AC1d/AC1e required×mode×timeout matrix) | Tests reviewer prompt + combine.py honor `requested_reviewers` AND `required` flag |
+| AC2 | Same file | 4 (AC2a invalid-config; AC2b cache idempotent; AC2c explicit-path; AC2d mode×timeout contract) | reviewers.json validation + caching |
 | AC3 | Same file | 3 (AC3a smoke-with-env-var; AC3b missing-env-var; AC3c unknown-slug) | Shared helper scripts; smoke is the existing harness with env override |
-| AC4 | Same file | 1 (AC4a late-response race) | Race-fix in commit-reviewer-response.sh |
+| AC4 | Same file | 3 (AC4a race-with-combined.md; AC4b no-race-happy-path; AC4c race-with-os.link-already-linked) | Race-fix in reviewer prompt's Step 5 (NOT commit-reviewer-response.sh) |
 | AC5 | Update `tests/review-queue/schemas.test.ts` | 1 (hyphenated-slug fixture) | Schema regex widening |
-| AC6 | Same as AC1 | 7 (AC6a-AC6g — verdict roll-up cases) | N-way `compute_combined_verdict` cases |
+| AC6 | Same as AC1 | 10 (AC6a-AC6g verdict roll-up + AC6h N-way 3-reviewer + AC6i 3-reviewer convergent + AC6j 3-reviewer divergent) | N-way `compute_combined_verdict` AND `build_combined` generalization; AC6h is THE falsification test for 3-reviewer support |
 | AC7 | `tests/review-queue/default-deploy-baseline.test.ts` | 1 (byte-identical combined.md) | Default-deploy regression guard |
 
 Net new test count: **17** (one new test file with 16 blocks + 1 fixture-update in schemas.test.ts). Existing suite count was 56 at 042 merge (55 review-queue + 1 pre-existing-fail); should reach **72 review-queue tests** at 043 merge (still 1 pre-existing-fail for the orphan-cleanup).
