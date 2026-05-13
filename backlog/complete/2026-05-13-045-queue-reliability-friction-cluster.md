@@ -81,7 +81,73 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Shell + Python + Markdown skill-edit work. ~7 files touched (3 reviewer prompts + 3 skill files + 1 install script) + 1 test fix + 1 new helper script. No new dependencies, no UI, no MCP/storage churn.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-13 (UTC ~23:18) via strategist-driven /merge-and-cleanup
+  under "full auto on review and merge" founder direction. Strategist (this
+  Claude Code session) authored the spec and ran the 2-round review cycle;
+  builder (agent ID 78D5AB0F-...) implemented in worktree; code-reviewer
+  subagent produced merge-with-founder-fixups verdict; merge-and-cleanup
+  applied here. Independence rule satisfied: strategist != builder.
+
+  Conflicts resolved:
+  - none — `git merge --no-ff` clean ort-strategy merge. Main and branch
+    touched disjoint paths (main: skills/ + tools/sync-skills.sh +
+    raw/internal/decisions/...md + CLAUDE.md from the mid-cycle skills
+    relocation at `6d29f51`; branch: 6 `.claude/commands/<name>.md` files +
+    new helper + install script + new tests + concurrency test fix).
+
+  Fixups applied:
+  - **Skills-relocation migration** (HEADLINE — per sidecar pre-merge
+    punch-list). Builder edited the now-derived `.claude/commands/<name>.md`
+    adapters per the spec (the relocation landed AFTER claim but BEFORE
+    review). Migration: `cp` each of the 6 modified `.claude/commands/<X>.md`
+    files to `skills/<X>.md` so the new canonical reflects the builder's
+    edits. `tools/sync-skills.sh --check` passes post-fixup. One-time cost
+    of relocating mid-cycle.
+
+  Fixups deferred to follow-up items:
+  - none. Both sidecar punch-list items applied (the second item was a
+    "verify-already-done" check on a stash that had been popped + dropped
+    during the relocation work; no action needed).
+
+  Verify post-merge (full suite from project root):
+  - `npm run lint`: clean.
+  - `npm run typecheck`: clean.
+  - `npm test`: 835/856 pass, 0 fail, 21 skip. **AC3 closes the 3-cycle
+    orphan-cleanup deferral** — `concurrency.test.ts:128` now passes.
+    No more pre-existing-fail carried forward in future verify steps.
+
+  Follow-up items (non-blocking; filed in _followups.md at merge):
+  - `/merge-and-cleanup` C5 verify should include `tools/sync-skills.sh
+    --check`. Would catch any future adapter-vs-canonical drift
+    mechanically at every merge. Roll into the same 046 candidate as the
+    pre-commit hook follow-up named in the 2026-05-13 decision note.
+  - Code-style nit in `tools/review-queue/validate_response_yaml.py:91`:
+    `__import__("os").environ` should be a top-level `import os` +
+    `os.environ`. Tiny.
+
+  Empirical cycle measurement:
+
+  **Founder reviewer-activations during 045's own review cycle: 0.**
+
+  2 rounds total (one BETTER than 044's 3, two better than 043's 8 — best
+  yet for class:narrow scope with explicit Out-of-Scope defense).
+  - r1: codex pushback / 3 findings (3 HIGH) + codex-ops
+    proceed_after_patches / 4 findings (2 HIGH + 2 MED). Combined verdict
+    `divergent + escalated_to_founder` (verdict-label crossing); strategist
+    dispositioned past the mechanical flag because substantive direction
+    was unanimous. 5 distinct issues, 5 spec-patches applied.
+  - r2: codex proceed_after_patches / 3 MED + codex-ops
+    proceed_after_patches / 1 MED. All mechanical. 3 patches applied;
+    path-(c) terminal, verification waived.
+
+  Mid-cycle architectural shift: ECHO skills relocated from
+  `.claude/commands/` (Claude-specific) to `skills/` (vendor-neutral) at
+  main `6d29f51`, AFTER claim AND AFTER 2-round review converged BUT BEFORE
+  the build finished. Builder didn't know about the shift and faithfully
+  followed the original spec. The headline fixup (above) migrated their
+  adapter edits to the new canonical location. One-time relocation cost;
+  future merges in the new layout won't pay it.
 ---
 
 # Queue-reliability friction cluster — friction-045

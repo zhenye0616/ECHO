@@ -64,10 +64,12 @@ Read the artifact plus any inline embeds in the `request.md` body. Apply your re
 
 Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` only.
 
-## Step 5 — Write cursor.md atomically and commit via the validation helper
+## Step 5 — Validate, write cursor.md atomically, then commit via the validation helper
+
+Write your fully-formed response content to a unique temp file FIRST. **Before** `os.link`-ing it into the canonical `<dir>/cursor.md` path, run the pre-link YAML gate (045 AC1). On failure, delete the temp file, regenerate the response in-session, and re-run the gate. After all in-session retries are exhausted, log a single `PRE-LINK-INVALID:` row to `raw/internal/queue-errors.md` and exit non-zero — the next tick will re-poll the round and re-attempt.
 
 ```python
-import os, uuid
+import os, uuid, subprocess
 # 043 AC4: late-response race guard. If combined.md was written during the
 # review window, our response is stale — discard without linking.
 round_dir = os.path.dirname(final)
@@ -75,19 +77,33 @@ if os.path.exists(os.path.join(round_dir, "combined.md")):
     raise SystemExit(0)
 tmp = f"{final}.{uuid.uuid4().hex}.tmp"
 with open(tmp, "w") as f: f.write(content)
+
+# 045 AC1 — pre-link YAML gate. Validate against reviewer.schema.json BEFORE
+# os.link so malformed frontmatter never enters the live state. Stderr-only
+# on the retry path; queue-errors.md only on terminal failure.
+gate = subprocess.run(
+    ["tools/review-queue/validate_response_yaml.py", tmp],
+    capture_output=True, text=True,
+)
+if gate.returncode != 0:
+    os.unlink(tmp)
+    # Regenerate in-session; on terminal exhaustion append a single
+    # PRE-LINK-INVALID row to raw/internal/queue-errors.md and exit 1.
+    raise SystemExit(1)
+
 try:
     os.link(tmp, final); os.unlink(tmp)
 except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
-Then commit + push via the validation helper (AC4 of item 041 — mechanically enforces `reviewer.schema.json` before any git operation):
+Then commit + push via the post-link validation helper (AC4 of item 041 — defense-in-depth backstop that mechanically re-checks `reviewer.schema.json` before any git operation, in case the pre-link gate missed a file shape):
 
 ```bash
 tools/review-queue/commit-reviewer-response.sh "$dir/cursor.md" cursor "$N" "$item_id"
 ```
 
-On validation failure the helper quarantines the file to `<path>.invalid.<ISO-ts>` and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`; on success it commits with message `review-r<N>: cursor on <item_id>` and pushes via `push-with-retry.sh`.
+On validation failure the helper quarantines the file to `<path>.invalid.<ISO-ts>` and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`; on success it commits with message `review-r<N>: cursor on <item_id>` and pushes via `push-with-retry.sh`. With AC1's pre-link gate in place the post-link path should rarely fire.
 
 Operational push; no founder approval needed per §"Out of Scope" #4.
 
