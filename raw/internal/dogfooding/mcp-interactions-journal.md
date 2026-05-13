@@ -3015,6 +3015,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** `commit-reviewer-response.sh` validated and committed the response, then `push-with-retry.sh` failed because a concurrent Codex validation failure had dirtied `queue-errors.md` and left quarantine artifacts in the shared worktree. A concurrent Codex retry then committed those artifacts and pushed `f9b88f1`, carrying the codex-ops response commit as an ancestor. The review landed, but the helper exit was still non-zero in this tick.
 - **Conjecture:** The queue needs a cleaner story for validation-fail artifacts and queue-error appends under concurrent reviewer ticks; otherwise a successful reviewer can still trip over another reviewer's intended failure path during the push phase.
 
+### 13:37 PDT — Codex R2 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex` with no `codex.md` and no `combined.md`; read the R2 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `4ca4904b20cb2340a877e5ddbf763fa7b72b2cee`, prior R1 combined context, `combine.py`, `_reviewers.py`, `reviewers.json`, `_run_reviewer.sh`, `_install_reviewer_launchd.sh`, `combined.schema.json`, and review-queue tests.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex.md` as `a4c96d8`, verdict `proceed`, findings `[]`.
+- **Read sources:** Artifact SHA `4ca4904b20cb2340a877e5ddbf763fa7b72b2cee`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored review to the requested spec SHA, and pushed exactly one reviewer response before this journal entry.
+- **Note:** R2 converged on the prior focus hints: direct-invoke now uses the per-reviewer driver, headless reviewers keep `timeout_hours: null`, AC3 defines the `not_yet_due` round gate with tests, the docs grep is scoped to the edited docs, and AC4 reuses `partial_responses` with only the `escalated_to_founder` flag changed for the narrow single-missing/proceed path.
+- **Conjecture:** (none — observations only per dogfooding-journal discipline)
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

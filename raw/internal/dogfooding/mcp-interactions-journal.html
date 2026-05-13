@@ -1438,6 +1438,9 @@ PDT — Codex R1 on 044 reviewer-cycle infrastructure debt</a></li>
 href="#pdt-codex-ops-r1-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-ops-r1-on-044-reviewer-cycle-infrastructure-debt">13:28
 PDT — Codex-ops R1 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a href="#pdt-codex-r2-on-044-reviewer-cycle-infrastructure-debt"
+id="toc-pdt-codex-r2-on-044-reviewer-cycle-infrastructure-debt">13:37
+PDT — Codex R2 on 044 reviewer-cycle infrastructure debt</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14061,6 +14064,48 @@ helper exit was still non-zero in this tick.</li>
 validation-fail artifacts and queue-error appends under concurrent
 reviewer ticks; otherwise a successful reviewer can still trip over
 another reviewer’s intended failure path during the push phase.</li>
+</ul>
+<h3 id="pdt-codex-r2-on-044-reviewer-cycle-infrastructure-debt">13:37
+PDT — Codex R2 on 044 reviewer-cycle infrastructure debt</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+at <code>4ca4904b20cb2340a877e5ddbf763fa7b72b2cee</code>, prior R1
+combined context, <code>combine.py</code>, <code>_reviewers.py</code>,
+<code>reviewers.json</code>, <code>_run_reviewer.sh</code>,
+<code>_install_reviewer_launchd.sh</code>,
+<code>combined.schema.json</code>, and review-queue tests.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex.md</code>
+as <code>a4c96d8</code>, verdict <code>proceed</code>, findings
+<code>[]</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>4ca4904b20cb2340a877e5ddbf763fa7b72b2cee</code>; request path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA, and
+pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> R2 converged on the prior focus hints:
+direct-invoke now uses the per-reviewer driver, headless reviewers keep
+<code>timeout_hours: null</code>, AC3 defines the
+<code>not_yet_due</code> round gate with tests, the docs grep is scoped
+to the edited docs, and AC4 reuses <code>partial_responses</code> with
+only the <code>escalated_to_founder</code> flag changed for the narrow
+single-missing/proceed path.</li>
+<li><strong>Conjecture:</strong> (none — observations only per
+dogfooding-journal discipline)</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
