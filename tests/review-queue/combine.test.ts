@@ -232,13 +232,17 @@ describe('combine.py', () => {
     expect(existsSync(join(dir, 'combined.md'))).toBe(false);
   });
 
-  it('one response missing, past timeout: single_reviewer_timeout + escalated', () => {
+  it('one response missing, past timeout: partial_responses + escalated (043 AC6 rename)', () => {
+    // 043 AC6: new emitted value is `partial_responses` (replaces
+    // `single_reviewer_timeout` for new rounds). The legacy enum value is
+    // preserved in combined.schema.json for back-compat with rounds in
+    // backlog/complete/.
     const dir = writeRequest(root, 1, '2026-05-12T05:00:00Z');
     writeReviewer(dir, 'codex', 1, 'proceed', []);
     const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
     expect(r.code).toBe(0);
     const { fm } = readCombined(dir);
-    expect(fm.combined_verdict).toBe('single_reviewer_timeout');
+    expect(fm.combined_verdict).toBe('partial_responses');
     expect(fm.escalated_to_founder).toBe(true);
     expect(fm.cursor_response).toBe(null);
   });

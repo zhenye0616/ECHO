@@ -60,9 +60,9 @@ def main(argv: list[str]) -> int:
     for rev in reviewers:
         if rev not in valid:
             print(
-                f"reviewer `{rev}` not in current reviewers.json roster "
-                f"({', '.join(valid)}); add it to reviewers.json + extend the "
-                f"reviewer.schema.json + request.schema.json enums first.",
+                f"reviewer `{rev}` not in current enum {{{', '.join(valid)}}}; "
+                f"extend the schema first (reviewers.json + reviewer.schema.json "
+                f"+ request.schema.json enums).",
                 file=sys.stderr,
             )
             return 2
