@@ -30,3 +30,4 @@ escalated_to_founder: true
 
 `claim-ready after R8` — **path-(c) terminal, verification waived.** Rationale: Codex r8 verdict explicitly says "Proceed after patching the shell helper routing"; the patch is a narrow ~10-line mechanical change to two shell helpers (`TOOL_DIR` vs `TARGET_REPO` split, parallel pattern); finding count trend converged (4→2→1) over r6/r7/r8; 8 rounds is well past the 039 structural-reform 3-4 round expectation. The remaining precision-refinement is asymptotic and would be more productively surfaced as builder-time `agent_notes` than another review round.
 
+verification waived; rationale: Verification waived per path-(c). Codex R8 said 'Proceed after patching the shell helper routing'; patch applied inline (TOOL_DIR/TARGET_REPO split in commit-reviewer-response.sh + push-with-retry.sh). 8 rounds past structural-reform 3-4 expectation; finding count converged 4→2→1; precision-refinement asymptotic.
