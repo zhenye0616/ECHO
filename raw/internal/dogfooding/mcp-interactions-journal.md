@@ -2993,6 +2993,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** Friction #2 (launchctl kickstart silent-exit) immediately reproduced during `--smoke`: the kickstart fired, launchctl recorded `last exit code = 0`, but no log file was ever written. Direct-invoke (`tools/review-queue/run-codex-ops-reviewer.sh` from interactive shell) wrote the log fine in 6.7s wall time. This is *exactly* the AC2 pattern the spec is supposed to fix — meaning friction #2 is empirically still present at HEAD of main, validating 044's premise.
 - **Conjecture:** (none — observations only per dogfooding-journal discipline)
 
+### 13:27 PDT — Codex R1 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R1 request, reviewer schema, Cursor-side queue command, pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `a13e52b9583a7c0721e89cc5583ce40e2271cf05`, current `combine.py`, schemas, `reviewers.json`, `_reviewers.py`, `request.py`, `_run_reviewer.sh`, `_install_reviewer_launchd.sh`, `dispatch-next-round.py`, `docs/review-queue-setup.md`, and review-queue tests.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex.md` as `f9b88f1`, verdict `pushback`. Findings: AC2's direct-invoke command does not set `REVIEWER_NAME`; AC2's grep test is overbroad and already matches out-of-scope files; AC3's `codex-ops timeout_hours: 0.5` requirement conflicts with `_reviewers.py` headless validation; AC3's per-reviewer slot timeout test conflicts with `combine.py`'s round-level eligibility model.
+- **Read sources:** Artifact SHA `a13e52b9583a7c0721e89cc5583ce40e2271cf05`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored review to the requested spec SHA, and pushed exactly one reviewer response before this journal entry.
+- **Note:** The first response emission failed YAML validation because a nested quoted grep string was not escaped; the helper quarantined it and appended `queue-errors.md` as designed, then the regenerated response passed validation. That operational wrinkle is now visible in the same pushed commit as the successful response, which avoided leaving the review worktree dirty before the helper's pull/rebase push path.
+- **Conjecture:** The AC2 command mismatch is likely the fastest patch: use the already-existing per-reviewer driver wrappers (`run-codex-reviewer.sh`, `run-codex-ops-reviewer.sh`) or export `REVIEWER_NAME` explicitly rather than teaching `_run_reviewer.sh` to parse positional slugs.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
