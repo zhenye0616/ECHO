@@ -663,3 +663,9 @@ Option (a) is the lowest-friction fix; (c) is the most resilient.
 6. #6 — watcher on launchd, cross-session autonomy
 
 043 itself becomes the next AC8 measurement vehicle, this time also measuring round-trip latency (target: ≤30 min for 3-round convergence end-to-end, no overrides needed).
+
+## From 042 merge (2026-05-13)
+
+- **Pre-existing orphan-cleanup test failure** (`tests/review-queue/concurrency.test.ts:133`) — fails on main HEAD; also failed before 042's changes. Out of scope per 042 spec §Out of Scope. Root cause was investigated post-040 (see _followups.md "From 041 merge" → the `--now=` fixed-timestamp vs real-mtime mismatch under `touch -t $(date -r ...)`). Two prescribed Option-A/Option-B fixes were named there but never landed. Suggested ID: `2026-05-XX-044-orphan-cleanup-test-fix`. Tiny scope (5-10 lines in the test).
+- **Cosmetic re-parse in `combine.py:200-201`** — `build_malformed_combined` re-opens `request.md` even though `build_combined` already parsed it. Harmless (one extra small file read on the escalation path, which is rare anyway). Thread the parsed dict through the helper signature. Defer to next builder touching combine.py.
+- **Path-resolution caveat in `combine.py:207`** — `Path.resolve().relative_to(repo_root.resolve())` assumes `repo_root` is realpath-resolved by the caller. Tests pre-resolve with `realpathSync` for macOS `/private/var/folders/...`. Not a current bug; document for next builder. Could add an internal-style `_resolve_repo_root(path)` helper that always realpath-resolves.
