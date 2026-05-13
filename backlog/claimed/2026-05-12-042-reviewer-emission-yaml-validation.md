@@ -6,9 +6,9 @@ priority: HIGH
 estimate: 0.5d
 created: 2026-05-12
 spec_commit_sha: ""
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-13T05:06:42Z"
+branch: "agent/reviewer-emission-yaml-validation"
 head_sha: ""
 agent_notes: ""
 spec_refs:
