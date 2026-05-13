@@ -124,7 +124,7 @@ subprocess.run([
 ], check=True)
 ```
 
-Apply the same fix to dispatch-next-round.py's branch (c) — terminal-with-verification-waived — which currently also doesn't pass `--reviewers`. (Branch (a) is terminal without dispatching anything; no fix needed there.)
+**Branches (a) and (c) need NO change** (R5 MED #1 fix). Branch (a) is `proceed`/`pushback` terminal — no r<N+1> dispatched. Branch (c) is `proceed_after_patches` with verification waived — the helper appends a `verification waived; rationale: ...` line to the current round's `combined.md` and leaves `next_round: null`; it never invokes `request.py`. Both terminal branches leave the roster moot. AC1f's roster-propagation fix is **branch (b) only**.
 
 **Files Touched (add).** `tools/review-queue/dispatch-next-round.py` is now part of the modified-file list (was missing from R1's enumeration; R2 HIGH #3 caught this).
 
@@ -391,7 +391,18 @@ exec "$(dirname "$0")/_install_reviewer_launchd.sh" codex "$@"
 **Out of scope for 043: factoring `status-codex-reviewer-launchd.sh`, `uninstall-codex-reviewer-launchd.sh`, `smoke-test-codex-runner.sh` into shared helpers.** These three exist (verified by `ls tools/review-queue/*codex*.sh`) and are ~50 lines each of straightforward shell that operates on the codex-specific launchd label. Adding a 2nd Codex reviewer requires cloning these three at 5-min-each cost. Factor into shared helpers in a 044-follow-up only when a 2nd Codex actually ships and the duplication friction is real. `_run_reviewer.sh` and `_install_reviewer_launchd.sh` are the two load-bearing helpers because they run every 10 min (run) and at install time (install); status/uninstall/smoke run rarely and ad-hoc.
 
 **Test (`n-reviewer-framework.test.ts`):**
-- **AC3a — Smoke runs with REVIEWER_NAME=codex.** Invoke `_run_reviewer.sh` directly with `REVIEWER_NAME=codex` + `ECHO_REVIEW_QUEUE_REPO_ROOT=<smoke-tmpdir>`. Assert: behaves identically to the current `run-codex-reviewer.sh` smoke (uses existing `smoke-test-codex-runner.sh` as the harness with `REVIEWER_NAME=codex` set in env).
+**Implementation note (R5 MED #3 fix) — explicit chmod step.** Both new shared helpers (`_run_reviewer.sh`, `_install_reviewer_launchd.sh`) MUST be created with executable permissions (mode 0755). `apply_patch` creates files at 0644 by default; without an explicit `chmod +x`, the 5-line driver `run-codex-reviewer.sh` (which `exec`s `_run_reviewer.sh`) would fail with `Permission denied`. The builder's implementation step:
+
+```bash
+chmod +x tools/review-queue/_run_reviewer.sh tools/review-queue/_install_reviewer_launchd.sh
+git update-index --chmod=+x tools/review-queue/_run_reviewer.sh
+git update-index --chmod=+x tools/review-queue/_install_reviewer_launchd.sh
+```
+
+The `git update-index --chmod=+x` ensures the +x bit is committed (otherwise local +x doesn't persist across clones).
+
+**Test (`n-reviewer-framework.test.ts`):**
+- **AC3a — Smoke runs with REVIEWER_NAME=codex.** Invoke `_run_reviewer.sh` directly with `REVIEWER_NAME=codex` + `ECHO_REVIEW_QUEUE_REPO_ROOT=<smoke-tmpdir>`. Assert: (i) `_run_reviewer.sh` is executable (`os.access(path, os.X_OK)`); (ii) behaves identically to the current `run-codex-reviewer.sh` smoke (uses existing `smoke-test-codex-runner.sh` as the harness with `REVIEWER_NAME=codex` set in env). (i) is the falsifier for R5 MED #3.
 - **AC3b — REVIEWER_NAME missing fails clearly.** Invoke `_run_reviewer.sh` without `REVIEWER_NAME`; assert exit non-zero, stderr matches `/REVIEWER_NAME env var required/`.
 - **AC3c — REVIEWER_NAME not in reviewers.json fails clearly.** Set `REVIEWER_NAME=ghost`; assert exit non-zero, stderr contains the EXACT literal string `ghost not found in reviewers.json` (no `ModuleNotFoundError`, no Python traceback). The literal-match assertion is the falsification for R2 HIGH #5 (PYTHONPATH must be set so the inline `from _reviewers import` doesn't crash before the not-found check fires).
 - **AC3d — REVIEWER_NAME points at an `ide` reviewer fails clearly.** Set `REVIEWER_NAME=cursor` (which has `mode: ide` in default deploy); assert exit non-zero, stderr contains `cursor has mode=ide, not headless`. Same falsification class — guards against accidental launchd-firing of an IDE reviewer.
@@ -626,13 +637,18 @@ for c_finding in codex_findings:
 # NEW (N-way group-by-PRIMARY-anchor, preserves normalize_where + cross_refs_match):
 # Build {primary_anchor: {reviewer_slug: finding}} via two-phase pass:
 # Phase 3a — group by normalized primary anchor.
-findings_by_anchor: dict[str, dict[str, dict]] = {}
+# R5 MED #2 fix: per-reviewer findings are stored as a LIST, not a single dict
+# value. Without this, two findings from the SAME reviewer at the SAME normalized
+# anchor would overwrite each other — silently dropping a finding before
+# disposition. The list shape also preserves finding-index addressability so
+# cross_refs_match can resolve `finding_index: N` correctly.
+findings_by_anchor: dict[str, dict[str, list[dict]]] = {}
 for slug, (fm, _body) in responses.items():
     if fm is None:
         continue
     for f in fm.get("findings", []):
         primary, _ = normalize_where(f["where"])
-        findings_by_anchor.setdefault(primary, {})[slug] = f
+        findings_by_anchor.setdefault(primary, {}).setdefault(slug, []).append(f)
 
 # Phase 3b — union-find merge for cross_ref-bridged convergence (R4 MED #2 fix).
 # A naive pairwise merge can split chains: if A's bucket merges with B, then C's
@@ -674,15 +690,19 @@ for anchor, by_reviewer in findings_by_anchor.items():
     merged_buckets.setdefault(root, {}).update(by_reviewer)
 findings_by_anchor = merged_buckets
 
-# Phase 3c — bucketize into convergent (≥2 reviewers) vs divergent (1 reviewer).
+# Phase 3c — bucketize into convergent (≥2 reviewers contributed) vs divergent (1 reviewer).
+# A "reviewer contribution" is at least one finding from that reviewer in the bucket.
+# Multiple findings from the same reviewer at the same anchor stay in the list.
 convergent = []
 divergent = []
 for anchor, by_reviewer in findings_by_anchor.items():
-    if len(by_reviewer) >= 2:
-        convergent.append({"anchor": anchor, "by_reviewer": by_reviewer})
+    contributing_reviewers = list(by_reviewer.keys())
+    if len(contributing_reviewers) >= 2:
+        convergent.append({"anchor": anchor, "by_reviewer": by_reviewer})  # by_reviewer is {slug: [finding, ...]}
     else:
-        slug, f = next(iter(by_reviewer.items()))
-        divergent.append({"reviewer": slug, "anchor": anchor, **f})
+        slug = contributing_reviewers[0]
+        for f in by_reviewer[slug]:
+            divergent.append({"reviewer": slug, "anchor": anchor, **f})
 ```
 
 This preserves all three semantics of the current pairwise code: (1) `normalize_where` extracts the primary anchor (current line 311 + 316); (2) `cross_refs_match` is the explicit override that bridges different anchors when a reviewer's finding cross-references another (current line 320); (3) the convergent/divergent split is unchanged in shape. The N-way generalization rides on top.
@@ -707,6 +727,7 @@ No changes to the table column structure beyond `Source` being a comma-list when
 - **AC6i — 3 requested reviewers, convergent finding across all 3:** same fixture as AC6h but all three reviewers flag the same `where` anchor with similar findings. Assert: convergent table row has `Source: codex, cursor, codex-arch` (comma-list, alphabetical) and divergent table is empty.
 - **AC6j — 3 requested reviewers, one diverges:** same fixture, codex+cursor flag anchor X with finding A; codex-arch flags anchor X with finding A AND anchor Y with finding B. Assert: convergent has anchor X with all three; divergent has anchor Y with `Source: codex-arch` only.
 - **AC6k — Two-reviewer default-deploy cross_ref convergence (regression guard for R2 HIGH #2).** Fixture: default `reviewers.json` (codex + cursor only), round with both responses; codex's finding has `where: "AC1 implementation"`, cursor's finding has `where: "AC1 test fixture"` (different primary anchors). Codex's finding includes `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` pointing at cursor's finding. Assert: combined.md convergent table has ONE row pairing both findings (proven by their cross_ref override bridging different anchors); divergent is empty. **This is the falsification for R2 HIGH #2** — proves the N-way refactor preserves `cross_refs_match` semantics. Build_combined would otherwise put them in divergent (different normalize_where outputs).
+- **AC6m — Same-reviewer duplicate-anchor findings preserved (R5 MED #2 fix).** Fixture: default 2-reviewer deploy; codex's response has TWO findings, both with `where: "AC1 implementation"` (same primary anchor). Different `finding` text, different severities (HIGH + MEDIUM). cursor has zero findings. Invoke `combine.py`. Assert: divergent table has BOTH codex findings (not just one); their order is stable (input-order preserving); each appears in the table with its own severity and finding text. **Falsifies R5 MED #2** — without the list-shape fix, the second finding would overwrite the first at `findings_by_anchor[anchor][codex]` and be silently dropped.
 - **AC6l — Three-reviewer cross_ref convergence via transitive chain (R4 MED #2 fix).** Same fixture as AC6k but with synthetic `codex-arch` added. Each finding carries EXACTLY ONE `cross_ref` (per `reviewer.schema.json`'s schema):
   - codex's finding: `where: "AC1 implementation"`, `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` (chain hop A→B).
   - cursor's finding: `where: "AC1 test fixture"`, no cross_ref (B is the bridge).
