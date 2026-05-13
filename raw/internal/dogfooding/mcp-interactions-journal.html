@@ -1426,6 +1426,11 @@ href="#pdt-drill-into-last-conversation-strategic-exchanges-043-close-out-qa"
 id="toc-pdt-drill-into-last-conversation-strategic-exchanges-043-close-out-qa">13:08
 PDT — drill into “last conversation” strategic exchanges (043 close-out
 Q&amp;A)</a></li>
+<li><a
+href="#pdt-044-pre-flight-r1-dispatch-first-production-exercise-of-043s-adding-a-reviewer-changelist"
+id="toc-pdt-044-pre-flight-r1-dispatch-first-production-exercise-of-043s-adding-a-reviewer-changelist">13:22
+PDT — 044 pre-flight + r1 dispatch (first production exercise of 043’s
+Adding-a-Reviewer Changelist)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13899,6 +13904,55 @@ axis on cluster source_breakdown (strategist vs builder vs
 auto-fired-loop) would speed up the “what did <em>I</em> personally say
 vs what was machinery” question, but that’s a V1.6+ shape suggestion not
 a blocker.</li>
+</ul>
+<h3
+id="pdt-044-pre-flight-r1-dispatch-first-production-exercise-of-043s-adding-a-reviewer-changelist">13:22
+PDT — 044 pre-flight + r1 dispatch (first production exercise of 043’s
+Adding-a-Reviewer Changelist)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder said “run the pre-flight and
+dispatch r1” after the 044 spec was filed (commit b074db0).</li>
+<li><strong>Query inputs:</strong> No MCP calls — this was
+infrastructure setup. Six pre-flight edits (reviewers.json + 3 schema
+enums + new slash command + new wrapper driver), one schema-test pass
+(18/18), one
+<code>_install_reviewer_launchd.sh codex-ops --smoke</code>, one
+<code>request.py</code> dispatch, two direct-invoke fires.</li>
+<li><strong>Returned:</strong> Pre-flight committed at
+<code>a13e52b</code>. r1 dispatched at <code>e8d0c85</code> with
+<code>requested_reviewers: [codex, codex-ops]</code> (cursor
+deliberately omitted for this spec only). Both reviewers fired via
+background nohup (AC2 direct-invoke pattern — the first production use
+of friction #2’s cure).</li>
+<li><strong>Sources:</strong> Repo state across
+<code>tools/review-queue/reviewers.json</code>,
+<code>tools/review-queue/schemas/{request,reviewer,combined}.schema.json</code>,
+<code>.claude/commands/review-queue-codex-ops.md</code> (new),
+<code>tools/review-queue/run-codex-ops-reviewer.sh</code> (new). r1 at
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md</code>.
+Background process logs at <code>/tmp/044-r1-codex.log</code> and
+<code>/tmp/044-r1-codex-ops.log</code>. Plist installed at
+<code>~/Library/LaunchAgents/com.echo.review-queue-codex-ops.plist</code>.</li>
+<li><strong>Verdict:</strong> ✅ pre-flight successful — schema tests
+pass, reviewers.py loads codex-ops cleanly, smoke verified that
+<code>_run_reviewer.sh</code> correctly handles the “no candidate for
+codex-ops yet” case (exit 0, log written), direct-invoke fires confirmed
+both wrappers run from background. Spec deviation noted in commit
+message: <code>timeout_hours=0.5</code> for codex-ops was overridden to
+<code>null</code> because <code>_reviewers.py:94</code> enforces
+headless-must-be-null (semantic: headless reviewers are launchd-driven,
+no human-timeout concept applies).</li>
+<li><strong>Note:</strong> Friction #2 (launchctl kickstart silent-exit)
+immediately reproduced during <code>--smoke</code>: the kickstart fired,
+launchctl recorded <code>last exit code = 0</code>, but no log file was
+ever written. Direct-invoke
+(<code>tools/review-queue/run-codex-ops-reviewer.sh</code> from
+interactive shell) wrote the log fine in 6.7s wall time. This is
+<em>exactly</em> the AC2 pattern the spec is supposed to fix — meaning
+friction #2 is empirically still present at HEAD of main, validating
+044’s premise.</li>
+<li><strong>Conjecture:</strong> (none — observations only per
+dogfooding-journal discipline)</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
