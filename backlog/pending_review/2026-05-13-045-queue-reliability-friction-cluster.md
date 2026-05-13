@@ -9,8 +9,60 @@ spec_commit_sha: "0a09fed"
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-13T22:48:56Z"
 branch: "agent/queue-reliability-friction-cluster"
-head_sha: ""
-agent_notes: ""
+head_sha: "1e7c3ef58d66edd2c0de09405cf25ce7cbee21e5"
+agent_notes: |
+  AC1–AC6 land in a single attempt; 0 drift events, 0 escalations, 0 spec
+  ambiguity. Branch agent/queue-reliability-friction-cluster pushed to
+  origin at 1e7c3ef.
+
+  AC1 — pre-link gate ships as tools/review-queue/validate_response_yaml.py;
+  invoked from Step 5 of all 3 reviewer slash commands between temp-write
+  and os.link. Stderr-only on retry path; queue-errors.md untouched by
+  the helper itself (terminal-failure logging stays a prompt
+  responsibility per spec disposition for r1 codex HIGH #2).
+
+  AC2 — _install_reviewer_launchd.sh fail-closed gate moved BEFORE any
+  plist write/launchctl call. Detected pre-existing bug: the original
+  trailing `[ "${1:-}" = "--smoke" ]` shape was wrong-by-construction
+  (post-shift $1 is the optional remaining arg, not the flag). Replaced
+  with SMOKE_REQUESTED set by an early `for arg in "$@"` scan; trailing
+  block now uses that flag and is unconditional once executability is
+  pre-verified.
+
+  AC3 — Option-A landed (capture now_iso BEFORE touch -t, pass same
+  timestamp to combine.py --now=); concurrency.test.ts is now FULLY
+  green (was 6/7).
+
+  AC4 — watch.md:38 now matches combine.py:684 emitter literal verbatim.
+
+  AC5a — identity-guard (4 atomic checks) gates rm -rf
+  $WORKTREE/node_modules; no-force invariant on git worktree remove
+  preserved. AC5b — stage-before-mv form chosen (spec preference); C8
+  diff will now include review_notes content, fixing the 044 ca51bb2 →
+  011b539 split-commit pattern.
+
+  AC6 — per-sidecar git add + commit + push-with-retry.sh inside the
+  SIDECARS loop; description, intro, Step E, Must-Not, Success-section
+  all updated consistently to describe sidecar-commit as the single
+  read-only exception. push-with-retry chosen over bare-push-with-swallow
+  per r1 codex-ops HIGH #1.
+
+  Verification: npm test → 835/0/21 (passed/failed/skipped) across 58
+  files; tests/review-queue → 95 passed across 14 files (5 new AC1, 3
+  new AC2, AC3 fix re-greens orphan-cleanup); npm run lint clean; npm
+  run typecheck clean.
+
+  Founder notes:
+  1. Run log at raw/internal/agent-runs/2026-05-13-2026-05-13-045-queue-reliability-friction-cluster.md (date prefix is doubled because the item id starts with a date — matches the skill's $(date +%Y-%m-%d)-$ITEM_ID template literally).
+  2. On entering the main repo to write the run log I found pre-existing
+     staged renames (.claude/commands/* → skills/* + new
+     tools/sync-skills.sh). Per AGENT_INSTRUCTIONS "investigate before
+     overwriting", I git-stashed it untouched (`git stash list` shows
+     "process-backlog 045: stashing pre-existing strategist skills/
+     rename WIP"). Restore at your discretion. If this is your in-flight
+     skills migration, the agent's .claude/commands/* edits in this
+     branch will need to be re-applied to the new skills/* paths post-
+     migration. Surfaced for awareness; the agent did not act on it.
 requested_reviewers: ["codex", "codex-ops"]
 spec_refs:
   - backlog/complete/2026-05-13-044-reviewer-cycle-infrastructure-debt.md   # Direct parent. 044 closed friction #1-#4 from the 043 enumeration. 045 closes the cluster of recurring frictions that ALSO showed up during 044's own cycle but were out of 044's scope. Read 044's review_notes for the empirical observation list that informs this spec's scope.
