@@ -584,3 +584,82 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 - **✅ Cross-out: AC0 Codex recipe failure on macOS** — 041 AC3 pins the corrected invocation (`--sandbox danger-full-access`, no `--ask-for-approval`, `<` redirection) in the wrapper script.
 
 - **✅ Cross-out: AC3 reviewer-emission validation gap** — 041 AC4 ships `tools/review-queue/commit-reviewer-response.sh` with mechanical validate-before-commit + invalid-file MV-aside on failure; both reviewer slash-commands rewired.
+
+## From 042 dogfooding cycle (2026-05-12)
+
+**Context:** First post-041 AC8 measurement vehicle. Founder-authorized off-protocol overrides for speed (strategist drove single-reviewer disposition; `MISSING_REVIEWER_TIMEOUT_HOURS=0` flag used 3×). Spec `2026-05-12-042-reviewer-emission-yaml-validation` converged in ~50 min wall-time across 3 rounds (R1: 3 findings → R2: 2 → R3: 1 LOW → terminal). **AC8 = 0 founder activations.** Five structural findings surfaced during the cycle; collectively, they're the speed-and-resilience seed for 043.
+
+### 🔴 #1 — launchd kickstart silently fails before log redirect (HIGH)
+
+**Observed:** Strategist issued `launchctl kickstart -k gui/$(id -u)/com.echo.review-queue-codex` at 23:28:12Z. `launchctl print` showed `runs` incremented (4→5), but `~/Library/Logs/echo-review-queue-codex.log` was unchanged — no `tick start` line. The 041 wrapper script (`run-codex-reviewer.sh`) writes errors in lines 14-43 to stderr BEFORE the `{...} >> "$LOG_FILE" 2>&1` redirect on line 50; stderr is mapped to `/dev/null` per the plist's `StandardErrorPath`. Any pre-redirect failure (cd, git rev-parse, mkdir, rotation) is therefore invisible.
+
+**Cost:** First launchd-fired tick after install also exhibited this; the 041 followup hinted at it. Workaround used 4× this cycle: invoke `tools/review-queue/run-codex-reviewer.sh` directly via Bash with `2>&1`. Strategist-direct invocation works perfectly; only launchd-fired invocations fail silently.
+
+**Fix candidates:** (a) move the pre-redirect work inside the `{...}` block; (b) plist `StandardErrorPath` → log file path instead of `/dev/null`; (c) emit a `[bootstrap]` marker line at the very top of `{...}` so silent failures are detectable downstream.
+
+### 🔴 #2 — `git pull --rebase origin main` wedges on dirty tree in every prompt's Step 1 (HIGH)
+
+**Observed:** Both `review-queue-watch.md` and `review-queue-codex.md` (and presumably `review-queue-cursor.md`) start Step 1 with bare `git pull --rebase origin main`. If the worktree is dirty, the rebase aborts non-zero and the tick exits without doing anything. This fired 4+ times during 042: once at the first watcher tick (workaround: manual stash/pop), and once at Codex r2's first attempt (Codex correctly aborted to avoid reviewing stale artifacts, leaving r2/codex.md never written; resolved only after strategist stashed the dirty tree).
+
+**Cost:** Roughly half the strategist intervention time this cycle. The dirty state is unavoidable in steady state — Codex's own post-review journal write always leaves the tree dirty for several seconds; concurrent agents add to it; the strategist's WIP wiki edits sit dirty across sessions.
+
+**Fix:** One-line change to all three slash-commands' Step 1:
+
+```bash
+# Before:
+git pull --rebase origin main
+# After:
+git -c rebase.autoStash=true pull --rebase origin main
+```
+
+Codex itself adopted this pattern organically in one of the 042 r1 ticks; this should be the documented convention.
+
+### 🔴 #3 — `MISSING_REVIEWER_TIMEOUT_HOURS=2` is too slow for iterative work (HIGH)
+
+**Observed:** With Cursor closed (the accept-degradation case from 041), combine.py refuses to write `combined.md` until 2h elapse from `requested_at`. For 042 that meant a per-round wait of ~2h just to start dispositioning. Strategist worked around by invoking `combine.py --timeout-hours=0` three times across the cycle.
+
+**Cost:** 042 cycle would have taken 6+ hours under default 2h timeout. With `--timeout-hours=0`, the cycle took ~50 min.
+
+**Fix:** Drop the default to a small value (5-15 min) OR — better — replace the timeout-based "accept-degradation" with a config-driven optional reviewer list. If Cursor is in `optional_reviewers` for the current session, combine.py treats absent-Cursor as a clean single-reviewer round, no waiting. Per the 041 followup's "replace Cursor as a reviewer" candidate (line 531), this also opens the door to a second headless reviewer (second Codex with different prompt, or Claude API cron) that doesn't have the "is the IDE open?" question.
+
+### 🟠 #4 — Watcher's `single_reviewer_timeout → escalate_to_founder` default contradicts AC8 goal (MEDIUM)
+
+**Observed:** When combine.py writes `combined_verdict: single_reviewer_timeout`, it sets `escalated_to_founder: true`. The watcher slash-command's Step 3 then says "Append a journal entry; **exit**. The founder will see and act on next session." That's exactly the founder-activation 041/AC8 is trying to eliminate. Strategist overrode this 3× during 042 by ignoring the escalation flag and dispositioning the single-reviewer (Codex-only) findings as if it were a normal `proceed_after_patches` round.
+
+**Cost:** None this cycle (off-protocol override was clean), but the default behavior is the wrong default — every non-Cursor session would hit it.
+
+**Fix:** Watcher Step 3 should treat `single_reviewer_timeout` differently from `divergent`/`no_responses`: when one named reviewer (codex) succeeded and only the accept-degradation reviewer (cursor) is absent, the strategist disposition path fires normally with `escalated_to_founder: false` (or a new `escalated: false, mode: single_reviewer_strategist_drive` flag). Divergent + no_responses still escalate.
+
+### 🟡 #5 — Reviewer schema accepts unquoted-YAML timestamps; reviewers emit them ~half the time (MEDIUM)
+
+**Observed:** `reviewer.schema.json` declares `completed_at: { type: string }`. YAML parses `2026-05-12T23:56:42Z` (unquoted) as `datetime.datetime`, not `str`. jsonschema then rejects: `is not of type 'string'`. 042 r1/r2 happened to emit single-quoted strings (passing); r3 first-attempt emitted unquoted (failing → 041 AC4 quarantine fired). The variance is non-deterministic across Codex ticks.
+
+**Cost:** One extra ~3-min round-trip in r3 to regenerate. AC4 absorbed it without founder activation, but the wasted compute is real.
+
+**Fix candidates:**
+- **(a)** Tighten reviewer prompts (`review-queue-codex.md` + `review-queue-cursor.md`) to specify `completed_at: '2026-05-XXTHH:MM:SSZ'` (quoted) verbatim, with example.
+- **(b)** Relax `reviewer.schema.json` to accept `completed_at: { oneOf: [{ type: string, format: date-time }, ...] }` — though YAML's auto-coercion to datetime is a python-yaml quirk; jsonschema's `format: date-time` only checks strings.
+- **(c)** Pre-normalize in validate.py: if `completed_at` value is `datetime.datetime`, coerce to ISO 8601 string before validation.
+
+Option (a) is the lowest-friction fix; (c) is the most resilient.
+
+### 🟡 #6 — Watcher cron is session-only; cross-session autonomy gap (MEDIUM)
+
+**Observed:** `/loop 10m /review-queue-watch` registers a CronCreate job in this Claude Code session's in-memory store. Job dies when the session closes. The launchd Codex job survives session closures (independent process), but with no watcher running, nothing combines or dispositions; queue stalls until the founder re-opens a strategist session and re-loops.
+
+**Cost:** None today (session stayed open). Real cost in production: any spec dispatched at end-of-day sits idle overnight; founder finds it un-converged next morning despite Codex having reviewed hours ago.
+
+**Fix:** Launchd-ify the watcher too. Similar plist + wrapper shape as 041's Codex one. Trade-off: watcher's slash-command body does require a Claude session to invoke (it's not just a shell script). Real fix is the slash-command body extracted into a standalone Python/bash helper that doesn't need Claude, or a Claude Code headless invocation similar to `codex exec`.
+
+### Summary recommendation
+
+**File 043 as a single spec** named `2026-05-XX-043-reviewer-loop-speed-and-resilience` covering #1-#6. Estimated 1-2d. Order of leverage (per cost-saved-this-cycle):
+
+1. #2 — `git -c rebase.autoStash=true`, 4× wedge hits avoided
+2. #3 — drop timeout default OR config-driven optional-reviewer list, ~10× speed boost
+3. #4 — watcher single-reviewer-strategist-drive path, 3× off-protocol overrides avoided
+4. #1 — launchd kickstart logging fix, debugging gain
+5. #5 — reviewer prompt quoted-timestamp + validate.py coercion, ~50% emission-fail avoidance
+6. #6 — watcher on launchd, cross-session autonomy
+
+043 itself becomes the next AC8 measurement vehicle, this time also measuring round-trip latency (target: ≤30 min for 3-round convergence end-to-end, no overrides needed).

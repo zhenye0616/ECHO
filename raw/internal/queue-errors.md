@@ -5,3 +5,4 @@
 2026-05-12T09:58:45Z PUSH-RACE-FALLBACK: review-r3: codex on 2026-05-12-040-watcher-state-executable-test sha=a412b7b0f216e6fb961db1947170f49071da2dca
 2026-05-12T10:01:55Z PUSH-RACE-FALLBACK: review-r3: cursor on 2026-05-12-040-watcher-state-executable-test sha=1c6cfc1a0a211b8cf93d681eb3f52a95d6dc6c0d
 2026-05-12T23:57:09Z VALIDATION-FAIL: codex r3 on 2026-05-12-042-reviewer-emission-yaml-validation moved_to=backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md.invalid.2026-05-12T23:57:09Z diagnostic=backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md: schema violation at completed_at: datetime.datetime(2026, 5, 12, 23, 56, 42, tzinfo=datetime.timezone.utc) is not of type 'string'
+2026-05-13T00:02:39Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-12-042-reviewer-emission-yaml-validation sha=75e44e018961961f6dfb57e26bc605301f61ea06

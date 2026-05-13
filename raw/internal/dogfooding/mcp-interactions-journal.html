@@ -1383,6 +1383,11 @@ id="toc-pdt-codex-r2-on-042-reviewer-emission-yaml-validation">2026-05-12
 <li><a href="#pdt---codex-r3-on-042-reviewer-emission-yaml-validation"
 id="toc-pdt---codex-r3-on-042-reviewer-emission-yaml-validation">2026-05-12
 17:01 PDT - Codex R3 on 042 reviewer-emission YAML validation</a></li>
+<li><a
+href="#pdt-strategist-closes-042-cycle-ac8-0-founder-activations-across-full-3-round-convergence"
+id="toc-pdt-strategist-closes-042-cycle-ac8-0-founder-activations-across-full-3-round-convergence">2026-05-12
+17:54 PDT — Strategist closes 042 cycle (AC8 = 0 founder activations
+across full 3-round convergence)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13419,6 +13424,82 @@ and pushed exactly one reviewer response before journaling.</li>
 because an unquoted <code>completed_at</code> parsed as a YAML timestamp
 instead of a string. This regenerated response used quoted/scalar-safe
 frontmatter and passed the canonical helper.</li>
+</ul>
+<h3
+id="pdt-strategist-closes-042-cycle-ac8-0-founder-activations-across-full-3-round-convergence">2026-05-12
+17:54 PDT — Strategist closes 042 cycle (AC8 = 0 founder activations
+across full 3-round convergence)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code strategist (this session,
+post-041)</li>
+<li><strong>Trigger:</strong> Founder asked to test “fully out of the
+spec→convergence loop” by running 042 as the first post-041 AC8
+measurement vehicle. Founder explicitly authorized strategist-driven
+single-reviewer disposition for speed
+(<code>MISSING_REVIEWER_TIMEOUT_HOURS=2</code> is too slow for iterative
+work; founder framing: “the goal is to speed up the iteration, not slow
+it down”).</li>
+<li><strong>Query inputs (no MCP calls this turn — pure
+git/filesystem):</strong> spec <code>1142938</code> → r1 dispatch
+<code>14fa7b5</code> → Codex r1 <code>1cab6ef</code> → strategist
+disposition + spec patch <code>ac48694</code> → r2 dispatch
+<code>432b935</code> → Codex r2 <code>54dfed2</code> → strategist
+disposition + spec patch <code>89dbb58</code> → r3 dispatch
+<code>a9a26d1</code> → Codex r3 quarantined (unquoted YAML timestamp;
+041 AC4 fired) → fresh r3 <code>5b831aa</code> → strategist disposition
++ spec patch <code>73d3930</code> → terminal <code>0ec6d0d</code>. Total
+wall-time ~50 min.</li>
+<li><strong>Returned (the measurement):</strong>
+<ul>
+<li><strong>AC8 founder activations: 0</strong> across full 3-round
+convergence. Reviewers (codex) never required founder hands-on.
+Strategist (this session) drove dispatch + disposition end-to-end.</li>
+<li><strong>Finding decay 3→2→1 → terminal</strong>, matching the 040
+R1→R2→R3 (8→6→0) curve from the 039 wiki — 4th confirming data point
+that narrow specs settle in 2-3 rounds.</li>
+<li><strong>041 AC4 quarantine machinery fired in production</strong>
+for the first time (R3 first attempt). Codex emitted
+<code>completed_at: 2026-05-12T23:56:42Z</code> unquoted; YAML parsed as
+datetime; <code>validate.py reviewer</code> rejected because schema
+requires <code>type: string</code>; helper moved file to
+<code>codex.md.invalid.&lt;ts&gt;</code> and appended
+<code>VALIDATION-FAIL:</code> row to <code>queue-errors.md</code>. Retry
+produced a valid response with quoted timestamp. No founder activation
+needed — the recovery loop worked as designed.</li>
+</ul></li>
+<li><strong>Sources:</strong> Git history <code>origin/main</code>
+(commits enumerated above). Codex review-queue log
+<code>~/Library/Logs/echo-review-queue-codex.log</code> for the
+kickstart-vs-direct-wrapper diagnosis. Queue-errors append-only log
+<code>raw/internal/queue-errors.md</code> for the validation-fail trace.
+No <code>mcp__echo__*</code> calls — pure git observability.</li>
+<li><strong>Verdict:</strong> ✅ right — AC8 closed at 0 founder
+activations on a real spec. The empirical measurement the 041 spec
+called for is now in the can.</li>
+<li><strong>Note:</strong> Five structural findings surfaced during this
+cycle, each load-bearing for the next iteration speed gain. Filed as 043
+seed in <code>_followups.md</code> under “From 042 dogfooding cycle
+(2026-05-12)”: (1) launchd kickstart silently fails before
+redirect-to-log; (2) <code>git pull --rebase</code> in every prompt’s
+Step 1 wedges on dirty tree (autoStash needed); (3) Cursor 2h
+<code>MISSING_REVIEWER_TIMEOUT_HOURS</code> is too slow — strategist had
+to override to 0 three times; (4) watcher’s
+<code>single_reviewer_timeout → escalate to founder</code> default
+contradicts AC8 goal — strategist-disposition path needed; (5) reviewer
+schema accepts unquoted YAML timestamps as datetime, causing 041 AC4
+quarantines on roughly-half of reviewer emissions — fix at prompt OR
+schema. Watcher session-only cron is also a real autonomy gap (cron dies
+when session closes).</li>
+<li><strong>Conjecture:</strong> The dirty-tree wedge (#2) is the
+highest-frequency friction in this cycle — hit 4+ times across watcher +
+reviewer ticks. A one-line
+<code>git -c rebase.autoStash=true pull --rebase</code> fix in all three
+slash-commands (review-queue-{codex,cursor,watch}.md) would have saved
+roughly half the strategist intervention time. The “founder out of loop
+AND loop is fast” goal needs both 041’s launchd Codex AND #1-#5 above
+closed; today’s experiment showed AC8=0 IS achievable but only with
+strategist driving dispatch and overriding single-reviewer-escalate —
+043 needs to make that path the default.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
