@@ -1416,6 +1416,16 @@ id="toc-pdt---codex-r4-on-043-per-round-reviewer-roster">2026-05-12
 <li><a href="#pdt---codex-r5-on-043-per-round-reviewer-roster"
 id="toc-pdt---codex-r5-on-043-per-round-reviewer-roster">00:03 PDT -
 Codex R5 on 043 per-round reviewer roster</a></li>
+<li><a
+href="#pdt-strategist-resume-after-overnight-clear-context-043-post-merge"
+id="toc-pdt-strategist-resume-after-overnight-clear-context-043-post-merge">13:00
+PDT — strategist resume after overnight clear-context (043
+post-merge)</a></li>
+<li><a
+href="#pdt-drill-into-last-conversation-strategic-exchanges-043-close-out-qa"
+id="toc-pdt-drill-into-last-conversation-strategic-exchanges-043-close-out-qa">13:08
+PDT — drill into “last conversation” strategic exchanges (043 close-out
+Q&amp;A)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13802,6 +13812,93 @@ union-find focus items, but the review still found three implementation
 hazards outside the focus list. Operational wrinkle: unrelated local
 wiki edits had to be stashed before the queue helper could run its
 rebase/push path cleanly.</li>
+</ul>
+<h3
+id="pdt-strategist-resume-after-overnight-clear-context-043-post-merge">13:00
+PDT — strategist resume after overnight clear-context (043
+post-merge)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder said “use echo and understand
+where we left off last night before i clear context” at session
+start.</li>
+<li><strong>Query inputs:</strong>
+<code>find_clusters(since=2026-05-12T18:00:00)</code> then
+<code>get_atoms(atom_ids=[30 newest from rank-1 cluster], prefer=newest_first, format=minimal)</code>.</li>
+<li><strong>Returned:</strong> find_clusters → 4 clusters; rank-1
+<code>ctx_84741dee</code> covered the 043 cycle (116 atoms,
+source_breakdown={claude_code:58, git:58}, time_range 02:06–09:00Z =
+19:06 PDT 05-12 → 02:00 PDT 05-13). get_atoms returned 9 newest atoms in
+budget; 21 older ones prefix-dropped — fine for “where did I leave off”
+intent. Recovered: 043 merged at d846c35, follow-ups at b808cca, AC6b
+empirical close (0 founder reviewer-activations), strategist cron
+<code>89b63767</code> stopped autonomously, r8 ended in
+<code>single_reviewer_timeout</code> not full convergence.</li>
+<li><strong>Sources:</strong> rank-1 cluster’s <code>atom_ids[]</code>
+(116 items, well-mixed claude_code + git). Per-atom sources: 5 git
+commits (<code>812ec94</code>, <code>4e1886d</code>,
+<code>e9fd64b</code>, <code>77091ef</code>, <code>b808cca</code>) and 4
+Claude Code turns from session
+<code>9d90f570-d6d5-4009-ba07-8e0e4e27e1b4</code>. Codex traffic from
+the same window lived in a separate rank-4 cluster
+<code>ctx_948c5d8b</code> (echo_wiki, codex-only, 13 atoms).</li>
+<li><strong>Verdict:</strong> ✅ right — rank-1 surfaced the actual
+prior session’s terminal state, <code>newest_first</code> prefix-drop
+kept the most recent commits + final assistant turn, founder got an
+oriented summary in 2 tool calls.</li>
+<li><strong>Note:</strong> Cross-source pairing (git commits interleaved
+with the Claude Code session that produced them) made the cycle
+reconstructable without re-reading raw commits — exactly the
+cross-tool-resume use case 018 was designed for. Mild friction: rank-4
+codex cluster was siblings to rank-1 rather than merged with it (same
+time window, same project), even though they were part of the same
+logical work. Worth noting but not blocking.</li>
+</ul>
+<h3
+id="pdt-drill-into-last-conversation-strategic-exchanges-043-close-out-qa">13:08
+PDT — drill into “last conversation” strategic exchanges (043 close-out
+Q&amp;A)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked “use echo and check our last
+conversation” — wanted the actual conversational threads, not just repo
+state.</li>
+<li><strong>Query inputs:</strong>
+<code>echo_resolve_mru(sources=['claude_code', 'codex', 'cursor'], repo_path=&lt;repo&gt;)</code>
+to confirm prior session id; then
+<code>get_atoms(atom_ids=[30 earlier-in-rank-1-cluster atoms], prefer=newest_first, format=minimal)</code>
+to surface user-driven turns.</li>
+<li><strong>Returned:</strong> resolve_mru → MRU
+<code>claude_code</code> = 961217b2 (THIS session, post-clear);
+cursor=null (founder’s Cursor surface had no recent activity for this
+repo). Prior session = 9d90f570 (the strategist). get_atoms surfaced 8
+atoms in budget (21 dropped — fine, newest_first kept the strategic
+close-out). Critical recoveries: (a) the 2-session orchestration shape
+(builder c091c42e + strategist 9d90f570 in tandem), (b) the 3-fixup
+yes/yes/yes approval flow during merge-and-cleanup, (c) the “two codex /
+review agnostic?” Q&amp;A that pinned the precise capability gap and
+named the codex-arch deployment as 044’s most efficient close path.</li>
+<li><strong>Sources:</strong> rank-1 cluster <code>ctx_84741dee</code>
+(overlap with prior 13:00 entry). Two distinct claude_code sessions
+appeared in the same cluster: <code>9d90f570</code> (strategist) and
+<code>c091c42e</code> (builder agent). git interleave:
+<code>ddee83f</code>, <code>acd9347</code>, <code>24d7a9a</code>,
+<code>0dcc2b5</code>, <code>fc9a7c6</code>, <code>ab0661e</code>. cursor
+→ null on resolve_mru is itself a signal (founder hasn’t touched Cursor
+on this repo recently — Cursor’s Claude builder pattern is being used
+through the c091c42e Claude Code instance instead, or builder ran
+headlessly).</li>
+<li><strong>Verdict:</strong> ✅ right — newest_first ordering preserved
+the strategically-load-bearing close-out turns; the 2-Codex Q&amp;A
+surfaced cleanly as the final user/assistant pair before clear; drop-21
+didn’t lose anything material.</li>
+<li><strong>Note:</strong> Two same-session-pair atoms (one strategist,
+one builder) appearing in the same cluster is correct cross-tool
+behavior — the 116-atom rank-1 cluster bundled the parallel strategist +
+builder + git activity into a single thread, exactly the
+cross-session-in-same-project use case. Mild observation: an “actor”
+axis on cluster source_breakdown (strategist vs builder vs
+auto-fired-loop) would speed up the “what did <em>I</em> personally say
+vs what was machinery” question, but that’s a V1.6+ shape suggestion not
+a blocker.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
