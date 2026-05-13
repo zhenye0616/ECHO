@@ -17,7 +17,8 @@ spec_refs:
   - backlog/complete/2026-05-12-042-reviewer-emission-yaml-validation.md  # 042's own _followups.md seed first identified items #1, #2, #3, #4 as recurring. 043 did not address. This spec closes that loop.
   - backlog/_followups.md                                                # Top of file documents the 13-item friction list from 043's dogfooding. AC1-AC4 below address items #1-#4 (the top-4 compounders, >70% of cycle overhead). Items #5-#13 explicitly OUT OF SCOPE.
   - raw/internal/dogfooding/mcp-interactions-journal.md                  # The 043-cycle journal entries that document each friction's per-tick cost (~15-20 ticks for #1, ~8 rounds for #2/#3/#4). Empirical input for the 044 spec scope decision.
-  - .claude/commands/review-queue-watch.md                               # AC1 touch: line 11 `git pull --rebase origin main` → `git -c rebase.autoStash=true pull --rebase origin main`. One-line change; the autostash flag is git-supported since 2.6.
+  - .claude/commands/review-queue-watch.md                               # AC1 touch: line 11 `git pull --rebase origin main` → `git -c rebase.autoStash=true pull --rebase origin main`. AC4 touch: Step 3 prose branches on `escalated_to_founder` for `combined_verdict: partial_responses` (auto-disposition path when false; founder-escalation path when true).
+  - tools/review-queue/push-with-retry.sh                                # AC1 EXTENSION (r2 disposition): line 25's inner `git pull --rebase` also gets `-c rebase.autoStash=true`. combine.py shells out to this helper for terminal/disposition pushes; if only watcher Step 1 had autostash, friction #1 would persist in the helper's inner pull. Both call sites must change. Fallback semantics (PUSH-RACE-FALLBACK logging) untouched.
   - tools/review-queue/run-codex-reviewer.sh                             # AC2: the canonical 5-line driver (per 043 AC3) that exports REVIEWER_NAME and execs _run_reviewer.sh. AC2 documents direct-invoke via this driver (NOT `_run_reviewer.sh codex` — that fails fast because the wrapper consumes REVIEWER_NAME from env, not positional args).
   - tools/review-queue/_run_reviewer.sh                                  # AC2 NOT touched as code. Referenced because r1 reviewers caught that direct-invoke must go through `run-<reviewer>-reviewer.sh` driver (which exports REVIEWER_NAME). The wrapper itself remains unchanged.
   - tools/review-queue/combine.py                                        # AC3 touch: `DEFAULT_TIMEOUT_HOURS = 2.0` at :39 becomes per-reviewer config lookup; new `FALLBACK_TIMEOUT_HOURS = 0.5` applies when reviewer.timeout_hours is null (mandatory for headless reviewers per _reviewers.py:94). `find_eligible_rounds()` adds the `not_yet_due` gate per AC3 change #4. `--timeout-hours` CLI flag stays for ad-hoc override. AC4 touch: `combined_verdict: partial_responses` path at :114-119 + :358 flips `escalated_to_founder: false` for the single-missing-AND-present-proceeds sub-case ONLY; multi-missing + pushback paths retain `escalated_to_founder: true`. NO new enum value (verdict stays `partial_responses`).
@@ -114,21 +115,26 @@ Cursor is intentionally **not** in this spec's review roster. Cursor stays in `r
 
 ## Acceptance Criteria
 
-### AC1 — Watcher Step 1 uses autostash
+### AC1 — Watcher transaction uses autostash on EVERY `git pull --rebase`
 
-**Touch:** `.claude/commands/review-queue-watch.md:11`
+**Touch:**
+- `.claude/commands/review-queue-watch.md:11` — Step 1 pull
+- `tools/review-queue/push-with-retry.sh:25` — the inner-pull-then-push retry loop
 
-**Change:** `git pull --rebase origin main` → `git -c rebase.autoStash=true pull --rebase origin main`
+**Change:** Both call sites change `git pull --rebase origin main` → `git -c rebase.autoStash=true pull --rebase origin main`.
+
+Disposition for r2 codex-ops HIGH (the "AC1 incompleteness" finding): the watcher's Step 1 is not the only `git pull --rebase` in the transaction — `combine.py` shells out to `push-with-retry.sh` for its disposition + terminal pushes (per `combine.py:~177`), and `push-with-retry.sh:25` runs its own `git pull --rebase` before retrying the push. If only Step 1 has autostash, the watcher still hits the dirty-tree block at `push-with-retry.sh:25`, and friction #1 isn't actually eliminated. Both sites must change. This is scope-completion (extending the cure to where it's load-bearing), not scope-creep.
 
 **Why:** Eliminates the per-tick stash dance for friction #1 (and the cascading #5 push-with-retry fallback loop, since the underlying dirty-tree condition no longer blocks the pull). The autostash flag is git's built-in mechanism since 2.6: stash → pull → pop, atomically, with proper conflict surfacing if the pop fails.
 
-**Out-of-scope drift to defend against:** Do NOT generalize autostash to other slash commands. Do NOT modify `push-with-retry.sh`'s fallback semantics. The fallback log to `queue-errors.md` remains useful as a tripwire even when the per-tick autostash dance is gone — that file should rarely accumulate rows after this fix.
+**Out-of-scope drift to defend against:** Do NOT generalize autostash to slash commands outside the strategist watcher transaction — specifically: `.claude/commands/process-backlog.md`, `process-backlog-batch.md`, `merge-and-cleanup.md`, and the reviewer prompts (`review-queue-codex.md`, `review-queue-cursor.md`, `review-queue-codex-ops.md`) are explicitly out of scope. Their pulls run at tick-start when the tree should already be clean; the friction surface 044 targets is the *watcher transaction*. Do NOT modify `push-with-retry.sh`'s fallback semantics (only the autostash flag is added to its inner pull; the fallback to logging `PUSH-RACE-FALLBACK` rows remains intact as a tripwire).
 
-**Test:** Add a fixture-based test under `tests/review-queue/` that:
-1. Initializes a fixture repo with `_install_reviewer_launchd.sh`-style scaffold.
-2. Creates a dirty journal file in the working tree.
-3. Runs the watcher Step 1 command verbatim (extracted as a shell snippet).
-4. Asserts `git pull --rebase` succeeded AND the dirty file is preserved post-pull.
+**Test:** Add a fixture-based test under `tests/review-queue/` that exercises the full watcher transaction under a dirty tree, not just Step 1:
+1. Initializes a fixture repo (per the 041 `ECHO_REVIEW_QUEUE_REPO_ROOT` smoke pattern).
+2. Stages a fresh `r<N>/request.md` and reviewer responses that will trigger combine + push.
+3. Creates a dirty journal file in the working tree BEFORE invoking the watcher.
+4. Runs the equivalent of the watcher Step 1 pull THEN `combine.py` (which exercises `push-with-retry.sh`'s inner pull on its terminal/disposition push).
+5. Asserts: both pulls succeeded; the combined.md was committed and pushed; the dirty journal file is preserved on the working tree post-transaction; `queue-errors.md` got zero new `PUSH-RACE-FALLBACK` rows during the transaction (the cure is verified by absence of fallback rows, not just by transaction success).
 
 ### AC2 — Direct-invoke pattern for manual reviewer force-fires
 
