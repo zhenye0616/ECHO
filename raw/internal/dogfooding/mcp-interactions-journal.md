@@ -2906,6 +2906,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The cluster label was generic, but source mix + rank reasons were enough to choose it. The literal `strategist` search was more useful for this task than full atom bodies because the role term is consistently used in prompts, specs, and merge notes.
 - **Conjecture:** For role-orientation tasks, `find_clusters(repo_path, skeleton)` plus one literal `search_memories` query is a low-cost pattern; hydrate only if the user asks for exact quoted context.
 
+### 22:54 PDT — Codex hydrates Claude's handoff-friction note for independent review
+
+- **Source agent:** Codex (interactive investigation)
+- **Trigger:** Founder asked Codex to do its own investigation and say whether it agrees with Claude's suggestions or would push back.
+- **Query inputs:** `get_atom({id:'e46a93eb-244f-4c37-a272-cc8fbeb66fea'})`
+- **Returned:** 1 atom, 8,547 bytes, `truncations: []`. Content was Claude's exact handoff investigation for 042: phase boundaries A-E, hidden founder activations outside AC8's phase-2 measurement, and the proposed split between 043a speed/resilience and 043b cross-phase auto-triggers.
+- **Read sources:** exact Claude Code JSONL `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9d90f570-d6d5-4009-ba07-8e0e4e27e1b4.jsonl`; repo metadata filter already present on the atom as `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** ✅ right — hydration was necessary because the prior `search_memories` result clipped the handoff analysis; this recovered the load-bearing details without source-file spelunking.
+- **Note:** The exact atom made the distinction between "review-cycle AC8=0" and "full lifecycle still has founder-triggered handoffs" much clearer than the clipped search snippet.
+- **Conjecture:** For clipped strategic-review turns, `search_memories` should be treated as discovery only; `get_atom` is the right follow-up when the user asks for judgment on the substance.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

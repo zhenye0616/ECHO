@@ -1393,6 +1393,11 @@ href="#pdt-codex-uses-echo-to-understand-the-claude-strategist-context"
 id="toc-pdt-codex-uses-echo-to-understand-the-claude-strategist-context">22:48
 PDT — Codex uses ECHO to understand the Claude strategist
 context</a></li>
+<li><a
+href="#pdt-codex-hydrates-claudes-handoff-friction-note-for-independent-review"
+id="toc-pdt-codex-hydrates-claudes-handoff-friction-note-for-independent-review">22:54
+PDT — Codex hydrates Claude’s handoff-friction note for independent
+review</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13553,6 +13558,39 @@ specs, and merge notes.</li>
 <code>find_clusters(repo_path, skeleton)</code> plus one literal
 <code>search_memories</code> query is a low-cost pattern; hydrate only
 if the user asks for exact quoted context.</li>
+</ul>
+<h3
+id="pdt-codex-hydrates-claudes-handoff-friction-note-for-independent-review">22:54
+PDT — Codex hydrates Claude’s handoff-friction note for independent
+review</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive
+investigation)</li>
+<li><strong>Trigger:</strong> Founder asked Codex to do its own
+investigation and say whether it agrees with Claude’s suggestions or
+would push back.</li>
+<li><strong>Query inputs:</strong>
+<code>get_atom({id:'e46a93eb-244f-4c37-a272-cc8fbeb66fea'})</code></li>
+<li><strong>Returned:</strong> 1 atom, 8,547 bytes,
+<code>truncations: []</code>. Content was Claude’s exact handoff
+investigation for 042: phase boundaries A-E, hidden founder activations
+outside AC8’s phase-2 measurement, and the proposed split between 043a
+speed/resilience and 043b cross-phase auto-triggers.</li>
+<li><strong>Read sources:</strong> exact Claude Code JSONL
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9d90f570-d6d5-4009-ba07-8e0e4e27e1b4.jsonl</code>;
+repo metadata filter already present on the atom as
+<code>/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — hydration was necessary because
+the prior <code>search_memories</code> result clipped the handoff
+analysis; this recovered the load-bearing details without source-file
+spelunking.</li>
+<li><strong>Note:</strong> The exact atom made the distinction between
+“review-cycle AC8=0” and “full lifecycle still has founder-triggered
+handoffs” much clearer than the clipped search snippet.</li>
+<li><strong>Conjecture:</strong> For clipped strategic-review turns,
+<code>search_memories</code> should be treated as discovery only;
+<code>get_atom</code> is the right follow-up when the user asks for
+judgment on the substance.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
