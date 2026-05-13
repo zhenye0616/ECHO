@@ -1388,6 +1388,11 @@ href="#pdt-strategist-closes-042-cycle-ac8-0-founder-activations-across-full-3-r
 id="toc-pdt-strategist-closes-042-cycle-ac8-0-founder-activations-across-full-3-round-convergence">2026-05-12
 17:54 PDT — Strategist closes 042 cycle (AC8 = 0 founder activations
 across full 3-round convergence)</a></li>
+<li><a
+href="#pdt-codex-uses-echo-to-understand-the-claude-strategist-context"
+id="toc-pdt-codex-uses-echo-to-understand-the-claude-strategist-context">22:48
+PDT — Codex uses ECHO to understand the Claude strategist
+context</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13500,6 +13505,54 @@ AND loop is fast” goal needs both 041’s launchd Codex AND #1-#5 above
 closed; today’s experiment showed AC8=0 IS achievable but only with
 strategist driving dispatch and overriding single-reviewer-escalate —
 043 needs to make that path the default.</li>
+</ul>
+<h3
+id="pdt-codex-uses-echo-to-understand-the-claude-strategist-context">22:48
+PDT — Codex uses ECHO to understand the Claude strategist context</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (interactive repo-orientation
+request)</li>
+<li><strong>Trigger:</strong> Founder asked Codex to “use echo and
+understand the claude strategist.”</li>
+<li><strong>Query inputs:</strong>
+<ol type="1">
+<li><code>find_clusters({repo_path:'/Users/zhenye/Desktop/Project_echo', format:'skeleton'})</code>
+— no explicit <code>since</code>/<code>until</code>; server evaluated
+<code>2026-05-13T01:48:42.426Z</code> through
+<code>2026-05-13T05:48:42.426Z</code>, <code>window_hours:4</code>.</li>
+<li><code>search_memories({repo_path:'/Users/zhenye/Desktop/Project_echo', query:'strategist', limit:10})</code></li>
+</ol></li>
+<li><strong>Returned:</strong> <code>find_clusters</code> returned 1
+cluster / 23 atom ids; top cluster <code>ctx_1254f412</code>, label
+<code>"discussion about Project_echo"</code>,
+<code>rank_reasons:["recent_activity","has_open_loop","dense"]</code>,
+open-loop hints present. <code>search_memories</code> returned 10
+matches plus <code>next_cursor</code>; top hits were the active Claude
+strategist thread about 042’s AC8 loop, handoff friction, merge cleanup,
+and the 043 follow-up seed. Several match contents were clipped, but
+snippets and metadata were enough for orientation.</li>
+<li><strong>Read sources:</strong> <code>find_clusters</code>
+<code>source_breakdown={claude_code:17, git:6}</code> under repo filter
+<code>/Users/zhenye/Desktop/Project_echo</code>.
+<code>search_memories</code> per-match sources:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/9d90f570-d6d5-4009-ba07-8e0e4e27e1b4.jsonl</code>
+(5),
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/7cc28baa-0f57-43b6-a31d-c36d391449f4/subagents/agent-a6ac403bbd3028ad5.jsonl</code>
+(1),
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/2fc1bde5-d3f2-4e3f-98ba-af18ee4b1fe0.jsonl</code>
+(1), <code>git:/Users/zhenye/Desktop/Project_echo</code> (3).</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO surfaced the current
+strategist/reviewer context and recent 042/043 handoff thread without
+needing atom hydration.</li>
+<li><strong>Note:</strong> The cluster label was generic, but source mix
++ rank reasons were enough to choose it. The literal
+<code>strategist</code> search was more useful for this task than full
+atom bodies because the role term is consistently used in prompts,
+specs, and merge notes.</li>
+<li><strong>Conjecture:</strong> For role-orientation tasks,
+<code>find_clusters(repo_path, skeleton)</code> plus one literal
+<code>search_memories</code> query is a low-cost pattern; hydrate only
+if the user asks for exact quoted context.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
