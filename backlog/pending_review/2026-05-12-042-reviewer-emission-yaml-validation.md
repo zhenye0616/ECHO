@@ -9,8 +9,17 @@ spec_commit_sha: ""
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-13T05:06:42Z"
 branch: "agent/reviewer-emission-yaml-validation"
-head_sha: ""
-agent_notes: ""
+head_sha: "69809e2573db57efc9519a7aa72f3b31ac6b26db"
+agent_notes: |
+  AC1–AC4 implemented and tested on agent/reviewer-emission-yaml-validation @ 69809e2.
+  - AC1: yaml.safe_load wrapped in _lib.parse_frontmatter; YAMLError → ValueError with path + line/col + remediation. validate.py emits clean exit-1 with no traceback. Tests: yaml-error-handling.test.ts AC1a (040 R1 embedded-quote fixture) + AC1b (tab-in-flow-mapping).
+  - AC2: combine.py now collect-then-emit. build_malformed_combined helper emits combined_verdict: malformed_reviewer_response with escalated_to_founder: true, repo-root-relative offending_response (string when one offender, length-2+ array when many — codex first per REVIEWERS enum), index-aligned parse_error. Tests: combine-malformed-response.test.ts AC2a (single offender, string shape, clean tree) + AC2b (dual offender, array shape, both parsed before emit, two queue-errors rows, clean tree).
+  - AC3: combined.schema.json gained malformed_reviewer_response enum value + optional offending_response (oneOf string|array minItems:2, path pattern enforced) + optional parse_error (oneOf string|array minItems:2). 4 new fixtures in schemas.test.ts: valid string / valid 2-array / invalid 1-array / invalid item-relative path.
+  - AC4: per-offender row appended to raw/internal/queue-errors.md in the canonical "<UTC>Z MALFORMED-REVIEWER-RESPONSE: …" shape; combine.py stages combined.md + queue-errors.md in one commit so the next tick's git pull --rebase isn't tripped.
+  - Pre-existing: tests/review-queue/concurrency.test.ts orphan-cleanup test fails on baseline main BEFORE 042's changes — not in files_to_modify, out of scope per spec §Out of Scope; flagged in run log under "Next Suggested Backlog Items".
+  - AC5 measurement vehicle: this item's review cycle is the bed. Strategist records founder-activation count in review_notes at merge.
+  - Test count: review-queue suite 47 → 55 passing (target 51 met and exceeded). Wider suite: 795 passing, 21 skipped, 1 pre-existing failure (same concurrency test). No new regressions.
+  Run log: raw/internal/agent-runs/2026-05-12-2026-05-12-042-reviewer-emission-yaml-validation.md
 spec_refs:
   - backlog/complete/2026-05-12-041-reviewer-background-execution.md   # 041 wired validate.py into commit-reviewer-response.sh (AC4); this item closes the unhandled-YAML-error path validate.py still leaks
   - backlog/complete/2026-05-12-040-watcher-state-executable-test.md    # 040 R1 produced the canonical failure: Cursor cursor.md had `finding: ""embedded quote..."`; yaml.parser.ParserError leaked from combine.py with full traceback; queue stalled; strategist hand-patched cursor.md
