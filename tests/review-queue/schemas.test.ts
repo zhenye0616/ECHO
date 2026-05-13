@@ -191,6 +191,66 @@ describe('review-queue schemas', () => {
     }
   });
 
+  it('combined: malformed_reviewer_response with string offending_response + string parse_error (AC3)', () => {
+    const p = write(
+      'combined.md',
+      validCombined({
+        combined_verdict: 'malformed_reviewer_response',
+        escalated_to_founder: true,
+        offending_response: 'backlog/reviews/2026-05-12-040-example-spec/r1/cursor.md',
+        parse_error: 'malformed YAML at line 11 column 16: ...',
+      }),
+    );
+    expect(validate('combined', p).code).toBe(0);
+  });
+
+  it('combined: malformed_reviewer_response with array shapes of length 2 (AC3)', () => {
+    const p = write(
+      'combined.md',
+      validCombined({
+        combined_verdict: 'malformed_reviewer_response',
+        escalated_to_founder: true,
+        offending_response: [
+          'backlog/reviews/2026-05-12-040-example-spec/r1/codex.md',
+          'backlog/reviews/2026-05-12-040-example-spec/r1/cursor.md',
+        ],
+        parse_error: ['codex yaml error', 'cursor yaml error'],
+      }),
+    );
+    expect(validate('combined', p).code).toBe(0);
+  });
+
+  it('combined: offending_response as length-1 array is rejected (AC3 minItems gate)', () => {
+    const p = write(
+      'combined.md',
+      validCombined({
+        combined_verdict: 'malformed_reviewer_response',
+        escalated_to_founder: true,
+        offending_response: ['backlog/reviews/2026-05-12-040-example-spec/r1/cursor.md'],
+        // parse_error stays a string so only the offending_response minItems:2 gate fires.
+        parse_error: 'only one error',
+      }),
+    );
+    const r = validate('combined', p);
+    expect(r.code).not.toBe(0);
+    expect(r.stderr).toMatch(/offending_response/);
+  });
+
+  it('combined: offending_response with item-relative path is rejected (AC3 path-pattern gate)', () => {
+    const p = write(
+      'combined.md',
+      validCombined({
+        combined_verdict: 'malformed_reviewer_response',
+        escalated_to_founder: true,
+        offending_response: 'r1/cursor.md',
+        parse_error: 'msg',
+      }),
+    );
+    const r = validate('combined', p);
+    expect(r.code).not.toBe(0);
+    expect(r.stderr).toMatch(/offending_response/);
+  });
+
   it('requested_reviewers must be a non-empty subset of the reviewer enum', () => {
     // empty
     const empty = write('request.md', validRequest({ requested_reviewers: [] }));

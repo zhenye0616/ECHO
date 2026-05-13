@@ -49,11 +49,28 @@
         "pushback",
         "divergent",
         "single_reviewer_timeout",
-        "no_responses"
+        "no_responses",
+        "malformed_reviewer_response"
       ]
     },
     "escalated_to_founder": {
       "type": "boolean"
+    },
+    "offending_response": {
+      "oneOf": [
+        { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" },
+        {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" },
+          "minItems": 2
+        }
+      ]
+    },
+    "parse_error": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+      ]
     }
   }
 }

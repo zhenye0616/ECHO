@@ -38,7 +38,19 @@ def parse_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     m = FRONTMATTER_RE.match(text)
     if not m:
         raise ValueError(f"{path}: no frontmatter block found")
-    fm = yaml.safe_load(m.group(1)) or {}
+    try:
+        fm = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        problem = getattr(exc, "problem", None) or str(exc)
+        if mark is not None:
+            loc = f"line {mark.line + 1} column {mark.column + 1}"
+        else:
+            loc = "unknown location"
+        raise ValueError(
+            f"{path}: malformed YAML at {loc}: {problem}. "
+            f"Regenerate response with valid YAML; do not hand-edit committed reviewer files."
+        ) from exc
     if not isinstance(fm, dict):
         raise ValueError(f"{path}: frontmatter is not a mapping")
     return fm, m.group(2)

@@ -36,7 +36,42 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Pure Python (3 files in tools/review-queue/) + 2 new pytest-or-vitest tests + 1 schema addition. Reviewer prompt prose edits if any are trivial.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-13 (UTC ~05:30) via founder reconciliation under /merge-and-cleanup.
+
+  Conflicts resolved:
+  - none — sidecar predicted clean merge (`merge-base = 9669c11` claim commit; no main-side overlap on `tools/review-queue/*`); `git merge --no-ff` reported "Automatic merge went well".
+
+  Fixups applied:
+  - `tests/review-queue/combine-malformed-response.test.ts:152` — deleted unused `readCombinedRaw` helper (TS6133); kept `readFileSync` import (still used at lines 44, 221, 268).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify post-merge (full suite):
+  - `npm run lint`: clean.
+  - `npm run typecheck`: clean.
+  - `npm test`: 795 pass / 1 fail / 21 skip. The 1 failure is the pre-existing `tests/review-queue/concurrency.test.ts:133` orphan-cleanup test that also fails on main HEAD and is explicitly excluded per the spec's "Out of Scope (Don't Drift)" — filed as follow-up below.
+
+  Follow-up items (non-blocking):
+  - `tests/review-queue/concurrency.test.ts > orphan .tmp.* older than 30 min is cleaned up by combine.py` — pre-existing failure on main HEAD; out of scope per spec. File as its own backlog item (suggest 044).
+  - Cosmetic in `combine.py:200-201` — `request.md` re-parsed inside `build_malformed_combined` even though `build_combined` already opened it. Harmless; thread the parsed dict through.
+  - Path-resolution caveat in `combine.py:207` — `Path.resolve().relative_to(repo_root.resolve())` assumes `repo_root` is realpath-resolved by caller; test pre-resolves with `realpathSync` for macOS `/private/var/folders/...`. Not a current bug; document for next builder.
+
+  AC5 empirical measurement (per spec §AC5):
+
+  **Founder activations during 042's own review cycle: 0.**
+
+  Strategist (Claude Code in this session) drove all 3 rounds of cross-tool review end-to-end:
+  - r1 dispatch + Codex review + strategist disposition + spec patch + r2 dispatch
+  - r2 Codex review + strategist disposition + spec patch + r3 dispatch
+  - r3 Codex review (first attempt quarantined by 041 AC4 due to unquoted YAML timestamp; retry succeeded cleanly) + strategist disposition + spec patch + terminal at 0ec6d0d (path c, verification waived: LOW format-precision finding only, mechanical).
+
+  Founder explicitly authorized two off-protocol overrides for speed: (a) strategist-driven single-reviewer disposition (Cursor absent; accept-degradation) instead of the default `single_reviewer_timeout → escalate_to_founder` branch — used 3×; (b) `combine.py --timeout-hours=0` override to bypass the 2h Cursor timeout — used 3×.
+
+  Total wall-time spec push → terminal: ~50 min. Compare to pre-041 baseline of ~5 founder activations and several-hour wall-time for 040. The empirical AC8 close on 041 fires positive: founder was out of the spec→convergence loop while the measurement vehicle was running.
+
+  Five structural findings collected during the cycle filed as 043 seed in `backlog/_followups.md` under "From 042 dogfooding cycle (2026-05-12)": (1) launchd kickstart silently fails before redirect-to-log; (2) `git pull --rebase` wedges on dirty tree in every prompt's Step 1; (3) `MISSING_REVIEWER_TIMEOUT_HOURS=2` too slow for iterative work; (4) watcher `single_reviewer_timeout → escalate_to_founder` default contradicts AC8 goal; (5) reviewer schema accepts unquoted YAML timestamps; (6) watcher cron is session-only — cross-session autonomy gap.
 ---
 
 ## Summary
