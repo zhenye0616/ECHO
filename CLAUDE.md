@@ -98,6 +98,16 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline; **never review or merge their own work**
 3. **Founder** — gives final approval at the two irreversible moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. Also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
 
+### Cross-tool protocol lives in `skills/` (not `.claude/commands/`)
+
+The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch` — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients (Claude Code as strategist, Cursor's Claude as builder, Codex as headless reviewer, etc.) coordinate as peers.
+
+- **Canonical source of truth:** `skills/<name>.md` — vendor-neutral, ECHO-namespaced.
+- **Claude Code adapter:** `.claude/commands/<name>.md` — derived real-file copy, maintained by `tools/sync-skills.sh`. **Do not hand-edit `.claude/commands/<name>.md`**; the sync script overwrites it. Edit the canonical `skills/<name>.md` and re-run `tools/sync-skills.sh` (or `tools/sync-skills.sh --check` to verify identity post-edit).
+- **Future client adapters** (Cursor's Claude, Codex, web ChatGPT, etc.): add their own directories alongside `.claude/commands/`. The sync script will extend to copy to each adapter directory. For non-filesystem clients (OpenAI's GPT, web ChatGPT, etc.), a future MCP tool `echo_skill(name)` will return canonical content from `skills/` on demand.
+
+Why this matters: Anthropic structurally can't be vendor-neutral because they ARE a vendor. ECHO's wedge is hosting the *protocol* that lets Claude AND non-Claude tools work as peers. Putting the protocol under `.claude/` would perpetuate the "Claude owns the workflow" framing the wedge is designed to undo. See `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` for the full reasoning.
+
 ### Reviewer independence rule
 
 The reviewer-and-merger of any item must be **a different role/agent than the builder** that wrote the code. Acceptable reviewers, in preference order:
