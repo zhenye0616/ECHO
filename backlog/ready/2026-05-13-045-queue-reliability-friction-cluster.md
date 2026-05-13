@@ -59,25 +59,33 @@ review_notes: ""
 - `.claude/commands/review-queue-codex-ops.md` Step 5 (codex-ops reviewer prompt)
 - NEW: `tools/review-queue/validate_response_yaml.py` (shared helper)
 
-**Change:** Before any reviewer prompts call `commit-reviewer-response.sh`, they invoke a new shared helper `validate_response_yaml.py <path>` that parses the response file's frontmatter and validates against `reviewer.schema.json`. On parse failure or schema violation, the helper exits non-zero with a clear diagnostic, the reviewer prompt aborts before `os.link`, deletes the temp file, and writes a `PRE-LINK-INVALID:` row to `raw/internal/queue-errors.md` instead of producing a quarantined file. The reviewer prompt then retries the response generation in-session (codex CLI's existing in-session retry pattern, just shifted earlier in the flow).
+**Change:** Before any reviewer prompts call `commit-reviewer-response.sh`, they invoke a new shared helper `validate_response_yaml.py <path>` that parses the response file's frontmatter and validates against `reviewer.schema.json`. On parse failure or schema violation, the helper exits non-zero with a clear stderr diagnostic; the reviewer prompt aborts before `os.link`, deletes the temp file, and **re-generates the response in-session** (codex CLI's existing retry pattern, just shifted earlier in the flow).
+
+Disposition for r1 codex HIGH #2 + codex-ops HIGH #2 (the convergent "PRE-LINK-INVALID dirty-tree trap"): **the helper writes to stderr only on the retry path.** It does NOT write to `raw/internal/queue-errors.md` for in-session retries. Only on **terminal failure** (after all in-session retries are exhausted and the reviewer prompt is about to exit non-zero without writing a response) does the prompt append a single `PRE-LINK-INVALID:` row to `queue-errors.md`. This preserves observability for genuinely-broken cases (the tripwire still fires) without introducing a dirty-tree race for the success-after-retry path.
 
 The shared helper reuses the existing `validate.py reviewer` logic — it does NOT duplicate schema validation, just calls the same code path before atomic-link write.
+
+Disposition for r1 codex HIGH #1 (executable boundary / testability): the helper IS the executable boundary. The spec tests the helper's behavior directly (script-driven, deterministic). The reviewer prompts' INVOCATION of the helper is verified separately via grep — each of the three reviewer slash commands must contain a literal `validate_response_yaml.py` reference in their Step 5 prose. No deterministic test of the prompt itself is required; the helper test + the grep covers the contract.
 
 **Why:** Eliminates F-A. Today's quarantine semantic (042 AC4 + AC5: `<reviewer>.md.invalid.<ISO-ts>` + queue-errors row) is reactive — the malformed file gets atomically linked, validated, and then renamed-aside. The validation should happen BEFORE the link operation, so malformed YAML never enters the live state. Compound-interest payoff: 5 quarantines across 042/043/044 → expected 0 in 046+ cycles.
 
 **Out-of-scope drift to defend against:** Do NOT change the post-link quarantine path itself (042 AC4) — keep it as a defense-in-depth backstop for cases where the pre-link validator misses something (e.g., a different file shape than schema covers). Do NOT change `commit-reviewer-response.sh`'s validation gate (041 AC4); the pre-link helper is an EARLIER gate, not a replacement. Do NOT add YAML validation to reviewer prompts via inline `python3 -c "..."` heredoc — use the dedicated script (`_reviewer_gate.py` precedent from 043 AC3 — heredoc stderr is unreliable across shell-wrapping permutations).
 
 **Test:** Add `tests/review-queue/045-pre-link-yaml-validation.test.ts`:
-1. Fixture: synthetic request.md + a reviewer-side response file with malformed YAML (e.g., unescaped quote in `finding:` string, or `completed_at: datetime.datetime(...)` not string).
-2. Invoke the reviewer prompt's pre-link step.
-3. Assert: no `<reviewer>.md` exists at the target path; temp file cleaned up; `queue-errors.md` has a `PRE-LINK-INVALID:` row.
-4. Repeat with a valid response — assert link succeeds.
+1. **Helper test (script-driven, deterministic):** Invoke `validate_response_yaml.py <path>` directly against fixture files.
+   - **AC1a** — Valid response YAML: assert exit 0, stderr empty.
+   - **AC1b** — Malformed YAML (unescaped quote in `finding:` string): assert exit non-zero, stderr contains the parser error with line/column info.
+   - **AC1c** — Schema violation (`completed_at: datetime.datetime(...)` not string): assert exit non-zero, stderr contains the schema violation path.
+2. **Prompt-grep test:** Assert each of `.claude/commands/review-queue-codex.md`, `review-queue-cursor.md`, `review-queue-codex-ops.md` contains a literal `validate_response_yaml.py` reference in their Step 5 prose (`grep -l validate_response_yaml.py .claude/commands/review-queue-{codex,cursor,codex-ops}.md` returns all three files).
+3. **Clean-tree test (AC1d):** Stage a synthetic queue-errors row that would have been written by the OLD failure path. Invoke the helper against malformed YAML. Assert: `git status --porcelain raw/internal/queue-errors.md` shows NO change post-helper (success-after-retry path is stderr-only).
 
 ### AC2 — Smoke gate fail-closed
 
 **Touch:** `tools/review-queue/_install_reviewer_launchd.sh:97-103`
 
-**Change:** When `--smoke` is requested and `smoke-test-<reviewer>-runner.sh` does NOT exist (or is not executable), the script exits 1 with a clear diagnostic ("smoke runner missing for reviewer <slug>: expected <path>") instead of printing a warning and exiting 0. The plist install step still completes before the smoke gate runs (so the launchd job is in place even if smoke fails — the founder/strategist can then either author the missing smoke runner or accept the deploy without smoke by re-running without `--smoke`).
+**Change:** When `--smoke` is requested, the script checks for `smoke-test-<reviewer>-runner.sh` (existence + executable bit) **BEFORE** any plist write, bootout, bootstrap, or kickstart. If the smoke runner is absent or not executable, the script exits 1 with a clear diagnostic ("smoke runner missing for reviewer <slug>: expected <path>") and NO production-side state changes — no plist installed, no launchd job activated, no kickstart fired.
+
+Disposition for r1 codex-ops MED #1: the original spec deferred the smoke-runner check to AFTER plist install, which would leave an active StartInterval job running unverified production reviewer ticks even when `--smoke` failed. Moving the check before the install closes that fail-open path. The founder/strategist can either author the missing smoke runner or re-run WITHOUT `--smoke` to install-without-verification (explicit operator choice).
 
 **Why:** Eliminates F-B. 044's pre-flight declared codex-ops "smoke verified" without running a synthetic-request smoke. Operationally this means no isolated falsification of the new reviewer's wrapper + commit-helper chain before production launch. Fix is tiny (≤10 lines).
 
@@ -87,8 +95,9 @@ The shared helper reuses the existing `validate.py reviewer` logic — it does N
 1. Fixture: temp install of a `mock-reviewer` slug into reviewers.json.
 2. Confirm `smoke-test-mock-reviewer-runner.sh` does NOT exist.
 3. Invoke `_install_reviewer_launchd.sh mock-reviewer --smoke`.
-4. Assert: script exits 1; the plist IS installed (it's the smoke step that failed, not the install); stderr contains the expected "smoke runner missing" diagnostic.
-5. Touch a valid `smoke-test-mock-reviewer-runner.sh` and re-run — assert exit 0.
+4. Assert: script exits 1; **NO plist installed at `~/Library/LaunchAgents/com.echo.review-queue-mock-reviewer.plist`** (production-side state untouched); stderr contains the expected "smoke runner missing" diagnostic.
+5. Touch a valid `smoke-test-mock-reviewer-runner.sh` and re-run — assert exit 0 AND the plist now exists.
+6. **AC2b — install-without-smoke explicit-choice path:** Invoke `_install_reviewer_launchd.sh mock-reviewer` (no `--smoke` flag). Assert exit 0 AND plist installed (no smoke gate fires; operator made an explicit choice).
 
 ### AC3 — Orphan-cleanup test fix
 
@@ -126,7 +135,20 @@ If Option-A doesn't work (e.g., combine.py rejects `--now` for the orphan-cleanu
 
 **Change (two sub-edits to the same skill file):**
 
-**AC5a — worktree cleanup robustness (Step C9):** Before `git worktree remove "$WORKTREE"`, the skill prose adds an explicit `rm -rf "$WORKTREE/node_modules"` step (with a comment explaining: regenerable, not work; `npm install` from the build or code-reviewer verify left it). After the rm, attempt `git worktree remove` once. If it still fails, surface the new blocker to the founder per the existing "do not --force" rule. The strict no-force invariant on `git worktree remove` is preserved — the surgical `rm -rf node_modules` is justified because `node_modules` is regenerable and never contains user work. Eliminates F-E.
+**AC5a — worktree cleanup robustness (Step C9):** Before `git worktree remove "$WORKTREE"`, the skill prose adds an explicit `rm -rf "$WORKTREE/node_modules"` step (with a comment explaining: regenerable, not work; `npm install` from the build or code-reviewer verify left it).
+
+Disposition for r1 codex-ops MED #2 (the `rm -rf` identity-guard concern): **a guard MUST precede the rm**, asserting `$WORKTREE` points at the expected agent worktree and not some unrelated path. The guard checks three conditions atomically; any failure surfaces to the founder and the rm does NOT execute:
+```bash
+[ -n "$WORKTREE" ] || { echo "ERROR: WORKTREE empty"; exit 1; }
+[ -d "$WORKTREE/.git" ] || [ -f "$WORKTREE/.git" ] || { echo "ERROR: $WORKTREE not a git worktree"; exit 1; }
+EXPECTED_WT_TOPLEVEL="$WORKTREE"
+ACTUAL_WT_TOPLEVEL="$(git -C "$WORKTREE" rev-parse --show-toplevel 2>/dev/null)"
+[ "$ACTUAL_WT_TOPLEVEL" = "$EXPECTED_WT_TOPLEVEL" ] || { echo "ERROR: worktree toplevel mismatch (expected $EXPECTED_WT_TOPLEVEL, got $ACTUAL_WT_TOPLEVEL)"; exit 1; }
+ACTUAL_BRANCH="$(git -C "$WORKTREE" branch --show-current 2>/dev/null)"
+[ "$ACTUAL_BRANCH" = "$BRANCH" ] || { echo "ERROR: branch mismatch (expected $BRANCH on $WORKTREE, got $ACTUAL_BRANCH)"; exit 1; }
+rm -rf "$WORKTREE/node_modules"
+```
+After the rm, attempt `git worktree remove` once. If it still fails, surface the new blocker to the founder per the existing "do not --force" rule. The strict no-force invariant on `git worktree remove` is preserved — the surgical `rm -rf node_modules` is justified because `node_modules` is regenerable AND the identity guard precludes deleting from the wrong tree. Eliminates F-E.
 
 **AC5b — post-mv stage of renamed file content (Step C7→C8):** Currently the skill's flow is: C6 edits `review_notes` in the pending_review/ file, C7 runs `git mv pending_review/X complete/X` + `git rm sidecar`, C8 runs `git add -A && git commit`. The issue: `git mv` stages the rename with HEAD's old blob; the C6 `review_notes` edit is unstaged against the new path; `git add -A` SHOULD pick it up, but in practice `git mv` of a freshly-edited file produces a similarity-100% rename detection that may not include the content delta in some git versions. **Observed during 044 merge:** the populated `review_notes` block (70 lines) was lost from the merge commit `ca51bb2` and had to be re-committed separately at `011b539`. Per-cycle cost: every merge populating review_notes risks the same loss.
 
@@ -158,22 +180,20 @@ Update the skill's "What Success Looks Like" section to mention: "review_notes a
 
 **Touch:** `.claude/commands/review-pending.md` Step C ("Synthesize and write per-item sidecar plans")
 
-**Change:** After writing each sidecar at `backlog/pending_review/<id>.review.md`, the skill prose adds explicit git operations:
-```bash
-git add backlog/pending_review/<id>.review.md
-```
-The sidecar is staged but NOT committed inside /review-pending — the strategist may want to edit it before commit. The strategist (or founder) commits via standard `git commit` workflow before invoking /merge-and-cleanup. Alternative: /review-pending commits the sidecar itself with message `review: <id>` (matches 044's manual commit). The spec picks COMMIT (not just add): the sidecar IS a complete review artifact and benefits from atomic git history, and the founder can still edit + amend if needed.
+**Change:** After writing each sidecar at `backlog/pending_review/<id>.review.md`, the skill prose adds explicit git operations: stage + commit + push-with-retry. The sidecar IS a complete review artifact and benefits from atomic git history; founder can amend after the fact if edits are needed.
 
-Updated /review-pending prose:
+Updated /review-pending prose (single chosen path — disposition for r1 codex MED #3 removes the prior contradictory "staged but not committed" paragraph):
 ```bash
 for SIDECAR in "${SIDECARS[@]}"; do
   git add "$SIDECAR"
   git commit -m "review: $(basename "$SIDECAR" .review.md)" "$SIDECAR"
-  git push origin main || true  # tolerate push race; the next strategist op will rebase
 done
+tools/review-queue/push-with-retry.sh "review: $(basename "$ITEM" .md)"
 ```
 
-Updated /review-pending Step E "What You Must NOT Do" — REMOVE the line "Do not commit anything" and REPLACE with "Do not commit anything OTHER than the review sidecars themselves (which are the deliverable of this skill)."
+Disposition for r1 codex-ops HIGH #1: `push-with-retry.sh` is used in place of `git push origin main || true`. The bare-push-with-swallow pattern would have produced a local-only sidecar commit on auth loss, network outage, or rejected push, leaving the strategist's `/merge-and-cleanup` to pass pre-flight locally while the next operator or machine sees no review artifact on origin. `push-with-retry.sh` performs bounded retries, logs to `queue-errors.md` on terminal failure (existing 039+041 contract), and surfaces the failure non-zero — making any push gap visible at /review-pending exit time, not silently at /merge-and-cleanup time.
+
+Updated /review-pending Step E "What You Must NOT Do" — REMOVE the line "Do not commit anything" and REPLACE with "Do not commit anything OTHER than the review sidecars themselves (which are the deliverable of this skill). The sidecar commit + push via `push-with-retry.sh` is in-scope per AC6 of spec 045."
 
 **Why:** Eliminates F-F. /review-pending → /merge-and-cleanup handoff currently requires a manual strategist commit between skills. Closing this gap brings the merge-cycle's automation depth to parity with the review-cycle's (where reviewers commit their responses atomically via `commit-reviewer-response.sh`).
 
