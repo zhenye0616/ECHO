@@ -30,3 +30,4 @@ escalated_to_founder: true
 
 `claim-ready after R3 — single LOW format-precision finding patched inline; verification waived as mechanical per watcher §Step 3 (c). All r1/r2/r3 findings dispositioned; no residual HIGH/MED at convergence. Spec is implementation-ready.`
 
+verification waived; rationale: LOW format-precision finding only; mechanical pin to UTC ISO + EVENT-TOKEN matching push-with-retry.sh; not load-bearing; no semantics changed
