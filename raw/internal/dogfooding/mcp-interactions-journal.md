@@ -2926,6 +2926,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
 - **Note:** The highest-risk ambiguity is eligibility: `cursor.required=false` plus `timeout_hours=2` needs an explicit before-timeout and after-timeout fixture so builders cannot choose different terminal behavior.
 
+### 2026-05-12 23:32 PDT - Codex R2 on 043 per-round reviewer roster
+
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R2 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-043-per-round-reviewer-roster.md` at `9725a917ed4eb93a1f94b342ee8fa34c16307737`, R1 combined context, current review-queue code, schemas, runner helpers, and dispatch helper.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/codex.md` as `04832dd`, verdict `pushback`. Findings: third-reviewer path still fails current schema/commit gates; N-way combine grouping drops existing `normalize_where`/`cross_ref` semantics; `dispatch-next-round.py` drops custom rosters; `_reviewers.py` returns a mutable list despite tuple/cache ACs; `_run_reviewer.sh` needs an explicit Python import path for `_reviewers`.
+- **Sources:** Artifact SHA `9725a917ed4eb93a1f94b342ee8fa34c16307737`; request path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/request.md`; response path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** R2 fixed the original timeout matrix and prompt-side race-guard placement, but the third-reviewer story still needs the validation boundary and next-round propagation specified before a builder can implement it safely.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

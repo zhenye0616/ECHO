@@ -1401,6 +1401,9 @@ review</a></li>
 <li><a href="#pdt---codex-r1-on-043-per-round-reviewer-roster"
 id="toc-pdt---codex-r1-on-043-per-round-reviewer-roster">2026-05-12
 23:18 PDT - Codex R1 on 043 per-round reviewer roster</a></li>
+<li><a href="#pdt---codex-r2-on-043-per-round-reviewer-roster"
+id="toc-pdt---codex-r2-on-043-per-round-reviewer-roster">2026-05-12
+23:32 PDT - Codex R2 on 043 per-round reviewer roster</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13631,6 +13634,43 @@ and pushed exactly one reviewer response before journaling.</li>
 <code>cursor.required=false</code> plus <code>timeout_hours=2</code>
 needs an explicit before-timeout and after-timeout fixture so builders
 cannot choose different terminal behavior.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-043-per-round-reviewer-roster">2026-05-12
+23:32 PDT - Codex R2 on 043 per-round reviewer roster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+the R2 request, reviewer schema, pinned artifact
+<code>backlog/ready/2026-05-13-043-per-round-reviewer-roster.md</code>
+at <code>9725a917ed4eb93a1f94b342ee8fa34c16307737</code>, R1 combined
+context, current review-queue code, schemas, runner helpers, and
+dispatch helper.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/codex.md</code>
+as <code>04832dd</code>, verdict <code>pushback</code>. Findings:
+third-reviewer path still fails current schema/commit gates; N-way
+combine grouping drops existing
+<code>normalize_where</code>/<code>cross_ref</code> semantics;
+<code>dispatch-next-round.py</code> drops custom rosters;
+<code>_reviewers.py</code> returns a mutable list despite tuple/cache
+ACs; <code>_run_reviewer.sh</code> needs an explicit Python import path
+for <code>_reviewers</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>9725a917ed4eb93a1f94b342ee8fa34c16307737</code>; request path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r2/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and pushed exactly one reviewer response before journaling.</li>
+<li><strong>Note:</strong> R2 fixed the original timeout matrix and
+prompt-side race-guard placement, but the third-reviewer story still
+needs the validation boundary and next-round propagation specified
+before a builder can implement it safely.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
