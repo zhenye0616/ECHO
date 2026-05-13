@@ -1466,6 +1466,11 @@ id="toc-journal-operating-notes">Journal Operating Notes</a>
 <li><a href="#pdt-codex-r1-on-045-queue-reliability-friction-cluster"
 id="toc-pdt-codex-r1-on-045-queue-reliability-friction-cluster">2026-05-13
 14:51 PDT — Codex R1 on 045 queue-reliability friction cluster</a></li>
+<li><a
+href="#pdt-codex-ops-r1-on-045-queue-reliability-friction-cluster"
+id="toc-pdt-codex-ops-r1-on-045-queue-reliability-friction-cluster">2026-05-13
+14:52 PDT — Codex-ops R1 on 045 queue-reliability friction
+cluster</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14420,6 +14425,51 @@ actual write/log/retry behavior in prompt prose. That makes the intended
 fix hard to falsify and risks recreating the dirty-tree retry problem
 the recent queue work has been paying down.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt-codex-ops-r1-on-045-queue-reliability-friction-cluster">2026-05-13
+14:52 PDT — Codex-ops R1 on 045 queue-reliability friction cluster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code> first;
+<code>git pull --rebase origin main</code> hit duplicate
+<code>FETCH_HEAD</code> merge entries, then
+<code>git rebase origin/main</code> confirmed local <code>main</code>
+was up to date. Scanned <code>backlog/reviews/**/r*/request.md</code>
+for rounds requesting <code>codex-ops</code> with no
+<code>codex-ops.md</code> and no <code>combined.md</code>; read the R1
+request, reviewer schema, pinned artifact
+<code>backlog/ready/2026-05-13-045-queue-reliability-friction-cluster.md</code>
+at <code>8252b2d73c282854f13975d57917011939ac5118</code>,
+<code>commit-reviewer-response.sh</code>,
+<code>push-with-retry.sh</code>,
+<code>_install_reviewer_launchd.sh</code>,
+<code>review-pending.md</code>, <code>merge-and-cleanup.md</code>, and
+reviewer prompt internals. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned shape:</strong> Wrote, validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/codex-ops.md</code>
+as <code>7b355eb</code>, verdict <code>proceed_after_patches</code>,
+findings: AC6 silently swallows sidecar push failure; AC1
+<code>PRE-LINK-INVALID</code> can leave <code>queue-errors.md</code>
+dirty after successful retry; AC2 can leave an active unverified launchd
+job after smoke failure; AC5 needs an identity guard before
+<code>rm -rf "$WORKTREE/node_modules"</code>.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+and pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The operational theme matches the 044-cycle
+evidence: fixes that improve the happy path still need clean-tree,
+launchd-liveness, and push-failure semantics or they become the next
+unattended queue stall.</li>
+<li><strong>Conjecture:</strong> AC1 and AC6 may share one cure shape:
+every state append that is meant to survive a tick should be either
+committed by the same helper transaction or explicitly treated as
+terminal-error-only state.</li>
 </ul>
 </body>
 </html>
