@@ -1452,6 +1452,11 @@ PDT — Codex-ops R3 on 044 reviewer-cycle infrastructure debt</a></li>
 <li><a href="#pdt-codex-r3-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-r3-on-044-reviewer-cycle-infrastructure-debt">13:48
 PDT — Codex R3 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a
+href="#pdt-044-converged-in-3-rounds-founder-out-of-loop-after-brainstorming-spec-ac80-held"
+id="toc-pdt-044-converged-in-3-rounds-founder-out-of-loop-after-brainstorming-spec-ac80-held">13:50
+PDT — 044 converged in 3 rounds (founder out of loop after brainstorming
++ spec; AC8=0 held)</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14258,6 +14263,66 @@ pull.</li>
 commit when unrelated paths are already staged would prevent
 observation-only journal edits from being bundled into queue-handshake
 commits.</li>
+</ul>
+<h3
+id="pdt-044-converged-in-3-rounds-founder-out-of-loop-after-brainstorming-spec-ac80-held">13:50
+PDT — 044 converged in 3 rounds (founder out of loop after brainstorming
++ spec; AC8=0 held)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder said “full auto mode until the
+spec converges. i want to see if i can be completely out of the loop
+after the brainstorming and initial speccing” at ~13:33 PDT. From that
+point the strategist (Claude Code) drove all 3 review rounds,
+dispositions, dispatch, and convergence call autonomously. Founder
+check-ins limited to “are you monitoring codex reviewer status?” (single
+status-check question) and the autonomous-loop wakeup that fired empty
+(correctly identified the monitoring condition was already
+satisfied).</li>
+<li><strong>Query inputs:</strong> No MCP queries — infrastructure
+orchestration only. ~6 git commits driven from the conversation (r1
+disposition, r2 dispatch, r2 disposition, r3 dispatch, r3 terminal,
+BACKLOG.md status update). 6 reviewer direct-invokes (2 per round × 3
+rounds). 3 combine.py runs.</li>
+<li><strong>Returned:</strong> 044 spec at <code>17f44d7</code> is
+claim-ready. Decay curve: r1=7 findings → r2=2 → r3=1. Final convergence
+call: path-(c) terminal, verification waived. Single remaining MED (r3
+codex on combine.py:690’s third subprocess git pull site) was
+cross_ref’d to r2 codex-ops’s same-semantics finding — mechanical
+3-token patch applied inline, no r4 needed.</li>
+<li><strong>Sources:</strong>
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+(spec),
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r{1,2,3}/{codex,codex-ops,combined}.md</code>
+(review artifacts), <code>backlog/_followups.md</code>
+(045-smoke-gate-fail-closed deferred from r2 MED),
+<code>tools/review-queue/reviewers.json</code> + 3 schemas +
+<code>.claude/commands/review-queue-codex-ops.md</code> +
+<code>tools/review-queue/run-codex-ops-reviewer.sh</code> (pre-flight
+6-edit changelist). Two YAML validation quarantines auto-handled by
+codex CLI’s in-session retry: r1 codex (malformed YAML line 13 col 136),
+r3 codex-ops (datetime-not-string at completed_at). One
+PUSH-RACE-FALLBACK at r2 combine.</li>
+<li><strong>Verdict:</strong> ✅ AC8=0 held across the full cycle.
+Founder activations during the autonomous run: 0. The cycle is the
+load-bearing empirical result the user wanted: after brainstorming +
+initial speccing, the strategist can drive review → disposition →
+dispatch → terminal autonomously.</li>
+<li><strong>Note:</strong> Two distinct empirical wins this cycle.
+<strong>(1)</strong> codex-ops’s perspective IS uncorrelated with
+codex’s. r1 produced 8 findings; 2 were convergent (both reviewers
+caught same issue), 1 was codex-only (docs-grep unsatisfiable —
+implementation lens), 5 were codex-ops-only (round-level eligibility
+semantics, watcher-contract sprawl, AC1 cure incompleteness — all
+runtime/ops lens). The “Adding a Reviewer Changelist” from 043 works in
+production. <strong>(2)</strong> Friction #1 (dirty-tree blocks pull)
+reproduced live during my own work: when I went to commit the r1
+disposition, <code>git pull --rebase</code> blocked exactly as 044
+documents. I had to use the AC1 cure
+(<code>git -c rebase.autoStash=true pull</code>) — the spec’s own cure
+validated itself by being the only viable path forward during the cycle.
+Friction #1 hit 3 times across the 3 rounds (once per disposition push).
+The autostash flag worked every time.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
