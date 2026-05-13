@@ -1479,6 +1479,11 @@ cluster</a></li>
 <li><a href="#pdt---codex-r2-on-045-queue-reliability-friction-cluster"
 id="toc-pdt---codex-r2-on-045-queue-reliability-friction-cluster">2026-05-13
 15:40 PDT - Codex R2 on 045 queue-reliability friction cluster</a></li>
+<li><a
+href="#pdt-strategist-cross-tool-friction-synthesis-claude-reading-codexs-working-notes"
+id="toc-pdt-strategist-cross-tool-friction-synthesis-claude-reading-codexs-working-notes">2026-05-13
+16:25 PDT — strategist cross-tool friction synthesis (claude reading
+codex’s working notes)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14563,6 +14568,61 @@ path.</li>
 <code>validate-reviewer-response</code> wrapper for humans/agents to
 call pre-link, reusing the helper’s Python architecture fallback and
 avoiding ad hoc validator invocations during manual reviewer ticks.</li>
+</ul>
+<h3
+id="pdt-strategist-cross-tool-friction-synthesis-claude-reading-codexs-working-notes">2026-05-13
+16:25 PDT — strategist cross-tool friction synthesis (claude reading
+codex’s working notes)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked “what are some of the
+compounding friction that you repeatedly face? if no use echo and
+understand what me and codex strategist been discussing and provide your
+own input” — explicitly inviting cross-tool synthesis.</li>
+<li><strong>Tool and query inputs:</strong>
+<code>find_clusters(since=2026-05-13T12:00-07:00, window_hours=12)</code>
+returned 3 clusters: rank-1 Project_echo (98 atoms, mixed git +
+claude_code), rank-2 echo_wiki (13 atoms, codex-only — same time window,
+parallel session), rank-3 isr-demo-mohsen (3 atoms, unrelated). Then
+<code>get_atoms(13 codex atoms, prefer=newest_first, format=minimal)</code>
+returned 7 atoms in budget (6 prefix-dropped — fine, kept the newest
+strategist exchange).</li>
+<li><strong>Returned shape:</strong> Recovered codex strategist’s
+working framing: “role-slot-agnostic orchestration” (proposed 046,
+deferred per friction-first) + codex’s own observed frictions during 045
+reviewer ticks (FETCH_HEAD duplicate-branches hiccup in
+push-with-retry’s first pull; arm64 Python validate.py mismatch handled
+by commit-helper fallback but not by direct invocations; parallel
+codex-ops journal edit accidentally committed by codex during another
+tick). Also recovered codex’s own proposed cure shape: “every state
+append that is meant to survive a tick should be either committed by the
+same helper transaction or explicitly treated as terminal-error-only
+state.”</li>
+<li><strong>Sources:</strong> Codex sessions
+<code>019e239e-d270-71c0</code> (strategist conversation, vscode,
+gpt-5.5 xhigh) + <code>019e234f-656b-7f13</code> +
+<code>019e234f-656b-7801</code> + <code>019e237c-bb22-7f13</code> +
+<code>019e237c-bb24-71d2</code> (reviewer-tick sessions, exec).
+Cross-source pairing in cluster: claude_code (my strategist) and codex
+(codex strategist + codex reviewers) co-occurred in time window 20:00Z
+to 23:21Z; cluster correctly split them into separate clusters by
+source.</li>
+<li><strong>Verdict:</strong> ✅ right — exactly the cross-vendor wedge
+in action. My Claude Code-side friction list (“two-commit merge
+pattern”, “subagent prompt-token cost”, “bash cwd non-persistence”) is
+complementary to codex’s (“FETCH_HEAD ambiguity”, “arm64 Python
+mismatch”, “reviewer-tick-vs-reviewer-tick race”). Neither tool sees the
+other’s frictions in isolation; ECHO synthesizes both. The founder can
+ask either strategist for friction without copy-pasting between
+tools.</li>
+<li><strong>Note:</strong> The find_clusters result has codex and
+claude_code in SEPARATE clusters (rank-1 = claude_code+git, rank-2 =
+codex-only) despite covering the same time window + same project. The
+clustering algo splits by source. For “what did BOTH strategists
+discuss?” type queries, the user-visible cluster split is mild friction
+— would prefer either a co-occurrence flag OR an explicit cross-source
+cluster. Filed as observation; not 046 scope.</li>
+<li><strong>Conjecture:</strong> (none — observations only per
+dogfooding-journal discipline)</li>
 </ul>
 </body>
 </html>
