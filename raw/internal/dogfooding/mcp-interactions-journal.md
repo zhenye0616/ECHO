@@ -3004,6 +3004,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The first response emission failed YAML validation because a nested quoted grep string was not escaped; the helper quarantined it and appended `queue-errors.md` as designed, then the regenerated response passed validation. That operational wrinkle is now visible in the same pushed commit as the successful response, which avoided leaving the review worktree dirty before the helper's pull/rebase push path.
 - **Conjecture:** The AC2 command mismatch is likely the fastest patch: use the already-existing per-reviewer driver wrappers (`run-codex-reviewer.sh`, `run-codex-ops-reviewer.sh`) or export `REVIEWER_NAME` explicitly rather than teaching `_run_reviewer.sh` to parse positional slugs.
 
+### 13:28 PDT — Codex-ops R1 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one codex-ops review queue tick; first pending codex-ops response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R1 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `a13e52b9583a7c0721e89cc5583ce40e2271cf05`, current `combine.py`, `_reviewers.py`, `reviewers.json`, `_run_reviewer.sh`, `_install_reviewer_launchd.sh`, `docs/review-queue-setup.md`, and the strategist watcher prompt.
+- **Returned:** Wrote and validated `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex-ops.md` as commit `368b765`, verdict `pushback`. Findings: AC2's direct-invoke recipe calls `_run_reviewer.sh` without `REVIEWER_NAME`; AC3's codex-ops timeout config conflicts with the headless-reviewer loader contract; AC3 does not define round-level behavior for mixed per-reviewer timeouts; AC4 introduces `proceed_after_patches_partial` without updating the unattended watcher/dispatch path.
+- **Read sources:** Artifact SHA `a13e52b9583a7c0721e89cc5583ce40e2271cf05`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex-ops.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** 🟡 partial — the queue selected and anchored the right codex-ops response, and the response landed on `origin/main`, but the first push helper attempt hit the exact dirty-tree queue-error race 044 is meant to reduce.
+- **Note:** `commit-reviewer-response.sh` validated and committed the response, then `push-with-retry.sh` failed because a concurrent Codex validation failure had dirtied `queue-errors.md` and left quarantine artifacts in the shared worktree. A concurrent Codex retry then committed those artifacts and pushed `f9b88f1`, carrying the codex-ops response commit as an ancestor. The review landed, but the helper exit was still non-zero in this tick.
+- **Conjecture:** The queue needs a cleaner story for validation-fail artifacts and queue-error appends under concurrent reviewer ticks; otherwise a successful reviewer can still trip over another reviewer's intended failure path during the push phase.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

@@ -1434,6 +1434,10 @@ Adding-a-Reviewer Changelist)</a></li>
 <li><a href="#pdt-codex-r1-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-r1-on-044-reviewer-cycle-infrastructure-debt">13:27
 PDT — Codex R1 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a
+href="#pdt-codex-ops-r1-on-044-reviewer-cycle-infrastructure-debt"
+id="toc-pdt-codex-ops-r1-on-044-reviewer-cycle-infrastructure-debt">13:28
+PDT — Codex-ops R1 on 044 reviewer-cycle infrastructure debt</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14007,6 +14011,56 @@ fastest patch: use the already-existing per-reviewer driver wrappers
 <code>run-codex-ops-reviewer.sh</code>) or export
 <code>REVIEWER_NAME</code> explicitly rather than teaching
 <code>_run_reviewer.sh</code> to parse positional slugs.</li>
+</ul>
+<h3
+id="pdt-codex-ops-r1-on-044-reviewer-cycle-infrastructure-debt">13:28
+PDT — Codex-ops R1 on 044 reviewer-cycle infrastructure debt</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+the R1 request, reviewer schema, pinned artifact
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+at <code>a13e52b9583a7c0721e89cc5583ce40e2271cf05</code>, current
+<code>combine.py</code>, <code>_reviewers.py</code>,
+<code>reviewers.json</code>, <code>_run_reviewer.sh</code>,
+<code>_install_reviewer_launchd.sh</code>,
+<code>docs/review-queue-setup.md</code>, and the strategist watcher
+prompt.</li>
+<li><strong>Returned:</strong> Wrote and validated
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex-ops.md</code>
+as commit <code>368b765</code>, verdict <code>pushback</code>. Findings:
+AC2’s direct-invoke recipe calls <code>_run_reviewer.sh</code> without
+<code>REVIEWER_NAME</code>; AC3’s codex-ops timeout config conflicts
+with the headless-reviewer loader contract; AC3 does not define
+round-level behavior for mixed per-reviewer timeouts; AC4 introduces
+<code>proceed_after_patches_partial</code> without updating the
+unattended watcher/dispatch path.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>a13e52b9583a7c0721e89cc5583ce40e2271cf05</code>; request path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex-ops.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the queue selected and
+anchored the right codex-ops response, and the response landed on
+<code>origin/main</code>, but the first push helper attempt hit the
+exact dirty-tree queue-error race 044 is meant to reduce.</li>
+<li><strong>Note:</strong> <code>commit-reviewer-response.sh</code>
+validated and committed the response, then
+<code>push-with-retry.sh</code> failed because a concurrent Codex
+validation failure had dirtied <code>queue-errors.md</code> and left
+quarantine artifacts in the shared worktree. A concurrent Codex retry
+then committed those artifacts and pushed <code>f9b88f1</code>, carrying
+the codex-ops response commit as an ancestor. The review landed, but the
+helper exit was still non-zero in this tick.</li>
+<li><strong>Conjecture:</strong> The queue needs a cleaner story for
+validation-fail artifacts and queue-error appends under concurrent
+reviewer ticks; otherwise a successful reviewer can still trip over
+another reviewer’s intended failure path during the push phase.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
