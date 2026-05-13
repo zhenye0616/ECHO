@@ -49,6 +49,7 @@
         "pushback",
         "divergent",
         "single_reviewer_timeout",
+        "partial_responses",
         "no_responses",
         "malformed_reviewer_response"
       ]
@@ -58,10 +59,10 @@
     },
     "offending_response": {
       "oneOf": [
-        { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" },
+        { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z][a-z0-9-]+\\.md$" },
         {
           "type": "array",
-          "items": { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z]+\\.md$" },
+          "items": { "type": "string", "pattern": "^backlog/reviews/[^/]+/r\\d+/[a-z][a-z0-9-]+\\.md$" },
           "minItems": 2
         }
       ]

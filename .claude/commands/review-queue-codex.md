@@ -19,14 +19,23 @@ This catches any new request directories AND ensures you are reviewing against t
 
 ## Step 2 — Scan for missing responses
 
-Find any `backlog/reviews/<item_id>/r<N>/request.md` whose corresponding `<item_id>/r<N>/codex.md` does **not** exist. If `combined.md` already exists for that round (the strategist watcher beat you), skip — your review is no longer needed.
+Find any `backlog/reviews/<item_id>/r<N>/request.md` whose corresponding `<item_id>/r<N>/codex.md` does **not** exist, AND whose `request.requested_reviewers` includes `codex`. If `combined.md` already exists for that round (the strategist watcher beat you), skip — your review is no longer needed. If `requested_reviewers` does not include `codex` (per 043 AC1 — the per-round roster is now the source of truth), skip silently — this round did not ask for a Codex review.
 
 ```bash
+MY_REVIEWER=codex
+CANDIDATE=""
 for req in backlog/reviews/*/r*/request.md; do
   dir=$(dirname "$req")
-  if [ -f "$dir/codex.md" ]; then continue; fi
+  if [ -f "$dir/$MY_REVIEWER.md" ]; then continue; fi
   if [ -f "$dir/combined.md" ]; then continue; fi
-  # this is your candidate; one per tick
+  # 043 AC1: skip rounds where MY_REVIEWER is not in requested_reviewers.
+  if ! python3 -c "
+import sys, yaml
+fm = yaml.safe_load(open('$req').read().split('---')[1])
+sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
+"; then
+    continue
+  fi
   CANDIDATE="$req"
   break
 done
@@ -61,6 +70,14 @@ Write to a unique temp file, then `os.link` it into place (no overwrite). If `Fi
 
 ```python
 import os, uuid
+# 043 AC4: late-response race guard. The os.link is atomic, but the window
+# between "Codex started reviewing" and "Codex is about to link" is minutes
+# long. If combined.md was written during that window, our response is stale —
+# discard it without linking. The round is already terminal from this
+# reviewer's POV; next tick will see r<N+1>/request.md if there is one.
+round_dir = os.path.dirname(final)
+if os.path.exists(os.path.join(round_dir, "combined.md")):
+    raise SystemExit(0)
 tmp = f"{final}.{uuid.uuid4().hex}.tmp"
 with open(tmp, "w") as f: f.write(content)
 try:
