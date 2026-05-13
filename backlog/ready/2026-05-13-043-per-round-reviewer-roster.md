@@ -164,15 +164,16 @@ Field semantics — ONE rule for eligibility×verdict (resolves R1 HIGH #1 ambig
 
 - `mode` (required, enum `headless | ide`): determines launchd-plumbing applicability. `headless` reviewers ARE installed as launchd jobs; `ide` reviewers are user-triggered inside the IDE and never installed as launchd jobs.
 
-- `required` (required, bool):
-    - **`required: true` + `mode: headless`:** `combine.py` waits indefinitely for this reviewer's response. Headless reviewers tick every ~10 min via launchd, so "indefinitely" is bounded in practice. A missing required headless reviewer past, say, 24h is operationally a queue stall — out of scope for 043 (separate observability concern).
-    - **`required: true` + `mode: ide`:** `combine.py` waits up to `timeout_hours` for this reviewer. If absent past timeout, combine emits `combined_verdict: partial_responses` with `escalated_to_founder: true`; the body enumerates present reviewers' verdicts. This is current Cursor behavior; **AC7's "default deploy unchanged" depends on this.**
+- `required` (required, bool): whether `combine.py` waits for this reviewer's response before computing a non-`partial_responses` verdict.
+    - **`required: true`** (any mode): `combine.py`'s global `--timeout-hours` CLI flag (default 2h) is the per-round wait threshold for this reviewer's absence. If absent past `--timeout-hours`, combine emits `combined_verdict: partial_responses` with `escalated_to_founder: true`; the body enumerates present reviewers' verdicts. **This applies to BOTH headless and ide reviewers** in 043. (Future extension: per-reviewer `timeout_hours` from `reviewers.json` could become effective per-reviewer; explicitly out of scope for 043.)
     - **`required: false`:** Combine treats absence as non-blocking. Eligibility is computed against the required-only set; the optional reviewer is included in the verdict roll-up if-and-only-if its response is present at combine time. Any late-landing response after `combined.md` exists is rejected by AC4's race guard (the response is unwritten by the reviewer prompt's pre-`os.link` check). `timeout_hours` on an optional reviewer is semantically meaningless — the value is allowed in `reviewers.json` but ignored by `combine.py`.
 
-- `timeout_hours` (required, number | null):
-    - For `required: true` + `mode: ide` reviewers: positive number, meaningful (used by combine).
-    - For `required: true` + `mode: headless` reviewers: must be `null` (the launchd tick-cadence is the de facto timing layer).
-    - For `required: false` reviewers: present but ignored by combine; conventionally `null` for headless and the same `2` as before for cursor if we ever toggle cursor to optional.
+- `timeout_hours` (required, number | null): **metadata about each reviewer's expected response cadence; NOT yet effective per-reviewer in 043.** All required reviewers share the same global `--timeout-hours` threshold from `combine.py` CLI flag. The per-reviewer value here is reserved for a future spec that wires it through `find_eligible_rounds`. Today the schema-validation rules hold:
+    - For `mode: ide` reviewers: positive number (matches current cursor default of 2h).
+    - For `mode: headless` reviewers: must be `null` (launchd tick-cadence is the de facto timing layer; per-reviewer timeout is meaningless for headless until per-reviewer routing is built).
+    - For `required: false` reviewers: present but ignored by combine; conventionally `null` for headless and `2` for cursor.
+
+**Important — R4 HIGH #1 clarification on default behavior.** Current 2-reviewer-default-deploy semantics (codex + cursor both `required: true`): combine.py's global `--timeout-hours` (default 2h) is the wait threshold for either's absence. A missing codex past 2h produces `partial_responses` (the rename of `single_reviewer_timeout`, preserved as an enum alias for back-compat). A missing cursor past 2h produces the same. **043 does NOT change this behavior** — the AC7 byte-identical fixture covers the happy path (both reviewers present); AC7b adds an explicit regression test for the codex-missing-past-timeout edge.
 
 - `slash_command` (required, string): the `.claude/commands/<slash_command>.md` file this reviewer reads. Convention is `review-queue-<name>` but explicit reference allows future variants.
 
@@ -633,28 +634,45 @@ for slug, (fm, _body) in responses.items():
         primary, _ = normalize_where(f["where"])
         findings_by_anchor.setdefault(primary, {})[slug] = f
 
-# Phase 3b — apply cross_refs_match override across all reviewer pairs.
-# A cross_ref on reviewer X's finding pointing at reviewer Y's finding (same round)
-# forces them into the same convergence bucket even if their primary anchors differ.
-# This preserves the cross_ref-as-override semantics from combine.py:67-95.
-def _key_for(slug: str, f: dict) -> str:
-    """Stable key the cross_ref resolver uses; combines normalized primary anchor."""
-    primary, _ = normalize_where(f["where"])
-    return primary
+# Phase 3b — union-find merge for cross_ref-bridged convergence (R4 MED #2 fix).
+# A naive pairwise merge can split chains: if A's bucket merges with B, then C's
+# cross_ref→A is evaluated AFTER A was renamed, so C might form its own bucket
+# instead of joining {A, B}. Union-find guarantees transitive closure regardless
+# of iteration order.
 
-# Pairwise scan for cross_ref overrides; merge buckets when matched.
+class UnionFind:
+    def __init__(self, keys: list[str]):
+        self.parent = {k: k for k in keys}
+    def find(self, k: str) -> str:
+        while self.parent[k] != k:
+            self.parent[k] = self.parent[self.parent[k]]  # path compression
+            k = self.parent[k]
+        return k
+    def union(self, a: str, b: str) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+# Initial buckets: one per primary-normalized anchor.
+uf = UnionFind(list(findings_by_anchor.keys()))
+
+# Apply cross_ref edges to union buckets.
 all_findings = [(slug, f) for slug, (fm, _b) in responses.items() if fm for f in fm.get("findings", [])]
-for i, (slug_a, f_a) in enumerate(all_findings):
-    for slug_b, f_b in all_findings[i+1:]:
-        if slug_a == slug_b:
+for slug_a, f_a in all_findings:
+    for slug_b, f_b in all_findings:
+        if slug_a == slug_b and f_a is f_b:
             continue
         if cross_refs_match(f_a, rnd, slug_a, f_b, rnd, slug_b):
-            key_a, key_b = _key_for(slug_a, f_a), _key_for(slug_b, f_b)
-            if key_a != key_b:
-                # Merge bucket key_b into key_a (or vice-versa); preserve all reviewers.
-                merged = {**findings_by_anchor.get(key_b, {}), **findings_by_anchor.get(key_a, {})}
-                findings_by_anchor[key_a] = merged
-                findings_by_anchor.pop(key_b, None)
+            key_a, _ = normalize_where(f_a["where"])
+            key_b, _ = normalize_where(f_b["where"])
+            uf.union(key_a, key_b)
+
+# Collapse buckets by union-find root.
+merged_buckets: dict[str, dict[str, dict]] = {}
+for anchor, by_reviewer in findings_by_anchor.items():
+    root = uf.find(anchor)
+    merged_buckets.setdefault(root, {}).update(by_reviewer)
+findings_by_anchor = merged_buckets
 
 # Phase 3c — bucketize into convergent (≥2 reviewers) vs divergent (1 reviewer).
 convergent = []
@@ -689,7 +707,11 @@ No changes to the table column structure beyond `Source` being a comma-list when
 - **AC6i — 3 requested reviewers, convergent finding across all 3:** same fixture as AC6h but all three reviewers flag the same `where` anchor with similar findings. Assert: convergent table row has `Source: codex, cursor, codex-arch` (comma-list, alphabetical) and divergent table is empty.
 - **AC6j — 3 requested reviewers, one diverges:** same fixture, codex+cursor flag anchor X with finding A; codex-arch flags anchor X with finding A AND anchor Y with finding B. Assert: convergent has anchor X with all three; divergent has anchor Y with `Source: codex-arch` only.
 - **AC6k — Two-reviewer default-deploy cross_ref convergence (regression guard for R2 HIGH #2).** Fixture: default `reviewers.json` (codex + cursor only), round with both responses; codex's finding has `where: "AC1 implementation"`, cursor's finding has `where: "AC1 test fixture"` (different primary anchors). Codex's finding includes `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` pointing at cursor's finding. Assert: combined.md convergent table has ONE row pairing both findings (proven by their cross_ref override bridging different anchors); divergent is empty. **This is the falsification for R2 HIGH #2** — proves the N-way refactor preserves `cross_refs_match` semantics. Build_combined would otherwise put them in divergent (different normalize_where outputs).
-- **AC6l — Three-reviewer cross_ref convergence (extension of AC6k):** same as AC6k but with synthetic `codex-arch` added; codex-arch's finding has `where: "AC1 schema"` (different again) and `cross_ref: {round: 1, reviewer: codex, finding_index: 1}` pointing at codex's. **Additionally**: codex's finding has `cross_ref: {round: 1, reviewer: "codex-arch", finding_index: 1}` (a default-deploy reviewer pointing at the new reviewer). Assert: (i) convergent has ONE row with all three reviewers; divergent empty; (ii) `validate.py reviewer <codex.md>` exits 0 (proves the `findings[].cross_ref.reviewer` enum in `reviewer.schema.json` was updated per R3 MED #3 — without that update, validate rejects codex.md with `'codex-arch' is not one of ['codex', 'cursor']`). This is the falsification for R3 MED #3.
+- **AC6l — Three-reviewer cross_ref convergence via transitive chain (R4 MED #2 fix).** Same fixture as AC6k but with synthetic `codex-arch` added. Each finding carries EXACTLY ONE `cross_ref` (per `reviewer.schema.json`'s schema):
+  - codex's finding: `where: "AC1 implementation"`, `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` (chain hop A→B).
+  - cursor's finding: `where: "AC1 test fixture"`, no cross_ref (B is the bridge).
+  - codex-arch's finding: `where: "AC1 schema"`, `cross_ref: {round: 1, reviewer: codex, finding_index: 1}` (chain hop C→A, completing the transitive A→B + C→A so union-find merges all three into one bucket).
+  Assert: (i) the union-find merge produces convergent table with ONE row containing all three reviewers (transitive convergence via codex-arch→codex→cursor chain); divergent empty; (ii) all three reviewer responses pass `validate.py reviewer` (proves the `findings[].cross_ref.reviewer` enum in `reviewer.schema.json` was updated to include `codex-arch` per R3 MED #3 — without that update, codex-arch.md fails validation). This is the joint falsification for R3 MED #3 + R4 MED #2.
 
 ### AC7 — Default deploy proven byte-identical via fixture test
 
@@ -701,6 +723,8 @@ Test runs:
 3. Assert: produced `combined.md` is byte-identical to the reference fixture (after stripping the `combined_at` timestamp, which is the only non-deterministic field).
 
 **Why this AC.** Codex pushback MED #11 explicitly flags "default deploy unchanged" as un-proven by mere inspection. A fixture-level byte-comparison is the only reliable falsification. If any of AC2-AC6's changes accidentally alter the default-deploy output (different field order, different verdict-string formatting, different body text, etc.), this test fails.
+
+**AC7b — Timeout-path regression (R4 HIGH #1 fix).** Companion test in the same file. Fixture: default `reviewers.json` (codex + cursor), round with `requested_reviewers: [codex, cursor]` dispatched 3h ago, codex.md ABSENT, cursor.md present with verdict `proceed`. Invoke `combine.py` (default `--timeout-hours=2`). Assert: `combined.md` has `combined_verdict: partial_responses` (the rename; legacy enum value `single_reviewer_timeout` is also accepted by combined.schema.json for back-compat) AND `escalated_to_founder: true` AND body enumerates cursor's `proceed` verdict explicitly AND `codex_response: null`. **This is the falsification for R4 HIGH #1**: proves that codex-absent-past-timeout still escalates (no behavior change from the `mode: headless + timeout_hours: null` framing).
 
 ## Out of Scope (Don't Drift)
 
