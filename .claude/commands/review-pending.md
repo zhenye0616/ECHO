@@ -1,10 +1,10 @@
 ---
-description: Review every item in backlog/pending_review/ in parallel. Spawns one code-reviewer subagent per item; synthesizes a per-item verdict + fixup list + merge-conflict preview; writes a sidecar review plan next to each item; stops for human validation. Read-only — never touches the working tree, never moves files, never runs git operations beyond read-only diffs.
+description: Review every item in backlog/pending_review/ in parallel. Spawns one code-reviewer subagent per item; synthesizes a per-item verdict + fixup list + merge-conflict preview; writes a sidecar review plan next to each item; stops for human validation. Read-only EXCEPT for committing+pushing the per-item review sidecars (the skill's deliverable) — closes the /review-pending → /merge-and-cleanup handoff gap per 045 AC6.
 ---
 
 You are reviewing the agent's pending work for the founder. The founder runs this command in the morning (or whenever pending_review has items) to get a structured verdict before deciding what to merge.
 
-This command is **read-only**. It does not move files, modify the working tree, or run any state-changing git operations. Its only output is human-readable summaries plus a sidecar review plan per item.
+This command is **read-only** in the sense that matters for merge planning: it does not move items between stages, modify item frontmatter, or run git operations beyond committing+pushing the per-item review sidecars (the skill's deliverable). Sidecars become tracked artifacts on `origin/main` so the downstream `/merge-and-cleanup` skill's pre-flight clean-tree check passes without manual founder intervention. Its primary output is human-readable summaries plus the sidecar review plans themselves.
 
 ## Inputs
 
@@ -101,6 +101,24 @@ test_counts: { passed: 132, failed: 0 }
 
 The human will read this, optionally edit it (uncheck fixups they want to defer, edit resolution strategy, add notes), then invoke `/merge-and-cleanup`.
 
+### Sidecar commit + push (045 AC6)
+
+After ALL sidecars are written, commit + push each one atomically. The sidecar IS a complete review artifact and benefits from atomic git history; the founder can amend in place via a follow-up commit if edits are needed.
+
+```bash
+# SIDECARS is the list of paths written above (one per item).
+for SIDECAR in "${SIDECARS[@]}"; do
+  SIDECAR_BASE=$(basename "$SIDECAR" .review.md)
+  git add "$SIDECAR"
+  git commit -m "review: $SIDECAR_BASE" "$SIDECAR"
+  tools/review-queue/push-with-retry.sh "review: $SIDECAR_BASE"
+done
+```
+
+`push-with-retry.sh` is used in place of `git push origin main || true`. The bare-push-with-swallow pattern would produce a local-only sidecar commit on auth loss, network outage, or rejected push, leaving the strategist's `/merge-and-cleanup` to pass pre-flight locally while the next operator or machine sees no review artifact on origin. `push-with-retry.sh` performs bounded retries, logs to `queue-errors.md` on terminal failure (existing 039+041 contract), and surfaces the failure non-zero — making any push gap visible at /review-pending exit time, not silently at /merge-and-cleanup time.
+
+The helper is invoked **inside the SIDECARS loop**, once per sidecar, using the per-sidecar base name. This is unambiguous for multi-item /review-pending invocations and produces one push-with-retry per review (matches the per-reviewer-response pattern used by `commit-reviewer-response.sh`).
+
 ## Step D — Surface a founder-facing summary
 
 After all sidecars are written, output to the conversation:
@@ -114,7 +132,7 @@ End with a clear pause prompt: *"Reply with `/merge-and-cleanup <ids>` to procee
 
 ## Step E — STOP
 
-Do not move files. Do not run git operations beyond `git diff` and `git fetch`. Do not modify the item frontmatter. Do not touch `wiki/`, `docs/BACKLOG.md`, or any complete/ items.
+Do not move files. Do not modify the item frontmatter. Do not touch `wiki/`, `docs/BACKLOG.md`, or any complete/ items. The only git state changes this skill makes are the per-sidecar commit + push from Step C (045 AC6); everything else stays read-only (`git diff`, `git fetch`).
 
 ## Failure Modes
 
@@ -130,15 +148,15 @@ Do not move files. Do not run git operations beyond `git diff` and `git fetch`. 
 - Do not move any items between stages.
 - Do not modify any item file's frontmatter or body.
 - Do not run `npm test` / `npm install` from the main repo root (only the subagents do, inside their respective worktrees).
-- Do not commit anything.
+- Do not commit anything OTHER than the review sidecars themselves (which are the deliverable of this skill). The sidecar commit + push via `push-with-retry.sh` is in-scope per AC6 of spec 045.
 - Do not delete worktrees or branches (that's `/merge-and-cleanup`'s job, post-merge).
 - Do not "be helpful" by speculating beyond what the code shows — the verdict must be evidence-based.
 
 ## What Success Looks Like
 
-- Every item in `pending_review/` has a sidecar `.review.md` file with a verdict.
+- Every item in `pending_review/` has a sidecar `.review.md` file with a verdict, committed and pushed to `origin/main` (one `review: <id>` commit per sidecar, via `push-with-retry.sh`).
 - The founder has a single conversation-facing summary they can act on without re-reading individual reviews.
 - The exact follow-up command is named.
-- No files moved, no commits made, no branches touched.
+- No items moved between stages, no item frontmatter modified, no branches touched. The only state changes are the sidecar commits themselves — which `/merge-and-cleanup`'s pre-flight will see as a clean tree.
 
 Now begin. Resolve the item list, dispatch the subagents in parallel, and synthesize.

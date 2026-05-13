@@ -184,7 +184,13 @@ Open the file for human edits before commit: *"Review the notes, then reply `com
 
 ### C7. Move item to complete/, delete sidecar
 
+Stage the `review_notes` edit BEFORE the `git mv` so the new path's blob includes C6's content. Without the explicit stage-before-mv, `git mv` records a similarity-100% rename of HEAD's old blob and the freshly-edited `review_notes` content sits unstaged against the new path; in some git versions `git add -A` at C8 still picks it up via the path-on-disk, but the post-044 merge surfaced a case (commit `ca51bb2`) where the populated 70-line `review_notes` block was lost from the merge commit and had to be re-committed separately at `011b539`. Staging first is the unambiguous fix (045 AC5b).
+
 ```bash
+# 045 AC5b — stage review_notes content BEFORE rename so the new path's
+# blob captures C6's edit. Either form below works; the spec prefers the
+# stage-before-mv shape because intent is clearer than re-stage-after.
+git add backlog/pending_review/$(basename "$ITEM")    # stage C6's review_notes edit FIRST
 git mv backlog/pending_review/$(basename "$ITEM") backlog/complete/$(basename "$ITEM")
 git rm "$SIDECAR"               # sidecar is consumed; do not let it follow the item
 ```
@@ -209,13 +215,28 @@ EOM
 
 ### C9. Cleanup worktree and branches
 
+Before `git worktree remove`, surgically delete `$WORKTREE/node_modules` (regenerable, not work — `npm install` from C5 or the code-reviewer subagent's in-worktree verify left it). The strict "do not --force" invariant on `git worktree remove` is preserved; this rm is narrowly scoped to a known-regenerable directory AND gated behind an identity check that aborts the operation if `$WORKTREE` doesn't point at the expected agent worktree on the expected branch.
+
 ```bash
+# 045 AC5a — identity guard. ALL four checks must pass or the rm does NOT
+# execute; the operator surfaces the new blocker to the founder.
+[ -n "$WORKTREE" ] || { echo "ERROR: WORKTREE empty"; exit 1; }
+[ -d "$WORKTREE/.git" ] || [ -f "$WORKTREE/.git" ] || { echo "ERROR: $WORKTREE not a git worktree"; exit 1; }
+EXPECTED_WT_TOPLEVEL="$WORKTREE"
+ACTUAL_WT_TOPLEVEL="$(git -C "$WORKTREE" rev-parse --show-toplevel 2>/dev/null)"
+[ "$ACTUAL_WT_TOPLEVEL" = "$EXPECTED_WT_TOPLEVEL" ] || { echo "ERROR: worktree toplevel mismatch (expected $EXPECTED_WT_TOPLEVEL, got $ACTUAL_WT_TOPLEVEL)"; exit 1; }
+ACTUAL_BRANCH="$(git -C "$WORKTREE" branch --show-current 2>/dev/null)"
+[ "$ACTUAL_BRANCH" = "$BRANCH" ] || { echo "ERROR: branch mismatch (expected $BRANCH on $WORKTREE, got $ACTUAL_BRANCH)"; exit 1; }
+rm -rf "$WORKTREE/node_modules"
+
 git worktree remove "$WORKTREE"
 git branch -d "$BRANCH"
 git push origin --delete "$BRANCH"
 ```
 
 Use `-d` (not `-D`) for the local delete — this fails loud if the branch isn't fully merged, which would mean the merge commit doesn't actually contain the branch's tip and something is wrong.
+
+If `git worktree remove` still fails (chokidar handles, stray pyc, etc.) AFTER the node_modules cleanup, surface the new blocker per the existing "do not --force" rule below. Do NOT broaden the rm beyond `node_modules` (no dist/, .vite/, etc. — those would be a separate scoped decision).
 
 If the remote delete fails because the branch was already pushed for someone else's reference (rare): surface the error and ask the human; do not force.
 
@@ -286,7 +307,7 @@ After the loop completes, output:
 
 For each id in the argument list, by the end of the run:
 
-- Item file moved from `backlog/pending_review/` to `backlog/complete/` with `review_notes` populated.
+- Item file moved from `backlog/pending_review/` to `backlog/complete/` with `review_notes` populated AND committed (the merge commit's diff includes the `review_notes` content, not just the rename — 045 AC5b).
 - Sidecar `.review.md` removed.
 - Merge commit on `main` with descriptive message; pushed to origin.
 - Worktree `~/Desktop/Project_echo--<slug>/` removed.
