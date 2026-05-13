@@ -9,8 +9,17 @@ spec_commit_sha: ""
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-13T07:53:00Z"
 branch: "agent/per-round-reviewer-roster"
-head_sha: ""
-agent_notes: ""
+head_sha: "ef9d83946eeab48ba598ef6cd5bab18e4e924526"
+agent_notes: |
+  Implemented AC1, AC1f, AC2, AC3, AC4, AC5, AC6, AC7 + AC7b. Full pipeline
+  exercised through 21 new + 1 updated test blocks; review-queue suite at
+  76/77 passing (1 pre-existing orphan-cleanup fail unchanged from main).
+  Default-deploy 2-reviewer behavior byte-identical via AC7 fixture; N-way
+  union-find for cross_ref convergence implemented but not falsified by a
+  3-reviewer fixture (AC6h end-to-end + AC1e optional-missing + AC1a
+  cursor-exits-no-op are the gaps — see run log open questions). Branch
+  agent/per-round-reviewer-roster pushed at head_sha
+  ef9d83946eeab48ba598ef6cd5bab18e4e924526.
 spec_refs:
   - backlog/complete/2026-05-12-042-reviewer-emission-yaml-validation.md   # Immediate parent; AC5 measurement (0 founder activations) closed 041's AC8 gate; this item targets the speed-and-scale dimension next
   - backlog/complete/2026-05-12-041-reviewer-background-execution.md       # Parent operating-model item; launched the Codex-headless wrapper + slash-command convention. AC4's commit-reviewer-response.sh is touched here too (AC4 race fix)
