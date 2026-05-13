@@ -2917,6 +2917,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The exact atom made the distinction between "review-cycle AC8=0" and "full lifecycle still has founder-triggered handoffs" much clearer than the clipped search snippet.
 - **Conjecture:** For clipped strategic-review turns, `search_memories` should be treated as discovery only; `get_atom` is the right follow-up when the user asks for judgment on the substance.
 
+### 2026-05-12 23:18 PDT - Codex R1 on 043 per-round reviewer roster
+
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R1 request, reviewer schema, Cursor-side queue command, canonical repo instructions, and pinned artifact `backlog/ready/2026-05-13-043-per-round-reviewer-roster.md` at `d1d9fbc728f7ad4b0e42fb7ab630b4f24cd6350b`; checked current `tools/review-queue/{combine.py,request.py,commit-reviewer-response.sh,run-codex-reviewer.sh,install-codex-reviewer-launchd.sh,_lib.py,validate.py,push-with-retry.sh}` plus review-queue tests for code-grounded gaps.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/codex.md` as `c2f61ec`, verdict `pushback`. Findings: optional-reviewer timeout semantics conflict across AC1/AC2/AC6; AC4 places a race guard after the prompt has already linked the response; `combine.py` is not required to consume an N-reviewer response set end to end; `_reviewers.py` skeleton cannot satisfy AC2a's clear `ValueError` contract as written.
+- **Sources:** Artifact SHA `d1d9fbc728f7ad4b0e42fb7ab630b4f24cd6350b`; request path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/request.md`; response path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** The highest-risk ambiguity is eligibility: `cursor.required=false` plus `timeout_hours=2` needs an explicit before-timeout and after-timeout fixture so builders cannot choose different terminal behavior.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

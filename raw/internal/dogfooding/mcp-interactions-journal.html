@@ -1398,6 +1398,9 @@ href="#pdt-codex-hydrates-claudes-handoff-friction-note-for-independent-review"
 id="toc-pdt-codex-hydrates-claudes-handoff-friction-note-for-independent-review">22:54
 PDT — Codex hydrates Claude’s handoff-friction note for independent
 review</a></li>
+<li><a href="#pdt---codex-r1-on-043-per-round-reviewer-roster"
+id="toc-pdt---codex-r1-on-043-per-round-reviewer-roster">2026-05-12
+23:18 PDT - Codex R1 on 043 per-round reviewer roster</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13591,6 +13594,43 @@ handoffs” much clearer than the clipped search snippet.</li>
 <code>search_memories</code> should be treated as discovery only;
 <code>get_atom</code> is the right follow-up when the user asks for
 judgment on the substance.</li>
+</ul>
+<h3 id="pdt---codex-r1-on-043-per-round-reviewer-roster">2026-05-12
+23:18 PDT - Codex R1 on 043 per-round reviewer roster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+the R1 request, reviewer schema, Cursor-side queue command, canonical
+repo instructions, and pinned artifact
+<code>backlog/ready/2026-05-13-043-per-round-reviewer-roster.md</code>
+at <code>d1d9fbc728f7ad4b0e42fb7ab630b4f24cd6350b</code>; checked
+current
+<code>tools/review-queue/{combine.py,request.py,commit-reviewer-response.sh,run-codex-reviewer.sh,install-codex-reviewer-launchd.sh,_lib.py,validate.py,push-with-retry.sh}</code>
+plus review-queue tests for code-grounded gaps.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/codex.md</code>
+as <code>c2f61ec</code>, verdict <code>pushback</code>. Findings:
+optional-reviewer timeout semantics conflict across AC1/AC2/AC6; AC4
+places a race guard after the prompt has already linked the response;
+<code>combine.py</code> is not required to consume an N-reviewer
+response set end to end; <code>_reviewers.py</code> skeleton cannot
+satisfy AC2a’s clear <code>ValueError</code> contract as written.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d1d9fbc728f7ad4b0e42fb7ab630b4f24cd6350b</code>; request path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r1/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and pushed exactly one reviewer response before journaling.</li>
+<li><strong>Note:</strong> The highest-risk ambiguity is eligibility:
+<code>cursor.required=false</code> plus <code>timeout_hours=2</code>
+needs an explicit before-timeout and after-timeout fixture so builders
+cannot choose different terminal behavior.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
