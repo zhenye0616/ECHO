@@ -118,17 +118,41 @@ If Option-A doesn't work (e.g., combine.py rejects `--now` for the orphan-cleanu
 
 **Test:** Visual diff inspection during review. No automated test required.
 
-### AC5 — Worktree cleanup robustness in /merge-and-cleanup
+### AC5 — /merge-and-cleanup skill robustness (worktree cleanup + post-mv stage)
 
-**Touch:** `.claude/commands/merge-and-cleanup.md` Step C9 ("Cleanup worktree and branches")
+**Touch:** `.claude/commands/merge-and-cleanup.md`:
+- Step C9 ("Cleanup worktree and branches") — node_modules cleanup
+- Step C8 ("Commit") — explicit `git add` of the renamed file after C7's `git mv`
 
-**Change:** Before `git worktree remove "$WORKTREE"`, the skill prose adds an explicit `rm -rf "$WORKTREE/node_modules"` step (with a comment explaining: regenerable, not work; `npm install` from the build or code-reviewer verify left it). After the rm, attempt `git worktree remove` once. If it still fails, surface the new blocker to the founder per the existing "do not --force" rule. The strict no-force invariant on `git worktree remove` is preserved — the surgical `rm -rf node_modules` is justified because `node_modules` is regenerable and never contains user work.
+**Change (two sub-edits to the same skill file):**
 
-**Why:** Eliminates F-E. Every cycle that runs `npm install` inside the worktree (almost all — code-reviewer subagent runs `npm test` in-worktree) will leave `node_modules/` untracked. The skill's existing retry-without-force loop loops forever on this benign blocker.
+**AC5a — worktree cleanup robustness (Step C9):** Before `git worktree remove "$WORKTREE"`, the skill prose adds an explicit `rm -rf "$WORKTREE/node_modules"` step (with a comment explaining: regenerable, not work; `npm install` from the build or code-reviewer verify left it). After the rm, attempt `git worktree remove` once. If it still fails, surface the new blocker to the founder per the existing "do not --force" rule. The strict no-force invariant on `git worktree remove` is preserved — the surgical `rm -rf node_modules` is justified because `node_modules` is regenerable and never contains user work. Eliminates F-E.
 
-**Out-of-scope drift to defend against:** Do NOT add `rm -rf` for other paths (e.g., dist/, .vite/, etc.) — node_modules is the load-bearing one. Add others only when empirically observed blocking. Do NOT replace `git worktree remove` with `--force` — the no-force invariant is the trust anchor.
+**AC5b — post-mv stage of renamed file content (Step C7→C8):** Currently the skill's flow is: C6 edits `review_notes` in the pending_review/ file, C7 runs `git mv pending_review/X complete/X` + `git rm sidecar`, C8 runs `git add -A && git commit`. The issue: `git mv` stages the rename with HEAD's old blob; the C6 `review_notes` edit is unstaged against the new path; `git add -A` SHOULD pick it up, but in practice `git mv` of a freshly-edited file produces a similarity-100% rename detection that may not include the content delta in some git versions. **Observed during 044 merge:** the populated `review_notes` block (70 lines) was lost from the merge commit `ca51bb2` and had to be re-committed separately at `011b539`. Per-cycle cost: every merge populating review_notes risks the same loss.
 
-**Test:** This is a skill-prose edit. Test is "the next /merge-and-cleanup run that has node_modules in the worktree completes C9 without manual founder intervention." No unit test feasible for skill prose.
+The fix: change C7's order so the content edit is staged BEFORE the mv. The new C7 sequence:
+```bash
+git add backlog/pending_review/$(basename "$ITEM")    # stage C6's review_notes edit FIRST
+git mv backlog/pending_review/$(basename "$ITEM") backlog/complete/$(basename "$ITEM")
+git rm "$SIDECAR"
+```
+Alternative (equivalent): keep the existing C7 order but add an explicit re-stage after the mv:
+```bash
+git mv backlog/pending_review/$(basename "$ITEM") backlog/complete/$(basename "$ITEM")
+git rm "$SIDECAR"
+git add backlog/complete/$(basename "$ITEM")          # re-stage to capture C6 content edit
+```
+Either form works; the spec prefers the **first form** (stage-before-mv) because it's clearer in intent.
+
+Update the skill's "What Success Looks Like" section to mention: "review_notes are populated AND committed (the merge commit's diff includes the review_notes content, not just the rename)."
+
+**Why:** Eliminates F-E AND F-(merge-stage-loss). Both are /merge-and-cleanup skill prose issues; bundled because they share a touch site and the AC defends against an "edit-and-mv ordering" class of friction broadly.
+
+**Out-of-scope drift to defend against:** Do NOT add `rm -rf` for other paths beyond `node_modules` (e.g., dist/, .vite/, etc.). Do NOT replace `git worktree remove` with `--force` — the no-force invariant is the trust anchor. Do NOT redesign C7's overall flow (move/rm/commit) beyond the staging order fix.
+
+**Test:** This is a skill-prose edit. Tests:
+- AC5a: next /merge-and-cleanup run with node_modules in the worktree completes C9 without manual founder intervention.
+- AC5b: next /merge-and-cleanup run that populates review_notes produces a single merge commit whose diff includes the review_notes block (not split across the merge commit + a separate "populate review_notes" follow-up commit). Verifiable via `git log -1 --stat` on the merge commit post-cycle.
 
 ### AC6 — /review-pending sidecar commit gap
 
