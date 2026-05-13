@@ -1471,6 +1471,11 @@ href="#pdt-codex-ops-r1-on-045-queue-reliability-friction-cluster"
 id="toc-pdt-codex-ops-r1-on-045-queue-reliability-friction-cluster">2026-05-13
 14:52 PDT — Codex-ops R1 on 045 queue-reliability friction
 cluster</a></li>
+<li><a
+href="#pdt-codex-ops-r2-on-045-queue-reliability-friction-cluster"
+id="toc-pdt-codex-ops-r2-on-045-queue-reliability-friction-cluster">2026-05-13
+15:40 PDT — Codex-ops R2 on 045 queue-reliability friction
+cluster</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14470,6 +14475,48 @@ unattended queue stall.</li>
 every state append that is meant to survive a tick should be either
 committed by the same helper transaction or explicitly treated as
 terminal-error-only state.</li>
+</ul>
+<h3
+id="pdt-codex-ops-r2-on-045-queue-reliability-friction-cluster">2026-05-13
+15:40 PDT — Codex-ops R2 on 045 queue-reliability friction cluster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r2/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-045-queue-reliability-friction-cluster.md</code>
+at <code>bb1309f1d6487274748b458c114efbcaf239e0ce</code>, prior R1
+combined context, r1 codex-ops response,
+<code>commit-reviewer-response.sh</code>,
+<code>push-with-retry.sh</code>,
+<code>_install_reviewer_launchd.sh</code>, and the current codex-ops
+reviewer prompt. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned shape:</strong> Wrote, validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r2/codex-ops.md</code>
+as <code>4114c5d</code>, verdict <code>proceed_after_patches</code>, one
+medium finding: AC2’s smoke-gate test needs temp-HOME/PATH launchd
+isolation so the test itself does not mutate the operator’s real
+LaunchAgents state.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+and pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The r1 runtime blockers were addressed. The
+remaining ops issue is test-harness containment: a fail-closed
+production script can still be proven by a test that avoids real
+<code>launchctl</code> state and records the intended calls through
+stubs.</li>
+<li><strong>Conjecture:</strong> The review-queue launchd tests should
+probably share one fixture helper that supplies temp <code>HOME</code>,
+fake <code>launchctl</code>, fake <code>sw_vers</code>, and fake
+<code>id</code> so future specs cannot accidentally test against the
+founder’s live user domain.</li>
 </ul>
 </body>
 </html>
