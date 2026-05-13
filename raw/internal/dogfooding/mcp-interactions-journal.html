@@ -1380,6 +1380,9 @@ get_atoms to rehydrate</a></li>
 <li><a href="#pdt-codex-r2-on-042-reviewer-emission-yaml-validation"
 id="toc-pdt-codex-r2-on-042-reviewer-emission-yaml-validation">2026-05-12
 16:52 PDT — Codex R2 on 042 reviewer-emission YAML validation</a></li>
+<li><a href="#pdt---codex-r3-on-042-reviewer-emission-yaml-validation"
+id="toc-pdt---codex-r3-on-042-reviewer-emission-yaml-validation">2026-05-12
+17:01 PDT - Codex R3 on 042 reviewer-emission YAML validation</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13381,6 +13384,41 @@ and pushed exactly one reviewer response before journaling.</li>
 operational cleanliness: <code>raw/internal/queue-errors.md</code> is
 tracked, while current <code>combine.py</code> only stages
 <code>combined.md</code> on its git path.</li>
+</ul>
+<h3
+id="pdt---codex-r3-on-042-reviewer-emission-yaml-validation">2026-05-12
+17:01 PDT - Codex R3 on 042 reviewer-emission YAML validation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+the R3 request, reviewer schema, and pinned artifact
+<code>backlog/ready/2026-05-12-042-reviewer-emission-yaml-validation.md</code>
+at <code>89dbb58f64cc98175c11c34ad9fc74a0aacac15a</code>; checked
+current review-queue code, prior R1/R2 combined notes, the quarantined
+earlier R3 Codex attempt, and <code>raw/internal/queue-errors.md</code>
+format.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md</code>
+as <code>5b831aa</code>, verdict <code>proceed_after_patches</code>.
+Finding: one LOW ambiguity that AC4 says to match
+<code>push-with-retry.sh</code> queue-error format while the sample row
+and builder reminder specify a local-PDT Markdown-bullet shape.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>89dbb58f64cc98175c11c34ad9fc74a0aacac15a</code>; request path
+<code>backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and pushed exactly one reviewer response before journaling.</li>
+<li><strong>Note:</strong> A previous R3 attempt had been quarantined
+because an unquoted <code>completed_at</code> parsed as a YAML timestamp
+instead of a string. This regenerated response used quoted/scalar-safe
+frontmatter and passed the canonical helper.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

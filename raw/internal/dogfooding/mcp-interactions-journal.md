@@ -2870,6 +2870,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
 - **Note:** The main remaining implementation risk is operational cleanliness: `raw/internal/queue-errors.md` is tracked, while current `combine.py` only stages `combined.md` on its git path.
 
+### 2026-05-12 17:01 PDT - Codex R3 on 042 reviewer-emission YAML validation
+
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R3 request, reviewer schema, and pinned artifact `backlog/ready/2026-05-12-042-reviewer-emission-yaml-validation.md` at `89dbb58f64cc98175c11c34ad9fc74a0aacac15a`; checked current review-queue code, prior R1/R2 combined notes, the quarantined earlier R3 Codex attempt, and `raw/internal/queue-errors.md` format.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md` as `5b831aa`, verdict `proceed_after_patches`. Finding: one LOW ambiguity that AC4 says to match `push-with-retry.sh` queue-error format while the sample row and builder reminder specify a local-PDT Markdown-bullet shape.
+- **Sources:** Artifact SHA `89dbb58f64cc98175c11c34ad9fc74a0aacac15a`; request path `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/request.md`; response path `backlog/reviews/2026-05-12-042-reviewer-emission-yaml-validation/r3/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** A previous R3 attempt had been quarantined because an unquoted `completed_at` parsed as a YAML timestamp instead of a string. This regenerated response used quoted/scalar-safe frontmatter and passed the canonical helper.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
