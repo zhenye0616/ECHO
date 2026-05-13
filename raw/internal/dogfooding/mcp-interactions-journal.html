@@ -1476,6 +1476,9 @@ href="#pdt-codex-ops-r2-on-045-queue-reliability-friction-cluster"
 id="toc-pdt-codex-ops-r2-on-045-queue-reliability-friction-cluster">2026-05-13
 15:40 PDT — Codex-ops R2 on 045 queue-reliability friction
 cluster</a></li>
+<li><a href="#pdt---codex-r2-on-045-queue-reliability-friction-cluster"
+id="toc-pdt---codex-r2-on-045-queue-reliability-friction-cluster">2026-05-13
+15:40 PDT - Codex R2 on 045 queue-reliability friction cluster</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14517,6 +14520,49 @@ probably share one fixture helper that supplies temp <code>HOME</code>,
 fake <code>launchctl</code>, fake <code>sw_vers</code>, and fake
 <code>id</code> so future specs cannot accidentally test against the
 founder’s live user domain.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-045-queue-reliability-friction-cluster">2026-05-13
+15:40 PDT - Codex R2 on 045 queue-reliability friction cluster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r2/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-045-queue-reliability-friction-cluster.md</code>
+at <code>bb1309f1d6487274748b458c114efbcaf239e0ce</code>,
+<code>commit-reviewer-response.sh</code>, <code>validate.py</code>,
+<code>_install_reviewer_launchd.sh</code>, <code>combine.py</code>,
+<code>concurrency.test.ts</code>, <code>review-pending.md</code>,
+<code>merge-and-cleanup.md</code>, and reviewer prompt files. No
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Returned shape:</strong> Wrote, validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r2/codex.md</code>
+as <code>9fda1f9</code>, verdict <code>proceed_after_patches</code>,
+three medium findings: AC1d’s staged <code>queue-errors.md</code> status
+assertion is not falsifiable as worded; AC2’s smoke-gate test needs
+temp-HOME/PATH launchd isolation; AC6 must update all remaining
+<code>/review-pending</code> read-only prose and replace the ambiguous
+post-loop <code>$ITEM</code> push context.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA, and
+pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The first local pre-link validation attempt
+hit the known Rosetta Python/jsonschema architecture mismatch, so I
+retried with <code>arch -arm64 python3</code>, matching the queue helper
+fallback. No response file was linked before the successful validation
+path.</li>
+<li><strong>Conjecture:</strong> The review queue could expose a small
+<code>validate-reviewer-response</code> wrapper for humans/agents to
+call pre-link, reusing the helper’s Python architecture fallback and
+avoiding ad hoc validator invocations during manual reviewer ticks.</li>
 </ul>
 </body>
 </html>
