@@ -9,8 +9,21 @@ spec_commit_sha: ""
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-13T20:55:03Z"
 branch: "agent/reviewer-cycle-infrastructure-debt"
-head_sha: ""
-agent_notes: ""
+head_sha: "9832dca110883e1b62301b2e72d57bf93b7986b8"
+agent_notes: |
+  AC1-AC4 implemented per spec. Pre-flight (codex-ops deploy + schema/config edits + slash-command) was already on main from a13e52b — confirmed all 6 components in place before claiming.
+
+  - AC1: `-c rebase.autoStash=true` added at all 3 watcher-transaction sites (review-queue-watch.md:11, push-with-retry.sh:25, combine.py:690). New fixture test `044-autostash-dirty-tree.test.ts` (bare origin + working clone + remote-advance + dirty journal) exercises the full transaction; passes 1/1.
+  - AC2: docs/review-queue-setup.md gains a "Manual force-fire — direct-invoke the wrapper driver" subsection with the `nohup tools/review-queue/run-codex-reviewer.sh >> /tmp/...` recipe (and codex-ops variant). The AC2 grep `! grep -n "launchctl kickstart" .claude/commands/review-queue-watch.md docs/review-queue-setup.md` returns zero matches (the "why" prose deliberately avoids the literal string).
+  - AC3: `DEFAULT_TIMEOUT_HOURS=2.0` removed; `FALLBACK_TIMEOUT_HOURS=0.5` applies for `timeout_hours: null` reviewers. `find_eligible_rounds()` reads per-reviewer timeouts and enforces the not_yet_due gate. `--timeout-hours` CLI override stays. 4 new tests (AC3a/b/c/d) pass.
+  - AC4: `compute_combined_verdict` flips `escalated_to_founder: false` for single-required-missing + present-proceed*. Multi-missing + pushback-with-missing keep escalated_to_founder: true. Synthetic divergent row added for missing reviewer in auto-disposition path. Watcher Step 3 prose branches on the flag. 5 new tests (AC4a-e) pass.
+
+  86/87 review-queue tests pass; the single failure is the pre-existing known-failing `concurrency.test.ts:133` orphan-cleanup (explicitly out of scope per spec's Definition of Done).
+
+  Two extras for reviewer to audit: (a) four pre-existing tests asserting `escalated_to_founder: true` for single-missing-proceed updated to track the new flag value; (b) the default-deploy AC7 byte-identity fixture gained `codex-ops_response: null` to track the pre-flight schema addition (mechanical drift caused by pre-flight, not by AC1-AC4).
+
+  Run log: raw/internal/agent-runs/2026-05-13-2026-05-13-044-reviewer-cycle-infrastructure-debt.md
+  Branch: agent/reviewer-cycle-infrastructure-debt @ 9832dca
 requested_reviewers: ["codex", "codex-ops"]
 spec_refs:
   - backlog/complete/2026-05-13-043-per-round-reviewer-roster.md   # Direct parent. 043 shipped the N-reviewer framework but explicitly deferred the 4 friction items below ("Out of scope: ... dirty-tree fix, single-reviewer-escalate, launchd kickstart bug, timeout default change"). 043's own review_notes named 044 as the falsification-bundle item; the founder has redirected 044's scope to the friction-fix cluster instead, and bundled the falsification *into the cycle itself* via the codex-ops deployment in §Pre-flight.
