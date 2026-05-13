@@ -10,3 +10,5 @@
 2026-05-13T06:19:18Z PUSH-RACE-FALLBACK: dogfood: 043 codex review tick sha=60ac05bb3ab8695fe285a69a286c6c9a76bce066
 2026-05-13T06:44:49Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-13-043-per-round-reviewer-roster sha=fe6dbd3291f731742bec0e65dde1516d699b00b2
 2026-05-13T06:54:14Z PUSH-RACE-FALLBACK: review-r4: codex on 2026-05-13-043-per-round-reviewer-roster sha=f154f8e83918bab86a24d0f281fd2ede9a4a9904
+2026-05-13T20:25:04Z VALIDATION-FAIL: codex r1 on 2026-05-13-044-reviewer-cycle-infrastructure-debt moved_to=backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex.md.invalid.2026-05-13T20:25:04Z diagnostic=backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r1/codex.md: malformed YAML at line 13 column 136: expected <block end>, but found '<scalar>'. Regenerate response with valid YAML; do not hand-edit committed reviewer files.
+2026-05-13T20:25:48Z PUSH-RACE-FALLBACK: review-r1: codex-ops on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=368b765e1cbd84206126f97d1f432e93e741c829

@@ -1,0 +1,54 @@
+---
+item_id: 2026-05-13-044-reviewer-cycle-infrastructure-debt
+round: 1
+reviewer: codex
+artifact_sha: a13e52b9583a7c0721e89cc5583ce40e2271cf05
+completed_at: '2026-05-13T20:24:38Z'
+verdict: pushback
+findings:
+- severity: high
+  where: §AC2 Direct-invoke pattern + tools/review-queue/_run_reviewer.sh:21
+  finding: The prescribed manual force-fire command is not executable against the
+    current wrapper contract. `_run_reviewer.sh` does not consume the positional `codex`
+    argument; it fails fast unless `REVIEWER_NAME` is set in the environment. As written,
+    `nohup tools/review-queue/_run_reviewer.sh codex ...` exits before running a review
+    tick. The spec should use `env REVIEWER_NAME=codex tools/review-queue/_run_reviewer.sh`,
+    or the existing `run-codex-reviewer.sh` driver, and give the equivalent codex-ops
+    command.
+- severity: high
+  where: §AC2 Test + §Out-of-scope drift to defend against
+  finding: The required docs grep is broader than the stated AC2 surface and is already
+    unsatisfiable at the pinned SHA. `git grep "launchctl kickstart" -- .claude/commands
+    docs/review-queue-setup.md tools/review-queue` matches `.claude/commands/merge-and-cleanup.md`,
+    `.claude/commands/review-queue-codex-ops.md`, and `tools/review-queue/_install_reviewer_launchd.sh`.
+    The last one is active smoke-install code, while AC2 simultaneously says no code
+    change and no launchd/plist changes. Narrow the grep to the actual user-facing
+    review-queue force-fire docs, or explicitly scope a code change to the install
+    smoke path.
+- severity: high
+  where: §Pre-flight step 1 + §AC3 Per-reviewer timeout from reviewers.json + tools/review-queue/_reviewers.py:64
+  finding: 'The spec requires the new headless `codex-ops` row to carry `timeout_hours:
+    0.5`, but the current reviewers loader rejects any non-null timeout for `mode:
+    headless`. Implementing the pre-flight row exactly as written makes `_reviewers.load_reviewers()`
+    raise, which breaks `request.py`, `combine.py`, and `_run_reviewer.sh` before
+    AC3 can run. The spec needs to either change the loader/schema contract to allow
+    headless per-reviewer timeouts or keep headless timeouts null and make the fallback
+    policy explicit.'
+- severity: medium
+  where: §AC3 Test + tools/review-queue/combine.py:177
+  finding: The AC3 test describes reviewer-level slot eligibility (`0.1h` reviewer
+    eligible while `2h` reviewer is not), but `combine.py` currently has only round-level
+    eligibility and `build_combined()` treats every absent requested reviewer as missing
+    once a round is selected. If a round has two absent reviewers with different unexpired/expired
+    timeouts, a naive per-reviewer timeout patch either still waits for the slow reviewer
+    or combines prematurely and reports the slow reviewer missing. Specify the intended
+    round-level rule, such as "combine only when all missing required reviewers have
+    timed out", or introduce an explicit per-reviewer missing/not-yet-due state before
+    making this a test requirement.
+---
+
+# Codex review
+
+Verdict: `pushback`.
+
+The blockers are implementability issues in the spec itself rather than objections to the goal. The largest risks are that the AC2 command will not run the wrapper, AC2's grep test cannot pass under the stated scope, and AC3 conflicts with the existing reviewers loader contract.
