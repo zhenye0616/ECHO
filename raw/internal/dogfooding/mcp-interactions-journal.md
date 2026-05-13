@@ -2935,6 +2935,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
 - **Note:** R2 fixed the original timeout matrix and prompt-side race-guard placement, but the third-reviewer story still needs the validation boundary and next-round propagation specified before a builder can implement it safely.
 
+### 2026-05-12 23:44 PDT - Codex R3 on 043 per-round reviewer roster
+
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/request.md`.
+- **Query inputs:** Pulled `origin/main`; read the R3 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-043-per-round-reviewer-roster.md` at `2b264f396ef2513cb91577d5c9e8bcef1ed94257`, R1/R2 review context, current `combine.py`, schemas, and `commit-reviewer-response.sh`.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/codex.md` as `1159646`, verdict `pushback`. Findings: AC6's response-field loop omits schema-required null fields for unrequested reviewers; `commit-reviewer-response.sh` still rejects a synthetic third reviewer before validation; `reviewer.schema.json`'s nested `cross_ref.reviewer` enum is not covered by the reviewer-add changelist or tests.
+- **Sources:** Artifact SHA `2b264f396ef2513cb91577d5c9e8bcef1ed94257`; request path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/request.md`; response path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** right - the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** R3 patched the explicit R2 focus list, but the end-to-end third-reviewer path still crosses a hardcoded helper boundary and the codex-only requested round still conflicts with the static combined schema.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample

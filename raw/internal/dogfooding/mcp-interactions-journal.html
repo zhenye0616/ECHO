@@ -1404,6 +1404,9 @@ id="toc-pdt---codex-r1-on-043-per-round-reviewer-roster">2026-05-12
 <li><a href="#pdt---codex-r2-on-043-per-round-reviewer-roster"
 id="toc-pdt---codex-r2-on-043-per-round-reviewer-roster">2026-05-12
 23:32 PDT - Codex R2 on 043 per-round reviewer roster</a></li>
+<li><a href="#pdt---codex-r3-on-043-per-round-reviewer-roster"
+id="toc-pdt---codex-r3-on-043-per-round-reviewer-roster">2026-05-12
+23:44 PDT - Codex R3 on 043 per-round reviewer roster</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -13671,6 +13674,42 @@ and pushed exactly one reviewer response before journaling.</li>
 prompt-side race-guard placement, but the third-reviewer story still
 needs the validation boundary and next-round propagation specified
 before a builder can implement it safely.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-043-per-round-reviewer-roster">2026-05-12
+23:44 PDT - Codex R3 on 043 per-round reviewer roster</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+the R3 request, reviewer schema, pinned artifact
+<code>backlog/ready/2026-05-13-043-per-round-reviewer-roster.md</code>
+at <code>2b264f396ef2513cb91577d5c9e8bcef1ed94257</code>, R1/R2 review
+context, current <code>combine.py</code>, schemas, and
+<code>commit-reviewer-response.sh</code>.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/codex.md</code>
+as <code>1159646</code>, verdict <code>pushback</code>. Findings: AC6’s
+response-field loop omits schema-required null fields for unrequested
+reviewers; <code>commit-reviewer-response.sh</code> still rejects a
+synthetic third reviewer before validation;
+<code>reviewer.schema.json</code>’s nested
+<code>cross_ref.reviewer</code> enum is not covered by the reviewer-add
+changelist or tests.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>2b264f396ef2513cb91577d5c9e8bcef1ed94257</code>; request path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r3/codex.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing Codex response, anchored the review to the requested spec SHA,
+and pushed exactly one reviewer response before journaling.</li>
+<li><strong>Note:</strong> R3 patched the explicit R2 focus list, but
+the end-to-end third-reviewer path still crosses a hardcoded helper
+boundary and the codex-only requested round still conflicts with the
+static combined schema.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>
