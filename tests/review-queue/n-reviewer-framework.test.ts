@@ -153,20 +153,69 @@ describe('043 AC1 — per-round roster (codex-only round)', () => {
     expect(existsSync(join(dir, 'combined.md'))).toBe(false);
   });
 
-  it('AC1d: required cursor missing AFTER timeout, codex present → partial_responses + escalated', () => {
+  it('AC1d: required cursor missing AFTER timeout, codex proceeds → partial_responses + auto-disposition (044 AC4)', () => {
     // requested_at 3h ago — past the default 2h timeout.
+    // 044 AC4: single-required-missing AND present-proceed → strategist
+    // watcher autonomously dispositions (escalated_to_founder: false).
     const dir = writeRequest(root, 1, ['codex', 'cursor'], '2026-05-13T05:00:00Z');
     writeReviewer(dir, 'codex', 1, 'proceed');
     const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
     expect(r.code, r.stderr).toBe(0);
     const fm = readCombinedFm(dir);
     expect(fm.combined_verdict).toBe('partial_responses');
-    expect(fm.escalated_to_founder).toBe(true);
+    expect(fm.escalated_to_founder).toBe(false);
     expect(fm.cursor_response).toBe(null);
     const body = readFileSync(join(dir, 'combined.md'), 'utf-8');
     // Body enumerates codex's verdict explicitly (043 AC6 partial_responses
     // body contract).
     expect(body).toMatch(/codex: proceed/);
+  });
+
+  // 044 AC4d — multi-missing still escalates.
+  it('044 AC4d: 3 requested, 1 responds proceed, 2 missing past timeout → escalates', () => {
+    // codex + cursor + codex-ops requested. codex responds proceed; cursor
+    // and codex-ops both missing past their respective timeouts (cursor 2h,
+    // codex-ops 0.5h fallback). 3h elapsed clears both timeouts. Two
+    // required missing → 044 AC4 does NOT auto-disposition.
+    const dir = writeRequest(
+      root,
+      1,
+      ['codex', 'cursor', 'codex-ops'],
+      '2026-05-13T05:00:00Z',
+    );
+    writeReviewer(dir, 'codex', 1, 'proceed');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(true);
+  });
+
+  // 044 AC4e — codex+codex-ops native deploy: codex proceeds, codex-ops missing
+  // past 0.5h fallback timeout → auto-disposition (the production 044 cycle
+  // shape).
+  it('044 AC4e: codex+codex-ops requested, codex proceeds, codex-ops missing past timeout → auto-disposition', () => {
+    // codex-ops's per-reviewer timeout is null in reviewers.json (headless),
+    // which falls back to FALLBACK_TIMEOUT_HOURS = 0.5. 1h elapsed clears
+    // that. codex proceeded; codex-ops alone is missing → 044 AC4 single-
+    // missing-proceed sub-case fires.
+    const dir = writeRequest(
+      root,
+      1,
+      ['codex', 'codex-ops'],
+      '2026-05-13T07:00:00Z',
+    );
+    writeReviewer(dir, 'codex', 1, 'proceed');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(false);
+    const body = readFileSync(join(dir, 'combined.md'), 'utf-8');
+    expect(body).toMatch(/codex: proceed/);
+    expect(body).toMatch(
+      /did not respond; per 044 AC4 single-reviewer auto-disposition/,
+    );
   });
 });
 

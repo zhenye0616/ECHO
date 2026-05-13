@@ -22,7 +22,7 @@ set -e
 CONTEXT="${1:-unknown}"
 
 for attempt in 1 2; do
-  if git pull --rebase origin main && git push origin main; then
+  if git -c rebase.autoStash=true pull --rebase origin main && git push origin main; then
     exit 0
   fi
 done

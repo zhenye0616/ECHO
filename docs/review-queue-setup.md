@@ -48,6 +48,24 @@ Why these flags:
 - `--ask-for-approval` is **not** passed — the flag does not exist on Codex CLI v0.130.0, and the runtime preamble already defaults headless `codex exec` to `never`.
 - `<` redirection rather than `cat | codex exec` — survives shell-paste edge cases the pipe variant does not. See memory note `reference_codex_review_queue_invocation.md`.
 
+### Manual force-fire — direct-invoke the wrapper driver
+
+The unattended cron pathway above is the steady-state recipe. If the strategist needs to force a reviewer tick *between* the 10-minute `StartInterval` slots (e.g., after pushing a new round's `request.md`), invoke the per-reviewer wrapper driver directly with `nohup` and a log redirect — bypassing launchd entirely for the manual case.
+
+```bash
+nohup tools/review-queue/run-codex-reviewer.sh \
+  >> /tmp/review-queue-codex-$(date +%s).log 2>&1 &
+```
+
+Equivalent recipes for the other headless reviewers (substitute the per-reviewer driver):
+
+```bash
+nohup tools/review-queue/run-codex-ops-reviewer.sh \
+  >> /tmp/review-queue-codex-ops-$(date +%s).log 2>&1 &
+```
+
+Why direct-invoke and not the launchd-side per-job kickstart command: the launchd-kickstart form increments the job's `runs` counter but the wrapper exits before the launchd-captured stream opens for write, so the kickstart appears successful while no actual review tick happens. The direct-invoke pattern bypasses the scheduler entirely for manual fires and writes its log to `/tmp/`; the regular wrapper log at `~/Library/Logs/echo-review-queue-<slug>.log` continues to capture unattended cron-fired ticks. The cron-fired `StartInterval=600` pathway is untouched.
+
 `cron` is not the primary recipe on macOS; it is documented here as a fallback for non-macOS founders (untested):
 
 ```cron

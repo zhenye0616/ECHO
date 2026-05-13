@@ -36,7 +36,13 @@ import _lib  # noqa: E402
 import _reviewers  # noqa: E402
 
 ORPHAN_TMP_AGE_SEC = 30 * 60  # 30 min
-DEFAULT_TIMEOUT_HOURS = 2.0
+# Per-reviewer timeouts are sourced from reviewers.json's `timeout_hours`
+# field (043 schema). Headless reviewers must have `timeout_hours: null`
+# per `_reviewers.py:94`; null entries fall back to the value below at
+# combine time. The legacy global `DEFAULT_TIMEOUT_HOURS = 2.0` (044 AC3)
+# was removed in favor of the per-reviewer policy; the `--timeout-hours`
+# CLI flag still works as a uniform override for ad-hoc / fixture cases.
+FALLBACK_TIMEOUT_HOURS = 0.5
 
 SECTION_RE = re.compile(r"§[^,;+]+")
 
@@ -113,10 +119,16 @@ def compute_combined_verdict(
 
     Returns: (combined_verdict, escalated_to_founder).
 
-    Verdict table (043 AC6):
+    Verdict table (043 AC6, refined by 044 AC4):
       - No responses at all (all requested are missing) → ("no_responses", True)
-      - Some required missing (and at least one present) →
-            ("partial_responses", True)   # new name, replaces single_reviewer_timeout
+      - Some required missing (and at least one present):
+          - 044 AC4: exactly ONE required missing AND every present
+            reviewer's verdict is in PROCEED_STAR → ("partial_responses", False)
+            (auto-disposition: strategist watcher dispositions through the
+            normal path-(a)/(b)/(c) flow as if all reviewers had responded;
+            the missing reviewer is surfaced as a divergent row.)
+          - Otherwise (multi-missing OR any-pushback-with-missing) →
+            ("partial_responses", True)   # 043 AC6 founder-escalation path
             (the legacy `single_reviewer_timeout` enum value stays in
             combined.schema.json for back-compat with rounds in complete/)
       - All required present + all-same verdict → (that_verdict, False)
@@ -133,6 +145,15 @@ def compute_combined_verdict(
         return "no_responses", True
 
     if missing_required:
+        # 044 AC4 auto-disposition: single-required-missing AND every present
+        # reviewer is in PROCEED_STAR → strategist watcher autonomously
+        # dispositions (escalated_to_founder: false). Multi-missing OR any
+        # present pushback still escalates to founder.
+        if (
+            len(missing_required) == 1
+            and all(v in PROCEED_STAR for v in present.values())
+        ):
+            return "partial_responses", False
         return "partial_responses", True
 
     # All required present (optional missing don't block).
@@ -205,19 +226,30 @@ def _read_requested_reviewers(request_path: Path) -> list[str]:
 
 def find_eligible_rounds(
     repo_root: Path,
-    timeout_hours: float,
+    timeout_hours_override: float | None,
     now: _dt.datetime,
 ) -> list[Path]:
     """Return a list of round dirs eligible to combine.
 
     043 AC1: per-round roster honored — the active reviewer set for a round
     is the round's request.requested_reviewers (intersected with the current
-    reviewers.json roster). A round is eligible iff combined.md does NOT
-    exist AND either:
+    reviewers.json roster). 044 AC3: per-reviewer timeouts from
+    reviewers.json (with `FALLBACK_TIMEOUT_HOURS` for null entries), gated
+    by the `not_yet_due` rule: every required-requested reviewer that is
+    missing must INDIVIDUALLY have exceeded its per-reviewer timeout for
+    the round to be eligible. A single still-pending slow reviewer keeps
+    the round in `not_yet_due` state.
+
+    A round is eligible iff combined.md does NOT exist AND either:
       (a) every REQUIRED requested reviewer has its <slug>.md present, OR
-      (b) request.requested_at is older than timeout_hours AND at least one
-          required reviewer is missing (so we emit partial_responses /
-          no_responses).
+      (b) at least one required reviewer is missing AND every missing
+          required reviewer has individually exceeded its per-reviewer
+          timeout. Reviewers whose own timeout has not yet elapsed gate
+          the round.
+
+    `timeout_hours_override`: when non-None, applies uniformly to every
+    reviewer (current `--timeout-hours` CLI semantics). When None,
+    per-reviewer values from reviewers.json are used (null → fallback).
     """
     out: list[Path] = []
     reviews = repo_root / "backlog" / "reviews"
@@ -225,6 +257,7 @@ def find_eligible_rounds(
         return out
     roster = _reviewers.load_reviewers()
     required_by_name = {r.name: r.required for r in roster}
+    timeout_by_name = {r.name: r.timeout_hours for r in roster}
     for item_dir in sorted(reviews.iterdir()):
         if not item_dir.is_dir():
             continue
@@ -254,15 +287,32 @@ def find_eligible_rounds(
                 out.append(round_dir)
                 continue
 
-            # (b) timeout path: requested_at older than threshold AND at least
-            # one required reviewer missing.
+            # (b) per-reviewer timeout gate. A round is eligible only when
+            # EVERY missing required reviewer has individually exceeded its
+            # per-reviewer timeout. If any missing required reviewer is
+            # `not_yet_due`, the round stays gated.
             try:
                 fm, _ = _lib.parse_frontmatter(request)
                 requested_at = parse_iso_utc(fm["requested_at"])
             except (ValueError, KeyError):
                 continue
             elapsed = (now - requested_at).total_seconds()
-            if elapsed >= timeout_hours * 3600:
+            all_missing_timed_out = True
+            any_missing = False
+            for name in required_requested:
+                if (round_dir / f"{name}.md").exists():
+                    continue
+                any_missing = True
+                if timeout_hours_override is not None:
+                    per_reviewer_hours = timeout_hours_override
+                else:
+                    per_reviewer_hours = timeout_by_name.get(name)
+                    if per_reviewer_hours is None:
+                        per_reviewer_hours = FALLBACK_TIMEOUT_HOURS
+                if elapsed < per_reviewer_hours * 3600:
+                    all_missing_timed_out = False
+                    break
+            if any_missing and all_missing_timed_out:
                 out.append(round_dir)
     return out
 
@@ -589,20 +639,58 @@ def build_combined(
     body_lines: list[str] = ["\n# Combined findings\n"]
     if combined_verdict == "partial_responses":
         present_slugs = [s for s in requested if verdict_map.get(s) is not None]
-        missing_slugs = [s for s in requested if verdict_map.get(s) is None]
-        body_lines.append(
-            "**Partial responses** — at least one required reviewer is missing past "
-            "the timeout. Strategist must escalate to founder per §AC4 verdict roll-up.\n"
-        )
+        missing_slugs_required = [
+            s for s in requested
+            if verdict_map.get(s) is None and s in required_set
+        ]
+        if escalated:
+            body_lines.append(
+                "**Partial responses** — at least one required reviewer is missing past "
+                "the timeout. Strategist must escalate to founder per §AC4 verdict roll-up.\n"
+            )
+        else:
+            # 044 AC4 — exactly one required reviewer missing AND every present
+            # reviewer is in {proceed, proceed_after_patches}. The watcher
+            # dispositions through path-(a)/(b)/(c) as if all reviewers had
+            # responded; the missing reviewer is surfaced as a divergent row.
+            body_lines.append(
+                "**Partial responses (auto-disposition)** — exactly one required reviewer "
+                "is missing past its timeout AND every present reviewer is in "
+                "{proceed, proceed_after_patches}. Per 044 AC4, the strategist watcher "
+                "dispositions through path-(a)/(b)/(c) as if all reviewers had responded. "
+                "The missing reviewer is surfaced as a divergent row below.\n"
+            )
         body_lines.append("Present reviewers (and their verdicts):")
         for s in present_slugs:
             body_lines.append(f"- {s}: {verdict_map[s]}")
         body_lines.append("")
         body_lines.append("Missing required reviewers:")
-        for s in missing_slugs:
-            if s in required_set:
-                body_lines.append(f"- {s}")
+        for s in missing_slugs_required:
+            body_lines.append(f"- {s}")
         body_lines.append("")
+        # 044 AC4 — auto-disposition path appends a synthetic divergent row
+        # per missing required reviewer so the watcher's table-walking
+        # disposition logic still sees the missing-reviewer signal.
+        if not escalated:
+            for slug in missing_slugs_required:
+                divergent_rows.append({
+                    "slug": slug,
+                    "finding": {
+                        "severity": "low",
+                        # `where` carries the human-readable note because the
+                        # body's divergent table renders only severity / slug /
+                        # where / disposition columns — the literal "finding"
+                        # text is not in the row template.
+                        "where": (
+                            "did not respond; per 044 AC4 single-reviewer "
+                            "auto-disposition"
+                        ),
+                        "finding": (
+                            "did not respond; per 044 AC4 single-reviewer "
+                            "auto-disposition"
+                        ),
+                    },
+                })
     if combined_verdict == "no_responses":
         body_lines.append(
             f"**No-responses timeout** — all {len(requested_set)} requested reviewers "
@@ -666,7 +754,17 @@ def write_combined(round_dir: Path, fm: dict[str, Any], body: str) -> str:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=None)
-    ap.add_argument("--timeout-hours", type=float, default=DEFAULT_TIMEOUT_HOURS)
+    ap.add_argument(
+        "--timeout-hours",
+        type=float,
+        default=None,
+        help=(
+            "uniform per-reviewer timeout override (hours). When omitted, "
+            "per-reviewer values from reviewers.json apply, with "
+            f"FALLBACK_TIMEOUT_HOURS={FALLBACK_TIMEOUT_HOURS} for null entries "
+            "(headless reviewers). 044 AC3."
+        ),
+    )
     ap.add_argument("--all", dest="all_rounds", action="store_true")
     ap.add_argument("--no-git", action="store_true", help="skip git pull/push (test hook)")
     ap.add_argument("--now", default=None, help="override 'now' (ISO-8601 UTC; test hook)")
@@ -687,7 +785,11 @@ def main(argv: list[str]) -> int:
     if not args.no_git:
         import subprocess
 
-        subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=repo_root, check=False)
+        subprocess.run(
+            ["git", "-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
+            cwd=repo_root,
+            check=False,
+        )
 
     reviewer_slugs = tuple(r.name for r in _reviewers.load_reviewers())
 

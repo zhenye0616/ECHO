@@ -162,7 +162,7 @@ except FileExistsError:
     rmSync(repo, { recursive: true, force: true });
   });
 
-  it('missing-reviewer timeout: partial_responses + escalated_to_founder (043 AC6 rename)', () => {
+  it('missing-reviewer timeout: partial_responses + auto-disposition (044 AC4 — single-missing-proceed)', () => {
     const dir = join(root, 'backlog/reviews', ITEM_ID, 'r1');
     mkdirSync(dir, { recursive: true });
     writeFileSync(
@@ -211,7 +211,8 @@ except FileExistsError:
     expect(r.code).toBe(0);
     const combined = readFileSync(join(dir, 'combined.md'), 'utf-8');
     expect(combined).toMatch(/combined_verdict: partial_responses/);
-    expect(combined).toMatch(/escalated_to_founder: true/);
+    // 044 AC4: single-missing AND present-proceed → escalated_to_founder false
+    expect(combined).toMatch(/escalated_to_founder: false/);
   });
 
   it('same-SHA idempotency is checked by reading the existing file, not by treating FileExistsError as success', () => {
