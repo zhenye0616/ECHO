@@ -18,9 +18,10 @@ spec_refs:
   - backlog/_followups.md                                                # Top of file documents the 13-item friction list from 043's dogfooding. AC1-AC4 below address items #1-#4 (the top-4 compounders, >70% of cycle overhead). Items #5-#13 explicitly OUT OF SCOPE.
   - raw/internal/dogfooding/mcp-interactions-journal.md                  # The 043-cycle journal entries that document each friction's per-tick cost (~15-20 ticks for #1, ~8 rounds for #2/#3/#4). Empirical input for the 044 spec scope decision.
   - .claude/commands/review-queue-watch.md                               # AC1 touch: line 11 `git pull --rebase origin main` → `git -c rebase.autoStash=true pull --rebase origin main`. One-line change; the autostash flag is git-supported since 2.6.
-  - tools/review-queue/_run_reviewer.sh                                  # AC2 touch: replace `launchctl kickstart`-based dispatch (silent-exit footgun) with direct background-bash invocation pattern. Wrapper itself stays; the *invocation pathway* changes in the dispatcher (the launchd plist + 10-min StartInterval remains for unattended ticks; manual force-fires switch to direct-invoke).
-  - tools/review-queue/combine.py                                        # AC3 touch: `DEFAULT_TIMEOUT_HOURS = 2.0` at :39 becomes per-reviewer config lookup. Read `reviewer.timeout_hours` from reviewers.json (already present in schema since 043). `--timeout-hours` CLI flag stays for ad-hoc override but is no longer the default policy. AC4 touch: `combined_verdict: partial_responses` + `escalated_to_founder: true` path at :114-119 + :358 becomes auto-disposition for the *single-reviewer-missing-AND-present-reviewer-proceeds* sub-case; founder-escalation reserved for pushback OR multi-missing.
-  - tools/review-queue/reviewers.json                                    # AC0 touch (Pre-flight): add codex-ops row. AC3 touch: codex-ops carries `timeout_hours: 0.5` (per-reviewer, deliberately tight); existing rows untouched.
+  - tools/review-queue/run-codex-reviewer.sh                             # AC2: the canonical 5-line driver (per 043 AC3) that exports REVIEWER_NAME and execs _run_reviewer.sh. AC2 documents direct-invoke via this driver (NOT `_run_reviewer.sh codex` — that fails fast because the wrapper consumes REVIEWER_NAME from env, not positional args).
+  - tools/review-queue/_run_reviewer.sh                                  # AC2 NOT touched as code. Referenced because r1 reviewers caught that direct-invoke must go through `run-<reviewer>-reviewer.sh` driver (which exports REVIEWER_NAME). The wrapper itself remains unchanged.
+  - tools/review-queue/combine.py                                        # AC3 touch: `DEFAULT_TIMEOUT_HOURS = 2.0` at :39 becomes per-reviewer config lookup; new `FALLBACK_TIMEOUT_HOURS = 0.5` applies when reviewer.timeout_hours is null (mandatory for headless reviewers per _reviewers.py:94). `find_eligible_rounds()` adds the `not_yet_due` gate per AC3 change #4. `--timeout-hours` CLI flag stays for ad-hoc override. AC4 touch: `combined_verdict: partial_responses` path at :114-119 + :358 flips `escalated_to_founder: false` for the single-missing-AND-present-proceeds sub-case ONLY; multi-missing + pushback paths retain `escalated_to_founder: true`. NO new enum value (verdict stays `partial_responses`).
+  - tools/review-queue/reviewers.json                                    # AC0 touch (Pre-flight): add codex-ops row with `timeout_hours: null` (mandatory for `mode: headless` per `_reviewers.py:94`). Existing rows untouched.
   - tools/review-queue/schemas/request.schema.json                       # AC0 touch: `requested_reviewers.items.enum` gets `"codex-ops"`. AC4 touch: NO schema change — `partial_responses` enum value already exists per 043 AC6.
   - tools/review-queue/schemas/reviewer.schema.json                      # AC0 touch: `reviewer` enum + `findings[].cross_ref.reviewer` enum both get `"codex-ops"`. 043's "Adding a Reviewer Changelist" — 4th of the 5 files.
   - tools/review-queue/schemas/combined.schema.json                      # AC0 touch: declare `codex-ops_response` optional field (mirrors `codex_response`, `cursor_response` shape). 5th of the 5 files per 043.
@@ -62,11 +63,11 @@ The pre-flight is **6 edits before r1 dispatches**:
      "name": "codex-ops",
      "mode": "headless",
      "required": true,
-     "timeout_hours": 0.5,
+     "timeout_hours": null,
      "slash_command": "review-queue-codex-ops"
    }
    ```
-   Note: `timeout_hours: 0.5` is deliberately tight per AC3's per-reviewer-config pattern. codex-ops should be roughly as fast as codex; if it lags 30 min the round can already proceed under AC4 single-reviewer auto-disposition.
+   Note: `timeout_hours: null` is mandatory for `mode: headless` reviewers — `_reviewers.py:94` enforces this rule because headless reviewers are launchd-driven (no human-timeout concept applies). The AC3 `FALLBACK_TIMEOUT_HOURS = 0.5` policy applies at combine time for any reviewer whose `timeout_hours` is `null`. Disposition for r1 finding "Pre-flight headless-timeout conflict" (convergent codex HIGH #3 + codex-ops HIGH #2).
 
 2. **`tools/review-queue/schemas/request.schema.json`** — append `"codex-ops"` to `requested_reviewers.items.enum`.
 
@@ -133,21 +134,21 @@ Cursor is intentionally **not** in this spec's review roster. Cursor stays in `r
 
 **Touch:** Documentation in `docs/review-queue-setup.md` and the strategist's `/review-queue-watch` slash command (any user-facing reference to `launchctl kickstart`).
 
-**Change:** Replace any documented `launchctl kickstart -k gui/$(id -u)/com.echo.review-queue-<slug>` invocation with:
+**Change:** Replace any documented `launchctl kickstart -k gui/$(id -u)/com.echo.review-queue-<slug>` invocation with a direct-invoke of the existing per-reviewer wrapper driver (the 5-line script established by 043 AC3):
 ```bash
-nohup tools/review-queue/_run_reviewer.sh codex >> /tmp/review-queue-codex-$(date +%s).log 2>&1 &
+nohup tools/review-queue/run-codex-reviewer.sh >> /tmp/review-queue-codex-$(date +%s).log 2>&1 &
 ```
-Equivalent for codex-ops and any other headless reviewer.
+Equivalent for codex-ops (`run-codex-ops-reviewer.sh`) and any other headless reviewer. The driver exports `REVIEWER_NAME=<slug>` before `exec`ing `_run_reviewer.sh`, which is the contract `_run_reviewer.sh` expects (it fails fast with `set -u` if `REVIEWER_NAME` is unset). Disposition for r1 finding "AC2 force-fire CLI wrong" (convergent codex HIGH #1 + codex-ops HIGH #1): the original `nohup _run_reviewer.sh codex` would have exited at line 15 because `_run_reviewer.sh` consumes `REVIEWER_NAME` from env, NOT from positional args.
 
-**Why:** `launchctl kickstart -k` increments the launchd `runs` counter but the wrapper exits before its log file opens for write — a 042-era footgun that 043's `_run_reviewer.sh` refactor did not address. The direct-invoke pattern (background bash + log redirect) bypasses launchd entirely for manual fires while preserving the cron-fired `StartInterval=600s` pathway for unattended ticks.
+**Why:** `launchctl kickstart -k` increments the launchd `runs` counter but the wrapper exits before its log file opens for write — a 042-era footgun that 043's `_run_reviewer.sh` refactor did not address. The direct-invoke pattern (background bash via the existing driver + log redirect) bypasses launchd entirely for manual fires while preserving the cron-fired `StartInterval=600s` pathway for unattended ticks.
 
-**Out-of-scope drift to defend against:** Do NOT remove launchd. Do NOT change the launchd plist contents. Do NOT change `_run_reviewer.sh` itself. This is documentation + slash-command-prose only: the *manual force-fire pathway* changes; the *unattended cron pathway* is untouched.
+**Out-of-scope drift to defend against:** Do NOT remove launchd. Do NOT change the launchd plist contents. Do NOT change `_run_reviewer.sh` itself. Do NOT change the per-reviewer 5-line driver shape. This is documentation-only: the *manual force-fire pathway* changes; the *unattended cron pathway* is untouched.
 
-**Test:** No code change; the test is a docs grep:
+**Test:** Narrowly-scoped docs-grep (codex HIGH #2 disposition — the original grep matched legitimate launchctl uses in `_install_reviewer_launchd.sh:95` for `--smoke`, `.claude/commands/merge-and-cleanup.md`'s daemon-restart prose, and `review-queue-codex-ops.md`'s own documentation of friction #2). Grep is scoped to the two files that 044 actually edits:
 ```bash
-! grep -r "launchctl kickstart" .claude/commands/ docs/review-queue-setup.md tools/review-queue/
+! grep -n "launchctl kickstart" .claude/commands/review-queue-watch.md docs/review-queue-setup.md
 ```
-This must pass with zero matches once the docs are updated.
+This must pass with zero matches once the docs are updated. `_install_reviewer_launchd.sh`'s `--smoke` use of `launchctl kickstart` is legitimate (one-shot test, not a steady-state force-fire) and explicitly allowed; `merge-and-cleanup.md`'s daemon-restart prose is out of 044's scope.
 
 ### AC3 — Per-reviewer timeout from reviewers.json
 
@@ -155,45 +156,52 @@ This must pass with zero matches once the docs are updated.
 
 **Change:**
 
-1. `DEFAULT_TIMEOUT_HOURS = 2.0` at line 39 → removed; replaced with `FALLBACK_TIMEOUT_HOURS = 0.5` (used only when a reviewer has `timeout_hours: null` AND no `--timeout-hours` CLI override is present).
+1. `DEFAULT_TIMEOUT_HOURS = 2.0` at line 39 → removed; replaced with `FALLBACK_TIMEOUT_HOURS = 0.5` (used only when a reviewer has `timeout_hours: null` — the mandatory value for `mode: headless` reviewers per `_reviewers.py:94` — AND no `--timeout-hours` CLI override is present).
 2. `find_eligible_rounds()` and downstream callers consume the per-reviewer `timeout_hours` from `_reviewers.load_reviewers()`, not a global default. For each reviewer in `request.requested_reviewers`, look up their `timeout_hours` from reviewers.json; treat `null` as `FALLBACK_TIMEOUT_HOURS`.
 3. CLI flag `--timeout-hours` stays for ad-hoc override (debug / fixture cases) but is no longer the policy default. When set, it overrides ALL reviewers' per-reviewer values (current semantics).
+4. **Round-level eligibility rule (disposition for r1 codex-ops HIGH #3 + codex MED #4 — the "not_yet_due" semantic):** A round becomes combine-eligible only when EVERY missing required reviewer has individually exceeded its per-reviewer timeout (`FALLBACK_TIMEOUT_HOURS` for null entries; the per-reviewer value otherwise). Reviewers whose own timeout has not yet elapsed are in `not_yet_due` state and gate the round — combine.py refuses to emit `combined.md` while any required reviewer is `not_yet_due`. This prevents the silent-mis-timeout failure mode where a fast headless reviewer's 0.5h elapsed would have falsely combined a round in which Cursor (2h timeout) was still inside its window. The rule is round-level (per existing `find_eligible_rounds()` shape); per-reviewer state is computed inside that gate.
 
-**Why:** Eliminates friction #3 (manual `--timeout-hours=0` every round). The per-reviewer field already exists in 043's `reviewers.json` schema (`timeout_hours: 2` for cursor, `null` for codex); 043 specced it but `combine.py` never read it. Reading it closes the loop. Cursor's 2h timeout is preserved (rare-event correctness); codex/codex-ops at 0/0.5h becomes the fast path.
+**Why:** Eliminates friction #3 (manual `--timeout-hours=0` every round). The per-reviewer field already exists in 043's `reviewers.json` schema (`timeout_hours: 2` for cursor, `null` for codex); 043 specced it but `combine.py` never read it. Reading it closes the loop. Cursor's 2h timeout is preserved (rare-event correctness); codex/codex-ops at 0.5h fallback becomes the fast path. The not_yet_due rule (change #4) preserves cursor's rare-event correctness *even when faster reviewers are also missing*.
 
-**Out-of-scope drift to defend against:** Do NOT make `--timeout-hours` per-reviewer (i.e., `--timeout-hours=codex:0,cursor:2`). Single CLI override remains all-reviewers. Do NOT change the eligibility-rounds query semantics beyond the timeout source.
+**Out-of-scope drift to defend against:** Do NOT make `--timeout-hours` per-reviewer (i.e., `--timeout-hours=codex:0,cursor:2`). Single CLI override remains all-reviewers. Do NOT change the eligibility-rounds query semantics beyond the timeout source + not_yet_due gate. Do NOT relax `_reviewers.py:94`'s headless-must-be-null rule.
 
 **Test:** Extend `tests/review-queue/combine.test.ts` (or wherever `find_eligible_rounds` is tested):
-1. Fixture: 2 reviewers in reviewers.json, one with `timeout_hours: 0.1`, one with `timeout_hours: 2`.
-2. Set request.requested_at to 10 minutes ago.
-3. Assert: the 0.1h reviewer's slot is eligible (10 min > 6 min); the 2h reviewer's slot is not (10 min < 2h).
-4. Re-run with `--timeout-hours=2` CLI flag; assert: both slots gated by 2h (override semantics).
+1. **AC3a — per-reviewer eligibility:** Fixture: 2 reviewers, one `timeout_hours: 0.1`, one `timeout_hours: 2`. Set `requested_at` to 10 minutes ago. Both reviewers absent. Assert: round is NOT eligible (cursor's slot is `not_yet_due`; the 0.1h reviewer's slot HAS timed out, but the round is gated by the slowest still-pending reviewer).
+2. **AC3b — all-timed-out:** Same fixture, advance to 2.5h elapsed. Both reviewers still absent. Assert: round IS eligible (both slots have timed out).
+3. **AC3c — fast-responded-slow-pending:** Same fixture at 10 min elapsed, the 0.1h reviewer responded. Assert: round is NOT eligible (the slow reviewer is `not_yet_due` and the round still waits for it, the same way 043 currently treats missing required reviewers).
+4. **AC3d — CLI override:** Re-run AC3a with `--timeout-hours=2` CLI flag; assert: both slots gated by 2h (override semantics, no not_yet_due distinction).
 
 ### AC4 — Single-reviewer auto-disposition
 
-**Touch:** `tools/review-queue/combine.py:114-120, :358, :585`
+**Touch:** `tools/review-queue/combine.py:114-120, :358, :585`; `.claude/commands/review-queue-watch.md` Step 3 (watcher prose for the new `escalated_to_founder: false` partial-response path).
 
 **Change:**
 
-`compute_combined_verdict()` and the combined.md emission path treat the case **"exactly one requested reviewer missing AND every present reviewer's verdict is `proceed` or `proceed_after_patches`"** as auto-disposition rather than founder-escalation:
+Disposition for r1 codex-ops HIGH #4 (the watcher-contract sprawl): keep the verdict enum unchanged (no `proceed_after_patches_partial` addition). Make AC4 a single-flag change: the existing `combined_verdict: partial_responses` value (043 AC6) stays the carrier; only the `escalated_to_founder` flag flips.
 
-- `combined_verdict: proceed_after_patches_partial` (NEW enum value; add to `combined.schema.json`)
-- `escalated_to_founder: false`
-- `next_round: null` ONLY IF the present-reviewer verdict was `proceed`; otherwise `next_round` is filled and the strategist watcher dispositions as normal.
-- The combined.md body explicitly notes the missing reviewer as a divergent row ("reviewer X: did not respond; per AC4 single-reviewer auto-disposition") so the watcher's path-(a)/(b)/(c) decision logic still sees the partial-response signal.
+`compute_combined_verdict()` and the combined.md emission path treat the case **"exactly one requested reviewer missing AND every present reviewer's verdict is `proceed` or `proceed_after_patches`"** as `escalated_to_founder: false`:
 
-The existing `partial_responses` enum value (043 AC6) remains for the **multi-missing** case (≥2 reviewers absent) and for the **pushback-with-missing** case (any present reviewer pushed back AND a reviewer is missing). Those both stay escalated_to_founder=true.
+- `combined_verdict: partial_responses` (UNCHANGED — existing enum value reused)
+- `escalated_to_founder: false` (NEW for this sub-case; was `true` in 043 AC6)
+- `next_round: null` ALWAYS (the strategist watcher fills `next_round` after disposition — combine.py never auto-fills it, preserving the 043 contract that `dispatch-next-round.py` is the sole `next_round` writer)
+- The combined.md body explicitly notes the missing reviewer as a divergent row ("reviewer X: did not respond; per 044 AC4 single-reviewer auto-disposition") so the watcher's path-(a)/(b)/(c) decision logic still sees the partial-response signal.
 
-**Why:** Eliminates friction #4 (manual strategist re-disposition every cycle). The single-reviewer-missing-AND-present-reviewer-proceeds case is the overwhelming majority of "escalated" events in 042/043; the strategist was always dispositioning them the same way. Codifying the policy in combine.py moves that decision out of strategist-runtime and into mechanism.
+The remaining `partial_responses` sub-cases stay `escalated_to_founder: true`:
+- **Multi-missing** (≥2 reviewers absent)
+- **Pushback-with-missing** (any present reviewer pushed back AND a reviewer is missing)
 
-**Out-of-scope drift to defend against:** Do NOT change the multi-missing escalation semantics. Do NOT change the pushback escalation semantics. Do NOT auto-disposition past 1 missing reviewer. Do NOT remove the founder-escalation pathway entirely; it must still fire for the cases that genuinely need a human.
+Watcher prose update in `.claude/commands/review-queue-watch.md` Step 3: when reading a `combined.md` with `combined_verdict: partial_responses`, branch on `escalated_to_founder`. If `true`, treat as founder-escalation (existing path; ping founder, do not disposition). If `false`, treat as auto-disposition: the present reviewer's findings flow through the existing path-(a)/(b)/(c) disposition prose as if all-requested reviewers had responded, with the missing reviewer's row pre-filled "missing — per 044 AC4." `dispatch-next-round.py` is unchanged (it never reads `escalated_to_founder`; its mapping is keyed on `combined_verdict` + `next_round`, both of which retain their 043 semantics).
+
+**Why:** Eliminates friction #4 (manual strategist re-disposition every cycle). The single-reviewer-missing-AND-present-reviewer-proceeds case is the overwhelming majority of "escalated" events in 042/043; the strategist was always dispositioning them the same way. Codifying the policy as a flag flip (rather than a new verdict) keeps the schema enum stable, keeps `dispatch-next-round.py` untouched, and concentrates the contract change in two places (combine.py emission + watcher Step 3 prose) instead of four.
+
+**Out-of-scope drift to defend against:** Do NOT change the multi-missing escalation semantics. Do NOT change the pushback escalation semantics. Do NOT auto-disposition past 1 missing reviewer. Do NOT remove the founder-escalation pathway entirely; it must still fire for the cases that genuinely need a human. Do NOT add a new `combined_verdict` enum value — the existing `partial_responses` is sufficient.
 
 **Test:** Extend `tests/review-queue/combine.test.ts`:
 
-1. **AC4a — single-missing-proceed → auto-disposition:** 2 reviewers requested, 1 responds `proceed`, 1 missing past timeout. Assert: `combined_verdict: proceed_after_patches_partial`, `escalated_to_founder: false`, `next_round: null`, combined.md body lists missing reviewer as divergent row.
-2. **AC4b — single-missing-proceed_after_patches → auto-disposition with next_round:** 2 reviewers, 1 responds `proceed_after_patches` with findings, 1 missing. Assert: `combined_verdict: proceed_after_patches_partial`, `escalated_to_founder: false`, `next_round: r<N+1>` (so the watcher dispositions normally).
-3. **AC4c — single-missing-pushback → still escalates:** 2 reviewers, 1 responds `pushback`, 1 missing. Assert: `combined_verdict: partial_responses` (existing), `escalated_to_founder: true` (preserved).
-4. **AC4d — multi-missing → still escalates:** 3 reviewers requested, 1 responds `proceed`, 2 missing. Assert: `combined_verdict: partial_responses` (existing), `escalated_to_founder: true` (preserved).
+1. **AC4a — single-missing-proceed → auto-disposition:** 2 reviewers requested, 1 responds `proceed`, 1 missing past timeout. Assert: `combined_verdict: partial_responses`, `escalated_to_founder: false`, `next_round: null`, combined.md body lists missing reviewer as divergent row.
+2. **AC4b — single-missing-proceed_after_patches → auto-disposition:** 2 reviewers, 1 responds `proceed_after_patches` with findings, 1 missing. Assert: `combined_verdict: partial_responses`, `escalated_to_founder: false`, `next_round: null` (watcher fills via dispatch-next-round.py).
+3. **AC4c — single-missing-pushback → still escalates:** 2 reviewers, 1 responds `pushback`, 1 missing. Assert: `combined_verdict: partial_responses`, `escalated_to_founder: true` (preserved).
+4. **AC4d — multi-missing → still escalates:** 3 reviewers requested, 1 responds `proceed`, 2 missing. Assert: `combined_verdict: partial_responses`, `escalated_to_founder: true` (preserved).
 5. **AC4e — codex-only-with-codex-ops-missing (the 044-cycle native case):** Mirrors AC4a with the exact reviewer roster this spec dispatches under. Falsifies the policy on the precise shape of the codex+codex-ops deploy.
 
 ## Out of Scope (Don't Drift)
@@ -237,4 +245,4 @@ Once 044 lands in `complete/`, the strategist should:
 
 - **Codex-ops deployment fails the framework** — if the 6-edit pre-flight reveals that 043's "Adding a Reviewer Changelist" is missing a step (e.g., the install script errors, or `_run_reviewer.sh` doesn't accept arbitrary slugs), 044's first r1 cannot dispatch. Mitigation: pre-flight smoke (`--smoke` flag) runs before r1 dispatch. If smoke fails, escalate to founder and file findings against 043 retrospectively — that's an empirical contribution either way.
 - **Codex-ops findings are correlated with codex findings** — if codex-ops's ops-perspective prompt doesn't differentiate enough, both reviewers will agree on the same findings and the "two codex" experiment proves only that the framework dispatches correctly, not that adding a perspective adds signal. Mitigation: the prompt template in §Pre-flight explicitly lists 5 ops-only lenses; if codex-ops's r1 still produces purely implementation-correctness findings, that's a prompt-tuning iteration (not a 044 scope item — log to journal and tighten in the next cycle).
-- **AC4 auto-disposition mis-fires** — the single-reviewer-missing-AND-proceeds case may have edge cases (e.g., proceed-with-findings that the strategist would have wanted to surface to founder anyway). Mitigation: AC4b explicitly handles the proceed_after_patches sub-case by setting `next_round` so the strategist watcher still dispositions normally; only `proceed` (zero findings) goes fully terminal. The founder-escalation pathway is preserved for everything else.
+- **AC4 auto-disposition mis-fires** — the single-reviewer-missing-AND-proceeds case may have edge cases (e.g., proceed-with-findings that the strategist would have wanted to surface to founder anyway). Mitigation: AC4 keeps the existing `combined_verdict: partial_responses` enum value and flips only `escalated_to_founder` for the narrow single-missing-proceed sub-case; the strategist watcher reads both `combined_verdict` and `escalated_to_founder` and dispositions normally through the existing path-(a)/(b)/(c) when `escalated_to_founder: false`. The founder-escalation pathway stays wired for multi-missing + pushback-with-missing.
