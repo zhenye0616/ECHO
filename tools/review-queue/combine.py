@@ -181,12 +181,93 @@ def read_response(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     return fm, findings
 
 
-def build_combined(round_dir: Path, now: _dt.datetime) -> dict[str, Any]:
+def _one_line(s: str) -> str:
+    return " ".join(s.split())
+
+
+def build_malformed_combined(
+    round_dir: Path,
+    repo_root: Path,
+    now: _dt.datetime,
+    malformed: list[tuple[Path, str]],
+) -> dict[str, Any]:
+    """Emit the malformed-reviewer-response escalation combined.md (AC2).
+
+    `malformed` is a list of (path, parse_error_str) tuples in stable
+    iteration order (codex first per the reviewers enum order).
+    Repo-root-relative paths are surfaced in frontmatter + body.
+    """
+    request_fm, _ = _lib.parse_frontmatter(round_dir / "request.md")
+    item_id = request_fm["item_id"]
+    rnd = request_fm["round"]
+
+    # Repo-root-relative paths per AC2 builder note.
+    rel_paths: list[str] = []
+    for p, _err in malformed:
+        rel_paths.append(str(p.resolve().relative_to(repo_root.resolve()).as_posix()))
+    errors: list[str] = [_one_line(e) for _p, e in malformed]
+
+    codex_path = round_dir / "codex.md"
+    cursor_path = round_dir / "cursor.md"
+
+    if len(malformed) == 1:
+        offending: Any = rel_paths[0]
+        parse_err: Any = errors[0]
+    else:
+        offending = rel_paths
+        parse_err = errors
+
+    fm_out: dict[str, Any] = {
+        "item_id": item_id,
+        "round": rnd,
+        "combined_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "codex_response": "codex.md" if codex_path.exists() else None,
+        "cursor_response": "cursor.md" if cursor_path.exists() else None,
+        "patch_commit_sha": None,
+        "next_round": None,
+        "combined_verdict": "malformed_reviewer_response",
+        "escalated_to_founder": True,
+        "offending_response": offending,
+        "parse_error": parse_err,
+    }
+
+    body_lines: list[str] = [
+        "\n# Combined findings\n",
+        "**Malformed reviewer response** — one or more reviewer-response files "
+        "failed YAML parse and could not be combined this round. Reviewer must "
+        "regenerate. Strategist + founder: see `raw/internal/queue-errors.md` "
+        "for the full incident log and the regeneration handshake.\n",
+    ]
+    for rel, err in zip(rel_paths, errors):
+        body_lines.append(f"- `{rel}` failed YAML parse with: `{err}`")
+    body_lines.append("")
+    body = "\n".join(body_lines) + "\n"
+
+    return {
+        "frontmatter": fm_out,
+        "body": body,
+        "malformed_responses": list(zip(rel_paths, errors)),
+        "item_id": item_id,
+        "round": rnd,
+    }
+
+
+def build_combined(
+    round_dir: Path,
+    now: _dt.datetime,
+    repo_root: Path | None = None,
+) -> dict[str, Any]:
     """Compute frontmatter + body for combined.md for this round.
 
     Body is a single markdown document with: convergent table, divergent
     table, and a placeholder "Disposition" column (strategist fills in
     inline per AC3.5 step 3).
+
+    If any reviewer-response file is unparseable (YAML error → typed
+    ValueError after AC1's _lib wrap), emit a malformed-reviewer-response
+    escalation combined.md per AC2 instead. Both codex.md and cursor.md are
+    attempted before emission so a doubly-malformed round produces one
+    combined.md naming both offenders.
     """
     request_fm, _ = _lib.parse_frontmatter(round_dir / "request.md")
     item_id = request_fm["item_id"]
@@ -195,14 +276,28 @@ def build_combined(round_dir: Path, now: _dt.datetime) -> dict[str, Any]:
     codex_path = round_dir / "codex.md"
     cursor_path = round_dir / "cursor.md"
 
+    # Phase 1: collect parse failures across both reviewers (stable order).
+    malformed: list[tuple[Path, str]] = []
     codex_fm: dict[str, Any] | None = None
     cursor_fm: dict[str, Any] | None = None
     codex_findings: list[dict[str, Any]] = []
     cursor_findings: list[dict[str, Any]] = []
+
     if codex_path.exists():
-        codex_fm, codex_findings = read_response(codex_path)
+        try:
+            codex_fm, codex_findings = read_response(codex_path)
+        except ValueError as exc:
+            malformed.append((codex_path, str(exc)))
     if cursor_path.exists():
-        cursor_fm, cursor_findings = read_response(cursor_path)
+        try:
+            cursor_fm, cursor_findings = read_response(cursor_path)
+        except ValueError as exc:
+            malformed.append((cursor_path, str(exc)))
+
+    # Phase 2 (escalation branch): any malformed → terminal combined.md.
+    if malformed:
+        root = repo_root if repo_root is not None else _lib.REPO_ROOT
+        return build_malformed_combined(round_dir, root, now, malformed)
 
     codex_verdict = codex_fm["verdict"] if codex_fm else None
     cursor_verdict = cursor_fm["verdict"] if cursor_fm else None
@@ -342,7 +437,7 @@ def main(argv: list[str]) -> int:
     for round_dir in eligible:
         # clean orphans first
         cleanup_orphans(round_dir, now_ts)
-        result = build_combined(round_dir, now)
+        result = build_combined(round_dir, now, repo_root=repo_root)
         write_status = write_combined(round_dir, result["frontmatter"], result["body"])
         if write_status == "race_lost":
             print(f"[combine] race-lost on {round_dir}/combined.md; skipping", file=sys.stderr)
@@ -350,10 +445,30 @@ def main(argv: list[str]) -> int:
         _lib.validate_frontmatter(result["frontmatter"], "combined")
         print(str(round_dir / "combined.md"))
 
+        is_malformed = result["frontmatter"]["combined_verdict"] == "malformed_reviewer_response"
+
+        # AC4: on malformed-reviewer-response escalation, append one row to
+        # raw/internal/queue-errors.md per offender. Row format matches the
+        # existing `<UTC>Z EVENT-TOKEN: ...` shape used by push-with-retry.sh.
+        if is_malformed:
+            queue_errors = repo_root / "raw" / "internal" / "queue-errors.md"
+            queue_errors.parent.mkdir(parents=True, exist_ok=True)
+            with queue_errors.open("a", encoding="utf-8") as fh:
+                for rel_path, err in result["malformed_responses"]:
+                    excerpt = err.split("\n", 1)[0]
+                    fh.write(
+                        f"{_lib.iso_utc_now()} MALFORMED-REVIEWER-RESPONSE: "
+                        f"combine.py round {result['item_id']}/r{result['round']} "
+                        f"offending_response={rel_path} parse_error=\"{excerpt}\"\n"
+                    )
+
         if not args.no_git:
             import subprocess
 
-            subprocess.run(["git", "add", str(round_dir / "combined.md")], cwd=repo_root, check=False)
+            add_paths = [str(round_dir / "combined.md")]
+            if is_malformed:
+                add_paths.append(str(repo_root / "raw" / "internal" / "queue-errors.md"))
+            subprocess.run(["git", "add", *add_paths], cwd=repo_root, check=False)
             subprocess.run(
                 [
                     "git",
