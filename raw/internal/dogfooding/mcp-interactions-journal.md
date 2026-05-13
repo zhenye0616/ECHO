@@ -2954,6 +2954,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** R4 is converging: two patchable findings instead of another broad pushback. Operational wrinkle: a parallel watcher wrote R4 combined/disposition changes in the shared worktree before the response push completed, exposing the dirty-tree race that 043 is already trying to reduce.
 - **Conjecture:** The next verification round should be close to terminal if it checks exactly the two new falsifiers: codex-missing after the default timeout and a chained three-reviewer cross-ref convergence fixture that validates under the existing one-object `cross_ref` schema.
 
+## 2026-05-13
+
+### 00:03 PDT - Codex R5 on 043 per-round reviewer roster
+
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r5/request.md`.
+- **Query inputs:** Pulled `origin/main` with autostash preservation, read the R5 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-043-per-round-reviewer-roster.md` at `e66306189eb85feb34bbd99f6db63c19a55c31d2`, R4 combined context, current `combine.py`, schemas, `request.py`, `dispatch-next-round.py`, queue prompt files, runner helpers, and review-queue tests.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r5/codex.md` as `0d8b09d`, verdict `proceed_after_patches`. Findings: AC1f incorrectly tells the builder to propagate reviewers through branch (c), which does not dispatch a next request; AC6 Phase 3's `{anchor: {reviewer: finding}}` bucket can overwrite same-reviewer same-anchor findings; AC3 needs an explicit executable-bit step/test for the new shell helpers.
+- **Sources:** Artifact SHA `e66306189eb85feb34bbd99f6db63c19a55c31d2`; request path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r5/request.md`; response path `backlog/reviews/2026-05-13-043-per-round-reviewer-roster/r5/codex.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored the review to the requested spec SHA, and pushed exactly one reviewer response before journaling.
+- **Note:** R5 resolved the requested timeout and union-find focus items, but the review still found three implementation hazards outside the focus list. Operational wrinkle: unrelated local wiki edits had to be stashed before the queue helper could run its rebase/push path cleanly.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
