@@ -286,12 +286,23 @@ Currently `tools/review-queue/_lib.py:SCHEMA_DIR = Path(__file__).parent / "sche
 Implementation: add env-var fallback in `_lib.py`:
 
 ```python
-# _lib.py — new module-level constants with env-var overrides
+# _lib.py — new module-level constants with env-var overrides.
+# R7 HIGH #1 fix: route REPO_ROOT through ECHO_REVIEW_QUEUE_REPO_ROOT (the env
+# var introduced by 041 AC1 for the wrapper script). Without this, AC6h fixture
+# commands still write to the production repo for the reviews directory because
+# REPO_ROOT was hardcoded to Path(__file__).resolve().parents[2].
 import os
 _TOOLS_DIR = Path(__file__).resolve().parent
+_DEFAULT_REPO_ROOT = _TOOLS_DIR.parents[1]  # project root (two dirs up from tools/review-queue)
+REPO_ROOT = Path(os.environ.get("ECHO_REVIEW_QUEUE_REPO_ROOT", _DEFAULT_REPO_ROOT))
 SCHEMA_DIR = Path(os.environ.get("ECHO_SCHEMA_DIR", _TOOLS_DIR / "schemas"))
 REVIEWERS_CONFIG = Path(os.environ.get("ECHO_REVIEWERS_CONFIG", _TOOLS_DIR / "reviewers.json"))
+# Derived dirs follow REPO_ROOT so they relocate to the fixture together:
+REVIEWS_DIR = REPO_ROOT / "backlog" / "reviews"
+QUEUE_ERRORS_LOG = REPO_ROOT / "raw" / "internal" / "queue-errors.md"
 ```
+
+All downstream call sites in `combine.py`, `request.py`, `commit-reviewer-response.sh`, `push-with-retry.sh` that compute paths from REPO_ROOT must use `_lib.REPO_ROOT` (or these derived constants) instead of computing their own. This is the same plumbing pattern as 041's wrapper but pushed one layer deeper into `_lib`.
 
 `_reviewers.py:load_reviewers()` reads from `REVIEWERS_CONFIG` by default (line `path = config_path or _lib.REVIEWERS_CONFIG` instead of `or _TOOLS_DIR / "reviewers.json"`). `validate.py` reads from `_lib.SCHEMA_DIR`. `combine.py` reads from `_lib.SCHEMA_DIR` for the combined-schema validator. `commit-reviewer-response.sh` inherits env from its parent process — shell-side no change needed once `_lib.py` honors the env vars.
 
@@ -616,19 +627,47 @@ combined_fm["codex_response"] = "codex.md" if codex_fm else None
 combined_fm["cursor_response"] = "cursor.md" if cursor_fm else None
 
 # NEW (per-round discovery driven by requested_reviewers):
+# R7 HIGH #2 fix: PRESERVE 042's two-phase collect-then-emit pattern for malformed
+# responses. The Phase 1 collect step gathers (path, error_str) tuples for any
+# reviewer file that fails YAML parse; if any are found, control transfers to
+# build_malformed_combined (generalized below for N reviewers). Re-raising on
+# ValueError would regress 042's malformed-reviewer-response escalation path —
+# combine.py would crash before emitting combined.md with
+# combined_verdict=malformed_reviewer_response.
 requested = request_fm["requested_reviewers"]  # list of reviewer slugs for THIS round
-responses = {}  # {reviewer_slug: (frontmatter_dict | None, body_str | None)}
+responses = {}            # {reviewer_slug: (frontmatter_dict, body_str)} — successful parses
+malformed_responses = []  # list[(repo_root_relative_path, parse_error_str)] — Phase 1 collect
 for slug in requested:
     path = round_dir / f"{slug}.md"
     if path.exists():
         try:
             responses[slug] = _lib.parse_frontmatter(path)
-        except ValueError:
-            # 042 AC2 handles malformed; that path emits malformed_reviewer_response.
-            # build_combined for the normal path doesn't see malformed files.
-            raise
+        except ValueError as exc:
+            # Per 042 AC2: collect the malformed response; DON'T re-raise. Phase 1
+            # accumulates ALL malformed responses across all requested reviewers.
+            rel_path = path.relative_to(_lib.REPO_ROOT).as_posix()
+            malformed_responses.append((rel_path, str(exc)))
+            responses[slug] = (None, None)
     else:
         responses[slug] = (None, None)
+
+# Phase 1 → Phase 2 branch (preserves 042's two-phase shape generalized for N reviewers):
+if malformed_responses:
+    # Generalized build_malformed_combined: emits combined_verdict=malformed_reviewer_response,
+    # escalated_to_founder=true, offending_response={string when 1; array when ≥2}
+    # (repo-root-relative paths preserved per 042 AC2/AC3), parse_error aligned with
+    # offending_response indices, AND emits ALL schema-declared response fields (null
+    # for unrequested/missing/malformed). Append one row per malformed response to
+    # raw/internal/queue-errors.md per 042 AC4.
+    return build_malformed_combined(
+        round_dir=round_dir,
+        item_id=request_fm["item_id"],
+        round_num=request_fm["round"],
+        requested=requested,
+        malformed=malformed_responses,
+        schema_declared=tuple(r.name for r in load_reviewers()),  # all known reviewer slugs
+    )
+# else: fall through to the normal Phase 2/3 path below (build the non-malformed combined.md).
 
 # … later, R3 HIGH #1 fix: separate schema-declared reviewer set from
 # requested-for-round reviewer set. The schema-declared set is the universe
@@ -815,6 +854,8 @@ The 2-reviewer special-case is a deliberate concession to AC7's byte-identical c
 - **AC6i — 3 requested reviewers, convergent finding across all 3:** same fixture as AC6h but all three reviewers flag the same `where` anchor with similar findings. Assert: convergent table row has `Source: codex, cursor, codex-arch` (comma-list, alphabetical) and divergent table is empty.
 - **AC6j — 3 requested reviewers, one diverges:** same fixture, codex+cursor flag anchor X with finding A; codex-arch flags anchor X with finding A AND anchor Y with finding B. Assert: convergent has anchor X with all three; divergent has anchor Y with `Source: codex-arch` only.
 - **AC6k — Two-reviewer default-deploy cross_ref convergence (regression guard for R2 HIGH #2).** Fixture: default `reviewers.json` (codex + cursor only), round with both responses; codex's finding has `where: "AC1 implementation"`, cursor's finding has `where: "AC1 test fixture"` (different primary anchors). Codex's finding includes `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` pointing at cursor's finding. Assert: combined.md convergent table has ONE row pairing both findings (proven by their cross_ref override bridging different anchors); divergent is empty. **This is the falsification for R2 HIGH #2** — proves the N-way refactor preserves `cross_refs_match` semantics. Build_combined would otherwise put them in divergent (different normalize_where outputs).
+- **AC6p — Malformed-response escalation preserved (R7 HIGH #2 fix).** Fixture: default 2-reviewer deploy; round has `r1/codex.md` malformed (unparseable YAML — reuse 042's AC2a fixture pattern) + `r1/cursor.md` valid. Invoke `combine.py`. Assert: (i) NO crash/traceback; (ii) `r1/combined.md` exists with `combined_verdict: malformed_reviewer_response` + `escalated_to_founder: true` + `offending_response: "backlog/reviews/<item_id>/r1/codex.md"` (string-shape for single offender, per 042 AC2/AC3); (iii) all schema-declared response fields present (`codex_response`, `cursor_response`) — `codex_response: null`, `cursor_response: cursor.md` (R3 HIGH #1 invariant). (iv) Queue-errors row appended in same commit (042 AC4). **Falsifies R7 HIGH #2** — without the collect-then-emit fix, the original 042-specced behavior regresses (combine.py raises ValueError before emitting combined.md). This is the regression guard for the 042 → 043 interaction.
+- **AC6q — N-reviewer malformed-response with `offending_response: array` shape.** Same shape as AC6p but with 3 requested reviewers (codex, cursor, codex-arch), TWO of which are malformed (codex + codex-arch). Assert: `offending_response` is a length-2 array (042 AC2b shape) with both repo-root-relative paths; `parse_error` is a length-2 array index-aligned; the one valid reviewer's response (`cursor.md`) is referenced in `cursor_response`. Proves the malformed path generalizes to N requested reviewers.
 - **AC6n — `cross_refs_match` uses finding_index (R6 MED #2 fix).** Fixture: default 2-reviewer deploy; cursor has TWO findings (cursor's finding 1 at anchor X with no cross_ref; cursor's finding 2 at anchor Y with no cross_ref); codex has ONE finding with `cross_ref: {round: 1, reviewer: cursor, finding_index: 2}` — explicitly pointing at cursor's SECOND finding only. Assert: convergent table has ONE row pairing codex's finding with cursor's finding 2; cursor's finding 1 lands in divergent. **Falsifies R6 MED #2** — without the finding_index check, codex's cross_ref would match ALL cursor findings in r1, falsely converging cursor's finding 1.
 - **AC6o — Union-find bucket-collapse extends per-reviewer lists (R6 MED #3 fix).** Fixture: 3-reviewer (codex + cursor + codex-arch). codex has TWO findings at anchor X and anchor Y. cursor has one finding at anchor X (so anchor X is convergent for {codex_finding1, cursor_finding1}). codex-arch has one finding at anchor Z with `cross_ref` to codex's finding 2 at anchor Y. Union-find merges Y∪Z via the cross_ref edge. Assert: the final {Y, Z} bucket has codex contributing BOTH finding 2 (originally at Y) AND finding 1 (no — finding 1 was at X, not Y); cursor contributes nothing to this bucket; codex-arch contributes finding 1. Critical assertion: codex's finding 2 is NOT dropped by the `.update()` → `.extend()` fix. (If `.update()` were still used, codex's list at the merged root would be overwritten when buckets Y and Z collide.)
 - **AC6m — Same-reviewer duplicate-anchor findings preserved (R5 MED #2 fix).** Fixture: default 2-reviewer deploy; codex's response has TWO findings, both with `where: "AC1 implementation"` (same primary anchor). Different `finding` text, different severities (HIGH + MEDIUM). cursor has zero findings. Invoke `combine.py`. Assert: divergent table has BOTH codex findings (not just one); their order is stable (input-order preserving); each appears in the table with its own severity and finding text. **Falsifies R5 MED #2** — without the list-shape fix, the second finding would overwrite the first at `findings_by_anchor[anchor][codex]` and be silently dropped.
