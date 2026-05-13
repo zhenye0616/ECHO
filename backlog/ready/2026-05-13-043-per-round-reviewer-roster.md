@@ -279,6 +279,35 @@ def load_reviewers(config_path: Path | None = None) -> tuple[Reviewer, ...]:
 
 New schema `tools/review-queue/schemas/reviewers-config.schema.json` validates the JSON file shape.
 
+**Schema-dir and reviewers-config routing via env vars (R6 HIGH #1 fix — required for AC6h's fixture-local end-to-end exercise).**
+
+Currently `tools/review-queue/_lib.py:SCHEMA_DIR = Path(__file__).parent / "schemas"` and the new `reviewers.json` lives at `Path(__file__).parent / "reviewers.json"` — both pinned to the script tree. AC6h's "fixture-local schema patches + REAL pipeline exercise" requires routing these to a fixture-local copy without mutating the checked-in tool files (which would break parallel test runs and production).
+
+Implementation: add env-var fallback in `_lib.py`:
+
+```python
+# _lib.py — new module-level constants with env-var overrides
+import os
+_TOOLS_DIR = Path(__file__).resolve().parent
+SCHEMA_DIR = Path(os.environ.get("ECHO_SCHEMA_DIR", _TOOLS_DIR / "schemas"))
+REVIEWERS_CONFIG = Path(os.environ.get("ECHO_REVIEWERS_CONFIG", _TOOLS_DIR / "reviewers.json"))
+```
+
+`_reviewers.py:load_reviewers()` reads from `REVIEWERS_CONFIG` by default (line `path = config_path or _lib.REVIEWERS_CONFIG` instead of `or _TOOLS_DIR / "reviewers.json"`). `validate.py` reads from `_lib.SCHEMA_DIR`. `combine.py` reads from `_lib.SCHEMA_DIR` for the combined-schema validator. `commit-reviewer-response.sh` inherits env from its parent process — shell-side no change needed once `_lib.py` honors the env vars.
+
+Same plumbing pattern as the existing `ECHO_REVIEW_QUEUE_REPO_ROOT` env var from 041. The three env vars compose: AC6h's fixture setup sets all three.
+
+```bash
+ECHO_SCHEMA_DIR="$FIXTURE/schemas" \
+ECHO_REVIEWERS_CONFIG="$FIXTURE/reviewers.json" \
+ECHO_REVIEW_QUEUE_REPO_ROOT="$FIXTURE/repo" \
+  python3 tools/review-queue/request.py 2026-05-13-FIXTURE-codex-arch 1 \
+    --reviewers=codex,cursor,codex-arch \
+    --class=narrow
+```
+
+**Without this fix, AC6h cannot execute** because it would require mutating the production tool tree mid-test. Add to Files Touched: `tools/review-queue/_lib.py` (new env-var constants), `tools/review-queue/_reviewers.py` (use `_lib.REVIEWERS_CONFIG`).
+
 **`request.py` change.** Replace line 27:
 ```python
 # OLD
@@ -619,6 +648,30 @@ for slug in schema_declared_reviewers:
 
 **Implementation (Phase 3: cross-reference matching for findings).** Per R2 HIGH #2, the N-way generalization MUST preserve current `combine.py:normalize_where()` (anchor extraction) AND `combine.py:cross_refs_match()` (explicit reviewer-emitted convergence override). Raw-`where` grouping regresses the default 2-reviewer deploy where existing tests rely on these semantics.
 
+**`cross_refs_match` signature extension (R6 MED #2 fix).** Current `combine.py:67-95` has `cross_refs_match(a, a_round, a_reviewer, b, b_round, b_reviewer)` — no finding_index. With list-shape per-reviewer findings (R5 fix), this matches any finding from the target reviewer in the target round. 043 extends the signature to take 1-based finding indexes:
+
+```python
+# OLD signature (combine.py:67):
+def cross_refs_match(a, a_round, a_reviewer, b, b_round, b_reviewer): ...
+
+# NEW signature (043 AC6 Phase 3):
+def cross_refs_match(a, a_round, a_reviewer, a_index, b, b_round, b_reviewer, b_index):
+    # a's cross_ref pointing at b counts only when:
+    #   a.cross_ref.round == b_round AND
+    #   a.cross_ref.reviewer == b_reviewer AND
+    #   a.cross_ref.finding_index == b_index (NEW — was ignored)
+    # Symmetric: b's cross_ref pointing at a also counts.
+    a_cr = a.get("cross_ref")
+    if a_cr and (a_cr.get("round"), a_cr.get("reviewer"), a_cr.get("finding_index")) == (b_round, b_reviewer, b_index):
+        return True
+    b_cr = b.get("cross_ref")
+    if b_cr and (b_cr.get("round"), b_cr.get("reviewer"), b_cr.get("finding_index")) == (a_round, a_reviewer, a_index):
+        return True
+    return False
+```
+
+The signature change is a real but small refactor to `combine.py`. Callers in 043's Phase 3b already pass index. Default 2-reviewer existing tests pass after the refactor because they emit `cross_ref` with explicit `finding_index: 1` (already required by `reviewer.schema.json`).
+
 ```python
 # OLD (pairwise hardcoded — combine.py:311-330):
 for c_finding in codex_findings:
@@ -673,21 +726,38 @@ class UnionFind:
 uf = UnionFind(list(findings_by_anchor.keys()))
 
 # Apply cross_ref edges to union buckets.
-all_findings = [(slug, f) for slug, (fm, _b) in responses.items() if fm for f in fm.get("findings", [])]
-for slug_a, f_a in all_findings:
-    for slug_b, f_b in all_findings:
-        if slug_a == slug_b and f_a is f_b:
+# R6 MED #2 fix: thread finding_index (1-based) through so cross_refs_match
+# can compare BOTH (round, reviewer) AND finding_index. Without this, a
+# cross_ref to "cursor finding 1" matches EVERY cursor finding once a reviewer
+# can emit multiple findings.
+all_findings = []  # list of (slug, finding_index_1based, finding_dict)
+for slug, (fm, _b) in responses.items():
+    if fm:
+        for i, f in enumerate(fm.get("findings", []), start=1):
+            all_findings.append((slug, i, f))
+
+for slug_a, idx_a, f_a in all_findings:
+    for slug_b, idx_b, f_b in all_findings:
+        if slug_a == slug_b and idx_a == idx_b:
             continue
-        if cross_refs_match(f_a, rnd, slug_a, f_b, rnd, slug_b):
+        # cross_refs_match must check (round, reviewer, finding_index) tuple, not just (round, reviewer).
+        # The helper signature is extended in 043 to accept the index:
+        #   cross_refs_match(f_a, rnd, slug_a, idx_a, f_b, rnd, slug_b, idx_b)
+        if cross_refs_match(f_a, rnd, slug_a, idx_a, f_b, rnd, slug_b, idx_b):
             key_a, _ = normalize_where(f_a["where"])
             key_b, _ = normalize_where(f_b["where"])
             uf.union(key_a, key_b)
 
 # Collapse buckets by union-find root.
-merged_buckets: dict[str, dict[str, dict]] = {}
+# R6 MED #3 fix: use EXTEND not UPDATE for the per-reviewer list shape.
+# `.update()` overwrites; with list-shape values, two unioned buckets sharing
+# a reviewer would drop one list entirely.
+merged_buckets: dict[str, dict[str, list[dict]]] = {}
 for anchor, by_reviewer in findings_by_anchor.items():
     root = uf.find(anchor)
-    merged_buckets.setdefault(root, {}).update(by_reviewer)
+    target = merged_buckets.setdefault(root, {})
+    for slug, finding_list in by_reviewer.items():
+        target.setdefault(slug, []).extend(finding_list)
 findings_by_anchor = merged_buckets
 
 # Phase 3c — bucketize into convergent (≥2 reviewers contributed) vs divergent (1 reviewer).
@@ -709,11 +779,29 @@ This preserves all three semantics of the current pairwise code: (1) `normalize_
 
 **Falsification:** default 2-reviewer deploy behavior is identical to current pairwise logic. AC6k test exercises a `cross_ref`-bridged convergence in the 2-reviewer case to prove no regression.
 
-**Combined.md table rendering.** Currently the body has two tables with `Source: codex | cursor`. Generalize to:
-- For convergent rows: `Source` column lists ALL reviewers that flagged the anchor (e.g., `codex, cursor` or `codex, codex-arch, cursor`).
-- For divergent rows: `Source` column is a single reviewer slug.
+**Combined.md table rendering (R6 MED #4 fix — preserve 2-reviewer format, comma-list only for N≥3).**
 
-No changes to the table column structure beyond `Source` being a comma-list when multiple reviewers converge.
+Current 2-reviewer rendering: `Source: both (convergent on \`<primary>\`)` for convergent rows, `Source: codex` or `Source: cursor` for divergent. AC7 requires byte-identical default-deploy output, so the 2-reviewer format must NOT change.
+
+Generalization rule:
+- **2 reviewers contributing to a convergent row** (the default-deploy steady state): keep the EXACT current format `Source: both (convergent on \`<primary>\`)`. Byte-identical to pre-043 main.
+- **3+ reviewers contributing to a convergent row** (only fires when a 3rd reviewer is added per the "Adding a Reviewer" changelist): comma-list with alphabetical sort, e.g. `Source: codex, codex-arch, cursor`.
+- **Divergent rows** (1 reviewer): single slug, e.g. `Source: codex`. No change from current behavior.
+
+Implementation: in the body-renderer, branch on `len(contributing_reviewers)`:
+
+```python
+if len(contributing_reviewers) == 2 and set(contributing_reviewers) == {"codex", "cursor"}:
+    # Preserve byte-identical 2-reviewer default-deploy format (AC7 invariant).
+    source_str = f"both (convergent on `{primary_anchor}`)"
+elif len(contributing_reviewers) >= 2:
+    # N≥3 OR a 2-reviewer non-default set (e.g., codex + codex-arch only).
+    source_str = ", ".join(sorted(contributing_reviewers))
+else:
+    source_str = contributing_reviewers[0]
+```
+
+The 2-reviewer special-case is a deliberate concession to AC7's byte-identical contract. When the default deploy expands beyond 2 reviewers, the comma-list path takes over. **Falsification**: AC7 fixture (codex + cursor unanimous proceed) produces byte-identical output; AC6i (3 reviewers convergent) produces `codex, codex-arch, cursor` comma-list.
 
 **Test (`n-reviewer-framework.test.ts`):**
 - **AC6a — Unanimous proceed (2 reviewers):** verdicts `{codex: proceed, cursor: proceed}`, required `{codex, cursor}`, requested `{codex, cursor}` → returns `("proceed", False)`.
@@ -727,6 +815,8 @@ No changes to the table column structure beyond `Source` being a comma-list when
 - **AC6i — 3 requested reviewers, convergent finding across all 3:** same fixture as AC6h but all three reviewers flag the same `where` anchor with similar findings. Assert: convergent table row has `Source: codex, cursor, codex-arch` (comma-list, alphabetical) and divergent table is empty.
 - **AC6j — 3 requested reviewers, one diverges:** same fixture, codex+cursor flag anchor X with finding A; codex-arch flags anchor X with finding A AND anchor Y with finding B. Assert: convergent has anchor X with all three; divergent has anchor Y with `Source: codex-arch` only.
 - **AC6k — Two-reviewer default-deploy cross_ref convergence (regression guard for R2 HIGH #2).** Fixture: default `reviewers.json` (codex + cursor only), round with both responses; codex's finding has `where: "AC1 implementation"`, cursor's finding has `where: "AC1 test fixture"` (different primary anchors). Codex's finding includes `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` pointing at cursor's finding. Assert: combined.md convergent table has ONE row pairing both findings (proven by their cross_ref override bridging different anchors); divergent is empty. **This is the falsification for R2 HIGH #2** — proves the N-way refactor preserves `cross_refs_match` semantics. Build_combined would otherwise put them in divergent (different normalize_where outputs).
+- **AC6n — `cross_refs_match` uses finding_index (R6 MED #2 fix).** Fixture: default 2-reviewer deploy; cursor has TWO findings (cursor's finding 1 at anchor X with no cross_ref; cursor's finding 2 at anchor Y with no cross_ref); codex has ONE finding with `cross_ref: {round: 1, reviewer: cursor, finding_index: 2}` — explicitly pointing at cursor's SECOND finding only. Assert: convergent table has ONE row pairing codex's finding with cursor's finding 2; cursor's finding 1 lands in divergent. **Falsifies R6 MED #2** — without the finding_index check, codex's cross_ref would match ALL cursor findings in r1, falsely converging cursor's finding 1.
+- **AC6o — Union-find bucket-collapse extends per-reviewer lists (R6 MED #3 fix).** Fixture: 3-reviewer (codex + cursor + codex-arch). codex has TWO findings at anchor X and anchor Y. cursor has one finding at anchor X (so anchor X is convergent for {codex_finding1, cursor_finding1}). codex-arch has one finding at anchor Z with `cross_ref` to codex's finding 2 at anchor Y. Union-find merges Y∪Z via the cross_ref edge. Assert: the final {Y, Z} bucket has codex contributing BOTH finding 2 (originally at Y) AND finding 1 (no — finding 1 was at X, not Y); cursor contributes nothing to this bucket; codex-arch contributes finding 1. Critical assertion: codex's finding 2 is NOT dropped by the `.update()` → `.extend()` fix. (If `.update()` were still used, codex's list at the merged root would be overwritten when buckets Y and Z collide.)
 - **AC6m — Same-reviewer duplicate-anchor findings preserved (R5 MED #2 fix).** Fixture: default 2-reviewer deploy; codex's response has TWO findings, both with `where: "AC1 implementation"` (same primary anchor). Different `finding` text, different severities (HIGH + MEDIUM). cursor has zero findings. Invoke `combine.py`. Assert: divergent table has BOTH codex findings (not just one); their order is stable (input-order preserving); each appears in the table with its own severity and finding text. **Falsifies R5 MED #2** — without the list-shape fix, the second finding would overwrite the first at `findings_by_anchor[anchor][codex]` and be silently dropped.
 - **AC6l — Three-reviewer cross_ref convergence via transitive chain (R4 MED #2 fix).** Same fixture as AC6k but with synthetic `codex-arch` added. Each finding carries EXACTLY ONE `cross_ref` (per `reviewer.schema.json`'s schema):
   - codex's finding: `where: "AC1 implementation"`, `cross_ref: {round: 1, reviewer: cursor, finding_index: 1}` (chain hop A→B).
