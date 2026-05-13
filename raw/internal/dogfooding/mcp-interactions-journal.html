@@ -1445,6 +1445,10 @@ PDT — Codex R2 on 044 reviewer-cycle infrastructure debt</a></li>
 href="#pdt-codex-ops-r2-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-ops-r2-on-044-reviewer-cycle-infrastructure-debt">13:39
 PDT — Codex-ops R2 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a
+href="#pdt-codex-ops-r3-on-044-reviewer-cycle-infrastructure-debt"
+id="toc-pdt-codex-ops-r3-on-044-reviewer-cycle-infrastructure-debt">13:47
+PDT — Codex-ops R3 on 044 reviewer-cycle infrastructure debt</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14160,6 +14164,51 @@ absent.</li>
 watcher tick through combine + push, not just the initial pull;
 otherwise the test blesses the preserved dirt that still breaks the
 later git operations.</li>
+</ul>
+<h3
+id="pdt-codex-ops-r3-on-044-reviewer-cycle-infrastructure-debt">13:47
+PDT — Codex-ops R3 on 044 reviewer-cycle infrastructure debt</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex-ops</code> with no <code>codex-ops.md</code> and
+no <code>combined.md</code>; read the R3 request, reviewer schema,
+sibling Codex queue command, and pinned artifact
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+at <code>38ce307e0a11e18417eb6a721e2e3ce54d97b545</code>.</li>
+<li><strong>Returned:</strong> Wrote and pushed
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md</code>
+as <code>309715d</code>, verdict <code>proceed</code>, findings
+<code>[]</code>. Also committed the queue diagnostic artifacts from the
+retry as <code>ba6551f</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>38ce307e0a11e18417eb6a721e2e3ce54d97b545</code>; request path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the queue selected and
+anchored the right codex-ops response, and the response landed on
+<code>origin/main</code>, but the helper’s first valid-response push
+attempt still hit the dirty-tree failure mode because the earlier
+validation-fail quarantine dirtied <code>queue-errors.md</code>.</li>
+<li><strong>Note:</strong> The review itself was terminal: r3 fixed the
+AC1 incompleteness by naming both watcher Step 1 and
+<code>push-with-retry.sh</code>, and the AC1 test now covers the full
+watcher transaction through <code>combine.py</code>. Operational
+wrinkle: unquoted YAML timestamps still parse as datetimes under PyYAML,
+causing reviewer schema validation to fail unless
+<code>completed_at</code> is quoted.</li>
+<li><strong>Conjecture:</strong> 044’s AC1
+<code>push-with-retry.sh</code> autostash patch should remove the
+second-order failure seen here, but the validator docs or helper could
+still reduce timestamp-related reviewer retries by showing a quoted
+frontmatter template.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

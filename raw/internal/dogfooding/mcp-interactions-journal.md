@@ -3037,6 +3037,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The dirty-tree finding was falsified against the actual runtime chain: AC1's first pull can autostash successfully and still leave the same dirty files present before `combine.py` and `push-with-retry.sh` run their own plain pulls. The smoke finding comes from `_install_reviewer_launchd.sh`'s warning-and-continue behavior when `smoke-test-codex-ops-runner.sh` is absent.
 - **Conjecture:** The AC1 test should exercise a full watcher tick through combine + push, not just the initial pull; otherwise the test blesses the preserved dirt that still breaks the later git operations.
 
+### 13:47 PDT — Codex-ops R3 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one codex-ops review queue tick; first pending codex-ops response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex-ops` with no `codex-ops.md` and no `combined.md`; read the R3 request, reviewer schema, sibling Codex queue command, and pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `38ce307e0a11e18417eb6a721e2e3ce54d97b545`.
+- **Returned:** Wrote and pushed `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md` as `309715d`, verdict `proceed`, findings `[]`. Also committed the queue diagnostic artifacts from the retry as `ba6551f`.
+- **Read sources:** Artifact SHA `38ce307e0a11e18417eb6a721e2e3ce54d97b545`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** 🟡 partial — the queue selected and anchored the right codex-ops response, and the response landed on `origin/main`, but the helper's first valid-response push attempt still hit the dirty-tree failure mode because the earlier validation-fail quarantine dirtied `queue-errors.md`.
+- **Note:** The review itself was terminal: r3 fixed the AC1 incompleteness by naming both watcher Step 1 and `push-with-retry.sh`, and the AC1 test now covers the full watcher transaction through `combine.py`. Operational wrinkle: unquoted YAML timestamps still parse as datetimes under PyYAML, causing reviewer schema validation to fail unless `completed_at` is quoted.
+- **Conjecture:** 044's AC1 `push-with-retry.sh` autostash patch should remove the second-order failure seen here, but the validator docs or helper could still reduce timestamp-related reviewer retries by showing a quoted frontmatter template.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
