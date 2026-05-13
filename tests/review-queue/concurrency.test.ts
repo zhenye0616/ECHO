@@ -118,16 +118,26 @@ except FileExistsError:
     );
     const stale = join(dir, 'codex.md.deadbeef.tmp');
     writeFileSync(stale, 'orphan');
-    // Set mtime 31 min in the past
-    const past = Date.now() / 1000 - 31 * 60;
-    execSync(`touch -t $(date -r ${Math.floor(past)} +%Y%m%d%H%M.%S) "${stale}"`);
-    // Reviewers both still missing — single_reviewer_timeout or no_responses
+    // 045 AC3 — Option-A: capture `now_iso` BEFORE `touch -t` and pass the
+    // same timestamp to combine.py via `--now`. The earlier shape relied on
+    // real wall-clock alignment between `Date.now()` and combine.py's
+    // default `now`, which silently disagreed when combine.py was invoked
+    // with a fixed `--now=2026-05-12T11:00:00Z` (deterministic test setup)
+    // while `Date.now()` returned the real wall-clock time. Pinning both
+    // clocks to the same instant restores the strict ">30min" assertion.
+    const nowSec = Math.floor(Date.now() / 1000);
+    const nowIso = new Date(nowSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const past = nowSec - 31 * 60;
+    execSync(`touch -t $(date -r ${past} +%Y%m%d%H%M.%S) "${stale}"`);
+    // Reviewers both still missing — partial_responses / no_responses paths
+    // are not what's being asserted; the assertion is the orphan-cleanup
+    // side-effect.
     const r = runPython([
       combineScript(),
       `--repo-root=${root}`,
       '--no-git',
       '--all',
-      '--now=2026-05-12T11:00:00Z',
+      `--now=${nowIso}`,
     ]);
     expect(r.code, r.stderr).toBe(0);
     expect(existsSync(stale)).toBe(false);

@@ -64,12 +64,12 @@ Read `/tmp/echo-rq-artifact.md` plus any inline embeds in the `request.md` body.
 
 Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Use the per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` — never `divergent` / `single_reviewer_timeout` / `no_responses` (those are combined-only).
 
-## Step 5 — Write codex.md atomically and commit via the validation helper
+## Step 5 — Validate, write codex.md atomically, then commit via the validation helper
 
-Write to a unique temp file, then `os.link` it into place (no overwrite). If `FileExistsError`, someone else (a retry of yours, or a parallel codex agent) wrote first — drop your temp and skip this candidate.
+Write your fully-formed response content to a unique temp file FIRST. **Before** `os.link`-ing it into the canonical `<dir>/codex.md` path, run the pre-link YAML gate (045 AC1). On failure, delete the temp file, regenerate the response in-session, and re-run the gate. After all in-session retries are exhausted, log a single `PRE-LINK-INVALID:` row to `raw/internal/queue-errors.md` and exit non-zero — the next tick will re-poll the round and re-attempt.
 
 ```python
-import os, uuid
+import os, uuid, subprocess
 # 043 AC4: late-response race guard. The os.link is atomic, but the window
 # between "Codex started reviewing" and "Codex is about to link" is minutes
 # long. If combined.md was written during that window, our response is stale —
@@ -80,19 +80,37 @@ if os.path.exists(os.path.join(round_dir, "combined.md")):
     raise SystemExit(0)
 tmp = f"{final}.{uuid.uuid4().hex}.tmp"
 with open(tmp, "w") as f: f.write(content)
+
+# 045 AC1 — pre-link YAML gate. Validate against reviewer.schema.json BEFORE
+# os.link so malformed frontmatter never enters the live state. The helper
+# wraps validate.py reviewer; on failure it writes the parser/schema
+# diagnostic to stderr only — it does NOT touch queue-errors.md (in-session
+# retries are not queue errors; only terminal failure is).
+gate = subprocess.run(
+    ["tools/review-queue/validate_response_yaml.py", tmp],
+    capture_output=True, text=True,
+)
+if gate.returncode != 0:
+    os.unlink(tmp)
+    # Regenerate in-session per codex CLI's existing retry pattern, just
+    # shifted earlier in the flow. After exhausting retries, append a single
+    # PRE-LINK-INVALID row to raw/internal/queue-errors.md and exit 1; do not
+    # call os.link, do not touch the canonical path.
+    raise SystemExit(1)
+
 try:
     os.link(tmp, final); os.unlink(tmp)
 except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
-Then commit + push via the validation helper (AC4 of item 041 — mechanically enforces `reviewer.schema.json` before any git operation):
+Then commit + push via the post-link validation helper (AC4 of item 041 — defense-in-depth backstop that mechanically re-checks `reviewer.schema.json` before any git operation, in case the pre-link gate missed a file shape):
 
 ```bash
 tools/review-queue/commit-reviewer-response.sh "$dir/codex.md" codex "$N" "$item_id"
 ```
 
-The helper runs `tools/review-queue/validate.py reviewer <path>`; on failure it quarantines the malformed file to `<path>.invalid.<ISO-ts>` (so the next poll regenerates rather than skipping the round forever) and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`. On success it `git add`s the file, commits with message `review-r<N>: codex on <item_id>`, and pushes via `push-with-retry.sh`.
+The helper runs `tools/review-queue/validate.py reviewer <path>`; on failure it quarantines the malformed file to `<path>.invalid.<ISO-ts>` (so the next poll regenerates rather than skipping the round forever) and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`. On success it `git add`s the file, commits with message `review-r<N>: codex on <item_id>`, and pushes via `push-with-retry.sh`. With AC1's pre-link gate in place the post-link path should rarely fire — it remains as a backstop for shapes the pre-link validator misses (e.g., a future schema change the helper hasn't been taught about).
 
 This is an **operational push**, not a ship push — it does not need founder approval per §"Out of Scope" #4 of the 039 spec.
 
