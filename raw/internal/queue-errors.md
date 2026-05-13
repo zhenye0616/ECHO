@@ -15,3 +15,4 @@
 2026-05-13T20:41:49Z PUSH-RACE-FALLBACK: combine: r2 on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=17746b44767d1c3e9f627426f3c90fe0e3cf9549
 2026-05-13T20:44:54Z VALIDATION-FAIL: codex-ops r3 on 2026-05-13-044-reviewer-cycle-infrastructure-debt moved_to=backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md.invalid.2026-05-13T20:44:54Z diagnostic=backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex-ops.md: schema violation at completed_at: datetime.datetime(2026, 5, 13, 20, 44, 38, tzinfo=datetime.timezone.utc) is not of type 'string'
 2026-05-13T20:45:26Z PUSH-RACE-FALLBACK: review-r3: codex-ops on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=309715d2b273c739313153b8b56fc471daa64a03
+2026-05-13T20:50:04Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=b85a109c3e617456b06f691339e42eea61fc976d
