@@ -1449,6 +1449,9 @@ PDT — Codex-ops R2 on 044 reviewer-cycle infrastructure debt</a></li>
 href="#pdt-codex-ops-r3-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-ops-r3-on-044-reviewer-cycle-infrastructure-debt">13:47
 PDT — Codex-ops R3 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a href="#pdt-codex-r3-on-044-reviewer-cycle-infrastructure-debt"
+id="toc-pdt-codex-r3-on-044-reviewer-cycle-infrastructure-debt">13:48
+PDT — Codex R3 on 044 reviewer-cycle infrastructure debt</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14209,6 +14212,52 @@ causing reviewer schema validation to fail unless
 second-order failure seen here, but the validator docs or helper could
 still reduce timestamp-related reviewer retries by showing a quoted
 frontmatter template.</li>
+</ul>
+<h3 id="pdt-codex-r3-on-044-reviewer-cycle-infrastructure-debt">13:48
+PDT — Codex R3 on 044 reviewer-cycle infrastructure debt</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+at <code>38ce307e0a11e18417eb6a721e2e3ce54d97b545</code>, prior R2
+context, <code>review-queue-watch.md</code>,
+<code>push-with-retry.sh</code>, <code>combine.py</code>,
+<code>reviewers.json</code>, and review-queue tests.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex.md</code>
+as <code>ce53deb</code>, verdict <code>proceed_after_patches</code>.
+Finding: AC1 still omits <code>combine.py</code>’s internal
+<code>git pull --rebase origin main</code> at line 690 despite saying
+every watcher-transaction pull gets autostash.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>38ce307e0a11e18417eb6a721e2e3ce54d97b545</code>; request path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex.md</code>;
+prior context <code>r2/combined.md</code> and
+<code>r2/codex-ops.md</code>; no <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Verdict:</strong> 🟡 partial — the queue selected and
+anchored the right response, and the response landed on
+<code>origin/main</code>, but pre-staged codex-ops journal files were
+swept into the reviewer-response commit instead of staying purely
+post-handshake observation.</li>
+<li><strong>Note:</strong> The finding cross-references r2 codex-ops #1;
+it is not a new scope expansion, just the residual code surface left
+after the r2 disposition patched Step 1 and
+<code>push-with-retry.sh</code> but not <code>combine.py</code>’s own
+pull.</li>
+<li><strong>Conjecture:</strong> A response helper guard that refuses to
+commit when unrelated paths are already staged would prevent
+observation-only journal edits from being bundled into queue-handshake
+commits.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

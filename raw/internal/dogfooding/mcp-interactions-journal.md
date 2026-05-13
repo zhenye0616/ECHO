@@ -3048,6 +3048,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** The review itself was terminal: r3 fixed the AC1 incompleteness by naming both watcher Step 1 and `push-with-retry.sh`, and the AC1 test now covers the full watcher transaction through `combine.py`. Operational wrinkle: unquoted YAML timestamps still parse as datetimes under PyYAML, causing reviewer schema validation to fail unless `completed_at` is quoted.
 - **Conjecture:** 044's AC1 `push-with-retry.sh` autostash patch should remove the second-order failure seen here, but the validator docs or helper could still reduce timestamp-related reviewer retries by showing a quoted frontmatter template.
 
+### 13:48 PDT — Codex R3 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex` with no `codex.md` and no `combined.md`; read the R3 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `38ce307e0a11e18417eb6a721e2e3ce54d97b545`, prior R2 context, `review-queue-watch.md`, `push-with-retry.sh`, `combine.py`, `reviewers.json`, and review-queue tests.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex.md` as `ce53deb`, verdict `proceed_after_patches`. Finding: AC1 still omits `combine.py`'s internal `git pull --rebase origin main` at line 690 despite saying every watcher-transaction pull gets autostash.
+- **Read sources:** Artifact SHA `38ce307e0a11e18417eb6a721e2e3ce54d97b545`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r3/codex.md`; prior context `r2/combined.md` and `r2/codex-ops.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** 🟡 partial — the queue selected and anchored the right response, and the response landed on `origin/main`, but pre-staged codex-ops journal files were swept into the reviewer-response commit instead of staying purely post-handshake observation.
+- **Note:** The finding cross-references r2 codex-ops #1; it is not a new scope expansion, just the residual code surface left after the r2 disposition patched Step 1 and `push-with-retry.sh` but not `combine.py`'s own pull.
+- **Conjecture:** A response helper guard that refuses to commit when unrelated paths are already staged would prevent observation-only journal edits from being bundled into queue-handshake commits.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
