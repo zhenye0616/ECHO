@@ -1441,6 +1441,10 @@ PDT — Codex-ops R1 on 044 reviewer-cycle infrastructure debt</a></li>
 <li><a href="#pdt-codex-r2-on-044-reviewer-cycle-infrastructure-debt"
 id="toc-pdt-codex-r2-on-044-reviewer-cycle-infrastructure-debt">13:37
 PDT — Codex R2 on 044 reviewer-cycle infrastructure debt</a></li>
+<li><a
+href="#pdt-codex-ops-r2-on-044-reviewer-cycle-infrastructure-debt"
+id="toc-pdt-codex-ops-r2-on-044-reviewer-cycle-infrastructure-debt">13:39
+PDT — Codex-ops R2 on 044 reviewer-cycle infrastructure debt</a></li>
 </ul></li>
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
@@ -14106,6 +14110,56 @@ only the <code>escalated_to_founder</code> flag changed for the narrow
 single-missing/proceed path.</li>
 <li><strong>Conjecture:</strong> (none — observations only per
 dogfooding-journal discipline)</li>
+</ul>
+<h3
+id="pdt-codex-ops-r2-on-044-reviewer-cycle-infrastructure-debt">13:39
+PDT — Codex-ops R2 on 044 reviewer-cycle infrastructure debt</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex-ops</code> with no <code>codex-ops.md</code> and
+no <code>combined.md</code>; read the R2 request, reviewer schema,
+pinned artifact
+<code>backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md</code>
+at <code>4ca4904b20cb2340a877e5ddbf763fa7b72b2cee</code>, prior R1
+context, <code>combine.py</code>, <code>_reviewers.py</code>,
+<code>reviewers.json</code>, <code>_run_reviewer.sh</code>,
+<code>_install_reviewer_launchd.sh</code>,
+<code>push-with-retry.sh</code>,
+<code>commit-reviewer-response.sh</code>,
+<code>combined.schema.json</code>, and watcher/setup docs.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex-ops.md</code>
+as <code>25bb3e6</code>, verdict <code>proceed_after_patches</code>,
+findings: AC1 autostash does not keep the full watcher transaction clean
+after Git reapplies dirty journal/queue-error files; codex-ops
+<code>--smoke</code> can succeed without a codex-ops smoke runner.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>4ca4904b20cb2340a877e5ddbf763fa7b72b2cee</code>; request path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex-ops.md</code>;
+no <code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls
+this tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+and pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The dirty-tree finding was falsified against
+the actual runtime chain: AC1’s first pull can autostash successfully
+and still leave the same dirty files present before
+<code>combine.py</code> and <code>push-with-retry.sh</code> run their
+own plain pulls. The smoke finding comes from
+<code>_install_reviewer_launchd.sh</code>’s warning-and-continue
+behavior when <code>smoke-test-codex-ops-runner.sh</code> is
+absent.</li>
+<li><strong>Conjecture:</strong> The AC1 test should exercise a full
+watcher tick through combine + push, not just the initial pull;
+otherwise the test blesses the preserved dirt that still breaks the
+later git operations.</li>
 </ul>
 <p><em>To be written by the founder + strategist together at end of
 window. Sections to cover:</em></p>

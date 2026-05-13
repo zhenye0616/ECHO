@@ -3026,6 +3026,17 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Note:** R2 converged on the prior focus hints: direct-invoke now uses the per-reviewer driver, headless reviewers keep `timeout_hours: null`, AC3 defines the `not_yet_due` round gate with tests, the docs grep is scoped to the edited docs, and AC4 reuses `partial_responses` with only the `escalated_to_founder` flag changed for the narrow single-missing/proceed path.
 - **Conjecture:** (none — observations only per dogfooding-journal discipline)
 
+### 13:39 PDT — Codex-ops R2 on 044 reviewer-cycle infrastructure debt
+
+- **Source agent:** Codex
+- **Trigger:** Execute one codex-ops review queue tick; first pending codex-ops response was `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex-ops` with no `codex-ops.md` and no `combined.md`; read the R2 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-044-reviewer-cycle-infrastructure-debt.md` at `4ca4904b20cb2340a877e5ddbf763fa7b72b2cee`, prior R1 context, `combine.py`, `_reviewers.py`, `reviewers.json`, `_run_reviewer.sh`, `_install_reviewer_launchd.sh`, `push-with-retry.sh`, `commit-reviewer-response.sh`, `combined.schema.json`, and watcher/setup docs.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex-ops.md` as `25bb3e6`, verdict `proceed_after_patches`, findings: AC1 autostash does not keep the full watcher transaction clean after Git reapplies dirty journal/queue-error files; codex-ops `--smoke` can succeed without a codex-ops smoke runner.
+- **Read sources:** Artifact SHA `4ca4904b20cb2340a877e5ddbf763fa7b72b2cee`; request path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/request.md`; response path `backlog/reviews/2026-05-13-044-reviewer-cycle-infrastructure-debt/r2/codex-ops.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing codex-ops response, anchored review to the requested spec SHA, and pushed exactly one reviewer response before this journal entry.
+- **Note:** The dirty-tree finding was falsified against the actual runtime chain: AC1's first pull can autostash successfully and still leave the same dirty files present before `combine.py` and `push-with-retry.sh` run their own plain pulls. The smoke finding comes from `_install_reviewer_launchd.sh`'s warning-and-continue behavior when `smoke-test-codex-ops-runner.sh` is absent.
+- **Conjecture:** The AC1 test should exercise a full watcher tick through combine + push, not just the initial pull; otherwise the test blesses the preserved dirt that still breaks the later git operations.
+
 *To be written by the founder + strategist together at end of window. Sections to cover:*
 
 - **What's the trace layer's actual hit rate** (% of calls that returned the right cluster) on a representative sample
