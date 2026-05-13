@@ -3096,3 +3096,14 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - This file is not a backlog item — `tools/blocked.py` will not pick it up.
 - Markdown is canonical. Regenerate `mcp-interactions-journal.html` after every journal edit with:
   `pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 -H raw/internal/dogfooding/journal-style.html raw/internal/dogfooding/mcp-interactions-journal.md -o raw/internal/dogfooding/mcp-interactions-journal.html`
+
+### 2026-05-13 14:51 PDT — Codex R1 on 045 queue-reliability friction cluster
+
+- **Source agent:** Codex
+- **Trigger:** Execute one Codex-side review queue tick; first pending Codex response was `backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex` with no `codex.md` and no `combined.md`; read the R1 request, reviewer schema, Codex/Cursor/codex-ops queue prompts, `claude.md`, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, and pinned artifact `backlog/ready/2026-05-13-045-queue-reliability-friction-cluster.md` at `8252b2d73c282854f13975d57917011939ac5118`.
+- **Returned:** Wrote, validated, committed, and pushed `backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/codex.md` as `25ab1fd`, verdict `pushback`, findings: AC1 lacks an executable/testable pre-link write boundary; AC1's `PRE-LINK-INVALID` queue-error write has no clean commit/cleanup path after successful retry; AC6 contradicts itself on staged-only vs committed sidecars.
+- **Sources:** Artifact SHA `8252b2d73c282854f13975d57917011939ac5118`; request path `backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/request.md`; response path `backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/codex.md`; referenced local files `.claude/commands/review-queue-{codex,cursor,codex-ops}.md`, `tools/review-queue/commit-reviewer-response.sh`, `tools/review-queue/push-with-retry.sh`, `.claude/commands/review-pending.md`, `.claude/commands/merge-and-cleanup.md`; no `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Verdict:** ✅ right — the queue selected the expected missing Codex response, anchored review to the requested spec SHA, and pushed exactly one reviewer response before this journal entry.
+- **Note:** The highest-signal implementation issue is that AC1 tries to move validation before atomic link, but keeps the actual write/log/retry behavior in prompt prose. That makes the intended fix hard to falsify and risks recreating the dirty-tree retry problem the recent queue work has been paying down.
+- **Conjecture:** (none — observations only)

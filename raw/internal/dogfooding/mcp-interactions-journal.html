@@ -1461,7 +1461,12 @@ PDT — 044 converged in 3 rounds (founder out of loop after brainstorming
 <li><a href="#candidate-backlog-items"
 id="toc-candidate-backlog-items">Candidate Backlog Items</a></li>
 <li><a href="#journal-operating-notes"
-id="toc-journal-operating-notes">Journal Operating Notes</a></li>
+id="toc-journal-operating-notes">Journal Operating Notes</a>
+<ul>
+<li><a href="#pdt-codex-r1-on-045-queue-reliability-friction-cluster"
+id="toc-pdt-codex-r1-on-045-queue-reliability-friction-cluster">2026-05-13
+14:51 PDT — Codex R1 on 045 queue-reliability friction cluster</a></li>
+</ul></li>
 </ul></li>
 </ul>
 </nav>
@@ -14368,6 +14373,53 @@ not pick it up.</li>
 <code>mcp-interactions-journal.html</code> after every journal edit
 with:
 <code>pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 -H raw/internal/dogfooding/journal-style.html raw/internal/dogfooding/mcp-interactions-journal.md -o raw/internal/dogfooding/mcp-interactions-journal.html</code></li>
+</ul>
+<h3
+id="pdt-codex-r1-on-045-queue-reliability-friction-cluster">2026-05-13
+14:51 PDT — Codex R1 on 045 queue-reliability friction cluster</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema,
+Codex/Cursor/codex-ops queue prompts, <code>claude.md</code>,
+<code>docs/AGENT_INSTRUCTIONS.md</code>, <code>backlog/README.md</code>,
+and pinned artifact
+<code>backlog/ready/2026-05-13-045-queue-reliability-friction-cluster.md</code>
+at <code>8252b2d73c282854f13975d57917011939ac5118</code>.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/codex.md</code>
+as <code>25ab1fd</code>, verdict <code>pushback</code>, findings: AC1
+lacks an executable/testable pre-link write boundary; AC1’s
+<code>PRE-LINK-INVALID</code> queue-error write has no clean
+commit/cleanup path after successful retry; AC6 contradicts itself on
+staged-only vs committed sidecars.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>8252b2d73c282854f13975d57917011939ac5118</code>; request path
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-045-queue-reliability-friction-cluster/r1/codex.md</code>;
+referenced local files
+<code>.claude/commands/review-queue-{codex,cursor,codex-ops}.md</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>,
+<code>.claude/commands/review-pending.md</code>,
+<code>.claude/commands/merge-and-cleanup.md</code>; no
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA, and
+pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The highest-signal implementation issue is
+that AC1 tries to move validation before atomic link, but keeps the
+actual write/log/retry behavior in prompt prose. That makes the intended
+fix hard to falsify and risks recreating the dirty-tree retry problem
+the recent queue work has been paying down.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
 </html>
