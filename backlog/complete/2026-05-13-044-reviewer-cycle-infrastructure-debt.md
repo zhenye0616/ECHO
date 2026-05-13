@@ -43,7 +43,76 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Shell + Python + schema work. ~5 files touched + 1 new file. No new dependencies, no UI, no MCP/storage churn. Builder may be Claude Code, Cursor's Claude, or any agent — Cursor-domain delegation does not apply here.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-13 (UTC 21:36) via strategist-driven /merge-and-cleanup
+  under "full auto on review and merge" founder direction. Strategist (this
+  Claude Code session) authored the spec and ran the 3-round review cycle;
+  builder (agent ID 78D5AB0F-...) implemented in worktree; code-reviewer
+  subagent produced merge-as-is verdict; merge-and-cleanup applied here.
+  Independence rule satisfied: strategist ≠ builder; code-reviewer subagent
+  was independent fresh-eyes at the merge gate.
+
+  Conflicts resolved:
+  - none — fast-forward from claim commit `2058a4a`; main had not advanced
+    since claim. `git merge --no-ff` produced clean ort-strategy merge.
+
+  Fixups applied:
+  - none. Sidecar verdict was `merge as-is` with zero pre-merge fixups.
+
+  Fixups deferred to follow-up items:
+  - none (no pre-merge fixups to defer).
+
+  Verify post-merge (full suite from project root):
+  - `npm run lint`: clean.
+  - `npm run typecheck`: clean.
+  - `npm test`: 826/848 pass, 1 fail, 21 skip. The 1 failure is the
+    pre-existing `tests/review-queue/concurrency.test.ts:133` orphan-
+    cleanup test that has been failing on main since before 042, also
+    deferred at 042 + 043 merges. Out of scope per Definition of Done
+    step 6.
+
+  Follow-up items (non-blocking; filed in _followups.md at merge):
+  - **Cosmetic prose mismatch** — `.claude/commands/review-queue-watch.md:38`
+    documents the missing-reviewer divergent-row example as `where: "—"`,
+    but the actual emitter at `tools/review-queue/combine.py:684` writes
+    `where: "did not respond; per 044 AC4 single-reviewer auto-disposition"`.
+    Pure cosmetic; no behavior change. Pick the canonical form and align.
+  - **2026-05-XX-045-smoke-gate-fail-closed** (already filed in _followups.md
+    during 044 r2 disposition) — `_install_reviewer_launchd.sh --smoke`
+    currently warns-and-exits-0 when smoke runner is absent. Fail-closed
+    fix, ≤10 lines. Next friction-fix candidate per the friction-first
+    prioritization directive.
+
+  Empirical cycle measurement (per spec §Definition of Done step 4):
+
+  **Founder reviewer-activations during 044's own review cycle: 0.**
+
+  3 rounds total (matches structural-reform baseline 042=3, 040=3; the
+  043 8-round anomaly did NOT repeat — 044's class:narrow scope discipline
+  and explicit Out-of-Scope defenses held).
+  - r1: pushback / 7 findings (5 distinct issues after strategist union-find)
+  - r2: proceed_after_patches / 2 findings (1 HIGH AC1-scope-completion + 1
+    MED smoke-gate, deferred to 045)
+  - r3: proceed_after_patches / 1 MED (cross_ref to r2, mechanical) →
+    path-(c) terminal, verification waived
+
+  Friction observations during the cycle (logged to dogfooding journal at
+  ~13:50 PDT; informs next friction-fix backlog items):
+  - Friction #1 (dirty-tree blocks pull) reproduced 3× — the AC1 cure
+    (now merged) was the only viable workaround during the cycle. Spec
+    cure validated itself.
+  - Friction #2 (launchctl kickstart silent-exit) reproduced once at
+    pre-flight smoke; direct-invoke (AC2 pattern) verified the wrapper.
+  - YAML emission quarantines: 2 (r1 codex malformed YAML; r3 codex-ops
+    `completed_at: datetime` not string). Both auto-recovered by codex
+    CLI's in-session retry. Recurring 5× across 042/043/044 — highest
+    compound-interest signal for the next friction-fix spec (potential
+    046: reviewer-side YAML validation gate).
+  - Cross-perspective signal validated: r1 produced 8 findings; 2
+    convergent, 1 codex-only (implementation lens), 5 codex-ops-only
+    (operational/runtime lens). codex-ops's perspective is genuinely
+    uncorrelated with codex's — 043's "Adding a Reviewer Changelist"
+    framework empirically delivers signal, not just dispatch correctness.
 ---
 
 # Reviewer-cycle infrastructure debt — friction-044
