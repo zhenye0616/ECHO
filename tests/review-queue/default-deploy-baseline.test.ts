@@ -108,6 +108,7 @@ describe('043 AC7 — default-deploy baseline (codex + cursor happy path)', () =
       'combined_at: "<STRIPPED>"',
       'codex_response: codex.md',
       'cursor_response: cursor.md',
+      'codex-ops_response: null',
       'patch_commit_sha: null',
       'next_round: null',
       'combined_verdict: proceed',
@@ -136,9 +137,11 @@ describe('043 AC7 — default-deploy baseline (codex + cursor happy path)', () =
     expect(readCombinedStripped(dir)).toBe(expected);
   });
 
-  it('AC7b: codex absent past 2h timeout, cursor proceed → partial_responses (043 AC6 rename) + escalated', () => {
+  it('AC7b: codex absent past 2h timeout, cursor proceed → partial_responses + auto-disposition (044 AC4)', () => {
     // R4 HIGH #1 regression test — proves codex-absent-past-timeout still
-    // escalates with the renamed `partial_responses` verdict.
+    // emits the renamed `partial_responses` verdict. 044 AC4 then flipped
+    // the escalation flag to false for the single-missing-proceed sub-case
+    // (strategist watcher autonomously dispositions).
     const dir = writeFixture(
       root,
       [
@@ -157,7 +160,7 @@ describe('043 AC7 — default-deploy baseline (codex + cursor happy path)', () =
     expect(r.code, r.stderr).toBe(0);
     const text = readFileSync(join(dir, 'combined.md'), 'utf-8');
     expect(text).toMatch(/combined_verdict: partial_responses/);
-    expect(text).toMatch(/escalated_to_founder: true/);
+    expect(text).toMatch(/escalated_to_founder: false/);
     expect(text).toMatch(/codex_response: null/);
     expect(text).toMatch(/cursor_response: cursor\.md/);
     expect(text).toMatch(/cursor: proceed/); // body enumerates present verdicts

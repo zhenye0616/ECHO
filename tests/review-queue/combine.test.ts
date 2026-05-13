@@ -232,18 +232,20 @@ describe('combine.py', () => {
     expect(existsSync(join(dir, 'combined.md'))).toBe(false);
   });
 
-  it('one response missing, past timeout: partial_responses + escalated (043 AC6 rename)', () => {
-    // 043 AC6: new emitted value is `partial_responses` (replaces
-    // `single_reviewer_timeout` for new rounds). The legacy enum value is
-    // preserved in combined.schema.json for back-compat with rounds in
-    // backlog/complete/.
+  it('one response missing, past timeout: partial_responses + auto-disposition (044 AC4)', () => {
+    // 043 AC6 renamed the verdict to `partial_responses`. 044 AC4 then
+    // flipped `escalated_to_founder` to false for the single-required-
+    // missing AND present-reviewer-proceeds sub-case (strategist watcher
+    // autonomously dispositions). The legacy `single_reviewer_timeout`
+    // enum value is preserved in combined.schema.json for back-compat
+    // with rounds in backlog/complete/.
     const dir = writeRequest(root, 1, '2026-05-12T05:00:00Z');
     writeReviewer(dir, 'codex', 1, 'proceed', []);
     const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
     expect(r.code).toBe(0);
     const { fm } = readCombined(dir);
     expect(fm.combined_verdict).toBe('partial_responses');
-    expect(fm.escalated_to_founder).toBe(true);
+    expect(fm.escalated_to_founder).toBe(false);
     expect(fm.cursor_response).toBe(null);
   });
 
@@ -342,5 +344,104 @@ describe('combine.py', () => {
     expect(fm.combined_verdict).toBe('proceed_after_patches');
     expect(fm.next_round).toBe(null);
     expect(existsSync(join(root, 'backlog/reviews', ITEM_ID, 'r2/request.md'))).toBe(false);
+  });
+
+  // ---------- 044 AC3 — per-reviewer timeout from reviewers.json ----------
+  // Default reviewers.json: codex (headless, null → 0.5h fallback),
+  // cursor (ide, 2h). These tests exercise the per-reviewer + not_yet_due
+  // gate using those defaults.
+
+  it('AC3a — per-reviewer + not_yet_due gate: codex timed out, cursor not_yet_due → NOT eligible', () => {
+    // 35 min elapsed (> codex 0.5h fallback, < cursor 2h). Both reviewers absent.
+    // Round is gated by the slowest still-pending reviewer (cursor).
+    const dir = writeRequest(root, 1, '2026-05-12T07:25:00Z');
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/no rounds to combine/);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(false);
+  });
+
+  it('AC3b — all-timed-out: both reviewers past their per-reviewer timeout → eligible (no_responses)', () => {
+    // 2.5h elapsed. Both reviewers absent. Both timed out → eligible.
+    const dir = writeRequest(root, 1, '2026-05-12T05:30:00Z');
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    const { fm } = readCombined(dir);
+    expect(fm.combined_verdict).toBe('no_responses');
+    expect(fm.escalated_to_founder).toBe(true);
+  });
+
+  it('AC3c — fast-responded-slow-pending: cursor (slow) absent past its own timeout, codex present → eligible', () => {
+    // 35 min elapsed. cursor's slot is still not_yet_due (35min < 2h).
+    // With my new per-reviewer gate the round stays gated. But codex
+    // responded so the only missing required reviewer is cursor — which
+    // is still not_yet_due. NOT eligible.
+    const dir = writeRequest(root, 1, '2026-05-12T07:25:00Z');
+    writeReviewer(dir, 'codex', 1, 'proceed', []);
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/no rounds to combine/);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(false);
+  });
+
+  it('AC3d — CLI override --timeout-hours=2 uniformly: at 35min elapsed both gated by 2h → NOT eligible', () => {
+    // With --timeout-hours=2 applied uniformly, both reviewers' timeouts
+    // become 2h. At 35min elapsed both are inside their 2h windows →
+    // NOT eligible (override semantics, no per-reviewer distinction).
+    const dir = writeRequest(root, 1, '2026-05-12T07:25:00Z');
+    const r = runCombine(root, [
+      '--timeout-hours=2',
+      '--now=2026-05-12T08:00:00Z',
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/no rounds to combine/);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(false);
+  });
+
+  // ---------- 044 AC4 — single-reviewer auto-disposition ----------
+
+  it('AC4a — single-missing-proceed → auto-disposition (escalated_to_founder: false)', () => {
+    // 3h elapsed past 2h cursor timeout. codex responds proceed, cursor absent.
+    // 044 AC4: strategist watcher autonomously dispositions.
+    const dir = writeRequest(root, 1, '2026-05-12T05:00:00Z');
+    writeReviewer(dir, 'codex', 1, 'proceed', []);
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    const { fm, body } = readCombined(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(false);
+    expect(fm.next_round).toBe(null);
+    // The missing reviewer appears as a divergent row.
+    expect(body).toMatch(/\| cursor \|/);
+    expect(body).toMatch(
+      /did not respond; per 044 AC4 single-reviewer auto-disposition/,
+    );
+  });
+
+  it('AC4b — single-missing-proceed_after_patches → auto-disposition', () => {
+    const dir = writeRequest(root, 1, '2026-05-12T05:00:00Z');
+    writeReviewer(dir, 'codex', 1, 'proceed_after_patches', [
+      { severity: 'high', where: '§AC1', finding: 'codex finding' },
+    ]);
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    const { fm } = readCombined(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(false);
+    expect(fm.next_round).toBe(null);
+  });
+
+  it('AC4c — single-missing-pushback → still escalates (escalated_to_founder: true)', () => {
+    // codex responds pushback, cursor missing. Auto-disposition does NOT
+    // kick in because the present reviewer is in pushback, not proceed*.
+    const dir = writeRequest(root, 1, '2026-05-12T05:00:00Z');
+    writeReviewer(dir, 'codex', 1, 'pushback', [
+      { severity: 'high', where: '§AC1', finding: 'codex pushback' },
+    ]);
+    const r = runCombine(root, ['--now=2026-05-12T08:00:00Z']);
+    expect(r.code).toBe(0);
+    const { fm } = readCombined(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(true);
   });
 });

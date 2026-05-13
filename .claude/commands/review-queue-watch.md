@@ -8,7 +8,7 @@ You are running one tick of the **strategist** watcher loop. Invoked from the st
 
 ```bash
 cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
-git pull --rebase origin main
+git -c rebase.autoStash=true pull --rebase origin main
 # Surface unpushed work / queue errors (push-with-retry.sh fallback target)
 tail -n 5 raw/internal/queue-errors.md 2>/dev/null || true
 ```
@@ -33,9 +33,9 @@ Otherwise the script prints the path to the newly-written `combined.md`. Capture
 
 Read the just-written `combined.md`'s frontmatter:
 
-- **`escalated_to_founder: true`** — verdict is `divergent` (verdicts crossed `{proceed*, pushback}` boundary) OR `partial_responses` (one or more required reviewers missing past timeout — 043 AC6 rename; legacy `single_reviewer_timeout` still appears on pre-043 rounds in `complete/`) OR `no_responses`. Append a journal entry citing the queue path; **exit**. The founder will see and act on next session. You do NOT attempt to adjudicate divergence — that is the §"Out of Scope" #7 boundary. For N-reviewer rounds (043 AC6 generalized roll-up), `partial_responses` body enumerates which reviewers landed and which are missing; the founder uses that to decide whether to wait, escalate, or accept the partial set.
+- **`escalated_to_founder: true`** — verdict is `divergent` (verdicts crossed `{proceed*, pushback}` boundary) OR `partial_responses` with multi-missing OR any-pushback-with-missing (043 AC6 rename; legacy `single_reviewer_timeout` still appears on pre-043 rounds in `complete/`) OR `no_responses`. Append a journal entry citing the queue path; **exit**. The founder will see and act on next session. You do NOT attempt to adjudicate divergence — that is the §"Out of Scope" #7 boundary. For N-reviewer rounds (043 AC6 generalized roll-up), `partial_responses` body enumerates which reviewers landed and which are missing; the founder uses that to decide whether to wait, escalate, or accept the partial set.
 
-- **`escalated_to_founder: false`** — verdict is within `{proceed, proceed_after_patches, pushback}` (no boundary cross). You autonomously disposition findings.
+- **`escalated_to_founder: false`** — verdict is within `{proceed, proceed_after_patches, pushback}` (no boundary cross) OR `partial_responses` with exactly one required reviewer missing AND every present reviewer in `{proceed, proceed_after_patches}` (044 AC4 single-reviewer auto-disposition). You autonomously disposition findings. For the 044 AC4 auto-disposition sub-case, the missing reviewer appears as a divergent row with `where: "—"` and `finding: "did not respond; per 044 AC4 single-reviewer auto-disposition"`; fill its `Disposition` column the same way you'd fill any other divergent row (typically `accepted as missing per 044 AC4 — no patch`), then follow the standard path-(a)/(b)/(c) selection on the rest of the table.
 
 ### Step 3 — Disposition (only on the not-escalated branch)
 
