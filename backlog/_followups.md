@@ -669,3 +669,29 @@ Option (a) is the lowest-friction fix; (c) is the most resilient.
 - **Pre-existing orphan-cleanup test failure** (`tests/review-queue/concurrency.test.ts:133`) — fails on main HEAD; also failed before 042's changes. Out of scope per 042 spec §Out of Scope. Root cause was investigated post-040 (see _followups.md "From 041 merge" → the `--now=` fixed-timestamp vs real-mtime mismatch under `touch -t $(date -r ...)`). Two prescribed Option-A/Option-B fixes were named there but never landed. Suggested ID: `2026-05-XX-044-orphan-cleanup-test-fix`. Tiny scope (5-10 lines in the test).
 - **Cosmetic re-parse in `combine.py:200-201`** — `build_malformed_combined` re-opens `request.md` even though `build_combined` already parsed it. Harmless (one extra small file read on the escalation path, which is rare anyway). Thread the parsed dict through the helper signature. Defer to next builder touching combine.py.
 - **Path-resolution caveat in `combine.py:207`** — `Path.resolve().relative_to(repo_root.resolve())` assumes `repo_root` is realpath-resolved by the caller. Tests pre-resolve with `realpathSync` for macOS `/private/var/folders/...`. Not a current bug; document for next builder. Could add an internal-style `_resolve_repo_root(path)` helper that always realpath-resolves.
+
+## From 043 merge (2026-05-13)
+
+- **2026-05-XX-044-add-3rd-reviewer-end-to-end-falsification** (LARGE, HIGH) — AC6h N=3 end-to-end test through `request.py` → `validate.py reviewer` → `commit-reviewer-response.sh` → `combine.py` → `validate.py combined` with a synthetic `codex-arch` reviewer added across all 4 schemas. Bundles: AC6h (load-bearing falsification for R2 HIGH #1), AC6i (3-reviewer convergent comma-list output), AC6j (3-reviewer one-diverges roll-up), AC6l (transitive cross_ref chain — A→B + C→A union-find correctness), AC6m (same-reviewer duplicate-anchor list-shape preservation — R5 MED #2 falsification), AC6n (cross_refs_match uses finding_index — R6 MED #2 falsification), AC6o (extend-not-update bucket collapse — R6 MED #3 falsification), AC6p N≥3 extension, AC6q (offending_response array shape at N=3). Also bundles **spec R8 HIGH #1 TOOL_DIR/TARGET_REPO split** in `commit-reviewer-response.sh` + `push-with-retry.sh` (deferred at 043 merge; see `raw/internal/decisions/2026-05-13-043-r8-deferred.md`). Without 044, the "adding a 3rd reviewer works end-to-end" claim from R2 HIGH #1 remains a hypothesis. Founder may want to actually deploy a `codex-arch` reviewer (different prompt, e.g., architectural perspective) so 044 closes by virtue of being real.
+
+- **AC1a — cursor exits no-op when not in requested_reviewers** — needs a shell-extractable harness for the reviewer-prompt Step 2 gate. The behavior is correct (verified in code review); test coverage is the gap.
+
+- **AC1e — optional cursor missing, codex present (non-blocking)** — unreachable in default deploy where `cursor.required=true`. Defer until founder flips cursor to optional (likely as part of a speed-decision item).
+
+- **AC2a missing invalid-config fixtures (5 of 7 specced)** — `_reviewers.py` validation tested for `invalid mode` + `duplicate slug`; missing fixtures: missing required field, extra field, invalid slug pattern (uppercase/leading-digit/special-char), non-bool `required`.
+
+- **AC2b cache-identity assertion** — explicit `isinstance(result, tuple) AND result is load_reviewers()` check.
+
+- **AC2c explicit config_path bypasses cache** — explicit it() block.
+
+- **AC2d missing mode×timeout fixtures (4 of 6)** — tested: `mode=headless+timeout=null`, `mode=ide+timeout=positive`. Missing: `mode=ide+timeout=null`, `mode=ide+timeout=0`, `mode=ide+timeout="string"`, `mode=ide+timeout=bool`.
+
+- **combine.py:569-580 dead-branch cleanup** — `if not now` is unreachable since `main()` always sets `now=`. Cosmetic.
+
+- **`_lib.REVIEWS_DIR` / `_lib.ERROR_LOG` import-time computation fragility** — mid-test env-var mutation won't re-evaluate. Suite passes today because no test does this; document or move to lazy properties.
+
+- **`_run_reviewer.sh:17` baked-in default** — `$HOME/Desktop/Project_echo` portability concern; carried over from main.
+
+- **`_reviewer_gate.py` standalone script** — beneficial deviation from spec (more robust stderr survival than inline heredoc). Strategist should promote as spec addendum to 043's `wiki/operating-model/cross-tool-spec-review.md` post-promotion pass.
+
+- **Structural-reform spec round count signal** — 043 took 8 rounds (vs 042's 3, 040's 3, 039's 4 baseline). The decay curve was real but slower than expected; the spec also grew from ~700 to ~1200 lines mid-cycle. Worth comparing 044's round count to validate whether "structural-reform" specs of this size benefit from sub-spec decomposition vs single large items. File as observation in next strategist conversation's review of the 039 cross-tool review wiki page.
