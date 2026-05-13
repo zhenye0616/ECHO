@@ -8,3 +8,5 @@
 2026-05-13T00:02:39Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-12-042-reviewer-emission-yaml-validation sha=75e44e018961961f6dfb57e26bc605301f61ea06
 2026-05-13T06:19:17Z PUSH-RACE-FALLBACK: combine: r1 on 2026-05-13-043-per-round-reviewer-roster sha=d93c1a6679afc8b036ea3e30f773b7e7ae61ab4c
 2026-05-13T06:19:18Z PUSH-RACE-FALLBACK: dogfood: 043 codex review tick sha=60ac05bb3ab8695fe285a69a286c6c9a76bce066
+2026-05-13T06:44:49Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-13-043-per-round-reviewer-roster sha=fe6dbd3291f731742bec0e65dde1516d699b00b2
+2026-05-13T06:54:14Z PUSH-RACE-FALLBACK: review-r4: codex on 2026-05-13-043-per-round-reviewer-roster sha=f154f8e83918bab86a24d0f281fd2ede9a4a9904
