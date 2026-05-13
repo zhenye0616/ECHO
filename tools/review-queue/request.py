@@ -22,9 +22,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _lib  # noqa: E402
+import _reviewers  # noqa: E402
 
 VALID_CLASSES = ("narrow", "structural-reform")
-VALID_REVIEWERS = ("codex", "cursor")
+
+
+def _valid_reviewers() -> tuple[str, ...]:
+    """043 AC2: sourced from reviewers.json via _reviewers.py (no longer a module
+    constant). reviewer.schema.json's enum is the schema-side gate; this is the
+    request-time gate."""
+    return tuple(r.name for r in _reviewers.load_reviewers())
 
 
 def find_artifact(item_id: str, repo_root: Path) -> Path:
@@ -49,11 +56,13 @@ def main(argv: list[str]) -> int:
 
     repo_root = Path(args.repo_root).resolve() if args.repo_root else _lib.REPO_ROOT
     reviewers = [r.strip() for r in args.reviewers.split(",") if r.strip()]
+    valid = _valid_reviewers()
     for rev in reviewers:
-        if rev not in VALID_REVIEWERS:
+        if rev not in valid:
             print(
-                f"reviewer `{rev}` not in current enum {{codex, cursor}}; "
-                f"extend the schema first.",
+                f"reviewer `{rev}` not in current enum {{{', '.join(valid)}}}; "
+                f"extend the schema first (reviewers.json + reviewer.schema.json "
+                f"+ request.schema.json enums).",
                 file=sys.stderr,
             )
             return 2

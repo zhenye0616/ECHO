@@ -41,7 +41,47 @@ spec_refs:
 blocked_by: []
 suggested_builder: any  # Pure Python + bash + schema work. ~6 code files modified, ~4 new files, ~4 new test cases. No new dependencies, no UI, no MCP/storage churn.
 resume_tail_source: "fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/<current>.jsonl"
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-13 (UTC ~08:50) via founder reconciliation under /merge-and-cleanup.
+
+  Conflicts resolved:
+  - none — sidecar predicted clean merge (no concurrent main churn on touched files post-042 merge at `4fb517d`); `git merge --no-ff` reported "Automatic merge went well".
+
+  Fixups applied (2):
+  - `tools/review-queue/commit-reviewer-response.sh:37-43` — dropped the hardcoded `case "$REVIEWER_NAME" in codex|cursor)` block. validate.py reviewer enum (in `reviewer.schema.json`) is now the sole reviewer-name gate. Closes spec R3 HIGH #2 option (a). Without this fixup, AC6h's end-to-end-add-a-3rd-reviewer path could never pass.
+  - `tests/review-queue/n-reviewer-framework.test.ts:23` — removed unused `dirname` import from `'node:path'`. Was blocking `npm run lint` (eslint --max-warnings 0) and `npm run typecheck` (TS6133).
+
+  Fixups deferred to follow-up items:
+  - none. The sidecar's "Fixup #3" (chmod +x verification via `git ls-files --stage`) was a sanity check, not an action — verified inline: both `_run_reviewer.sh` and `_install_reviewer_launchd.sh` are `100755` in the index.
+
+  Verify post-merge (full suite from project root):
+  - `npm run lint`: clean.
+  - `npm run typecheck`: clean.
+  - `npm test`: 816 pass / 1 fail / 21 skip. The 1 failure is the pre-existing `tests/review-queue/concurrency.test.ts:133` orphan-cleanup test that also fails on main HEAD and was deferred at 042 merge. Suite grew from 795 (post-042) to 816 (post-043) — +21 net new tests for the N-reviewer framework.
+
+  Follow-up items (non-blocking; filed in _followups.md at merge):
+  - **2026-05-XX-044-add-3rd-reviewer-end-to-end-falsification** (LARGE) — AC6h N≥3 end-to-end test through `request.py` → `validate.py reviewer` → `commit-reviewer-response.sh` → `combine.py` → `validate.py combined` with synthetic `codex-arch` reviewer added across all 4 schemas. Bundles AC6i (3-reviewer convergent comma-list), AC6j (one-diverges), AC6l (transitive cross_ref chain), AC6m (same-reviewer duplicate-anchor — R5 MED #2 falsification), AC6n (cross_refs_match uses finding_index — R6 MED #2 falsification), AC6o (extend-not-update bucket collapse — R6 MED #3 falsification), AC6p extension, AC6q (offending_response array at N=3). THE load-bearing falsification for R2 HIGH #1; if 043 ships without it the "adding the 3rd reviewer works end-to-end" claim remains a hypothesis. Founder may want to actually deploy a `codex-arch` reviewer for 044's review cycle.
+  - **Spec R8 HIGH #1 (TOOL_DIR/TARGET_REPO split) deferred** — `commit-reviewer-response.sh` and `push-with-retry.sh` still derive REPO_ROOT via `git rev-parse --show-toplevel` (cwd-based). Production reviewer ticks work correctly (cwd is right). Only matters for AC6h-style fixture-local end-to-end tests; bundled with 044 above.
+  - AC1a (cursor exits no-op when not in requested_reviewers) — needs shell-extractable harness for reviewer-prompt Step 2 gate.
+  - AC1e (optional cursor missing) — unreachable in default deploy (cursor.required=true); defer until founder flips cursor to optional.
+  - AC2a missing fixtures (5 of 7 specced fail modes); AC2b/AC2c cache-identity assertions; AC2d missing timeout-contract fixtures (4 of 6).
+  - `combine.py:569-580` dead-branch cleanup (cosmetic — `if not now` is unreachable since `main()` always sets `now=`).
+  - `_lib.REVIEWS_DIR` / `_lib.ERROR_LOG` import-time computation fragility w.r.t. mid-test env-var mutation.
+  - `_run_reviewer.sh:17` `$HOME/Desktop/Project_echo` baked-in default — portability; carried from main.
+  - `_reviewer_gate.py` standalone script is a beneficial deviation from spec (more robust stderr survival than inline heredoc). Strategist should promote as spec addendum.
+
+  AC5 empirical measurement (per spec §AC5):
+
+  **Founder reviewer-activations during 043's own review cycle: 0.**
+
+  Strategist (Claude Code) drove all 8 review rounds end-to-end:
+  - r1–r3: pushback verdicts.
+  - r4–r8: proceed_after_patches; finding count decay 4→5→3→2→3→4→2→1 over 8 rounds.
+  - r8 terminal via path (c) — verification waived; Codex r8 explicitly said "Proceed after patching."
+
+  Total wall-time spec push → terminal: ~70 min (vs 042's ~50 min for 3 rounds). 043 is "structural-reform" class touching 16+ files. Compared to pre-041 baseline (~5 founder reviewer-activations + several hours per cycle), 043's cycle preserves AC8=0 while increasing strategist disposition cost — signals that structural-reform-class specs of this size warrant scope-down or sub-spec decomposition in future cycles.
+
+  Founder strategist-direction touches during 043's cycle (NOT counted against AC8; these are strategist coordination, not reviewer activation): ~6 (option-c choice for framework-generalize-only scope, "yes" to fixups during the early cycle, path-a at the 7-round trend-pause, path-b at r7 pushback, "proceed with r4", terminal-now decision at r8).
 ---
 
 ## Summary

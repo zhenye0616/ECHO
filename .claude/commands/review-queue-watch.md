@@ -33,7 +33,7 @@ Otherwise the script prints the path to the newly-written `combined.md`. Capture
 
 Read the just-written `combined.md`'s frontmatter:
 
-- **`escalated_to_founder: true`** — verdict is `divergent` (verdicts crossed `{proceed*, pushback}` boundary) OR `single_reviewer_timeout` OR `no_responses`. Append a journal entry citing the queue path; **exit**. The founder will see and act on next session. You do NOT attempt to adjudicate divergence — that is the §"Out of Scope" #7 boundary.
+- **`escalated_to_founder: true`** — verdict is `divergent` (verdicts crossed `{proceed*, pushback}` boundary) OR `partial_responses` (one or more required reviewers missing past timeout — 043 AC6 rename; legacy `single_reviewer_timeout` still appears on pre-043 rounds in `complete/`) OR `no_responses`. Append a journal entry citing the queue path; **exit**. The founder will see and act on next session. You do NOT attempt to adjudicate divergence — that is the §"Out of Scope" #7 boundary. For N-reviewer rounds (043 AC6 generalized roll-up), `partial_responses` body enumerates which reviewers landed and which are missing; the founder uses that to decide whether to wait, escalate, or accept the partial set.
 
 - **`escalated_to_founder: false`** — verdict is within `{proceed, proceed_after_patches, pushback}` (no boundary cross). You autonomously disposition findings.
 

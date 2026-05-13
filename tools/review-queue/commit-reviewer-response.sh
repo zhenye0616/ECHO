@@ -34,14 +34,6 @@ REVIEWER_NAME="$2"
 ROUND="$3"
 ITEM_ID="$4"
 
-case "$REVIEWER_NAME" in
-  codex|cursor) ;;
-  *)
-    echo "error: reviewer name must be 'codex' or 'cursor', got '$REVIEWER_NAME'" >&2
-    exit 2
-    ;;
-esac
-
 if [ ! -f "$REVIEWER_PATH" ]; then
   echo "error: reviewer file not found at $REVIEWER_PATH" >&2
   exit 2

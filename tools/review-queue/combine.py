@@ -4,7 +4,9 @@
 Polls backlog/reviews/<item_id>/r<N>/ directories for rounds eligible to
 combine, then writes combined.md per the verdict roll-up + convergent-on-
 primary-where-section logic specced in
-backlog/ready/2026-05-11-039-cross-tool-review-dispatch-queue.md AC4.
+backlog/complete/2026-05-11-039-cross-tool-review-dispatch-queue.md AC4,
+generalized for the per-round reviewer roster by
+backlog/ready/2026-05-13-043-per-round-reviewer-roster.md AC6.
 
 Usage:
     combine.py [--repo-root=<path>] [--timeout-hours=<float>] [--all]
@@ -31,11 +33,11 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _lib  # noqa: E402
+import _reviewers  # noqa: E402
 
 ORPHAN_TMP_AGE_SEC = 30 * 60  # 30 min
 DEFAULT_TIMEOUT_HOURS = 2.0
 
-REVIEWERS = ("codex", "cursor")
 SECTION_RE = re.compile(r"§[^,;+]+")
 
 
@@ -64,57 +66,110 @@ def normalize_where(where: str) -> tuple[str, list[str]]:
     return primary, related
 
 
-def cross_refs_match(a: dict[str, Any], a_round: int, a_reviewer: str,
-                     b: dict[str, Any], b_round: int, b_reviewer: str) -> bool:
+def cross_refs_match(
+    a: dict[str, Any], a_round: int, a_reviewer: str, a_index: int,
+    b: dict[str, Any], b_round: int, b_reviewer: str, b_index: int,
+) -> bool:
     """Return True iff either finding explicitly cross-refs the other.
 
-    A.cross_ref pointing to B counts even when round/reviewer disagree —
-    cross_ref is the canonical override per §AC4 combine logic.
+    A.cross_ref pointing to B counts when round/reviewer/finding_index all
+    match. cross_ref is the canonical override per §AC4 combine logic.
+    a_index / b_index are 1-based per the reviewer.schema.json contract.
+
+    043 AC6 R6 MED #2: finding_index is now part of the match — earlier
+    versions ignored it which produced false matches in lists of findings.
     """
     a_cr = a.get("cross_ref")
-    if isinstance(a_cr, dict) and a_cr.get("reviewer") == b_reviewer and a_cr.get("round") == b_round:
-        # finding_index is 1-indexed in cross_ref; we don't have indexes here
-        # but the reviewer+round match is the strong signal.
+    if (
+        isinstance(a_cr, dict)
+        and a_cr.get("reviewer") == b_reviewer
+        and a_cr.get("round") == b_round
+        and a_cr.get("finding_index") == b_index
+    ):
         return True
     b_cr = b.get("cross_ref")
-    if isinstance(b_cr, dict) and b_cr.get("reviewer") == a_reviewer and b_cr.get("round") == a_round:
+    if (
+        isinstance(b_cr, dict)
+        and b_cr.get("reviewer") == a_reviewer
+        and b_cr.get("round") == a_round
+        and b_cr.get("finding_index") == a_index
+    ):
         return True
     return False
 
 
-def compute_combined_verdict(codex_v: str | None, cursor_v: str | None) -> tuple[str, bool]:
-    """Apply the §AC4 verdict roll-up table.
+def compute_combined_verdict(
+    verdicts: dict[str, str | None],
+    requested: set[str],
+    required_set: set[str],
+) -> tuple[str, bool]:
+    """Apply the §AC4 verdict roll-up table, generalized for N reviewers.
 
-    Returns (combined_verdict, escalated_to_founder).
+    Args:
+        verdicts: {reviewer_name: per_reviewer_verdict_string | None}.
+                  `None` means "expected (requested) but missing".
+        requested: set of reviewer names requested for this round.
+        required_set: subset of `requested` with reviewers.json `required: true`.
+
+    Returns: (combined_verdict, escalated_to_founder).
+
+    Verdict table (043 AC6):
+      - No responses at all (all requested are missing) → ("no_responses", True)
+      - Some required missing (and at least one present) →
+            ("partial_responses", True)   # new name, replaces single_reviewer_timeout
+            (the legacy `single_reviewer_timeout` enum value stays in
+            combined.schema.json for back-compat with rounds in complete/)
+      - All required present + all-same verdict → (that_verdict, False)
+      - All required present + mix of proceed* only → ("proceed_after_patches", False)
+      - All required present + mix of proceed*+pushback → ("divergent", True)
+      - All required present + all pushback → ("pushback", False)
     """
     PROCEED_STAR = {"proceed", "proceed_after_patches"}
-    if codex_v is None and cursor_v is None:
+
+    present = {k: v for k, v in verdicts.items() if v is not None and k in requested}
+    missing_required = required_set - present.keys()
+
+    if not present:
         return "no_responses", True
-    if codex_v is None or cursor_v is None:
-        return "single_reviewer_timeout", True
-    if codex_v == cursor_v:
-        return codex_v, False
-    pair = {codex_v, cursor_v}
-    if pair <= PROCEED_STAR:
-        # proceed + proceed_after_patches → proceed_after_patches
-        return "proceed_after_patches", False
-    if pair == {"pushback", "pushback"}:
-        return "pushback", False
-    # one in PROCEED_STAR, the other pushback → divergent
-    if "pushback" in pair and pair & PROCEED_STAR:
+
+    if missing_required:
+        return "partial_responses", True
+
+    # All required present (optional missing don't block).
+    verdict_set = set(present.values())
+    if len(verdict_set) == 1:
+        return next(iter(verdict_set)), False
+
+    has_proceed = bool(verdict_set & PROCEED_STAR)
+    has_pushback = "pushback" in verdict_set
+    if has_proceed and has_pushback:
         return "divergent", True
-    return "divergent", True  # safety net
+    if verdict_set <= PROCEED_STAR:
+        # mix of proceed + proceed_after_patches → take the stricter
+        return "proceed_after_patches", False
+    # safety net (shouldn't reach here)
+    return "divergent", True
 
 
-def cleanup_orphans(round_dir: Path, now_ts: float) -> list[str]:
-    """Remove `.tmp.*` orphans older than ORPHAN_TMP_AGE_SEC. Return removed paths."""
+def cleanup_orphans(round_dir: Path, now_ts: float, reviewer_slugs: tuple[str, ...]) -> list[str]:
+    """Remove `.tmp.*` orphans older than ORPHAN_TMP_AGE_SEC. Return removed paths.
+
+    043 AC6: orphan-tmp regex is now derived from the active reviewer slugs
+    plus the known infrastructure names (combined, request). The earlier
+    hardcoded `(codex|cursor|combined|request)` alternation forfeited any
+    new-reviewer's orphan-tmp cleanup, leaking temp files indefinitely.
+    """
+    # Build the regex alternation from reviewer slugs (escaped) + infra names.
+    infra_names = ("combined", "request")
+    name_alternation = "|".join(
+        re.escape(s) for s in (*reviewer_slugs, *infra_names)
+    )
+    tmp_re = re.compile(rf"^({name_alternation})\.md\.[0-9a-f]+\.tmp$")
     removed: list[str] = []
     for tmp in round_dir.iterdir():
         if not tmp.is_file():
             continue
-        name = tmp.name
-        # match <reviewer>.md.<uuid>.tmp shape
-        if not re.match(r"^(codex|cursor|combined|request)\.md\.[0-9a-f]+\.tmp$", name):
+        if not tmp_re.match(tmp.name):
             continue
         try:
             age = now_ts - tmp.stat().st_mtime
@@ -132,17 +187,44 @@ def cleanup_orphans(round_dir: Path, now_ts: float) -> list[str]:
 # ---------------- round eligibility ----------------
 
 
-def find_eligible_rounds(repo_root: Path, timeout_hours: float, now: _dt.datetime) -> list[Path]:
+def _read_requested_reviewers(request_path: Path) -> list[str]:
+    """Parse request.md and return its `requested_reviewers` list.
+
+    Returns [] if the file is missing or the field is absent/malformed.
+    Callers treat empty as "skip this round (cannot determine roster)".
+    """
+    try:
+        fm, _ = _lib.parse_frontmatter(request_path)
+    except ValueError:
+        return []
+    val = fm.get("requested_reviewers")
+    if isinstance(val, list):
+        return [str(v) for v in val if isinstance(v, str)]
+    return []
+
+
+def find_eligible_rounds(
+    repo_root: Path,
+    timeout_hours: float,
+    now: _dt.datetime,
+) -> list[Path]:
     """Return a list of round dirs eligible to combine.
 
-    A round is eligible iff combined.md does NOT exist AND either:
-      (a) both codex.md and cursor.md exist, OR
-      (b) request.requested_at is older than timeout_hours (timeout path).
+    043 AC1: per-round roster honored — the active reviewer set for a round
+    is the round's request.requested_reviewers (intersected with the current
+    reviewers.json roster). A round is eligible iff combined.md does NOT
+    exist AND either:
+      (a) every REQUIRED requested reviewer has its <slug>.md present, OR
+      (b) request.requested_at is older than timeout_hours AND at least one
+          required reviewer is missing (so we emit partial_responses /
+          no_responses).
     """
     out: list[Path] = []
     reviews = repo_root / "backlog" / "reviews"
     if not reviews.is_dir():
         return out
+    roster = _reviewers.load_reviewers()
+    required_by_name = {r.name: r.required for r in roster}
     for item_dir in sorted(reviews.iterdir()):
         if not item_dir.is_dir():
             continue
@@ -155,12 +237,25 @@ def find_eligible_rounds(repo_root: Path, timeout_hours: float, now: _dt.datetim
             request = round_dir / "request.md"
             if not request.exists():
                 continue
-            codex = round_dir / "codex.md"
-            cursor = round_dir / "cursor.md"
-            if codex.exists() and cursor.exists():
+            requested = _read_requested_reviewers(request)
+            if not requested:
+                continue
+            # Intersect with known roster (silently drop unknown reviewers).
+            requested = [r for r in requested if r in required_by_name]
+            if not requested:
+                continue
+            required_requested = [r for r in requested if required_by_name[r]]
+
+            # (a) all required-and-requested reviewers have responses
+            all_required_present = all(
+                (round_dir / f"{r}.md").exists() for r in required_requested
+            )
+            if all_required_present:
                 out.append(round_dir)
                 continue
-            # timeout path
+
+            # (b) timeout path: requested_at older than threshold AND at least
+            # one required reviewer missing.
             try:
                 fm, _ = _lib.parse_frontmatter(request)
                 requested_at = parse_iso_utc(fm["requested_at"])
@@ -185,30 +280,52 @@ def _one_line(s: str) -> str:
     return " ".join(s.split())
 
 
+_NON_REVIEWER_RESPONSE_FIELDS = {"offending_response"}
+
+
+def _schema_response_fields() -> list[str]:
+    """Return the schema-declared <slug>_response field names.
+
+    Derived from the combined.schema.json properties (single source of truth)
+    so that adding a new reviewer = adding `<slug>_response` to the schema +
+    a row in reviewers.json. combine.py reads the schema, not the reviewers
+    config, for this list — the schema is the validator's enforcement layer.
+
+    Excludes schema fields ending in `_response` that are not per-reviewer
+    response pointers (e.g. `offending_response` which encodes a malformed-
+    response path).
+    """
+    schema = _lib.load_schema("combined")
+    return [
+        k for k in schema.get("properties", {}).keys()
+        if k.endswith("_response") and k not in _NON_REVIEWER_RESPONSE_FIELDS
+    ]
+
+
 def build_malformed_combined(
     round_dir: Path,
     repo_root: Path,
     now: _dt.datetime,
+    requested: list[str],
     malformed: list[tuple[Path, str]],
 ) -> dict[str, Any]:
-    """Emit the malformed-reviewer-response escalation combined.md (AC2).
+    """Emit the malformed-reviewer-response escalation combined.md (042 AC2,
+    generalized for N reviewers per 043 AC6 R7 HIGH #2).
 
     `malformed` is a list of (path, parse_error_str) tuples in stable
-    iteration order (codex first per the reviewers enum order).
-    Repo-root-relative paths are surfaced in frontmatter + body.
+    iteration order. Repo-root-relative paths are surfaced in frontmatter +
+    body. ALL schema-declared `<slug>_response` fields are emitted (null for
+    unrequested/missing/malformed); this preserves combined.schema.json's
+    `required: [..., codex_response, cursor_response]` contract.
     """
     request_fm, _ = _lib.parse_frontmatter(round_dir / "request.md")
     item_id = request_fm["item_id"]
     rnd = request_fm["round"]
 
-    # Repo-root-relative paths per AC2 builder note.
     rel_paths: list[str] = []
     for p, _err in malformed:
         rel_paths.append(str(p.resolve().relative_to(repo_root.resolve()).as_posix()))
     errors: list[str] = [_one_line(e) for _p, e in malformed]
-
-    codex_path = round_dir / "codex.md"
-    cursor_path = round_dir / "cursor.md"
 
     if len(malformed) == 1:
         offending: Any = rel_paths[0]
@@ -221,15 +338,27 @@ def build_malformed_combined(
         "item_id": item_id,
         "round": rnd,
         "combined_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "codex_response": "codex.md" if codex_path.exists() else None,
-        "cursor_response": "cursor.md" if cursor_path.exists() else None,
+    }
+    # Emit ALL schema-declared <slug>_response fields. Per 042 convention:
+    # the `<slug>_response` field points at the on-disk filename if it
+    # exists (even when malformed — the offending_response field surfaces
+    # the parse failure separately). Null only when the file is absent
+    # from disk or the slug is not in this round's requested set.
+    for field in _schema_response_fields():
+        slug = field[: -len("_response")]
+        path = round_dir / f"{slug}.md"
+        if path.exists() and slug in requested:
+            fm_out[field] = f"{slug}.md"
+        else:
+            fm_out[field] = None
+    fm_out.update({
         "patch_commit_sha": None,
         "next_round": None,
         "combined_verdict": "malformed_reviewer_response",
         "escalated_to_founder": True,
         "offending_response": offending,
         "parse_error": parse_err,
-    }
+    })
 
     body_lines: list[str] = [
         "\n# Combined findings\n",
@@ -252,6 +381,30 @@ def build_malformed_combined(
     }
 
 
+class _UnionFind:
+    """043 AC6 R4 MED #2: union-find for cross_ref-bridged convergence.
+
+    A pairwise merge can split chains (if A∼B is merged then C→A is evaluated
+    after A was renamed, C might form its own bucket instead of joining
+    {A,B}). Union-find with path compression guarantees transitive closure
+    regardless of iteration order.
+    """
+
+    def __init__(self, keys: list[str]) -> None:
+        self.parent: dict[str, str] = {k: k for k in keys}
+
+    def find(self, k: str) -> str:
+        while self.parent[k] != k:
+            self.parent[k] = self.parent[self.parent[k]]
+            k = self.parent[k]
+        return k
+
+    def union(self, a: str, b: str) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+
 def build_combined(
     round_dir: Path,
     now: _dt.datetime,
@@ -260,134 +413,236 @@ def build_combined(
     """Compute frontmatter + body for combined.md for this round.
 
     Body is a single markdown document with: convergent table, divergent
-    table, and a placeholder "Disposition" column (strategist fills in
-    inline per AC3.5 step 3).
-
-    If any reviewer-response file is unparseable (YAML error → typed
-    ValueError after AC1's _lib wrap), emit a malformed-reviewer-response
-    escalation combined.md per AC2 instead. Both codex.md and cursor.md are
-    attempted before emission so a doubly-malformed round produces one
-    combined.md naming both offenders.
+    table, and a placeholder "Disposition" column. Default 2-reviewer
+    behavior is byte-identical to pre-043 output (verified by AC7 fixture).
     """
     request_fm, _ = _lib.parse_frontmatter(round_dir / "request.md")
     item_id = request_fm["item_id"]
     rnd = request_fm["round"]
+    requested_raw = request_fm.get("requested_reviewers", []) or []
+    if not isinstance(requested_raw, list):
+        requested_raw = []
+    roster = _reviewers.load_reviewers()
+    known = {r.name: r for r in roster}
+    requested = [str(r) for r in requested_raw if str(r) in known]
 
-    codex_path = round_dir / "codex.md"
-    cursor_path = round_dir / "cursor.md"
-
-    # Phase 1: collect parse failures across both reviewers (stable order).
+    # Phase 1: collect parse failures across all REQUESTED reviewers (stable order).
     malformed: list[tuple[Path, str]] = []
-    codex_fm: dict[str, Any] | None = None
-    cursor_fm: dict[str, Any] | None = None
-    codex_findings: list[dict[str, Any]] = []
-    cursor_findings: list[dict[str, Any]] = []
-
-    if codex_path.exists():
-        try:
-            codex_fm, codex_findings = read_response(codex_path)
-        except ValueError as exc:
-            malformed.append((codex_path, str(exc)))
-    if cursor_path.exists():
-        try:
-            cursor_fm, cursor_findings = read_response(cursor_path)
-        except ValueError as exc:
-            malformed.append((cursor_path, str(exc)))
+    responses: dict[str, tuple[dict[str, Any] | None, list[dict[str, Any]]]] = {}
+    for slug in requested:
+        path = round_dir / f"{slug}.md"
+        if path.exists():
+            try:
+                fm, findings = read_response(path)
+                responses[slug] = (fm, findings)
+            except ValueError as exc:
+                malformed.append((path, str(exc)))
+                responses[slug] = (None, [])
+        else:
+            responses[slug] = (None, [])
 
     # Phase 2 (escalation branch): any malformed → terminal combined.md.
     if malformed:
         root = repo_root if repo_root is not None else _lib.REPO_ROOT
-        return build_malformed_combined(round_dir, root, now, malformed)
+        return build_malformed_combined(round_dir, root, now, requested, malformed)
 
-    codex_verdict = codex_fm["verdict"] if codex_fm else None
-    cursor_verdict = cursor_fm["verdict"] if cursor_fm else None
-    combined_verdict, escalated = compute_combined_verdict(codex_verdict, cursor_verdict)
+    # Verdict roll-up — 043 AC6 generalized.
+    requested_set = set(requested)
+    required_set = {r.name for r in roster if r.required and r.name in requested_set}
+    verdict_map: dict[str, str | None] = {
+        slug: (responses[slug][0]["verdict"] if responses[slug][0] else None)
+        for slug in requested
+    }
+    combined_verdict, escalated = compute_combined_verdict(
+        verdict_map, requested_set, required_set,
+    )
 
-    # Build match table: convergent vs. divergent.
-    convergent: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    consumed_cursor: set[int] = set()
-    divergent_codex: list[dict[str, Any]] = []
-    for cf in codex_findings:
-        cp, _ = normalize_where(cf["where"])
-        matched_idx: int | None = None
-        for j, uf in enumerate(cursor_findings):
-            if j in consumed_cursor:
+    # Convergent / divergent matching, generalized via union-find.
+    # findings_by_anchor[primary_anchor][slug] = list[finding]
+    findings_by_anchor: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    # finding_index[id(finding)] = (reviewer_slug, 1-based_index)
+    finding_index: dict[int, tuple[str, int]] = {}
+    for slug in requested:
+        fm, findings = responses[slug]
+        if not fm:
+            continue
+        for i, f in enumerate(findings, start=1):
+            finding_index[id(f)] = (slug, i)
+            primary, _ = normalize_where(f["where"])
+            findings_by_anchor.setdefault(primary, {}).setdefault(slug, []).append(f)
+
+    # Union-find over anchors. Apply cross_ref edges to union buckets.
+    anchors = list(findings_by_anchor.keys())
+    uf = _UnionFind(anchors)
+    for a_anchor, a_by_slug in findings_by_anchor.items():
+        for a_slug, a_list in a_by_slug.items():
+            for a_finding in a_list:
+                a_idx = finding_index[id(a_finding)][1]
+                a_cr = a_finding.get("cross_ref")
+                if not isinstance(a_cr, dict):
+                    continue
+                target_slug = a_cr.get("reviewer")
+                target_round = a_cr.get("round")
+                target_index = a_cr.get("finding_index")
+                if target_round != rnd:
+                    continue
+                # Find target finding in our pool.
+                for b_anchor, b_by_slug in findings_by_anchor.items():
+                    if target_slug not in b_by_slug:
+                        continue
+                    for b_finding in b_by_slug[target_slug]:
+                        b_idx = finding_index[id(b_finding)][1]
+                        if cross_refs_match(
+                            a_finding, rnd, a_slug, a_idx,
+                            b_finding, rnd, target_slug, b_idx,
+                        ):
+                            uf.union(a_anchor, b_anchor)
+
+    # Group anchors by root.
+    bucket_anchors: dict[str, list[str]] = {}
+    for a in anchors:
+        bucket_anchors.setdefault(uf.find(a), []).append(a)
+
+    # Build convergent + divergent rows, preserving ordering from the
+    # default 2-reviewer algorithm: codex findings first (in their original
+    # order), then unmatched cursor findings. Generalized: iterate the
+    # requested reviewer slugs in spec order; convergent bucket = one whose
+    # findings come from ≥2 distinct reviewer slugs.
+    convergent_rows: list[dict[str, Any]] = []
+    divergent_rows: list[dict[str, Any]] = []
+    consumed_findings: set[int] = set()
+
+    # Process in primary-reviewer-first order. For 2-reviewer default the
+    # primary is `codex` (first in roster). This preserves byte-identity
+    # with pre-043 output for the AC7 happy-path fixture.
+    primary_slug = requested[0] if requested else None
+    for slug in requested:
+        fm, findings = responses[slug]
+        if not fm:
+            continue
+        for f in findings:
+            if id(f) in consumed_findings:
                 continue
-            up, _ = normalize_where(uf["where"])
-            if cp == up:
-                matched_idx = j
-                break
-            if cross_refs_match(cf, rnd, "codex", uf, rnd, "cursor"):
-                matched_idx = j
-                break
-        if matched_idx is not None:
-            convergent.append((cf, cursor_findings[matched_idx]))
-            consumed_cursor.add(matched_idx)
-        else:
-            divergent_codex.append(cf)
-    divergent_cursor = [
-        uf for j, uf in enumerate(cursor_findings) if j not in consumed_cursor
-    ]
+            primary_anchor, _ = normalize_where(f["where"])
+            bucket_root = uf.find(primary_anchor)
+            bucket = bucket_anchors.get(bucket_root, [primary_anchor])
+            # Collect ALL findings in this bucket from all reviewers.
+            bucket_findings_by_slug: dict[str, list[dict[str, Any]]] = {}
+            for anchor in bucket:
+                for s2, fs in findings_by_anchor.get(anchor, {}).items():
+                    for ff in fs:
+                        if id(ff) in consumed_findings:
+                            continue
+                        bucket_findings_by_slug.setdefault(s2, []).append(ff)
+            participating_slugs = [s for s in requested if s in bucket_findings_by_slug]
+            if len(participating_slugs) >= 2:
+                # Convergent — one row per anchor-bucket. Pair codex+cursor
+                # for default 2-reviewer compat; for N-reviewer, emit one
+                # row with source listing all participants.
+                if slug != primary_slug and primary_slug in bucket_findings_by_slug:
+                    # Skip — the primary reviewer's row already covered this
+                    # bucket on its own iteration.
+                    continue
+                # Severity = max across all participating findings.
+                sev_order = {"high": 3, "medium": 2, "low": 1, "nit": 0}
+                all_findings = [
+                    ff for fs in bucket_findings_by_slug.values() for ff in fs
+                ]
+                sev = max((ff["severity"] for ff in all_findings),
+                          key=lambda s: sev_order[s])
+                convergent_rows.append({
+                    "anchor": primary_anchor,
+                    "severity": sev,
+                    "participants": participating_slugs,
+                    "findings": bucket_findings_by_slug,
+                })
+                for ff in all_findings:
+                    consumed_findings.add(id(ff))
+            else:
+                # Divergent — emit this single finding.
+                divergent_rows.append({"slug": slug, "finding": f})
+                consumed_findings.add(id(f))
 
+    # Frontmatter — emit ALL schema-declared <slug>_response fields (null for
+    # unrequested or missing). Preserves combined.schema.json's `required`
+    # contract for any roster configuration (043 AC6 R3 HIGH #1).
     fm_out: dict[str, Any] = {
         "item_id": item_id,
         "round": rnd,
-        "combined_at": _lib.iso_utc_now() if not now else now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "codex_response": "codex.md" if codex_fm else None,
-        "cursor_response": "cursor.md" if cursor_fm else None,
+        "combined_at": (
+            _lib.iso_utc_now() if not now
+            else now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        ),
+    }
+    for field in _schema_response_fields():
+        slug = field[: -len("_response")]
+        fm, _ = responses.get(slug, (None, []))
+        fm_out[field] = f"{slug}.md" if fm and slug in requested_set else None
+    fm_out.update({
         "patch_commit_sha": None,
         "next_round": None,
         "combined_verdict": combined_verdict,
         "escalated_to_founder": escalated,
-    }
+    })
 
+    # Body.
     body_lines: list[str] = ["\n# Combined findings\n"]
-    if escalated and combined_verdict == "single_reviewer_timeout":
-        missing = "codex" if codex_fm is None else "cursor"
+    if combined_verdict == "partial_responses":
+        present_slugs = [s for s in requested if verdict_map.get(s) is not None]
+        missing_slugs = [s for s in requested if verdict_map.get(s) is None]
         body_lines.append(
-            f"**Single-reviewer timeout** — `{missing}.md` is missing past the "
-            f"timeout. Strategist must escalate to founder per §AC4 verdict roll-up.\n"
+            "**Partial responses** — at least one required reviewer is missing past "
+            "the timeout. Strategist must escalate to founder per §AC4 verdict roll-up.\n"
         )
-    if escalated and combined_verdict == "no_responses":
+        body_lines.append("Present reviewers (and their verdicts):")
+        for s in present_slugs:
+            body_lines.append(f"- {s}: {verdict_map[s]}")
+        body_lines.append("")
+        body_lines.append("Missing required reviewers:")
+        for s in missing_slugs:
+            if s in required_set:
+                body_lines.append(f"- {s}")
+        body_lines.append("")
+    if combined_verdict == "no_responses":
         body_lines.append(
-            "**No-responses timeout** — both reviewers silent past the timeout. "
-            "Strategist must escalate to founder per §AC4 verdict roll-up.\n"
+            f"**No-responses timeout** — all {len(requested_set)} requested reviewers "
+            f"silent past the timeout. Strategist must escalate to founder per §AC4 "
+            f"verdict roll-up.\n"
         )
-    if escalated and combined_verdict == "divergent":
+    if combined_verdict == "divergent":
+        verdict_summary = ", ".join(
+            f"{s}={verdict_map[s]!r}" for s in requested if verdict_map.get(s) is not None
+        )
         body_lines.append(
-            f"**Divergent verdicts** — codex={codex_verdict!r} cursor={cursor_verdict!r} "
-            f"cross the `{{proceed*, pushback}}` boundary; founder escalation per §Out of Scope #7.\n"
+            f"**Divergent verdicts** — {verdict_summary} cross the "
+            f"`{{proceed*, pushback}}` boundary; founder escalation per §Out of Scope #7.\n"
         )
 
     body_lines.append("\n## Convergent findings\n")
     body_lines.append("| # | Severity | Source | Where (primary) | Disposition | Patch SHA / rationale |")
     body_lines.append("|---|---|---|---|---|---|")
-    for i, (cf, uf) in enumerate(convergent, start=1):
-        primary, _ = normalize_where(cf["where"])
-        sev = max(cf["severity"], uf["severity"], key=lambda s: {"high": 3, "medium": 2, "low": 1, "nit": 0}[s])
+    for i, row in enumerate(convergent_rows, start=1):
+        participants = row["participants"]
+        if set(participants) == set(requested) and len(requested) == 2:
+            # Preserve the legacy "both" wording for the default 2-reviewer
+            # AC7 byte-identity fixture.
+            source = f"both (convergent on `{row['anchor']}`)"
+        else:
+            source = f"{'+'.join(participants)} (convergent on `{row['anchor']}`)"
         body_lines.append(
-            f"| {i} | {sev.upper()} | both (convergent on `{primary}`) | "
-            f"{primary} | _strategist fills_ | _strategist fills_ |"
+            f"| {i} | {row['severity'].upper()} | {source} | "
+            f"{row['anchor']} | _strategist fills_ | _strategist fills_ |"
         )
 
     body_lines.append("\n## Divergent findings (single-reviewer or non-overlapping primary `where`)\n")
     body_lines.append("| # | Severity | Source | Where | Disposition | Patch SHA / rationale |")
     body_lines.append("|---|---|---|---|---|---|")
-    n = 1
-    for cf in divergent_codex:
-        primary, _ = normalize_where(cf["where"])
+    for n, row in enumerate(divergent_rows, start=1):
+        primary, _ = normalize_where(row["finding"]["where"])
         body_lines.append(
-            f"| {n} | {cf['severity'].upper()} | codex | {primary} | "
-            f"_strategist fills_ | _strategist fills_ |"
+            f"| {n} | {row['finding']['severity'].upper()} | {row['slug']} | "
+            f"{primary} | _strategist fills_ | _strategist fills_ |"
         )
-        n += 1
-    for uf in divergent_cursor:
-        primary, _ = normalize_where(uf["where"])
-        body_lines.append(
-            f"| {n} | {uf['severity'].upper()} | cursor | {primary} | "
-            f"_strategist fills_ | _strategist fills_ |"
-        )
-        n += 1
 
     body_lines.append("\n## Convergence call\n")
     body_lines.append(
@@ -434,9 +689,10 @@ def main(argv: list[str]) -> int:
 
         subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=repo_root, check=False)
 
+    reviewer_slugs = tuple(r.name for r in _reviewers.load_reviewers())
+
     for round_dir in eligible:
-        # clean orphans first
-        cleanup_orphans(round_dir, now_ts)
+        cleanup_orphans(round_dir, now_ts, reviewer_slugs)
         result = build_combined(round_dir, now, repo_root=repo_root)
         write_status = write_combined(round_dir, result["frontmatter"], result["body"])
         if write_status == "race_lost":
@@ -447,9 +703,6 @@ def main(argv: list[str]) -> int:
 
         is_malformed = result["frontmatter"]["combined_verdict"] == "malformed_reviewer_response"
 
-        # AC4: on malformed-reviewer-response escalation, append one row to
-        # raw/internal/queue-errors.md per offender. Row format matches the
-        # existing `<UTC>Z EVENT-TOKEN: ...` shape used by push-with-retry.sh.
         if is_malformed:
             queue_errors = repo_root / "raw" / "internal" / "queue-errors.md"
             queue_errors.parent.mkdir(parents=True, exist_ok=True)

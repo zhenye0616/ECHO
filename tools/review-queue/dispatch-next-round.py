@@ -155,14 +155,33 @@ def _branch_a(combined_path: Path) -> int:
 
 
 def _branch_b(args: argparse.Namespace, repo_root: Path, combined_path: Path, n: int) -> int:
-    """(b) Run request.py for r<N+1>, then set next_round=<N+1>."""
+    """(b) Run request.py for r<N+1>, then set next_round=<N+1>.
+
+    043 AC1f (R2 HIGH #3): the r<N+1> request inherits r<N>'s
+    `requested_reviewers` roster. Without this, a custom roster set on r1 (e.g.
+    `[codex, cursor, codex-arch]`) would silently regress to request.py's
+    default for r2 — breaking AC1's "per-round roster honored end-to-end".
+    """
     next_n = n + 1
+    current_request = combined_path.parent / "request.md"
+    roster: str | None = None
+    if current_request.is_file():
+        try:
+            cur_fm, _ = _lib.parse_frontmatter(current_request)
+            cur_roster = cur_fm.get("requested_reviewers")
+            if isinstance(cur_roster, list) and cur_roster:
+                roster = ",".join(str(r) for r in cur_roster)
+        except (ValueError, KeyError):
+            pass
+
     cmd = _resolve_request_py() + [
         args.item_id,
         str(next_n),
         f"--class={args.cls}",
         f"--repo-root={repo_root}",
     ]
+    if roster:
+        cmd.append(f"--reviewers={roster}")
     if args.focus_hints:
         cmd.append(f"--focus-hints={args.focus_hints}")
     if args.spec_sha:

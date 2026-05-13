@@ -251,6 +251,21 @@ describe('review-queue schemas', () => {
     expect(r.stderr).toMatch(/offending_response/);
   });
 
+  it('combined: offending_response with hyphenated reviewer slug validates (AC5)', () => {
+    // 043 AC5: regex widened from [a-z]+ to [a-z][a-z0-9-]+ so hyphenated slugs
+    // like "codex-arch" land cleanly. Falsifies the original pre-043 regex.
+    const p = write(
+      'combined.md',
+      validCombined({
+        combined_verdict: 'malformed_reviewer_response',
+        escalated_to_founder: true,
+        offending_response: 'backlog/reviews/2026-05-13-FIXTURE-codex-arch/r1/codex-arch.md',
+        parse_error: 'malformed YAML at line 5 column 1',
+      }),
+    );
+    expect(validate('combined', p).code).toBe(0);
+  });
+
   it('requested_reviewers must be a non-empty subset of the reviewer enum', () => {
     // empty
     const empty = write('request.md', validRequest({ requested_reviewers: [] }));

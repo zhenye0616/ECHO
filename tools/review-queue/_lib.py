@@ -25,8 +25,14 @@ except ImportError:
         os.execvp("arch", ["arch", "-arm64", _sys.executable, *_sys.argv])
     raise
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
+_TOOLS_DIR = Path(__file__).resolve().parent
+_DEFAULT_REPO_ROOT = _TOOLS_DIR.parents[1]
+# Env-var routing (043 R6 HIGH #1 + R7 HIGH #1). Tests fixture the full
+# pipeline by exporting these env vars so request.py / combine.py / shell
+# helpers all operate on the fixture tree without mutating production paths.
+REPO_ROOT = Path(os.environ.get("ECHO_REVIEW_QUEUE_REPO_ROOT", _DEFAULT_REPO_ROOT))
+SCHEMA_DIR = Path(os.environ.get("ECHO_SCHEMA_DIR", _TOOLS_DIR / "schemas"))
+REVIEWERS_CONFIG = Path(os.environ.get("ECHO_REVIEWERS_CONFIG", _TOOLS_DIR / "reviewers.json"))
 REVIEWS_DIR = REPO_ROOT / "backlog" / "reviews"
 ERROR_LOG = REPO_ROOT / "raw" / "internal" / "queue-errors.md"
 

@@ -19,13 +19,23 @@ This catches any new request directories AND ensures you are reviewing against t
 
 ## Step 2 — Scan for missing responses
 
-Find any `backlog/reviews/<item_id>/r<N>/request.md` whose corresponding `<item_id>/r<N>/cursor.md` does **not** exist. If `combined.md` already exists for that round (the strategist watcher beat you), skip.
+Find any `backlog/reviews/<item_id>/r<N>/request.md` whose corresponding `<item_id>/r<N>/cursor.md` does **not** exist, AND whose `request.requested_reviewers` includes `cursor`. If `combined.md` already exists for that round (the strategist watcher beat you), skip. If `requested_reviewers` does not include `cursor` (per 043 AC1), skip silently.
 
 ```bash
+MY_REVIEWER=cursor
+CANDIDATE=""
 for req in backlog/reviews/*/r*/request.md; do
   dir=$(dirname "$req")
-  if [ -f "$dir/cursor.md" ]; then continue; fi
+  if [ -f "$dir/$MY_REVIEWER.md" ]; then continue; fi
   if [ -f "$dir/combined.md" ]; then continue; fi
+  # 043 AC1: skip rounds where MY_REVIEWER is not in requested_reviewers.
+  if ! python3 -c "
+import sys, yaml
+fm = yaml.safe_load(open('$req').read().split('---')[1])
+sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
+"; then
+    continue
+  fi
   CANDIDATE="$req"
   break
 done
@@ -58,6 +68,11 @@ Construct the response frontmatter and findings list per `tools/review-queue/sch
 
 ```python
 import os, uuid
+# 043 AC4: late-response race guard. If combined.md was written during the
+# review window, our response is stale — discard without linking.
+round_dir = os.path.dirname(final)
+if os.path.exists(os.path.join(round_dir, "combined.md")):
+    raise SystemExit(0)
 tmp = f"{final}.{uuid.uuid4().hex}.tmp"
 with open(tmp, "w") as f: f.write(content)
 try:

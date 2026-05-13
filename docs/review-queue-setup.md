@@ -90,6 +90,45 @@ After install, verify each recipe by running it once before relying on the queue
 
 If any recipe fails verification, raise as a follow-up; the verified recipes are blocking for any post-merge dogfooding cycle that relies on the queue.
 
+## Adding a 3rd reviewer (043 AC2 + AC3)
+
+The reviewer roster is sourced from `tools/review-queue/reviewers.json` plus the explicit `reviewer` enums in the JSON schemas. Adding a new reviewer (e.g., a second Codex variant with an architectural-review prompt called `codex-arch`) is **5 file edits + 1 install invocation** for headless reviewers, **5 file edits** for IDE reviewers:
+
+| # | File | Edit |
+|---|---|---|
+| 1 | `tools/review-queue/reviewers.json` | Append one row: `{"name": "X", "mode": "headless"\|"ide", "required": true\|false, "timeout_hours": null\|<positive number>, "slash_command": "review-queue-X"}` |
+| 2 | `tools/review-queue/schemas/request.schema.json` | Append `"X"` to `requested_reviewers.items.enum` |
+| 3 | `tools/review-queue/schemas/reviewer.schema.json` | Append `"X"` to BOTH enums: top-level `reviewer` enum AND `findings[].cross_ref.reviewer` enum |
+| 4 | `tools/review-queue/schemas/combined.schema.json` | Add `"X_response": { "type": ["string", "null"] }` under `properties`. Schema's `additionalProperties: false` is preserved. |
+| 5 | `.claude/commands/review-queue-X.md` | New file; mirror `review-queue-codex.md`'s structure with the reviewer-perspective-specific prompt body. |
+
+For **`mode: headless`** reviewers, then run:
+
+```bash
+# Create the 5-line driver wrapper:
+cat > tools/review-queue/run-X-reviewer.sh <<'EOF'
+#!/usr/bin/env bash
+exec env REVIEWER_NAME=X "$(dirname "$0")/_run_reviewer.sh"
+EOF
+chmod +x tools/review-queue/run-X-reviewer.sh
+git update-index --chmod=+x tools/review-queue/run-X-reviewer.sh
+
+# Install the launchd job (mirrors install-codex-reviewer-launchd.sh):
+cat > tools/review-queue/install-X-reviewer-launchd.sh <<'EOF'
+#!/usr/bin/env bash
+exec "$(dirname "$0")/_install_reviewer_launchd.sh" X "$@"
+EOF
+chmod +x tools/review-queue/install-X-reviewer-launchd.sh
+git update-index --chmod=+x tools/review-queue/install-X-reviewer-launchd.sh
+
+# Run once to install + verify:
+tools/review-queue/install-X-reviewer-launchd.sh --smoke
+```
+
+For **`mode: ide`** reviewers, no launchd plumbing is needed. The user invokes `/review-queue-X` in the IDE on demand, the same way Cursor is invoked today.
+
+Schemas stay explicit (no `patternProperties`) — adding a reviewer touches one enum line per schema, but the validator contract stays as crisp as the day it was written. See `backlog/complete/2026-05-13-043-per-round-reviewer-roster.md` for the design rationale (Codex pushback R1 HIGH #5).
+
 ## Reviewer-prompt contract — `get_atom` parameter name
 
 The MCP `get_atom` tool's parameter is `id`, not `atom_id`. Reviewer prompts and any forward-looking guidance should call it as:
