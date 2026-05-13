@@ -28,21 +28,11 @@ fi
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 
-# Validate REVIEWER_NAME exists in reviewers.json with mode=headless. Fails
-# fast with the exact diagnostic AC3c/AC3d assert on stderr.
-SLASH_COMMAND="$(python3 - <<PY
-import sys
-from _reviewers import load_reviewers
-r = next((r for r in load_reviewers() if r.name == "$REVIEWER_NAME"), None)
-if r is None:
-    sys.stderr.write("$REVIEWER_NAME not found in reviewers.json\n")
-    sys.exit(1)
-if r.mode != "headless":
-    sys.stderr.write(f"$REVIEWER_NAME has mode={r.mode}, not headless\n")
-    sys.exit(1)
-print(r.slash_command)
-PY
-)"
+# Validate REVIEWER_NAME exists in reviewers.json with mode=headless. The
+# gate is a dedicated Python script (`_reviewer_gate.py`) so its stderr
+# survives all shell-wrapping permutations (e.g. node spawnSync without a
+# tty was eating heredoc-via-`<<PY` stderr in some setups).
+SLASH_COMMAND=$(python3 "$TOOL_DIR/_reviewer_gate.py") || exit $?
 
 # PATH augmentation — launchd's environment is stripped down; codex (and
 # common dependencies it shells out to) live in user-local bin directories

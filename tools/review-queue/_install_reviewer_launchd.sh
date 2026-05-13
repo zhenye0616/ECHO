@@ -30,19 +30,9 @@ TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$TOOL_DIR/../.." && pwd)"
 export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 
-# Validate slug is in reviewers.json with mode=headless.
-python3 - <<PY
-import sys
-from _reviewers import load_reviewers
-r = next((r for r in load_reviewers() if r.name == "$REVIEWER"), None)
-if r is None:
-    sys.stderr.write("$REVIEWER not found in reviewers.json\n")
-    sys.exit(1)
-if r.mode != "headless":
-    sys.stderr.write(f"$REVIEWER has mode={r.mode}, not headless; "
-                     f"IDE-mode reviewers have no launchd job\n")
-    sys.exit(1)
-PY
+# Validate slug is in reviewers.json with mode=headless. Reuses the same
+# gate script as _run_reviewer.sh (043 AC3).
+REVIEWER_NAME="$REVIEWER" python3 "$TOOL_DIR/_reviewer_gate.py" >/dev/null
 
 LABEL="com.echo.review-queue-$REVIEWER"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
