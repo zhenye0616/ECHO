@@ -129,11 +129,13 @@ This item also serves the **AC8 empirical test** carried forward from 041: it is
 
 ### AC4 — queue-errors.md append on AC2 escalation
 
-**Implementation.** On AC2's catch path (after the combined.md write but before exit), append one row to `raw/internal/queue-errors.md` matching the existing format used by `push-with-retry.sh`:
+**Implementation.** On AC2's catch path (after the combined.md write but before exit), append one row to `raw/internal/queue-errors.md` matching the **exact format already used by `push-with-retry.sh`** in the same file: UTC ISO 8601 timestamp + space + EVENT-TOKEN + colon + diagnostic text. Pattern:
 
 ```
-- 2026-05-XX HH:MM PDT — combine.py escalated round <round_id> to founder: malformed YAML in `<offending_response>` (`<parse_error_one_line>`)
+2026-05-XX HH:MM:SSZ MALFORMED-REVIEWER-RESPONSE: combine.py round <item_id>/r<N> offending_response=<repo-root-relative path> parse_error="<one-line excerpt>"
 ```
+
+The format choice is deliberately NOT a Markdown bullet and NOT local PDT, despite the Builder Discipline preference for PDT in human artifacts (line 179). Reason: `queue-errors.md` is a machine-parseable operational log (already grepped by `push-with-retry.sh`'s race-fallback logic), not a human-narrative artifact like the dogfooding journal. Existing rows in this file ALL use the `<UTC>Z EVENT-TOKEN: ...` form; AC4 must stay in that form so future `grep`-based readers don't have to handle two shapes.
 
 This is the only mutating-write to a shared file outside `backlog/reviews/<round>/` — same surface `push-with-retry.sh` already writes to, same append-only handshake, no new contention.
 
@@ -176,7 +178,7 @@ Net: +2 test files, +4 it()/test() blocks. Existing review-queue suite was 47 at
 - AC1 is ~3-5 lines in `_lib.py` + 1-2 lines in `validate.py` if any (likely zero). Don't refactor `parse_frontmatter`'s signature.
 - AC2's combined.md output must use the same atomic-write pattern (`os.link`) as the existing combine.py write path — don't introduce a second pattern.
 - The AC2 escalation does NOT call `dispatch-next-round.py`. The round is terminal (`next_round: null`). Founder + strategist handle recovery out-of-band.
-- AC4's queue-errors.md row uses local PDT time per the founder's `feedback_local_time_in_human_artifacts.md` convention. Use Python's `zoneinfo.ZoneInfo("America/Los_Angeles")`.
+- AC4's queue-errors.md row uses **UTC ISO 8601 with `Z` suffix** (e.g. `2026-05-12T23:57:09Z MALFORMED-REVIEWER-RESPONSE: ...`) to match the existing `<UTC>Z EVENT-TOKEN: ...` format used by `push-with-retry.sh` in the same file. This intentionally diverges from `feedback_local_time_in_human_artifacts.md`'s PDT preference because `queue-errors.md` is a machine-parseable operational log, not a human-narrative artifact — see AC4 implementation note above.
 - If you find a related bug while in `combine.py` (e.g., the finding-enumeration audit), log it in `raw/internal/decisions/` as a drift-event and STOP. File it as a separate followup. Do not inline-fix.
 
 ## After Completion (Strategist Notes)
