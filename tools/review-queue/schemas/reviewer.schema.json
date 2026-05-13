@@ -25,7 +25,7 @@
     },
     "reviewer": {
       "type": "string",
-      "enum": ["codex", "cursor"]
+      "enum": ["codex", "cursor", "codex-ops"]
     },
     "artifact_sha": {
       "type": "string",
@@ -64,7 +64,7 @@
             "additionalProperties": false,
             "properties": {
               "round": {"type": "integer", "minimum": 1},
-              "reviewer": {"type": "string", "enum": ["codex", "cursor"]},
+              "reviewer": {"type": "string", "enum": ["codex", "cursor", "codex-ops"]},
               "finding_index": {"type": "integer", "minimum": 1}
             }
           }

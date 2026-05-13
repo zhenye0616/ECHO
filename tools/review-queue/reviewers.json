@@ -14,6 +14,13 @@
       "required": true,
       "timeout_hours": 2,
       "slash_command": "review-queue-cursor"
+    },
+    {
+      "name": "codex-ops",
+      "mode": "headless",
+      "required": true,
+      "timeout_hours": null,
+      "slash_command": "review-queue-codex-ops"
     }
   ]
 }
