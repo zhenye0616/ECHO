@@ -304,7 +304,37 @@ QUEUE_ERRORS_LOG = REPO_ROOT / "raw" / "internal" / "queue-errors.md"
 
 All downstream call sites in `combine.py`, `request.py`, `commit-reviewer-response.sh`, `push-with-retry.sh` that compute paths from REPO_ROOT must use `_lib.REPO_ROOT` (or these derived constants) instead of computing their own. This is the same plumbing pattern as 041's wrapper but pushed one layer deeper into `_lib`.
 
-`_reviewers.py:load_reviewers()` reads from `REVIEWERS_CONFIG` by default (line `path = config_path or _lib.REVIEWERS_CONFIG` instead of `or _TOOLS_DIR / "reviewers.json"`). `validate.py` reads from `_lib.SCHEMA_DIR`. `combine.py` reads from `_lib.SCHEMA_DIR` for the combined-schema validator. `commit-reviewer-response.sh` inherits env from its parent process — shell-side no change needed once `_lib.py` honors the env vars.
+`_reviewers.py:load_reviewers()` reads from `REVIEWERS_CONFIG` by default (line `path = config_path or _lib.REVIEWERS_CONFIG` instead of `or _TOOLS_DIR / "reviewers.json"`). `validate.py` reads from `_lib.SCHEMA_DIR`. `combine.py` reads from `_lib.SCHEMA_DIR` for the combined-schema validator AND uses `_lib.REPO_ROOT` for the round-discovery path.
+
+**Shell helpers — `TOOL_DIR` vs `TARGET_REPO` split (R8 HIGH #1 fix).** `commit-reviewer-response.sh` and `push-with-retry.sh` currently derive their own repo root via `git rev-parse --show-toplevel`. That means the AC6h fixture's `ECHO_REVIEW_QUEUE_REPO_ROOT` env var ONLY routes the Python pipeline; the shell pipeline still commits/pushes against the production repo. Fix:
+
+```bash
+# In commit-reviewer-response.sh and push-with-retry.sh — change the prelude from:
+#   REPO_ROOT="$(git rev-parse --show-toplevel)"
+#   <use REPO_ROOT for everything: locating validate.py, committing, pushing>
+# to:
+TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"  # where THIS script + validate.py + push-with-retry.sh live
+TARGET_REPO="${ECHO_REVIEW_QUEUE_REPO_ROOT:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel)}"
+
+# Then EVERY git invocation pins -C "$TARGET_REPO":
+git -C "$TARGET_REPO" add "$RELATIVE_PATH"
+git -C "$TARGET_REPO" commit -m "$MSG"
+git -C "$TARGET_REPO" pull --rebase origin main
+git -C "$TARGET_REPO" push origin main
+
+# AND every file-write to the target repo uses TARGET_REPO:
+echo "$ROW" >> "$TARGET_REPO/raw/internal/queue-errors.md"
+
+# AND every tool invocation uses TOOL_DIR:
+python3 "$TOOL_DIR/validate.py" reviewer "$RESPONSE_PATH"
+"$TOOL_DIR/push-with-retry.sh" "$MSG"
+```
+
+This makes the shell pipeline honor `ECHO_REVIEW_QUEUE_REPO_ROOT` end-to-end. AC6h fixture can set the env var and the entire pipeline (Python + shell) writes to `$FIXTURE/repo` without copying the tool tree.
+
+**AC6h assertion update.** AC6h test must additionally assert: when `ECHO_REVIEW_QUEUE_REPO_ROOT=$FIXTURE/repo` is set, `commit-reviewer-response.sh` (invoked from the production tool tree at `$REPO_ROOT/tools/review-queue/`) commits to `$FIXTURE/repo` not to the production repo. Falsification: post-test, `git -C $REPO_ROOT log -1 --format=%H` is unchanged (no production commits); `git -C $FIXTURE/repo log -1 --format=%H` reflects the fixture's reviewer-response commit.
+
+Add `tools/review-queue/push-with-retry.sh` to Files Touched (same TOOL_DIR vs TARGET_REPO split).
 
 Same plumbing pattern as the existing `ECHO_REVIEW_QUEUE_REPO_ROOT` env var from 041. The three env vars compose: AC6h's fixture setup sets all three.
 
