@@ -77,7 +77,12 @@ Disposition for r1 codex HIGH #1 (executable boundary / testability): the helper
    - **AC1b** — Malformed YAML (unescaped quote in `finding:` string): assert exit non-zero, stderr contains the parser error with line/column info.
    - **AC1c** — Schema violation (`completed_at: datetime.datetime(...)` not string): assert exit non-zero, stderr contains the schema violation path.
 2. **Prompt-grep test:** Assert each of `.claude/commands/review-queue-codex.md`, `review-queue-cursor.md`, `review-queue-codex-ops.md` contains a literal `validate_response_yaml.py` reference in their Step 5 prose (`grep -l validate_response_yaml.py .claude/commands/review-queue-{codex,cursor,codex-ops}.md` returns all three files).
-3. **Clean-tree test (AC1d):** Stage a synthetic queue-errors row that would have been written by the OLD failure path. Invoke the helper against malformed YAML. Assert: `git status --porcelain raw/internal/queue-errors.md` shows NO change post-helper (success-after-retry path is stderr-only).
+3. **Clean-tree test (AC1d):** Disposition for r2 codex MED #1 (AC1d falsifiable-assertion fix): the prior shape used `git status --porcelain` which is dirty-by-construction when the fixture stages a synthetic row. The corrected assertion compares the post-helper state against the pre-helper staged baseline via `git diff --exit-code -- raw/internal/queue-errors.md`. Test plan:
+   - Stage a synthetic `queue-errors.md` row representing the test fixture's known baseline.
+   - Capture the staged blob SHA via `git rev-parse :raw/internal/queue-errors.md`.
+   - Invoke the helper against malformed-YAML fixture file.
+   - Assert: `git diff --exit-code -- raw/internal/queue-errors.md` returns 0 (no unstaged diff against the staged baseline). The helper MUST NOT mutate the file beyond what the fixture pre-staged.
+   - Assert: the staged blob SHA is unchanged after the helper runs.
 
 ### AC2 — Smoke gate fail-closed
 
@@ -91,13 +96,18 @@ Disposition for r1 codex-ops MED #1: the original spec deferred the smoke-runner
 
 **Out-of-scope drift to defend against:** Do NOT create a generic `_smoke_test_runner.sh` fallback in this spec (that would be a separate item — it requires designing what a parameterized smoke test looks like for an arbitrary reviewer slug). The 045 fix is just fail-closed.
 
-**Test:** Add a `tests/review-queue/045-smoke-gate-fail-closed.test.ts`:
-1. Fixture: temp install of a `mock-reviewer` slug into reviewers.json.
-2. Confirm `smoke-test-mock-reviewer-runner.sh` does NOT exist.
+**Test:** Add a `tests/review-queue/045-smoke-gate-fail-closed.test.ts`. **Test isolation requirement** (disposition for r2 convergent MED — codex MED #2 + codex-ops MED #1): the test MUST NOT interact with the operator's real LaunchAgents directory or invoke real `launchctl`/`sw_vers`/`id` binaries. Required fixture isolation:
+- **Temp HOME:** set `HOME=$(mktemp -d)` for the duration of the test; `$HOME/Library/LaunchAgents/` becomes an isolated directory the test owns.
+- **PATH stubs:** prepend a temp directory to `PATH` containing executable stubs for `launchctl`, `sw_vers`, and `id` that record their invocations to a fixture log instead of running the real binaries. The stubs return canned exit codes (0 for `launchctl bootout`/`bootstrap`/`kickstart`/`load`; canned strings for `sw_vers -productVersion` and `id -u`).
+- **Cleanup:** the test's `afterEach` deletes the temp HOME and temp PATH dir; resets `HOME`/`PATH` env vars.
+
+Test cases (all run inside the isolation):
+1. Fixture: temp install of a `mock-reviewer` slug into a temp `reviewers.json` (reusing the temp HOME for the working repo if needed).
+2. Confirm `smoke-test-mock-reviewer-runner.sh` does NOT exist in the test's tools/review-queue/.
 3. Invoke `_install_reviewer_launchd.sh mock-reviewer --smoke`.
-4. Assert: script exits 1; **NO plist installed at `~/Library/LaunchAgents/com.echo.review-queue-mock-reviewer.plist`** (production-side state untouched); stderr contains the expected "smoke runner missing" diagnostic.
-5. Touch a valid `smoke-test-mock-reviewer-runner.sh` and re-run — assert exit 0 AND the plist now exists.
-6. **AC2b — install-without-smoke explicit-choice path:** Invoke `_install_reviewer_launchd.sh mock-reviewer` (no `--smoke` flag). Assert exit 0 AND plist installed (no smoke gate fires; operator made an explicit choice).
+4. Assert: script exits 1; **NO plist exists at `$HOME/Library/LaunchAgents/com.echo.review-queue-mock-reviewer.plist`** (production-side state untouched); stderr contains "smoke runner missing"; **the launchctl stub recorded ZERO invocations** on the fail path.
+5. Touch a valid `smoke-test-mock-reviewer-runner.sh` and re-run — assert exit 0 AND the plist now exists in `$HOME/Library/LaunchAgents/`; the launchctl stub recorded the expected bootout + bootstrap + kickstart sequence.
+6. **AC2b — install-without-smoke explicit-choice path:** Invoke `_install_reviewer_launchd.sh mock-reviewer` (no `--smoke` flag). Assert exit 0 AND plist installed AND the launchctl stub recorded bootout + bootstrap but NO kickstart.
 
 ### AC3 — Orphan-cleanup test fix
 
@@ -185,15 +195,23 @@ Update the skill's "What Success Looks Like" section to mention: "review_notes a
 Updated /review-pending prose (single chosen path — disposition for r1 codex MED #3 removes the prior contradictory "staged but not committed" paragraph):
 ```bash
 for SIDECAR in "${SIDECARS[@]}"; do
+  SIDECAR_BASE=$(basename "$SIDECAR" .review.md)
   git add "$SIDECAR"
-  git commit -m "review: $(basename "$SIDECAR" .review.md)" "$SIDECAR"
+  git commit -m "review: $SIDECAR_BASE" "$SIDECAR"
+  tools/review-queue/push-with-retry.sh "review: $SIDECAR_BASE"
 done
-tools/review-queue/push-with-retry.sh "review: $(basename "$ITEM" .md)"
 ```
+
+Disposition for r2 codex MED #3b (the `$(basename "$ITEM" .md)` ambiguity): the push helper is invoked **inside the SIDECARS loop**, once per sidecar, using the per-sidecar base name. This is unambiguous for multi-item /review-pending invocations and produces one push-with-retry per review (matches the per-reviewer-response pattern used by `commit-reviewer-response.sh`). The prior shape (single push after the loop with `basename "$ITEM"` referencing a variable from outside the loop) is removed.
 
 Disposition for r1 codex-ops HIGH #1: `push-with-retry.sh` is used in place of `git push origin main || true`. The bare-push-with-swallow pattern would have produced a local-only sidecar commit on auth loss, network outage, or rejected push, leaving the strategist's `/merge-and-cleanup` to pass pre-flight locally while the next operator or machine sees no review artifact on origin. `push-with-retry.sh` performs bounded retries, logs to `queue-errors.md` on terminal failure (existing 039+041 contract), and surfaces the failure non-zero — making any push gap visible at /review-pending exit time, not silently at /merge-and-cleanup time.
 
-Updated /review-pending Step E "What You Must NOT Do" — REMOVE the line "Do not commit anything" and REPLACE with "Do not commit anything OTHER than the review sidecars themselves (which are the deliverable of this skill). The sidecar commit + push via `push-with-retry.sh` is in-scope per AC6 of spec 045."
+**Disposition for r2 codex MED #3a — residual read-only prose elsewhere in /review-pending:** the description field (line 2) and the intro paragraph (line 7) currently both say `/review-pending` is read-only and never runs state-changing git operations. AC6 updates BOTH to the new sidecar-only exception:
+- **Description (line 2):** change `read-only` clause to `Read-only EXCEPT for committing+pushing the per-item review sidecars (the skill's deliverable).`
+- **Intro (line 7):** change `It does not move files, modify the working tree, or run any state-changing git operations.` → `It does not move items between stages, modify item frontmatter, or run git operations beyond committing+pushing the per-item review sidecars (the skill's deliverable).`
+- **Step E "What You Must NOT Do":** REMOVE the line "Do not commit anything" and REPLACE with "Do not commit anything OTHER than the review sidecars themselves (which are the deliverable of this skill). The sidecar commit + push via `push-with-retry.sh` is in-scope per AC6 of spec 045."
+
+All three prose locations now consistently describe the sidecar-write-and-push as the skill's single exception to read-only.
 
 **Why:** Eliminates F-F. /review-pending → /merge-and-cleanup handoff currently requires a manual strategist commit between skills. Closing this gap brings the merge-cycle's automation depth to parity with the review-cycle's (where reviewers commit their responses atomically via `commit-reviewer-response.sh`).
 
