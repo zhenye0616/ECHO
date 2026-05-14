@@ -118,7 +118,7 @@ Fixture shape matches `tests/task-state/push-round-state.test.ts` (tmpdir + bare
 3. **`atomic lockfile prevents overlapping wrapper invocations`** (wrapper-owned, R1 codex F3 fixture):
    - Use a "slow" stub `mock-codex.sh` that `sleep 3 && exit 0` to keep the lock dir held.
    - Invoke `run-codex-builder.sh` in the background.
-   - **Synchronization (R2 codex F2 — make the race-free):** poll for `.git/echo-builder-in-progress.d/info` to exist with timeout ~2s (`while [ ! -f .git/echo-builder-in-progress.d/info ] && [ "$WAITED" -lt 20 ]; do sleep 0.1; WAITED=$((WAITED+1)); done`). Only THEN invoke the second `run-codex-builder.sh`. Without this gate, a Vitest `spawn` implementation can race the first process's `mkdir` and occasionally let the second invocation acquire first on a loaded machine.
+   - **Synchronization (R2 codex F2 — make the race-free):** poll for `.git/echo-builder-in-progress.d/info` to exist with timeout ~2s (`WAITED=0; while [ ! -f .git/echo-builder-in-progress.d/info ] && [ "$WAITED" -lt 20 ]; do sleep 0.1; WAITED=$((WAITED+1)); done`). Only THEN invoke the second `run-codex-builder.sh`. Without this gate, a Vitest `spawn` implementation can race the first process's `mkdir` and occasionally let the second invocation acquire first on a loaded machine. (`WAITED=0` initializer per R3 cursor F2 — required under `set -u`.)
    - Assert: (a) second invocation exits non-zero with the lock-exists diagnostic; (b) `LOCK_DIR/info` content shows the FIRST invocation's PID and timestamp (unchanged); (c) after the first invocation completes, `LOCK_DIR` is gone; (d) a third invocation (post-cleanup) acquires the lock cleanly.
 
 Tests do **NOT** invoke real `codex exec` (would require codex CLI + auth + non-deterministic LLM output). The wrapper's contract — what env/argv/stdin/lock-visibility codex receives — is what's under test, not codex's runtime behavior.
@@ -153,7 +153,7 @@ This is the cycle that gets measured against the baseline. AC5 is **not** a hard
 
 - **Launchd job for the codex builder.** Builder is one-shot, not periodic. Spawning it via cron / launchd would race multiple builders on the same item. Manual invocation is the correct lifecycle.
 - **Headless Claude Code reviewer binding.** Codex's R0 consult was explicit: "Do not build headless Claude Code unless founder clarifies that 'claude reviewer' means headless." Cursor's Claude via `skills/review-queue-cursor.md` is the claude reviewer for this cycle.
-- **Multi-machine builder coordination.** Lockfile is local-only (`.git/echo-builder-in-progress`). Cross-machine coordination is V2+ work; no current need.
+- **Multi-machine builder coordination.** Lockfile is local-only (`.git/echo-builder-in-progress.d/`, the atomic-`mkdir` lock DIRECTORY per AC1; stale-recovery is `rm -rf .git/echo-builder-in-progress.d`). Cross-machine coordination is V2+ work; no current need.
 - **Builder retry semantics beyond skills/process-backlog.md.** The existing skill defines retry / escalation / stop-on-uncertainty behavior. 047 does NOT change that.
 - **Changes to the cross-tool protocol.** Only ADDS a binding. The protocol (atomic-claim shape, worktree contract, push-to-pending-review semantics) is unchanged.
 - **Builder-state pointer for already-merged 046 item.** The retroactive `task-state/2026-05-13-046-.../builder.md` does not exist and will not be backfilled. AC3 starts with 047's own pointer.
