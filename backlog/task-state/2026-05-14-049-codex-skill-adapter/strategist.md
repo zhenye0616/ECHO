@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T20:50:00Z
+last_updated: 2026-05-14T21:10:00Z
 ---
 
 ## current_thesis
 
-Spec 049 at **R4-disposition state**, R5 about to fire. **Decay pattern unusual:** each strategist disposition introduces new operational-safety surface that the next round catches. Tally: R1 7 findings 1 HIGH → R2 6→3 unique 2 HIGH → R3 3 findings 1 HIGH → R4 4 findings 1 HIGH (verdict divergence at proceed*/pushback boundary). R4 codex-ops `pushback` was on the staged-rename copy mechanism I added in R3 disposition — staging lived inside the live codex skill root, SIGKILL/power-loss leaves orphans visible to codex. Auto-resolved per 046 R4 precedent extension (founder-authorized full-auto-mode "till converge"): staging moved to `$HOME/.codex/.echo-staging/`, per-target lock added via atomic `mkdir`, --check now enumerates+rejects unexpected adapters, stale-staging cleanup in pre-flight. R5 verification dispatched. **If R5 also produces a HIGH on the staging/lock mechanism, the rational next step is to simplify AC4 by dropping --copy mode entirely** (defer to a followup spec) — symlink-only would significantly reduce surface area and likely converge cleanly. Tracked as R5-exit-criterion in strategist's contingency plan.
+Spec 049 at **R6-disposition state**, R7 about to fire. **Cycle has 6 rounds — at the upper bound of reasonable round count.** Decay pattern: R1 7→6 unique 1 HIGH → R2 6→3 unique 2 HIGH → R3 3 findings 1 HIGH → R4 4→3 unique 1 HIGH (verdict divergence pushback/proceed*) → R5 6→4 unique 1 HIGH (divergence pushback/proceed*) → R6 4 findings 2 HIGH (BOTH proceed_after_patches — verdict divergence resolved). Each strategist disposition kept introducing new operational-safety surface; this round R6 verdicts converged for the first time since R3, suggesting decay toward terminal. R6 patches: complete section list for AC2 child output (codex F1 HIGH), `workspace-write` sandbox SCOPED to per-item worktree (codex F2 MED, leverages existing /process-backlog worktree isolation — real architectural improvement, not a workaround), `set +e; echo $? > rc; wait || true` shell wrapping (codex-ops F1 HIGH), pid+timestamp in lock + stale-lock recovery (codex-ops F2 MED). **R7 is the final verification round per cycle budget. If R7 produces ANY new HIGH, escalate to founder** for explicit "continue / simplify / accept-and-claim" decision rather than self-extend to R8+. The pattern of new-surface-per-round is genuine; this spec hit operational complexity that wasn't visible at draft time. Worth retro: was the original spec scope too large? Should --copy mode have been deferred entirely from V1?
 
 ## locked_decisions
 
