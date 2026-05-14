@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T21:25:00Z
+last_updated: 2026-05-14T21:30:00Z
 ---
 
 ## current_thesis
 
-Spec 049 at **R7-disposition state**, R8 about to fire. Cycle now has 7 rounds. R7 escalation to founder fired per documented exit-criterion (R7 produced codex F1 HIGH — real builder-blocking bug about `codex exec` stdout shape vs `--output-last-message` flag); **founder explicitly authorized continuing with `--copy` mode kept** + applying R7 patches inline. R7 patches: `--output-last-message` for child final-response file (codex F1 HIGH — real spec bug, would have broken builder), stale-lock recovery test added (codex F2 MED), parse-failure-evidence-preserved-outside-RUN_DIR-cleanup (codex-ops F1 MED), corrupted-timestamp fallback to mtime under set-e-safe read (codex-ops F2 MED), copy-mode stale-after-sync detection via `synced_from_commit` sentinel + `--check` warning (codex-ops F3 MED). **R8 is final verification.** If R8 returns clean (no HIGH, both proceed*), CLAIM-READY. If R8 produces another HIGH, escalate to founder again with hard "we're at 8 rounds; pick simplify-or-accept-or-claim" decision. Verdict-shape signal positive: R6 + R7 both `proceed_after_patches` from both reviewers (no pushback for 2 rounds running) — convergence trajectory holds.
+Spec 049 **CLAIM-READY at R8 by founder decision** — FIRST FAIL-TO-CONVERGE CYCLE in ECHO history. 8 rounds of cross-vendor codex+codex-ops review; verdicts converged at proceed_after_patches both sides for R6/R7/R8 but reviewers kept surfacing new operational-safety concerns each round (~20 unique-root findings total), never reaching zero-HIGH. Founder's R8 decision: "B for now but note this as the first fail to converge loop. this is a very good signal a responsible because the cross vendor multi reviewer has the discipline to reject convergence when the scope is too ambitious." Builder may atomically claim. **Load-bearing property demonstrated:** cross-vendor multi-reviewer pipeline has the discipline to refuse convergence when spec scope is too ambitious — this is the property working as designed, not a failure. R8 patches applied inline (orchestrator-test deferred → eliminates R7-self-inflicted test-vs-OoS contradiction; three-factor stale-lock gate with `kill -0` pid liveness; content-hash sentinel instead of HEAD-SHA). Followups filed: 050-codex-fan-out-orchestrator (V1.5+); cycle-length-budget-enforcement (operating-model); wiki promotion documenting the load-bearing fail-to-converge property.
 
 ## locked_decisions
 

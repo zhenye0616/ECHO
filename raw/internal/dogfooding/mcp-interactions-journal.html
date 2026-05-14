@@ -1651,6 +1651,11 @@ PDT - Codex-ops R8 on 049 codex skill adapter</a></li>
 <li><a href="#pdt---codex-r8-on-049-codex-skill-adapter"
 id="toc-pdt---codex-r8-on-049-codex-skill-adapter">2026-05-14 14:19 PDT
 - Codex R8 on 049 codex skill adapter</a></li>
+<li><a
+href="#pdt-049-first-fail-to-converge-cycle-load-bearing-positive-signal"
+id="toc-pdt-049-first-fail-to-converge-cycle-load-bearing-positive-signal">2026-05-14
+14:30 PDT — 049 FIRST FAIL-TO-CONVERGE CYCLE (load-bearing positive
+signal)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16983,6 +16988,111 @@ entry.</li>
 and install-shell hazards. The remaining issue is narrower: remove/defer
 the test for executable parse-failure handling unless 049 also brings
 the codex review-pending orchestrator/parser into scope.</li>
+</ul>
+<h3
+id="pdt-049-first-fail-to-converge-cycle-load-bearing-positive-signal">2026-05-14
+14:30 PDT — 049 FIRST FAIL-TO-CONVERGE CYCLE (load-bearing positive
+signal)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked Claude strategist to draft
+049 (codex-skill-adapter — third sync target for tools/sync-skills.sh +
+vendor-neutralization of skills/review-pending.md) “with this shape and
+full auto mode with two codex reviewers till converge.” Claude
+strategist drove the cycle through 8 cross-vendor review rounds;
+verdicts converged to proceed_after_patches both sides at R6/R7/R8 but
+reviewers (especially codex-ops’s runtime/ops lens) kept surfacing new
+operational-safety findings each round; never reached zero-HIGH. Founder
+explicit decision at R8 escalation: ship with R8 patches inline +
+CLAIM-READY despite open HIGH, frame this as “the first fail to converge
+loop… a very good signal a responsible because the cross vendor multi
+reviewer has the discipline to reject convergence when the scope is too
+ambitious.”</li>
+<li><strong>Query inputs:</strong> No ECHO MCP calls during this journal
+entry (post-cycle observation log). Cycle itself used
+<code>wait_for_new_turns(codex)</code> + <code>get_atoms</code>
+repeatedly to monitor R1-R8 reviewer progress; those calls were
+journaled at their respective ticks.</li>
+<li><strong>Returned:</strong> N/A — this is the post-cycle synthesis
+entry.</li>
+<li><strong>Sources:</strong> 8
+r<N>/{request,codex,codex-ops,combined}.md sets under
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/</code>; 8
+strategist disposition commits on <code>main</code>
+(<code>ce00143</code> → <code>f0bf4ea</code> plus post-R8 disposition
+commit); spec body at
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code>;
+strategist task-state pointer; cycle round-finding tally: R1 7 (1H), R2
+6→3-unique (2H), R3 3 (1H), R4 4→3-unique (1H, pushback), R5 6→4-unique
+(1H, pushback), R6 4 (2H, no pushback), R7 5 (1H), R8 3 (1H). ~20
+unique-root findings total.</li>
+<li><strong>Verdict:</strong> ✅ right — the SYSTEM did its job. The
+reviewer pipeline correctly refused to converge to zero-HIGH on a spec
+whose operational complexity (install helper + codex fan-out + copy mode
++ crash-safe staging + lock recovery + drift detection) genuinely
+exceeded what one cycle should carry. The
+discipline-to-reject-convergence is the property working as designed,
+not a failure of the protocol.</li>
+<li><strong>Note:</strong> FIVE post-cycle observations.
+<ol type="1">
+<li><strong>Each strategist disposition introduced new operational
+surface.</strong> R2 catches my R1 patches; R3 catches my R2; R4 catches
+my R3; etc. Pattern: when reviewers find issues in my dispositions (not
+the original spec), that’s the strategist over-reaching. Should have
+detected at R3-R4 and SIMPLIFIED (drop –copy mode entirely; ship
+symlink-only) rather than continuing to iterate. Logged as
+operating-model followup in <code>backlog/_followups.md</code>:
+cycle-length-budget enforcement — strategist decision-tree should detect
+“HIGH count not decreasing + new HIGHs from prior round’s patches”
+pattern and force scope reduction before round N+1.</li>
+<li><strong>Self-inflicted contradictions surfaced late.</strong> R8’s
+codex F1 HIGH was a self-inflicted contradiction from my R7 disposition:
+I added a
+<code>parse-failure preserves evidence outside RUN_DIR cleanup</code>
+test in AC3 that required an executable orchestrator the spec’s Out of
+Scope explicitly forbids implementing. Reviewers caught what I
+introduced. Not their fault — mine for over-aggressive patch
+additions.</li>
+<li><strong>Cross-vendor signal was strong throughout.</strong> codex
+(procedural lens) and codex-ops (runtime/ops lens) caught DIFFERENT
+issues each round (R2: codex caught child sandbox + temp file race;
+codex-ops caught child sandbox + temp file race FROM DIFFERENT FRAMING —
+convergent. R4: codex-ops caught staging-inside-skill-root that codex
+missed. R5: codex caught JSON-contract under-specification; codex-ops
+caught lock-not-covering-symlink. R7: codex caught
+stdout-vs-output-last-message HIGH; codex-ops caught
+parse-failure-evidence-loss MED. Complementary findings, not
+contradictory. The cross-vendor pair was load-bearing for the
+discipline-to-reject-convergence property; same-vendor reviewer pair
+would have likely converged earlier on incomplete state.</li>
+<li><strong>Verdict convergence ≠ finding convergence.</strong> Both
+reviewers said proceed_after_patches from R6 onward (no pushback for 3
+rounds) BUT findings continued. The protocol’s verdict-divergence
+escalation criterion (proceed<em>/pushback boundary) wasn’t tripped from
+R6+, yet the spec wasn’t converging. Suggests adding a SECONDARY
+convergence criterion: finding-count-trajectory. If finding count not
+strictly decreasing across 2+ rounds with both reviewers at
+proceed</em>, that’s a signal of fail-to-converge — distinct from
+verdict-band escalation.</li>
+<li><strong>Founder R8 framing is the right reading.</strong> “First
+fail to converge loop… very good signal a responsible because the cross
+vendor multi reviewer has the discipline to reject convergence when the
+scope is too ambitious.” This reframes 049’s 8-round-no-zero-HIGH from
+“cycle failure” to “discipline working.” Wiki promotion candidate:
+document this as a load-bearing positive property of the protocol —
+<code>wiki/operating-model/fail-to-converge-as-designed-property</code>
+or similar.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> The pattern of “operationally-rich spec
+generates new safety surface per round” may be characteristic of
+install/CLI/operational-mechanism specs in general (anything that ships
+shell scripts running in user environments with FS state, locks,
+sandboxes, crash recovery). Future specs with similar shape (install
+helpers, daemons, cron infrastructure) should be scoped to
+single-mechanism-per-spec. 049 carried <code>--symlink</code> mode +
+<code>--copy</code> mode + stale-staging cleanup + stale-lock recovery +
+drift detection — should have been 2-3 separate specs. Mirror of 044’s
+pattern (compound interest of infrastructure debt) but at the
+spec-design layer rather than the operating-model layer.</li>
 </ul>
 </body>
 </html>
