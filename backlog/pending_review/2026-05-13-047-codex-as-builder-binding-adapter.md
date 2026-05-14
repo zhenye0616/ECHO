@@ -1,14 +1,42 @@
 ---
 id: 2026-05-13-047-codex-as-builder-binding-adapter
 title: Codex-as-builder binding adapter — the missing binding that makes role-slot-agnostic orchestration empirically true (first post-046 spec; vendor-agnostic pivot begins)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-05-13
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-14T06:25:03Z"
 branch: "agent/codex-as-builder-binding-adapter"
+head_sha: "50761d3b7c1a3ef6096722a2262aac253b986125"
+pr_url: ""
 task_state_ref: 2026-05-13-047-codex-as-builder-binding-adapter
+agent_notes: |
+  All 7 ACs implemented on agent/codex-as-builder-binding-adapter @ 50761d3.
+  Verified: npm test 883/21-skip/0-fail (incl. 3 new AC4 cases), npm run lint
+  clean, npm run typecheck clean, tools/sync-skills.sh --check clean,
+  tools/task-state/lint.py clean.
+
+  Pre-claim escalation: strategist flagged open Q(b) "codex-bootstrap vs
+  existing-binding-build" as awaiting founder go-ahead; I surfaced + waited;
+  founder said "go" (Option B — Claude Code as builder for 047). Then
+  executed the loop.
+
+  One deviation from the literal AC1 form to flag: the wrapper has a
+  `*.sh`-suffix branch on CODEX_BIN to satisfy AC4 case 1 (a)'s
+  argv[0]="codex" assertion against a shebang fixture. Empirically, shebang
+  re-exec strips `exec -a codex`; the test branch sources the mock inside
+  `bash -c` to preserve $0="codex". Production path (CODEX_BIN=codex, a real
+  binary) takes the else-branch unchanged from the spec. Documented in
+  builder.md locked_decisions + the run log.
+
+  AC5 §1 was measured + recorded by the strategist pre-claim (PASS at
+  comparison-047.md §1, commit f5e4e0c); §3/§5 deferred to merge-time
+  observation per spec. I did NOT touch comparison-047.{md,html} — those
+  are strategist-owned.
+
+  Run log: raw/internal/agent-runs/2026-05-13-2026-05-13-047-codex-as-builder-binding-adapter.md
+  Builder pointer (on agent branch): backlog/task-state/2026-05-13-047-codex-as-builder-binding-adapter/builder.md
 requested_reviewers: ["codex", "cursor"]
 files_to_modify:
   # AC1 — new wrapper script
