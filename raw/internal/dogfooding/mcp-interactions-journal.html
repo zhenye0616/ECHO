@@ -1612,6 +1612,9 @@ id="toc-pdt---codex-r1-on-049-codex-skill-adapter">2026-05-14 12:53 PDT
 <li><a href="#pdt---codex-ops-r2-on-049-codex-skill-adapter"
 id="toc-pdt---codex-ops-r2-on-049-codex-skill-adapter">2026-05-14 13:02
 PDT - Codex-ops R2 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r2-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r2-on-049-codex-skill-adapter">2026-05-14 13:02 PDT
+- Codex R2 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16385,6 +16388,50 @@ entry.</li>
 clean-install gaps, but the runtime fan-out contract remains unsafe for
 unattended or concurrent use because children are writable and temp
 files are scoped to item id rather than to a run-owned directory.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-049-codex-skill-adapter">2026-05-14 13:02 PDT
+- Codex R2 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>2a132696dd6a27c4920bc052e1e2389592848416</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/review-pending.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, current test surfaces, and
+<code>codex exec --help</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r2/codex.md</code>
+as <code>281470a</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH codex fan-out temp files/cleanup are not per-run
+isolated; MEDIUM child <code>codex exec</code> sandbox rationale grants
+production-checkout writes without a concrete mutation guard; MEDIUM
+install conflict tests/contract need to protect non-managed symlinks and
+files before forceful link/copy operations.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>2a132696dd6a27c4920bc052e1e2389592848416</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r2/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> Codex and codex-ops independently converged
+on the unsafe fan-out shape in R2. The patch needed before builder claim
+is narrow: run-scoped temp ownership, a defensible child
+sandbox/mutation guard, and installer preflight tests that cover all
+unmanaged target shapes, not only directories.</li>
 </ul>
 </body>
 </html>
