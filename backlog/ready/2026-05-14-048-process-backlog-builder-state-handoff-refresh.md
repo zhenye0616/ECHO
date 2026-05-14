@@ -61,10 +61,17 @@ This serves the current friction-first gate directly. It removes a recurring han
   - Patch only the `## current_thesis`, `## open_questions`, and `## canonical_anchors` blocks.
   - Preserve `## locked_decisions` byte-for-byte, because it carries builder-authored design choices and rejected alternatives that cannot be reconstructed from CLI args.
   - Preserve `## dont_touch` byte-for-byte, because it mirrors spec-specific drift boundaries.
-  - In `## current_thesis`, never guess which existing sentence is a lifecycle sentence. Instead, append or replace a patcher-owned marker block:
-    `<!-- builder-state-handoff:start -->` / `<!-- builder-state-handoff:end -->`, containing the complete/ready-for-review or escalated-for-founder-input lifecycle note.
-  - In `## open_questions`, preserve existing non-empty builder-authored content. If the block is empty or whitespace-only, insert `- None blocking; handed off for review.` for `complete`, or `- See agent_notes and run log for the escalation question.` for `escalated`. If `outcome=escalated` and the block is non-empty, append or replace a patcher-owned marker bullet instead of overwriting the existing question.
+  - In `## current_thesis`, never guess which existing sentence is a lifecycle sentence. Instead, use a patcher-owned marker block:
+    `<!-- builder-state-handoff:start -->` / `<!-- builder-state-handoff:end -->`.
+    If the start marker is present, replace everything from the start marker through the end marker. If absent, append a new marker block after existing block content.
+  - Current-thesis marker content uses canonical wording:
+    - `complete`: `- Lifecycle: COMPLETE — ready for review at <head_sha_or_none>.`
+    - `escalated`: `- Lifecycle: ESCALATED — see agent_notes and <run_log> for blocker.`
+  - In `## open_questions`, preserve existing non-empty builder-authored content. If the block is empty or whitespace-only, insert `- None blocking; handed off for review.` for `complete`, or `- See agent_notes and run log for the escalation question.` for `escalated`. If `outcome=escalated` and the block is non-empty, use a patcher-owned marker block:
+    `<!-- builder-state-handoff-open-questions:start -->` / `<!-- builder-state-handoff-open-questions:end -->`.
+    If the start marker is present, replace through the end marker; if absent, append the marker block after existing open-question content.
   - In `## canonical_anchors`, keep the block schema-compliant with `skills/role-typed-task-state.md`: write only `spec` and, if already present, `reviews`. `spec` must point to `backlog/pending_review/<item>.md`; this is the staleness-prone 047 failure mode. Unknown keys such as `branch`, `run_log`, `head_sha`, and `worktree` must not remain in `canonical_anchors`; the named handoff metadata belongs in frontmatter.
+- Patcher marker regions are reserved for the helper. Builders must not author durable working-memory content inside `builder-state-handoff:*` marker regions because the next handoff patch replaces those regions.
 - If `builder.md` is missing, the helper exits 0 with a clear no-op message and does not create a generic placeholder pointer. This lets `/process-backlog` remain compatible with items that set `task_state_ref` before the builder has adopted `builder.md`.
 - If `builder.md` exists but is malformed or lacks required blocks, the helper exits non-zero and does not create a generic replacement pointer. The builder escalates rather than silently erasing working memory.
 - After patching, `python3 tools/task-state/lint.py <path>` passes.
@@ -78,8 +85,7 @@ This serves the current friction-first gate directly. It removes a recurring han
   - After `ensure_stage "$(basename $ITEM_FILE)" "pending_review"` and after the agent fills `head_sha`, `pr_url`, and `agent_notes`, call `tools/task-state/patch-builder-state.py`.
   - Pass `--spec-path backlog/pending_review/<item>.md`.
   - Pass `--outcome complete` for successful handoff and `--outcome escalated` for blocked/uncertain handoff.
-  - Run `python3 tools/task-state/lint.py "backlog/task-state/<task-id>/builder.md"` immediately after patching.
-  - Stage `backlog/task-state/<task-id>/builder.md` in the same final handoff commit as the pending-review item and run log.
+  - After the helper returns, check whether `backlog/task-state/<task-id>/builder.md` exists. If it exists, run `python3 tools/task-state/lint.py "backlog/task-state/<task-id>/builder.md"` and stage it in the same final handoff commit as the pending-review item and run log. If it does not exist, skip linting/staging that path and continue; the helper's missing-pointer no-op is the compatibility path.
 - The step must be idempotent for semantic content: rerunning handoff updates only the timestamp plus the same lifecycle/anchor fields, and does not create a second pointer path or rewrite `locked_decisions`.
 - This protocol-wide step is the only canonical implementation site. Binding-specific sections may reference it, but must not duplicate their own final-handoff patch logic.
 
@@ -99,11 +105,11 @@ This serves the current friction-first gate directly. It removes a recurring han
 
 - Add `tests/task-state/patch-builder-state.test.ts` covering:
   - complete handoff patches `spec` from `backlog/claimed/<item>.md` to `backlog/pending_review/<item>.md`, writes `handoff_head_sha` in frontmatter, keeps `canonical_anchors` schema-compliant, and passes `tools/task-state/lint.py`;
-  - complete handoff appends/replaces only the patcher-owned `current_thesis` marker block and preserves the existing multi-sentence implementation summary;
+  - complete handoff appends the patcher-owned `current_thesis` marker block when absent, replaces it exactly once when present, uses the canonical lifecycle wording, and preserves the existing multi-sentence implementation summary;
   - complete handoff preserves non-empty `open_questions` byte-for-byte;
-  - escalated handoff appends/replaces escalation-oriented patcher-owned lifecycle/open-question markers, preserves `locked_decisions` byte-for-byte, and passes lint;
+  - escalated handoff appends/replaces escalation-oriented patcher-owned lifecycle/open-question markers using the same marker replacement rule, preserves `locked_decisions` byte-for-byte, and passes lint;
   - missing `builder.md` exits 0 as a no-op without creating a generic replacement pointer;
-  - malformed existing `builder.md` exits non-zero without creating a generic replacement pointer. Required malformed fixtures: missing `## canonical_anchors` and required headings out of order.
+  - malformed existing `builder.md` exits non-zero without creating a generic replacement pointer. Required malformed fixtures: missing `## canonical_anchors`, required headings out of order, and YAML-invalid frontmatter.
   - invalid `--outcome` exits non-zero without writing misleading state.
 - Add `tests/backlog/process-backlog-skill.test.ts` covering:
   - `skills/process-backlog.md` contains the named final builder-state refresh step;

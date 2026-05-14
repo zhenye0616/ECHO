@@ -2,12 +2,12 @@
 task_id: 2026-05-14-048-process-backlog-builder-state-handoff-refresh
 role: strategist
 writer: codex-strategist
-last_updated: 2026-05-14T08:47:33Z
+last_updated: 2026-05-14T09:12:05Z
 ---
 
 ## current_thesis
 
-R1 reviews landed and were dispositioned with founder authorization to patch despite divergent verdicts (`codex=pushback`, `cursor=proceed_after_patches`). Spec 048 is patched and should go to R2. The core design remains minimal patcher, tightened after R1: preserve builder-authored body content, keep `canonical_anchors` schema-compliant (`spec`/`reviews` only), and move handoff branch/head/run-log metadata to frontmatter.
+R2 reviews landed and were dispositioned. Spec 048 is claim-ready after the R2 patch commit unless the founder asks for an optional verification round. Both reviewers converged to `proceed_after_patches` with zero HIGH; remaining findings were mechanical specificity fixes on missing-pointer no-op, marker idempotence, canonical lifecycle text, marker ownership, and malformed fixture coverage.
 
 ## locked_decisions
 
@@ -24,10 +24,13 @@ R1 reviews landed and were dispositioned with founder authorization to patch des
 - R1 accepted: `current_thesis` updates are append-only via a patcher-owned marker block; no sentence guessing.
 - R1 accepted: non-empty `open_questions` is preserved; missing `builder.md` is a no-op; malformed existing `builder.md` fails closed.
 - R1 rejected/overrode Cursor LOW suggestion to preserve non-named anchors, because the shipped anchor parser rejects unknown keys.
+- R2 accepted: when the patcher no-ops for missing `builder.md`, `/process-backlog` must skip linting/staging that absent path.
+- R2 accepted: patcher marker semantics are deterministic: replace existing marker block from start through end, otherwise append exactly one marker block.
+- R2 accepted: lifecycle marker text is canonical per outcome, marker regions are patcher-owned, and YAML-invalid frontmatter is a malformed fixture.
 
 ## open_questions
 
-- None blocking. Next action: open R2 on the patched 048 spec.
+- None blocking. Next action: claim/build 048, unless founder wants an optional R3 verification round.
 
 ## dont_touch
 
