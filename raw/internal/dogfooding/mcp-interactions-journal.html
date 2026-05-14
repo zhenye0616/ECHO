@@ -1573,6 +1573,11 @@ sanity check</a></li>
 <li><a href="#pdt-claude-reviewer-tick-cursor-slot-for-048-r1"
 id="toc-pdt-claude-reviewer-tick-cursor-slot-for-048-r1">2026-05-14
 01:14 PDT — Claude reviewer tick (cursor slot) for 048 R1</a></li>
+<li><a
+href="#pdt-claude-orchestrator-confirms-via-echo-that-codex-reviewer-launchd-is-dead"
+id="toc-pdt-claude-orchestrator-confirms-via-echo-that-codex-reviewer-launchd-is-dead">2026-05-14
+01:25 PDT — Claude orchestrator confirms via ECHO that codex reviewer
+launchd is dead</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15781,6 +15786,75 @@ pending; convergence requires both reviewer responses before combine.py
 reviewer tick (per
 <code>reference_codex_review_queue_invocation.md</code>) to unblock R1’s
 combine step.</li>
+</ul>
+<h3
+id="pdt-claude-orchestrator-confirms-via-echo-that-codex-reviewer-launchd-is-dead">2026-05-14
+01:25 PDT — Claude orchestrator confirms via ECHO that codex reviewer
+launchd is dead</h3>
+<ul>
+<li><strong>Trigger:</strong> User asked “use echo to get full context”
+after codex strategist’s watcher tick returned “no rounds to combine” —
+wanted ECHO-confirmed picture of why R1 isn’t progressing.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li><code>find_clusters(since="2026-05-14T07:30:00Z")</code> — recent
+55-min window across all sources to see cycle activity.</li>
+<li><code>get_atoms(atom_ids=["5a40c6e0-...", "75d21bfa-..."], format="minimal")</code>
+— two NEW codex atoms surfaced by find_clusters since my prior
+check.</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>find_clusters: 2 clusters, 23 atoms total. Top cluster (rank 1,
+<code>ctx_f8f4a2e5</code>): claude_code=9 + git=8 (orchestrator +
+commits). Rank-2 cluster (<code>ctx_76dcb2dd</code>): codex=6 atoms —
+but ALL from one session (the strategist REPL) plus one from a watcher
+one-shot. NO separate codex reviewer session.</li>
+<li>get_atoms: 5a40c6e0 = watcher tick (session
+<code>019e2590-...</code>, codex.source=<code>exec</code>,
+sandbox=danger-full-access, prompt=full review-queue-watch.md body) —
+combine.py returned “no rounds to combine”. 75d21bfa = strategist REPL
+turn 4 (session <code>019e2566</code>) responding to “both r1 reviewed
+laneded confirm” — codex strategist correctly pulled, ls’d r1/, reported
+codex.md absent.</li>
+</ul></li>
+<li><strong>Sources:</strong>
+<ul>
+<li>find_clusters: source_breakdown <code>{claude_code:9, git:8}</code>
+for cluster 1; <code>{codex:6}</code> for cluster 2. The
+<code>codex</code> atoms all trace to
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/14/rollout-2026-05-14T00-32-35-019e2566-...jsonl</code>
+(strategist REPL) +
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/14/rollout-2026-05-14T01-18-19-019e2590-...jsonl</code>
+(one-shot watcher). NO atoms from any codex-reviewer-style session
+(which would be a separate session_id under launchd-spawned codex
+exec).</li>
+<li>get_atoms: same per-atom source paths.</li>
+<li>Additionally checked outside ECHO:
+<code>~/Library/Logs/echo-review-queue-codex.log</code> last tick
+<code>2026-05-14T06:08:44Z</code> (047 R3);
+<code>launchctl print gui/&lt;uid&gt;/com.echo.review-queue-codex</code>
+shows <code>state=not running, last exit code=126</code>.</li>
+</ul></li>
+<li><strong>Verdict:</strong> ✅ right — ECHO’s source-breakdown is the
+load-bearing observation. The absence of a second codex source-app
+session in the cluster is direct empirical evidence that codex reviewer
+has not fired since 048 R1 opened. The user’s intuition (“tokens used
+shows no codex review”) is correct; ECHO confirms.</li>
+<li><strong>Note:</strong> ECHO’s source-breakdown field is doing real
+epistemic work here. Without it, “no codex review” would be a guess
+based on the absence of codex.md on disk. With it, we know affirmatively
+that the codex reviewer launchd binding produced ZERO session bytes
+since 06:08:44Z — the launchd job is the blocker, not a race or a timing
+issue.</li>
+<li><strong>Conjecture:</strong> Launchd exit-code 126 (“command cannot
+execute”) on the reviewer wrapper plist is structurally broken. Doesn’t
+affect the strategist’s path (codex strategist can fire one-shot
+reviewer ticks the same way it fires watcher ticks:
+<code>codex exec -C ... --sandbox danger-full-access - &lt; .claude/commands/review-queue-codex.md</code>).
+Separate fix candidate for <code>_followups.md</code> — the launchd
+plist or wrapper script broke recently. Don’t design here; observation
+only.</li>
 </ul>
 </body>
 </html>
