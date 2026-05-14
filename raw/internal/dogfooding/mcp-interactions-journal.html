@@ -1656,6 +1656,11 @@ href="#pdt-049-first-fail-to-converge-cycle-load-bearing-positive-signal"
 id="toc-pdt-049-first-fail-to-converge-cycle-load-bearing-positive-signal">2026-05-14
 14:30 PDT — 049 FIRST FAIL-TO-CONVERGE CYCLE (load-bearing positive
 signal)</a></li>
+<li><a
+href="#pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-1"
+id="toc-pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-1">2026-05-14
+14:36 PDT - Codex strategist joins Claude strategist via ECHO for spec
+050 question 1</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17093,6 +17098,56 @@ single-mechanism-per-spec. 049 carried <code>--symlink</code> mode +
 drift detection — should have been 2-3 separate specs. Mirror of 044’s
 pattern (compound interest of infrastructure debt) but at the
 spec-design layer rather than the operating-model layer.</li>
+</ul>
+<h3
+id="pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-1">2026-05-14
+14:36 PDT - Codex strategist joins Claude strategist via ECHO for spec
+050 question 1</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex strategist</li>
+<li><strong>Trigger:</strong> Founder asked Codex to act as a strategist
+alongside Claude, use ECHO to connect to the Claude strategist session,
+and suggest an answer for question 1.</li>
+<li><strong>Query inputs:</strong> 4 ECHO MCP calls by local curl: (1)
+<code>echo_resolve_mru({sources:["claude_code"], repo_path:"/Users/zhenye/Desktop/Project_echo"})</code>;
+(2)
+<code>search_memories({source:"fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/ba7d1a83-5ac3-4835-b1f5-c630c67b1728.jsonl", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:12})</code>;
+(3)
+<code>search_memories({query:"Question 1", source_app:"claude_code", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:10})</code>;
+(4)
+<code>get_atom({id:"0e63ad60-4000-475c-a65d-36dc155ea25f"})</code>.</li>
+<li><strong>Returned:</strong> (1) MRU resolved to Claude Code source
+<code>ba7d1a83-5ac3-4835-b1f5-c630c67b1728.jsonl</code> with repo
+filter. (2) Tail returned 6 matches, but the latest MRU thread was
+merge-cleanup/review work and asked whether to re-run
+<code>/review-pending 048</code> or proceed on a stale sidecar. (3)
+Targeted “Question 1” search returned 3 matches; top match was active
+strategist session
+<code>48167b0f-eca7-44da-8409-fd0c9d7e9669.jsonl</code>, turn 3, asking
+spec 050 scope: <code>(a) reviewers only</code>,
+<code>(b) reviewers + merger in worktrees</code>,
+<code>(c) something else</code>. Older hits were 047 and 046 strategy
+questions. (4) <code>get_atom</code> returned the full 13,985-byte atom
+for the active strategist question; content recovered verbatim, metadata
+projected only.</li>
+<li><strong>Read sources:</strong> Exact source paths:
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/ba7d1a83-5ac3-4835-b1f5-c630c67b1728.jsonl</code>,
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/48167b0f-eca7-44da-8409-fd0c9d7e9669.jsonl</code>,
+and older <code>Question 1</code> hits in
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/01c5ae0a-ae46-40bf-987e-b35999e679f4.jsonl</code>;
+all scoped by
+<code>repo_path=/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> ✅ right - ECHO’s MRU resolver found a
+relevant Claude thread but not the strategist one; targeted search plus
+<code>get_atom</code> recovered the exact active “Question 1” without
+founder copy-paste.</li>
+<li><strong>Note:</strong> The useful path was not pure MRU because two
+Claude sessions were active at nearly the same timestamp. “Question 1”
+search successfully disambiguated the strategist session from the
+merge-cleanup session.</li>
+<li><strong>Conjecture:</strong> Active multi-Claude work may need an
+easier “current strategist session” discriminator than MRU when
+merge/review and strategy sessions interleave in the same repo.</li>
 </ul>
 </body>
 </html>
