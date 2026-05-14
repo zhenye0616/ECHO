@@ -1621,6 +1621,12 @@ PDT - Codex-ops R3 on 049 codex skill adapter</a></li>
 <li><a href="#pdt---codex-r3-on-049-codex-skill-adapter"
 id="toc-pdt---codex-r3-on-049-codex-skill-adapter">2026-05-14 13:08 PDT
 - Codex R3 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r4-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r4-on-049-codex-skill-adapter">2026-05-14 13:15 PDT
+- Codex R4 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-ops-r4-on-049-codex-skill-adapter"
+id="toc-pdt---codex-ops-r4-on-049-codex-skill-adapter">2026-05-14 13:13
+PDT - Codex-ops R4 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16521,6 +16527,94 @@ hygiene: the builder allowlist must match AC3, copy-mode install should
 avoid self-created non-managed partial directories, and the risk
 register should not authorize a mid-build scope expansion outside the
 declared file set.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-049-codex-skill-adapter">2026-05-14 13:15 PDT
+- Codex R4 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>bd50b28b1d0a8d865e1bb547de5f50fee640c4e7</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/review-pending.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, package/test surfaces, and
+<code>codex exec --help</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/codex.md</code>
+as <code>e7856b1</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM install helper copy-mode still lacks a lock across
+probe/stage/finalize despite claiming parallel-install safety; MEDIUM
+<code>tools/sync-skills.sh --check</code> does not reject unexpected
+<code>adapters/codex/skills/*</code> directories, so the exact in-scope
+adapter set is not mechanically enforced.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>bd50b28b1d0a8d865e1bb547de5f50fee640c4e7</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R4 is down to two enforceability gaps: the
+install helper needs a real concurrency guard if it documents parallel
+safety, and the sync check needs to fail closed on stale/out-of-scope
+Codex adapters so future builders cannot accidentally expose
+Claude-coupled skills while the check stays green. The helper’s
+commit/push path exited 0; it printed a transient
+<code>Cannot rebase onto multiple branches</code> diagnostic during
+retry handling, then confirmed <code>main</code> was up to date and
+pushed <code>e7856b1</code>.</li>
+<li><strong>Conjecture:</strong> (none - observations only per
+dogfooding-journal discipline)</li>
+</ul>
+<h3 id="pdt---codex-ops-r4-on-049-codex-skill-adapter">2026-05-14 13:13
+PDT - Codex-ops R4 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, and the
+pinned artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>bd50b28b1d0a8d865e1bb547de5f50fee640c4e7</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/codex-ops.md</code>
+as <code>2f62be8</code>, verdict <code>pushback</code>, findings: HIGH
+copy-mode staging under the live Codex skill discovery root can leave a
+valid orphaned <code>.staging-*</code> skill after interrupted installs;
+MEDIUM installer probe/remove/stage/mv is still not atomic across
+concurrent install processes.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>bd50b28b1d0a8d865e1bb547de5f50fee640c4e7</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r4/codex-ops.md</code>;
+schema/helper paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link after regenerating a quoted timestamp, committed and pushed
+before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R4 narrows the remaining runtime concern to
+the install helper’s copy-mode publish path. The fan-out and
+adapter-scope issues are no longer the blocker; the unsafe surface is
+now what Codex might discover after a killed or racing install.</li>
 </ul>
 </body>
 </html>
