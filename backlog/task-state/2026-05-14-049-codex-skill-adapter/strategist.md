@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T20:12:00Z
+last_updated: 2026-05-14T20:20:00Z
 ---
 
 ## current_thesis
 
-Spec 049 at **R2-disposition state**. **R2 reviewers converged at `proceed_after_patches`** with strong cross-reviewer agreement (6 findings → 3 unique-root after consolidation; codex and codex-ops independently caught identical operational-safety gaps in my R1 disposition patches). Two R2 HIGHs were both about AC2 operational safety: (A) children should run `--sandbox read-only` not workspace-write, sandbox-enforced not prompt-disciplined; (B) per-run `mktemp -d` instead of item-id-keyed temp files to prevent cross-orchestrator races. One R2 MED on AC4: explicit target probing before `ln -snf` instead of relying on force-overwrite semantics. All 3 mechanically patched in R2 disposition. R3 dispatched for verification. CLAIM-READY expected after R3 if reviewers return proceed* with no HIGH (typical decay pattern matches 046/047/048).
+Spec 049 at **R4-disposition state**, R5 about to fire. **Decay pattern unusual:** each strategist disposition introduces new operational-safety surface that the next round catches. Tally: R1 7 findings 1 HIGH → R2 6→3 unique 2 HIGH → R3 3 findings 1 HIGH → R4 4 findings 1 HIGH (verdict divergence at proceed*/pushback boundary). R4 codex-ops `pushback` was on the staged-rename copy mechanism I added in R3 disposition — staging lived inside the live codex skill root, SIGKILL/power-loss leaves orphans visible to codex. Auto-resolved per 046 R4 precedent extension (founder-authorized full-auto-mode "till converge"): staging moved to `$HOME/.codex/.echo-staging/`, per-target lock added via atomic `mkdir`, --check now enumerates+rejects unexpected adapters, stale-staging cleanup in pre-flight. R5 verification dispatched. **If R5 also produces a HIGH on the staging/lock mechanism, the rational next step is to simplify AC4 by dropping --copy mode entirely** (defer to a followup spec) — symlink-only would significantly reduce surface area and likely converge cleanly. Tracked as R5-exit-criterion in strategist's contingency plan.
 
 ## locked_decisions
 
