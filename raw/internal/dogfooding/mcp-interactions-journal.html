@@ -1542,6 +1542,11 @@ href="#pdt---codex-ops-r5-on-046-context-fatigue-via-role-typed-state"
 id="toc-pdt---codex-ops-r5-on-046-context-fatigue-via-role-typed-state">2026-05-13
 21:36 PDT - Codex-ops R5 on 046 context fatigue via role-typed
 state</a></li>
+<li><a
+href="#pdt-046-cycle-baseline-written-post-merge-empirical-reference"
+id="toc-pdt-046-cycle-baseline-written-post-merge-empirical-reference">2026-05-13
+22:45 PDT — 046 cycle baseline written (post-merge empirical
+reference)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15284,6 +15289,65 @@ log file itself. The stale rewrite is blocked; the operator can still
 lose the promised CAS-abort breadcrumb and inherit a dirty rebase state
 if abort logging races.</li>
 <li><strong>Conjecture:</strong> (none - observations only)</li>
+</ul>
+<h3
+id="pdt-046-cycle-baseline-written-post-merge-empirical-reference">2026-05-13
+22:45 PDT — 046 cycle baseline written (post-merge empirical
+reference)</h3>
+<ul>
+<li><strong>Source agent:</strong> claude strategist (orchestrator
+session that ran 046’s brainstorm + review cycle + merge).</li>
+<li><strong>Trigger:</strong> Founder asked: “can you analyze the
+context of this past cycle and set a concrete baseline for future
+cycle.” 046 just merged at <code>4968aca</code>; without a measured
+pre-state, AC8’s post-merge target (50% MCP-call reduction + 70%
+atom-byte reduction) is unfalsifiable.</li>
+<li><strong>Query inputs (this turn):</strong> No
+<code>mcp__echo__*</code> calls in this turn. Only repo-local sources:
+<code>git log 5480034^..4968aca</code> (commit count = 42),
+<code>wc -l backlog/complete/2026-05-13-046-...md</code> (292 final
+lines), <code>awk</code> over each
+<code>backlog/reviews/.../r&lt;N&gt;/{codex,codex-ops}.md</code>
+(findings counts per round: R1=9, R2=7, R3=3, R4=2, R5=2), the 16:30 PDT
+and 16:45 PDT journal entries (this same file),
+<code>~/Library/Logs/echo-review-queue-{codex,codex-ops}.log</code> for
+reviewer-tick token signals (per-tick token counts varied 10–90 k;
+baseline captures floor + ceiling).</li>
+<li><strong>Returned shape:</strong> Wrote
+<code>raw/internal/dogfooding/role-typed-state-baseline.md</code>
+(immutable, dated, provenance-anchored) covering six dimensions: (1)
+strategist cold-start, (2) cross-tool consults, (3) inter-round
+strategist work, (4) reviewer-tick cold-start, (5) founder bridging, (6)
+wall time + commits. Each dimension carries an empirical value +
+post-046 target. Three falsifiable PASS conditions defined (§Falsifiable
+PASS criteria); a FAIL on any of the three means 046’s primitive didn’t
+ship its claimed effect and triggers a
+<code>047-role-typed-state-empirical-fixes</code> (or rollback). HTML
+twin regenerated. The file is explicitly marked “do not edit” — future
+comparisons go in sibling
+<code>role-typed-state-comparison-&lt;spec-id&gt;.md</code> files.</li>
+<li><strong>Sources:</strong> repo-local only. Provenance section in the
+baseline lists exact paths + SHAs for: 046 spec at merge
+(<code>b419994</code> / <code>d8d8493</code>); 5 review-round
+directories; this journal’s two load-bearing entries (16:30 PDT, 16:45
+PDT); builder run log; /review-pending sidecar at SHA
+<code>8e66f5c</code> (since deleted at merge per skill C7).</li>
+<li><strong>Verdict:</strong> ✅ right — this closes the AC8 measurement
+gap. The cycle’s friction is now numerically pinned (3 MCP calls + 18
+atoms + ~3-4 min for strategist cold-start; 4 consults × 1.5-3 KB
+hand-summarization for cross-tool; 5 rounds × 5-10 min × 5-10 k tokens
+for inter-round; 10 ticks × 9-90 k tokens for reviewer; 2 manual pushes
++ 1 escalation + 0 in-queue founder activations; ~5h wall, 42 commits,
+23 findings, 12 unique root issues).</li>
+<li><strong>Note:</strong> Reviewer-tick cold-start is locked as
+INVARIANT (must NOT change) — a token reduction would mean AC3
+fresh-eyes lint is broken. The baseline calls this out explicitly as a
+regression test, not an improvement target. Soft signals (consult prompt
+size, inter-round tokens, wall time, round count) are observe-only — not
+gating conditions.</li>
+<li><strong>Conjecture:</strong> (none — observations only per CLAUDE.md
+discipline. The baseline file itself records
+expected-direction-of-change but not how to ship it.)</li>
 </ul>
 </body>
 </html>

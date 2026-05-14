@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Role-typed task-state baseline</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Role-typed task-state baseline</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a
+href="#role-typed-task-state-baseline-empirical-reference-for-measuring-046s-effect"
+id="toc-role-typed-task-state-baseline-empirical-reference-for-measuring-046s-effect">Role-typed
+task-state baseline — empirical reference for measuring 046’s effect</a>
+<ul>
+<li><a href="#why-a-baseline-is-needed"
+id="toc-why-a-baseline-is-needed">Why a baseline is needed</a></li>
+<li><a href="#strategist-cold-start-session-resume-after-clear"
+id="toc-strategist-cold-start-session-resume-after-clear">1. Strategist
+cold-start (session resume after <code>/clear</code>)</a></li>
+<li><a
+href="#cross-tool-consults-claude-strategist-codex-strategist-via-codex-exec"
+id="toc-cross-tool-consults-claude-strategist-codex-strategist-via-codex-exec">2.
+Cross-tool consults (claude-strategist → codex-strategist via
+<code>codex exec</code>)</a></li>
+<li><a href="#strategist-between-rounds-work-r1r2-r4r5"
+id="toc-strategist-between-rounds-work-r1r2-r4r5">3. Strategist
+between-rounds work (R1→R2 … R4→R5)</a></li>
+<li><a href="#reviewer-tick-cold-start-codex-codex-ops"
+id="toc-reviewer-tick-cold-start-codex-codex-ops">4. Reviewer-tick
+cold-start (codex / codex-ops)</a></li>
+<li><a href="#founder-bridging-cost" id="toc-founder-bridging-cost">5.
+Founder bridging cost</a></li>
+<li><a href="#wall-time-commit-count" id="toc-wall-time-commit-count">6.
+Wall time + commit count</a></li>
+<li><a href="#falsifiable-pass-criteria-for-the-next-qualifying-cycle"
+id="toc-falsifiable-pass-criteria-for-the-next-qualifying-cycle">Falsifiable
+PASS criteria for the next qualifying cycle</a></li>
+<li><a href="#whats-not-in-this-baseline-out-of-scope"
+id="toc-whats-not-in-this-baseline-out-of-scope">What’s NOT in this
+baseline (out of scope)</a></li>
+<li><a href="#provenance" id="toc-provenance">Provenance</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1
+id="role-typed-task-state-baseline-empirical-reference-for-measuring-046s-effect">Role-typed
+task-state baseline — empirical reference for measuring 046’s
+effect</h1>
+<p><strong>Created:</strong> 2026-05-13 22:45 PDT (immediately post-046
+merge at <code>4968aca</code>). <strong>Purpose:</strong> Concrete,
+falsifiable numbers from the 046 cycle itself — which ran
+<em>without</em> the role-typed task-state primitive available — so the
+next qualifying spec cycle can prove (or disprove) the primitive’s
+effect on context fatigue.</p>
+<p><strong>Status:</strong> baseline (immutable). Comparison reports
+live in
+<code>raw/internal/dogfooding/role-typed-state-comparison-&lt;spec-id&gt;.md</code>.</p>
+<hr />
+<h2 id="why-a-baseline-is-needed">Why a baseline is needed</h2>
+<p>046 shipped the role-typed task-state primitive
+(<code>backlog/task-state/&lt;task-id&gt;/{strategist,builder,round-state}.md</code>
++ ECHO MCP <code>get_role_state</code> / <code>list_task_states</code> +
+AC3 fresh-eyes lint). AC8 + After-Completion #4 require a post-merge
+dogfooding measurement, but a 50% / 70% target is meaningless without a
+measured pre-state. This doc fixes the pre-state.</p>
+<p>The 046 cycle is the obvious baseline because the spec was actively
+about its own friction; the strategist + builder + reviewers all
+experienced the friction the primitive aims to eliminate, while building
+it.</p>
+<hr />
+<h2 id="strategist-cold-start-session-resume-after-clear">1. Strategist
+cold-start (session resume after <code>/clear</code>)</h2>
+<p><strong>Single observed event:</strong> 2026-05-13 ~16:30 PDT,
+journaled in
+<code>raw/internal/dogfooding/mcp-interactions-journal.md</code> under
+heading “session resume after /clear (claude strategist)”.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>ECHO MCP calls to re-establish state</td>
+<td><strong>3</strong> (<code>find_clusters</code> +
+<code>get_atoms</code> × 2)</td>
+</tr>
+<tr class="even">
+<td>Atoms returned in budget</td>
+<td>7 + 11 = <strong>18 atoms</strong> (rank-1 cluster size: 98 atoms;
+rank-2 cluster: 13 atoms — 80 prefix-dropped)</td>
+</tr>
+<tr class="odd">
+<td>Broad-corpus file reads before productive work</td>
+<td>CLAUDE.md (~340 lines), MEMORY.md (12 entries), <code>git log</code>
+(8 commits), <code>ls backlog/{ready,claimed,pending_review}</code></td>
+</tr>
+<tr class="even">
+<td>Wall time to first productive output</td>
+<td>~3–4 minutes (3 MCP roundtrips + atom-body synthesis + summary
+message)</td>
+</tr>
+<tr class="odd">
+<td>Approximate tokens consumed</td>
+<td>50–80k (3 MCP responses + atom bodies + CLAUDE.md + transcript)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Target post-046</strong> (After Completion #4): ≥50%
+reduction in MCP-call count + ≥70% reduction in atom-body bytes
+consumed. Concretely: - <strong>≤1 MCP call</strong> (a single
+<code>get_role_state(&lt;task-id&gt;, "strategist")</code> reads the
+pointer). - <strong>≤200 lines read total</strong> for state recovery
+(the pointer body capped at 120 + canonical_anchors as discovery edges).
+- <strong>&lt;60s to first productive output.</strong></p>
+<hr />
+<h2
+id="cross-tool-consults-claude-strategist-codex-strategist-via-codex-exec">2.
+Cross-tool consults (claude-strategist → codex-strategist via
+<code>codex exec</code>)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Informal cross-strategist consults during brainstorm</td>
+<td><strong>4</strong> (root-cause framing, scoping a/b/c, location
+a/b/c/d, pressure-test)</td>
+</tr>
+<tr class="even">
+<td>Per-consult prompt size</td>
+<td>1.5–3 KB of <em>hand-summarized</em> prior state + question (claude
+paraphrasing into each prompt)</td>
+</tr>
+<tr class="odd">
+<td>Per-consult wall time</td>
+<td>30–90 s</td>
+</tr>
+<tr class="even">
+<td>Closed-loop event (codex→codex via ECHO)</td>
+<td><strong>1</strong> (16:45 PDT — codex retrieved prior codex
+strategist’s load-bearing sentence from a different session via
+<code>search_memories</code> + <code>get_atom</code> after
+<code>find_clusters</code> returned 0 on tz-mismatched query)</td>
+</tr>
+<tr class="odd">
+<td>Codex MCP calls during closed-loop consult</td>
+<td><strong>3</strong> (1 failed <code>find_clusters</code> + 1
+<code>search_memories</code> + 1 <code>get_atom</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The closed-loop event is the <em>demonstration</em> of the primitive;
+it worked, but cost 3 MCP calls and required 1 retry. The other 3
+consults required claude to hand-summarize the state into each prompt (a
+manual workaround for the missing pointer).</p>
+<p><strong>Target post-046:</strong> - Consult prompts CITE pointer
+paths (<code>backlog/task-state/&lt;id&gt;/strategist.md</code>) instead
+of inlining hand-summarized state. - Consultee makes <strong>1
+<code>get_role_state</code> call</strong> instead of needing context
+hand-fed. - ≥50% reduction in per-consult prompt size (1.5–3 KB → ~750 B
+– 1.5 KB). - Tz-mismatch / retry friction surfaced in the closed-loop
+event should be filed as a separate <code>find_clusters</code>
+ergonomics issue (NOT covered by 046; out of scope).</p>
+<hr />
+<h2 id="strategist-between-rounds-work-r1r2-r4r5">3. Strategist
+between-rounds work (R1→R2 … R4→R5)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Round transitions in this cycle</td>
+<td><strong>5</strong> (R1→R2, R2→R3, R3→R4, R4→R5, R5→claim-ready)</td>
+</tr>
+<tr class="even">
+<td>Per-transition reads</td>
+<td>full spec at HEAD (~180–290 lines) + both
+<code>&lt;reviewer&gt;.md</code> (1–4 KB each) + previous
+<code>combined.md</code> (1–2 KB) + working-memory recall of prior
+rounds</td>
+</tr>
+<tr class="odd">
+<td>Per-transition outputs</td>
+<td>disposition table (in current combined.md) + spec patches (Edit
+calls) + new combined.md + next-round <code>request.md</code></td>
+</tr>
+<tr class="even">
+<td>Per-transition wall time</td>
+<td>5–10 min</td>
+</tr>
+<tr class="odd">
+<td>Approximate tokens per transition</td>
+<td>5–10 k (strategist disposition + Edit calls + request.py
+invocation)</td>
+</tr>
+<tr class="even">
+<td>Total inter-round strategist work</td>
+<td>~30–50 k tokens across 5 transitions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Target post-046:</strong> - <code>round-state.md</code>
+exists from R1 onward; each transition writes the pointer’s
+<code>current_round / locked_decisions / open_questions / dont_touch</code>
+deltas instead of regenerating from scratch. - Subsequent transitions
+READ <code>round-state.md</code> first (CAS protocol step 1:
+<code>git rev-parse HEAD:&lt;path&gt;</code>). - ≥50% reduction in
+tokens-per-transition (5–10 k → 2.5–5 k).</p>
+<hr />
+<h2 id="reviewer-tick-cold-start-codex-codex-ops">4. Reviewer-tick
+cold-start (codex / codex-ops)</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Total reviewer ticks in this cycle</td>
+<td><strong>10</strong> (5 rounds × 2 reviewers)</td>
+</tr>
+<tr class="even">
+<td>Per-tick reads</td>
+<td>full spec at pinned SHA + reviewer prompt
+(<code>.claude/commands/review-queue-&lt;reviewer&gt;.md</code>, ~80–120
+lines) + reviewer schema + <code>reviewers.json</code> + prior-round
+<code>combined.md</code> (R2+ ticks)</td>
+</tr>
+<tr class="odd">
+<td>Per-tick wall time</td>
+<td>30–90 s (codex CLI exec; logged in
+<code>~/Library/Logs/echo-review-queue-&lt;reviewer&gt;.log</code>)</td>
+</tr>
+<tr class="even">
+<td>Per-tick token usage (from <code>tokens used</code> in codex
+output)</td>
+<td>R1 codex ~9.9 k / codex-ops ~? · R2 ~18 k / 88 k · R3 ~12 k / ? · R4
+~? / ? · R5 ~? / ? — varied widely; ops-side spelunking inflated some
+ticks past 90 k</td>
+</tr>
+<tr class="odd">
+<td>Findings by round</td>
+<td>R1: 9 → R2: 7 → R3: 3 → R4: 2 → R5: 2 (decay 9→5→2→1→2 unique
+root)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>INVARIANT post-046, NOT a target:</strong> Reviewer
+cold-start must NOT change. Fresh-eyes-at-SHA is preserved by AC3
+hard-fail lint (≥3-of-6 required-block heading-pattern threshold;
+<code>consumed_task_state: true</code> schema gate). If reviewer-tick
+tokens DROP post-046, AC3’s enforcement is broken — that’s a regression,
+not a win. Lock the baseline numbers here as the floor.</p>
+<hr />
+<h2 id="founder-bridging-cost">5. Founder bridging cost</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Manual push authorizations (founder typed approval)</td>
+<td><strong>2</strong> (R1 “permit to push here” + standing auth “full
+auto mode till the spec converges”)</td>
+</tr>
+<tr class="even">
+<td>Founder decisions on escalation</td>
+<td><strong>1</strong> (R4 divergent verdicts — founder picked option
+(A) “treat-as-convergent” via implicit “check now” + auto-mode
+reaffirmation)</td>
+</tr>
+<tr class="odd">
+<td>Direction shifts during cycle</td>
+<td><strong>2</strong> (“full auto till the spec converges” → “auto mode
+until merge”)</td>
+</tr>
+<tr class="even">
+<td>Founder activations <em>within</em> the review queue (042 AC8
+metric)</td>
+<td><strong>0</strong> ✓ — the load-bearing metric continues to pass
+(the queue self-disposed across 5 rounds; founder only weighed in on the
+R4 escalation, which is the operating-model checkpoint)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Target post-046:</strong> Hold all five metrics.
+Specifically: - Founder activations within review queue MUST remain 0
+(regression test). - Manual push authorizations may shrink if
+<code>task_state_ref</code> discovery lets cron-driven auto-pushes
+operate more safely — but only if the irreversible-action invariant is
+preserved. Not a target; observe.</p>
+<hr />
+<h2 id="wall-time-commit-count">6. Wall time + commit count</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Baseline value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Spec commit (<code>5480034</code>) → R1 push</td>
+<td>~10 min (request generation + commit + manual push)</td>
+</tr>
+<tr class="even">
+<td>R1 push → R1 combined.md (both responses + combine.py)</td>
+<td>~13 min</td>
+</tr>
+<tr class="odd">
+<td>R1 disposition → R5 claim-ready (<code>ba3c2f4</code>)</td>
+<td>4h 15m wall total across the 5 rounds</td>
+</tr>
+<tr class="even">
+<td>Claim → builder pushes to pending_review (<code>c7b68b7</code>)</td>
+<td>24 min</td>
+</tr>
+<tr class="odd">
+<td>Sidecar (<code>8e66f5c</code>) → merge (<code>b419994</code>) →
+followups (<code>4968aca</code>)</td>
+<td>16 min</td>
+</tr>
+<tr class="even">
+<td><strong>Total spec-to-ship wall time</strong></td>
+<td><strong>~5 hours</strong> (17:22 PDT → 22:20 PDT, 2026-05-13)</td>
+</tr>
+<tr class="odd">
+<td>Commits on main across cycle (<code>5480034^..4968aca</code>)</td>
+<td><strong>42</strong></td>
+</tr>
+<tr class="even">
+<td>Findings dispositioned across all rounds</td>
+<td><strong>23</strong> (R1: 9 + R2: 7 + R3: 3 + R4: 2 + R5: 2)</td>
+</tr>
+<tr class="odd">
+<td>Unique root issues</td>
+<td><strong>12</strong> (R1: 9 + R2: 5 unique + R3: 2 + R4: 1 + R5: 2 =
+19 surfaced, 12 distinct after cross-reviewer dedup)</td>
+</tr>
+<tr class="even">
+<td>Final spec body</td>
+<td>292 lines</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Target post-046:</strong> for a <em>similar-sized</em> spec
+(~200 lines, 1.5–2d estimate, 4–5 rounds): - 25–40% reduction in
+spec-to-ship wall time → ~3h to 3h 45m target. - Commit count
+structurally similar (each round still has request + 2 responses +
+combined + disposition + next request + journals — that’s ~7 commits per
+round; the savings come from FEWER ROUNDS, not from condensing per-round
+commits). - A 4-round cycle on a similar spec is the operational target
+(R1→R2→R3→R4 converge instead of R1→R2→R3→R4→R5).</p>
+<hr />
+<h2
+id="falsifiable-pass-criteria-for-the-next-qualifying-cycle">Falsifiable
+PASS criteria for the next qualifying cycle</h2>
+<p>The next cycle counts as a PASS for 046’s effect when ALL three
+conditions hold:</p>
+<ol type="1">
+<li><strong>Strategist cold-start: ≤1 MCP call + ≤200 lines read +
+&lt;60s to productive output.</strong> (§1 target.)</li>
+<li><strong>Reviewer-tick cold-start INVARIANT: token counts within 10%
+of baseline floor.</strong> (§4 — no regression in fresh-eyes.)</li>
+<li><strong>Founder activations within review queue: 0.</strong> (§5 —
+the 042 AC8 metric.)</li>
+</ol>
+<p>Soft signals (observe + report, not gate): - Cross-tool consult
+prompt-size reduction (§2 target: 50%). - Inter-round strategist tokens
+(§3 target: 50%). - Wall-time reduction (§6 target: 25–40%). - Round
+count (§6 target: 4 not 5).</p>
+<p>A FAIL on any of the three hard conditions means 046’s primitive
+didn’t ship the friction-elimination it claimed. The right response is
+<code>047-role-typed-state-empirical-fixes</code> (or rollback), not
+“next time we’ll measure better.”</p>
+<hr />
+<h2 id="whats-not-in-this-baseline-out-of-scope">What’s NOT in this
+baseline (out of scope)</h2>
+<ul>
+<li><strong>Builder cold-start cost.</strong> The builder ran for ~24
+min and the run log captured its experience, but the builder did not use
+<code>task-state/&lt;id&gt;/builder.md</code> (which would have required
+reading R5/combined.md’s builder-applied dispositions). The cost was
+therefore confounded with the builder-omission bug F1+F2 surfaced by
+/review-pending. Future cycles can baseline builder cold-start cleanly
+once builders dogfood the pointer.</li>
+<li><strong>Watcher pointer cost.</strong> Watcher is explicitly out of
+046 scope.</li>
+<li><strong>Cross-vendor (claude+codex+cursor) measurement.</strong>
+This cycle’s reviewers were only <code>codex</code> +
+<code>codex-ops</code>; cursor’s lens wasn’t on the roster. A future
+cycle with the cursor reviewer adapter dogfooding
+<code>task_state_ref</code> discovery would be the right place to
+measure cross-vendor effect.</li>
+</ul>
+<hr />
+<h2 id="provenance">Provenance</h2>
+<ul>
+<li>046 spec final SHA at merge: <code>b419994</code> (merge ceremony
+commit) / <code>d8d8493</code> (–no-ff merge of
+<code>agent/context-fatigue-via-role-typed-state</code>).</li>
+<li>All 5 review rounds:
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/{r1,r2,r3,r4,r5}/{request,codex,codex-ops,combined}.md</code>.</li>
+<li>Strategist resume journal entry:
+<code>raw/internal/dogfooding/mcp-interactions-journal.md</code> §
+“2026-05-13 16:30 PDT — session resume after /clear (claude
+strategist)”.</li>
+<li>Closed-loop event journal entry: same journal § “2026-05-13 16:45
+PDT — closed-loop event: codex reads prior codex strategist via
+ECHO”.</li>
+<li>Builder run log:
+<code>raw/internal/agent-runs/2026-05-13-2026-05-13-046-context-fatigue-via-role-typed-state.md</code>.</li>
+<li>/review-pending sidecar (deleted at merge; viewable at SHA
+<code>8e66f5c</code>):
+<code>backlog/pending_review/2026-05-13-046-context-fatigue-via-role-typed-state.review.md</code>.</li>
+</ul>
+<p><strong>Do not edit this file.</strong> Comparison reports go in
+sibling <code>role-typed-state-comparison-&lt;spec-id&gt;.md</code>
+files. If the baseline is wrong, file a follow-up explaining why and
+write the corrected baseline as a new dated file — but never silently
+overwrite this one. The empirical pre-state is load-bearing precisely
+because it can’t move.</p>
+</body>
+</html>
