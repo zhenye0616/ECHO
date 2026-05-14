@@ -1578,6 +1578,11 @@ href="#pdt-claude-orchestrator-confirms-via-echo-that-codex-reviewer-launchd-is-
 id="toc-pdt-claude-orchestrator-confirms-via-echo-that-codex-reviewer-launchd-is-dead">2026-05-14
 01:25 PDT — Claude orchestrator confirms via ECHO that codex reviewer
 launchd is dead</a></li>
+<li><a
+href="#pdt---codex-r1-on-048-process-backlog-builder-state-handoff-refresh"
+id="toc-pdt---codex-r1-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
+01:35 PDT - Codex R1 on 048 process-backlog builder-state handoff
+refresh</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15855,6 +15860,57 @@ reviewer ticks the same way it fires watcher ticks:
 Separate fix candidate for <code>_followups.md</code> — the launchd
 plist or wrapper script broke recently. Don’t design here; observation
 only.</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
+01:35 PDT - Codex R1 on 048 process-backlog builder-state handoff
+refresh</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-048-process-backlog-builder-state-handoff-refresh.md</code>
+at <code>72f3ddb9b501fd80a8ae12db9a3c0a93cc089dbd</code>,
+<code>skills/process-backlog.md</code>,
+<code>docs/AGENT_INSTRUCTIONS.md</code>,
+<code>skills/role-typed-task-state.md</code>,
+<code>src/mcp/parse-anchors.ts</code>,
+<code>src/mcp/tools/list-task-states.ts</code>,
+<code>tests/task-state/anchors-fixtures.json</code>,
+<code>tests/task-state/anchors.test.ts</code>,
+<code>tools/task-state/lint.py</code>, and
+<code>package.json</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/codex.md</code>
+as <code>cf0ec3a</code>, verdict <code>pushback</code>, findings: HIGH
+<code>canonical_anchors</code> key conflict (<code>branch</code>,
+<code>run_log</code>, <code>head_sha</code> are rejected by the current
+parser while schema/parser edits are out of scope); MEDIUM
+<code>current_thesis</code> lifecycle-sentence patch target is
+underspecified against free-Markdown block bodies.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>72f3ddb9b501fd80a8ae12db9a3c0a93cc089dbd</code>; request path
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The main Codex-side blocker is structural,
+not editorial: a builder following AC1 would make builder-state
+discovery degrade through <code>_parse_error</code> unless the spec
+either stops writing extra anchor keys or explicitly widens the
+parser/schema/test scope.</li>
+<li><strong>Conjecture:</strong> (none - observations only)</li>
 </ul>
 </body>
 </html>
