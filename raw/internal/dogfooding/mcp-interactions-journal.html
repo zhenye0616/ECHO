@@ -1603,6 +1603,9 @@ href="#pdt-claude-orchestrator-discovers-codex-native-skill-system-via-echo"
 id="toc-pdt-claude-orchestrator-discovers-codex-native-skill-system-via-echo">2026-05-14
 12:35 PDT — Claude orchestrator discovers codex native skill system via
 ECHO</a></li>
+<li><a href="#pdt---codex-ops-r1-on-049-codex-skill-adapter"
+id="toc-pdt---codex-ops-r1-on-049-codex-skill-adapter">2026-05-14 12:52
+PDT - Codex-ops R1 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16234,6 +16237,53 @@ target with the directory-shape transformation. The canonical
 adapter (Claude Code’s flat .md vs codex’s SKILL.md directory) becomes a
 derived form. This actually FIXES the “TBD” placeholder in the
 cross-tool-protocol decision doc.</li>
+</ul>
+<h3 id="pdt---codex-ops-r1-on-049-codex-skill-adapter">2026-05-14 12:52
+PDT - Codex-ops R1 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, Codex
+reviewer command sibling, response helper, existing codex-ops response
+examples, and the pinned artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>ce001433246774afd205e1d6feed991e5912abe0</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r1/codex-ops.md</code>
+as <code>abbac4f</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH materializing Codex adapters for known non-neutral skills
+exposes broken slash commands; MEDIUM parallel <code>codex exec</code>
+fan-out needs isolated/per-child fail-closed runtime handling; MEDIUM
+install helper must create/validate <code>~/.codex/skills</code>; MEDIUM
+symlink-discovery risk needs an accepted copy fallback or explicit
+blocked outcome.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>ce001433246774afd205e1d6feed991e5912abe0</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r1/codex-ops.md</code>;
+schema/helper paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The ops lens found deployment/runtime hazards
+rather than implementability gaps: Codex discovery would make unfinished
+protocol skills invokable, and the proposed Codex fan-out needs
+isolation plus hard failure accounting before it becomes a reliable
+unattended workflow.</li>
+<li><strong>Conjecture:</strong> 049 may need a smaller first adapter
+surface: publish only skills with explicit Codex binding notes, then let
+each followup widen the materialized set as it neutralizes another
+canonical body.</li>
 </ul>
 </body>
 </html>
