@@ -39,6 +39,10 @@
       "type": "string",
       "enum": ["proceed", "proceed_after_patches", "pushback"]
     },
+    "consumed_task_state": {
+      "type": "boolean",
+      "description": "Optional. Defaults to false. MUST be false (or omitted). Reviewer ticks are fresh-eyes-at-SHA: they consume only `request.md` (artifact SHA, spec ref, requested lens) and the spec at SHA. Explicit `consumed_task_state: true` declares a fresh-eyes violation and is rejected by validate.py with REVIEWER_FRESH_EYES_VIOLATION."
+    },
     "findings": {
       "type": "array",
       "items": {
