@@ -1685,6 +1685,9 @@ PDT - Codex-ops R1 on 050 worktree isolation</a></li>
 <li><a href="#pdt---codex-r2-on-050-worktree-isolation"
 id="toc-pdt---codex-r2-on-050-worktree-isolation">2026-05-14 15:30 PDT -
 Codex R2 on 050 worktree isolation</a></li>
+<li><a href="#pdt---codex-ops-r2-on-050-worktree-isolation"
+id="toc-pdt---codex-ops-r2-on-050-worktree-isolation">2026-05-14 15:32
+PDT - Codex-ops R2 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17468,6 +17471,56 @@ protects founder-paused merger worktrees but makes registered crash
 cleanup impossible, and the push-failure preservation patch keeps a
 directory but not durable Git metadata if implemented with plain
 <code>mv</code>.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-050-worktree-isolation">2026-05-14 15:32
+PDT - Codex-ops R2 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>56175d0190c6c18820e643fb1e2e25b448571c1a</code>, prior R1
+response/combined context, current <code>_run_reviewer.sh</code>,
+reviewer command/validation helpers, and existing response examples for
+formatting. Also ran throwaway linked-worktree probes for detached
+<code>git pull --rebase origin main</code> and raw-<code>mv</code>
+failed-worktree behavior before/after
+<code>git worktree prune</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/codex-ops.md</code>
+as <code>204206c</code>, verdict <code>pushback</code>, findings: HIGH
+watcher/reviewer worktree isolation can close a round from a stale
+snapshot because the existing <code>combined.md</code> race guard is
+local-worktree-only; HIGH raw <code>mv</code> preservation of a failed
+linked worktree becomes non-inspectable after the next
+<code>git worktree prune</code>; HIGH registered-worktree safe-list
+contradicts AC6.4 crashed-tick cleanup; MEDIUM wrapper cannot
+distinguish child <code>push-with-retry.sh</code> exhaustion from other
+<code>codex exec</code> failures without a machine-readable signal.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>56175d0190c6c18820e643fb1e2e25b448571c1a</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> Three of four findings are R2
+disposition-surface issues rather than objections to the original
+worktree-isolation direction. The new codex-ops-only HIGH is the remote
+terminality race: once watcher and reviewer no longer share a live
+checkout, the 043 local <code>combined.md</code> guard stops protecting
+against a late reviewer response and stale combined emission.</li>
 </ul>
 </body>
 </html>
