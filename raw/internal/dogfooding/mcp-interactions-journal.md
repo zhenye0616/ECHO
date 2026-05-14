@@ -3329,3 +3329,14 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** right - one Codex review was written for the requested round, anchored to the requested spec SHA, validated before link, committed and pushed before this observation-only journal entry.
 - **Note:** The R1 CAS-helper and file-scope blockers are resolved. The remaining implementation risk is local to the wrapper contract: the lock metadata must only use variables available before `codex exec` starts, otherwise the `_run_reviewer.sh`-style `set -u` shell shape aborts before the builder can run.
 - **Conjecture:** (none - observations only)
+
+### 2026-05-13 23:05 PDT — Cursor R3 on 047 codex-as-builder binding adapter
+
+- **Source agent:** Cursor's Claude
+- **Trigger:** Execute one Cursor-side review queue tick (`MY_REVIEWER=cursor`); first pending response was `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `cursor` with no `cursor.md` and no `combined.md`; read R3 focus_hints, reviewer schema, pinned artifact `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md` at `ac9fa7d46d67b1c1227e56fc92eba539f8cb0624`. No `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Returned:** Wrote, pre-link validated, committed, and pushed `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/cursor.md` as `8ff546e`, verdict `proceed_after_patches`, headline findings: §Out of Scope lock path string lags `.d` directory; AC4 poll snippet should initialize loop counter for `set -u` copy-paste.
+- **Sources:** Artifact SHA `ac9fa7d46d67b1c1227e56fc92eba539f8cb0624`; request path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/request.md`; response path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/cursor.md`; no ECHO MCP reads.
+- **Verdict:** ✅ right — one review per tick, SHA-pinned artifact, validated before link, response pushed before this journal entry.
+- **Note:** DoD three-case wording and R4→AC5 qualitative sink are aligned at this SHA; AC1 lock metadata and AC4 synchronization gate match R3 last-mile review prompts.
+- **Conjecture:** (none — observations only)
