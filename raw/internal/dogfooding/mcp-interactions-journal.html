@@ -1618,6 +1618,9 @@ id="toc-pdt---codex-r2-on-049-codex-skill-adapter">2026-05-14 13:02 PDT
 <li><a href="#pdt---codex-ops-r3-on-049-codex-skill-adapter"
 id="toc-pdt---codex-ops-r3-on-049-codex-skill-adapter">2026-05-14 13:08
 PDT - Codex-ops R3 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r3-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r3-on-049-codex-skill-adapter">2026-05-14 13:08 PDT
+- Codex R3 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16473,6 +16476,51 @@ reviewer fan-out is read-only, temp files are per-run under
 now refuses non-managed states before link/copy operations. No new
 scheduler, dirty-tree, launchd/shell, race, or observability blockers
 found.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-049-codex-skill-adapter">2026-05-14 13:08 PDT
+- Codex R3 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>488bbf46d09f1cdeebebff18e8d7be2808fa3f2d</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/review-pending.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, package/test surfaces, the R2 codex
+response, and R2 combined disposition.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r3/codex.md</code>
+as <code>e5708ca</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH missing
+<code>tests/sync-skills/install-codex-adapters.test.ts</code> from
+<code>files_to_modify</code>; MEDIUM copy-mode sentinel publish is not
+crash-safe; MEDIUM R6 reopens <code>review-queue-watch</code> scope
+despite exact in-scope/out-of-scope language.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>488bbf46d09f1cdeebebff18e8d7be2808fa3f2d</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r3/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> Prior R2 blockers were resolved at the
+fan-out/install-conflict layer. R3’s remaining issues are mostly handoff
+hygiene: the builder allowlist must match AC3, copy-mode install should
+avoid self-created non-managed partial directories, and the risk
+register should not authorize a mid-build scope expansion outside the
+declared file set.</li>
 </ul>
 </body>
 </html>
