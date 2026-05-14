@@ -1556,6 +1556,9 @@ id="toc-pdt---codex-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
 <li><a href="#pdt-cursor-r2-on-047-codex-as-builder-binding-adapter"
 id="toc-pdt-cursor-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
 22:58 PDT — Cursor R2 on 047 codex-as-builder binding adapter</a></li>
+<li><a href="#pdt---codex-r2-on-047-codex-as-builder-binding-adapter"
+id="toc-pdt---codex-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
+23:01 PDT - Codex R2 on 047 codex-as-builder binding adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15491,6 +15494,51 @@ entry.</li>
 Cursor-visible gaps are editorial alignment (DoD vs AC4, R4 vs AC5) and
 an AC8 typo in the request focus_hints only.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
+23:01 PDT - Codex R2 on 047 codex-as-builder binding adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>
+at <code>966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/role-typed-task-state.md</code>,
+<code>skills/review-queue-cursor.md</code>,
+<code>skills/merge-and-cleanup.md</code>,
+<code>tools/task-state/push-round-state.sh</code>,
+<code>tools/sync-skills.sh</code>,
+<code>tests/task-state/push-round-state.test.ts</code>, and
+<code>package.json</code>. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/codex.md</code>
+as <code>61a9c77</code>, verdict <code>proceed_after_patches</code>,
+findings: AC1’s lock-info snippet uses <code>$ITEM_ID</code> before the
+wrapper can know an item id; AC4’s overlapping-process test should wait
+for lock acquisition deterministically; DoD still says two test cases
+while AC4 defines three.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R1 CAS-helper and file-scope blockers are
+resolved. The remaining implementation risk is local to the wrapper
+contract: the lock metadata must only use variables available before
+<code>codex exec</code> starts, otherwise the
+<code>_run_reviewer.sh</code>-style <code>set -u</code> shell shape
+aborts before the builder can run.</li>
+<li><strong>Conjecture:</strong> (none - observations only)</li>
 </ul>
 </body>
 </html>

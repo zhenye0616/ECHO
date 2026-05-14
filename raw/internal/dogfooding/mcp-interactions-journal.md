@@ -3320,3 +3320,12 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — one review per tick, SHA-pinned artifact, validated before link, response pushed before this journal entry.
 - **Note:** R2 resolves prior AC3/CAS tension; remaining Cursor-visible gaps are editorial alignment (DoD vs AC4, R4 vs AC5) and an AC8 typo in the request focus_hints only.
 - **Conjecture:** (none — observations only)
+
+### 2026-05-13 23:01 PDT - Codex R2 on 047 codex-as-builder binding adapter
+
+- **Trigger:** Execute one Codex-side review queue tick (`MY_REVIEWER=codex`); first pending Codex response was `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md`.
+- **Tool and query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex` with no `codex.md` and no `combined.md`; read the R2 request, reviewer schema, pinned artifact `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md` at `966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8`, `tools/review-queue/_run_reviewer.sh`, `skills/process-backlog.md`, `skills/role-typed-task-state.md`, `skills/review-queue-cursor.md`, `skills/merge-and-cleanup.md`, `tools/task-state/push-round-state.sh`, `tools/sync-skills.sh`, `tests/task-state/push-round-state.test.ts`, and `package.json`. No `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Returned shape:** Wrote, pre-link validated, committed, and pushed `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/codex.md` as `61a9c77`, verdict `proceed_after_patches`, findings: AC1's lock-info snippet uses `$ITEM_ID` before the wrapper can know an item id; AC4's overlapping-process test should wait for lock acquisition deterministically; DoD still says two test cases while AC4 defines three.
+- **Verdict:** right - one Codex review was written for the requested round, anchored to the requested spec SHA, validated before link, committed and pushed before this observation-only journal entry.
+- **Note:** The R1 CAS-helper and file-scope blockers are resolved. The remaining implementation risk is local to the wrapper contract: the lock metadata must only use variables available before `codex exec` starts, otherwise the `_run_reviewer.sh`-style `set -u` shell shape aborts before the builder can run.
+- **Conjecture:** (none - observations only)
