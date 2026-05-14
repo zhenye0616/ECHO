@@ -62,6 +62,97 @@ spec_refs:
   - skills/process-backlog.md  # AC2 touch. Vendor-neutral protocol stays here. AC2 appends ONE binding-specific section for codex; no protocol changes.
   - skills/role-typed-task-state.md  # AC3 reference. Builder pointer schema + writer-responsibilities table for `builder.md` are inherited verbatim from 046.
   - skills/review-queue-cursor.md  # AC7 reference. Existing skill that defines the Cursor's-Claude reviewer binding. 047 does NOT modify it — only documents how the founder triggers cursor reviewer ticks during the 047 cycle.
+review_notes: |
+  Merged 2026-05-14 via founder reconciliation (auto-mode). First post-046
+  spec; first concrete builder.md written under the role-typed task-state
+  schema; first cross-vendor `[codex, cursor]` review cycle (3 rounds:
+  R1 divergent → R2 converged → R3 CLAIM-READY with codex zero-findings
+  + cursor doc hygiene).
+
+  Conflicts resolved during merge: none. Clean `--no-ff` merge of
+  `agent/codex-as-builder-binding-adapter` @ 50761d3. The two main
+  commits between branch-base and merge time (ebe123b review sidecar,
+  fa21ff3 strategist.md update) touch strategist-side state only,
+  disjoint from the branch's 6 files.
+
+  Fixups applied at merge time (from the /review-pending sidecar):
+  - Fixup #1 (real): builder.md refreshed to AC3 completion frame.
+    canonical_anchors.spec updated backlog/claimed/ → backlog/complete/
+    to match the post-merge location; current_thesis updated to
+    "047 complete, ready for review — and now merged" wording;
+    head_sha anchor added; "(will be written at handoff)" stub
+    removed from run_log. task-state/lint clean (50 body lines).
+  - Fixup #2 (acceptance, no code change): the documented
+    `CODEX_BIN=*.sh` test-only branch in tools/backlog/run-codex-
+    builder.sh — confirmed acceptable. Production path (CODEX_BIN=
+    codex real binary) is unchanged from AC1 spec form. The test-only
+    branch is the minimum-cost concession to satisfy AC4 case 1 (a)'s
+    `argv[0]=codex` assertion against a shebang fixture, given that
+    macOS/Linux kernel shebang re-exec strips `exec -a` argv[0]
+    overrides. Documented inline at wrapper lines 85–93 and in
+    builder.md locked_decisions.
+
+  Fixups deferred to follow-up items (non-blocking):
+  - Tighten ~/.echo/agent-id file mode to 0600 (currently
+    umask-dependent). Belongs in a future "binding hardening" sweep.
+  - Revisit per-machine wrapper-lock semantics IF cross-machine
+    codex-builder coordination becomes a real ask (currently
+    Out-of-Scope #3 of 047).
+
+  Verify (post-fixup, post-merge): npm test 883 passed / 21 skipped /
+  0 failed; npm run lint clean (eslint + lint:task-state); npm run
+  typecheck clean. tools/sync-skills.sh --check clean (pre-merge in
+  builder verify; not re-run post-merge since neither skill nor
+  adapter file was touched in C4).
+
+  AC5 measurement status at merge time:
+  - §1 strategist cold-start: PASS at f5e4e0c (0 ECHO MCP / ~175
+    lines / <60s) — measured by the post-/clear strategist resume on
+    2026-05-13 23:25 PDT. Recorded in raw/internal/dogfooding/
+    role-typed-state-comparison-047.md §1.
+  - §3 codex-side reviewer-tick INVARIANT (tokens) and §3-cursor
+    qualitative subsection: TODO — strategist + founder to fill
+    post-merge per spec's "merge-time observation" framing.
+  - §5 founder in-queue activations: 0 during R1-R3 (auto-mode +
+    046 R4 precedent extension absorbed verdict divergence); 0
+    during build (auto-mode); 0 during this merge (auto-mode +
+    sidecar pre-approved by founder invoking /merge-and-cleanup).
+    Final §5 = 0 — preliminary PASS at sidecar time stands.
+
+  Cross-vendor dogfooding signal: PASS qualitatively. R1 divergent
+  → complementary findings (codex caught 3 unique procedural;
+  cursor caught 3 unique workflow). R2 converged at verdict band.
+  R3 terminal alignment (codex zero-findings + cursor doc hygiene
+  only). The 046 R4 precedent extension (auto-resolve mechanically-
+  dispositionable findings even on verdict divergence) holds for
+  cross-vendor cases — no founder escalation needed across the
+  3-round cycle.
+
+  Vendor coverage delta (north star (e2)):
+  - Before 047: builder = [Claude Code, Cursor's Claude] = 1 vendor.
+  - After 047: builder = [Claude Code, Cursor's Claude, codex] = 2
+    vendors via the new run-codex-builder.sh wrapper. Builder role
+    now multi-vendor ↗.
+  - Remaining single-vendor roles: strategist (Claude only),
+    watcher (unspecified), dispatcher (unspecified). Friction-first
+    gate stays closed until all four roles reach ≥2 vendor bindings
+    per north star (e2).
+
+  Independence note: builder was Claude Code (agent_id 78D5AB0F-...);
+  /review-pending dispatched a Claude code-reviewer subagent that
+  CORROBORATED the merge-as-is signal but MISSED the builder.md
+  staleness fixup the prior reviewer caught. The prior committed
+  sidecar (f1f2545) was authoritative. This is empirical evidence
+  that same-vendor review can miss real issues — flag for future
+  reviewer-independence consideration.
+
+  Recursive dogfooding (AC3 inherited from 046 AC8): the builder.md
+  pointer is the FIRST concrete builder.md written under the schema.
+  builder.md hygiene at end-of-cycle is a fixup item caught by
+  /review-pending — surfaces the gap that the builder didn't
+  auto-update the pointer on move to pending_review. Worth tracking
+  in followups: should /process-backlog enforce a builder.md
+  end-of-cycle refresh before moving the item to pending_review?
 ---
 
 ## Why this spec exists

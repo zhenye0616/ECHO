@@ -2,12 +2,12 @@
 task_id: 2026-05-13-047-codex-as-builder-binding-adapter
 role: builder
 writer: claude-code-builder
-last_updated: 2026-05-14T06:38:41Z
+last_updated: 2026-05-14T06:55:00Z
 ---
 
 ## current_thesis
 
-047 is being built by the Claude Code binding (Option B — existing-binding-build), chosen by the founder over Option A (codex-bootstrap recursive dogfooding) at the moment of `/process-backlog` invocation post-strategist `/clear`. Five concrete deliverables on `agent/codex-as-builder-binding-adapter`: AC1 wrapper at `tools/backlog/run-codex-builder.sh`, AC2+AC3-contract+AC6 "Binding-specific notes — codex" section appended to `skills/process-backlog.md` (synced to `.claude/commands/process-backlog.md`), AC4 three-case integration tests at `tests/backlog/run-codex-builder.test.ts` + mock at `tests/backlog/fixtures/mock-codex.sh`, and this pointer. AC5 measurement is observational and deferred to merge time by the strategist + founder. AC7 is doc-only inside the spec body — no code or skill changes.
+047 complete, ready for review — and now merged. Built by the Claude Code binding (Option B — existing-binding-build), chosen by the founder over Option A (codex-bootstrap recursive dogfooding) at the moment of `/process-backlog` invocation post-strategist `/clear`. Five concrete deliverables landed on `agent/codex-as-builder-binding-adapter` @ `50761d3`: AC1 wrapper at `tools/backlog/run-codex-builder.sh`, AC2+AC3-contract+AC6 "Binding-specific notes — codex" section appended to `skills/process-backlog.md` (synced to `.claude/commands/process-backlog.md`), AC4 three-case integration tests at `tests/backlog/run-codex-builder.test.ts` + mock at `tests/backlog/fixtures/mock-codex.sh`, and this pointer. AC5 measurement is observational and deferred to merge time by the strategist + founder. AC7 is doc-only inside the spec body — no code or skill changes.
 
 ## locked_decisions
 
@@ -32,8 +32,9 @@ last_updated: 2026-05-14T06:38:41Z
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-13-047-codex-as-builder-binding-adapter.md
+- spec: backlog/complete/2026-05-13-047-codex-as-builder-binding-adapter.md
 - reviews: backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/
 - branch: agent/codex-as-builder-binding-adapter
 - worktree: ~/Desktop/Project_echo--codex-as-builder-binding-adapter/
-- run_log: raw/internal/agent-runs/2026-05-13-2026-05-13-047-codex-as-builder-binding-adapter.md (will be written at handoff)
+- run_log: raw/internal/agent-runs/2026-05-13-2026-05-13-047-codex-as-builder-binding-adapter.md
+- head_sha: 50761d3b7c1a3ef6096722a2262aac253b986125
