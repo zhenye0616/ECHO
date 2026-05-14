@@ -1570,6 +1570,9 @@ href="#pdt-claude-orchestrator-monitoring-codex-strategist-phase-1-sanity-check"
 id="toc-pdt-claude-orchestrator-monitoring-codex-strategist-phase-1-sanity-check">2026-05-14
 00:38 PDT — Claude orchestrator monitoring codex strategist Phase 1
 sanity check</a></li>
+<li><a href="#pdt-claude-reviewer-tick-cursor-slot-for-048-r1"
+id="toc-pdt-claude-reviewer-tick-cursor-slot-for-048-r1">2026-05-14
+01:14 PDT — Claude reviewer tick (cursor slot) for 048 R1</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15712,6 +15715,72 @@ If true, monitoring a freshly-started cross-vendor session needs
 <code>wait_for_new_turns</code> or <code>echo_resolve_mru</code> for the
 first ~5 turns, then <code>find_clusters</code> once codex accrues
 enough activity. Don’t design fixes here — observation only.</li>
+</ul>
+<h3 id="pdt-claude-reviewer-tick-cursor-slot-for-048-r1">2026-05-14
+01:14 PDT — Claude reviewer tick (cursor slot) for 048 R1</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked for codex strategist + codex
+reviewer + Claude reviewer triad on 048. Codex strategist opened R1 at
+<code>220871c</code>; codex reviewer (launchd) has not yet fired (last
+tick 2026-05-14T06:08:44Z, ~2h before this request); I (Claude Code,
+this conversation) filled the <code>cursor</code> reviewer slot via
+<code>skills/review-queue-cursor.md</code> to keep the cycle
+progressing.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick (fresh-eyes-at-SHA invariant; reviewer ticks consume only
+<code>request.md</code> + artifact at SHA). The earlier monitoring calls
+(<code>wait_for_new_turns</code>, <code>get_atoms</code>) were
+strategist-orchestrator-side, not reviewer-side; this journal entry is
+the reviewer-side companion.</li>
+<li><strong>Returned:</strong> N/A — no MCP responses to summarize. The
+reviewer’s output is <code>cursor.md</code> itself.</li>
+<li><strong>Sources:</strong>
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/request.md</code>
+(artifact spec @ <code>72f3ddb9b501fd80a8ae12db9a3c0a93cc089dbd</code>);
+<code>git show 72f3ddb:backlog/ready/2026-05-14-048-process-backlog-builder-state-handoff-refresh.md</code>
+for the spec body;
+<code>tools/review-queue/schemas/reviewer.schema.json</code> for
+response shape. Committed response at
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r1/cursor.md</code>
+(commit <code>9fdf3ab</code>).</li>
+<li><strong>Verdict:</strong> ✅ right —
+<code>proceed_after_patches</code> with 8 findings (1 HIGH, 2 MEDIUM, 3
+LOW, 2 nit). The HIGH is the <code>open_questions</code> overwrite issue
+(regression vs. 047 builder.md pattern; the patcher’s stated motivation
+to preserve builder content contradicts this rewrite). The MEDIUMs are
+the <code>current_thesis</code> lifecycle-sentence mechanism underspec +
+the detection-vs-failure logical contradiction
+(task_state_ref-set-but-builder.md-absent would block any new spec’s
+first cycle). LOWs are anchor preservation + AC location precision +
+malformed-fixture concretization. Nits are skill-prose-token brittleness
++ AC4 scope expansion.</li>
+<li><strong>Note:</strong> TWO process observations.
+<ol type="1">
+<li>Semantic note: the <code>cursor</code> reviewer slot is being filled
+by Claude Code (this conversation), not by Cursor’s-Claude in Cursor
+IDE. The Claude <em>lens</em> is the same; only the IDE binding differs.
+Slot-name <code>cursor</code> is a label, not an IDE gate —
+<code>validate.py</code> accepts the binding because the response’s
+<code>reviewer: cursor</code> matches the requested slot. If
+strict-Cursor’s-Claude is needed for a future cycle, founder fires
+<code>/review-queue-cursor</code> from Cursor IDE.</li>
+<li>Pre-commit validation caught a real YAML issue:
+<code>completed_at: 2026-05-14T08:14:00Z</code> (unquoted) was
+auto-parsed by PyYAML as a <code>datetime.datetime</code> object,
+failing the schema’s <code>string</code> type check. Fixed by quoting:
+<code>completed_at: "2026-05-14T08:14:00Z"</code>. The 045 AC1 pre-link
+gate works as designed — caught a real schema violation before the
+response entered live state.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> The codex reviewer launchd appears
+inactive (last tick ~2h before this request). Either the cron interval
+is long (perhaps hourly?) and 048’s request just hasn’t landed in a tick
+yet, OR the job is paused. Either way, the codex reviewer side of R1 is
+pending; convergence requires both reviewer responses before combine.py
++ watcher disposition can run. Founder may need to manually fire a codex
+reviewer tick (per
+<code>reference_codex_review_queue_invocation.md</code>) to unblock R1’s
+combine step.</li>
 </ul>
 </body>
 </html>
