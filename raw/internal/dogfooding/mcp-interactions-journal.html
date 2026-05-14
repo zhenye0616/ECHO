@@ -1645,6 +1645,12 @@ PDT - Codex-ops R7 on 049 codex skill adapter</a></li>
 <li><a href="#pdt---codex-r7-on-049-codex-skill-adapter"
 id="toc-pdt---codex-r7-on-049-codex-skill-adapter">2026-05-14 14:08 PDT
 - Codex R7 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-ops-r8-on-049-codex-skill-adapter"
+id="toc-pdt---codex-ops-r8-on-049-codex-skill-adapter">2026-05-14 14:19
+PDT - Codex-ops R8 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r8-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r8-on-049-codex-skill-adapter">2026-05-14 14:19 PDT
+- Codex R8 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16893,6 +16899,90 @@ but the runtime child-output source is still wrong for Codex CLI: stdout
 contains framing and the prompt, so regex extraction can read template
 headings instead of the final child review. The stale-lock recovery test
 gap is straightforward to add.</li>
+</ul>
+<h3 id="pdt---codex-ops-r8-on-049-codex-skill-adapter">2026-05-14 14:19
+PDT - Codex-ops R8 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R8 request, reviewer schema, current
+response examples, and the pinned artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>f0bf4ea65aa9a1c8423b1258ee1aaff1b670208a</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/codex-ops.md</code>
+as <code>fe52ccb</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM stale-lock recovery can steal a still-running install
+because it ignores the live <code>pid</code> file; MEDIUM copy-mode
+stale detection keys off repo <code>HEAD</code> instead of actual
+per-skill content, producing false stale and false fresh signals.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>f0bf4ea65aa9a1c8423b1258ee1aaff1b670208a</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/codex-ops.md</code>;
+schema/helper paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R8 resolves the prior stdout-evidence,
+corrupt-lock, and copy-refresh visibility patches, but the remaining
+runtime gaps are in the precision of the new recovery/observability
+mechanisms: a stale-lock timeout must not override a live installer, and
+copy-mode freshness should track skill bytes rather than unrelated
+repository commits.</li>
+<li><strong>Conjecture:</strong> (none - observations only per
+dogfooding-journal discipline)</li>
+</ul>
+<h3 id="pdt---codex-r8-on-049-codex-skill-adapter">2026-05-14 14:19 PDT
+- Codex R8 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R8 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>f0bf4ea65aa9a1c8423b1258ee1aaff1b670208a</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/review-pending.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, package/test surfaces,
+<code>codex exec --help</code>, and existing response examples for
+formatting only.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/codex.md</code>
+as <code>73b5bb7</code>, verdict <code>proceed_after_patches</code>,
+finding: HIGH AC3 requires an executable parse-failure Vitest for a
+codex review-pending orchestrator while Out of Scope explicitly defers
+implementing that orchestrator/helper code.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>f0bf4ea65aa9a1c8423b1258ee1aaff1b670208a</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r8/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R8 closes the previously identified runtime
+and install-shell hazards. The remaining issue is narrower: remove/defer
+the test for executable parse-failure handling unless 049 also brings
+the codex review-pending orchestrator/parser into scope.</li>
 </ul>
 </body>
 </html>
