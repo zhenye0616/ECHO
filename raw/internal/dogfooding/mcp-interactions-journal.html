@@ -1527,6 +1527,11 @@ href="#pdt---codex-ops-r4-on-046-context-fatigue-via-role-typed-state"
 id="toc-pdt---codex-ops-r4-on-046-context-fatigue-via-role-typed-state">2026-05-13
 21:09 PDT - Codex-ops R4 on 046 context fatigue via role-typed
 state</a></li>
+<li><a
+href="#pdt---codex-r4-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-r4-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:10 PDT - Codex R4 on 046 context fatigue via role-typed
+state</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15117,6 +15122,60 @@ observability. The ABSENT sentinel and unchanged-blob single retry look
 operationally sound; the patch needed is only to make the queue-error
 row durable across the hard reset, or to document the post-reset
 dirty-file/autostash behavior explicitly.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r4-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:10 PDT - Codex R4 on 046 context fatigue via role-typed state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, R3
+combined disposition, R3 sibling responses, pinned artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>3f4e829ed51438d06659e93798bc4c36b5bbe115</code>, AC1
+narrow-review lines, <code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/_lib.py</code>, and the tracked
+<code>raw/internal/queue-errors.md</code> file. No
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/codex.md</code>
+as <code>1d13057</code>, verdict <code>pushback</code>, finding: AC1’s
+stale-push CAS-abort path says the queue-error row persists, but the
+specified append-before-<code>git reset --hard origin/main</code>
+ordering erases the tracked <code>raw/internal/queue-errors.md</code>
+append unless the helper uses a durable post-reset log sequence.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>3f4e829ed51438d06659e93798bc4c36b5bbe115</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/codex.md</code>;
+prior disposition
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r3/combined.md</code>;
+sibling response
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/codex-ops.md</code>;
+local code paths <code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>raw/internal/queue-errors.md</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA,
+validated before link, committed and pushed exactly one reviewer
+response before this journal entry.</li>
+<li><strong>Note:</strong> Codex and codex-ops converged on the same R4
+issue. The actual CAS lease and <code>ABSENT</code> sentinel semantics
+look sound; the unresolved implementability gap is making the abort log
+survive the hard reset without leaving the next unattended tick in a
+dirty tracked-file state.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
