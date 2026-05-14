@@ -50,6 +50,11 @@
     },
     "focus_hints": {
       "type": "string"
+    },
+    "task_state_ref": {
+      "type": "string",
+      "description": "Optional. Per-round pointer to the task-state directory under backlog/task-state/<task-id>/. Non-reviewer consumers (watcher, dispatcher, strategist) may use it to locate role-typed state. Reviewers MUST NOT read task_state_ref or its contents — fresh-eyes-at-SHA invariant is preserved by the validate.py REVIEWER_FRESH_EYES_VIOLATION check.",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}-\\d{3}-[a-z][a-z0-9-]*$"
     }
   }
 }

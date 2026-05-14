@@ -263,6 +263,10 @@ created: 2026-04-30
 spec_refs:                        # files to read before working (in addition to the four mandatory reads)
   - (other backlog items, raw decision notes, or wiki pages that already exist)
 blocked_by: []                    # other item IDs that must be in backlog/complete/ before this can be claimed
+task_state_ref: ""                # optional (046+). When set, names the task-state pointer directory
+                                  # under backlog/task-state/<task-id>/ — the role-typed working-memory
+                                  # snapshot strategist/builder/watcher/dispatcher actors read on cold
+                                  # start. Reviewer ticks MUST NOT read this; see skills/role-typed-task-state.md.
 acceptance:                       # specific, testable criteria
   - All capture data flows through one chokepoint function
   - Non-allowlisted sources rejected; rejections are logged

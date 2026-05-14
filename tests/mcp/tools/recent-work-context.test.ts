@@ -140,7 +140,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Migration:');
   });
 
-  it('all eight tools are registered (item 038: -tail_session, +echo_resolve_mru — tool count stays at 8 until the 2026-05-17 follow-up drops recent_work_context)', async () => {
+  it('all ten tools are registered (item 046: +get_role_state, +list_task_states — until the 2026-05-17 follow-up drops recent_work_context)', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
@@ -151,6 +151,8 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       'get_atom',
       'get_atoms',
       'get_recent_work_context',
+      'get_role_state',
+      'list_task_states',
       'search_memories',
       'wait_for_new_turns',
     ]);

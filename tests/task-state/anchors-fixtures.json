@@ -1,0 +1,69 @@
+[
+  {
+    "name": "spec-only",
+    "input": "## canonical_anchors\n\n- spec: backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md\n",
+    "expected": {
+      "spec": "backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md"
+    }
+  },
+  {
+    "name": "spec-and-reviews",
+    "input": "## canonical_anchors\n\n- spec: backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md\n- reviews: backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/\n",
+    "expected": {
+      "spec": "backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md",
+      "reviews": "backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/"
+    }
+  },
+  {
+    "name": "anchors-block-after-other-blocks",
+    "input": "## current_thesis\n\nthesis line\n\n## canonical_anchors\n\n- spec: backlog/claimed/2026-05-13-046-x.md\n- reviews: backlog/reviews/2026-05-13-046-x/\n",
+    "expected": {
+      "spec": "backlog/claimed/2026-05-13-046-x.md",
+      "reviews": "backlog/reviews/2026-05-13-046-x/"
+    }
+  },
+  {
+    "name": "anchors-block-followed-by-trailing-section",
+    "input": "## canonical_anchors\n\n- spec: a.md\n- reviews: b/\n\n## related\n\n- foo\n",
+    "expected": {
+      "spec": "a.md",
+      "reviews": "b/"
+    }
+  },
+  {
+    "name": "no-heading-fails",
+    "input": "## current_thesis\n\nthesis only\n",
+    "expected": {
+      "_parse_error": "canonical_anchors: heading not found"
+    }
+  },
+  {
+    "name": "missing-required-spec-fails",
+    "input": "## canonical_anchors\n\n- reviews: backlog/reviews/2026-05-13-046-x/\n",
+    "expected": {
+      "_parse_error": "canonical_anchors: missing required key 'spec'"
+    }
+  },
+  {
+    "name": "unknown-key-fails",
+    "input": "## canonical_anchors\n\n- spec: a.md\n- something_else: b.md\n",
+    "expected": {
+      "_parse_error": "canonical_anchors: unknown key 'something_else' (allowed: spec, reviews)"
+    }
+  },
+  {
+    "name": "duplicate-key-fails-best-effort-spec",
+    "input": "## canonical_anchors\n\n- spec: first.md\n- spec: second.md\n",
+    "expected": {
+      "spec": "second.md",
+      "_parse_error": "canonical_anchors: duplicate key(s): spec"
+    }
+  },
+  {
+    "name": "malformed-line-fails",
+    "input": "## canonical_anchors\n\nspec: missing-bullet.md\n",
+    "expected": {
+      "_parse_error": "canonical_anchors: unrecognised line \"spec: missing-bullet.md\""
+    }
+  }
+]

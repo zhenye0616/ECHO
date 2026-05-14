@@ -8,6 +8,8 @@ import { registerEchoResolveMru } from './tools/echo-resolve-mru.js';
 import { registerFindClusters } from './tools/find-clusters.js';
 import { registerGetAtom } from './tools/get-atom.js';
 import { registerGetAtoms } from './tools/get-atoms.js';
+import { registerGetRoleState } from './tools/get-role-state.js';
+import { registerListTaskStates } from './tools/list-task-states.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 import { registerWaitForNewTurns } from './tools/wait-for-new-turns.js';
@@ -23,6 +25,20 @@ export interface McpServerHandle {
 export interface StartMcpServerOptions {
   port?: number;
   host?: string;
+  /**
+   * Repo root used by `get_role_state` / `list_task_states` (046 AC4).
+   * Resolution priority: explicit option > `ECHO_REPO_ROOT` env > process
+   * `cwd()`. Captured ONCE at server-start; tool handlers never re-read
+   * `process.cwd()`.
+   */
+  repo_root?: string;
+}
+
+function resolveRepoRoot(option?: string): string {
+  if (option !== undefined && option !== '') return option;
+  const env = process.env.ECHO_REPO_ROOT;
+  if (env !== undefined && env !== '') return env;
+  return process.cwd();
 }
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -77,6 +93,7 @@ export async function startMcpServer(
 ): Promise<McpServerHandle> {
   const host = options.host ?? '127.0.0.1';
   const requestedPort = options.port ?? 38478;
+  const repoRoot = resolveRepoRoot(options.repo_root);
 
   let boundPort = requestedPort;
 
@@ -103,6 +120,9 @@ export async function startMcpServer(
     // Item 038 / AC1 — MRU resolver primitive (returns search_memories-ready
     // descriptors for the most-recently-active source(s) under a predicate).
     registerEchoResolveMru(mcp, storage);
+    // Item 046 / AC4 — role-typed task-state read surface (repo_root pinned).
+    registerGetRoleState(mcp, repoRoot);
+    registerListTaskStates(mcp, repoRoot);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
