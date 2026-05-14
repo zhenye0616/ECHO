@@ -1598,6 +1598,11 @@ href="#pdt---codex-r2-on-048-process-backlog-builder-state-handoff-refresh"
 id="toc-pdt---codex-r2-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
 02:04 PDT - Codex R2 on 048 process-backlog builder-state handoff
 refresh</a></li>
+<li><a
+href="#pdt-claude-orchestrator-discovers-codex-native-skill-system-via-echo"
+id="toc-pdt-claude-orchestrator-discovers-codex-native-skill-system-via-echo">2026-05-14
+12:35 PDT — Claude orchestrator discovers codex native skill system via
+ECHO</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16121,6 +16126,114 @@ rather than a parser/schema redesign: if <code>builder.md</code> is
 absent, the helper can correctly no-op, but the documented handoff still
 needs to skip lint/stage or consume a machine-readable helper
 result.</li>
+</ul>
+<h3
+id="pdt-claude-orchestrator-discovers-codex-native-skill-system-via-echo">2026-05-14
+12:35 PDT — Claude orchestrator discovers codex native skill system via
+ECHO</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder activated codex
+<code>skill-creator</code> in their codex REPL and asked Claude to “use
+echo to connect and see how codex skills are created.” Earlier the
+founder had observed <code>/review-pending</code> working in Cursor but
+not in codex — now exploring whether codex has its own skill
+mechanism.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li><code>wait_for_new_turns(sources=["codex"], since="2026-05-14T09:14:38.841Z", timeout=45)</code>
+— poll for new codex activity after the ~10h gap since 048 strategist
+cycle closed.</li>
+<li><code>get_atoms(atom_ids=["ad809aa3-..."], format="minimal")</code>
+— fetch the single returned codex turn.</li>
+<li>(No ECHO MCP for the follow-on filesystem reads —
+<code>ls</code>/<code>head</code>/<code>find</code> on
+<code>~/.codex/skills/</code> are local FS, not ECHO substrate.)</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>wait_for_new_turns: 1 turn id, <code>timed_out: false</code>,
+<code>next_since=2026-05-14T19:35:35Z</code> (note: ~10h gap from prior
+<code>since</code> reflects the conversation pause).</li>
+<li>get_atoms: atom from NEW codex session <code>019e27f9-...</code>
+(started 2026-05-14T12:31:42Z = 05:31 PDT — wait, the
+<code>started 12:31</code> is UTC; PDT is 12:31-7h = 05:31, but the
+founder’s “activated codex skill creator” was now-ish, so this might be
+a different startup; regardless captured at git.sha c0ea432). Atom
+content: USER message was the FULL
+<code>~/.codex/skills/.system/skill-creator/SKILL.md</code> content
+(codex auto-loads system skills as user-message context); ASSISTANT
+replied “I’m using <code>skill-creator</code>. What skill do you want to
+create or update?” — the meta-skill’s interactive prompt fired.</li>
+</ul></li>
+<li><strong>Sources:</strong>
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/14/rollout-2026-05-14T12-31-42-019e27f9-...jsonl</code>
+(new codex session this morning, NOT the 048 strategist session). Plus
+follow-on local-FS reads of
+<code>~/.codex/skills/.system/{skill-creator,skill-installer,plugin-creator}/SKILL.md</code>
+— codex’s BUILT-IN system skills directory.</li>
+<li><strong>Verdict:</strong> ✅ right — ECHO’s source-prefix
+wait_for_new_turns surfaced the new codex session immediately. The
+truncated <code>content_bytes_elided: 20300</code> confirmed the
+system-skill body is substantial; reading it directly from
+<code>~/.codex/skills/.system/skill-creator/SKILL.md</code> (416 lines)
+gave the complete codex-side skill anatomy.</li>
+<li><strong>Note:</strong> Major architectural finding for ECHO’s
+cross-tool protocol claim.
+<ol type="1">
+<li><strong>Codex CLI v0.130.0 has a native skill system</strong> at
+<code>~/.codex/skills/</code>. Skill anatomy:
+<code>&lt;skill-name&gt;/SKILL.md</code> (required, YAML frontmatter
+with <code>name</code> + <code>description</code> + optional
+<code>metadata.short-description</code>) + optional
+<code>agents/openai.yaml</code> (UI metadata) + optional
+<code>scripts/</code> (executable) + <code>references/</code> (on-demand
+context) + <code>assets/</code> (output resources). Three-level
+progressive disclosure: name+description ALWAYS in context (~100 words);
+SKILL.md body loaded ON TRIGGER (&lt;5k words target); bundled resources
+loaded AS NEEDED.</li>
+<li><strong>Built-in system skills today</strong>:
+<code>skill-creator</code> (meta-skill for creating skills),
+<code>skill-installer</code> (install from openai/skills curated +
+experimental), <code>plugin-creator</code> (codex plugin scaffolding),
+<code>openai-docs</code>, <code>imagegen</code>. The
+<code>.system/</code> namespace prefix marks built-ins; user skills go
+to <code>~/.codex/skills/&lt;name&gt;/</code> directly.</li>
+<li><strong>This unblocks the third adapter target in ECHO’s
+<code>tools/sync-skills.sh</code>.</strong> Until today the canonical
+<code>skills/&lt;name&gt;.md</code> synced only to
+<code>.claude/commands/&lt;name&gt;.md</code> (Claude Code adapter);
+other clients were “TBD.” Codex’s
+<code>~/.codex/skills/&lt;name&gt;/SKILL.md</code> is now a concrete
+adapter slot. Sync script could extend to: copy canonical body → wrap in
+directory → transform frontmatter (codex’s
+<code>metadata.short-description</code> differs slightly from ECHO’s
+plain <code>description</code>) → write to
+<code>~/.codex/skills/&lt;name&gt;/SKILL.md</code>. The
+<code>agents/openai.yaml</code> UI metadata is recommended-not-required;
+could be deferred.</li>
+<li><strong>Implication for <code>/review-pending</code>
+cross-binding</strong>: codex skill-creator can author
+<code>~/.codex/skills/review-pending/SKILL.md</code> natively. The
+codex-side body can substitute <code>codex exec</code> subprocess
+fan-out for Claude’s <code>Agent</code>-tool subagent dispatch. The
+skill becomes binding-aware: same canonical purpose, different mechanism
+per binding. ECHO’s <code>skills/review-pending.md</code> would either
+grow per-binding sub-sections OR be the abstract spec with
+binding-specific implementations in <code>.claude/commands/</code>
+(Claude Agent tool) vs <code>~/.codex/skills/review-pending/</code>
+(codex exec fan-out).</li>
+</ol></li>
+<li><strong>Conjecture:</strong> The cleanest near-term path is to use
+codex skill-creator (interactively, in the active codex REPL) to author
+a <code>review-pending</code> codex skill that mirrors ECHO’s protocol
+intent but uses codex-native primitives. Then iterate: rinse-repeat for
+<code>process-backlog</code>, <code>review-queue-watch</code>, etc.
+Long-term: <code>tools/sync-skills.sh</code> grows the codex adapter
+target with the directory-shape transformation. The canonical
+<code>skills/&lt;name&gt;.md</code> becomes the protocol spec; each
+adapter (Claude Code’s flat .md vs codex’s SKILL.md directory) becomes a
+derived form. This actually FIXES the “TBD” placeholder in the
+cross-tool-protocol decision doc.</li>
 </ul>
 </body>
 </html>
