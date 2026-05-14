@@ -2,12 +2,12 @@
 task_id: 2026-05-13-047-codex-as-builder-binding-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T06:30:00Z
+last_updated: 2026-05-14T06:45:00Z
 ---
 
 ## current_thesis
 
-047 (codex-as-builder binding adapter) is **CLAIM-READY** at commit `03d708b` after a 3-round cross-vendor review cycle (codex + cursor reviewers) that converged with codex `proceed` zero-findings + cursor `proceed_after_patches` (doc hygiene only). Item file at `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md`. **AC5 §1 measurement is now DONE (PASS) as of 2026-05-13 23:25 PDT** — measured via the post-/clear strategist resume that produced this update: 0 ECHO MCP calls, ~175 lines read (strategist.md + comparison-047.md), <60s wall time. Recorded in `raw/internal/dogfooding/role-typed-state-comparison-047.md` §1. Next decision (open question (b)): build 047 via codex-bootstrap (recursive dogfooding) OR via existing binding (Claude Code / Cursor's Claude). Founder is leaning bootstrap; present and wait for go.
+047 (codex-as-builder binding adapter) was **CLAIM-READY** at commit `03d708b` after a 3-round cross-vendor review cycle (codex + cursor reviewers) that converged with codex `proceed` zero-findings + cursor `proceed_after_patches` (doc hygiene only). **CLAIMED 2026-05-13 ~23:30 PDT by Claude** (via existing builder binding — Claude Code or Cursor's Claude; bootstrap path deferred). **AC5 §1 measurement DONE (PASS)** on the same post-/clear strategist resume that wrote this update: 0 ECHO MCP calls, ~175 lines read, <60s wall time; recorded in `raw/internal/dogfooding/role-typed-state-comparison-047.md` §1. Strategist's posture is now WAIT until 047 reaches `pending_review/`. **North star reaffirmed at this checkpoint:** keep dogfooding cycles until BOTH (a) founder is out of the loop AND (b) every role is vendor-agnostic at ≥2 bindings (see open_questions (e)). The vendor-neutral harness extraction discussed in this session is deliberately deferred — premature while protocol evolves.
 
 ## locked_decisions
 
@@ -23,7 +23,16 @@ last_updated: 2026-05-14T06:30:00Z
 ## open_questions
 
 - (a) ~~AC5 §1 strategist cold-start measurement.~~ **DONE — PASS** (0 MCP / ~175 lines / <60s). Recorded in comparison-047.md §1 on 2026-05-13 23:25 PDT.
-- (b) **Codex-bootstrap-build vs existing-binding-build for 047.** Founder is leaning bootstrap (codex-on-skills/process-backlog.md without the wrapper, building the wrapper itself = recursive dogfooding). Existing-binding (Claude Code / Cursor's Claude) is the safer alternative. NOT YET DECIDED. Awaiting founder go-ahead now that §1 is closed.
+- (b) ~~Codex-bootstrap-build vs existing-binding-build for 047.~~ **RESOLVED 2026-05-13 ~23:30 PDT — existing-binding via Claude (Claude Code or Cursor's Claude; founder said "claude just claimed it"). Bootstrap path deferred to a future spec.**
+- (e) **North star reaffirmed (2026-05-13 ~23:30 PDT).** Founder: "keep dogfooding till i can truly take myself out of the loop and echo is vendor agnostic at every role." Two conjunctive end-state conditions:
+  - (e1) **Founder out of the loop.** Complete spec→ship cycle with zero in-queue founder activations (extends 042 AC8). Residual touchpoints today: substantive-conflict signoff + `git push origin main` + escalation paths.
+  - (e2) **Vendor-agnostic at every role.** ≥2 interoperable vendor bindings per role; no role's protocol depends structurally on one vendor's quirks. Today's bindings:
+    - Reviewer: codex + cursor (Claude) + codex-ops — multi-vendor ✓
+    - Builder: Claude Code + Cursor's Claude + codex (047 in progress) — multi-vendor ↗ (047 lands the second-vendor builder)
+    - Strategist: Claude only — single-vendor ✗
+    - Watcher: unspecified — ✗
+    - Dispatcher: unspecified — ✗
+  - Until BOTH (e1) AND (e2) hold, friction-first gate stays closed and every new spec must serve (e1) or (e2) or eliminate journal/followups friction. Extraction of the vendor-neutral harness (per the conversation that produced this update) is deferred — premature while protocol still evolving. No 048-harness-extraction spec filed.
 - (c) **AC5 §3 codex-side reviewer-tick INVARIANT token counts.** Codex tick durations contracted across R1→R2→R3 (expected — converging spec). Need to pull `tokens used` lines from `~/Library/Logs/echo-review-queue-codex.log` for R1/R2/R3 and compare against 046 R1-R5 spread (9-90k). Likely PASS but uncomputed.
 - (d) **AC5 §3-cursor (qualitative) subsection in comparison report.** Founder TODO at merge time — subjective signal of "did re-reading 047's growing spec feel heavier than 046's growing spec at comparable rounds?"
 
