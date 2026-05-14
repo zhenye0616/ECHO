@@ -1522,6 +1522,11 @@ href="#pdt---codex-r3-on-046-context-fatigue-via-role-typed-state"
 id="toc-pdt---codex-r3-on-046-context-fatigue-via-role-typed-state">2026-05-13
 21:04 PDT - Codex R3 on 046 context fatigue via role-typed
 state</a></li>
+<li><a
+href="#pdt---codex-ops-r4-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-ops-r4-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:09 PDT - Codex-ops R4 on 046 context fatigue via role-typed
+state</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15064,6 +15069,55 @@ remaining AC1 race: the spec’s CAS check is path/blob-based, but the
 generic push helper’s retry success condition is a clean rebase, which
 can be weaker than “the round-state blob never changed since the
 CAS.”</li>
+</ul>
+<h3
+id="pdt---codex-ops-r4-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:09 PDT - Codex-ops R4 on 046 context fatigue via role-typed
+state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex-ops</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>3f4e829ed51438d06659e93798bc4c36b5bbe115</code>, AC1
+narrow-review lines, and the review-queue push/commit helpers. No
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/codex-ops.md</code>
+as <code>77f0aaa</code>, verdict <code>proceed_after_patches</code>,
+finding: AC1’s stale-push abort path says the CAS violation row
+persists, but the specified
+append-before-<code>git reset --hard origin/main</code> ordering can
+erase the local <code>queue-errors.md</code> edit.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>3f4e829ed51438d06659e93798bc4c36b5bbe115</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r4/codex-ops.md</code>;
+prior focused context embedded in the R4 request; local code paths
+<code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; no ECHO
+MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+validated before link, committed and pushed the response first, then
+wrote this observation-only journal entry.</li>
+<li><strong>Note:</strong> R4 narrowed the remaining risk to abort-path
+observability. The ABSENT sentinel and unchanged-blob single retry look
+operationally sound; the patch needed is only to make the queue-error
+row durable across the hard reset, or to document the post-reset
+dirty-file/autostash behavior explicitly.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
 </html>
