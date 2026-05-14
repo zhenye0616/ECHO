@@ -52,17 +52,20 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 ### AC1 — `tools/sync-skills.sh` extension: codex adapter target
 
 - Add `adapters/codex/skills/` as the tracked codex-side adapter directory in the repo. Same role as `.claude/commands/` but for codex.
-- For each canonical `skills/<name>.md` (excluding `using-superpowers.md` and `role-typed-task-state.md` — see Out of Scope), the sync writes:
-  - `adapters/codex/skills/<name>/SKILL.md` with codex-required YAML frontmatter:
-    - `name: <name>` (from canonical filename basename without `.md`)
-    - `description: <canonical's description field>` (passthrough)
-    - `metadata.short-description: <first 80 chars of description, truncated at last whole word>` (deterministic transform)
-  - Body byte-identical to the canonical's body (everything below the closing `---` of canonical's frontmatter).
+- **Scope of materialization**: only canonical `skills/<name>.md` files that already have a documented `## Binding-specific notes — codex` section get adapter materialization in 049. Today that's exactly TWO skills:
+  - `skills/process-backlog.md` — codex notes added by 047
+  - `skills/review-pending.md` — codex notes added by AC2 below (this spec)
+- All other canonical skills (`merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `process-backlog-batch`, `using-superpowers`, `role-typed-task-state`) are explicitly OUT OF SCOPE for adapter materialization — they would expose Claude-Agent-tool-specific or other Claude-coupled mechanisms to codex's slash-command surface without a codex-side implementation. They get materialized in per-skill followups AFTER their canonical body adds a codex binding-specific notes section. This addresses codex-ops F1 HIGH from R1.
+- For each in-scope canonical skill, the sync writes `adapters/codex/skills/<name>/SKILL.md` with codex-required YAML frontmatter:
+  - `name: <name>` (from canonical filename basename without `.md`)
+  - `description: <canonical's description field>` — **MUST be YAML-safe-serialized** via `yaml.safe_dump` or equivalent quoting strategy so descriptions containing colons (`:`), quotes (`"`/`'`), brackets, or other YAML-sensitive characters produce valid output. Naive line-scraping that passes the raw scalar would break for current canonical content (e.g., `skills/process-backlog.md`'s description contains an unquoted colon-space sequence). This addresses codex F1 from R1.
+  - `metadata.short-description: <first 80 chars of description, truncated at last whole word>` (deterministic transform, also YAML-safe)
+- Body byte-identical to the canonical's body (everything below the closing `---` of canonical's frontmatter).
 - Per-skill directory must contain ONLY `SKILL.md` for V1. `agents/openai.yaml` / `scripts/` / `references/` / `assets/` are out of scope (Risk R3 explains).
 - `tools/sync-skills.sh --check` mode:
-  - For each canonical skill, verify `adapters/codex/skills/<name>/SKILL.md` exists.
+  - For each in-scope canonical skill, verify `adapters/codex/skills/<name>/SKILL.md` exists.
   - Verify body byte-identity (canonical body == adapter body below adapter's frontmatter).
-  - Verify frontmatter has the three required keys with correct derivation.
+  - Verify frontmatter parses as valid YAML AND has the three required keys with correct derivation.
   - Exit non-zero with a diagnostic if any check fails. Match the existing Claude Code adapter check shape.
 - Default (no args) sync mode:
   - Creates `adapters/codex/skills/<name>/` directory if missing.
@@ -75,11 +78,14 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 - Add `## Binding-specific notes — Claude Code` section before `## Step C` (the synthesis step):
   - Names the Agent tool with `superpowers:code-reviewer` subagent_type as the Claude Code dispatch mechanism.
   - References `.claude/commands/review-pending.md` as the synced adapter.
-- Add `## Binding-specific notes — codex` section adjacent to the Claude Code one:
+- Add `## Binding-specific notes — codex` section adjacent to the Claude Code one. **Operationally-safe fan-out contract** (addresses codex-ops F2 from R1):
   - Names `codex exec --sandbox workspace-write -C <repo> - < <per-item-prompt>` subprocess fan-out as the codex dispatch mechanism.
-  - Each per-item codex exec produces a JSON-formatted review on stdout; orchestrator collects and synthesizes.
+  - **Per-child isolation**: each per-item invocation writes its stdout to a unique temp file `$TMPDIR/echo-review-pending-<item-id>.stdout`, stderr to `.stderr`, and exit code to `.rc`. Plain `&` + `wait` does NOT preserve per-child status; the per-file pattern does.
+  - **Worktree safety**: per-item subprocesses share the production checkout. To prevent accidental cross-item file writes / journal edits / queue-response races, each per-item prompt explicitly instructs the child "DO NOT edit files in the working tree; emit your review as a JSON-formatted string on stdout only — the orchestrator collects + writes the sidecar." Read-only sandbox is preferable but `workspace-write` is needed for the orchestrator's final sidecar write (children are write-disciplined by prompt, not by sandbox).
+  - **JSON parse failure semantics**: orchestrator parses each child's stdout JSON; parse failure = hard per-item failure (skip the item's sidecar emission + log to queue-errors). Don't silently drop or substitute defaults.
+  - **Bounded cleanup**: orchestrator removes per-child temp files after collecting stdout/stderr/rc, regardless of success/failure path. Use `trap "rm -f $TMPDIR/echo-review-pending-*" EXIT` to guarantee cleanup even on orchestrator crash.
+  - **Concurrency cap**: fan-out concurrency N ≤ 4 to avoid CPU saturation on the founder's machine. Use a counting semaphore pattern (`(( running < N ))` gate before each child spawn) rather than unbounded `&`.
   - References `adapters/codex/skills/review-pending/SKILL.md` as the synced adapter target.
-  - Notes that fan-out concurrency control = `&` + `wait` in a bash for-loop; suggests N ≤ 4 to avoid CPU saturation on the founder's machine.
 - Mirror the 047 pattern in `skills/process-backlog.md` for the codex binding-specific notes section structure (header level, sandbox semantics, dogfooding journaling expectation).
 - Re-sync via `tools/sync-skills.sh` so `.claude/commands/review-pending.md` and (post-AC1) `adapters/codex/skills/review-pending/SKILL.md` both reflect the new canonical body.
 
@@ -87,23 +93,37 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 
 - Add `tests/sync-skills/codex-adapter.test.ts` (vitest):
   - **`materialized SKILL.md has codex-valid frontmatter`**: Run sync on a fixture canonical skill; assert `adapters/codex/skills/<name>/SKILL.md` exists; assert YAML parses; assert `name === basename`; assert `description === canonical.description`; assert `metadata.short-description` is non-empty and ≤80 chars.
+  - **`YAML-safe serialization for tricky descriptions`** (addresses codex F1 from R1): fixture canonical with `description: "Use when X: do Y with 'quoted' Z"` (contains colons + apostrophes); assert sync produces parseable codex YAML; assert round-trip description equality.
   - **`body byte-identity holds`**: After sync, read canonical body (everything after closing `---`) and adapter body (everything after closing `---`); assert byte-for-byte equality.
   - **`--check passes on synced state`**: After sync, run `tools/sync-skills.sh --check`; assert exit 0; assert stderr empty.
   - **`--check fails on adapter body drift`**: After sync, mutate adapter body; run `--check`; assert exit non-zero; assert diagnostic names the drifted file.
   - **`--check fails on adapter frontmatter drift`**: After sync, mutate adapter frontmatter description; run `--check`; assert exit non-zero.
   - **`--check fails on missing adapter`**: Delete an adapter file; run `--check`; assert exit non-zero; assert diagnostic names the missing path.
-- All tests use temporary fixture directories under `$TMPDIR` to avoid touching the real `adapters/codex/skills/`.
+  - **`--check skips out-of-scope canonical skills`**: Fixture canonical without a `## Binding-specific notes — codex` section; assert sync does NOT create an adapter for it; assert `--check` does not flag missing adapter for it.
+- Add `tests/sync-skills/install-codex-adapters.test.ts` (vitest, addresses codex F2 + codex-ops F3 from R1):
+  - **`clean install creates symlinks under HOME=$TMPDIR`**: Set `HOME=<tmp>`; run install script; assert `<tmp>/.codex/skills/<name>` is a symlink pointing at repo's adapter dir for each in-scope skill.
+  - **`pre-flight creates ~/.codex/skills if absent`**: Set `HOME=<tmp>` where `~/.codex/` exists but `~/.codex/skills/` does not; run install; assert `<tmp>/.codex/skills/` created with default permissions.
+  - **`idempotent rerun is a no-op`**: Run install twice in symlink mode; assert exit 0 both times; assert no extra entries; assert symlink targets unchanged.
+  - **`--copy mode creates copies with `.echo-managed` sentinel`**: Run with `--copy`; assert directory exists at target (not symlink); assert `<target>/.echo-managed` sentinel exists.
+  - **`mode switch rewrites cleanly`**: Run `--symlink` then `--copy`; assert second run replaces symlink with copy; vice-versa works too.
+  - **`--dry-run produces no FS changes`**: Run with `--dry-run`; assert no entries created under `<tmp>/.codex/skills/`; assert stdout lists planned ops.
+  - **`non-managed conflict refuses overwrite`**: Pre-create `<tmp>/.codex/skills/<name>/` as a regular directory (no symlink, no sentinel); run install; assert exit non-zero; assert diagnostic names the conflicting path; assert the pre-existing content unchanged.
+  - **`unwritable HOME exits with clear error`**: Set HOME to a read-only path; run install; assert exit non-zero with `HOME` named in diagnostic.
+- All tests use temporary fixture directories under `$TMPDIR` (HOME override) to avoid touching the real `adapters/codex/skills/` or `~/.codex/skills/`.
 - Existing `npm run lint` + `npm run typecheck` + `tools/sync-skills.sh --check` remain clean post-change.
 
 ### AC4 — Deployment helper + AGENTS.md documentation
 
 - Add `tools/install-codex-adapters.sh` (executable, mode 0755):
-  - For each `adapters/codex/skills/<name>/` directory, create `~/.codex/skills/<name>` as a symlink pointing at the repo's `adapters/codex/skills/<name>/`.
-  - On macOS/Linux, use `ln -snf "$REPO_ROOT/adapters/codex/skills/<name>" "$HOME/.codex/skills/<name>"` (force-overwrite-symlink semantics).
-  - Refuse to overwrite a non-symlink existing path at `~/.codex/skills/<name>` (could be a manually-installed skill from `skill-installer`); exit non-zero with a clear message naming the conflicting path.
-  - Idempotent: re-running on an already-symlinked target is a no-op (returns 0).
+  - **Mode flag**: `--symlink` (default) | `--copy`. Both modes share the same path-resolution + conflict semantics; only the install operation differs. This addresses codex F3 / codex-ops F4 from R1 — the copy fallback is now in-AC, not just a documented mitigation.
+  - **Pre-flight**: `mkdir -p "$HOME/.codex/skills"` before any link/copy operation. Required for clean-machine installs where `~/.codex/` exists but `~/.codex/skills/` doesn't yet. Addresses codex-ops F3 from R1. If `$HOME/.codex/` itself is unwritable (rare but possible under restricted profiles), exit non-zero with a clear diagnostic naming the unwritable path.
+  - **For each `adapters/codex/skills/<name>/` directory** in the in-scope set (matches AC1 — only skills with codex notes get installed):
+    - `--symlink` mode: `ln -snf "$REPO_ROOT/adapters/codex/skills/<name>" "$HOME/.codex/skills/<name>"` (force-overwrite-symlink semantics).
+    - `--copy` mode: `rm -rf "$HOME/.codex/skills/<name>" && cp -R "$REPO_ROOT/adapters/codex/skills/<name>" "$HOME/.codex/skills/<name>"`. Use when codex's session-start discovery doesn't resolve symlinks (R2).
+  - Refuse to overwrite a non-symlink, non-installed-by-us path at `~/.codex/skills/<name>` (could be a manually-installed skill from `skill-installer`); exit non-zero with a clear message naming the conflicting path. "Installed-by-us" is identifiable by either: (a) existing symlink target matching `adapters/codex/skills/<name>` (--symlink mode), or (b) sentinel marker file `.echo-managed` inside the directory (--copy mode).
+  - Idempotent: re-running in the same mode is a no-op (returns 0). Switching modes between runs (e.g. `--symlink` followed by `--copy`) is allowed and rewrites cleanly.
   - Dry-run mode: `--dry-run` prints planned operations without executing.
-- Update `AGENTS.md` "Canonical Reads" section to add: "Codex skill discovery — if you are running as a codex binding and want ECHO's protocol skills to appear in your `/<name>` discovery, run `tools/install-codex-adapters.sh` once. This symlinks `adapters/codex/skills/*` into `~/.codex/skills/` so codex auto-discovers them at session start."
+- Update `AGENTS.md` "Canonical Reads" section to add a "Codex skill discovery" paragraph: "If you are running as a codex binding and want ECHO's protocol skills (currently `process-backlog`, `review-pending` — per 049 in-scope set) to appear in your `/<name>` discovery, run `tools/install-codex-adapters.sh` once. Default is symlink mode (dev-friendly); pass `--copy` if codex session-start discovery doesn't resolve symlinks on your platform. Per-skill list grows as future specs add codex binding-specific notes + materialize their adapters."
 
 ### AC5 — Materialize codex adapters in this commit
 
@@ -115,6 +135,7 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 ## Out of Scope (Don't Drift)
 
 - Do not vendor-neutralize ANY canonical `skills/<name>.md` other than `review-pending.md`. The remaining skills (`process-backlog.md` already has codex notes from 047; `review-queue-{codex,cursor,codex-ops,watch}.md`, `merge-and-cleanup.md`, `process-backlog-batch.md`, etc.) get their per-skill vendor-neutralization in followups, AFTER 049's pattern proves out.
+- Do not materialize codex adapters for skills lacking documented codex binding-specific notes. The in-scope materialization set is exactly `process-backlog` (codex notes from 047) + `review-pending` (codex notes added by AC2). All other skills get materialization AFTER their codex notes section lands in a future spec (addresses codex-ops F1 HIGH from R1 — prevents exposing Claude-coupled skills via codex's slash-command surface).
 - Do not include `using-superpowers.md` or `role-typed-task-state.md` in the codex adapter target. Both are ECHO-namespaced cold-start primers + schema docs, not slash-command-invokable workflows. They're read by file path, not via codex skill discovery. Including them would dilute codex's slash-command surface with non-actionable skills.
 - Do not generate `agents/openai.yaml` UI metadata in V1. Codex's skill-creator marks this as RECOMMENDED, not required. Defer to a followup once the basic adapter target is wired.
 - Do not generate `scripts/`, `references/`, or `assets/` subdirectories under `adapters/codex/skills/<name>/`. Each skill is a single `SKILL.md` for V1.
@@ -127,10 +148,11 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 ## Risk Register
 
 - **R1 — Codex frontmatter contract may evolve.** Today codex requires `name` + `description` + optional `metadata.short-description`. Future codex versions may add required fields (e.g., `version`, `requires`). Mitigation: `sync-skills.sh`'s codex frontmatter generation is a single function; bump as needed when codex's schema changes. The AC3 frontmatter-validity test pins the V1 expectation; failures on schema changes will surface as test failures, not silent breakage.
-- **R2 — Codex auto-discovery may not honor symlinks.** `tools/install-codex-adapters.sh` uses symlinks for dev ergonomics (edit canonical → adapter updates → codex sees new content without manual install). If codex's session-start discovery resolves only real files, the symlink approach breaks. Mitigation: install script supports a `--copy` mode (or a separate `--copy` script) that copies adapter content to `~/.codex/skills/<name>/` instead of symlinking; documented as a fallback in AGENTS.md. Verify which mode codex prefers in AC4 smoke test.
+- **R2 — Codex auto-discovery may not honor symlinks.** `tools/install-codex-adapters.sh` uses symlinks by default for dev ergonomics (edit canonical → adapter updates → codex sees new content without manual install). If codex's session-start discovery resolves only real files, the symlink approach breaks. Mitigation: the install script is required by AC4 to support a `--copy` mode (in-AC, not just a documented mitigation — addresses codex F3 and codex-ops F4 from R1). If smoke test (DoD) shows symlink mode fails discovery, builder switches to `--copy` default; either mode lands cleanly in scope.
 - **R3 — Skill body length may exceed codex's <500-line target.** Codex's `skill-creator` recommends ≤500 lines per `SKILL.md` body for context-window hygiene. ECHO's `skills/review-pending.md` is currently ~150 lines; `skills/merge-and-cleanup.md` is the longest at ~250 lines. Both fit. If a future canonical skill exceeds 500 lines, the codex-side adapter would need the `references/` split codex documents — but V1 isn't blocked.
 - **R4 — Two-codex reviewer roster (codex + codex-ops) loses cross-vendor signal.** This cycle deliberately uses same-vendor reviewers because the work is narrow (sync-script extension + documentation), the codex-ops lens specifically catches runtime/ops issues distinct from codex's procedural lens, and the cross-vendor pattern is proven by 047/048. If R2 verdict divergence is wider than expected, file as evidence that cross-vendor remains needed even for narrow specs.
 - **R5 — Adapter content drift between sync runs.** If a builder manually edits `adapters/codex/skills/<name>/SKILL.md` without updating canonical, the next `--check` will flag it but the drift was visible to codex users in between. Mitigation: pre-commit hook (out of scope for V1) eventually; for now the AC3 `--check` test surfaces drift on every CI/local check run.
+- **R6 — In-scope set may need to expand mid-build.** AC1's adapter materialization is restricted to 2 skills (process-backlog + review-pending). If during the build phase the builder finds that codex strategist sessions ALSO commonly invoke `/review-queue-watch` (the strategist's own watcher tick from 048), the in-scope set is too narrow. Mitigation: builder may add `review-queue-watch` to AC1's in-scope set IF AND ONLY IF the builder also adds a codex binding-specific notes section to `skills/review-queue-watch.md` body in the same commit; otherwise defer to followup. This trades scope expansion for protocol consistency (every materialized adapter must have codex notes).
 
 ## Tests
 
@@ -142,11 +164,11 @@ The work is narrow: add the adapter target + transform, vendor-neutralize ONE ca
 
 - All ACs implemented.
 - `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check` all clean.
-- New vitest cases pass.
-- `adapters/codex/skills/<name>/SKILL.md` files materialized + committed for every canonical skill in-scope per AC1.
-- `tools/install-codex-adapters.sh` is executable (mode 0755) + works idempotently against a clean `~/.codex/skills/`.
-- AGENTS.md gains the codex-skill-discovery one-paragraph note.
-- Builder smoke test recorded in the run log: codex CLI sees the synced skills + can trigger at least one (`review-pending`).
+- New vitest cases pass (both `codex-adapter.test.ts` and `install-codex-adapters.test.ts`).
+- `adapters/codex/skills/<name>/SKILL.md` files materialized + committed for every canonical skill in-scope per AC1 (2 skills: `process-backlog`, `review-pending`).
+- `tools/install-codex-adapters.sh` is executable (mode 0755) + supports `--symlink` (default), `--copy`, `--dry-run` modes + works idempotently against a clean `~/.codex/skills/` AND against an absent `~/.codex/skills/` (`mkdir -p` pre-flight).
+- AGENTS.md gains the codex-skill-discovery paragraph with both install modes documented.
+- Builder smoke test recorded in the run log: codex CLI sees the synced skills + can trigger at least one (`review-pending`). If symlink mode fails discovery, builder switches to `--copy` default and re-runs smoke. Either mode landing cleanly satisfies DoD.
 
 ## After Completion (Strategist Notes)
 

@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T19:50:00Z
+last_updated: 2026-05-14T20:05:00Z
 ---
 
 ## current_thesis
 
-Spec 049 drafted; awaiting claim. Friction-first compliance: serves (e2) vendor-agnostic-at-every-role at the SKILL DISCOVERY layer for codex. Today only Claude Code (via `.claude/commands/`) and Cursor's Claude (via Cursor's `.claude/commands/` compat) can invoke ECHO skills by name; codex strategist cannot, which the 048 cycle empirically surfaced as a friction (codex strategist had to be fed full skill bodies inline rather than fire `/review-queue-watch` etc.). 049 wires `~/.codex/skills/<name>/SKILL.md` as the third adapter target via `tools/sync-skills.sh` extension, tracked in repo at `adapters/codex/skills/`. Reviewer roster `["codex", "codex-ops"]` (founder-authorized two-codex test; loses cross-vendor signal in exchange for full-auto codex-side reviewer cycle).
+Spec 049 at R1-disposition state. **R1 reviewers converged at `proceed_after_patches`** (codex 3 MEDIUM, codex-ops 1 HIGH + 3 MEDIUM, 6 unique-root after consolidating codex F3 ∪ codex-ops F4). **codex-ops F1 HIGH was the load-bearing finding** — caught a real scope-vs-OoS mismatch where AC1 would have materialized adapters for skills lacking codex binding-specific notes, exposing Claude-coupled mechanisms via codex's slash-command surface. Strategist accepted ALL 7 findings as accept-with-patch inline; spec patches applied to AC1 (scope tightening + YAML-safe serialization), AC2 (operationally-safe fan-out contract), AC3 (new install-codex-adapters.test.ts + YAML-safe serialization test + scope-skip test), AC4 (--copy mode, mkdir -p pre-flight, mode-switch semantics, --dry-run), Risk R2 (copy in-AC), R6 added (in-scope set expansion gated on codex notes). Ready to dispatch R2 (verification round).
 
 ## locked_decisions
 
@@ -21,7 +21,9 @@ Spec 049 drafted; awaiting claim. Friction-first compliance: serves (e2) vendor-
 
 ## open_questions
 
-- None blocking. Builder should implement AC1-AC5 in order. R2 (symlink-vs-copy) is verifiable in AC4 smoke test — if codex CLI discovers symlinked skills correctly, ship symlink mode; if not, switch default to copy mode and document the symlink option as `--symlink` for future codex versions.
+- (post-R1) None blocking. R2 verification round is in flight after the disposition commit; codex + codex-ops re-review the patched spec at the new SHA.
+- R6 (in-scope set expansion mid-build for `review-queue-watch`) is a builder-side judgment call surfaced by R1 — strategist position is "expand IFF builder also adds codex notes to that skill in the same commit." Builder can also defer entirely to a separate followup if scope expansion feels risky.
+- Symlink-vs-copy install mode default (R2): the spec now requires both modes; AC4 smoke determines the default in the build phase. Strategist preference: symlink mode for dev ergonomics; copy mode if symlink discovery fails.
 
 ## dont_touch
 
