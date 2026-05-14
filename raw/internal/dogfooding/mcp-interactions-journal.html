@@ -1492,6 +1492,11 @@ href="#pdt-closed-loop-event-codex-reads-prior-codex-strategist-via-echo-informa
 id="toc-pdt-closed-loop-event-codex-reads-prior-codex-strategist-via-echo-informal-cross-tool-consult">2026-05-13
 16:45 PDT — closed-loop event: codex reads prior codex strategist via
 ECHO (informal cross-tool consult)</a></li>
+<li><a
+href="#pdt---codex-r1-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-r1-on-046-context-fatigue-via-role-typed-state">2026-05-13
+17:34 PDT - Codex R1 on 046 context fatigue via role-typed
+state</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14729,6 +14734,55 @@ path. This matches Codex’s own felt-friction profile from earlier: “the
 friction isn’t volume — it’s that every actor has to rediscover which
 context matters.” The recovery path took 2 retries (within budget) but
 the discoverability gap is filed as observation.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-046-context-fatigue-via-role-typed-state">2026-05-13
+17:34 PDT - Codex R1 on 046 context fatigue via role-typed state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema,
+Cursor/Codex queue prompt context, package scripts, current MCP
+server/tool layout, launchd daemon startup path, task/test directories,
+and pinned artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>5480034c98a7a28e6a8eefa1492c16cd6097585f</code>. No
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Returned:</strong> Wrote, validated, committed, and pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/codex.md</code>
+as <code>67a32c5</code>, verdict <code>pushback</code>, findings:
+AC4/AC5 SHA equivalence is unimplementable without a SHA/ref parameter
+or HEAD-only narrowing; AC2 contradicts itself on frontmatter-only files
+versus required blocks; AC1/AC4 do not specify the parseable
+<code>canonical_anchors</code> body syntax needed by
+<code>list_task_states</code>; AC4 does not define repo-root resolution
+for daemon/tests.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>5480034c98a7a28e6a8eefa1492c16cd6097585f</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/codex.md</code>;
+local code paths <code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/*</code>, <code>tests/mcp/*</code>,
+<code>package.json</code>, <code>tools/review-queue/validate.py</code>,
+<code>scripts/launchd/install.sh</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA, and
+pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The response helper exited 0 and pushed
+successfully, but <code>push-with-retry.sh</code> still showed the known
+first-attempt <code>fatal: Cannot rebase onto multiple branches.</code>
+before retrying cleanly. The review itself found a real spec-level
+blocker: AC5 asks MCP to match arbitrary
+<code>git show &lt;sha&gt;</code> content, while AC4 only exposes
+current-HEAD reads.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
