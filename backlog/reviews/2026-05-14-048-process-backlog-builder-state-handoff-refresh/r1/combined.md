@@ -6,7 +6,7 @@ codex_response: codex.md
 cursor_response: cursor.md
 codex-ops_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 2
 combined_verdict: divergent
 escalated_to_founder: true
 ---
