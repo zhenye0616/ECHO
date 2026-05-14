@@ -1593,6 +1593,11 @@ href="#pdt-claude-reviewer-r2-cursor.md-for-048-codex-strategist-drove-dispositi
 id="toc-pdt-claude-reviewer-r2-cursor.md-for-048-codex-strategist-drove-disposition-r2-dispatch-autonomously">2026-05-14
 01:57 PDT — Claude reviewer R2 cursor.md for 048 (codex strategist drove
 disposition + R2 dispatch autonomously)</a></li>
+<li><a
+href="#pdt---codex-r2-on-048-process-backlog-builder-state-handoff-refresh"
+id="toc-pdt---codex-r2-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
+02:04 PDT - Codex R2 on 048 process-backlog builder-state handoff
+refresh</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16070,6 +16075,52 @@ dispatch) without founder pause if prompted. The “ping m when ready for
 r2” pause was founder-requested, not protocol-mandated. Worth observing
 whether codex would correctly DECLARE CLAIM-READY at R2 if the cycle has
 converged with no HIGH, vs. continuing to R3 reflexively.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
+02:04 PDT - Codex R2 on 048 process-backlog builder-state handoff
+refresh</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-048-process-backlog-builder-state-handoff-refresh.md</code>
+at <code>971112f23861677ed5593c1e522dc3e1e9cf6e41</code>,
+<code>CLAUDE.md</code>, <code>skills/role-typed-task-state.md</code>,
+<code>skills/process-backlog.md</code>,
+<code>docs/AGENT_INSTRUCTIONS.md</code>,
+<code>tools/task-state/lint.py</code>, and
+<code>package.json</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r2/codex.md</code>
+as <code>712853a</code>, verdict <code>proceed_after_patches</code>, one
+MEDIUM finding: the missing-<code>builder.md</code> compatibility path
+still hard-fails because AC2 unconditionally lints and stages
+<code>backlog/task-state/&lt;task-id&gt;/builder.md</code> after the
+helper’s no-op.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>971112f23861677ed5593c1e522dc3e1e9cf6e41</code>; request path
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r2/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 is down to a narrow protocol contradiction
+rather than a parser/schema redesign: if <code>builder.md</code> is
+absent, the helper can correctly no-op, but the documented handoff still
+needs to skip lint/stage or consume a machine-readable helper
+result.</li>
 </ul>
 </body>
 </html>
