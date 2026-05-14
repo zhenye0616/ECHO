@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T20:05:00Z
+last_updated: 2026-05-14T20:10:00Z
 ---
 
 ## current_thesis
 
-Spec 049 at R1-disposition state. **R1 reviewers converged at `proceed_after_patches`** (codex 3 MEDIUM, codex-ops 1 HIGH + 3 MEDIUM, 6 unique-root after consolidating codex F3 ∪ codex-ops F4). **codex-ops F1 HIGH was the load-bearing finding** — caught a real scope-vs-OoS mismatch where AC1 would have materialized adapters for skills lacking codex binding-specific notes, exposing Claude-coupled mechanisms via codex's slash-command surface. Strategist accepted ALL 7 findings as accept-with-patch inline; spec patches applied to AC1 (scope tightening + YAML-safe serialization), AC2 (operationally-safe fan-out contract), AC3 (new install-codex-adapters.test.ts + YAML-safe serialization test + scope-skip test), AC4 (--copy mode, mkdir -p pre-flight, mode-switch semantics, --dry-run), Risk R2 (copy in-AC), R6 added (in-scope set expansion gated on codex notes). Ready to dispatch R2 (verification round).
+Spec 049 at **R2-disposition state**. **R2 reviewers converged at `proceed_after_patches`** with strong cross-reviewer agreement (6 findings → 3 unique-root after consolidation; codex and codex-ops independently caught identical operational-safety gaps in my R1 disposition patches). Two R2 HIGHs were both about AC2 operational safety: (A) children should run `--sandbox read-only` not workspace-write, sandbox-enforced not prompt-disciplined; (B) per-run `mktemp -d` instead of item-id-keyed temp files to prevent cross-orchestrator races. One R2 MED on AC4: explicit target probing before `ln -snf` instead of relying on force-overwrite semantics. All 3 mechanically patched in R2 disposition. R3 dispatched for verification. CLAIM-READY expected after R3 if reviewers return proceed* with no HIGH (typical decay pattern matches 046/047/048).
 
 ## locked_decisions
 
