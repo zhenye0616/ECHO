@@ -1666,6 +1666,11 @@ href="#pdt-claude-strategist-pulls-codex-strategists-spec-050-question-1-vote-vi
 id="toc-pdt-claude-strategist-pulls-codex-strategists-spec-050-question-1-vote-via-echo">2026-05-14
 14:42 PDT — Claude strategist pulls codex strategist’s spec-050 Question
 1 vote via ECHO</a></li>
+<li><a
+href="#pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-2"
+id="toc-pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-2">2026-05-14
+14:43 PDT - Codex strategist joins Claude strategist via ECHO for spec
+050 question 2</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17203,6 +17208,54 @@ two slightly different intents.</li>
 recipes side-by-side in <code>wiki/architecture/</code> after spec 050
 ships — “ECHO as cross-tool consult medium” as a property worth naming
 explicitly. (Observation only; no spec implications.)</li>
+</ul>
+<h3
+id="pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-2">2026-05-14
+14:43 PDT - Codex strategist joins Claude strategist via ECHO for spec
+050 question 2</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex strategist</li>
+<li><strong>Trigger:</strong> Founder asked Codex for another round of
+the same Claude strategist consultation, now answering the active
+spec-050 Question 2.</li>
+<li><strong>Query inputs:</strong> 3 ECHO MCP calls by local curl: (1)
+<code>echo_resolve_mru({sources:["claude_code"], repo_path:"/Users/zhenye/Desktop/Project_echo"})</code>;
+(2)
+<code>search_memories({query:"Question 2", source_app:"claude_code", repo_path:"/Users/zhenye/Desktop/Project_echo", limit:10})</code>;
+(3)
+<code>get_atom({id:"439a7cb6-3cf2-4fb4-b71e-1227c10cafa6"})</code>.</li>
+<li><strong>Returned:</strong> (1) MRU now resolved directly to active
+Claude strategist source
+<code>48167b0f-eca7-44da-8409-fd0c9d7e9669.jsonl</code>. (2) Targeted
+“Question 2” search returned 3 matches; top match was the active
+strategist session, asking whether spec 050 should cover
+<code>(alpha) reviewers+merger only</code>,
+<code>(beta) reviewers+merger+watcher</code>, or
+<code>(gamma) all six live-main writers</code>. (3)
+<code>get_atom</code> recovered the full 4,670-byte Q2 atom, including
+the writer-role table: builders already isolated; reviewers and merger
+locked by Q1; watcher, claim step, and standalone journal commits
+unresolved.</li>
+<li><strong>Read sources:</strong> Exact active source path
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/48167b0f-eca7-44da-8409-fd0c9d7e9669.jsonl</code>,
+plus older <code>Question 2</code> hits in
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/01c5ae0a-ae46-40bf-987e-b35999e679f4.jsonl</code>
+and
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/71b36548-cf1d-4fe5-9370-b0317f9c4ac0.jsonl</code>;
+all scoped by
+<code>repo_path=/Users/zhenye/Desktop/Project_echo</code>.</li>
+<li><strong>Verdict:</strong> ✅ right - MRU and targeted search now
+converged on the same active strategist session, and
+<code>get_atom</code> provided the unclipped table needed to distinguish
+alpha/beta/gamma.</li>
+<li><strong>Note:</strong> Compared with the prior round, MRU worked
+cleanly once the active strategist session had the freshest Claude turn.
+The search still provided useful guardrails by surfacing older “Question
+2” collisions.</li>
+<li><strong>Conjecture:</strong> Search results for generic labels like
+“Question 2” benefit from repo scoping but still collide across
+historical strategy sessions; a session-specific continuation handle
+would make repeated cross-tool consultations cheaper.</li>
 </ul>
 </body>
 </html>
