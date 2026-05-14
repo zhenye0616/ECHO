@@ -82,9 +82,16 @@ The cap is the structural enforcement of "working memory, not audit trail." Drif
 
 | Pointer | Writer | When |
 |---|---|---|
-| `strategist.md` | strategist role (current binding) | At session end or before `/clear`; freshness check on rewrite. |
+| `strategist.md` | strategist role (current binding) | **At spec creation (initial write — same response as the new `backlog/ready/<id>.md` commit; canonical_anchors.spec = the spec path);** at session end or before `/clear`; freshness check on rewrite. |
 | `builder.md` | builder role (current binding) | On atomic-claim (initial), after milestone commits, on completion (move to `pending_review`). |
 | `round-state.md` | watcher (boundary rewrite) + strategist (between-round edits) | After `combine.py` emits `combined.md`; before `request.py` creates next round. |
+
+**Initial strategist.md content at spec creation.** When the strategist files a new `backlog/ready/<id>.md` with `task_state_ref:` set (self-reference), they MUST also create `backlog/task-state/<id>/strategist.md` in the same response. Typical initial blocks:
+- `current_thesis`: "Spec drafted; awaiting claim. Friction-first compliance: <which (e1)/(e2) condition or followups line this serves>."
+- `locked_decisions`: every design pick the strategist committed to, with rejected alternatives. **Load-bearing block** — do NOT leave empty; it's what a future strategist (or post-`/clear` you) reads to understand "why was X picked over Y."
+- `open_questions`: anything the builder might surface; "none blocking" is acceptable when the spec is fully self-contained.
+- `dont_touch`: surface area the builder must leave alone (typically mirrors the spec's "Out of Scope" section, plus any strategist-owned files like wiki/, comparison reports, etc.).
+- `canonical_anchors`: at minimum `spec:` (the new ready/ file) and `parent_spec:` (the most recent ancestor in `complete/`).
 
 **Reviewer ticks NEVER write `round-state.md` and MUST NOT read any pointer file under `backlog/task-state/<task-id>/`.** Fresh-eyes-at-SHA is the invariant; reviewers consume only `request.md` (artifact SHA, spec ref, requested lens) and the spec at SHA. Structural enforcement lives in `tools/review-queue/validate.py` (REVIEWER_FRESH_EYES_VIOLATION).
 

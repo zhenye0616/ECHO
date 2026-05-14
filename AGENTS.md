@@ -68,6 +68,40 @@ ECHO uses three roles:
 
 Codex must identify which role the current user request implies. For normal coding tasks in this repo, behave like a builder agent unless the user is explicitly brainstorming strategy, asking for explanation only, or asking you to review another agent's pending work.
 
+### Strategist speccing checklist (when you draft a new `backlog/ready/<id>.md`)
+
+**Three artifacts in one response, all committed + pushed.** Reference the most-recent shipped spec (today: `backlog/complete/2026-05-13-047-codex-as-builder-binding-adapter.md`) as the canonical shape — copy its frontmatter pattern and body-section ordering verbatim, then adapt content.
+
+1. **The spec file.** Frontmatter MUST include:
+   - `id`, `title`, `status: ready`, `priority`, `estimate`, `created`.
+   - `task_state_ref: <id>` — **self-reference** to the task-state pointer dir. Required for the cold-start primer to find the pointer. (047's pattern: `task_state_ref: 2026-05-13-047-codex-as-builder-binding-adapter`.)
+   - `requested_reviewers: ["codex", "cursor"]` — cross-vendor pair is the post-047 default.
+   - `files_to_modify:` — bulleted list, one-line `# why` comment per entry.
+   - `spec_refs:` — bulleted list of paths the builder MUST read before code, one-line `# why` comment per entry.
+   - `claimed_by`, `claimed_at`, `branch`, `head_sha`, `pr_url`, `agent_notes` — present but empty; the agent fills these on claim.
+
+   Body sections, **in this exact order**:
+   - `## Why this spec exists` — motivation + which (e1)/(e2) condition or `_followups.md` line this serves.
+   - `## Acceptance Criteria` — `AC1`, `AC2`, ... as level-3 headings (`### AC1 — <one-line>`), each with file:line precision and concrete test contracts.
+   - `## Out of Scope (Don't Drift)` — explicit + comprehensive bullets.
+   - `## Risks` (or `## Risk Register`, matching 047) — what could go wrong; fallback; non-fix candidates.
+   - `## Tests` — concrete vitest test file paths + the assertions they make. Mandatory; do not bury inside an AC.
+   - `## After Completion (Strategist Notes)` — which wiki pages get created/updated post-shipment; which `_followups.md` lines this spec retires; cross-cuts to other in-flight items.
+
+2. **The strategist.md task-state pointer** at `backlog/task-state/<id>/strategist.md`. Five required level-2 blocks (`current_thesis`, `locked_decisions`, `open_questions`, `dont_touch`, `canonical_anchors`); ≤120 body lines (target 40–60). `locked_decisions` is the load-bearing block — capture every design pick + rejected alternatives. Lint with `python3 tools/task-state/lint.py <path>` before commit. Full schema in `skills/role-typed-task-state.md` "Initial strategist.md content at spec creation."
+
+3. **Supporting artifact updates** in the same commit (or the immediately-next commit):
+   - `docs/BACKLOG.md` — append a row to the Ready table for the new item.
+   - `backlog/_followups.md` — retire the line this spec resolves (annotate "→ SPECCED as `<path>`").
+
+**Commit + push all three together.** Atomic-claim by builder agents requires specs on `origin/main` — working-tree-only specs are invisible to the claim flow. This is a load-bearing project memory hook (`feedback_commit_specs_immediately`).
+
+**Pre-commit verifications** (run before the commit):
+- `python3 tools/blocked.py` — confirm the new item is selectable.
+- `tools/sync-skills.sh --check` — confirm no adapter drift if you touched `skills/`.
+- `python3 tools/task-state/lint.py backlog/task-state/<id>/strategist.md` — confirm pointer schema compliance.
+- `git diff --check` — confirm no conflict markers in the staged changes.
+
 ## Repo Discipline From `CLAUDE.md`
 
 - Search existing wiki and backlog before creating new concepts.
