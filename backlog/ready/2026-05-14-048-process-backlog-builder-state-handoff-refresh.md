@@ -56,14 +56,17 @@ This serves the current friction-first gate directly. It removes a recurring han
   - `--head-sha <sha-or-empty>`
   - `--run-log raw/internal/agent-runs/<...>.md`
 - Patch behavior:
-  - Update frontmatter `last_updated` to the current UTC timestamp if frontmatter exists; preserve all other frontmatter keys and ordering.
+  - Update frontmatter `last_updated` to the current UTC timestamp if frontmatter exists; preserve existing frontmatter keys and ordering.
+  - Store non-anchor handoff metadata in frontmatter keys `handoff_branch`, `handoff_head_sha`, and `handoff_run_log`, updating existing keys if present or appending them after existing frontmatter keys if absent.
   - Patch only the `## current_thesis`, `## open_questions`, and `## canonical_anchors` blocks.
   - Preserve `## locked_decisions` byte-for-byte, because it carries builder-authored design choices and rejected alternatives that cannot be reconstructed from CLI args.
   - Preserve `## dont_touch` byte-for-byte, because it mirrors spec-specific drift boundaries.
-  - In `## current_thesis`, change the lifecycle sentence to complete/ready-for-review or escalated-for-founder-input without deleting the builder's existing implementation summary.
-  - In `## open_questions`, write `- None blocking; handed off for review.` for `complete`, or `- See agent_notes and run log for the escalation question.` for `escalated`.
-  - In `## canonical_anchors`, replace or add `spec`, `branch`, `run_log`, and `head_sha` anchors. `spec` must point to `backlog/pending_review/<item>.md`; this is the staleness-prone 047 failure mode.
-- If `builder.md` is missing, malformed, or lacks required blocks, the helper exits non-zero and does not create a generic placeholder pointer. The builder escalates rather than silently erasing working memory.
+  - In `## current_thesis`, never guess which existing sentence is a lifecycle sentence. Instead, append or replace a patcher-owned marker block:
+    `<!-- builder-state-handoff:start -->` / `<!-- builder-state-handoff:end -->`, containing the complete/ready-for-review or escalated-for-founder-input lifecycle note.
+  - In `## open_questions`, preserve existing non-empty builder-authored content. If the block is empty or whitespace-only, insert `- None blocking; handed off for review.` for `complete`, or `- See agent_notes and run log for the escalation question.` for `escalated`. If `outcome=escalated` and the block is non-empty, append or replace a patcher-owned marker bullet instead of overwriting the existing question.
+  - In `## canonical_anchors`, keep the block schema-compliant with `skills/role-typed-task-state.md`: write only `spec` and, if already present, `reviews`. `spec` must point to `backlog/pending_review/<item>.md`; this is the staleness-prone 047 failure mode. Unknown keys such as `branch`, `run_log`, `head_sha`, and `worktree` must not remain in `canonical_anchors`; the named handoff metadata belongs in frontmatter.
+- If `builder.md` is missing, the helper exits 0 with a clear no-op message and does not create a generic placeholder pointer. This lets `/process-backlog` remain compatible with items that set `task_state_ref` before the builder has adopted `builder.md`.
+- If `builder.md` exists but is malformed or lacks required blocks, the helper exits non-zero and does not create a generic replacement pointer. The builder escalates rather than silently erasing working memory.
 - After patching, `python3 tools/task-state/lint.py <path>` passes.
 - No CAS or blob-lease logic. `builder.md` is still single-writer state; the helper edits the builder-owned file and lets the existing `/process-backlog` commit/push flow carry it.
 
@@ -78,6 +81,7 @@ This serves the current friction-first gate directly. It removes a recurring han
   - Run `python3 tools/task-state/lint.py "backlog/task-state/<task-id>/builder.md"` immediately after patching.
   - Stage `backlog/task-state/<task-id>/builder.md` in the same final handoff commit as the pending-review item and run log.
 - The step must be idempotent for semantic content: rerunning handoff updates only the timestamp plus the same lifecycle/anchor fields, and does not create a second pointer path or rewrite `locked_decisions`.
+- This protocol-wide step is the only canonical implementation site. Binding-specific sections may reference it, but must not duplicate their own final-handoff patch logic.
 
 ### AC3 — Codex binding notes defer to the protocol-wide final step
 
@@ -94,9 +98,12 @@ This serves the current friction-first gate directly. It removes a recurring han
 ### AC5 — Tests cover the helper and protocol hook
 
 - Add `tests/task-state/patch-builder-state.test.ts` covering:
-  - complete handoff patches `spec` from `backlog/claimed/<item>.md` to `backlog/pending_review/<item>.md`, adds/updates `head_sha`, and passes `tools/task-state/lint.py`;
-  - escalated handoff writes escalation-oriented `current_thesis` / `open_questions`, preserves `locked_decisions` byte-for-byte, and passes lint;
-  - malformed or missing `builder.md` exits non-zero without creating a generic replacement pointer;
+  - complete handoff patches `spec` from `backlog/claimed/<item>.md` to `backlog/pending_review/<item>.md`, writes `handoff_head_sha` in frontmatter, keeps `canonical_anchors` schema-compliant, and passes `tools/task-state/lint.py`;
+  - complete handoff appends/replaces only the patcher-owned `current_thesis` marker block and preserves the existing multi-sentence implementation summary;
+  - complete handoff preserves non-empty `open_questions` byte-for-byte;
+  - escalated handoff appends/replaces escalation-oriented patcher-owned lifecycle/open-question markers, preserves `locked_decisions` byte-for-byte, and passes lint;
+  - missing `builder.md` exits 0 as a no-op without creating a generic replacement pointer;
+  - malformed existing `builder.md` exits non-zero without creating a generic replacement pointer. Required malformed fixtures: missing `## canonical_anchors` and required headings out of order.
   - invalid `--outcome` exits non-zero without writing misleading state.
 - Add `tests/backlog/process-backlog-skill.test.ts` covering:
   - `skills/process-backlog.md` contains the named final builder-state refresh step;
@@ -118,14 +125,15 @@ This serves the current friction-first gate directly. It removes a recurring han
 
 ## Risks
 
-- **R1 — Patcher might miss stale prose outside anchors.** The 047 failure was stale anchors/stage framing, not stale design content. Acceptance limits the patcher to lifecycle fields so it preserves working memory. If later dogfooding shows body prose routinely goes stale too, file a separate item with evidence.
-- **R2 — Malformed existing pointers can block handoff.** That is intentional. A generic replacement would hide the real loss of builder-authored context; the correct behavior is escalation with a clear lint/helper error.
+- **R1 — Patcher might miss stale prose outside anchors.** The 047 failure was stale anchors/stage framing, not stale design content. Acceptance limits the patcher to frontmatter handoff metadata, schema-compliant anchors, and patcher-owned lifecycle markers so it preserves working memory. If later dogfooding shows body prose routinely goes stale too, file a separate item with evidence.
+- **R2 — Malformed existing pointers can block handoff.** That is intentional when a pointer exists. A generic replacement would hide the real loss of builder-authored context; the correct behavior is escalation with a clear lint/helper error. Missing pointers are different: they are a no-op for compatibility, not a malformed-state replacement.
 - **R3 — Timestamp changes make byte-for-byte full-file idempotence impossible.** Semantic idempotence is the contract: repeated runs preserve `locked_decisions` and converge the same anchors/lifecycle fields while refreshing `last_updated`.
 - **R4 — Helper scope could drift into a general pointer editor.** Keep it builder-handoff-specific. `round-state.md` still uses the CAS helper; strategist and watcher pointers are out of scope.
+- **R5 — Canonical anchor cleanup may remove legacy non-schema anchor keys.** That is deliberate. The parser accepts only `spec` and optional `reviews`; branch/run-log/head-sha metadata must live in frontmatter until a separate schema-expansion item exists.
 
 ## Tests
 
-- `tests/task-state/patch-builder-state.test.ts` covers complete, escalated, malformed/missing pointer, invalid outcome, required-block preservation, and task-state lint compatibility.
+- `tests/task-state/patch-builder-state.test.ts` covers complete, escalated, malformed pointer, missing-pointer no-op, invalid outcome, required-block preservation, schema-compliant anchors, marker idempotence, and task-state lint compatibility.
 - `tests/backlog/process-backlog-skill.test.ts` covers the protocol text hook and skill adapter byte identity.
 - Verification commands: targeted Vitest files above, `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check`, and `python3 tools/blocked.py`.
 
