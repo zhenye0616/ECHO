@@ -30,9 +30,36 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-14T21:29:52Z"
 branch: "agent/codex-skill-adapter"
 worktree: ""
-head_sha: ""
+head_sha: "da573483f3ed7f58284e29690fafd21c830b3278"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All five ACs implemented in a single Claude Code session. tools/sync-skills.sh extended
+  with adapters/codex/skills/<name>/SKILL.md materialization for canonical skills that
+  document a "## Binding-specific notes — codex" section (in-scope set: process-backlog,
+  review-pending). skills/review-pending.md vendor-neutralized + Claude Code + codex
+  binding-specific notes appended (codex notes: workspace-write -C <worktree>, RUN_DIR
+  via mktemp, --output-last-message capture, parse-failure evidence preservation,
+  concurrency cap N<=4). tools/install-codex-adapters.sh: --symlink (default) / --copy /
+  --dry-run, three-factor stale-lock gate (age + pid liveness via kill -0 + process
+  search), --copy stages outside the live skill discovery root, sentinel records
+  synced_from_commit + synced_content_sha256. 27 vitest cases (9 sync + 18 install) all
+  green. AGENTS.md gains Codex skill discovery paragraph. npm run lint, typecheck, test
+  (910 pass / 21 pre-existing skip), and tools/sync-skills.sh --check all clean. Adapter
+  files materialized + committed at da57348.
+
+  AC3's parse-failure-evidence-preservation test deferred per spec line 134 (would have
+  required implementing the codex fan-out orchestrator that the spec's Out of Scope
+  forbids). Live codex CLI discovery smoke test deferred to founder per DoD: run
+  bash tools/install-codex-adapters.sh from a trusted terminal then verify in a real
+  codex session that /review-pending resolves. If symlink-mode discovery fails,
+  re-run with --copy.
+
+  Implementation decision worth flagging: canonical-side YAML frontmatter is parsed
+  line-by-line (not via yaml.safe_load) because skills/process-backlog.md's description
+  contains an unquoted "Idempotent: a crashed run..." substring that PyYAML rejects.
+  Adapter-side frontmatter is still strict YAML (round-trips through yaml.safe_dump),
+  so codex parses it cleanly. No canonical files were edited. If a future spec wants
+  strict-YAML canonicals, that is a separate decision.
 review_notes: ""
 ---
 
