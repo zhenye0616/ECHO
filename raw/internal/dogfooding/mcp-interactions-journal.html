@@ -1537,6 +1537,11 @@ href="#pdt---codex-r5-on-046-context-fatigue-via-role-typed-state"
 id="toc-pdt---codex-r5-on-046-context-fatigue-via-role-typed-state">2026-05-13
 21:34 PDT - Codex R5 on 046 context fatigue via role-typed
 state</a></li>
+<li><a
+href="#pdt---codex-ops-r5-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-ops-r5-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:36 PDT - Codex-ops R5 on 046 context fatigue via role-typed
+state</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15230,6 +15235,55 @@ issue, but the cleanup primitive is still broader than the stale
 round-state rewrite. The remaining observation is about preserving
 unrelated local state during the same broken-lease abort, not about the
 CAS lease itself.</li>
+</ul>
+<h3
+id="pdt---codex-ops-r5-on-046-context-fatigue-via-role-typed-state">2026-05-13
+21:36 PDT - Codex-ops R5 on 046 context fatigue via role-typed
+state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex-ops</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r5/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>6be1eec280ba1b1df6680e19a6fcad50c0447de2</code>, AC1
+narrow-review lines, <code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tests/review-queue/concurrency.test.ts</code>, and
+<code>package.json</code>. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r5/codex-ops.md</code>
+as <code>4195345</code>, verdict <code>proceed_after_patches</code>,
+finding: AC1’s post-reset CAS abort log can still become local-only if
+multiple aborting writers append <code>queue-errors.md</code>
+concurrently and the generic push helper hits a rebase conflict.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>6be1eec280ba1b1df6680e19a6fcad50c0447de2</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r5/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r5/codex-ops.md</code>;
+local code paths <code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tests/review-queue/concurrency.test.ts</code>,
+<code>package.json</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+validated before link, committed and pushed exactly one reviewer
+response before this journal entry.</li>
+<li><strong>Note:</strong> R5 fixes the single-writer durable-log
+ordering, but the remaining runtime risk is contention on the tracked
+log file itself. The stale rewrite is blocked; the operator can still
+lose the promised CAS-abort breadcrumb and inherit a dirty rebase state
+if abort logging races.</li>
+<li><strong>Conjecture:</strong> (none - observations only)</li>
 </ul>
 </body>
 </html>
