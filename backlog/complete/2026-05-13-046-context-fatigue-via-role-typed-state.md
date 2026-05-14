@@ -25,6 +25,73 @@ agent_notes: |
   (c) push-round-state.sh has a defensive post-rebase blob-equality check
       beyond the literal spec text — catches the rebase-succeeded-cleanly-
       but-replaced-our-blob branch. Easy to revert.
+review_notes: |
+  Merged 2026-05-14 via founder reconciliation. 5-round review cycle (R1-R5)
+  converged with both codex + codex-ops at proceed_after_patches; see
+  backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r5/combined.md
+  for the decay-shape table (9 -> 5 -> 2 -> 1 -> 2 findings; final 2 MEDIUMs
+  builder-applied at merge time).
+
+  Conflicts resolved during merge: none. Clean --no-ff merge of agent/
+  context-fatigue-via-role-typed-state.
+
+  Builder-applied fixups at merge time (F1 + F2 from R5 disposition):
+  - F1 (codex MEDIUM, R5): tools/task-state/push-round-state.sh now
+    enforces a clean-other-than-target precondition gate (option-a per
+    R5 disposition). Helper exits 2 with ROUND_STATE_HELPER_DIRTY_TREE if
+    any tracked file OTHER than the target round-state.md is dirty;
+    untracked files (?? prefix) are ignored. Prevents the abort path's
+    `git reset --hard origin/main` from wiping unrelated in-flight
+    strategist/watcher edits.
+  - F2 (codex-ops MEDIUM, R5): tools/task-state/push-round-state.sh
+    durable_log_abort now writes per-event files at
+    raw/internal/queue-errors/<ISO-ts-compact>-<writer>-<task-id>.md
+    instead of appending to a single raw/internal/queue-errors.md. Matches
+    the existing 039/043 per-event response file pattern. Eliminates the
+    rebase-conflict race between concurrent abort-loggers. Writer identity
+    comes from MY_REVIEWER env (reviewer-tick convention), falling back
+    to $USER. Skill doc skills/role-typed-task-state.md updated to
+    describe the per-event shape; .claude/commands/ re-synced.
+  - F1+F2 tests: tests/task-state/push-round-state.test.ts extended with
+    (i) dirty-other-than-target fixture asserting an unrelated file's
+    edits are preserved + origin/main is untouched after precondition
+    abort, and (ii) two-writer concurrent-abort fixture asserting both
+    writers produce unique per-event files that reach origin/main with
+    no rebase conflict.
+
+  Design-choice judgments on the 3 agent open questions:
+  (a) skills/using-superpowers.md as NEW ECHO-namespaced file: STAND.
+      Slash command names are distinct (superpowers:using-superpowers vs
+      using-superpowers); coexistence is correct per the cross-tool-
+      protocol decision.
+  (b) tests/echo-mcp/role-state.test.ts at literal spec path: STAND.
+      Spec text names the path; vitest auto-discovers via tests/**.
+  (c) push-round-state.sh defensive post-rebase blob-equality check:
+      STAND. Belt-and-braces against silent rebase-replaced-local-blob;
+      spec-aligned in spirit.
+
+  Verify (post-fixup, post-merge): npm test 880/0/21 pass; npm run lint
+  clean (eslint + lint:task-state); npm run typecheck clean;
+  tools/sync-skills.sh --check OK.
+
+  Recursive dogfooding (AC8 pre-merge): backlog/task-state/2026-05-13-046-
+  context-fatigue-via-role-typed-state/strategist.md populated during
+  the cycle. Strategist did not subsequently /clear and re-engage within
+  this cycle (single continuous session), so the post-merge 1-week A/B
+  measurement (After Completion #4) becomes the load-bearing empirical
+  test.
+
+  Follow-up items (non-blocking, filed in backlog/_followups.md):
+  - Spec-body-vs-implementation path divergence: spec body still names
+    tools/review-queue/push-round-state.sh but builder placed at
+    tools/task-state/push-round-state.sh. Skill doc + tests already use
+    the implemented path. Cosmetic reconciliation at wiki-promotion time.
+  - Per-event queue-errors aggregation view: if humans want a single
+    rendered queue-errors.md, a separate index-generator script can
+    emit it lazily. Filed for future.
+  - F1 option-b consideration (targeted restore vs precondition gate):
+    if watcher's typical run-state has its own staged combined.md,
+    option-a may block unnecessarily. Observational follow-up.
 spec_refs:
   - backlog/complete/2026-05-13-045-queue-reliability-friction-cluster.md  # Direct friction-cluster parent. 045 closed reviewer-queue + sidecar-handoff frictions; 046 closes the umbrella friction those individual fixes were chasing — every cold-start actor pays a full-corpus reload tax because role state has no canonical compact home.
   - raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md  # The decision that skills/ is the cross-tool collaboration protocol (not Claude-Code-specific). Frames roles-as-protocol-slots. 046 operationalizes that frame.

@@ -16,19 +16,30 @@
 # Pass the literal string `ABSENT` for the first-write path (round-state.md
 # did not exist at HEAD when the writer began).
 #
+# Clean-other-than-target invariant (046 R5 F1, founder reconciliation):
+#   The helper REFUSES to start if any tracked file OTHER than its target
+#   round-state.md is dirty. This prevents `git reset --hard origin/main`
+#   in the abort path from wiping unrelated in-flight strategist/watcher
+#   edits. Callers must ensure their working tree is clean w.r.t. all
+#   tracked files except the target before invoking this helper.
+#
 # Behavior:
-#   1. git add backlog/task-state/<task-id>/round-state.md
-#   2. git commit
-#   3. git push origin main
-#   4. On rejection: re-read remote blob; if it equals <base-blob>, the
+#   1. Precondition: clean-other-than-target gate (exits 2 if violated).
+#   2. git add backlog/task-state/<task-id>/round-state.md
+#   3. git commit
+#   4. git push origin main
+#   5. On rejection: re-read remote blob; if it equals <base-blob>, the
 #      lease holds and we retry once via pull-rebase + push (safe because
 #      origin/main advanced but didn't touch our file). If the blob
 #      changed, run the durable-log abort sequence:
 #        a. git reset --hard origin/main  (discards our stale commit)
-#        b. append ROUND_STATE_WRITE_CAS_ABORT_PUSH row to queue-errors.md
-#        c. commit + push that log row via push-with-retry.sh
+#        b. write per-event abort file at
+#             raw/internal/queue-errors/<ISO-ts>-<writer>-<task-id>.md
+#           (per-event shape avoids rebase-conflict race between
+#            concurrent abort-log writers — 046 R5 F2 fix)
+#        c. commit + push that log file via push-with-retry.sh
 #        d. exit non-zero
-#   5. If pull-rebase introduces ANY conflict on round-state.md, run the
+#   6. If pull-rebase introduces ANY conflict on round-state.md, run the
 #      durable-log abort sequence (never auto-resolve).
 
 set -e
@@ -59,23 +70,59 @@ resolve_remote_blob() {
 
 durable_log_abort() {
   local reason="$1" remote="$2"
-  local ts
+  local ts ts_compact writer log_rel log_abs
   ts=$(iso_now)
-  # Step (a): discard the stale local round-state commit BEFORE writing the
-  # log entry. raw/internal/queue-errors.md is tracked; if we appended
-  # first then reset, the append would be wiped.
+  ts_compact=$(date -u +%Y%m%dT%H%M%SZ)
+  # Per-event log filename (046 R5 F2): avoids the rebase-conflict race
+  # that two simultaneous abort-log writers would hit with a single
+  # `raw/internal/queue-errors.md` appender. Writer identity comes from
+  # MY_REVIEWER (reviewer-tick convention) or falls back to $USER.
+  writer="${MY_REVIEWER:-${USER:-unknown}}"
+  log_rel="raw/internal/queue-errors/${ts_compact}-${writer}-${TASK_ID}.md"
+  log_abs="${REPO_ROOT}/${log_rel}"
+  # Step (a): discard the stale local round-state commit BEFORE writing
+  # the log entry. The per-event file is then created against a clean
+  # origin/main base — no append-race possible since each writer owns a
+  # unique path.
   git reset --hard origin/main >&2 || true
-  mkdir -p "${REPO_ROOT}/raw/internal"
-  printf '%s ROUND_STATE_WRITE_CAS_ABORT_PUSH: %s base=%s remote=%s reason=%s\n' \
-    "$ts" "$TASK_ID" "$BASE_BLOB" "$remote" "$reason" \
-    >> "${REPO_ROOT}/raw/internal/queue-errors.md"
-  # Step (c): commit + push the log row via the generic helper. Safe
-  # because this commit only touches queue-errors.md (uncontested).
-  git add "${REPO_ROOT}/raw/internal/queue-errors.md"
+  mkdir -p "$(dirname "${log_abs}")"
+  printf '%s ROUND_STATE_WRITE_CAS_ABORT_PUSH: %s base=%s remote=%s reason=%s writer=%s\n' \
+    "$ts" "$TASK_ID" "$BASE_BLOB" "$remote" "$reason" "$writer" \
+    > "${log_abs}"
+  # Step (c): commit + push the per-event log file via the generic
+  # helper. Safe because this commit only touches a unique new path
+  # (no append, no concurrent-writer conflict possible).
+  git add "${log_rel}"
   git commit -m "queue-errors: round-state CAS push abort (${TASK_ID})" >&2
   "${REPO_ROOT}/tools/review-queue/push-with-retry.sh" "queue-errors: round-state CAS push abort ${TASK_ID}" >&2 || true
   exit 1
 }
+
+# 046 R5 F1 — clean-other-than-target precondition gate.
+# Refuse to start if any tracked file OTHER than the target round-state.md
+# is dirty (modified, staged, or with unmerged paths). Untracked files
+# are ignored (the `??` prefix). This prevents `git reset --hard
+# origin/main` in the abort path from wiping unrelated in-flight edits.
+clean_other_than_target_check() {
+  local porcelain target_porcelain_path
+  porcelain=$(git status --porcelain 2>&1)
+  # Anything matching the target round-state.md path is allowed; anything
+  # else (other than `??` untracked) is a violation.
+  target_porcelain_path="${PATH_REL}"
+  if echo "$porcelain" \
+    | awk -v target="$target_porcelain_path" '
+        # skip untracked
+        $1 == "??" { next }
+        # skip lines whose path == target
+        { sub(/^...?/, ""); if ($0 == target) next; found=1; print }
+        END { exit (found ? 0 : 1) }
+      ' >&2; then
+    echo "push-round-state: ROUND_STATE_HELPER_DIRTY_TREE — tracked files other than ${PATH_REL} are dirty; abort before reset" >&2
+    exit 2
+  fi
+}
+
+clean_other_than_target_check
 
 if [ ! -f "${PATH_ABS}" ]; then
   echo "push-round-state: file not present at ${PATH_REL}" >&2
