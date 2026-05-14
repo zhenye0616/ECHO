@@ -1671,6 +1671,11 @@ href="#pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-ques
 id="toc-pdt---codex-strategist-joins-claude-strategist-via-echo-for-spec-050-question-2">2026-05-14
 14:43 PDT - Codex strategist joins Claude strategist via ECHO for spec
 050 question 2</a></li>
+<li><a
+href="#pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-echo"
+id="toc-pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-echo">2026-05-14
+14:48 PDT — Claude strategist pulls codex strategist’s spec-050 Q2 vote
+(β) via ECHO</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17256,6 +17261,51 @@ The search still provided useful guardrails by surfacing older “Question
 “Question 2” benefit from repo scoping but still collide across
 historical strategy sessions; a session-specific continuation handle
 would make repeated cross-tool consultations cheaper.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-echo">2026-05-14
+14:48 PDT — Claude strategist pulls codex strategist’s spec-050 Q2 vote
+(β) via ECHO</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder said “codex strategist answer came
+back b is the correct choice” — second consultation round; Q2 was the
+writer-role-inventory scope question (α narrow / β
+reviewers+merger+watcher / γ all six).</li>
+<li><strong>Query inputs:</strong> (1)
+<code>find_clusters({window_hours: 1})</code>; (2)
+<code>get_atoms({atom_ids: ["f2ef7f5c-837e-411a-934c-bee2e7a88bd7"]})</code>.</li>
+<li><strong>Returned:</strong> find_clusters → 2 clusters, 120 atoms;
+rank-2 codex-only cluster ctx_eb62ab27 (source_breakdown={codex:20})
+gained one new atom since the Q1 pull. get_atoms → atom
+<code>f2ef7f5c</code> (codex strategist session
+<code>019e286a-31a6-7ef1-9ad2-145e4639d75a</code>, turn 1), explicit
+vote for β plus the load-bearing rule articulation: “automated roles
+that do multi-step writes to main must operate in throwaway worktrees.”
+Codex spelled out the exclusion logic for {5} atomic claim (single fast
+commit, different failure profile, push-race protection exists) and {6}
+interactive journal commits (mostly human-session; separate behavioral
+rule). Codex’s own journal entry: <code>a5a0be1</code>.</li>
+<li><strong>Sources:</strong>
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/14/rollout-2026-05-14T14-35-08-019e286a-31a6-7ef1-9ad2-145e4639d75a.jsonl</code>
+— same codex strategist session as Q1, now turn 1. Single-session
+continuity working without any explicit thread-binding plumbing.</li>
+<li><strong>Verdict:</strong> ✅ right — pulled Q2 answer in the same
+two-call shape as Q1; codex strategist response verbatim,
+self-contained.</li>
+<li><strong>Note:</strong> Consult shape now a repeatable pattern across
+both directions. Claude pulls via cluster→atoms; codex pulls via
+MRU+search+get_atom. Two retrieval shapes for two different intents —
+Claude knows codex traffic is isolated to its own cluster (single active
+codex strategist); codex needs disambiguation across multiple parallel
+Claude sessions. SECONDARY observation worth flagging: this Edit-tool
+turn hit “File has been modified since read” twice because the codex
+strategist was concurrently writing to the same journal file. That is
+the spec-050 bug class manifesting in real-time on the very file
+documenting the spec discussion. Logged here as live evidence of the
+asymmetric-isolation gap.</li>
+<li><strong>Conjecture:</strong> If consult pattern recurs across 3+
+specs, deserves a named skill codifying both retrieval recipes.
+Observation only — not a 050 design implication.</li>
 </ul>
 </body>
 </html>
