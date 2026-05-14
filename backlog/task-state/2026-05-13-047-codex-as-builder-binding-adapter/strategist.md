@@ -2,12 +2,12 @@
 task_id: 2026-05-13-047-codex-as-builder-binding-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T06:20:00Z
+last_updated: 2026-05-14T06:30:00Z
 ---
 
 ## current_thesis
 
-047 (codex-as-builder binding adapter) is **CLAIM-READY** at commit `03d708b` after a 3-round cross-vendor review cycle (codex + cursor reviewers) that converged with codex `proceed` zero-findings + cursor `proceed_after_patches` (doc hygiene only). Item file at `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md`. You (post-/clear strategist) are about to either (a) trigger the build via existing binding (Claude Code / Cursor's Claude) OR (b) do the codex-bootstrap dogfooding test (codex builds 047 itself via raw `codex exec - < skills/process-backlog.md`). Founder is currently leaning toward bootstrap per the recursive-dogfooding pattern 046 set, but the immediate next move is the **AC5 §1 measurement** — this very `/clear` is the test. If you read this file and resume productively, §1 is testing PASS (≤1 MCP call + ≤200 lines + <60s). Append the §1 measurement to `raw/internal/dogfooding/role-typed-state-comparison-047.md` and commit before doing anything else load-bearing.
+047 (codex-as-builder binding adapter) is **CLAIM-READY** at commit `03d708b` after a 3-round cross-vendor review cycle (codex + cursor reviewers) that converged with codex `proceed` zero-findings + cursor `proceed_after_patches` (doc hygiene only). Item file at `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md`. **AC5 §1 measurement is now DONE (PASS) as of 2026-05-13 23:25 PDT** — measured via the post-/clear strategist resume that produced this update: 0 ECHO MCP calls, ~175 lines read (strategist.md + comparison-047.md), <60s wall time. Recorded in `raw/internal/dogfooding/role-typed-state-comparison-047.md` §1. Next decision (open question (b)): build 047 via codex-bootstrap (recursive dogfooding) OR via existing binding (Claude Code / Cursor's Claude). Founder is leaning bootstrap; present and wait for go.
 
 ## locked_decisions
 
@@ -22,8 +22,8 @@ last_updated: 2026-05-14T06:20:00Z
 
 ## open_questions
 
-- (a) **AC5 §1 strategist cold-start measurement.** ABOUT TO HAPPEN VIA THIS /clear. Post-/clear you reads THIS file, measures (tool call count, lines read, wall time), reports verdict (PASS / PARTIAL / FAIL), appends to comparison report.
-- (b) **Codex-bootstrap-build vs existing-binding-build for 047.** Founder is leaning bootstrap (codex-on-skills/process-backlog.md without the wrapper, building the wrapper itself = recursive dogfooding). Existing-binding (Claude Code / Cursor's Claude) is the safer alternative. NOT YET DECIDED. After §1 measurement, present to founder for decision.
+- (a) ~~AC5 §1 strategist cold-start measurement.~~ **DONE — PASS** (0 MCP / ~175 lines / <60s). Recorded in comparison-047.md §1 on 2026-05-13 23:25 PDT.
+- (b) **Codex-bootstrap-build vs existing-binding-build for 047.** Founder is leaning bootstrap (codex-on-skills/process-backlog.md without the wrapper, building the wrapper itself = recursive dogfooding). Existing-binding (Claude Code / Cursor's Claude) is the safer alternative. NOT YET DECIDED. Awaiting founder go-ahead now that §1 is closed.
 - (c) **AC5 §3 codex-side reviewer-tick INVARIANT token counts.** Codex tick durations contracted across R1→R2→R3 (expected — converging spec). Need to pull `tokens used` lines from `~/Library/Logs/echo-review-queue-codex.log` for R1/R2/R3 and compare against 046 R1-R5 spread (9-90k). Likely PASS but uncomputed.
 - (d) **AC5 §3-cursor (qualitative) subsection in comparison report.** Founder TODO at merge time — subjective signal of "did re-reading 047's growing spec feel heavier than 046's growing spec at comparable rounds?"
 

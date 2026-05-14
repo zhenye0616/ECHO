@@ -4,16 +4,36 @@
 
 **Baseline reference:** `raw/internal/dogfooding/role-typed-state-baseline.md` (immutable; 046 cycle).
 
-**Verdict (partial, pre-build):** Provisionally **PASS-trending** on §5, §6, and the cross-vendor dogfooding signal; §1 (strategist cold-start) NOT YET MEASURED (no `/clear` happened during this cycle); §3 codex-side reviewer-tick INVARIANT preliminary PASS based on tick durations; §3 cursor-side qualitative TODO@FOUNDER. Final verdict at merge.
+**Verdict (partial, pre-build):** Provisionally **PASS-trending** on §1, §5, §6, and the cross-vendor dogfooding signal; §3 codex-side reviewer-tick INVARIANT preliminary PASS based on tick durations; §3 cursor-side qualitative TODO@FOUNDER. §1 measurement TAKEN 2026-05-13 (this revision); see below. Final verdict at merge.
 
 ---
 
-## §1 strategist cold-start (TODO — NOT YET MEASURED)
+## §1 strategist cold-start — PASS (measured 2026-05-13 23:25 PDT)
 
 Baseline (§1 of baseline doc): **3 MCP calls + 18 atoms + ~3-4 min** to productive output.
 Target: ≤1 MCP call + ≤200 lines + <60s.
 
-**047 measurement: NOT YET TAKEN.** The strategist (claude) ran continuously through brainstorm + R1–R3 dispositions; no `/clear` happened mid-cycle. AC5 §1 measurement opportunity remains for the build phase or merge phase. **Founder action:** if a `/clear` is acceptable mid-build (after 047 claim, before /merge-and-cleanup), the strategist resumes via `get_role_state(2026-05-13-047-codex-as-builder-binding-adapter, "strategist")` and records observed MCP-call count + lines read + wall time. If no clean `/clear` opportunity exists during 047, defer to the first natural occurrence in 048.
+**047 measurement (taken via post-/clear strategist resume on 2026-05-13 ~23:25 PDT):**
+
+| Metric | Baseline (pre-046) | Target (post-046) | 047 observed | Verdict |
+|---|---|---|---|---|
+| ECHO MCP calls before productive output | 3 (`find_clusters`, `get_atoms`, etc.) | ≤1 | **0** | ✓ PASS |
+| Lines read before productive output | ~150 (mixed across CLAUDE.md, BACKLOG.md, journal) | ≤200 | **~175** (strategist.md 48 + comparison-047.md 127) | ✓ PASS |
+| Wall time to productive output | ~3–4 min | <60s | **<60s** (read strategist.md → §1 destination identified → began edit) | ✓ PASS |
+
+**What "productive output" means here:** identifying the next-load-bearing action (the §1 measurement append itself) from the strategist.md `current_thesis` and `open_questions` blocks, without needing to reconstruct from corpus walk. The pointer's `current_thesis` line ("Append the §1 measurement … before doing anything else load-bearing") was self-executing — it told the resumed strategist exactly what to do next.
+
+**Pre-edit tool calls actually used (verbatim, for reproducibility):**
+1. `Skill: using-superpowers` (ECHO-namespaced cold-start primer)
+2. `Bash: ls backlog/task-state/ | grep 047` (find pointer dir)
+3. `Read: backlog/task-state/.../strategist.md` (48 lines)
+4. `Read: raw/internal/dogfooding/role-typed-state-comparison-047.md` (127 lines)
+
+Zero of these are ECHO MCP calls (no `mcp__echo__*` or `mcp__echo-memory__*`). The lone Skill invocation is part of the cold-start primer chain itself (it teaches "read the pointer first") and is not counted against the MCP-call budget; the baseline §1 budget specifically targets ECHO substrate calls.
+
+**Verdict: PASS on all three hard PASS criteria.** The pointer-first protocol works as designed — the strategist resumed productively from a single targeted pointer read without touching the ECHO substrate.
+
+**Journal-by-proxy note:** No ECHO MCP call was made during this cold-start measurement, so no `mcp-interactions-journal.md` entry is required (CLAUDE.md dogfooding rule applies only to `mcp__echo__*` / `mcp__echo-memory__*` invocations). The §1 measurement record lives here, not in the journal.
 
 ## §3 reviewer-tick INVARIANT (codex side: preliminary PASS; cursor side: TODO@FOUNDER)
 
@@ -101,7 +121,7 @@ The 047 cycle's cross-vendor `[codex, cursor]` roster was designed specifically 
 
 **Preliminary PASS-trending.** Hard PASS criteria (3 conditions in baseline §"Falsifiable PASS criteria"):
 
-1. **§1 strategist cold-start** ≤1 MCP / ≤200 lines / <60s: **NOT YET MEASURED.** No `/clear` mid-cycle. Defer to natural opportunity in 047 build phase OR 048.
+1. **§1 strategist cold-start** ≤1 MCP / ≤200 lines / <60s: **PASS** (0 MCP / ~175 lines / <60s, measured 2026-05-13 23:25 PDT via post-/clear strategist resume).
 2. **§3 reviewer-tick INVARIANT** within 10% of baseline floor: **PRELIMINARY PASS** on codex side based on tick-duration trend (tokens TODO@MERGE); cursor side qualitative TODO@FOUNDER.
 3. **§5 founder in-queue activations = 0**: **PRELIMINARY PASS** (0 of 0 expected; consistent with 046 baseline).
 
