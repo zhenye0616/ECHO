@@ -1691,6 +1691,9 @@ PDT - Codex-ops R2 on 050 worktree isolation</a></li>
 <li><a href="#pdt---codex-r3-on-050-worktree-isolation"
 id="toc-pdt---codex-r3-on-050-worktree-isolation">2026-05-14 15:41 PDT -
 Codex R3 on 050 worktree isolation</a></li>
+<li><a href="#pdt---codex-ops-r3-on-050-worktree-isolation"
+id="toc-pdt---codex-ops-r3-on-050-worktree-isolation">2026-05-14 15:43
+PDT - Codex-ops R3 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17571,6 +17574,49 @@ known YAML timestamp pitfall: unquoted <code>completed_at</code> parsed
 as a datetime and failed the pre-link schema gate. Regenerated
 in-session with a quoted timestamp; no malformed response reached the
 canonical queue path.</li>
+</ul>
+<h3 id="pdt---codex-ops-r3-on-050-worktree-isolation">2026-05-14 15:43
+PDT - Codex-ops R3 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>c74fde90fc4542ff3b5e80b1cb64b42018f5169c</code>, current
+<code>_run_reviewer.sh</code>, <code>push-with-retry.sh</code>,
+<code>skills/review-queue-watch.md</code>,
+<code>skills/merge-and-cleanup.md</code>, and the codex reviewer command
+sibling for response shape.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r3/codex-ops.md</code>
+as <code>4e488ce</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM same-reviewer launchd overlap is not specified/tested
+under isolated worktrees; MEDIUM post-response journal append can be
+lost when the ephemeral worktree is force-removed unless 050 adds an
+explicit journal commit/push path.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c74fde90fc4542ff3b5e80b1cb64b42018f5169c</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r3/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response push used
+<code>push-with-retry.sh</code> and autostashed the post-commit
+journal/HTML dirty state already present in the live checkout before
+landing cleanly. This entry was appended only after the response commit
+was durable on <code>origin/main</code>.</li>
 </ul>
 </body>
 </html>
