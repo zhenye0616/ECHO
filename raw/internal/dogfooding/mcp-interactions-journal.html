@@ -1676,6 +1676,9 @@ href="#pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-ech
 id="toc-pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-echo">2026-05-14
 14:48 PDT — Claude strategist pulls codex strategist’s spec-050 Q2 vote
 (β) via ECHO</a></li>
+<li><a href="#pdt---codex-r1-on-050-worktree-isolation"
+id="toc-pdt---codex-r1-on-050-worktree-isolation">2026-05-14 15:00 PDT -
+Codex R1 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17306,6 +17309,59 @@ asymmetric-isolation gap.</li>
 <li><strong>Conjecture:</strong> If consult pattern recurs across 3+
 specs, deserves a named skill codifying both retrieval recipes.
 Observation only — not a 050 design implication.</li>
+</ul>
+<h3 id="pdt---codex-r1-on-050-worktree-isolation">2026-05-14 15:00 PDT -
+Codex R1 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>469a8e7da38ec23e163011e6ea1e9669b7adf479</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>, reviewer
+runner scripts, <code>skills/merge-and-cleanup.md</code>,
+<code>skills/review-queue-watch.md</code>,
+<code>skills/review-queue-cursor.md</code>,
+<code>skills/process-backlog.md</code>, and current review-queue test
+surfaces.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/codex.md</code>
+as <code>610f80d</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH reviewer wrapper must pass the ephemeral worktree into
+the Codex child process/env or the prompt re-enters the live checkout;
+HIGH crash-cleanup order prunes before stale-dir removal and cannot
+satisfy AC6.4’s admin-dir cleanup assertion; MEDIUM detached-worktree
+push tests must assert the worktree <code>HEAD</code> reaches
+<code>origin/main</code>; MEDIUM AC7’s suggested
+<code>tools.review_queue._lib</code> import path is invalid for the
+hyphenated <code>tools/review-queue</code> directory.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>469a8e7da38ec23e163011e6ea1e9669b7adf479</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The first temp response failed the pre-link
+YAML gate because the unquoted <code>completed_at</code> ISO value
+parsed as a YAML timestamp instead of a string; regenerated in-session
+with quoted timestamps, then linked atomically. The response push
+rebased over a contemporaneous main update and landed cleanly.</li>
+<li><strong>Conjecture:</strong> (none - observations only per
+dogfooding-journal discipline)</li>
 </ul>
 </body>
 </html>
