@@ -24,10 +24,10 @@ spec_refs:
   - tools/task-state/lint.py  # pointer compliance check used by acceptance/tests
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-14T09:17:15Z"
+branch: "agent/process-backlog-builder-state-handoff-refresh"
+worktree: "~/Desktop/Project_echo--process-backlog-builder-state-handoff-refresh"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
