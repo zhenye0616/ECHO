@@ -60,7 +60,37 @@ agent_notes: |
   Adapter-side frontmatter is still strict YAML (round-trips through yaml.safe_dump),
   so codex parses it cleanly. No canonical files were edited. If a future spec wants
   strict-YAML canonicals, that is a separate decision.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-14 via founder reconciliation. Recorded as a follow-up commit (bookkeeping + post-merge sync) on top of `c398307` rather than as part of a merge commit — see history-loss note below.
+
+  Conflicts resolved:
+  - None (clean text merge).
+
+  History note (cross-vendor merge-lock collision, second occurrence today):
+  - My `git merge --no-ff` produced a proper merge commit `018e26a` (parents: 9724cab + da57348). While npm test was running (~30s), a parallel codex review-queue process committed `r1/codex.md` for spec 050 on top of `018e26a` as `c503a5a`, then `push-with-retry.sh` ran `git pull --rebase origin main` because origin had advanced. The rebase did NOT preserve merges (no `--rebase-merges`), so my merge commit got flattened into a linear cherry-pick `c398307` on origin/main with 049's full diff but no second parent. The merge structure is lost; the content is intact. agent/codex-skill-adapter at da57348 is technically "unmerged" by ref-graph standards even though all its content is in main via c398307.
+  - This is the SAME class of collision that hit the first 048 merge attempt this morning. Both motivated spec 050 (worktree-isolation-for-multi-step-main-writers) which was already in flight.
+  - `agent/codex-skill-adapter` deleted with `-D` (force) because `-d` refuses on the missing merge structure; content verified present on main before delete.
+
+  Post-merge cross-cut surfaced + repaired:
+  - `adapters/codex/skills/process-backlog/SKILL.md` drifted from canonical `skills/process-backlog.md` after merge. Root cause: 049's branch was forked BEFORE 048's `skills/process-backlog.md` update (E2.5 step), so the codex adapter was materialized from pre-048 canonical content. Git couldn't surface this textually because the adapter lives at a different path than the canonical. Caught by `tools/sync-skills.sh --check` post-merge and by the 048 byte-identity test which itself runs sync-skills. Re-running `tools/sync-skills.sh` regenerated the adapter (75-line diff). Re-verified: 927/927 tests pass.
+
+  Fixups applied:
+  - None pre-merge (verdict was `merge as-is`).
+  - Post-merge: re-sync of `adapters/codex/skills/process-backlog/SKILL.md` via `tools/sync-skills.sh`.
+
+  Fixups deferred to follow-up items: None.
+
+  Verify: 927/927 tests pass (21 skipped); eslint clean; tsc --noEmit clean; `tools/sync-skills.sh --check` clean.
+
+  Follow-up items (non-blocking):
+  - `tools/install-codex-adapters.sh:201` cosmetic — `age_ok=${age_ok}` always 1 by the time it's printed.
+  - `tools/install-codex-adapters.sh:342` cosmetic — `cp -R "$adapter/." "$stage/"` runs after sentinel write; safe per V1 scope, worth a comment.
+  - Document in `tools/sync-skills.sh` header that `--check` reads `$HOME/.codex/skills/*/` for stale-`--copy` warnings.
+  - Strategist follow-ups (from spec After-Completion): extend vendor-neutralization to remaining canonical skills; generate `agents/openai.yaml`; pre-commit hook for sync-skills --check; verify codex auto-discovery honors symlinks.
+  - File deferred `parse-failure-evidence-preservation` test against the future codex-fan-out-orchestrator spec.
+  - Human smoke test owed per DoD: run `tools/install-codex-adapters.sh` in a real codex CLI session.
+  - **CROSS-CUT LESSON #1 (post-merge adapter drift)**: when an item's fork-point precedes a canonical change in main, materialized adapters end up stale at merge time and git can't surface it textually. Mitigations to consider: (a) `/merge-and-cleanup` runs `tools/sync-skills.sh` automatically as part of C5 verify, OR (b) `tools/sync-skills.sh --check` runs as a pre-push hook. (a) closer to existing 045 AC5b stage-before-mv intent. File as a backlog item.
+  - **CROSS-CUT LESSON #2 (merge-lock cross-vendor gap, second occurrence)**: `.git/echo-merge-in-progress` is Claude-Code-only; the codex review-queue's `push-with-retry.sh` runs `git pull --rebase` independently and flattens in-flight merge commits. The 048 morning collision and this 049 collision are the same root cause. Spec 050 (worktree-isolation-for-multi-step-main-writers, already in flight) is the long-term fix; meanwhile the merge-lock should be honored by reviewer-queue scripts AND `push-with-retry.sh` should use `--rebase-merges` to preserve merge structure. Already noted in 048 followups; raising the priority.
 ---
 
 # Codex skill adapter
