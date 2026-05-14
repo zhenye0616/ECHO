@@ -2,44 +2,46 @@
 task_id: 2026-05-13-047-codex-as-builder-binding-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T05:50:00Z
+last_updated: 2026-05-14T06:20:00Z
 ---
 
 ## current_thesis
 
-047 ships the codex-builder binding adapter (`tools/backlog/run-codex-builder.sh`) — a thin shell wrapper that lets `codex exec` execute `skills/process-backlog.md`'s vendor-neutral protocol. This is the FIRST post-046 spec; vendor-agnostic ECHO pivot begins here. The cycle is ALSO the first qualifying empirical measurement of 046's three baseline PASS conditions (AC5 is observational, not a hard gate).
+047 (codex-as-builder binding adapter) is **CLAIM-READY** at commit `03d708b` after a 3-round cross-vendor review cycle (codex + cursor reviewers) that converged with codex `proceed` zero-findings + cursor `proceed_after_patches` (doc hygiene only). Item file at `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md`. You (post-/clear strategist) are about to either (a) trigger the build via existing binding (Claude Code / Cursor's Claude) OR (b) do the codex-bootstrap dogfooding test (codex builds 047 itself via raw `codex exec - < skills/process-backlog.md`). Founder is currently leaning toward bootstrap per the recursive-dogfooding pattern 046 set, but the immediate next move is the **AC5 §1 measurement** — this very `/clear` is the test. If you read this file and resume productively, §1 is testing PASS (≤1 MCP call + ≤200 lines + <60s). Append the §1 measurement to `raw/internal/dogfooding/role-typed-state-comparison-047.md` and commit before doing anything else load-bearing.
 
 ## locked_decisions
 
-- Scope path: (B) adapter + opportunistic 046 dogfooding measurement; ~1-1.5d.
-- Bindings for this cycle: strategist=claude (this session); reviewers=`[codex, cursor]`; builder of 047 is independent of the new adapter (chicken-and-egg — codex-builder doesn't exist yet, so 047's builder is whichever existing binding claims it).
-- "Claude reviewer" = Cursor's Claude via existing `skills/review-queue-cursor.md`. NOT a new headless Claude Code reviewer. (Codex strategist R0 consult, 22:30 PDT.)
-- Builder lifecycle: one-shot, long-running. NOT a launchd tick. Manual invocation from a terminal.
-- Sandbox: `danger-full-access` required (workspace-write blocks `.git/FETCH_HEAD`, `~/.echo/agent-id`, sibling worktrees).
-- Protocol stays in `skills/process-backlog.md`; AC2 appends one binding-specific section. NO protocol changes.
-- Lockfile path: `.git/echo-builder-in-progress` (local-only; cross-machine coordination is V2+).
-- AC4 integration test mocks `codex exec` via shell stub; does NOT invoke real codex (would require credentials + non-deterministic LLM output).
-- AC5 PASS verdict: PASS (all 3 hard conditions met) / PARTIAL / FAIL. FAIL → file `048-046-rollback-or-redesign`; restore friction-first prioritization gate.
+- 047 spec at `03d708b` is final (claim-ready). Don't touch the spec body unless a new review round is requested.
+- 3-round decay: R1 (8 findings, divergent verdicts from complementary coverage) → R2 (6 findings, verdicts converged) → R3 (2 findings — codex zero, cursor doc hygiene — CLAIM-READY).
+- All 16 findings dispositioned as accept-with-patch. 2 inline patches applied at R3 disposition (Out of Scope path string fix + AC4 case-3 `WAITED=0` initializer).
+- Cycle bindings: strategist=claude (you); reviewers=`[codex, cursor]`; builder of 047 = chicken-and-egg (codex builder doesn't exist yet; 047 builds it).
+- "Claude reviewer" for 047 cycle = Cursor's Claude via existing `skills/review-queue-cursor.md` (manual `/review-queue-cursor` trigger). NOT a new headless Claude Code reviewer.
+- Cross-vendor dogfooding signal: PASS qualitatively (R1 divergent → complementary findings; R2 converged; R3 terminal alignment). The dogfooding hypothesis ("cross-vendor reviewers catch different things by design, not contradictory") is validated.
+- Pre-build comparison report at `raw/internal/dogfooding/role-typed-state-comparison-047.{md,html}` (commit `c7687a2`). Captures everything except §1 (your job).
+- The 046 R4 precedent extension (auto-resolve mechanically-dispositionable findings even on verdict divergence) holds for cross-vendor cases ✓.
 
 ## open_questions
 
-- (a) AC3 builder.md writes — should they go through `push-round-state.sh` (which is currently round-state.md-specific) or via direct commit (since builder is single-owner per 046 writer-responsibilities, no CAS needed)? **Surfaced as R5 in spec; reviewers will disposition.** Likely answer: direct commit, drop CAS.
-- (b) AC5 measurement timing — when does the strategist `/clear` to test cold-start? Spec suggests "between R1 and R3 ideally" but it's the strategist's call. Founder can direct or skip.
-- (c) AC4 test fixture for ECHO_AGENT_ID: should the test pre-seed `~/.echo/agent-id` or assert the wrapper creates it on first run? Both cases needed; test covers both.
+- (a) **AC5 §1 strategist cold-start measurement.** ABOUT TO HAPPEN VIA THIS /clear. Post-/clear you reads THIS file, measures (tool call count, lines read, wall time), reports verdict (PASS / PARTIAL / FAIL), appends to comparison report.
+- (b) **Codex-bootstrap-build vs existing-binding-build for 047.** Founder is leaning bootstrap (codex-on-skills/process-backlog.md without the wrapper, building the wrapper itself = recursive dogfooding). Existing-binding (Claude Code / Cursor's Claude) is the safer alternative. NOT YET DECIDED. After §1 measurement, present to founder for decision.
+- (c) **AC5 §3 codex-side reviewer-tick INVARIANT token counts.** Codex tick durations contracted across R1→R2→R3 (expected — converging spec). Need to pull `tokens used` lines from `~/Library/Logs/echo-review-queue-codex.log` for R1/R2/R3 and compare against 046 R1-R5 spread (9-90k). Likely PASS but uncomputed.
+- (d) **AC5 §3-cursor (qualitative) subsection in comparison report.** Founder TODO at merge time — subjective signal of "did re-reading 047's growing spec feel heavier than 046's growing spec at comparable rounds?"
 
 ## dont_touch
 
-- Existing `skills/process-backlog.md` protocol body. Only the new "Binding-specific notes — codex" section is added.
-- Existing `tools/review-queue/_run_reviewer.sh` and its callers. 047 borrows the SHAPE of this wrapper but does not modify it.
-- The reviewer protocol — `skills/review-queue-codex.md`, `skills/review-queue-cursor.md`, AC3 fresh-eyes lint in `tools/review-queue/validate.py`. Out of scope per 046.
-- `claimed_by` legacy frontmatter field. Coexists with new pointer-based approach; no rename.
-- Other ECHO MCP tools (`get_role_state`, `list_task_states`, etc.). 047 USES them (codex builder reads/writes `builder.md`) but does not modify them.
-- `backlog/task-state/2026-05-13-046-context-fatigue-via-role-typed-state/builder.md` — no retroactive backfill. The schema is forward-only.
+- 047 spec body at `03d708b`. CLAIM-READY; spec is frozen unless a new review round is requested.
+- The comparison report's baseline-section structure (§1, §3, §5, §6 + cross-vendor signal). Append TODO data; don't restructure.
+- The baseline file `raw/internal/dogfooding/role-typed-state-baseline.md`. Immutable per its own do-not-edit notice.
+- 046's complete-state files (`backlog/complete/2026-05-13-046-...md`, the 046 review cycle archive, `task-state/2026-05-13-046-.../strategist.md`). Closed/merged; do not retroactively edit.
+- The `backlog/ready/` → `claimed/` atomic-move flow. Reserved for the builder when 047 gets claimed. DON'T move it yourself.
+- Cursor reviewer manual-trigger workflow. Cursor reviewer ticks for R1-R3 already landed; if a hypothetical R4 happens (it shouldn't), founder triggers `/review-queue-cursor` from Cursor IDE.
 
 ## canonical_anchors
 
 - spec: backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md
-- reviews: backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/
-- baseline (for AC5 measurement): raw/internal/dogfooding/role-typed-state-baseline.md
+- reviews: backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/  (3 rounds; r3/combined.md is the claim-ready disposition)
+- comparison_report: raw/internal/dogfooding/role-typed-state-comparison-047.md  (partial; §1 TODO is what you're measuring)
+- baseline: raw/internal/dogfooding/role-typed-state-baseline.md  (immutable reference; §"Falsifiable PASS criteria" defines your test)
 - parent (046): backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md
-- decision (skills-as-protocol): raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md
+- 046 R4 precedent (auto-resolve mechanical divergence): backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md (search for "founder-authorized auto-disposition" in review_notes)
+- last main commit at pointer-write time: 03d708b (claim-ready) → c7687a2 (partial comparison report)
