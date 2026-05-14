@@ -1697,6 +1697,9 @@ PDT - Codex-ops R3 on 050 worktree isolation</a></li>
 <li><a href="#pdt---codex-ops-r4-on-050-worktree-isolation"
 id="toc-pdt---codex-ops-r4-on-050-worktree-isolation">2026-05-14 15:48
 PDT - Codex-ops R4 on 050 worktree isolation</a></li>
+<li><a href="#pdt---codex-r4-on-050-worktree-isolation"
+id="toc-pdt---codex-r4-on-050-worktree-isolation">2026-05-14 15:51 PDT -
+Codex R4 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17660,6 +17663,50 @@ entry.</li>
 the R3 same-reviewer launchd concern open narrowly: the new pre-commit
 upstream check is not atomic with the later push retry path, and the
 body test ACs do not make that race executable.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-050-worktree-isolation">2026-05-14 15:51 PDT -
+Codex R4 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>adb9000e3eeb27cfb5ee1c8725604bdbdafa4d69</code>, current
+<code>_run_reviewer.sh</code>, <code>push-with-retry.sh</code>,
+<code>_reviewer_gate.py</code>, <code>reviewers.json</code>,
+<code>commit-reviewer-response.sh</code>,
+<code>dispatch-next-round.py</code>, <code>_lib.py</code>, package/test
+surfaces, and current reviewer/watch/merge skill prose relevant to the
+R4 focus hints.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r4/codex.md</code>
+as <code>b3f7df6</code>, verdict <code>proceed_after_patches</code>,
+finding: MEDIUM AC1 routes CWD/env/<code>codex -C</code> into
+<code>$WT</code> but does not require the wrapper to feed Codex the
+prompt file from <code>$WT</code>, so the R3 prompt-only fixes can be
+absent if stdin still comes from the live checkout.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>adb9000e3eeb27cfb5ee1c8725604bdbdafa4d69</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r4/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The first temp response failed the pre-link
+YAML gate because quoted shell text inside a double-quoted YAML scalar
+confused the parser; regenerated in-session with serializer-backed
+frontmatter, then linked atomically. No malformed response reached the
+canonical queue path.</li>
 </ul>
 </body>
 </html>
