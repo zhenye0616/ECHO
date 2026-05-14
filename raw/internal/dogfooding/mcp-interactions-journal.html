@@ -1682,6 +1682,9 @@ Codex R1 on 050 worktree isolation</a></li>
 <li><a href="#pdt---codex-ops-r1-on-050-worktree-isolation"
 id="toc-pdt---codex-ops-r1-on-050-worktree-isolation">2026-05-14 15:16
 PDT - Codex-ops R1 on 050 worktree isolation</a></li>
+<li><a href="#pdt---codex-r2-on-050-worktree-isolation"
+id="toc-pdt---codex-r2-on-050-worktree-isolation">2026-05-14 15:30 PDT -
+Codex R2 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17418,6 +17421,53 @@ explicit <code>git rebase origin/main</code> confirmed the branch was
 current before scanning. Two pre-link retries were caught before queue
 state was touched: first malformed YAML from quoted text, then an
 unquoted timestamp parsed as a YAML datetime.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-050-worktree-isolation">2026-05-14 15:30 PDT -
+Codex R2 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>56175d0190c6c18820e643fb1e2e25b448571c1a</code>, current
+<code>_run_reviewer.sh</code>, <code>push-with-retry.sh</code>,
+<code>commit-reviewer-response.sh</code>, package/test surfaces, and
+existing response examples for formatting. Also ran two throwaway
+linked-worktree probes: detached
+<code>git pull --rebase origin main</code>, and plain-<code>mv</code>
+failed-worktree behavior across <code>git worktree prune</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/codex.md</code>
+as <code>11f3bf8</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH registered-worktree safe-list contradicts AC6.4
+crashed-tick recovery; HIGH plain <code>mv</code> of a failed linked
+worktree becomes non-inspectable after <code>git worktree prune</code>;
+MEDIUM <code>worktree-helper.py</code> cannot be imported as
+<code>worktree_helper</code> through normal <code>PYTHONPATH</code>
+import.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>56175d0190c6c18820e643fb1e2e25b448571c1a</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r2/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> Both HIGH findings are R2 disposition-surface
+issues rather than original-direction objections: the safe-list patch
+protects founder-paused merger worktrees but makes registered crash
+cleanup impossible, and the push-failure preservation patch keeps a
+directory but not durable Git metadata if implemented with plain
+<code>mv</code>.</li>
 </ul>
 </body>
 </html>
