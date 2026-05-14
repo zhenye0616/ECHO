@@ -1547,6 +1547,9 @@ href="#pdt-046-cycle-baseline-written-post-merge-empirical-reference"
 id="toc-pdt-046-cycle-baseline-written-post-merge-empirical-reference">2026-05-13
 22:45 PDT — 046 cycle baseline written (post-merge empirical
 reference)</a></li>
+<li><a href="#pdt-cursor-r1-on-047-codex-as-builder-binding-adapter"
+id="toc-pdt-cursor-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:49 PDT — Cursor R1 on 047 codex-as-builder binding adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15348,6 +15351,48 @@ gating conditions.</li>
 <li><strong>Conjecture:</strong> (none — observations only per CLAUDE.md
 discipline. The baseline file itself records
 expected-direction-of-change but not how to ship it.)</li>
+</ul>
+<h3
+id="pdt-cursor-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:49 PDT — Cursor R1 on 047 codex-as-builder binding adapter</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> Execute one Cursor-side review queue tick
+(<code>MY_REVIEWER=cursor</code>); first pending response was
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>cursor</code> with no <code>cursor.md</code> and no
+<code>combined.md</code>; read R1 request focus_hints, reviewer schema,
+pinned artifact
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>
+at <code>4cce421586cd05f1d7d31b2e8871886f7c1ef112</code>, and
+<code>git show</code> of
+<code>tools/task-state/push-round-state.sh</code> at the same SHA for
+AC3/R5 alignment. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/cursor.md</code>
+as <code>8c95a7e</code>, verdict <code>proceed_after_patches</code>,
+headline finding: AC3 claims <code>push-round-state.sh</code> applies to
+<code>builder.md</code> but the helper hardcodes
+<code>round-state.md</code> only at artifact SHA.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>4cce421586cd05f1d7d31b2e8871886f7c1ef112</code>; request path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/cursor.md</code>;
+verified helper via
+<code>git show 4cce421586cd05f1d7d31b2e8871886f7c1ef112:tools/task-state/push-round-state.sh</code>;
+no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — one review per tick, SHA-pinned
+artifact read, pre-link gate passed, response pushed before this journal
+entry.</li>
+<li><strong>Note:</strong> Scope and §Out of Scope boundaries read clean
+for IDE-side execution; the CAS-helper mismatch is spec-internal and
+should be reconciled before a builder implements AC3 literally.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
 </html>

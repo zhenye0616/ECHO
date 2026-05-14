@@ -3289,3 +3289,14 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — this closes the AC8 measurement gap. The cycle's friction is now numerically pinned (3 MCP calls + 18 atoms + ~3-4 min for strategist cold-start; 4 consults × 1.5-3 KB hand-summarization for cross-tool; 5 rounds × 5-10 min × 5-10 k tokens for inter-round; 10 ticks × 9-90 k tokens for reviewer; 2 manual pushes + 1 escalation + 0 in-queue founder activations; ~5h wall, 42 commits, 23 findings, 12 unique root issues).
 - **Note:** Reviewer-tick cold-start is locked as INVARIANT (must NOT change) — a token reduction would mean AC3 fresh-eyes lint is broken. The baseline calls this out explicitly as a regression test, not an improvement target. Soft signals (consult prompt size, inter-round tokens, wall time, round count) are observe-only — not gating conditions.
 - **Conjecture:** (none — observations only per CLAUDE.md discipline. The baseline file itself records expected-direction-of-change but not how to ship it.)
+
+### 2026-05-13 22:49 PDT — Cursor R1 on 047 codex-as-builder binding adapter
+
+- **Source agent:** Cursor's Claude
+- **Trigger:** Execute one Cursor-side review queue tick (`MY_REVIEWER=cursor`); first pending response was `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `cursor` with no `cursor.md` and no `combined.md`; read R1 request focus_hints, reviewer schema, pinned artifact `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md` at `4cce421586cd05f1d7d31b2e8871886f7c1ef112`, and `git show` of `tools/task-state/push-round-state.sh` at the same SHA for AC3/R5 alignment. No `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Returned:** Wrote, pre-link validated, committed, and pushed `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/cursor.md` as `8c95a7e`, verdict `proceed_after_patches`, headline finding: AC3 claims `push-round-state.sh` applies to `builder.md` but the helper hardcodes `round-state.md` only at artifact SHA.
+- **Sources:** Artifact SHA `4cce421586cd05f1d7d31b2e8871886f7c1ef112`; request path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md`; response path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/cursor.md`; verified helper via `git show 4cce421586cd05f1d7d31b2e8871886f7c1ef112:tools/task-state/push-round-state.sh`; no ECHO MCP reads.
+- **Verdict:** ✅ right — one review per tick, SHA-pinned artifact read, pre-link gate passed, response pushed before this journal entry.
+- **Note:** Scope and §Out of Scope boundaries read clean for IDE-side execution; the CAS-helper mismatch is spec-internal and should be reconciled before a builder implements AC3 literally.
+- **Conjecture:** (none — observations only)
