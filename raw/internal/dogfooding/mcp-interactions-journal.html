@@ -1679,6 +1679,9 @@ id="toc-pdt-claude-strategist-pulls-codex-strategists-spec-050-q2-vote-β-via-ec
 <li><a href="#pdt---codex-r1-on-050-worktree-isolation"
 id="toc-pdt---codex-r1-on-050-worktree-isolation">2026-05-14 15:00 PDT -
 Codex R1 on 050 worktree isolation</a></li>
+<li><a href="#pdt---codex-ops-r1-on-050-worktree-isolation"
+id="toc-pdt---codex-ops-r1-on-050-worktree-isolation">2026-05-14 15:16
+PDT - Codex-ops R1 on 050 worktree isolation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17362,6 +17365,59 @@ with quoted timestamps, then linked atomically. The response push
 rebased over a contemporaneous main update and landed cleanly.</li>
 <li><strong>Conjecture:</strong> (none - observations only per
 dogfooding-journal discipline)</li>
+</ul>
+<h3 id="pdt---codex-ops-r1-on-050-worktree-isolation">2026-05-14 15:16
+PDT - Codex-ops R1 on 050 worktree isolation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled/fetched <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, Codex
+reviewer command sibling, pinned artifact
+<code>backlog/ready/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>
+at <code>469a8e7da38ec23e163011e6ea1e9669b7adf479</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>,
+<code>tools/review-queue/_lib.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>, reviewer
+runner scripts, <code>skills/merge-and-cleanup.md</code>,
+<code>skills/review-queue-watch.md</code>,
+<code>tools/review-queue/dispatch-next-round.py</code>, and current
+review-queue test surfaces.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/codex-ops.md</code>
+as <code>6773911</code>, verdict <code>pushback</code>, findings: HIGH
+error cleanup can delete push-with-retry’s unpushed commit and
+<code>queue-errors.md</code> breadcrumb; HIGH
+<code>$TMPDIR/echo-*</code> stale GC can delete an active merger
+conflict-resolution worktree after 60 minutes; MEDIUM reviewer wrapper
+must pass <code>$WT</code> into the Codex child process/env or prompts
+re-enter the live checkout; MEDIUM launchd <code>$TMPDIR</code>
+hard-fail needs a required smoke/diagnostic contract.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>469a8e7da38ec23e163011e6ea1e9669b7adf479</code>; request path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-050-worktree-isolation-for-multi-step-main-writers/r1/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The initial
+<code>git pull --rebase origin main</code> failed with
+<code>fatal: Cannot rebase onto multiple branches</code>, but the fetch
+completed and <code>HEAD...origin/main</code> was <code>0 0</code>; an
+explicit <code>git rebase origin/main</code> confirmed the branch was
+current before scanning. Two pre-link retries were caught before queue
+state was touched: first malformed YAML from quoted text, then an
+unquoted timestamp parsed as a YAML datetime.</li>
 </ul>
 </body>
 </html>
