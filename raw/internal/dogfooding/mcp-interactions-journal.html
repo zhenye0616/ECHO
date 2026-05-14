@@ -1588,6 +1588,11 @@ href="#pdt-claude-orchestrator-diagnoses-fixes-codex-reviewer-launchd-silent-fai
 id="toc-pdt-claude-orchestrator-diagnoses-fixes-codex-reviewer-launchd-silent-failure">2026-05-14
 01:38 PDT — Claude orchestrator diagnoses + fixes codex reviewer launchd
 silent failure</a></li>
+<li><a
+href="#pdt-claude-reviewer-r2-cursor.md-for-048-codex-strategist-drove-disposition-r2-dispatch-autonomously"
+id="toc-pdt-claude-reviewer-r2-cursor.md-for-048-codex-strategist-drove-disposition-r2-dispatch-autonomously">2026-05-14
+01:57 PDT — Claude reviewer R2 cursor.md for 048 (codex strategist drove
+disposition + R2 dispatch autonomously)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15998,6 +16003,73 @@ shell’s full PATH for that specific spawn, but subsequent cron-spawned
 ticks fall back to launchd’s bare default. Founder may want to confirm
 whether they manually kickstarted around that time. Either way: the
 wrapper fix makes the cron robust to ANY PATH context.</li>
+</ul>
+<h3
+id="pdt-claude-reviewer-r2-cursor.md-for-048-codex-strategist-drove-disposition-r2-dispatch-autonomously">2026-05-14
+01:57 PDT — Claude reviewer R2 cursor.md for 048 (codex strategist drove
+disposition + R2 dispatch autonomously)</h3>
+<ul>
+<li><strong>Trigger:</strong> Codex strategist landed R1 disposition +
+spec patches at <code>971112f</code> (turn 6: 47 tool calls, 5
+apply_patch). Founder fed codex the R2 dispatch prompt. Codex executed:
+<code>request.py</code> interactive with round=2, pinned R2 at
+<code>971112f</code>, updated R1 combined.md
+<code>next_round: null → next_round: 2</code>, validated
+request+combined, committed at <code>80cf599</code>. Claude orchestrator
+detected R2 via ECHO <code>wait_for_new_turns(codex)</code> returning
+turn-7 atom; switched hats from monitor to Claude reviewer per the
+cursor-slot pattern.</li>
+<li><strong>Query inputs:</strong> Earlier this cycle —
+<code>wait_for_new_turns(codex, since=...)</code> +
+<code>get_atoms(latest)</code>. This entry covers the reviewer tick
+itself: NO ECHO MCP calls (fresh-eyes-at-SHA invariant for reviewer
+ticks; only <code>request.md</code> + spec at SHA + reviewer schema
+consumed).</li>
+<li><strong>Returned:</strong> N/A — reviewer output is
+<code>cursor.md</code> itself.</li>
+<li><strong>Sources:</strong>
+<code>backlog/reviews/2026-05-14-048-process-backlog-builder-state-handoff-refresh/r2/request.md</code>
+(pinned spec SHA <code>971112f</code>);
+<code>git show 971112f:backlog/ready/2026-05-14-048-...md</code> (spec
+body at the post-R1-disposition SHA); R1 combined.md focus_hints (read
+for verification scaffolding, NOT for finding-generation — fresh-eyes
+preserved);
+<code>tools/review-queue/schemas/reviewer.schema.json</code>. Committed
+response: <code>backlog/reviews/.../r2/cursor.md</code> (commit
+<code>d8e0cc1</code>).</li>
+<li><strong>Verdict:</strong> ✅ right —
+<code>proceed_after_patches</code> with 4 findings (1 MEDIUM
+marker-block append/replace ambiguity, 2 LOW marker content template +
+authorship reservation, 1 nit YAML-invalid frontmatter as third
+malformed fixture). All R1 HIGH+MEDIUM findings verified resolved; all
+R1 focus_hints satisfied at the load-bearing level. R2 findings are
+mechanically dispositionable inline.</li>
+<li><strong>Note:</strong> TWO observations.
+<ol type="1">
+<li>Cross-vendor decay shape matches 046/047: R1 divergent verdicts
+(codex pushback + cursor proceed_after_patches) → R2 converging (both
+expected to be proceed* with no HIGH). Codex’s R1 unique HIGH
+(canonical_anchors parser contract) and cursor’s R1 unique HIGH
+(open_questions overwrite) were complementary, not contradictory. Codex
+strategist’s R1 disposition picked the right design (move handoff
+metadata to frontmatter <code>handoff_*</code> keys + marker-block in
+current_thesis) — preserves parser contract AND builder authorship.
+Better than my recommended option (a) was — marker-block is more
+idempotent than “append-only sentence.”</li>
+<li>Procedural: codex strategist drove combine + disposition + spec
+patch + strategist.md update + R2 dispatch end-to-end across two turns
+(47 + 24 tool calls). Founder pinged once for “ready for r2”
+authorization (turn 7 prompt). This matches the 046/047
+Claude-strategist flow except for that single pause — which is the
+residual founder-in-loop touchpoint. If a watcher launchd existed, that
+touchpoint could be eliminated too.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> Codex strategist could likely run R2
+watcher autonomously (combine + disposition + claim-ready OR R3
+dispatch) without founder pause if prompted. The “ping m when ready for
+r2” pause was founder-requested, not protocol-mandated. Worth observing
+whether codex would correctly DECLARE CLAIM-READY at R2 if the cycle has
+converged with no HIGH, vs. continuing to R3 reflexively.</li>
 </ul>
 </body>
 </html>
