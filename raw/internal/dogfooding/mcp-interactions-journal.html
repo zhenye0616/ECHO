@@ -1565,6 +1565,11 @@ id="toc-pdt-cursor-r3-on-047-codex-as-builder-binding-adapter">2026-05-13
 <li><a href="#pdt---codex-r3-on-047-codex-as-builder-binding-adapter"
 id="toc-pdt---codex-r3-on-047-codex-as-builder-binding-adapter">2026-05-13
 23:07 PDT - Codex R3 on 047 codex-as-builder binding adapter</a></li>
+<li><a
+href="#pdt-claude-orchestrator-monitoring-codex-strategist-phase-1-sanity-check"
+id="toc-pdt-claude-orchestrator-monitoring-codex-strategist-phase-1-sanity-check">2026-05-14
+00:38 PDT — Claude orchestrator monitoring codex strategist Phase 1
+sanity check</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15628,6 +15633,85 @@ synchronization, DoD count, and AC5 qualitative-report sink are
 implementable as written; the installed Codex CLI supports the specified
 <code>codex exec -C ... --sandbox danger-full-access -</code>
 invocation.</li>
+</ul>
+<h3
+id="pdt-claude-orchestrator-monitoring-codex-strategist-phase-1-sanity-check">2026-05-14
+00:38 PDT — Claude orchestrator monitoring codex strategist Phase 1
+sanity check</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder running codex CLI side-by-side as
+the strategist-row vendor-coverage test (north star (e2)). Founder said
+“phase 1 is in flight use echo mcp to monitor” — orchestrator using ECHO
+to observe codex’s session activity as it streams.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li>Call 1: <code>find_clusters(since="2026-05-13T23:30:00")</code> —
+naive lookback (~1.1h window).</li>
+<li>Call 2:
+<code>wait_for_new_turns(sources=["codex"], since="2026-05-14T07:00:00Z", timeout=30)</code>
+— synchronized-multi-agent wake-up primitive on the codex source-app
+prefix.</li>
+<li>Call 3:
+<code>get_atoms(atom_ids=["661ba451-a26e-431b-b088-418714b4cc32"], format="minimal")</code>
+— fetch the single returned codex turn body.</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>Call 1: 1 cluster (<code>ctx_e47e4d5c</code>), 18 atoms, label
+“discussion about Project_echo”, rank_reasons
+<code>[recent_activity, has_open_loop, dense]</code>. Source mix git=8,
+claude_code=10. <strong>No codex atoms in the 1.1h window</strong> —
+codex session not yet captured at find_clusters time.</li>
+<li>Call 2: 1 codex turn (<code>661ba451-...</code>),
+<code>timed_out: false</code> (resolved immediately),
+<code>next_since=2026-05-14T07:38:57.033Z</code>.</li>
+<li>Call 3: atom returned;
+<code>truncations=["content","metadata.tool_calls:projected"]</code>
+(3265 content bytes elided, 49810 metadata bytes elided — expected for a
+long-turn codex strategist response with 17 exec_commands). Visible tail
+carried codex’s full (b)/(c)/(d) answers.</li>
+</ul></li>
+<li><strong>Sources:</strong>
+<ul>
+<li>Call 1: <code>git</code>×8 + <code>claude_code</code>×10 (no codex).
+Path attributions implicit in atom_ids; not enumerated.</li>
+<li>Call 2 + 3:
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/14/rollout-2026-05-14T00-32-35-019e2566-d197-72c0-b3b8-19efdd95fd9b.jsonl</code>
+(canonical codex session jsonl path). Session id
+<code>019e2566-d197-72c0-b3b8-19efdd95fd9b</code>, captured at
+<code>git.sha=d1cea51</code> (the AGENTS.md push commit). Model
+<code>gpt-5.5</code>, reasoning_effort <code>xhigh</code>, sandbox
+<code>workspace-write</code>, 17 exec_commands, 0 ECHO MCP calls from
+codex itself.</li>
+</ul></li>
+<li><strong>Verdict:</strong> ✅ right. wait_for_new_turns landed the
+in-flight codex turn within seconds; get_atoms returned a body that
+carried the strategic content (answers a-d). The 17-exec_command + 3265
+elided content bytes + zero MCP calls from codex itself is internally
+consistent with codex doing the file reads I instructed.</li>
+<li><strong>Note:</strong> Two things stand out.
+<ol type="1">
+<li>find_clusters showed NO codex atoms in the 1.1h lookback even though
+codex was actively running — the cluster discovery is somehow not
+picking up codex activity that the source-prefix wait_for_new_turns DID
+see immediately. Likely the cluster algorithm needs more than one event
+from a source-app before incorporating it into a cluster; the
+single-codex-turn case may be below its threshold.
+Discovery-vs-wake-primitive divergence worth flagging.</li>
+<li>Codex session ran with <code>workspace-write</code> sandbox despite
+my Phase 1 instruction “read-only sandbox.” Either the founder launched
+it that way pre-emptively for Phase 2, or codex CLI’s default isn’t
+read-only. No harm in this case (Phase 1 didn’t write); but if the test
+depended on read-only enforcement, this would be a violation. Worth
+confirming the founder’s launch command.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> find_clusters’ source-mix algorithm may
+have a min-atoms-per-source threshold (e.g., need ≥2 atoms from a
+source-app before it becomes “interesting” enough to anchor a cluster).
+If true, monitoring a freshly-started cross-vendor session needs
+<code>wait_for_new_turns</code> or <code>echo_resolve_mru</code> for the
+first ~5 turns, then <code>find_clusters</code> once codex accrues
+enough activity. Don’t design fixes here — observation only.</li>
 </ul>
 </body>
 </html>
