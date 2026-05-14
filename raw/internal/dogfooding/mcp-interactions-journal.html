@@ -1633,6 +1633,9 @@ PDT - Codex-ops R5 on 049 codex skill adapter</a></li>
 <li><a href="#pdt---codex-r5-on-049-codex-skill-adapter"
 id="toc-pdt---codex-r5-on-049-codex-skill-adapter">2026-05-14 13:23 PDT
 - Codex R5 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r6-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r6-on-049-codex-skill-adapter">2026-05-14 13:58 PDT
+- Codex R6 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16705,6 +16708,55 @@ copy-staging hazards, but the codex <code>review-pending</code> runtime
 contract is still not executable as written because JSON parsing is
 required without a JSON-producing child contract. The install-helper
 lock and cleanup issues converge with codex-ops’ R5 findings.</li>
+<li><strong>Conjecture:</strong> (none - observations only per
+dogfooding-journal discipline)</li>
+</ul>
+<h3 id="pdt---codex-r6-on-049-codex-skill-adapter">2026-05-14 13:58 PDT
+- Codex R6 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R6 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>dc38b684a4397b44e422eda091b4673f577092e5</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/review-pending.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, current test surfaces, and
+<code>codex exec --help</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/codex.md</code>
+as <code>f440e0a</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH Codex child markdown output omits
+<code>Design-choice judgments</code> and
+<code>Merge-conflict preview</code> even though the current
+<code>review-pending</code> sidecar synthesis needs them; MEDIUM
+read-only Codex children do not have a specified owner/data flow for the
+required <code>npm test</code>, <code>npm run lint</code>, and
+<code>npm run typecheck</code> verification commands.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>dc38b684a4397b44e422eda091b4673f577092e5</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The queue response commit had to be made from
+a clean temporary clone because the production worktree had an unrelated
+unresolved conflict in
+<code>backlog/task-state/2026-05-14-048-process-backlog-builder-state-handoff-refresh/builder.md</code>;
+the conflicted worktree was left untouched.</li>
 <li><strong>Conjecture:</strong> (none - observations only per
 dogfooding-journal discipline)</li>
 </ul>
