@@ -1630,6 +1630,9 @@ PDT - Codex-ops R4 on 049 codex skill adapter</a></li>
 <li><a href="#pdt---codex-ops-r5-on-049-codex-skill-adapter"
 id="toc-pdt---codex-ops-r5-on-049-codex-skill-adapter">2026-05-14 13:22
 PDT - Codex-ops R5 on 049 codex skill adapter</a></li>
+<li><a href="#pdt---codex-r5-on-049-codex-skill-adapter"
+id="toc-pdt---codex-r5-on-049-codex-skill-adapter">2026-05-14 13:23 PDT
+- Codex R5 on 049 codex skill adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -16656,6 +16659,54 @@ entry.</li>
 location issue, but the install helper still needs the lock to cover the
 default symlink path and needs stale-stage cleanup that cannot remove
 its own parent directory.</li>
+</ul>
+<h3 id="pdt---codex-r5-on-049-codex-skill-adapter">2026-05-14 13:23 PDT
+- Codex R5 on 049 codex skill adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema,
+<code>CLAUDE.md</code>, pinned artifact
+<code>backlog/ready/2026-05-14-049-codex-skill-adapter.md</code> at
+<code>55d2b1707039cad96dd38712cea45c9a66e27219</code>,
+<code>tools/sync-skills.sh</code>,
+<code>skills/review-pending.md</code>,
+<code>skills/process-backlog.md</code>, local Codex
+<code>skill-creator/SKILL.md</code>, package/test surfaces, and
+<code>codex exec --help</code>.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r5/codex.md</code>
+as <code>1bce29f</code>, verdict <code>pushback</code>, findings: HIGH
+codex child output is required to be JSON but the skill’s per-item
+prompt still returns markdown and no JSON schema/invocation enforcement
+is specified; MEDIUM stale staging cleanup can delete the
+<code>.echo-staging</code> root without <code>-mindepth 1</code>; MEDIUM
+default <code>--symlink</code> install path is still outside the
+required probe-to-finalize lock; LOW Tests summary understates the AC3
+test surface.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>55d2b1707039cad96dd38712cea45c9a66e27219</code>; request path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-049-codex-skill-adapter/r5/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R5 resolves prior adapter-scope and
+copy-staging hazards, but the codex <code>review-pending</code> runtime
+contract is still not executable as written because JSON parsing is
+required without a JSON-producing child contract. The install-helper
+lock and cleanup issues converge with codex-ops’ R5 findings.</li>
+<li><strong>Conjecture:</strong> (none - observations only per
+dogfooding-journal discipline)</li>
 </ul>
 </body>
 </html>
