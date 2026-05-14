@@ -28,7 +28,7 @@ cleanup() {
 trap cleanup EXIT
 
 ITEM_ID="2026-05-12-999-smoke-test-synthetic"
-PRODUCTION_ORIGIN="https://github.com/zhenye0616/echo_wiki.git"
+PRODUCTION_ORIGIN="https://github.com/zhenye0616/ECHO.git"
 
 echo "smoke: SMOKE_WORK=$SMOKE_WORK"
 echo "smoke: SMOKE_ORIGIN=$SMOKE_ORIGIN"
