@@ -1,7 +1,7 @@
 ---
 id: 2026-05-13-046-context-fatigue-via-role-typed-state
 title: Context fatigue via role-typed task-state — role-slot-agnostic orchestration viewed from the friction side (LAST friction-removal spec before vendor-agnostic pivot)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1.5-2d
 created: 2026-05-13
@@ -9,6 +9,22 @@ requested_reviewers: ["codex", "codex-ops"]
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-14T04:39:58Z"
 branch: "agent/context-fatigue-via-role-typed-state"
+head_sha: "76638c2e28591f398509490bfe170816c2cdee5c"
+pr_url: ""
+agent_notes: |
+  All 8 ACs implemented. npm test 878 passed (1 skipped), npm run lint clean,
+  npm run typecheck clean, tools/sync-skills.sh --check clean. Run log:
+  raw/internal/agent-runs/2026-05-13-2026-05-13-046-context-fatigue-via-role-typed-state.md.
+
+  3 minor open questions for the reviewer (see run log "Open Questions"):
+  (a) skills/using-superpowers.md is a NEW ECHO-namespaced file (spec said
+      "edit" but file did not exist); name overlaps with the superpowers
+      plugin's same-named skill — distinct slash commands, rename optional;
+  (b) tests/echo-mcp/role-state.test.ts placed at the literal spec path; can
+      relocate to tests/mcp/ for consistency if desired;
+  (c) push-round-state.sh has a defensive post-rebase blob-equality check
+      beyond the literal spec text — catches the rebase-succeeded-cleanly-
+      but-replaced-our-blob branch. Easy to revert.
 spec_refs:
   - backlog/complete/2026-05-13-045-queue-reliability-friction-cluster.md  # Direct friction-cluster parent. 045 closed reviewer-queue + sidecar-handoff frictions; 046 closes the umbrella friction those individual fixes were chasing — every cold-start actor pays a full-corpus reload tax because role state has no canonical compact home.
   - raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md  # The decision that skills/ is the cross-tool collaboration protocol (not Claude-Code-specific). Frames roles-as-protocol-slots. 046 operationalizes that frame.
