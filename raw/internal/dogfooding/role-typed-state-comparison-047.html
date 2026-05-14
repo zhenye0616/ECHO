@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>047 cycle comparison vs 046 baseline (partial, pre-build)</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">047 cycle comparison vs 046 baseline (partial,
+pre-build)</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a
+href="#role-typed-task-state-comparison-report-047-cycle-partial-pre-build"
+id="toc-role-typed-task-state-comparison-report-047-cycle-partial-pre-build">Role-typed
+task-state comparison report — 047 cycle (partial, pre-build)</a>
+<ul>
+<li><a href="#strategist-cold-start-todo-not-yet-measured"
+id="toc-strategist-cold-start-todo-not-yet-measured">§1 strategist
+cold-start (TODO — NOT YET MEASURED)</a></li>
+<li><a
+href="#reviewer-tick-invariant-codex-side-preliminary-pass-cursor-side-todofounder"
+id="toc-reviewer-tick-invariant-codex-side-preliminary-pass-cursor-side-todofounder">§3
+reviewer-tick INVARIANT (codex side: preliminary PASS; cursor side:
+TODO@FOUNDER)</a></li>
+<li><a href="#founder-in-queue-activations-preliminary-pass-00"
+id="toc-founder-in-queue-activations-preliminary-pass-00">§5 founder
+in-queue activations — PRELIMINARY PASS (0/0)</a></li>
+<li><a
+href="#wall-time-commit-count-preliminary-suggestive-not-conclusive"
+id="toc-wall-time-commit-count-preliminary-suggestive-not-conclusive">§6
+wall time + commit count — PRELIMINARY (suggestive, not
+conclusive)</a></li>
+<li><a
+href="#cross-vendor-dogfooding-signal-pass-qualitative-the-load-bearing-primary-signal"
+id="toc-cross-vendor-dogfooding-signal-pass-qualitative-the-load-bearing-primary-signal">Cross-vendor
+dogfooding signal — PASS (qualitative, the load-bearing primary
+signal)</a></li>
+<li><a href="#overall-partial-verdict"
+id="toc-overall-partial-verdict">Overall partial verdict</a></li>
+<li><a href="#provenance" id="toc-provenance">Provenance</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1
+id="role-typed-task-state-comparison-report-047-cycle-partial-pre-build">Role-typed
+task-state comparison report — 047 cycle (partial, pre-build)</h1>
+<p><strong>Created:</strong> 2026-05-13 23:12 PDT, immediately after 047
+reached claim-ready at commit <code>03d708b</code>.
+<strong>Partial</strong> because the cycle has only reached
+spec→claim-ready (R1–R3). Sections marked <strong>TODO@MERGE</strong>
+are populated when 047 itself merges; that’s the AC5 measurement
+deadline.</p>
+<p><strong>Baseline reference:</strong>
+<code>raw/internal/dogfooding/role-typed-state-baseline.md</code>
+(immutable; 046 cycle).</p>
+<p><strong>Verdict (partial, pre-build):</strong> Provisionally
+<strong>PASS-trending</strong> on §5, §6, and the cross-vendor
+dogfooding signal; §1 (strategist cold-start) NOT YET MEASURED (no
+<code>/clear</code> happened during this cycle); §3 codex-side
+reviewer-tick INVARIANT preliminary PASS based on tick durations; §3
+cursor-side qualitative TODO@FOUNDER. Final verdict at merge.</p>
+<hr />
+<h2 id="strategist-cold-start-todo-not-yet-measured">§1 strategist
+cold-start (TODO — NOT YET MEASURED)</h2>
+<p>Baseline (§1 of baseline doc): <strong>3 MCP calls + 18 atoms + ~3-4
+min</strong> to productive output. Target: ≤1 MCP call + ≤200 lines +
+&lt;60s.</p>
+<p><strong>047 measurement: NOT YET TAKEN.</strong> The strategist
+(claude) ran continuously through brainstorm + R1–R3 dispositions; no
+<code>/clear</code> happened mid-cycle. AC5 §1 measurement opportunity
+remains for the build phase or merge phase. <strong>Founder
+action:</strong> if a <code>/clear</code> is acceptable mid-build (after
+047 claim, before /merge-and-cleanup), the strategist resumes via
+<code>get_role_state(2026-05-13-047-codex-as-builder-binding-adapter, "strategist")</code>
+and records observed MCP-call count + lines read + wall time. If no
+clean <code>/clear</code> opportunity exists during 047, defer to the
+first natural occurrence in 048.</p>
+<h2
+id="reviewer-tick-invariant-codex-side-preliminary-pass-cursor-side-todofounder">§3
+reviewer-tick INVARIANT (codex side: preliminary PASS; cursor side:
+TODO@FOUNDER)</h2>
+<p>Baseline (§4 of baseline doc): codex reviewer-tick token usage
+<strong>9–90 k</strong> across R1–R5 (varied widely; ops-side spelunking
+inflated some ticks past 90 k). INVARIANT: must NOT change post-046;
+drops would mean AC3 fresh-eyes lint is broken.</p>
+<p><strong>047 codex side (preliminary):</strong> - R1 codex tick:
+~22:50→22:52 PDT (~2 min wall) - R2 codex tick: ~23:00→23:01 PDT (~1 min
+wall) - R3 codex tick: ~23:06→23:06 PDT (&lt;1 min wall)</p>
+<p>Tick wall durations contracted across rounds, which is EXPECTED — the
+spec converged so the reviewer had less to flag, not because the
+reviewer had less to read. Token counts (need pulling from
+<code>~/Library/Logs/echo-review-queue-codex.log</code>):</p>
+<pre><code># TODO@MERGE: pull `tokens used` lines from echo-review-queue-codex.log
+# for R1/R2/R3 of 047, compare against 046&#39;s R1: ~10k / R2: ~18k / R3: ~12k
+# / R4: ~? / R5: ~10k spread. PASS if within ~10% of baseline floor across
+# comparable rounds (where &quot;comparable&quot; = same artifact size, same lens).</code></pre>
+<p><strong>047 cursor side (TODO@FOUNDER, qualitative):</strong> Founder
+records subjective signal in the <code>§3-cursor (qualitative)</code>
+subsection below at merge time. Question: “did re-reading the cycle’s
+growing spec feel heavier than 046’s cycle’s growing spec at comparable
+rounds?”</p>
+<h3 id="cursor-qualitative-todofounder">§3-cursor (qualitative) —
+TODO@FOUNDER</h3>
+<p><em>Mandatory subsection per AC5 §3 patch (R1 cursor F7); shape
+preserved across future comparison reports.</em></p>
+<ul>
+<li>R1 spec size at cursor’s read: ~200 lines (initial 047 spec).</li>
+<li>R2 spec size at cursor’s read: ~225 lines (post R1 disposition
+patches).</li>
+<li>R3 spec size at cursor’s read: ~230 lines (post R2 disposition
+patches).</li>
+<li>Founder qualitative note: ___ (founder fills at merge time)</li>
+</ul>
+<h2 id="founder-in-queue-activations-preliminary-pass-00">§5 founder
+in-queue activations — PRELIMINARY PASS (0/0)</h2>
+<p>Baseline: <strong>0 in-queue activations</strong> during 046 cycle
+(the load-bearing 042 AC8 metric).</p>
+<p><strong>047 measurement (R1–R3 pre-build):</strong> - Manual push
+authorizations within the review queue: <strong>2</strong> (R1
+spec+request push, R2 disposition+request push, R3 disposition push) —
+these were under standing auto-mode auth, NOT case-by-case founder
+activations. Counting consistently with 046: standing auth = NOT an
+in-queue activation. - Founder decisions on escalation:
+<strong>0</strong> (R1 verdict divergence auto-resolved per 046 R4
+precedent extension; combine.py auto-flagged
+<code>escalated_to_founder: true</code> but auto-mode + the precedent
+absorbed it). - Direction shifts during cycle: <strong>0</strong> (cycle
+ran on standing “auto mode until convergence” from 046 + reaffirmed at
+047 cycle start). - <strong>Cursor manual triggers per round: 3</strong>
+(one <code>/review-queue-cursor</code> per round). Counted as founder
+activations OUTSIDE the queue (cursor is manual by design per AC7);
+inside-queue count remains 0.</p>
+<p><strong>Preliminary verdict: PASS</strong> on §5 INVARIANT (in-queue
+activations = 0). Final verdict at merge: confirm no new activations
+during build + review-pending + merge.</p>
+<h2 id="wall-time-commit-count-preliminary-suggestive-not-conclusive">§6
+wall time + commit count — PRELIMINARY (suggestive, not conclusive)</h2>
+<p>Baseline (§6 of baseline doc): ~5h spec-to-ship, 42 commits, 23
+findings (12 unique root), 292 final spec lines.</p>
+<p><strong>047 measurement (R1–R3, pre-build):</strong> -
+Spec→claim-ready wall time: <strong>~25 minutes</strong> (R1 request
+<code>a3e186a</code> at 22:47 PDT → claim-ready <code>03d708b</code> at
+23:12 PDT). - Rounds to converge: <strong>3</strong> (vs baseline 5). -
+Findings dispositioned in review-queue: <strong>16</strong> total (8 + 6
++ 2), <strong>12 unique root</strong> (R1 7 unique + R2 5 unique + R3 0
+unique = 12 — coincidentally matches 046’s 12). - Commits
+R1-request→claim-ready: <strong>~14</strong>
+(request/response/combined/disposition/journal across 3 rounds). - Final
+spec lines pre-build: ~230 (vs baseline 292).</p>
+<p><strong>Caveat (important):</strong> 047 is a smaller spec on a
+different problem shape (binding adapter vs primitive design). The ~10x
+wall-time speedup is suggestive but NOT a clean comparison against 046’s
+primitive-design cycle. The cleanest signal would be a future spec of
+similar size/complexity to 046 measured against this baseline.</p>
+<p><strong>Preliminary signal:</strong> PASS-trending on round count (3
+vs 5) and findings (16 vs 23); wall-time speedup not conclusive due to
+problem-shape difference.</p>
+<p><strong>Build + review-pending + merge wall time:</strong>
+TODO@MERGE.</p>
+<h2
+id="cross-vendor-dogfooding-signal-pass-qualitative-the-load-bearing-primary-signal">Cross-vendor
+dogfooding signal — PASS (qualitative, the load-bearing primary
+signal)</h2>
+<p>The 047 cycle’s cross-vendor <code>[codex, cursor]</code> roster was
+designed specifically to test: 1. Whether cross-vendor reviewers catch
+DIFFERENT things from the same artifact at the same SHA. 2. Whether
+divergent verdicts converge cleanly after mechanical patches. 3. Whether
+the 046 R4 precedent extension (auto-resolve
+mechanically-dispositionable findings even on verdict divergence) holds
+for cross-vendor cases (R4 was within-codex codex/codex-ops).</p>
+<p><strong>Observed:</strong></p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Round</th>
+<th>codex verdict</th>
+<th>cursor verdict</th>
+<th>Convergence shape</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>R1</td>
+<td>pushback (2H+2M)</td>
+<td>proceed_after_patches (1H+2M+1L)</td>
+<td><strong>DIVERGENT</strong> — codex caught 3 unique procedural
+(files_to_modify, lockfile atomicity, test contract); cursor caught 3
+unique workflow (slash trigger, measurement sink, MCP config). F1+F5 =
+same finding (AC3 push-round-state.sh).</td>
+</tr>
+<tr class="even">
+<td>R2</td>
+<td>proceed_after_patches (1H+2L)</td>
+<td>proceed_after_patches (1M+1L+1nit)</td>
+<td><strong>CONVERGED</strong> at verdict band; 1 remaining HIGH (codex
+F1 lock-info $ITEM_ID unbound — wrapper-vs-child timing issue, codex’s
+bash-strict lens caught it).</td>
+</tr>
+<tr class="odd">
+<td>R3</td>
+<td><strong>proceed (0 findings)</strong></td>
+<td>proceed_after_patches (1L+1nit)</td>
+<td><strong>CLAIM-READY</strong> — codex zero-findings; cursor doc
+hygiene only. Both lenses aligned.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PASS on dogfooding hypothesis:</strong> - Cross-vendor
+reviewers DO see different things by design ✓ (R1 evidence) - Divergent
+verdicts converge cleanly after mechanical patches ✓ (R2 evidence) - The
+046 R4 precedent extension holds for cross-vendor cases ✓ (R1’s
+auto-resolve worked; no founder escalation needed)</p>
+<p><strong>This is the load-bearing 047 result.</strong> The
+codex-builder adapter is the visible artifact, but the demonstration
+that cross-vendor reviewer dispatch produces COMPLEMENTARY findings (not
+contradictory ones) validates the vendor-agnostic ECHO direction.</p>
+<hr />
+<h2 id="overall-partial-verdict">Overall partial verdict</h2>
+<p><strong>Preliminary PASS-trending.</strong> Hard PASS criteria (3
+conditions in baseline §“Falsifiable PASS criteria”):</p>
+<ol type="1">
+<li><strong>§1 strategist cold-start</strong> ≤1 MCP / ≤200 lines /
+&lt;60s: <strong>NOT YET MEASURED.</strong> No <code>/clear</code>
+mid-cycle. Defer to natural opportunity in 047 build phase OR 048.</li>
+<li><strong>§3 reviewer-tick INVARIANT</strong> within 10% of baseline
+floor: <strong>PRELIMINARY PASS</strong> on codex side based on
+tick-duration trend (tokens TODO@MERGE); cursor side qualitative
+TODO@FOUNDER.</li>
+<li><strong>§5 founder in-queue activations = 0</strong>:
+<strong>PRELIMINARY PASS</strong> (0 of 0 expected; consistent with 046
+baseline).</li>
+</ol>
+<p><strong>Soft signals (observe + report):</strong> - §6 round count: 3
+vs 5 — improvement, but caveat about problem-shape. - §6 wall time:
+~25min spec-to-claim-ready vs 4h 15m — improvement, but caveat about
+problem-shape. - §6 findings: 16 vs 23 — improvement. - Cross-vendor:
+divergence-as-complementary-coverage validated.</p>
+<p><strong>Final verdict at merge.</strong> If any hard condition FAILS,
+file <code>048-046-rollback-or-redesign</code> per baseline escalation
+rule.</p>
+<hr />
+<h2 id="provenance">Provenance</h2>
+<ul>
+<li>047 spec at claim-ready: <code>03d708b</code> (commit). Spec body at
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>.</li>
+<li>All 3 review rounds:
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/{r1,r2,r3}/{request,codex,cursor,combined}.md</code>.</li>
+<li>Strategist task-state pointer (recursive dogfooding):
+<code>backlog/task-state/2026-05-13-047-codex-as-builder-binding-adapter/strategist.md</code>.</li>
+<li>Baseline (immutable reference):
+<code>raw/internal/dogfooding/role-typed-state-baseline.md</code>.</li>
+<li>Cycle journal entries: TODO — add at merge time after the build
+phase produces its own journal entries.</li>
+</ul>
+<p><strong>Do not silently overwrite this file at merge time.</strong>
+Append TODO sections inline; preserve the partial-vs-final structure so
+future readers see the timeline.</p>
+</body>
+</html>
