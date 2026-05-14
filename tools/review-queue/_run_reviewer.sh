@@ -28,16 +28,21 @@ fi
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 
+# PATH augmentation — launchd's environment is stripped down; codex (and
+# common dependencies it shells out to, including the python3 with
+# jsonschema installed) live in user-local bin directories under Homebrew
+# or asdf/nodenv. Cover the common locations. MUST come BEFORE any
+# python3 invocation — under bare launchd PATH=/usr/bin:/bin:..., python3
+# resolves to /usr/bin/python3 (Xcode 3.9, no site-packages) and the gate
+# fails with ModuleNotFoundError: jsonschema. Surfaced 2026-05-14 when
+# 048 R1 codex review tick silently failed every 10min for ~2h.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.nodenv/shims:$HOME/.asdf/shims:$HOME/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # Validate REVIEWER_NAME exists in reviewers.json with mode=headless. The
 # gate is a dedicated Python script (`_reviewer_gate.py`) so its stderr
 # survives all shell-wrapping permutations (e.g. node spawnSync without a
 # tty was eating heredoc-via-`<<PY` stderr in some setups).
 SLASH_COMMAND=$(python3 "$TOOL_DIR/_reviewer_gate.py") || exit $?
-
-# PATH augmentation — launchd's environment is stripped down; codex (and
-# common dependencies it shells out to) live in user-local bin directories
-# under Homebrew or asdf/nodenv. Cover the common locations.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.nodenv/shims:$HOME/.asdf/shims:$HOME/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 LOG_DIR="$HOME/Library/Logs"
 LOG_FILE="$LOG_DIR/echo-review-queue-${REVIEWER_NAME}.log"

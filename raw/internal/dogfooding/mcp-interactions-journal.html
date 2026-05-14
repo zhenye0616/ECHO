@@ -1583,6 +1583,11 @@ href="#pdt---codex-r1-on-048-process-backlog-builder-state-handoff-refresh"
 id="toc-pdt---codex-r1-on-048-process-backlog-builder-state-handoff-refresh">2026-05-14
 01:35 PDT - Codex R1 on 048 process-backlog builder-state handoff
 refresh</a></li>
+<li><a
+href="#pdt-claude-orchestrator-diagnoses-fixes-codex-reviewer-launchd-silent-failure"
+id="toc-pdt-claude-orchestrator-diagnoses-fixes-codex-reviewer-launchd-silent-failure">2026-05-14
+01:38 PDT — Claude orchestrator diagnoses + fixes codex reviewer launchd
+silent failure</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15911,6 +15916,88 @@ discovery degrade through <code>_parse_error</code> unless the spec
 either stops writing extra anchor keys or explicitly widens the
 parser/schema/test scope.</li>
 <li><strong>Conjecture:</strong> (none - observations only)</li>
+</ul>
+<h3
+id="pdt-claude-orchestrator-diagnoses-fixes-codex-reviewer-launchd-silent-failure">2026-05-14
+01:38 PDT — Claude orchestrator diagnoses + fixes codex reviewer launchd
+silent failure</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder pushed back on the “launchd is
+dead” diagnosis: “codex review was just working before and nothing
+changed. feel free to do some dry runs to confirm codex reviewer is
+truly broken.” User wanted ECHO + dry runs to find the real cause.</li>
+<li><strong>Query inputs:</strong> No ECHO MCP calls this tick
+(diagnostic was shell-based; the prior tick’s <code>find_clusters</code>
++ <code>get_atoms</code> had already established no codex reviewer
+session was captured). Dry runs:
+<ul>
+<li><code>launchctl print gui/&lt;uid&gt;/com.echo.review-queue-codex</code>
+→ state=not running, last_exit=126, runs=100, StartInterval=600s,
+default PATH=/usr/bin:/bin:/usr/sbin:/sbin (no explicit
+EnvironmentVariables in plist)</li>
+<li><code>env -i HOME=$HOME PATH=/usr/bin:/bin:/usr/sbin:/sbin run-codex-reviewer.sh</code>
+→ rc=1 with
+<code>ModuleNotFoundError: No module named 'jsonschema'</code> from
+<code>_lib.py:18</code></li>
+<li><code>/usr/bin/python3 -m pip list | grep schema</code> → empty;
+sys.path is Xcode-framework only (3.9.6, NO site-packages)</li>
+<li><code>/usr/local/bin/python3 -c 'import jsonschema'</code> → OK
+4.25.1 (jsonschema IS installed, just on the wrong python3 for launchd’s
+bare PATH)</li>
+<li><code>env -i HOME=$HOME PATH=/opt/homebrew/bin:/usr/local/bin:... run-codex-reviewer.sh</code>
+→ rc=0, wrote codex.md for 048 R1, pushed <code>cf0ec3a</code></li>
+</ul></li>
+<li><strong>Returned:</strong> N/A (no MCP). Output of the dry runs
+revealed the actual root cause.</li>
+<li><strong>Sources:</strong>
+<code>~/Library/LaunchAgents/com.echo.review-queue-codex.plist</code>
+(no EnvironmentVariables key — uses launchd’s default);
+<code>tools/review-queue/_run_reviewer.sh</code> lines 28-40 (PATH
+augmentation on line 40, AFTER <code>python3 _reviewer_gate.py</code> on
+line 35 — the bug);
+<code>~/Library/Logs/echo-review-queue-codex.log</code> (no recent
+entries because failures happen BEFORE the
+<code>{...} &gt;&gt; $LOG_FILE</code> redirection block on line ~54 of
+wrapper); <code>tools/review-queue/_lib.py</code> line 18
+(<code>import jsonschema</code>, added in commit <code>cd02160</code>
+for 039 cross-tool review dispatch); <code>/usr/bin/python3</code>
+(Xcode 3.9.6, no site-packages) vs <code>/usr/local/bin/python3</code>
+(3.10, has jsonschema).</li>
+<li><strong>Verdict:</strong> ✅ right — the dry-run methodology
+surfaced the real bug. Founder’s intuition was correct: nothing changed
+in the code, but launchd’s PATH context apparently changed (likely
+<code>launchctl setenv PATH</code> got unset, or the 06:08:44Z success
+was from a manual kickstart in an interactive-shell context). The
+wrapper’s PATH augmentation has always been ordered wrong; it only
+worked previously when launchd happened to inherit a fuller PATH from
+somewhere.</li>
+<li><strong>Note:</strong> TWO observations.
+<ol type="1">
+<li><strong>Real wrapper bug, applied fix:</strong> moved
+<code>export PATH=...</code> BEFORE
+<code>python3 _reviewer_gate.py</code> in
+<code>tools/review-queue/_run_reviewer.sh</code>. One-line structural
+move. Under launchd’s bare <code>/usr/bin:/bin:...</code>, the gate now
+finds <code>/usr/local/bin/python3</code> (with jsonschema) instead of
+<code>/usr/bin/python3</code> (Xcode no-site-packages). Verified by
+re-running the dry run with launchd-exact env: rc=0.</li>
+<li><strong>The silent-failure mode is also a real friction.</strong>
+Wrapper failures BEFORE the <code>{...} &gt;&gt; $LOG_FILE</code> block
+go to launchd’s stderr (set to /dev/null in plist). No log entry, no
+journal entry. The next 10-min auto-tick fails identically, ad
+infinitum, until manually invoked from an interactive shell. Worth
+either redirecting stderr to the log file from line 1, OR setting
+StandardErrorPath in the plist to a separate
+<code>echo-review-queue-${REVIEWER}.err.log</code>. Friction-fix
+candidate for <code>_followups.md</code>.</li>
+</ol></li>
+<li><strong>Conjecture:</strong> The 06:08:44Z success was most likely
+from a manual <code>launchctl kickstart</code> from the founder’s
+interactive shell during 047 R3 cycle — kickstart inherits the calling
+shell’s full PATH for that specific spawn, but subsequent cron-spawned
+ticks fall back to launchd’s bare default. Founder may want to confirm
+whether they manually kickstarted around that time. Either way: the
+wrapper fix makes the cron robust to ANY PATH context.</li>
 </ul>
 </body>
 </html>
