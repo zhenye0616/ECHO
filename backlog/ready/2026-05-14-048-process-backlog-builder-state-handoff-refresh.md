@@ -6,22 +6,22 @@ priority: HIGH
 estimate: 0.5d
 created: 2026-05-14
 blocked_by: []
-task_state_ref: ""
+task_state_ref: 2026-05-14-048-process-backlog-builder-state-handoff-refresh
 requested_reviewers: ["codex", "cursor"]
 files_to_modify:
-  - skills/process-backlog.md
-  - .claude/commands/process-backlog.md
-  - docs/AGENT_INSTRUCTIONS.md
-  - tools/task-state/write-builder-state.py
-  - tests/task-state/write-builder-state.test.ts
-  - tests/backlog/process-backlog-skill.test.ts
+  - skills/process-backlog.md  # add protocol-wide final builder-state patch step
+  - .claude/commands/process-backlog.md  # synced adapter copy from skills/
+  - docs/AGENT_INSTRUCTIONS.md  # generic builder manual mirrors the protocol
+  - tools/task-state/patch-builder-state.py  # minimal stale-anchor patch helper
+  - tests/task-state/patch-builder-state.test.ts  # helper behavior tests
+  - tests/backlog/process-backlog-skill.test.ts  # protocol text/sync assertions
 spec_refs:
-  - backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md
-  - backlog/complete/2026-05-13-047-codex-as-builder-binding-adapter.md
-  - skills/role-typed-task-state.md
-  - skills/process-backlog.md
-  - docs/AGENT_INSTRUCTIONS.md
-  - tools/task-state/lint.py
+  - backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md  # parent task-state primitive and writer contract
+  - backlog/complete/2026-05-13-047-codex-as-builder-binding-adapter.md  # first builder.md dogfooding cycle and stale-pointer evidence
+  - skills/role-typed-task-state.md  # schema, writer responsibilities, initial pointer content
+  - skills/process-backlog.md  # protocol body to patch
+  - docs/AGENT_INSTRUCTIONS.md  # builder loop mirror
+  - tools/task-state/lint.py  # pointer compliance check used by acceptance/tests
 
 # --- agent-managed fields (filled in during run) ---
 claimed_by: ""
@@ -36,11 +36,7 @@ review_notes: ""
 
 # Process-backlog builder-state handoff refresh
 
-## What
-
-Make `/process-backlog` refresh `backlog/task-state/<task-id>/builder.md` as part of the final handoff commit whenever an item has role-typed builder state in scope. The 047 merge proved the gap: the builder wrote a valid `builder.md`, then moved the item to `pending_review/` while the pointer still described the claimed-stage state. `/review-pending` caught the stale pointer, but that is exactly the friction the task-state primitive is supposed to remove.
-
-## Why
+## Why this spec exists
 
 046 made role-typed task-state the cold-start substrate for strategist, builder, watcher, and dispatcher roles. 047 was the first concrete `builder.md` dogfooding cycle and exposed a lifecycle hole: the writer contract says the builder refreshes the pointer on completion, but the actual `/process-backlog` handoff steps only stage `backlog/pending_review/` and the run log. The fix belongs in the protocol, not in reviewer memory.
 
@@ -48,15 +44,10 @@ This serves the current friction-first gate directly. It removes a recurring han
 
 ## Acceptance Criteria
 
-### AC1 — Deterministic builder-state renderer
+### AC1 — Minimal builder-state patcher
 
-- Add `tools/task-state/write-builder-state.py`.
-- The helper writes `backlog/task-state/<task-id>/builder.md` with the five required blocks from `skills/role-typed-task-state.md`, in order:
-  - `## current_thesis`
-  - `## locked_decisions`
-  - `## open_questions`
-  - `## dont_touch`
-  - `## canonical_anchors`
+- Add `tools/task-state/patch-builder-state.py`.
+- The helper patches an existing `backlog/task-state/<task-id>/builder.md`; it does **not** render a fresh pointer body from CLI arguments.
 - Required CLI shape:
   - `--task-id <id>`
   - `--outcome complete|escalated`
@@ -64,29 +55,35 @@ This serves the current friction-first gate directly. It removes a recurring han
   - `--branch agent/<slug>`
   - `--head-sha <sha-or-empty>`
   - `--run-log raw/internal/agent-runs/<...>.md`
-- Completion output says the item is complete and ready for review, and points readers to `agent_notes` plus the run log for acceptance/test detail.
-- Escalation output says the item is escalated for founder input, and points readers to `agent_notes` plus the run log for the blocker.
-- `canonical_anchors` includes at least `spec`, `branch`, `run_log`, and `head_sha` when provided.
-- The rendered body is comfortably under the 80-line soft target and passes `python3 tools/task-state/lint.py <path>`.
-- No CAS or blob-lease logic. `builder.md` is still single-writer state; the helper only renders the file and lets the existing `/process-backlog` commit/push flow carry it.
+- Patch behavior:
+  - Update frontmatter `last_updated` to the current UTC timestamp if frontmatter exists; preserve all other frontmatter keys and ordering.
+  - Patch only the `## current_thesis`, `## open_questions`, and `## canonical_anchors` blocks.
+  - Preserve `## locked_decisions` byte-for-byte, because it carries builder-authored design choices and rejected alternatives that cannot be reconstructed from CLI args.
+  - Preserve `## dont_touch` byte-for-byte, because it mirrors spec-specific drift boundaries.
+  - In `## current_thesis`, change the lifecycle sentence to complete/ready-for-review or escalated-for-founder-input without deleting the builder's existing implementation summary.
+  - In `## open_questions`, write `- None blocking; handed off for review.` for `complete`, or `- See agent_notes and run log for the escalation question.` for `escalated`.
+  - In `## canonical_anchors`, replace or add `spec`, `branch`, `run_log`, and `head_sha` anchors. `spec` must point to `backlog/pending_review/<item>.md`; this is the staleness-prone 047 failure mode.
+- If `builder.md` is missing, malformed, or lacks required blocks, the helper exits non-zero and does not create a generic placeholder pointer. The builder escalates rather than silently erasing working memory.
+- After patching, `python3 tools/task-state/lint.py <path>` passes.
+- No CAS or blob-lease logic. `builder.md` is still single-writer state; the helper edits the builder-owned file and lets the existing `/process-backlog` commit/push flow carry it.
 
-### AC2 — `/process-backlog` final handoff calls the renderer
+### AC2 — `/process-backlog` final handoff calls the patcher
 
 - Update the protocol body in `skills/process-backlog.md`, not only the codex binding-specific notes.
 - Add a named handoff substep before the final `git add ... && git commit -m "review: <item-id>"` / escalation commit:
   - Detect builder-state scope if `task_state_ref:` is non-empty in the item frontmatter OR `backlog/task-state/<task-id>/builder.md` already exists.
-  - After `ensure_stage "$(basename $ITEM_FILE)" "pending_review"` and after the agent fills `head_sha`, `pr_url`, and `agent_notes`, call `tools/task-state/write-builder-state.py`.
+  - After `ensure_stage "$(basename $ITEM_FILE)" "pending_review"` and after the agent fills `head_sha`, `pr_url`, and `agent_notes`, call `tools/task-state/patch-builder-state.py`.
   - Pass `--spec-path backlog/pending_review/<item>.md`.
   - Pass `--outcome complete` for successful handoff and `--outcome escalated` for blocked/uncertain handoff.
-  - Run `python3 tools/task-state/lint.py "backlog/task-state/<task-id>/builder.md"` immediately after rendering.
+  - Run `python3 tools/task-state/lint.py "backlog/task-state/<task-id>/builder.md"` immediately after patching.
   - Stage `backlog/task-state/<task-id>/builder.md` in the same final handoff commit as the pending-review item and run log.
-- The step must be idempotent: rerunning the handoff re-renders the same final pointer for the same inputs and does not create a second pointer path.
+- The step must be idempotent for semantic content: rerunning handoff updates only the timestamp plus the same lifecycle/anchor fields, and does not create a second pointer path or rewrite `locked_decisions`.
 
 ### AC3 — Codex binding notes defer to the protocol-wide final step
 
 - Update the existing `skills/process-backlog.md` codex-specific `builder.md` section so it does not imply the final handoff refresh is codex-only.
 - Keep codex-specific details that still matter: `danger-full-access`, wrapper invocation, single-owner direct commits, and no `push-round-state.sh` for `builder.md`.
-- Make the final handoff row point to the new protocol-wide renderer step.
+- Make the final handoff row point to the new protocol-wide patcher step.
 - Sync `.claude/commands/process-backlog.md` from `skills/process-backlog.md` with `tools/sync-skills.sh`.
 
 ### AC4 — Builder manual mirrors the protocol
@@ -96,13 +93,14 @@ This serves the current friction-first gate directly. It removes a recurring han
 
 ### AC5 — Tests cover the helper and protocol hook
 
-- Add `tests/task-state/write-builder-state.test.ts` covering:
-  - complete handoff pointer renders the required blocks, anchors `backlog/pending_review/<item>.md`, and passes `tools/task-state/lint.py`;
-  - escalated handoff pointer renders an escalation thesis/open-question shape and passes lint;
-  - invalid `--outcome` exits non-zero without writing a misleading pointer.
+- Add `tests/task-state/patch-builder-state.test.ts` covering:
+  - complete handoff patches `spec` from `backlog/claimed/<item>.md` to `backlog/pending_review/<item>.md`, adds/updates `head_sha`, and passes `tools/task-state/lint.py`;
+  - escalated handoff writes escalation-oriented `current_thesis` / `open_questions`, preserves `locked_decisions` byte-for-byte, and passes lint;
+  - malformed or missing `builder.md` exits non-zero without creating a generic replacement pointer;
+  - invalid `--outcome` exits non-zero without writing misleading state.
 - Add `tests/backlog/process-backlog-skill.test.ts` covering:
   - `skills/process-backlog.md` contains the named final builder-state refresh step;
-  - that step names `task_state_ref`, existing `builder.md`, `write-builder-state.py`, `backlog/pending_review/`, and `tools/task-state/lint.py`;
+  - that step names `task_state_ref`, existing `builder.md`, `patch-builder-state.py`, `backlog/pending_review/`, and `tools/task-state/lint.py`;
   - `.claude/commands/process-backlog.md` is byte-identical to `skills/process-backlog.md` after sync.
 - Existing `npm run lint`, `npm run typecheck`, and targeted Vitest tests pass.
 - `tools/sync-skills.sh --check` passes.
@@ -113,9 +111,23 @@ This serves the current friction-first gate directly. It removes a recurring han
 - Do not generalize `tools/task-state/push-round-state.sh`; it is still only for multi-writer `round-state.md`.
 - Do not add CAS/lease semantics for `builder.md`.
 - Do not backfill old items' missing or stale pointers.
+- Do not replace builder-authored `locked_decisions` with generic helper output.
 - Do not modify wiki pages; promotion happens only after this item lands in `complete/`.
 - Do not change reviewer queue behavior, reviewer validation, or merge-and-cleanup.
 - Do not redesign the agent run-log convention or `agent_notes` frontmatter.
+
+## Risks
+
+- **R1 — Patcher might miss stale prose outside anchors.** The 047 failure was stale anchors/stage framing, not stale design content. Acceptance limits the patcher to lifecycle fields so it preserves working memory. If later dogfooding shows body prose routinely goes stale too, file a separate item with evidence.
+- **R2 — Malformed existing pointers can block handoff.** That is intentional. A generic replacement would hide the real loss of builder-authored context; the correct behavior is escalation with a clear lint/helper error.
+- **R3 — Timestamp changes make byte-for-byte full-file idempotence impossible.** Semantic idempotence is the contract: repeated runs preserve `locked_decisions` and converge the same anchors/lifecycle fields while refreshing `last_updated`.
+- **R4 — Helper scope could drift into a general pointer editor.** Keep it builder-handoff-specific. `round-state.md` still uses the CAS helper; strategist and watcher pointers are out of scope.
+
+## Tests
+
+- `tests/task-state/patch-builder-state.test.ts` covers complete, escalated, malformed/missing pointer, invalid outcome, required-block preservation, and task-state lint compatibility.
+- `tests/backlog/process-backlog-skill.test.ts` covers the protocol text hook and skill adapter byte identity.
+- Verification commands: targeted Vitest files above, `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check`, and `python3 tools/blocked.py`.
 
 ## Definition of Done
 
