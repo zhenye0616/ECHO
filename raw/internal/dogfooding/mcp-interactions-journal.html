@@ -1502,6 +1502,16 @@ href="#pdt---codex-ops-r1-on-046-context-fatigue-via-role-typed-state"
 id="toc-pdt---codex-ops-r1-on-046-context-fatigue-via-role-typed-state">2026-05-13
 17:35 PDT - Codex-ops R1 on 046 context fatigue via role-typed
 state</a></li>
+<li><a
+href="#pdt---codex-ops-r2-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-ops-r2-on-046-context-fatigue-via-role-typed-state">2026-05-13
+20:52 PDT - Codex-ops R2 on 046 context fatigue via role-typed
+state</a></li>
+<li><a
+href="#pdt---codex-r2-on-046-context-fatigue-via-role-typed-state"
+id="toc-pdt---codex-r2-on-046-context-fatigue-via-role-typed-state">2026-05-13
+20:52 PDT - Codex R2 on 046 context fatigue via role-typed
+state</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14840,6 +14850,112 @@ who can read it, who writes it, and what snapshot MCP clients observe.
 Those are the failure modes that surface during unattended
 reviewer/watch ticks rather than during a local happy-path
 implementation.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-ops-r2-on-046-context-fatigue-via-role-typed-state">2026-05-13
+20:52 PDT - Codex-ops R2 on 046 context fatigue via role-typed
+state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex-ops</li>
+<li><strong>Trigger:</strong> Execute one codex-ops review queue tick;
+first pending codex-ops response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, R1
+combined disposition, pinned artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>aa1023ca95c9f5ae2f714e052731c22929d68e92</code>, project
+operating docs, current watcher/reviewer skill docs, and reviewer
+commit/validation helpers. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/codex-ops.md</code>
+as <code>b8e6552</code>, verdict <code>pushback</code>, findings:
+omitted-ref MCP reads can still return content and echoed
+<code>ref</code> from different commits; the round-state writer
+freshness protocol is not an atomic compare-and-swap; the reviewer
+contamination hard-fail can quarantine legitimate findings that name the
+forbidden marker as critique evidence.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>aa1023ca95c9f5ae2f714e052731c22929d68e92</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/codex-ops.md</code>;
+prior-round context
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/combined.md</code>;
+local docs/helpers <code>CLAUDE.md</code>,
+<code>docs/AGENT_INSTRUCTIONS.md</code>, <code>backlog/README.md</code>,
+<code>skills/review-queue-watch.md</code>,
+<code>skills/review-queue-codex.md</code>,
+<code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing codex-ops response, anchored review to the requested spec SHA,
+validated before link, and pushed exactly one reviewer response before
+this journal entry.</li>
+<li><strong>Note:</strong> The R1 fixes closed the large contamination
+and dirty-working-tree hazards, but the remaining risks are the small
+races that matter once this becomes unattended coordination state:
+resolve HEAD once before reads, compare against the upstream blob before
+writes, and keep the reviewer lint from rejecting valid critique
+text.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-046-context-fatigue-via-role-typed-state">2026-05-13
+20:52 PDT - Codex R2 on 046 context fatigue via role-typed state</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick;
+first pending Codex response was
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, R1
+combined disposition, pinned artifact
+<code>backlog/ready/2026-05-13-046-context-fatigue-via-role-typed-state.md</code>
+at <code>aa1023ca95c9f5ae2f714e052731c22929d68e92</code>, current MCP
+server/tool layout, package scripts, review-queue validation helpers,
+and sync-skills script. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/codex.md</code>
+as <code>50aa22b</code>, verdict <code>pushback</code>, findings: AC1’s
+freshness check still has an impossible success path and underspecified
+remote-race comparison; AC3’s fresh-eyes string gate would quarantine
+legitimate critique text; AC4/AC5 need explicit commit-SHA echoing for
+branch/tag refs; AC1/AC4 need a concrete cross-language anchor parser
+contract.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>aa1023ca95c9f5ae2f714e052731c22929d68e92</code>; request path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r2/codex.md</code>;
+prior disposition
+<code>backlog/reviews/2026-05-13-046-context-fatigue-via-role-typed-state/r1/combined.md</code>;
+local code paths <code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/*</code>, <code>tests/mcp/server.test.ts</code>,
+<code>tools/review-queue/validate.py</code>,
+<code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/sync-skills.sh</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — the queue selected the expected
+missing Codex response, anchored review to the requested spec SHA, and
+pushed exactly one reviewer response before this journal entry.</li>
+<li><strong>Note:</strong> The R1 patches closed the broad read-contract
+and reviewer-contamination shape, but the new spec text still leaves two
+mechanisms that would fail under implementation pressure: a stale-write
+check that compares the wrong moment, and a whole-response string scan
+that cannot distinguish contamination from a reviewer describing the
+contamination rule.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
