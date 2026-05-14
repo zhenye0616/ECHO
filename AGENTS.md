@@ -1,14 +1,47 @@
 # AGENTS.md - Codex Working Instructions for ECHO
 
-This file is the Codex-facing companion to `claude.md`, which is the canonical project guide for ECHO. Codex should read `claude.md` first and treat it as the source of truth. This file exists so Codex-native sessions can pick up the same operating model, plus Codex-specific dogfooding rules.
+This file is the Codex-facing companion to `CLAUDE.md`, which is the canonical project guide for ECHO. Codex should read `CLAUDE.md` first and treat it as the source of truth. This file exists so Codex-native sessions can pick up the same operating model, plus Codex-specific dogfooding rules.
 
-If this file ever conflicts with `claude.md`, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, or an active backlog item's acceptance criteria, stop and surface the conflict instead of guessing.
+If this file ever conflicts with `CLAUDE.md`, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, or an active backlog item's acceptance criteria, stop and surface the conflict instead of guessing.
+
+## Current operating gate (read before doing anything strategic)
+
+**Friction-first prioritization (post-044, sharpened post-047 on 2026-05-13).** Zero new architecture / V1.5+ feature specs until BOTH of these end-state conditions hold:
+
+- **(e1) Founder fully out of the loop.** A complete spec→ship cycle runs with zero in-queue founder activations (extends 042 AC8 metric).
+- **(e2) Vendor-agnostic at every role.** ≥2 interoperable vendor bindings per role; no role's protocol depends structurally on one vendor's quirks.
+
+Today's per-role vendor coverage (post-047 merge):
+
+| Role | Vendor coverage | Status |
+|---|---|---|
+| Reviewer | codex + cursor (Claude) + codex-ops | ✓ multi-vendor |
+| Builder | Claude Code + Cursor's Claude + codex (047) | ✓ multi-vendor (Anthropic + OpenAI) |
+| Strategist | Claude (Claude Code only today; THIS codex session is the second-vendor test) | ✗ single-vendor — actively being tested |
+| Watcher | unspecified | ✗ |
+| Dispatcher | unspecified | ✗ |
+
+Until BOTH (e1) AND (e2) hold, every new spec must directly serve (e1) or (e2) or eliminate operating-model friction enumerated in `backlog/_followups.md` or the dogfooding journal. No greenfield architecture work.
+
+## Role-typed task-state pointers (046+)
+
+ECHO ships a compact working-memory snapshot at `backlog/task-state/<task-id>/<role>.md` per role binding. Continuity roles (strategist, builder, watcher, dispatcher) write these; reviewer ticks DO NOT read or write them (fresh-eyes-at-SHA invariant). Full schema + read/write protocol in `skills/role-typed-task-state.md`. Cold-start primer in `skills/using-superpowers.md` (the ECHO-namespaced file at the repo root's skills directory; this is distinct from the superpowers-plugin skill of the same name).
+
+**If you are starting a strategist or builder session and the task already has a `task_state_ref:` in its backlog item frontmatter, read your role's pointer FIRST before any broader corpus walk.** That's the load-bearing primer rule — it should cut cold-start from ~3 MCP calls + ~3-4 min down to 0-1 MCP calls + <60s.
+
+## Memory equivalence (Codex vs Claude Code)
+
+Claude Code auto-loads `~/.claude/projects/.../memory/MEMORY.md` (one-line hooks for project memory like timezone, friction-first gate, north star). Codex CLI has no equivalent auto-load. Until the founder wires a Codex memory mechanism:
+
+- The founder will paste relevant MEMORY.md hooks into your session preamble at the start of any session where memory context matters.
+- If a strategic question turns on a load-bearing fact you don't have (e.g., "what's the friction-first gate?", "what's the founder's timezone?"), ASK before guessing. Do not silently default to a generic answer that would have been overridden by memory.
+- Today's load-bearing memory hooks: timezone is PDT (`America/Los_Angeles`); friction-first gate per `(e1)+(e2)` above; commit specs immediately on creation; log every ECHO MCP call to the journal in-the-moment.
 
 ## Project Mission
 
 ECHO is the cross-platform context layer for AI-era knowledge work. It makes every AI surface smarter by unifying context across the user's tools, while staying invisible through the browser extension, MCP server, and hotkey overlay rather than becoming a destination app.
 
-Brand promise from `claude.md`:
+Brand promise from `CLAUDE.md`:
 
 > "We don't make AI smarter. We make every AI smarter about you."
 
@@ -16,12 +49,12 @@ Brand promise from `claude.md`:
 
 For any strategic or implementation work in this repo, read:
 
-1. `claude.md` - project mission, wiki/backlog discipline, role split, and pipeline.
+1. `CLAUDE.md` - project mission, wiki/backlog discipline, role split, and pipeline.
 2. `docs/AGENT_INSTRUCTIONS.md` - builder-agent execution loop.
 3. `backlog/README.md` - backlog mechanics and atomic claim details.
 4. The relevant backlog item and all of its `spec_refs`, if working on an item.
 
-The wiki is readable context, but do not treat planned ideas as shipped reality. Per `claude.md`, product wiki pages document shipped or committed reality; active specs live in backlog items.
+The wiki is readable context, but do not treat planned ideas as shipped reality. Per `CLAUDE.md`, product wiki pages document shipped or committed reality; active specs live in backlog items.
 
 ## Role Discipline
 
@@ -35,7 +68,7 @@ ECHO uses three roles:
 
 Codex must identify which role the current user request implies. For normal coding tasks in this repo, behave like a builder agent unless the user is explicitly brainstorming strategy, asking for explanation only, or asking you to review another agent's pending work.
 
-## Repo Discipline From `claude.md`
+## Repo Discipline From `CLAUDE.md`
 
 - Search existing wiki and backlog before creating new concepts.
 - Capture actionable new decisions as `backlog/ready/<id>.md`, not as wiki pages.
@@ -48,7 +81,7 @@ Codex must identify which role the current user request implies. For normal codi
 
 Do not edit `wiki/` during implementation unless the user explicitly asks for a strategist/wiki-promotion task and the relevant item has shipped. If a backlog spec asks a builder to edit `wiki/` but repo instructions or hooks forbid it, stop and surface the conflict.
 
-The wiki taxonomy from `claude.md` is:
+The wiki taxonomy from `CLAUDE.md` is:
 
 - `product/` - strategic what
 - `principles/` - active commitments
@@ -81,7 +114,7 @@ One item per run unless the user explicitly invokes the documented batch workflo
 
 ## Drift Prevention
 
-The `claude.md` drift rules apply to Codex:
+The `CLAUDE.md` drift rules apply to Codex:
 
 - Read `spec_refs` before writing code.
 - Respect every "Out of Scope (Don't Drift)" section.
@@ -90,7 +123,7 @@ The `claude.md` drift rules apply to Codex:
 
 ## V1 Scope Reminder
 
-Keep the V1 tape-above-desk from `claude.md` in mind:
+Keep the V1 tape-above-desk from `CLAUDE.md` in mind:
 
 - Cohort: indie AI builders and dev founders.
 - Bundle: Cursor, Claude Code, GitHub, Slack, web AI extension.
