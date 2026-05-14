@@ -1,10 +1,13 @@
 ---
 id: 2026-05-13-047-codex-as-builder-binding-adapter
 title: Codex-as-builder binding adapter — the missing binding that makes role-slot-agnostic orchestration empirically true (first post-046 spec; vendor-agnostic pivot begins)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-05-13
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-14T06:25:03Z"
+branch: "agent/codex-as-builder-binding-adapter"
 task_state_ref: 2026-05-13-047-codex-as-builder-binding-adapter
 requested_reviewers: ["codex", "cursor"]
 files_to_modify:
