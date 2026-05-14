@@ -255,3 +255,82 @@ By the end of the run:
 - Founder has everything they need to review in <30 minutes
 
 Now begin. Read `docs/AGENT_INSTRUCTIONS.md` first.
+
+---
+
+## Binding-specific notes — codex
+
+This section is binding-specific guidance for when the `codex` binding executes this skill. The protocol body above (atomic-claim, worktree, test/lint/typecheck, push, move-to-pending_review) is unchanged for every binding; the items below are codex-only concerns layered on top.
+
+### Invocation (047 AC6)
+
+- From a regular zsh / bash terminal (NOT inside the codex REPL): `bash tools/backlog/run-codex-builder.sh`. The wrapper mirrors the codex reviewer invocation convention.
+- Manual, on-demand. Not a daemon. Not a launchd / cron job. The builder lifecycle is one-shot and long-running; periodic invocation would race multiple builders on the same item.
+- Invoke when you want codex to claim the next ready item. The lockfile + atomic-claim git op together ensure only one codex-builder runs at a time per machine, and that two builders never claim the same item even if invoked simultaneously.
+
+### Sandbox semantics
+
+- The wrapper invokes `codex exec --sandbox danger-full-access`. This is broader than Claude Code's tool-use sandbox.
+- `danger-full-access` is required because the builder writes outside the repo (`~/.echo/agent-id`), creates sibling worktrees under `~/Desktop/Project_echo--<slug>/`, writes `node_modules/` during test installs, and pushes to `origin`. The narrower `workspace-write` blocks `.git/FETCH_HEAD` writes during push, sibling-worktree creation, and the `~/.echo/agent-id` write.
+- Threat model: full repo write + push + arbitrary FS write within reach of the codex CLI process for the duration of the run. The wrapper's repo-root validation, atomic lock DIRECTORY (`.git/echo-builder-in-progress.d/`), and `ECHO_AGENT_ID` gate accidental misuse. Operator MUST run the wrapper only from a terminal they trust.
+
+### ECHO MCP exposure
+
+- Codex sees the ECHO MCP server through the standard `mcp__echo__*` tool surface — **only if** the operator's codex configuration registers it (typically `~/.codex/config.toml`; consult `codex` docs for the current shape). The wrapper does not auto-register MCP; it inherits whatever the operator has configured.
+- **First-run setup checklist (do this before invoking the wrapper):**
+  1. Verify ECHO MCP is registered in your codex config. The exact surface depends on your codex version (`codex mcp list` if available; otherwise inspect `~/.codex/config.toml`).
+  2. Smoke-test via `codex exec` with a trivial `echo_ping` invocation; confirm a non-empty return.
+  3. Only then run `bash tools/backlog/run-codex-builder.sh`.
+- If MCP is silently missing during a build, codex falls back to non-MCP discovery (filesystem + git log) which is incomplete for ECHO's recent-work-context queries. The failure mode is silent context-degradation, not a hard error — catch it by smoke-testing first.
+
+### Journaling discipline (CLAUDE.md cross-tool)
+
+- The journal-by-proxy rule from `CLAUDE.md` "Dogfooding journal discipline" applies to read-only consultees. The codex-builder here runs with `--sandbox danger-full-access` and IS NOT a read-only consultee — it journals its own ECHO MCP calls in-the-moment per the standard discipline (the 6-field template), not via proxy.
+
+### Session-limit / token-cap escalation
+
+Codex CLI sessions have implicit upper bounds. If a long-running builder exhausts the session before reaching `pending_review/`:
+
+1. Commit current progress on `agent/<slug>` and push.
+2. Move the item to `pending_review/` with `agent_notes:` framed as the BLOCKED escalation (per the "Stopping Conditions" section above).
+3. Exit non-zero. The lockfile trap removes `.git/echo-builder-in-progress.d/` automatically.
+
+The next founder action is to read the run log and decide: re-invoke the wrapper (whose atomic-claim reconciliation path resumes the same item via `claimed_by` match), or escalate to a different builder binding via direct skill loading.
+
+### `backlog/task-state/<task-id>/builder.md` writer contract (047 AC3)
+
+The codex-builder writes a `builder.md` pointer for every claim, per the `skills/role-typed-task-state.md` schema (required blocks, hard 120-line body cap, lint enforced by `npm run lint:task-state`). **Single-owner invariant:** `builder.md` has exactly one writer for the duration of a claim (this codex-builder instance) — no concurrent writers exist, so the file uses plain `git add` + `git commit` + `git push`. **No CAS, no blob-lease helper.**
+
+`tools/task-state/push-round-state.sh` is hardcoded to `round-state.md` (`PATH_REL=backlog/task-state/${TASK_ID}/round-state.md`) and intentionally NOT generalized in 047 scope. Calling it for `builder.md` would clobber any in-flight `round-state.md` writes by the watcher. File a separate spec if a future single-owner pointer needs CAS.
+
+**Required blocks** (same five-heading shape as other pointers; `current_round:` is NOT applicable to builder lifecycle and is omitted):
+
+- `## current_thesis` — the operative frame for this attempt
+- `## locked_decisions` — the AC list as locked at claim time (and any AC-clarifying decisions taken since)
+- `## open_questions` — anything the builder will defer to founder; empty bullet list if none
+- `## dont_touch` — out-of-scope-per-spec; mirror the item's "Out of Scope (Don't Drift)" section
+- `## canonical_anchors` — `spec:` (required) + `reviews:` (optional) per the schema
+
+**When the codex-builder writes** (every moment uses the same write mechanism below):
+
+| Moment | What | Body content |
+|---|---|---|
+| Atomic claim (the `ready/` → `claimed/` op) | Initial write — same commit as the claim, OR as the very next commit | `current_thesis: "claim of <id>"`; AC list locked; `open_questions:` populated from anything that will be deferred; `canonical_anchors:` to the spec path |
+| Milestone commits (per "Step D" run-log writes) | Update `open_questions` + `locked_decisions` if anything shifts | Same five blocks; updated bullets |
+| Move to `pending_review/` (completion or escalation) | Final write | `current_thesis: "<id> complete, ready for review"` OR `"<id> escalated: <one-line reason>"`; `canonical_anchors:` to the spec, the branch name, and the run-log path |
+
+**Write mechanism (every moment):**
+
+```bash
+git add backlog/task-state/<task-id>/builder.md
+git commit -m "builder: <task-id> <milestone description>"
+git push origin <branch-or-main>
+```
+
+The initial-on-claim and final-on-handoff writes land on `main` (the main repo, where backlog state changes are coordinated). Milestone writes during the build land on `agent/<slug>` (the worktree branch) and are visible via the branch on origin. After merge, they land on `main` via `/merge-and-cleanup`.
+
+**Why direct commit (no CAS) is safe.** Per `skills/role-typed-task-state.md` writer-responsibilities, `builder.md`'s single owner is the builder role bound to the current binding for the duration of the claim. The atomic-claim lock (frontmatter `claimed_by` on main) plus the local wrapper lockfile (`.git/echo-builder-in-progress.d/`) together prevent any second writer from existing. The CAS protocol applies to `round-state.md` because it has two concurrent writers (watcher post-combine + strategist between rounds); `builder.md` does not.
+
+### Other bindings
+
+Claude Code (in-session via `/process-backlog`) and Cursor's Claude (in-session via the same skill) execute this protocol by direct skill loading — no wrapper. The codex wrapper exists because `codex exec` is a CLI binary that reads its prompt from stdin; Claude Code and Cursor's Claude read skills natively through their tool surface.
