@@ -1484,6 +1484,14 @@ href="#pdt-strategist-cross-tool-friction-synthesis-claude-reading-codexs-workin
 id="toc-pdt-strategist-cross-tool-friction-synthesis-claude-reading-codexs-working-notes">2026-05-13
 16:25 PDT — strategist cross-tool friction synthesis (claude reading
 codex’s working notes)</a></li>
+<li><a href="#pdt-session-resume-after-clear-claude-strategist"
+id="toc-pdt-session-resume-after-clear-claude-strategist">2026-05-13
+16:30 PDT — session resume after /clear (claude strategist)</a></li>
+<li><a
+href="#pdt-closed-loop-event-codex-reads-prior-codex-strategist-via-echo-informal-cross-tool-consult"
+id="toc-pdt-closed-loop-event-codex-reads-prior-codex-strategist-via-echo-informal-cross-tool-consult">2026-05-13
+16:45 PDT — closed-loop event: codex reads prior codex strategist via
+ECHO (informal cross-tool consult)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -14623,6 +14631,105 @@ discuss?” type queries, the user-visible cluster split is mild friction
 cluster. Filed as observation; not 046 scope.</li>
 <li><strong>Conjecture:</strong> (none — observations only per
 dogfooding-journal discipline)</li>
+</ul>
+<h3 id="pdt-session-resume-after-clear-claude-strategist">2026-05-13
+16:30 PDT — session resume after /clear (claude strategist)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder /cleared the session, then asked
+“use echo and retrieve session from last session to fully understand
+where we left off.”</li>
+<li><strong>Tool and query inputs:</strong>
+<ol type="1">
+<li><code>find_clusters(repo_path=/Users/zhenye/Desktop/Project_echo)</code>
+— no-args lookback, defaulted to 2026-05-13T19:30Z→23:30Z (4h
+cluster-gap window).</li>
+<li><code>get_atoms(49 ids from rank-1 cluster, prefer=newest_first, format=minimal)</code>
+— returned 7 newest atoms in budget; 42 prefix-dropped as designed.</li>
+<li><code>get_atoms(13 ids from rank-2 codex cluster, prefer=newest_first, format=minimal, fields=[id,source,timestamp,content,truncations])</code>
+— returned 11 atoms in budget; 2 dropped.</li>
+</ol></li>
+<li><strong>Returned shape:</strong> 2 clusters in 4h window. Rank-1
+<code>ctx_c55a4861</code> “work on Project_echo” (98 atoms total, 59 git
++ 41 claude_code, 20:00Z→23:27Z) — the 045 ship cycle: skills relocation
+merge (<code>6d29f51</code>), /review-pending sidecar
+(<code>2fc7653</code>), /merge-and-cleanup with reconciliation
+(<code>4f94a7e</code>→<code>ad5ba68</code>), BACKLOG update
+(<code>50fd8b7</code>), strategist friction-synthesis journal commit
+(<code>8e05396</code>). Rank-2 <code>ctx_a90b249c</code> “echo_wiki” (13
+atoms, codex-only, 20:21Z→23:17Z) — codex’s reviewer-tick activity for
+044 R2-R3 and 045 R1-R2, plus a late strategist exchange where founder
+asked codex about reverse-direction agent invocation (codex strategist
+proposed <code>046-role-slot-agnostic-orchestration</code> but deferred
+per friction-first).</li>
+<li><strong>Sources:</strong>
+<code>git:/Users/zhenye/Desktop/Project_echo</code> (59 atoms),
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/...</code>
+(41 claude_code atoms incl. subagent),
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/13/...</code> (13 codex
+atoms across 7 distinct session files). No <code>fs:</code>
+workspace-storage capture from Cursor — Cursor not active in this 4h
+window.</li>
+<li><strong>Verdict:</strong> ✅ right — the no-args resume correctly
+surfaced the 045 ship cycle as rank-1 with <code>has_open_loop</code> +
+<code>recent_activity</code> + <code>dense</code> rank reasons. The 8
+open_loop_hints were all <code>resolved: true</code>, matching the
+actual state (045 shipped, working tree clean, backlog pipeline
+empty).</li>
+<li><strong>Note:</strong> <code>find_clusters</code> no-args 4h window
+happened to align perfectly with the entire 045 ship cycle (~3.5h
+elapsed). Confirmed working-tree-clean state matches journal narrative —
+no surprises waiting in
+<code>backlog/{ready,claimed,pending_review}/</code>.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt-closed-loop-event-codex-reads-prior-codex-strategist-via-echo-informal-cross-tool-consult">2026-05-13
+16:45 PDT — closed-loop event: codex reads prior codex strategist via
+ECHO (informal cross-tool consult)</h3>
+<ul>
+<li><strong>Source agent:</strong> claude strategist (orchestrating);
+codex strategist (consulting; made the MCP calls)</li>
+<li><strong>Trigger:</strong> Founder asked claude to trigger codex for
+a second informal consult on 046 scoping, with explicit instruction:
+“ask codex to use echo to retrieve context from other codex strategist.”
+Founder framed it: “if codex reviewer is able to read context from other
+codex strategist this is truly a small magical moment because the
+context has officially become a closed loop.”</li>
+<li><strong>Query inputs (codex side, ECHO MCP):</strong>
+<ol type="1">
+<li><code>find_clusters(since='2026-05-13T20:00:00', until='2026-05-13T23:30:00', repo_path='/Users/zhenye/Desktop/Project_echo')</code>
+— timezone-qualified call, returned 0 clusters (codex noted timezone
+normalization as a possible cause).</li>
+<li><code>find_clusters(...)</code> retry with adjusted timestamps +
+<code>search_memories(source_app='codex', since='2026-05-13T22:00:00')</code>
+— search hit the prior codex strategist session.</li>
+<li><code>get_atom(&lt;atom from prior session 019e239e-d270-71c0-be02-c55a53103bd5&gt;)</code>
+— verbatim retrieval of the proposal exchange.</li>
+</ol></li>
+<li><strong>Returned:</strong> Codex successfully retrieved its prior
+strategist self’s load-bearing sentence: “The missing abstraction is:
+<strong>roles are slots, clients are bindings</strong>.” Used it to
+confirm the claude+codex collapse (046 = role-slot-agnostic viewed from
+friction side) matches prior-codex intent.</li>
+<li><strong>Sources:</strong> prior session =
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/13/rollout-2026-05-13T16-14-31-019e239e-d270-71c0-be02-c55a53103bd5.jsonl</code>
+(codex strategist). Cross-session within same vendor; reached only via
+ECHO substrate. No file copy, no founder copy-paste, no claude relay of
+the text.</li>
+<li><strong>Verdict:</strong> ✅ right — the canonical closed-loop
+demonstration: SAME vendor, DIFFERENT session, mediated entirely by
+ECHO. Founder’s framing was correct — this is the cross-vendor wedge
+collapsed to its smallest reproducible case (codex → codex via ECHO). If
+it works within-vendor across sessions, the cross-vendor case is the
+same operation with a different source_app filter.</li>
+<li><strong>Note:</strong> <code>find_clusters</code> initially returned
+0 — likely a timezone-string normalization issue.
+<code>search_memories</code> + <code>get_atom</code> was the recovery
+path. This matches Codex’s own felt-friction profile from earlier: “the
+friction isn’t volume — it’s that every actor has to rediscover which
+context matters.” The recovery path took 2 retries (within budget) but
+the discoverability gap is filed as observation.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
 </html>

@@ -3144,3 +3144,30 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** ✅ right — exactly the cross-vendor wedge in action. My Claude Code-side friction list ("two-commit merge pattern", "subagent prompt-token cost", "bash cwd non-persistence") is complementary to codex's ("FETCH_HEAD ambiguity", "arm64 Python mismatch", "reviewer-tick-vs-reviewer-tick race"). Neither tool sees the other's frictions in isolation; ECHO synthesizes both. The founder can ask either strategist for friction without copy-pasting between tools.
 - **Note:** The find_clusters result has codex and claude_code in SEPARATE clusters (rank-1 = claude_code+git, rank-2 = codex-only) despite covering the same time window + same project. The clustering algo splits by source. For "what did BOTH strategists discuss?" type queries, the user-visible cluster split is mild friction — would prefer either a co-occurrence flag OR an explicit cross-source cluster. Filed as observation; not 046 scope.
 - **Conjecture:** (none — observations only per dogfooding-journal discipline)
+
+### 2026-05-13 16:30 PDT — session resume after /clear (claude strategist)
+
+- **Trigger:** Founder /cleared the session, then asked "use echo and retrieve session from last session to fully understand where we left off."
+- **Tool and query inputs:**
+  1. `find_clusters(repo_path=/Users/zhenye/Desktop/Project_echo)` — no-args lookback, defaulted to 2026-05-13T19:30Z→23:30Z (4h cluster-gap window).
+  2. `get_atoms(49 ids from rank-1 cluster, prefer=newest_first, format=minimal)` — returned 7 newest atoms in budget; 42 prefix-dropped as designed.
+  3. `get_atoms(13 ids from rank-2 codex cluster, prefer=newest_first, format=minimal, fields=[id,source,timestamp,content,truncations])` — returned 11 atoms in budget; 2 dropped.
+- **Returned shape:** 2 clusters in 4h window. Rank-1 `ctx_c55a4861` "work on Project_echo" (98 atoms total, 59 git + 41 claude_code, 20:00Z→23:27Z) — the 045 ship cycle: skills relocation merge (`6d29f51`), /review-pending sidecar (`2fc7653`), /merge-and-cleanup with reconciliation (`4f94a7e`→`ad5ba68`), BACKLOG update (`50fd8b7`), strategist friction-synthesis journal commit (`8e05396`). Rank-2 `ctx_a90b249c` "echo_wiki" (13 atoms, codex-only, 20:21Z→23:17Z) — codex's reviewer-tick activity for 044 R2-R3 and 045 R1-R2, plus a late strategist exchange where founder asked codex about reverse-direction agent invocation (codex strategist proposed `046-role-slot-agnostic-orchestration` but deferred per friction-first).
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo` (59 atoms), `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/...` (41 claude_code atoms incl. subagent), `fs:/Users/zhenye/.codex/sessions/2026/05/13/...` (13 codex atoms across 7 distinct session files). No `fs:` workspace-storage capture from Cursor — Cursor not active in this 4h window.
+- **Verdict:** ✅ right — the no-args resume correctly surfaced the 045 ship cycle as rank-1 with `has_open_loop` + `recent_activity` + `dense` rank reasons. The 8 open_loop_hints were all `resolved: true`, matching the actual state (045 shipped, working tree clean, backlog pipeline empty).
+- **Note:** `find_clusters` no-args 4h window happened to align perfectly with the entire 045 ship cycle (~3.5h elapsed). Confirmed working-tree-clean state matches journal narrative — no surprises waiting in `backlog/{ready,claimed,pending_review}/`.
+- **Conjecture:** (none — observations only)
+
+### 2026-05-13 16:45 PDT — closed-loop event: codex reads prior codex strategist via ECHO (informal cross-tool consult)
+
+- **Source agent:** claude strategist (orchestrating); codex strategist (consulting; made the MCP calls)
+- **Trigger:** Founder asked claude to trigger codex for a second informal consult on 046 scoping, with explicit instruction: "ask codex to use echo to retrieve context from other codex strategist." Founder framed it: "if codex reviewer is able to read context from other codex strategist this is truly a small magical moment because the context has officially become a closed loop."
+- **Query inputs (codex side, ECHO MCP):**
+  1. `find_clusters(since='2026-05-13T20:00:00', until='2026-05-13T23:30:00', repo_path='/Users/zhenye/Desktop/Project_echo')` — timezone-qualified call, returned 0 clusters (codex noted timezone normalization as a possible cause).
+  2. `find_clusters(...)` retry with adjusted timestamps + `search_memories(source_app='codex', since='2026-05-13T22:00:00')` — search hit the prior codex strategist session.
+  3. `get_atom(<atom from prior session 019e239e-d270-71c0-be02-c55a53103bd5>)` — verbatim retrieval of the proposal exchange.
+- **Returned:** Codex successfully retrieved its prior strategist self's load-bearing sentence: "The missing abstraction is: **roles are slots, clients are bindings**." Used it to confirm the claude+codex collapse (046 = role-slot-agnostic viewed from friction side) matches prior-codex intent.
+- **Sources:** prior session = `fs:/Users/zhenye/.codex/sessions/2026/05/13/rollout-2026-05-13T16-14-31-019e239e-d270-71c0-be02-c55a53103bd5.jsonl` (codex strategist). Cross-session within same vendor; reached only via ECHO substrate. No file copy, no founder copy-paste, no claude relay of the text.
+- **Verdict:** ✅ right — the canonical closed-loop demonstration: SAME vendor, DIFFERENT session, mediated entirely by ECHO. Founder's framing was correct — this is the cross-vendor wedge collapsed to its smallest reproducible case (codex → codex via ECHO). If it works within-vendor across sessions, the cross-vendor case is the same operation with a different source_app filter.
+- **Note:** `find_clusters` initially returned 0 — likely a timezone-string normalization issue. `search_memories` + `get_atom` was the recovery path. This matches Codex's own felt-friction profile from earlier: "the friction isn't volume — it's that every actor has to rediscover which context matters." The recovery path took 2 retries (within budget) but the discoverability gap is filed as observation.
+- **Conjecture:** (none — observations only)
