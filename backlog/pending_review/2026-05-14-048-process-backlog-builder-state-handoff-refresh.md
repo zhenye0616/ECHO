@@ -28,9 +28,23 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-14T09:17:15Z"
 branch: "agent/process-backlog-builder-state-handoff-refresh"
 worktree: "~/Desktop/Project_echo--process-backlog-builder-state-handoff-refresh"
-head_sha: ""
+head_sha: "f8869ed51000749e72828397d82665bcb41812b9"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All 5 ACs implemented on agent/process-backlog-builder-state-handoff-refresh @ f8869ed.
+  AC1: tools/task-state/patch-builder-state.py — stdlib-only Python helper that patches
+  existing builder.md (frontmatter last_updated + handoff_* metadata; patcher-owned
+  current_thesis / open_questions marker blocks; schema-compliant canonical_anchors).
+  locked_decisions + dont_touch preserved byte-for-byte. Missing pointer = no-op; malformed
+  pointer = exit non-zero (no silent rewrite). AC2: skills/process-backlog.md adds named
+  E2.5 substep before the move-to-pending_review commit; idempotent; lint failure is a
+  hard stop. AC3: codex 'Move to pending_review' table row now defers to E2.5;
+  tools/sync-skills.sh --check clean. AC4: docs/AGENT_INSTRUCTIONS.md step 13 mirrors the
+  protocol. AC5: tests/task-state/patch-builder-state.test.ts (12 cases) +
+  tests/backlog/process-backlog-skill.test.ts (5 cases); npm test 900/900 pass; npm run lint,
+  npm run typecheck, sync-skills --check all clean. This handoff itself dogfoods E2.5: the
+  build's own builder.md is staged in this commit with the lifecycle marker refreshed and
+  canonical_anchors.spec rewritten to backlog/pending_review/.
 review_notes: ""
 ---
 
