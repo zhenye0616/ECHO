@@ -1553,6 +1553,9 @@ id="toc-pdt-cursor-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
 <li><a href="#pdt---codex-r1-on-047-codex-as-builder-binding-adapter"
 id="toc-pdt---codex-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
 22:52 PDT - Codex R1 on 047 codex-as-builder binding adapter</a></li>
+<li><a href="#pdt-cursor-r2-on-047-codex-as-builder-binding-adapter"
+id="toc-pdt-cursor-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:58 PDT — Cursor R2 on 047 codex-as-builder binding adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15448,6 +15451,46 @@ entry.</li>
 the <code>push-round-state.sh</code> mismatch, then added two
 builder-specific implementation blockers that the code paths surfaced:
 missing file-scope metadata and non-atomic lock/test wording.</li>
+</ul>
+<h3
+id="pdt-cursor-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:58 PDT — Cursor R2 on 047 codex-as-builder binding adapter</h3>
+<ul>
+<li><strong>Source agent:</strong> Cursor’s Claude</li>
+<li><strong>Trigger:</strong> Execute one Cursor-side review queue tick
+(<code>MY_REVIEWER=cursor</code>); first pending response was
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>cursor</code> with no <code>cursor.md</code> and no
+<code>combined.md</code>; read R2 focus_hints, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>
+at <code>966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8</code>, and
+spot-checked <code>skills/process-backlog.md</code> at that SHA for
+<code>agent/&lt;slug&gt;</code> branch push semantics vs AC3. No
+<code>mcp__echo__*</code> / <code>mcp__echo-memory__*</code> calls this
+tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/cursor.md</code>
+as <code>2cc4722</code>, verdict <code>proceed_after_patches</code>,
+headline finding: Definition of Done still says <strong>two</strong>
+green test cases while AC4 defines <strong>three</strong>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8</code>; request path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/cursor.md</code>;
+<code>git show 966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8:skills/process-backlog.md</code>
+(branch/worktree excerpts); no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — one review per tick, SHA-pinned
+artifact, validated before link, response pushed before this journal
+entry.</li>
+<li><strong>Note:</strong> R2 resolves prior AC3/CAS tension; remaining
+Cursor-visible gaps are editorial alignment (DoD vs AC4, R4 vs AC5) and
+an AC8 typo in the request focus_hints only.</li>
+<li><strong>Conjecture:</strong> (none — observations only)</li>
 </ul>
 </body>
 </html>

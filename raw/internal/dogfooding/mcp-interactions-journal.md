@@ -3309,3 +3309,14 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Sources:** Artifact SHA `4cce421586cd05f1d7d31b2e8871886f7c1ef112`; request path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md`; response path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/codex.md`; local code/spec paths `tools/task-state/push-round-state.sh`, `skills/process-backlog.md`, `skills/role-typed-task-state.md`, `backlog/README.md`, `tools/review-queue/_run_reviewer.sh`, `tests/task-state/push-round-state.test.ts`; no ECHO MCP reads.
 - **Verdict:** ✅ right — one Codex review was written for the requested round, anchored to the requested spec SHA, validated before link, committed and pushed before this observation-only journal entry.
 - **Note:** Codex independently converged with Cursor on the `push-round-state.sh` mismatch, then added two builder-specific implementation blockers that the code paths surfaced: missing file-scope metadata and non-atomic lock/test wording.
+
+### 2026-05-13 22:58 PDT — Cursor R2 on 047 codex-as-builder binding adapter
+
+- **Source agent:** Cursor's Claude
+- **Trigger:** Execute one Cursor-side review queue tick (`MY_REVIEWER=cursor`); first pending response was `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md`.
+- **Query inputs:** Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `cursor` with no `cursor.md` and no `combined.md`; read R2 focus_hints, reviewer schema, pinned artifact `backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md` at `966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8`, and spot-checked `skills/process-backlog.md` at that SHA for `agent/<slug>` branch push semantics vs AC3. No `mcp__echo__*` / `mcp__echo-memory__*` calls this tick.
+- **Returned:** Wrote, pre-link validated, committed, and pushed `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/cursor.md` as `2cc4722`, verdict `proceed_after_patches`, headline finding: Definition of Done still says **two** green test cases while AC4 defines **three**.
+- **Sources:** Artifact SHA `966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8`; request path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/request.md`; response path `backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r2/cursor.md`; `git show 966ef059e71dd6ac5a6d29bb7f1d7c6575ed53f8:skills/process-backlog.md` (branch/worktree excerpts); no ECHO MCP reads.
+- **Verdict:** ✅ right — one review per tick, SHA-pinned artifact, validated before link, response pushed before this journal entry.
+- **Note:** R2 resolves prior AC3/CAS tension; remaining Cursor-visible gaps are editorial alignment (DoD vs AC4, R4 vs AC5) and an AC8 typo in the request focus_hints only.
+- **Conjecture:** (none — observations only)
