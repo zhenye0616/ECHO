@@ -1,11 +1,14 @@
 ---
 id: 2026-05-13-046-context-fatigue-via-role-typed-state
 title: Context fatigue via role-typed task-state — role-slot-agnostic orchestration viewed from the friction side (LAST friction-removal spec before vendor-agnostic pivot)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1.5-2d
 created: 2026-05-13
 requested_reviewers: ["codex", "codex-ops"]
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-14T04:39:58Z"
+branch: "agent/context-fatigue-via-role-typed-state"
 spec_refs:
   - backlog/complete/2026-05-13-045-queue-reliability-friction-cluster.md  # Direct friction-cluster parent. 045 closed reviewer-queue + sidecar-handoff frictions; 046 closes the umbrella friction those individual fixes were chasing — every cold-start actor pays a full-corpus reload tax because role state has no canonical compact home.
   - raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md  # The decision that skills/ is the cross-tool collaboration protocol (not Claude-Code-specific). Frames roles-as-protocol-slots. 046 operationalizes that frame.
