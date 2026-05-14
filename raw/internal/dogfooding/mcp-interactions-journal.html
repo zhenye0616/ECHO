@@ -1550,6 +1550,9 @@ reference)</a></li>
 <li><a href="#pdt-cursor-r1-on-047-codex-as-builder-binding-adapter"
 id="toc-pdt-cursor-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
 22:49 PDT — Cursor R1 on 047 codex-as-builder binding adapter</a></li>
+<li><a href="#pdt---codex-r1-on-047-codex-as-builder-binding-adapter"
+id="toc-pdt---codex-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:52 PDT - Codex R1 on 047 codex-as-builder binding adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15393,6 +15396,58 @@ entry.</li>
 for IDE-side execution; the CAS-helper mismatch is spec-internal and
 should be reconciled before a builder implements AC3 literally.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-047-codex-as-builder-binding-adapter">2026-05-13
+22:52 PDT - Codex R1 on 047 codex-as-builder binding adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending response was
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read R1 request focus_hints, reviewer schema,
+pinned artifact
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>
+at <code>4cce421586cd05f1d7d31b2e8871886f7c1ef112</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/task-state/push-round-state.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/role-typed-task-state.md</code>,
+<code>backlog/README.md</code>, existing task-state tests, and
+<code>codex exec --help</code>. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/codex.md</code>
+as <code>ae38a49</code>, verdict <code>pushback</code>, findings: AC3
+points builders at a helper that cannot write <code>builder.md</code>;
+the item omits <code>files_to_modify</code> despite the builder
+protocol’s write gate; lock acquisition needs an atomic primitive and
+overlapping-run test; the codex stub test must assert the wrapper
+contract, not only stub-owned git operations.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>4cce421586cd05f1d7d31b2e8871886f7c1ef112</code>; request path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/request.md</code>;
+response path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r1/codex.md</code>;
+local code/spec paths <code>tools/task-state/push-round-state.sh</code>,
+<code>skills/process-backlog.md</code>,
+<code>skills/role-typed-task-state.md</code>,
+<code>backlog/README.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tests/task-state/push-round-state.test.ts</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> ✅ right — one Codex review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> Codex independently converged with Cursor on
+the <code>push-round-state.sh</code> mismatch, then added two
+builder-specific implementation blockers that the code paths surfaced:
+missing file-scope metadata and non-atomic lock/test wording.</li>
 </ul>
 </body>
 </html>
