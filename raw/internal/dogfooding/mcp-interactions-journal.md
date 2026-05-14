@@ -3567,3 +3567,12 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Verdict:** right - one Codex review was written for the requested round, anchored to the requested spec SHA, validated before link, committed and pushed before this observation-only journal entry.
 - **Note:** The queue response commit had to be made from a clean temporary clone because the production worktree had an unrelated unresolved conflict in `backlog/task-state/2026-05-14-048-process-backlog-builder-state-handoff-refresh/builder.md`; the conflicted worktree was left untouched.
 - **Conjecture:** (none - observations only per dogfooding-journal discipline)
+
+### 2026-05-14 13:59 PDT - Codex-ops R6 on 049 codex skill adapter
+
+- **Trigger:** Execute one `codex-ops` review queue tick (`MY_REVIEWER=codex-ops`); first pending codex-ops response was `backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/request.md`.
+- **Query inputs:** ZERO ECHO MCP calls during this reviewer tick. Pulled `origin/main`; scanned `backlog/reviews/**/r*/request.md` for rounds requesting `codex-ops` with no `codex-ops.md` and no `combined.md`; read the R6 request, reviewer schema, response helper, current response examples, and the pinned artifact `backlog/ready/2026-05-14-049-codex-skill-adapter.md` at `dc38b684a4397b44e422eda091b4673f577092e5`.
+- **Returned:** Wrote, pre-link validated, committed, and pushed `backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/codex-ops.md` as `73044dc`, verdict `proceed_after_patches`, findings: HIGH codex fan-out needs strict-shell-safe rc capture and parent wait draining; MEDIUM install locks need stale-lock recovery or explicit recovery diagnostics.
+- **Sources:** Artifact SHA `dc38b684a4397b44e422eda091b4673f577092e5`; request path `backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/request.md`; committed response path `backlog/reviews/2026-05-14-049-codex-skill-adapter/r6/codex-ops.md`; schema/helper paths listed in Query inputs; no ECHO MCP reads.
+- **Verdict:** right - one codex-ops review was written for the requested round, anchored to the requested spec SHA, validated before link, committed and pushed before this observation-only journal entry.
+- **Note:** R6 resolves the R5 symlink-lock and stale-staging points, but the documented codex fan-out still needs explicit failure collection semantics for unattended shell execution, and the new lock directory can itself become the next permanent install blocker after SIGKILL or power loss.
