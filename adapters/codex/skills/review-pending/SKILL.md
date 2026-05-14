@@ -1,5 +1,14 @@
 ---
-description: Review every item in backlog/pending_review/ in parallel. Spawns one code-reviewer subagent per item; synthesizes a per-item verdict + fixup list + merge-conflict preview; writes a sidecar review plan next to each item; stops for human validation. Read-only EXCEPT for committing+pushing the per-item review sidecars (the skill's deliverable) — closes the /review-pending → /merge-and-cleanup handoff gap per 045 AC6.
+name: review-pending
+description: Review every item in backlog/pending_review/ in parallel. Spawns one
+  code-reviewer subagent per item; synthesizes a per-item verdict + fixup list + merge-conflict
+  preview; writes a sidecar review plan next to each item; stops for human validation.
+  Read-only EXCEPT for committing+pushing the per-item review sidecars (the skill's
+  deliverable) — closes the /review-pending → /merge-and-cleanup handoff gap per 045
+  AC6.
+metadata:
+  short-description: Review every item in backlog/pending_review/ in parallel. Spawns
+    one
 ---
 
 You are reviewing the agent's pending work for the founder. The founder runs this command in the morning (or whenever pending_review has items) to get a structured verdict before deciding what to merge.

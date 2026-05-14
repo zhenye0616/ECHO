@@ -56,6 +56,10 @@ For any strategic or implementation work in this repo, read:
 
 The wiki is readable context, but do not treat planned ideas as shipped reality. Per `CLAUDE.md`, product wiki pages document shipped or committed reality; active specs live in backlog items.
 
+### Codex skill discovery
+
+If you are running as a codex binding and want ECHO's protocol skills (currently `process-backlog` and `review-pending` — per 049's in-scope set; more land as future specs add codex binding-specific notes) to appear in your `/<name>` discovery, run `tools/install-codex-adapters.sh` once. Default is **symlink mode**, which is dev-friendly: edits to canonical `skills/<name>.md` propagate to `~/.codex/skills/<name>/SKILL.md` on the next `tools/sync-skills.sh` run, with no re-install needed. Pass `--copy` if codex session-start discovery on your platform does not resolve symlinks — BUT note: **`--copy` mode installs are SNAPSHOTS**. Future `tools/sync-skills.sh` runs update `adapters/codex/skills/*` in the repo but do NOT update `~/.codex/skills/*`. If you use `--copy`, you MUST re-run `tools/install-codex-adapters.sh --copy` after every `tools/sync-skills.sh` to refresh the installed skills. `tools/sync-skills.sh --check` emits a stderr WARNING (not an error) when an installed `--copy` adapter's content hash disagrees with the repo's current canonical, so a stale `--copy` install does not silently rot.
+
 ## Role Discipline
 
 ECHO uses three roles:

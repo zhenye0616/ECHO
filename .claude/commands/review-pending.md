@@ -35,9 +35,16 @@ fi
 echo "Reviewing ${#ITEMS[@]} item(s): ${ITEMS[*]##*/}"
 ```
 
-## Step B — Spawn one code-reviewer subagent per item, in parallel
+## Step B — Dispatch one code-review process per item, in parallel
 
-For each item, dispatch a `superpowers:code-reviewer` subagent **in the same message** so they run concurrently. Each subagent gets a self-contained prompt that does not depend on conversation context.
+For each item, dispatch one independent code-review process **concurrently** using your binding's subagent dispatch primitive. Each process must run with a self-contained prompt that does not depend on conversation context — context-shared dispatch defeats parallelism and pollutes per-item evidence.
+
+Concrete dispatch mechanisms differ by binding (see "Binding-specific notes" sections below). The contract those mechanisms must satisfy:
+
+1. Per-item isolation — each process operates on exactly one pending_review item; its writeable surface is scoped to that item's existing per-item worktree, not the main repo or other items' worktrees.
+2. Parallelism — all processes start before any completes.
+3. Capture-and-survive — each process emits its review into a discrete, durably-addressable artifact (file or returned content). The orchestrator must be able to inspect the artifact even if the process exited non-zero.
+4. Concurrency cap — fan-out is bounded (N ≤ 4 on the founder's machine) to avoid CPU saturation when many items are pending.
 
 ### Per-item prompt template
 
@@ -62,9 +69,98 @@ The prompt must include all of:
   5. Cross-cut conflicts — what this branch will collide with on merge to current main (read main's versions of files in `files_to_modify` to predict).
   6. Bugs/risks with `file:line` refs.
 - **Verification.** Run `npm test`, `npm run lint`, `npm run typecheck` inside the worktree (which we just confirmed is at the recorded head_sha). Don't trust agent_notes' test counts at face value — re-run, report observed.
-- **What to return.** A structured review with sections: Verdict (one of `merge as-is` | `merge with founder fixups` | `redo before merge` | `block`), Acceptance status table, Drift findings, Design-choice judgments, Bugs/risks, Merge-conflict preview, Suggested fixups (split into pre-merge punch list + non-blocking follow-ups). Aim for under 1000 words.
+- **What to return.** A structured review (markdown) with sections — exact headings required so the orchestrator can extract them by regex match: **`Verdict`** (one of `merge as-is` | `merge with founder fixups` | `redo before merge` | `block`), **`Acceptance status`**, **`Drift findings`**, **`Design-choice judgments`**, **`Bugs/risks`**, **`Merge-conflict preview`**, **`Suggested fixups`** (split into pre-merge punch list + non-blocking follow-ups), **`Test counts observed`**. Aim for under 1000 words.
 
-Spawn all subagents in a single message with multiple Agent tool calls — do not serialize.
+Dispatch all per-item processes concurrently — do not serialize them.
+
+## Binding-specific notes — Claude Code
+
+When this skill executes inside a Claude Code session:
+
+- Dispatch primitive: spawn one `superpowers:code-reviewer` subagent per item via the `Agent` tool, with all calls in a single message so subagents run in parallel.
+- Each subagent runs in Claude Code's tool-use sandbox; `npm test`, `npm run lint`, `npm run typecheck` run inside its respective worktree directly.
+- Per-item review markdown is returned as the subagent's final message; the orchestrator (the parent Claude Code session) consumes it directly from the tool result — no temp files are needed.
+- Synced adapter: `.claude/commands/review-pending.md` (byte-identical to canonical `skills/review-pending.md`).
+
+## Binding-specific notes — codex
+
+When this skill executes inside a codex CLI session, the protocol body above (Step A, the per-item prompt template, Step C–E) is unchanged; codex's dispatch primitive is what differs from Claude Code's. This section is operational guidance specific to that primitive.
+
+### Synced adapter
+
+- `adapters/codex/skills/review-pending/SKILL.md` (tracked in repo; deployed to `~/.codex/skills/review-pending/SKILL.md` via `tools/install-codex-adapters.sh`).
+
+### Sandbox semantics (per-child)
+
+- Each per-item child runs as `codex exec --sandbox workspace-write -C "$WORKTREE" --output-last-message "$RUN_DIR/<item-id>.review.md" - < "$PROMPT"`.
+- `-C "$WORKTREE"` scopes the child's CWD AND its workspace-write surface to its own per-item worktree at `$HOME/Desktop/Project_echo--<slug>/`, NOT the main repo. The per-item worktree is the disjoint write surface each child needs in order to run `npm install` / `npm test` / `npm run lint` / `npm run typecheck` without racing other children. Parallel children CANNOT race each other's writes because worktree paths are disjoint.
+- The main repo (`~/Desktop/Project_echo/`) is OUTSIDE each child's workspace-write surface; per-item sidecar writes happen in the single-threaded orchestrator path (see below), not from children.
+
+### Run-directory + per-child output isolation
+
+- Orchestrator allocates a per-run isolated directory ONCE at fan-out start: `RUN_DIR=$(mktemp -d -t echo-review-pending-XXXXX)` (uses `${TMPDIR:-/tmp}` when `TMPDIR` is unset). Two concurrent `/review-pending` invocations each get their own `RUN_DIR` so per-child output files cannot collide across orchestrators.
+- Each child writes:
+  - The final response → `$RUN_DIR/<item-id>.review.md` via `--output-last-message` (NOT parsed from stdout — see below).
+  - Stdout → `$RUN_DIR/<item-id>.stdout` (diagnostics only).
+  - Stderr → `$RUN_DIR/<item-id>.stderr` (diagnostics only).
+  - Exit code → `$RUN_DIR/<item-id>.rc`.
+- Cleanup is scoped to `RUN_DIR` only: `trap 'rm -rf "$RUN_DIR"' EXIT`. Never a broad glob; another in-flight orchestrator's `RUN_DIR` must be untouched.
+
+### Subprocess wrapping under `set -euo pipefail`
+
+Each per-item child invocation is wrapped so codex's non-zero exit does not terminate the orchestrator before all outputs are durable:
+
+```bash
+(
+  set +e
+  codex exec --sandbox workspace-write -C "$WORKTREE" \
+    --output-last-message "$RUN_DIR/$ITEM_ID.review.md" \
+    - < "$PROMPT" > "$RUN_DIR/$ITEM_ID.stdout" 2> "$RUN_DIR/$ITEM_ID.stderr"
+  echo $? > "$RUN_DIR/$ITEM_ID.rc"
+) &
+PIDS+=( $! )
+```
+
+Parent drains: `for pid in "${PIDS[@]}"; do wait "$pid" || true; done`. The `|| true` prevents `set -e` in the orchestrator from killing it mid-drain when a child's `wait` returns non-zero.
+
+### Why `--output-last-message`, not stdout parsing
+
+codex CLI v0.130.0's stdout interleaves banner + workdir/model metadata + the echoed user prompt + token summary BEFORE the final answer. The per-item prompt contains the same review-section heading names (`Verdict`, `Drift findings`, etc.) as the desired output, so regex extraction from raw stdout would match prompt text as if it were the child's review and silently produce wrong reviews. `--output-last-message` writes ONLY the final response to the named file. Orchestrator parses `<item-id>.review.md` — never `<item-id>.stdout`. Stdout + stderr are kept only as diagnostics, surfaced when a parse fails or `rc≠0`.
+
+### Concurrency cap
+
+Fan-out is bounded by a counting-semaphore gate (`(( running < N ))`) before each child spawn; N ≤ 4 on the founder's machine. Unbounded `&` would saturate CPU on a 10-item review.
+
+### Sidecar write happens in the orchestrator path
+
+Children never write the sidecar. The orchestrator (single-threaded for that step) parses `<item-id>.review.md`, derives `verdict` + structured sections, then writes `backlog/pending_review/<id>.review.md` in the MAIN repo, commits, and pushes via `tools/review-queue/push-with-retry.sh` (same as the Claude Code path). Main-repo writes never race because exactly one orchestrator process performs them.
+
+### Required section headings
+
+Orchestrator extracts the following section headings (level-2 Markdown, `## <heading>`) from each child's `<item-id>.review.md`:
+
+- `Verdict`
+- `Acceptance status`
+- `Drift findings`
+- `Design-choice judgments`
+- `Bugs/risks`
+- `Merge-conflict preview`
+- `Suggested fixups`
+- `Test counts observed`
+
+These match what the Claude Code path's `superpowers:code-reviewer` subagent already produces, so sidecar synthesis (Step C) is binding-agnostic.
+
+### Parse-failure semantics — durable evidence preservation
+
+If the child's review file is missing, OR `rc ≠ 0`, OR any required section heading is absent from the file, the orchestrator MUST:
+
+1. **Preserve evidence first** — copy the child's `<item-id>.{stdout,stderr,review.md}` triple to `raw/internal/queue-errors/<ISO-ts>-review-pending-<item-id>/` BEFORE the `RUN_DIR` cleanup trap fires. This gives the operator a durable pointer to inspect what the child actually produced.
+2. **Log a queue-errors row** that names the specific missing section headings + `rc` + the first 2KB of stderr inline. This is durable in `queue-errors.md` and visible at next-run pre-flight.
+3. **Do not silently drop or substitute defaults.** A child whose review failed parsing is treated as a missing review; the founder gets a "verdict: block (parse failure)" sidecar with a pointer to the preserved evidence directory.
+
+### Dogfooding journaling
+
+Per `CLAUDE.md` "Dogfooding journal discipline", every ECHO MCP call made during a `/review-pending` run is journaled in-the-moment to `raw/internal/dogfooding/mcp-interactions-journal.md` with the 6-field template. The codex orchestrator journals its own calls directly; the codex children journal theirs in-the-moment if they make any (typically they don't — children operate on the worktree filesystem, not MCP).
 
 ## Step C — Synthesize and write per-item sidecar plans
 
@@ -137,10 +233,10 @@ Do not move files. Do not modify the item frontmatter. Do not touch `wiki/`, `do
 ## Failure Modes
 
 - **`pending_review/` is empty** → exit 0 with "nothing to review."
-- **Item's worktree directory is missing** → flag in the summary as "worktree gone — already merged?" and skip that item. Don't spawn a subagent for it.
+- **Item's worktree directory is missing** → flag in the summary as "worktree gone — already merged?" and skip that item. Don't dispatch a code-review process for it.
 - **Subagent returns verdict `redo before merge`** → write the sidecar, but the summary should highlight that this item is *not* a candidate for `/merge-and-cleanup`. The founder should escalate back to the agent who wrote the work (typically: `git mv` the item back to `claimed/`, message the agent's run log).
 - **Subagent returns verdict `block`** → surface the open questions prominently. The founder needs to make a decision before merge can proceed.
-- **A subagent fails internally (timeout, error)** → report which item failed, don't attempt to merge it. Founder can re-run `/review-pending <id>` for just that one.
+- **A subagent fails internally (timeout, error)** → report which item failed, don't attempt to merge it. Founder can re-run `/review-pending <id>` for just that one. For codex children specifically: parse-failure evidence preservation (above) gives the founder the child's stdout/stderr/review.md triple at `raw/internal/queue-errors/...` even if the orchestrator's `RUN_DIR` is gone.
 - **Multiple worktrees + parallel sessions** → harmless; each subagent reads its own worktree, no shared state.
 
 ## What You Must NOT Do
@@ -159,4 +255,4 @@ Do not move files. Do not modify the item frontmatter. Do not touch `wiki/`, `do
 - The exact follow-up command is named.
 - No items moved between stages, no item frontmatter modified, no branches touched. The only state changes are the sidecar commits themselves — which `/merge-and-cleanup`'s pre-flight will see as a clean tree.
 
-Now begin. Resolve the item list, dispatch the subagents in parallel, and synthesize.
+Now begin. Resolve the item list, dispatch one code-review process per item in parallel using your binding's primitive, and synthesize.
