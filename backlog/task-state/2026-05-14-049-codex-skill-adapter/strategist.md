@@ -2,12 +2,12 @@
 task_id: 2026-05-14-049-codex-skill-adapter
 role: strategist
 writer: claude-strategist
-last_updated: 2026-05-14T21:10:00Z
+last_updated: 2026-05-14T21:25:00Z
 ---
 
 ## current_thesis
 
-Spec 049 at **R6-disposition state**, R7 about to fire. **Cycle has 6 rounds — at the upper bound of reasonable round count.** Decay pattern: R1 7→6 unique 1 HIGH → R2 6→3 unique 2 HIGH → R3 3 findings 1 HIGH → R4 4→3 unique 1 HIGH (verdict divergence pushback/proceed*) → R5 6→4 unique 1 HIGH (divergence pushback/proceed*) → R6 4 findings 2 HIGH (BOTH proceed_after_patches — verdict divergence resolved). Each strategist disposition kept introducing new operational-safety surface; this round R6 verdicts converged for the first time since R3, suggesting decay toward terminal. R6 patches: complete section list for AC2 child output (codex F1 HIGH), `workspace-write` sandbox SCOPED to per-item worktree (codex F2 MED, leverages existing /process-backlog worktree isolation — real architectural improvement, not a workaround), `set +e; echo $? > rc; wait || true` shell wrapping (codex-ops F1 HIGH), pid+timestamp in lock + stale-lock recovery (codex-ops F2 MED). **R7 is the final verification round per cycle budget. If R7 produces ANY new HIGH, escalate to founder** for explicit "continue / simplify / accept-and-claim" decision rather than self-extend to R8+. The pattern of new-surface-per-round is genuine; this spec hit operational complexity that wasn't visible at draft time. Worth retro: was the original spec scope too large? Should --copy mode have been deferred entirely from V1?
+Spec 049 at **R7-disposition state**, R8 about to fire. Cycle now has 7 rounds. R7 escalation to founder fired per documented exit-criterion (R7 produced codex F1 HIGH — real builder-blocking bug about `codex exec` stdout shape vs `--output-last-message` flag); **founder explicitly authorized continuing with `--copy` mode kept** + applying R7 patches inline. R7 patches: `--output-last-message` for child final-response file (codex F1 HIGH — real spec bug, would have broken builder), stale-lock recovery test added (codex F2 MED), parse-failure-evidence-preserved-outside-RUN_DIR-cleanup (codex-ops F1 MED), corrupted-timestamp fallback to mtime under set-e-safe read (codex-ops F2 MED), copy-mode stale-after-sync detection via `synced_from_commit` sentinel + `--check` warning (codex-ops F3 MED). **R8 is final verification.** If R8 returns clean (no HIGH, both proceed*), CLAIM-READY. If R8 produces another HIGH, escalate to founder again with hard "we're at 8 rounds; pick simplify-or-accept-or-claim" decision. Verdict-shape signal positive: R6 + R7 both `proceed_after_patches` from both reviewers (no pushback for 2 rounds running) — convergence trajectory holds.
 
 ## locked_decisions
 
