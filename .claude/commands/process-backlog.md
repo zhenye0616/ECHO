@@ -193,7 +193,80 @@ ensure_stage "$(basename $ITEM_FILE)" "pending_review"
 #     <one-paragraph summary if work succeeded>
 #     OR
 #     BLOCKED: <specific question> | Tried: <...> | Best guess: <...> | Why escalated: <rule>
+```
+
+### E2.5. Final builder-state refresh (protocol-wide)
+
+This step is the **only canonical implementation site** for keeping
+`backlog/task-state/<task-id>/builder.md` current at handoff. Binding-specific
+sections may reference it, but must NOT duplicate their own final-handoff
+patch logic.
+
+**Detect builder-state scope.** Run this step iff EITHER condition holds:
+
+- the item's frontmatter `task_state_ref:` is non-empty, OR
+- `backlog/task-state/<task-id>/builder.md` already exists on disk.
+
+If neither holds, skip ahead to E3's final commit; nothing to refresh.
+
+**Choose the outcome.** Use `--outcome complete` for a successful handoff
+(work landed, tests passing, ready for review). Use `--outcome escalated`
+for the blocked/uncertain handoff path where `agent_notes` is framed as the
+BLOCKED escalation rather than a one-paragraph summary.
+
+**Call the patcher.** It updates frontmatter `last_updated` + the
+`handoff_*` metadata keys, refreshes the patcher-owned `## current_thesis`
+and (when needed) `## open_questions` marker blocks, and rewrites
+`## canonical_anchors` to the schema-compliant `spec` (+ preserved
+`reviews`) shape pointing at `backlog/pending_review/<item>.md`.
+`## locked_decisions` and `## dont_touch` are preserved byte-for-byte.
+
+```bash
+TASK_ID="${ITEM_ID}"                  # backlog item id == task-state directory name
+POINTER="backlog/task-state/$TASK_ID/builder.md"
+
+# Builder-state scope detection. Read frontmatter via grep — the item file
+# is the one we just moved into pending_review/.
+HAS_TASK_STATE_REF=$(
+  awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' \
+    "backlog/pending_review/$(basename $ITEM_FILE)"
+)
+
+if [ -n "$HAS_TASK_STATE_REF" ] || [ -f "$POINTER" ]; then
+  # OUTCOME=complete on the success path; OUTCOME=escalated on the BLOCKED path.
+  python3 tools/task-state/patch-builder-state.py \
+    --task-id "$TASK_ID" \
+    --outcome "$OUTCOME" \
+    --spec-path "backlog/pending_review/$(basename $ITEM_FILE)" \
+    --branch "agent/$SLUG" \
+    --head-sha "$HEAD_SHA" \
+    --run-log "$LOG"
+
+  # The helper is a no-op when the pointer is missing (compatibility for items
+  # that set task_state_ref before the builder adopted builder.md). Only
+  # lint + stage the path if it exists post-patch.
+  if [ -f "$POINTER" ]; then
+    python3 tools/task-state/lint.py "$POINTER"   # hard stop on failure
+    git add "$POINTER"
+  fi
+fi
+```
+
+If lint fails, STOP — do not push stale builder state. Treat lint failure as
+a hard stop and escalate per the Stopping Conditions section. The protocol
+rule is "lint failure means escalation, not silent shipping."
+
+**Idempotency note.** Re-running E2.5 updates only the `last_updated`
+timestamp plus the same lifecycle / anchor fields, and never creates a
+second pointer path or rewrites `## locked_decisions`. A crashed run
+resumed via reconciliation produces the same logical pointer state.
+
+### E2.6. Commit + push (single final commit)
+
+```bash
 git add backlog/pending_review/ "$LOG"
+# E2.5 already staged the pointer if it exists; this commit captures all
+# three (item move, run log, builder.md refresh) atomically.
 git commit -m "review: $ITEM_ID"
 git push origin main
 ```
@@ -317,7 +390,7 @@ The codex-builder writes a `builder.md` pointer for every claim, per the `skills
 |---|---|---|
 | Atomic claim (the `ready/` → `claimed/` op) | Initial write — same commit as the claim, OR as the very next commit | `current_thesis: "claim of <id>"`; AC list locked; `open_questions:` populated from anything that will be deferred; `canonical_anchors:` to the spec path |
 | Milestone commits (per "Step D" run-log writes) | Update `open_questions` + `locked_decisions` if anything shifts | Same five blocks; updated bullets |
-| Move to `pending_review/` (completion or escalation) | Final write | `current_thesis: "<id> complete, ready for review"` OR `"<id> escalated: <one-line reason>"`; `canonical_anchors:` to the spec, the branch name, and the run-log path |
+| Move to `pending_review/` (completion or escalation) | **Final refresh runs via the protocol-wide E2.5 step (`tools/task-state/patch-builder-state.py`), not via codex-specific logic.** That step is the only canonical implementation site. It updates frontmatter `last_updated` + `handoff_*` metadata, refreshes the lifecycle marker block in `## current_thesis`, and rewrites `## canonical_anchors` to point at `backlog/pending_review/<item>.md` (schema-compliant `spec` + preserved `reviews`). `## locked_decisions` and `## dont_touch` are preserved byte-for-byte. | Patcher-managed marker block in `## current_thesis`; existing builder-authored `## locked_decisions` and `## dont_touch` content untouched. |
 
 **Write mechanism (every moment):**
 

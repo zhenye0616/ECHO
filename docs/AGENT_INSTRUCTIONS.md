@@ -64,11 +64,24 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
        (in main repo on main, after pulling)
        ensure_stage(<item>, pending_review)   # upsert: no-op if already there
        edit frontmatter: agent_notes summary, head_sha, pr_url (if any)
+       FINAL BUILDER-STATE REFRESH (before the commit is pushed):
+         if `task_state_ref:` is non-empty in the item frontmatter
+            OR `backlog/task-state/<task-id>/builder.md` already exists on disk:
+              python3 tools/task-state/patch-builder-state.py \
+                --task-id <item-id> --outcome complete \
+                --spec-path backlog/pending_review/<item>.md \
+                --branch agent/<slug> --head-sha <sha> --run-log <log>
+              if backlog/task-state/<item-id>/builder.md now exists:
+                python3 tools/task-state/lint.py <pointer>     # HARD STOP on failure
+                git add <pointer>
+         Lint failure here is a hard stop: escalate via path 14 rather than
+         shipping a stale or malformed pointer downstream.
        git commit -m "review: <item-id>"
        git push origin main
        STOP
 14. If uncertain or blocked:
-       Same as 13, but agent_notes is the SPECIFIC question, not a summary
+       Same as 13, but agent_notes is the SPECIFIC question, not a summary,
+       AND the FINAL BUILDER-STATE REFRESH uses `--outcome escalated`.
        STOP
 15. If you caught yourself drifting:
        Write raw/internal/decisions/<today>-DRIFT-<slug>.md

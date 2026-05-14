@@ -45,7 +45,24 @@ agent_notes: |
   npm run typecheck, sync-skills --check all clean. This handoff itself dogfoods E2.5: the
   build's own builder.md is staged in this commit with the lifecycle marker refreshed and
   canonical_anchors.spec rewritten to backlog/pending_review/.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-14 via founder reconciliation (second attempt; first attempt was hijacked by a parallel codex-side commit and reset cleanly — preserved on backup/codex-ops-r6-bad-local-merge).
+
+  Conflicts resolved:
+  - backlog/task-state/2026-05-14-048-process-backlog-builder-state-handoff-refresh/builder.md: add/add conflict. Resolved with `--ours` (main side). Main carried the post-handoff pointer written at c0ea432 (handoff_* frontmatter, lifecycle marker block, spec anchor → pending_review/); branch carried the pre-handoff snapshot (spec anchor → claimed/ — the exact stale-anchor failure mode 048 was created to fix). locked_decisions / dont_touch / open_questions byte-identical between sides, so no builder-authored content was lost.
+
+  Fixups applied:
+  - None (verdict was `merge as-is`).
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 900/900 tests pass (21 skipped); eslint clean (incl. task-state lint); tsc --noEmit clean.
+
+  Follow-up items (non-blocking):
+  - Tighten the E2.5 `HAS_TASK_STATE_REF` awk detection in skills/process-backlog.md to filter empty-string task_state_ref values (spec wording is "non-empty"). Helper's missing-pointer no-op covers this benignly — cosmetic.
+  - The item's agent_notes claims "the build's own builder.md is staged in this commit" — branch tip f8869ed does not contain builder.md; the dogfood pointer first appeared in c0ea432. Cosmetic / historical only.
+  - Merge-lock cross-vendor: `.git/echo-merge-in-progress` is only honored by Claude Code; codex-side and cursor-side reviewer queues bypass it. This run also surfaced the same risk class (cursor sandbox committing on 040 r3 in parallel) but did not collide. File a process-debt item to extend the lock convention to all vendor queues.
 ---
 
 # Process-backlog builder-state handoff refresh
