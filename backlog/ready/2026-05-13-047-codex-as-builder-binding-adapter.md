@@ -57,7 +57,7 @@ spec_refs:
   - **Log file:** `~/Library/Logs/echo-backlog-codex-builder.log` with rotation at 10MB → `.1` sidecar, drop older. Same `stat -f%z` / `stat -c%s` portability fallback as the reviewer wrapper.
 - Builder-specific additions:
   - **`ECHO_AGENT_ID`:** a stable per-machine identifier read from `~/.echo/agent-id` (or generated + persisted there on first run). This is the writer identity for `task-state/<id>/builder.md` per 046 AC1 writer-responsibilities. Must be unique across machines (UUID4 on first init).
-  - **Lockfile (atomic acquisition).** Resolved per R1 codex F3: use a **lock DIRECTORY** rather than a file, because `mkdir` is atomic on macOS HFS+/APFS (and Linux ext4) — `[ -e ]` + `echo >` is not, and would let two near-simultaneous wrapper invocations both enter the critical section. Concretely:
+  - **Lockfile (atomic acquisition).** Resolved per R1 codex F3 + R2 codex F1: use a **lock DIRECTORY** rather than a file, because `mkdir` is atomic on macOS HFS+/APFS (and Linux ext4) — `[ -e ]` + `echo >` is not, and would let two near-simultaneous wrapper invocations both enter the critical section. Lock-info content uses ONLY wrapper-known metadata — `$ITEM_ID` is selected inside `codex exec` (after the lock is held), so referencing it in the wrapper would be unbound under `set -euo pipefail`:
     ```
     LOCK_DIR="$REPO_ROOT/.git/echo-builder-in-progress.d"
     if ! mkdir "$LOCK_DIR" 2>/dev/null; then
@@ -66,7 +66,7 @@ spec_refs:
       echo "  remove with: rm -rf $LOCK_DIR" >&2
       exit 1
     fi
-    echo "$ITEM_ID @ $(date -u +%Y-%m-%dT%H:%M:%SZ) by $$" > "$LOCK_DIR/info"
+    echo "codex-builder @ $(date -u +%Y-%m-%dT%H:%M:%SZ) by $$ agent=$ECHO_AGENT_ID" > "$LOCK_DIR/info"
     trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
     ```
     Defends against the founder accidentally running two `run-codex-builder.sh` instances on the same machine (the two would race on atomic-claim git ops). The `mkdir` race-window is closed by atomic-create-or-fail semantics; check-then-write would not be sufficient.
@@ -118,7 +118,7 @@ Fixture shape matches `tests/task-state/push-round-state.test.ts` (tmpdir + bare
 3. **`atomic lockfile prevents overlapping wrapper invocations`** (wrapper-owned, R1 codex F3 fixture):
    - Use a "slow" stub `mock-codex.sh` that `sleep 3 && exit 0` to keep the lock dir held.
    - Invoke `run-codex-builder.sh` in the background.
-   - Within the sleep window, invoke a second `run-codex-builder.sh`.
+   - **Synchronization (R2 codex F2 — make the race-free):** poll for `.git/echo-builder-in-progress.d/info` to exist with timeout ~2s (`while [ ! -f .git/echo-builder-in-progress.d/info ] && [ "$WAITED" -lt 20 ]; do sleep 0.1; WAITED=$((WAITED+1)); done`). Only THEN invoke the second `run-codex-builder.sh`. Without this gate, a Vitest `spawn` implementation can race the first process's `mkdir` and occasionally let the second invocation acquire first on a loaded machine.
    - Assert: (a) second invocation exits non-zero with the lock-exists diagnostic; (b) `LOCK_DIR/info` content shows the FIRST invocation's PID and timestamp (unchanged); (c) after the first invocation completes, `LOCK_DIR` is gone; (d) a third invocation (post-cleanup) acquires the lock cleanly.
 
 Tests do **NOT** invoke real `codex exec` (would require codex CLI + auth + non-deterministic LLM output). The wrapper's contract — what env/argv/stdin/lock-visibility codex receives — is what's under test, not codex's runtime behavior.
@@ -164,7 +164,7 @@ This is the cycle that gets measured against the baseline. AC5 is **not** a hard
 ## Definition of Done
 
 - All 7 ACs implemented and verified.
-- `npm test`, `npm run lint`, `npm run typecheck` clean. `tests/backlog/run-codex-builder.test.ts` 2 cases green.
+- `npm test`, `npm run lint`, `npm run typecheck` clean. `tests/backlog/run-codex-builder.test.ts` **3 cases** green (matches AC4's three-case partition: wrapper env/argv contract, ECHO_AGENT_ID stability, atomic-lock overlapping-invocation race).
 - `tools/sync-skills.sh --check` clean.
 - Sidecar review verdict ≥ `merge with founder fixups`.
 - AC5 dogfooding measurement recorded in review_notes + `raw/internal/dogfooding/role-typed-state-comparison-047.md`.
@@ -188,6 +188,6 @@ Once merged:
 - **R1 — Codex session limits in long-running builder.** A backlog item that takes >30min of codex work may exhaust codex CLI's token cap. Mitigation: AC4's test doesn't exercise this (mocks codex); spec body explicitly documents the escalation path (commit-and-pending-review-with-note). Real-world data informs whether to file a successor item that splits work across multiple codex sessions.
 - **R2 — `danger-full-access` sandbox breadth.** Builder has full repo write + push + node_modules + sibling worktree creation. Lockfile + ECHO_AGENT_ID + repo-root validation mitigate accidental misuse. Document the threat model in AC6 skill section. The same sandbox + protections already work for codex reviewer-tick (5x in 046 cycle); pattern is proven.
 - **R3 — AC5 measurement is single-cycle, single-point.** A /clear-then-resume during 047 is the only strategist cold-start data point unless founder triggers more naturally. Mitigation: the comparison report explicitly notes this as a controlled measurement; future cycles measure naturally as opportunities arise.
-- **R4 — Cursor reviewer is manual; cursor side of dogfooding §3 invariant is qualitative.** Without automated cursor reviewer-tick logging, the reviewer-INVARIANT measurement is codex-only. Mitigation: spec body notes cursor side is qualitative; the §3 hard condition for PASS still requires codex-side INVARIANT (10% bound). Cursor side is "doesn't feel heavier than before" — recorded in review_notes prose.
+- **R4 — Cursor reviewer is manual; cursor side of dogfooding §3 invariant is qualitative.** Without automated cursor reviewer-tick logging, the reviewer-INVARIANT measurement is codex-only. Mitigation: spec body notes cursor side is qualitative; the §3 hard condition for PASS still requires codex-side INVARIANT (10% bound). **Cursor-side qualitative notes land in the mandatory `§3-cursor (qualitative)` subsection of `raw/internal/dogfooding/role-typed-state-comparison-047.md` per AC5 §3 patch.** (R2 cursor F2 — sync risk language to AC5's authoritative sink, not `review_notes` prose.)
 - **R5 — RESOLVED at R1 (codex F1 + cursor F5 convergent HIGH).** `push-round-state.sh` is hardcoded to `round-state.md` at SHA `4cce421`. AC3 patched to use direct `git add + commit + push` for `builder.md`. Builder is single-owner per 046 writer-responsibilities; no CAS needed. No generalization of the helper in 047 scope.
 - **R6 — `~/.echo/agent-id` writes need filesystem write permission outside repo.** `danger-full-access` allows it; workspace-write would block it. Documented as part of AC1's sandbox choice; tests cover the file-creation case.
