@@ -1562,6 +1562,9 @@ id="toc-pdt---codex-r2-on-047-codex-as-builder-binding-adapter">2026-05-13
 <li><a href="#pdt-cursor-r3-on-047-codex-as-builder-binding-adapter"
 id="toc-pdt-cursor-r3-on-047-codex-as-builder-binding-adapter">2026-05-13
 23:05 PDT — Cursor R3 on 047 codex-as-builder binding adapter</a></li>
+<li><a href="#pdt---codex-r3-on-047-codex-as-builder-binding-adapter"
+id="toc-pdt---codex-r3-on-047-codex-as-builder-binding-adapter">2026-05-13
+23:07 PDT - Codex R3 on 047 codex-as-builder binding adapter</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -15580,6 +15583,51 @@ entry.</li>
 sink are aligned at this SHA; AC1 lock metadata and AC4 synchronization
 gate match R3 last-mile review prompts.</li>
 <li><strong>Conjecture:</strong> (none — observations only)</li>
+</ul>
+<h3
+id="pdt---codex-r3-on-047-codex-as-builder-binding-adapter">2026-05-13
+23:07 PDT - Codex R3 on 047 codex-as-builder binding adapter</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/request.md</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-13-047-codex-as-builder-binding-adapter.md</code>
+at <code>ac9fa7d46d67b1c1227e56fc92eba539f8cb0624</code>,
+<code>.claude/commands/review-queue-codex.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tests/task-state/push-round-state.test.ts</code>,
+<code>package.json</code>, prior R2 review context, and
+<code>codex exec --help</code>. No <code>mcp__echo__*</code> /
+<code>mcp__echo-memory__*</code> calls this tick.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/codex.md</code>
+as <code>de63a38</code>, verdict <code>proceed</code>, findings
+<code>[]</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>ac9fa7d46d67b1c1227e56fc92eba539f8cb0624</code>; request path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-13-047-codex-as-builder-binding-adapter/r3/codex.md</code>;
+local code/tool paths <code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>tests/task-state/push-round-state.test.ts</code>,
+<code>package.json</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R3’s patched lock metadata, polling
+synchronization, DoD count, and AC5 qualitative-report sink are
+implementable as written; the installed Codex CLI supports the specified
+<code>codex exec -C ... --sandbox danger-full-access -</code>
+invocation.</li>
 </ul>
 </body>
 </html>
