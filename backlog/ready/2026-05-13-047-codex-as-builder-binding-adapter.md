@@ -7,6 +7,22 @@ estimate: 1-1.5d
 created: 2026-05-13
 task_state_ref: 2026-05-13-047-codex-as-builder-binding-adapter
 requested_reviewers: ["codex", "cursor"]
+files_to_modify:
+  # AC1 — new wrapper script
+  - tools/backlog/run-codex-builder.sh
+  # AC2 + AC6 — binding-specific section appended to vendor-neutral protocol skill
+  - skills/process-backlog.md
+  - .claude/commands/process-backlog.md  # synced from skills/ via tools/sync-skills.sh
+  # AC4 — integration tests (new directory + fixtures)
+  - tests/backlog/run-codex-builder.test.ts
+  - tests/backlog/fixtures/mock-codex.sh
+  # AC3 — recursive dogfooding pointer the codex builder writes during claim
+  # (path follows 046 AC1 task-state schema; created on atomic claim, updated
+  # on milestones, finalized on move-to-pending_review)
+  - backlog/task-state/2026-05-13-047-codex-as-builder-binding-adapter/builder.md
+  # AC5 — opportunistic 046 dogfooding measurement report (written at merge time)
+  - raw/internal/dogfooding/role-typed-state-comparison-047.md
+  - raw/internal/dogfooding/role-typed-state-comparison-047.html  # HTML twin per CLAUDE.md convention
 spec_refs:
   - backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md  # Direct parent. 046 shipped the role-typed task-state primitive, the AC3 fresh-eyes lint, and the role-slot-agnostic vocabulary. 047 fills the missing codex-builder binding so the role-slot vocabulary is true in operation, not just in prose. AC1 builder-state.md format + writer responsibilities are inherited from 046.
   - raw/internal/dogfooding/role-typed-state-baseline.md  # The immutable empirical baseline written 2026-05-13 22:45 PDT against which AC5's opportunistic dogfooding measurement is compared. Three falsifiable PASS conditions defined in §"Falsifiable PASS criteria for the next qualifying cycle" — 047 is that next qualifying cycle.
@@ -41,7 +57,19 @@ spec_refs:
   - **Log file:** `~/Library/Logs/echo-backlog-codex-builder.log` with rotation at 10MB → `.1` sidecar, drop older. Same `stat -f%z` / `stat -c%s` portability fallback as the reviewer wrapper.
 - Builder-specific additions:
   - **`ECHO_AGENT_ID`:** a stable per-machine identifier read from `~/.echo/agent-id` (or generated + persisted there on first run). This is the writer identity for `task-state/<id>/builder.md` per 046 AC1 writer-responsibilities. Must be unique across machines (UUID4 on first init).
-  - **Lockfile:** `.git/echo-builder-in-progress` (inside the repo's `.git/`, not the worktree). Acquire on entry, write `"$ITEM_ID @ $(date) by $$"`, `trap 'rm -f "$LOCK"' EXIT INT TERM`. If lock exists, exit non-zero with the standard "remove with: rm $LOCK" diagnostic shape. Same pattern as `tools/review-queue/_run_reviewer.sh`-less `merge-and-cleanup`-style lock. Defends against the founder accidentally running two `run-codex-builder.sh` instances on the same machine (the two would race on atomic-claim git ops).
+  - **Lockfile (atomic acquisition).** Resolved per R1 codex F3: use a **lock DIRECTORY** rather than a file, because `mkdir` is atomic on macOS HFS+/APFS (and Linux ext4) — `[ -e ]` + `echo >` is not, and would let two near-simultaneous wrapper invocations both enter the critical section. Concretely:
+    ```
+    LOCK_DIR="$REPO_ROOT/.git/echo-builder-in-progress.d"
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+      echo "ERROR: existing lock at $LOCK_DIR" >&2
+      [ -f "$LOCK_DIR/info" ] && echo "  contents: $(cat "$LOCK_DIR/info")" >&2
+      echo "  remove with: rm -rf $LOCK_DIR" >&2
+      exit 1
+    fi
+    echo "$ITEM_ID @ $(date -u +%Y-%m-%dT%H:%M:%SZ) by $$" > "$LOCK_DIR/info"
+    trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+    ```
+    Defends against the founder accidentally running two `run-codex-builder.sh` instances on the same machine (the two would race on atomic-claim git ops). The `mkdir` race-window is closed by atomic-create-or-fail semantics; check-then-write would not be sufficient.
   - **Invocation:** `codex exec -C "$REPO_ROOT" --sandbox danger-full-access - < "$REPO_ROOT/skills/process-backlog.md"`.
   - **Sandbox:** `danger-full-access` is required (workspace-write blocks `.git/FETCH_HEAD` writes during push, `~/.echo/agent-id` writes, sibling worktree creation under `~/Desktop/Project_echo--<slug>/`, and node_modules writes during test runs).
 - Script lives at `tools/backlog/run-codex-builder.sh`; executable bit set; shellcheck-clean.
@@ -51,35 +79,58 @@ spec_refs:
 
 - Append a single section at the end of `skills/process-backlog.md` (after existing protocol body, before any "Failure Modes" or trailing index). New section title: **"Binding-specific notes — codex"**. Content covers:
   - Codex's `--sandbox danger-full-access` flag semantics; how it differs from Claude Code's tool-use sandbox.
-  - That codex sees ECHO MCP via the same `mcp__echo__*` tool surface as Claude Code.
+  - That codex sees ECHO MCP via the same `mcp__echo__*` tool surface as Claude Code — **subject to the operator's Codex/MCP configuration** (R1 cursor F8). MCP exposure for `codex exec` depends on the operator's `~/.codex/config.toml` (or equivalent) actually registering the ECHO MCP server with codex; the skill file alone does not infer this. First-time codex-builder setup: verify ECHO MCP is registered in the operator's codex config OR document the silent-missing-tool failure mode and the recovery step. Add a one-line checklist to the binding-specific section so first-run setup is unambiguous.
   - Reminder: journal-by-proxy rule from 046 AC6 applies; codex's `codex exec` here is NOT a read-only consult (sandbox is full-access), so codex journals its own ECHO MCP calls in-the-moment per the standard discipline — not via proxy.
   - Token / session-limit observation: codex sessions have implicit upper bounds; if a long-running builder exhausts the session, the builder must commit its progress and surface the limit via `agent_notes:` in `pending_review/` (move the item there with an escalation note rather than losing work).
 - Sync to `.claude/commands/process-backlog.md` via `tools/sync-skills.sh`.
 - **NO protocol changes.** Atomic-claim git ops, worktree creation, test/lint/typecheck running, commit-and-push, move-to-pending-review — all unchanged. Only binding-specific notes appended.
 
-**AC3 — Codex builder writes `backlog/task-state/<id>/builder.md` per 046 AC1 writer-responsibilities.**
+**AC3 — Codex builder writes `backlog/task-state/<id>/builder.md` via direct commit (NO CAS).**
+
+Resolved per R1 codex F1 + cursor F5 (convergent HIGH on the same finding). `tools/task-state/push-round-state.sh` is hardcoded to `round-state.md` (verified at SHA `4cce421` — `PATH_REL=backlog/task-state/${TASK_ID}/round-state.md`); it cannot write `builder.md` without modification. AND `builder.md` doesn't need CAS: per 046 AC1's writer-responsibilities table, `builder.md` has a single owner (the builder role bound to the current binding) for the duration of the claim. No concurrent writer race exists. Direct commit is correct.
 
 - On atomic claim (the single-commit `ready/ → claimed/` op): the codex builder writes an initial `builder.md` containing:
-  - `current_round: r0` is NOT applicable here (round-state.md is reviewer-cycle state, not builder state); omit.
   - Required top blocks: `current_thesis` ("claim of <id>"), `locked_decisions` ("AC list as locked"), `open_questions` ("any items the agent will defer to founder"), `dont_touch` (out-of-scope per spec), `canonical_anchors` (spec path + worktree path).
-- On milestone commits (per `process-backlog.md`'s "log work in `raw/internal/agent-runs/...`"): update `builder.md`'s `open_questions` + `locked_decisions` if anything shifts. Use the 046 CAS protocol from `skills/role-typed-task-state.md` — read base blob, fetch upstream, compare, replace, push via `push-round-state.sh`. (Yes, even though this is `builder.md` and not `round-state.md`; the CAS protocol generalizes to any task-state pointer. The helper script is suitable as-is for builder.md — same blob-lease semantics.)
-- On completion (move to `pending_review/`): write a final `builder.md` with `current_thesis: "<id> complete, ready for review"` + the final `canonical_anchors` (spec at the head_sha, branch, etc.).
-- The builder pointer is the path future strategists/reviewers/watchers consult to understand "what state was this item left in?" — replaces the existing `agent_notes:` frontmatter as the canonical source (over time; for 047, both coexist).
+  - `current_round:` is NOT applicable — `round-state.md` is reviewer-cycle state; `builder.md` is builder lifecycle state. Omit.
+- On milestone commits (per `process-backlog.md`'s "log work in `raw/internal/agent-runs/...`"): update `builder.md`'s `open_questions` + `locked_decisions` if anything shifts. **Write mechanism: plain `git add backlog/task-state/<task-id>/builder.md && git commit -m "builder: <task-id> milestone update" && git push origin <branch>`.** No CAS helper. Single-owner invariant from 046 is the safety property.
+- On completion (move to `pending_review/`): write a final `builder.md` with `current_thesis: "<id> complete, ready for review"` + the final `canonical_anchors` (spec at the head_sha, branch, etc.). Same direct-commit mechanism.
+- If the builder writes `builder.md` on the AGENT BRANCH (not main): the writes land via the existing branch-push flow that `skills/process-backlog.md` already uses. The pointer is visible on `agent/<slug>` until merge, then lands on main via `/merge-and-cleanup`.
+- The builder pointer is the path future strategists/reviewers/watchers consult to understand "what state was this item left in?" — coexists with the existing `agent_notes:` frontmatter as the canonical source (for 047, both coexist; future cycles may deprecate `agent_notes`).
+- **No generalization of `push-round-state.sh`** in 047 scope. If a future writer needs CAS for a non-round-state pointer, file that separately.
 
 **AC4 — Integration test `tests/backlog/run-codex-builder.test.ts`.**
 
-- Fixture shape matches `tests/task-state/push-round-state.test.ts` (tmpdir + bare-origin + clone). Two test cases:
-  1. **`builder claims, writes builder.md, pushes, moves to pending_review`** — Set up a synthetic spec in `backlog/ready/test-spec.md`. Mock the `codex exec` invocation (replace with a shell stub that simulates writing a small file + commit). Invoke `run-codex-builder.sh`. Assert: (a) lockfile acquired during run; (b) lockfile released on exit; (c) ECHO_AGENT_ID was either read from `~/.echo/agent-id` (if pre-seeded) or generated + persisted there; (d) item moved from `ready/` to `pending_review/`; (e) `claimed_by` frontmatter equals the resolved ECHO_AGENT_ID; (f) `builder.md` written at the spec's `task_state_ref:` path with the required top blocks.
-  2. **`lockfile prevents overlapping builders`** — Pre-create `.git/echo-builder-in-progress`. Invoke `run-codex-builder.sh`. Assert: (a) exits non-zero; (b) error message includes the lockfile path + "remove with: rm" diagnostic; (c) original lockfile content unchanged.
-- Tests do **NOT** invoke real `codex exec` (would require codex CLI + auth + non-deterministic LLM output). The wrapper's git ops + lockfile + log + ID generation are what's under test, not the LLM's behavior.
-- TypeScript tests under vitest; shell stub for codex lives in `tests/backlog/fixtures/mock-codex.sh`.
+Resolved per R1 codex F4: the test asserts the **wrapper contract** (env passed to codex, lockfile visibility, git ops the wrapper itself performs), NOT the workflow the stub performs. Stub work is allowed and useful; it just doesn't count as wrapper proof.
+
+Fixture shape matches `tests/task-state/push-round-state.test.ts` (tmpdir + bare-origin + clone). Three test cases:
+
+1. **`wrapper passes correct env + argv to codex exec`** (wrapper-owned assertions):
+   - Mock codex via `tests/backlog/fixtures/mock-codex.sh` that records its exact `argv` + `env` + `stdin` to a side-channel file, then exits 0 without doing any workflow.
+   - Invoke `tools/backlog/run-codex-builder.sh`.
+   - Assert (wrapper-owned): (a) recorded argv is exactly `codex exec -C <repo_root> --sandbox danger-full-access -`; (b) recorded env contains `ECHO_AGENT_ID=<resolved>`; (c) recorded `HOME` is the test tmpdir's HOME (proving the wrapper respects an overridden HOME for `~/.echo/agent-id` placement); (d) recorded stdin equals the on-disk content of `$REPO_ROOT/skills/process-backlog.md` at HEAD; (e) `LOCK_DIR` exists during the codex invocation (captured via the stub's first action: read-and-record the lock dir's presence), released after exit; (f) log file at `~/Library/Logs/echo-backlog-codex-builder.log` (or test-overridden path) contains start + end markers.
+
+2. **`wrapper handles ECHO_AGENT_ID first-run generation`** (wrapper-owned):
+   - Pre-condition: no `~/.echo/agent-id` file in the test HOME.
+   - Invoke `run-codex-builder.sh`.
+   - Assert: (a) `~/.echo/agent-id` is created with a UUID4-shaped string; (b) the same value appears in the recorded env passed to codex.
+   - Second invocation (after stub cleans up the LOCK_DIR): assert the SAME UUID is read from `~/.echo/agent-id` (stable across runs).
+
+3. **`atomic lockfile prevents overlapping wrapper invocations`** (wrapper-owned, R1 codex F3 fixture):
+   - Use a "slow" stub `mock-codex.sh` that `sleep 3 && exit 0` to keep the lock dir held.
+   - Invoke `run-codex-builder.sh` in the background.
+   - Within the sleep window, invoke a second `run-codex-builder.sh`.
+   - Assert: (a) second invocation exits non-zero with the lock-exists diagnostic; (b) `LOCK_DIR/info` content shows the FIRST invocation's PID and timestamp (unchanged); (c) after the first invocation completes, `LOCK_DIR` is gone; (d) a third invocation (post-cleanup) acquires the lock cleanly.
+
+Tests do **NOT** invoke real `codex exec` (would require codex CLI + auth + non-deterministic LLM output). The wrapper's contract — what env/argv/stdin/lock-visibility codex receives — is what's under test, not codex's runtime behavior.
+
+TypeScript tests under vitest; shell stub for codex lives in `tests/backlog/fixtures/mock-codex.sh`. The stub MAY perform workflow operations (commit, push, move-to-pending_review) but those are not assertion targets; they're allowed as side-effects the wrapper enables, not as wrapper proof.
 
 **AC5 — Opportunistic 046 dogfooding measurement (observational).**
 
 This is the cycle that gets measured against the baseline. AC5 is **not** a hard merge-gate; it's a documented observation that lands in review_notes at merge time AND as a sibling file `raw/internal/dogfooding/role-typed-state-comparison-047.md`. Measurement protocol:
 
 - **§1 strategist cold-start:** Once during the 047 cycle (between R1 and R3 of review-queue cycle, ideally), the strategist (claude) `/clear`s the session and resumes via `get_role_state(047-id, "strategist")` instead of the broad-corpus reconstruction pattern from the baseline (3 MCP calls + 18 atoms + ~3-4 min). Journal observed: MCP call count, lines read, wall time to first productive output. Compare against baseline §1's three targets (≤1 MCP / ≤200 lines / <60s).
-- **§3 reviewer-tick INVARIANT:** Compare codex reviewer-tick token counts per round (from `~/Library/Logs/echo-review-queue-codex.log`) against baseline §4's R1-R5 token spread (9-90k range). Cursor reviewer ticks are qualitative — founder records subjective signal of "did re-reading the cycle's growing spec feel heavier than before?"
+- **§3 reviewer-tick INVARIANT:** Compare codex reviewer-tick token counts per round (from `~/Library/Logs/echo-review-queue-codex.log`) against baseline §4's R1-R5 token spread (9-90k range). Cursor reviewer ticks are qualitative — founder records subjective signal of "did re-reading the cycle's growing spec feel heavier than before?" Cursor-side qualitative notes land in **a mandatory subsection of `role-typed-state-comparison-047.md` titled "§3-cursor (qualitative)"** (per R1 cursor F7 — name the sink so it stays comparable across cycles). Same subsection shape across future comparison reports.
 - **§5 founder in-queue activations:** Count manual founder interventions inside the review-queue (escalations, divergent-verdict resolutions, push authorizations that aren't standing). Target: 0.
 - **Comparison report:** `raw/internal/dogfooding/role-typed-state-comparison-047.md` written at merge time (sibling to baseline). Same six-dimension structure as baseline. Verdict: PASS (all 3 hard conditions met) / PARTIAL (1-2 met) / FAIL (0-1 met). If FAIL → file `047-fixups` per baseline escalation rule; do NOT merge as if 046 worked.
 
@@ -94,7 +145,8 @@ This is the cycle that gets measured against the baseline. AC5 is **not** a hard
 
 **AC7 — Cursor reviewer activation note (no new infrastructure).**
 
-- Spec body explicitly notes: cursor reviewer ticks for THIS 047 cycle are triggered manually by the founder from Cursor IDE via `skills/review-queue-cursor.md`. No new wrapper, no launchd job, no automation. Founder pins a sidebar conversation in Cursor for the cycle's duration; runs the skill from the command palette when a round's `request.md` lands on origin/main.
+- Spec body explicitly notes: cursor reviewer ticks for THIS 047 cycle are triggered manually by the founder from Cursor IDE. **Trigger mechanism:** in Cursor, the canonical `skills/review-queue-cursor.md` skill is invoked via the slash command `/review-queue-cursor` from the command palette (the slash form is the operator-facing trigger; the canonical path is the source of truth). Per R1 cursor F6 — one explicit sentence linking trigger ↔ canonical path reduces activation ambiguity across rounds.
+- No new wrapper, no launchd job, no automation. Founder pins a sidebar conversation in Cursor for the cycle's duration; runs `/review-queue-cursor` from the command palette when a new round's `request.md` lands on origin/main.
 - No code or skill changes — this is documentation only, captured in spec body to prevent the cursor side from being silently skipped during dogfooding measurement.
 
 ## Out of Scope (Don't Drift)
@@ -137,5 +189,5 @@ Once merged:
 - **R2 — `danger-full-access` sandbox breadth.** Builder has full repo write + push + node_modules + sibling worktree creation. Lockfile + ECHO_AGENT_ID + repo-root validation mitigate accidental misuse. Document the threat model in AC6 skill section. The same sandbox + protections already work for codex reviewer-tick (5x in 046 cycle); pattern is proven.
 - **R3 — AC5 measurement is single-cycle, single-point.** A /clear-then-resume during 047 is the only strategist cold-start data point unless founder triggers more naturally. Mitigation: the comparison report explicitly notes this as a controlled measurement; future cycles measure naturally as opportunities arise.
 - **R4 — Cursor reviewer is manual; cursor side of dogfooding §3 invariant is qualitative.** Without automated cursor reviewer-tick logging, the reviewer-INVARIANT measurement is codex-only. Mitigation: spec body notes cursor side is qualitative; the §3 hard condition for PASS still requires codex-side INVARIANT (10% bound). Cursor side is "doesn't feel heavier than before" — recorded in review_notes prose.
-- **R5 — AC3 `builder.md` writing via push-round-state.sh helper assumes the helper generalizes from round-state.md to builder.md.** The 046 CAS protocol uses paths-specific commands; verify the helper script signature accepts arbitrary task-state files, not just round-state.md. If not, AC1 spec text needs amendment — either generalize the helper or write builder.md via a different mechanism.
+- **R5 — RESOLVED at R1 (codex F1 + cursor F5 convergent HIGH).** `push-round-state.sh` is hardcoded to `round-state.md` at SHA `4cce421`. AC3 patched to use direct `git add + commit + push` for `builder.md`. Builder is single-owner per 046 writer-responsibilities; no CAS needed. No generalization of the helper in 047 scope.
 - **R6 — `~/.echo/agent-id` writes need filesystem write permission outside repo.** `danger-full-access` allows it; workspace-write would block it. Documented as part of AC1's sandbox choice; tests cover the file-creation case.
