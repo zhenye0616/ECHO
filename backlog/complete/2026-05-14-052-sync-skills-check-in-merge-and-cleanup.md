@@ -27,6 +27,22 @@ branch: "agent/sync-skills-check-in-merge-and-cleanup"
 worktree: "~/Desktop/Project_echo--sync-skills-check-in-merge-and-cleanup"
 head_sha: "6a7372fa8ae9ef31ec1dcc05b4b5e90f04b26038"
 pr_url: ""
+review_notes: |
+  Merged 2026-05-15 via founder reconciliation (/merge-and-cleanup).
+
+  Conflicts resolved: none — clean merge against main (the C5 block insertion was pure-addition, no overlap).
+
+  Fixups applied: none (verdict = merge as-is, sidecar punch list empty).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify post-merge: 937/937 tests pass + 21 skipped (npm test); npm run lint clean; npm run typecheck clean; tools/sync-skills.sh --check returned "OK: all adapters match canonical skills/" — the new C5 gate self-verifies on its own merge.
+
+  Follow-up items (non-blocking):
+  - When 050 merges, founder must re-insert the `tools/sync-skills.sh --check` line + remediation paragraph into 050's restructured C5 form. AC4's shape test (tests/skills/merge-and-cleanup-shape.test.ts) will fail loudly if forgotten.
+  - Strategist task per spec's "After Completion" section — add one-line note to `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` "Next steps" recording the pre-commit hook landed (tools/install-pre-commit-hook.sh).
+
+  Reviewer trajectory: codex r1 → r3 / codex-ops r1 → r3 → terminal proceed/proceed (per sidecar at backlog/pending_review/2026-05-14-052-sync-skills-check-in-merge-and-cleanup.review.md, reviewed_at 2026-05-15T09:30:00Z).
 agent_notes: |
   All 4 ACs implemented in one commit on agent/sync-skills-check-in-merge-and-cleanup (6a7372f).
   AC1: skills/merge-and-cleanup.md C5 verify ends with `tools/sync-skills.sh --check` plus the
