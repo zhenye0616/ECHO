@@ -1785,6 +1785,9 @@ id="toc-pdt---codex-r1-on-054-c3.5-conflict-review-spec">2026-05-15
 <li><a href="#pdt---codex-ops-r1-on-054-c3.5-conflict-review-spec"
 id="toc-pdt---codex-ops-r1-on-054-c3.5-conflict-review-spec">2026-05-15
 13:10 PDT - Codex-ops R1 on 054 C3.5 conflict-review spec</a></li>
+<li><a href="#pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec">2026-05-15
+13:18 PDT - Codex-ops R2 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19032,6 +19035,49 @@ entry.</li>
 attempt. The required upstream duplicate check found no existing
 <code>codex-ops.md</code>; <code>commit-reviewer-response.sh</code> then
 rebased and pushed the response commit successfully.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec">2026-05-15
+13:18 PDT - Codex-ops R2 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>26bd31372386fd166201b3ccd504ad6f0171eda7</code>, current
+<code>skills/merge-and-cleanup.md</code>,
+<code>tests/skills/merge-and-cleanup-shape.test.ts</code>, and the prior
+R1 review files for local round context.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/codex-ops.md</code>
+as <code>4fbc26a</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH a required <code>spec_ref</code> points at missing
+<code>.claude/projects/.../reference_codex_review_queue_invocation.md</code>;
+MEDIUM C3.5 lacks an explicit recovery branch for
+unavailable/non-zero/unreadable/unparsable nested reviewer invocation
+while the merge is paused with unresolved conflicts.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>26bd31372386fd166201b3ccd504ad6f0171eda7</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/codex-ops.md</code>;
+code/test paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The R1 patches landed the main C3
+pause-contract, <code>$MERGER_WT</code>,
+<code>--sandbox read-only</code>, and C6/C8 audit-trail fixes. R2’s
+remaining issues are operational readiness gaps rather than a
+disagreement with the C3.5 shape.</li>
 </ul>
 </body>
 </html>
