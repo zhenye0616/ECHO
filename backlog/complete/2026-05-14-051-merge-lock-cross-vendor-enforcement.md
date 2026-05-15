@@ -27,6 +27,23 @@ branch: "agent/merge-lock-cross-vendor-enforcement"
 worktree: "/Users/zhenye/Desktop/Project_echo--merge-lock-cross-vendor-enforcement"
 head_sha: "545800b02304d4f46df7f83d5943a0c74c02bf4f"
 pr_url: ""
+review_notes: |
+  Merged 2026-05-15 via founder reconciliation (/merge-and-cleanup).
+
+  Conflicts resolved: none — clean merge against main. The merge-order intent ("051 FIRST, then 050") was honored: 051 landed second in the batch after 052 (which is non-overlapping); 050 lands next and will rewrite both files 051 touches.
+
+  Fixups applied: none (verdict = merge as-is, sidecar punch list empty).
+
+  Fixups deferred to follow-up items: none new (the two pre-existing 051-followup-A/B entries in backlog/_followups.md remain open; deferred per sidecar §"Bugs/risks").
+
+  Verify post-merge: 942/942 tests pass + 21 skipped (npm test — +5 tests over 052 from 051's two new test files); npm run lint clean; npm run typecheck clean; tools/sync-skills.sh --check OK.
+
+  Follow-up items (non-blocking, BUT 050-merge-time blocker):
+  - At 050-merge time, founder MUST re-apply `--rebase=merges` (equals form, not bare `--rebase-merges`) onto 050's rewritten `push-with-retry.sh` push line. 050's diff REPLACES that region wholesale; textual three-way merge will silently drop AC1's flag change. The sidecar at backlog/pending_review/2026-05-14-051-merge-lock-cross-vendor-enforcement.review.md §"Merge-conflict preview" documents this in detail.
+  - 050 also deletes the `echo-merge-in-progress` sentinel-file convention as part of structurally removing the multi-writer race surface. 051's lock-check at `_run_reviewer.sh:77-82` becomes dead code at that point — take 050's side wholesale in that file.
+  - Pre-existing 051-followup-A (push-with-retry.sh rebase-failure recovery, MED) and 051-followup-B (lock-release race in holder read, LOW) remain open in backlog/_followups.md.
+
+  Reviewer trajectory: codex r1 → r4 / codex-ops r1 → r4 — converged at proceed/proceed (per sidecar reviewed_at 2026-05-15T09:15:00Z).
 agent_notes: |
   AC1, AC2, AC3 implemented per spec. AC4 (Out-of-Scope enumeration)
   is documentation-only in the spec body and honored throughout. AC5
