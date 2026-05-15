@@ -41,6 +41,32 @@ branch: "agent/worktree-isolation-for-multi-step-main-writers"
 worktree: "~/Desktop/Project_echo--worktree-isolation-for-multi-step-main-writers"
 head_sha: "0e7ee057fef533c85a9947d4dc3ab3a0631da460"
 pr_url: ""
+review_notes: |
+  Merged 2026-05-15 via founder reconciliation (/merge-and-cleanup).
+
+  Conflicts resolved (4 files; 2 with markers, 2 auto-merged):
+  - skills/merge-and-cleanup.md — auto-merged cleanly. 050's restructured Step B (delete sentinel-lock, wrap merge in $TMPDIR/echo-merger-<uuid>) AND 052's C5 sync-skills gate (tools/sync-skills.sh --check + remediation paragraph) both survived. Verified gate present at line 169 + 172. AC4 shape test passes.
+  - .claude/commands/merge-and-cleanup.md — same auto-merge result, byte-identical to canonical via sync-skills.sh --check.
+  - tools/review-queue/_run_reviewer.sh — two conflict hunks. Took 050's side wholesale on both per 051's review_notes prescription. Also removed the now-orphaned 051 `CODEX_BIN` env-hook block (lines 49–53 pre-merge), per Codex ad-hoc review of conflict resolution (see "Codex consulted" below). Result: lock-check codepath fully removed; reviewer execution uses `codex exec -C "$WT"` directly.
+  - tools/review-queue/push-with-retry.sh — single-line conflict. Resolved as the load-bearing hybrid: `git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin HEAD:main` — preserves both 051 AC1 (--rebase=merges, equals form) and 050 AC5 (HEAD:main refspec). Also updated header behavior-comment to match.
+
+  Test deletion (Codex-approved):
+  - DELETED tests/review-queue/run-reviewer-honors-merge-lock.test.ts — tested the lock-check codepath that 050 AC3 spec'd out, and depended on the 051 `CODEX_BIN` env seam that was removed alongside. Negative-assertion coverage that the sentinel convention is absent is already provided by tests/review-queue/worktree-isolation.test.ts:360-363 (AC6.5).
+
+  Codex consulted on conflict resolution (cross-vendor independent review, founder-requested mid-merge):
+  - Verdict: proceed-with-modifications. Codex agreed with the resolution semantics (take 050 wholesale on _run_reviewer.sh; combine --rebase=merges with HEAD:main on push-with-retry.sh; delete the now-obsolete 051 test). Modifications: (a) remove orphaned 051 CODEX_BIN block outside conflict markers; (b) update push-with-retry.sh header comment to say --rebase=merges. Both modifications applied before C8 commit.
+
+  Fixups applied: 0 from sidecar punch list (was empty). 2 from Codex mid-merge review (CODEX_BIN cleanup + header comment).
+
+  Fixups deferred to follow-up items: see follow-up queue.
+
+  Verify post-merge: 947/947 tests pass + 21 skipped (npm test — +5 net: +9 from 050's worktree-isolation + push-with-retry-cwd-agnostic, −4 from deleted 051 lock-honor test); npm run lint clean; npm run typecheck clean; tools/sync-skills.sh --check OK; bash -n on both shell scripts OK; AC7 grep returns 6 residual hits (2 in docs/BACKLOG.md row prose — founder-only edit per AGENT_INSTRUCTIONS; 4 in worktree-isolation.test.ts as AC6.5 negative-assertions — legitimate).
+
+  Follow-up items (non-blocking):
+  - Founder: remove or backtick the literal `echo-merge-in-progress` string from docs/BACKLOG.md:23 (051 row) and :24 (050 row). Backticking still hits the grep — rewording as `the sentinel-file lock convention` is cleanest. 1-minute edit. AGENT_INSTRUCTIONS forbids the builder from editing docs/BACKLOG.md; this is founder-scope.
+  - Pre-existing 050-followup-D (push-failure preservation), 050-followup-E (reviewer/watcher origin-aware terminal check), 050-followup-F (echo-worktree-doctor.sh operator script), 050-followup-G (race-tight same-reviewer launchd-overlap fix) remain as documented in the spec body.
+
+  Reviewer trajectory: codex r1 → r? / codex-ops r1 → r? — sidecar reviewed_at 2026-05-15T08:26:02Z (pre-052/051 landing). Mid-merge codex consult at 2026-05-15T19:38:54Z confirmed conflict resolution.
 agent_notes: |
   Single-pass implementation of AC1-AC7 against the c1ba5c1 CLAIM-READY spec. Branch
   agent/worktree-isolation-for-multi-step-main-writers pushed at 0e7ee05; one commit

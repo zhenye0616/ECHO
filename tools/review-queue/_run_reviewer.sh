@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# _run_reviewer.sh — generic headless reviewer tick wrapper (043 AC3).
+# _run_reviewer.sh — generic headless reviewer tick wrapper (043 AC3 + 050).
 #
 # Reads REVIEWER_NAME env var; expects a matching reviewers.json entry with
 # mode:headless. Fails fast with a clear diagnostic if REVIEWER_NAME is unset,
@@ -9,6 +9,14 @@
 # founder's production repo. Single source of truth for the launchd-tick
 # wrapper body — codex-specific scripts (run-codex-reviewer.sh) are 5-line
 # drivers that `exec env REVIEWER_NAME=<slug> ${this_script}`.
+#
+# 050 worktree-isolation (architectural invariant): the wrapper does NOT
+# launch the child Codex process inside the founder's live main checkout.
+# Each tick creates an ephemeral, detached-HEAD worktree at
+# $TMPDIR/echo-<reviewer>-<uuid>, routes the child via CWD + env +
+# prompt-path + `-C` (all four handoffs), and discards the worktree on
+# unified ERR/EXIT cleanup. The live main .git/index is never written to
+# by an automated reviewer tick.
 
 set -euo pipefail
 
@@ -38,12 +46,6 @@ export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 # 048 R1 codex review tick silently failed every 10min for ~2h.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.nodenv/shims:$HOME/.asdf/shims:$HOME/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-# CODEX_BIN — deterministic injection point for tests (051 AC2). Mirrors
-# tools/backlog/run-codex-builder.sh:94. Defaults to the unqualified
-# `codex` resolved via the wrapper's prepended PATH; tests set this to a
-# stub script path to assert the wrapper does (or does not) spawn codex.
-CODEX_BIN="${CODEX_BIN:-codex}"
-
 # Validate REVIEWER_NAME exists in reviewers.json with mode=headless. The
 # gate is a dedicated Python script (`_reviewer_gate.py`) so its stderr
 # survives all shell-wrapping permutations (e.g. node spawnSync without a
@@ -65,30 +67,77 @@ fi
 {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start REVIEWER=$REVIEWER_NAME ECHO_REVIEW_QUEUE_REPO_ROOT=$REPO_ROOT"
 
-  # 051 AC2 — honor the merge-and-cleanup sentinel-file lock. If a Claude
-  # merge-and-cleanup session is in progress on the live `.git/index`, any
-  # reviewer-tick `git add`/`commit` would race the merge writer (see
-  # 048-morning + 049-evening incidents). Skip cleanly so launchd's next
-  # ~10-min cadence retries organically — no in-script polling (would
-  # deadlock against the strategist's interactive conflict-resolution).
-  # `--git-common-dir` (not `--git-path`) resolves to the shared `.git/`
-  # from any worktree, so the lock written by the main checkout is visible
-  # even when this wrapper is invoked from a linked worktree CWD.
-  LOCK_PATH="$(git rev-parse --git-common-dir)/echo-merge-in-progress"
-  if [ -f "$LOCK_PATH" ]; then
-    HOLDER=$(cat "$LOCK_PATH" 2>/dev/null | head -1)
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick skipped: merge in progress (lock=$LOCK_PATH, holder=$HOLDER)"
-    exit 0
+  # ── 050 AC1 step 0: pre-flight worktree hygiene (order matters) ────────
+  # 1) Prune admin entries for worktrees whose dirs are already gone (e.g.
+  #    cleanly-removed prior ticks). Admin-only — does not touch live dirs.
+  git worktree prune || true
+  # 2) Enumerate registered worktrees. Any path in this set is skipped no
+  #    matter its age — registered worktrees include active merger
+  #    conflict-pauses AND crashed registered survivors. 050 does not
+  #    distinguish (followup-F is the operator script for crashed cleanup).
+  REGISTERED_WT=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+  # 3) GC unregistered $TMPDIR/echo-* orphans older than 60 minutes.
+  if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
+    while IFS= read -r -d '' orphan; do
+      if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then
+        continue   # registered → skip regardless of mtime
+      fi
+      rm -rf -- "$orphan" || true
+    done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
   fi
 
-  PROMPT="$REPO_ROOT/.claude/commands/${SLASH_COMMAND}.md"
+  # ── 050 AC1 step 1: read-only fetch (does NOT check out, does NOT touch
+  # live index). The reviewer will run in a fresh detached-HEAD worktree at
+  # origin/main below.
+  git fetch origin main
+
+  # ── 050 AC1 step 2: compute worktree path. Hard-fail if $TMPDIR is unset
+  # or empty (don't silently fall back to /tmp — surfacing the unset-env
+  # case is more useful than silently writing somewhere unexpected).
+  if [ -z "${TMPDIR:-}" ]; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: TMPDIR unset; cannot place ephemeral worktree" >&2
+    exit 1
+  fi
+  WT="$TMPDIR/echo-${REVIEWER_NAME}-$(uuidgen)"
+
+  # ── 050 AC1 step 3: create the detached worktree pinned to origin/main.
+  if ! git worktree add --detach "$WT" origin/main; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: git worktree add failed at $WT" >&2
+    exit 1
+  fi
+
+  # ── 050 AC1 step 6: unified cleanup trap (success + failure paths).
+  # No push-failure-specific preservation logic — any failure mode discards
+  # the worktree and its uncommitted/unpushed work. Crashed-tick safety is
+  # guaranteed by re-fireability (next tick re-reads r<N>/request.md).
+  cleanup() {
+    local rc=$?
+    cd "$REPO_ROOT" 2>/dev/null || true
+    if [ -n "${WT:-}" ] && [ -d "$WT" ]; then
+      git worktree remove --force "$WT" 2>/dev/null || true
+    fi
+    git worktree prune 2>/dev/null || true
+    return $rc
+  }
+  trap cleanup EXIT
+  trap 'cleanup; exit 1' ERR INT TERM
+
+  # ── 050 AC1 step 4: route the child Codex into $WT via ALL FOUR handoffs.
+  # CWD, env (so the prompt body's `cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-...}"`
+  # lands in the worktree), prompt-path (so the reviewer reads prompt bytes
+  # from the worktree copy — picks up R3-disposition fixes that landed in
+  # origin/main), and `-C` to codex itself.
+  cd "$WT"
+  export ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"
+
+  PROMPT="$WT/.claude/commands/${SLASH_COMMAND}.md"
   if [ ! -f "$PROMPT" ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: prompt missing at $PROMPT" >&2
     exit 1
   fi
 
   set +e
-  "$CODEX_BIN" exec -C "$REPO_ROOT" --sandbox danger-full-access - < "$PROMPT"
+  codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"
   rc=$?
   set -e
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick end rc=$rc"

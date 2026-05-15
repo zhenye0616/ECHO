@@ -6,6 +6,53 @@ You are running one tick of the **Cursor-side** review queue loop. **Do not chai
 
 Bind the variable `MY_REVIEWER=cursor` for this prompt. See `.claude/commands/review-queue-codex.md` for the Codex-side equivalent.
 
+## Binding-specific notes — Cursor's Claude (IDE-mode)
+
+This skill runs interactively from a Cursor IDE session — there is no launchd wrapper. Cursor reviewer ticks are explicitly NOT routed through `tools/review-queue/_run_reviewer.sh`; the `_reviewer_gate.py` rejects IDE-mode reviewers per the existing 043 contract.
+
+**050 AC4 worktree-isolation invariant for Cursor reviewer ticks.** Cursor's Claude MUST perform the same worktree-isolation lifecycle as the launchd-fired codex/codex-ops reviewers, encoded here as IDE-mode prose because there is no wrapper to do it. Two implementations of the same lifecycle (one in bash via `_run_reviewer.sh`, one in this skill's prose) must produce byte-equivalent worktree management observable from `origin/main`.
+
+Per-tick lifecycle (do this in this exact order at the start of every Cursor reviewer tick, before Step 1 below):
+
+```bash
+# Pre-flight hygiene (order matters)
+cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
+git worktree prune || true
+REGISTERED_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2}')
+# GC unregistered $TMPDIR/echo-* orphans older than 60 min; skip registered worktrees regardless of mtime
+if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
+  while IFS= read -r -d '' orphan; do
+    if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then continue; fi
+    rm -rf -- "$orphan" || true
+  done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
+fi
+
+# Create the ephemeral, detached-HEAD worktree
+git fetch origin main
+[ -n "${TMPDIR:-}" ] || { echo "TMPDIR unset; cannot place ephemeral worktree"; exit 1; }
+WT="$TMPDIR/echo-cursor-$(uuidgen)"
+git worktree add --detach "$WT" origin/main
+
+# Cleanup trap (success + failure paths — uniform lost-work semantics, no preservation)
+cleanup() {
+  local rc=$?
+  cd "$HOME/Desktop/Project_echo" 2>/dev/null || true
+  if [ -n "${WT:-}" ] && [ -d "$WT" ]; then
+    git worktree remove --force "$WT" 2>/dev/null || true
+  fi
+  git worktree prune 2>/dev/null || true
+  return $rc
+}
+trap cleanup EXIT
+trap 'cleanup; exit 1' ERR INT TERM
+
+# Route the rest of the tick through the worktree
+cd "$WT"
+export ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"
+```
+
+Steps 1–7 below then execute inside `$WT`. The founder's live `main` checkout `.git/index` is never written to by this tick. The journal commit in Step 6 must complete its `push-with-retry.sh` BEFORE the cleanup trap fires (natural ordering inside the prompt body).
+
 ## Step 1 — Pull origin/main first
 
 ```bash
@@ -97,6 +144,17 @@ except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
+**050 AC1 step 5 — same-reviewer launchd-overlap no-op guard** (mirrored from codex/codex-ops for parity; Cursor reviewer ticks are interactive rather than launchd-fired, but a manually-invoked duplicate produces the same race). Before the post-link commit, re-fetch `origin/main` and check whether `<dir>/cursor.md` already exists upstream for this round:
+
+```bash
+git fetch origin main
+upstream_path="backlog/reviews/$item_id/r$N/cursor.md"
+if git cat-file -e "origin/main:$upstream_path" 2>/dev/null; then
+  echo "tick: cursor.md already exists at $upstream_path on origin — duplicate, exiting 0" >&2
+  exit 0
+fi
+```
+
 Then commit + push via the post-link validation helper (AC4 of item 041 — defense-in-depth backstop that mechanically re-checks `reviewer.schema.json` before any git operation, in case the pre-link gate missed a file shape):
 
 ```bash
@@ -107,11 +165,19 @@ On validation failure the helper quarantines the file to `<path>.invalid.<ISO-ts
 
 Operational push; no founder approval needed per §"Out of Scope" #4.
 
-## Step 6 — Log to the dogfooding journal AFTER commit
+## Step 6 — Log to the dogfooding journal AFTER commit (and BEFORE worktree cleanup)
 
 Run this step **only after `commit-reviewer-response.sh` exits 0**. If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
-Append a 6-field journal entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md, referencing the committed response file. Regenerate the HTML twin. **Never as part of the handshake** — journal is observation-only.
+Append a 6-field journal entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md, referencing the committed response file. Regenerate the HTML twin and push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**:
+
+```bash
+git add raw/internal/dogfooding/mcp-interactions-journal.md raw/internal/dogfooding/mcp-interactions-journal.html
+git commit -m "journal: cursor r$N review tick on $item_id"
+tools/review-queue/push-with-retry.sh "journal: cursor r$N review tick on $item_id"
+```
+
+**050 ordering invariant — journal pushes BEFORE the worktree cleanup trap fires.** The IDE-mode worktree lifecycle established in the binding-specific note removes the worktree on prompt exit; any journal commit that has not been pushed by then is lost. The journal commit is the last thing this prompt does before returning. **Never as part of the handshake** — journal is observation-only.
 
 ## Step 7 — Exit
 

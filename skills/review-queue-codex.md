@@ -15,6 +15,8 @@ git pull --rebase origin main
 
 (Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset → defaults to the production repo. The 041 wrapper script + AC5 smoke set it explicitly so the launchd job and tests use the right tree.)
 
+**050 worktree-isolation note (headless reviewer path).** Under launchd-fired headless invocation, `_run_reviewer.sh` has already created an ephemeral, detached-HEAD worktree at `$TMPDIR/echo-codex-<uuid>`, set `ECHO_REVIEW_QUEUE_REPO_ROOT` to that path, routed Codex with `-C "$WT"`, and read this prompt's bytes from `$WT/.claude/commands/review-queue-codex.md`. Steps 1–7 below execute inside that worktree; the founder's live `main` checkout `.git/index` is never written to by this tick. The unified ERR/EXIT cleanup trap in the wrapper discards the worktree on tick exit (success or failure); the journal commit in Step 6 must complete its `push-with-retry.sh` BEFORE the cleanup trap fires, which is the natural ordering inside this prompt body.
+
 This catches any new request directories AND ensures you are reviewing against the up-to-date spec. **Mandatory** — without it, you may write a review against a stale artifact.
 
 ## Step 2 — Scan for missing responses
@@ -104,6 +106,17 @@ except FileExistsError:
     os.unlink(tmp); raise SystemExit(0)
 ```
 
+**050 AC1 step 5 — same-reviewer launchd-overlap no-op guard.** Before the post-link commit, re-fetch `origin/main` and check whether `<dir>/codex.md` already exists upstream for this round. A sibling launchd-cadence tick can fire after this tick's initial fetch but before this tick's push; if it has already produced the response, this tick is a duplicate from cadence overlap and must exit cleanly (not push a noisy duplicate commit). The check narrows but does not close the race — two ticks may both pass the check and collide in `push-with-retry.sh`'s rebase loop; the loser produces a noisy failed tick which the next launchd cadence re-fires cleanly. (Race-tight fix is filed as 050-followup-G.)
+
+```bash
+git fetch origin main
+upstream_path="backlog/reviews/$item_id/r$N/codex.md"
+if git cat-file -e "origin/main:$upstream_path" 2>/dev/null; then
+  echo "tick: codex.md already exists at $upstream_path on origin — duplicate cadence overlap, exiting 0" >&2
+  exit 0
+fi
+```
+
 Then commit + push via the post-link validation helper (AC4 of item 041 — defense-in-depth backstop that mechanically re-checks `reviewer.schema.json` before any git operation, in case the pre-link gate missed a file shape):
 
 ```bash
@@ -114,11 +127,19 @@ The helper runs `tools/review-queue/validate.py reviewer <path>`; on failure it 
 
 This is an **operational push**, not a ship push — it does not need founder approval per §"Out of Scope" #4 of the 039 spec.
 
-## Step 6 — Log to the dogfooding journal AFTER commit
+## Step 6 — Log to the dogfooding journal AFTER commit (and BEFORE wrapper cleanup)
 
 Run this step **only after `commit-reviewer-response.sh` exits 0** (validation passed, commit + push succeeded). If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
-Append a 6-field entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md discipline. The entry references the committed response file; it does **not** coordinate the queue. Then regenerate the HTML twin.
+Append a 6-field entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md discipline. The entry references the committed response file; it does **not** coordinate the queue. Then regenerate the HTML twin and push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**:
+
+```bash
+git add raw/internal/dogfooding/mcp-interactions-journal.md raw/internal/dogfooding/mcp-interactions-journal.html
+git commit -m "journal: codex r$N review tick on $item_id"
+tools/review-queue/push-with-retry.sh "journal: codex r$N review tick on $item_id"
+```
+
+**050 ordering invariant — journal pushes BEFORE wrapper cleanup fires.** Under headless launchd invocation, the entire reviewer tick runs inside the wrapper's ephemeral worktree at `$TMPDIR/echo-codex-<uuid>`. The wrapper's unified ERR/EXIT cleanup trap removes that worktree at tick exit; any journal commit that has not been pushed by then is lost. Because the journal commit is the LAST thing this prompt does before returning, the prompt's natural exit order delivers the journal commit to `origin/main` before the wrapper trap fires.
 
 **Do not write the journal as part of the queue handshake.** The journal is observation-only; mixing it with queue state produces cross-reviewer journal-edit races (the case 039 §Implementation Notes calls out).
 

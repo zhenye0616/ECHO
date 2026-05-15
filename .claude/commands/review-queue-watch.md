@@ -4,16 +4,65 @@ description: Strategist watcher tick. One eligible round per tick. Runs combine.
 
 You are running one tick of the **strategist** watcher loop. Invoked from the strategist's own Claude Code session via `/loop 10m /review-queue-watch`. **Do not chain reasoning across ticks.** One eligible round per tick — exit and wait for the next loop fire.
 
+## Step 0 — Pre-flight worktree hygiene + create ephemeral worktree (050 AC2)
+
+The entire post-`combine.py` work (disposition patches, `dispatch-next-round.py` for r<N+1>, journal append, commit + push) is multi-step writes to `main` — three to four distinct commits before the tick exits. Per the 050 architectural invariant, none of those writes touch the founder's live `main` checkout. The tick runs inside `$TMPDIR/echo-watcher-<uuid>`.
+
+```bash
+# Anchor on the production repo first for pre-flight hygiene.
+cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
+
+# Pre-flight (order matters)
+git worktree prune || true
+REGISTERED_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2}')
+# GC unregistered $TMPDIR/echo-* orphans older than 60 min; registered ones
+# (active merger conflict-pauses, crashed registered survivors) are skipped
+# regardless of mtime — 050-followup-F handles crashed cleanup separately.
+if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
+  while IFS= read -r -d '' orphan; do
+    if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then continue; fi
+    rm -rf -- "$orphan" || true
+  done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
+fi
+
+# Create the ephemeral, detached-HEAD worktree pinned to origin/main.
+git fetch origin main
+[ -n "${TMPDIR:-}" ] || { echo "TMPDIR unset; cannot place ephemeral watcher worktree"; exit 1; }
+WT="$TMPDIR/echo-watcher-$(uuidgen)"
+git worktree add --detach "$WT" origin/main
+
+# Unified ERR/EXIT cleanup trap. No push-failure-specific preservation;
+# uniform lost-work-on-failure semantics per the 050 architectural invariant.
+cleanup() {
+  local rc=$?
+  cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}" 2>/dev/null || true
+  if [ -n "${WT:-}" ] && [ -d "$WT" ]; then
+    git worktree remove --force "$WT" 2>/dev/null || true
+  fi
+  git worktree prune 2>/dev/null || true
+  return $rc
+}
+trap cleanup EXIT
+trap 'cleanup; exit 1' ERR INT TERM
+
+# Route the rest of the tick through the worktree.
+cd "$WT"
+export ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"
+```
+
+`dispatch-next-round.py`, `combine.py`, and `push-with-retry.sh` are CWD-agnostic by construction (they use `git rev-parse --show-toplevel` / process-relative paths), so running them from `$WT` works without modification.
+
 ## Step 1 — Pull origin/main first
 
 ```bash
-cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
+# Already in $WT from Step 0. Pull to fast-forward the detached HEAD onto any
+# commits that landed on origin/main between Step 0's fetch and now.
 git -c rebase.autoStash=true pull --rebase origin main
 # Surface unpushed work / queue errors (push-with-retry.sh fallback target)
 tail -n 5 raw/internal/queue-errors.md 2>/dev/null || true
 ```
 
-(Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset in the strategist's own Claude Code session → defaults to the production repo. The 041 reviewer wrapper script + AC5 smoke set it explicitly so the launchd reviewer ticks and tests use the right tree. Strategist watcher ticks always run against production.)
+(Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset in the strategist's own Claude Code session → Step 0 anchors on the production repo, then sets `ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"` for the rest of the tick. The 041 reviewer wrapper script + AC5 smoke set it explicitly so the launchd reviewer ticks and tests use the right tree. Strategist watcher ticks always run against production but write inside the ephemeral worktree.)
 
 The tail surfaces any push-race fallbacks since the last tick so you can flag them in this turn's narration if action is needed. The file itself is repo-tracked, append-only, and uses the `.md` extension to avoid `*.log` gitignore.
 
@@ -99,5 +148,7 @@ The helper appends a `verification waived; rationale: <focus-hints>` line into t
 ## Step 4 — Exit
 
 One round per tick. The watcher does not batch rounds; serializing rounds across ticks keeps the tick body deterministic.
+
+**050 cleanup ordering.** All work in Steps 2–3 executes inside `$WT` (the ephemeral worktree created in Step 0). The commits + pushes happen inline within each branch's git block; by the time this prompt returns, every artifact has been pushed to `origin/main`. The Step 0 ERR/EXIT trap then runs `git worktree remove --force "$WT"` + `git worktree prune` in `${ECHO_REVIEW_QUEUE_REPO_ROOT:-…}`, discarding the worktree. There is no work that should persist locally past tick exit — the founder's live checkout sees the watcher's outputs only via `origin/main`.
 
 (Builder note: `combine.py --all` is available for one-shot batch processing outside the `/loop` body. The watcher-driven path is one-round-per-tick.)
