@@ -38,6 +38,12 @@ export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 # 048 R1 codex review tick silently failed every 10min for ~2h.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.nodenv/shims:$HOME/.asdf/shims:$HOME/bin:$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
+# CODEX_BIN — deterministic injection point for tests (051 AC2). Mirrors
+# tools/backlog/run-codex-builder.sh:94. Defaults to the unqualified
+# `codex` resolved via the wrapper's prepended PATH; tests set this to a
+# stub script path to assert the wrapper does (or does not) spawn codex.
+CODEX_BIN="${CODEX_BIN:-codex}"
+
 # Validate REVIEWER_NAME exists in reviewers.json with mode=headless. The
 # gate is a dedicated Python script (`_reviewer_gate.py`) so its stderr
 # survives all shell-wrapping permutations (e.g. node spawnSync without a
@@ -59,6 +65,22 @@ fi
 {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start REVIEWER=$REVIEWER_NAME ECHO_REVIEW_QUEUE_REPO_ROOT=$REPO_ROOT"
 
+  # 051 AC2 — honor the merge-and-cleanup sentinel-file lock. If a Claude
+  # merge-and-cleanup session is in progress on the live `.git/index`, any
+  # reviewer-tick `git add`/`commit` would race the merge writer (see
+  # 048-morning + 049-evening incidents). Skip cleanly so launchd's next
+  # ~10-min cadence retries organically — no in-script polling (would
+  # deadlock against the strategist's interactive conflict-resolution).
+  # `--git-common-dir` (not `--git-path`) resolves to the shared `.git/`
+  # from any worktree, so the lock written by the main checkout is visible
+  # even when this wrapper is invoked from a linked worktree CWD.
+  LOCK_PATH="$(git rev-parse --git-common-dir)/echo-merge-in-progress"
+  if [ -f "$LOCK_PATH" ]; then
+    HOLDER=$(cat "$LOCK_PATH" 2>/dev/null | head -1)
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick skipped: merge in progress (lock=$LOCK_PATH, holder=$HOLDER)"
+    exit 0
+  fi
+
   PROMPT="$REPO_ROOT/.claude/commands/${SLASH_COMMAND}.md"
   if [ ! -f "$PROMPT" ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: prompt missing at $PROMPT" >&2
@@ -66,7 +88,7 @@ fi
   fi
 
   set +e
-  codex exec -C "$REPO_ROOT" --sandbox danger-full-access - < "$PROMPT"
+  "$CODEX_BIN" exec -C "$REPO_ROOT" --sandbox danger-full-access - < "$PROMPT"
   rc=$?
   set -e
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick end rc=$rc"
