@@ -5,7 +5,7 @@ combined_at: '2026-05-15T07:31:12Z'
 codex_response: codex.md
 cursor_response: null
 codex-ops_response: codex-ops.md
-patch_commit_sha: 'will-fill-after-commit'
+patch_commit_sha: '39daa25'
 next_round: 4
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
@@ -26,7 +26,7 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md:87-93 | accepted | AC2 test was non-deterministic on machines with real Codex installs (PATH stub shadowed by wrapper's prepended `/opt/homebrew/bin:/usr/local/bin:...`) AND would crash on missing prompt fixture before reaching the lock-absent assertion. Patched AC2 to (a) add a `CODEX_BIN` env hook to `_run_reviewer.sh` mirroring existing `run-codex-builder.sh:94` pattern, (b) require prompt fixture copy as test step 2, (c) use `CODEX_BIN=<stub-path>` instead of `$PATH` manipulation. Codex-ops issued no findings → fix is grounded only in codex's lens but real per the wrapper's PATH-prepend logic at line 39. Patch SHA: PENDING |
+| 1 | MEDIUM | codex | backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md:87-93 | accepted | AC2 test was non-deterministic on machines with real Codex installs (PATH stub shadowed by wrapper's prepended `/opt/homebrew/bin:/usr/local/bin:...`) AND would crash on missing prompt fixture before reaching the lock-absent assertion. Patched AC2 to (a) add a `CODEX_BIN` env hook to `_run_reviewer.sh` mirroring existing `run-codex-builder.sh:94` pattern, (b) require prompt fixture copy as test step 2, (c) use `CODEX_BIN=<stub-path>` instead of `$PATH` manipulation. Codex-ops issued no findings → fix is grounded only in codex's lens but real per the wrapper's PATH-prepend logic at line 39. Patch SHA: `39daa25` |
 
 ## Convergence call
 
