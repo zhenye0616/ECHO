@@ -1779,6 +1779,9 @@ PDT - Codex R6 on 053 completed_at coercion</a></li>
 <li><a href="#pdt-strategist-drove-053-r1r6-to-convergence"
 id="toc-pdt-strategist-drove-053-r1r6-to-convergence">2026-05-15 01:56
 PDT — Strategist drove 053 R1–R6 to convergence</a></li>
+<li><a href="#pdt---codex-r1-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-r1-on-054-c3.5-conflict-review-spec">2026-05-15
+13:06 PDT - Codex R1 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18942,6 +18945,46 @@ or shrink AC3 rather than expand”), the strategist judged each R4+
 round’s findings as narrow-correctness-not-architectural-expansion, so
 chose to converge rather than escalate. The R6 zero-finding result
 validates that judgment.</li>
+</ul>
+<h3 id="pdt---codex-r1-on-054-c3.5-conflict-review-spec">2026-05-15
+13:06 PDT - Codex R1 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>0e5d1019664b7ec711a2fa62e35aea12300dce3c</code>, current
+<code>skills/merge-and-cleanup.md</code>, and
+<code>tests/skills/merge-and-cleanup-shape.test.ts</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r1/codex.md</code>
+as <code>8e8a599</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH C3.5 must run Codex against the active
+<code>$MERGER_WT</code> rather than the clean production checkout;
+MEDIUM AC2 does not falsify AC1.7’s verdict-action handling prose; LOW
+no-separate-artifact persistence still needs an explicit C6/C8
+audit-trail instruction.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>0e5d1019664b7ec711a2fa62e35aea12300dce3c</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r1/codex.md</code>;
+code/test paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response used a single-quoted
+<code>completed_at</code>, so the pre-link YAML gate passed on the first
+attempt. The queue helper touched only the r1 Codex response file; this
+journal entry is a separate sibling commit.</li>
 </ul>
 </body>
 </html>
