@@ -2,7 +2,7 @@
 id: 2026-05-14-053-reviewer-completed-at-coercion
 title: Reviewer schema accepts/coerces unquoted-YAML completed_at timestamps (two-prong — quoted-example prompts + defensive coercion)
 status: ready
-priority: MEDIUM
+priority: MED
 estimate: 0.5-1d
 created: 2026-05-14
 blocked_by: []

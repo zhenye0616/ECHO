@@ -2,7 +2,7 @@
 id: 2026-05-14-052-sync-skills-check-in-merge-and-cleanup
 title: /merge-and-cleanup C5 verify includes tools/sync-skills.sh --check + pre-commit hook
 status: ready
-priority: MEDIUM
+priority: MED
 estimate: 0.25-0.5d
 created: 2026-05-14
 blocked_by: []
