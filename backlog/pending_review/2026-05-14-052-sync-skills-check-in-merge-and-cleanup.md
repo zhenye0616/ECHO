@@ -24,10 +24,22 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-15T18:34:20Z"
 branch: "agent/sync-skills-check-in-merge-and-cleanup"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--sync-skills-check-in-merge-and-cleanup"
+head_sha: "6a7372fa8ae9ef31ec1dcc05b4b5e90f04b26038"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  All 4 ACs implemented in one commit on agent/sync-skills-check-in-merge-and-cleanup (6a7372f).
+  AC1: skills/merge-and-cleanup.md C5 verify ends with `tools/sync-skills.sh --check` plus the
+  spec-mandated remediation paragraph (no auto-fix). AC2: adapter re-derived via sync-skills.sh;
+  --check exits 0 in branch tree. AC3: tools/install-pre-commit-hook.sh ships, executable;
+  resolves hook path through absolute/relative core.hooksPath then git --git-path fallback;
+  idempotent on content AND mode (install / unchanged / mode-repair branches); overwrite
+  warning on content-differs; 6-scenario vitest test covers fresh / idempotent-no-rewrite /
+  mode-repair / content-differs / linked-worktree / relative-hooksPath-from-nested-cwd.
+  AC4: tests/skills/merge-and-cleanup-shape.test.ts extracts first fenced block under C5 via
+  anchored ^#+ C5 / ^#+ C6 regexes (NOT regex-permissive; no EOF fallback if C6 absent) and
+  asserts the literal `tools/sync-skills.sh --check` lives inside. Full suite: 937 pass, 21
+  skipped; npm run lint + typecheck clean; tools/sync-skills.sh --check exits 0.
 review_notes: ""
 ---
 
