@@ -139,7 +139,10 @@ npm install                 # in case dependencies changed (especially MCP SDK, 
 npm test
 npm run lint
 npm run typecheck
+tools/sync-skills.sh --check
 ```
+
+If `tools/sync-skills.sh --check` exits non-zero: **pause and surface the failure with this exact remediation message:** `sync-skills check failed — adapter drift between skills/ and .claude/commands/. Run \`tools/sync-skills.sh\` to re-derive, then re-stage and reply 'continue'.` Do NOT run `tools/sync-skills.sh` (without `--check`) on the operator's behalf — auto-fix would mask cases where the canonical was edited on a parallel branch and the adapter snapshot the merge produced is the *wrong* derived form. Same posture as the other verify failures: pause, let the operator inspect and re-derive deliberately, re-stage, then reply `continue`.
 
 If `package.json` was a conflict, `package-lock.json` should be regenerated rather than hand-merged — too noisy:
 
