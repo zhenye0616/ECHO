@@ -16,9 +16,14 @@ requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC1 — roster entry
   - tools/review-queue/reviewers.json
+  # AC1b — roster loader must accept the new invoke_command field (r1 codex F1 + codex-ops F4 HIGH convergent)
+  - tools/review-queue/_reviewers.py
   # AC2 — schema enum extensions (the 3-file manual-sync rule per 043 R1 HIGH #5)
   - tools/review-queue/schemas/reviewer.schema.json
   - tools/review-queue/schemas/request.schema.json
+  # AC2b — additional schema surface uncovered by r1 codex F2 HIGH (combined.schema.json + cross_ref.reviewer enum)
+  - tools/review-queue/schemas/combined.schema.json
+  - tools/review-queue/schemas/reviewers-config.schema.json  # add invoke_command field validation
   # AC3 — canonical Claude reviewer skill body
   - skills/review-queue-claude.md
   - .claude/commands/review-queue-claude.md       # synced from skills/ via tools/sync-skills.sh
@@ -77,12 +82,17 @@ Append to the `reviewers` array:
 - `mode: "headless"` per `claude -p` invocation form. `timeout_hours: null` (headless reviewers must have null timeout per `_reviewers.py:92-106`).
 - The reviewers-config schema preamble already flags the manual-sync rule (043 R1 HIGH #5); AC2 closes the sync.
 
-**AC2 — Extend the `reviewer` enum in both schemas.**
+**AC2 — Extend ALL reviewer-slug enum sites + the combined-response schema surface (r1 codex F2 HIGH).**
+
+The "manual-sync rule" preamble in `reviewers-config.schema.json` only named two enum sites; r1 codex review surfaced two more. ALL four must move together:
 
 - `tools/review-queue/schemas/reviewer.schema.json:24-25` — `reviewer` field enum becomes `["codex", "cursor", "codex-ops", "claude"]`.
+- `tools/review-queue/schemas/reviewer.schema.json` `findings[].cross_ref.reviewer` enum (second enum site in the same schema) — same 4-slug list. **Without this, no reviewer can legally cross-reference a Claude finding** — convergence-match would fail at validation time.
 - `tools/review-queue/schemas/request.schema.json:48` — `requested_reviewers` items enum becomes the same 4-slug list.
+- `tools/review-queue/schemas/combined.schema.json` — add `claude_response` property in the additionalProperties:false object. `combine.py` only emits `<slug>_response` keys that are schema-declared; without this property a Claude-included round produces a combined.md that fails schema validation. Either add `claude_response: { oneOf: [{type:string},{type:null}] }` explicitly, OR widen the schema to accept `*_response` via a regex pattern (preferred long-term — future reviewer slugs slot in without schema changes).
+- `tools/review-queue/schemas/reviewers-config.schema.json` — add `invoke_command: { type: string, minLength: 1 }` to the required field set for each roster entry (AC5 dependency).
 
-Live-fire validation: after the edits, the dry-run from this session must invert — `python3 tools/review-queue/validate.py reviewer <claude.md-fixture>` and `REVIEWER_NAME=claude python3 tools/review-queue/_reviewer_gate.py` both exit 0 instead of 1.
+Live-fire validation: after the edits, the dry-run from this session must invert — `python3 tools/review-queue/validate.py reviewer <claude.md-fixture>` and `REVIEWER_NAME=claude python3 tools/review-queue/_reviewer_gate.py` both exit 0 instead of 1. AND: a synthetic combined.md fixture with `claude_response: "claude.md"` validates against the updated combined.schema.json.
 
 **AC3 — `skills/review-queue-claude.md` canonical reviewer skill.**
 
@@ -110,7 +120,7 @@ exec env REVIEWER_NAME=claude "$(dirname "$0")/_run_reviewer.sh"
 
 Same shellcheck-clean shape as `run-codex-reviewer.sh` and `run-codex-ops-reviewer.sh`. Executable bit set.
 
-**AC5 — `_run_reviewer.sh` genericized via roster `invoke_command` field.**
+**AC5 — `_run_reviewer.sh` genericized via roster `invoke_command` field, with `_reviewers.py` loader extension + shell-safe substitution.**
 
 This is the load-bearing substrate change. Today `_run_reviewer.sh:140` is:
 
@@ -118,25 +128,51 @@ This is the load-bearing substrate change. Today `_run_reviewer.sh:140` is:
 codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"
 ```
 
-Replace with a roster-driven dispatch. Two-step:
+**Five-part landing** (each part must be in the same commit set; tests in AC9 guard each):
 
-1. **Schema:** Add an `invoke_command` string field to each entry in `reviewers.json`, schema-validated by `schemas/reviewers-config.schema.json`. The field is a shell-command template using two substitution tokens: `{{WT}}` (worktree path) and `{{PROMPT}}` (path to the prompt body inside the worktree). Example values:
+**1. `tools/review-queue/_reviewers.py` — extend the loader (r1 codex F1 + codex-ops F4 HIGH convergent).**
 
-   ```json
-   "invoke_command": "codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}"
-   ```
+The current loader at `_reviewers.py:26-35,62-72` constructs `Reviewer(**r)` against `_REQUIRED_FIELDS = ("name", "mode", "required", "timeout_hours", "slash_command")`. Adding `invoke_command` to reviewers.json without extending the loader breaks every roster load via the NamedTuple's `__new__` rejection of unknown fields — and that takes down the existing codex + codex-ops launchd ticks BEFORE any new claude tick can run.
 
-   For claude:
+Required edits:
+- Append `"invoke_command"` to `_REQUIRED_FIELDS`.
+- Extend the `Reviewer` NamedTuple with `invoke_command: str` (or `typing.NamedTuple` field-list).
+- Extend validation at `_reviewers.py:92-106` to require `invoke_command` be a non-empty string containing both `{{WT}}` and `{{PROMPT}}` tokens.
+- `_reviewer_gate.py` continues to print `slash_command` to stdout (back-compat); add a second mode `--print invoke_command` (or a sibling helper) so the wrapper can resolve the template.
 
-   ```json
-   "invoke_command": "claude -p --dangerously-skip-permissions < {{PROMPT}}"
-   ```
+**2. `reviewers.json` — add `invoke_command` per entry, including codex + codex-ops for backwards compatibility.**
 
-   (Or whichever `claude -p` invocation form ships the prompt body via stdin + bypasses interactive permission prompts; the spec body verifies the exact form against the installed `claude` CLI before merging.)
+```json
+{
+  "name": "codex",  "mode": "headless", "required": true, "timeout_hours": null,
+  "slash_command": "review-queue-codex",
+  "invoke_command": "codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}"
+},
+{
+  "name": "claude", "mode": "headless", "required": false, "timeout_hours": null,
+  "slash_command": "review-queue-claude",
+  "invoke_command": "claude -p --dangerously-skip-permissions < {{PROMPT}}"
+}
+```
 
-2. **Wrapper:** Read `invoke_command` for `$REVIEWER_NAME` from `reviewers.json` (via `_reviewer_gate.py` already returning it on stdout, OR a sibling small Python helper), do literal `{{WT}}` / `{{PROMPT}}` substitution, eval-exec the result. Do NOT use shell expansion on untrusted strings — `reviewers.json` is a committed file, so trust is well-defined, but use `bash -c` with a strict-mode preamble for defensive isolation.
+(Exact `claude -p` flag set is verified by AC9 unit test against the installed claude CLI — the spec body MAY refine the canonical flags during build.)
 
-**Backwards compatibility:** codex + codex-ops entries get their existing invocation as `invoke_command` values. Behavior is byte-identical pre/post AC5 for the codex/codex-ops bindings. AC9's integration test guards regression.
+**3. Shell-safe substitution (r1 codex F3 + codex-ops F6 MEDIUM convergent).**
+
+The literal `{{WT}}` / `{{PROMPT}}` substitution into a `bash -c` string loses argv quoting and breaks at runtime when `$TMPDIR` or repo paths contain spaces. Choose ONE of two shell-safe strategies (builder picks during R2; both are acceptable):
+
+- **Option A — `shlex.quote()` at substitution time.** The wrapper resolves the template in Python (small helper or extension of `_reviewer_gate.py`), runs `shlex.quote()` on both token values before substitution, and only then invokes `bash -c <string>`. Backwards-compatible with the string-template shape; just makes substitution safe.
+- **Option B — argv-style template (preferred).** Change `invoke_command` from a string to a JSON array: `["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-", "<", "{{PROMPT}}"]` (or model stdin redirect separately as `stdin_from: "{{PROMPT}}"`). Wrapper substitutes per-element via shlex.quote, then uses `subprocess.Popen` with `shell=False`. No bash-c at all. Cleaner but a larger refactor.
+
+The spec mandates "no `bash -c` against an un-escaped string template" — pick A or B and document the choice in the patch. AC9 fixture below proves it for the chosen strategy.
+
+**4. `_run_reviewer.sh` wrapper edit.**
+
+Replace the hardcoded `codex exec` line with a call to the chosen substitution mechanism. Worktree path is `$WT`; prompt is `$WT/.claude/commands/${SLASH_COMMAND}.md`. Failure to resolve `invoke_command` (missing field, template token mismatch, executable not on PATH) MUST surface as a queue-errors entry, not a silent rc=1.
+
+**5. Backwards compatibility invariant.**
+
+codex + codex-ops invocations are byte-equivalent pre/post AC5 (same `codex exec -C $WT --sandbox danger-full-access - < $PROMPT` argv, same env, same stdin). AC9 includes an explicit "argv snapshot" regression test: capture argv from the codex mock before AC5, capture argv after AC5, assert equivalence. Even one-character drift is a regression.
 
 **AC6 — `tools/sync-skills.sh --check` clean post-AC3.**
 
@@ -150,7 +186,12 @@ Sibling to `smoke-test-codex-runner.sh`. Runs the wrapper against an isolated tm
 - `commit-reviewer-response.sh` commits it
 - Hard isolation assertions (no writes outside `$SMOKE_HOME`, no PATH leak, `~/.echo/agent-id` not touched, etc.)
 
-If the founder's machine doesn't have `claude` CLI on PATH, the smoke runner exits 0 with a `[skip] claude CLI not installed at $(which claude || echo '<unset>')` line — same fail-open shape `_install_reviewer_launchd.sh` uses for missing smoke runners pre-045. (Per 045 AC2 the install path is fail-closed; the smoke runner ITSELF may fail-open on missing tooling so CI / fresh-machine setups don't choke.)
+**Fail-open is ONLY allowed in non-install contexts (r1 codex-ops F5 HIGH unique).** If `claude` CLI is absent:
+
+- **Non-install context (CI / unit test / dry-run inspection):** `smoke-test-claude-runner.sh` exits 0 with a `[skip] claude CLI not installed at $(which claude || echo '<unset>')` line. CI doesn't choke; fresh-machine setups proceed.
+- **Install context (operator-run `_install_reviewer_launchd.sh claude` flow):** smoke MUST fail-closed. The installer either (a) preflights the resolved `invoke_command` executable (`command -v claude`) BEFORE plist writes — exits non-zero if missing, no plist created; OR (b) runs smoke post-install and fails non-zero if smoke would have skipped — operator gets an immediate error AND the launchd job is uninstalled in the same step. Without this, an install-with-smoke flow can leave `com.echo.review-queue-claude.plist` firing every 10 min with `command-not-found`, silently consuming the launchd schedule and burning the founder's `_followups.md` HIGH #1 launchd-silent-fail surface MORE.
+
+Implementation hint: pass an `--install-context` flag to the smoke runner that flips fail-open to fail-closed. Default is fail-open; installer passes `--install-context` explicitly.
 
 **AC8 — Launchd install path works for `claude` slug via `_install_reviewer_launchd.sh`.**
 
@@ -167,10 +208,16 @@ against a dry-run target (e.g., a non-production `Label` prefix or test plist di
 Two-prong:
 1. **Unit-level (in `tests/review-queue/056-claude-reviewer-onboarding.test.ts`):** Using a mock claude CLI (`tests/review-queue/fixtures/mock-claude.sh` that records its argv + stdin then writes a hand-crafted valid `claude.md` to the expected path) — invoke `run-claude-reviewer.sh` against an isolated tmpdir, assert the wrapper:
    - Reads `invoke_command` from `reviewers.json` (not a hardcoded codex string)
-   - Substitutes `{{WT}}` and `{{PROMPT}}` correctly
+   - Substitutes `{{WT}}` and `{{PROMPT}}` correctly under the chosen shell-safe strategy from AC5 part 3
    - Reads the prompt body from `$WT/.claude/commands/review-queue-claude.md`
    - Calls mock-claude with the substituted argv
    - Mock-claude's output `claude.md` validates against `reviewer.schema.json` and is committed via `commit-reviewer-response.sh`
+
+   **Additional regression-class cases that close the r1 finding set:**
+   - **`_reviewers.py` accepts all 4 slugs** — instantiate the loader after AC5 part 1 lands; assert codex, codex-ops, cursor, claude all load without `ValueError`; assert each carries a non-empty `invoke_command`; assert the codex/codex-ops argv resolution is byte-equivalent to pre-AC5 (the "argv snapshot" regression check from AC5 part 5).
+   - **Combined schema validates 4-reviewer round** — synthesize a combined.md with `codex_response`, `codex-ops_response`, `claude_response` populated; assert `validate.py combined` exits 0 (closes r1 codex F2 HIGH).
+   - **Shell-safe substitution under spaces** (closes r1 codex F3 + codex-ops F6 MEDIUM convergent) — set `TMPDIR=/var/folders/.../tmp with spaces/` (or equivalent), invoke `run-claude-reviewer.sh`, assert the wrapper survives + mock-claude is invoked with the correctly-quoted args + the resulting `claude.md` lands correctly. Run the same fixture against codex + codex-ops to prove no backwards-incompat regression.
+   - **Install-context fail-closed when claude is absent** (closes r1 codex-ops F5 HIGH unique) — `PATH=/usr/bin:/bin` (no claude), invoke `_install_reviewer_launchd.sh claude --smoke --install-context`; assert non-zero exit; assert no plist file written under the test plist dir; assert no launchd job loaded. Inverse: `PATH=$TEST_BIN_WITH_CLAUDE`, same command; assert plist written + smoke passes.
 
 2. **Integration-level (cycle dogfooding, observational):** After 056 merges, the next qualifying spec dispatched with `requested_reviewers: ["codex", "codex-ops", "claude"]` is the empirical proof. Both codex AND claude ticks land their response files; `combine.py` writes `combined.md` cleanly with claude included in the convergent/divergent rows. Journal entry confirms the cycle ran with zero founder dispatch messages and zero schema-validation failures.
 
