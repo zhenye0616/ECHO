@@ -1724,6 +1724,9 @@ id="toc-pdt---codex-ops-r5-on-051-merge-lock-enforcement">2026-05-15
 <li><a href="#pdt---codex-r5-on-051-merge-lock-enforcement"
 id="toc-pdt---codex-r5-on-051-merge-lock-enforcement">2026-05-15 00:50
 PDT - Codex R5 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-ops-r2-on-052-sync-skills-merge-gate"
+id="toc-pdt---codex-ops-r2-on-052-sync-skills-merge-gate">2026-05-15
+01:13 PDT - Codex-ops R2 on 052 sync-skills merge gate</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18089,6 +18092,49 @@ intended differential: this Git advertises
 <code>--rebase=merges</code> preserved a two-parent merge in the temp
 fixture, and plain <code>--rebase</code> flattened it. No deferred
 codex-ops findings were re-raised.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-052-sync-skills-merge-gate">2026-05-15
+01:13 PDT - Codex-ops R2 on 052 sync-skills merge gate</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex (<code>codex-ops</code>)</li>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema,
+canonical codex-ops queue skill, pinned artifact
+<code>backlog/ready/2026-05-14-052-sync-skills-check-in-merge-and-cleanup.md</code>
+at <code>8be6fca287e41aabcf5e4e3922ccaf7cb923df07</code>, pinned
+<code>skills/merge-and-cleanup.md</code>, pinned
+<code>tools/sync-skills.sh</code>, package/test inventory, and
+referenced decision/follow-up context.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/codex-ops.md</code>
+as <code>7bb126b</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM relative <code>core.hooksPath</code> can install the
+hook at the wrong path when invoked from a subdirectory; MEDIUM AC4’s C5
+extraction can pass with the literal in C5 prose while the actual verify
+command fence omits <code>tools/sync-skills.sh --check</code>.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>8be6fca287e41aabcf5e4e3922ccaf7cb923df07</code>; request path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> First response generation failed before any
+file write because this Python lacks <code>datetime.UTC</code>;
+regenerated with <code>datetime.timezone.utc</code>, passed the pre-link
+YAML gate, and no malformed response reached the canonical queue
+path.</li>
 </ul>
 </body>
 </html>
