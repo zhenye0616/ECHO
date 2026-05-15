@@ -11,7 +11,9 @@ requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - skills/merge-and-cleanup.md  # AC1 — C5 verify block adds `tools/sync-skills.sh --check`; failure aborts merge with explicit error
   - .claude/commands/merge-and-cleanup.md  # AC2 — re-synced from canonical after AC1 edit (must be byte-identical to the canonical post-edit)
-  - tools/install-pre-commit-hook.sh  # NEW (AC3) — idempotent installer for `.git/hooks/pre-commit` running `tools/sync-skills.sh --check`; documents overwrite policy
+  - tools/install-pre-commit-hook.sh  # NEW (AC3) — idempotent installer for the resolved pre-commit hook path running `tools/sync-skills.sh --check`; documents overwrite policy; respects `core.hooksPath`; repairs non-executable mode
+  - tests/tools/install-pre-commit-hook.test.ts  # NEW (AC3 installer test) — covers fresh install, idempotent no-op, mode-repair on non-executable existing hook, content-differs overwrite warning, and linked-worktree path resolution
+  - tests/skills/merge-and-cleanup-shape.test.ts  # NEW (AC4 block-extraction test) — extracts C5 verify block and asserts the literal `tools/sync-skills.sh --check` is inside the extraction
 spec_refs:
   - skills/merge-and-cleanup.md  # AC1 target — current C5 block lists `npm install / npm test / npm run lint / npm run typecheck`; this spec appends the sync-identity check
   - tools/sync-skills.sh  # consumed (`--check` mode); NOT modified by this spec — it already supports --check (verified via header `tools/sync-skills.sh --check    # verify identity, exit non-zero on drift`)
@@ -70,19 +72,37 @@ The merge-time gate is the load-bearing half (it catches both cases at the integ
 ### AC3 — `tools/install-pre-commit-hook.sh` ships, idempotent, with documented overwrite policy
 
 - **NEW file:** `tools/install-pre-commit-hook.sh` (executable: `chmod +x`).
-- **What it does:** writes `.git/hooks/pre-commit` containing a small bash script that runs `tools/sync-skills.sh --check` and exits non-zero if drift is detected. The hook script's body MUST `cd "$(git rev-parse --show-toplevel)"` before invoking the check so it works regardless of where `git commit` was launched from.
-- **Idempotent:** running the installer twice produces the same `.git/hooks/pre-commit` (byte-identical). Implementation: write to a temp file, compare with the existing hook (if any), only `mv` over the live path if content differs. Print `"pre-commit hook unchanged"` on no-op or `"pre-commit hook installed at .git/hooks/pre-commit"` on first install / update.
-- **Overwrite policy (documented in installer header comment AND printed at runtime):** the installer **overwrites** any existing `.git/hooks/pre-commit` unconditionally. Rationale: pre-commit hooks are local-only (never committed), this installer is documented as the canonical way to install ECHO's hook, and merging this hook with a hand-written one is out of scope. Operators who have a custom pre-commit hook MUST manually concatenate the two — the installer's printed output reminds them by saying: `"NOTE: existing .git/hooks/pre-commit was overwritten. If you had a custom hook, restore it from your shell history or version-controlled backup."`
+- **What it does:** writes a small bash script (running `tools/sync-skills.sh --check` and exiting non-zero on drift) to the resolved pre-commit hook path for the current checkout. The hook script's body MUST `cd "$(git rev-parse --show-toplevel)"` before invoking the check so it works regardless of where `git commit` was launched from.
+- **Hook path resolution (load-bearing — codex-ops R1 F5):** the installer MUST NOT hardcode `.git/hooks/pre-commit`. ECHO's normal workflow includes linked worktrees where `.git` is a pointer file, not a directory; a hardcoded path either fails or writes to the wrong location while the installer still prints success. Required resolution order:
+  1. If `git config --get core.hooksPath` returns a non-empty value, use `<that>/pre-commit`.
+  2. Otherwise use `git rev-parse --git-path hooks/pre-commit` (which correctly resolves through the main repo's git common dir from inside a linked worktree).
+  3. `mkdir -p "$(dirname "$HOOK_PATH")"` before writing, in case the resolved directory does not yet exist.
+- **Idempotent (content AND mode):** running the installer twice produces a `pre-commit` hook that is byte-identical AND executable for the user. Implementation: write to a temp file (in the same directory as the resolved hook path to keep the rename atomic on the same filesystem), compare with the existing hook (if any). Branches:
+  - **Content differs OR hook missing:** `mv` the temp file over the live path, then `chmod u+x "$HOOK_PATH"`. Print `"pre-commit hook installed at <resolved-path>"`.
+  - **Content byte-identical AND existing hook is already executable for the user:** discard the temp file. Print `"pre-commit hook unchanged"`.
+  - **Content byte-identical BUT existing hook is NOT executable for the user (codex-ops R1 F4 — git silently ignores non-executable hooks, so a no-op reinstall that leaves a non-executable hook is a silent failure):** discard the temp file, then `chmod u+x "$HOOK_PATH"` to repair the mode in place. Print `"pre-commit hook mode repaired (was non-executable) at <resolved-path>"`.
+- **Overwrite policy (documented in installer header comment AND printed at runtime):** the installer **overwrites** any existing pre-commit hook content unconditionally on the content-differs branch. Rationale: pre-commit hooks are local-only (never committed), this installer is documented as the canonical way to install ECHO's hook, and merging this hook with a hand-written one is out of scope. Operators who have a custom pre-commit hook MUST manually concatenate the two — the installer's printed output reminds them on the content-differs branch by saying: `"NOTE: existing pre-commit hook was overwritten. If you had a custom hook, restore it from your shell history or version-controlled backup."`
 - **Manual install only:** the installer is NOT auto-invoked by any other tool, skill, or test. The founder runs it once per checkout, deliberately. (Out of Scope #1 enforces this.)
-- **No registration / discovery:** the installer does not write to any config file outside `.git/hooks/`. It does not append to a manifest or registry. One file in, one file out.
+- **No registration / discovery:** the installer does not write to any config file outside the resolved hooks directory. It does not append to a manifest or registry. One file in, one file out.
+- **Installer test (codex-ops R1 F4):** a `bats` or shell-based test (or a TypeScript test using `child_process.execSync`) under `tests/tools/install-pre-commit-hook.test.*` MUST cover all four cases above in a throwaway repo:
+  1. Fresh install (no existing hook): asserts the resolved hook exists AND is executable for the user (`-x "$HOOK_PATH"` true).
+  2. Idempotent re-install with hook present + executable + byte-identical: asserts the file's mtime is unchanged (proves no rewrite) AND it remains executable.
+  3. Mode-repair re-install with hook present + byte-identical + `chmod -x` applied first: asserts the hook is executable after the installer runs, AND the "mode repaired" prose appears in stdout.
+  4. Content-differs re-install with hook present + different content: asserts the new content lands, the file is executable, AND the "was overwritten" warning appears in stdout.
+  5. Linked-worktree scenario: install from a worktree created via `git worktree add`; assert the installer resolves the hook into the main repo's hooks directory (NOT into the worktree's `.git` pointer file), and assert `-x "$HOOK_PATH"`.
 
-### AC4 — Operational test: C5 prose contains the literal string `tools/sync-skills.sh --check`
+### AC4 — Operational test: literal string `tools/sync-skills.sh --check` appears inside the C5 verify command block
 
-- **NEW or extended test:** a small grep-style assertion that the canonical `skills/merge-and-cleanup.md` C5 block contains the literal string `tools/sync-skills.sh --check`. Implementation forms acceptable, in preference order:
-  1. Add a test case to an existing skills-shape test under `tests/` if one exists for `merge-and-cleanup.md`. Otherwise:
-  2. Add a one-liner shell assertion to the existing CI-run point most adjacent to skills (e.g., a script invoked from `npm test`) that does `grep -q "tools/sync-skills.sh --check" skills/merge-and-cleanup.md || { echo "AC4 fail: C5 missing sync-skills check"; exit 1; }`. Otherwise:
-  3. Create a minimal `tests/skills/merge-and-cleanup-shape.test.ts` with a single test that does the equivalent grep via `fs.readFileSync` + `expect(content).toContain("tools/sync-skills.sh --check")`.
-- **Why a literal-string test, not a behavioral test:** behavioral testing of the C5 verify (running an actual merge with adapter drift and asserting the merge aborts) requires fixturing a worktree, a stale-fork branch, and a captured-stdout assertion. That's out of scope for this small spec. The literal-string test catches the most likely regression (a future skill edit removes the `--check` line by accident) without the fixture cost. If subsequent dogfooding shows the literal-string test isn't enough, file a follow-up.
+- **NEW or extended test:** a grep-style assertion that the literal string `tools/sync-skills.sh --check` appears INSIDE the C5 verify command block of `skills/merge-and-cleanup.md`, NOT merely somewhere in the file body (codex-ops R1 F6 — a whole-file `toContain` / `grep -q` can pass if the string survives only in explanatory prose, risk notes, or a future comment while the actual C5 verify command stops running the check, which is exactly the regression this spec is meant to prevent).
+- **Block-extraction contract (load-bearing):** the test MUST first extract the C5 verify command block, then assert the literal appears inside that extraction. The extraction MUST anchor on the C5 verify block's stable markers:
+  - **Start:** the first line matching `^#+ .*[Cc]5[^a-zA-Z]` (case-insensitive `C5` heading) inside `skills/merge-and-cleanup.md`.
+  - **End:** the first line matching `^#+ ` AFTER the start line (i.e., the next heading at any depth) OR end-of-file.
+  - The extracted block is the text between those two markers, exclusive of the end marker.
+  - The assertion: `extracted_block.includes("tools/sync-skills.sh --check")`.
+- **Implementation forms acceptable, in preference order:**
+  1. Add a test case to an existing skills-shape test under `tests/` if one exists for `merge-and-cleanup.md`. The test reads the file, runs the block extraction, asserts the literal is inside the extraction. Otherwise:
+  2. Create a minimal `tests/skills/merge-and-cleanup-shape.test.ts` with a single test that does the block extraction (regex-based) and assertion as above. Plain whole-file `expect(content).toContain(...)` is INSUFFICIENT and MUST NOT be used.
+- **Why a structural-extraction test, not a behavioral test:** behavioral testing of the C5 verify (running an actual merge with adapter drift and asserting the merge aborts) requires fixturing a worktree, a stale-fork branch, and a captured-stdout assertion. That's out of scope for this small spec. The block-extraction test catches the most likely regression (the literal moving out of the C5 command list into prose, or being removed entirely) without the fixture cost. If subsequent dogfooding shows the block-extraction test isn't enough, file a follow-up.
 - **Test must run in `npm test`** so it's part of the gate that the merge-and-cleanup C5 block already runs (closing the loop: the gate that's being added is itself protected by the existing gate).
 
 ## Out of Scope (Don't Drift)
@@ -106,8 +126,8 @@ The merge-time gate is the load-bearing half (it catches both cases at the integ
 
 - AC1: `skills/merge-and-cleanup.md` C5 verify block contains `tools/sync-skills.sh --check`; failure surfaces with the exact remediation message named in AC1.
 - AC2: `.claude/commands/merge-and-cleanup.md` byte-identical to canonical post-edit; `tools/sync-skills.sh --check` exits 0 in the feature branch's tree.
-- AC3: `tools/install-pre-commit-hook.sh` exists, executable, idempotent on re-run, prints overwrite warning, documented header comment.
-- AC4: `npm test` includes an assertion that `skills/merge-and-cleanup.md` contains the literal string `tools/sync-skills.sh --check`.
+- AC3: `tools/install-pre-commit-hook.sh` exists, executable, idempotent on re-run (content + mode), resolves hook path via `core.hooksPath` / `git rev-parse --git-path hooks/pre-commit`, repairs non-executable mode on no-op re-install, prints overwrite warning on content-differs, has a test covering all five cases including the linked-worktree scenario.
+- AC4: `npm test` includes an assertion that the literal string `tools/sync-skills.sh --check` appears INSIDE the extracted C5 verify command block of `skills/merge-and-cleanup.md`, not merely somewhere in the file body.
 - All four ACs verified locally before pushing the feature branch.
 
 ## After Completion (Strategist Notes)
