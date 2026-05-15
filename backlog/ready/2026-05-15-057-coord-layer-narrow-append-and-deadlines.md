@@ -17,9 +17,13 @@ agent_notes: |
   invoke `request.py` for 057 r1 after those converge.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
+  # AC0 — strategist-initiated active trigger (added in r0 patch — user model)
+  - src/mcp/tools/coord-invoke.ts                  # new MCP write tool — spawns wrapper for headless reviewer roles
+  - tools/review-queue/request.py                  # call coord_invoke for each headless reviewer post-dispatch
+  - tests/coord/active-trigger-roundtrip.test.ts
   # AC1 — narrow coord append seam
   - src/mcp/tools/coord-emit.ts                    # new MCP write tool
-  - src/mcp/server.ts                              # register coord_emit
+  - src/mcp/server.ts                              # register coord_emit + coord_invoke
   - src/storage/sqlite.ts                          # narrow coord-write path; preserve single-writer constraint
   - src/coord/types.ts                             # new module — coord event types + schema_version registry
   - src/coord/validate.ts                          # event shape validation; reject unknown event_type / schema_version
@@ -99,6 +103,23 @@ review_notes: |
 Codex strategist's read-only consult at the v1-design boundary surfaced 5 findings that the strategist had missed. 057 absorbs all 5 as acceptance criteria — see AC1-AC5 below. Bottom line from codex: *"substrate choice is directionally good, but the spec must stop treating 'atom-shaped' as enough. Coordination atoms need a reserved source family, a narrow append seam, explicit non-pollution rules, durable replay, and a mailbox-not-push delivery contract."*
 
 ## Acceptance Criteria
+
+**AC0 — Strategist-initiated active trigger (closes the launchd-polling latency + silent-fail dimension).**
+
+The launchd-polled reviewer model has two compounding failures: (a) 0-10 min latency per hop even on the happy path, and (b) silent kickstart failures that swallow themselves before the log redirect (`_followups.md` HIGH #1). Today's 056 r1 spurious-escalation incident (2026-05-15 ~22:50-23:24Z) is the canonical case — the strategist dispatched r1, launchd never ticked, combine.py's `FALLBACK_TIMEOUT_HOURS=0.5` declared `no_responses` 30 min later despite both reviewers having `timeout_hours: null` in `reviewers.json`.
+
+The fix: a **strategist-initiated active trigger** via the coord layer, parallel to (NOT replacing) launchd polling:
+
+- **New MCP tool `coord_invoke(role, request_path?, correlation_id?)`** at `src/mcp/tools/coord-invoke.ts`. Strategist calls this immediately after `request.py` writes `r<N>/request.md`. The daemon reads the role's `invoke_command` from `coord-roles.json` (sibling of `reviewers.json`'s `slash_command` field), substitutes `{{REQUEST_PATH}}` / `{{CORRELATION_ID}}` tokens, and spawns the wrapper via the same process-spawn path the launchd plist uses. Synchronous spawn (daemon returns success once the wrapper starts), non-blocking on the wrapper's completion — the strategist subscribes via `wait_for_new_turns` for the `tick_start` / `tick_end` pings.
+- **Strategist's `request.py` integration:** after the `request.md` commit+push lands, call `coord_invoke` for each reviewer in `requested_reviewers` whose `coord-roles.json` entry has a `headless: true` flag. IDE-mode reviewers (e.g., cursor) don't get auto-invoked — they're paste-triggered per `skills/review-queue-cursor.md`.
+- **In-progress ping (already in AC7):** the wrapper emits `coord_emit(tick_start, correlation_id=<from invoke>)` before any pre-redirect work — earliest possible signal that the wrapper bootstrapped. Strategist's live subscription receives this within ~100ms.
+- **Completion ping (already in AC7):** after the reviewer's response file is committed + pushed, the wrapper emits `coord_emit(tick_end, correlation_id, verdict=<from response>)`. Strategist receives → runs combine.py (or short-circuits if both reviewers have pinged tick_end).
+- **Launchd polling stays as the fallback heartbeat.** If the daemon is down or `coord_invoke` fails, launchd's 600s tick still discovers `r<N>/request.md` the old way. The coord layer is the latency-optimized happy path; the polling layer is the durability-guaranteed slow path. Both coexist by design.
+- **Strategist short-circuit:** when both reviewers have emitted `tick_end` for the same `correlation_id`, the strategist can run combine.py immediately rather than wait for the next `/loop` cron tick. (Optional optimization; the cron-driven path still works.)
+
+**Why this isn't push-to-stateless** (AC4 invariant preserved): `coord_invoke` is a NEW outbound action from the daemon (spawning a wrapper), not a push to a passive subscriber. The reviewer wrapper is still launched fresh each time; it just learns its work via the spawn args + the committed request.md, not via a long-poll. AC4 still holds: a SECOND builder that's already exited cannot be pinged about a race in real-time.
+
+**Falsifiable test (extends AC8):** `tests/coord/active-trigger-roundtrip.test.ts` — strategist invokes `coord_invoke(role=codex)`; assert wrapper PID spawned within 500ms; assert `coord:tick_start` atom appears within 1s; assert `coord:tick_end` atom appears after the wrapper completes; assert the entire roundtrip is observable via `coord_status()` as a closed correlation_id pair.
 
 **AC1 — Narrow coord append seam (closes codex Q1 HIGH).**
 
