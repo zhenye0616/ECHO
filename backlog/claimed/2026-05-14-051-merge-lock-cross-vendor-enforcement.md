@@ -21,9 +21,9 @@ spec_refs:
   - raw/internal/dogfooding/mcp-interactions-journal.md    # 2026-05-14 evidence of the bug class: the 14:02 PDT collision atom (codex reviewer launchd tick PID 69375 swept Claude's staged 048 conflict-resolution into commit ec2907f), and the 049-evening recurrence cited in _followups.md. Both incidents are the same two-prong gap that 051 closes interim.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-15T08:23:16Z"
+branch: "agent/merge-lock-cross-vendor-enforcement"
 worktree: ""
 head_sha: ""
 pr_url: ""
