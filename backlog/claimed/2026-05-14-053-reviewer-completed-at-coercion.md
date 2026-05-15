@@ -28,10 +28,10 @@ spec_refs:
   - backlog/ready/2026-05-14-052-merge-cleanup-sync-skills-check.md  # complementary spec — 052 adds `tools/sync-skills.sh --check` to merge-and-cleanup C5 so AC5's re-sync drift is caught mechanically. 053 and 052 are independent but mutually reinforcing for skill/.claude-commands consistency.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-15T19:11:10Z"
+branch: "agent/reviewer-completed-at-coercion"
+worktree: "~/Desktop/Project_echo--reviewer-completed-at-coercion"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
