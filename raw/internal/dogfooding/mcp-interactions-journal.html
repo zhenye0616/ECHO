@@ -1706,6 +1706,12 @@ PDT - Codex R2 on 051 merge-lock enforcement</a></li>
 <li><a href="#pdt---codex-ops-r2-on-051-merge-lock-enforcement"
 id="toc-pdt---codex-ops-r2-on-051-merge-lock-enforcement">2026-05-15
 00:19 PDT - Codex-ops R2 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-r3-on-051-merge-lock-enforcement"
+id="toc-pdt---codex-r3-on-051-merge-lock-enforcement">2026-05-15 00:28
+PDT - Codex R3 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-ops-r3-on-051-merge-lock-enforcement"
+id="toc-pdt---codex-ops-r3-on-051-merge-lock-enforcement">2026-05-15
+00:28 PDT - Codex-ops R3 on 051 merge-lock enforcement</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17800,6 +17806,96 @@ entry.</li>
 surface from the ops angle: the production command and launchd
 lock-check insertion point are correct in the AC body, but stale summary
 text can still send a builder toward the runtime-bad paths.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-051-merge-lock-enforcement">2026-05-15 00:28
+PDT - Codex R3 on 051 merge-lock enforcement</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+at <code>21e0a05f37442dd252c35b8338a860f2c93447db</code>, current
+<code>push-with-retry.sh</code>, <code>_run_reviewer.sh</code>,
+<code>_reviewer_gate.py</code>, <code>_reviewers.py</code>,
+<code>_lib.py</code>, <code>package.json</code>, existing reviewer
+wrapper tests, and prior R2 responses for response shape. Also ran a
+throwaway Git probe to verify the AC1 <code>origin/main^2</code>
+assertion remains observable after
+<code>git pull --rebase=merges &amp;&amp; git push</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/codex.md</code>
+as <code>efea69e</code>, verdict <code>proceed_after_patches</code>,
+finding: MEDIUM AC2’s required lock-absent test can either abort on a
+missing reviewer prompt in the throwaway repo or bypass the PATH stub
+and launch the real <code>/usr/local/bin/codex</code> because
+<code>_run_reviewer.sh</code> prepends install directories before
+inherited <code>$PATH</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>21e0a05f37442dd252c35b8338a860f2c93447db</code>; request path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R2 focus patches are present:
+<code>--rebase=merges</code> is now consistent outside the single
+invalid-form falsification note, the frontmatter command is corrected,
+and the lock-absent branch points to the prompt/codex continuation path.
+The remaining issue is confined to making the new wrapper test
+deterministic and safe on machines with a real Codex install.</li>
+</ul>
+<h3 id="pdt---codex-ops-r3-on-051-merge-lock-enforcement">2026-05-15
+00:28 PDT - Codex-ops R3 on 051 merge-lock enforcement</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+at <code>21e0a05f37442dd252c35b8338a860f2c93447db</code>, pinned
+<code>_run_reviewer.sh</code>, pinned <code>push-with-retry.sh</code>,
+reviewer runner scripts, <code>skills/merge-and-cleanup.md</code>, and
+existing R2 response examples for response shape.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/codex-ops.md</code>
+as <code>e0030ce</code>, verdict <code>proceed</code>, findings: none.
+R3 focus checks passed: the instruction-bearing frontmatter uses
+<code>--rebase=merges</code>; the only standalone
+<code>--rebase-merges</code> reference is the AC1 falsification note;
+AC2 lock-absent prose now continues to the prompt/codex invocation path
+after log setup.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>21e0a05f37442dd252c35b8338a860f2c93447db</code>; request path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r3/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> First response generation failed before any
+file write because this Python lacks <code>datetime.UTC</code>;
+regenerated with <code>datetime.timezone.utc</code>, passed the pre-link
+YAML gate, and no malformed response reached the canonical queue
+path.</li>
 </ul>
 </body>
 </html>
