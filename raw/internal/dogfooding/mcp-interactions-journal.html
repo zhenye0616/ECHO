@@ -1764,6 +1764,9 @@ PDT - Codex R4 on 053 completed_at coercion</a></li>
 <li><a href="#pdt---codex-ops-r4-on-053-completed_at-coercion"
 id="toc-pdt---codex-ops-r4-on-053-completed_at-coercion">2026-05-15
 01:45 PDT - Codex-ops R4 on 053 completed_at coercion</a></li>
+<li><a href="#pdt---codex-ops-r5-on-053-completed_at-coercion"
+id="toc-pdt---codex-ops-r5-on-053-completed_at-coercion">2026-05-15
+01:50 PDT - Codex-ops R5 on 053 completed_at coercion</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18686,6 +18689,48 @@ entry.</li>
 <code>completed_at</code>, so the pre-link YAML gate passed on the first
 attempt. The helper commit touched only the r4 codex-ops response
 file.</li>
+</ul>
+<h3 id="pdt---codex-ops-r5-on-053-completed_at-coercion">2026-05-15
+01:50 PDT - Codex-ops R5 on 053 completed_at coercion</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-053-reviewer-completed-at-coercion.md</code>
+at <code>c8fe2cc743c59c59b06c6e31aa18b47941e97823</code>, prior R4
+disposition context embedded in the repo, and the queue
+validation/commit/combine helpers.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r5/codex-ops.md</code>
+as <code>b20d763</code>, verdict <code>proceed</code>, findings: none.
+R5 focus checks passed: AC3.2 now anchors the no-quarantine assertion on
+<code>&lt;reviewer&gt;.md.invalid.&lt;ISO-ts&gt;</code> siblings plus
+<code>VALIDATION-FAIL</code> rows, and the Node no-shell alternative
+uses command-plus-argv form with <code>os.homedir()</code>/equivalent
+and status, signal, plus 40-hex SHA validation.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c8fe2cc743c59c59b06c6e31aa18b47941e97823</code>; request path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r5/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response used a single-quoted
+<code>completed_at</code>, so the pre-link YAML gate passed on the first
+attempt. The helper’s first <code>push-with-retry.sh</code> pull hit
+<code>fatal: Cannot rebase onto multiple branches</code>, then the
+second attempt pulled cleanly and pushed successfully.</li>
 </ul>
 </body>
 </html>
