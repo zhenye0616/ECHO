@@ -1829,6 +1829,11 @@ href="#pdt---codex-ops-r2-on-055-cursor-as-builder-paste-trigger-spec"
 id="toc-pdt---codex-ops-r2-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
 16:26 PDT - Codex-ops R2 on 055 Cursor-as-builder paste-trigger
 spec</a></li>
+<li><a
+href="#pdt---codex-r2-on-055-cursor-as-builder-paste-trigger-spec"
+id="toc-pdt---codex-r2-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
+16:26 PDT - Codex R2 on 055 Cursor-as-builder paste-trigger
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19647,6 +19652,54 @@ now says Cursor serialization is operator-enforced, carries the shared
 <code>ECHO_AGENT_ID</code> resume hazard, uses path-specific claim
 verification instead of relying on <code>origin/main</code> tip
 position, and gives AC5 a durable merge-time followup path.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
+16:26 PDT - Codex R2 on 055 Cursor-as-builder paste-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-055-cursor-as-builder-paste-trigger.md</code>
+at <code>034715984abe15eb9f9c9e8e1df83361989ce8fc</code>, R1 combined
+context, current <code>skills/process-backlog.md</code>,
+<code>skills/review-queue-cursor.md</code>,
+<code>tools/sync-skills.sh</code>,
+<code>docs/AGENT_INSTRUCTIONS.md</code>, completed 047 excerpts, and
+<code>tools/task-state/lint.py</code> /
+<code>skills/role-typed-task-state.md</code> for the builder-pointer
+lint contract.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r2/codex.md</code>
+as <code>0982bd9</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>034715984abe15eb9f9c9e8e1df83361989ce8fc</code>; request path
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R2 closed the R1 implementability gaps:
+Cursor’s shared <code>ECHO_AGENT_ID</code> concurrency caveat is
+explicit, AC2 matches the real sync helper behavior, the claim-success
+check is path-specific, and the docs-only verification commands are
+concrete enough for handoff.</li>
 </ul>
 </body>
 </html>
