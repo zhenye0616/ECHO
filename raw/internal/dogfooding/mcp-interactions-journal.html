@@ -1797,6 +1797,9 @@ id="toc-pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec">2026-05-15
 <li><a href="#pdt---codex-r3-on-054-c3.5-conflict-review-spec"
 id="toc-pdt---codex-r3-on-054-c3.5-conflict-review-spec">2026-05-15
 13:35 PDT - Codex R3 on 054 C3.5 conflict-review spec</a></li>
+<li><a href="#pdt---codex-ops-r4-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-ops-r4-on-054-c3.5-conflict-review-spec">2026-05-15
+13:43 PDT - Codex-ops R4 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19234,6 +19237,52 @@ consult-failure recovery branch. The C6 summary enumeration looks
 correct: <code>pushback</code> remains the verdict, while founder
 override/acceptance is summary text rather than a fourth success
 verdict.</li>
+</ul>
+<h3 id="pdt---codex-ops-r4-on-054-c3.5-conflict-review-spec">2026-05-15
+13:43 PDT - Codex-ops R4 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>8bcd9c980163b557727fd0aea6901f8b6548bfaa</code>, and current
+<code>skills/merge-and-cleanup.md</code> around the
+<code>$MERGER_WT</code> runtime context.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r4/codex-ops.md</code>
+as <code>8a0875e</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM exact raw <code>consult_cwd == $MERGER_WT</code>
+comparison can false-fail under TMPDIR path canonicalization
+differences; LOW C6 failed-consult audit example says
+<code>wrong SHA</code> instead of wrong-tree/cwd-mismatch.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>8bcd9c980163b557727fd0aea6901f8b6548bfaa</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r4/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R4 patches closed the R3 stdout/stderr
+capture and missing scope-anchor issues. The remaining runtime risk is
+narrower: keep <code>consult_cwd</code>, but avoid classifying a valid
+consult as wrong-tree because <code>/var</code> and
+<code>/private/var</code> or logical/physical cwd forms differ.</li>
 </ul>
 </body>
 </html>
