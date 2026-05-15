@@ -1819,6 +1819,11 @@ href="#pdt---codex-r1-on-055-cursor-as-builder-paste-trigger-spec"
 id="toc-pdt---codex-r1-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
 15:58 PDT - Codex R1 on 055 Cursor-as-builder paste-trigger
 spec</a></li>
+<li><a
+href="#pdt---watcher-tick-056-r1-no_responses-escalation-spurious"
+id="toc-pdt---watcher-tick-056-r1-no_responses-escalation-spurious">2026-05-15
+16:25 PDT - Watcher tick: 056 r1 no_responses escalation
+(spurious)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19541,6 +19546,55 @@ committed and pushed before this observation-only journal entry.</li>
 but the Cursor binding prose needs to preserve the existing persona-ID
 concurrency warning, and the sync acceptance text needs to match the
 Codex adapter transform rather than literal byte identity.</li>
+</ul>
+<h3
+id="pdt---watcher-tick-056-r1-no_responses-escalation-spurious">2026-05-15
+16:25 PDT - Watcher tick: 056 r1 no_responses escalation (spurious)</h3>
+<ul>
+<li><strong>Trigger:</strong> strategist
+<code>/loop 10m /review-queue-watch</code> cron tick at 23:24Z;
+combine.py declared 056 r1 eligible due to
+<code>FALLBACK_TIMEOUT_HOURS=0.5</code> (combine.py:45) — both required
+reviewers (codex, codex-ops, both <code>timeout_hours: null</code> in
+reviewers.json) missing past 30 min elapsed since
+<code>requested_at=22:48Z</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls. Read
+backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r1/{request.md,combined.md};
+checked ~/Library/Logs/echo-review-queue-codex*.log for tick
+history.</li>
+<li><strong>Returned shape:</strong> combined.md written by combine.py
+with
+<code>combined_verdict: no_responses, escalated_to_founder: true, codex_response: null, codex-ops_response: null</code>.
+Path:
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r1/combined.md</code>
+(commit <code>6a7fd81</code>).</li>
+<li><strong>Sources:</strong> queue path above; reviewers.json
+(codex+codex-ops both null timeout); combine.py:311
+(FALLBACK_TIMEOUT_HOURS substitution); codex/codex-ops launchd logs
+(last successful tick 20:47Z, then silent-fail 21:00-22:54, then
+direct-invoke at 22:54 covered 055 r1 only, then direct-invoke at 23:22
+mid-tick on 055 r2 at combine time).</li>
+<li><strong>Verdict:</strong> 🚨 spurious escalation — root cause is
+<code>_followups.md</code> HIGH #1 launchd silent-fail (no reviewer
+ticks fired between 20:47 and my direct-invoke at 22:54 / 23:22).
+Combine.py’s 30-min FALLBACK_TIMEOUT_HOURS for null-timeout reviewers is
+also debatable per the 043 spec wording (“headless reviewers must have
+timeout_hours: null” implying no timeout) — but the implementation chose
+a 30-min eligibility-gate fallback instead. Both surface in 057
+AC2+AC3.</li>
+<li><strong>Note:</strong> Per the watcher skill Step 3 escalation
+branch: journal + exit; founder will decide whether to (a) re-dispatch
+056 r1 fresh, (b) accept the escalation and treat it as terminal, (c)
+hand-edit the combined.md to unblock the existing reviewer cycle that’s
+still running PID 29593/29595. The reviewers will finish their current
+055 r2 tick in ~2 min and naturally land response files for 055 r2; 056
+r1 stays closed-by-escalation.</li>
+<li><strong>Conjecture:</strong> 057’s AC3 deadline tracker would have
+correctly distinguished “reviewer’s individual deadline” from
+“round-eligibility-gate timeout” — same data, two purposes. 057’s AC6
+coord_status() would also have surfaced the launchd silent-fail at 21:00
+instead of letting it accumulate to 36 min undetected. Both are concrete
+acceptance-criteria justifications baked into 057.</li>
 </ul>
 </body>
 </html>
