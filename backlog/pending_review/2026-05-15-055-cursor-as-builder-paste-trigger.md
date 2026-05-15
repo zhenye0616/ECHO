@@ -8,10 +8,11 @@ created: 2026-05-15
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-15T23:33:16Z"
 branch: "agent/cursor-as-builder-paste-trigger"
-head_sha: ""
+head_sha: "064f1ee67cb721c9c001bcf4e16c04420261e3d1"
 pr_url: ""
 task_state_ref: 2026-05-15-055-cursor-as-builder-paste-trigger
-agent_notes: ""
+agent_notes: |
+  AC1–AC4 complete. AC1: new "Binding-specific notes — Cursor's Claude (IDE-mode)" section appended to skills/process-backlog.md after the codex section, mirroring its shape (trigger mode, operator-enforced serialization, atomic-claim as sole sync primitive, ECHO_AGENT_ID resolution, MCP exposure, invariants reminder). AC2: tools/sync-skills.sh --check clean post-resync of both adapters. AC3: docs/cursor-builder-trigger.md (47 lines, sibling shape to docs/review-queue-setup.md) with the four-step paste-trigger ritual + pre-flight + failure modes; contains the spec-required ECHO_AGENT_ID and "one active Cursor builder per ECHO_AGENT_ID" grep phrases. AC4: schema-conforming builder.md (5 blocks, lint clean, 37-line body). Built by Claude Code binding (AC5 explicitly permits non-Cursor binding to claim; founder + strategist must file the dated 055-AC5-cursor-builder-run-by followup at merge time per the spec's "Durable reminder" clause). No protocol body changes; no wrapper; no schema changes.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC1 — binding-specific section appended to vendor-neutral protocol skill
