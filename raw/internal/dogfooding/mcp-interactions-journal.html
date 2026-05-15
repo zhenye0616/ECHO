@@ -1752,6 +1752,12 @@ href="#pdt-claude-builder-run-on-2026-05-14-051-merge-lock-cross-vendor-enforcem
 id="toc-pdt-claude-builder-run-on-2026-05-14-051-merge-lock-cross-vendor-enforcement">2026-05-15
 01:35 PDT — Claude builder run on 2026-05-14-051 (merge-lock
 cross-vendor enforcement)</a></li>
+<li><a href="#pdt---codex-ops-r3-on-053-completed_at-coercion"
+id="toc-pdt---codex-ops-r3-on-053-completed_at-coercion">2026-05-15
+01:37 PDT - Codex-ops R3 on 053 completed_at coercion</a></li>
+<li><a href="#pdt---codex-r3-on-053-completed_at-coercion"
+id="toc-pdt---codex-r3-on-053-completed_at-coercion">2026-05-15 01:38
+PDT - Codex R3 on 053 completed_at coercion</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18495,6 +18501,99 @@ commit, not a merge), so the AC2 lock check wouldn’t have caught it. The
 residual race is on 050’s structural path (per the spec’s “Critical
 context — 050 supersedes 051” section). No fix here per CLAUDE.md “Don’t
 design fixes in the journal.” Observation only.</li>
+</ul>
+<h3 id="pdt---codex-ops-r3-on-053-completed_at-coercion">2026-05-15
+01:37 PDT - Codex-ops R3 on 053 completed_at coercion</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. The mandated initial
+<code>git pull --rebase origin main</code> was blocked by pre-existing
+unstaged local work; an autostash retry fetched <code>origin/main</code>
+but hit the known <code>Cannot rebase onto multiple branches</code>
+path, so the tick verified <code>main...origin/main</code> was
+<code>0 0</code> before reviewing. Scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-053-reviewer-completed-at-coercion.md</code>
+at <code>dc46e101a7bb8dea5d59c1c2eabe3964357c5c2a</code>, and the queue
+validation/commit helpers.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/codex-ops.md</code>
+as <code>162d102</code>, verdict <code>proceed</code>, findings: none.
+R3 focus checks passed: AC3.2 now requires <code>mktemp</code>, bare
+local origin, <code>-b main</code> checkout, local git identity, remote
+add, seeded/pushed <code>origin/main</code>, helper copies, request
+fixture placement, real-remote refusal for any <code>github.com</code>
+origin, and always-run production-repo byte comparisons against the real
+<code>refs/heads/main</code> SHA.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>dc46e101a7bb8dea5d59c1c2eabe3964357c5c2a</code>; request path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response used a single-quoted
+<code>completed_at</code>, so the pre-link YAML gate passed on the first
+attempt. The codex-ops response commit itself touched only
+<code>r3/codex-ops.md</code>; unrelated 051 handoff state had already
+been absorbed by the parent commit <code>792142c</code> before this tick
+pushed <code>162d102</code>.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-053-completed_at-coercion">2026-05-15 01:38
+PDT - Codex R3 on 053 completed_at coercion</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. The mandated initial
+<code>git pull --rebase origin main</code> was blocked by pre-existing
+unstaged local work, so the tick used an autostash pull and verified
+<code>origin/main</code> was up to date before reviewing. Scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-053-reviewer-completed-at-coercion.md</code>
+at <code>dc46e101a7bb8dea5d59c1c2eabe3964357c5c2a</code>, and the queue
+validation/commit/combine helpers plus existing review-queue tests.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/codex.md</code>
+as <code>7764f25</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM PATH-only push-with-retry stubbing is ineffective
+because commit-reviewer-response.sh invokes the repo-root helper path
+directly; MEDIUM AC3.2 needs explicit combine-stage prerequisites
+(<code>_reviewers.py</code>, <code>reviewers.json</code>, and an
+eligible requested_reviewers fixture); LOW production remote SHA guard
+should assert <code>ls-remote</code> returns a non-empty hex SHA before
+comparing pre/post values.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>dc46e101a7bb8dea5d59c1c2eabe3964357c5c2a</code>; request path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r3/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response used a single-quoted
+<code>completed_at</code>, so the pre-link YAML gate passed on the first
+attempt. The queue helper’s first push-with-retry pull hit
+<code>Cannot rebase onto multiple branches</code>; its second attempt
+autostashed the pre-existing tracked edit and pushed successfully.</li>
 </ul>
 </body>
 </html>
