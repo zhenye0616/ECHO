@@ -26,5 +26,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R5`. Decay curve: R1=4 (2H 2M) → R2=3 (0H 2M 1L) → R3=1 (0H 1M 0L) → R4=4 (1H 2M 1L; self-inflicted, simplified) → R5=0. Both reviewers `proceed` with zero findings at R5. The R4 deferrals (`051-followup-A`, `051-followup-B`) are filed in `_followups.md`; no reviewer re-raised them at R5, confirming the friction-first defer was respected. 051 is now claim-ready for a builder.
 
