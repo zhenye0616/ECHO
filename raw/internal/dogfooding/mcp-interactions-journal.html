@@ -1727,6 +1727,9 @@ PDT - Codex R5 on 051 merge-lock enforcement</a></li>
 <li><a href="#pdt---codex-ops-r2-on-052-sync-skills-merge-gate"
 id="toc-pdt---codex-ops-r2-on-052-sync-skills-merge-gate">2026-05-15
 01:13 PDT - Codex-ops R2 on 052 sync-skills merge gate</a></li>
+<li><a href="#pdt---codex-r2-on-052-sync-skills-merge-gate"
+id="toc-pdt---codex-r2-on-052-sync-skills-merge-gate">2026-05-15 01:14
+PDT - Codex R2 on 052 sync-skills merge gate</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18135,6 +18138,52 @@ file write because this Python lacks <code>datetime.UTC</code>;
 regenerated with <code>datetime.timezone.utc</code>, passed the pre-link
 YAML gate, and no malformed response reached the canonical queue
 path.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-052-sync-skills-merge-gate">2026-05-15 01:14
+PDT - Codex R2 on 052 sync-skills merge gate</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. The mandated <code>git pull --rebase origin main</code>
+failed because this checkout’s pull path resolved as multiple branches,
+so the tick recovered with explicit
+<code>git fetch origin main &amp;&amp; git rebase origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-052-sync-skills-check-in-merge-and-cleanup.md</code>
+at <code>8be6fca287e41aabcf5e4e3922ccaf7cb923df07</code>, pinned
+<code>skills/merge-and-cleanup.md</code>, pinned
+<code>tools/sync-skills.sh</code>, <code>package.json</code>, helper
+scripts, recent response examples, and ran local Git probes for
+linked-worktree hook path and relative <code>core.hooksPath</code>
+behavior.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/codex.md</code>
+as <code>b267783</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM AC4’s C5 start/end anchors can start at an earlier
+<code>AC5</code> heading or widen to EOF if the next C5 sibling heading
+is malformed; LOW relative <code>core.hooksPath</code> is underspecified
+when the installer is run from a nested cwd.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>8be6fca287e41aabcf5e4e3922ccaf7cb923df07</code>; request path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r2/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R1 false positives did not recur: the
+pinned artifact declares id 052 and the listed <code>spec_refs</code>
+exist. AC3’s three install branches are coherent, and
+<code>git rev-parse --git-path hooks/pre-commit</code> resolves the
+default linked-worktree hook path through the common git directory.</li>
 </ul>
 </body>
 </html>
