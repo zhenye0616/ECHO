@@ -1791,6 +1791,9 @@ id="toc-pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec">2026-05-15
 <li><a href="#pdt---codex-r2-on-054-c3.5-conflict-review-spec"
 id="toc-pdt---codex-r2-on-054-c3.5-conflict-review-spec">2026-05-15
 13:29 PDT - Codex R2 on 054 C3.5 conflict-review spec</a></li>
+<li><a href="#pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec">2026-05-15
+13:35 PDT - Codex-ops R3 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19133,6 +19136,53 @@ single-line
 requirement looks acceptable because it is a copyable invocation guard
 and the installed Codex CLI supports <code>-C</code> plus
 <code>--sandbox read-only</code>.</li>
+</ul>
+<h3 id="pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec">2026-05-15
+13:35 PDT - Codex-ops R3 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>d458c6cd70e11f31bf9039aa80d0c7714d9fdb56</code>, and the queue
+validation/commit helpers for response-shape and commit-path
+checks.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/codex-ops.md</code>
+as <code>d5c5633</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH wrong-tree / artifact-SHA recovery is specified but the
+required response header has no echoed scope anchor to compare; MEDIUM
+the required <code>codex exec</code> one-liner does not durably capture
+stdout/stderr even though consult-failure recovery depends on response
+files, stderr excerpts, and parseability.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d458c6cd70e11f31bf9039aa80d0c7714d9fdb56</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R3 patches closed the prior missing-spec-ref
+and consult-failure taxonomy issues. The remaining findings are runtime
+observability gaps in the consult itself: the wrong-tree failure needs a
+compareable scope field, and the failure-handling prose needs the
+invocation recipe to create the artifacts it later expects to
+inspect.</li>
 </ul>
 </body>
 </html>
