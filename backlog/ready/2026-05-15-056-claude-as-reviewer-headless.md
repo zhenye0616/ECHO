@@ -24,6 +24,8 @@ files_to_modify:
   # AC2b — additional schema surface uncovered by r1 codex F2 HIGH (combined.schema.json + cross_ref.reviewer enum)
   - tools/review-queue/schemas/combined.schema.json
   - tools/review-queue/schemas/reviewers-config.schema.json  # add invoke_command field validation
+  # AC7b — installer must accept --install-context (r2 codex F2 + codex-ops F3 convergent HIGH)
+  - tools/review-queue/_install_reviewer_launchd.sh
   # AC3 — canonical Claude reviewer skill body
   - skills/review-queue-claude.md
   - .claude/commands/review-queue-claude.md       # synced from skills/ via tools/sync-skills.sh
@@ -89,8 +91,8 @@ The "manual-sync rule" preamble in `reviewers-config.schema.json` only named two
 - `tools/review-queue/schemas/reviewer.schema.json:24-25` — `reviewer` field enum becomes `["codex", "cursor", "codex-ops", "claude"]`.
 - `tools/review-queue/schemas/reviewer.schema.json` `findings[].cross_ref.reviewer` enum (second enum site in the same schema) — same 4-slug list. **Without this, no reviewer can legally cross-reference a Claude finding** — convergence-match would fail at validation time.
 - `tools/review-queue/schemas/request.schema.json:48` — `requested_reviewers` items enum becomes the same 4-slug list.
-- `tools/review-queue/schemas/combined.schema.json` — add `claude_response` property in the additionalProperties:false object. `combine.py` only emits `<slug>_response` keys that are schema-declared; without this property a Claude-included round produces a combined.md that fails schema validation. Either add `claude_response: { oneOf: [{type:string},{type:null}] }` explicitly, OR widen the schema to accept `*_response` via a regex pattern (preferred long-term — future reviewer slugs slot in without schema changes).
-- `tools/review-queue/schemas/reviewers-config.schema.json` — add `invoke_command: { type: string, minLength: 1 }` to the required field set for each roster entry (AC5 dependency).
+- `tools/review-queue/schemas/combined.schema.json` — add `claude_response` property explicitly as `{ oneOf: [{type:string},{type:null}] }` in the additionalProperties:false object. **r2 codex F1 HIGH locks in the explicit-property choice** — `combine.py:_schema_response_fields()` at this SHA discovers response fields ONLY from schema properties enumeration (not via regex matching), so the patternProperties route would require also editing `combine.py`, which Out-of-Scope #4 forbids ("no changes to combine.py's union-find / convergence-match logic"). Pattern-based widening is a V1.5+ followup if more reviewers join; for V1 + claude, explicit property is correct and minimal.
+- `tools/review-queue/schemas/reviewers-config.schema.json` — add `invoke_command: { type: string, minLength: 1 }` to the field set, **conditionally required only when `mode === "headless"`** (r2 codex F4 + codex-ops F1 convergent HIGH — Cursor IDE-mode reviewers don't run via the headless wrapper and can't sensibly carry a WT/PROMPT command). Encode as a JSON Schema `if/then`: `if: { properties: { mode: { const: "headless" } } } then: { required: [..., "invoke_command"] }`. IDE-mode reviewer entries MAY omit `invoke_command`.
 
 Live-fire validation: after the edits, the dry-run from this session must invert — `python3 tools/review-queue/validate.py reviewer <claude.md-fixture>` and `REVIEWER_NAME=claude python3 tools/review-queue/_reviewer_gate.py` both exit 0 instead of 1. AND: a synthetic combined.md fixture with `claude_response: "claude.md"` validates against the updated combined.schema.json.
 
@@ -130,15 +132,14 @@ codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"
 
 **Five-part landing** (each part must be in the same commit set; tests in AC9 guard each):
 
-**1. `tools/review-queue/_reviewers.py` — extend the loader (r1 codex F1 + codex-ops F4 HIGH convergent).**
+**1. `tools/review-queue/_reviewers.py` — extend the loader (r1 codex F1 + codex-ops F4 HIGH convergent; r2 codex F4 + codex-ops F1 HIGH convergent refinement).**
 
 The current loader at `_reviewers.py:26-35,62-72` constructs `Reviewer(**r)` against `_REQUIRED_FIELDS = ("name", "mode", "required", "timeout_hours", "slash_command")`. Adding `invoke_command` to reviewers.json without extending the loader breaks every roster load via the NamedTuple's `__new__` rejection of unknown fields — and that takes down the existing codex + codex-ops launchd ticks BEFORE any new claude tick can run.
 
 Required edits:
-- Append `"invoke_command"` to `_REQUIRED_FIELDS`.
-- Extend the `Reviewer` NamedTuple with `invoke_command: str` (or `typing.NamedTuple` field-list).
-- Extend validation at `_reviewers.py:92-106` to require `invoke_command` be a non-empty string containing both `{{WT}}` and `{{PROMPT}}` tokens.
-- `_reviewer_gate.py` continues to print `slash_command` to stdout (back-compat); add a second mode `--print invoke_command` (or a sibling helper) so the wrapper can resolve the template.
+- Extend the `Reviewer` NamedTuple with `invoke_command: str | None` (Optional — IDE-mode reviewers may omit it per r2 codex F4 + codex-ops F1 patch above).
+- DO NOT append `"invoke_command"` to `_REQUIRED_FIELDS` unconditionally — it must be conditionally required only when `mode === "headless"`. Encode in validation at `_reviewers.py:92-106`: when `mode == "headless"`, require `invoke_command` be a non-empty string containing the `{{PROMPT}}` token (the `{{WT}}` token is RECOMMENDED but NOT REQUIRED — `claude -p` operates relative to cwd and has no `-C` analog, so the example `claude -p --dangerously-skip-permissions < {{PROMPT}}` must validate). Document the rule: `{{PROMPT}}` is mandatory for stdin-driven invocations; `{{WT}}` is optional if the invoke command operates on `$WT` via cwd (the wrapper already `cd`'s to `$WT` before substitution).
+- `_reviewer_gate.py` continues to print `slash_command` to stdout (back-compat); add a second mode `--print invoke_command` (or a sibling helper) so the wrapper can resolve the template. For IDE-mode reviewers, `--print invoke_command` exits non-zero with a clear stderr diagnostic (`IDE-mode reviewer cursor has no invoke_command`).
 
 **2. `reviewers.json` — add `invoke_command` per entry, including codex + codex-ops for backwards compatibility.**
 
@@ -157,14 +158,17 @@ Required edits:
 
 (Exact `claude -p` flag set is verified by AC9 unit test against the installed claude CLI — the spec body MAY refine the canonical flags during build.)
 
-**3. Shell-safe substitution (r1 codex F3 + codex-ops F6 MEDIUM convergent).**
+**3. Shell-safe substitution — Option A only (r1 codex F3 + codex-ops F6 MEDIUM convergent; r2 codex F3 + codex-ops F2 HIGH refinement).**
 
-The literal `{{WT}}` / `{{PROMPT}}` substitution into a `bash -c` string loses argv quoting and breaks at runtime when `$TMPDIR` or repo paths contain spaces. Choose ONE of two shell-safe strategies (builder picks during R2; both are acceptable):
+The literal `{{WT}}` / `{{PROMPT}}` substitution into a `bash -c` string loses argv quoting and breaks at runtime when `$TMPDIR` or repo paths contain spaces. **r2 review locked Option A as the only allowed strategy.** The r1-spec's Option B (argv-style template) was broken as written: `subprocess.Popen(..., shell=False)` does NOT interpret `<` as a stdin redirect, so the child process would receive the literal `<` and the prompt path as argv elements rather than the prompt body on stdin. Option B as drafted would silently break dispatch.
 
-- **Option A — `shlex.quote()` at substitution time.** The wrapper resolves the template in Python (small helper or extension of `_reviewer_gate.py`), runs `shlex.quote()` on both token values before substitution, and only then invokes `bash -c <string>`. Backwards-compatible with the string-template shape; just makes substitution safe.
-- **Option B — argv-style template (preferred).** Change `invoke_command` from a string to a JSON array: `["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-", "<", "{{PROMPT}}"]` (or model stdin redirect separately as `stdin_from: "{{PROMPT}}"`). Wrapper substitutes per-element via shlex.quote, then uses `subprocess.Popen` with `shell=False`. No bash-c at all. Cleaner but a larger refactor.
+**Option A is the only acceptable implementation:**
+- Wrapper (extension of `_reviewer_gate.py` or sibling Python helper) resolves the `invoke_command` template.
+- For each token (`{{WT}}`, `{{PROMPT}}`), the helper substitutes the actual value through `shlex.quote()` BEFORE assembling the final shell string.
+- The final string is passed to `bash -c <string>` (shell IS used; that's why the redirect `< {{PROMPT}}` works).
+- Backwards-compatible: codex + codex-ops existing invocations stay byte-equivalent post-AC5 because their templates use single-token-per-position layout and `shlex.quote()` is a no-op on paths without spaces or special characters.
 
-The spec mandates "no `bash -c` against an un-escaped string template" — pick A or B and document the choice in the patch. AC9 fixture below proves it for the chosen strategy.
+**No argv-style template in V1.** If a future binding needs argv-style invocation (e.g., a CLI without stdin support), file as a successor spec that defines an explicit `stdin_from` field and a separate argv-array `invoke_argv` template. For V1 + codex + codex-ops + claude, Option A is sufficient.
 
 **4. `_run_reviewer.sh` wrapper edit.**
 
@@ -192,6 +196,15 @@ Sibling to `smoke-test-codex-runner.sh`. Runs the wrapper against an isolated tm
 - **Install context (operator-run `_install_reviewer_launchd.sh claude` flow):** smoke MUST fail-closed. The installer either (a) preflights the resolved `invoke_command` executable (`command -v claude`) BEFORE plist writes — exits non-zero if missing, no plist created; OR (b) runs smoke post-install and fails non-zero if smoke would have skipped — operator gets an immediate error AND the launchd job is uninstalled in the same step. Without this, an install-with-smoke flow can leave `com.echo.review-queue-claude.plist` firing every 10 min with `command-not-found`, silently consuming the launchd schedule and burning the founder's `_followups.md` HIGH #1 launchd-silent-fail surface MORE.
 
 Implementation hint: pass an `--install-context` flag to the smoke runner that flips fail-open to fail-closed. Default is fail-open; installer passes `--install-context` explicitly.
+
+**Installer contract (r2 codex F2 + codex-ops F3 convergent HIGH).** `tools/review-queue/_install_reviewer_launchd.sh` is now in `files_to_modify` because the install-context contract requires installer edits:
+- Accept a `--install-context` flag (or always treat installer invocations as install-context — the installer is the install-context by definition; the flag is forwarded to the smoke runner).
+- **Preflight the resolved `invoke_command` executable BEFORE writing the plist.** Parse the roster entry's `invoke_command`, extract the first token (the executable name — e.g., `codex`, `claude`), run `command -v <exe>`. If not found:
+  - Exit non-zero with a clear diagnostic on stderr (`<exe> not found on PATH; cannot install com.echo.review-queue-<slug>`).
+  - DO NOT write the plist file.
+  - DO NOT call `launchctl bootstrap` / `launchctl load`.
+- If preflight passes, write the plist + smoke-test path proceeds normally.
+- The `--smoke` flow continues to work for non-install testing (separate code path or `--install-context=false` flag); the installer ALWAYS uses install-context (fail-closed).
 
 **AC8 — Launchd install path works for `claude` slug via `_install_reviewer_launchd.sh`.**
 
