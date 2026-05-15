@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# _run_reviewer.sh — generic headless reviewer tick wrapper (043 AC3).
+# _run_reviewer.sh — generic headless reviewer tick wrapper (043 AC3 + 050).
 #
 # Reads REVIEWER_NAME env var; expects a matching reviewers.json entry with
 # mode:headless. Fails fast with a clear diagnostic if REVIEWER_NAME is unset,
@@ -9,6 +9,14 @@
 # founder's production repo. Single source of truth for the launchd-tick
 # wrapper body — codex-specific scripts (run-codex-reviewer.sh) are 5-line
 # drivers that `exec env REVIEWER_NAME=<slug> ${this_script}`.
+#
+# 050 worktree-isolation (architectural invariant): the wrapper does NOT
+# launch the child Codex process inside the founder's live main checkout.
+# Each tick creates an ephemeral, detached-HEAD worktree at
+# $TMPDIR/echo-<reviewer>-<uuid>, routes the child via CWD + env +
+# prompt-path + `-C` (all four handoffs), and discards the worktree on
+# unified ERR/EXIT cleanup. The live main .git/index is never written to
+# by an automated reviewer tick.
 
 set -euo pipefail
 
@@ -59,14 +67,77 @@ fi
 {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start REVIEWER=$REVIEWER_NAME ECHO_REVIEW_QUEUE_REPO_ROOT=$REPO_ROOT"
 
-  PROMPT="$REPO_ROOT/.claude/commands/${SLASH_COMMAND}.md"
+  # ── 050 AC1 step 0: pre-flight worktree hygiene (order matters) ────────
+  # 1) Prune admin entries for worktrees whose dirs are already gone (e.g.
+  #    cleanly-removed prior ticks). Admin-only — does not touch live dirs.
+  git worktree prune || true
+  # 2) Enumerate registered worktrees. Any path in this set is skipped no
+  #    matter its age — registered worktrees include active merger
+  #    conflict-pauses AND crashed registered survivors. 050 does not
+  #    distinguish (followup-F is the operator script for crashed cleanup).
+  REGISTERED_WT=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+  # 3) GC unregistered $TMPDIR/echo-* orphans older than 60 minutes.
+  if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
+    while IFS= read -r -d '' orphan; do
+      if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then
+        continue   # registered → skip regardless of mtime
+      fi
+      rm -rf -- "$orphan" || true
+    done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
+  fi
+
+  # ── 050 AC1 step 1: read-only fetch (does NOT check out, does NOT touch
+  # live index). The reviewer will run in a fresh detached-HEAD worktree at
+  # origin/main below.
+  git fetch origin main
+
+  # ── 050 AC1 step 2: compute worktree path. Hard-fail if $TMPDIR is unset
+  # or empty (don't silently fall back to /tmp — surfacing the unset-env
+  # case is more useful than silently writing somewhere unexpected).
+  if [ -z "${TMPDIR:-}" ]; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: TMPDIR unset; cannot place ephemeral worktree" >&2
+    exit 1
+  fi
+  WT="$TMPDIR/echo-${REVIEWER_NAME}-$(uuidgen)"
+
+  # ── 050 AC1 step 3: create the detached worktree pinned to origin/main.
+  if ! git worktree add --detach "$WT" origin/main; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: git worktree add failed at $WT" >&2
+    exit 1
+  fi
+
+  # ── 050 AC1 step 6: unified cleanup trap (success + failure paths).
+  # No push-failure-specific preservation logic — any failure mode discards
+  # the worktree and its uncommitted/unpushed work. Crashed-tick safety is
+  # guaranteed by re-fireability (next tick re-reads r<N>/request.md).
+  cleanup() {
+    local rc=$?
+    cd "$REPO_ROOT" 2>/dev/null || true
+    if [ -n "${WT:-}" ] && [ -d "$WT" ]; then
+      git worktree remove --force "$WT" 2>/dev/null || true
+    fi
+    git worktree prune 2>/dev/null || true
+    return $rc
+  }
+  trap cleanup EXIT
+  trap 'cleanup; exit 1' ERR INT TERM
+
+  # ── 050 AC1 step 4: route the child Codex into $WT via ALL FOUR handoffs.
+  # CWD, env (so the prompt body's `cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-...}"`
+  # lands in the worktree), prompt-path (so the reviewer reads prompt bytes
+  # from the worktree copy — picks up R3-disposition fixes that landed in
+  # origin/main), and `-C` to codex itself.
+  cd "$WT"
+  export ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"
+
+  PROMPT="$WT/.claude/commands/${SLASH_COMMAND}.md"
   if [ ! -f "$PROMPT" ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: prompt missing at $PROMPT" >&2
     exit 1
   fi
 
   set +e
-  codex exec -C "$REPO_ROOT" --sandbox danger-full-access - < "$PROMPT"
+  codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"
   rc=$?
   set -e
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick end rc=$rc"

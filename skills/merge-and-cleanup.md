@@ -18,7 +18,10 @@ For each id, locate the matching `.md` file in `backlog/pending_review/` and its
 ```bash
 cd ~/Desktop/Project_echo
 
-# 1. Working tree must be clean — do not auto-stash, easy to lose work
+# 1. Working tree of the live main checkout must be clean — do not auto-stash,
+#    easy to lose work. (The actual merge runs inside an ephemeral worktree
+#    per Step B below, but the live checkout still needs to be coherent so
+#    the founder can read post-merge state.)
 if [ -n "$(git status --porcelain)" ]; then
   echo "ERROR: working tree dirty. Commit or stash first."; exit 1
 fi
@@ -53,26 +56,50 @@ for ID in "$@"; do
 done
 ```
 
-## Step B — Acquire cross-session merge lock
+## Step B — Create ephemeral merger worktree (050 AC3)
 
-A merge in progress is process-global state in git. If a parallel agent commits during your conflict-resolution pause, their staged changes get folded into your merge commit (this happened on the 013 merge — a parallel agent's 010-rework got committed under our merge title). Defend against this:
+A merge in progress is process-global state in git. The 2026-05-14 14:02 PDT collision (047 retro) showed why prose-as-protocol sentinel-file locks are insufficient — no other binding reads the lock, so a parallel codex reviewer launchd-tick committed into the same `.git/index` while a Claude merger session had unpushed staging in flight. The 050 architectural answer is to **remove the shared `.git/index` race surface entirely**: the merge runs inside a per-tick ephemeral worktree at `$TMPDIR/echo-merger-<uuid>`. Two unrelated processes cannot collide if they do not share an index.
 
 ```bash
-LOCK=".git/echo-merge-in-progress"
-if [ -f "$LOCK" ]; then
-  EXISTING=$(cat "$LOCK")
-  echo "ERROR: another merge is in progress: $EXISTING"
-  echo "  — if older than ~15 minutes and no merge is actively running,"
-  echo "    remove with: rm $LOCK"
-  exit 1
+# Pre-flight worktree hygiene (order matters)
+git worktree prune || true
+REGISTERED_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2}')
+if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
+  while IFS= read -r -d '' orphan; do
+    if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then continue; fi
+    rm -rf -- "$orphan" || true
+  done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
 fi
-echo "$ID @ $(date -u +%Y-%m-%dT%H:%M:%SZ) by $$" > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT INT TERM
+
+# Create the ephemeral, detached-HEAD worktree pinned to origin/main.
+git fetch origin main
+[ -n "${TMPDIR:-}" ] || { echo "TMPDIR unset; cannot place ephemeral merger worktree"; exit 1; }
+MERGER_WT="$TMPDIR/echo-merger-$(uuidgen)"
+git worktree add --detach "$MERGER_WT" origin/main
+
+# Unified cleanup trap. Note: founder-in-loop conflict-resolution pauses
+# (C3) and verify-step pauses (C5) keep this worktree registered while the
+# session is paused — pre-flight in OTHER role wrappers (reviewer / watcher)
+# skips registered worktrees regardless of mtime, so a paused merger
+# session is never GC'd out from under the founder.
+cleanup_merger() {
+  local rc=$?
+  cd "$HOME/Desktop/Project_echo" 2>/dev/null || true
+  if [ -n "${MERGER_WT:-}" ] && [ -d "$MERGER_WT" ]; then
+    git worktree remove --force "$MERGER_WT" 2>/dev/null || true
+  fi
+  git worktree prune 2>/dev/null || true
+  return $rc
+}
+trap cleanup_merger EXIT
+trap 'cleanup_merger; exit 1' ERR INT TERM
+
+cd "$MERGER_WT"
 ```
 
-**The lock auto-releases on script exit, ctrl-C, or termination.** If the parent process is killed ungracefully (`kill -9`, OS forced quit), the trap doesn't fire and the lock survives — that's why the error message includes the timestamp and a clear manual-recovery command. The founder reads `$EXISTING`, decides if the merge actually died, and removes the lock by hand.
+**Scope of this isolation.** It removes the parallel-sessions-on-this-machine race surface (the bug class that caused the 013 + 010-rework collision AND the 2026-05-14 14:02 PDT 048/049 collision) by giving each role its own `.git/index`. It does NOT prevent inbound pushes from another machine — the C11 push step's "rejected → rebase" path handles cross-machine cases. The previous prose-as-protocol merge sentinel-file lock is DELETED in this spec; no defense-in-depth file lock is retained because retaining one would preserve the one-sided-convention failure mode for whichever future binding next ignored it.
 
-**Scope of this lock.** It guards against *parallel sessions on this machine* racing into your merge state — the bug class that caused the 013 + 010-rework collision. It does NOT prevent inbound pushes from another machine. The C11 push step's "rejected → rebase" path handles cross-machine cases.
+**Migration note.** If a stale sentinel file from a pre-050 manually-aborted merge happens to exist on the live checkout under `.git/`, the worktree-mode merger does not read or care about it. It is simply orphaned — clean up by hand with a one-shot `rm` of the stale file.
 
 ## Step C — Per-item sequential loop
 
@@ -257,14 +284,18 @@ For each fixup deferred in C4 and each item in the sidecar's "Follow-up items" s
 ### C11. Push
 
 ```bash
-git push origin main
+# 050 AC5 — explicit HEAD:main refspec. The merger runs inside a detached-HEAD
+# worktree ($MERGER_WT pinned to origin/main at Step B); `git push origin main`
+# would push the COMMON repository's `main` branch ref, leaving the merger
+# worktree's new commit unpushed. HEAD:main pushes the worktree's actual HEAD.
+git push origin HEAD:main
 ```
 
 If push is rejected (someone else pushed during the merge):
 
 1. `git pull --rebase origin main`. The merge commit may need to be replayed.
 2. If rebase produces conflicts: stop, surface, ask the human.
-3. Re-push.
+3. Re-push (still `git push origin HEAD:main`).
 
 If still rejected after one rebase attempt: stop. Surface to the human; do not loop.
 
@@ -283,7 +314,6 @@ After the loop completes, output:
 | Dirty working tree at pre-flight | Refuse; exit 1. Do not auto-stash. |
 | Sidecar missing for an id | Refuse; tell the human to run `/review-pending <id>` first. |
 | Sidecar verdict is `redo` or `block` | Refuse for that id; suggest the right next action. |
-| Lock file already exists | Refuse; show the lock contents and ask the human. |
 | Conflict in a file *not* mentioned in the sidecar's expected-conflicts list | Pause hard — this is a signal the spec or the agent did something unexpected. Surface and wait. |
 | Verify step fails | Pause; do not auto-fix. The human's structural fix becomes part of the merge commit. |
 | Pre-merge fixup makes a test go red | Same — don't auto-revert. The human decides whether to keep the fixup with a deeper fix, or drop it to a follow-up. |
