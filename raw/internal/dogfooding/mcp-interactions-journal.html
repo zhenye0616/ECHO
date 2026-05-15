@@ -1794,6 +1794,9 @@ id="toc-pdt---codex-r2-on-054-c3.5-conflict-review-spec">2026-05-15
 <li><a href="#pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec"
 id="toc-pdt---codex-ops-r3-on-054-c3.5-conflict-review-spec">2026-05-15
 13:35 PDT - Codex-ops R3 on 054 C3.5 conflict-review spec</a></li>
+<li><a href="#pdt---codex-r3-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-r3-on-054-c3.5-conflict-review-spec">2026-05-15
+13:35 PDT - Codex R3 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19183,6 +19186,54 @@ observability gaps in the consult itself: the wrong-tree failure needs a
 compareable scope field, and the failure-handling prose needs the
 invocation recipe to create the artifacts it later expects to
 inspect.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-054-c3.5-conflict-review-spec">2026-05-15
+13:35 PDT - Codex R3 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>d458c6cd70e11f31bf9039aa80d0c7714d9fdb56</code>, current
+<code>skills/merge-and-cleanup.md</code>,
+<code>tests/skills/merge-and-cleanup-shape.test.ts</code>, completed
+specs 050/052, prior local 054 review examples, and queue validation
+helpers.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/codex.md</code>
+as <code>4de9c53</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM AC1b.7’s wrong-tree recovery mode depends on an
+artifact/tree anchor, but AC1b.5 only requires <code>verdict:</code> and
+<code>reviewer:</code> and the uncommitted merge resolution has no
+defined artifact SHA to echo or validate.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d458c6cd70e11f31bf9039aa80d0c7714d9fdb56</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r3/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The R2 patches landed the missing repo
+reference, scoped post-review-handling detection, and explicit
+consult-failure recovery branch. The C6 summary enumeration looks
+correct: <code>pushback</code> remains the verdict, while founder
+override/acceptance is summary text rather than a fourth success
+verdict.</li>
 </ul>
 </body>
 </html>
