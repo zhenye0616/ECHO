@@ -1,6 +1,6 @@
 ---
 id: 2026-05-14-051-merge-lock-cross-vendor-enforcement
-title: Merge-lock cross-vendor enforcement + push-with-retry --rebase-merges — interim two-prong fix until 050 ships
+title: Merge-lock cross-vendor enforcement + push-with-retry `--rebase=merges` — interim two-prong fix until 050 ships
 status: ready
 priority: HIGH
 estimate: 0.5d
@@ -9,7 +9,7 @@ blocked_by: []
 task_state_ref: 2026-05-14-051-merge-lock-cross-vendor-enforcement
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  - tools/review-queue/push-with-retry.sh                  # AC1 — switch `git pull --rebase` to `git pull --rebase --rebase-merges` so in-flight merge commits survive the retry rebase
+  - tools/review-queue/push-with-retry.sh                  # AC1 — switch `git pull --rebase` to `git pull --rebase=merges` so in-flight merge commits survive the retry rebase
   - tools/review-queue/_run_reviewer.sh                    # AC2 — read .git/echo-merge-in-progress before any reviewer-tick git add/commit; if present, log "merge in progress; skipping tick" and exit 0
   - tools/review-queue/run-codex-reviewer.sh               # AC3 — confirm the codex-side launchd entrypoint inherits the AC2 gate via _run_reviewer.sh (no separate code path)
   - tools/review-queue/run-codex-ops-reviewer.sh           # AC3 — same for codex-ops launchd entrypoint
@@ -31,14 +31,14 @@ agent_notes: ""
 review_notes: ""
 ---
 
-# Merge-lock cross-vendor enforcement + push-with-retry `--rebase-merges`
+# Merge-lock cross-vendor enforcement + push-with-retry `--rebase=merges`
 
 ## Why this spec exists
 
 On **2026-05-14**, the same root cause produced two separate `main`-corruption incidents in one day:
 
 1. **Morning (14:02 PDT, item 048 merge):** A codex-side reviewer launchd tick (`com.echo.review-queue-codex`, PID 69375) ran `git add` + `git commit` against the live `.git/index` while a Claude `merge-and-cleanup` session had Claude's staged 048 conflict-resolution work in flight. The codex commit (`ec2907f review-r6: codex-ops on 2026-05-14-049-codex-skill-adapter`) captured BOTH file sets. Recovery required soft-reset, branch backup (`backup/codex-ops-r6-bad-local-merge`), abandoning the 048 merge cycle for the morning, and a manual main-state cleanup.
-2. **Evening (049 merge cycle):** `tools/review-queue/push-with-retry.sh` ran `git pull --rebase origin main` against an in-flight merge commit during the second reviewer / merger overlap. Because the script omits `--rebase-merges`, the rebase **flattened** the in-flight merge commit's structure — a known git semantic where a non-rebase-merges rebase replays the merge's first-parent linear history without preserving the merge node. Same operational outcome: corrupted `main` requiring manual recovery.
+2. **Evening (049 merge cycle):** `tools/review-queue/push-with-retry.sh` ran `git pull --rebase origin main` against an in-flight merge commit during the second reviewer / merger overlap. Because the script omits `--rebase=merges`, the rebase **flattened** the in-flight merge commit's structure — a known git semantic where a non-rebase-merges rebase replays the merge's first-parent linear history without preserving the merge node. Same operational outcome: corrupted `main` requiring manual recovery.
 
 `backlog/_followups.md` lines 746 and 754–755 file both incidents under the **same recurring-class HIGH** ("merge-lock cross-vendor gap, SECOND occurrence today"). Two-prong gap diagnosis:
 
@@ -55,13 +55,13 @@ On **2026-05-14**, the same root cause produced two separate `main`-corruption i
 
 1. 051 lands first (this spec) — closes the bleeding incident class TODAY.
 2. 050 lands shortly after — deletes the sentinel-file lock convention; 051's AC2 + AC3 lock-honoring code becomes dead code that 050's grep gate removes.
-3. 051's AC1 (`--rebase-merges` flag in `push-with-retry.sh`) **survives 050** because 050 does not modify `push-with-retry.sh`'s rebase semantics. The `--rebase-merges` flag is a permanent improvement orthogonal to the worktree-isolation lock-deletion work.
+3. 051's AC1 (`--rebase=merges` flag in `push-with-retry.sh`) **survives 050** because 050 does not modify `push-with-retry.sh`'s rebase semantics. The `--rebase=merges` flag is a permanent improvement orthogonal to the worktree-isolation lock-deletion work.
 
-**Builder MUST verify 050 has not already landed before claiming 051.** If 050 has merged to `main` between this spec being authored and the builder's claim, 051's AC2 + AC3 are no-ops (the file 051 reads no longer exists by spec). In that case: skip AC2 + AC3, ship AC1 (`--rebase-merges`) only, and note in `agent_notes` that "050 superseded AC2/AC3 pre-claim."
+**Builder MUST verify 050 has not already landed before claiming 051.** If 050 has merged to `main` between this spec being authored and the builder's claim, 051's AC2 + AC3 are no-ops (the file 051 reads no longer exists by spec). In that case: skip AC2 + AC3, ship AC1 (`--rebase=merges`) only, and note in `agent_notes` that "050 superseded AC2/AC3 pre-claim."
 
 ## Acceptance Criteria
 
-### AC1 — `push-with-retry.sh` uses `--rebase-merges`
+### AC1 — `push-with-retry.sh` uses `--rebase=merges`
 
 - **Modified file:** `tools/review-queue/push-with-retry.sh` line 25.
 - **Change:** `git -c rebase.autoStash=true pull --rebase origin main && git push origin main` becomes `git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin main`. Single-flag-value change (`--rebase` → `--rebase=merges`). The standalone `--rebase-merges` flag is NOT accepted by `git pull` (exits 129 "unknown option rebase-merges"); the supported form is `--rebase=(false|true|merges|interactive)` per `git pull -h`. No other change to the script. (R1 codex F1 fix — codex verified the bad form empirically with exit 129.)
@@ -82,7 +82,7 @@ On **2026-05-14**, the same root cause produced two separate `main`-corruption i
   1. Append a single tick-log line to the existing `$LOG_FILE` (`$HOME/Library/Logs/echo-review-queue-${REVIEWER_NAME}.log`): `[<UTC ISO ts>] tick skipped: merge in progress (lock=<path>, holder=<lock contents>)`. The "holder" is the contents of the lock file (single line: `<id> @ <ts> by <pid>` per `merge-and-cleanup.md` line 69). Logging the holder makes operator debugging trivial when reading the rotation log.
   2. Exit 0 cleanly (NOT non-zero — a merge being in progress is the EXPECTED transient state, not a tick failure; non-zero would pollute launchd's failure-counting and could trigger backoff).
   3. **No git operations are run** (no `git add`, no `git commit`, no `git pull`, no `push-with-retry.sh` invocation). The reviewer prompt body never executes; codex is never spawned.
-- **Behavior on lock absent:** the wrapper continues to its existing line 47 (LOG_DIR setup) unchanged.
+- **Behavior on lock absent:** the wrapper continues to the prompt/codex invocation block unchanged. (Per the AC2 R1 fix, the lock check is inserted AFTER the LOG_DIR/LOG_FILE/mkdir/rotation block at lines 47-57; lock-absent execution therefore proceeds straight to the existing `codex exec` invocation at line 69 with no detour.)
 - **No in-script polling.** The launchd cadence (~10 min for both `com.echo.review-queue-codex` and `com.echo.review-queue-codex-ops`) is the natural retry. If the merge is still in progress on the next tick, the lock check fires again and exits 0 again. A typical merge-and-cleanup session takes 1–3 minutes (rarely up to 10–15 with founder conflict-resolution pauses), so worst-case 1–3 launchd ticks no-op cleanly before the lock releases.
 - **Test:** new shell-driven test `tests/review-queue/run-reviewer-honors-merge-lock.test.ts` (or `.sh`):
   1. Set up a throwaway repo with `.git/echo-merge-in-progress` containing `test-id @ <ts> by 12345`.
@@ -107,10 +107,10 @@ The "Out of Scope (Don't Drift)" section (below) lists, at minimum:
 - No retry / polling logic inside `_run_reviewer.sh` for the lock-present case (the launchd cadence IS the retry; in-script polling would deadlock against the strategist's debugger if the lock holds for hours).
 - No changes to `merge-and-cleanup.md`'s lock-acquisition logic (Step B, line 61). 051 only adds READING surfaces; the WRITER surface stays untouched.
 - No changes to `commit-reviewer-response.sh` (the pre-link / post-link helper invoked by reviewer prompts). The lock check sits in the OUTER wrapper, not the inner per-response helper, so a tick that's already past the lock check doesn't need a re-check inside the response commit step (the worst case — a merge starts AFTER a reviewer tick passed the lock check — is the exact bug class 050 fixes structurally; 051 narrows but does not close that race).
-- No `--rebase-merges` change anywhere OTHER than `push-with-retry.sh` line 25. In particular: do NOT add it to `merge-and-cleanup.md`'s C11 push step (that step uses a different push form).
+- No `--rebase=merges` change anywhere OTHER than `push-with-retry.sh` line 25. In particular: do NOT add it to `merge-and-cleanup.md`'s C11 push step (that step uses a different push form).
 - No deletion of the lock file by 051 — only `merge-and-cleanup.md`'s `trap` (line 70) cleans up the lock. If a launchd reviewer tick ever sees a stale lock (merge died, trap didn't fire), 051's behavior is "skip and exit 0"; the founder's manual `rm .git/echo-merge-in-progress` is the only cleanup path. This matches today's `merge-and-cleanup.md` operator-recovery prose (Step B lines 64–66).
 - No retro-conversion of past collision artifacts. `backup/codex-ops-r6-bad-local-merge` and the `ec2907f` historical commit stay as forensic evidence.
-- 050 supersession note: when 050 lands, 051's AC2 + AC3 changes become dead code that 050's grep gate (AC7) removes. 051's AC1 (`--rebase-merges`) survives 050.
+- 050 supersession note: when 050 lands, 051's AC2 + AC3 changes become dead code that 050's grep gate (AC7) removes. 051's AC1 (`--rebase=merges`) survives 050.
 
 ### AC5 — Backoff behavior is "exit 0 and wait for next launchd cadence"
 
@@ -134,7 +134,7 @@ The "Out of Scope (Don't Drift)" section (below) lists, at minimum:
 - **No in-script retry loop in `_run_reviewer.sh`.** Lock-present means exit 0 immediately and let the launchd cadence retry. Any in-script polling would deadlock against the strategist's interactive merge-and-cleanup session.
 - **No changes to `merge-and-cleanup.md`.** 051 only adds READING surfaces (codex-side reviewer ticks). The WRITER surface (Step B's `echo "$ID @ ..." > "$LOCK"` and the cleanup `trap`) stays untouched. Editing `merge-and-cleanup.md` would conflict structurally with 050's deletion of the same file's lock prose.
 - **No changes to `commit-reviewer-response.sh`.** The lock check is wrapper-level, not response-helper-level. A tick that already passed the wrapper lock check completes its response work even if a merge starts mid-tick. This narrows but does not close the race; closing the race is 050's job.
-- **No `--rebase-merges` anywhere except `push-with-retry.sh` line 25.** In particular, do NOT add it to `merge-and-cleanup.md`'s C11 push step (that uses a different push form and is on 050's deletion path anyway).
+- **No `--rebase=merges` anywhere except `push-with-retry.sh` line 25.** In particular, do NOT add it to `merge-and-cleanup.md`'s C11 push step (that uses a different push form and is on 050's deletion path anyway).
 - **No Cursor reviewer changes.** Cursor reviewer is `mode: ide` and does not invoke `_run_reviewer.sh` (`_reviewer_gate.py` rejects IDE-mode reviewers per 043). Cursor is also explicitly excluded from the current in-flight reviewer roster per the 2026-05-14 founder directive. Future Cursor reactivation is a separate followup spec — OR moot once 050 ships.
 - **No lock cleanup logic in `_run_reviewer.sh`.** The lock is owned by `merge-and-cleanup.md`'s trap. Stale-lock recovery is operator-manual (`rm .git/echo-merge-in-progress`) per the existing prose.
 - **No retro-conversion of collision artifacts.** `backup/codex-ops-r6-bad-local-merge` and `ec2907f` stay as forensic evidence. 051 prevents future collisions of this two-prong shape; it does not rewrite history.
@@ -145,7 +145,7 @@ The "Out of Scope (Don't Drift)" section (below) lists, at minimum:
 
 - **Risk R1 — TOCTOU race between AC2 lock check and codex child's git operations.** A merge could START AFTER the wrapper passes the lock check but BEFORE the codex child commits its response. 051 narrows the window from "entire reviewer tick" to "post-lock-check codex initialization + response generation + git add + commit" (~10–60s typical). Closing the residual race requires the structural fix in 050 (worktree isolation eliminates the shared `.git/index`). 051 explicitly accepts this residual race as the price of being a 1-day interim fix vs 050's 1-1.5d structural fix.
 - **Risk R2 — `git rev-parse` primitive choice inside future worktrees.** Per the R1 convergent finding (codex F3 + codex-ops F2), `git rev-parse --git-path <name>` resolves to `.git/worktrees/<wt>/<name>` inside a linked worktree, NOT to the shared `.git/<name>` — so the original spec's `--git-path` choice would have silently missed the merge-and-cleanup writer's lock when the wrapper is invoked from a worktree CWD. AC2 now uses `git rev-parse --git-common-dir` plus `/echo-merge-in-progress`, which DOES resolve to the shared `.git/` from any worktree. Operators running `_run_reviewer.sh` interactively from a worktree CWD honor the lock written by the main checkout. (Spec value: R1 caught a real correctness bug before any code was written.)
-- **Open Question Q1 — Should AC1's `--rebase-merges` test simulate the actual 049-evening crash, or just assert merge-commit preservation under a rebase-over-fast-forward-reject?** The narrower test (preserves the two-parent shape) is sufficient to falsify the bug. A full crash-replay test would require reproducing the exact merger / reviewer / push-with-retry interleaving, which is closer to the 050 AC6.2 collision-simulation territory. Keep AC1's test narrow; defer integration-shape testing to 050.
+- **Open Question Q1 — Should AC1's `--rebase=merges` test simulate the actual 049-evening crash, or just assert merge-commit preservation under a rebase-over-fast-forward-reject?** The narrower test (preserves the two-parent shape) is sufficient to falsify the bug. A full crash-replay test would require reproducing the exact merger / reviewer / push-with-retry interleaving, which is closer to the 050 AC6.2 collision-simulation territory. Keep AC1's test narrow; defer integration-shape testing to 050.
 - **Open Question Q2 — Should 051's tests live under `tests/review-queue/` or a new `tests/merge-lock/` directory?** Recommendation: `tests/review-queue/` to match the 045 precedent (`tests/review-queue/concurrency.test.ts`, `tests/review-queue/045-pre-link-yaml-validation.test.ts`). New directory adds organizational debt with no benefit; the lock check IS reviewer-queue infrastructure.
 
 ## Definition of Done
