@@ -21,9 +21,9 @@ spec_refs:
   - backlog/_followups.md  # line 713 (045 code-reviewer subagent meta-finding) + line 754 (cross-cut: post-merge adapter drift) — both name this exact two-prong fix; line 713 explicitly says "Tiny scope (one line in merge-and-cleanup skill prose, plus maybe a pre-commit hook script)"
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-15T18:34:20Z"
+branch: "agent/sync-skills-check-in-merge-and-cleanup"
 worktree: ""
 head_sha: ""
 pr_url: ""
