@@ -1712,6 +1712,12 @@ PDT - Codex R3 on 051 merge-lock enforcement</a></li>
 <li><a href="#pdt---codex-ops-r3-on-051-merge-lock-enforcement"
 id="toc-pdt---codex-ops-r3-on-051-merge-lock-enforcement">2026-05-15
 00:28 PDT - Codex-ops R3 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-ops-r4-on-051-merge-lock-enforcement"
+id="toc-pdt---codex-ops-r4-on-051-merge-lock-enforcement">2026-05-15
+00:38 PDT - Codex-ops R4 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-r4-on-051-merge-lock-enforcement"
+id="toc-pdt---codex-r4-on-051-merge-lock-enforcement">2026-05-15 00:36
+PDT - Codex R4 on 051 merge-lock enforcement</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17896,6 +17902,99 @@ file write because this Python lacks <code>datetime.UTC</code>;
 regenerated with <code>datetime.timezone.utc</code>, passed the pre-link
 YAML gate, and no malformed response reached the canonical queue
 path.</li>
+</ul>
+<h3 id="pdt---codex-ops-r4-on-051-merge-lock-enforcement">2026-05-15
+00:38 PDT - Codex-ops R4 on 051 merge-lock enforcement</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+at <code>39daa2533431e344381bb9344ae72527fd89b2df</code>, pinned
+<code>push-with-retry.sh</code>, pinned <code>_run_reviewer.sh</code>,
+pinned <code>skills/merge-and-cleanup.md</code>, validation helpers, and
+recent reviewer/journal examples for response shape.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/codex-ops.md</code>
+as <code>1bfe657</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM failed <code>git pull --rebase=merges</code> or
+autostash conflict can leave the live checkout mid-rebase because AC1
+does not require an abort-before-retry/terminal-log recovery path; LOW
+lock-holder read can fail under <code>set -euo pipefail</code> if the
+merge lock is released between existence check and
+<code>cat</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>39daa2533431e344381bb9344ae72527fd89b2df</code>; request path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R4 focus patches for prompt fixture and
+<code>CODEX_BIN</code> determinism are present. The new findings are
+narrower unattended-runtime edges: failed rebase cleanup in the
+production push helper and a benign lock-release race that can become a
+noisy launchd failure if implemented with a bare <code>cat</code>.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-051-merge-lock-enforcement">2026-05-15 00:36
+PDT - Codex R4 on 051 merge-lock enforcement</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+at <code>39daa2533431e344381bb9344ae72527fd89b2df</code>, pinned
+<code>_run_reviewer.sh</code>, <code>push-with-retry.sh</code>,
+<code>package.json</code>,
+<code>tests/review-queue/concurrency.test.ts</code>,
+<code>_reviewer_gate.py</code>, <code>reviewers.json</code>, reviewer
+runner scripts, and response examples. Also ran a throwaway Git probe
+for the AC1 <code>--rebase=merges</code> second-parent tree
+assertion.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, committed, and
+pushed
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/codex.md</code>
+as <code>ab0ea32</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC1’s <code>origin/main^2^{tree}</code> equals original
+feature-tip tree assertion fails under correct
+<code>git pull --rebase=merges</code> behavior because the rebased
+second parent includes the concurrent main-side commit; MEDIUM AC2/AC3
+prompt fixture only creates <code>review-queue-codex.md</code>, but
+<code>codex-ops</code> resolves to <code>review-queue-codex-ops</code>
+before the <code>CODEX_BIN</code> stub can run.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>39daa2533431e344381bb9344ae72527fd89b2df</code>; request path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r4/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right - one Codex review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R4’s CODEX_BIN hook is precise enough, but
+the AC1 tree assertion regressed from the earlier narrow probe: under a
+realistic sibling-clone concurrent commit, full tree equality is too
+strong even though merge shape is preserved. The response itself linked
+cleanly on the first pre-link validation attempt.</li>
 </ul>
 </body>
 </html>
