@@ -423,7 +423,9 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 - [ ] **`safeMtimeMs` vs `maxGlobalDbFamilyMtime` stat-failure asymmetry** (`src/capture/extractors/cursor.ts:480` vs `:491-503`). Legacy `safeMtimeMs` returns `Date.now()` on stat failure; the new `maxGlobalDbFamilyMtime` returns 0. Both behaviors are correct as scoped, but the divergence is worth noting if a future refactor unifies them. Non-blocking. Source: 034 code-reviewer.
 - [ ] **Re-evaluate `agentKv:` migration follow-up gating.** The "Cursor capture — `agentKv:` migration (gated, not scheduled)" entry at the top of this file (under "Known V1 degraded surfaces") was originally diagnosed pre-2026-05-09 (later corrected). 034 ships the capture-cadence + bubble-shape fixes for the EXISTING `bubbleId:` / `composerData:` schema; it does NOT address the future `agentKv:` migration. Reactivation gate (founder upgraded to Cursor Pro 2026-05-09) is still triggered; 034's AC4 dogfooding evidence may help re-prioritize the `agentKv:` work for V1.6.2+.
 
-- [ ] **🔴 KNOWN GAP — Cursor multi-cluster agent runs: follow-on bubbles silently dropped (item 036 candidate; surfaced by 034 AC4 dogfooding, 2026-05-10 23:17 PDT).** **Discovered during the AC4 dogfooding run on fresh composer `4f02b335-4b1d-4bd1-a9fa-2e0d76ae5e56`.** The composer had 1 user message + 26 consecutive assistant bubbles (a typical Cursor agent-mode run with ~10 tool calls). 034's periodic re-poll fired at 15s and captured the first 11 bubbles as ONE atom (40,601 chars). Cursor continued writing 15 more assistant bubbles (still answering the same user question). The next cadence tick found `lastSeenMap[4f02b335] = 70975526` (an assistant bubble); the V1.5.7 streaming-continuation fast-forward at `cursor.ts` `extractCursorTurns` lines 402-409 (explicitly preserved in 034's Out-of-Scope) silently skipped all 15 follow-on assistant bubbles as "streaming continuations." Lost content from this single test conversation: Cursor's analysis paragraph ("There are two overlapping threads..."), action narration ("I'm appending a short dogfooding journal entry..."), and the **verdict turn** ("ECHO says the latest real state is: `034` landed and was merged as `7362d88`...").
+- [x] ✅ **CLOSED 2026-05-15 by 036** (HIGH) — **Cursor multi-cluster agent runs: follow-on bubbles silently dropped.** Item 036 shipped Option A (continuation atom emission). Verified live in `src/capture/extractors/cursor.ts`: `is_continuation?: true` field declaration at lines 115-121, continuation-atom emission with `continuation_of_assistant_bubble_id: checkpoint` at lines 956-968, metadata projection at lines 1334-1338. Spec at `backlog/complete/2026-05-11-036-cursor-multicluster-continuation.md`. Original analysis preserved below for historical context.
+
+- [ ] **🔴 KNOWN GAP (HISTORICAL, CLOSED) — Cursor multi-cluster agent runs: follow-on bubbles silently dropped (item 036 candidate; surfaced by 034 AC4 dogfooding, 2026-05-10 23:17 PDT).** **Discovered during the AC4 dogfooding run on fresh composer `4f02b335-4b1d-4bd1-a9fa-2e0d76ae5e56`.** The composer had 1 user message + 26 consecutive assistant bubbles (a typical Cursor agent-mode run with ~10 tool calls). 034's periodic re-poll fired at 15s and captured the first 11 bubbles as ONE atom (40,601 chars). Cursor continued writing 15 more assistant bubbles (still answering the same user question). The next cadence tick found `lastSeenMap[4f02b335] = 70975526` (an assistant bubble); the V1.5.7 streaming-continuation fast-forward at `cursor.ts` `extractCursorTurns` lines 402-409 (explicitly preserved in 034's Out-of-Scope) silently skipped all 15 follow-on assistant bubbles as "streaming continuations." Lost content from this single test conversation: Cursor's analysis paragraph ("There are two overlapping threads..."), action narration ("I'm appending a short dogfooding journal entry..."), and the **verdict turn** ("ECHO says the latest real state is: `034` landed and was merged as `7362d88`...").
 
   **Why it happens:** Cursor's agent-mode runs typically take 20-60s to write all bubbles for one user question. 034's cadence is 15s. So agent-mode runs basically always cross at least one tick boundary, and the second-half bubbles arrive after a checkpoint that lands on an assistant. V1.5.7's fast-forward then drops them as orphans. The bug isn't 034's two fixes (those work correctly for the first cluster); it's that V1.5.7's silent-skip is being asked to handle a class of cases it wasn't designed for (legitimately-new content arriving after a partial-cluster capture).
 
@@ -536,7 +538,9 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 ## From 040 merge (2026-05-12)
 
-- **🟡 MED — `tests/review-queue/concurrency.test.ts:133` orphan-cleanup test has a clock-frame mismatch with its own `--now` argument (RECLASSIFIED 2026-05-12 14:00 PDT after Codex local investigation + strategist empirical verification).**
+- **🟡 MED — `tests/review-queue/concurrency.test.ts:133` orphan-cleanup test clock-frame mismatch.** ✅ **CLOSED 2026-05-15** — live-verified: `npx vitest run tests/review-queue/concurrency.test.ts` shows all 7 tests passing, including `orphan .tmp.* older than 30 min is cleaned up by combine.py` (315ms). Fix landed in the test file at some point after 040 merge. Original analysis preserved below for historical context.
+
+#### Historical entry (closed)
 
   **Original Claude/strategist classification (now superseded):** "HIGH — combine.py orphan-cleanup is a real production bug; cleanup path isn't actually firing." Wrong.
 
@@ -574,7 +578,9 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 - **AC8 empirical measurement (strategist, next qualifying spec)** — count founder activations during the next post-041 spec's review cycle. Pre-041 baseline measured: ~5 per 3-round cycle during 040 (initial Codex terminal command + Codex re-fires after sandbox correction + Cursor chat pastes). Target post-041: 0–1. Record measurement in the next item's `review_notes` at merge time. If count >1, file 042 with the specific friction observed.
 
-- **combine.py reviewer-finding-enumeration audit** — empirically observed twice during 041's review rounds:
+- **combine.py reviewer-finding-enumeration audit** — ✅ **CLOSED 2026-05-15 by 043** (MED). Stricter convergence match-key shipped: `tools/review-queue/combine.py:75-101` `cross_refs_match` now requires round/reviewer/`finding_index` triple to match (043 AC6 R6 MED #2 — finding_index discriminator). Union-find over anchors at lines 510-554 with `consumed_findings` set guards against double-listing the same finding across convergent + divergent rows. Live regression: `npx vitest run tests/review-queue/combine.test.ts` — 21/21 tests pass. Original observation preserved below for historical context.
+
+  **Historical observation (closed):** empirically observed twice during 041's review rounds:
   - R1: combine.py folded Codex M4 + Cursor M2 into one "convergent" row even though they were different findings at the same anchor (variable-name normativity vs synthetic item_id whitelist).
   - R2: combine.py dropped Cursor L1 (AC2 Label vs kickstart target) entirely from both tables, AND double-listed Cursor L2 (AC1 invalid env var) across convergent + divergent.
   Strategist's manual read of `<reviewer>.md` files was the safety net both times. Needs a backlog item to fix the finding-enumeration logic (suggested: stricter convergence match-key + a "missing findings" audit pass that compares input findings to output rows). Priority: MED (queue still works correctly; this is friction on the hands-off pattern that 041+ depends on).
@@ -589,7 +595,10 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 **Context:** First post-041 AC8 measurement vehicle. Founder-authorized off-protocol overrides for speed (strategist drove single-reviewer disposition; `MISSING_REVIEWER_TIMEOUT_HOURS=0` flag used 3×). Spec `2026-05-12-042-reviewer-emission-yaml-validation` converged in ~50 min wall-time across 3 rounds (R1: 3 findings → R2: 2 → R3: 1 LOW → terminal). **AC8 = 0 founder activations.** Five structural findings surfaced during the cycle; collectively, they're the speed-and-resilience seed for 043.
 
-### 🔴 #1 — launchd kickstart silently fails before log redirect (HIGH)
+### 🔴 #1 — launchd kickstart silently fails before log redirect (HIGH) — 🟡 **PARTIAL (revalidated 2026-05-15)**
+
+**Revalidation 2026-05-15:** Pre-redirect surface materially reduced — `_reviewer_gate.py` was promoted to a standalone script so its stderr survives shell-wrapping (`tools/review-queue/_run_reviewer.sh:49-53`); `PATH` augmentation added (line 47) to dodge the launchd-stripped-env `ModuleNotFoundError: jsonschema` failure 048 R1 hit. BUT fix candidate (b) from the original entry — plist `StandardErrorPath` → log file — is NOT landed: `tools/review-queue/_install_reviewer_launchd.sh:96-99` still emits `StandardErrorPath /dev/null` + `StandardOutPath /dev/null`. Remaining pre-redirect surface (`cd $REPO_ROOT`, `git rev-parse`, `mkdir LOG_DIR`, log rotation, gate call) can still fail invisibly when launchd fires the wrapper. Mitigations have made the live exposure window narrow; the structural fix is unshipped.
+
 
 **Observed:** Strategist issued `launchctl kickstart -k gui/$(id -u)/com.echo.review-queue-codex` at 23:28:12Z. `launchctl print` showed `runs` incremented (4→5), but `~/Library/Logs/echo-review-queue-codex.log` was unchanged — no `tick start` line. The 041 wrapper script (`run-codex-reviewer.sh`) writes errors in lines 14-43 to stderr BEFORE the `{...} >> "$LOG_FILE" 2>&1` redirect on line 50; stderr is mapped to `/dev/null` per the plist's `StandardErrorPath`. Any pre-redirect failure (cd, git rev-parse, mkdir, rotation) is therefore invisible.
 
@@ -597,7 +606,11 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 **Fix candidates:** (a) move the pre-redirect work inside the `{...}` block; (b) plist `StandardErrorPath` → log file path instead of `/dev/null`; (c) emit a `[bootstrap]` marker line at the very top of `{...}` so silent failures are detectable downstream.
 
-### 🔴 #2 — `git pull --rebase origin main` wedges on dirty tree in every prompt's Step 1 (HIGH)
+### 🔴 #2 — `git pull --rebase origin main` wedges on dirty tree in every prompt's Step 1 (HIGH) — ✅ **CLOSED 2026-05-15 by 044 + 050**
+
+**Status:** Closed two ways. (1) **044 autostash fix shipped** — `skills/review-queue-watch.md:60` uses `git -c rebase.autoStash=true pull --rebase origin main`; `tools/review-queue/push-with-retry.sh:40` and `tools/review-queue/combine.py:789` also use autostash at every watcher-transaction site. Live test: `tests/review-queue/044-autostash-dirty-tree.test.ts` passes (`dirty journal + remote-advanced origin: full transaction succeeds, dirty file preserved, no PUSH-RACE-FALLBACK rows`). (2) **050 worktree-isolation structurally obsoletes the reviewer-side concern** — `tools/review-queue/_run_reviewer.sh` runs every headless reviewer tick in a fresh `$TMPDIR/echo-<reviewer>-<uuid>` ephemeral worktree pinned to `origin/main`; there is no shared dirty-tree surface for the codex/codex-ops reviewer prompts to wedge against. Original analysis preserved below for historical context.
+
+#### Historical entry (closed)
 
 **Observed:** Both `review-queue-watch.md` and `review-queue-codex.md` (and presumably `review-queue-cursor.md`) start Step 1 with bare `git pull --rebase origin main`. If the worktree is dirty, the rebase aborts non-zero and the tick exits without doing anything. This fired 4+ times during 042: once at the first watcher tick (workaround: manual stash/pop), and once at Codex r2's first attempt (Codex correctly aborted to avoid reviewing stale artifacts, leaving r2/codex.md never written; resolved only after strategist stashed the dirty tree).
 
@@ -614,7 +627,11 @@ git -c rebase.autoStash=true pull --rebase origin main
 
 Codex itself adopted this pattern organically in one of the 042 r1 ticks; this should be the documented convention.
 
-### 🔴 #3 — `MISSING_REVIEWER_TIMEOUT_HOURS=2` is too slow for iterative work (HIGH)
+### 🔴 #3 — `MISSING_REVIEWER_TIMEOUT_HOURS=2` is too slow for iterative work (HIGH) — ✅ **CLOSED 2026-05-15 by 043**
+
+**Status:** Closed by 043 (`2026-05-13-043-per-round-reviewer-roster`, merged at `d846c35`). Per-reviewer timeout config replaced the single global `MISSING_REVIEWER_TIMEOUT_HOURS`. `tools/review-queue/reviewers.json` now declares per-reviewer `mode` + `timeout_hours`: headless reviewers (codex, codex-ops) have `mode: "headless"` + `timeout_hours: null` (no wait at all); only IDE-mode reviewers (cursor) carry `timeout_hours: 2`. Validated at `tools/review-queue/_reviewers.py:92-106` (mode↔timeout_hours contract). Result: codex-only or codex+codex-ops rounds never wait on Cursor; combine.py auto-dispositions immediately. Original analysis preserved below for historical context.
+
+#### Historical entry (closed)
 
 **Observed:** With Cursor closed (the accept-degradation case from 041), combine.py refuses to write `combined.md` until 2h elapse from `requested_at`. For 042 that meant a per-round wait of ~2h just to start dispositioning. Strategist worked around by invoking `combine.py --timeout-hours=0` three times across the cycle.
 
@@ -622,7 +639,11 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 
 **Fix:** Drop the default to a small value (5-15 min) OR — better — replace the timeout-based "accept-degradation" with a config-driven optional reviewer list. If Cursor is in `optional_reviewers` for the current session, combine.py treats absent-Cursor as a clean single-reviewer round, no waiting. Per the 041 followup's "replace Cursor as a reviewer" candidate (line 531), this also opens the door to a second headless reviewer (second Codex with different prompt, or Claude API cron) that doesn't have the "is the IDE open?" question.
 
-### 🟠 #4 — Watcher's `single_reviewer_timeout → escalate_to_founder` default contradicts AC8 goal (MEDIUM)
+### 🟠 #4 — Watcher's `single_reviewer_timeout → escalate_to_founder` default contradicts AC8 goal (MEDIUM) — ✅ **CLOSED 2026-05-15 by 043 + 044**
+
+**Status:** Closed by 043's `partial_responses` rename + 044 AC4 auto-disposition. `tools/review-queue/combine.py:122-156` (`compute_combined_verdict`): when exactly one required reviewer is missing AND every present reviewer's verdict is in `PROCEED_STAR` (`{proceed, proceed_after_patches}`), the watcher returns `("partial_responses", escalated=False)` — the strategist auto-dispositions through the normal path-(a)/(b)/(c) flow, no founder escalation. Multi-missing or any-pushback-with-missing still escalates. Skill prose at `skills/review-queue-watch.md:85` reflects the new boundary. Live regression test: `tests/review-queue/concurrency.test.ts` includes `missing-reviewer timeout: partial_responses + auto-disposition (044 AC4 — single-missing-proceed)` which passes. Original analysis preserved below for historical context.
+
+#### Historical entry (closed)
 
 **Observed:** When combine.py writes `combined_verdict: single_reviewer_timeout`, it sets `escalated_to_founder: true`. The watcher slash-command's Step 3 then says "Append a journal entry; **exit**. The founder will see and act on next session." That's exactly the founder-activation 041/AC8 is trying to eliminate. Strategist overrode this 3× during 042 by ignoring the escalation flag and dispositioning the single-reviewer (Codex-only) findings as if it were a normal `proceed_after_patches` round.
 
@@ -644,7 +665,10 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 >
 > **Fix candidates:** (a) tighten reviewer prompts to specify `completed_at: '2026-05-XXTHH:MM:SSZ'` (quoted) verbatim, with example. (b) Relax `reviewer.schema.json` to accept `oneOf` shapes. (c) Pre-normalize in `validate.py`: if value is `datetime.datetime`, coerce to ISO 8601 string before validation. Option (a) is the lowest-friction fix; (c) is the most resilient.
 
-### 🟡 #6 — Watcher cron is session-only; cross-session autonomy gap (MEDIUM)
+### 🟡 #6 — Watcher cron is session-only; cross-session autonomy gap (MEDIUM) — ❌ **STILL OPEN (revalidated 2026-05-15)**
+
+**Revalidation 2026-05-15:** `ls ~/Library/LaunchAgents/ | grep -i echo` shows `com.echo.daemon.plist`, `com.echo.review-queue-codex.plist`, `com.echo.review-queue-codex-ops.plist` — no `com.echo.review-queue-watch.plist`. Watcher remains session-only via `/loop 10m /review-queue-watch` in a strategist Claude Code session. No watcher headless wrapper has been built. Cross-session autonomy gap unchanged.
+
 
 **Observed:** `/loop 10m /review-queue-watch` registers a CronCreate job in this Claude Code session's in-memory store. Job dies when the session closes. The launchd Codex job survives session closures (independent process), but with no watcher running, nothing combines or dispositions; queue stalls until the founder re-opens a strategist session and re-loops.
 
