@@ -1788,6 +1788,9 @@ id="toc-pdt---codex-ops-r1-on-054-c3.5-conflict-review-spec">2026-05-15
 <li><a href="#pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec"
 id="toc-pdt---codex-ops-r2-on-054-c3.5-conflict-review-spec">2026-05-15
 13:18 PDT - Codex-ops R2 on 054 C3.5 conflict-review spec</a></li>
+<li><a href="#pdt---codex-r2-on-054-c3.5-conflict-review-spec"
+id="toc-pdt---codex-r2-on-054-c3.5-conflict-review-spec">2026-05-15
+13:29 PDT - Codex R2 on 054 C3.5 conflict-review spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19078,6 +19081,58 @@ pause-contract, <code>$MERGER_WT</code>,
 <code>--sandbox read-only</code>, and C6/C8 audit-trail fixes. R2’s
 remaining issues are operational readiness gaps rather than a
 disagreement with the C3.5 shape.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-054-c3.5-conflict-review-spec">2026-05-15
+13:29 PDT - Codex R2 on 054 C3.5 conflict-review spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md</code>
+at <code>26bd31372386fd166201b3ccd504ad6f0171eda7</code>, current
+<code>skills/merge-and-cleanup.md</code>,
+<code>tests/skills/merge-and-cleanup-shape.test.ts</code>, the reachable
+<code>.claude</code> tree, <code>codex exec --help</code>, and queue
+validation helpers.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/codex.md</code>
+as <code>02f6675</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM required <code>spec_refs</code> path
+<code>.claude/projects/.../reference_codex_review_queue_invocation.md</code>
+is not checked in at the artifact SHA; MEDIUM AC1b/AC2b verdict-action
+detection can fail the required YAML-like verdict header because the
+first two verdict occurrences are pipe-separated before any action
+sentence.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>26bd31372386fd166201b3ccd504ad6f0171eda7</code>; request path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The R1 patches landed the main C3
+pause-contract, <code>$MERGER_WT</code>,
+<code>--sandbox read-only</code>, and C6/C8 audit-trail fixes. The
+single-line
+<code>codex exec -C "$MERGER_WT" --sandbox read-only ...</code>
+requirement looks acceptable because it is a copyable invocation guard
+and the installed Codex CLI supports <code>-C</code> plus
+<code>--sandbox read-only</code>.</li>
 </ul>
 </body>
 </html>
