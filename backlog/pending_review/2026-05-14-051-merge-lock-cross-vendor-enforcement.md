@@ -24,10 +24,41 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-15T08:23:16Z"
 branch: "agent/merge-lock-cross-vendor-enforcement"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--merge-lock-cross-vendor-enforcement"
+head_sha: "545800b02304d4f46df7f83d5943a0c74c02bf4f"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  AC1, AC2, AC3 implemented per spec. AC4 (Out-of-Scope enumeration)
+  is documentation-only in the spec body and honored throughout. AC5
+  (exit-0-and-wait backoff) is satisfied implicitly by AC2's
+  lock-present codepath. AC6 verification gates all clean.
+
+  Two commits on branch agent/merge-lock-cross-vendor-enforcement:
+    - dc9010a: AC1 — push-with-retry.sh uses --rebase=merges
+    - 545800b: AC2/AC3 — _run_reviewer.sh honors echo-merge-in-progress
+               + CODEX_BIN env hook for test determinism
+
+  050 supersession check at claim time: 050 still in pending_review/
+  (not complete/); skills/merge-and-cleanup.md still contains the
+  echo-merge-in-progress writer convention. AC2 + AC3 are therefore
+  in scope; AC1 ships unconditionally. The grep gates per DoD #4
+  show: 1 reader (the new AC2 ref in _run_reviewer.sh) + 2 writers
+  (skills/ + .claude/commands/ pair). No other surfaces.
+
+  New tests:
+    - tests/review-queue/push-with-retry-rebase-merges.test.ts (1 test)
+    - tests/review-queue/run-reviewer-honors-merge-lock.test.ts
+      (4 parameterized tests: codex/codex-ops × lock present/absent)
+
+  Sanity-falsification: AC1 test was re-run against a buggy --rebase
+  form of push-with-retry.sh and failed as predicted ("ambiguous
+  argument 'origin/main^2'"), confirming the test is not vacuously
+  green. Restored the fix; final run is clean.
+
+  Full review-queue test suite: 17 files, 109 tests, all green.
+
+  Run log: raw/internal/agent-runs/2026-05-15-2026-05-14-051-merge-lock-cross-vendor-enforcement.md
+  Builder branch tip: 545800b02304d4f46df7f83d5943a0c74c02bf4f
 review_notes: ""
 ---
 

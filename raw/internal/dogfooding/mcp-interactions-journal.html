@@ -1747,6 +1747,11 @@ PDT - Codex R2 on 053 completed_at coercion</a></li>
 <li><a href="#pdt---codex-ops-r2-on-053-completed_at-coercion"
 id="toc-pdt---codex-ops-r2-on-053-completed_at-coercion">2026-05-15
 01:32 PDT - Codex-ops R2 on 053 completed_at coercion</a></li>
+<li><a
+href="#pdt-claude-builder-run-on-2026-05-14-051-merge-lock-cross-vendor-enforcement"
+id="toc-pdt-claude-builder-run-on-2026-05-14-051-merge-lock-cross-vendor-enforcement">2026-05-15
+01:35 PDT — Claude builder run on 2026-05-14-051 (merge-lock
+cross-vendor enforcement)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18435,6 +18440,61 @@ pre-existing staged backlog move for item 051 (<code>claimed/</code>
 -&gt; <code>pending_review/</code>), matching the known index-hygiene
 failure mode; additional unstaged item 051 files and journal/html edits
 were left untouched.</li>
+</ul>
+<h3
+id="pdt-claude-builder-run-on-2026-05-14-051-merge-lock-cross-vendor-enforcement">2026-05-15
+01:35 PDT — Claude builder run on 2026-05-14-051 (merge-lock
+cross-vendor enforcement)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude Code (builder) via
+<code>/process-backlog 051</code></li>
+<li><strong>Trigger:</strong> Founder invoked
+<code>/process-backlog 051</code> to ship the interim merge-lock fix
+before 050 lands. Builder claimed
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+(CLAIM-READY post-r5 spec convergence, SHA at claim time
+~<code>f2fa8c7</code>), created worktree, implemented AC1+AC2+AC3, ran
+tests, moved to <code>pending_review/</code>. ZERO ECHO MCP calls during
+the builder run — implementation read only filesystem + git.</li>
+<li><strong>Query inputs:</strong> No <code>mcp__echo__*</code>
+invocations. 050 supersession check at claim time was a direct
+filesystem read: <code>ls backlog/pending_review/ | grep 050</code>
+(found, not yet merged) +
+<code>grep -c "echo-merge-in-progress" skills/merge-and-cleanup.md</code>
+(=1, lock convention still present). AC6 verification gates ran
+<code>bash -n</code> +
+<code>grep -rn echo-merge-in-progress -- tools/review-queue/ skills/ .claude/</code>.
+Tests via <code>npx vitest run tests/review-queue/</code>.</li>
+<li><strong>Returned shape:</strong> 17 review-queue test files, 109
+tests, all green (104 pre-existing + 5 new: 1 AC1 + 4 AC2/AC3
+parameterized on codex/codex-ops × lock present/absent). Branch tip
+<code>545800b02304d4f46df7f83d5943a0c74c02bf4f</code> on
+<code>agent/merge-lock-cross-vendor-enforcement</code>. Two
+implementation commits + handoff commit on <code>main</code> (item to
+<code>pending_review/</code> + run log).</li>
+<li><strong>Sources:</strong> Spec at HEAD pre-claim =
+<code>f2fa8c7</code> (R5 CLAIM-READY trajectory 4→3→1→4→0). Claim commit
+<code>6505e43</code>. Branch commits <code>dc9010a</code> (AC1) +
+<code>545800b</code> (AC2/AC3). Run log:
+<code>raw/internal/agent-runs/2026-05-15-2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>.
+No ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> ✅ right — builder run finished within
+~0.2d (well under the 0.5d estimate), zero drift events, zero open
+questions, zero escalations. AC1+AC2+AC3 land cleanly; AC4 is
+documentation-only and honored; AC5 is implicit in AC2’s exit-0
+codepath; AC6 gates clean.</li>
+<li><strong>Note:</strong> Mid-handoff, a parallel codex-ops
+reviewer-queue launchd tick (per the journal entry at 01:32 PDT)
+<code>git add</code>-swept my pre-handoff staged backlog move
+(<code>claimed/</code> → <code>pending_review/</code>) into commit
+<code>945b5c1</code> — the exact two-prong race 051 exists to fix. This
+is observational: 051 itself, once merged, prevents the codex tick from
+running while my merge-and-cleanup session holds the lock; my builder
+handoff doesn’t hold a merge lock (this is a <code>git mv</code> +
+commit, not a merge), so the AC2 lock check wouldn’t have caught it. The
+residual race is on 050’s structural path (per the spec’s “Critical
+context — 050 supersedes 051” section). No fix here per CLAUDE.md “Don’t
+design fixes in the journal.” Observation only.</li>
 </ul>
 </body>
 </html>
