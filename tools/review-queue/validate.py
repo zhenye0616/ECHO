@@ -22,6 +22,7 @@ Reviewer fresh-eyes enforcement (046 AC3):
 
 from __future__ import annotations
 
+import datetime
 import re
 import sys
 from pathlib import Path
@@ -47,6 +48,13 @@ _TASK_STATE_HEADING_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 _FRESH_EYES_THRESHOLD = 3
+
+
+def _coerce_completed_at(value: datetime.datetime) -> str:
+    """Coerce a YAML-auto-parsed datetime.datetime into the canonical ISO 8601 Z-suffixed string the reviewer schema expects."""
+    if value.tzinfo is not None:
+        value = value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _detect_task_state_quotation(body: str) -> tuple[bool, list[str]]:
@@ -76,6 +84,8 @@ def main(argv: list[str]) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
+    if schema_name == "reviewer" and isinstance(fm.get("completed_at"), datetime.datetime):
+        fm["completed_at"] = _coerce_completed_at(fm["completed_at"])
     try:
         _lib.validate_frontmatter(fm, schema_name)
     except jsonschema.ValidationError as exc:
