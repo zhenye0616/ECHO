@@ -21,14 +21,130 @@ spec_refs:
   # Note: the canonical codex-exec invocation recipe (-C <cwd> --sandbox <mode> - < <prompt>) is documented inline in this spec's Architectural Invariant § "Runtime cwd is the merger worktree" — no out-of-repo memory reference is needed.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "claude-code-strategist-fused"
+claimed_at: "2026-05-15T20:55:00Z"
+branch: "main"
+worktree: "/Users/zhenye/Desktop/Project_echo"
 head_sha: ""
 pr_url: ""
-agent_notes: ""
-review_notes: ""
+agent_notes: |
+  Implemented directly on main per founder authorization ("then you can implement
+  it here"). Strategist and builder roles fused for this single item; normal
+  ready→claimed→pending_review→complete pipeline collapsed to ready→complete.
+
+  AC1a (§C3 pause-contract change): skills/merge-and-cleanup.md:138-142 now
+  surfaces a three-branch prompt (`c3.5` / `continue` / `abort`) within the §C3
+  pause body, immediately after the conflict-marker mention. The c3.5-branch
+  returns control to the same pause point per the architectural invariant.
+
+  AC1b (§C3.5 insertion): skills/merge-and-cleanup.md:151-209 adds the new
+  section with all 7 sub-elements — OPTIONAL marker (151), trigger taxonomy
+  (153-156, founder-explicit + strategist-recommended), Invocation recipe
+  (159-163, 5 substrings on the codex-exec line: `codex exec` + `$MERGER_WT` +
+  `--sandbox read-only` + `.c3.5-stdout` + `.c3.5-stderr`, continuation
+  backslash form), Prompt template (167-174, 6 items, mentions $MERGER_WT,
+  item (vi) names consult_cwd + pwd -P), Output format (178-186, 6 verdict-
+  header substrings + pwd -P canonicalization), Post-review handling
+  (190-194, 3 entries with action sentences), Consult-failure recovery
+  (198-203, all 4 failure-mode signatures including consult_cwd mismatch).
+  Worked example (207-209) honestly notes the historical -C ~/Desktop vs
+  post-050 -C $MERGER_WT difference.
+
+  AC1c (failure-modes table row): added at skills/merge-and-cleanup.md:407.
+
+  AC2 (shape test extension): tests/skills/merge-and-cleanup-shape.test.ts
+  extended with 3 describe blocks (AC2a §C3 contract, AC2b §C3.5 contract,
+  AC2c audit-trail). 17 new test cases (21 total in the file, up from 4):
+  - AC2a: §C3 surfaces branches within 30 lines of <<<<<<<; missing-C3.5
+    error; missing-c3.5-branch synthetic.
+  - AC2b: OPTIONAL + codex-exec recipe + triggers + verdict-header + pwd -P;
+    prompt-template list (≥6 items + $MERGER_WT + consult_cwd + pwd -P);
+    Post-review handling exactly-3-entries + ≥30-char action prose;
+    Consult-failure recovery all 4 failure-mode signatures; 5 synthetic
+    cases for missing-C3.5, missing-C4, missing-$MERGER_WT, missing-stdout-
+    redirect, missing-stderr-redirect; continuation-backslash join works;
+    Post-review-handling-with-only-2-entries; Consult-failure-recovery-
+    missing-consult_cwd.
+  - AC2c: §C6 review_notes template contains `C3.5 cross-vendor consult:`;
+    §C8 commit-body HEREDOC contains `Cross-vendor consult:`.
+
+  AC3 (.claude/commands/merge-and-cleanup.md re-synced): tools/sync-skills.sh
+  ran successfully; --check returns "OK: all adapters match canonical skills/".
+
+  AC4 (audit-trail integration):
+  - AC4a: §C6 review_notes template (skills/merge-and-cleanup.md:266-275) adds
+    `C3.5 cross-vendor consult: <reviewer> @ <verdict> — <summary>` with the
+    five verdict variants commented in (proceed-as-proposed, proceed-with-
+    modifications, pushback-accepted, pushback-overridden, failed) and the
+    "none invoked" no-op case.
+  - AC4b: §C8 commit-body HEREDOC (skills/merge-and-cleanup.md:319-321) adds
+    a conditional `Cross-vendor consult: <reviewer> @ <verdict>;
+    modifications: <N>` signpost line with the omit-if-not-fired guidance
+    documented in adjacent comments.
+
+  AC5 (full suite green):
+  - npm test: 970 passed, 21 skipped (954 → 970, +17 from the shape test;
+    spec required 957+).
+  - npm run lint: clean.
+  - npm run typecheck: clean.
+  - tools/sync-skills.sh --check: OK.
+
+  AC6 (Worked example): §C3.5 includes 120-150 word worked example summarizing
+  the 050 merge as empirical precedent, with explicit note that the historical
+  invocation used the pre-050 `-C ~/Desktop/Project_echo` form and the correct
+  post-050 form is `-C "$MERGER_WT"`.
+
+  Review trajectory: 5 rounds, 6→4→2→4→0 findings, all narrow correctness, all
+  in-scope, zero pushback. R4's bounce-up was the legitimate macOS canonical-
+  path finding (the R3 patch surfaced the brittleness; R4 caught it). R5 both
+  reviewers proceed with zero findings.
+review_notes: |
+  Implemented + merged 2026-05-15 by Claude Code in fused strategist+builder mode
+  per founder authorization. No separate merge step — the implementation commit
+  IS the audit trail. No worktree; no agent/<slug> branch (since the builder
+  binding is the strategist binding, and the strategist binding is THIS Claude
+  Code session, the work happened directly on main).
+
+  Conflicts resolved: none (single linear implementation; no parallel branch).
+
+  C3.5 cross-vendor consult: none invoked (054's own implementation didn't need
+  C3.5 — there were no merge conflicts to consult on, since the implementation
+  is a single feature edit, not a merge of divergent branches).
+
+  Fixups applied: 1 (test-side adjustment for case-insensitive founder-explicit /
+  strategist-recommended substring match, because the canonical prose uses
+  capitalized sentence-start form "Founder-explicit:" and "Strategist-recommended:"
+  while the spec AC's mechanical-detection language assumed lowercase forms;
+  case-insensitive matches the AC's intent — locate the trigger taxonomy by name —
+  and avoids spurious failures on natural English prose casing).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify post-implementation: 970 tests pass, 21 skipped (npm test); npm run lint
+  clean; npm run typecheck clean; tools/sync-skills.sh --check OK; AC2 shape test
+  itself is 21 passing test cases (4 pre-existing C5/C6 + 17 new from C3 / C3.5 /
+  audit-trail blocks).
+
+  Reviewer trajectory: codex r1 → r5 / codex-ops r1 → r5 — converged at terminal
+  proceed/proceed with zero findings (per combined.md at backlog/reviews/.../r5/).
+  Trajectory 6→4→2→4→0 — bounce up at R4 was the legitimate macOS canonical-path
+  finding (R3's wrong-tree patch surfaced the /var-vs-/private/var brittleness;
+  R4 caught it; R5 closed it).
+
+  Follow-up items (non-blocking):
+  - When `/merge-and-cleanup` is next invoked on a real conflicted merge, exercise
+    the C3.5 path end-to-end as a live smoke test. The shape test enforces
+    structure; runtime behavior (codex exec actually firing with the named-file
+    capture, consult_cwd compare against canonicalized $MERGER_WT) hasn't been
+    empirically validated since 054 ships only the protocol prose + structural
+    tests, not the C3.5 invocation harness itself (which is per-merge-instance).
+  - The pre-054 C3 pause prompt language survives only in git history; future
+    readers won't see the original "Resolve conflicts in your editor, then reply
+    `continue`" simple form. That's intentional — the post-054 three-branch form
+    is strictly more capable.
+  - Close `050-cross-merge-note` in backlog/_followups.md as ✅ CLOSED 2026-05-15
+    by 054 (the entry's "Consider codifying as /merge-and-cleanup optional
+    escalation (C3.5: ...)" proposal is now shipped).
 ---
 
 # /merge-and-cleanup C3.5 — optional cross-vendor mid-merge conflict-resolution review

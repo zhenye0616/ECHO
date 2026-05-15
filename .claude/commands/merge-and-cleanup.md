@@ -135,7 +135,9 @@ For each conflicted file, output to the conversation:
 3. The relevant excerpt from the item's `agent_notes` (any design-choice context the agent flagged).
 4. A summary of which side does what (e.g., "main has fs-watcher; branch has git-watcher; both belong").
 
-**Pause.** Do not edit any conflicted file yourself. Tell the human: *"Resolve conflicts in your editor, then reply `continue`."*
+**Pause.** Do not edit any conflicted file yourself. Surface the proposed resolution to the human with a three-branch prompt: *"Reply `c3.5` to invoke a cross-vendor consult on this resolution (see §C3.5 below — recommended when the resolution involves test deletion, wholesale-side-take on a restructured file, reconciliation across ≥3 files where the sidecar playbook is silent, or new code outside the conflict markers). OR resolve in your editor and reply `continue` to apply. OR reply `abort` to back out of the merge."*
+
+If the human replies `c3.5`, proceed to §C3.5; the consult returns control to this same pause point (with codex's verdict + any modifications surfaced), and the human still replies `continue` (or `abort`) to advance. **`continue` remains the single gate that verifies + applies the resolved tree.**
 
 When the human replies `continue`, verify:
 
@@ -143,6 +145,70 @@ When the human replies `continue`, verify:
 git diff --check               # any remaining conflict markers?
 git status --porcelain | grep -E '^(UU|AA|DD)' && { echo "still unmerged"; exit 1; }
 ```
+
+### C3.5. Optional cross-vendor consult on the proposed resolution
+
+C3.5 is **OPTIONAL** and trigger-driven; the vast majority of merge conflicts are mechanical and resolved cleanly via §C3 alone. C3.5 is the escape hatch for the minority of conflicts where the proposed resolution involves judgment beyond the sidecar's prescriptive playbook. The trigger is **either**:
+
+- **Founder-explicit:** founder says `c3.5` (or "review with codex" or similar) at the §C3 pause. This is the empirically-validated trigger (2026-05-15 050 merge — see Worked example below).
+- **Strategist-recommended:** strategist proactively recommends C3.5 in its §C3 surface when the proposed resolution touches any of: (a) deletion of test files, (b) wholesale-side-take on a restructured file (not a single-line side-take), (c) reconciliation across ≥3 files where the sidecar playbook is silent or absent, (d) introduction of new code outside the conflict markers. The recommendation is a one-line addendum to the §C3 output: "This resolution touches [a/b/c/d] — recommend §C3.5 cross-vendor review before applying." The founder remains the decider.
+
+#### Invocation recipe
+
+Write the consult prompt to a temp file under `$MERGER_WT`, then invoke (continuation backslashes allowed for line-wrap):
+
+```bash
+codex exec -C "$MERGER_WT" --sandbox read-only - < "$MERGER_WT/.c3.5-prompt.md" \
+    > "$MERGER_WT/.c3.5-stdout" 2> "$MERGER_WT/.c3.5-stderr"
+```
+
+The named-file capture is load-bearing for the **Consult-failure recovery** subsection below: terminal scrollback is not durable after a `/clear` or session restart; the `.c3.5-stdout` and `.c3.5-stderr` files under `$MERGER_WT` survive at least until the merger worktree is cleaned up, giving the strategist a fixed handle for both happy-path stdout parsing and unhappy-path stderr surfacing.
+
+#### Prompt template
+
+The prompt body MUST include the SIX load-bearing elements:
+
+1. **Working-tree state** captured *inside `$MERGER_WT`* via `git status --porcelain` + relevant `git diff` output. NOT relative to the live checkout (`$REPO_ROOT`) — the live checkout is on a separate branch tip with a clean tree and contains none of the unresolved conflict state.
+2. **Batch context:** other recent merges in this session + the sidecar prescriptions that already shaped the strategist's proposed resolution. Reviewers should see what's already been decided.
+3. **Conflict markers:** either direct the reviewer to read files inside `$MERGER_WT` via `git diff <file>` (the invocation cwd is `$MERGER_WT`, so relative-path directives interpret correctly), OR embed the full conflict-marker blocks verbatim. Both are acceptable.
+4. **Specs and sidecars** the reviewer should consult — current spec at SHA, adjacent items' sidecars, prior `review_notes` excerpts.
+5. **The proposed resolution** verbatim — paths to take, lines to add, tests to delete, etc. This is the artifact being reviewed.
+6. **Output format** — the reviewer MUST emit a YAML-like header containing `verdict:`, `reviewer:`, AND `consult_cwd: $(pwd -P)`. The `consult_cwd` value is the **physical/canonical** path returned by `pwd -P` (POSIX), NOT the logical `$PWD`. The strategist canonicalizes its `$MERGER_WT` via `(cd "$MERGER_WT" && pwd -P)` for the wrong-tree compare; the canonical-vs-canonical form survives macOS's `/var/folders/...` (logical) vs `/private/var/folders/...` (physical) ambiguity.
+
+#### Output format
+
+The reviewer's response file (`$MERGER_WT/.c3.5-stdout`) MUST start with a YAML-like header:
+
+```yaml
+---
+verdict: proceed-as-proposed | proceed-with-modifications | pushback
+reviewer: codex
+consult_cwd: /private/var/folders/.../echo-merger-<uuid>   # captured via pwd -P at consult start
+---
+```
+
+The three verdict strings (`proceed-as-proposed`, `proceed-with-modifications`, `pushback`) are the only allowed values. The `reviewer:` field names the cross-vendor reviewer (`codex` for the empirical case, but any non-strategist binding is permitted). The `consult_cwd:` value is load-bearing for failure-mode (iv) detection in **Consult-failure recovery** below.
+
+#### Post-review handling
+
+Each verdict produces a distinct strategist action; control always returns to the §C3 pause point (the human still types `continue` or `abort` to advance).
+
+- **proceed-as-proposed** — Codex endorsed the resolution as-is. Strategist surfaces the endorsement to the founder: *"Codex consult returned proceed-as-proposed; apply your resolution as planned and reply `continue`."* No modifications to fold; the original resolution is what gets applied.
+- **proceed-with-modifications** — Codex agreed with the spirit but identified refinements (typically outside-conflict-marker cleanup, dead-code removal, header comment updates). Strategist surfaces the modifications: *"Codex consult returned proceed-with-modifications. Apply your original resolution + these N modifications: <one-line list>. Reply `continue` when done."* The founder applies both the original resolution and codex's modifications before replying `continue`.
+- **pushback** — Codex disagreed with the resolution approach. Strategist surfaces the pushback verbatim: *"Codex pushed back on the resolution because: <reason>. Reconsider before applying — you may rework the resolution, override the pushback and reply `continue` anyway, or reply `abort`."* The strategist does NOT auto-revert; the founder decides whether codex is right.
+
+#### Consult-failure recovery
+
+The four failure modes — strategist MUST handle each gracefully and surface to the founder, then return to §C3 with the three branches (`c3.5` retry-with-different-vendor / `continue` apply-without-consult / `abort`). The strategist does NOT auto-retry.
+
+- **(i) Codex binary not found / exit code 127.** Detected via `$MERGER_WT/.c3.5-stderr` containing `command not found` OR the shell's `$?` being 127. Surface: read `.c3.5-stderr`, paste the relevant lines to the founder. Record in C6: `C3.5 cross-vendor consult: codex @ failed — not-found`.
+- **(ii) `codex exec` exits non-zero with no parseable response.** Detected via `$?` non-zero AND `.c3.5-stdout` empty or lacking the required YAML header. Surface: read `.c3.5-stderr`. Record: `C3.5 cross-vendor consult: codex @ failed — non-zero exit`.
+- **(iii) Response present but YAML header malformed / `verdict:` missing or not one of the three allowed values.** Detected by strategist's YAML parse of `.c3.5-stdout` failing OR by the parsed `verdict` not being in the allowed set. Surface: read `.c3.5-stdout` excerpt. Record: `C3.5 cross-vendor consult: codex @ failed — malformed response`.
+- **(iv) Response YAML-parseable but `consult_cwd:` does not match `$MERGER_WT` canonicalized.** Detected by string compare of the echoed `consult_cwd` value against the strategist's `$(cd "$MERGER_WT" && pwd -P)` — mismatch means the reviewer ran in the wrong tree even though `-C "$MERGER_WT"` was specified (e.g., a misconfigured codex CLI ignored `-C`). Surface: read `.c3.5-stdout` and explain to the founder that the reviewer didn't actually see the merger worktree. Record: `C3.5 cross-vendor consult: codex @ failed — consult_cwd mismatch`.
+
+#### Worked example
+
+2026-05-15 050 merge (commit `5ad67e0`). Two conflicted files (`tools/review-queue/_run_reviewer.sh` UU + `tools/review-queue/push-with-retry.sh` UU) and two auto-merged ones. The proposed resolution was judgment-loaded: take 050's worktree-isolation hunk wholesale, **delete** the obsolete `run-reviewer-honors-merge-lock.test.ts`, and reconcile the `push-with-retry.sh` line by combining 051's `--rebase=merges` flag with 050's `HEAD:main` refspec. Founder said *"use a codex reviewer here"*. Strategist improvised the consult — at the time, the empirical invocation used `-C ~/Desktop/Project_echo` because 050's worktree-isolation hadn't shipped yet. **Post-050, the correct invocation is `-C "$MERGER_WT"` per the recipe above.** Codex returned `proceed-with-modifications` with two non-conflict refinements (orphaned `CODEX_BIN` block + `push-with-retry.sh` header-comment mismatch); both folded into the merge commit. Net effect: a tighter merge than the strategist's solo plan would have produced. Spec 054 codified this pattern.
 
 ### C4. Apply pre-merge fixups (unless `--skip-fixups`)
 
@@ -195,6 +261,16 @@ review_notes: |
   - <file>: <one-sentence resolution>
   - ...
 
+  C3.5 cross-vendor consult: <reviewer> @ <verdict> — <one-sentence summary>
+  # <verdict> ∈ {proceed-as-proposed, proceed-with-modifications, pushback, failed}
+  # Summary text by verdict:
+  #   proceed-as-proposed       → "no modifications"
+  #   proceed-with-modifications → "applied N modifications: <one-line list>"
+  #   pushback (accepted)       → "founder accepted pushback; redesigning resolution"
+  #   pushback (overridden)     → "pushback rejected by founder — applied original anyway"
+  #   failed                    → "<one of: not-found / non-zero exit / malformed response / consult_cwd mismatch>"
+  # If no C3.5 fired during the merge, the line reads: "C3.5 cross-vendor consult: none invoked"
+
   Fixups applied:
   - <fixup 1>
   - ...
@@ -236,6 +312,9 @@ merge: $ID-$SLUG (with founder reconciliation)
 
 Conflicts: <file list>
 Fixups applied: <count>; deferred: <count>
+# Include the next line ONLY if §C3.5 fired during this merge; omit entirely otherwise.
+# The durable record lives in review_notes (per §C6); this line signposts non-default events.
+Cross-vendor consult: <reviewer> @ <verdict>; modifications: <N>
 Tests: <N>/<N> pass; lint and typecheck clean.
 
 Reviewed-by: ECHO code-reviewer subagent (see /review-pending sidecar for full review)
@@ -323,6 +402,7 @@ After the loop completes, output:
 | Push rejected | One rebase attempt; if still rejected, surface and stop. |
 | Worktree remove fails (chokidar still has handles, etc.) | Retry once after 1s; if still failing, surface — do not `--force`. |
 | Branch -d fails (not fully merged) | This is a real signal; do not force-delete. Surface and stop. |
+| §C3.5 cross-vendor consult requested by founder or recommended by strategist | OPTIONAL and trigger-driven; never required. Invoke per the §C3.5 recipe; on failure, follow §C3.5 Consult-failure recovery and return to §C3 pause. Record outcome in review_notes (§C6) per the audit-trail contract. |
 
 ## What You Must NOT Do
 
