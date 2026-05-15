@@ -1758,6 +1758,9 @@ id="toc-pdt---codex-ops-r3-on-053-completed_at-coercion">2026-05-15
 <li><a href="#pdt---codex-r3-on-053-completed_at-coercion"
 id="toc-pdt---codex-r3-on-053-completed_at-coercion">2026-05-15 01:38
 PDT - Codex R3 on 053 completed_at coercion</a></li>
+<li><a href="#pdt---codex-r4-on-053-completed_at-coercion"
+id="toc-pdt---codex-r4-on-053-completed_at-coercion">2026-05-15 01:45
+PDT - Codex R4 on 053 completed_at coercion</a></li>
 <li><a href="#pdt---codex-ops-r4-on-053-completed_at-coercion"
 id="toc-pdt---codex-ops-r4-on-053-completed_at-coercion">2026-05-15
 01:45 PDT - Codex-ops R4 on 053 completed_at coercion</a></li>
@@ -18597,6 +18600,49 @@ entry.</li>
 attempt. The queue helper’s first push-with-retry pull hit
 <code>Cannot rebase onto multiple branches</code>; its second attempt
 autostashed the pre-existing tracked edit and pushed successfully.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-053-completed_at-coercion">2026-05-15 01:45
+PDT - Codex R4 on 053 completed_at coercion</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-053-reviewer-completed-at-coercion.md</code>
+at <code>e248f4def9da192957787f071b2ad83edcac759e</code>, and the queue
+validation/commit/combine helpers plus existing review-queue tests.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r4/codex.md</code>
+as <code>a8dc521</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM AC3.2’s no-quarantine assertion points at
+<code>raw/internal/quarantine/</code>, but the real helper quarantines
+malformed responses as
+<code>&lt;reviewer&gt;.md.invalid.&lt;ISO-ts&gt;</code> siblings and
+logs <code>VALIDATION-FAIL</code>; LOW the Node
+<code>execFileSync</code> no-shell alternative is not copyable as
+written and needs command-plus-args form with an expanded home
+path.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>e248f4def9da192957787f071b2ad83edcac759e</code>; request path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r4/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The r4 focus fixes landed: PATH-stubbing is
+no longer allowed, <code>reviewers.json</code> is copied, combine
+eligibility is explicit, and empty <code>ls-remote</code> snapshots are
+rejected. The remaining patch is localized to AC3.2 assertion precision
+and an implementation hint.</li>
 </ul>
 <h3 id="pdt---codex-ops-r4-on-053-completed_at-coercion">2026-05-15
 01:45 PDT - Codex-ops R4 on 053 completed_at coercion</h3>
