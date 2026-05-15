@@ -1814,6 +1814,11 @@ href="#pdt---codex-ops-r1-on-055-cursor-builder-paste-trigger-spec"
 id="toc-pdt---codex-ops-r1-on-055-cursor-builder-paste-trigger-spec">2026-05-15
 15:57 PDT - Codex-ops R1 on 055 Cursor builder paste-trigger
 spec</a></li>
+<li><a
+href="#pdt---codex-r1-on-055-cursor-as-builder-paste-trigger-spec"
+id="toc-pdt---codex-r1-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
+15:58 PDT - Codex R1 on 055 Cursor-as-builder paste-trigger
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19487,6 +19492,55 @@ paste-driven. The operational risk is the absence of an actual
 Cursor-side serialization primitive while the builder protocol’s
 <code>builder.md</code> direct-commit contract assumes exactly one live
 writer.</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-055-cursor-as-builder-paste-trigger-spec">2026-05-15
+15:58 PDT - Codex R1 on 055 Cursor-as-builder paste-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-055-cursor-as-builder-paste-trigger.md</code>
+at <code>a37c9b9cbb3670641e9d9b9f181842b19f0eac42</code>, current
+<code>skills/process-backlog.md</code>,
+<code>skills/review-queue-cursor.md</code>,
+<code>skills/role-typed-task-state.md</code>,
+<code>tools/sync-skills.sh</code>, and completed 047 excerpts for
+implementability checks.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r1/codex.md</code>
+as <code>6221daa</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM shared default <code>ECHO_AGENT_ID</code> can make
+cross-binding concurrency look like resume instead of a claim race;
+MEDIUM AC2’s byte-identity requirement for the Codex adapter contradicts
+the generated-frontmatter behavior in <code>tools/sync-skills.sh</code>;
+LOW the ready spec lacks a <code>## Tests</code> section.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>a37c9b9cbb3670641e9d9b9f181842b19f0eac42</code>; request path
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-055-cursor-as-builder-paste-trigger/r1/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The spec direction is small and buildable,
+but the Cursor binding prose needs to preserve the existing persona-ID
+concurrency warning, and the sync acceptance text needs to match the
+Codex adapter transform rather than literal byte identity.</li>
 </ul>
 </body>
 </html>
