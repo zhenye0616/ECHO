@@ -1741,6 +1741,9 @@ href="#pdt-strategist-drove-052-r1r3-to-convergence-founder-override-on-r1-escal
 id="toc-pdt-strategist-drove-052-r1r3-to-convergence-founder-override-on-r1-escalation">2026-05-15
 01:25 PDT — Strategist drove 052 R1–R3 to convergence (founder-override
 on R1 escalation)</a></li>
+<li><a href="#pdt---codex-r2-on-053-completed_at-coercion"
+id="toc-pdt---codex-r2-on-053-completed_at-coercion">2026-05-15 01:31
+PDT - Codex R2 on 053 completed_at coercion</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18338,6 +18341,49 @@ validator catches schema errors but cannot catch
 semantic-content-anchored-on-wrong-artifact errors. <strong>Don’t design
 fixes here per CLAUDE.md</strong> — observation only; if recurrent, file
 as a backlog item.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-053-completed_at-coercion">2026-05-15 01:31
+PDT - Codex R2 on 053 completed_at coercion</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-053-reviewer-completed-at-coercion.md</code>
+at <code>20400bd71a8cec424e67901e49accb04f408c72b</code>, current queue
+validators/helpers (<code>validate.py</code>,
+<code>validate_response_yaml.py</code>,
+<code>commit-reviewer-response.sh</code>,
+<code>push-with-retry.sh</code>, <code>combine.py</code>), existing
+review-queue tests, and ran a local PyYAML timestamp parse probe.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r2/codex.md</code>
+as <code>055797f</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC3.2’s production-remote guard can miss the actual
+<code>origin main</code> push path because it only checks fixture-named
+refs; MEDIUM AC3.2’s temp repo setup omits git identity plus an initial
+pushed <code>origin/main</code>, both required by the real commit/push
+helper.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>20400bd71a8cec424e67901e49accb04f408c72b</code>; request path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-053-reviewer-completed-at-coercion/r2/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 fixed the R1 helper-testability and
+shell-safe grep issues. The remaining patch is localized to AC3.2’s
+hermetic git fixture and safety assertions; it should not alter the
+runtime coercion design.</li>
 </ul>
 </body>
 </html>
