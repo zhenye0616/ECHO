@@ -1733,6 +1733,14 @@ PDT - Codex R2 on 052 sync-skills merge gate</a></li>
 <li><a href="#pdt---codex-ops-r3-on-052-sync-skills-merge-gate"
 id="toc-pdt---codex-ops-r3-on-052-sync-skills-merge-gate">2026-05-15
 01:20 PDT - Codex-ops R3 on 052 sync-skills merge gate</a></li>
+<li><a href="#pdt---codex-r3-on-052-sync-skills-merge-gate"
+id="toc-pdt---codex-r3-on-052-sync-skills-merge-gate">2026-05-15 01:20
+PDT - Codex R3 on 052 sync-skills merge gate</a></li>
+<li><a
+href="#pdt-strategist-drove-052-r1r3-to-convergence-founder-override-on-r1-escalation"
+id="toc-pdt-strategist-drove-052-r1r3-to-convergence-founder-override-on-r1-escalation">2026-05-15
+01:25 PDT — Strategist drove 052 R1–R3 to convergence (founder-override
+on R1 escalation)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -18229,6 +18237,107 @@ regenerated with a quoted timestamp before linking. The queue helper
 commit also included a pre-existing staged backlog move for item 050,
 while additional unstaged item 050 files remained in the worktree and
 were left untouched.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-052-sync-skills-merge-gate">2026-05-15 01:20
+PDT - Codex R3 on 052 sync-skills merge gate</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-052-sync-skills-check-in-merge-and-cleanup.md</code>
+at <code>d4d7f92aad91bb92ffdf227216602cc851a47c52</code>, pinned
+<code>skills/merge-and-cleanup.md</code>, pinned
+<code>tools/sync-skills.sh</code>, <code>package.json</code>, test
+inventory, recent response examples, and ran local Git probes for
+default linked-worktree hook path plus relative
+<code>core.hooksPath</code> behavior.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r3/codex.md</code>
+as <code>3e81be2</code>, verdict <code>proceed</code>, findings: none.
+R3 focus checks passed: AC4’s C5 anchor no longer admits
+AC5/BC5/C50/C5A, C6 is a required successor heading rather than an EOF
+fallback, the first C5 fence extraction is explicit, and AC3 requires
+the nested-cwd relative <code>core.hooksPath</code> case.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d4d7f92aad91bb92ffdf227216602cc851a47c52</code>; request path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-052-sync-skills-check-in-merge-and-cleanup/r3/codex.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The response linked cleanly on the first
+pre-link validation attempt. The artifact still has stale editorial
+counts (“four”/“five”) around six AC3 installer test cases, but the
+enumerated acceptance criteria are explicit enough that this was not
+raised as a blocking finding.</li>
+</ul>
+<h3
+id="pdt-strategist-drove-052-r1r3-to-convergence-founder-override-on-r1-escalation">2026-05-15
+01:25 PDT — Strategist drove 052 R1–R3 to convergence (founder-override
+on R1 escalation)</h3>
+<ul>
+<li><strong>Source agent:</strong> Claude orchestrator (strategist)</li>
+<li><strong>Trigger:</strong> Founder said “start the full auto spec
+review round with codex until convergence for 052”. R1 had escalated to
+founder (<code>escalated_to_founder: true</code>, divergent:
+codex=‘pushback’ vs codex-ops=‘proceed_after_patches’). Founder
+explicitly overrode the escalation gate; strategist took over
+disposition and drove to convergence autonomously.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during the
+disposition itself. Cold-start used MCP:
+<code>mcp__echo__list_task_states({stage: claimed})</code>,
+<code>list_task_states({stage: ready})</code>,
+<code>list_task_states({role: strategist})</code>,
+<code>get_role_state({task_id: 2026-05-14-050..., role: strategist})</code>
+(error: file not present at HEAD — expected). All disposition reads were
+direct git/file reads against the pinned SHAs.</li>
+<li><strong>Returned shape:</strong> Three rounds executed; trajectory
+<strong>6 findings → 4 findings → 0 findings</strong>. R1: 3 codex false
+positives rejected with verified-evidence (artifact at pinned SHA
+<code>2a052e02</code> is IS the 052 spec; codex appears to have crossed
+wires with 053), 3 codex-ops substantive findings accepted-with-patch on
+AC3 (<code>chmod</code>+mode-repair,
+<code>core.hooksPath</code>/<code>git-path</code> resolution) and AC4
+(block-extraction). R2: 4 findings, paired across reviewers, on AC3
+(relative <code>core.hooksPath</code> normalization against repo root
+with nested-cwd test) and AC4 (tightened to first-code-fence-inside-C5
+with anchored C5 regex + required-C6 end-anchor). R3: 0 findings, both
+reviewers <code>proceed</code>. Terminal commit <code>16c1457</code>,
+declared CLAIM-READY.</li>
+<li><strong>Sources:</strong> R1 spec SHA
+<code>2a052e02203ea7733c707514285552c9e6042fb0</code>; R1
+disposition+patch <code>8be6fca</code>; R2 spec SHA
+<code>8be6fca287e41aabcf5e4e3922ccaf7cb923df07</code>; R2
+disposition+patch <code>d4d7f92</code>; R3 spec SHA pinned via dispatch
+helper. Reviewer ticks fired manually
+(<code>env REVIEWER_NAME=&lt;r&gt; _run_reviewer.sh &amp;</code>) in
+parallel; r3 codex did NOT journal itself (codex-ops r3 did at commit
+<code>663bb91</code>) — this entry serves as journal-by-proxy for the
+missing codex r3 tick (response SHA <code>3e81be2</code>, verdict
+<code>proceed</code>, findings none).</li>
+<li><strong>Verdict:</strong> ✅ right — convergence to
+<code>proceed</code> from both reviewers; spec now CLAIM-READY at HEAD
+<code>16c1457</code>.</li>
+<li><strong>Note:</strong> R1 codex false positives are striking — three
+HIGH/MEDIUM findings all hallucinated against a different spec (053),
+despite the request.md and artifact_sha both correctly pointing at 052.
+Worth a follow-up observation: this is a reviewer-side hallucination
+mode (codex appears to have “anchored” on a prior 053 review session and
+replayed those findings against the 052 prompt). The pre-link YAML
+validator catches schema errors but cannot catch
+semantic-content-anchored-on-wrong-artifact errors. <strong>Don’t design
+fixes here per CLAUDE.md</strong> — observation only; if recurrent, file
+as a backlog item.</li>
 </ul>
 </body>
 </html>
