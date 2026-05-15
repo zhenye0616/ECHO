@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 57 pages · 55 shipped · 2 planned
+**Status:** 58 pages · 56 shipped · 2 planned
 
 ---
 
@@ -139,4 +139,5 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### Process
 
 - [[cross-tool-spec-review|Cross-Tool Spec Review]] — Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.
+- [[review-queue-protocol|Review Queue Protocol]] — File-backed wire protocol for strategist↔reviewer handoffs — three artifacts (request.md, <reviewer>.md, combined.md), three loop exits, fresh-eyes-at-SHA invariant
 - [[wave-1-2-3-retrospective|Wave 1-2-3 Retrospective]] — Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.
