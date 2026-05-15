@@ -1703,6 +1703,9 @@ Codex R4 on 050 worktree isolation</a></li>
 <li><a href="#pdt---codex-r2-on-051-merge-lock-enforcement"
 id="toc-pdt---codex-r2-on-051-merge-lock-enforcement">2026-05-15 00:18
 PDT - Codex R2 on 051 merge-lock enforcement</a></li>
+<li><a href="#pdt---codex-ops-r2-on-051-merge-lock-enforcement"
+id="toc-pdt---codex-ops-r2-on-051-merge-lock-enforcement">2026-05-15
+00:19 PDT - Codex-ops R2 on 051 merge-lock enforcement</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -17755,6 +17758,48 @@ patches before build. A throwaway Git probe confirmed the proposed
 tree-not-SHA assertion can pass under
 <code>git pull --rebase=merges</code> for the narrow non-conflicting
 merge-preservation fixture.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-051-merge-lock-enforcement">2026-05-15
+00:19 PDT - Codex-ops R2 on 051 merge-lock enforcement</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-14-051-merge-lock-cross-vendor-enforcement.md</code>
+at <code>555eb65f48b8dd728473e95490da82f874d15461</code>, current
+<code>_run_reviewer.sh</code>, <code>push-with-retry.sh</code>, reviewer
+runner scripts, <code>skills/merge-and-cleanup.md</code>, and R1
+review/combined context to avoid duplicating already-dispositioned
+runtime findings.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated,
+committed, and pushed
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r2/codex-ops.md</code>
+as <code>b0a26b8</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM frontmatter still instructs the invalid
+<code>git pull --rebase --rebase-merges</code> form despite AC1’s
+corrected <code>--rebase=merges</code> command; LOW AC2 lock-absent
+prose still points to the pre-R1 line 47 log setup insertion point.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>555eb65f48b8dd728473e95490da82f874d15461</code>; request path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-14-051-merge-lock-cross-vendor-enforcement/r2/codex-ops.md</code>;
+code/tool paths listed in Query inputs; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> This converges with the Codex R2 cleanup
+surface from the ops angle: the production command and launchd
+lock-check insertion point are correct in the AC body, but stale summary
+text can still send a builder toward the runtime-bad paths.</li>
 </ul>
 </body>
 </html>
