@@ -44,8 +44,9 @@ spec_refs:
 
 - Append a single section at the end of `skills/process-backlog.md` (immediately AFTER the existing "Binding-specific notes — codex" section from 047, BEFORE any trailing failure-modes / index content). New section title: **"Binding-specific notes — Cursor's Claude (IDE-mode)"**. Content covers:
   - **Trigger mode:** founder paste-driven, not headless. The founder opens Cursor IDE, opens a chat with Cursor's Claude, and pastes the same vendor-neutral protocol body (or a one-line invocation that loads `skills/process-backlog.md`). Cursor's Claude reads `skills/` directly from the open repo — no adapter copy needed.
-  - **No wrapper, no lockfile:** Cursor IDE serializes naturally (one open chat = one builder cycle). The atomic-claim git op (single commit `ready/ → claimed/`) IS the synchronization primitive — if two Cursor sessions race, only one push succeeds and the other observes the claim conflict on next `git pull`.
-  - **ECHO_AGENT_ID resolution:** Cursor's Claude reads `~/.echo/agent-id` on first Bash call; if absent, generates a UUID4 and writes it. Same `~/.echo/agent-id` file shared with the codex builder per 047 AC1 — different *machines* have different IDs; same machine across all bindings gets one stable ID. (Single-owner invariant for `builder.md` holds per 046 AC1: only one binding owns a given claim at a time.)
+  - **Serialization is operator-enforced, not provided by Cursor.** Cursor IDE does NOT serialize multiple chats/windows on the same machine — they share the same `~/.echo/agent-id` and can both pass the builder protocol's "find claim by claimed_by" resume check, attaching to the same worktree and `builder.md`. That would create two live writers and break the single-owner invariant the no-CAS direct-commit contract assumes. **Rule:** run at most one Cursor builder per machine at a time. If you need parallel Cursor builders on DIFFERENT items, set a distinct `ECHO_AGENT_ID=<uuid4>` env var (or per-chat override) before invoking the protocol — that gives each chat its own writer identity. **Second-session recovery:** if a second Cursor chat is opened by mistake while the first is mid-claim, stop the second immediately — do NOT let it proceed, since the resume check will silently attach it to the first chat's claim.
+  - **The atomic-claim git op is the only race-loser surface.** When operator rule above is followed, the single commit `ready/ → claimed/` push is the only synchronization primitive needed — if a Cursor builder races a Claude Code or codex builder on a different machine, only one push succeeds and the other observes the conflict on next `git pull`. The cross-machine case is naturally serialized by git; the same-machine case is operator-serialized per the rule above.
+  - **ECHO_AGENT_ID resolution:** Cursor's Claude reads `~/.echo/agent-id` on first Bash call; if absent, generates a UUID4 and writes it. Same `~/.echo/agent-id` file shared with the codex builder per 047 AC1 — different *machines* have different IDs; same machine across all bindings gets one stable ID. **Concurrency caveat:** the shared default ID makes cross-binding concurrency look like a resume (same `claimed_by`) rather than a claim race. Per the operator-serialization rule above, do not run two builder bindings concurrently on the same machine with the shared default ID; if intentional parallelism is needed, set distinct `ECHO_AGENT_ID` per binding.
   - **MCP access:** Cursor's Claude sees ECHO MCP through Cursor's MCP configuration. Verify `mcp__echo__echo_ping` returns OK before claiming; if not, abort with a one-line note in the founder paste. Journal-by-proxy rule (CLAUDE.md, 046 AC6) does NOT apply — Cursor's Claude has its own MCP write path; it journals its own calls in-the-moment.
   - **Reminder:** journal discipline + drift-prevention rules apply identically. Cursor's Claude is no more or less prone to drift than Claude Code; the binding-specific notes do NOT relax any protocol invariant.
 - Sync to `.claude/commands/process-backlog.md` and `adapters/codex/skills/process-backlog/SKILL.md` via `tools/sync-skills.sh`.
@@ -53,7 +54,10 @@ spec_refs:
 
 **AC2 — `tools/sync-skills.sh --check` clean after AC1's edits.**
 
-- All three on-disk copies (`skills/process-backlog.md`, `.claude/commands/process-backlog.md`, `adapters/codex/skills/process-backlog/SKILL.md`) byte-identical post-sync.
+Per the current `tools/sync-skills.sh` behavior (lines 81-89, 196-215), the three adapters are NOT byte-identical: the Codex adapter intentionally rewrites frontmatter into codex-shaped YAML and `--check` compares the Markdown body plus a generated-frontmatter validation. The AC therefore tracks what the tool actually enforces:
+
+- **Claude adapter (`.claude/commands/process-backlog.md`):** byte-identical to `skills/process-backlog.md` post-sync.
+- **Codex adapter (`adapters/codex/skills/process-backlog/SKILL.md`):** Markdown body identical to `skills/process-backlog.md` post-sync; frontmatter validated against the codex adapter schema by `tools/sync-skills.sh --check`.
 - Verified by running `tools/sync-skills.sh --check` and asserting exit 0.
 
 **AC3 — `docs/cursor-builder-trigger.md` operator-facing instruction.**
@@ -61,7 +65,7 @@ spec_refs:
 - New short doc (~30-60 lines) covering:
   - **Pre-flight:** ECHO daemon running, ECHO MCP registered in Cursor's MCP config, `~/.echo/agent-id` file exists OR Cursor's Claude is allowed to create it on first run.
   - **Step-by-step paste-trigger:** (1) Open Cursor IDE on the founder's Project_echo repo. (2) Open a fresh chat with Cursor's Claude (no prior context). (3) Paste the contents of `skills/process-backlog.md` (or a one-line `Follow the protocol in skills/process-backlog.md` instruction if Cursor's Claude can read files autonomously). (4) Observe: Cursor's Claude announces which item it is claiming, pushes the atomic-claim commit, creates the worktree, etc.
-  - **What success looks like:** `git log --oneline -1 origin/main` after the claim shows the move commit; `backlog/claimed/<id>.md` exists with `claimed_by: <ECHO_AGENT_ID>` populated.
+  - **What success looks like:** `git show origin/main:backlog/claimed/<id>.md` returns the moved spec with `claimed_by: <ECHO_AGENT_ID>` populated AND `git log origin/main --oneline --grep "claim: <id>"` returns a matching commit. Do NOT rely on `git log --oneline -1 origin/main` — origin/main can advance from a reviewer/journal/spec commit immediately after the claim, false-failing the tip-commit check.
   - **Failure modes the founder should look for:** ECHO MCP unreachable (Cursor's Claude can't journal); atomic-claim race lost to another binding (Cursor's Claude reports the conflict and exits — no work lost, founder picks a different item); test failures on the worktree (founder reviews + decides whether to push to pending_review with `agent_notes` or rework).
   - **What NOT to do:** do NOT have two Cursor sessions claiming concurrently. Do NOT skip the journal discipline. Do NOT paste in-progress modifications to `skills/process-backlog.md` — paste the version from `main`.
 - Sibling to existing `docs/review-queue-setup.md` shape.
@@ -81,6 +85,32 @@ If Cursor's Claude claims 055 itself (recursive dogfooding), the merge-time jour
 - Confirm at least one ECHO MCP call was journaled in-the-moment from the Cursor session
 
 Failure of AC5 (no Cursor-as-builder run within 7 days) is NOT a regression — file as a separate followup ("055 binding shipped but no production run yet"). The binding's correctness is verified by AC1+AC2+AC3 even without AC5 firing.
+
+**Durable reminder (mandatory at merge time).** If 055 is claimed by a non-Cursor binding, the merge-time `review_notes` MUST cite a dated followup item in `backlog/_followups.md` of the form `055-AC5-cursor-builder-run-by: 2026-05-<merge_date+7>` so the 7-day window has a tracked deadline. Retire the followup entry when the qualifying Cursor builder journal entry lands; convert it to an open spec successor if 7 days elapse without a run.
+
+## Tests
+
+Verification commands the builder runs before move-to-pending_review:
+
+```bash
+# AC2 — sync hygiene
+tools/sync-skills.sh --check                                       # exit 0
+
+# AC4 — builder pointer lint
+python3 tools/task-state/lint.py \
+  backlog/task-state/2026-05-15-055-cursor-as-builder-paste-trigger/builder.md   # exit 0
+
+# AC1 — section presence (grep is the cheapest assertion; full prose review is done by reviewers)
+grep -q "Binding-specific notes — Cursor's Claude (IDE-mode)" skills/process-backlog.md
+grep -q "Serialization is operator-enforced" skills/process-backlog.md
+
+# AC3 — operator doc exists + key contract terms present
+test -f docs/cursor-builder-trigger.md
+grep -q "ECHO_AGENT_ID" docs/cursor-builder-trigger.md
+grep -q "one active Cursor builder per ECHO_AGENT_ID" docs/cursor-builder-trigger.md
+```
+
+No vitest tests required — this is a docs-only spec; the assertions above are sufficient to gate the move-to-pending_review handoff. Reviewers cover the prose-quality dimension; mechanical contract terms are grep-checkable.
 
 ## Out of Scope (Don't Drift)
 
