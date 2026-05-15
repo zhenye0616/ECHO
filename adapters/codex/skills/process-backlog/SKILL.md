@@ -413,3 +413,46 @@ The initial-on-claim and final-on-handoff writes land on `main` (the main repo, 
 ### Other bindings
 
 Claude Code (in-session via `/process-backlog`) and Cursor's Claude (in-session via the same skill) execute this protocol by direct skill loading — no wrapper. The codex wrapper exists because `codex exec` is a CLI binary that reads its prompt from stdin; Claude Code and Cursor's Claude read skills natively through their tool surface.
+
+---
+
+## Binding-specific notes — Cursor's Claude (IDE-mode)
+
+This section is binding-specific guidance for when **Cursor's Claude** executes this skill from inside the Cursor IDE. The protocol body above (atomic-claim, worktree, test/lint/typecheck, push, move-to-pending_review) is unchanged for every binding; the items below are Cursor-IDE-only concerns layered on top. The shape mirrors the "Binding-specific notes — codex" section above; the same skill body runs in both bindings.
+
+### Trigger mode
+
+- **Founder paste-driven, not headless.** Cursor IDE has no `codex exec`-equivalent today; there is no launchd wrapper to invoke. The founder opens Cursor IDE on the `Project_echo` repo, opens a fresh chat with Cursor's Claude (no prior context), and either pastes the contents of `skills/process-backlog.md` into the chat OR sends a one-line `Follow the protocol in skills/process-backlog.md` instruction.
+- Cursor's Claude reads `skills/` directly from the open repo via its native file tools — no adapter copy needed and `.claude/commands/process-backlog.md` is not consulted from inside Cursor.
+- The same paste-trigger shape is already in production for the **reviewer** role via `skills/review-queue-cursor.md`; this section extends the IDE-mode trigger ritual to the **builder** role. See `docs/cursor-builder-trigger.md` for the operator-facing step-by-step.
+- Manual, on-demand. Not a daemon. The builder lifecycle is one-shot and long-running per claim; periodic auto-invocation would race multiple builders on the same item.
+
+### Serialization is operator-enforced, not provided by Cursor
+
+- Cursor IDE does NOT serialize multiple chats/windows on the same machine. Two parallel Cursor chats both read the same `~/.echo/agent-id` file, both resolve to the same `AGENT_ID`, and both pass the protocol's "find existing claim by `claimed_by`" resume check. They will silently attach to the same `claimed/` item, the same worktree directory, and the same `backlog/task-state/<task-id>/builder.md` pointer — breaking the single-owner invariant the no-CAS direct-commit contract assumes.
+- **Rule: at most one active Cursor builder per ECHO_AGENT_ID at a time.** Concretely: at most one Cursor chat per machine running `/process-backlog` on the default `~/.echo/agent-id` UUID. If you need genuinely parallel Cursor builders working DIFFERENT items on the same machine, set a distinct `ECHO_AGENT_ID=<uuid4>` env var (or per-chat override) before invoking the protocol — that gives each chat its own writer identity, its own resume horizon, and its own claim.
+- **Second-session recovery:** if a second Cursor chat is opened by mistake while the first is mid-claim under the same `ECHO_AGENT_ID`, **stop the second immediately** — do NOT let it proceed past Step A. The resume check will silently attach it to the first chat's claim and the two will race the worktree + the `builder.md` writes.
+
+### The atomic-claim git op is the only race-loser surface
+
+- When the operator-serialization rule above is followed, the single commit `ready/ → claimed/` push is the only synchronization primitive needed for cross-binding races. If a Cursor builder races a Claude Code builder on the same machine (forbidden per the rule above) or a codex / Claude Code builder on a different machine, only one push succeeds; the loser observes the conflict on next `git pull --rebase` and exits cleanly per Step A's race-loss branch.
+- The cross-machine case is naturally serialized by git's non-fast-forward push rejection. The same-machine case is operator-serialized per the rule above. **No new lock primitive** is introduced for the Cursor binding — the codex wrapper's `.git/echo-builder-in-progress.d/` lock directory has no Cursor analogue, and 055 explicitly does not add one.
+
+### `ECHO_AGENT_ID` resolution
+
+- Cursor's Claude reads `~/.echo/agent-id` on its first Bash call inside a `/process-backlog` run; if absent, it generates a UUID4 (`uuidgen`) and writes it. Same `~/.echo/agent-id` file shared with the codex builder per 047 AC1 — different *machines* have different IDs; the same machine across all three bindings (Claude Code, codex, Cursor's Claude) gets one stable ID.
+- **Concurrency caveat:** the shared default ID makes cross-binding concurrency on the same machine look like a *resume* (same `claimed_by`) rather than a claim *race*. Per the operator-serialization rule above, do not run two builder bindings concurrently on the same machine with the shared default ID; if intentional parallelism is needed, set distinct `ECHO_AGENT_ID` per binding before invocation.
+
+### ECHO MCP exposure
+
+- Cursor's Claude sees the ECHO MCP server through Cursor's MCP configuration (typically `~/.cursor/mcp.json`; consult Cursor's docs for the current shape). The skill does not auto-register MCP; it inherits whatever the operator has configured at the IDE level.
+- **Pre-flight contract:** verify `mcp__echo__echo_ping` returns OK before performing the atomic claim. If MCP is unreachable, abort with a one-line note in the founder paste — do NOT proceed with a claim while MCP is silently missing, since the resulting builder run would lose the in-the-moment journal discipline that the merge-time review depends on.
+- The journal-by-proxy rule from `CLAUDE.md` "Dogfooding journal discipline" (046 AC6) does **not** apply to the Cursor builder — Cursor's Claude has its own MCP write path and journals its own `mcp__echo__*` calls in-the-moment per the standard 6-field template.
+
+### Reminder: protocol invariants are unchanged
+
+- Journal discipline (every `mcp__echo__*` call logged in-the-moment to `raw/internal/dogfooding/mcp-interactions-journal.md` with the 6-field template).
+- Drift-prevention rules (`wiki/principles/drift-prevention.md`, the five questions in `docs/NORTH_STAR.md`) — Cursor's Claude is no more or less prone to drift than Claude Code or codex.
+- Single-owner `builder.md` writer contract (047 AC3) — plain `git add` + `git commit` + `git push`; no CAS; no blob-lease helper. The single-owner invariant is preserved by the operator-serialization rule above, NOT by a new lock primitive.
+
+The binding-specific notes here document IDE-mode operational concerns; they do **not** relax any protocol invariant.
