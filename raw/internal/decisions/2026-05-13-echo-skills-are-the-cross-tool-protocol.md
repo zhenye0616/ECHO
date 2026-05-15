@@ -61,7 +61,7 @@ The implication: putting the skills under `.claude/commands/` as the source of t
 
 ## Next steps (deferred, not in this commit)
 
-- **Pre-commit hook calling `tools/sync-skills.sh --check`.** Closes drift at commit time. Tiny scope; defer to 046 friction-fix bundle.
+- ~~**Pre-commit hook calling `tools/sync-skills.sh --check`.** Closes drift at commit time. Tiny scope; defer to 046 friction-fix bundle.~~ ✅ **SHIPPED 2026-05-15 by 052** — `tools/install-pre-commit-hook.sh` (idempotent installer; resolves `core.hooksPath` absolute/relative/fallback; mode-repairs non-executable hooks; 6-scenario vitest including linked-worktree and relative-hooksPath-from-nested-cwd). The hook itself runs `tools/sync-skills.sh --check`. Bundled with `/merge-and-cleanup` C5 verify also calling `--check` (052 AC1), so adapter drift is caught at both commit time and merge time.
 - **Cursor's Claude adapter directory** when first needed. Probably `.cursor/commands/` or via Cursor's MCP/rules surface.
 - **MCP `echo_skill(name)` tool** for non-Anthropic clients (Codex, web ChatGPT, etc.). Returns canonical content from `skills/`. Lives in the ECHO MCP server.
 - **Wiki promotion:** after the friction queue is empty (per friction-first directive), promote this decision into `wiki/architecture/cross-tool-protocol.md` and update `wiki/principles/context-as-moat.md` to reference it.
