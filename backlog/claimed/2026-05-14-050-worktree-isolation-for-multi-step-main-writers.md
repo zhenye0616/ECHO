@@ -35,10 +35,10 @@ spec_refs:
   - raw/internal/dogfooding/mcp-interactions-journal.md  # live evidence of the bug class: 2026-05-14 14:02 PDT collision atom + 14:48 PDT entry where THIS spec's journal append hit "File has been modified since read" twice because codex was concurrently writing the same file (real-time manifestation of the asymmetric-isolation gap on the very file documenting it)
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-15T07:30:00Z"
+branch: "agent/worktree-isolation-for-multi-step-main-writers"
+worktree: "~/Desktop/Project_echo--worktree-isolation-for-multi-step-main-writers"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
