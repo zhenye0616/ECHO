@@ -1847,6 +1847,9 @@ href="#pdt---codex-ops-r2-on-056-claude-reviewer-headless-onboarding-spec"
 id="toc-pdt---codex-ops-r2-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
 16:46 PDT - Codex-ops R2 on 056 Claude reviewer headless onboarding
 spec</a></li>
+<li><a href="#pdt---codex-r2-on-056-claude-as-reviewer-headless-spec"
+id="toc-pdt---codex-r2-on-056-claude-as-reviewer-headless-spec">2026-05-15
+16:46 PDT - Codex R2 on 056 Claude-as-reviewer headless spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -19877,6 +19880,60 @@ class: one invalid roster entry can break existing launchd reviewers, an
 unsafe command-template option can fail before a response file exists,
 and install smoke cannot be fail-closed unless the installer itself owns
 the install-context branch.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-056-claude-as-reviewer-headless-spec">2026-05-15
+16:46 PDT - Codex R2 on 056 Claude-as-reviewer headless spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-056-claude-as-reviewer-headless.md</code>
+at <code>5207612bf11241a01c81ef2d4ab1483553195b90</code>, and the pinned
+queue implementation files <code>_reviewers.py</code>,
+<code>_reviewer_gate.py</code>, <code>_run_reviewer.sh</code>,
+<code>_install_reviewer_launchd.sh</code>, <code>reviewers.json</code>,
+<code>combined.schema.json</code>, <code>combine.py</code>,
+<code>validate.py</code>, <code>commit-reviewer-response.sh</code>, and
+<code>tools/sync-skills.sh</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r2/codex.md</code>
+as <code>3d3db7c</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC2’s patternProperties option does not work with current
+combine.py response-field discovery unless combine.py is included and
+tested; HIGH AC7/AC9 require <code>_install_reviewer_launchd.sh</code>
+changes but the installer is missing from <code>files_to_modify</code>;
+MEDIUM Option B’s literal <code>&lt;</code> argv token is not stdin
+redirection under <code>shell=False</code>; MEDIUM
+<code>invoke_command</code> should be required only for headless rows,
+not the IDE cursor row.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>5207612bf11241a01c81ef2d4ab1483553195b90</code>; request path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R2 substantially narrows the first-round
+patch set, but two remaining issues are still build-path hazards rather
+than taste: the combined-schema widening must match the current code
+that enumerates response fields, and the install-context test contract
+needs an explicit installer edit surface.</li>
 </ul>
 </body>
 </html>
