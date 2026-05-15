@@ -63,47 +63,75 @@ Both refinements were folded into the merge commit (`5ad67e0`). Net effect: a ti
 - **Founder-explicit:** founder says "review with codex" (or similar) at any §C3 pause. This is the empirically-validated trigger (today's 050 merge).
 - **Strategist-recommended:** strategist proactively recommends C3.5 when the proposed resolution involves any of: (a) deletion of test files, (b) wholesale-side-take on a restructured file (not a single-line side-take), (c) reconciliation across ≥3 files where the sidecar playbook is silent or absent, (d) introduction of new code outside the conflict markers (today's CODEX_BIN-cleanup case).
 
-Strategist recommendation does NOT mandate C3.5 — founder can decline ("just apply it, I trust the sidecars"). The recommendation is a one-line surface in the §C3 output: *"This resolution touches [a/b/c/d] — recommend §C3.5 cross-vendor review before applying. Reply `c3.5` to invoke, or `continue` to apply directly."*
+**C3 pause contract must be modified — not just appended to.** Inserting §C3.5 *after* §C3 is insufficient: C3 currently tells the operator "Resolve conflicts in your editor, then reply `continue`." A founder who follows that literal instruction will apply the resolution before ever reaching the new C3.5 section. AC1 below therefore patches C3 itself to make the consult option visible at the right moment: the C3 pause prompt becomes a three-branch choice — `c3.5` (invoke cross-vendor consult) OR resolve-in-editor-then-`continue` OR `abort`. After C3.5 returns, control returns to the same C3 pause point (the strategist surfaces codex's verdict + any modifications; founder still applies the resolution and replies `continue` to advance). **`continue` remains the single gate that verifies + applies the resolved tree.** Strategist recommendation does NOT mandate C3.5 — founder can decline ("just apply it, I trust the sidecars").
+
+**Runtime cwd is the merger worktree, not the live checkout.** Post-050, `/merge-and-cleanup` performs the merge inside `$MERGER_WT = $TMPDIR/echo-merger-<uuid>` (skills/merge-and-cleanup.md:77, `cd "$MERGER_WT"` at line 97). Unresolved conflict markers, staged resolutions, and any `git diff <file>` directives only exist inside `$MERGER_WT` — the live checkout at `~/Desktop/Project_echo` is on a separate branch tip with a clean tree. The C3.5 invocation MUST run with `-C "$MERGER_WT"` (or the strategist must `cd "$MERGER_WT"` before invoking with relative paths). Empirical example from 2026-05-15 050 merge used `-C ~/Desktop/Project_echo` because 050's worktree-isolation hadn't shipped yet; that command shape is no longer correct.
 
 **No new helper script.** The invocation is one shell line per the existing reference recipe; codifying it inline in the skill prose is sufficient. Adding a `tools/review-queue/conflict-review.sh` wrapper would add scope without functional benefit — the strategist writes the prompt body inline and shells out directly.
 
+**Audit trail in existing artifacts only.** C3.5 responses are NOT persisted to `backlog/reviews/.../c3-5/` or any new file. The strategist records (a) one C3.5-result line in `review_notes` (C6) and (b) one C3.5-summary line in the merge commit body (C8), per the AC4 spec below. This keeps C3.5 lightweight + reversible while ensuring a future reader of the merge commit can tell that a cross-vendor consult fired and what it returned. Without this rule the `proceed-with-modifications` decision and its modifications would survive only in terminal scrollback or `/tmp/`, which is unacceptable for an action that shapes the merge commit.
+
 ## Acceptance criteria
 
-### AC1 — `skills/merge-and-cleanup.md` adds §C3.5 between current §C3 and §C4
+### AC1 — `skills/merge-and-cleanup.md` modifies §C3 pause contract AND adds §C3.5 between §C3 and §C4
 
-The new section MUST contain (anchored regex-detectable, per AC2 below):
+**AC1a — §C3 pause contract change (mandatory).** The existing §C3 pause prompt language MUST be updated so the founder sees C3.5 as a branch option *before* applying the resolution. Replace the current "Resolve conflicts in your editor, then reply `continue`" line with an explicit three-branch prompt: (i) reply `c3.5` to invoke cross-vendor consult, (ii) resolve in your editor and reply `continue`, (iii) reply `abort` to back out of the merge. Mechanical detection (AC2 enforces): substring **"c3.5"** AND substring **"continue"** AND substring **"abort"** must appear in §C3 within 30 lines of the existing `<<<<<<<` conflict-marker mention. The strategist's prose also recommends `c3.5` proactively when any of the (a)-(d) triggers fires (per Architectural Invariant § above), but the prompt itself stays neutral.
 
-1. A `### C3.5. ...` heading.
-2. The literal substring **"OPTIONAL"** (caps-sensitive) in the opening paragraph, so the optional-not-required posture is mechanically detectable.
-3. The literal substring **"codex exec"** (caps-insensitive) in a fenced code block, so the documented invocation recipe is mechanically detectable.
-4. A trigger clause that names both founder-explicit and strategist-recommended triggers (mechanical detection: substring **"founder-explicit"** AND substring **"strategist-recommended"**, both in the same section).
-5. A prompt-template section listing the SIX load-bearing prompt elements: (i) working-tree state, (ii) batch context (other recent merges + their sidecar prescriptions), (iii) conflict markers (verbatim or as a `git diff <file>` directive), (iv) specs/sidecars the reviewer should consult, (v) the proposed resolution (verbatim), (vi) output format. Mechanical detection: an ordered/unordered list of ≥6 items under a subheading named or containing "prompt".
-6. An output-format specification: the reviewer's response MUST start with a YAML-like header containing `verdict: proceed-as-proposed | proceed-with-modifications | pushback` AND `reviewer: codex` (or other vendor name). Mechanical detection: substring **"proceed-as-proposed"** AND substring **"proceed-with-modifications"** AND substring **"pushback"** AND substring **"verdict:"**, all in the same section.
-7. A post-review handling clause: on `proceed-as-proposed` the strategist proceeds to §C4 with the original resolution; on `proceed-with-modifications` the strategist applies the named modifications before proceeding; on `pushback` the strategist pauses again and surfaces the pushback to the founder (does NOT auto-revert). Mechanical detection: each of the three verdict strings appears in the same section AND is followed by a sentence describing the action.
-8. A failure-modes table entry (in the existing failure-modes table at the bottom of the skill body) noting that C3.5 is OPTIONAL and trigger-driven (not strictly part of AC1's "must contain" list but expected by the prose structure; tested by AC2 only via the anchored regex finding C3.5).
+**AC1b — §C3.5 insertion (mandatory).** Insert a new `### C3.5. ...` heading after the modified §C3 and before §C4. The new section MUST contain (anchored regex-detectable, per AC2 below):
 
-### AC2 — `tests/skills/merge-and-cleanup-shape.test.ts` asserts C3.5 structural shape
+1. The literal substring **"OPTIONAL"** (caps-sensitive) in the opening paragraph, so the optional-not-required posture is mechanically detectable.
+2. A fenced code block whose contents include ALL THREE of these literal substrings on the same `codex exec` line: **"codex exec"** AND **"$MERGER_WT"** (or equivalent — accepts `"$MERGER_WT"` with quotes or unquoted `$MERGER_WT`) AND **"--sandbox read-only"**. Mechanical detection in AC2 asserts all three substrings co-occur on a single line inside a fenced block. This pins the invocation cwd to the merger worktree where the unresolved conflict actually exists.
+3. A trigger clause that names both founder-explicit and strategist-recommended triggers (mechanical detection: substring **"founder-explicit"** AND substring **"strategist-recommended"**, both in the same section).
+4. A prompt-template section listing the SIX load-bearing prompt elements: (i) working-tree state captured *inside `$MERGER_WT`* via `git status --porcelain` + `git diff` (NOT relative to the live checkout), (ii) batch context (other recent merges + their sidecar prescriptions), (iii) conflict markers (the prompt MAY direct the reviewer to read files inside `$MERGER_WT` via `git diff <file>` since the invocation cwd is `$MERGER_WT`; OR the prompt embeds conflict markers verbatim — both are acceptable), (iv) specs/sidecars the reviewer should consult, (v) the proposed resolution (verbatim), (vi) output format. Mechanical detection: an ordered/unordered list of ≥6 items under a subheading containing "prompt" (case-insensitive); the list MUST mention `$MERGER_WT` (or `MERGER_WT`) at least once.
+5. An output-format specification: the reviewer's response MUST start with a YAML-like header containing `verdict: proceed-as-proposed | proceed-with-modifications | pushback` AND `reviewer: codex` (or other vendor name). Mechanical detection: substring **"proceed-as-proposed"** AND substring **"proceed-with-modifications"** AND substring **"pushback"** AND substring **"verdict:"**, all in the same section.
+6. A post-review handling clause: for EACH of the three verdict strings, the prose MUST include a sentence describing the strategist's required action. Mechanical detection in AC2: within 200 characters after each verdict string occurrence (or before the next verdict string), an action sentence exists. The action shapes are: `proceed-as-proposed` → return to C3 pause + tell founder "codex endorsed; apply your resolution and reply `continue`"; `proceed-with-modifications` → return to C3 pause + surface the modifications + tell founder "apply original resolution + these N modifications, then reply `continue`"; `pushback` → return to C3 pause + surface the pushback + tell founder "codex pushed back on the resolution because <reason>; reconsider before applying."
 
-Extend the existing test file with a parallel test block:
+**AC1c — Failure-modes table entry (mandatory, but assertion is light).** Add one row to the existing failure-modes table at the bottom of the skill noting C3.5 is OPTIONAL and trigger-driven. AC2 does NOT mechanically assert the row text — the existing test infrastructure does not extract or shape-check the failure-modes table. The row exists for human readers.
 
+### AC2 — `tests/skills/merge-and-cleanup-shape.test.ts` asserts §C3 contract change AND §C3.5 structural shape
+
+Extend the existing test file with TWO parallel test blocks.
+
+**AC2a — §C3 contract assertions:**
+- Anchored regex `^#+\s+C3(?:[^A-Za-z0-9]|$)` to locate the §C3 heading.
+- Anchored regex `^#+\s+C3\.5(?:[^A-Za-z0-9]|$)` to locate the §C3.5 heading (no EOF fallback; if C3.5 is missing, throw `C3.5 heading not found after C3`).
+- Extract the bytes between the C3 heading and the C3.5 heading.
+- Assert that the extracted block contains: substring `<<<<<<<` (the existing conflict-marker mention) AND substring `c3.5` (case-insensitive) AND substring `continue` AND substring `abort`, with `c3.5` appearing within 30 lines of the `<<<<<<<` mention.
+
+**AC2b — §C3.5 contract assertions:**
 - Anchored regex `^#+\s+C3\.5(?:[^A-Za-z0-9]|$)` to locate the §C3.5 heading.
-- Anchored regex `^#+\s+C4(?:[^A-Za-z0-9]|$)` to locate the §C4 heading immediately after (no EOF fallback; if C4 is missing, throw a distinct error message — mirrors the existing C5/C6 pattern).
+- Anchored regex `^#+\s+C4(?:[^A-Za-z0-9]|$)` to locate the §C4 heading immediately after (no EOF fallback; if C4 is missing, throw `C4 heading not found after C3.5` — mirrors the existing C5/C6 pattern).
 - Extract the bytes between the C3.5 heading and the C4 heading.
-- Assert that the extracted block contains, in order: the literal `OPTIONAL`, the literal `codex exec` inside a fenced code block, the substrings `founder-explicit` AND `strategist-recommended`, a list section (≥6 items) under a subheading containing `prompt` (case-insensitive), and each of the three verdict strings (`proceed-as-proposed`, `proceed-with-modifications`, `pushback`).
-- Add synthetic-content test cases (parallel to the existing C5/C6 synthetic tests at lines 87-124): one happy-path test that passes, one missing-C3.5 test that fails with `C3.5 heading not found`, one missing-C4 test that fails with `C4 heading not found after C3.5`, one verdict-string-missing test that fails with a distinct error per missing string.
+- Assert that the extracted block contains, in order:
+  - The literal `OPTIONAL`.
+  - A fenced code block (`` ``` `` … `` ``` ``) containing a single line that has all three substrings `codex exec`, `$MERGER_WT` (or `MERGER_WT` allowing for unquoted/quoted forms), AND `--sandbox read-only`.
+  - The substrings `founder-explicit` AND `strategist-recommended`.
+  - A list section (≥6 list items) under a subheading containing `prompt` (case-insensitive). The list section MUST mention `$MERGER_WT` (or `MERGER_WT`) at least once across its items.
+  - Each of the three verdict strings (`proceed-as-proposed`, `proceed-with-modifications`, `pushback`), AND for each: a non-empty action sentence within 200 characters following the verdict string occurrence (or before the next verdict string, whichever is shorter).
+- Add synthetic-content test cases (parallel to the existing C5/C6 synthetic tests at lines 87-124): one happy-path test that passes; one missing-C3.5 test (`C3.5 heading not found`); one missing-C4 test (`C4 heading not found after C3.5`); one missing-MERGER_WT-in-codex-exec-line test (distinct error message); one verdict-string-missing test (one per missing string); one verdict-without-action-prose test (distinct error per missing action sentence); one §C3 missing-`c3.5`-branch test.
 - The synthetic tests MUST NOT depend on the real `skills/merge-and-cleanup.md` content (so the test file is robust to future edits of the canonical skill).
 
 ### AC3 — `.claude/commands/merge-and-cleanup.md` re-synced byte-identical
 
-After AC1's edit to the canonical `skills/merge-and-cleanup.md`, run `tools/sync-skills.sh` to re-derive the adapter; the spec MUST land with `tools/sync-skills.sh --check` exiting 0. The 052-shipped C5 sync-skills gate auto-verifies this at merge time, but the builder MUST also assert it locally before pushing the branch.
+After AC1's edits to the canonical `skills/merge-and-cleanup.md`, run `tools/sync-skills.sh` to re-derive the adapter; the spec MUST land with `tools/sync-skills.sh --check` exiting 0. The 052-shipped C5 sync-skills gate auto-verifies this at merge time, but the builder MUST also assert it locally before pushing the branch.
 
-### AC4 — Full vitest suite green; no regression
+### AC4 — Audit-trail integration into §C6 (review_notes) and §C8 (commit body)
 
-`npm test` MUST return 953+ passed / 0 failed / 21 skipped post-implementation (matches current main HEAD post-053-merge baseline). `npm run lint` and `npm run typecheck` MUST exit 0. `tools/sync-skills.sh --check` MUST exit 0.
+C3.5 results MUST persist into the two existing merge artifacts; no new file/directory is created.
 
-### AC5 — Worked example in the skill prose
+**AC4a — §C6 review_notes template field.** The existing §C6 review_notes template MUST add a new line under "Conflicts resolved" (or as a sibling top-level entry): `C3.5 cross-vendor consult: <reviewer> @ <verdict> — <one-sentence summary of modifications applied OR "no modifications" if proceed-as-proposed OR "pushback rejected by founder — applied original anyway" if pushback overridden>`. If no C3.5 fired during the merge, the line reads `C3.5 cross-vendor consult: none invoked`. Mechanical detection in AC2c: §C6's review_notes template (lines 197-225 in the post-AC1 canonical skill, adjust if line numbers shift) MUST contain the substring `C3.5 cross-vendor consult:`.
 
-§C3.5 MUST include a brief "Worked example" subsection summarizing today's 050 merge as the empirical precedent: two conflicted files, judgment-loaded resolution (test deletion + wholesale-side-take + line-combining), strategist surfaced + founder requested codex consult, codex returned `proceed-with-modifications` with two non-conflict refinements (orphaned CODEX_BIN + header-comment mismatch), both folded, merge commit `5ad67e0`. ~120 words; not the full incident — just enough for a future strategist to recognize a comparable situation.
+**AC4b — §C8 commit-body summary line.** The existing §C8 commit-message HEREDOC MUST add a one-line summary line within the commit body when C3.5 fires: `Cross-vendor consult: <reviewer> @ <verdict>; modifications: <N>`. When no C3.5 fired, the line MAY be omitted entirely (no `none invoked` clutter in the commit body — review_notes is the durable record; the commit body merely signposts non-default events). Mechanical detection in AC2c: §C8's HEREDOC template MUST contain the conditional-or-included substring `Cross-vendor consult:` in either prose or a commented placeholder so future readers know to write it.
+
+**AC2c — Audit-trail assertions** (new sub-block in the test file): extract §C6's review_notes template block, assert substring `C3.5 cross-vendor consult:`; extract §C8's commit-message HEREDOC block, assert substring `Cross-vendor consult:`. No synthetic-content tests required for AC2c — failure mode is missing-substring with a clear error.
+
+### AC5 — Full vitest suite green; no regression
+
+`npm test` MUST return 953+ passed / 0 failed / 21 skipped post-implementation (matches current main HEAD post-053-merge baseline; the new shape tests in AC2 add at least 4 new passing tests, so the final count is 957+). `npm run lint` and `npm run typecheck` MUST exit 0. `tools/sync-skills.sh --check` MUST exit 0.
+
+### AC6 — Worked example in the skill prose
+
+§C3.5 MUST include a brief "Worked example" subsection summarizing today's 050 merge as the empirical precedent: two conflicted files, judgment-loaded resolution (test deletion + wholesale-side-take + line-combining), strategist surfaced + founder requested codex consult, codex returned `proceed-with-modifications` with two non-conflict refinements (orphaned CODEX_BIN + header-comment mismatch), both folded, merge commit `5ad67e0`. ~120-150 words. The example MUST note that the empirical invocation used `-C ~/Desktop/Project_echo` because 050's worktree-isolation hadn't shipped yet, AND that the post-050 correct invocation is `-C "$MERGER_WT"`. This honesty prevents future readers from copy-pasting the old command shape.
 
 ## Out of Scope (Don't Drift)
 
