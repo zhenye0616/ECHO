@@ -141,7 +141,7 @@ Required edits:
 - DO NOT append `"invoke_command"` to `_REQUIRED_FIELDS` unconditionally — it must be conditionally required only when `mode === "headless"`. Encode in validation at `_reviewers.py:92-106`: when `mode == "headless"`, require `invoke_command` be a non-empty string containing the `{{PROMPT}}` token (the `{{WT}}` token is RECOMMENDED but NOT REQUIRED — `claude -p` operates relative to cwd and has no `-C` analog, so the example `claude -p --dangerously-skip-permissions < {{PROMPT}}` must validate). Document the rule: `{{PROMPT}}` is mandatory for stdin-driven invocations; `{{WT}}` is optional if the invoke command operates on `$WT` via cwd (the wrapper already `cd`'s to `$WT` before substitution).
 - `_reviewer_gate.py` continues to print `slash_command` to stdout (back-compat); add a second mode `--print invoke_command` (or a sibling helper) so the wrapper can resolve the template. For IDE-mode reviewers, `--print invoke_command` exits non-zero with a clear stderr diagnostic (`IDE-mode reviewer cursor has no invoke_command`).
 
-**2. `reviewers.json` — add `invoke_command` per entry, including codex + codex-ops for backwards compatibility.**
+**2. `reviewers.json` — add `invoke_command` per HEADLESS entry, including codex + codex-ops for backwards compatibility (Cursor IDE-mode row omits the field).**
 
 ```json
 {
@@ -170,9 +170,17 @@ The literal `{{WT}}` / `{{PROMPT}}` substitution into a `bash -c` string loses a
 
 **No argv-style template in V1.** If a future binding needs argv-style invocation (e.g., a CLI without stdin support), file as a successor spec that defines an explicit `stdin_from` field and a separate argv-array `invoke_argv` template. For V1 + codex + codex-ops + claude, Option A is sufficient.
 
-**4. `_run_reviewer.sh` wrapper edit.**
+**4. `_run_reviewer.sh` wrapper edit — durable queue-error commit before cleanup (r3 codex-ops F2 HIGH).**
 
-Replace the hardcoded `codex exec` line with a call to the chosen substitution mechanism. Worktree path is `$WT`; prompt is `$WT/.claude/commands/${SLASH_COMMAND}.md`. Failure to resolve `invoke_command` (missing field, template token mismatch, executable not on PATH) MUST surface as a queue-errors entry, not a silent rc=1.
+Replace the hardcoded `codex exec` line with a call to the chosen substitution mechanism. Worktree path is `$WT`; prompt is `$WT/.claude/commands/${SLASH_COMMAND}.md`. Failure to resolve `invoke_command` (missing field, template token mismatch, executable not on PATH) MUST surface as a queue-errors entry on `origin/main`, not a silent rc=1, and **not** an uncommitted append inside `$WT` that the 050 cleanup trap will erase.
+
+**Required failure-path mechanism:**
+- Detect failure (token mismatch, executable missing, etc.) BEFORE spawning the child.
+- Append a row to `raw/internal/queue-errors.md` inside `$WT` with format: `<ISO-Z> <DIAGNOSTIC>: reviewer=<slug> failure=<reason> spec=<artifact_path>@<spec_commit_sha>` (matching the existing queue-error row shape).
+- Commit + push via `tools/review-queue/push-with-retry.sh` BEFORE the cleanup trap fires. The push has to land on `origin/main`; otherwise the queue-error is lost when `git worktree remove --force "$WT"` runs at trap-time and the operator is left only with the launchd-log (StandardErrorPath=/dev/null in the silent-fail case).
+- After the push lands, exit non-zero so the launchd job reflects the failure status.
+- Implementation hint: write a small helper `tools/review-queue/queue_error.sh <reason> <diagnostic>` (or extend `commit-reviewer-response.sh` with an `--error <reason>` mode) so the wrapper has a single entry point. The helper handles append + commit + push + retry-on-non-fast-forward.
+- The pre-redirect launchd-silent-fail surface (`_followups.md` HIGH #1) is OUT OF SCOPE — by definition no path body has executed at that point; queue-errors can't be written. 057 closes that separately via `coord_invoke`. AC8 of 056 only addresses failures that occur INSIDE the wrapper body, after the log redirect block opens.
 
 **5. Backwards compatibility invariant.**
 
@@ -227,7 +235,9 @@ Two-prong:
    - Mock-claude's output `claude.md` validates against `reviewer.schema.json` and is committed via `commit-reviewer-response.sh`
 
    **Additional regression-class cases that close the r1 finding set:**
-   - **`_reviewers.py` accepts all 4 slugs** — instantiate the loader after AC5 part 1 lands; assert codex, codex-ops, cursor, claude all load without `ValueError`; assert each carries a non-empty `invoke_command`; assert the codex/codex-ops argv resolution is byte-equivalent to pre-AC5 (the "argv snapshot" regression check from AC5 part 5).
+   - **`_reviewers.py` accepts all 4 slugs — invoke_command assertion is mode-conditional** (r3 codex F1 + codex-ops F1 convergent; codex-ops elevated to HIGH). Instantiate the loader after AC5 part 1 lands; assert codex, codex-ops, cursor, claude all load without `ValueError`. **Assert non-empty `invoke_command` ONLY for the headless reviewers** (codex, codex-ops, claude — `each.invoke_command is not None and len(each.invoke_command) > 0`). **Cursor MAY load with `invoke_command = None`** (or omitted from JSON entirely if the schema if/then permits it); assert the value is exactly `None` for cursor. **Assert `_reviewer_gate.py --print invoke_command` for `REVIEWER_NAME=cursor` exits non-zero with stderr containing `IDE-mode reviewer cursor has no invoke_command`** (the documented diagnostic from AC5 part 1). Assert the same call for codex/codex-ops/claude exits 0 and prints the resolved template. Assert the codex/codex-ops argv resolution is byte-equivalent to pre-AC5 (the "argv snapshot" regression check from AC5 part 5).
+
+   - **Wrapper-side queue-error persistence on failure-before-spawn** (r3 codex-ops F2 HIGH new surface). Simulate a `mode=headless` reviewer entry whose `invoke_command` references a missing executable (e.g., `nonexistent-binary {{PROMPT}}`) OR contains an `invoke_command` with no `{{PROMPT}}` token. Invoke `_run_reviewer.sh REVIEWER_NAME=<that-slug>`. Assert: (a) wrapper exits non-zero; (b) `origin/main` HAS a new row in `raw/internal/queue-errors.md` matching `*<DIAGNOSTIC>: reviewer=<slug>*` shape; (c) the ephemeral `$WT` worktree was removed by cleanup trap; (d) no partial commits or orphan files left in the live checkout. Inverse: with a valid `invoke_command` whose executable exists and template tokens validate, no queue-error row is appended.
    - **Combined schema validates 4-reviewer round** — synthesize a combined.md with `codex_response`, `codex-ops_response`, `claude_response` populated; assert `validate.py combined` exits 0 (closes r1 codex F2 HIGH).
    - **Shell-safe substitution under spaces** (closes r1 codex F3 + codex-ops F6 MEDIUM convergent) — set `TMPDIR=/var/folders/.../tmp with spaces/` (or equivalent), invoke `run-claude-reviewer.sh`, assert the wrapper survives + mock-claude is invoked with the correctly-quoted args + the resulting `claude.md` lands correctly. Run the same fixture against codex + codex-ops to prove no backwards-incompat regression.
    - **Install-context fail-closed when claude is absent** (closes r1 codex-ops F5 HIGH unique) — `PATH=/usr/bin:/bin` (no claude), invoke `_install_reviewer_launchd.sh claude --smoke --install-context`; assert non-zero exit; assert no plist file written under the test plist dir; assert no launchd job loaded. Inverse: `PATH=$TEST_BIN_WITH_CLAUDE`, same command; assert plist written + smoke passes.
