@@ -66,6 +66,20 @@ Read `/tmp/echo-rq-artifact.md` plus any inline embeds in the `request.md` body.
 
 Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Use the per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` — never `divergent` / `single_reviewer_timeout` / `no_responses` (those are combined-only).
 
+The `completed_at` value MUST be single-quoted (`'2026-05-XXTHH:MM:SSZ'`); unquoted ISO 8601 timestamps are auto-parsed by PyYAML as `datetime.datetime` and rejected by the schema. Use this canonical frontmatter shape (placeholders `XX` / `HH:MM:SS` are intentional — substitute today's values, do NOT copy the example date verbatim):
+
+```yaml
+---
+item_id: "2026-05-XX-NNN-some-spec-slug"
+round: 1
+reviewer: "codex"
+artifact_sha: "abc1234"
+completed_at: '2026-05-XXTHH:MM:SSZ'
+verdict: "proceed_after_patches"
+findings: []
+---
+```
+
 ## Step 5 — Validate, write codex.md atomically, then commit via the validation helper
 
 Write your fully-formed response content to a unique temp file FIRST. **Before** `os.link`-ing it into the canonical `<dir>/codex.md` path, run the pre-link YAML gate (045 AC1). On failure, delete the temp file, regenerate the response in-session, and re-run the gate. After all in-session retries are exhausted, log a single `PRE-LINK-INVALID:` row to `raw/internal/queue-errors.md` and exit non-zero — the next tick will re-poll the round and re-attempt.
