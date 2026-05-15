@@ -39,9 +39,50 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-15T07:30:00Z"
 branch: "agent/worktree-isolation-for-multi-step-main-writers"
 worktree: "~/Desktop/Project_echo--worktree-isolation-for-multi-step-main-writers"
-head_sha: ""
+head_sha: "0e7ee057fef533c85a9947d4dc3ab3a0631da460"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Single-pass implementation of AC1-AC7 against the c1ba5c1 CLAIM-READY spec. Branch
+  agent/worktree-isolation-for-multi-step-main-writers pushed at 0e7ee05; one commit
+  touching 14 files (+1094 / -59). Full test suite green: 936 passed / 21 skipped
+  pre-existing. typecheck + lint clean. sync-skills.sh --check passes.
+
+  AC1: _run_reviewer.sh wraps every headless tick in $TMPDIR/echo-${REVIEWER_NAME}-<uuid>
+  with all four handoffs (CWD + ECHO_REVIEW_QUEUE_REPO_ROOT + PROMPT path + codex -C),
+  unified ERR/EXIT cleanup, and the pre-flight prune→enumerate→GC sequence. The
+  same-reviewer overlap no-op guard + journal-before-cleanup ordering are encoded in
+  the canonical bodies of skills/review-queue-{codex,codex-ops,cursor}.md (and synced
+  to .claude/commands/ via tools/sync-skills.sh).
+
+  AC2/AC3/AC4: watcher + merger + cursor IDE reviewer all run inside their respective
+  $TMPDIR/echo-<role>-<uuid> worktrees per identical lifecycle prose. AC3 deletes the
+  sentinel-file lock convention; the failure-modes row referencing it is removed.
+
+  AC5: push-with-retry.sh is CWD-agnostic (queue-errors.md path resolved via
+  git rev-parse --show-toplevel) and uses `git push origin HEAD:main` so detached-HEAD
+  worktree commits actually land. Test (d) asserts `git rev-parse origin/main` == WT HEAD.
+
+  AC6: 9 new tests across 2 files cover same-round multi-reviewer rebase, reviewer+merger
+  concurrency (the 14:02 collision shape), watcher+reviewer concurrency, registered
+  worktrees never GC'd regardless of mtime, sentinel-file absence across all flows, and
+  push-with-retry CWD-agnostic + HEAD:main refspec from both live-checkout and detached
+  worktree CWDs.
+
+  AC7: grep -rn echo-merge-in-progress skills/ tools/ .claude/ tests/ wiki/ returns ZERO.
+  TWO RESIDUAL HITS in docs/BACKLOG.md row descriptions for 050 + 051 (founder-owned
+  tracking-table prose) — AGENT_INSTRUCTIONS forbids the builder from editing
+  docs/BACKLOG.md; surfaced as founder-cleanup, not builder-loop work. Either remove
+  the literal string from those row descriptions post-merge (1-minute edit), or extend
+  AC7's `raw/` carve-out to also exempt the founder-regenerated tracking table.
+
+  Two scope-conservative decisions:
+   - run-codex-reviewer.sh + run-codex-ops-reviewer.sh left untouched (they're 5-line
+     drivers that already exec _run_reviewer.sh; AC1 changes propagate automatically).
+   - No tools/echo-worktree-doctor.sh (filed as 050-followup-F).
+   - No push-failure preservation logic (filed as 050-followup-D).
+   - No reviewer/watcher origin-aware terminal check (filed as 050-followup-E).
+   - No race-tight same-reviewer launchd-overlap fix beyond the R3 pre-commit re-check
+     (filed as 050-followup-G).
 review_notes: ""
 ---
 
