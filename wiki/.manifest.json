@@ -58,6 +58,19 @@
     "topic": "Architecture",
     "subtopic": "Capture"
   },
+  "architecture/coord-active-trigger-and-role-emission.md": {
+    "status": "shipped",
+    "title": "Coord active trigger + role emission (057b)",
+    "link": "coord-active-trigger-and-role-emission",
+    "summary": "Producer-side of the coord layer: coord_invoke MCP tool (5-step path-resolver gate + causality-safe reviewer_invoked emission + pinned-request mode with bind_failed outcome), two-phase wrapper emission via coord-emit.sh, post-push hooks in strategist skills, daemon-side internal-emitter attribution model. Activates the substrate from 057a.",
+    "aliases": [
+      "Coord Active Trigger",
+      "057b",
+      "coord_invoke"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Substrate"
+  },
   "architecture/coord-layer.md": {
     "status": "shipped",
     "title": "Coord layer",

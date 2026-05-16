@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 63 pages · 61 shipped · 2 planned
+**Status:** 64 pages · 62 shipped · 2 planned
 
 ---
 
@@ -68,6 +68,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[capture-allowlist|Capture Allowlist]] — Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.
 - [[capture-gate|Capture Gate]] — Pure-function chokepoint at src/capture/gate.ts; five source kinds, six stable rejection codes, exhaustive test coverage.
 - [[capture-pipeline|Capture Pipeline]] — Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.
+- [[coord-active-trigger-and-role-emission|Coord active trigger + role emission (057b)]] — Producer-side of the coord layer: coord_invoke MCP tool (5-step path-resolver gate + causality-safe reviewer_invoked emission + pinned-request mode with bind_failed outcome), two-phase wrapper emission via coord-emit.sh, post-push hooks in strategist skills, daemon-side internal-emitter attribution model. Activates the substrate from 057a.
 - [[coord-layer|Coord layer]] — Generic role↔role coordination substrate over the daemon — narrow append seam + role-typed deadline tracker + identity-gated single-writer lane. Spec 057 brainstorm + decomposition rationale; ships dormant until 057a substrate + 057b active trigger activate it. Parent overview page; substrate detail in coord-substrate-and-observability, producer-side in coord-active-trigger-and-role-emission.
 - [[coord-substrate-and-observability|Coord substrate + observability (057a)]] — Daemon-side coord ledger: narrow coord_emit append seam, role-typed deadline config (ajv-validated coord-roles.json), single-actor deadline tracker with cache-hit-also-terminal fireMissedDeadline, durable boot replay + periodic reconciliation, on-demand coord_status, 100k-atom V1 perf contract. Ships dormant; 057b activates emission.
 - [[group-session|Group Session]] — V1.6 cross-tool coordination pattern — AI clients work the same problem through ECHO's shared substrate via wait_for_new_turns subscriptions on each others' capture sources. Implements Goal A (synchronized human-driven); Goal C (autonomous group) deferred to V2+. First-call reliability gate (item 032) closes the resume-after-gap join pattern with structural guarantees.

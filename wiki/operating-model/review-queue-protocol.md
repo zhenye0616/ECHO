@@ -237,4 +237,4 @@ Builder / merger / watcher lifecycle event types are deferred to a follow-on obs
 - [[cross-tool-spec-review]] — the multi-reviewer pattern this protocol implements
 - [[coord-layer]] — the operator-observability substrate that wraps every reviewer tick
 - [[builder-bindings]] — the three vendor-agnostic builder bindings (Claude Code, codex, Cursor's Claude)
-- [[journal-is-observation-only]] — invariant separating dogfooding journal from queue artifacts
+- journal-is-observation-only discipline (documented in CLAUDE.md "Dogfooding journal discipline") — invariant separating dogfooding journal from queue artifacts

@@ -43,7 +43,7 @@ Every coord event names a `subject_role` — the role whose SLA the event pertai
 
 ## Role-Typed Deadline Config
 
-The split mirrors `reviewers.json` + `_reviewers.py` from item 043's [[per-round-reviewer-roster|per-round reviewer roster]]:
+The split mirrors `reviewers.json` + `_reviewers.py` from 043's per-round reviewer roster (`tools/review-queue/reviewers.json` + `_reviewers.py`):
 
 - **`tools/review-queue/coord-roles.json`** — per-role-per-event-type SLA defaults. `name` matches the reviewer slug exactly (`codex`, `codex-ops`, `claude`, `cursor`) so wrapper identity and coord identity converge on one canonical entry.
 - **`tools/review-queue/schemas/coord-roles.schema.json`** — JSON Schema (draft-07) validating shape, types, required fields, and the `headless` if/then constraint (headless roles MUST carry `invoke_command` as a JSON argv array; IDE-mode roles MAY omit it).
@@ -223,4 +223,4 @@ All tests use the MCP `coord_emit` tool directly to inject synthetic atoms; no w
 - [[timestamp-canonicalization]] — append-time canonicalization invariant honored by coord
 - [[group-session]] — peer pattern: cross-tool coordination via shared ledger + `wait_for_new_turns`
 - [[review-queue-protocol]] — uses coord events to track per-round reviewer SLAs once 057b activates emission
-- [[per-round-reviewer-roster]] — 043 pattern for per-role JSON config + Python validator that `coord-roles.json` mirrors
+- 043 per-round reviewer roster (`tools/review-queue/reviewers.json` + `_reviewers.py`) — per-role JSON config + Python validator pattern that `coord-roles.json` mirrors
