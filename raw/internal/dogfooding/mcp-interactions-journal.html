@@ -1994,6 +1994,9 @@ id="toc-pdt---codex-r4-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-ops-r4-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r4-on-057b-coord-active-trigger-spec">2026-05-16
 00:38 PDT - Codex-ops R4 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-ops-r5-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r5-on-057b-coord-active-trigger-spec">2026-05-16
+00:47 PDT - Codex-ops R5 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22522,6 +22525,59 @@ validation is canonical v4, pinned bind failures close through
 <code>tick_start</code> plus <code>tick_end(bind_failed)</code>, and
 scheduler health is bootstrap-scoped rather than
 long-review-scoped.</li>
+</ul>
+<h3 id="pdt---codex-ops-r5-on-057b-coord-active-trigger-spec">2026-05-16
+00:47 PDT - Codex-ops R5 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>e6124c00279112d074df7c5767ac174aa13691ca</code>, current
+<code>_run_reviewer.sh</code> wrapper context, 050 worktree-isolation
+context, and 057a claimed substrate excerpts needed to evaluate
+active-spawn/runtime behavior.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r5/codex-ops.md</code>
+as <code>236dac3</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH detached Node <code>spawn()</code> path lacks a required
+<code>ChildProcess</code> <code>error</code> listener, so an OS-level
+spawn failure can crash the MCP daemon instead of surfacing as bounded
+coordination failure/deadline telemetry.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>e6124c00279112d074df7c5767ac174aa13691ca</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r5/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/run-codex-ops-reviewer.sh</code>,
+<code>backlog/complete/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md</code>,
+<code>backlog/claimed/2026-05-16-057a-coord-substrate-and-observability.md</code>;
+no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R5 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R5 closed the R4
+no-candidate/scheduler-health wording issue and the role-path validation
+patch is now explicit. The remaining operational hole is the detached
+child-process error path: the daemon needs to survive failed exec
+attempts so production coordination failures stay observable rather than
+taking down the observer.</li>
 </ul>
 </body>
 </html>
