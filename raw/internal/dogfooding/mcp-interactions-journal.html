@@ -1912,6 +1912,9 @@ id="toc-pdt---codex-ops-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT
 <li><a href="#pdt---codex-r5-on-057-coord-layer-spec"
 id="toc-pdt---codex-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT -
 Codex R5 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-r1-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-r1-on-057a-coord-substrate-spec">2026-05-15 21:45
+PDT - Codex R1 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20902,6 +20905,64 @@ committed and pushed before this observation-only journal entry.</li>
 mostly absorbed, but the active-trigger handoff still needs to name the
 actual wrapper/prompt plumbing that can carry a pinned request through
 Codex without reverting to the scan loop.</li>
+</ul>
+<h3 id="pdt---codex-r1-on-057a-coord-substrate-spec">2026-05-15 21:45
+PDT - Codex R1 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>6d26e60aa287a40c016bb2a4b600fed600959f88</code>, and pinned
+implementation context for <code>wait-for-new-turns.ts</code>,
+<code>search-memories.ts</code>, <code>storage/interface.ts</code>,
+<code>sqlite.ts</code>, <code>server.ts</code>,
+<code>daemon/index.ts</code>, <code>pipeline.ts</code>,
+<code>gate.ts</code>, <code>_reviewers.py</code>,
+<code>reviewers.json</code>, <code>reviewers-config.schema.json</code>,
+<code>find-clusters.ts</code>, <code>cluster-engine.ts</code>,
+<code>normalize/index.ts</code>, and
+<code>normalize/dispatch.ts</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/codex.md</code>
+as <code>a87236c</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH <code>subject_role</code> is required by deadline
+keys/status but never defined as input or derived state; HIGH
+heartbeat/reconstruction deadline-missed idempotency is scan-then-append
+and can double-fire without a serialized firing guard; MEDIUM
+<code>wait_for_new_turns(source_prefix="coord:")</code> conflicts with
+the current required <code>sources[]</code> schema unless one-of
+semantics are specified; MEDIUM daemon startup validation for
+<code>coord-roles.json</code> is assigned to a Python helper/per-request
+tool boundary instead of a concrete TypeScript daemon runtime
+loader.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>6d26e60aa287a40c016bb2a4b600fed600959f88</code>; request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057a round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The split from 057 to 057a is directionally
+cleaner and independently buildable, but the substrate spec still needs
+tighter contracts around who a coord event is about, how missed-deadline
+emission stays idempotent across concurrent daemon paths, and how the
+daemon loads role policy once at startup.</li>
 </ul>
 </body>
 </html>
