@@ -71,4 +71,38 @@ export interface Storage {
   // V1.6 `get_atoms` MCP tool, which materialises atom bodies for ids the
   // caller already obtained from `find_clusters` / `search_memories`.
   getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]>;
+
+  // 057a AC3 — durable append-order coord seam for the deadline tracker's
+  // boot reconstruction + periodic reconciliation paths. The r4 design
+  // dropped the r3 third method `getCoordSequenceAtOrAfter(timestamp)`
+  // because its timestamp-order semantics couldn't compose with
+  // append-order replay under skewed `emitted_at`. V1 reconstruction does
+  // full-ledger replay; the half-open `[sinceSeq, +∞)` + watermark snapshot
+  // (`getCurrentCoordSequence()`) lets the reconciliation pass make
+  // forward-only progress without skipping or re-processing atoms.
+
+  /** Iterate coord atoms (source LIKE 'coord:%') in monotonic durable-append
+   *  order. Each yielded record carries its `sequence_id` (SQLite rowid in
+   *  SqliteStorage; insertion counter in MemoryStorage). Half-open interval:
+   *  returns atoms with `sequence_id >= sinceSeq`. `sinceSeq` omitted means
+   *  "from the beginning of the ledger" (effectively `sinceSeq = 1`). */
+  iterateCoordAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    limit?: number;
+  }): Promise<CoordAtomIterationRecord[]>;
+
+  /** Return `max(sequence_id)` over all currently-durable coord atoms
+   *  (`source LIKE 'coord:%'`). Returns `0` if no coord atoms exist yet.
+   *  Used by reconstruction + reconciliation to capture an inclusive
+   *  watermark; the next pass starts at `last_full_replay_watermark + 1`. */
+  getCurrentCoordSequence(): Promise<number>;
+}
+
+/** Yield-shape for `iterateCoordAtomsByAppendOrder`. The `sequence_id` is a
+ *  per-row monotonic integer durable across restart (rowid in SQLite;
+ *  insertion counter in MemoryStorage). Callers MUST treat it as opaque
+ *  beyond ordering + watermark equality — it is NOT embedded in the atom
+ *  itself, only surfaced at iteration time. */
+export interface CoordAtomIterationRecord extends CaptureEvent {
+  readonly sequence_id: number;
 }

@@ -76,6 +76,17 @@ class StreamingStorage implements Storage {
   getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
     return this.inner.getByIds(ids);
   }
+
+  // 057a AC3: delegate. StreamingStorage is a dev-time stream tap that
+  // wraps the durable storage; the coord seam works through the wrapper.
+  iterateCoordAtomsByAppendOrder(
+    opts?: Parameters<Storage['iterateCoordAtomsByAppendOrder']>[0],
+  ): ReturnType<Storage['iterateCoordAtomsByAppendOrder']> {
+    return this.inner.iterateCoordAtomsByAppendOrder(opts);
+  }
+  getCurrentCoordSequence(): Promise<number> {
+    return this.inner.getCurrentCoordSequence();
+  }
 }
 
 // ─── Pre-seeding: walk existing JSONLs, mark them processed-to-EOF ──────────

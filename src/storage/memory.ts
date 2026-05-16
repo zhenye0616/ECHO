@@ -2,17 +2,44 @@ import { randomUUID } from 'node:crypto';
 import {
   METADATA_MATCH_KEY_WHITELIST,
   type CaptureEvent,
+  type CoordAtomIterationRecord,
   type EventId,
   type QueryFilter,
   type Storage,
 } from './interface.js';
 
+// 057a AC3 — monotonic insertion counter parallel to SQLite's rowid.
+// Stored alongside the event so iterateCoordAtomsByAppendOrder + the
+// MAX-watermark query both have a stable per-row sequence number that
+// survives reordering by query() (which sorts by timestamp DESC).
+interface InternalEvent extends CaptureEvent {
+  _seq: number;
+}
+
+function stripSeq(e: InternalEvent): CaptureEvent {
+  // Re-construct to drop `_seq` — the internal sequence counter is
+  // exposed only via iterateCoordAtomsByAppendOrder's typed
+  // CoordAtomIterationRecord shape. `query()` and `getByIds()` must
+  // return plain CaptureEvent so a deep-equal roundtrip test passes.
+  const out: CaptureEvent = {
+    id: e.id,
+    source: e.source,
+    timestamp: e.timestamp,
+    content: e.content,
+  };
+  if (e.metadata !== undefined) out.metadata = e.metadata;
+  if (e.embedding !== undefined) out.embedding = e.embedding;
+  return out;
+}
+
 export class MemoryStorage implements Storage {
-  private readonly events: CaptureEvent[] = [];
+  private readonly events: InternalEvent[] = [];
+  private seqCounter = 0;
 
   async append(event: Omit<CaptureEvent, 'id'>): Promise<EventId> {
     const id: EventId = randomUUID();
-    this.events.push({ ...event, id });
+    this.seqCounter += 1;
+    this.events.push({ ...event, id, _seq: this.seqCounter });
     return id;
   }
 
@@ -97,10 +124,10 @@ export class MemoryStorage implements Storage {
       if (a.id > b.id) return order === 'asc' ? 1 : -1;
       return 0;
     });
-    if (limit !== undefined && filtered.length > limit) {
-      return filtered.slice(0, limit);
-    }
-    return filtered;
+    const truncated = limit !== undefined && filtered.length > limit
+      ? filtered.slice(0, limit)
+      : filtered;
+    return truncated.map(stripSeq);
   }
 
   async count(): Promise<number> {
@@ -113,15 +140,46 @@ export class MemoryStorage implements Storage {
     // regardless of insertion order. Missing ids are silently dropped
     // here; get_atoms surfaces them in atoms_dropped_ids.
     const wanted = new Set(ids);
-    const byId = new Map<EventId, CaptureEvent>();
+    const byId = new Map<EventId, InternalEvent>();
     for (const e of this.events) {
       if (wanted.has(e.id)) byId.set(e.id, e);
     }
     const out: CaptureEvent[] = [];
     for (const id of ids) {
       const ev = byId.get(id);
-      if (ev !== undefined) out.push(ev);
+      if (ev !== undefined) out.push(stripSeq(ev));
     }
     return out;
+  }
+
+  // 057a AC3 — durable append-order coord seam (parity with SqliteStorage).
+  async iterateCoordAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    limit?: number;
+  }): Promise<CoordAtomIterationRecord[]> {
+    const sinceSeq = opts?.sinceSeq ?? 1;
+    const limit = opts?.limit;
+    const out: CoordAtomIterationRecord[] = [];
+    // Iterate in insertion order (this.events.push appends, so iteration
+    // order IS insertion order). Filter to coord:% atoms with _seq >= sinceSeq.
+    for (const e of this.events) {
+      if (!e.source.startsWith('coord:')) continue;
+      if (e._seq < sinceSeq) continue;
+      // Strip the internal _seq from the surface CaptureEvent; re-expose
+      // as a top-level `sequence_id` field per the iteration contract.
+      const publicEvent = stripSeq(e);
+      out.push({ ...publicEvent, sequence_id: e._seq });
+      if (limit !== undefined && out.length >= limit) break;
+    }
+    return out;
+  }
+
+  async getCurrentCoordSequence(): Promise<number> {
+    let max = 0;
+    for (const e of this.events) {
+      if (!e.source.startsWith('coord:')) continue;
+      if (e._seq > max) max = e._seq;
+    }
+    return max;
   }
 }
