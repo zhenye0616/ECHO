@@ -1906,6 +1906,9 @@ Codex R4 on 057 coord layer spec</a></li>
 <li><a href="#pdt---codex-ops-r4-on-057-coord-layer-spec"
 id="toc-pdt---codex-ops-r4-on-057-coord-layer-spec">2026-05-15 21:07 PDT
 - Codex-ops R4 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-ops-r5-on-057-coord-layer-spec"
+id="toc-pdt---codex-ops-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT
+- Codex-ops R5 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20793,6 +20796,57 @@ scheduler-tier fixes are closer, but the active-trigger runtime contract
 still needs to close two normal unattended cases: “spawned reviewer
 picked a different request” and “spawned reviewer cleanly no-opped after
 another tick won.”</li>
+</ul>
+<h3 id="pdt---codex-ops-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT
+- Codex-ops R5 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>2d15276209d77278022d2c1bff4929d64d46f234</code>, and prior
+R3/R4 combined context plus R4 codex-ops context to avoid re-reporting
+already-dispositioned runtime findings.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/codex-ops.md</code>
+as <code>cb34308</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH <code>reviewer_invoked</code> appended after child spawn
+can replay after <code>tick_start</code> and false-fire the pre-spawn
+deadline; HIGH scheduler-tier deadline transition/idempotency/status
+rules remain correlation-id-only despite <code>tick_run_id</code>
+events; MEDIUM <code>tick_failed_to_bind</code> is named but not
+registered or wired to close the pre-spawn deadline.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>2d15276209d77278022d2c1bff4929d64d46f234</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; prior context paths
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r3/combined.md</code>,
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/combined.md</code>,
+and
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/codex-ops.md</code>;
+no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R5 verifies the R4 cleanup landed, but the
+operational shape still needs causality between daemon invoke records
+and child tick records, plus a true tier-keyed scheduler-health path so
+the new observability layer does not create false pages.</li>
 </ul>
 </body>
 </html>
