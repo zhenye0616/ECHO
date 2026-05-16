@@ -2018,6 +2018,11 @@ id="toc-pdt---codex-r8-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-ops-r8-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r8-on-057b-coord-active-trigger-spec">2026-05-16
 01:13 PDT - Codex-ops R8 on 057b coord active-trigger spec</a></li>
+<li><a
+href="#pdt---codex-r9-on-057b-coord-active-trigger-implementation"
+id="toc-pdt---codex-r9-on-057b-coord-active-trigger-implementation">2026-05-16
+12:10 PDT - Codex R9 on 057b coord active-trigger
+implementation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22950,6 +22955,68 @@ spec layer: <code>coord-emit.sh</code> now uses portable whole-second
 UTC timestamps, and AC8 requires the helper to execute on the local
 macOS/BSD-date platform with daemon acceptance and millisecond
 canonicalization verified.</li>
+</ul>
+<h3
+id="pdt---codex-r9-on-057b-coord-active-trigger-implementation">2026-05-16
+12:10 PDT - Codex R9 on 057b coord active-trigger implementation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R9 request, reviewer schema, pinned
+pending-review artifact at
+<code>401867bb82a56dac51d9307d03a2abef5914230f</code>, and
+implementation commit
+<code>38246c1972957ef3ba5f3b90599f02c48d15b8d4</code> focusing on
+<code>coord_invoke</code>, path validation, wrapper emission, reviewer
+prompt pinned-mode flow, post-push hooks, and shipped coord tests.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/codex.md</code>
+as <code>3db9a8a</code>, verdict <code>pushback</code>, findings: HIGH
+watcher/review-pending active-trigger urllib calls omit the required MCP
+<code>Accept: application/json, text/event-stream</code> header; HIGH
+shipped coord_invoke happy-path tests spawn the real detached reviewer
+wrapper; MEDIUM pinned-request bind failures emit
+<code>tick_end(bind_failed)</code> but exit 0 despite AC0’s non-zero
+requirement.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>401867bb82a56dac51d9307d03a2abef5914230f</code>; implementation
+head <code>38246c1972957ef3ba5f3b90599f02c48d15b8d4</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; inspected
+implementation paths <code>src/mcp/tools/coord-invoke.ts</code>,
+<code>src/coord/paths.ts</code>,
+<code>src/coord/internal-emitter.ts</code>,
+<code>tools/review-queue/coord-emit.sh</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>skills/review-queue-codex.md</code>,
+<code>skills/review-queue-codex-ops.md</code>,
+<code>skills/review-queue-claude.md</code>,
+<code>skills/review-queue-watch.md</code>,
+<code>skills/review-pending.md</code>, and selected
+<code>tests/coord/*</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057b R9 round, anchored to the requested artifact SHA and
+recorded implementation head, validated before link, checked against
+upstream duplicate response state, committed and pushed before this
+observation-only journal entry.</li>
+<li><strong>Note:</strong> This is the first implementation review after
+R8 spec convergence. The core TypeScript spawn path is close, but the
+production active-trigger hook and test isolation both need patching
+before merge because one leaves active spawn inert and the other makes
+<code>vitest</code> itself perform uncontrolled reviewer
+invocations.</li>
 </ul>
 </body>
 </html>
