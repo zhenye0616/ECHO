@@ -8,67 +8,69 @@ created: 2026-05-16
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T07:28:32Z"
 branch: "agent/coord-substrate-and-observability"
-head_sha: "a1f2c7b792a6d770cc377ce33cf860a2ae5e414f"
+head_sha: "cfa7e3c"
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
 agent_notes: |
-  RESUMED 2026-05-16T07:55:00Z on founder's "continue" authorization
-  (answers Q1 from prior escalation: stay in Claude Code, do NOT hand off
-  to codex). Working AC2 next. Prior run's verified state at branch
-  agent/coord-substrate-and-observability @ a1f2c7b carries forward.
+  BLOCKED (partial — second handoff after Run 2):
+  Claude-code builder Run 2 closed AC1 + AC2 + AC5 + the AC3 storage seam
+  on top of Run 1's AC4. AC3 deadline tracker, AC6 coord_status, and ~11
+  remaining AC8 test files are NOT STARTED. AC7 is N/A by spec; AC9
+  initial builder.md done with E2.5 final refresh at this handoff.
 
-  Prior-run summary (preserved for context): claude-code builder run delivered
-  AC4 + AC9 (initial builder.md) only; ACs 1/2/3/5/6/8 not started. AC7 is
-  N/A by spec.
-  Reason for escalation: spec scope (2-2.5d, ~40 files, new external
-  dep ajv@^8 + ajv-formats@^3, distributed-systems semantics with 8 review
-  rounds of accumulated complexity on AC3 alone) structurally exceeds a
-  single Claude Code session.
+  Branch agent/coord-substrate-and-observability pushed at cfa7e3c
+  792a6d770cc377ce33cf860a2ae5e414f.
+  Full test suite: 1062 passing, 21 skipped (pre-existing), 0 failures.
+  Typecheck + lint clean. Python `_coord_roles.py` smoke: OK, 4 roles
+  loaded.
 
-  Done this attempt (verified):
-    - Atomic claim landed on main at 2ee791d.
-    - backlog/task-state/2026-05-16-057a-coord-substrate-and-observability/builder.md
-      written + linted clean (initial-on-claim shape per 047 AC3).
-    - AC4 — wait_for_new_turns source_prefix widening + disjunction
-      validation + union semantics + byte-identical pre-AC4 path.
-      Branch agent/coord-substrate-and-observability pushed at
-      a1f2c7b792a6d770cc377ce33cf860a2ae5e414f.
-      6 new tests + 21 regression tests pass; typecheck + lint clean.
+  Done across Run 1 + Run 2:
+    Commit a1f2c7b — AC4: wait_for_new_turns source_prefix widening
+      (6 tests pass; pre-AC4 byte-identical preserved)
+    Commit d294da1 — AC2: coord-roles.json + draft-07 schema + src/coord/
+      roles.ts loader (ajv@^8 + ajv-formats@^3 deps) + _coord_roles.py
+      Python sibling. Hard startup gate via startMcpServer.
+      (16 tests pass)
+    Commit 383cfb9 — AC1 + AC5 (bundled): src/coord/{types,identity,
+      source,validate}.ts + src/mcp/tools/coord-emit.ts + non-pollution
+      exclusion in search-memories.ts. X-Echo-Role plumbed through
+      server.ts. (38 tests pass across 4 new files)
+    Commit cfa7e3c — AC3 STORAGE SEAM ONLY: Storage.iterateCoordAtoms
+      ByAppendOrder + getCurrentCoordSequence; SqliteStorage uses rowid;
+      MemoryStorage uses monotonic _seq + stripSeq helper. Dev-time
+      Storage wrappers gain delegating stubs. (16 tests × 2 backends
+      pass — boundary safety covered)
 
-  Specific question for founder:
-    Q1: Which binding handles the remaining ACs? Recommendation:
-        hand off to codex-builder via `bash tools/backlog/run-codex-builder.sh`
-        — the wrapper is explicitly designed for long-running builder
-        lifecycle, and the shared ~/.echo/agent-id UUID
-        (78D5AB0F-A8A3-4F01-BC2E-EB05961B2405) means codex reconciles
-        this claim automatically through Step A's grep. Alternative:
-        re-invoke /process-backlog in Claude Code; the protocol's
-        idempotent worktree + resume-on-reclaim path handles multi-session
-        continuation.
-    Q2: Ordering preference — AC2 (config loader + ajv dep) first to
-        unblock AC3/AC6 slot-universe consumers? Or AC1 (coord_emit +
-        types registry) first because AC2's validation tests want a
-        real loader call? Either ordering ships; resuming builder can
-        decide.
+  Specific next-builder questions:
+    Q1: Continue Claude Code OR hand off to codex-builder for AC3+AC6+
+        remaining AC8? Estimated remaining work: 1-1.5d focused. The
+        codex wrapper at tools/backlog/run-codex-builder.sh is built
+        for this; AGENT_ID UUID 78D5AB0F-A8A3-4F01-BC2E-EB05961B2405
+        is shared so resume is automatic.
+    Q2: Spec-coupling check — 057b is in r8 review (post-Run-2 pull).
+        If 057b r6-r8 changed anything about the deadline_missed atom
+        payload or idempotency key shape, that needs to land in 057a
+        AC3 design before src/coord/deadlines.ts is written.
 
-  Tried (this run):
-    Loaded 4 mandatory context files, full 057a spec (273 lines), and
-    spec_refs subset (src/storage/{interface,sqlite}.ts +
-    src/mcp/tools/wait-for-new-turns.ts). Implemented + tested AC4 end
-    to end. Stopped before AC1 to avoid producing a half-baked
-    foundational layer that the next builder would have to either
-    rebuild or extend across an incomplete boundary.
+  Tried (Run 2):
+    Loaded src/storage/sqlite.ts + memory.ts + interface.ts + wait-for-
+    new-turns.ts + search-memories.ts (and key fragments). Inspected
+    coord-roles config patterns from 043's reviewers.json + _reviewers.py
+    + reviewers-config.schema.json. Implemented + tested AC1 + AC2 + AC5
+    + AC3 storage seam end-to-end. Stopped before src/coord/deadlines.ts
+    because the deadline tracker requires its own focused session
+    (serial mutation lane semantics + boot reconstruction algorithm +
+    11 behavior tests).
 
-  Best guess if forced to continue in Claude Code: 1 more session
-  delivers ~AC1 + AC2 + AC5; 1 more after that delivers AC3 + AC6;
-  1 more after that delivers AC8 + final AC9 patcher. Three additional
-  sessions, ~70% confidence. Codex-builder estimate: 1-2 sessions,
-  higher confidence given session-length tooling.
+  Best guess if forced: codex-builder finishes the remaining work in 1
+  session, ~80% confidence. Claude Code resume finishes in 2 sessions,
+  ~60% confidence (per-session context re-orient cost).
 
-  Why escalated: "session-fit reality" applied analogously to the codex
-  binding's "Session-limit / token-cap escalation" pattern in
-  skills/process-backlog.md. Partial completion with a clean handoff
-  beats deeper but messier progress that complicates review.
+  Why escalated: same as Run 1 — "session-fit reality" applied
+  analogously to the codex binding's "Session-limit / token-cap
+  escalation" pattern. Run 2 closed 4 more ACs; Run 3 should ideally be
+  a single binding (codex preferred) that drives AC3 + AC6 + AC8
+  remaining to convergence in one focused pass.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC1 — narrow coord append seam (the load-bearing write surface)

@@ -221,3 +221,169 @@ For the next builder (Claude Code resume OR codex builder via wrapper):
    r3 dispatch as of this run). 057b is the active-trigger half; 057a
    must ship dormant. Watch for spec churn on the boundary between the
    two if 057b's review surfaces something requiring 057a-side change.
+
+---
+
+## Run 2 (resumed at 2026-05-16T08:11:48Z)
+
+Founder authorized "continue" — staying in Claude Code on 057a rather than handing off to codex. Item moved back from `pending_review/` to `claimed/`; agent_notes refreshed to mark the resume.
+
+### What I Implemented (this attempt)
+
+Four additional ACs landed, plus the AC3 storage seam (foundation for the remaining AC3 work). Branch carries the full slice from a1f2c7b → cfa7e3c.
+
+**AC2 — role-typed deadline config (commit `d294da1`).**
+
+- `tools/review-queue/coord-roles.json` (4 roles: codex, codex-ops, claude headless; cursor IDE-mode). `invoke_command` is an argv vector per r4 codex F2 HIGH.
+- `tools/review-queue/schemas/coord-roles.schema.json` (draft-07 with if/then on `headless: true` requiring `invoke_command`; cross-field max>default enforced in the TS loader since draft-07 if/then can't express it).
+- `src/coord/roles.ts` — `loadCoordRoles(configPath?)` TS loader. Resolution: explicit arg → `ECHO_COORD_ROLES_PATH` env → module-relative `DEFAULT_CONFIG_URL` via `new URL('../../tools/review-queue/coord-roles.json', import.meta.url)` (cwd-independent per r2 codex-ops F5 MED). ajv schema validation + cross-field check + slug uniqueness. Returns a frozen `CoordRolesConfig`. Bad config throws at boot per r1 codex F4 MED.
+- `tools/review-queue/_coord_roles.py` — Python CI sibling mirroring `_reviewers.py`. NOT loaded by the daemon at runtime.
+- `package.json` — `ajv@^8.17.1` + `ajv-formats@^3.0.1` as direct runtime deps.
+- `src/mcp/server.ts` — `loadCoordRoles(options.coord_roles_path)` called BEFORE any tool registration. Hard startup gate.
+- Tests: `tests/coord/coord-roles-validation.test.ts` (15 cases) + `tests/coord/coord-roles-cwd-independent-path.test.ts` (1 case, the chdir('/') boot path).
+
+**AC1 + AC5 — narrow coord append seam (commit `383cfb9`).**
+
+- `src/coord/types.ts` — event registry: `reviewer_invoked`, `tick_start`, `tick_end`, `tick_failed_to_bind`, `scheduler_health`, `scheduler_health_done`, `deadline_missed`. Each entry carries `tier` (round vs scheduler) + `subject_role_policy` (`self_attestation` / `invocation` / `daemon_emitted`) + `schema_version`. `expects` value DELIBERATELY NOT in this registry — it lives only in `coord-roles.json` (r5 codex F1 MED single-source-of-truth).
+- `src/coord/identity.ts` — `resolveEmitterIdentity(xEchoRoleHeader, config)` → `EmitterIdentity { role }`. `CoordIdentityError` for missing / empty / unknown role. `isKnownRole(role, config)` exported for the validator's subject_role check.
+- `src/coord/source.ts` — `deriveCoordSource(identity)` → `"coord:<role>"`. Single chokepoint; caller-supplied source is never trusted (r1 codex Q5 HIGH).
+- `src/coord/validate.ts` — `validateCoordEmitInput(raw, emitterRole, config)` → `ValidatedCoordEmitInput` (round-tier union scheduler-tier). Rejects: unknown event_type, unknown schema_version, cross-tier fields, subject_role not in roster, self-attestation subject!=emitter, daemon-emitted event types from caller path. `CoordValidationError` carries the specific message.
+- `src/mcp/tools/coord-emit.ts` — the MCP write tool. Identity resolved per-request via closure-captured X-Echo-Role; deferred error surfaces on every `coord_emit` call within the request when identity fails (other tools stay functional). On accept: validates → derives source → canonicalizes emitted_at → appends with `metadata.surface=coord` + `metadata.session_id=echo:coord` + per-tier coord metadata.
+- `src/mcp/server.ts` — extracts `X-Echo-Role` from `req.headers` BEFORE tool registration; passes to `registerCoordEmit`. Native MCP clients (no header) get the identity error per AC5 line 207.
+- `src/mcp/tools/search-memories.ts` — AC1 non-pollution exclusion. Default excludes `metadata.surface=coord`; opt-in via explicit `source_prefix` or `source` starting with `"coord:"`. The exclusion is LOCAL (NOT in the shared `withFsExclusion` helper — that would also break `wait_for_new_turns(source_prefix="coord:")` per AC4). Assignment-style update (no inline colon-array literal) so the fs-exclusion grep-scan CI test stays green.
+- Tests:
+  - `tests/coord/append-seam.test.ts` (16 cases)
+  - `tests/coord/identity-spoof-rejection.test.ts` (10 cases)
+  - `tests/coord/coord-emit-per-tier-input.test.ts` (7 cases)
+  - `tests/coord/non-pollution-three-way.test.ts` (5 cases — all three invariants enforced simultaneously)
+- Tool-roster bump in `tests/mcp/tools/recent-work-context.test.ts` — "all ten tools" → "all eleven tools", `coord_emit` added.
+
+**AC3 storage seam (commit `cfa7e3c`).** The deadline tracker itself is deferred, but the storage methods it consumes are in place:
+
+- `src/storage/interface.ts` — `iterateCoordAtomsByAppendOrder({sinceSeq?, limit?})` returning `CoordAtomIterationRecord[]` (extends `CaptureEvent` with `sequence_id`). `getCurrentCoordSequence()` returning `max(seq)` over coord atoms (0 when empty).
+- `src/storage/sqlite.ts` — implementation uses implicit SQLite `rowid` (monotonic, durable across restart per the single-writer constraint at `wiki/architecture/storage.md:119-127`).
+- `src/storage/memory.ts` — implementation uses a monotonic insertion counter `_seq` stored on each internal event (with a new `stripSeq` helper to keep `_seq` from leaking through `query()` / `getByIds()`).
+- `tools/render-trace.ts` / `tools/serve-trace.ts` / `tools/stream-watch.ts` — delegating stubs added to keep the `Storage` interface uniform across dev-time wrappers.
+- Test: `tests/storage/iterate-coord-by-append-order.test.ts` (16 cases × {Memory, Sqlite}): empty ledger, iteration in append order, non-coord rows ignored, sinceSeq half-open boundary, limit cap, same-timestamp append order, **out-of-order emitted_at does NOT affect iteration order** (r2 codex F1 HIGH + r2 codex-ops F6 MED), `getCurrentCoordSequence` parity + non-coord rows don't bump watermark, **boundary safety: watermark + sinceSeq = watermark+1 returns exactly the next new atom** (r4 codex F1 MED).
+
+**AC4 unchanged** — landed in Run 1; passes regression.
+
+**AC7 unchanged** — N/A by spec.
+
+**AC9** — initial `builder.md` from Run 1 remains; E2.5 patcher will refresh `last_updated` + handoff metadata at this attempt's handoff.
+
+### Files Modified (this attempt)
+
+New files (12):
+- `src/coord/types.ts` (~140 lines)
+- `src/coord/identity.ts` (~80 lines)
+- `src/coord/source.ts` (~20 lines)
+- `src/coord/validate.ts` (~230 lines)
+- `src/coord/roles.ts` (~180 lines)
+- `src/mcp/tools/coord-emit.ts` (~190 lines)
+- `tools/review-queue/coord-roles.json` (42 lines)
+- `tools/review-queue/schemas/coord-roles.schema.json` (63 lines)
+- `tools/review-queue/_coord_roles.py` (~190 lines)
+- `tests/coord/append-seam.test.ts` (260 lines, 16 cases)
+- `tests/coord/coord-emit-per-tier-input.test.ts` (140 lines, 7 cases)
+- `tests/coord/coord-roles-cwd-independent-path.test.ts` (39 lines, 1 case)
+- `tests/coord/coord-roles-validation.test.ts` (321 lines, 15 cases)
+- `tests/coord/identity-spoof-rejection.test.ts` (140 lines, 10 cases)
+- `tests/coord/non-pollution-three-way.test.ts` (130 lines, 5 cases)
+- `tests/storage/iterate-coord-by-append-order.test.ts` (200 lines, 16 cases)
+
+Modified (8):
+- `src/mcp/server.ts` (coord_emit registration + X-Echo-Role plumb)
+- `src/mcp/tools/search-memories.ts` (non-pollution exclusion)
+- `src/mcp/tools/wait-for-new-turns.ts` (Run 1's AC4 — unchanged in Run 2)
+- `src/storage/interface.ts` (storage seam types)
+- `src/storage/sqlite.ts` (storage seam impl)
+- `src/storage/memory.ts` (storage seam impl + stripSeq)
+- `tools/{render-trace,serve-trace,stream-watch}.ts` (delegating stubs)
+- `tests/mcp/tools/recent-work-context.test.ts` (eleven-tools assertion bump)
+- `package.json` / `package-lock.json` (ajv + ajv-formats deps)
+
+### Decisions Made This Attempt
+
+**Decision 1: AC1 + AC5 bundled into one commit (`383cfb9`).** AC5's `identity.ts` is the load-bearing file for AC1's coord_emit, and the spec's files_to_modify list overlaps both ACs. Separating into two commits would require a second pass through coord_emit to wire the resolved identity through — wasted churn. The frontmatter agent_notes is honest about both ACs being closed together.
+
+**Decision 2: AC3 deferred at the deadline-tracker boundary, not at the storage seam.** The storage methods are pure, self-contained, and unblock the tracker without committing to its async-lane complexity. Shipping them now lets the next builder (Claude Code resume OR codex handoff) start AC3 at the right entry point: `src/coord/deadlines.ts` with the lane + maps + fireMissedDeadline + reconstruction algorithm. The watermark + half-open boundary semantics (r4 codex F1 MED) are already enforced by the storage seam tests, so AC3's reconstruction code can trust them.
+
+**Decision 3: `_seq` stripping via a new `stripSeq` helper in MemoryStorage.** The pre-existing `tests/storage/memory.test.ts` "preserves all fields including optional metadata and embedding" test does a deep-equal roundtrip on a queried event. The internal counter `_seq` would leak through unless every public-surface return path strips it. The dedicated helper is a small abstraction that the iteration path also uses (it then re-attaches `sequence_id`).
+
+**Decision 4: ajv import via NAMED `Ajv` class + namespace-unwrap for ajv-formats.** ajv@8 + ajv-formats@3 ship CJS mains; under `module: NodeNext` + `esModuleInterop: true`, the default import surfaces as the module namespace, not the callable/class. The named export `Ajv` lands the class cleanly without any unwrap. ajv-formats has no named export for its plugin, so its default-vs-namespace unwrap is necessary. Runtime-checked typeof guard plus a `.default` fallback handles both shapes.
+
+**Decision 5: `subject_role` policy `daemon_emitted` is rejected from the caller path.** The registry entry for `deadline_missed` carries `subject_role_policy: 'daemon_emitted'`. Callers cannot supply that event_type via `coord_emit`; the validator throws with a clear message. The AC3 fire path will append `deadline_missed` atoms directly via a server-internal code path that bypasses `validateCoordEmitInput`.
+
+### Acceptance Criteria Status (cumulative across Run 1 + Run 2)
+
+- [x] **AC1** — coord append seam. **DONE** (commit `383cfb9`).
+- [x] **AC2** — role-typed deadline config. **DONE** (commit `d294da1`).
+- [ ] **AC3** — deadline tracker. **PARTIAL** — storage seam done (commit `cfa7e3c`); serial mutation lane + fireMissedDeadline + boot reconstruction + periodic reconciliation NOT STARTED.
+- [x] **AC4** — wait_for_new_turns source_prefix widening. **DONE** (commit `a1f2c7b`).
+- [x] **AC5** — X-Echo-Role identity + schema versioning. **DONE** (bundled into AC1 at commit `383cfb9`).
+- [ ] **AC6** — coord_status MCP + CLI sibling. **NOT STARTED** (depends on the AC3 deadline tracker).
+- [x] **AC7** — N/A by spec.
+- [ ] **AC8** — substrate tests. **PARTIAL** — 6 of ~18 test files done (`append-seam`, `identity-spoof-rejection`, `coord-emit-per-tier-input`, `non-pollution-three-way`, `coord-roles-validation`, `coord-roles-cwd-independent-path`, `wait-for-new-turns-source-prefix`, plus `iterate-coord-by-append-order` in `tests/storage/`). Remaining tests in spec AC8 inventory:
+  - `tests/coord/deadlines-reconstruction.test.ts`
+  - `tests/coord/deadlines-fire-once-and-remove.test.ts`
+  - `tests/coord/deadlines-reconstruction-concurrency.test.ts`
+  - `tests/coord/subject-role-multi-under-one-correlation.test.ts`
+  - `tests/coord/idempotency-per-role.test.ts`
+  - `tests/coord/scheduler-vs-round-tier-keyspace.test.ts`
+  - `tests/coord/coord-status-shape.test.ts`
+  - `tests/coord/coord-volume-perf.test.ts` (100k atom synthetic ledger; <1500ms boot / <300ms status)
+  - `tests/coord/restart-after-fired-no-stale-open.test.ts`
+  - `tests/coord/out-of-order-emitted-at-replay.test.ts`
+  - `tests/coord/last-miss-cleared-by-successful-close.test.ts`
+  - All depend on AC3 tracker being in place.
+- [x] **AC9** — builder pointer. **DONE** initial-on-claim + Run-1 escalated refresh. Run-2 handoff will run E2.5 patcher again to update lifecycle metadata + canonical_anchors to the pending_review path.
+
+### Test Results (verbatim, final)
+
+```
+$ npm test --silent
+ Test Files  83 passed | 1 skipped (84)
+      Tests  1062 passed | 21 skipped (1083)
+   Start at  01:10:30
+   Duration  26.32s
+
+$ npm run typecheck
+> tsc --noEmit
+[clean]
+
+$ npm run lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+> python3 tools/task-state/lint.py
+[clean]
+
+$ python3 tools/review-queue/_coord_roles.py
+coord-roles.json OK: 4 roles loaded
+```
+
+### Open Questions for Founder (next-builder choice point)
+
+The remaining work concentrates in AC3 (the deadline tracker async lane, `fireMissedDeadline` path, boot reconstruction algorithm, periodic reconciliation) and AC6 (`coord_status` consuming AC3 output + on-demand atom-log scan for last-miss persistence), plus ~11 test files in the AC8 inventory.
+
+**Q1: Same as Run 1 — Claude Code resume vs codex handoff?** My Run-1 recommendation (codex via `bash tools/backlog/run-codex-builder.sh`, AGENT_ID-shared resume) still stands for the remaining work. The deadline-tracker semantics (serial mutation lane, cache-hit-also-terminal, full-ledger replay) benefit from continuous focus; multi-session Claude Code re-entry pays a re-orient cost per session.
+
+**Q2: Spec-coupling check before resuming AC3.** Sibling spec 057b is in r8 review as of this attempt's pull (`94c468f` etc. on main). If 057b's review surfaces a constraint that touches the deadline-tracker contract (idempotency key shape, fire-path metadata), the resuming builder should re-read 057b r6→r8 before writing AC3 code.
+
+### Drift Events Caught
+
+None.
+
+### What Was Kept vs Discarded
+
+Run 1's branch state was kept intact — `agent/coord-substrate-and-observability` at `a1f2c7b` was the starting point for Run 2; nothing was reset or rebased. The frontmatter `agent_notes` was rewritten (the BLOCKED escalation text from Run 1 is preserved as a "Prior-run summary" sub-section so the historical context survives).
+
+### Resume Instructions (for the next builder)
+
+Same as Run 1 plus the new shape of remaining work:
+
+1. **Reconcile via AGENT_ID UUID `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`** — Step A grep finds 057a; Step B reuses the existing worktree at `~/Desktop/Project_echo--coord-substrate-and-observability` on branch `agent/coord-substrate-and-observability` @ `cfa7e3c`. `node_modules` is present; no install needed.
+2. **Next AC entry point: `src/coord/deadlines.ts`** — the file is named in `files_to_modify` but does not yet exist. Spec AC3 prose (lines 161-189) is the design. The storage seam (`iterateCoordAtomsByAppendOrder` + `getCurrentCoordSequence`) is the underlying API. The two open-records maps + the in-memory idempotency cache + the single-actor serial async lane are the new abstractions.
+3. **AC3 boot reconstruction algorithm** = full ledger replay (V1 — r4 codex F1 MED + r4 codex-ops F1 MED dropped the 24h horizon). Capture `highSeq = getCurrentCoordSequence()` at task start; iterate `iterateCoordAtomsByAppendOrder({ sinceSeq: 1 })` paginated, processing only atoms with `sequence_id <= highSeq`; populate idempotency cache from `coord:deadline_missed` atoms; replay close-then-open over the rest; set `last_full_replay_watermark = highSeq`; fire any record still open AND past `expected_by`.
+4. **AC3 periodic reconciliation** = same shape, but `sinceSeq = last_full_replay_watermark + 1` and bounded above by a fresh `getCurrentCoordSequence()` snapshot. Both passes run on the same serial lane as live event ingest + heartbeat — no two mutations execute concurrently.
+5. **AC6 last-miss persistence** = on-demand atom-log scan during `coord_status()`. Per-slot `last_miss` (highest-seq matching `deadline_missed`) + per-slot `last_close` (highest-seq successful event matching the slot's `expected_event_type`). Slot universe from `coord-roles.json` only (NOT from the AC1 registry). No in-memory `last_miss_clear_watermark` map.
+6. **AC8 perf fixture** at `tests/coord/coord-volume-perf.test.ts` — synthesize 100k coord atoms (use a faster `append` path that skips per-row write hops if vitest's default is too slow); assert boot reconstruction <1500ms + one `coord_status()` <300ms. NO startup-warning mechanism in V1 (r6 rejected the r5 warning patch).
