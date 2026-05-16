@@ -1,13 +1,13 @@
 ---
 id: 2026-05-16-057a-coord-substrate-and-observability
 title: Coord layer 057a — substrate + observability (daemon-side read/write/track/report; synthetic-emitter testable; ships dormant until 057b activates production emission)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 2-2.5d
 created: 2026-05-16
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-16T07:28:32Z"
+branch: "agent/coord-substrate-and-observability"
 head_sha: ""
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
