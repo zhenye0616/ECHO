@@ -120,6 +120,13 @@ fi
 
 mkdir -p "$(dirname "$PLIST")"
 
+# launchd's per-LaunchAgent environment does NOT reliably inherit TMPDIR
+# from the user's Aqua session — _run_reviewer.sh hard-aborts when TMPDIR
+# is unset (the 050 ephemeral-worktree path needs a real temp dir). Pin
+# the user's canonical per-user temp dir into the plist so launchd-spawned
+# ticks see the same value as interactive runs.
+USER_TMPDIR="$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || echo "/tmp/")"
+
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -143,6 +150,11 @@ cat > "$PLIST" <<EOF
     <string>/dev/null</string>
     <key>StandardErrorPath</key>
     <string>/dev/null</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TMPDIR</key>
+        <string>$USER_TMPDIR</string>
+    </dict>
 </dict>
 </plist>
 EOF
