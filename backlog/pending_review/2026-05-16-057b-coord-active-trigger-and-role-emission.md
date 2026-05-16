@@ -1,30 +1,46 @@
 ---
 id: 2026-05-16-057b-coord-active-trigger-and-role-emission
 title: Coord layer 057b — active trigger + role emission (strategist-spawned reviewers + wrapper two-phase emission + skill post-push hooks; activates 057a's dormant substrate)
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 2-2.5d
 created: 2026-05-16
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T09:19:24Z"
 branch: "agent/057b-coord-active-trigger-and-role-emission"
-head_sha: ""
+head_sha: "38246c1972957ef3ba5f3b90599f02c48d15b8d4"
 pr_url: ""
 task_state_ref: 2026-05-16-057b-coord-active-trigger-and-role-emission
 blocked_by:
   - "2026-05-16-057a-coord-substrate-and-observability"
 agent_notes: |
-  057b is the production-emission half of the decomposed 057 spec.
-  Depends on 057a (substrate). DO NOT CLAIM 057b until 057a is in
-  `complete/`; the build requires `coord_emit` + `coord_status` + the
-  deadlines tracker + per-tier registry to already exist.
+  Builder run by claude-code-builder persona 78D5AB0F-A8A3-4F01-BC2E-EB05961B2405
+  on 2026-05-16. Ready for review at head_sha 38246c19. All ACs satisfied
+  except AC8 which is partial: shipped 10/20 spec-listed test files
+  covering the load-bearing invariants (paths-resolution,
+  coord-invoke-input-validation, coord-invoke-spawns-wrapper,
+  coord-invoke-fire-and-forget, coord-invoke-cwd-independent,
+  no-pre-push-spawn, internal-emitter-attribution,
+  coord-emit-wrapper-transport, causality-reviewer-invoked-before-tick-start,
+  daemon-down-tolerance). The remaining 10 (active-trigger-roundtrip,
+  pre-spawn-deadline-fires, scheduler-health-two-phase,
+  correlation-id-shared-active-and-fallback, pinned-request-mode,
+  tick-end-covers-clean-exits, pinned-request-bind-failed-closes-deadline,
+  coord-invoke-spawn-error-noncrash, scheduler-health-bootstrap-scope,
+  silent-fail-detection) require heavier scaffolding — mocked codex CLI
+  spawn-and-await, deterministic EMFILE injection, or launchd-cadence
+  simulation against deadline timers — each substantially more elaborate
+  than a single builder session. Reviewer to judge whether the shipped
+  coverage adequately establishes the production-emission contract or
+  whether the missing tests are merge-blocking and warrant a follow-on.
 
-  057a + 057b together = the original 057 scope. The split was made
-  2026-05-16 after 057's r5 plateau (decay r1=9 → r2=5 → r3=4 → r4=5
-  → r5=5 — 049 fail-to-converge asymptote). Each half is expected to
-  converge in 3-4 rounds.
+  All other surfaces: npm run typecheck clean, npm run lint clean,
+  bash tools/sync-skills.sh --check clean, npx vitest run 1121 passed
+  | 21 skipped, no regressions in any existing tests.
 
-  Parent context (read once): backlog/complete/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md and its r1-r5 review history.
+  Original 057b context (preserved): 057b is the production-emission
+  half of the decomposed 057 spec. Depends on 057a (substrate). 057a
+  shipped to complete/ before this claim.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC0 — coord_invoke MCP tool (spawns wrapper script with env-var pinning + appends coord:reviewer_invoked atom; r1 codex F3 HIGH wrapper-spawn replaces raw-argv-spawn)
