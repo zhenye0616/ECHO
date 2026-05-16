@@ -164,14 +164,30 @@ Adding a new reviewer requires four coordinated edits (the reviewers-config sche
 3. Extend the enum in `schemas/request.schema.json` (`requested_reviewers` items).
 4. Write `skills/review-queue-<slug>.md`; sync via `tools/sync-skills.sh`. Headless reviewers also need a `run-<slug>-reviewer.sh` 5-line driver + launchd plist installer.
 
+## Builder bindings
+
+The reviewer role above has three peers (codex, codex-ops, cursor); the builder role — the role that *claims* an item from `backlog/ready/` and walks it to `pending_review/` via `skills/process-backlog.md` — also has three vendor-agnostic bindings, all running the same vendor-neutral protocol body. See [[builder-bindings]] for the full matrix; the short version:
+
+| Binding | Trigger mode | Wrapper | Documented by |
+|---|---|---|---|
+| Claude Code in-session | conversational (founder asks Claude Code to claim) | none — implicit default | implicit since project start |
+| `codex` | headless (launchd / on-demand `codex exec`) | `tools/run-codex-builder.sh` | item 047 |
+| Cursor's Claude (IDE-mode) | founder paste-driven inside Cursor IDE chat | none — paste skill prose | item 055 |
+
+Per-binding notes live at the bottom of `skills/process-backlog.md` under "Binding-specific notes — codex" (047) and "Binding-specific notes — Cursor's Claude (IDE-mode)" (055); the protocol body itself is unchanged for every binding. Operator-facing trigger recipes: `docs/cursor-builder-trigger.md` (Cursor) and `docs/codex-builder-setup.md` (codex).
+
+The atomic-claim git op (single commit moving `ready/<id>.md → claimed/<id>.md` with `claimed_by` populated, push-or-lose) is the sole cross-binding synchronization primitive. Same-machine concurrency under the shared default `~/.echo/agent-id` UUID is operator-serialized (one builder per `ECHO_AGENT_ID` at a time); cross-machine concurrency is naturally serialized by git.
+
 ## Key files
 
-- **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-watch.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
+- **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-watch.md`, `skills/process-backlog.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
 - **Python helpers:** `tools/review-queue/request.py` (creates `request.md`), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact).
-- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges).
+- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Operator docs:** `docs/cursor-builder-trigger.md` (055), `docs/review-queue-setup.md` (reviewer triggers).
 - **Schemas:** `tools/review-queue/schemas/{reviewer,combined,request,reviewers-config}.schema.json`.
 
 ## Related
 
 - [[cross-tool-spec-review]] — the multi-reviewer pattern this protocol implements
+- [[builder-bindings]] — the three vendor-agnostic builder bindings (Claude Code, codex, Cursor's Claude)
 - [[journal-is-observation-only]] — invariant separating dogfooding journal from queue artifacts
