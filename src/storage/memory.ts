@@ -88,7 +88,7 @@ export class MemoryStorage implements Storage {
     // newest N" semantics regardless of insertion order. Tie-break on `id`
     // matches the sqlite adapter's `ORDER BY timestamp DESC, id DESC` (and
     // ASC, ASC) — parallel directions, never mixed.
-    const filtered: CaptureEvent[] = [];
+    const filtered: InternalEvent[] = [];
     for (const event of this.events) {
       if (source !== undefined && event.source !== source) continue;
       if (sourcePrefix !== undefined && !event.source.startsWith(sourcePrefix)) continue;

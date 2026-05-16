@@ -291,6 +291,9 @@ describe('046 AC4 — repo-root resolution via startMcpServer option', () => {
     writePointer(repoRoot, TASK, 'strategist', validStrategist);
     commitAll(repoRoot, 'r1');
     // Stub Storage — the role-state tools don't use it but the server signature requires it.
+    // 057a: deadlines tracker's boot reconstruction reads from storage, so the stub
+    // must also satisfy the AC3 coord-seam methods. enable_deadlines=false bypasses
+    // the tracker entirely for this test (role-state has no coord interaction).
     const stubStorage = { query: async () => [] } as unknown as Parameters<
       typeof startMcpServer
     >[0];
@@ -298,6 +301,7 @@ describe('046 AC4 — repo-root resolution via startMcpServer option', () => {
       port: 0, // ephemeral port
       host: '127.0.0.1',
       repo_root: repoRoot,
+      enable_deadlines: false,
     });
     try {
       const url = handle.url;

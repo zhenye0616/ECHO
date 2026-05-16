@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer, type Server as HttpServer } from 'node:http';
+import { DeadlineTracker, type DeadlineTrackerHandle } from '../coord/deadlines.js';
 import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
@@ -41,6 +42,24 @@ export interface StartMcpServerOptions {
    * production callers should rely on the env / default.
    */
   coord_roles_path?: string;
+  /**
+   * 057a AC3 — when true (default), startMcpServer constructs a
+   * DeadlineTracker, awaits its boot reconstruction (HARD STARTUP GATE
+   * — server doesn't accept connections until reconstruction finishes),
+   * and starts the heartbeat + reconciliation timers. Tests that don't
+   * need the tracker set this to false to avoid timer noise.
+   */
+  enable_deadlines?: boolean;
+  /**
+   * 057a AC3 — test-only override for the heartbeat interval. Production
+   * uses the default 1s.
+   */
+  deadline_heartbeat_ms?: number;
+  /**
+   * 057a AC3 — test-only override for the periodic reconciliation
+   * interval. Production uses the default 10min. `null` disables.
+   */
+  deadline_reconciliation_ms?: number | null;
 }
 
 function resolveRepoRoot(option?: string): string {
@@ -118,6 +137,29 @@ export async function startMcpServer(
   const coordRoles: CoordRolesConfig = loadCoordRoles(options.coord_roles_path);
   log.info('coord_roles_loaded', { role_count: coordRoles.roles.length });
 
+  // 057a AC3 — HARD STARTUP GATE. The deadline tracker boot
+  // reconstruction MUST complete before the MCP server accepts a single
+  // request. r1 codex-ops F6 HIGH: a coord_emit racing in mid-replay
+  // could produce a transient open-record state that diverges from the
+  // durable ledger. Awaiting reconstruction here closes that window —
+  // by the time `await server.listen()` returns control, the lane has
+  // replayed the full ledger.
+  let deadlineHandle: DeadlineTrackerHandle | null = null;
+  let deadlines: DeadlineTracker | null = null;
+  if (options.enable_deadlines !== false) {
+    const trackerOpts: ConstructorParameters<typeof DeadlineTracker>[2] = {};
+    if (options.deadline_heartbeat_ms !== undefined) {
+      trackerOpts.heartbeatIntervalMs = options.deadline_heartbeat_ms;
+    }
+    if (options.deadline_reconciliation_ms !== undefined) {
+      trackerOpts.reconciliationIntervalMs = options.deadline_reconciliation_ms;
+    }
+    deadlines = new DeadlineTracker(storage, coordRoles, trackerOpts);
+    await deadlines.reconstruct();
+    deadlineHandle = deadlines.start();
+    log.info('deadlines_started', {});
+  }
+
   let boundPort = requestedPort;
 
   // Stateless: per-request McpServer + StreamableHTTPServerTransport.
@@ -163,7 +205,12 @@ export async function startMcpServer(
     // 057a AC1 — coord substrate append seam. The emitter identity is
     // resolved per-request from X-Echo-Role; native MCP clients without
     // the header get a clear identity error on every call (r1 codex F4 MED).
-    registerCoordEmit(mcp, { storage, coordRoles, xEchoRoleHeader });
+    registerCoordEmit(mcp, {
+      storage,
+      coordRoles,
+      xEchoRoleHeader,
+      ...(deadlines !== null ? { deadlines } : {}),
+    });
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -243,6 +290,9 @@ export async function startMcpServer(
     port: boundPort,
     url,
     stop: async () => {
+      if (deadlineHandle !== null) {
+        await deadlineHandle.stop();
+      }
       await new Promise<void>((resolve) => {
         httpServer.close(() => {
           resolve();

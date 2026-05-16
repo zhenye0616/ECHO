@@ -16,6 +16,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import type { DeadlineTracker } from '../../coord/deadlines.js';
 import { resolveEmitterIdentity, type EmitterIdentity } from '../../coord/identity.js';
 import type { CoordRolesConfig } from '../../coord/roles.js';
 import { deriveCoordSource } from '../../coord/source.js';
@@ -55,6 +56,12 @@ export interface CoordEmitDependencies {
    *  tool will reject every call with a CoordIdentityError so native
    *  MCP clients can't emit (r1 codex F4 MED). */
   xEchoRoleHeader: string | null;
+  /** AC3 deadline tracker. The tool calls `ingest()` after a successful
+   *  storage.append so the close-then-open transition runs on the
+   *  tracker's serial lane. May be `undefined` in early-boot or test
+   *  scenarios where the tracker is not yet wired — the tool then
+   *  appends but skips the tracker update. */
+  deadlines?: DeadlineTracker;
 }
 
 export function registerCoordEmit(
@@ -143,6 +150,23 @@ export function registerCoordEmit(
           }),
           metadata,
         });
+        // AC3 wiring — after a successful durable append, run close-then-
+        // open on the deadline tracker's serial lane. Storage write
+        // ordering (single-writer constraint) + lane ordering together
+        // guarantee that subsequent reads of the tracker see this event
+        // applied. We do NOT await this on the request hot path beyond
+        // its enqueue (the lane returns a promise the daemon doesn't
+        // block on); a future reconciliation pass catches any tracker
+        // skew if this enqueue fails.
+        if (deps.deadlines !== undefined) {
+          try {
+            await deps.deadlines.ingest(validated);
+          } catch {
+            // Swallow — tracker ingest must not fail coord_emit because
+            // the durable atom is already appended. Reconciliation
+            // will pick this up on its next pass.
+          }
+        }
         const result: CoordEmitResult = {
           schema_version: SCHEMA_VERSION,
           tool: 'coord_emit',
