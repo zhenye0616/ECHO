@@ -189,6 +189,11 @@ for role in reviewers:
             data=json.dumps(body).encode(),
             headers={
                 "Content-Type": "application/json",
+                # StreamableHTTPServerTransport content-negotiates and
+                # 406-rejects MCP POSTs missing both media types in
+                # Accept. Without this, the active-trigger silently falls
+                # back to launchd cadence. (r9 codex F1 HIGH.)
+                "Accept": "application/json, text/event-stream",
                 # 057b active-trigger calls are strategist-initiated; tag
                 # the request with the strategist role so 057a's identity
                 # gate accepts the coord_invoke. Future: a dedicated
