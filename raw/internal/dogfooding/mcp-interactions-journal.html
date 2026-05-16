@@ -1970,9 +1970,15 @@ href="#pdt---codex-r2-on-058-strategist-disposition-discipline-spec"
 id="toc-pdt---codex-r2-on-058-strategist-disposition-discipline-spec">2026-05-15
 23:42 PDT - Codex R2 on 058 strategist disposition discipline
 spec</a></li>
+<li><a href="#pdt---codex-r1-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-r1-on-057b-coord-active-trigger-spec">2026-05-15
+23:51 PDT - Codex R1 on 057b coord active-trigger spec</a></li>
 <li><a href="#pdt---codex-ops-r1-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r1-on-057b-coord-active-trigger-spec">2026-05-15
 23:52 PDT - Codex-ops R1 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-ops-r2-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r2-on-057b-coord-active-trigger-spec">2026-05-16
+00:15 PDT - Codex-ops R2 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21965,14 +21971,13 @@ upstream duplicate state, committed, and pushed
 <code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/codex.md</code>
 as <code>7a250a0</code>, verdict <code>pushback</code>, findings: HIGH
 correlation_id shape conflict between 36-character schema and
-<code>uuid.uuid4().hex</code>; HIGH
-<code>tick_failed_to_bind</code> cannot close a
-<code>reviewer_invoked</code> deadline under 057a&#39;s existing
-<code>expects</code> rule; HIGH coord_invoke spawn command/prompt/env
-handoff is underspecified against coord-roles.json and the current
-headless runner; MEDIUM 057a spec_ref points to <code>ready/</code> even
-though 057b is claimable only after 057a moves to
-<code>complete/</code>.</li>
+<code>uuid.uuid4().hex</code>; HIGH <code>tick_failed_to_bind</code>
+cannot close a <code>reviewer_invoked</code> deadline under 057a’s
+existing <code>expects</code> rule; HIGH coord_invoke spawn
+command/prompt/env handoff is underspecified against coord-roles.json
+and the current headless runner; MEDIUM 057a spec_ref points to
+<code>ready/</code> even though 057b is claimable only after 057a moves
+to <code>complete/</code>.</li>
 <li><strong>Sources:</strong> Artifact SHA
 <code>be6dcce8a3d1d2390a447cc64c0e3d5ecfecf724</code>; request path
 <code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>;
@@ -22179,6 +22184,58 @@ to 057a’s registry as a r9 amendment OR drop them from 057b and defer.
 Observations only; founder decides whether to re-open 057a OR push the
 architectural cost into 057b’s scope OR accept V1 false-positive on bind
 failures.</p></li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-057b-coord-active-trigger-spec">2026-05-16
+00:15 PDT - Codex-ops R2 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>7fcb4b202523cf3e27d032926050d273c86a0a1c</code>,
+<code>CLAUDE.md</code>,
+<code>.claude/commands/review-queue-codex-ops.md</code>, and current
+reviewer wrapper context for spawn/runtime semantics.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/codex-ops.md</code>
+as <code>520f300</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH active <code>coord_invoke</code> wrapper path/cwd/env
+contract can silently fail outside repo-root daemon cwd; MEDIUM detached
+reviewer spawn leaves stdio/unref semantics implicit.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>7fcb4b202523cf3e27d032926050d273c86a0a1c</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>CLAUDE.md</code>,
+<code>.claude/commands/review-queue-codex-ops.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/run-codex-ops-reviewer.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 resolved the earlier event-shape and
+dependency blockers without re-opening 057a. The remaining runtime
+concern is narrower: active reviewer spawning needs to be stable when
+the MCP daemon is not launched from repo root, and its child-process
+contract should be explicit enough to survive repeated unattended
+post-push hooks.</li>
 </ul>
 </body>
 </html>
