@@ -1879,6 +1879,9 @@ href="#pdt---codex-ops-r6-on-056-claude-reviewer-headless-onboarding-spec"
 id="toc-pdt---codex-ops-r6-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
 17:12 PDT - Codex-ops R6 on 056 Claude reviewer headless onboarding
 spec</a></li>
+<li><a href="#pdt---codex-r6-on-056-claude-as-reviewer-headless-spec"
+id="toc-pdt---codex-r6-on-056-claude-as-reviewer-headless-spec">2026-05-15
+17:13 PDT - Codex R6 on 056 Claude-as-reviewer headless spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20305,6 +20308,54 @@ R5: AC9 now distinguishes pre-spawn minimal queue-error rows from
 per-round full rows preserving
 <code>artifact_path@spec_commit_sha</code>, so the unattended diagnostic
 path is testable before the Claude reviewer binding ships.</li>
+</ul>
+<h3
+id="pdt---codex-r6-on-056-claude-as-reviewer-headless-spec">2026-05-15
+17:13 PDT - Codex R6 on 056 Claude-as-reviewer headless spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r6/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R6 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-056-claude-as-reviewer-headless.md</code>
+at <code>31cc71acc7ec696b454f13aae61d965ceb9a9b73</code>, and pinned
+queue implementation files <code>_run_reviewer.sh</code>,
+<code>_reviewers.py</code>, <code>_reviewer_gate.py</code>,
+<code>_install_reviewer_launchd.sh</code>, <code>reviewers.json</code>,
+<code>schemas/reviewers-config.schema.json</code>,
+<code>schemas/combined.schema.json</code>, <code>combine.py</code>,
+<code>commit-reviewer-response.sh</code>, and
+<code>validate.py</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r6/codex.md</code>
+as <code>70ac490</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>31cc71acc7ec696b454f13aae61d965ceb9a9b73</code>; request path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r6/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r6/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R6 makes the queue-error persistence test
+contract distinguish both row shapes: minimal pre-spawn failures before
+request scanning and full per-round failures after request selection
+with <code>artifact_path@spec_commit_sha</code>. The Codex lens found no
+remaining implementability blocker.</li>
 </ul>
 </body>
 </html>
