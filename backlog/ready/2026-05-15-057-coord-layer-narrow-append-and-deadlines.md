@@ -35,7 +35,7 @@ files_to_modify:
   - src/coord/deadlines.ts                         # in-memory tracker + reconstruction logic
   - src/daemon/index.ts                            # wire deadlines.reconstruct() into daemon boot
   # AC4 — mailbox semantics (durable log + live long-poll; no push to stateless)
-  - src/mcp/tools/wait-for-new-turns.ts            # confirm coord:<role> source_prefix subscription works as-is
+  - src/mcp/tools/wait-for-new-turns.ts            # widen with a `source_prefix: string` parameter (current tool only accepts `sources[]` exact / source-app-mapped list per src/mcp/tools/wait-for-new-turns.ts:121-132,157-162; bug caught by codex strategist consult 2026-05-16 00:31 PDT)
   # AC5 — identity + schema versioning + observability
   - src/coord/identity.ts                          # caller-identity → role mapping (env var or header-based)
   # AC6 — operator status surface
@@ -63,7 +63,7 @@ spec_refs:
   - wiki/architecture/storage.md  # Lines 50, 68-76 (append-only, no trim today), 119-127 (single-writer constraint). AC1 + AC5 honor these invariants verbatim.
   - src/capture/gate.ts  # Lines 57-72 — current capture-gate rejects unknown source schemes (only `app/domain/fs/api/git`). AC1's coord seam is SEPARATE from this gate — coord writes bypass the capture pipeline entirely to avoid extractor / normalizer / clustering pollution.
   - src/capture/pipeline.ts  # Lines 17-44 — timestamp canonicalization pattern AC1 reuses verbatim (the Bug A fix from item 022 must continue to hold for coord:* atoms).
-  - src/mcp/tools/wait-for-new-turns.ts  # Lines 9-13, 121-162, 202-279 — the read-side subscription primitive. AC4 confirms it works for `source_prefix: "coord:"` without modification. Stateless by design — that's exactly the property that forces AC4's mailbox-not-push reframing.
+  - src/mcp/tools/wait-for-new-turns.ts  # Lines 9-13, 121-162, 202-279 — the read-side subscription primitive. Current tool accepts `sources[]` (exact source-app-mapped names + literal exact sources at lines 121-132, 157-162) but NOT a prefix parameter. AC4 widens with one new optional `source_prefix: string` input so callers can subscribe to `coord:*` without enumerating every role slug. Stateless by design — that's exactly the property that forces AC4's mailbox-not-push reframing.
   - src/normalize/dispatch.ts  # Lines 11-46 — normalizer adapters registry. AC1 explicitly does NOT register a coord adapter; coord atoms bypass normalization, embedding, and trace clustering. The "non-pollution" property the spec guarantees.
   - src/trace/index.ts  # Lines 69-83 — trace clustering input. AC1 documents that coord atoms are EXCLUDED from clustering (no edges, no candidacy for cluster anchors).
   - src/mcp/server.ts  # Lines 127-132 — current host/DNS-rebinding protection. AC5 adds caller-identity → role mapping on top of this without changing the loopback constraint.
@@ -169,12 +169,13 @@ In-memory deadline tracker is volatile by design (low latency for the hot path);
 - **Idempotency key** in metadata (`coord.idempotency_key = sha256(correlation_id + "|deadline_missed")`); before appending `deadline_missed`, check for existing atom with the same idempotency key. Prevents double-fire on daemon-restart-during-overdue-firing edge case.
 - **Periodic reconciliation:** every 10 minutes the deadline tracker re-runs the reconstruction logic to catch any drift (defensive against in-memory state divergence).
 
-**AC4 — Mailbox semantics (closes codex Q4 MED — reframe "push" claim).**
+**AC4 — Mailbox semantics + `wait_for_new_turns` widening (closes codex Q4 MED — reframe "push" claim; closes codex strategist 2026-05-16 substrate-consult finding on `source_prefix` gap).**
 
-The v1 design's "second builder gets a push notification about race" was wishful thinking — `wait_for_new_turns` has no subscriber registry and reviewer wrappers exit between ticks. Reframe:
+The v1 design's "second builder gets a push notification about race" was wishful thinking — `wait_for_new_turns` has no subscriber registry and reviewer wrappers exit between ticks. Reframe + one substrate widening:
 
+- **Widen `wait_for_new_turns` with `source_prefix: string` optional input.** Current tool at `src/mcp/tools/wait-for-new-turns.ts:121-132,157-162` accepts `sources[]` (source-app-mapped names + literal exact sources) but NOT a prefix. AC4 adds a sibling parameter `source_prefix` (mutually exclusive with `sources[]`, OR additive — implementation chooses). Subscribers can then call `wait_for_new_turns(source_prefix="coord:")` to receive ALL coord events from ANY role without enumerating the role list. Backwards compatible: existing callers with `sources[]` see no behavior change.
 - **Durable event log is the primary contract.** Every coord event is appended to the existing ledger; any role can `search_memories(source_prefix="coord:<peer>", since=<watermark>)` at any time to learn what its peers have done.
-- **Live long-poll is the latency optimization for connected subscribers.** A role currently holding a `wait_for_new_turns` connection gets events pushed within ~100ms of emission (per 030's existing semantics). Exited roles do NOT get events delivered — they learn on next invocation via the durable log.
+- **Live long-poll is the latency optimization for connected subscribers.** A role currently holding a `wait_for_new_turns(source_prefix="coord:")` connection gets events pushed within ~100ms of emission (per 030's existing semantics). Exited roles do NOT get events delivered — they learn on next invocation via the durable log.
 - **No claim of push-to-stateless-roles.** The spec explicitly documents: "The second-builder-race-warning notification arrives the next time that builder is invoked, not in real time. If your use case requires immediate cross-process signaling to an exited peer, file as V2+." This bounds the V1 promise honestly.
 - **No subscriber directory, no participant registry, no presence detection.** Group sessions stay as 030 shipped them — bag of events, anyone can read.
 
@@ -233,7 +234,7 @@ Standard `backlog/task-state/<id>/builder.md` schema use, inherited from 046. No
 - **No new write surface for capture events.** The capture pipeline at `src/capture/gate.ts` stays unchanged; coord writes are SEPARATE. The `coord_emit` MCP tool does not become a back door for arbitrary atom appends — it validates event_type against the registry and rejects everything else.
 - **No reviewer/builder protocol changes.** All AC7 integrations are ADDITIVE. If the integration is too invasive for any role, partial coverage is fine — document the gap and ship anyway.
 - **No Cursor IDE-mode emission requirement in V1.** Cursor's Claude SHOULD emit coord events when it ticks, but if the paste-driven flow doesn't fire emissions reliably, that's a V1.5+ followup, not a 057 merge-blocker.
-- **No removal or modification of `wait_for_new_turns` semantics.** 057 confirms by test that the read-side primitive works for `source_prefix="coord:"` as-is — no API change.
+- **No removal or modification of `wait_for_new_turns` EXISTING semantics.** AC4 ADDS one optional `source_prefix: string` input; existing `sources[]` behavior is unchanged. No breaking changes to current consumers (group-session subscribers continue to work byte-identically).
 - **No removal of the existing launchd-based reviewer mechanism.** The coord layer ADDS visibility; it does NOT replace the polling-based reviewer dispatch. Both coexist.
 - **No tests for partial-AC7 coverage.** AC7 says "if natural emission point missing, document and skip" — there's no AC asserting all 6 roles emit. Future hardening only.
 
