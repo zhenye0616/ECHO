@@ -73,6 +73,19 @@ fi
 {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start REVIEWER=$REVIEWER_NAME ECHO_REVIEW_QUEUE_REPO_ROOT=$REPO_ROOT"
 
+  # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
+  # Emit coord:scheduler_health at log-redirect-open. This opens a SHORT
+  # bootstrap-window deadline (default 120s / max 300s per 057a's
+  # coord-roles.json) that covers ONLY the worktree-creation, env-setup,
+  # prompt-routing, codex-argv-assembly window. After that finishes (just
+  # before INVOKE_CMD runs), Phase 1 emits scheduler_health_done to close
+  # the deadline. Round-tier tick_start/tick_end takes over from there.
+  # The split (r3 codex-ops F2 MED) prevents long real reviews from
+  # firing false coord:deadline_missed alerts on the scheduler tier.
+  TICK_RUN_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+  REVIEWER_NAME="$REVIEWER_NAME" "$TOOL_DIR/coord-emit.sh" scheduler_health \
+    --tick-run-id="$TICK_RUN_ID" || true
+
   # ── 050 AC1 step 0: pre-flight worktree hygiene (order matters) ────────
   # 1) Prune admin entries for worktrees whose dirs are already gone (e.g.
   #    cleanly-removed prior ticks). Admin-only — does not touch live dirs.
@@ -186,6 +199,19 @@ fi
       || echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] queue_error.sh failed to record executable_not_found" >&2
     exit 1
   fi
+
+  # ── 057b AC7 Phase 1 — scheduler health DONE ───────────────────────────
+  # Bootstrap is complete (worktree created, env routed, prompt resolved,
+  # CLI argv built, executable verified). Close the scheduler_health
+  # deadline BEFORE INVOKE_CMD runs so the long review window does NOT
+  # fire a false scheduler-tier deadline_missed. Round-tier tick_start /
+  # tick_end emitted inside the reviewer skill cover the review work.
+  # Export TICK_RUN_ID so child reviewer-skill steps could (in principle)
+  # emit additional scheduler-tier events under the same run identity,
+  # though 057b's protocol only requires the pair above.
+  export TICK_RUN_ID
+  REVIEWER_NAME="$REVIEWER_NAME" "$TOOL_DIR/coord-emit.sh" scheduler_health_done \
+    --tick-run-id="$TICK_RUN_ID" || true
 
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] dispatching: $INVOKE_CMD"
   set +e

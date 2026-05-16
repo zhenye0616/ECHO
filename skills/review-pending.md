@@ -215,6 +215,44 @@ done
 
 The helper is invoked **inside the SIDECARS loop**, once per sidecar, using the per-sidecar base name. This is unambiguous for multi-item /review-pending invocations and produces one push-with-retry per review (matches the per-reviewer-response pattern used by `commit-reviewer-response.sh`).
 
+**057b AC7 post-push hook — active trigger for any sidecar that dispatches a new reviewer round.** /review-pending today produces sidecar reviews for `pending_review/<id>.review.md` (a per-item verdict + fixup list, human-merged). It does NOT itself dispatch reviewer-round `request.md` files. If a future extension of /review-pending escalates a sidecar verdict to a per-round reviewer queue (e.g. when the sidecar's verdict is `pushback` and the orchestrator chooses to seed an `r1/request.md` for headless reviewer rounds), the post-push hook below applies. As of 057b, the loop is a no-op when no `r*/request.md` was written during the workflow — the test in `tests/coord/no-pre-push-spawn.test.ts` asserts this contract for `request.py` independently.
+
+```bash
+# Iterate any r*/request.md files written during this /review-pending
+# session (PUSHED_REQUESTS array captured from the workflow above; empty
+# when the workflow only wrote sidecars). For each, call coord_invoke per
+# headless reviewer in the request's requested_reviewers. Same Python
+# helper as skills/review-queue-watch.md's post-push hook.
+for REQ_PATH in "${PUSHED_REQUESTS[@]+"${PUSHED_REQUESTS[@]}"}"; do
+  python3 - "$REQ_PATH" <<'PY'
+import json, os, sys, urllib.request, yaml
+req_path = sys.argv[1]
+with open(req_path) as f:
+    fm = yaml.safe_load(f.read().split('---')[1])
+corr = fm.get('correlation_id')
+reviewers = fm.get('requested_reviewers', [])
+if not corr or not reviewers:
+    sys.exit(0)
+with open('tools/review-queue/coord-roles.json') as f:
+    roles_cfg = json.load(f)
+headless = {r['name'] for r in roles_cfg['roles'] if r.get('headless')}
+url = os.environ.get('ECHO_MCP_URL', f"http://127.0.0.1:{os.environ.get('ECHO_MCP_PORT', '38478')}/mcp")
+for role in reviewers:
+    if role not in headless:
+        continue
+    body = {"jsonrpc":"2.0","method":"tools/call","params":{"name":"coord_invoke","arguments":{"role":role,"request_path":req_path,"correlation_id":corr}},"id":1}
+    try:
+        req = urllib.request.Request(url, data=json.dumps(body).encode(),
+            headers={"Content-Type":"application/json","X-Echo-Role":"claude"}, method="POST")
+        urllib.request.urlopen(req, timeout=5).read()
+    except Exception as e:
+        print(f"coord_invoke({role}) failed (best-effort): {e}", file=sys.stderr)
+PY
+done
+```
+
+NO `coord:review_pending_*` emission in 057b (deferred — those event types are not in 057a's registry; adding them requires a follow-on observability spec).
+
 ## Step D — Surface a founder-facing summary
 
 After all sidecars are written, output to the conversation:

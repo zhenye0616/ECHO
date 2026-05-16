@@ -48,6 +48,8 @@ function validRequest(overrides: Record<string, unknown> = {}): Record<string, u
     class: 'narrow',
     requested_at: '2026-05-13T08:00:00Z',
     requested_reviewers: ['codex', 'codex-ops'],
+    // 057b AC7 — canonical uuid4 (version-4 nibble + [89ab] variant byte).
+    correlation_id: 'c9b71286-5f67-4a6c-9a5a-ab6ed07ce4ef',
     ...overrides,
   };
 }

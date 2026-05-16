@@ -145,6 +145,67 @@ tools/review-queue/push-with-retry.sh "dispatch: r<N+1> on <item_id>"
 
 The helper invokes `request.py` to write `r<N+1>/request.md`, then in-place atomic-updates `r<N>/combined.md` to set `next_round: <N+1>`. **This is the default branch.** Accepted-without-follow-ups is **orthogonal** to whether patches need verification.
 
+**057b AC7 post-push hook — active trigger for r<N+1> reviewers.** After `push-with-retry.sh` succeeds (the new request.md is now on `origin/main`), call `coord_invoke` for each headless reviewer in `r<N+1>/request.md`'s `requested_reviewers`. This is the only legitimate `coord_invoke` call site in the watcher tick. `coord_invoke` is best-effort (daemon-down does not abort the queue tick — the launchd-fallback wrapper still runs on its 10-minute cadence as a redundant path). 057b scope is reviewer-role active trigger ONLY; builder/merger/watcher event-type emission is deferred to a follow-on observability spec per r1 codex-ops F4 MED.
+
+```bash
+# Read the new round's request.md (just pushed) to discover its
+# correlation_id + requested_reviewers + headless flag per role.
+REQ_PATH="backlog/reviews/<item_id>/r<N+1>/request.md"
+python3 - "$REQ_PATH" <<'PY'
+import json, subprocess, sys, urllib.request, yaml, os
+req_path = sys.argv[1]
+with open(req_path) as f:
+    fm = yaml.safe_load(f.read().split('---')[1])
+corr = fm.get('correlation_id')
+reviewers = fm.get('requested_reviewers', [])
+if not corr or not reviewers:
+    print('no correlation_id or roster — skipping coord_invoke', file=sys.stderr)
+    sys.exit(0)
+# Load coord-roles.json to identify headless reviewers (skip cursor's
+# IDE-mode entry — it has no wrapper).
+with open('tools/review-queue/coord-roles.json') as f:
+    roles_cfg = json.load(f)
+headless = {r['name'] for r in roles_cfg['roles'] if r.get('headless')}
+url = os.environ.get('ECHO_MCP_URL', f"http://127.0.0.1:{os.environ.get('ECHO_MCP_PORT', '38478')}/mcp")
+for role in reviewers:
+    if role not in headless:
+        continue
+    body = {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+            "name": "coord_invoke",
+            "arguments": {
+                "role": role,
+                "request_path": req_path,
+                "correlation_id": corr,
+            },
+        },
+        "id": 1,
+    }
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers={
+                "Content-Type": "application/json",
+                # 057b active-trigger calls are strategist-initiated; tag
+                # the request with the strategist role so 057a's identity
+                # gate accepts the coord_invoke. Future: a dedicated
+                # strategist role + per-tool ACL.
+                "X-Echo-Role": "claude",
+            },
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5).read()
+    except Exception as e:
+        print(f"coord_invoke({role}) failed (best-effort): {e}", file=sys.stderr)
+        # Non-fatal — launchd-fallback still fires on its cadence.
+PY
+```
+
+NO `coord:round_combined` emission in 057b (deferred per r1 codex-ops F4 MED — that event type is not in 057a's registry and `coord_emit` would silently reject it; rather than mid-flight-amend 057a's registry, defer the watcher observability surface to a follow-on spec).
+
 #### (c) Patches applied — verification explicitly waived (rare)
 
 Strategist's-call when patches are mechanical (typo fixes, comment-only changes, link updates) AND no reviewer requested a verification round AND no finding was load-bearing. **Use sparingly** — when in doubt, run a verification round.

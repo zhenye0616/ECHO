@@ -21,31 +21,93 @@ git pull --rebase origin main
 
 This catches any new request directories AND ensures you are reviewing against the up-to-date spec. **Mandatory** — without it, you may write a review against a stale artifact.
 
-## Step 2 — Scan for missing responses
+## Step 2 — Select the request (pinned-mode vs scan-pick)
 
-Find any `backlog/reviews/<item_id>/r<N>/request.md` whose corresponding `<item_id>/r<N>/claude.md` does **not** exist, AND whose `request.requested_reviewers` includes `claude`. If `combined.md` already exists for that round (the strategist watcher beat you), skip — your review is no longer needed. If `requested_reviewers` does not include `claude` (per 043 AC1 — the per-round roster is the source of truth), skip silently — this round did not ask for a Claude review.
+There are two paths:
+
+- **Pinned-request mode** (057b AC0): when `ECHO_COORD_REQUEST_PATH` is set in the env (set by `coord_invoke` at active-trigger time), this tick reviews EXACTLY that request and skips the scan. Read `ECHO_COORD_CORRELATION_ID` for the round-tier coord identity.
+- **Launchd-fallback scan-pick mode**: when `ECHO_COORD_REQUEST_PATH` is unset, scan `backlog/reviews/**/r*/request.md` for the first round with no `claude.md` yet.
+
+Emit `coord:tick_start` **before** bind-validation runs, so 057a's `expects: tick_start` close rule fires regardless of bind-validation outcome. `coord-emit.sh` is `|| true` on daemon-down; non-fatal.
 
 ```bash
 MY_REVIEWER=claude
 CANDIDATE=""
-for req in backlog/reviews/*/r*/request.md; do
-  dir=$(dirname "$req")
-  if [ -f "$dir/$MY_REVIEWER.md" ]; then continue; fi
-  if [ -f "$dir/combined.md" ]; then continue; fi
-  # 043 AC1: skip rounds where MY_REVIEWER is not in requested_reviewers.
-  if ! python3 -c "
+if [ -n "${ECHO_COORD_REQUEST_PATH:-}" ]; then
+  REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_start \
+    --correlation-id="$ECHO_COORD_CORRELATION_ID" || true
+  bind_reason=""
+  if [ ! -f "$ECHO_COORD_REQUEST_PATH" ]; then
+    bind_reason="request_not_found"
+  fi
+  if [ -z "$bind_reason" ]; then
+    fm_corr=$(python3 -c "
+import yaml, sys
+fm = yaml.safe_load(open('$ECHO_COORD_REQUEST_PATH').read().split('---')[1])
+print(fm.get('correlation_id',''))
+" 2>/dev/null || echo "")
+    if [ "$fm_corr" != "$ECHO_COORD_CORRELATION_ID" ]; then
+      bind_reason="correlation_id_mismatch"
+    fi
+  fi
+  if [ -z "$bind_reason" ]; then
+    in_roster=$(python3 -c "
+import yaml, sys
+fm = yaml.safe_load(open('$ECHO_COORD_REQUEST_PATH').read().split('---')[1])
+sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
+" && echo yes || echo no)
+    if [ "$in_roster" = "no" ]; then
+      bind_reason="role_not_in_roster"
+    fi
+  fi
+  if [ -z "$bind_reason" ]; then
+    dir=$(dirname "$ECHO_COORD_REQUEST_PATH")
+    if [ -f "$dir/combined.md" ]; then
+      bind_reason="already_combined"
+    elif [ -f "$dir/$MY_REVIEWER.md" ]; then
+      bind_reason="already_responded"
+    fi
+  fi
+  if [ -n "$bind_reason" ]; then
+    REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_end \
+      --correlation-id="$ECHO_COORD_CORRELATION_ID" \
+      --payload="{\"outcome\":\"bind_failed\",\"reason\":\"$bind_reason\"}" || true
+    echo "tick: pinned-request bind failed: $bind_reason" >&2
+    exit 0
+  fi
+  CANDIDATE="$ECHO_COORD_REQUEST_PATH"
+else
+  for req in backlog/reviews/*/r*/request.md; do
+    dir=$(dirname "$req")
+    if [ -f "$dir/$MY_REVIEWER.md" ]; then continue; fi
+    if [ -f "$dir/combined.md" ]; then continue; fi
+    if ! python3 -c "
 import sys, yaml
 fm = yaml.safe_load(open('$req').read().split('---')[1])
 sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
 "; then
-    continue
+      continue
+    fi
+    CANDIDATE="$req"
+    break
+  done
+  if [ -z "$CANDIDATE" ]; then
+    echo "tick: no claude reviews to write" >&2
+    exit 0
   fi
-  CANDIDATE="$req"
-  break
-done
+  CAND_CORRELATION_ID=$(python3 -c "
+import yaml, sys
+fm = yaml.safe_load(open('$CANDIDATE').read().split('---')[1])
+print(fm.get('correlation_id',''))
+" 2>/dev/null || echo "")
+  if [ -n "$CAND_CORRELATION_ID" ]; then
+    REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_start \
+      --correlation-id="$CAND_CORRELATION_ID" || true
+  fi
+fi
 ```
 
-If no candidate, log a one-line "tick: no claude reviews to write" to stderr (NOT the journal — the journal is for actual review writes) and exit 0.
+If no candidate, the scan branch above exits 0 with a stderr log.
 
 ## Step 3 — Read artifact at request SHA
 
@@ -162,6 +224,27 @@ tools/review-queue/push-with-retry.sh "journal: claude r$N review tick on $item_
 
 **Do not write the journal as part of the queue handshake.** The journal is observation-only; mixing it with queue state produces cross-reviewer journal-edit races (the case 039 §Implementation Notes calls out).
 
-## Step 7 — Exit
+## Step 7 — Emit `tick_end` on every clean exit (057b AC7)
+
+`tick_end` MUST be emitted on EVERY clean exit after `tick_start`, so 057a's deadline tracker closes the open `tick_start` deadline. Wrapper CRASHES before `tick_end` intentionally yield NO terminal event — the pre-spawn deadline fires `deadline_missed` per 057a AC3. Outcome enum:
+
+- `completed` — review succeeded, response file committed + pushed.
+- `stale_combined` — `combined.md` already existed when this tick started Step 2.
+- `duplicate_response` — local `os.link` race lost; another wrapper wrote first.
+- `upstream_duplicate` — pre-push pull found another response landed.
+- `bind_failed` — pinned-request validation rejected (emitted in Step 2).
+
+```bash
+CORR="${ECHO_COORD_CORRELATION_ID:-${CAND_CORRELATION_ID:-}}"
+if [ -n "$CORR" ]; then
+  "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_end \
+    --correlation-id="$CORR" \
+    --payload='{"outcome":"completed"}' || true
+fi
+```
+
+For non-completed clean exits, emit `tick_end` with the matching outcome at the exit point. Uncaught crashes leave no terminal event — 057a fires `deadline_missed`.
+
+## Step 8 — Exit
 
 One review per tick. Next tick picks up the next missing response.
