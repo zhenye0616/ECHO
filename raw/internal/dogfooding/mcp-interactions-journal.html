@@ -1888,6 +1888,9 @@ id="toc-pdt---codex-ops-r1-on-057-coord-layer-spec">2026-05-15 20:36 PDT
 <li><a href="#pdt---codex-r1-on-057-coord-layer-spec"
 id="toc-pdt---codex-r1-on-057-coord-layer-spec">2026-05-15 20:37 PDT -
 Codex R1 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-ops-r2-on-057-coord-layer-spec"
+id="toc-pdt---codex-ops-r2-on-057-coord-layer-spec">2026-05-15 20:45 PDT
+- Codex-ops R2 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20472,6 +20475,55 @@ direction but found several build-path hazards at the protocol
 boundaries: active trigger ordering, reviewer slug-to-command mapping,
 identity for non-curl MCP clients, and keeping coord atoms excluded from
 normal search without excluding the coord mailbox itself.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-057-coord-layer-spec">2026-05-15 20:45 PDT
+- Codex-ops R2 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>5beaf38b35336b0e25142f5ac01e6db22a18c1ba</code>, and R1
+codex-ops plus combined context to verify the runtime fixes.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r2/codex-ops.md</code>
+as <code>434d6c5</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH <code>request.py</code> still appears as a coord_invoke
+caller before the watcher post-push boundary and can create false
+healthy/completed signals; HIGH daemon-authored
+reviewer_invoked/deadline_missed events need a defined internal
+subject-role attribution path under the header-derived identity model;
+MEDIUM launchd/manual no-args fallback ticks still lack defined
+correlation_id semantics.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>5beaf38b35336b0e25142f5ac01e6db22a18c1ba</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r2/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R2 fixes the original pre-spawn,
+bounded-timeout, idempotency, role-config, and non-pollution items, but
+the remaining runtime shape needs clearer boundaries around who may
+spawn a reviewer, who may author role-attributed daemon events, and what
+a scheduler-only tick reports when it was not created by
+coord_invoke.</li>
 </ul>
 </body>
 </html>
