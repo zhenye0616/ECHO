@@ -1909,6 +1909,9 @@ id="toc-pdt---codex-ops-r4-on-057-coord-layer-spec">2026-05-15 21:07 PDT
 <li><a href="#pdt---codex-ops-r5-on-057-coord-layer-spec"
 id="toc-pdt---codex-ops-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT
 - Codex-ops R5 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-r5-on-057-coord-layer-spec"
+id="toc-pdt---codex-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT -
+Codex R5 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20847,6 +20850,58 @@ committed and pushed before this observation-only journal entry.</li>
 operational shape still needs causality between daemon invoke records
 and child tick records, plus a true tier-keyed scheduler-health path so
 the new observability layer does not create false pages.</li>
+</ul>
+<h3 id="pdt---codex-r5-on-057-coord-layer-spec">2026-05-15 21:16 PDT -
+Codex R5 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>2d15276209d77278022d2c1bff4929d64d46f234</code>, and pinned
+implementation context for <code>server.ts</code>,
+<code>wait-for-new-turns.ts</code>, <code>search-memories.ts</code>,
+<code>storage/interface.ts</code>, <code>sqlite.ts</code>,
+<code>_run_reviewer.sh</code>, <code>run-codex-reviewer.sh</code>,
+<code>run-codex-ops-reviewer.sh</code>, <code>reviewers.json</code>,
+<code>skills/review-queue-codex.md</code>,
+<code>.claude/commands/review-queue-codex.md</code>, and
+<code>tools/sync-skills.sh</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/codex.md</code>
+as <code>31cbc73</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH pinned-request active trigger is not wired to a real
+wrapper entrypoint because the spec’s example uses unsupported
+<code>codex exec</code> flags and existing reviewer drivers discard
+args; MEDIUM pinned-request mode does not explicitly preserve the 043
+<code>requested_reviewers</code> / existing-response / combined-round
+guards.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>2d15276209d77278022d2c1bff4929d64d46f234</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r5/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R5 verifies the r4 tool-boundary fixes were
+mostly absorbed, but the active-trigger handoff still needs to name the
+actual wrapper/prompt plumbing that can carry a pinned request through
+Codex without reverting to the scan loop.</li>
 </ul>
 </body>
 </html>
