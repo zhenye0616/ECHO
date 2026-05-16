@@ -74,7 +74,7 @@ files_to_modify:
   - tests/coord/coord-invoke-cwd-independent.test.ts          # NEW (r2 codex-ops F4 HIGH): start MCP daemon from a non-repo cwd (e.g. process.chdir("/")) — wrapper path still resolves via import.meta.url, child cwd is REPO_ROOT, ECHO_REVIEW_QUEUE_REPO_ROOT env var arrives, wrapper's git/storage operations hit the right checkout
   - tests/coord/coord-invoke-fire-and-forget.test.ts          # NEW (r2 codex F2 MED + r2 codex-ops F5 MED convergent): wrapper spawns a sleep/early-stderr sequence — coord_invoke returns within bounded timeout (under 1s) AND child does not block on undrained pipe AND daemon does not retain child handle (child.unref()); test asserts process.memoryUsage stays bounded across N=100 coord_invoke calls
   - tests/coord/coord-invoke-spawn-error-noncrash.test.ts      # NEW (r5 codex-ops F1 HIGH): force spawn to emit async 'error' (e.g. delete the wrapper between stat-check and spawn-call OR set ulimit -n 0 to force EMFILE) — daemon stays alive, coord_invoke returns/records bounded failure, pre-spawn deadline still fires deadline_missed via 057a tracker (the correct operator signal)
-  - tests/coord/coord-emit-wrapper-transport.test.ts           # NEW (r5 codex F1 MED): wrapper-originated atoms carry metadata.coord.emitter_role=${REVIEWER_NAME} via X-Echo-Role header; daemon-down does NOT abort the queue tick (curl --connect-timeout 2 --max-time 5 returns non-zero, wrapper continues with `|| true`)
+  - tests/coord/coord-emit-wrapper-transport.test.ts           # NEW (r5 codex F1 MED, extended r6 codex F1 HIGH + r7 convergent HIGH): wrapper-originated atoms carry metadata.coord.emitter_role=${REVIEWER_NAME} via X-Echo-Role header; daemon-down does NOT abort the queue tick (curl --connect-timeout 2 --max-time 5 returns non-zero, wrapper continues with `|| true`); **executes tools/review-queue/coord-emit.sh on the local (macOS BSD-date) platform** and asserts the produced emitted_at value (e.g. "2026-05-16T08:05:09Z") is accepted by 057a's coord_emit validator AND canonicalized to ms-precision on the daemon side; full 057a input contract (event_type + schema_version=1 + emitted_at + subject_role + tier_key + optional payload) verified end-to-end (r6 codex F1 HIGH + r7 convergent HIGH portability)
   - tests/coord/paths-resolution.test.ts                       # NEW (r3 codex F1 + r3 codex-ops F1 convergent HIGH, narrowed r6 codex F2 LOW): src/coord/paths.ts exports REPO_ROOT that ends in canonical repo dir regardless of process.cwd(); resolveReviewerWrapperPath("codex") returns existing executable; ECHO_REPO_ROOT env override is honored; SHAPE-INVALID roles ("../", "/", "foo/../bar", "foo;rm", "foo bar", "", "FOO") reject with NO FS access AND NO MCP side-effects (shape regex first); ROSTER-INVALID roles ("cursor" [headless:false], "nonexistent") reject AFTER loadCoordRoles() reads coord-roles.json but BEFORE wrapper-path construction/stat/spawn/MCP side-effects
   - tests/coord/scheduler-health-bootstrap-scope.test.ts       # NEW (r3 codex-ops F2 MED): wrapper emits scheduler_health → does bootstrap (worktree, env, prompt routing) → emits scheduler_health_done → THEN starts review work; long review (synthesized 5+ min codex exec) does NOT fire false coord:deadline_missed for the scheduler_health tier; round-tier tick_start/tick_end lifecycle covers the long review window
   - tests/coord/silent-fail-detection.test.ts               # the full motivating scenario: launchd-style wrapper invocation fails to emit tick_start; deadline fires coord:deadline_missed within budget
@@ -206,7 +206,12 @@ for arg in "$@"; do
 done
 # Per 057a coord_emit input contract: top-level event_type, schema_version,
 # emitted_at, subject_role, exactly one tier key, optional payload.
-emitted_at="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+# r7 convergent HIGH (codex F1 + codex-ops F1): use seconds precision via portable
+# BSD/GNU date format. BSD date on macOS launchd does NOT support `%N`; the prior
+# `%S.%3N` would render literal `.3NZ` and 057a's coord_emit validator would reject
+# every atom (silently — curl `|| true` swallows the failure). 057a canonicalizes
+# emitted_at via `new Date(...).toISOString()` which pads seconds → ms server-side.
+emitted_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 tier_key="\"correlation_id\": \"${correlation_id}\""
 [ -z "${correlation_id}" ] && tier_key="\"tick_run_id\": \"${tick_run_id}\""
 curl -sS --connect-timeout 2 --max-time 5 \
