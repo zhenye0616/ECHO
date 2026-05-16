@@ -1,42 +1,42 @@
 ---
 id: 2026-05-16-058-strategist-disposition-discipline-prefer-removal
 title: Strategist disposition discipline — prefer removal over deeper patching when findings target a recent-round patch
-status: ready
+status: claimed
 priority: MED
 estimate: 0.25d
 created: 2026-05-16
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T08:44:12Z"
 branch: "agent/strategist-disposition-discipline-prefer-removal"
-head_sha: ""
+head_sha: "3eb6cbebf4a9a5b945c45ef314c0075c27221d70"
 pr_url: ""
 task_state_ref: 2026-05-16-058-strategist-disposition-discipline-prefer-removal
 agent_notes: |
-  Operating-model addition: codify the disposition pattern that converged 057a after r3 escalation
-  override. The pattern fires inside the watcher tick (Step 3 — Disposition) and reads: when a
-  finding targets mechanism a PRIOR round's patch added (not the original spec), prefer REMOVING
-  the prior-round mechanism over patching it deeper.
+  Pre-applied on main before claim. The strategist self-applied AC1 + AC2 + AC3 directly to main
+  in commit be6dcce ("058: apply strategist disposition discipline addition + CLAUDE.md
+  cross-reference", 2026-05-15 23:44 PDT, by Zhen) before the spec left backlog/ready/. The item
+  body anticipated this explicitly: "(This item is small enough that a builder agent may not run;
+  if the strategist self-applies post-review, the builder pointer may be skipped.)"
 
-  Empirical evidence is the 057a convergence trajectory r1→r8 = 7→6→5→3→2→3→2→0 findings.
-  Two inflection points used this discipline:
+  This run made NO new commits on agent/strategist-disposition-discipline-prefer-removal. The
+  branch was created from main at 3eb6cbe (the claim commit, immediately after be6dcce), so it
+  already contains all spec'd edits and is a no-op fast-forward of main.
 
-  1. r4 disposition (removing premature time-horizon optimization)
-  2. r6 disposition (removing premature runtime volume-warning mechanism)
+  All 7 merge-blocking verification checks pass on the branch as-is:
+    T1 sync-skills.sh --check → OK (canonical + adapter byte-identical)
+    T2a/b skill subsection heading present in skills/ and .claude/commands/ (1 match each)
+    T3 skill subsection positioned correctly (line 101, between Step 3 @ 89 and (a) @ 118)
+    T4a/b worked examples r4 and r6 present inside the new subsection
+    T5 CLAUDE.md H3 present (1 match)
+    T6 CLAUDE.md H3 positioned inside "Drift Prevention Applies to Agents Too" (line 201, after
+       section heading @ 191; no later H2 boundary)
+    T7 CLAUDE.md cross-reference targets canonical skills/review-queue-watch.md (1 match)
 
-  Both produced clean next-round convergence (r5 zero-storage-finding, r7 zero-warning-finding).
-  Without this discipline, each round's patches accumulate mechanism that the load-bearing core
-  doesn't need, and reviewers find bugs in each new mechanism — the spec drifts via the back door.
+  Reviewer note: since the work lives on main already, this row may be a candidate to skip a
+  normal review round and move directly to backlog/complete/. Merging agent/<slug> into main is a
+  no-op fast-forward — the branch tip and main are at the same SHA (3eb6cbe).
 
-  This is the strategist-side twin of CLAUDE.md "Drift Prevention Applies to Agents Too" — same
-  failure pattern (unnecessary mechanism), different actor (strategist patching specs during
-  review rounds, not builders expanding scope during implementation).
-
-  Scope is TWO file edits, both small:
-    1. skills/review-queue-watch.md — new subsection inside Step 3 (Disposition) at the
-       branching point where path (a)/(b)/(c) is chosen.
-    2. CLAUDE.md — new H3 under "Drift Prevention Applies to Agents Too" pointing at the skill.
-
-  After review-queue convergence: apply the edits, run tools/sync-skills.sh, commit + push.
+  Run log: raw/internal/agent-runs/2026-05-16-2026-05-16-058-strategist-disposition-discipline-prefer-removal.md
 requested_reviewers: ["codex"]
 files_to_modify:
   - skills/review-queue-watch.md      # new Step-3 subsection (the prose is embedded below in AC1)
