@@ -237,6 +237,21 @@ export async function searchMemories(
   const filter: QueryFilter = withFsExclusion({});
   if (effectiveSource !== undefined) filter.source = effectiveSource;
   if (effectivePrefix !== undefined) filter.source_prefix = effectivePrefix;
+  // 057a AC1 non-pollution: search_memories() with no filter MUST NOT
+  // return coord atoms by default — they're substrate plumbing, not
+  // user-facing knowledge. The dedicated exclusion lives here (NOT in
+  // the shared withFsExclusion helper — that would also block
+  // wait_for_new_turns(source_prefix="coord:") per AC4). The opt-in is
+  // an explicit source_prefix starting with "coord:" (forensic
+  // retrieval); a coord-targeted exact source filter or source_prefix
+  // also opts in.
+  const coordExplicitlyRequested =
+    (effectiveSource !== undefined && effectiveSource.startsWith('coord:')) ||
+    (effectivePrefix !== undefined && effectivePrefix.startsWith('coord:'));
+  if (!coordExplicitlyRequested) {
+    const exclude = filter.exclude_metadata_surface ?? [];
+    filter.exclude_metadata_surface = [...exclude, 'coord'];
+  }
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
   if (before !== undefined) filter.before = before;

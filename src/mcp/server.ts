@@ -4,6 +4,7 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
+import { registerCoordEmit } from './tools/coord-emit.js';
 import { registerEchoPing } from './tools/echo-ping.js';
 import { registerEchoResolveMru } from './tools/echo-resolve-mru.js';
 import { registerFindClusters } from './tools/find-clusters.js';
@@ -127,6 +128,20 @@ export async function startMcpServer(
     res: import('node:http').ServerResponse,
     body: unknown,
   ): Promise<void> {
+    // 057a AC1+AC5 — extract X-Echo-Role from the raw HTTP request BEFORE
+    // tool registration so coord_emit can server-derive the emitter
+    // identity. Native MCP clients (Cursor IDE-mode) don't set this
+    // header, which is the correct V1 behavior — they get a clear
+    // CoordIdentityError on coord_emit and can't pollute the coord
+    // surface. Wrapper-side curl callers set it explicitly.
+    const xEchoRoleRaw = req.headers['x-echo-role'];
+    const xEchoRoleHeader =
+      typeof xEchoRoleRaw === 'string'
+        ? xEchoRoleRaw
+        : Array.isArray(xEchoRoleRaw) && xEchoRoleRaw.length > 0
+          ? String(xEchoRoleRaw[0])
+          : null;
+
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     registerEchoPing(mcp);
     registerSearchMemories(mcp, storage);
@@ -145,6 +160,10 @@ export async function startMcpServer(
     // Item 046 / AC4 — role-typed task-state read surface (repo_root pinned).
     registerGetRoleState(mcp, repoRoot);
     registerListTaskStates(mcp, repoRoot);
+    // 057a AC1 — coord substrate append seam. The emitter identity is
+    // resolved per-request from X-Echo-Role; native MCP clients without
+    // the header get a clear identity error on every call (r1 codex F4 MED).
+    registerCoordEmit(mcp, { storage, coordRoles, xEchoRoleHeader });
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
