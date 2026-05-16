@@ -29,6 +29,29 @@ spec_refs:
   - skills/review-queue-cursor.md  # AC3 reference. Existing Cursor-binding skill (reviewer role) — established convention for IDE-mode skill prose. AC3 docs follow the same shape: founder pastes skill body into Cursor IDE chat; Cursor's Claude executes the protocol; founder observes.
   - raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md  # The decision that skills/ is the cross-tool collaboration protocol. 055 operationalizes the third builder binding (after Claude Code in-session + codex via 047's wrapper).
   - wiki/operating-model/review-queue-protocol.md  # Diagram context — Cursor is already an IDE-mode reviewer in this protocol; 055 extends the same IDE-mode trigger ritual to the builder role.
+review_notes: |
+  Merged on 2026-05-16 via founder reconciliation. Merge commit: 92ca9b2.
+  review_notes + C7 move + C4 followup re-applied in a follow-up fixup commit
+  after the original C4/C6/C7 ops were silently dropped by
+  `git rebase --rebase-merges` during cross-machine race recovery — see the
+  fixup commit body for the post-mortem.
+
+  Conflicts resolved:
+  - backlog/task-state/2026-05-15-055-cursor-as-builder-paste-trigger/builder.md (add/add): took HEAD (main) wholesale. Main's version is the post-handoff state written by tools/task-state/patch-builder-state.py at the claimed→pending_review transition (handoff metadata + COMPLETE lifecycle marker + canonical_anchors.spec rewritten to pending_review/). The branch's 064f1ee version is the pre-handoff snapshot the agent wrote at claim time; the builder.md body itself documents this contract. The /review-pending sidecar predicted "no conflicts" because the reviewer subagent didn't notice that the patcher had run on main between the branch's fork-point and current main.
+
+  C3.5 cross-vendor consult: codex @ proceed-as-proposed — no modifications. Codex independently inspected both index stages, confirmed the diff is exactly the three patcher-owned regions (frontmatter handoff metadata, lifecycle marker, spec anchor), confirmed the branch has no unique body content in locked_decisions/open_questions/dont_touch/reviews, and endorsed `git checkout --ours` for this file.
+
+  Fixups applied:
+  - Appended `055-AC5-cursor-builder-run-by: 2026-05-22` entry to backlog/_followups.md per the spec's "Durable reminder" clause (055 was built by the Claude Code binding, so the Cursor-as-builder dogfooding observation is deferred to a 7-day post-merge window).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 970/991 tests pass (21 skipped, 74/75 test files passed) on the pre-rebase commit (7297aee). Lint and typecheck clean. tools/sync-skills.sh --check returns "OK: all adapters match canonical skills/". Live tip after rebase + 056 merge: 8e40c56 — also clean (986/1007, lint+typecheck+sync-skills all green).
+
+  Follow-up items (non-blocking):
+  - Future micro-spec documenting Claude Code-as-builder explicitly (currently the "implicit default"), so all three bindings are prose-documented symmetrically. File only if the implicit-default framing causes confusion.
+  - Strategist conversation: promote 055's After-Completion targets to wiki/operating-model/review-queue-protocol.md and update memory feedback_delegate_cursor_work_to_cursor.md.
+  - **NEW (from this incident)**: spec a guard in skills/merge-and-cleanup.md C11 rebase path — after `git rebase --rebase-merges` of a merge commit that carried C4/C6/C7 extras, the operator MUST re-stage those extras before continuing. Alternatively, restructure C11 to abort + restart rather than rebase. See `055-rebase-merges-drops-extras-postmortem` followup.
 ---
 
 ## Why this spec exists
