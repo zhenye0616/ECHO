@@ -10,7 +10,7 @@ aliases:
 
 # Review Queue Protocol
 
-The file-backed wire protocol that lets the strategist and one-or-more reviewers cycle a spec through review rounds without any direct IPC. Every handoff is a committed file under `backlog/reviews/<id>/r<N>/`. Shipped by item 039 (file-backed queue), extended by 040 (watcher-state test), 041 (reviewer background execution), 043 (per-round reviewer roster), 044 (autostash + AC4 auto-disposition), 045 (queue reliability cluster), and 050 (worktree isolation).
+The file-backed wire protocol that lets the strategist and one-or-more reviewers cycle a spec through review rounds without any direct IPC. Every handoff is a committed file under `backlog/reviews/<id>/r<N>/`. Shipped by item 039 (file-backed queue), extended by 040 (watcher-state test), 041 (reviewer background execution), 043 (per-round reviewer roster), 044 (autostash + AC4 auto-disposition), 045 (queue reliability cluster), 050 (worktree isolation), and 056 (claude as fourth reviewer + roster-driven `invoke_command` wrapper).
 
 For the rationale behind multi-reviewer cross-tool review, see [[cross-tool-spec-review]]. This page documents only the mechanical flow.
 
@@ -35,7 +35,7 @@ For the rationale behind multi-reviewer cross-tool review, see [[cross-tool-spec
                               │  ─ artifact_path                    │
                               │  ─ spec_commit_sha (frozen)         │
                               │  ─ requested_reviewers: [codex,     │
-                              │       codex-ops, cursor]            │
+                              │       codex-ops, cursor, claude]    │
                               │  ─ focus_hints                      │
                               └────────────────┬────────────────────┘
                                                │
@@ -66,7 +66,7 @@ For the rationale behind multi-reviewer cross-tool review, see [[cross-tool-spec
             ─── HANDOFF #2 ──── writes file (atomic link, one writer wins) ───
             ┌──────────────────────────────────────────────────────────────┐
             │ backlog/reviews/<id>/r<N>/                                   │
-            │     codex.md,  codex-ops.md,  cursor.md                      │
+            │     codex.md, codex-ops.md, cursor.md, claude.md             │
             │  ─ artifact_sha (must match request.spec_commit_sha)         │
             │  ─ verdict: {proceed, proceed_after_patches, pushback}       │
             │  ─ findings[] (with cross_ref.finding_index for convergence) │
@@ -140,7 +140,7 @@ When the strategist dispositions findings on the `proceed_after_patches` path, t
 ## Load-bearing invariants
 
 - **Fresh-eyes-at-SHA.** Every reviewer reads the spec via `git show <spec_commit_sha>:<artifact_path>` — never working-tree HEAD. The frozen sha is the anchor that lets the next round's reviewer see only what the strategist meant for this round even if `main` has advanced. Enforced by `validate.py reviewer`'s `REVIEWER_FRESH_EYES_VIOLATION` check; the `task_state_ref:` field exists for non-reviewer consumers and reviewers MUST NOT read it.
-- **Worktree isolation (050).** Headless reviewers (codex, codex-ops) run in ephemeral `$TMPDIR/echo-<reviewer>-<uuid>` worktrees pinned to `origin/main`; the founder's live checkout is never written to by an automated reviewer tick. Cursor's IDE-mode reviewer mirrors the same lifecycle in skill prose (`skills/review-queue-cursor.md` "050 AC4 worktree-isolation invariant").
+- **Worktree isolation (050).** Headless reviewers (codex, codex-ops, claude) run in ephemeral `$TMPDIR/echo-<reviewer>-<uuid>` worktrees pinned to `origin/main`; the founder's live checkout is never written to by an automated reviewer tick. Cursor's IDE-mode reviewer mirrors the same lifecycle in skill prose (`skills/review-queue-cursor.md` "050 AC4 worktree-isolation invariant").
 - **Per-round roster (043).** `requested_reviewers` in `request.md` is the source of truth for which reviewers tick this round; reviewer skills filter on it and silently skip if their slug isn't listed. The roster + `required`/`timeout_hours`/`mode` per-reviewer config lives in `tools/review-queue/reviewers.json`.
 - **Journal-as-queue prohibition.** The dogfooding journal is observation-only; the review queue uses dedicated `backlog/reviews/**` files. Reviewers and strategist append journal entries only AFTER queue artifacts are committed.
 - **Atomic write semantics.** Reviewer responses use `os.link()` from a `<reviewer>.md.<tmpsuffix>` temp file → final name. Concurrent ticks race the link; only one wins, the loser sees `FileExistsError` and exits cleanly.
@@ -154,15 +154,43 @@ Source: `tools/review-queue/reviewers.json`.
 | `codex` | headless | yes | n/a | `run-codex-reviewer.sh → _run_reviewer.sh` (launchd) |
 | `codex-ops` | headless | yes | n/a | `run-codex-ops-reviewer.sh → _run_reviewer.sh` (launchd) |
 | `cursor` | ide | yes | 2 h | none — paste skill prose into Cursor IDE chat |
+| `claude` | headless | no [^claude-required] | n/a | `run-claude-reviewer.sh → _run_reviewer.sh` (launchd; install deferred) |
+
+[^claude-required]: `claude` ships with `required: false` per 056 to permit the initial onboarding round (`requested_reviewers: ["codex", "codex-ops"]`) without violating the "all required must respond" invariant. The flip to `required: true` is gated by **followup `056-claude-required-flag-gate`** (`backlog/_followups.md`): production headless execution requires the operator to either (a) configure `~/.claude/settings.json` permission rules so `claude -p` runs without interactive prompts, OR (b) add `--dangerously-skip-permissions` to the `invoke_command`. Until that gate is resolved, the binding is wired end-to-end but not enforced on every round.
 
 `mode=headless` reviewers must have `timeout_hours: null` (no wait); `mode=ide` reviewers must have a positive numeric timeout. Enforced at `tools/review-queue/_reviewers.py:92-106`.
 
-Adding a new reviewer requires four coordinated edits (the reviewers-config schema preamble flags this manual-sync rule per 043 R1 HIGH #5):
+### Roster-driven `invoke_command` (056 substrate change)
 
-1. Append a roster entry to `reviewers.json`.
-2. Extend the enum in `schemas/reviewer.schema.json` (`reviewer` field).
+Post-056, the headless wrapper (`_run_reviewer.sh`) is vendor-agnostic. Each headless roster entry carries an `invoke_command` template string that the wrapper resolves at tick-time:
+
+```json
+{
+  "name": "codex",  "mode": "headless", "required": true, "timeout_hours": null,
+  "slash_command": "review-queue-codex",
+  "invoke_command": "codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}"
+},
+{
+  "name": "claude", "mode": "headless", "required": false, "timeout_hours": null,
+  "slash_command": "review-queue-claude",
+  "invoke_command": "claude -p < {{PROMPT}}"
+}
+```
+
+Token substitution uses `shlex.quote()` per substitution site before assembling the final `bash -c` string (Option A in the 056 spec — Option B argv-style was rejected as unsafe with stdin redirects). The `{{PROMPT}}` token is required for headless reviewers; `{{WT}}` is optional (the wrapper already `cd`s to `$WT` before substitution, so commands like `claude -p` that lack a `-C` analog operate via cwd). Conditionally required via JSON Schema `if/then` in `reviewers-config.schema.json`: only when `mode === "headless"`.
+
+The IDE-mode `cursor` row omits `invoke_command`; `_reviewer_gate.py --print invoke_command` for `cursor` exits non-zero with `IDE-mode reviewer cursor has no invoke_command`.
+
+Adding a new reviewer requires **six** coordinated edits (post-056; the reviewers-config schema preamble flags this manual-sync rule per 043 R1 HIGH #5):
+
+1. Append a roster entry to `reviewers.json` with `invoke_command` if `mode: headless`.
+2. Extend the enum in `schemas/reviewer.schema.json` — `reviewer` field AND `findings[].cross_ref.reviewer` (both enum sites; without the second, no reviewer can legally cross-reference the new slug's findings).
 3. Extend the enum in `schemas/request.schema.json` (`requested_reviewers` items).
-4. Write `skills/review-queue-<slug>.md`; sync via `tools/sync-skills.sh`. Headless reviewers also need a `run-<slug>-reviewer.sh` 5-line driver + launchd plist installer.
+4. Extend `schemas/combined.schema.json` with the explicit `<slug>_response` property — `combine.py:_schema_response_fields()` discovers response fields ONLY from schema properties enumeration, so pattern-based widening would require also editing `combine.py`.
+5. Write `skills/review-queue-<slug>.md`; sync via `tools/sync-skills.sh`. Headless reviewers also need a `run-<slug>-reviewer.sh` 5-line driver (`exec env REVIEWER_NAME=<slug> "$(dirname "$0")/_run_reviewer.sh"`) + launchd plist installer.
+6. For headless reviewers, the installer (`_install_reviewer_launchd.sh`) preflights the resolved `invoke_command` executable via `command -v <exe>` BEFORE writing the plist — fail-closed if the binary is missing (otherwise the launchd job fires every 10 min with `command-not-found`, silently consuming the schedule).
+
+056 is the canonical worked example: a new headless reviewer (`claude`) added end-to-end with zero edits to `_run_reviewer.sh`'s exec line, zero edits to `combine.py`, and full backwards-compat (codex/codex-ops argv byte-equivalent pre/post — guarded by the 056 AC9 "argv snapshot" regression test).
 
 ## Builder bindings
 
@@ -180,9 +208,10 @@ The atomic-claim git op (single commit moving `ready/<id>.md → claimed/<id>.md
 
 ## Key files
 
-- **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-watch.md`, `skills/process-backlog.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
-- **Python helpers:** `tools/review-queue/request.py` (creates `request.md`), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact).
-- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-claude.md`, `skills/review-queue-watch.md`, `skills/process-backlog.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
+- **Python helpers:** `tools/review-queue/request.py` (creates `request.md`), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact), `tools/review-queue/_reviewers.py` (loader; enforces conditional-required `invoke_command` per 056), `tools/review-queue/_reviewer_gate.py` (per-tick gate; supports `--print invoke_command` post-056).
+- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body — vendor-agnostic post-056), `tools/review-queue/run-{codex,codex-ops,claude}-reviewer.sh` (5-line drivers), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/queue_error.sh` (durable queue-error commit before cleanup, per 056 AC5 part 4), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Installer:** `tools/review-queue/_install_reviewer_launchd.sh` (roster-driven launchd plist installer; preflights `invoke_command` executable via `command -v` post-056).
 - **Operator docs:** `docs/cursor-builder-trigger.md` (055), `docs/review-queue-setup.md` (reviewer triggers).
 - **Schemas:** `tools/review-queue/schemas/{reviewer,combined,request,reviewers-config}.schema.json`.
 
