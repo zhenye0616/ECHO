@@ -805,3 +805,9 @@ Surfaced in the /review-pending 057a sidecar (verdict: merge as-is). All five ar
 - **057a-followup-C — warn on swallowed `deadlines.ingest()` failure.** `src/mcp/tools/coord-emit.ts:162-168`. Currently silent on the failure path; operators only see it after the 10-min reconcile window picks it up. One `warn` log line closes the visibility gap.
 - **057a-followup-D — TZ-aware validation for `expected_by`.** `src/coord/validate.ts:81`. Either apply `canonicalizeTimestamp` (matching the rest of the canonicalization path) or tighten the `ISO_RE` to require explicit `Z` / `[+-]hh:mm`. Closes the TZ-naive foot-gun.
 - **057a-followup-E (V1.5+) — `coord_status` `recent_missed` heap allocation.** `src/mcp/tools/coord-status.ts:236-238`. Replace push-all-then-slice-200 with a min-heap-of-200 to bound memory at O(200) instead of O(N-in-horizon). Defer until production volumes warrant — substrate ships dormant.
+
+## From 058 merge (2026-05-16) — deferred follow-ups
+
+058 was a no-op pre-applied-on-main merge (AC1+AC2+AC3 landed directly on main as commit `be6dcce` 2026-05-15 23:44 PDT before the spec left `backlog/ready/`).
+
+- **058-followup-A (strategist task, low priority)** — During the After-Completion wiki-promotion pass, add a one-sentence mention of "prefer removal over deeper patching" to `wiki/operating-model/review-queue-protocol.md` with a link to the corresponding subsection in `skills/review-queue-watch.md`. The skill itself is already the authoritative source; the wiki line just makes the principle discoverable from the protocol page.
