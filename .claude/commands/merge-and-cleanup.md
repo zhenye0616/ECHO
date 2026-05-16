@@ -349,15 +349,11 @@ If `git worktree remove` still fails (chokidar handles, stray pyc, etc.) AFTER t
 
 If the remote delete fails because the branch was already pushed for someone else's reference (rare): surface the error and ask the human; do not force.
 
-### C9b. Restart the ECHO daemon
+### C9b. (deferred — see "Live checkout bringup" at end of Step D)
 
-`vite-node` only loads source at process start. If the daemon is running from before this merge, the next dogfooding call will silently run on stale code — looks like the patch didn't ship. Observed twice (post-018, post-019) before this step was codified.
+**REMOVED: auto-kickstart of `com.echo.daemon`.** Earlier versions ran `launchctl kickstart -k` here, on the assumption that merger-worktree-verify implies live-checkout-runnable. That assumption is false whenever the merge bumps `package.json` (and is true for any dep change, not just one): the merger worktree's `npm install` from C5 lives only inside the ephemeral worktree, discarded at C9 cleanup. The live checkout's `node_modules` never gets reconciled. Auto-kickstart against stale `node_modules` crashes the daemon silently — observed 2026-05-16 post-057a merge with the `Ajv is not a constructor` symptom (eslint's transitive ajv@6 hoisted over the ajv@8 the new lockfile required; tests passed in the merger's fresh-install tree).
 
-```bash
-launchctl kickstart -k "gui/$(id -u)/com.echo.daemon"
-```
-
-If the daemon isn't managed by launchd in this environment (e.g., during a manual `npm run daemon` session), surface that to the founder rather than skipping silently — they should restart by hand before the next call.
+Daemon bringup is now an explicit founder-in-the-loop step at the end of Step D, after all items in the argument list have been pushed (so the live checkout's `git pull` actually sees the new commits). See the "Live checkout bringup" subsection below.
 
 ### C10. File follow-up items
 
@@ -388,6 +384,31 @@ After the loop completes, output:
 - One line per merged item: id, slug, conflicts hit, fixups applied, fixups deferred, test counts.
 - The follow-up queue contents (`backlog/_followups.md`).
 - A reminder: *"Strategist conversation: <ids> are now in `complete/`. Their After-Completion sections need to be promoted to `wiki/` next."*
+
+### Live checkout bringup (founder-in-the-loop, replaces C9b auto-kickstart)
+
+After Step D's summary, surface this exact prompt and wait for founder `continue`:
+
+> **Live checkout bringup needed.** The merge(s) have landed on origin/main. The live checkout still runs the pre-merge code + dependencies. To make the daemon serve the new code:
+>
+> ```bash
+> cd ~/Desktop/Project_echo
+> git pull --ff-only origin main
+> # if this merge touched package.json (check `git diff HEAD~ HEAD -- package.json` post-pull):
+> npm install
+> # if daemon is launchd-managed:
+> launchctl kickstart -k "gui/$(id -u)/com.echo.daemon"
+> # verify boot (must return 200 with a status payload, NOT 406 / connection-refused):
+> bash tools/coord-status.sh uptime
+> ```
+>
+> Reply `continue` when `coord-status.sh uptime` returns a number.
+
+The founder's `continue` is the final gate. The skill does not exit past this pause without it. If `coord-status.sh uptime` fails, surface the failure — do not auto-retry. Daemon-boot failures after merge typically indicate a real defect (module-loader interop, lockfile drift, missing dependency) that needs investigation, not automated recovery.
+
+If the daemon isn't launchd-managed in this environment (e.g., during a manual `npm run daemon` session), the `launchctl kickstart` line won't apply — founder restarts by hand. The verification check via `coord-status.sh uptime` is the same.
+
+**Why this replaces the old auto-kickstart pattern.** The old C9b was codified post-018/019 to handle "founder forgets to restart daemon". That convenience worked when dep changes were rare. Post-057a (which added ajv) and going forward (coord layer + future deps), silent daemon death on stale `node_modules` is a recurring failure mode. Visible founder-driven bringup is structurally safer than invisible automation that fails when assumptions break. The verification step (`coord-status.sh uptime`) catches not just stale-dep crashes but any daemon-boot regression a merge introduces.
 
 ## Failure Modes (and what the command does)
 
@@ -425,7 +446,7 @@ For each id in the argument list, by the end of the run:
 - Merge commit on `main` with descriptive message; pushed to origin.
 - Worktree `~/Desktop/Project_echo--<slug>/` removed.
 - Branch `agent/<slug>` deleted locally and on origin.
-- ECHO daemon kickstarted so the next call runs on merged code.
+- ECHO daemon bringup completed via the post-Step-D founder-in-the-loop pause: founder pulled live to current main, ran `npm install` if package.json was in the diff, restarted the daemon, and confirmed `tools/coord-status.sh uptime` returns a number (not 406 / not connection-refused).
 - Tests pass, lint clean, typecheck clean post-merge.
 - `backlog/_followups.md` updated with deferred fixups and follow-up items.
 - The founder is unblocked to invoke a strategist conversation for wiki promotion.
