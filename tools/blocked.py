@@ -45,7 +45,11 @@ from typing import Any, Optional
 
 PRIORITY_ORDER = {"HIGH": 0, "MED": 1, "LOW": 2}
 STAGES = ("ready", "claimed", "pending_review", "complete")
-ID_FILENAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{3}-[a-z][a-z0-9-]*$")
+# Accept optional single-letter suffix on the 3-digit sequence number for
+# decomposed parent/sibling specs (e.g. 057a, 057b). Mirrors the same widening
+# applied to tools/review-queue/schemas/{request,combined,reviewer}.schema.json
+# at 6a83b3c (2026-05-15) — keep the two patterns in sync.
+ID_FILENAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{3}[a-z]?-[a-z][a-z0-9-]*$")
 
 
 class ValidationError(Exception):

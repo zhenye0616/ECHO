@@ -94,6 +94,14 @@ class BlockedScriptTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("2026-04-30-001-foo.md", out.strip())
 
+    def test_alpha_suffixed_id_is_accepted(self) -> None:
+        # Decomposed parent/sibling specs use a single-letter suffix on the
+        # 3-digit sequence (e.g. 057a, 057b). Selector + schemas must accept.
+        write_item(self.repo, "ready", "2026-05-16-057a-coord-substrate")
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-05-16-057a-coord-substrate.md", out.strip())
+
     def test_blocker_in_pending_review_does_NOT_unblock(self) -> None:
         # Critical safety property: only complete/ satisfies a dependency
         write_item(self.repo, "pending_review", "2026-04-30-001-foo")

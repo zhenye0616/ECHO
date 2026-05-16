@@ -2,7 +2,7 @@
 id: 2026-05-16-058-strategist-disposition-discipline-prefer-removal
 title: Strategist disposition discipline — prefer removal over deeper patching when findings target a recent-round patch
 status: ready
-priority: MEDIUM
+priority: MED
 estimate: 0.25d
 created: 2026-05-16
 claimed_by: ""
