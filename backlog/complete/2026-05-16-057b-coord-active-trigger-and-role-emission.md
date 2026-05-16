@@ -109,6 +109,66 @@ spec_refs:
   - skills/review-queue-watch.md  # AC7 touch site (post-push hook).
   - tools/review-queue/request.py  # AC7 touch site (correlation_id field write).
   - tools/review-queue/schemas/request.schema.json  # AC7 touch site (correlation_id required field add).
+review_notes: |
+  Merged 2026-05-16 via founder reconciliation in ephemeral merger
+  worktree ($TMPDIR/echo-merger-<uuid> per 050 AC3).
+
+  10-round review trajectory: r1–r8 spec-iteration converged (verdict
+  proceed at r8), r9 POST-BUILD review at original builder SHA 38246c19
+  flagged 3 codex pushback findings, r10 POST-BUILD verification at
+  patched SHA 77df78d converged clean (codex + codex-ops both proceed,
+  zero findings).
+
+  r9 codex findings disposition:
+  - F1 (HIGH, Accept header missing in Python urllib hooks): patched on
+    agent branch at commit 54450fa — added Accept: application/json,
+    text/event-stream to both skills/review-queue-watch.md:187 and
+    skills/review-pending.md:245.
+  - F3 (MEDIUM, bind_failed exit code): patched on agent branch at commit
+    77df78d — changed exit 0 → exit 1 in all three reviewer skills
+    (review-queue-codex.md, review-queue-codex-ops.md, review-queue-
+    claude.md) bind_failed branch to match AC0 contract.
+  - F2 (HIGH, test-injection): accepted as follow-up
+    057b-followup-test-injection in backlog/_followups.md. Test-hygiene
+    concern (coord-invoke happy-path tests spawn real production
+    wrappers); doesn't block production code path. NOT patched here.
+
+  Conflicts resolved:
+  - None. Git 'ort' strategy reported automatic merge clean with zero
+    conflict markers. Predicted by /review-pending sidecar.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None. Sidecar verdict was `merge as-is` with empty pre-merge fixups.
+
+  Fixups deferred to follow-up items:
+  - None (F2 was already filed as 057b-followup-test-injection during r9
+    disposition; nothing new to defer at merge time).
+
+  Verify: 1121/1121 tests pass (21 pre-existing skips); npm run lint,
+  lint:task-state, typecheck, and tools/sync-skills.sh --check all exit
+  0 post-merge.
+
+  Follow-up items (non-blocking, already queued in backlog/_followups.md):
+  - 057b-followup-test-injection (codex r9 F2, MEDIUM) — wire coord_invoke
+    test handler to accept an injected spawn-mock; eliminate real wrapper
+    spawning during npm test.
+  - AC8 remaining 10 integration tests (active-trigger-roundtrip,
+    pre-spawn-deadline-fires, scheduler-health-two-phase,
+    correlation-id-shared-active-and-fallback, pinned-request-mode,
+    tick-end-covers-clean-exits, pinned-request-bind-failed-closes-deadline,
+    coord-invoke-spawn-error-noncrash, scheduler-health-bootstrap-scope,
+    silent-fail-detection) — require mocked codex CLI + EMFILE injection +
+    launchd cadence simulator scaffolding; file as successor item.
+  - LOW: src/coord/paths.ts:140 exec-bit POSIX assumption — revisit if
+    daemon targets non-POSIX FS.
+
+  Activation note: this merge activates the coord substrate that 057a
+  shipped dormant. The next reviewer launchd tick / strategist
+  post-push hook will start emitting tick_start/tick_end atoms via
+  coord-emit.sh and exercising coord_invoke. Watch for first
+  scheduler_health atoms in raw/internal/dogfooding/ traces.
 ---
 
 ## Why this spec exists
