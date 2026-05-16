@@ -2009,6 +2009,9 @@ id="toc-pdt---codex-r6-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-ops-r7-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r7-on-057b-coord-active-trigger-spec">2026-05-16
 01:07 PDT - Codex-ops R7 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-r7-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-r7-on-057b-coord-active-trigger-spec">2026-05-16
+01:07 PDT - Codex R7 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22796,6 +22799,58 @@ portability issue rather than a design-shape issue. The helper now has
 the right boundary and JSON-RPC fields, but its timestamp generation
 must be portable on the founder’s macOS launchd path or the coordination
 lane fails quietly.</li>
+</ul>
+<h3 id="pdt---codex-r7-on-057b-coord-active-trigger-spec">2026-05-16
+01:07 PDT - Codex R7 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r7/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R7 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>c134d732aabc1cbd0e5841b9810c84634aa5f111</code>, current
+<code>_run_reviewer.sh</code> context, 057a claimed substrate
+timestamp-canonicalization context, R6 Codex response context, and local
+macOS <code>date</code> behavior for <code>%3N</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r7/codex.md</code>
+as <code>9446912</code>, verdict <code>proceed_after_patches</code>,
+finding: HIGH the verbatim <code>coord-emit.sh</code> timestamp command
+uses <code>date ... %3N</code>, which BSD/macOS <code>date</code>
+renders as <code>...3NZ</code>, causing 057a’s ISO-Z canonicalization
+path to reject helper-originated scheduler_health/tick_start/tick_end
+events while curl exits under <code>|| true</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c134d732aabc1cbd0e5841b9810c84634aa5f111</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r7/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r7/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>src/capture/pipeline.ts</code>,
+<code>backlog/claimed/2026-05-16-057a-coord-substrate-and-observability.md</code>,
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r6/codex.md</code>;
+no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057b R7 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R7 narrows the remaining issue to platform
+portability in the concrete shell helper. The active trigger shape is
+otherwise implementable from the Codex lens; patching timestamp
+generation and asserting the helper runs on the local platform should
+close this round.</li>
 </ul>
 </body>
 </html>
