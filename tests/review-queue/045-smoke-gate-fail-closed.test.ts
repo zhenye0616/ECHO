@@ -129,6 +129,8 @@ function setup(opts: { withSmokeRunner: boolean }): Fixture {
             required: true,
             timeout_hours: null,
             slash_command: `review-queue-${REVIEWER}`,
+            // 056 AC5 part 1 — headless reviewers require invoke_command.
+            invoke_command: 'echo mock < {{PROMPT}}',
           },
         ],
       },

@@ -109,6 +109,12 @@ describe('043 AC7 — default-deploy baseline (codex + cursor happy path)', () =
       'codex_response: codex.md',
       'cursor_response: cursor.md',
       'codex-ops_response: null',
+      // 056 AC1 added `claude` as a default-deploy reviewer (required=false).
+      // combine.py emits `<slug>_response:` lines for every reviewer in the
+      // roster, so the baseline now includes `claude_response: null` when
+      // the round did not request claude. The line is emitted in roster
+      // order (after codex-ops, before patch_commit_sha).
+      'claude_response: null',
       'patch_commit_sha: null',
       'next_round: null',
       'combined_verdict: proceed',

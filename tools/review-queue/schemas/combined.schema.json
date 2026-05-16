@@ -36,6 +36,9 @@
     "codex-ops_response": {
       "type": ["string", "null"]
     },
+    "claude_response": {
+      "type": ["string", "null"]
+    },
     "patch_commit_sha": {
       "type": ["string", "null"],
       "pattern": "^([0-9a-f]{7,40})?$"

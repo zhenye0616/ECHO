@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://echo.local/review-queue/reviewers-config.schema.json",
   "title": "review-queue reviewers.json config",
-  "description": "Schema for tools/review-queue/reviewers.json — the per-deploy reviewer roster + runtime metadata. Source of truth for the reviewer slugs known to combine.py / request.py / shared helpers. The reviewer.schema.json + request.schema.json `reviewer` enums must be kept in sync manually when a reviewer is added (per spec 043 R1 HIGH #5).",
+  "description": "Schema for tools/review-queue/reviewers.json — the per-deploy reviewer roster + runtime metadata. Source of truth for the reviewer slugs known to combine.py / request.py / shared helpers. The reviewer.schema.json + request.schema.json + combined.schema.json `reviewer` / `<slug>_response` surfaces must be kept in sync manually when a reviewer is added (per spec 043 R1 HIGH #5 + 056 AC2). The `invoke_command` field is REQUIRED for mode:headless entries (056 AC5 part 1) and MAY be omitted for mode:ide entries (Cursor's IDE-mode reviewer has no headless wrapper to launch).",
   "type": "object",
   "required": ["reviewers"],
   "additionalProperties": true,
@@ -34,7 +34,18 @@
           "slash_command": {
             "type": "string",
             "minLength": 1
+          },
+          "invoke_command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Headless-only. Template string used by tools/review-queue/_run_reviewer.sh to launch the per-vendor CLI inside the per-tick worktree. The `{{PROMPT}}` token is mandatory (substituted with the resolved prompt path); the `{{WT}}` token is optional (substituted with the worktree absolute path). Substitution is shell-safe via shlex.quote → bash -c per 056 AC5 part 3 Option A."
           }
+        },
+        "if": {
+          "properties": { "mode": { "const": "headless" } }
+        },
+        "then": {
+          "required": ["name", "mode", "required", "timeout_hours", "slash_command", "invoke_command"]
         }
       }
     }
