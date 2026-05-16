@@ -1903,6 +1903,9 @@ Codex R3 on 057 coord layer spec</a></li>
 <li><a href="#pdt---codex-r4-on-057-coord-layer-spec"
 id="toc-pdt---codex-r4-on-057-coord-layer-spec">2026-05-15 21:07 PDT -
 Codex R4 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-ops-r4-on-057-coord-layer-spec"
+id="toc-pdt---codex-ops-r4-on-057-coord-layer-spec">2026-05-15 21:07 PDT
+- Codex-ops R4 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20740,6 +20743,56 @@ scheduler-keyspace fixes are mostly present, but the implementation
 contract still needs tightening at two tool boundaries: the registered
 coord emitter’s input schema and the active invoker’s process-spawn
 safety.</li>
+</ul>
+<h3 id="pdt---codex-ops-r4-on-057-coord-layer-spec">2026-05-15 21:07 PDT
+- Codex-ops R4 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>d9aa9ca3a95bac9044b09c9488ed32261d37c0fa</code>, and current
+request-validation context around <code>request.py</code>,
+<code>validate.py</code>, and
+<code>schemas/request.schema.json</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/codex-ops.md</code>
+as <code>093a419</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC5 still lists <code>request.py</code> as a curl/MCP
+emission path despite AC0’s zero-MCP-call invariant; HIGH
+<code>coord_invoke(request_path, correlation_id)</code> does not require
+the spawned reviewer to bind its queue scan to that request; HIGH clean
+duplicate/stale exits after <code>tick_start</code> can leave the round
+deadline open and later emit a false <code>deadline_missed</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d9aa9ca3a95bac9044b09c9488ed32261d37c0fa</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r4/codex-ops.md</code>;
+schema paths
+<code>tools/review-queue/schemas/reviewer.schema.json</code> and
+<code>tools/review-queue/schemas/request.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R4 confirms the committed correlation-id and
+scheduler-tier fixes are closer, but the active-trigger runtime contract
+still needs to close two normal unattended cases: “spawned reviewer
+picked a different request” and “spawned reviewer cleanly no-opped after
+another tick won.”</li>
 </ul>
 </body>
 </html>
