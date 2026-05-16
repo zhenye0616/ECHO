@@ -83,7 +83,20 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   'Cost trade-off: polling = N calls/min (poll frequency). Long-poll = 1 call per wake event. Polling adds wake-latency (≤ poll interval) but works on any client.';
 
 export interface WaitForNewTurnsParams {
-  sources: string[];
+  /** Optional under AC4 (057a). At least one of `sources` (non-empty) or
+   *  `source_prefix` (non-empty) must be present; both absent / both empty
+   *  is a structured validation error. Pre-AC4 callers passing
+   *  `sources=[...]` with no `source_prefix` observe byte-identical
+   *  behavior to the pre-AC4 contract. */
+  sources?: string[];
+  /** AC4 (057a) — optional prefix filter, sibling of `sources[]`. Matches
+   *  any captured atom whose `source` string starts with `source_prefix`.
+   *  When supplied alongside `sources[]`, the returned turn-id set is the
+   *  UNION of the two filters (a turn whose source matches either filter
+   *  qualifies). The mailbox contract for the coord substrate uses
+   *  `source_prefix="coord:"` to wake on any role's coord event without
+   *  enumerating role slugs. */
+  source_prefix?: string;
   since: string;
   timeout?: number;
   /** Item 037 / AC5: absolute repo root path. When set, every per-source
@@ -206,10 +219,19 @@ export async function waitForNewTurns(
 ): Promise<WaitForNewTurnsResult> {
   // Defense-in-depth validation — schema enforces the same at the MCP
   // boundary, but in-process callers and tests come through here.
-  if (params.sources === undefined || params.sources.length === 0) {
-    throw new Error('wait_for_new_turns: sources must be a non-empty array');
+  // AC4 (057a): the previous "non-empty sources[]" check loosens to a
+  // disjunction over `sources[]` and `source_prefix`. Pre-AC4 callers
+  // passing `sources=[...]` with no `source_prefix` hit exactly the same
+  // accept path. The /non-empty/ phrasing is preserved in the error
+  // message so legacy tests asserting on it still match.
+  const hasSources = params.sources !== undefined && params.sources.length > 0;
+  const hasSourcePrefix = params.source_prefix !== undefined && params.source_prefix.length > 0;
+  if (!hasSources && !hasSourcePrefix) {
+    throw new Error(
+      'wait_for_new_turns: at least one of sources[] (non-empty) or source_prefix (non-empty) must be present',
+    );
   }
-  if (params.sources.length > WAIT_MAX_SOURCES) {
+  if (hasSources && params.sources!.length > WAIT_MAX_SOURCES) {
     throw new Error(`wait_for_new_turns: sources exceeds max ${WAIT_MAX_SOURCES} per call`);
   }
   if (params.since === undefined || !ISO_RE.test(params.since)) {
@@ -231,7 +253,18 @@ export async function waitForNewTurns(
   const pollIntervalMs = options.pollIntervalMs ?? WAIT_DEFAULT_POLL_INTERVAL_MS;
   const now = options.now ?? (() => new Date());
 
-  const resolved = resolveSources(params.sources);
+  // AC4 (057a): build the resolved query set from `sources[]` (when
+  // present) and append a caller-supplied `source_prefix` (when present)
+  // to the prefix list. `pollOnce` then fans out one query per exact + one
+  // query per prefix and merges by atom id — which is precisely the
+  // "union of two filters" semantic AC4 requires, with dedup-by-id falling
+  // out of the existing merged Map<string, CaptureEvent>.
+  const resolved = hasSources
+    ? resolveSources(params.sources!)
+    : { exact: [] as string[], prefixes: [] as string[] };
+  if (hasSourcePrefix) {
+    resolved.prefixes.push(params.source_prefix!);
+  }
   if (resolved.exact.length === 0 && resolved.prefixes.length === 0) {
     // sources[] was non-empty but nothing resolved — caller passed strings
     // that aren't source_apps but also pass schema (any string). Return
@@ -297,7 +330,20 @@ export function registerWaitForNewTurns(server: McpServer, storage: Storage): vo
     {
       description: WAIT_FOR_NEW_TURNS_DESCRIPTION,
       inputSchema: {
-        sources: z.array(z.string()).min(1).max(WAIT_MAX_SOURCES),
+        // AC4 (057a): `sources` is now optional at the schema level — the
+        // one-of-required disjunction with `source_prefix` is enforced in
+        // `waitForNewTurns()` so the structured validation error
+        // surfaces both empty-array and both-absent cases under one
+        // contract. Pre-AC4 callers passing `sources=[...]` are
+        // schema-byte-identical (max-length cap preserved; the only
+        // change is removal of the .min(1) lower bound).
+        sources: z.array(z.string()).max(WAIT_MAX_SOURCES).optional(),
+        source_prefix: z
+          .string()
+          .optional()
+          .describe(
+            'AC4 (057a): optional prefix filter, sibling of `sources[]`. Matches any captured atom whose `source` string starts with this prefix. When supplied alongside `sources[]`, the returned `turn_ids` are the UNION of the two filters. At least one of `sources[]` (non-empty) or `source_prefix` (non-empty) MUST be present.',
+          ),
         since: isoString,
         timeout: z.number().int().min(0).max(WAIT_MAX_TIMEOUT_SECONDS).optional(),
         repo_path: z
