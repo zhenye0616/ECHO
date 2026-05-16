@@ -173,6 +173,42 @@ spec_refs:
   - src/mcp/server.ts  # Lines 103-136, 127-132 — current MCP server + DNS-rebinding protection. AC5 X-Echo-Role identity model layers on top of existing loopback-only constraint.
   - backlog/complete/2026-05-13-043-per-round-reviewer-roster.md  # AC2 pattern reference: per-role config in JSON + Python loader pattern. coord-roles.json mirrors reviewers.json shape.
   - backlog/complete/2026-05-14-050-worktree-isolation-for-multi-step-main-writers.md  # 050 worktree-isolation invariant: AC8 test fixtures run in ephemeral worktrees; daemon writes go through single-writer constraint.
+review_notes: |
+  Merged 2026-05-16 via founder reconciliation in ephemeral merger worktree
+  ($TMPDIR/echo-merger-<uuid> per 050 AC3).
+
+  Conflicts resolved:
+  - None. Git 'ort' strategy auto-merged all overlap points the sidecar
+    pre-identified as expected conflicts (package.json/lock, src/mcp/server.ts,
+    src/storage/memory.ts, etc.). No structural reconciliation needed.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None. Sidecar verdict was `merge as-is` with empty pre-merge fixups list.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1080/1080 tests pass (21 pre-existing skips); npm run lint, lint:task-state,
+  typecheck, and tools/sync-skills.sh --check all exit 0 post-merge.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Add named it() blocks for the two reconstruction/reconciliation concurrency cases
+    (tick_end during reconstruction does not resurrect closed tick_start; heartbeat
+    firing during periodic-reconciliation produces exactly one atom).
+  - Clamp expected_by at emit-time and persist the clamped value in the atom
+    (src/coord/deadlines.ts:398-417) to eliminate cross-restart non-idempotency.
+  - Log a warn on the swallowed deadlines.ingest() failure path in
+    src/mcp/tools/coord-emit.ts:162-168.
+  - TZ-aware validation for expected_by (src/coord/validate.ts:81): apply
+    canonicalizeTimestamp or tighten ISO_RE to require Z|[+-]hh:mm.
+  - V1.5+ scale-out for coord_status recent_missed allocation
+    (src/mcp/tools/coord-status.ts:236-238): min-heap-of-200 instead of
+    push-all-then-slice.
+
+  057a ships dormant — 057b will wire production emission per the decomposition
+  rationale documented at the top of this spec.
 ---
 
 ## Why this spec exists
