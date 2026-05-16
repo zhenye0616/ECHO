@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import {
   METADATA_MATCH_KEY_WHITELIST,
   type CaptureEvent,
+  type CoordAtomIterationRecord,
   type EventId,
   type QueryFilter,
   type Storage,
@@ -220,6 +221,44 @@ export class SqliteStorage implements Storage {
       if (ev !== undefined) out.push(ev);
     }
     return out;
+  }
+
+  // 057a AC3 — durable append-order coord seam. SQLite's `rowid` is
+  // monotonic per insertion and durable across restart (the single-writer
+  // constraint at wiki/architecture/storage.md:119-127 guarantees rowid
+  // reflects ingest order). The events table has no rowid alias on `id`
+  // (UUID strings), so the implicit rowid is what we expose as
+  // `sequence_id`.
+  async iterateCoordAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    limit?: number;
+  }): Promise<CoordAtomIterationRecord[]> {
+    const sinceSeq = opts?.sinceSeq ?? 1;
+    const limit = opts?.limit;
+    // The SQL ESCAPE \ matches existing source_prefix LIKE patterns at
+    // line ~108; we don't accept caller input here so no escape needed —
+    // the literal `'coord:%'` is bound directly.
+    const baseSql = `SELECT rowid AS sequence_id, id, source, timestamp, content, metadata, embedding
+                     FROM events
+                     WHERE source LIKE 'coord:%' AND rowid >= @sinceSeq
+                     ORDER BY rowid ASC`;
+    const sql = limit !== undefined ? `${baseSql} LIMIT @limit` : baseSql;
+    const params: Record<string, unknown> = { sinceSeq };
+    if (limit !== undefined) params['limit'] = limit;
+    const rows = this.db.prepare(sql).all(params) as Array<
+      EventRow & { sequence_id: number }
+    >;
+    return rows.map((r) => {
+      const base = rowToEvent(r);
+      return Object.assign({}, base, { sequence_id: r.sequence_id });
+    });
+  }
+
+  async getCurrentCoordSequence(): Promise<number> {
+    const row = this.db
+      .prepare(`SELECT COALESCE(MAX(rowid), 0) AS seq FROM events WHERE source LIKE 'coord:%'`)
+      .get() as { seq: number };
+    return row.seq;
   }
 
   close(): void {

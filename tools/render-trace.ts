@@ -82,6 +82,17 @@ class WindowedStorage implements Storage {
   getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
     return this.inner.getByIds(ids);
   }
+
+  // 057a AC3: delegate. WindowedStorage is an offline trace renderer
+  // wrapping SqliteStorage; the coord seam delegates through unchanged.
+  iterateCoordAtomsByAppendOrder(
+    opts?: Parameters<Storage['iterateCoordAtomsByAppendOrder']>[0],
+  ): ReturnType<Storage['iterateCoordAtomsByAppendOrder']> {
+    return this.inner.iterateCoordAtomsByAppendOrder(opts);
+  }
+  getCurrentCoordSequence(): Promise<number> {
+    return this.inner.getCurrentCoordSequence();
+  }
 }
 
 async function main(): Promise<void> {

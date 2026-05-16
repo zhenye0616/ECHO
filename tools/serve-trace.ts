@@ -103,6 +103,18 @@ class LiveStorage implements Storage {
   getByIds(ids: readonly EventId[]): Promise<CaptureEvent[]> {
     return this.inner.getByIds(ids);
   }
+
+  // 057a AC3: delegate. LiveStorage is a dev-time inspector that wraps
+  // SqliteStorage; the underlying rowid-backed coord seam works
+  // identically regardless of the wrapper.
+  iterateCoordAtomsByAppendOrder(
+    opts?: Parameters<Storage['iterateCoordAtomsByAppendOrder']>[0],
+  ): ReturnType<Storage['iterateCoordAtomsByAppendOrder']> {
+    return this.inner.iterateCoordAtomsByAppendOrder(opts);
+  }
+  getCurrentCoordSequence(): Promise<number> {
+    return this.inner.getCurrentCoordSequence();
+  }
 }
 
 async function main(): Promise<void> {
