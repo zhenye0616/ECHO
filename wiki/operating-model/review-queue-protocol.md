@@ -206,11 +206,28 @@ Per-binding notes live at the bottom of `skills/process-backlog.md` under "Bindi
 
 The atomic-claim git op (single commit moving `ready/<id>.md → claimed/<id>.md` with `claimed_by` populated, push-or-lose) is the sole cross-binding synchronization primitive. Same-machine concurrency under the shared default `~/.echo/agent-id` UUID is operator-serialized (one builder per `ECHO_AGENT_ID` at a time); cross-machine concurrency is naturally serialized by git.
 
+## Coord substrate lane (active as of 057b)
+
+The protocol above describes the file-handoff queue. The [[coord-layer|coord layer]] (substrate 057a + producer 057b) is the operator-observability lane that runs alongside it — turning silent launchd failures into in-ledger `coord:deadline_missed` atoms visible via `coord_status()`.
+
+| File handoff (above)                          | Coord-layer atoms (sibling lane)                                                    |
+|-----------------------------------------------|--------------------------------------------------------------------------------------|
+| Strategist writes `r<N>/request.md`           | Watcher (Step 3 b of `skills/review-queue-watch.md`) calls `coord_invoke(role, request_path, correlation_id)` for each headless reviewer. Daemon appends `coord:reviewer_invoked` synchronously and opens a pre-spawn deadline. |
+| Reviewer wrapper boots                        | `_run_reviewer.sh` emits `coord:scheduler_health` at log-redirect-open, then `coord:scheduler_health_done` after bootstrap (worktree + env + prompt routing) and BEFORE review work starts. |
+| Reviewer reads spec at frozen SHA             | Skill emits `coord:tick_start(correlation_id)` BEFORE bind-validation. 057a's tracker closes the pre-spawn `reviewer_invoked` deadline. |
+| Reviewer writes `r<N>/<reviewer>.md`          | On clean exit, skill emits `coord:tick_end(outcome=completed | stale_combined | duplicate_response | upstream_duplicate | bind_failed, reason=...)`. Tracker closes the open `tick_start` deadline. |
+| Wrapper crashes pre-`tick_end` (silent fail)  | NO terminal event → tracker fires `coord:deadline_missed` within budget. `coord_status()` surfaces the role + correlation_id. |
+
+`request.py` generates the canonical uuid4 `correlation_id` at request-write time. Active-spawn (`coord_invoke`) and launchd-fallback (scan-pick) wrapper paths share that same id, so whichever runs first correctly closes the daemon's pre-spawn deadline. All wrapper-side emission uses `tools/review-queue/coord-emit.sh` over HTTP with `--connect-timeout 2 --max-time 5 ... || true` — daemon-down preserves queue durability and only degrades observability.
+
+Builder / merger / watcher lifecycle event types are deferred to a follow-on observability spec (their registry entries are not in 057a's `coord-roles.json`).
+
 ## Key files
 
 - **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-claude.md`, `skills/review-queue-watch.md`, `skills/process-backlog.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
-- **Python helpers:** `tools/review-queue/request.py` (creates `request.md`), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact), `tools/review-queue/_reviewers.py` (loader; enforces conditional-required `invoke_command` per 056), `tools/review-queue/_reviewer_gate.py` (per-tick gate; supports `--print invoke_command` post-056).
-- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body — vendor-agnostic post-056), `tools/review-queue/run-{codex,codex-ops,claude}-reviewer.sh` (5-line drivers), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/queue_error.sh` (durable queue-error commit before cleanup, per 056 AC5 part 4), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Python helpers:** `tools/review-queue/request.py` (creates `request.md`, including the `correlation_id` uuid4 added by 057b), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact), `tools/review-queue/_reviewers.py` (loader; enforces conditional-required `invoke_command` per 056), `tools/review-queue/_reviewer_gate.py` (per-tick gate; supports `--print invoke_command` post-056).
+- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body — vendor-agnostic post-056, hosts two-phase coord emission), `tools/review-queue/run-{codex,codex-ops,claude}-reviewer.sh` (5-line drivers), `tools/review-queue/coord-emit.sh` (057b curl helper callable from wrappers + reviewer skill steps), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/queue_error.sh` (durable queue-error commit before cleanup, per 056 AC5 part 4), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Coord MCP tools:** `src/mcp/tools/coord-emit.ts`, `src/mcp/tools/coord-status.ts`, `src/mcp/tools/coord-invoke.ts`; `src/coord/{paths,roles,deadlines,internal-emitter,identity,validate}.ts`; `tools/review-queue/coord-roles.json`.
 - **Installer:** `tools/review-queue/_install_reviewer_launchd.sh` (roster-driven launchd plist installer; preflights `invoke_command` executable via `command -v` post-056).
 - **Operator docs:** `docs/cursor-builder-trigger.md` (055), `docs/review-queue-setup.md` (reviewer triggers).
 - **Schemas:** `tools/review-queue/schemas/{reviewer,combined,request,reviewers-config}.schema.json`.
@@ -218,5 +235,6 @@ The atomic-claim git op (single commit moving `ready/<id>.md → claimed/<id>.md
 ## Related
 
 - [[cross-tool-spec-review]] — the multi-reviewer pattern this protocol implements
+- [[coord-layer]] — the operator-observability substrate that wraps every reviewer tick
 - [[builder-bindings]] — the three vendor-agnostic builder bindings (Claude Code, codex, Cursor's Claude)
 - [[journal-is-observation-only]] — invariant separating dogfooding journal from queue artifacts
