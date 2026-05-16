@@ -31,7 +31,7 @@ PAYLOAD='{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"coord_s
 
 response=$(curl -sS -X POST "$URL" \
   -H 'Content-Type: application/json' \
-  -H 'Accept: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
   --data "$PAYLOAD")
 
 # The MCP response shape: result.structuredContent carries the typed
