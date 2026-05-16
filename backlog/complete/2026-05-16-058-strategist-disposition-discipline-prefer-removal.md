@@ -51,6 +51,36 @@ spec_refs:
   - backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r6/combined.md  # r6 found 3 bugs in r5's runtime warning patch (the over-engineering signal)
   - backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r7/combined.md  # r7 verifies r6 removal — zero warning-path findings
   - backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r8/combined.md  # r8 terminal: verdict=proceed, zero findings
+review_notes: |
+  Merged 2026-05-16 — pre-applied-on-main special path.
+
+  AC1+AC2+AC3 landed directly on main (commit be6dcce, 2026-05-15 23:44 PDT)
+  before the spec left backlog/ready/; claim commit 3eb6cbe branched off main
+  immediately after, leaving `git diff main...agent/<slug> --stat` empty. The
+  spec body sanctions this path explicitly ("if the strategist self-applies
+  post-review, the builder pointer may be skipped"). C2 merge --no-ff
+  reported "Already up to date"; no merge commit created. Recorded here for
+  future auditability — useful precedent if more small strategist-self-apply
+  items follow.
+
+  Conflicts resolved:
+  - None (no-op fast-forward; branch tip already ancestor of main).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None. Sidecar verdict was `merge as-is` with empty pre-merge fixups list.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1080/1080 tests pass (21 pre-existing skips); lint, lint:task-state,
+  typecheck, and tools/sync-skills.sh --check all exit 0 post-merge.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Strategist task: add a one-sentence mention of "prefer removal over deeper
+    patching" to wiki/operating-model/review-queue-protocol.md (with a link to
+    the skill subsection) when the After-Completion wiki-promotion pass runs.
 ---
 
 ## Why this spec exists
