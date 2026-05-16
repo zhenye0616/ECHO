@@ -5,9 +5,9 @@ status: ready
 priority: MED
 estimate: 0.25d
 created: 2026-05-16
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-16T08:44:12Z"
+branch: "agent/strategist-disposition-discipline-prefer-removal"
 head_sha: ""
 pr_url: ""
 task_state_ref: 2026-05-16-058-strategist-disposition-discipline-prefer-removal
