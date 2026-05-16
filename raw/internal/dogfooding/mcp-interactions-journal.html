@@ -1970,6 +1970,9 @@ href="#pdt---codex-r2-on-058-strategist-disposition-discipline-spec"
 id="toc-pdt---codex-r2-on-058-strategist-disposition-discipline-spec">2026-05-15
 23:42 PDT - Codex R2 on 058 strategist disposition discipline
 spec</a></li>
+<li><a href="#pdt---codex-ops-r1-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r1-on-057b-coord-active-trigger-spec">2026-05-15
+23:52 PDT - Codex-ops R1 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21940,6 +21943,56 @@ identity, skill heading presence and placement, 057a r4/r6
 worked-example anchors, CLAUDE.md H3 presence and placement, and the
 canonical skill-path cross-reference. No AC1-AC4 implementability
 regression surfaced in this tick.</li>
+</ul>
+<h3 id="pdt---codex-ops-r1-on-057b-coord-active-trigger-spec">2026-05-15
+23:52 PDT - Codex-ops R1 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>be6dcce8a3d1d2390a447cc64c0e3d5ecfecf724</code>, the 057a
+substrate spec, the current wrapper/selector context, and prior 057
+review history relevant to runtime deadline semantics.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/codex-ops.md</code>
+as <code>f018d69</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH split-id shape breaks <code>tools/blocked.py</code>; HIGH
+057a dependency lacks machine-readable <code>blocked_by</code>; HIGH
+<code>tick_failed_to_bind</code> does not close
+<code>reviewer_invoked -&gt; tick_start</code> under the consumed 057a
+deadline rule; MEDIUM new skill-side event types are not in the consumed
+057a registry and would fail best-effort/silent.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>tools/blocked.py</code>,
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>skills/review-queue-watch.md</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R1 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The review focused on what breaks unattended:
+builder selector/claim gates, bind-failure deadline closure, and event
+registry acceptance. The active reviewer flow can converge after those
+runtime gates are made explicit.</li>
 </ul>
 </body>
 </html>
