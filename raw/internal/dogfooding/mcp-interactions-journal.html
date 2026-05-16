@@ -2000,6 +2000,9 @@ id="toc-pdt---codex-ops-r5-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-r5-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-r5-on-057b-coord-active-trigger-spec">2026-05-16
 00:48 PDT - Codex R5 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-ops-r6-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r6-on-057b-coord-active-trigger-spec">2026-05-16
+00:56 PDT - Codex-ops R6 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22634,6 +22637,55 @@ entry.</li>
 earlier rounds: the producer spec now needs to pin the actual
 HTTP/header emission contract that 057a’s identity layer requires. The
 other two findings are wording/test-fixture cleanup.</li>
+</ul>
+<h3 id="pdt---codex-ops-r6-on-057b-coord-active-trigger-spec">2026-05-16
+00:56 PDT - Codex-ops R6 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r6/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R6 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>280d387145e487b2e4e8fe534977fe7092f29659</code>, current
+request/schema/combiner context for compatibility checks, and the R5
+response/combined context for verification focus.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r6/codex-ops.md</code>
+as <code>fda8de7</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>280d387145e487b2e4e8fe534977fe7092f29659</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r6/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r6/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/schemas/request.schema.json</code>,
+<code>tools/review-queue/combine.py</code>,
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r5/{codex-ops.md,combined.md}</code>;
+no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R6 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R6 closes the operational blocker from R5.
+The spec now explicitly requires a <code>ChildProcess</code> error
+listener before <code>unref()</code>, pins the wrapper HTTP
+transport/header contract, narrows role-validation claims, and adds the
+two load-bearing fixtures for spawn-error noncrash and wrapper transport
+non-fatality.</li>
 </ul>
 </body>
 </html>
