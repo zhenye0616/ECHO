@@ -68,7 +68,9 @@ files_to_modify:
   - tests/coord/tick-end-covers-clean-exits.test.ts         # completed / stale_combined / duplicate_response / upstream_duplicate / bind_failed all emit tick_end and close the open tick_start deadline (r4 codex-ops F3 HIGH + r1 codex F2 + r1 codex-ops F3 convergent HIGH bind_failed outcome)
   - tests/coord/causality-reviewer-invoked-before-tick-start.test.ts  # daemon's reviewer_invoked atom precedes child's tick_start in replay order (r5 codex-ops F1 HIGH)
   - tests/coord/pinned-request-bind-failed-closes-deadline.test.ts  # pinned-request validation failure emits tick_start then tick_end(outcome=bind_failed) — 057a's expects-based tracker closes the deadline correctly; NO coord:deadline_missed false-positive (r1 codex F2 + r1 codex-ops F3 convergent HIGH)
-  - tests/coord/coord-invoke-spawns-wrapper.test.ts          # coord_invoke spawns tools/review-queue/run-<role>-reviewer.sh (NOT raw codex argv); env vars ECHO_COORD_REQUEST_PATH + ECHO_COORD_CORRELATION_ID arrive in the wrapper process; role with headless:false (e.g. cursor) is rejected with structured MCP error (r1 codex F3 HIGH wrapper-spawn)
+  - tests/coord/coord-invoke-spawns-wrapper.test.ts          # coord_invoke spawns tools/review-queue/run-<role>-reviewer.sh (NOT raw codex argv); env vars ECHO_COORD_REQUEST_PATH + ECHO_COORD_CORRELATION_ID + ECHO_REVIEW_QUEUE_REPO_ROOT arrive in the wrapper process; role with headless:false (e.g. cursor) is rejected with structured MCP error (r1 codex F3 HIGH wrapper-spawn)
+  - tests/coord/coord-invoke-cwd-independent.test.ts          # NEW (r2 codex-ops F4 HIGH): start MCP daemon from a non-repo cwd (e.g. process.chdir("/")) — wrapper path still resolves via import.meta.url, child cwd is REPO_ROOT, ECHO_REVIEW_QUEUE_REPO_ROOT env var arrives, wrapper's git/storage operations hit the right checkout
+  - tests/coord/coord-invoke-fire-and-forget.test.ts          # NEW (r2 codex F2 MED + r2 codex-ops F5 MED convergent): wrapper spawns a sleep/early-stderr sequence — coord_invoke returns within bounded timeout (under 1s) AND child does not block on undrained pipe AND daemon does not retain child handle (child.unref()); test asserts process.memoryUsage stays bounded across N=100 coord_invoke calls
   - tests/coord/silent-fail-detection.test.ts               # the full motivating scenario: launchd-style wrapper invocation fails to emit tick_start; deadline fires coord:deadline_missed within budget
   # AC9 — task-state pointer per 046 AC1
   - backlog/task-state/2026-05-16-057b-coord-active-trigger-and-role-emission/builder.md
@@ -95,7 +97,7 @@ spec_refs:
 - 057a's `coord_status()` returns empty open-deadlines and zero-tick last-tick rows.
 
 With 057b:
-- The strategist actively spawns reviewers via `coord_invoke` (post-push hook in watcher/review-pending/merge-and-cleanup skills).
+- The strategist actively spawns reviewers via `coord_invoke` (post-push hook in `review-queue-watch` + `review-pending` skills only — `merge-and-cleanup` and `process-backlog` emission are deferred to a follow-on builder/merger/watcher observability spec per r1 codex-ops F4 MED; closes r2 codex F3 MED motivation/AC7 contradiction).
 - The daemon attributes `reviewer_invoked` + `deadline_missed` atoms to the correct `subject_role`.
 - Wrappers emit `scheduler_health` + `tick_start`/`tick_end` for both active-spawn and launchd-fallback paths.
 - The launchd silent-fail (`_followups.md` HIGH #1 — the motivating incident) becomes observable AND alertable via `coord_status()` within seconds.
@@ -110,12 +112,29 @@ New MCP tool at `src/mcp/tools/coord-invoke.ts`. Required input: `coord_invoke(r
 
 The daemon:
 
-1. **Spawns the reviewer wrapper** at `tools/review-queue/run-<role>-reviewer.sh` (r1 codex F3 HIGH — re-uses existing `_run_reviewer.sh` plumbing for prompt routing, log redirect, codex argv assembly, env handoff). 057a's `coord-roles.json` `invoke_command` argv is NOT what `coord_invoke` spawns directly — that argv targets `codex exec` and assumes the wrapper has already done prompt routing. Instead, `coord_invoke` derives the wrapper path from the role slug — `tools/review-queue/run-${role}-reviewer.sh` — and validates that file exists + is executable before spawn. Roles with `headless: false` in `coord-roles.json` (e.g. `cursor` IDE-mode) have no wrapper and are rejected by `coord_invoke` with structured MCP error.
+1. **Spawns the reviewer wrapper** at `<REPO_ROOT>/tools/review-queue/run-<role>-reviewer.sh` (r1 codex F3 HIGH — re-uses existing `_run_reviewer.sh` plumbing for prompt routing, log redirect, codex argv assembly, env handoff). 057a's `coord-roles.json` `invoke_command` argv is NOT what `coord_invoke` spawns directly — that argv targets `codex exec` and assumes the wrapper has already done prompt routing. Instead, `coord_invoke` derives the wrapper path from the role slug. **The repo root is resolved canonically** (r2 codex-ops F4 HIGH — daemon may be launched from launchd / login shell / package dir with non-repo cwd): use the same `import.meta.url`-based resolution that 057a's `loadCoordRoles()` uses (`new URL("../../tools/review-queue/run-${role}-reviewer.sh", import.meta.url)`), with `ECHO_REPO_ROOT` env-var override for tests. The daemon never depends on `process.cwd()`. Validate the wrapper file exists + is executable before spawn; reject with structured MCP error otherwise. Roles with `headless: false` in `coord-roles.json` (e.g. `cursor` IDE-mode) have no wrapper and are rejected.
 2. **Validates inputs strictly** (r4 codex F2 HIGH security):
    - `correlation_id` MUST match `^[a-f0-9-]{36}$` (uuid4 string-rendered shape with dashes — closes r1 codex F1 HIGH; aligns with the request.schema.json pattern AND the value `str(uuid.uuid4())` actually produces).
    - `request_path` MUST match `^backlog/reviews/[a-z0-9-]+/r[0-9]+/request\.md$` (no traversal, no shell metacharacters).
    - Reject with structured MCP error on either failure; do NOT spawn anything; do NOT append `coord:reviewer_invoked`.
-3. **Wrapper-spawn execution** (r4 codex F2 HIGH + r1 codex F3 HIGH — no shell injection regardless of input AND no argv-vs-prompt-routing impedance mismatch). `subprocess.spawn(["tools/review-queue/run-<role>-reviewer.sh"], { shell: false, detached: true, env: { ...process.env, ECHO_COORD_REQUEST_PATH: request_path, ECHO_COORD_CORRELATION_ID: correlation_id } })`. The wrapper's existing body (set REVIEWER_NAME, ephemeral worktree creation, codex exec, log redirect) runs unchanged. Pinned-request mode is signaled to the wrapper purely via the two `ECHO_COORD_*` env vars — no command-line change. (Argv-vs-shell hardening still applies: the wrapper path is a fixed string, the env-var values are pre-validated regex matches, and `shell: false` ensures no expansion. The r4 codex F2 security guarantee holds.)
+3. **Wrapper-spawn execution** (r4 codex F2 HIGH + r1 codex F3 HIGH + r2 codex F2 MED + r2 codex-ops F4 HIGH + r2 codex-ops F5 MED — no shell injection AND no argv-vs-prompt-routing impedance mismatch AND fire-and-forget semantics explicit AND repo-root-stable):
+   ```typescript
+   import { spawn } from 'node:child_process';
+   const child = spawn(wrapperAbsolutePath, [], {
+     shell: false,                                    // r4 codex F2 HIGH — no shell injection
+     detached: true,                                  // fire-and-forget; child outlives daemon-request lifetime
+     stdio: 'ignore',                                 // r2 codex F2 MED + r2 codex-ops F5 MED — no inherited pipe; daemon never blocks on undrained child output; wrapper opens its own log redirect inside the body
+     cwd: REPO_ROOT,                                  // r2 codex-ops F4 HIGH — child sees repo root regardless of daemon cwd; wrapper's `git` commands hit the right checkout
+     env: {
+       ...process.env,
+       ECHO_REVIEW_QUEUE_REPO_ROOT: REPO_ROOT,        // r2 codex-ops F4 HIGH — wrapper honors this per 050 worktree-isolation contract
+       ECHO_COORD_REQUEST_PATH: request_path,
+       ECHO_COORD_CORRELATION_ID: correlation_id,
+     },
+   });
+   child.unref();                                     // r2 codex F2 MED + r2 codex-ops F5 MED — daemon's event loop doesn't retain the child handle; coord_invoke returns promptly
+   ```
+   Pinned-request mode is signaled to the wrapper purely via the two `ECHO_COORD_*` env vars — no command-line change. The wrapper's existing body (set REVIEWER_NAME, ephemeral worktree creation, codex exec, log redirect) runs unchanged. Argv-vs-shell hardening still applies: the wrapper path is a fixed string (no path traversal possible since validated to be the canonical resolution), the env-var values are pre-validated regex matches, and `shell: false` ensures no expansion. The r4 codex F2 security guarantee holds.
 4. **Causality-safe `reviewer_invoked` emission** (r5 codex-ops F1 HIGH): the daemon appends `coord:reviewer_invoked` atom SYNCHRONOUSLY BEFORE returning to the caller — meaning before the spawned child can possibly emit `tick_start`. The contract: by the time `coord_invoke` returns, the `reviewer_invoked` atom is durable in the ledger AND the deadline tracker has opened the pre-spawn record. Concrete ordering in code:
    - daemon validates inputs
    - daemon appends `reviewer_invoked` atom (single-writer; durable)
@@ -139,7 +158,10 @@ Production emission lands in 057b. ALL integration is ADDITIVE — no protocol b
 **Wrapper two-phase emission** (r2 codex-ops F3 MED scheduler/round distinction; r4 codex-ops F3 HIGH every-clean-exit coverage):
 
 - **Phase 1 — scheduler health tick** (no `correlation_id`): at log-redirect-open in `_run_reviewer.sh`, emit `coord:scheduler_health(subject_role=<slug>, tick_run_id=<uuid4 generated at process-start>)`. This is "I started" — not tied to any review round. Has its own `expects` cycle (default_deadline_sec ~120s per 057a's coord-roles.json).
-- **Phase 2 — request-scoped events**: after Step 2 selects a candidate (or, in pinned-request mode, validates the pinned request), read the request's `correlation_id` field. Emit `coord:tick_start(subject_role, correlation_id)` BEFORE running the review. Emit `coord:tick_end(subject_role, correlation_id, outcome=<enum>)` on every clean exit, AND `coord:scheduler_health_done(subject_role, tick_run_id)` before process exit.
+- **Phase 2 — request-scoped events** (r2 codex F1 HIGH alignment with AC0 step 5):
+  - **Launchd-fallback (scan-pick) mode**: after Step 2 selects a candidate, read the candidate's `correlation_id` field; emit `coord:tick_start(subject_role, correlation_id)` BEFORE running the review.
+  - **Pinned-request mode** (`$ECHO_COORD_REQUEST_PATH` set): read `$ECHO_COORD_CORRELATION_ID` from env; emit `coord:tick_start(subject_role, correlation_id)` **BEFORE the bind-validation block** (per AC0 step 5). 057a's existing close rule then handles `reviewer_invoked → tick_start` deadline closure regardless of bind-validation outcome. On bind-failure, emit `coord:tick_end(outcome="bind_failed", reason=...)`; on bind-success, proceed to running the review and emit `coord:tick_end(outcome=...)` on every clean exit per the outcome enum below.
+  - In both modes: emit `coord:scheduler_health_done(subject_role, tick_run_id)` before process exit.
 - **`tick_end` covers EVERY clean exit after `tick_start`** (r4 codex-ops F3 HIGH; closes the false-`deadline_missed`-on-no-op exit class):
   - `outcome="completed"` — review succeeded; response file committed + pushed.
   - `outcome="stale_combined"` — `combined.md` already existed when wrapper started Step 2.
