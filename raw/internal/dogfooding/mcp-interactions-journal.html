@@ -1948,6 +1948,9 @@ PDT - Codex R6 on 057a coord substrate spec</a></li>
 <li><a href="#pdt---codex-ops-r6-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-ops-r6-on-057a-coord-substrate-spec">2026-05-15
 23:10 PDT - Codex-ops R6 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-ops-r7-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-ops-r7-on-057a-coord-substrate-spec">2026-05-15
+23:17 PDT - Codex-ops R7 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21636,6 +21639,51 @@ entry.</li>
 happy-path 100k-coord-atom case and fixes the <code>expects</code>
 source-of-truth slip. The remaining issues are operational observability
 details around when to warn and where that warning is surfaced.</li>
+</ul>
+<h3 id="pdt---codex-ops-r7-on-057a-coord-substrate-spec">2026-05-15
+23:17 PDT - Codex-ops R7 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r7/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R7 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>96cb505e4aae1fb7cdf2a65ef03d3f766148fa22</code>, and current
+storage context for <code>src/storage/sqlite.ts</code> plus
+<code>src/storage/migrations/0001_initial.sql</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r7/codex-ops.md</code>
+as <code>cf17b07</code>, verdict <code>proceed_after_patches</code>,
+finding: MEDIUM AC6 makes the 100k-atom perf fixture the V1 operational
+contract after removing runtime warnings, but AC8’s merge-blocking test
+inventory omits <code>tests/coord/coord-volume-perf.test.ts</code>.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r7/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r7/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057a R7 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R7 cleanly removes the r5/r6 warning
+mechanism and defers the proper count/warning/status path to V1.5+. The
+remaining patch is narrow: add the perf fixture to AC8’s explicit test
+inventory so the no-warning design still has a required runtime budget
+gate.</li>
 </ul>
 </body>
 </html>
