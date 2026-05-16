@@ -12,7 +12,10 @@ head_sha: "cfa7e3c"
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
 agent_notes: |
-  BLOCKED (partial — second handoff after Run 2):
+  RESUMED 2026-05-16T08:20:00Z on founder's second "continue" — Run 3
+  in Claude Code. Working AC3 deadline tracker next.
+
+  Prior Run 2 handoff (preserved for context): BLOCKED (partial — second handoff after Run 2):
   Claude-code builder Run 2 closed AC1 + AC2 + AC5 + the AC3 storage seam
   on top of Run 1's AC4. AC3 deadline tracker, AC6 coord_status, and ~11
   remaining AC8 test files are NOT STARTED. AC7 is N/A by spec; AC9
