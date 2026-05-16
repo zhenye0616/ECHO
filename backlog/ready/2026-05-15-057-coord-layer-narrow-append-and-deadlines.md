@@ -17,12 +17,20 @@ agent_notes: |
   invoke `request.py` for 057 r1 after those converge.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  # AC0 — strategist-initiated active trigger (added in r0 patch — user model)
-  - src/mcp/tools/coord-invoke.ts                  # new MCP write tool — spawns wrapper for headless reviewer roles
-  - tools/review-queue/request.py                  # call coord_invoke for each headless reviewer post-dispatch
+  # AC0 — strategist-initiated active trigger (active trigger fires from watcher post-push, not request.py — r1 codex F1 HIGH; daemon also opens pre-spawn deadline via coord:reviewer_invoked — r1 codex-ops F1 HIGH)
+  - src/mcp/tools/coord-invoke.ts                  # new MCP write tool — spawns wrapper + appends coord:reviewer_invoked atom for pre-spawn deadline
+  - tools/review-queue/request.py                  # best-effort coord_invoke after request.md write (non-fatal); the LOAD-BEARING invoke fires from the watcher post-push hook
+  - skills/review-queue-watch.md                   # Step 3 (b) post-push hook now calls coord_invoke for each headless reviewer
   - tests/coord/active-trigger-roundtrip.test.ts
+  - tests/coord/pre-spawn-deadline-fires.test.ts   # wrapper exits BEFORE tick_start → coord:deadline_missed still fires (r1 codex-ops F1 HIGH)
+  - tests/coord/daemon-down-tolerance.test.ts      # coord_invoke + coord_emit failures non-fatal to queue (r1 codex-ops F2 HIGH)
   # AC1 — narrow coord append seam
   - src/mcp/tools/coord-emit.ts                    # new MCP write tool
+  - src/mcp/tools/search-memories.ts               # AC1 non-pollution: default-exclude coord; only when no explicit source_prefix="coord:" (r1 codex F6 MED)
+  - tools/review-queue/_coord_roles.py             # AC2 code-level validator for max_deadline_sec > default_deadline_sec (r1 codex F3 MED — JSON Schema draft-07 can't express cross-field)
+  - tests/coord/coord-roles-validation.test.ts     # bad-config rejection fixture (AC2)
+  - tests/coord/non-pollution-three-way.test.ts    # search_memories()/search_memories(coord:)/wait_for_new_turns(coord:) contract (AC1 r1 codex F6 MED)
+  - tests/coord/idempotency-per-role.test.ts       # two reviewers same correlation_id, both miss → 2 distinct deadline_missed atoms (AC3 r1 codex F5 + codex-ops F3 MED)
   - src/mcp/server.ts                              # register coord_emit + coord_invoke
   - src/storage/sqlite.ts                          # narrow coord-write path; preserve single-writer constraint
   - src/coord/types.ts                             # new module — coord event types + schema_version registry
@@ -110,10 +118,12 @@ The launchd-polled reviewer model has two compounding failures: (a) 0-10 min lat
 
 The fix: a **strategist-initiated active trigger** via the coord layer, parallel to (NOT replacing) launchd polling:
 
-- **New MCP tool `coord_invoke(role, request_path?, correlation_id?)`** at `src/mcp/tools/coord-invoke.ts`. Strategist calls this immediately after `request.py` writes `r<N>/request.md`. The daemon reads the role's `invoke_command` from `coord-roles.json` (sibling of `reviewers.json`'s `slash_command` field), substitutes `{{REQUEST_PATH}}` / `{{CORRELATION_ID}}` tokens, and spawns the wrapper via the same process-spawn path the launchd plist uses. Synchronous spawn (daemon returns success once the wrapper starts), non-blocking on the wrapper's completion — the strategist subscribes via `wait_for_new_turns` for the `tick_start` / `tick_end` pings.
-- **Strategist's `request.py` integration:** after the `request.md` commit+push lands, call `coord_invoke` for each reviewer in `requested_reviewers` whose `coord-roles.json` entry has a `headless: true` flag. IDE-mode reviewers (e.g., cursor) don't get auto-invoked — they're paste-triggered per `skills/review-queue-cursor.md`.
+- **New MCP tool `coord_invoke(role, request_path?, correlation_id?)`** at `src/mcp/tools/coord-invoke.ts`. The daemon reads the role's `invoke_command` from `coord-roles.json` (sibling of `reviewers.json`'s `slash_command` field), substitutes `{{REQUEST_PATH}}` / `{{CORRELATION_ID}}` tokens, and spawns the wrapper via the same process-spawn path the launchd plist uses. Synchronous spawn (daemon returns success once the wrapper starts), non-blocking on the wrapper's completion — the strategist subscribes via `wait_for_new_turns(source_prefix="coord:")` for the `tick_start` / `tick_end` pings.
+- **`coord_invoke` opens a pre-spawn deadline** (r1 codex-ops F1 HIGH). Immediately after the daemon spawns the wrapper, the daemon itself appends a `coord:reviewer_invoked` event (source = `coord:<role>`, expected_by per AC2 config) with the same `correlation_id`. AC3's deadline tracker treats this as the opening record — `tick_start` later closes it. **This is load-bearing:** if the wrapper dies BEFORE emitting `tick_start` (the entire launchd silent-fail class — bad repo root, missing TMPDIR, bad prompt path, jsonschema missing, gate failure), the deadline still fires `coord:deadline_missed` after expected_by elapses. Without this, AC3 only catches mid-tick failures; pre-tick failures are still invisible — i.e., the EXACT failure mode 057 is built to catch would slip through.
+- **Trigger point: watcher post-push, not `request.py` (r1 codex F1 HIGH).** `request.py` writes + validates `request.md` but does NOT commit or push — that's the watcher's job. Calling `coord_invoke` from `request.py` would spawn the reviewer before `request.md` lands on `origin/main`; the reviewer's Step 1 pull would see no candidate and exit no-op. The trigger therefore moves into the watcher dispatch flow at `skills/review-queue-watch.md` Step 3 (b) — AFTER the `push-with-retry.sh "dispatch: r<N+1> on <item_id>"` call succeeds, AND in `/review-pending` / `/merge-and-cleanup` post-push hook points where strategist + reviewer roles cross. Concrete contract: any role that issues an MCP `coord_invoke(role=X)` call MUST have a preceding successful `push-with-retry.sh` of the artifact path that `X` will need to read.
 - **In-progress ping (already in AC7):** the wrapper emits `coord_emit(tick_start, correlation_id=<from invoke>)` before any pre-redirect work — earliest possible signal that the wrapper bootstrapped. Strategist's live subscription receives this within ~100ms.
 - **Completion ping (already in AC7):** after the reviewer's response file is committed + pushed, the wrapper emits `coord_emit(tick_end, correlation_id, verdict=<from response>)`. Strategist receives → runs combine.py (or short-circuits if both reviewers have pinged tick_end).
+- **Best-effort emission contract (r1 codex-ops F2 HIGH).** All wrapper-side `coord_emit` calls + `request.py`'s `coord_invoke` call MUST be non-fatal to the underlying queue operation. Use short bounded timeouts (suggested: 2s connect, 5s total) and tolerate non-zero rc / timeouts without aborting the parent step. The wrapper at `_run_reviewer.sh` runs `set -euo pipefail` today — the coord curl invocation must be wrapped in `|| true` (or equivalent guard) AND have a hard timeout (`curl --max-time 5 --connect-timeout 2 ... || true`). Same in `request.py` — `coord_invoke` failures log to stderr and continue; they do NOT cause `request.py` to exit non-zero or refuse to write the request. **The queue's existing durability stays intact when the coord daemon is down or stalled.** AC8 includes a daemon-down fixture asserting the queue continues to function with no coord observation.
 - **Launchd polling stays as the fallback heartbeat.** If the daemon is down or `coord_invoke` fails, launchd's 600s tick still discovers `r<N>/request.md` the old way. The coord layer is the latency-optimized happy path; the polling layer is the durability-guaranteed slow path. Both coexist by design.
 - **Strategist short-circuit:** when both reviewers have emitted `tick_end` for the same `correlation_id`, the strategist can run combine.py immediately rather than wait for the next `/loop` cron tick. (Optional optimization; the cron-driven path still works.)
 
@@ -135,28 +145,42 @@ The capture pipeline at `src/capture/gate.ts:57-72` rejects unknown source schem
 - **Non-pollution invariants** (load-bearing — guards against contaminating retrieval queries that aren't about coordination):
   - NO normalizer adapter registered in `src/normalize/dispatch.ts:11-46` for `coord:*` sources. Coord atoms bypass normalization, embedding, and clustering.
   - NO trace edges generated from coord atoms (verified by test at `src/trace/index.ts:69-83`).
-  - `search_memories(source_prefix="coord:")` works (forensic retrieval); `search_memories()` without filter DOES NOT return coord atoms by default (the existing `exclude_metadata_surface: ["coord"]` default added to `search-memories.ts`, matching the existing `fs` exclusion pattern).
+  - `search_memories(source_prefix="coord:")` works (forensic retrieval); `search_memories()` without filter DOES NOT return coord atoms by default; **`wait_for_new_turns(source_prefix="coord:")` MUST return coord turn ids** (closes mailbox AC4). The three-way contract is load-bearing (r1 codex F6 MED): if a builder implements non-pollution by adding "coord" to a shared `withFsExclusion` helper at `src/mcp/util/fs-exclusion.ts:16-28`, the helper would filter coord atoms out of `wait_for_new_turns` TOO — breaking the mailbox the layer depends on. **Specific contract:** coord non-pollution lives in a DEDICATED filter at the `search-memories.ts` level (not the shared helper), conditioned on the absence of an explicit `source_prefix="coord:"`. `wait_for_new_turns` does NOT apply the coord-default-exclude. AC8 includes three explicit fixtures: (a) `search_memories()` returns 0 coord atoms; (b) `search_memories(source_prefix="coord:")` returns N coord atoms; (c) `wait_for_new_turns(source_prefix="coord:")` returns N coord turn ids. All three must pass.
 
 **AC2 — Role-typed deadline config (closes codex Q2 MED).**
 
 Deadline tracking IS policy. The split mirrors the `reviewers.json` + `combine.py` pattern from 043:
 
-- **New file `tools/review-queue/coord-roles.json`** declares per-role-per-event-type defaults:
+- **New file `tools/review-queue/coord-roles.json`** declares per-role-per-event-type defaults. **`name` matches the reviewer slug exactly** (`codex`, `codex-ops`, `claude`, `cursor`, etc. — same slugs as `reviewers.json:name`), so `coord_invoke(role=codex)` and `X-Echo-Role: codex` map to a single canonical entry (r1 codex F2 HIGH):
   ```json
   {
     "roles": [
       {
-        "name": "codex-reviewer",
+        "name": "codex",
+        "headless": true,
+        "invoke_command": "...{{REQUEST_PATH}}...{{CORRELATION_ID}}...",
         "events": {
-          "tick_start": { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" }
+          "reviewer_invoked": { "default_deadline_sec": 90,  "max_deadline_sec": 300,  "expects": "tick_start" },
+          "tick_start":       { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" }
         }
       },
-      { "name": "codex-builder", "events": { "claim_start": { "default_deadline_sec": 1800, "max_deadline_sec": 7200, "expects": "claim_complete" } } },
-      ...
+      {
+        "name": "codex-ops",
+        "headless": true,
+        "invoke_command": "...{{REQUEST_PATH}}...{{CORRELATION_ID}}...",
+        "events": { "reviewer_invoked": {...}, "tick_start": {...} }
+      },
+      {
+        "name": "cursor",
+        "headless": false,
+        "events": { ... }
+      }
     ]
   }
   ```
-- **JSON schema** at `tools/review-queue/schemas/coord-roles.schema.json` validates the config shape, including a `max_deadline_sec > default_deadline_sec` constraint to prevent unbounded SLAs.
+  - `headless: true` is REQUIRED to be auto-invoked by `coord_invoke`. IDE-mode roles (`cursor`) MUST have `headless: false` and MAY omit `invoke_command`. The daemon refuses `coord_invoke(role=cursor)` with a structured error pointing at the paste-trigger path.
+  - For each headless role, `events.reviewer_invoked` opens the pre-spawn deadline (r1 codex-ops F1 HIGH); `events.tick_start` opens the mid-tick deadline.
+- **JSON schema** at `tools/review-queue/schemas/coord-roles.schema.json` validates the static config shape (string/int/bool types, required fields per `headless` value via JSON Schema `if/then`). The `max_deadline_sec > default_deadline_sec` cross-field constraint **cannot be expressed portably in draft-07 JSON Schema** (r1 codex F3 MED) — that check moves into a Python loader at `tools/review-queue/_coord_roles.py` (sibling of `_reviewers.py`), called by `coord-emit.ts`/`coord-invoke.ts` at daemon startup. The loader rejects `max_deadline_sec <= default_deadline_sec` with a clear error AND a startup-fixture in `tests/coord/coord-roles-validation.test.ts` asserts the bad-config case is rejected.
 - **`coord_emit` clamps caller-supplied `expected_by`** to the role's `max_deadline_sec`. If caller omits `expected_by`, daemon applies `default_deadline_sec`. Per-event-type override possible; unbounded self-declaration impossible.
 - **No reviewer role-specific code paths in the coord layer** — adding a new role is one JSON entry, mirroring 043's roster generalization.
 
@@ -166,7 +190,7 @@ In-memory deadline tracker is volatile by design (low latency for the hot path);
 
 - **`src/coord/deadlines.ts`** maintains an in-memory map of `(correlation_id, expected_by, role, event_type)` open records. `coord_emit(event_type="tick_start", correlation_id=X, expected_by=T)` inserts; `coord_emit(event_type="tick_end", correlation_id=X)` (or any registered completion event) deletes. A background heartbeat (1-second tick) fires `coord_emit(event_type="deadline_missed", correlation_id=X, role=Y)` when `now > expected_by` AND no matching completion has been emitted.
 - **Reconstruction on daemon boot:** scan recent `coord:*` atoms over the max-deadline horizon (24h is sufficient for V1 — extend if any role's `max_deadline_sec > 86400`). Rebuild `(correlation_id, expected_by)` open records, suppress any with matching completion/failure atoms (idempotency), and IMMEDIATELY fire `deadline_missed` events for any overdue records.
-- **Idempotency key** in metadata (`coord.idempotency_key = sha256(correlation_id + "|deadline_missed")`); before appending `deadline_missed`, check for existing atom with the same idempotency key. Prevents double-fire on daemon-restart-during-overdue-firing edge case.
+- **Idempotency key** in metadata (r1 codex F5 + codex-ops F3 MED convergent): `coord.idempotency_key = sha256(correlation_id + "|" + role + "|" + event_type + "|deadline_missed")`. Per-role-per-event-type — two reviewers under the same `correlation_id` who BOTH miss tick_end produce TWO distinct `deadline_missed` atoms (one per role), not one. Lookup mechanism: since `src/storage/interface.ts:50-62` `metadata_match` whitelist cannot query a nested `coord.idempotency_key` directly, the daemon scans recent `coord:deadline_missed` atoms over the max-deadline horizon at append-time (small set, in-memory side-cache OK for V1). If a future scale concern surfaces, extend `metadata_match` to include the key — defer that as V1.5+. AC8 includes a restart-test fixture covering two overdue records sharing one correlation_id.
 - **Periodic reconciliation:** every 10 minutes the deadline tracker re-runs the reconstruction logic to catch any drift (defensive against in-memory state divergence).
 
 **AC4 — Mailbox semantics + `wait_for_new_turns` widening (closes codex Q4 MED — reframe "push" claim; closes codex strategist 2026-05-16 substrate-consult finding on `source_prefix` gap).**
@@ -184,6 +208,7 @@ The v1 design's "second builder gets a push notification about race" was wishful
 The MCP server at `src/mcp/server.ts:127-132` has host/DNS-rebinding protection — fine for read tools, insufficient for arbitrary `coord_emit` writes. AC5 adds:
 
 - **Caller-identity → role mapping** at `src/coord/identity.ts`. Identity sourced from the existing wrapper environment (`REVIEWER_NAME`, `ECHO_AGENT_ID`, or future analog). For V1, accept identity via a header (`X-Echo-Role: <role>`) that the wrapper sets before invoking `coord_emit`. Server validates `<role>` is in `coord-roles.json`; rejects unknown roles. The daemon DOES NOT trust caller-supplied `source` — `source = coord:<server-derived-role>`.
+- **V1 emission is SCOPED TO WRAPPER PATHS (curl-style HTTP) — native MCP clients do NOT emit in V1** (r1 codex F4 MED). The existing MCP server at `src/mcp/server.ts:103-136` handles tool calls per request but does NOT expose request headers to tool handlers; Cursor IDE-mode and other MCP-native clients have no canonical way to supply `X-Echo-Role`. Rather than ship a partial identity model, V1 scopes coord emission to wrapper-side curl calls (codex/codex-ops/claude headless wrappers + `request.py` + `skills/review-queue-watch.md` watcher body when running under bash). Cursor IDE-mode emission is **out of scope for V1** (defer to V1.5+ along with the native-MCP identity path). AC7's wording is tightened to reflect this — Cursor's `review-queue-cursor.md` continues to operate without coord emission; its review still lands the normal queue artifacts; the strategist still has visibility via the existing file-side semantics. AC8 includes a "Cursor IDE-mode round runs to completion with no coord emission and 057 coord layer DOES NOT degrade the existing file-side flow" assertion.
 - **Required event fields** on every `coord_emit` call: `schema_version` (int), `event_type` (string from registry), `correlation_id` (string), `emitted_at` (ISO-Z; daemon canonicalizes), `role` (server-derives; ignored if caller supplies). Optional: `payload` (event-specific), `expected_by` (ISO-Z; clamped per AC2).
 - **Schema-version registry** in `src/coord/types.ts`. Each event type carries a `schema_version` field. Consumers that encounter an unknown `event_type` or `schema_version` MUST ignore (forward-compat).
 - **Single-writer constraint** preserved: all coord writes go through the existing `src/storage/sqlite.ts` write path (the same path capture events use). No parallel SQLite handle, no concurrent writer race.
@@ -208,7 +233,7 @@ Roles START using `coord_emit` as part of their existing tick bodies. ALL integr
 - **`skills/process-backlog.md`** binding-specific notes section gains "Emit coord:item_claimed after the atomic-claim push; coord:item_pushed after move-to-pending_review push" prose. Builder agents perform the emission as part of their existing protocol.
 - **`skills/review-queue-watch.md`** emits `coord:round_combined` after `combine.py` returns successfully.
 - **`skills/merge-and-cleanup.md`** emits `coord:merge_start` at Section A pre-flight, `coord:merge_complete` after final push.
-- **Cursor IDE-mode reviewer (`skills/review-queue-cursor.md`) emits opportunistically** — Cursor's Claude does `coord_emit` via the MCP tool surface (no curl needed, Cursor has MCP). Same prose pattern as headless reviewers.
+- **Cursor IDE-mode reviewer (`skills/review-queue-cursor.md`) does NOT emit in V1** (r1 codex F4 MED clarification + AC5 V1 scope). The existing MCP server at `src/mcp/server.ts:103-136` does not expose request headers to tool handlers, so a native-MCP client like Cursor's Claude has no canonical path to supply `X-Echo-Role`. Rather than ship a partial identity model, V1 defers Cursor coord emission to V1.5+ along with the native-MCP identity path. Cursor's review cycle continues to operate on the existing file-side semantics (commit cursor.md → strategist watcher reads on next cron tick). 057 explicitly does NOT degrade this path.
 
 If any role's existing skill/wrapper doesn't have a natural emission point, document the gap in `agent_notes` rather than forcing emission; partial coverage is fine for V1.
 
