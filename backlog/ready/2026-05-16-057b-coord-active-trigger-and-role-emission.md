@@ -11,6 +11,8 @@ branch: ""
 head_sha: ""
 pr_url: ""
 task_state_ref: 2026-05-16-057b-coord-active-trigger-and-role-emission
+blocked_by:
+  - "2026-05-16-057a-coord-substrate-and-observability"
 agent_notes: |
   057b is the production-emission half of the decomposed 057 spec.
   Depends on 057a (substrate). DO NOT CLAIM 057b until 057a is in
@@ -25,18 +27,18 @@ agent_notes: |
   Parent context (read once): backlog/complete/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md and its r1-r5 review history.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  # AC0 — coord_invoke MCP tool (with argv-spawn + input validation + pinned-request mode)
-  - src/mcp/tools/coord-invoke.ts                  # new MCP write tool — spawns wrapper + appends coord:reviewer_invoked atom for pre-spawn deadline (r4 codex F2 HIGH security + r4 codex-ops F2 HIGH pinned-mode)
+  # AC0 — coord_invoke MCP tool (spawns wrapper script with env-var pinning + appends coord:reviewer_invoked atom; r1 codex F3 HIGH wrapper-spawn replaces raw-argv-spawn)
+  - src/mcp/tools/coord-invoke.ts                  # new MCP write tool — derives wrapper path as tools/review-queue/run-${role}-reviewer.sh, validates exists+executable, subprocess.spawn with shell:false + env={ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID}; appends coord:reviewer_invoked synchronously BEFORE returning (r4 codex F2 HIGH security + r4 codex-ops F2 HIGH pinned-mode + r5 codex-ops F1 HIGH causality + r1 codex F3 HIGH wrapper-spawn)
   - src/mcp/server.ts                              # register coord_invoke
   # AC0/AC7 — request.py correlation_id generation (load-bearing for active/fallback sharing the same round id per r3 codex-ops F1 HIGH)
-  - tools/review-queue/schemas/request.schema.json # add correlation_id required field (uuid4 pattern)
-  - tools/review-queue/request.py                  # generate uuid4 correlation_id at request-write time; NO MCP call (carried from 057 r3 disposition)
+  - tools/review-queue/schemas/request.schema.json # add correlation_id required field (pattern ^[a-f0-9-]{36}$ matching string-rendered uuid4)
+  - tools/review-queue/request.py                  # generate correlation_id = str(uuid.uuid4()) (36 chars with dashes — closes r1 codex F1 HIGH; aligns with schema pattern AND coord_invoke validation); NO MCP call
   # AC7 — wrapper two-phase emission (scheduler_health no-correlation_id + request-scoped tick_start/tick_end with correlation_id)
-  - tools/review-queue/_run_reviewer.sh            # Phase 1 scheduler_health at log-redirect-open; Phase 2 tick_start after candidate selection; tick_end on EVERY clean exit (r4 codex-ops F3 HIGH outcome enum)
-  - tools/review-queue/run-codex-reviewer.sh       # forward ECHO_COORD_REQUEST_PATH + ECHO_COORD_CORRELATION_ID env vars (r5 codex F1 HIGH)
-  - tools/review-queue/run-codex-ops-reviewer.sh   # same forwarding
-  # AC7 — pinned-request mode in reviewer prompts
-  - skills/review-queue-codex.md                   # Step 2 scan-skip when ECHO_COORD_REQUEST_PATH set; tick_failed_to_bind on mismatch (r4 codex-ops F2 HIGH)
+  - tools/review-queue/_run_reviewer.sh            # Phase 1 scheduler_health at log-redirect-open; Phase 2 tick_start after candidate selection OR (pinned-mode) before bind-validation; tick_end on EVERY clean exit including bind_failed (r4 codex-ops F3 HIGH outcome enum + r1 codex F2 + r1 codex-ops F3 convergent HIGH bind_failed via tick_end-not-tick_failed_to_bind)
+  - tools/review-queue/run-codex-reviewer.sh       # no-op for 057b — env-var inheritance from coord_invoke's subprocess.spawn carries through; the 5-line wrapper passes env unchanged
+  - tools/review-queue/run-codex-ops-reviewer.sh   # same — no-op for 057b
+  # AC7 — pinned-request mode in reviewer prompts (bind-failure flow uses tick_end(outcome=bind_failed), NOT tick_failed_to_bind — r1 codex F2 + r1 codex-ops F3 convergent HIGH)
+  - skills/review-queue-codex.md                   # Step 2 scan-skip when ECHO_COORD_REQUEST_PATH set; emit tick_start BEFORE bind-validate; emit tick_end(outcome=bind_failed,reason=...) on validation failure (r4 codex-ops F2 HIGH + r1 codex F2 + r1 codex-ops F3 convergent HIGH)
   - skills/review-queue-codex-ops.md
   - skills/review-queue-claude.md                  # (if 056 has shipped; otherwise skip and add in successor)
   - .claude/commands/review-queue-codex.md         # synced from skills/ via tools/sync-skills.sh
@@ -44,19 +46,13 @@ files_to_modify:
   - .claude/commands/review-queue-claude.md        # synced (conditional)
   - adapters/codex/skills/review-queue-codex/SKILL.md  # synced
   - adapters/codex/skills/review-queue-codex-ops/SKILL.md  # synced
-  # AC7 — post-push hooks in strategist/watcher/merger skills (the ONLY legitimate coord_invoke call sites per r2 codex F1 + codex-ops F1 convergent HIGH)
-  - skills/review-queue-watch.md                   # Step 3 (b) post-push hook now calls coord_invoke; emits coord:round_combined after combine.py succeeds
+  # AC7 — post-push hooks in strategist/watcher skills (reviewer-role active trigger ONLY; builder/merger/watcher event-type emission deferred per r1 codex-ops F4 MED)
+  - skills/review-queue-watch.md                   # Step 3 (b) post-push hook calls coord_invoke for each headless reviewer in next round's requested_reviewers; NO coord:round_combined emission in 057b (deferred per r1 codex-ops F4 MED — event type not in 057a registry)
   - skills/review-pending.md                       # post-push hook calls coord_invoke for sidecar review reviewers
-  - skills/merge-and-cleanup.md                    # emits coord:merge_start at Section A pre-flight; coord:merge_complete after final push
-  - skills/process-backlog.md                      # builder emits coord:item_claimed after atomic claim; coord:item_pushed after move-to-pending_review
   - .claude/commands/review-queue-watch.md         # synced
   - .claude/commands/review-pending.md             # synced
-  - .claude/commands/merge-and-cleanup.md          # synced
-  - .claude/commands/process-backlog.md            # synced
   - adapters/codex/skills/review-queue-watch/SKILL.md  # synced
   - adapters/codex/skills/review-pending/SKILL.md  # synced
-  - adapters/codex/skills/merge-and-cleanup/SKILL.md  # synced
-  - adapters/codex/skills/process-backlog/SKILL.md  # synced
   # AC7 — daemon internal-emitter attribution (daemon writes reviewer_invoked + deadline_missed with subject_role attribution)
   - src/coord/internal-emitter.ts                  # new module — daemon-side emitter with emitter_role=daemon + subject_role=<reviewer> (r2 codex-ops F2 HIGH)
   # AC8 — integration tests (require both 057a substrate + 057b emission to pass)
@@ -69,14 +65,17 @@ files_to_modify:
   - tests/coord/correlation-id-shared-active-and-fallback.test.ts  # active-spawn crashes pre-tick_start; launchd-fallback closes the daemon's reviewer_invoked deadline using same correlation_id (r3 codex-ops F1 HIGH)
   - tests/coord/coord-invoke-input-validation.test.ts       # shell metacharacters + path traversal + bad uuid4 rejected; no spawn + no atom on rejection (r4 codex F2 HIGH security)
   - tests/coord/pinned-request-mode.test.ts                 # coord_invoke specifies request_path; wrapper reviews EXACT request (no scan-pick); roster guard (requested_reviewers membership) preserved (r4 codex-ops F2 HIGH + r5 codex F2 MED)
-  - tests/coord/tick-end-covers-clean-exits.test.ts         # stale_combined / duplicate_response / upstream_duplicate / completed all emit tick_end and close deadline (r4 codex-ops F3 HIGH)
+  - tests/coord/tick-end-covers-clean-exits.test.ts         # completed / stale_combined / duplicate_response / upstream_duplicate / bind_failed all emit tick_end and close the open tick_start deadline (r4 codex-ops F3 HIGH + r1 codex F2 + r1 codex-ops F3 convergent HIGH bind_failed outcome)
   - tests/coord/causality-reviewer-invoked-before-tick-start.test.ts  # daemon's reviewer_invoked atom precedes child's tick_start in replay order (r5 codex-ops F1 HIGH)
-  - tests/coord/tick-failed-to-bind-closes-deadline.test.ts # tick_failed_to_bind event is registered + closes the pre-spawn deadline (r5 codex-ops F3 MED)
+  - tests/coord/pinned-request-bind-failed-closes-deadline.test.ts  # pinned-request validation failure emits tick_start then tick_end(outcome=bind_failed) — 057a's expects-based tracker closes the deadline correctly; NO coord:deadline_missed false-positive (r1 codex F2 + r1 codex-ops F3 convergent HIGH)
+  - tests/coord/coord-invoke-spawns-wrapper.test.ts          # coord_invoke spawns tools/review-queue/run-<role>-reviewer.sh (NOT raw codex argv); env vars ECHO_COORD_REQUEST_PATH + ECHO_COORD_CORRELATION_ID arrive in the wrapper process; role with headless:false (e.g. cursor) is rejected with structured MCP error (r1 codex F3 HIGH wrapper-spawn)
   - tests/coord/silent-fail-detection.test.ts               # the full motivating scenario: launchd-style wrapper invocation fails to emit tick_start; deadline fires coord:deadline_missed within budget
   # AC9 — task-state pointer per 046 AC1
   - backlog/task-state/2026-05-16-057b-coord-active-trigger-and-role-emission/builder.md
 spec_refs:
-  - backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md  # SIBLING SPEC. 057a MUST be in `complete/` before 057b builder claims. 057b uses 057a's coord_emit MCP tool, coord-roles.json + Python loader, deadlines tracker, coord_status surface, and event-type registry as-is — does not modify them.
+  # SIBLING SPEC — 057a MUST be in `complete/` before 057b builder claims (machine-enforced via blocked_by above per r1 codex-ops F2 HIGH). Both paths listed because 057a moves ready→claimed→complete during normal pipeline progression; reader resolves whichever exists (r1 codex F4 MED). 057b uses 057a's coord_emit MCP tool, coord-roles.json + TS daemon loader, deadlines tracker, coord_status surface, and event-type registry as-is — does not modify them.
+  - backlog/complete/2026-05-16-057a-coord-substrate-and-observability.md
+  - backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md
   - backlog/complete/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md  # Parent monolithic spec (decomposed 2026-05-16). r1-r5 review history captures the design archive.
   - backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/  # r1 through r5 — 21+ findings are the source of truth for AC text below.
   - backlog/complete/2026-05-13-043-per-round-reviewer-roster.md  # AC7 pattern: per-role roster + Python loader. coord-roles.json (in 057a) is the sibling.
@@ -111,12 +110,12 @@ New MCP tool at `src/mcp/tools/coord-invoke.ts`. Required input: `coord_invoke(r
 
 The daemon:
 
-1. **Loads `invoke_command` from `coord-roles.json`** (the JSON-array argv vector per 057a AC2).
+1. **Spawns the reviewer wrapper** at `tools/review-queue/run-<role>-reviewer.sh` (r1 codex F3 HIGH — re-uses existing `_run_reviewer.sh` plumbing for prompt routing, log redirect, codex argv assembly, env handoff). 057a's `coord-roles.json` `invoke_command` argv is NOT what `coord_invoke` spawns directly — that argv targets `codex exec` and assumes the wrapper has already done prompt routing. Instead, `coord_invoke` derives the wrapper path from the role slug — `tools/review-queue/run-${role}-reviewer.sh` — and validates that file exists + is executable before spawn. Roles with `headless: false` in `coord-roles.json` (e.g. `cursor` IDE-mode) have no wrapper and are rejected by `coord_invoke` with structured MCP error.
 2. **Validates inputs strictly** (r4 codex F2 HIGH security):
-   - `correlation_id` MUST match `^[a-f0-9-]{36}$` (uuid4 shape).
+   - `correlation_id` MUST match `^[a-f0-9-]{36}$` (uuid4 string-rendered shape with dashes — closes r1 codex F1 HIGH; aligns with the request.schema.json pattern AND the value `str(uuid.uuid4())` actually produces).
    - `request_path` MUST match `^backlog/reviews/[a-z0-9-]+/r[0-9]+/request\.md$` (no traversal, no shell metacharacters).
    - Reject with structured MCP error on either failure; do NOT spawn anything; do NOT append `coord:reviewer_invoked`.
-3. **Argv-style spawning** (r4 codex F2 HIGH — no shell injection regardless of input). Substitute `{{WT}}`/`{{REQUEST_PATH}}`/`{{CORRELATION_ID}}` tokens INTO array elements, then invoke via `subprocess.spawn(argv, { shell: false })`. No `bash -c`. Even with strict input validation, argv-spawn is the primary defense; validation is defense-in-depth.
+3. **Wrapper-spawn execution** (r4 codex F2 HIGH + r1 codex F3 HIGH — no shell injection regardless of input AND no argv-vs-prompt-routing impedance mismatch). `subprocess.spawn(["tools/review-queue/run-<role>-reviewer.sh"], { shell: false, detached: true, env: { ...process.env, ECHO_COORD_REQUEST_PATH: request_path, ECHO_COORD_CORRELATION_ID: correlation_id } })`. The wrapper's existing body (set REVIEWER_NAME, ephemeral worktree creation, codex exec, log redirect) runs unchanged. Pinned-request mode is signaled to the wrapper purely via the two `ECHO_COORD_*` env vars — no command-line change. (Argv-vs-shell hardening still applies: the wrapper path is a fixed string, the env-var values are pre-validated regex matches, and `shell: false` ensures no expansion. The r4 codex F2 security guarantee holds.)
 4. **Causality-safe `reviewer_invoked` emission** (r5 codex-ops F1 HIGH): the daemon appends `coord:reviewer_invoked` atom SYNCHRONOUSLY BEFORE returning to the caller — meaning before the spawned child can possibly emit `tick_start`. The contract: by the time `coord_invoke` returns, the `reviewer_invoked` atom is durable in the ledger AND the deadline tracker has opened the pre-spawn record. Concrete ordering in code:
    - daemon validates inputs
    - daemon appends `reviewer_invoked` atom (single-writer; durable)
@@ -124,11 +123,12 @@ The daemon:
    - daemon `subprocess.spawn(argv, { shell: false })` — fire-and-forget
    - daemon returns success to caller
    - The child wrapper starts running; ANY `tick_start` it emits cannot precede the `reviewer_invoked` atom in replay order.
-5. **Pinned-request reviewer mode** (r4 codex-ops F2 HIGH + r5 codex F2 MED roster preservation): the wrapper receives `ECHO_COORD_REQUEST_PATH=<request_path>` and `ECHO_COORD_CORRELATION_ID=<correlation_id>` as env vars (r5 codex F1 HIGH — env-var handoff is implementable; CLI-flag handoff is not since `codex exec` doesn't expose those flags). When these are set, the reviewer skill's Step 2 (in `skills/review-queue-codex.md` etc.) MUST:
+5. **Pinned-request reviewer mode** (r4 codex-ops F2 HIGH + r5 codex F2 MED roster preservation + r1 codex F2 + r1 codex-ops F3 HIGH convergent — bind-failure path uses tick_start+tick_end(bind_failed), NOT a new `tick_failed_to_bind` event-type): the wrapper receives `ECHO_COORD_REQUEST_PATH=<request_path>` and `ECHO_COORD_CORRELATION_ID=<correlation_id>` as env vars (r5 codex F1 HIGH — env-var handoff is implementable; CLI-flag handoff is not since `codex exec` doesn't expose those flags). When these are set, the reviewer skill's Step 2 (in `skills/review-queue-codex.md` etc.) MUST:
    - Read ONLY the specified `$ECHO_COORD_REQUEST_PATH` (not scan-pick from `backlog/reviews/*/r*/`).
-   - Validate: file exists; `correlation_id` in frontmatter matches `$ECHO_COORD_CORRELATION_ID`; `requested_reviewers` includes the current `$MY_REVIEWER` (preserves 043 roster guard per r5 codex F2 MED); no `combined.md` or `<my_slug>.md` already exists.
-   - On any validation failure: emit `coord:tick_failed_to_bind(subject_role, correlation_id, reason="request_not_found"|"correlation_id_mismatch"|"role_not_in_roster"|"already_combined"|"already_responded")` and exit non-zero.
-   - On success: proceed with the rest of the reviewer protocol.
+   - Emit `coord:tick_start(subject_role=$MY_REVIEWER, correlation_id=$ECHO_COORD_CORRELATION_ID)` BEFORE the bind-validation block (so 057a's existing close rule fires: `reviewer_invoked.expects = "tick_start"` → tick_start closes the pre-spawn deadline and opens a `tick_start.expects = "tick_end"` record per 057a's coord-roles.json).
+   - Validate: file exists; `correlation_id` in frontmatter matches `$ECHO_COORD_CORRELATION_ID`; `requested_reviewers` includes `$MY_REVIEWER` (preserves 043 roster guard per r5 codex F2 MED); no `combined.md` or `<my_slug>.md` already exists.
+   - **On bind-validation failure**: emit `coord:tick_end(subject_role=$MY_REVIEWER, correlation_id=$ECHO_COORD_CORRELATION_ID, outcome="bind_failed", reason="request_not_found"|"correlation_id_mismatch"|"role_not_in_roster"|"already_combined"|"already_responded")` and exit non-zero. The `outcome=bind_failed` value is added to AC7's `tick_end.outcome` enum (alongside `completed`/`stale_combined`/`duplicate_response`/`upstream_duplicate`). 057a's tracker closes the open `tick_start` deadline on `tick_end` arrival — no `coord:deadline_missed` false-positive. (r1 codex F2 + r1 codex-ops F3 convergent — closes the cross-spec inconsistency between 057a's `expects`-based close rule and 057b's pinned-request bind-failure path WITHOUT modifying 057a's substrate. The bind-failure cause is preserved in `coord:tick_end.metadata.coord.reason` for `coord_status()` operator inspection.)
+   - On success: proceed with the rest of the reviewer protocol (which itself emits `tick_end` on every clean exit per AC7 step 6).
    - Scan-pick remains the launchd-fallback path (when `$ECHO_COORD_REQUEST_PATH` is unset).
 6. **Best-effort emission contract** (r1 codex-ops F2 HIGH carried forward): `coord_invoke` callers use bounded HTTP timeouts (2s connect, 5s total) and tolerate non-zero rc without aborting the parent step. Watcher/skill callers wrap in `|| true` equivalent guards. Queue durability stays intact when the daemon is down.
 
@@ -145,6 +145,7 @@ Production emission lands in 057b. ALL integration is ADDITIVE — no protocol b
   - `outcome="stale_combined"` — `combined.md` already existed when wrapper started Step 2.
   - `outcome="duplicate_response"` — local os.link race lost; another wrapper wrote the response first.
   - `outcome="upstream_duplicate"` — pre-push pull found another response landed.
+  - `outcome="bind_failed"` — pinned-request validation rejected the request (r1 codex F2 + r1 codex-ops F3 convergent HIGH; closes the cross-spec inconsistency between 057a's `expects`-based close rule and 057b's pinned-request bind-failure path WITHOUT modifying 057a's substrate). The bind-failure cause goes in `metadata.coord.reason` (`request_not_found` | `correlation_id_mismatch` | `role_not_in_roster` | `already_combined` | `already_responded`).
   - Wrapper CRASH before tick_end: intentionally NO terminal event → pre-spawn deadline fires `deadline_missed` per 057a AC3. That's correct behavior for real failures.
 - **No-candidate exit (Phase 2 finds nothing):** emit `coord:scheduler_health_done` (no `correlation_id`); no `tick_start`/`tick_end` for that round. The launchd-fallback "I ran but nothing to do" case stays cleanly distinguishable from a tick that processed a round.
 
@@ -152,18 +153,18 @@ Production emission lands in 057b. ALL integration is ADDITIVE — no protocol b
 
 The daemon writes `coord:reviewer_invoked` (from `coord_invoke`) and `coord:deadline_missed` (from 057a's tracker) atoms. These have a `subject_role` field that identifies the role being tracked, distinct from the `emitter_role: "daemon"` field. The atom's `source` field is `coord:<subject_role>` (so per-role `coord_status()` aggregation is correct). AC5's "caller-supplied role is ignored" rule from 057a applies ONLY to wrapper-side `coord_emit` calls — the daemon bypasses the X-Echo-Role check because it IS the authenticated emitter. New module `src/coord/internal-emitter.ts` codifies this.
 
-**Skill-side post-push hooks** (the ONLY legitimate `coord_invoke` call sites per r2 codex F1 + codex-ops F1 convergent HIGH):
+**Skill-side post-push hooks** (the ONLY legitimate `coord_invoke` call sites per r2 codex F1 + codex-ops F1 convergent HIGH). 057b is scoped to **reviewer-role active trigger only** — builder/merger/watcher lifecycle event types are deferred to a separate spec (r1 codex-ops F4 MED — those event types are not in 057a's registry and `coord_emit` would silently reject them at runtime; rather than amend 057a's registry mid-flight, defer the entire builder/merger/watcher observability surface to a follow-on spec where the registry expansion + event-shape design can be reviewed together):
 
-- **`skills/review-queue-watch.md` Step 3 (b)** after `push-with-retry.sh` succeeds: call `coord_invoke(role=X, request_path=<r<N+1>/request.md>, correlation_id=<from r<N+1>/request.md>)` for each headless reviewer in the next round's `requested_reviewers`.
-- **`skills/review-pending.md`** after sidecar push: call `coord_invoke` for the next reviewer round (if any).
-- **`skills/merge-and-cleanup.md`** emits `coord:merge_start` at Section A pre-flight and `coord:merge_complete` after final push.
-- **`skills/process-backlog.md`** builder emits `coord:item_claimed` after atomic-claim push and `coord:item_pushed` after move-to-pending_review push.
-- **`request.py` is NEVER a `coord_invoke` caller** (r2 codex F1 + codex-ops F1 convergent HIGH). Its only coord-related responsibility is generating + writing the `correlation_id` uuid4 to `request.md`. Zero MCP calls. `tests/coord/no-pre-push-spawn.test.ts` asserts this invariant.
+- **`skills/review-queue-watch.md` Step 3 (b)** after `push-with-retry.sh` succeeds: call `coord_invoke(role=X, request_path=<r<N+1>/request.md>, correlation_id=<from r<N+1>/request.md>)` for each headless reviewer in the next round's `requested_reviewers`. NO `coord:round_combined` emission (deferred per F4 — would require registry entry that 057a doesn't have).
+- **`skills/review-pending.md`** after sidecar push: call `coord_invoke` for the next reviewer round (if any). NO `coord:review_pending_*` emission (deferred).
+- **`skills/merge-and-cleanup.md`** NO emission in 057b (deferred — `coord:merge_start` + `coord:merge_complete` need their own event-type registry entries in a follow-on spec). The skill's flow is unchanged in 057b.
+- **`skills/process-backlog.md`** NO emission in 057b (deferred — `coord:item_claimed` + `coord:item_pushed` are V1.5+). The builder atomic-claim flow is unchanged in 057b.
+- **`request.py` is NEVER a `coord_invoke` caller** (r2 codex F1 + codex-ops F1 convergent HIGH). Its only coord-related responsibility is generating + writing the `correlation_id` uuid string to `request.md`. Zero MCP calls. `tests/coord/no-pre-push-spawn.test.ts` asserts this invariant.
 
 **`request.py` + request.schema.json `correlation_id` field** (r3 codex-ops F1 HIGH + r3 codex F2 MED convergent):
 
 - `tools/review-queue/schemas/request.schema.json` extends with `correlation_id: { type: "string", pattern: "^[a-f0-9-]{36}$" }` as a required field; existing `additionalProperties: false` constraint preserved.
-- `tools/review-queue/request.py` generates `correlation_id = uuid.uuid4().hex` at request-write time and includes it in the frontmatter. No MCP call.
+- `tools/review-queue/request.py` generates `correlation_id = str(uuid.uuid4())` at request-write time and includes it in the frontmatter. **The string-rendered form (36 chars with dashes — e.g. `c9b71286-5f67-4a6c-7a5a-ab6ed07ce4ef`) matches the schema pattern `^[a-f0-9-]{36}$` AND the `coord_invoke` validation regex from AC0 step 2** (closes r1 codex F1 HIGH — the `uuid.uuid4().hex` form is 32 chars without dashes and would fail both validators; one representation everywhere is the requirement). No MCP call.
 - The watcher's `coord_invoke` reads the value from `request.md`; the launchd-fallback wrapper's Phase 2 reads the SAME value. Active-spawn + launchd-fallback share one correlation_id per round → daemon's pre-spawn deadline closes correctly regardless of which path succeeds (the load-bearing test in `tests/coord/correlation-id-shared-active-and-fallback.test.ts`).
 - **Backward compatibility:** pre-057 requests on origin/main without `correlation_id` are treated as "no coord-tracked round" — wrapper falls back to scheduler-tier identifiers only (no round-tier deadline opened).
 
