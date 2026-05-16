@@ -1960,6 +1960,11 @@ id="toc-pdt---codex-ops-r8-on-057a-coord-substrate-spec">2026-05-15
 <li><a href="#pdt---codex-r8-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-r8-on-057a-coord-substrate-spec">2026-05-15 23:25
 PDT - Codex R8 on 057a coord substrate spec</a></li>
+<li><a
+href="#pdt---codex-r1-on-058-strategist-disposition-discipline-spec"
+id="toc-pdt---codex-r1-on-058-strategist-disposition-discipline-spec">2026-05-15
+23:36 PDT - Codex R1 on 058 strategist disposition discipline
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21835,6 +21840,55 @@ synthetic-atom fixture, reconstruction under 1500ms,
 <code>coord_status()</code> under 300ms, and explicit
 no-warning-log/no-warning-atom V1 scope. No AC1-AC7 regressions surfaced
 in this tick.</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-058-strategist-disposition-discipline-spec">2026-05-15
+23:36 PDT - Codex R1 on 058 strategist disposition discipline spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-058-strategist-disposition-discipline-prefer-removal.md</code>
+at <code>ac8d1223ae4de1442d340078d34056a63cb44f19</code>,
+<code>skills/review-queue-watch.md</code>, <code>CLAUDE.md</code>, and
+057a R4-R8 combined review context.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r1/codex.md</code>
+as <code>00ba5d5</code>, verdict <code>proceed_after_patches</code>,
+finding: LOW ready item has no collected <code>## Tests</code> section
+for the docs-only operating-model change.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>ac8d1223ae4de1442d340078d34056a63cb44f19</code>; request path
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r1/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>skills/review-queue-watch.md</code>, <code>CLAUDE.md</code>,
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r4/combined.md</code>,
+<code>r5/combined.md</code>, <code>r6/combined.md</code>,
+<code>r7/combined.md</code>, <code>r8/combined.md</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 058 R1 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The substantive skill and CLAUDE.md edits
+look implementable, and the 057a worked examples are empirically tight.
+The only patch is to add an explicit verification checklist so the
+builder has a single tests section for sync and content-placement
+checks.</li>
 </ul>
 </body>
 </html>
