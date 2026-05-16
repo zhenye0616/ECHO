@@ -27,5 +27,9 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R2** — terminal convergence. codex verdict=`proceed`; zero findings. r1 had one LOW finding (missing `## Tests` section); r2 verified the additive Tests section; the operating-model body (skill subsection + CLAUDE.md H3) was substantively correct at r1.
+
+**Convergence trajectory r1→r2: 1→0 findings; 0H/0M/1L → 0H/0M/0L.** Two-round convergence on a docs-only spec — the worked-example pattern transmission worked.
+
+Next step: strategist applies the AC1 + AC2 verbatim text to `skills/review-queue-watch.md` and `CLAUDE.md`, runs `tools/sync-skills.sh`, runs the 7 Tests-section grep/awk checks, commits + pushes. No builder claim required for this docs-only item.
 
