@@ -21947,11 +21947,11 @@ regression surfaced in this tick.</li>
 <h3 id="pdt---codex-ops-r1-on-057b-coord-active-trigger-spec">2026-05-15
 23:52 PDT - Codex-ops R1 on 057b coord active-trigger spec</h3>
 <ul>
-<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
-queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
-response was
-<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>.</li>
-<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+<li><p><strong>Trigger:</strong> Execute one <code>codex-ops</code>
+review queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending
+codex-ops response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>.</p></li>
+<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
 reviewer tick. Pulled <code>origin/main</code>; scanned
 <code>backlog/reviews/**/r*/request.md</code> for rounds requesting
 <code>codex-ops</code> with no <code>codex-ops.md</code> and no
@@ -21960,9 +21960,9 @@ artifact
 <code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
 at <code>be6dcce8a3d1d2390a447cc64c0e3d5ecfecf724</code>, the 057a
 substrate spec, the current wrapper/selector context, and prior 057
-review history relevant to runtime deadline semantics.</li>
-<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
-upstream duplicate state, committed, and pushed
+review history relevant to runtime deadline semantics.</p></li>
+<li><p><strong>Returned shape:</strong> Wrote, pre-link validated,
+checked upstream duplicate state, committed, and pushed
 <code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/codex-ops.md</code>
 as <code>f018d69</code>, verdict <code>proceed_after_patches</code>,
 findings: HIGH split-id shape breaks <code>tools/blocked.py</code>; HIGH
@@ -21970,8 +21970,8 @@ findings: HIGH split-id shape breaks <code>tools/blocked.py</code>; HIGH
 <code>tick_failed_to_bind</code> does not close
 <code>reviewer_invoked -&gt; tick_start</code> under the consumed 057a
 deadline rule; MEDIUM new skill-side event types are not in the consumed
-057a registry and would fail best-effort/silent.</li>
-<li><strong>Sources:</strong> Request path
+057a registry and would fail best-effort/silent.</p></li>
+<li><p><strong>Sources:</strong> Request path
 <code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/request.md</code>;
 committed response path
 <code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/codex-ops.md</code>;
@@ -21983,16 +21983,145 @@ paths <code>tools/review-queue/validate_response_yaml.py</code>,
 <code>tools/blocked.py</code>,
 <code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>,
 <code>tools/review-queue/_run_reviewer.sh</code>,
-<code>skills/review-queue-watch.md</code>; no ECHO MCP reads.</li>
-<li><strong>Verdict:</strong> right - one codex-ops review was written
-for the requested 057b R1 round, anchored to the requested spec SHA,
-validated before link, checked against upstream duplicate response
+<code>skills/review-queue-watch.md</code>; no ECHO MCP reads.</p></li>
+<li><p><strong>Verdict:</strong> right - one codex-ops review was
+written for the requested 057b R1 round, anchored to the requested spec
+SHA, validated before link, checked against upstream duplicate response
 state, committed and pushed before this observation-only journal
-entry.</li>
-<li><strong>Note:</strong> The review focused on what breaks unattended:
-builder selector/claim gates, bind-failure deadline closure, and event
-registry acceptance. The active reviewer flow can converge after those
-runtime gates are made explicit.</li>
+entry.</p></li>
+<li><p><strong>Note:</strong> The review focused on what breaks
+unattended: builder selector/claim gates, bind-failure deadline closure,
+and event registry acceptance. The active reviewer flow can converge
+after those runtime gates are made explicit. ### 2026-05-15 23:53 PDT —
+Watcher tick: 057b r1 escalation (codex pushback vs codex-ops
+proceed_after_patches; cross-spec inconsistencies between 057a-shipped
+and 057b-proposed)</p></li>
+<li><p><strong>Trigger:</strong> Watcher Monitor <code>b1zohxkl7</code>
+fired on
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/{codex.md,codex-ops.md}</code>
+landing on origin/main after r1 dispatch at <code>3228cab</code>.
+Strategist watcher tick ran in ephemeral worktree
+<code>$TMPDIR/echo-watcher-5F22E22A-...</code>; combine.py emitted
+<code>combined.md</code> (commit <code>112e976</code>) with
+<code>combined_verdict: divergent</code>,
+<code>escalated_to_founder: true</code>. codex verdict
+<code>pushback</code>, codex-ops verdict
+<code>proceed_after_patches</code> — crossed the
+<code>{proceed*, pushback}</code> boundary; strategist did NOT
+autonomously disposition per the watcher-skill §“Out of Scope” #7. (No
+052-style explicit-override language from founder for 057b; the request
+was “commit and push 057b review next” = start the cycle, not drive past
+escalations.)</p></li>
+<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls. Read
+<code>backlog/reviews/2026-05-16-057b.../r1/{request.md,codex.md,codex-ops.md,combined.md}</code>.
+Did not modify the spec.</p></li>
+<li><p><strong>Returned shape:</strong> <code>combined.md</code> written
+autonomously by combine.py. 8 findings total (6 HIGH + 2 MED).
+<strong>Two structural cross-spec inconsistencies between 057a-shipped
+and 057b-proposed</strong> (both reviewers converge in substance, codex
+frames as pushback):</p>
+<ul>
+<li><strong>codex F2 + codex-ops F3 CONVERGENT (both HIGH)</strong> —
+<code>tick_failed_to_bind</code> close-rule break: AC0 specifies that
+<code>tick_failed_to_bind</code> closes the pre-spawn
+<code>reviewer_invoked</code> deadline, but 057a’s deadline tracker
+closes records only when incoming <code>event_type</code> equals the
+opener’s configured <code>expects</code> value, and 057a registry has
+<code>reviewer_invoked.expects = "tick_start"</code> (NOT
+<code>tick_failed_to_bind</code>). 057b explicitly forbids
+daemon-tracker / coord-roles changes. At runtime a
+stale/already-combined/role-mismatch pinned request emits the
+explanatory bind-failure atom AND still later fires a false
+<code>deadline_missed</code>. Three architectural options: (a) re-open
+057a to support alternate-closer rule (a deadline can be closed by
+event_type in a configured set, not just one); (b) change 057b to emit
+<code>tick_start</code> then <code>tick_end(outcome=bind_failed)</code>
+for bind failures so the existing close rule works; (c) accept the V1
+false-positive on bind failures and document it as a known V1.5+
+followup.</li>
+<li><strong>codex F3 (HIGH)</strong> — <code>coord_invoke</code> argv vs
+reviewer-runner mismatch: AC0 says <code>coord_invoke</code> loads
+<code>invoke_command</code> from 057a’s <code>coord-roles.json</code>
+and substitutes <code>{{REQUEST_PATH}}</code> +
+<code>{{CORRELATION_ID}}</code> tokens, but 057a’s argv vector is
+<code>["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access"]</code>
+— no REQUEST_PATH/CORRELATION_ID slots, and 057b’s
+<code>files_to_modify</code> doesn’t include
+<code>coord-roles.json</code> updates. Today’s actual production
+invocation goes through <code>run-codex-reviewer.sh</code> →
+<code>_run_reviewer.sh</code> (prompt routing, env handoff, log
+redirect). Either coord_invoke spawns the wrapper (re-uses existing
+plumbing) OR coord_invoke duplicates the wrapper plumbing OR 057a needs
+to be re-opened to extend the argv schema with env/prompt slots.</li>
+</ul></li>
+<li><p><strong>Other findings (5)</strong> — tractable as patches:</p>
+<ul>
+<li><strong>codex F1 (HIGH)</strong> — <code>correlation_id</code>
+representation mismatch: AC7 says <code>uuid.uuid4().hex</code> (32
+chars), schema says <code>^[a-f0-9-]{36}$</code> (36 chars with dashes).
+Hard validation break. Fix: pick one, align both.</li>
+<li><strong>codex F4 (MED)</strong> — <code>spec_refs</code> points at
+<code>backlog/ready/...057a.md</code>; once 057a moves to
+<code>complete/</code>, the spec_ref is stale. Fix: list both paths or
+update post-shipment.</li>
+<li><strong>codex-ops F1 (HIGH)</strong> — <code>tools/blocked.py</code>
+validates ids with <code>^\d{4}-\d{2}-\d{2}-\d{3}-...$</code>; 057a/057b
+alpha-suffixes break the regex. Builder selector exits 2 (codex-ops
+reproduced the failure). Fix: extend selector regex (same fix as the
+schema-widening at <code>6a83b3c</code>).</li>
+<li><strong>codex-ops F2 (HIGH)</strong> — no machine-readable
+<code>blocked_by</code> gate. Once F1 is fixed, an unattended builder
+could claim 057b while 057a is still in <code>ready/</code>. Fix: add
+<code>blocked_by: ["2026-05-16-057a-coord-substrate-and-observability"]</code>
+frontmatter + selector enforcement.</li>
+<li><strong>codex-ops F4 (MED)</strong> — 057b emits
+<code>coord:round_combined</code>, <code>coord:merge_start</code>,
+<code>coord:merge_complete</code>, <code>coord:item_claimed</code>,
+<code>coord:item_pushed</code>, but 057a’s registry only defines the
+reviewer/scheduler/deadline event family. <code>coord_emit</code> will
+silently reject these. Fix: add to registry OR defer to a separate
+registry-expansion spec.</li>
+</ul></li>
+<li><p><strong>Sources:</strong> request path
+<code>backlog/reviews/2026-05-16-057b.../r1/request.md</code> at
+spec_commit_sha <code>be6dcce8a3d1d2390a447cc64c0e3d5ecfecf724</code>;
+response paths <code>r1/codex.md</code> (verdict pushback),
+<code>r1/codex-ops.md</code> (verdict proceed_after_patches);
+combined.md at <code>112e976</code>; cross-referenced 057a
+(<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>);
+no ECHO MCP reads.</p></li>
+<li><p><strong>Verdict:</strong> ✅ correct watcher behavior — divergent
+boundary cross → journal + exit; founder will decide. Different shape
+from 057a r3 escalation: there, both reviewers converged on substance
+and diverged only in verdict tone; here, codex’s pushback is structural
+(cross-spec inconsistency between 057a-shipped and 057b-proposed needs a
+design call, not a deeper patch).</p></li>
+<li><p><strong>Note:</strong> The 058 disposition discipline (“prefer
+removal when findings target a recent-round patch”) does NOT apply here
+— r1 findings target the ORIGINAL 057b spec, not a patch I added. They
+need real engagement. The decision points are founder-level because two
+of the HIGH findings (codex F2 + codex F3) propose changes that would
+re-open 057a (which just landed at r8 = claim-ready). The cost of
+re-opening 057a vs. accepting V1 limitations vs. shifting work into
+057b’s scope is exactly the kind of judgment the watcher escalation gate
+is designed to surface.</p></li>
+<li><p><strong>Conjecture:</strong> Cleanest architectural reading: (a)
+for the close-rule issue, option (b) — make <code>coord_invoke</code>
+emit <code>tick_start</code> immediately followed by
+<code>tick_end(outcome=bind_failed)</code> so the existing 057a tracker
+closes correctly — keeps 057a frozen and pushes complexity into 057b
+where it belongs; (b) for the argv mismatch, <code>coord_invoke</code>
+should <code>subprocess.spawn</code> the wrapper script
+(<code>run-&lt;role&gt;-reviewer.sh</code>) with env vars set, not a raw
+codex argv — re-uses today’s working plumbing; (c) for
+<code>correlation_id</code>, standardize on
+<code>str(uuid.uuid4())</code> (36 chars with dashes); (d) for
+blocked_by + selector, fix both; (e) for the 5 new event types, add them
+to 057a’s registry as a r9 amendment OR drop them from 057b and defer.
+(a)+(d) keep 057a sealed; (a)+(e) re-open 057a but only additively.
+Observations only; founder decides whether to re-open 057a OR push the
+architectural cost into 057b’s scope OR accept V1 false-positive on bind
+failures.</p></li>
 </ul>
 </body>
 </html>

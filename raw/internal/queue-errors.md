@@ -17,3 +17,4 @@
 2026-05-13T20:45:26Z PUSH-RACE-FALLBACK: review-r3: codex-ops on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=309715d2b273c739313153b8b56fc471daa64a03
 2026-05-13T20:50:04Z PUSH-RACE-FALLBACK: combine: r3 on 2026-05-13-044-reviewer-cycle-infrastructure-debt sha=b85a109c3e617456b06f691339e42eea61fc976d
 2026-05-14T08:44:06Z SANDBOX-GIT-BLOCKED: combine: r1 on 2026-05-14-048-process-backlog-builder-state-handoff-refresh wrote combined.md, but internal git pull/add/commit/push hit sandbox .git write restrictions; strategist committed combined.md and R1 spec patch manually in the same turn.
+2026-05-16T06:54:50Z PUSH-RACE-FALLBACK: journal: strategist watcher r1 escalation on 057b sha=48433097c9a674459ba1830df4122f601049fc56
