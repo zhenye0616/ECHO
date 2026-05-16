@@ -1930,6 +1930,9 @@ id="toc-pdt---codex-ops-r3-on-057a-coord-substrate-spec">2026-05-15
 <li><a href="#pdt---codex-r3-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-r3-on-057a-coord-substrate-spec">2026-05-15 22:15
 PDT - Codex R3 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-ops-r4-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-ops-r4-on-057a-coord-substrate-spec">2026-05-15
+22:52 PDT - Codex-ops R4 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21185,10 +21188,10 @@ reconstruction behind the daemon startup gate.</li>
 <h3 id="pdt---codex-r3-on-057a-coord-substrate-spec">2026-05-15 22:15
 PDT - Codex R3 on 057a coord substrate spec</h3>
 <ul>
-<li><p><strong>Trigger:</strong> Execute one Codex-side review queue
-tick (<code>MY_REVIEWER=codex</code>); first pending Codex response was
-<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>.</p></li>
-<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
 reviewer tick. Pulled <code>origin/main</code>; scanned
 <code>backlog/reviews/**/r*/request.md</code> for rounds requesting
 <code>codex</code> with no <code>codex.md</code> and no
@@ -21203,9 +21206,9 @@ context, and pinned implementation context for
 <code>src/mcp/server.ts</code>,
 <code>src/mcp/tools/wait-for-new-turns.ts</code>,
 <code>tools/review-queue/reviewers.json</code>, and
-<code>package.json</code>.</p></li>
-<li><p><strong>Returned shape:</strong> Wrote, pre-link validated,
-checked upstream duplicate state, committed, and pushed
+<code>package.json</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
 <code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/codex.md</code>
 as <code>b070dad</code>, verdict <code>proceed_after_patches</code>,
 findings: MEDIUM AC3’s append-order iterator still lacks explicit
@@ -21213,8 +21216,8 @@ timestamp-to-sequence and next-watermark primitives required by
 reconstruction/reconciliation; MEDIUM AC6’s horizon-independent
 last-miss status is not specified as durable across daemon restart; LOW
 AC3’s SQLite example names the non-existent <code>atoms</code> table
-instead of <code>events</code>.</p></li>
-<li><p><strong>Sources:</strong> Artifact SHA
+instead of <code>events</code>.</li>
+<li><strong>Sources:</strong> Artifact SHA
 <code>4d4530281fbca9593b6ca280e736bb3b1cdd7531</code>; request path
 <code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>;
 committed response path
@@ -21224,19 +21227,70 @@ schema path
 paths <code>tools/review-queue/validate_response_yaml.py</code>,
 <code>tools/review-queue/commit-reviewer-response.sh</code>,
 <code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
-reads.</p></li>
-<li><p><strong>Verdict:</strong> right - one Codex review was written
-for the requested 057a R3 round, anchored to the requested spec SHA,
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057a R3 round, anchored to the requested spec SHA,
 validated before link, checked against upstream duplicate response
 state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R3 verifies the r2 fixes for Ajv dependency
+naming, cwd-independent role-config loading, terminal fire-once
+lifecycle, append-order replay, and last-miss key disambiguation are
+mostly present. The remaining concerns are narrower storage/status
+durability contracts plus one concrete SQL-table typo.</li>
+</ul>
+<h3 id="pdt---codex-ops-r4-on-057a-coord-substrate-spec">2026-05-15
+22:52 PDT - Codex-ops R4 on 057a coord substrate spec</h3>
+<ul>
+<li><p><strong>Trigger:</strong> Execute one <code>codex-ops</code>
+review queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending
+codex-ops response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r4/request.md</code>.</p></li>
+<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>e68159823036a0bbd1a17f5b9ce0b1a3c14b43a2</code>, prior R3
+review context, and pinned storage/migration context for
+<code>src/storage/interface.ts</code>,
+<code>src/storage/sqlite.ts</code>,
+<code>src/storage/migrations/0001_initial.sql</code>,
+<code>src/mcp/tools/wait-for-new-turns.ts</code>, and
+<code>package.json</code>.</p></li>
+<li><p><strong>Returned shape:</strong> Wrote, pre-link validated,
+checked upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r4/codex-ops.md</code>
+as <code>d7728bb</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM restart replay still uses client
+<code>emitted_at</code> to choose the first append sequence and can skip
+delayed/horizon-crossing coord atoms; MEDIUM <code>coord_status()</code>
+last-miss rehydration iterates an in-memory observed-slot set that is
+empty after daemon restart.</p></li>
+<li><p><strong>Sources:</strong> Artifact SHA
+<code>e68159823036a0bbd1a17f5b9ce0b1a3c14b43a2</code>; request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r4/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</p></li>
+<li><p><strong>Verdict:</strong> right - one codex-ops review was
+written for the requested 057a R4 round, anchored to the requested spec
+SHA, validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
 entry.</p></li>
-<li><p><strong>Note:</strong> R3 verifies the r2 fixes for Ajv
-dependency naming, cwd-independent role-config loading, terminal
-fire-once lifecycle, append-order replay, and last-miss key
-disambiguation are mostly present. The remaining concerns are narrower
-storage/status durability contracts plus one concrete SQL-table typo.
-### 2026-05-15 22:16 PDT — Watcher tick: 057a r3 escalation (divergent
-verdicts cross the boundary)</p></li>
+<li><p><strong>Note:</strong> R4 moves the substrate closer by making
+the storage methods explicit and moving last-miss status to read-time
+rehydration, but the remaining restart behavior can still produce
+false-clean operator status after daemon downtime, clock skew, or a
+fresh-process status check. ### 2026-05-15 22:16 PDT — Watcher tick:
+057a r3 escalation (divergent verdicts cross the boundary)</p></li>
 <li><p><strong>Trigger:</strong> Watcher Monitor <code>bq4jhsjj1</code>
 fired on
 <code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/{codex.md,codex-ops.md}</code>
