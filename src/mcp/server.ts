@@ -6,6 +6,7 @@ import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerCoordEmit } from './tools/coord-emit.js';
+import { registerCoordInvoke } from './tools/coord-invoke.js';
 import { registerCoordStatus } from './tools/coord-status.js';
 import { registerEchoPing } from './tools/echo-ping.js';
 import { registerEchoResolveMru } from './tools/echo-resolve-mru.js';
@@ -222,6 +223,15 @@ export async function startMcpServer(
         coordRoles,
         deadlines,
         serverStartedAt,
+      });
+      // 057b AC0 — strategist-side active-trigger seam. Requires the
+      // deadline tracker (the pre-spawn deadline is opened by the
+      // internal-emitter helper); skipped together with coord_status
+      // when deadlines are disabled.
+      registerCoordInvoke(mcp, {
+        storage,
+        coordRoles,
+        deadlines,
       });
     }
 

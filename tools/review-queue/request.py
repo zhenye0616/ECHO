@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -92,6 +93,15 @@ def main(argv: list[str]) -> int:
     review_dir.mkdir(parents=True, exist_ok=True)
     final = review_dir / "request.md"
 
+    # 057b AC7 — canonical uuid4. str(uuid.uuid4()) renders as 36 chars with
+    # dashes and version-4 nibble + [89ab] variant byte by construction, so
+    # it matches both request.schema.json's `correlation_id` pattern and the
+    # `coord_invoke` validator regex with no further normalization.
+    # request.py has zero MCP responsibility — it only writes the field; the
+    # watcher reads it for coord_invoke, and the launchd-fallback wrapper
+    # reads it for Phase 2 tick_start emission.
+    correlation_id = str(uuid.uuid4())
+
     fm: dict[str, object] = {
         "item_id": args.item_id,
         "round": args.round,
@@ -100,6 +110,7 @@ def main(argv: list[str]) -> int:
         "class": args.cls,
         "requested_at": _lib.iso_utc_now(),
         "requested_reviewers": reviewers,
+        "correlation_id": correlation_id,
     }
     if args.focus_hints:
         fm["focus_hints"] = args.focus_hints

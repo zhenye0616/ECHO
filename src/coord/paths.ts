@@ -1,0 +1,147 @@
+// 057b AC0 — canonical repo-root + reviewer-wrapper path resolver.
+//
+// This module sits at `src/coord/` so its `import.meta.url`-based
+// resolution math (`../..`) lands at the repo root — same depth
+// convention as `src/coord/roles.ts` (which already resolves
+// `<repo>/tools/review-queue/coord-roles.json` correctly).
+//
+// Why a dedicated helper (r3 codex F1 + r3 codex-ops F1 convergent HIGH):
+// the r2 patch erroneously suggested `new URL("../../tools/...",
+// import.meta.url)` directly from `src/mcp/tools/coord-invoke.ts`, but
+// that path resolves to `<repo>/src/tools/...` not `<repo>/tools/...`
+// because the MCP tool module sits at a different depth than 057a's
+// `src/coord/roles.ts`. Centralizing the math here keeps depth changes
+// from silently breaking child spawning.
+//
+// Validation contract (r4 codex F1 HIGH): the 5-step gate
+// (shape → roster → path-construction → containment → exists+executable)
+// runs in resolveReviewerWrapperPath() in exact order. Shape-invalid
+// roles never reach the roster check; roster-invalid roles never reach
+// path construction. This means the "no FS access" property of the
+// shape-invalid malicious-role test (r4/r5/r6) holds true ONLY for the
+// shape-invalid subset, while the roster-invalid subset rejects AFTER
+// loadCoordRoles() reads coord-roles.json but BEFORE any wrapper-path
+// construction / stat / spawn / MCP side-effects.
+
+import { fileURLToPath } from 'node:url';
+import { join as pathJoin, resolve as pathResolve, sep as pathSep, basename } from 'node:path';
+import { statSync } from 'node:fs';
+import { loadCoordRoles, type CoordRolesConfig } from './roles.js';
+
+/** Canonical reviewer-slug shape — lowercase, starts with letter, no
+ *  slashes, no shell metacharacters, no path-traversal characters. The
+ *  shape regex is the first gate in the 5-step containment chain. */
+const ROLE_SHAPE_RE = /^[a-z][a-z0-9-]*$/;
+
+function computeRepoRoot(): string {
+  const envOverride = process.env['ECHO_REPO_ROOT'];
+  if (envOverride !== undefined && envOverride.length > 0) {
+    return pathResolve(envOverride);
+  }
+  // From `src/coord/paths.ts`: `..` = `src/`, `../..` = repo root.
+  // Same depth convention as 057a's `src/coord/roles.ts`.
+  return fileURLToPath(new URL('../..', import.meta.url));
+}
+
+/** Canonical repo-root path. Computed once at module load. Honors
+ *  `ECHO_REPO_ROOT` env-var override (tests + bundled-daemon deployments
+ *  where the source-tree path math doesn't hold). */
+export const REPO_ROOT: string = computeRepoRoot();
+
+export class CoordPathError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CoordPathError';
+  }
+}
+
+interface ResolveReviewerWrapperPathOptions {
+  /** Inject a roles config for tests. Production callers omit. */
+  coordRoles?: CoordRolesConfig;
+}
+
+/** Validate + resolve the absolute path to `tools/review-queue/run-<role>-reviewer.sh`.
+ *
+ *  Five-step gate (in exact order — r4 codex F1 HIGH):
+ *    1. Shape check (canonical reviewer slug)
+ *    2. Roster check (role present in coord-roles.json + headless:true)
+ *    3. Path construction (path.join)
+ *    4. Containment check (resolved path stays in-tree)
+ *    5. Existence + executable bit
+ *
+ *  Throws `CoordPathError` on any failure; all errors carry enough
+ *  context for the MCP tool boundary to surface a structured rejection.
+ *  Shape-invalid roles reject BEFORE any FS access; roster-invalid roles
+ *  reject AFTER loadCoordRoles() but BEFORE any path.join / stat / spawn.
+ */
+export function resolveReviewerWrapperPath(
+  role: string,
+  opts: ResolveReviewerWrapperPathOptions = {},
+): string {
+  // Step 1 — shape check (no FS access; no config read).
+  if (typeof role !== 'string' || !ROLE_SHAPE_RE.test(role)) {
+    throw new CoordPathError(
+      `coord_invoke: role shape-invalid (got '${String(role)}'). Required: lowercase, starts with letter, [a-z0-9-] only.`,
+    );
+  }
+
+  // Step 2 — roster check (loadCoordRoles() reads disk; no path math yet).
+  const cfg = opts.coordRoles ?? loadCoordRoles();
+  const entry = cfg.roles.find((r) => r.name === role);
+  if (entry === undefined) {
+    const known = cfg.roles.map((r) => r.name).join(', ');
+    throw new CoordPathError(
+      `coord_invoke: role '${role}' is not in coord-roles.json (known roles: ${known}).`,
+    );
+  }
+  if (!entry.headless) {
+    throw new CoordPathError(
+      `coord_invoke: role '${role}' is not headless (headless:false in coord-roles.json) — cannot be actively spawned. IDE-mode reviewers have no wrapper.`,
+    );
+  }
+
+  // Step 3 — path construction.
+  const reviewerDir = pathJoin(REPO_ROOT, 'tools/review-queue');
+  const candidate = pathJoin(reviewerDir, `run-${role}-reviewer.sh`);
+
+  // Step 4 — containment check (defense-in-depth: even if shape + roster
+  // both pass, the resolved path must stay in-tree under the reviewer-
+  // wrapper directory AND its basename must match exactly).
+  const resolved = pathResolve(candidate);
+  const reviewerDirResolved = pathResolve(reviewerDir);
+  if (!resolved.startsWith(reviewerDirResolved + pathSep)) {
+    throw new CoordPathError(
+      `coord_invoke: resolved path '${resolved}' is outside reviewer-wrapper directory '${reviewerDirResolved}'.`,
+    );
+  }
+  if (basename(resolved) !== `run-${role}-reviewer.sh`) {
+    throw new CoordPathError(
+      `coord_invoke: resolved basename '${basename(resolved)}' does not match expected 'run-${role}-reviewer.sh'.`,
+    );
+  }
+
+  // Step 5 — existence + executable bit.
+  let st: import('node:fs').Stats;
+  try {
+    st = statSync(resolved);
+  } catch (err) {
+    throw new CoordPathError(
+      `coord_invoke: reviewer wrapper not found at '${resolved}': ${(err as Error).message}`,
+    );
+  }
+  if (!st.isFile()) {
+    throw new CoordPathError(
+      `coord_invoke: reviewer wrapper '${resolved}' is not a regular file.`,
+    );
+  }
+  // Owner-executable bit (POSIX mode 0o100). On filesystems without exec
+  // bit semantics (e.g. mounted FAT) this check would false-fail; the V1
+  // dev environment is macOS APFS where the bit is meaningful.
+  if ((st.mode & 0o100) === 0) {
+    throw new CoordPathError(
+      `coord_invoke: reviewer wrapper '${resolved}' is not executable (mode ${st.mode.toString(8)}).`,
+    );
+  }
+
+  return resolved;
+}

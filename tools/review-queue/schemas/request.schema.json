@@ -11,7 +11,8 @@
     "artifact_path",
     "class",
     "requested_at",
-    "requested_reviewers"
+    "requested_reviewers",
+    "correlation_id"
   ],
   "additionalProperties": false,
   "properties": {
@@ -55,6 +56,11 @@
       "type": "string",
       "description": "Optional. Per-round pointer to the task-state directory under backlog/task-state/<task-id>/. Non-reviewer consumers (watcher, dispatcher, strategist) may use it to locate role-typed state. Reviewers MUST NOT read task_state_ref or its contents — fresh-eyes-at-SHA invariant is preserved by the validate.py REVIEWER_FRESH_EYES_VIOLATION check.",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}-\\d{3}[a-z]?-[a-z][a-z0-9-]*$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "057b — canonical uuid4 produced by request.py at request-write time. Shared by the watcher's coord_invoke spawn and the launchd-fallback wrapper so both paths close the daemon's pre-spawn reviewer_invoked deadline with the same key. r3 codex F2 MED — version-4 nibble + [89ab] variant byte enforced.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     }
   }
 }
