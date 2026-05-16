@@ -12,8 +12,14 @@ head_sha: "a1f2c7b792a6d770cc377ce33cf860a2ae5e414f"
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
 agent_notes: |
-  BLOCKED (partial): claude-code builder run delivered AC4 + AC9 (initial
-  builder.md) only; ACs 1/2/3/5/6/8 not started. AC7 is N/A by spec.
+  RESUMED 2026-05-16T07:55:00Z on founder's "continue" authorization
+  (answers Q1 from prior escalation: stay in Claude Code, do NOT hand off
+  to codex). Working AC2 next. Prior run's verified state at branch
+  agent/coord-substrate-and-observability @ a1f2c7b carries forward.
+
+  Prior-run summary (preserved for context): claude-code builder run delivered
+  AC4 + AC9 (initial builder.md) only; ACs 1/2/3/5/6/8 not started. AC7 is
+  N/A by spec.
   Reason for escalation: spec scope (2-2.5d, ~40 files, new external
   dep ajv@^8 + ajv-formats@^3, distributed-systems semantics with 8 review
   rounds of accumulated complexity on AC3 alone) structurally exceeds a
