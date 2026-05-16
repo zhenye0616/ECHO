@@ -1965,6 +1965,11 @@ href="#pdt---codex-r1-on-058-strategist-disposition-discipline-spec"
 id="toc-pdt---codex-r1-on-058-strategist-disposition-discipline-spec">2026-05-15
 23:36 PDT - Codex R1 on 058 strategist disposition discipline
 spec</a></li>
+<li><a
+href="#pdt---codex-r2-on-058-strategist-disposition-discipline-spec"
+id="toc-pdt---codex-r2-on-058-strategist-disposition-discipline-spec">2026-05-15
+23:42 PDT - Codex R2 on 058 strategist disposition discipline
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21889,6 +21894,52 @@ look implementable, and the 057a worked examples are empirically tight.
 The only patch is to add an explicit verification checklist so the
 builder has a single tests section for sync and content-placement
 checks.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-058-strategist-disposition-discipline-spec">2026-05-15
+23:42 PDT - Codex R2 on 058 strategist disposition discipline spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-058-strategist-disposition-discipline-prefer-removal.md</code>
+at <code>c8502bf4fc0191a24f9177884c855faf4e1c1384</code>, and pinned
+context for <code>skills/review-queue-watch.md</code>,
+<code>CLAUDE.md</code>, and <code>tools/sync-skills.sh</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r2/codex.md</code>
+as <code>2e0ac77</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c8502bf4fc0191a24f9177884c855faf4e1c1384</code>; request path
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-058-strategist-disposition-discipline-prefer-removal/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>skills/review-queue-watch.md</code>, <code>CLAUDE.md</code>,
+<code>tools/sync-skills.sh</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 058 R2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 closes the R1 verification gap: the spec
+now has a dedicated <code>## Tests</code> section covering sync
+identity, skill heading presence and placement, 057a r4/r6
+worked-example anchors, CLAUDE.md H3 presence and placement, and the
+canonical skill-path cross-reference. No AC1-AC4 implementability
+regression surfaced in this tick.</li>
 </ul>
 </body>
 </html>
