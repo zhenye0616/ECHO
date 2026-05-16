@@ -1954,6 +1954,9 @@ id="toc-pdt---codex-ops-r7-on-057a-coord-substrate-spec">2026-05-15
 <li><a href="#pdt---codex-r7-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-r7-on-057a-coord-substrate-spec">2026-05-15 23:19
 PDT - Codex R7 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-ops-r8-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-ops-r8-on-057a-coord-substrate-spec">2026-05-15
+23:25 PDT - Codex-ops R8 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21738,6 +21741,47 @@ no threshold warning, no warning log assertion, and no scheduler_health
 warning atom remain. The only Codex concern matches the surviving
 operational contract: AC8 must explicitly name the perf fixture so the
 perf-only design remains falsifiable.</li>
+</ul>
+<h3 id="pdt---codex-ops-r8-on-057a-coord-substrate-spec">2026-05-15
+23:25 PDT - Codex-ops R8 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r8/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R8 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>5aa0cb6d1954323dde9bd9dae1d8237210a9f0d5</code>, and the local
+R7 codex-ops response format for response-shape continuity.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r8/codex-ops.md</code>
+as <code>e086148</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r8/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r8/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057a R8 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R8 closes the R7 operational gap: AC8 now
+explicitly lists <code>tests/coord/coord-volume-perf.test.ts</code> with
+the reconstruction and <code>coord_status()</code> budgets, and it keeps
+the no-warning-log / no-warning-atom V1 scope explicit.</li>
 </ul>
 </body>
 </html>
