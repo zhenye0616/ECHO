@@ -198,4 +198,10 @@ Agents are more dangerous than the founder for drift, because they don't have th
 
 If an agent finds itself wanting to do something not in acceptance criteria: STOP, log the temptation in `raw/internal/decisions/` as a drift-event, fill `agent_notes` with the question, push branch, move item to `pending_review/`.
 
+### Strategist drift — patching deeper instead of removing
+
+The "agents drift via scope expansion" failure mode has a strategist-side twin during review rounds: adding mechanism in response to a finding, then watching the next round find bugs in *the mechanism the patch added*. Each round's diff grows; the spec accumulates premature optimizations and observability scaffolding that the load-bearing core doesn't need.
+
+The fix is dispositioning discipline, not better patches. See `skills/review-queue-watch.md` "Disposition discipline — prefer removal over deeper patching when findings target a recent-round patch" for the check the strategist applies mid-tick. Concrete worked examples from 057a r4 and r6 are in that skill.
+
 See [`backlog/README.md`](./backlog/README.md) for the full system documentation including atomic-claim and worktree mechanics.

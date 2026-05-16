@@ -98,6 +98,23 @@ tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 
 After dispositioning, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
+#### Disposition discipline — prefer removal over deeper patching when findings target a recent-round patch
+
+Before committing to a patch, check whether the finding is targeting **mechanism a prior round's patch added** vs. mechanism the original spec had. If it's the former — i.e. r<N>'s findings are bugs in r<N-1>'s patch — strongly prefer **removing the r<N-1> mechanism** over patching deeper.
+
+The signal: a finding is most likely "recent-patch-introduced" when (a) its `where:` lines all fall inside the diff range of a recent `spec-r<N-1>-patches` commit, OR (b) multiple reviewers converge on bugs in one mechanism that didn't exist before that commit. In that case, ask whether the prior round's reviewer actually required the mechanism, or whether it was your interpretation of a softer ask (e.g. "perf fixture OR runtime warning" → you added both → the warning has bugs).
+
+Concrete win condition: a removal-only `spec-r<N>-patches` commit typically converges in r<N+1>. A patch-deeper commit typically introduces r<N+1>'s findings.
+
+Worked examples (from 057a):
+
+- **r4**: r3 added a time-bound horizon optimization (`getCoordSequenceAtOrAfter(timestamp)`) to bound boot-replay cost. r4 reviewers found the time-bound was unsafe under skewed `emitted_at`. Disposition: drop the time bound entirely; V1 does full-ledger replay (substrate volume is small enough). One method removed from the seam. r5 had zero storage-seam findings.
+- **r6**: r5 added a runtime volume-threshold warning that emitted a `coord:scheduler_health` atom. r6 reviewers found 3 bugs in it (wrong metric, wrong atom shape, not visible in status). Disposition: drop the warning mechanism entirely; the AC8 perf fixture alone is the V1 contract (which was the original reviewer's "perf fixture OR warning" alternative). r7 had zero warning-path findings.
+
+The check is a forcing function against [recently-added mechanism becoming the new bug surface]. It does NOT apply when findings target the original AC text or load-bearing mechanism — those need real patches. Distinguish: "this mechanism didn't exist a round ago" (likely-removable) vs. "this mechanism is in the original spec contract" (must-patch).
+
+If you choose removal, the dispatch helper invocation is still `--patches-applied=true` because the spec changed; the change just happens to be a deletion. The disposition column should explicitly say "accepted — mechanism dropped" rather than "accepted — patched" so the convergence trail records the design discipline.
+
 #### (a) Zero patches applied → convergence
 
 Verdict was `proceed` with no actionable findings, OR a `pushback` where all findings deferred to follow-ups outside this round. No spec changes need verifying.
