@@ -1985,6 +1985,9 @@ id="toc-pdt---codex-r2-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-r3-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-r3-on-057b-coord-active-trigger-spec">2026-05-16
 00:26 PDT - Codex R3 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-ops-r3-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r3-on-057b-coord-active-trigger-spec">2026-05-16
+00:26 PDT - Codex-ops R3 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22350,6 +22353,61 @@ load-bearing: the accepted R2 wrapper-path patch copied a relative URL
 expression from a different source-tree depth. The UUID regex and
 motivation wording are smaller patches, but both are concrete enough to
 verify in the next round.</li>
+</ul>
+<h3 id="pdt---codex-ops-r3-on-057b-coord-active-trigger-spec">2026-05-16
+00:26 PDT - Codex-ops R3 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>c38f9ddd40d404438fd5a9a8d0d2470a0dd5a726</code>, current MCP
+server repo-root context, and current reviewer wrapper/schema context
+needed to evaluate runtime pathing and scheduler-health behavior.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r3/codex-ops.md</code>
+as <code>87f1b0b</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH wrapper path resolution from
+<code>src/mcp/tools/coord-invoke.ts</code> targets
+<code>src/tools</code>/<code>dist/tools</code> instead of repo-root
+<code>tools/review-queue</code>; MEDIUM scheduler-health can
+false-positive during normal long reviewer runs because
+<code>scheduler_health_done</code> is delayed until process exit while
+the stated deadline is ~120s.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c38f9ddd40d404438fd5a9a8d0d2470a0dd5a726</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r3/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>src/mcp/server.ts</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/schemas/request.schema.json</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R3 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R3 closed the previously requested
+detached-spawn, env handoff, pinned-request bind-failure, and
+active/fallback correlation-id gaps. The remaining concerns are
+runtime-only: the exact <code>import.meta.url</code> path is wrong for
+the declared module location, and scheduler-health needs a
+closure/timeout shape that does not page the operator on a healthy long
+review.</li>
 </ul>
 </body>
 </html>
