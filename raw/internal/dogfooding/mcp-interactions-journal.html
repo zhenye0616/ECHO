@@ -1858,6 +1858,11 @@ href="#pdt---codex-ops-r3-on-056-claude-reviewer-headless-onboarding-spec"
 id="toc-pdt---codex-ops-r3-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
 16:54 PDT - Codex-ops R3 on 056 Claude reviewer headless onboarding
 spec</a></li>
+<li><a
+href="#pdt---codex-ops-r4-on-056-claude-reviewer-headless-onboarding-spec"
+id="toc-pdt---codex-ops-r4-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
+17:02 PDT - Codex-ops R4 on 056 Claude reviewer headless onboarding
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20044,6 +20049,57 @@ Option A, and installer-in-scope issues. The remaining runtime concern
 is that the spec still has to keep the IDE/headless boundary exact, and
 any pre-child wrapper failure must produce durable queue observability
 rather than disappearing with the temporary worktree.</li>
+</ul>
+<h3
+id="pdt---codex-ops-r4-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
+17:02 PDT - Codex-ops R4 on 056 Claude reviewer headless onboarding
+spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-056-claude-as-reviewer-headless.md</code>
+at <code>9540a631dff608377372c42f1f40b70fee5b8a6e</code>, R3 combined
+context, and the pinned/current reviewer wrapper, reviewer gate, roster,
+installer, and queue-errors log shape for runtime checks.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r4/codex-ops.md</code>
+as <code>e83d66f</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH the new pre-spawn wrapper queue-error row format asks for
+<code>artifact_path/spec_commit_sha</code> before
+<code>_run_reviewer.sh</code> has selected a <code>request.md</code>, so
+the failure path can still lose or degrade the operator diagnostic
+unless the contract omits request-specific fields or defines candidate
+resolution before dispatch.</li>
+<li><strong>Sources:</strong> Artifact blob
+<code>d7406125a3b0986e28cad8919a38c9da9e6e952a</code>; request path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r4/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R4 closes the mode-conditional
+<code>invoke_command</code> issue and the durable commit-before-cleanup
+requirement. The remaining runtime issue is narrower: pre-spawn wrapper
+failures are global dispatch failures, not request-scoped review
+failures, unless the wrapper is explicitly taught to resolve a candidate
+before invoking the reviewer child.</li>
 </ul>
 </body>
 </html>
