@@ -2,12 +2,19 @@
 task_id: 2026-05-16-057a-coord-substrate-and-observability
 role: builder
 writer: claude-code-builder
-last_updated: 2026-05-16T07:30:00Z
+last_updated: 2026-05-16T07:39:18Z
+handoff_branch: agent/coord-substrate-and-observability
+handoff_head_sha: a1f2c7b792a6d770cc377ce33cf860a2ae5e414f
+handoff_run_log: raw/internal/agent-runs/2026-05-16-2026-05-16-057a-coord-substrate-and-observability.md
 ---
 
 ## current_thesis
 
 claim of 2026-05-16-057a-coord-substrate-and-observability. Spec ships the daemon-side coord substrate (read/write/track/report) decomposed from 057 after r5 plateau, then iterated 057a r1-r8. AC1 narrow coord append seam (coord_emit + types registry + identity), AC2 role-typed deadline config (coord-roles.json + TS loader + ajv), AC3 deadline tracker (serial mutation lane + two-tier maps + full-ledger replay at boot), AC4 wait_for_new_turns source_prefix widening, AC5 X-Echo-Role identity + schema versioning, AC6 coord_status MCP + CLI, AC7 no-op in 057a (production emission lives in 057b), AC8 ~18 synthetic-emitter test files (each merge-blocking incl. coord-volume-perf.test.ts at 100k atoms <1500ms boot / <300ms coord_status), AC9 builder.md (this file).
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-05-16-2026-05-16-057a-coord-substrate-and-observability.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -25,6 +32,10 @@ claim of 2026-05-16-057a-coord-substrate-and-observability. Spec ships the daemo
 
 - Session-budget fit: spec is 2-2.5d / 40 files / new external dep; Claude Code session boundaries likely force escalation before full convergence. Resume path: the shared `~/.echo/agent-id` UUID (78D5AB0F-A8A3-4F01-BC2E-EB05961B2405) is recognized by codex-builder + Cursor's Claude on this machine, so handoff is one founder invocation away if pressure builds. If escalating mid-spec, ensure the run log captures per-AC state with verbatim test output for whatever was attempted.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 
 - NO `coord_invoke` MCP tool (057b ships that).
@@ -39,10 +50,4 @@ claim of 2026-05-16-057a-coord-substrate-and-observability. Spec ships the daemo
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-16-057a-coord-substrate-and-observability.md
-- parent_spec: backlog/complete/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md
-- review_history_parent: backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r1..r5
-- review_history_057a: backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1..r8
-- sibling_spec: backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md
-- branch: agent/coord-substrate-and-observability
-- worktree: /Users/zhenye/Desktop/Project_echo--coord-substrate-and-observability
+- spec: backlog/pending_review/2026-05-16-057a-coord-substrate-and-observability.md
