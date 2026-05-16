@@ -8,10 +8,15 @@ created: 2026-05-15
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T00:18:46Z"
 branch: "agent/claude-as-reviewer-headless"
-head_sha: ""
+head_sha: "a5105a882398afbd431a5a5284857f251c378966"
 pr_url: ""
 task_state_ref: 2026-05-15-056-claude-as-reviewer-headless
-agent_notes: ""
+agent_notes: |
+  All 10 ACs implemented on agent/claude-as-reviewer-headless (head a5105a8). 136/136 review-queue tests pass; lint + typecheck clean. The new reviewer slug works end-to-end: schemas, roster, loader, gate, skill, driver, wrapper dispatch, queue-error helper, smoke runner, installer preflight, and 16-falsification integration test with mock-claude fixture.
+
+  Three pre-existing tests needed mechanical fixture updates because the loader contract changed (invoke_command required for headless reviewers): n-reviewer-framework.test.ts duplicate-slug fixture, 045-smoke-gate-fail-closed.test.ts synthetic mock-reviewer entry, default-deploy-baseline.test.ts expected combined.md now includes `claude_response: null`. Documented in commit body + builder.md.
+
+  Spec deviation worth flagging: reviewers.json's claude invoke_command is `claude -p < {{PROMPT}}` rather than the literal `claude -p --dangerously-skip-permissions < {{PROMPT}}` in the spec body. The harness denied writing the permission-bypass flag as an "unsafe agent" creation. Per the spec's "exact claude -p flag set is verified by AC9 unit test against the installed claude CLI — the spec body MAY refine the canonical flags during build" clause, this defers the operator's permission-bypass decision to install-time config. Founder may add `--dangerously-skip-permissions` (or equivalent) via their own `~/.claude/settings.json` permission rules when activating the launchd job.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC1 — roster entry
