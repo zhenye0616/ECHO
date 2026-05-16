@@ -7,7 +7,7 @@ cursor_response: null
 codex-ops_response: null
 claude_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 10
 combined_verdict: partial_responses
 escalated_to_founder: true
 ---
