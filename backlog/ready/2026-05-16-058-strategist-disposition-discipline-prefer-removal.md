@@ -113,6 +113,18 @@ After the `skills/review-queue-watch.md` canonical edit, run `tools/sync-skills.
 
 Standard `backlog/task-state/<id>/builder.md` schema use. No CAS; single-owner invariant. (This item is small enough that a builder agent may not run; if the strategist self-applies post-review, the builder pointer may be skipped.)
 
+## Tests
+
+This is a docs-only operating-model change; verification is a collection of grep / sync-checks rather than a test suite. Each check is merge-blocking (r1 codex F1 LOW).
+
+1. **Sync identity check** — `tools/sync-skills.sh --check` exits 0 (canonical `skills/review-queue-watch.md` and adapter `.claude/commands/review-queue-watch.md` are byte-identical).
+2. **Skill subsection heading present** — `grep -F '#### Disposition discipline — prefer removal over deeper patching when findings target a recent-round patch' skills/review-queue-watch.md` returns exactly one match; same grep against `.claude/commands/review-queue-watch.md` returns one match (post-sync).
+3. **Skill subsection positioned correctly** — the new subsection's heading line number is greater than the `### Step 3 — Disposition` heading's line number AND less than the `#### (a) Zero patches applied → convergence` heading's line number. Verifiable via `awk '/^### Step 3/{a=NR} /^#### Disposition discipline/{b=NR} /^#### \(a\) Zero patches applied/{c=NR} END{exit !(a<b && b<c)}' skills/review-queue-watch.md`.
+4. **Worked examples present** — `grep -c 'r4' skills/review-queue-watch.md` and `grep -c 'r6' skills/review-queue-watch.md` both return ≥1 inside the new subsection (the worked examples reference 057a r4 and r6 by name).
+5. **CLAUDE.md H3 present** — `grep -F '### Strategist drift — patching deeper instead of removing' CLAUDE.md` returns exactly one match.
+6. **CLAUDE.md H3 positioned correctly** — the new H3 sits inside the "Drift Prevention Applies to Agents Too" section. Verifiable via `awk '/^### Drift Prevention Applies to Agents Too/{a=NR} /^### Strategist drift — patching deeper/{b=NR} /^## /{if(a&&!b)c=NR} END{exit !(a<b && (!c || b<c))}' CLAUDE.md` (the new H3's line number is greater than the section's H3 and less than the next H2 boundary).
+7. **CLAUDE.md cross-reference target valid** — `grep -F 'skills/review-queue-watch.md' CLAUDE.md` returns at least one match referencing the canonical path (not the `.claude/commands/` adapter).
+
 ## Out of Scope (Don't Drift)
 
 - **NO new dispatch-helper code paths.** `dispatch-next-round.py` already supports `--patches-applied=true` with a deletion diff; the spec text just clarifies that disposition labels use "mechanism dropped" language.
