@@ -1,13 +1,13 @@
 ---
 id: 2026-05-16-057b-coord-active-trigger-and-role-emission
 title: Coord layer 057b — active trigger + role emission (strategist-spawned reviewers + wrapper two-phase emission + skill post-push hooks; activates 057a's dormant substrate)
-status: ready
+status: claimed
 priority: HIGH
 estimate: 2-2.5d
 created: 2026-05-16
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-16T09:19:24Z"
+branch: "agent/057b-coord-active-trigger-and-role-emission"
 head_sha: ""
 pr_url: ""
 task_state_ref: 2026-05-16-057b-coord-active-trigger-and-role-emission
