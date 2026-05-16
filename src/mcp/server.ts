@@ -6,6 +6,7 @@ import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerCoordEmit } from './tools/coord-emit.js';
+import { registerCoordStatus } from './tools/coord-status.js';
 import { registerEchoPing } from './tools/echo-ping.js';
 import { registerEchoResolveMru } from './tools/echo-resolve-mru.js';
 import { registerFindClusters } from './tools/find-clusters.js';
@@ -144,6 +145,7 @@ export async function startMcpServer(
   // durable ledger. Awaiting reconstruction here closes that window —
   // by the time `await server.listen()` returns control, the lane has
   // replayed the full ledger.
+  const serverStartedAt = new Date();
   let deadlineHandle: DeadlineTrackerHandle | null = null;
   let deadlines: DeadlineTracker | null = null;
   if (options.enable_deadlines !== false) {
@@ -211,6 +213,17 @@ export async function startMcpServer(
       xEchoRoleHeader,
       ...(deadlines !== null ? { deadlines } : {}),
     });
+    // 057a AC6 — coord substrate read surface. Only registered when the
+    // deadline tracker is enabled (its currentSnapshot() feeds the
+    // open_deadlines field).
+    if (deadlines !== null) {
+      registerCoordStatus(mcp, {
+        storage,
+        coordRoles,
+        deadlines,
+        serverStartedAt,
+      });
+    }
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
