@@ -1882,6 +1882,9 @@ spec</a></li>
 <li><a href="#pdt---codex-r6-on-056-claude-as-reviewer-headless-spec"
 id="toc-pdt---codex-r6-on-056-claude-as-reviewer-headless-spec">2026-05-15
 17:13 PDT - Codex R6 on 056 Claude-as-reviewer headless spec</a></li>
+<li><a href="#pdt---codex-ops-r1-on-057-coord-layer-spec"
+id="toc-pdt---codex-ops-r1-on-057-coord-layer-spec">2026-05-15 20:36 PDT
+- Codex-ops R1 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20356,6 +20359,59 @@ contract distinguish both row shapes: minimal pre-spawn failures before
 request scanning and full per-round failures after request selection
 with <code>artifact_path@spec_commit_sha</code>. The Codex lens found no
 remaining implementability blocker.</li>
+</ul>
+<h3 id="pdt---codex-ops-r1-on-057-coord-layer-spec">2026-05-15 20:36 PDT
+- Codex-ops R1 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>c9b712865f67a6c7a5aab6ed07ce4ef40461d695</code>, and current
+runtime surfaces <code>_run_reviewer.sh</code>,
+<code>run-codex-reviewer.sh</code>,
+<code>run-codex-ops-reviewer.sh</code>, <code>request.py</code>,
+<code>_reviewers.py</code>, <code>reviewers.json</code>,
+<code>server.ts</code>, <code>wait-for-new-turns.ts</code>,
+<code>sqlite.ts</code>, <code>storage/interface.ts</code>,
+<code>search-memories.ts</code>, and <code>fs-exclusion.ts</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r1/codex-ops.md</code>
+as <code>7555b83</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH deadline tracking starts only at <code>tick_start</code>,
+so a wrapper that never emits remains invisible; HIGH coord observation
+calls need bounded best-effort semantics so daemon failures cannot abort
+or hang the fallback queue path; MEDIUM <code>deadline_missed</code>
+idempotency must include role/event dimensions under shared round
+correlation.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>c9b712865f67a6c7a5aab6ed07ce4ef40461d695</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r1/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> The coordination-layer spec is directionally
+useful but must close the exact unattended gap it names:
+no-<code>tick_start</code> failures need a durable pre-spawn
+expectation, and coord instrumentation must degrade to logging instead
+of becoming another way for reviewer ticks to fail.</li>
 </ul>
 </body>
 </html>
