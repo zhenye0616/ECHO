@@ -1,0 +1,42 @@
+{
+  "$schema": "./schemas/coord-roles.schema.json",
+  "roles": [
+    {
+      "name": "codex",
+      "headless": true,
+      "invoke_command": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access"],
+      "events": {
+        "reviewer_invoked": { "default_deadline_sec": 90,  "max_deadline_sec": 300,  "expects": "tick_start" },
+        "tick_start":       { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" },
+        "scheduler_health": { "default_deadline_sec": 120, "max_deadline_sec": 300,  "expects": "scheduler_health_done" }
+      }
+    },
+    {
+      "name": "codex-ops",
+      "headless": true,
+      "invoke_command": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access"],
+      "events": {
+        "reviewer_invoked": { "default_deadline_sec": 90,  "max_deadline_sec": 300,  "expects": "tick_start" },
+        "tick_start":       { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" },
+        "scheduler_health": { "default_deadline_sec": 120, "max_deadline_sec": 300,  "expects": "scheduler_health_done" }
+      }
+    },
+    {
+      "name": "claude",
+      "headless": true,
+      "invoke_command": ["claude", "-p"],
+      "events": {
+        "reviewer_invoked": { "default_deadline_sec": 90,  "max_deadline_sec": 300,  "expects": "tick_start" },
+        "tick_start":       { "default_deadline_sec": 600, "max_deadline_sec": 1200, "expects": "tick_end" }
+      }
+    },
+    {
+      "name": "cursor",
+      "headless": false,
+      "events": {
+        "reviewer_invoked": { "default_deadline_sec": 7200, "max_deadline_sec": 28800, "expects": "tick_start" },
+        "tick_start":       { "default_deadline_sec": 7200, "max_deadline_sec": 28800, "expects": "tick_end" }
+      }
+    }
+  ]
+}

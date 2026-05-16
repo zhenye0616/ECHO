@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://echo.local/review-queue/coord-roles.schema.json",
+  "title": "review-queue coord-roles.json config",
+  "description": "Schema for tools/review-queue/coord-roles.json — the per-role-per-event-type SLA config consumed by src/coord/roles.ts at daemon boot. The `headless: true` discriminant requires `invoke_command` (an argv-vector NOT a shell string, per 057a r4 codex F2 HIGH — defense-in-depth against shell injection; 057b uses argv-spawn). IDE-mode roles MUST set `headless: false` and MAY omit `invoke_command`. The cross-field constraint `max_deadline_sec > default_deadline_sec` is NOT expressible in draft-07 if/then; it is enforced in the TypeScript loader.",
+  "type": "object",
+  "required": ["roles"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "headless", "events"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "headless": { "type": "boolean" },
+          "invoke_command": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Argv vector (not a shell string). Templated values {{WT}} (worktree absolute path) and {{PROMPT}} (prompt file path) are substituted as array elements by 057b's invoker. Required when headless=true."
+          },
+          "events": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "object",
+              "required": ["default_deadline_sec", "max_deadline_sec", "expects"],
+              "additionalProperties": false,
+              "properties": {
+                "default_deadline_sec": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "max_deadline_sec": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "expects": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "if": {
+          "properties": { "headless": { "const": true } }
+        },
+        "then": {
+          "required": ["name", "headless", "events", "invoke_command"]
+        }
+      }
+    }
+  }
+}

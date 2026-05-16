@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer, type Server as HttpServer } from 'node:http';
+import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
 import { registerEchoPing } from './tools/echo-ping.js';
@@ -32,6 +33,13 @@ export interface StartMcpServerOptions {
    * `process.cwd()`.
    */
   repo_root?: string;
+  /**
+   * 057a AC2 — explicit coord-roles config path override. When omitted, the
+   * loader resolves via `ECHO_COORD_ROLES_PATH` env or the module-relative
+   * default (cwd-independent, per 057a r2 codex-ops F5 MED). Test-only;
+   * production callers should rely on the env / default.
+   */
+  coord_roles_path?: string;
 }
 
 function resolveRepoRoot(option?: string): string {
@@ -94,6 +102,20 @@ export async function startMcpServer(
   const host = options.host ?? '127.0.0.1';
   const requestedPort = options.port ?? 38478;
   const repoRoot = resolveRepoRoot(options.repo_root);
+
+  // 057a AC2 — load coord-roles config BEFORE any tool registration. Bad
+  // config (schema violation OR cross-field `max_deadline_sec <= default`)
+  // throws here; the throw propagates out of startMcpServer, causing the
+  // daemon to exit non-zero with a clear stderr diagnostic. This is the
+  // hard startup gate required by r1 codex F4 MED — the operator sees a
+  // boot failure rather than a per-request error every 10 minutes.
+  //
+  // The returned config is held in a `const` available to future
+  // coord-emit / coord-status / deadlines registrations (AC1/AC3/AC6).
+  // 057a-AC2-only: nothing consumes it yet, but the throw-at-boot path is
+  // exercised by tests.
+  const coordRoles: CoordRolesConfig = loadCoordRoles(options.coord_roles_path);
+  log.info('coord_roles_loaded', { role_count: coordRoles.roles.length });
 
   let boundPort = requestedPort;
 
