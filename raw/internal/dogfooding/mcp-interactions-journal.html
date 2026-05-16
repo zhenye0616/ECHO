@@ -1897,6 +1897,9 @@ Codex R2 on 057 coord layer spec</a></li>
 <li><a href="#pdt---codex-ops-r3-on-057-coord-layer-spec"
 id="toc-pdt---codex-ops-r3-on-057-coord-layer-spec">2026-05-15 20:57 PDT
 - Codex-ops R3 on 057 coord layer spec</a></li>
+<li><a href="#pdt---codex-r3-on-057-coord-layer-spec"
+id="toc-pdt---codex-r3-on-057-coord-layer-spec">2026-05-15 20:58 PDT -
+Codex R3 on 057 coord layer spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20631,6 +20634,57 @@ The remaining patches should make correlation identity durable across
 fallback/retry paths and make scheduler-health its own race-safe
 deadline domain instead of relying on a missing round correlation
 id.</li>
+</ul>
+<h3 id="pdt---codex-r3-on-057-coord-layer-spec">2026-05-15 20:58 PDT -
+Codex R3 on 057 coord layer spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r3/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R3 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-057-coord-layer-narrow-append-and-deadlines.md</code>
+at <code>d9f09b267b26637ed648cfe7d6c1b248dd833dbd</code>, R2
+Codex/Codex-ops response context, and pinned implementation context for
+<code>request.py</code>, <code>schemas/request.schema.json</code>,
+<code>wait-for-new-turns.ts</code>, <code>search-memories.ts</code>,
+<code>storage/interface.ts</code>, <code>sqlite.ts</code>,
+<code>server.ts</code>, and <code>_run_reviewer.sh</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r3/codex.md</code>
+as <code>be54ba5</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC0 still contains leftover <code>request.py</code>
+<code>coord_invoke</code> language conflicting with the post-push-only
+trigger invariant; MEDIUM AC7 says fallback ticks read
+<code>correlation_id</code> from <code>request.md</code>, but the
+current request schema forbids that field and <code>request.py</code>
+does not write it.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>d9f09b267b26637ed648cfe7d6c1b248dd833dbd</code>; request path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/r3/codex.md</code>;
+schema paths
+<code>tools/review-queue/schemas/reviewer.schema.json</code> and
+<code>tools/review-queue/schemas/request.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R3 closes the large runtime-shape issues from
+R2, but two spec seams still need tightening before build: remove the
+last <code>request.py</code> invocation sentence, and make the round
+correlation-id source match the request artifact that fallback ticks can
+actually read.</li>
 </ul>
 </body>
 </html>
