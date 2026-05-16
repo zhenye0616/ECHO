@@ -12,9 +12,19 @@ head_sha: ""
 pr_url: ""
 task_state_ref: 2026-05-15-057-coord-layer-narrow-append-and-deadlines
 agent_notes: |
-  NOT YET DISPATCHED FOR REVIEW. Per founder instruction 2026-05-15: hold
-  for review queue until 055 + 056 review loops complete; strategist will
-  invoke `request.py` for 057 r1 after those converge.
+  DECOMPOSED 2026-05-16 into 057a (substrate + observability) + 057b
+  (active trigger + role emission) after r5 review-cycle plateau (decay
+  r1=9 → r2=5 → r3=4 → r4=5 → r5=5 — 049 fail-to-converge asymptote).
+  All r1-r5 patches are absorbed into the two child specs. Original spec
+  preserved here as design archive; review history at
+  `backlog/reviews/2026-05-15-057-coord-layer-narrow-append-and-deadlines/`
+  is the authoritative record of the 21+ findings + dispositions.
+
+  Successor specs:
+    - backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md
+    - backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md
+
+  057b depends on 057a; 057a is independently shippable.
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC0 — strategist-initiated active trigger (active trigger fires from watcher post-push, not request.py — r1 codex F1 HIGH; daemon also opens pre-spawn deadline via coord:reviewer_invoked — r1 codex-ops F1 HIGH)
