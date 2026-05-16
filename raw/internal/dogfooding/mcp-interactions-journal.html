@@ -1915,6 +1915,9 @@ Codex R5 on 057 coord layer spec</a></li>
 <li><a href="#pdt---codex-r1-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-r1-on-057a-coord-substrate-spec">2026-05-15 21:45
 PDT - Codex R1 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-ops-r1-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-ops-r1-on-057a-coord-substrate-spec">2026-05-15
+21:51 PDT - Codex-ops R1 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20963,6 +20966,54 @@ cleaner and independently buildable, but the substrate spec still needs
 tighter contracts around who a coord event is about, how missed-deadline
 emission stays idempotent across concurrent daemon paths, and how the
 daemon loads role policy once at startup.</li>
+</ul>
+<h3 id="pdt---codex-ops-r1-on-057a-coord-substrate-spec">2026-05-15
+21:51 PDT - Codex-ops R1 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R1 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>6d26e60aa287a40c016bb2a4b600fed600959f88</code>, recent
+codex-ops response format context, and the journal regeneration command
+embedded in this journal.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/codex-ops.md</code>
+as <code>92f9e6d</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH missed deadlines lack a terminal fired/removed lifecycle
+and can be reprocessed every heartbeat; HIGH 10-minute reconstruction is
+not serialized with live ingest/heartbeat and can resurrect or duplicate
+deadlines; MEDIUM <code>coord_status()</code> only shows last-1h missed
+deadlines, which can hide overnight launchd failures.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>6d26e60aa287a40c016bb2a4b600fed600959f88</code>; request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r1/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057a round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The substrate split removes the
+active-trigger noise from the review surface, but the daemon-side
+runtime still needs bounded missed-deadline lifecycle and single-lane
+reconciliation semantics so the new observability layer does not create
+stale state or false failure signals while unattended.</li>
 </ul>
 </body>
 </html>
