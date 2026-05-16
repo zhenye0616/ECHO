@@ -1979,6 +1979,9 @@ id="toc-pdt---codex-ops-r1-on-057b-coord-active-trigger-spec">2026-05-15
 <li><a href="#pdt---codex-ops-r2-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r2-on-057b-coord-active-trigger-spec">2026-05-16
 00:15 PDT - Codex-ops R2 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-r2-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-r2-on-057b-coord-active-trigger-spec">2026-05-16
+00:16 PDT - Codex R2 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22236,6 +22239,61 @@ concern is narrower: active reviewer spawning needs to be stable when
 the MCP daemon is not launched from repo root, and its child-process
 contract should be explicit enough to survive repeated unattended
 post-push hooks.</li>
+</ul>
+<h3 id="pdt---codex-r2-on-057b-coord-active-trigger-spec">2026-05-16
+00:16 PDT - Codex R2 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>7fcb4b202523cf3e27d032926050d273c86a0a1c</code>,
+<code>CLAUDE.md</code>, the R1 combined disposition, 057a substrate
+context, and current wrapper/request/server plumbing.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/codex.md</code>
+as <code>c28c29d</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH AC7 still says pinned-request tick_start happens after
+bind validation; MEDIUM TypeScript/Node spawn pseudocode uses
+<code>subprocess.spawn</code> and leaves unref/stdio semantics implicit;
+MEDIUM motivation still lists merge-and-cleanup as an active
+coord_invoke caller despite later deferral.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>7fcb4b202523cf3e27d032926050d273c86a0a1c</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>CLAUDE.md</code>,
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r1/combined.md</code>,
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/run-codex-reviewer.sh</code>,
+<code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/schemas/request.schema.json</code>,
+<code>src/mcp/server.ts</code>, <code>src/daemon/index.ts</code>,
+<code>package.json</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057b R2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 substantially closes the R1 cross-spec
+problems without reopening 057a. The remaining Codex findings are narrow
+spec-contract edits: make AC7 match AC0’s bind-failure order, spell the
+Node child-process API precisely, and remove the stale merge-and-cleanup
+caller mention.</li>
 </ul>
 </body>
 </html>
