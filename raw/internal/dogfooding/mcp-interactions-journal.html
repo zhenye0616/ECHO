@@ -1988,6 +1988,9 @@ id="toc-pdt---codex-r3-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-ops-r3-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-ops-r3-on-057b-coord-active-trigger-spec">2026-05-16
 00:26 PDT - Codex-ops R3 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-r4-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-r4-on-057b-coord-active-trigger-spec">2026-05-16
+00:37 PDT - Codex R4 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22408,6 +22411,62 @@ runtime-only: the exact <code>import.meta.url</code> path is wrong for
 the declared module location, and scheduler-health needs a
 closure/timeout shape that does not page the operator on a healthy long
 review.</li>
+</ul>
+<h3 id="pdt---codex-r4-on-057b-coord-active-trigger-spec">2026-05-16
+00:37 PDT - Codex R4 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R4 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>3d88d39c58eda9b26ea258c7f37c513bf7d72bff</code>, current 057a
+claimed substrate text, current reviewer wrapper/schema/server context,
+and Node <code>path.join</code> behavior for role-derived wrapper
+paths.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r4/codex.md</code>
+as <code>ce88540</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH <code>coord_invoke</code> validates
+<code>correlation_id</code> and <code>request_path</code> but not
+<code>role</code> before interpolating it into the wrapper path, so
+slash/traversal-bearing role strings can normalize outside
+<code>tools/review-queue</code> despite <code>shell:false</code>, and a
+future accidental wrapper file could activate an out-of-scope headless
+role.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>3d88d39c58eda9b26ea258c7f37c513bf7d72bff</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r4/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r4/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; context paths
+<code>backlog/claimed/2026-05-16-057a-coord-substrate-and-observability.md</code>,
+<code>tools/review-queue/_run_reviewer.sh</code>,
+<code>tools/review-queue/request.py</code>,
+<code>tools/review-queue/schemas/request.schema.json</code>,
+<code>src/mcp/server.ts</code>, <code>package.json</code>,
+<code>tsconfig.json</code>; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057b R4 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R4 closed the r3 path-depth, canonical UUID,
+boundary wording, and scheduler-health bootstrap-scope findings. The
+remaining issue is narrow but load-bearing for the active-spawn write
+surface: <code>role</code> must be checked against the canonical
+reviewer slug/headless-role set before it is used as a filesystem path
+component.</li>
 </ul>
 </body>
 </html>
