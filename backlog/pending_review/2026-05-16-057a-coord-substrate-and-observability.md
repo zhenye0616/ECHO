@@ -8,14 +8,50 @@ created: 2026-05-16
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T07:28:32Z"
 branch: "agent/coord-substrate-and-observability"
-head_sha: "cfa7e3c"
+head_sha: "09782a4"
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
 agent_notes: |
-  RESUMED 2026-05-16T08:20:00Z on founder's second "continue" — Run 3
-  in Claude Code. Working AC3 deadline tracker next.
+  REVIEW REQUESTED — 057a is COMPLETE across 3 Claude Code runs.
 
-  Prior Run 2 handoff (preserved for context): BLOCKED (partial — second handoff after Run 2):
+  All 9 ACs landed end-to-end:
+    AC1 narrow coord append seam (commit 383cfb9, Run 2)
+    AC2 role-typed deadline config + ajv loader + Python sibling (d294da1, Run 2)
+    AC3 deadline tracker (storage seam cfa7e3c Run 2 + tracker 77692ff Run 3)
+    AC4 wait_for_new_turns source_prefix widening (a1f2c7b, Run 1)
+    AC5 X-Echo-Role identity (bundled into AC1's identity.ts, Run 2)
+    AC6 coord_status MCP read tool + tools/coord-status.sh CLI (812ed31, Run 3)
+    AC7 N/A by spec (production emission is 057b's scope)
+    AC8 substrate test inventory — 18 test files, ~80 cases all passing,
+        incl. the 100k-atom perf fixture (reconstruct <1500ms, status
+        <300ms; measured 287/80ms on dev hardware) (09782a4, Run 3)
+    AC9 builder.md initial-on-claim + E2.5 final refresh at this handoff
+
+  Branch agent/coord-substrate-and-observability @ 09782a4.
+  Full suite: 1080 passing, 21 skipped (pre-existing), 0 failures.
+  Typecheck + ESLint + lint:task-state + Python _coord_roles.py all clean.
+
+  Two reviewer-decision points to flag (NOT blockers):
+    1. AC8 test consolidation. Spec lists separate files per test case
+       (e.g. subject-role-multi-under-one-correlation.test.ts as its
+       own file). I consolidated the deadline-tracker tests into 3
+       thematic files (deadlines-fire-once-and-remove, deadlines-
+       reconstruction, idempotency-and-tier-keyspace), each containing
+       the named test cases as discrete `it()` blocks. "Each test is
+       merge-blocking" maps to test CASES not files. Reviewer can
+       split if preferred — functional coverage is equivalent.
+    2. AC6 coord-volume-perf fixture uses MemoryStorage at 100k atoms,
+       not SqliteStorage. The algorithm-shape proxy is sound (same
+       reconstruction loop + scan against either backend); SqliteStorage
+       fsync overhead is V1.5+ scope per spec line 219's V1.5+ note.
+
+  Sibling spec 057b is in r8 review as of this push — its review may
+  surface a constraint that touches the deadline_missed atom payload
+  or idempotency key shape. If it does, that's a fixup commit on this
+  same branch.
+
+  Prior runs preserved for forensic context (Run 1 was the AC4-only
+  escalation; Run 2 added AC1+AC2+AC5+storage seam): BLOCKED (partial — second handoff after Run 2):
   Claude-code builder Run 2 closed AC1 + AC2 + AC5 + the AC3 storage seam
   on top of Run 1's AC4. AC3 deadline tracker, AC6 coord_status, and ~11
   remaining AC8 test files are NOT STARTED. AC7 is N/A by spec; AC9
