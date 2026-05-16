@@ -1939,6 +1939,9 @@ PDT - Codex R4 on 057a coord substrate spec</a></li>
 <li><a href="#pdt---codex-ops-r5-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-ops-r5-on-057a-coord-substrate-spec">2026-05-15
 23:02 PDT - Codex-ops R5 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-r5-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-r5-on-057a-coord-substrate-spec">2026-05-15 23:03
+PDT - Codex R5 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21473,6 +21476,58 @@ cleanly by dropping timestamp-bound replay and deriving last-miss state
 from durable atoms. The remaining concern is narrower and operational:
 make the full-ledger choice measurable or self-warning so the safer
 correctness strategy does not become a silent runtime slowdown.</li>
+</ul>
+<h3 id="pdt---codex-r5-on-057a-coord-substrate-spec">2026-05-15 23:03
+PDT - Codex R5 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>21c164b345a058532cb8809bb89c4bf414592fba</code>, and current
+implementation context for <code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/wait-for-new-turns.ts</code>,
+<code>src/mcp/tools/search-memories.ts</code>,
+<code>src/storage/interface.ts</code>,
+<code>src/storage/sqlite.ts</code>, <code>src/storage/memory.ts</code>,
+<code>src/daemon/index.ts</code>,
+<code>tools/review-queue/reviewers.json</code>, and
+<code>package.json</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r5/codex.md</code>
+as <code>d6b972d</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM AC6’s last-miss slot universe says to derive slots from
+registry entries declaring <code>expects</code>, while AC2/AC3 place
+<code>expects</code> in <code>coord-roles.json</code> and AC1’s registry
+only defines tier plus subject-role policy.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>21c164b345a058532cb8809bb89c4bf414592fba</code>; request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r5/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 057a R5 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R5 fixes the storage-watermark and durable
+last-miss restart gaps from R4. The remaining Codex concern is a narrow
+source-of-truth mismatch for <code>expects</code>; once patched, the
+substrate spec should be implementable from the current repo surfaces
+without another structural split.</li>
 </ul>
 </body>
 </html>
