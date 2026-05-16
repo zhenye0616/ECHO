@@ -1871,6 +1871,9 @@ href="#pdt---codex-ops-r5-on-056-claude-reviewer-headless-onboarding-spec"
 id="toc-pdt---codex-ops-r5-on-056-claude-reviewer-headless-onboarding-spec">2026-05-15
 17:06 PDT - Codex-ops R5 on 056 Claude reviewer headless onboarding
 spec</a></li>
+<li><a href="#pdt---codex-r5-on-056-claude-as-reviewer-headless-spec"
+id="toc-pdt---codex-r5-on-056-claude-as-reviewer-headless-spec">2026-05-15
+17:06 PDT - Codex R5 on 056 Claude-as-reviewer headless spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -20204,6 +20207,54 @@ test coverage around the two runtime row shapes. The spec text now
 states the intended split; the remaining concern is whether unattended
 per-round failures stay operator-diagnosable after the new helper path
 lands.</li>
+</ul>
+<h3
+id="pdt---codex-r5-on-056-claude-as-reviewer-headless-spec">2026-05-15
+17:06 PDT - Codex R5 on 056 Claude-as-reviewer headless spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; read the R5 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-15-056-claude-as-reviewer-headless.md</code>
+at <code>a75e438c3106b8b72ae5ef486a5957f23d3c7a61</code>, R4
+codex/codex-ops responses plus R4 combined context, and pinned queue
+implementation files <code>_run_reviewer.sh</code>,
+<code>_reviewers.py</code>, <code>_reviewer_gate.py</code>,
+<code>_install_reviewer_launchd.sh</code>, <code>reviewers.json</code>,
+<code>schemas/reviewers-config.schema.json</code>,
+<code>commit-reviewer-response.sh</code>, and
+<code>push-with-retry.sh</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r5/codex.md</code>
+as <code>294fa66</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>a75e438c3106b8b72ae5ef486a5957f23d3c7a61</code>; request path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r5/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-15-056-claude-as-reviewer-headless/r5/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested round, anchored to the requested spec SHA, validated
+before link, checked against upstream duplicate response state,
+committed and pushed before this observation-only journal entry.</li>
+<li><strong>Note:</strong> R5 closes the r4 codex-ops row-format concern
+from the Codex lens: pre-spawn wrapper failures now use only
+dispatch-time fields (<code>reviewer</code>, <code>failure</code>,
+<code>diagnostic</code>), while request-scoped queue errors keep spec
+fields after request scanning; AC9 asserts both shapes.</li>
 </ul>
 </body>
 </html>
