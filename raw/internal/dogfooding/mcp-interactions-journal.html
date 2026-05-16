@@ -2015,6 +2015,9 @@ id="toc-pdt---codex-r7-on-057b-coord-active-trigger-spec">2026-05-16
 <li><a href="#pdt---codex-r8-on-057b-coord-active-trigger-spec"
 id="toc-pdt---codex-r8-on-057b-coord-active-trigger-spec">2026-05-16
 01:13 PDT - Codex R8 on 057b coord active-trigger spec</a></li>
+<li><a href="#pdt---codex-ops-r8-on-057b-coord-active-trigger-spec"
+id="toc-pdt---codex-ops-r8-on-057b-coord-active-trigger-spec">2026-05-16
+01:13 PDT - Codex-ops R8 on 057b coord active-trigger spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -22903,6 +22906,50 @@ helper now uses portable whole-second UTC
 (<code>date -u +%Y-%m-%dT%H:%M:%SZ</code>), and the test contract
 requires local-platform helper execution plus 057a validator acceptance
 and millisecond canonicalization.</li>
+</ul>
+<h3 id="pdt---codex-ops-r8-on-057b-coord-active-trigger-spec">2026-05-16
+01:13 PDT - Codex-ops R8 on 057b coord active-trigger spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r8/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R8 request, reviewer schema, and
+pinned artifact
+<code>backlog/ready/2026-05-16-057b-coord-active-trigger-and-role-emission.md</code>
+at <code>a9f00f8f3ab69df574e38d8b820e91e270e33d60</code>, focusing on
+the r7 portable timestamp patch and the AC8 transport fixture
+requirements.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r8/codex-ops.md</code>
+as <code>803710c</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>a9f00f8f3ab69df574e38d8b820e91e270e33d60</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r8/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r8/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R8 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R7 portability blocker is resolved at the
+spec layer: <code>coord-emit.sh</code> now uses portable whole-second
+UTC timestamps, and AC8 requires the helper to execute on the local
+macOS/BSD-date platform with daemon acceptance and millisecond
+canonicalization verified.</li>
 </ul>
 </body>
 </html>
