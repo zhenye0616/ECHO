@@ -35,7 +35,8 @@ files_to_modify:
   - tools/review-queue/schemas/request.schema.json # add correlation_id required field, canonical uuid4 pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ (r3 codex F2 MED — version-4 + variant nibble enforced; the prior ^[a-f0-9-]{36}$ was too loose)
   - tools/review-queue/request.py                  # generate correlation_id = str(uuid.uuid4()) (36 chars with dashes; uuid4 by construction → automatically matches the canonical regex; closes r1 codex F1 HIGH); NO MCP call
   # AC7 — wrapper two-phase emission (scheduler_health no-correlation_id + request-scoped tick_start/tick_end with correlation_id)
-  - tools/review-queue/_run_reviewer.sh            # Phase 1 scheduler_health at log-redirect-open; Phase 2 tick_start after candidate selection OR (pinned-mode) before bind-validation; tick_end on EVERY clean exit including bind_failed (r4 codex-ops F3 HIGH outcome enum + r1 codex F2 + r1 codex-ops F3 convergent HIGH bind_failed via tick_end-not-tick_failed_to_bind)
+  - tools/review-queue/coord-emit.sh               # NEW (r6 codex F1 HIGH): standalone repo executable that wraps curl with the full 057a coord_emit input contract (event_type + schema_version + emitted_at + subject_role + tier_key + payload); callable from _run_reviewer.sh AND from inside reviewer skill steps run by codex exec / claude -p (the prior r5 sourced-shell-function design was unimplementable because reviewer skill steps run in a child CLI shell where parent's bash function is invisible); reads REVIEWER_NAME for X-Echo-Role header
+  - tools/review-queue/_run_reviewer.sh            # Phase 1 scheduler_health at log-redirect-open (invokes tools/review-queue/coord-emit.sh scheduler_health --tick-run-id=...); Phase 2 tick_start after candidate selection OR (pinned-mode) before bind-validation; tick_end on EVERY clean exit including bind_failed (r4 codex-ops F3 HIGH outcome enum + r1 codex F2 + r1 codex-ops F3 convergent HIGH bind_failed via tick_end-not-tick_failed_to_bind)
   - tools/review-queue/run-codex-reviewer.sh       # no-op for 057b — env-var inheritance from coord_invoke's subprocess.spawn carries through; the 5-line wrapper passes env unchanged
   - tools/review-queue/run-codex-ops-reviewer.sh   # same — no-op for 057b
   # AC7 — pinned-request mode in reviewer prompts (bind-failure flow uses tick_end(outcome=bind_failed), NOT tick_failed_to_bind — r1 codex F2 + r1 codex-ops F3 convergent HIGH)
@@ -74,7 +75,7 @@ files_to_modify:
   - tests/coord/coord-invoke-fire-and-forget.test.ts          # NEW (r2 codex F2 MED + r2 codex-ops F5 MED convergent): wrapper spawns a sleep/early-stderr sequence — coord_invoke returns within bounded timeout (under 1s) AND child does not block on undrained pipe AND daemon does not retain child handle (child.unref()); test asserts process.memoryUsage stays bounded across N=100 coord_invoke calls
   - tests/coord/coord-invoke-spawn-error-noncrash.test.ts      # NEW (r5 codex-ops F1 HIGH): force spawn to emit async 'error' (e.g. delete the wrapper between stat-check and spawn-call OR set ulimit -n 0 to force EMFILE) — daemon stays alive, coord_invoke returns/records bounded failure, pre-spawn deadline still fires deadline_missed via 057a tracker (the correct operator signal)
   - tests/coord/coord-emit-wrapper-transport.test.ts           # NEW (r5 codex F1 MED): wrapper-originated atoms carry metadata.coord.emitter_role=${REVIEWER_NAME} via X-Echo-Role header; daemon-down does NOT abort the queue tick (curl --connect-timeout 2 --max-time 5 returns non-zero, wrapper continues with `|| true`)
-  - tests/coord/paths-resolution.test.ts                       # NEW (r3 codex F1 + r3 codex-ops F1 convergent HIGH): src/coord/paths.ts exports REPO_ROOT that ends in canonical repo dir regardless of process.cwd(); resolveReviewerWrapperPath("codex") returns existing executable; ECHO_REPO_ROOT env override is honored; unknown role raises structured error
+  - tests/coord/paths-resolution.test.ts                       # NEW (r3 codex F1 + r3 codex-ops F1 convergent HIGH, narrowed r6 codex F2 LOW): src/coord/paths.ts exports REPO_ROOT that ends in canonical repo dir regardless of process.cwd(); resolveReviewerWrapperPath("codex") returns existing executable; ECHO_REPO_ROOT env override is honored; SHAPE-INVALID roles ("../", "/", "foo/../bar", "foo;rm", "foo bar", "", "FOO") reject with NO FS access AND NO MCP side-effects (shape regex first); ROSTER-INVALID roles ("cursor" [headless:false], "nonexistent") reject AFTER loadCoordRoles() reads coord-roles.json but BEFORE wrapper-path construction/stat/spawn/MCP side-effects
   - tests/coord/scheduler-health-bootstrap-scope.test.ts       # NEW (r3 codex-ops F2 MED): wrapper emits scheduler_health → does bootstrap (worktree, env, prompt routing) → emits scheduler_health_done → THEN starts review work; long review (synthesized 5+ min codex exec) does NOT fire false coord:deadline_missed for the scheduler_health tier; round-tier tick_start/tick_end lifecycle covers the long review window
   - tests/coord/silent-fail-detection.test.ts               # the full motivating scenario: launchd-style wrapper invocation fails to emit tick_start; deadline fires coord:deadline_missed within budget
   # AC9 — task-state pointer per 046 AC1
@@ -126,7 +127,7 @@ The daemon:
      3. **Path construction**: `const candidate = path.join(REPO_ROOT, "tools/review-queue", `run-${role}-reviewer.sh`);`
      4. **Containment check**: `const resolved = path.resolve(candidate);` and assert `resolved.startsWith(path.resolve(REPO_ROOT, "tools/review-queue") + path.sep)` AND `path.basename(resolved) === `run-${role}-reviewer.sh``. Structured error on mismatch (defense-in-depth: even if shape-check + roster-check both pass, the resolved path must stay in-tree under the reviewer-wrapper directory).
      5. **Existence + executable bit**: `fs.statSync(resolved)` must show a regular file with executable mode; otherwise structured error.
-   - **Has its own parity test** in `tests/coord/paths-resolution.test.ts` (NEW r3, extended r4): asserts `REPO_ROOT` ends in `/Project_echo` (or equivalent canonical root) regardless of daemon's `process.cwd()`; `resolveReviewerWrapperPath("codex")` returns the existing wrapper file; `ECHO_REPO_ROOT` env override is honored; **malicious-role inputs are rejected with NO file-system access and NO MCP-tool side-effects** (test cases: `"../"`, `"/"`, `"foo/../bar"`, `"foo;rm"`, `"foo bar"`, `""`, `"FOO"`, `"cursor"` [headless:false], `"nonexistent"` [not in coord-roles.json] — r4 codex F1 HIGH).
+   - **Has its own parity test** in `tests/coord/paths-resolution.test.ts` (NEW r3, extended r4, narrowed r6): asserts `REPO_ROOT` ends in `/Project_echo` (or equivalent canonical root) regardless of daemon's `process.cwd()`; `resolveReviewerWrapperPath("codex")` returns the existing wrapper file; `ECHO_REPO_ROOT` env override is honored. **Malicious-role test split by where they reject** (r6 codex F2 LOW — matches AC0 step 1 sub-step semantics): (a) **Shape-invalid roles** (`"../"`, `"/"`, `"foo/../bar"`, `"foo;rm"`, `"foo bar"`, `""`, `"FOO"`) reject with **NO file-system access AND NO MCP-tool side-effects** (caught by shape regex BEFORE `loadCoordRoles()`); (b) **Roster-invalid roles** (`"cursor"` [headless:false], `"nonexistent"` [not in coord-roles.json]) reject AFTER `loadCoordRoles()` reads `coord-roles.json` from disk, BUT before any wrapper-path construction / stat / spawn / MCP side-effects — i.e. NO `path.join` / `path.resolve` / `fs.statSync` / `coord_emit` atom.
    - The daemon never depends on `process.cwd()`. Roles with `headless: false` in `coord-roles.json` (e.g. `cursor` IDE-mode) have no wrapper and are rejected by `resolveReviewerWrapperPath()` with structured MCP error.
 2. **Validates inputs strictly** (r4 codex F2 HIGH security + r3 codex F2 MED uuid4-shape strictness + r4 codex F1 HIGH role-validation):
    - `role` MUST match `^[a-z][a-z0-9-]*$` AND be a known `headless: true` entry in `coord-roles.json` AND its resolved wrapper path MUST stay under `${REPO_ROOT}/tools/review-queue/` with exact basename `run-<role>-reviewer.sh` (full 5-step gate in `resolveReviewerWrapperPath` — see step 1 above; r4 codex F1 HIGH).
@@ -182,25 +183,46 @@ Production emission lands in 057b. ALL integration is ADDITIVE — no protocol b
 
 **Wrapper transport contract** (r5 codex F1 MED — 057a's identity model makes the wrapper-side HTTP header part of the production emission contract; without pinning, a builder could implement payload-only or native-MCP emissions that look consistent with this spec but get rejected at runtime by 057a's X-Echo-Role gate):
 
-Wrappers (`_run_reviewer.sh`, `run-<role>-reviewer.sh`) and reviewer skills emit coord events via the **same curl-style HTTP transport 057a's AC5 mandates for V1**: POST JSON-RPC `tools/call` for `coord_emit` to `${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}`, with `--connect-timeout 2 --max-time 5` and `-H "X-Echo-Role: ${REVIEWER_NAME}"`. Native-MCP emission is NOT supported in V1 (per 057a AC5 — the existing MCP server doesn't expose request headers to tool handlers; native clients would fail the X-Echo-Role check). Concrete helper:
+Wrappers (`_run_reviewer.sh`, `run-<role>-reviewer.sh`) and reviewer skills emit coord events via the **same curl-style HTTP transport 057a's AC5 mandates for V1**: POST JSON-RPC `tools/call` for `coord_emit` to `${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}`, with `--connect-timeout 2 --max-time 5` and `-H "X-Echo-Role: ${REVIEWER_NAME}"`. Native-MCP emission is NOT supported in V1 (per 057a AC5 — the existing MCP server doesn't expose request headers to tool handlers; native clients would fail the X-Echo-Role check).
+
+**Helper is a repo executable** (r6 codex F1 HIGH — the r5 in-shell-function design was unimplementable because: (a) it was sourced by `_run_reviewer.sh` but `tick_start`/`tick_end` emissions happen inside the reviewer skill steps run by `codex exec` / `claude -p`, a separate shell environment where the parent's bash function is not visible; (b) the JSON-RPC arguments were incomplete vs 057a's `coord_emit` contract which requires top-level `event_type`, `schema_version`, `emitted_at`, `subject_role`, exactly one tier key (`correlation_id` or `tick_run_id`), and optional `payload`). The helper is now a standalone executable at `tools/review-queue/coord-emit.sh`, callable identically from the wrapper, the reviewer skill steps, and any post-push hook in `skills/review-queue-watch.md` etc.:
 
 ```bash
-# Sourced by _run_reviewer.sh once at startup
-coord_emit() {
-  # $1 = event_type, $2..$N = key=value pairs for payload
-  local event_type="$1"; shift
-  local payload="{}"
-  # ... build payload JSON from kv args ...
-  curl -sS --connect-timeout 2 --max-time 5 \
-       -H "X-Echo-Role: ${REVIEWER_NAME}" \
-       -H "Content-Type: application/json" \
-       -X POST "${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}" \
-       -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"coord_emit\",\"arguments\":{\"event_type\":\"${event_type}\",\"payload\":${payload}}},\"id\":1}" \
-       >/dev/null 2>&1 || true   # r1 codex-ops F2 HIGH best-effort — non-fatal on daemon-down
-}
+#!/usr/bin/env bash
+# tools/review-queue/coord-emit.sh — wrapper-side V1 coord event emitter
+# Usage: coord-emit.sh <event_type> --correlation-id=<UUID> [--payload='{...}']
+#    OR: coord-emit.sh <event_type> --tick-run-id=<UUID>   [--payload='{...}']
+# Reads from env: ECHO_MCP_URL, ECHO_MCP_PORT, REVIEWER_NAME (= X-Echo-Role)
+# Exit 0 on success OR daemon-down (best-effort; queue durability preserved).
+set -u
+event_type="${1:?event_type required}"; shift
+correlation_id=""; tick_run_id=""; payload="{}"
+for arg in "$@"; do
+  case "$arg" in
+    --correlation-id=*) correlation_id="${arg#--correlation-id=}" ;;
+    --tick-run-id=*)    tick_run_id="${arg#--tick-run-id=}"       ;;
+    --payload=*)        payload="${arg#--payload=}"               ;;
+  esac
+done
+# Per 057a coord_emit input contract: top-level event_type, schema_version,
+# emitted_at, subject_role, exactly one tier key, optional payload.
+emitted_at="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+tier_key="\"correlation_id\": \"${correlation_id}\""
+[ -z "${correlation_id}" ] && tier_key="\"tick_run_id\": \"${tick_run_id}\""
+curl -sS --connect-timeout 2 --max-time 5 \
+     -H "X-Echo-Role: ${REVIEWER_NAME}" \
+     -H "Content-Type: application/json" \
+     -X POST "${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}" \
+     -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"coord_emit\",\"arguments\":{\"event_type\":\"${event_type}\",\"schema_version\":1,\"emitted_at\":\"${emitted_at}\",\"subject_role\":\"${REVIEWER_NAME}\",${tier_key},\"payload\":${payload}}},\"id\":1}" \
+     >/dev/null 2>&1 || true   # r1 codex-ops F2 HIGH best-effort — non-fatal on daemon-down
 ```
 
-Non-fatal semantics (`|| true`) preserve queue durability when the daemon is unreachable. AC8 fixture `coord-emit-wrapper-transport.test.ts` (NEW r5) asserts: (a) wrapper-originated atoms carry `metadata.coord.emitter_role = ${REVIEWER_NAME}` via the X-Echo-Role header; (b) daemon-down does NOT abort the queue tick (curl returns non-zero, wrapper continues).
+Call sites:
+- `_run_reviewer.sh` Phase 1 bootstrap: `tools/review-queue/coord-emit.sh scheduler_health --tick-run-id="${TICK_RUN_ID}"` (then `scheduler_health_done` after bootstrap)
+- Reviewer skill Phase 2: `tools/review-queue/coord-emit.sh tick_start --correlation-id="${ECHO_COORD_CORRELATION_ID}"` (then `tick_end` with `--payload='{"outcome":"completed"}'` etc.)
+- Pinned-mode bind-failure: `tools/review-queue/coord-emit.sh tick_end --correlation-id="${ECHO_COORD_CORRELATION_ID}" --payload='{"outcome":"bind_failed","reason":"correlation_id_mismatch"}'`
+
+Non-fatal semantics (`|| true`) preserve queue durability when the daemon is unreachable. AC8 fixture `coord-emit-wrapper-transport.test.ts` (NEW r5, extended r6) asserts: (a) wrapper-originated atoms carry `metadata.coord.emitter_role = ${REVIEWER_NAME}` via the X-Echo-Role header; (b) daemon-down does NOT abort the queue tick; (c) **`coord-emit.sh tick_start --correlation-id=...` invocation produces a valid `coord:tick_start` atom that 057a's `coord_emit` validator accepts** — i.e. the JSON-RPC arguments match the full 057a contract (event_type + schema_version + emitted_at + subject_role + tier key) — r6 codex F1 HIGH; (d) `coord-emit.sh scheduler_health --tick-run-id=...` analogously accepted.
 
 **Wrapper two-phase emission** (r2 codex-ops F3 MED scheduler/round distinction; r4 codex-ops F3 HIGH every-clean-exit coverage):
 
