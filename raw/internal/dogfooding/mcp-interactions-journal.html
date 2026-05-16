@@ -1918,6 +1918,9 @@ PDT - Codex R1 on 057a coord substrate spec</a></li>
 <li><a href="#pdt---codex-ops-r1-on-057a-coord-substrate-spec"
 id="toc-pdt---codex-ops-r1-on-057a-coord-substrate-spec">2026-05-15
 21:51 PDT - Codex-ops R1 on 057a coord substrate spec</a></li>
+<li><a href="#pdt---codex-ops-r2-on-057a-coord-substrate-spec"
+id="toc-pdt---codex-ops-r2-on-057a-coord-substrate-spec">2026-05-15
+22:04 PDT - Codex-ops R2 on 057a coord substrate spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -21014,6 +21017,55 @@ active-trigger noise from the review surface, but the daemon-side
 runtime still needs bounded missed-deadline lifecycle and single-lane
 reconciliation semantics so the new observability layer does not create
 stale state or false failure signals while unattended.</li>
+</ul>
+<h3 id="pdt---codex-ops-r2-on-057a-coord-substrate-spec">2026-05-15
+22:04 PDT - Codex-ops R2 on 057a coord substrate spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R2 request, reviewer schema, pinned
+artifact
+<code>backlog/ready/2026-05-16-057a-coord-substrate-and-observability.md</code>
+at <code>3e571c070d4506b938805e40e6cb3707c724a1c8</code>, the codex-ops
+reviewer command, and recent codex-ops response format context.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r2/codex-ops.md</code>
+as <code>ffd38d7</code>, verdict <code>proceed_after_patches</code>,
+findings: HIGH cache-hit idempotency after restart can leave
+already-missed records permanently open; MEDIUM daemon role-config
+loading depends on cwd unless path resolution is pinned; MEDIUM
+reconstruction/reconciliation replay in caller-supplied
+<code>emitted_at</code> order can diverge from durable append order
+under clock skew or delayed emission.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>3e571c070d4506b938805e40e6cb3707c724a1c8</code>; request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r2/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
+reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057a r2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 closes the main r1 runtime holes around
+subject-role semantics, serial mutation, terminal append lifecycle,
+source-prefix validation, and the widened status horizon. The remaining
+operational gaps are narrower restart/startup/replay contracts that
+would otherwise produce false stale-open deadlines or daemon startup
+surprises.</li>
 </ul>
 </body>
 </html>
