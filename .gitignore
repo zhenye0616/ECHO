@@ -27,6 +27,9 @@ raw/internal/dogfooding/**/full-response.json
 # Claude Code scheduler/loop runtime lock — transient process state
 .claude/scheduled_tasks.lock
 
+# Claude Code subagent worktrees — harness state, not project content
+.claude/worktrees/
+
 # Node / TypeScript
 node_modules/
 dist/
