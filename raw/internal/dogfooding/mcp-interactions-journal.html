@@ -2023,6 +2023,14 @@ href="#pdt---codex-r9-on-057b-coord-active-trigger-implementation"
 id="toc-pdt---codex-r9-on-057b-coord-active-trigger-implementation">2026-05-16
 12:10 PDT - Codex R9 on 057b coord active-trigger
 implementation</a></li>
+<li><a href="#pdt-strategist-watcher-r9-escalation-on-057b"
+id="toc-pdt-strategist-watcher-r9-escalation-on-057b">2026-05-16 14:24
+PDT — strategist watcher r9 escalation on 057b</a></li>
+<li><a
+href="#pdt---codex-ops-r10-on-057b-coord-active-trigger-implementation"
+id="toc-pdt---codex-ops-r10-on-057b-coord-active-trigger-implementation">2026-05-16
+15:00 PDT - Codex-ops R10 on 057b coord active-trigger
+implementation</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23017,6 +23025,90 @@ production active-trigger hook and test isolation both need patching
 before merge because one leaves active spawn inert and the other makes
 <code>vitest</code> itself perform uncontrolled reviewer
 invocations.</li>
+</ul>
+<h3 id="pdt-strategist-watcher-r9-escalation-on-057b">2026-05-16 14:24
+PDT — strategist watcher r9 escalation on 057b</h3>
+<ul>
+<li><strong>Trigger:</strong> /loop /review-queue-watch fired combine.py
+for 057b r9 (POST-BUILD verification round pinned at builder SHA
+38246c19); combined verdict crossed the {proceed*, pushback}
+boundary</li>
+<li><strong>Query inputs:</strong> combine.py →
+backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/combined.md</li>
+<li><strong>Returned:</strong> combined_verdict=partial_responses,
+escalated_to_founder=true; codex landed (verdict=pushback, 3 findings:
+1×HIGH on skills+coord-emit.sh, 1×HIGH on coord-invoke fire-and-forget
+tests, 1×MEDIUM on reviewer skills); codex-ops missing</li>
+<li><strong>Sources:</strong> filesystem read of
+backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r9/{request.md,codex.md,combined.md};
+no MCP call this tick</li>
+<li><strong>Verdict:</strong> 🟡 partial (codex landed with substantive
+pushback before codex-ops; founder must decide: wait for codex-ops then
+re-combine, or act on codex-only divergence)</li>
+<li><strong>Note:</strong> This is the second escalation pattern in r9 —
+first was the strategist /review-pending sidecar producing “merge with
+founder fixups” verdict at 17:30 UTC, now codex (cross-vendor POST-BUILD
+reviewer) returns pushback at the same builder SHA. The /review-pending
+sidecar uses ECHO’s code-reviewer subagent (claude); codex is the
+independent vendor check. Divergence between the two on the same SHA is
+exactly the value the POST-BUILD round was designed to surface.</li>
+<li><strong>Conjecture:</strong> (optional) Per spec, watcher exits
+without dispositioning; founder reviews codex’s 3 findings against the
+/review-pending sidecar’s verdict and decides whether to wait for
+codex-ops, or proceed with codex-only.</li>
+</ul>
+<h3
+id="pdt---codex-ops-r10-on-057b-coord-active-trigger-implementation">2026-05-16
+15:00 PDT - Codex-ops R10 on 057b coord active-trigger
+implementation</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r10/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+reviewer tick. Pulled <code>origin/main</code>; scanned
+<code>backlog/reviews/**/r*/request.md</code> for rounds requesting
+<code>codex-ops</code> with no <code>codex-ops.md</code> and no
+<code>combined.md</code>; read the R10 request, reviewer schema, pinned
+pending-review artifact at
+<code>b58e798bd75ac6996fa6f8fa3e2a9ec45b353af7</code>, r9
+response/combined context embedded in the repo, and implementation head
+<code>77df78d551cde9108e55d649a6b0b0adb6f68701</code> focusing on the r9
+F1 <code>Accept</code> header patch and r9 F3 bind-failed non-zero exit
+patch.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r10/codex-ops.md</code>
+as <code>fd0b022</code>, verdict <code>proceed</code>, findings:
+none.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>b58e798bd75ac6996fa6f8fa3e2a9ec45b353af7</code>; implementation
+head <code>77df78d551cde9108e55d649a6b0b0adb6f68701</code>; request path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r10/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-16-057b-coord-active-trigger-and-role-emission/r10/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; inspected
+implementation paths <code>skills/review-queue-watch.md</code>,
+<code>skills/review-pending.md</code>,
+<code>skills/review-queue-codex.md</code>,
+<code>skills/review-queue-codex-ops.md</code>,
+<code>skills/review-queue-claude.md</code>, and their synced
+<code>.claude/commands/*</code> copies; no ECHO MCP reads.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 057b R10 round, anchored to the requested artifact SHA
+and recorded implementation head, validated before link, checked against
+upstream duplicate response state, committed and pushed before this
+observation-only journal entry.</li>
+<li><strong>Note:</strong> R10 verifies the two operational patches in
+scope. The active-trigger Python hooks now negotiate
+StreamableHTTPServerTransport correctly, and pinned-request bind
+failures now preserve the coord atom while surfacing non-zero process
+failure to launchd/log consumers.</li>
 </ul>
 </body>
 </html>
