@@ -4,198 +4,34 @@
     "project": "ECHO",
     "version": "v1.6.1-shipped",
     "generated": "2026-05-10",
-    "notes": "V1.6.1 closes the V1.6 atomic MCP toolkit with item 033 (mcp-get-atom \u2014 verbatim escape hatch + Magic Moment M1-3 closure end-to-end in-MCP). Eight-tool toolkit shipped: search_memories + tail_session + find_clusters + get_atoms + get_atom + wait_for_new_turns + echo_ping (plus deprecated get_recent_work_context pending item 031 removal). 030+032 promoted earlier 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') made resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles; updated with 033's R1 divergent-verdict + R2 Gate 4 self-failure + recovery-primitive cost reduction. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
+    "notes": "V1.6.1 closes the V1.6 atomic MCP toolkit with item 033 (mcp-get-atom — verbatim escape hatch + Magic Moment M1-3 closure end-to-end in-MCP). Eight-tool toolkit shipped: search_memories + tail_session + find_clusters + get_atoms + get_atom + wait_for_new_turns + echo_ping (plus deprecated get_recent_work_context pending item 031 removal). 030+032 promoted earlier 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') made resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles; updated with 033's R1 divergent-verdict + R2 Gate 4 self-failure + recovery-primitive cost reduction. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
   },
-  "principles/compose-not-capture.md": {
+  "architecture/artifact-identity.md": {
     "status": "shipped",
-    "title": "Compose, Don't Capture",
-    "link": "compose-not-capture",
-    "summary": "ECHO ingests from tools that already capture; never builds its own capture surface for what others provide",
+    "title": "Artifact Identity (the join-key contract)",
+    "link": "artifact-identity",
+    "summary": "Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing — powers cross-source cluster joins.",
     "aliases": [
-      "Compose Not Capture"
+      "Artifact Identity",
+      "Artifact Identity Policy",
+      "Canonical Artifact ID",
+      "Artifact ID"
     ],
     "topic": "Architecture",
-    "subtopic": "Compose Not Capture"
+    "subtopic": "System Architecture"
   },
-  "principles/felt-not-seen.md": {
+  "architecture/capture-allowlist.md": {
     "status": "shipped",
-    "title": "Felt, Not Seen",
-    "link": "felt-not-seen",
-    "summary": "Ambient by default; visible on demand for trust. Product appears in the result, not the interface.",
+    "title": "Capture Allowlist",
+    "link": "capture-allowlist",
+    "summary": "Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.",
     "aliases": [
-      "Felt Not Seen",
-      "Ambient by Default"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "Felt Not Seen"
-  },
-  "principles/layer-above-saas.md": {
-    "status": "shipped",
-    "title": "Layer Above SaaS",
-    "link": "layer-above-saas",
-    "summary": "ECHO is additive to existing tools, never a replacement. The connective tissue between apps.",
-    "aliases": [
-      "Layer Above SaaS"
+      "Capture Allowlist",
+      "CAPTURED_SOURCES"
     ],
     "topic": "Architecture",
-    "subtopic": "Layer Above SaaS"
-  },
-  "principles/context-as-moat.md": {
-    "status": "shipped",
-    "title": "Context as Moat",
-    "link": "context-as-moat",
-    "summary": "Compete on context, not capability. Adjacent to foundation models, structurally outside their wars.",
-    "aliases": [
-      "Context as Moat",
-      "Compound on Context"
-    ],
-    "topic": "Brand & Positioning",
-    "subtopic": "Obsession Statement"
-  },
-  "principles/ambient-form-factor.md": {
-    "status": "shipped",
-    "title": "Ambient Form Factor",
-    "link": "ambient-form-factor",
-    "summary": "Browser extension + MCP server + hotkey overlay. No destination app. Three thin presences.",
-    "aliases": [
-      "Ambient Form Factor"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "Ambient Surfaces"
-  },
-  "principles/clipboard-and-launch.md": {
-    "status": "shipped",
-    "title": "Clipboard and Launch",
-    "link": "clipboard-and-launch",
-    "summary": "Universal delivery mechanism: assemble context, copy to clipboard, open target app, user pastes.",
-    "aliases": [
-      "Clipboard and Launch",
-      "Wispr Flow Pattern"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "Hotkey Overlay"
-  },
-  "principles/drift-prevention.md": {
-    "status": "shipped",
-    "title": "Drift Prevention",
-    "link": "drift-prevention",
-    "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
-    "aliases": [
-      "Drift Prevention",
-      "Scope Discipline"
-    ],
-    "topic": "V1 Scope",
-    "subtopic": "Non-Goals"
-  },
-  "principles/sandboxed-capture.md": {
-    "status": "shipped",
-    "title": "Sandboxed Capture",
-    "link": "sandboxed-capture",
-    "summary": "Capture enforced as code via the single gate chokepoint, now exercised in production by all four V1 capture surfaces.",
-    "aliases": [
-      "Sandboxed Capture",
-      "Capture Sandbox"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "principles/work-artifact-first-class.md": {
-    "status": "shipped",
-    "title": "Work Artifact First Class",
-    "link": "work-artifact-first-class",
-    "summary": "Repo as a first-class retrieval predicate. Every capture surface writes metadata.repo_root; every project-scoped retrieval tool accepts repo_path; cross-project bleed is structurally impossible. Landed via item 037.",
-    "aliases": [
-      "Work Artifact First Class",
-      "work-artifact-first-class",
-      "Repo Scoping as Retrieval Predicate"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Retrieval Discipline"
-  },
-  "principles/atomic-primitives-compose.md": {
-    "status": "shipped",
-    "title": "Atomic Primitives, Compose",
-    "link": "atomic-primitives-compose",
-    "summary": "Each MCP tool does one thing. Compound 'do everything in one call' tools are anti-patterns. The V1.6 toolkit ships 8 atomic primitives composing via 1-2 extra MCP calls. Formalized via item 038.",
-    "aliases": [
-      "Atomic Primitives Compose",
-      "atomic-primitives-compose",
-      "MCP Atomicity Principle"
-    ],
-    "topic": "Architecture",
-    "subtopic": "MCP Toolkit Discipline"
-  },
-  "surfaces/browser-extension.md": {
-    "status": "shipped",
-    "title": "Browser Extension",
-    "link": "browser-extension",
-    "summary": "Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.",
-    "aliases": [
-      "Browser Extension",
-      "Chrome Extension"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "Browser Extension"
-  },
-  "architecture/local-daemon.md": {
-    "status": "shipped",
-    "title": "Local Daemon",
-    "link": "local-daemon",
-    "summary": "Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.",
-    "aliases": [
-      "Local Daemon",
-      "ECHO Daemon"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "surfaces/mcp-server.md": {
-    "status": "shipped",
-    "title": "MCP Server",
-    "link": "mcp-server",
-    "summary": "Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.",
-    "aliases": [
-      "MCP Server",
-      "Model Context Protocol Server"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/hotkey-overlay.md": {
-    "status": "planned",
-    "title": "Hotkey Overlay",
-    "link": "hotkey-overlay",
-    "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
-    "aliases": [
-      "Hotkey Overlay",
-      "Hotkey Composer"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "Hotkey Overlay"
-  },
-  "surfaces/audit-page.md": {
-    "status": "planned",
-    "title": "Audit Page",
-    "link": "audit-page",
-    "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
-    "aliases": [
-      "Audit Page",
-      "Inspector"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage"
-  },
-  "product/target-cohort-indie-ai-builders.md": {
-    "status": "shipped",
-    "title": "Target Cohort: Indie AI Builders",
-    "link": "target-cohort-indie-ai-builders",
-    "summary": "V1 wedge: solo devs and small-team founders shipping AI tools. Strong founder-market-fit + warm distribution.",
-    "aliases": [
-      "Indie AI Builders",
-      "Target Cohort"
-    ],
-    "topic": "Cohorts",
-    "subtopic": "Indie AI Builders"
+    "subtopic": "Storage",
+    "raw": "src/capture/sources.ts"
   },
   "architecture/capture-gate.md": {
     "status": "shipped",
@@ -209,30 +45,80 @@
     "topic": "Architecture",
     "subtopic": "Storage"
   },
-  "architecture/storage.md": {
+  "architecture/capture-pipeline.md": {
     "status": "shipped",
-    "title": "Storage",
-    "link": "storage",
-    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.",
+    "title": "Capture Pipeline",
+    "link": "capture-pipeline",
+    "summary": "Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.",
     "aliases": [
-      "Storage",
-      "Storage Interface",
-      "MemoryStorage",
-      "SqliteStorage"
+      "Capture Pipeline",
+      "processCandidate",
+      "Pipeline Seam"
     ],
     "topic": "Architecture",
-    "subtopic": "Storage"
+    "subtopic": "Capture"
   },
-  "architecture/timestamp-canonicalization.md": {
+  "architecture/coord-layer.md": {
     "status": "shipped",
-    "title": "Timestamp Canonicalization",
-    "link": "timestamp-canonicalization",
-    "summary": "Single-chokepoint canonicalization at capture pipeline + idempotent migration on daemon startup; every events.timestamp row is canonical UTC Z form.",
+    "title": "Coord layer",
+    "link": "coord-layer",
+    "summary": "Generic role↔role coordination substrate over the daemon — narrow append seam + role-typed deadline tracker + identity-gated single-writer lane. Spec 057 brainstorm + decomposition rationale; ships dormant until 057a substrate + 057b active trigger activate it. Parent overview page; substrate detail in coord-substrate-and-observability, producer-side in coord-active-trigger-and-role-emission.",
     "aliases": [
-      "Timestamp Canonicalization",
-      "UTC Z form",
-      "Timestamp Migration",
-      "canonicalizeTimestamps"
+      "Coord Layer",
+      "Coordination Layer",
+      "echo:coord"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Substrate"
+  },
+  "architecture/coord-substrate-and-observability.md": {
+    "status": "shipped",
+    "title": "Coord substrate + observability (057a)",
+    "link": "coord-substrate-and-observability",
+    "summary": "Daemon-side coord ledger: narrow coord_emit append seam, role-typed deadline config (ajv-validated coord-roles.json), single-actor deadline tracker with cache-hit-also-terminal fireMissedDeadline, durable boot replay + periodic reconciliation, on-demand coord_status, 100k-atom V1 perf contract. Ships dormant; 057b activates emission.",
+    "aliases": [
+      "Coord Substrate",
+      "Coord Observability",
+      "coord_emit",
+      "coord_status"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Substrate"
+  },
+  "architecture/group-session.md": {
+    "status": "shipped",
+    "title": "Group Session",
+    "link": "group-session",
+    "summary": "V1.6 cross-tool coordination pattern — AI clients work the same problem through ECHO's shared substrate via wait_for_new_turns subscriptions on each others' capture sources. Implements Goal A (synchronized human-driven); Goal C (autonomous group) deferred to V2+. First-call reliability gate (item 032) closes the resume-after-gap join pattern with structural guarantees.",
+    "aliases": [
+      "Group session",
+      "Cross-tool group session",
+      "Synchronized human-driven group",
+      "Goal A pattern"
+    ],
+    "topic": "Architecture",
+    "subtopic": "System Architecture"
+  },
+  "architecture/interface-layers.md": {
+    "status": "shipped",
+    "title": "Interface Layers (1-5)",
+    "link": "interface-layers",
+    "summary": "Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.",
+    "aliases": [
+      "Interface Layers",
+      "Communication Stack"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Layer Stack"
+  },
+  "architecture/local-daemon.md": {
+    "status": "shipped",
+    "title": "Local Daemon",
+    "link": "local-daemon",
+    "summary": "Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.",
+    "aliases": [
+      "Local Daemon",
+      "ECHO Daemon"
     ],
     "topic": "Architecture",
     "subtopic": "Storage"
@@ -249,183 +135,6 @@
     ],
     "topic": "Architecture",
     "subtopic": "Observability"
-  },
-  "architecture/capture-pipeline.md": {
-    "status": "shipped",
-    "title": "Capture Pipeline",
-    "link": "capture-pipeline",
-    "summary": "Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.",
-    "aliases": [
-      "Capture Pipeline",
-      "processCandidate",
-      "Pipeline Seam"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture"
-  },
-  "capture/fs-watcher.md": {
-    "status": "shipped",
-    "title": "FS Watcher",
-    "link": "fs-watcher",
-    "summary": "First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.",
-    "aliases": [
-      "FS Watcher",
-      "Filesystem Watcher",
-      "fs-watcher"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture Surfaces"
-  },
-  "capture/cursor-extractor.md": {
-    "status": "shipped",
-    "capture_status": "degraded",
-    "title": "Cursor Extractor",
-    "link": "cursor-extractor",
-    "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents. Capture degraded since 2026-05-01 \u2014 Cursor migrated to agentKv: schema; rewrite gated on cohort dogfooder, not scheduled for V1.6.",
-    "aliases": [
-      "Cursor Extractor",
-      "cursor-extractor",
-      "Cursor Composer Extractor"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture Surfaces"
-  },
-  "capture/claude-code-extractor.md": {
-    "status": "shipped",
-    "title": "Claude Code Extractor",
-    "link": "claude-code-extractor",
-    "summary": "Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.",
-    "aliases": [
-      "Claude Code Extractor",
-      "claude-code-extractor",
-      "Claude Code Session Extractor"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture Surfaces"
-  },
-  "capture/codex-extractor.md": {
-    "status": "shipped",
-    "title": "Codex Extractor",
-    "link": "codex-extractor",
-    "summary": "Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with assistant clusters and adds cwd, config, tool, reasoning, and git metadata.",
-    "aliases": [
-      "Codex Extractor",
-      "codex-extractor",
-      "Codex Session Extractor"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture Surfaces"
-  },
-  "capture/git-capture.md": {
-    "status": "shipped",
-    "title": "Git Capture",
-    "link": "git-capture",
-    "summary": "Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.",
-    "aliases": [
-      "Git Capture",
-      "Git Watcher",
-      "git-watcher",
-      "git-capture"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Capture Surfaces"
-  },
-  "surfaces/mcp-search-memories.md": {
-    "status": "shipped",
-    "title": "MCP search_memories Tool",
-    "link": "mcp-search-memories",
-    "summary": "V1 MCP retrieval tool \u2014 case-insensitive substring + filters; source_app enum + post-038 source (exact) + metadata_match (whitelisted keys workspace_id/composer_id/session_id/repo_root); post-037 repo_path; composite-cursor pagination; wire-shape projection.",
-    "aliases": [
-      "search_memories",
-      "MCP search_memories tool",
-      "Search Memories"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-echo-resolve-mru.md": {
-    "status": "shipped",
-    "title": "MCP echo_resolve_mru Tool",
-    "link": "mcp-echo-resolve-mru",
-    "summary": "V1.6 RC2 MRU resolver \u2014 returns search_memories-ready descriptors {source, filter, phase?}; Cursor two-phase fallback (Phase 1 metadata.repo_root, Phase 2 legacy composer\u2194workspace registry); replaces tail_session compound modes. Item 038.",
-    "aliases": [
-      "echo_resolve_mru",
-      "MCP echo_resolve_mru tool",
-      "Echo Resolve MRU",
-      "MRU Resolver"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-recent-work-context.md": {
-    "status": "shipped",
-    "title": "MCP get_recent_work_context Tool",
-    "link": "mcp-recent-work-context",
-    "summary": "DEPRECATED V1.5 MCP tool; survives in item 038 as a thin re-export shim. Cluster engine canonical home moved to src/mcp/internal/cluster-engine.ts; MCP-tool registration removal scheduled in the 2026-05-17 follow-up.",
-    "aliases": [
-      "get_recent_work_context",
-      "MCP get_recent_work_context tool",
-      "Recent Work Context"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-find-clusters.md": {
-    "status": "shipped",
-    "title": "MCP find_clusters Tool",
-    "link": "mcp-find-clusters",
-    "summary": "V1.6 MCP discovery primitive \u2014 coherent work clusters as skeletons (atom_ids[], source_breakdown, ranks, open_loop_hints); cluster-gap controlled by window_hours; lookback by since/until. Item 032 adds no-args auto-expand (empty + single-source-recent triggers) and strict-partition demotion making prior-work clusters[0] a structural guarantee on resume-after-gap. Hard envelope ceiling 25kB; cheap.",
-    "aliases": [
-      "find_clusters",
-      "MCP find_clusters tool",
-      "Find Clusters",
-      "Cluster discovery"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-get-atoms.md": {
-    "status": "shipped",
-    "title": "MCP get_atoms Tool",
-    "link": "mcp-get-atoms",
-    "summary": "V1.6 MCP targeted body-fetch primitive \u2014 atom bodies by ID list (\u226450), wire-shape projected through projectMatch; truncations[] trust signal on every atom; deterministic prefix-drop on 25kB overflow; item 032 adds prefer='newest_first' + missing-ID-end position + duplicate-collapse asymmetry for resume calls.",
-    "aliases": [
-      "get_atoms",
-      "MCP get_atoms tool",
-      "Get Atoms",
-      "Targeted body fetch"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-get-atom.md": {
-    "status": "shipped",
-    "title": "MCP get_atom Tool",
-    "link": "mcp-get-atom",
-    "summary": "V1.6.1 MCP verbatim escape hatch (singular \u2014 counterpart to get_atoms plural). Returns one atom with content verbatim (no match_content clip) + metadata projected via reused projectMatch (per-key cap + tool_calls reshape) + embedding excluded. Three exit shapes: success / atom_too_large_for_wire (with source populated for JSONL fallback) / atom_not_found (distinct error). Closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP \u2014 no shell, no JSONL fallback, no composer-id context required. R2 truncations-correctness fix: 'content' filtered from returned truncations after verbatim override.",
-    "aliases": [
-      "get_atom",
-      "MCP get_atom tool",
-      "Get Atom",
-      "Verbatim escape hatch",
-      "Full-atom recovery"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
-  },
-  "surfaces/mcp-wait-for-new-turns.md": {
-    "status": "shipped",
-    "title": "MCP wait_for_new_turns Tool",
-    "link": "mcp-wait-for-new-turns",
-    "summary": "V1.6 MCP group-session subscription primitive \u2014 stateless long-poll on watched sources; post-038 IDs-only contract (returns turn_ids: string[], callers compose get_atoms/get_atom); post-037 repo_path; max 60s timeout; implements Goal A of group-session.",
-    "aliases": [
-      "wait_for_new_turns",
-      "MCP wait_for_new_turns tool",
-      "Group session subscription",
-      "Stateless long-poll"
-    ],
-    "topic": "Form Factor",
-    "subtopic": "MCP Server"
   },
   "architecture/normalization.md": {
     "status": "shipped",
@@ -454,19 +163,47 @@
     "topic": "Architecture",
     "subtopic": "System Architecture"
   },
-  "architecture/artifact-identity.md": {
+  "architecture/storage.md": {
     "status": "shipped",
-    "title": "Artifact Identity (the join-key contract)",
-    "link": "artifact-identity",
-    "summary": "Canonical (provider, type, id) rules that decide when two artifacts refer to the same thing \u2014 powers cross-source cluster joins.",
+    "title": "Storage",
+    "link": "storage",
+    "summary": "Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.",
     "aliases": [
-      "Artifact Identity",
-      "Artifact Identity Policy",
-      "Canonical Artifact ID",
-      "Artifact ID"
+      "Storage",
+      "Storage Interface",
+      "MemoryStorage",
+      "SqliteStorage"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "architecture/system-architecture.md": {
+    "status": "shipped",
+    "title": "System Architecture (Minimum Component View)",
+    "link": "system-architecture",
+    "summary": "Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.",
+    "aliases": [
+      "System Architecture",
+      "Minimum Component View",
+      "System Diagram",
+      "Architecture Diagram"
     ],
     "topic": "Architecture",
     "subtopic": "System Architecture"
+  },
+  "architecture/timestamp-canonicalization.md": {
+    "status": "shipped",
+    "title": "Timestamp Canonicalization",
+    "link": "timestamp-canonicalization",
+    "summary": "Single-chokepoint canonicalization at capture pipeline + idempotent migration on daemon startup; every events.timestamp row is canonical UTC Z form.",
+    "aliases": [
+      "Timestamp Canonicalization",
+      "UTC Z form",
+      "Timestamp Migration",
+      "canonicalizeTimestamps"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
   },
   "architecture/work-trace.md": {
     "status": "shipped",
@@ -481,31 +218,307 @@
     "topic": "Architecture",
     "subtopic": "System Architecture"
   },
-  "architecture/group-session.md": {
+  "capture/claude-code-extractor.md": {
     "status": "shipped",
-    "title": "Group Session",
-    "link": "group-session",
-    "summary": "V1.6 cross-tool coordination pattern \u2014 AI clients work the same problem through ECHO's shared substrate via wait_for_new_turns subscriptions on each others' capture sources. Implements Goal A (synchronized human-driven); Goal C (autonomous group) deferred to V2+. First-call reliability gate (item 032) closes the resume-after-gap join pattern with structural guarantees.",
+    "title": "Claude Code Extractor",
+    "link": "claude-code-extractor",
+    "summary": "Byte-offset tail of Claude Code session JSONL files, emitting one CaptureEvent per user/assistant turn pair.",
     "aliases": [
-      "Group session",
-      "Cross-tool group session",
-      "Synchronized human-driven group",
-      "Goal A pattern"
+      "Claude Code Extractor",
+      "claude-code-extractor",
+      "Claude Code Session Extractor"
     ],
     "topic": "Architecture",
-    "subtopic": "System Architecture"
+    "subtopic": "Capture Surfaces"
   },
-  "product/v1-spec.md": {
+  "capture/codex-extractor.md": {
     "status": "shipped",
-    "title": "V1 Spec (Locked)",
-    "link": "v1-spec",
-    "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
+    "title": "Codex Extractor",
+    "link": "codex-extractor",
+    "summary": "Byte-offset tail of OpenAI Codex CLI session JSONL files; pairs user with assistant clusters and adds cwd, config, tool, reasoning, and git metadata.",
     "aliases": [
-      "V1 Spec",
-      "V1 Scope"
+      "Codex Extractor",
+      "codex-extractor",
+      "Codex Session Extractor"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "capture/cursor-extractor.md": {
+    "status": "shipped",
+    "capture_status": "degraded",
+    "title": "Cursor Extractor",
+    "link": "cursor-extractor",
+    "summary": "Read-only SQLite extractor turning Cursor's globalStorage composer bubbles into per-turn user/assistant CaptureEvents. Capture degraded since 2026-05-01 — Cursor migrated to agentKv: schema; rewrite gated on cohort dogfooder, not scheduled for V1.6.",
+    "aliases": [
+      "Cursor Extractor",
+      "cursor-extractor",
+      "Cursor Composer Extractor"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "capture/fs-watcher.md": {
+    "status": "shipped",
+    "title": "FS Watcher",
+    "link": "fs-watcher",
+    "summary": "First capture surface; chokidar-backed watcher emitting raw FS-event candidates under allowlisted paths, no parsing.",
+    "aliases": [
+      "FS Watcher",
+      "Filesystem Watcher",
+      "fs-watcher"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "capture/git-capture.md": {
+    "status": "shipped",
+    "title": "Git Capture",
+    "link": "git-capture",
+    "summary": "Hybrid chokidar+poll watcher that emits one CaptureEvent per new commit (message + diff) from allowlisted git repos.",
+    "aliases": [
+      "Git Capture",
+      "Git Watcher",
+      "git-watcher",
+      "git-capture"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Capture Surfaces"
+  },
+  "capture/per-app/claude-code-collected-data.md": {
+    "status": "shipped",
+    "title": "Claude Code — Collected Data Reference",
+    "link": "claude-code-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.",
+    "aliases": [
+      "Claude Code Data Collection",
+      "What ECHO Collects from Claude Code",
+      "Claude Code Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
+  "capture/per-app/codex-collected-data.md": {
+    "status": "shipped",
+    "title": "Codex — Collected Data Reference",
+    "link": "codex-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; text, cwd, config, tool calls, reasoning summaries, git state, and ignored fields.",
+    "aliases": [
+      "Codex Data Collection",
+      "What ECHO Collects from Codex",
+      "Codex Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
+  "capture/per-app/cursor-collected-data.md": {
+    "status": "shipped",
+    "capture_status": "degraded",
+    "title": "Cursor — Collected Data Reference",
+    "link": "cursor-collected-data",
+    "summary": "Field-by-field record of what ECHO reads from Cursor's legacy bubbleId: / composerData: schema, where it lives, and what it becomes in CaptureEvent. Capture degraded since 2026-05-01 — agentKv: migration not yet implemented.",
+    "aliases": [
+      "Cursor Data Collection",
+      "What ECHO Collects from Cursor",
+      "Cursor Capture Reference"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Per-App Data Collection"
+  },
+  "operating-model/automation-worktree-isolation.md": {
+    "status": "shipped",
+    "title": "Automation worktree isolation (050)",
+    "link": "automation-worktree-isolation",
+    "summary": "Each automated role (reviewer, watcher, merger) runs in its own ephemeral $TMPDIR/echo-<role>-<uuid> worktree pinned to origin/main, eliminating the shared .git/index race surface. Replaces the prior sentinel-file lock convention which depended on every binding reading it. Unified ERR/EXIT cleanup; live checkout's .git/index is never written to by an automated tick.",
+    "aliases": [
+      "Worktree Isolation",
+      "Ephemeral Worktree"
+    ],
+    "topic": "Process",
+    "subtopic": "Automation Worktree Isolation"
+  },
+  "operating-model/builder-bindings.md": {
+    "status": "shipped",
+    "title": "Builder bindings",
+    "link": "builder-bindings",
+    "summary": "Three documented builder bindings — Claude Code (in-session via process-backlog skill), codex (headless via run-codex-builder.sh launchd wrapper), Cursor's Claude (IDE-mode via paste-trigger ritual). 055 closed the third-binding matrix. Add-a-binding recipe + cross-binding race semantics + operator-facing trigger differences.",
+    "aliases": [
+      "Builder Binding Matrix",
+      "Builder Vendor Matrix"
+    ],
+    "topic": "Process",
+    "subtopic": "Builder Bindings"
+  },
+  "operating-model/cross-tool-spec-review.md": {
+    "status": "shipped",
+    "title": "Cross-Tool Spec Review",
+    "link": "cross-tool-spec-review",
+    "summary": "Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.",
+    "aliases": [
+      "Cross-Tool Spec Review",
+      "Cross-Tool Review",
+      "Multi-Reviewer Pattern",
+      "R1/R2/R3 Review Cycle"
+    ],
+    "topic": "Process",
+    "subtopic": "Cross-Tool Review"
+  },
+  "operating-model/merge-protocol.md": {
+    "status": "shipped",
+    "title": "Merge protocol",
+    "link": "merge-protocol",
+    "summary": "Founder-in-the-loop merge protocol for backlog/pending_review items. Pre-flight clean-tree check, ephemeral merger worktree (050 AC3), per-item C1-C11 loop with founder checkpoints at conflicts (C3), optional cross-vendor C3.5 consult (054), verify (C5), explicit founder live-checkout bringup at end of Step D. Thin pointer; canonical lives in skills/merge-and-cleanup.md.",
+    "aliases": [
+      "Merge Protocol",
+      "merge-and-cleanup protocol"
+    ],
+    "topic": "Process",
+    "subtopic": "Merge Protocol"
+  },
+  "operating-model/review-queue-protocol.md": {
+    "status": "shipped",
+    "title": "Review Queue Protocol",
+    "link": "review-queue-protocol",
+    "summary": "File-backed wire protocol for strategist↔reviewer handoffs — three artifacts (request.md, <reviewer>.md, combined.md), three loop exits, fresh-eyes-at-SHA invariant",
+    "aliases": [
+      "Review Queue Protocol",
+      "Strategist Reviewer Handoff",
+      "File-Backed Review Queue"
+    ],
+    "topic": "Process",
+    "subtopic": "Review Queue Protocol"
+  },
+  "operating-model/wave-1-2-3-retrospective.md": {
+    "status": "shipped",
+    "title": "Wave 1-2-3 Retrospective",
+    "link": "wave-1-2-3-retrospective",
+    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.",
+    "aliases": [
+      "Wave 1-2-3 Retrospective",
+      "Substrate Wave Retrospective",
+      "Wave Retrospective"
+    ],
+    "topic": "Process",
+    "subtopic": "Wave Retrospective"
+  },
+  "principles/ambient-form-factor.md": {
+    "status": "shipped",
+    "title": "Ambient Form Factor",
+    "link": "ambient-form-factor",
+    "summary": "Browser extension + MCP server + hotkey overlay. No destination app. Three thin presences.",
+    "aliases": [
+      "Ambient Form Factor"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "Ambient Surfaces"
+  },
+  "principles/atomic-primitives-compose.md": {
+    "status": "shipped",
+    "title": "Atomic Primitives, Compose",
+    "link": "atomic-primitives-compose",
+    "summary": "Each MCP tool does one thing. Compound 'do everything in one call' tools are anti-patterns. The V1.6 toolkit ships 8 atomic primitives composing via 1-2 extra MCP calls. Formalized via item 038.",
+    "aliases": [
+      "Atomic Primitives Compose",
+      "atomic-primitives-compose",
+      "MCP Atomicity Principle"
+    ],
+    "topic": "Architecture",
+    "subtopic": "MCP Toolkit Discipline"
+  },
+  "principles/clipboard-and-launch.md": {
+    "status": "shipped",
+    "title": "Clipboard and Launch",
+    "link": "clipboard-and-launch",
+    "summary": "Universal delivery mechanism: assemble context, copy to clipboard, open target app, user pastes.",
+    "aliases": [
+      "Clipboard and Launch",
+      "Wispr Flow Pattern"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "Hotkey Overlay"
+  },
+  "principles/compose-not-capture.md": {
+    "status": "shipped",
+    "title": "Compose, Don't Capture",
+    "link": "compose-not-capture",
+    "summary": "ECHO ingests from tools that already capture; never builds its own capture surface for what others provide",
+    "aliases": [
+      "Compose Not Capture"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Compose Not Capture"
+  },
+  "principles/context-as-moat.md": {
+    "status": "shipped",
+    "title": "Context as Moat",
+    "link": "context-as-moat",
+    "summary": "Compete on context, not capability. Adjacent to foundation models, structurally outside their wars.",
+    "aliases": [
+      "Context as Moat",
+      "Compound on Context"
+    ],
+    "topic": "Brand & Positioning",
+    "subtopic": "Obsession Statement"
+  },
+  "principles/drift-prevention.md": {
+    "status": "shipped",
+    "title": "Drift Prevention",
+    "link": "drift-prevention",
+    "summary": "The discipline of not silently diverging V1 build from V1 spec. Five drift patterns + weekly audit.",
+    "aliases": [
+      "Drift Prevention",
+      "Scope Discipline"
     ],
     "topic": "V1 Scope",
-    "subtopic": "Bundle Decision"
+    "subtopic": "Non-Goals"
+  },
+  "principles/felt-not-seen.md": {
+    "status": "shipped",
+    "title": "Felt, Not Seen",
+    "link": "felt-not-seen",
+    "summary": "Ambient by default; visible on demand for trust. Product appears in the result, not the interface.",
+    "aliases": [
+      "Felt Not Seen",
+      "Ambient by Default"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "Felt Not Seen"
+  },
+  "principles/layer-above-saas.md": {
+    "status": "shipped",
+    "title": "Layer Above SaaS",
+    "link": "layer-above-saas",
+    "summary": "ECHO is additive to existing tools, never a replacement. The connective tissue between apps.",
+    "aliases": [
+      "Layer Above SaaS"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Layer Above SaaS"
+  },
+  "principles/sandboxed-capture.md": {
+    "status": "shipped",
+    "title": "Sandboxed Capture",
+    "link": "sandboxed-capture",
+    "summary": "Capture enforced as code via the single gate chokepoint, now exercised in production by all four V1 capture surfaces.",
+    "aliases": [
+      "Sandboxed Capture",
+      "Capture Sandbox"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "principles/work-artifact-first-class.md": {
+    "status": "shipped",
+    "title": "Work Artifact First Class",
+    "link": "work-artifact-first-class",
+    "summary": "Repo as a first-class retrieval predicate. Every capture surface writes metadata.repo_root; every project-scoped retrieval tool accepts repo_path; cross-project bleed is structurally impossible. Landed via item 037.",
+    "aliases": [
+      "Work Artifact First Class",
+      "work-artifact-first-class",
+      "Repo Scoping as Retrieval Predicate"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Retrieval Discipline"
   },
   "product/brand-promise.md": {
     "status": "shipped",
@@ -519,6 +532,18 @@
     "topic": "Brand & Positioning",
     "subtopic": "Brand Promise"
   },
+  "product/bundle-decision.md": {
+    "status": "shipped",
+    "title": "Bundle Decision",
+    "link": "bundle-decision",
+    "summary": "V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.",
+    "aliases": [
+      "Bundle Decision",
+      "V1 Tools"
+    ],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  },
   "product/form-factor-decision.md": {
     "status": "shipped",
     "title": "Form Factor Decision",
@@ -530,26 +555,72 @@
     "topic": "Form Factor",
     "subtopic": "Ambient Surfaces"
   },
-  "architecture/interface-layers.md": {
+  "product/narrowest-v1-scope.md": {
     "status": "shipped",
-    "title": "Interface Layers (1-5)",
-    "link": "interface-layers",
-    "summary": "Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.",
+    "title": "Narrowest V1 Scope",
+    "link": "narrowest-v1-scope",
+    "summary": "L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.",
     "aliases": [
-      "Interface Layers",
-      "Communication Stack"
+      "Narrowest V1 Scope"
+    ],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  },
+  "product/stack-decision.md": {
+    "status": "shipped",
+    "title": "Stack Decision",
+    "link": "stack-decision",
+    "summary": "Why ECHO's daemon is TypeScript on Node.js for V1, with the Swift Accessibility shim deferred.",
+    "aliases": [
+      "Stack Decision",
+      "Daemon Stack",
+      "Runtime Choice"
     ],
     "topic": "Architecture",
-    "subtopic": "Layer Stack"
+    "subtopic": "Substrate"
   },
-  "product/bundle-decision.md": {
+  "product/target-cohort-indie-ai-builders.md": {
     "status": "shipped",
-    "title": "Bundle Decision",
-    "link": "bundle-decision",
-    "summary": "V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.",
+    "title": "Target Cohort: Indie AI Builders",
+    "link": "target-cohort-indie-ai-builders",
+    "summary": "V1 wedge: solo devs and small-team founders shipping AI tools. Strong founder-market-fit + warm distribution.",
     "aliases": [
-      "Bundle Decision",
-      "V1 Tools"
+      "Indie AI Builders",
+      "Target Cohort"
+    ],
+    "topic": "Cohorts",
+    "subtopic": "Indie AI Builders"
+  },
+  "product/three-cohort-comparison.md": {
+    "status": "shipped",
+    "title": "Three-Cohort Comparison",
+    "link": "three-cohort-comparison",
+    "summary": "Indie AI builders vs vibe coders vs solo SaaS founders. Why indie AI builders win the V1 wedge.",
+    "aliases": [
+      "Three Cohort Comparison"
+    ],
+    "topic": "Cohorts",
+    "subtopic": "Indie AI Builders"
+  },
+  "product/tier-vs-vertical-slice.md": {
+    "status": "shipped",
+    "title": "Tier-by-Tier vs Vertical Slice",
+    "link": "tier-vs-vertical-slice",
+    "summary": "Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.",
+    "aliases": [
+      "Tier vs Vertical Slice"
+    ],
+    "topic": "V1 Scope",
+    "subtopic": "Sequencing"
+  },
+  "product/v1-spec.md": {
+    "status": "shipped",
+    "title": "V1 Spec (Locked)",
+    "link": "v1-spec",
+    "summary": "Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done",
+    "aliases": [
+      "V1 Spec",
+      "V1 Scope"
     ],
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
@@ -576,72 +647,6 @@
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
-  "architecture/capture-allowlist.md": {
-    "status": "shipped",
-    "title": "Capture Allowlist",
-    "link": "capture-allowlist",
-    "summary": "Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.",
-    "aliases": [
-      "Capture Allowlist",
-      "CAPTURED_SOURCES"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Storage",
-    "raw": "src/capture/sources.ts"
-  },
-  "product/stack-decision.md": {
-    "status": "shipped",
-    "title": "Stack Decision",
-    "link": "stack-decision",
-    "summary": "Why ECHO's daemon is TypeScript on Node.js for V1, with the Swift Accessibility shim deferred.",
-    "aliases": [
-      "Stack Decision",
-      "Daemon Stack",
-      "Runtime Choice"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Substrate"
-  },
-  "capture/per-app/cursor-collected-data.md": {
-    "status": "shipped",
-    "capture_status": "degraded",
-    "title": "Cursor \u2014 Collected Data Reference",
-    "link": "cursor-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from Cursor's legacy bubbleId: / composerData: schema, where it lives, and what it becomes in CaptureEvent. Capture degraded since 2026-05-01 \u2014 agentKv: migration not yet implemented.",
-    "aliases": [
-      "Cursor Data Collection",
-      "What ECHO Collects from Cursor",
-      "Cursor Capture Reference"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Per-App Data Collection"
-  },
-  "capture/per-app/codex-collected-data.md": {
-    "status": "shipped",
-    "title": "Codex \u2014 Collected Data Reference",
-    "link": "codex-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from OpenAI Codex's session JSONLs; text, cwd, config, tool calls, reasoning summaries, git state, and ignored fields.",
-    "aliases": [
-      "Codex Data Collection",
-      "What ECHO Collects from Codex",
-      "Codex Capture Reference"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Per-App Data Collection"
-  },
-  "capture/per-app/claude-code-collected-data.md": {
-    "status": "shipped",
-    "title": "Claude Code \u2014 Collected Data Reference",
-    "link": "claude-code-collected-data",
-    "summary": "Field-by-field record of what ECHO reads from Claude Code's session JSONLs; user/assistant pairing, had_tool_use flag, ignored line types, empirical coverage gap on subagent JSONLs.",
-    "aliases": [
-      "Claude Code Data Collection",
-      "What ECHO Collects from Claude Code",
-      "Claude Code Capture Reference"
-    ],
-    "topic": "Architecture",
-    "subtopic": "Per-App Data Collection"
-  },
   "research/wedge-vs-thesis-validation.md": {
     "status": "shipped",
     "title": "Wedge vs Thesis Validation",
@@ -653,91 +658,149 @@
     "topic": "Validation",
     "subtopic": "Wedge Validation"
   },
-  "product/three-cohort-comparison.md": {
-    "status": "shipped",
-    "title": "Three-Cohort Comparison",
-    "link": "three-cohort-comparison",
-    "summary": "Indie AI builders vs vibe coders vs solo SaaS founders. Why indie AI builders win the V1 wedge.",
+  "surfaces/audit-page.md": {
+    "status": "planned",
+    "title": "Audit Page",
+    "link": "audit-page",
+    "summary": "Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.",
     "aliases": [
-      "Three Cohort Comparison"
-    ],
-    "topic": "Cohorts",
-    "subtopic": "Indie AI Builders"
-  },
-  "product/tier-vs-vertical-slice.md": {
-    "status": "shipped",
-    "title": "Tier-by-Tier vs Vertical Slice",
-    "link": "tier-vs-vertical-slice",
-    "summary": "Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.",
-    "aliases": [
-      "Tier vs Vertical Slice"
-    ],
-    "topic": "V1 Scope",
-    "subtopic": "Sequencing"
-  },
-  "product/narrowest-v1-scope.md": {
-    "status": "shipped",
-    "title": "Narrowest V1 Scope",
-    "link": "narrowest-v1-scope",
-    "summary": "L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.",
-    "aliases": [
-      "Narrowest V1 Scope"
-    ],
-    "topic": "V1 Scope",
-    "subtopic": "Bundle Decision"
-  },
-  "architecture/system-architecture.md": {
-    "status": "shipped",
-    "title": "System Architecture (Minimum Component View)",
-    "link": "system-architecture",
-    "summary": "Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.",
-    "aliases": [
-      "System Architecture",
-      "Minimum Component View",
-      "System Diagram",
-      "Architecture Diagram"
+      "Audit Page",
+      "Inspector"
     ],
     "topic": "Architecture",
-    "subtopic": "System Architecture"
+    "subtopic": "Storage"
   },
-  "operating-model/wave-1-2-3-retrospective.md": {
+  "surfaces/browser-extension.md": {
     "status": "shipped",
-    "title": "Wave 1-2-3 Retrospective",
-    "link": "wave-1-2-3-retrospective",
-    "summary": "Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off \u2014 and where they didn't.",
+    "title": "Browser Extension",
+    "link": "browser-extension",
+    "summary": "Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.",
     "aliases": [
-      "Wave 1-2-3 Retrospective",
-      "Substrate Wave Retrospective",
-      "Wave Retrospective"
+      "Browser Extension",
+      "Chrome Extension"
     ],
-    "topic": "Process",
-    "subtopic": "Wave Retrospective"
+    "topic": "Form Factor",
+    "subtopic": "Browser Extension"
   },
-  "operating-model/cross-tool-spec-review.md": {
-    "status": "shipped",
-    "title": "Cross-Tool Spec Review",
-    "link": "cross-tool-spec-review",
-    "summary": "Multi-reviewer pattern (\u22652 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.",
+  "surfaces/hotkey-overlay.md": {
+    "status": "planned",
+    "title": "Hotkey Overlay",
+    "link": "hotkey-overlay",
+    "summary": "System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.",
     "aliases": [
-      "Cross-Tool Spec Review",
-      "Cross-Tool Review",
-      "Multi-Reviewer Pattern",
-      "R1/R2/R3 Review Cycle"
+      "Hotkey Overlay",
+      "Hotkey Composer"
     ],
-    "topic": "Process",
-    "subtopic": "Cross-Tool Review"
+    "topic": "Form Factor",
+    "subtopic": "Hotkey Overlay"
   },
-  "operating-model/review-queue-protocol.md": {
+  "surfaces/mcp-echo-resolve-mru.md": {
     "status": "shipped",
-    "title": "Review Queue Protocol",
-    "link": "review-queue-protocol",
-    "summary": "File-backed wire protocol for strategist\u2194reviewer handoffs \u2014 three artifacts (request.md, <reviewer>.md, combined.md), three loop exits, fresh-eyes-at-SHA invariant",
+    "title": "MCP echo_resolve_mru Tool",
+    "link": "mcp-echo-resolve-mru",
+    "summary": "V1.6 RC2 MRU resolver — returns search_memories-ready descriptors {source, filter, phase?}; Cursor two-phase fallback (Phase 1 metadata.repo_root, Phase 2 legacy composer↔workspace registry); replaces tail_session compound modes. Item 038.",
     "aliases": [
-      "Review Queue Protocol",
-      "Strategist Reviewer Handoff",
-      "File-Backed Review Queue"
+      "echo_resolve_mru",
+      "MCP echo_resolve_mru tool",
+      "Echo Resolve MRU",
+      "MRU Resolver"
     ],
-    "topic": "Process",
-    "subtopic": "Review Queue Protocol"
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-find-clusters.md": {
+    "status": "shipped",
+    "title": "MCP find_clusters Tool",
+    "link": "mcp-find-clusters",
+    "summary": "V1.6 MCP discovery primitive — coherent work clusters as skeletons (atom_ids[], source_breakdown, ranks, open_loop_hints); cluster-gap controlled by window_hours; lookback by since/until. Item 032 adds no-args auto-expand (empty + single-source-recent triggers) and strict-partition demotion making prior-work clusters[0] a structural guarantee on resume-after-gap. Hard envelope ceiling 25kB; cheap.",
+    "aliases": [
+      "find_clusters",
+      "MCP find_clusters tool",
+      "Find Clusters",
+      "Cluster discovery"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-get-atom.md": {
+    "status": "shipped",
+    "title": "MCP get_atom Tool",
+    "link": "mcp-get-atom",
+    "summary": "V1.6.1 MCP verbatim escape hatch (singular — counterpart to get_atoms plural). Returns one atom with content verbatim (no match_content clip) + metadata projected via reused projectMatch (per-key cap + tool_calls reshape) + embedding excluded. Three exit shapes: success / atom_too_large_for_wire (with source populated for JSONL fallback) / atom_not_found (distinct error). Closes Magic Moment M1-3 (long-turn elision recovery) end-to-end in-MCP — no shell, no JSONL fallback, no composer-id context required. R2 truncations-correctness fix: 'content' filtered from returned truncations after verbatim override.",
+    "aliases": [
+      "get_atom",
+      "MCP get_atom tool",
+      "Get Atom",
+      "Verbatim escape hatch",
+      "Full-atom recovery"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-get-atoms.md": {
+    "status": "shipped",
+    "title": "MCP get_atoms Tool",
+    "link": "mcp-get-atoms",
+    "summary": "V1.6 MCP targeted body-fetch primitive — atom bodies by ID list (≤50), wire-shape projected through projectMatch; truncations[] trust signal on every atom; deterministic prefix-drop on 25kB overflow; item 032 adds prefer='newest_first' + missing-ID-end position + duplicate-collapse asymmetry for resume calls.",
+    "aliases": [
+      "get_atoms",
+      "MCP get_atoms tool",
+      "Get Atoms",
+      "Targeted body fetch"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-recent-work-context.md": {
+    "status": "shipped",
+    "title": "MCP get_recent_work_context Tool",
+    "link": "mcp-recent-work-context",
+    "summary": "DEPRECATED V1.5 MCP tool; survives in item 038 as a thin re-export shim. Cluster engine canonical home moved to src/mcp/internal/cluster-engine.ts; MCP-tool registration removal scheduled in the 2026-05-17 follow-up.",
+    "aliases": [
+      "get_recent_work_context",
+      "MCP get_recent_work_context tool",
+      "Recent Work Context"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-search-memories.md": {
+    "status": "shipped",
+    "title": "MCP search_memories Tool",
+    "link": "mcp-search-memories",
+    "summary": "V1 MCP retrieval tool — case-insensitive substring + filters; source_app enum + post-038 source (exact) + metadata_match (whitelisted keys workspace_id/composer_id/session_id/repo_root); post-037 repo_path; composite-cursor pagination; wire-shape projection.",
+    "aliases": [
+      "search_memories",
+      "MCP search_memories tool",
+      "Search Memories"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-server.md": {
+    "status": "shipped",
+    "title": "MCP Server",
+    "link": "mcp-server",
+    "summary": "Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.",
+    "aliases": [
+      "MCP Server",
+      "Model Context Protocol Server"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
+  "surfaces/mcp-wait-for-new-turns.md": {
+    "status": "shipped",
+    "title": "MCP wait_for_new_turns Tool",
+    "link": "mcp-wait-for-new-turns",
+    "summary": "V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; post-038 IDs-only contract (returns turn_ids: string[], callers compose get_atoms/get_atom); post-037 repo_path; max 60s timeout; implements Goal A of group-session.",
+    "aliases": [
+      "wait_for_new_turns",
+      "MCP wait_for_new_turns tool",
+      "Group session subscription",
+      "Stateless long-poll"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
   }
 }

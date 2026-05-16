@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 58 pages · 56 shipped · 2 planned
+**Status:** 63 pages · 61 shipped · 2 planned
 
 ---
 
@@ -68,6 +68,8 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[capture-allowlist|Capture Allowlist]] — Five-category allowlist (apps, domains, fs_paths, apis, git_repos) declared in src/capture/sources.ts; per-source PRs add entries.
 - [[capture-gate|Capture Gate]] — Pure-function chokepoint at src/capture/gate.ts; five source kinds, six stable rejection codes, exhaustive test coverage.
 - [[capture-pipeline|Capture Pipeline]] — Thin async seam joining gate to storage; processCandidate(event, storage) gates then appends; storage is dependency-injected.
+- [[coord-layer|Coord layer]] — Generic role↔role coordination substrate over the daemon — narrow append seam + role-typed deadline tracker + identity-gated single-writer lane. Spec 057 brainstorm + decomposition rationale; ships dormant until 057a substrate + 057b active trigger activate it. Parent overview page; substrate detail in coord-substrate-and-observability, producer-side in coord-active-trigger-and-role-emission.
+- [[coord-substrate-and-observability|Coord substrate + observability (057a)]] — Daemon-side coord ledger: narrow coord_emit append seam, role-typed deadline config (ajv-validated coord-roles.json), single-actor deadline tracker with cache-hit-also-terminal fireMissedDeadline, durable boot replay + periodic reconciliation, on-demand coord_status, 100k-atom V1 perf contract. Ships dormant; 057b activates emission.
 - [[group-session|Group Session]] — V1.6 cross-tool coordination pattern — AI clients work the same problem through ECHO's shared substrate via wait_for_new_turns subscriptions on each others' capture sources. Implements Goal A (synchronized human-driven); Goal C (autonomous group) deferred to V2+. First-call reliability gate (item 032) closes the resume-after-gap join pattern with structural guarantees.
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
 - [[local-daemon|Local Daemon]] — Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.
@@ -138,6 +140,9 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Process
 
+- [[automation-worktree-isolation|Automation worktree isolation (050)]] — Each automated role (reviewer, watcher, merger) runs in its own ephemeral $TMPDIR/echo-<role>-<uuid> worktree pinned to origin/main, eliminating the shared .git/index race surface. Replaces the prior sentinel-file lock convention which depended on every binding reading it. Unified ERR/EXIT cleanup; live checkout's .git/index is never written to by an automated tick.
+- [[builder-bindings|Builder bindings]] — Three documented builder bindings — Claude Code (in-session via process-backlog skill), codex (headless via run-codex-builder.sh launchd wrapper), Cursor's Claude (IDE-mode via paste-trigger ritual). 055 closed the third-binding matrix. Add-a-binding recipe + cross-binding race semantics + operator-facing trigger differences.
 - [[cross-tool-spec-review|Cross-Tool Spec Review]] — Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.
+- [[merge-protocol|Merge protocol]] — Founder-in-the-loop merge protocol for backlog/pending_review items. Pre-flight clean-tree check, ephemeral merger worktree (050 AC3), per-item C1-C11 loop with founder checkpoints at conflicts (C3), optional cross-vendor C3.5 consult (054), verify (C5), explicit founder live-checkout bringup at end of Step D. Thin pointer; canonical lives in skills/merge-and-cleanup.md.
 - [[review-queue-protocol|Review Queue Protocol]] — File-backed wire protocol for strategist↔reviewer handoffs — three artifacts (request.md, <reviewer>.md, combined.md), three loop exits, fresh-eyes-at-SHA invariant
 - [[wave-1-2-3-retrospective|Wave 1-2-3 Retrospective]] — Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.
