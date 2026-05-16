@@ -252,7 +252,11 @@ for role in reviewers:
     body = {"jsonrpc":"2.0","method":"tools/call","params":{"name":"coord_invoke","arguments":{"role":role,"request_path":req_path,"correlation_id":corr}},"id":1}
     try:
         req = urllib.request.Request(url, data=json.dumps(body).encode(),
-            headers={"Content-Type":"application/json","X-Echo-Role":"claude"}, method="POST")
+            headers={"Content-Type":"application/json",
+                     # StreamableHTTPServerTransport 406-rejects MCP POSTs
+                     # missing both media types in Accept (r9 codex F1 HIGH).
+                     "Accept":"application/json, text/event-stream",
+                     "X-Echo-Role":"claude"}, method="POST")
         urllib.request.urlopen(req, timeout=5).read()
     except Exception as e:
         print(f"coord_invoke({role}) failed (best-effort): {e}", file=sys.stderr)

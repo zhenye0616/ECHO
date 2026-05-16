@@ -73,7 +73,11 @@ sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
       --correlation-id="$ECHO_COORD_CORRELATION_ID" \
       --payload="{\"outcome\":\"bind_failed\",\"reason\":\"$bind_reason\"}" || true
     echo "tick: pinned-request bind failed: $bind_reason" >&2
-    exit 0
+    # AC0 contract: bind-validation failure exits non-zero so launchd /
+    # log consumers see a failed tick (r9 codex F3 MEDIUM). The coord
+    # atom above carries the structured reason; the non-zero exit is the
+    # operator-facing signal.
+    exit 1
   fi
   CANDIDATE="$ECHO_COORD_REQUEST_PATH"
 else
