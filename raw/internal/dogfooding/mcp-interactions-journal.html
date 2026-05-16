@@ -21185,10 +21185,10 @@ reconstruction behind the daemon startup gate.</li>
 <h3 id="pdt---codex-r3-on-057a-coord-substrate-spec">2026-05-15 22:15
 PDT - Codex R3 on 057a coord substrate spec</h3>
 <ul>
-<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
-(<code>MY_REVIEWER=codex</code>); first pending Codex response was
-<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>.</li>
-<li><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
+<li><p><strong>Trigger:</strong> Execute one Codex-side review queue
+tick (<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>.</p></li>
+<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls during this
 reviewer tick. Pulled <code>origin/main</code>; scanned
 <code>backlog/reviews/**/r*/request.md</code> for rounds requesting
 <code>codex</code> with no <code>codex.md</code> and no
@@ -21203,9 +21203,9 @@ context, and pinned implementation context for
 <code>src/mcp/server.ts</code>,
 <code>src/mcp/tools/wait-for-new-turns.ts</code>,
 <code>tools/review-queue/reviewers.json</code>, and
-<code>package.json</code>.</li>
-<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
-upstream duplicate state, committed, and pushed
+<code>package.json</code>.</p></li>
+<li><p><strong>Returned shape:</strong> Wrote, pre-link validated,
+checked upstream duplicate state, committed, and pushed
 <code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/codex.md</code>
 as <code>b070dad</code>, verdict <code>proceed_after_patches</code>,
 findings: MEDIUM AC3’s append-order iterator still lacks explicit
@@ -21213,8 +21213,8 @@ timestamp-to-sequence and next-watermark primitives required by
 reconstruction/reconciliation; MEDIUM AC6’s horizon-independent
 last-miss status is not specified as durable across daemon restart; LOW
 AC3’s SQLite example names the non-existent <code>atoms</code> table
-instead of <code>events</code>.</li>
-<li><strong>Sources:</strong> Artifact SHA
+instead of <code>events</code>.</p></li>
+<li><p><strong>Sources:</strong> Artifact SHA
 <code>4d4530281fbca9593b6ca280e736bb3b1cdd7531</code>; request path
 <code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>;
 committed response path
@@ -21224,17 +21224,95 @@ schema path
 paths <code>tools/review-queue/validate_response_yaml.py</code>,
 <code>tools/review-queue/commit-reviewer-response.sh</code>,
 <code>tools/review-queue/push-with-retry.sh</code>; no ECHO MCP
-reads.</li>
-<li><strong>Verdict:</strong> right - one Codex review was written for
-the requested 057a R3 round, anchored to the requested spec SHA,
+reads.</p></li>
+<li><p><strong>Verdict:</strong> right - one Codex review was written
+for the requested 057a R3 round, anchored to the requested spec SHA,
 validated before link, checked against upstream duplicate response
 state, committed and pushed before this observation-only journal
-entry.</li>
-<li><strong>Note:</strong> R3 verifies the r2 fixes for Ajv dependency
-naming, cwd-independent role-config loading, terminal fire-once
-lifecycle, append-order replay, and last-miss key disambiguation are
-mostly present. The remaining concerns are narrower storage/status
-durability contracts plus one concrete SQL-table typo.</li>
+entry.</p></li>
+<li><p><strong>Note:</strong> R3 verifies the r2 fixes for Ajv
+dependency naming, cwd-independent role-config loading, terminal
+fire-once lifecycle, append-order replay, and last-miss key
+disambiguation are mostly present. The remaining concerns are narrower
+storage/status durability contracts plus one concrete SQL-table typo.
+### 2026-05-15 22:16 PDT — Watcher tick: 057a r3 escalation (divergent
+verdicts cross the boundary)</p></li>
+<li><p><strong>Trigger:</strong> Watcher Monitor <code>bq4jhsjj1</code>
+fired on
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/{codex.md,codex-ops.md}</code>
+landing on origin/main after r3 dispatch at <code>88e0d7d</code>.
+Strategist watcher tick ran in ephemeral worktree
+<code>$TMPDIR/echo-watcher-B00FC180-...</code>; combine.py emitted
+<code>combined.md</code> (commit <code>4906a9e</code>) with
+<code>combined_verdict: divergent</code>,
+<code>escalated_to_founder: true</code>. Codex verdict
+<code>proceed_after_patches</code>, codex-ops verdict
+<code>pushback</code> — crossed the <code>{proceed*, pushback}</code>
+boundary; strategist did NOT autonomously disposition per the
+watcher-skill §“Out of Scope” #7.</p></li>
+<li><p><strong>Query inputs:</strong> ZERO ECHO MCP calls. Read
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/{request.md,codex.md,codex-ops.md,combined.md}</code>.
+Did not modify the spec.</p></li>
+<li><p><strong>Returned shape:</strong> <code>combined.md</code> written
+autonomously by combine.py. Both reviewers found the SAME two
+substantive issues at different severities — divergence is in
+<em>verdict tone</em>, not finding <em>content</em>: (a) AC3’s
+<code>iterateCoordAtomsByAppendOrder</code> seam doesn’t define
+<code>time→sinceSeq</code> conversion OR <code>read-next-highSeq</code>,
+but the reconstruction + reconciliation algorithms invoke both (“convert
+time bound to sinceSeq by binary search”, “read highSeq off the storage
+seam”). codex called this MEDIUM “add explicit methods OR rewrite
+algorithm”; codex-ops called this HIGH “the bounded boot scan is
+unimplementable on large ledgers OR builder skips late-appended atoms
+and rebuilds wrong open-deadline map”; (b) AC6’s persistent last-miss
+list promises survival past the 24h horizon “until a successful expected
+event clears it”, but boot reconstruction only scans the 24h horizon — a
+48h-old uncleared miss disappears after restart. Both reviewers want an
+explicit rehydration path OR on-demand status replay; existing AC8 48h
+fixture doesn’t restart the daemon. codex also flagged LOW: AC3’s SQLite
+sketch says <code>FROM atoms</code> but the schema uses
+<code>events</code>.</p></li>
+<li><p><strong>Sources:</strong> request path
+<code>backlog/reviews/2026-05-16-057a-coord-substrate-and-observability/r3/request.md</code>
+at spec_commit_sha
+<code>4d4530281fbca9593b6ca280e736bb3b1cdd7531</code>; response paths
+<code>r3/codex.md</code> (commit <code>b070dad</code>),
+<code>r3/codex-ops.md</code> (commit before that on origin/main);
+combined.md at <code>4906a9e</code>; no ECHO MCP reads.</p></li>
+<li><p><strong>Verdict:</strong> ✅ correct watcher behavior — divergent
+boundary cross → journal + exit; founder will decide. NOT a spurious
+escalation (cf. 056 r1 launchd silent-fail at line 4091). Both reviewers
+are responding substantively at the same spec SHA; their disagreement is
+about whether 057a is converging-with-patches (codex) or has accumulated
+enough architectural complexity that a structural rethink is appropriate
+(codex-ops).</p></li>
+<li><p><strong>Note:</strong> r1→r2→r3 trend: findings 7→6→5; severity
+4H/3M → 2H/4M → 1H/4M. Finding count and HIGH count are both declining,
+but each round introduces findings against the prior round’s patches (r2
+found gaps in r1 patches; r3 found gaps in r2 patches). codex-ops’s r3
+HIGH escalates a structural concern: the storage seam needs either (a)
+two more primitives (<code>getCoordSequenceAtOrAfter(timestamp)</code> +
+<code>getCurrentCoordSequence()</code>) — extends the seam, V1 cost; OR
+(b) full-replay-with-snapshot/compaction — a bigger architectural
+commitment for V1; OR (c) accept unbounded boot replay for V1 with a
+known performance ceiling. The (a)/(b)/(c) choice is exactly the kind of
+judgment call that should be founder-level — the watcher correctly
+stopped.</p></li>
+<li><p><strong>Conjecture:</strong> The (subject_role,
+expected_event_type) last-miss durability gap (AC6) is the
+smaller/cleaner of the two; could be closed by “on every
+<code>coord_status()</code> call, run an on-demand scan of
+<code>coord:deadline_missed</code> atoms newer than the entry’s
+<code>cleared_after_seq</code> watermark” — pushes the work to
+read-time, no separate persistence layer. The append-order seam gap is
+the load-bearing decision. Both 057a’s spec growth pattern AND the
+parent 057’s r1-r5 plateau decomposition suggest we may be hitting a
+real “coord layer V1 is structurally bigger than narrow-append” signal,
+not just a “more patches” signal. Observation only; founder decides
+whether 057a needs further decomposition (e.g. 057a0: storage seam +
+roles loader; 057a1: deadline tracker; 057a2: status surface) or whether
+(c) “unbounded boot replay” is acceptable for V1 and we
+proceed.</p></li>
 </ul>
 </body>
 </html>
