@@ -89,6 +89,10 @@ The [[cross-tool-spec-review]] pattern (promoted to operating-model after six in
 
 Across items 030 + 032 + 033 (today's spec work), this pattern produced 8 review cycles, all with differentiated findings per reviewer per cycle — no two reviewers caught the same class of issue twice in a row. The wiki page documents the findings-class taxonomy, the strategist self-review checklist (4 gates pre-commit + post-patch re-grep proposed by 033 R2), and the verdict-convergence signal.
 
+## Sibling Well-Known Surface: `echo:coord`
+
+The [[coord-layer|coordination layer]] (item 057a substrate, 2026-05-16) introduced a sibling family of well-known surfaces on the same shared ledger: `coord:*` events emitted by the daemon-side coord substrate (`coord:codex`, `coord:codex-ops`, `coord:claude`, `coord:cursor`, ...) under a synthetic `metadata.session_id = "echo:coord"`. These events are NOT group-session turns — they bypass normalization, embedding, and clustering, and are default-excluded from [[mcp-search-memories|`search_memories()`]] — but they ride the same [[mcp-wait-for-new-turns|`wait_for_new_turns`]] subscription primitive when the caller opts in via `source_prefix="coord:"` (the AC4 widening of `wait_for_new_turns`). Group-session subscribers and coord-layer subscribers therefore share one mailbox contract: the durable atom log is the primary surface; long-poll is the latency optimization. See [[coord-substrate-and-observability|coord substrate page]] for the substrate's full semantics and the role-typed deadline tracker that consumes these events.
+
 ## What Group Sessions Do NOT Do
 
 - **No autonomous turn submission.** Humans (or extractors capturing their AI clients) produce turns. Goal C is V2+.
@@ -105,3 +109,4 @@ Across items 030 + 032 + 033 (today's spec work), this pattern produced 8 review
 - [[cross-tool-spec-review]] — the canonical use case (operating-model)
 - [[storage]] — the shared transcript substrate
 - [[mcp-server]] — host transport
+- [[coord-layer]] — sibling well-known surface on the same ledger (`coord:*` / `echo:coord`)
