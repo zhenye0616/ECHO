@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # _install_reviewer_launchd.sh <slug> — install a headless reviewer's launchd
-# job (043 AC3). Writes ~/Library/LaunchAgents/com.echo.review-queue-<slug>.plist
-# pointing at a per-reviewer wrapper script. Idempotent: re-running overwrites
-# the plist + re-bootstraps.
+# job (043 AC3 + 056 AC7b/AC8). Writes
+# ~/Library/LaunchAgents/com.echo.review-queue-<slug>.plist pointing at a
+# per-reviewer wrapper script. Idempotent: re-running overwrites the plist
+# + re-bootstraps.
 #
 # Validates that <slug> exists in reviewers.json with mode:headless before
 # writing anything; refuses to install for IDE-mode reviewers (those have no
 # launchd presence — they run inside the IDE on user invocation).
+#
+# 056 AC7b — install-context fail-closed preflight. The installer ALWAYS
+# treats itself as install-context: BEFORE writing the plist or invoking
+# launchctl, parse the reviewer's `invoke_command` template, extract the
+# first token (the executable name — `codex`, `claude`, etc.), and run
+# `command -v <exe>`. If the executable is not on PATH, exit non-zero with
+# a clear diagnostic and DO NOT write the plist. This prevents the scenario
+# where a misconfigured CLI install leaves `com.echo.review-queue-<slug>`
+# firing every 10 minutes with `command-not-found` (which burns the silent
+# launchd-fail surface).
 #
 # Usage:
 #   _install_reviewer_launchd.sh <slug> [--smoke]
@@ -32,11 +43,17 @@ shift
 # script. We intentionally do not `shift` away the flag so existing
 # positional logic (none today, but defensive) is unaffected.
 SMOKE_REQUESTED=0
+INSTALL_CONTEXT_FLAG=0
 for arg in "$@"; do
   case "$arg" in
     --smoke) SMOKE_REQUESTED=1 ;;
+    --install-context) INSTALL_CONTEXT_FLAG=1 ;;
   esac
 done
+# The installer IS the install-context by definition. The explicit
+# --install-context flag is accepted (no-op other than being forwarded to
+# the smoke runner) so operators can be explicit; the implicit default is
+# also install-context. See 056 AC7b.
 
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$TOOL_DIR/../.." && pwd)"
@@ -54,6 +71,35 @@ SMOKE="$TOOL_DIR/smoke-test-${REVIEWER}-runner.sh"
 if [ ! -x "$WRAPPER" ]; then
   echo "error: wrapper not executable at $WRAPPER" >&2
   echo "create a 5-line driver: '#!/usr/bin/env bash; exec env REVIEWER_NAME=$REVIEWER \"\$(dirname \"\$0\")/_run_reviewer.sh\"' and chmod +x" >&2
+  exit 1
+fi
+
+# 056 AC7b — install-context preflight. Resolve the invoke_command template
+# from reviewers.json, extract the first token (executable name), and gate
+# on `command -v`. Refuse to write the plist if the CLI is not installed.
+# We do NOT need real $WT / $PROMPT values here — we only want the resolved
+# template's first whitespace-delimited token. The gate-script
+# substitution is shell-safe; placeholder values flow through shlex.quote
+# unchanged, and we only look at argv[0].
+set +e
+INVOKE_RESOLVED=$(
+  REVIEWER_NAME="$REVIEWER" \
+  WT="/preflight/wt" \
+  PROMPT="/preflight/prompt.md" \
+  python3 "$TOOL_DIR/_reviewer_gate.py" --print invoke_command 2>&1
+)
+INVOKE_RC=$?
+set -e
+if [ "$INVOKE_RC" -ne 0 ] || [ -z "$INVOKE_RESOLVED" ]; then
+  echo "error: could not resolve invoke_command for $REVIEWER: $INVOKE_RESOLVED" >&2
+  echo "  fix: ensure tools/review-queue/reviewers.json has a valid invoke_command for $REVIEWER" >&2
+  exit 1
+fi
+INVOKE_EXE=$(printf '%s\n' "$INVOKE_RESOLVED" | awk '{print $1}')
+if ! command -v "$INVOKE_EXE" >/dev/null 2>&1; then
+  echo "error: $INVOKE_EXE not found on PATH; cannot install $LABEL" >&2
+  echo "  Resolved invoke_command: $INVOKE_RESOLVED" >&2
+  echo "  Either install the $INVOKE_EXE CLI first, or edit tools/review-queue/reviewers.json to use a different binding." >&2
   exit 1
 fi
 
@@ -127,6 +173,12 @@ if [ "$SMOKE_REQUESTED" -eq 1 ]; then
   # the gate and here (operator deleted the file mid-install), surface the
   # failure non-zero — the production state changes already landed, so the
   # operator's recovery is "re-run after authoring the smoke runner".
+  #
+  # 056 AC7b — installer always operates in install-context. Forward the
+  # flag so the smoke runner's `command -v <cli>` preflight fails-closed
+  # rather than fail-open. (The preflight at the top of this script
+  # already caught a missing CLI, but the smoke runner re-verifies in
+  # case the operator's PATH differs between this script and the smoke.)
   echo "--smoke step 2/2: running synthetic-request smoke test against an isolated tmpdir repo..."
-  "$SMOKE"
+  "$SMOKE" --install-context
 fi

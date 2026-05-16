@@ -53,6 +53,30 @@ spec_refs:
   - tools/review-queue/_run_reviewer.sh  # AC5 touch. Line 140 hardcodes `codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"`. AC5 genericizes via a new roster field `invoke_command` (or a per-driver-overridable function) so the same wrapper body fires Claude OR Codex without per-vendor branches.
   - tools/review-queue/reviewers.json  # AC1 touch.
   - wiki/operating-model/review-queue-protocol.md  # Diagram context — 056 adds the fourth lane (alongside codex / codex-ops / cursor) to the "REVIEWER" row in the diagram.
+review_notes: |
+  Merged on 2026-05-16 via founder reconciliation.
+
+  Conflicts resolved:
+  - backlog/task-state/2026-05-15-056-claude-as-reviewer-headless/builder.md (add/add): took HEAD (main) wholesale via `git checkout --ours`. Same pattern as 055 — main's version is the post-handoff state written by tools/task-state/patch-builder-state.py at the claimed→pending_review transition. Verified that stage 2 (HEAD) contains the full builder body (current_thesis, all 7 locked_decisions, open_questions, dont_touch, canonical_anchors) PLUS the handoff metadata + COMPLETE lifecycle marker; stage 3 (branch) has the same body but lacks the handoff metadata. Wholesale --ours take loses no branch-authored content. Three schema files (combined, request, reviewer) auto-merged cleanly.
+
+  C3.5 cross-vendor consult: none invoked. The conflict shape and resolution are identical to 055's; codex's `proceed-as-proposed` verdict from 055 covers this same pattern (the patcher contract is documented and behavior is deterministic). Re-consulting would be duplicative.
+
+  Acknowledged spec deviation (per sidecar fixup 1):
+  - reviewers.json's claude `invoke_command` is `claude -p < {{PROMPT}}` rather than the spec body's literal `claude -p --dangerously-skip-permissions < {{PROMPT}}`. The agent's harness denied writing the permission-bypass flag as an "unsafe agent" creation. Under the spec's "MAY refine the canonical flags during build" clause this is a stand, but production headless execution requires the operator to resolve permission handling before flipping `required: true`. Tracked in _followups.md as 056-claude-required-flag-gate.
+
+  Fixups applied:
+  - Fixup 1: deviation acknowledged in this commit body (no file change).
+  - Fixup 2: appended `056-claude-required-flag-gate` entry to backlog/_followups.md gating `required: true` flip on either ~/.claude/settings.json permission rule config OR adding --dangerously-skip-permissions to invoke_command.
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 986/1007 tests pass (21 skipped, 75/76 test files passed; 136/136 review-queue subset). Lint and typecheck clean (under bash -lc — raw zsh produces a shell-init artifact unrelated to code, per sidecar). tools/sync-skills.sh --check returns "OK: all adapters match canonical skills/".
+
+  Follow-up items (non-blocking, from sidecar):
+  - Add AC7b inverse-case test (synthetic-PATH-with-claude exercises plist-write success path) — current test covers the high-risk regression direction only.
+  - Future templates with quoted exe names would break `EXE_NAME=$(... | awk '{print $1}')` extraction in the installer preflight; minor V1.5 cleanup if needed.
+  - Spec `files_to_modify` lists `adapters/codex/skills/review-queue-claude/SKILL.md`, but adapters/codex only mirrors a subset of skills today (process-backlog + review-pending). Spurious path; does not affect mergeability since the file was never created and sync-skills --check is clean.
+  - Founder journals a tick after the first integration cycle dispatches a round with `requested_reviewers` including `claude` (AC9 prong 2 — observational confirmation).
 ---
 
 ## Why this spec exists

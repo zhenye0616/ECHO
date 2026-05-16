@@ -45,7 +45,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "enum": ["codex", "cursor", "codex-ops"]
+        "enum": ["codex", "cursor", "codex-ops", "claude"]
       }
     },
     "focus_hints": {

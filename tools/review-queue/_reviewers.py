@@ -1,10 +1,12 @@
 """_reviewers.py — load + validate reviewers.json. Single import point.
 
-Spec: 2026-05-13-043-per-round-reviewer-roster AC2. Loaded by request.py,
-combine.py, _run_reviewer.sh (via inline python3), and (transitively) by the
-reviewer prompts via the shared helpers. The cache is process-local; tests
-that need to swap in a different config pass `config_path` explicitly to
-bypass the cache.
+Spec: 2026-05-13-043-per-round-reviewer-roster AC2 (initial five-field shape).
+Extended by 2026-05-15-056 AC5 part 1 with `invoke_command` — conditionally
+required for mode:headless, MAY be omitted for mode:ide. Loaded by
+request.py, combine.py, _run_reviewer.sh (via _reviewer_gate.py), and
+(transitively) by the reviewer prompts via the shared helpers. The cache is
+process-local; tests that need to swap in a different config pass
+`config_path` explicitly to bypass the cache.
 """
 
 from __future__ import annotations
@@ -23,7 +25,12 @@ import _lib  # noqa: E402
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 _VALID_MODES = ("headless", "ide")
+# Always-required fields. `invoke_command` is conditionally required for
+# mode=headless entries (056 AC5 part 1) and is checked separately below so
+# the Reviewer(**r) construction can accept its absence on mode=ide rows.
 _REQUIRED_FIELDS = ("name", "mode", "required", "timeout_hours", "slash_command")
+_OPTIONAL_FIELDS = ("invoke_command",)
+_ALL_KNOWN_FIELDS = _REQUIRED_FIELDS + _OPTIONAL_FIELDS
 
 
 class Reviewer(NamedTuple):
@@ -32,6 +39,7 @@ class Reviewer(NamedTuple):
     required: bool
     timeout_hours: float | None
     slash_command: str
+    invoke_command: str | None = None
 
 
 _CACHED: tuple[Reviewer, ...] | None = None
@@ -63,7 +71,7 @@ def load_reviewers(config_path: Path | None = None) -> tuple[Reviewer, ...]:
             rev = Reviewer(**r)
         except TypeError as e:
             missing = set(_REQUIRED_FIELDS) - set(r.keys())
-            extra = set(r.keys()) - set(_REQUIRED_FIELDS)
+            extra = set(r.keys()) - set(_ALL_KNOWN_FIELDS)
             msg = f"reviewers.json[{i}] (name={r.get('name', '<unknown>')!r}): {e}"
             if missing:
                 msg += f"; missing required fields: {sorted(missing)}"
@@ -105,6 +113,27 @@ def load_reviewers(config_path: Path | None = None) -> tuple[Reviewer, ...]:
                 raise ValueError(
                     f"reviewers.json: {r.name!r} has invalid timeout_hours {r.timeout_hours!r}; "
                     f"must be a positive number"
+                )
+        # mode↔invoke_command contract (056 AC5 part 1). Headless reviewers
+        # MUST carry a non-empty string containing the {{PROMPT}} token; the
+        # {{WT}} token is RECOMMENDED but not required (some CLIs like
+        # `claude -p` operate relative to cwd and have no -C analog — the
+        # wrapper already `cd`'s to $WT before substitution).
+        if r.mode == "headless":
+            if r.invoke_command is None:
+                raise ValueError(
+                    f"reviewers.json: {r.name!r} has mode=headless but no invoke_command; "
+                    f"headless reviewers must declare an invoke_command template"
+                )
+            if not isinstance(r.invoke_command, str) or not r.invoke_command.strip():
+                raise ValueError(
+                    f"reviewers.json: {r.name!r} has invalid invoke_command {r.invoke_command!r}; "
+                    f"must be a non-empty string"
+                )
+            if "{{PROMPT}}" not in r.invoke_command:
+                raise ValueError(
+                    f"reviewers.json: {r.name!r} invoke_command must contain the "
+                    f"'{{{{PROMPT}}}}' token (got: {r.invoke_command!r})"
                 )
 
     reviewers_tuple = tuple(reviewers)

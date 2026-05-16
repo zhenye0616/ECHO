@@ -342,7 +342,10 @@ except ValueError as e:
       cfg,
       JSON.stringify({
         reviewers: [
-          { name: 'codex', mode: 'headless', required: true, timeout_hours: null, slash_command: 'a' },
+          // 056 AC5 part 1 added invoke_command as a required field for
+          // mode:headless. Both fixture rows carry it so the duplicate-slug
+          // check is what trips.
+          { name: 'codex', mode: 'headless', required: true, timeout_hours: null, slash_command: 'a', invoke_command: 'codex - < {{PROMPT}}' },
           { name: 'codex', mode: 'ide', required: true, timeout_hours: 2, slash_command: 'b' },
         ],
       }),
@@ -358,7 +361,7 @@ except ValueError as e:
       cfg,
       JSON.stringify({
         reviewers: [
-          { name: 'codex', mode: 'headless', required: true, timeout_hours: 2, slash_command: 'x' },
+          { name: 'codex', mode: 'headless', required: true, timeout_hours: 2, slash_command: 'x', invoke_command: 'codex - < {{PROMPT}}' },
         ],
       }),
     );
