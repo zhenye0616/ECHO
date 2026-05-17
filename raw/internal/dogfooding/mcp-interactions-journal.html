@@ -2206,6 +2206,11 @@ href="#pdt-codex-r4-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
 id="toc-pdt-codex-r4-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 14:50 PDT — Codex r4 review tick on 060
 hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r4-tick-on-060-combined-r4-patches-r5-dispatch-decay-6323"
+id="toc-pdt-claude-strategist-watcher-r4-tick-on-060-combined-r4-patches-r5-dispatch-decay-6323">2026-05-17
+14:53 PDT — Claude strategist watcher r4 tick on 060 — combined + r4
+patches + r5 dispatch (decay 6→3→2→3)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25527,6 +25532,112 @@ reason for <code>@raycast/utils</code> is a debounced-value-style hook,
 but the current package exports no such hook, so the 200ms debounce
 should be implemented locally or the dependency note should name a real
 API.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r4-tick-on-060-combined-r4-patches-r5-dispatch-decay-6323">2026-05-17
+14:53 PDT — Claude strategist watcher r4 tick on 060 — combined + r4
+patches + r5 dispatch (decay 6→3→2→3)</h3>
+<ul>
+<li><strong>Trigger:</strong> First wakeup tick found claude r4 landed
+proceed/0; codex r4 landed <code>proceed_after_patches</code>/3 during
+the strategist’s first journal turn (race for the third tick in a row —
+codex consistently lands 4-7 min after dispatch, right in the
+strategist’s wakeup window).</li>
+<li><strong>Query inputs:</strong> combine.py –no-git
+(combined_verdict=proceed_after_patches, escalated:false, 3 divergent
+codex findings); 3 inline spec patches (1 REMOVAL + 2 CORRECTNESS);
+dispatch-next-round.py with –verdict=proceed_after_patches
+–patches-applied=true –spec-sha=21e2012; two coord_invoke calls for
+r5.</li>
+<li><strong>Returned:</strong>
+<ul>
+<li>codex r4 findings: F1 (MED) — <code>Clipboard.paste()</code> no-arg
+fails <code>@raycast/api@1.104.17</code> strict types (requires
+<code>content: string | number | Content</code> arg); F2 (MED) —
+<code>@raycast/utils@2.2.4</code> has no <code>useDebouncedValue</code>
+export, builder following spec literally either imports nonexistent
+symbol OR carries unused dep; F3 (LOW) — <code>Style.Failure</code>
+should be <code>Toast.Style.Failure</code> (the enum lives under
+<code>Toast.Style.*</code>).</li>
+<li>All 3 dispositioned + patched: F1 word-level CORRECTNESS
+(<code>Clipboard.copy(bundle) then Clipboard.paste(bundle)</code> +
+<code>Action.Paste</code> declarative alternative); F2 REMOVAL (drop
+<code>@raycast/utils</code> from runtime deps entirely, spec the 200ms
+debounce as local React
+<code>useState</code>+<code>useEffect</code>+<code>setTimeout</code> ~10
+lines); F3 word-level CORRECTNESS
+(<code>Toast.Style.Failure</code>).</li>
+<li>r5 codex
+reviewer_invoked_id=<code>55e3575f-1215-4ae9-8619-9c4d0ffaf683</code>;
+r5 claude
+reviewer_invoked_id=<code>041b4a9b-516b-44a2-b695-59aeb9b8ebbd</code>.
+Both 200 OK.</li>
+</ul></li>
+<li><strong>Sources:</strong> spec at
+<code>21e2012cde1a0d193f8f58f375a1843725e25730</code> (post-r4 patches).
+r5/request.md at <code>9cc5435</code> with new correlation
+<code>dd5eaf66-3889-42b7-b913-930f650dc8c2</code>. Codex’s r4 evidence
+cited <code>@raycast/api@1.104.17</code> types +
+<code>@raycast/utils@2.2.4</code> public types + Raycast docs (Clipboard
+API, Toast API, Actions API, Manifest docs) — explicitly listed in the
+codex r4 response prelude.</li>
+<li><strong>Verdict:</strong> ✅ right but cycle is now 5 rounds. Decay
+shape 6→3→2→3 — UP from r3, but ALL 3 r4 findings are ORIGINAL-spec
+Raycast API correctness bugs that codex caught via deeper
+<code>@raycast/api</code> / <code>@raycast/utils</code> type checking.
+NONE r3-patch-induced. This is the same pattern as codex r3 F1
+(<code>prefer:newest_first</code> on lex-sorted atom_ids) —
+implementability lens does one MORE pass through library types each
+round. Not the “patches grow each round” anti-pattern; rather, the
+spec’s pre-existing API name citations are themselves a slow-revealing
+bug surface.</li>
+<li><strong>Note:</strong> Three calibration observations.
+<ul>
+<li><strong>(1) Claude prediction inverted at r4 for the 2nd round in a
+row.</strong> Claude r4 explicitly predicted “codex r4 prediction is 0
+findings, or at most 1 LOW on r3-patch-attribution leftovers”; codex
+actual was 2 MED + 1 LOW. Two-round prediction failure rate is now 100%
+— claude consistently underestimates codex’s capacity for deeper
+library-type tracing. The pattern: conceptual lens trusts “the patches I
+asked for landed correctly” → assumes that’s all there is → misses new
+bugs that codex’s evolving deeper-lens surfaces. Not a knock on claude
+(the lens-split IS the point) but a useful r5+ calibration: the
+conceptual lens prediction is a LOWER bound on codex’s finding count,
+not an upper bound.</li>
+<li><strong>(2) The strategist (me) HAS now placed a deliberate r5
+pre-disposition.</strong> R4 combined.md’s convergence call commits to
+AGGRESSIVE scope-trim if r5 lands more API-literal codex findings:
+“remove the API name citations from the spec body (let the builder grep
+<span class="citation" data-cites="raycast/api">@raycast/api</span>
+types directly per AC5’s tsc gate) rather than patching deeper.” This is
+the disposition-discipline rule pre-deployed — if r5 reveals the spec’s
+API citations are themselves the bug surface (as r3+r4 suggest), the
+right disposition is to delete the citations, not patch them.
+Pre-deciding the disposition strategy at r4 saves r5 strategist time and
+removes the “is this strategist drift?” hesitation under pressure.</li>
+<li><strong>(3) Decay-shape-going-UP is not the same as
+strategist-drift.</strong> The 057a r4/r6 anti-pattern was “patches add
+mechanism, next round’s reviewer finds bugs in the added mechanism.”
+Here the patches are removing mechanism (F2 deleted a dep) or fixing
+word-level typos (F1, F3) — and the r5+ predicted-bug surface is the
+SAME pre-existing API citations the patches just touched, not the
+patches themselves. If r5 surfaces ZERO new findings, the API-citation
+surface is exhausted and the spec is shippable. If r5 surfaces more
+API-citation findings, removing the citations entirely (the pre-disposed
+r5 plan) collapses the surface. Either path converges.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) Total findings
+across the 4 closed rounds = 6+3+2+3 = 14. If r5 lands [proceed,
+proceed] zero, the cycle’s healthy-cumulative-finding shape (14 total
+over 5 rounds, decay 6→3→2→3→0) is a NEW empirical data point for
+[codex, claude] roster on spec-with-external-API-citations. Compared to
+059’s 5-round 11-total decay shape (7→2→2→1→0), 060 is producing more
+findings per round on average — partly because the spec touches an
+external library surface (Raycast) that codex traces each round. Backlog
+candidate post-conv: spec-self-review checklist item “if spec cites
+external library symbols, strategist greps those symbols against the
+library’s actual exports BEFORE r1 dispatch” — would have caught
+F1+F2+F3 before any review round.</li>
 </ul>
 </body>
 </html>
