@@ -7,7 +7,7 @@ estimate: 0.5-1d
 created: 2026-05-17
 blocked_by: []
 task_state_ref: 2026-05-17-060-hotkey-overlay-v0-raycast-dogfood
-requested_reviewers: ["codex", "codex-ops"]
+requested_reviewers: ["codex", "claude"]
 files_to_modify:
   - tools/raycast-echo/package.json  # AC1 — Raycast extension manifest (commands, preferences, dependencies); name "echo-context"; one command "search-context" with title "Search ECHO Context"
   - tools/raycast-echo/src/search-context.tsx  # AC1 + AC2 — the command entry point; React/Raycast list view; two-state (empty input → find_clusters, typed → debounced search_memories); detail pane via get_atom / get_atoms; action menu per AC2
