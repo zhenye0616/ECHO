@@ -2085,6 +2085,11 @@ href="#pdt-claude-r3-review-tick-on-059-coord-emit-surface-daemon-rejection-veri
 id="toc-pdt-claude-r3-review-tick-on-059-coord-emit-surface-daemon-rejection-verification-round">2026-05-17
 01:14 PDT — claude r3 review tick on 059
 coord-emit-surface-daemon-rejection (verification round)</a></li>
+<li><a
+href="#pdt---codex-ops-r3-on-059-coord-emit-rejection-observability-spec"
+id="toc-pdt---codex-ops-r3-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:14 PDT - Codex-ops R3 on 059 coord-emit rejection observability
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23849,6 +23854,54 @@ failure mode is NOT present here; verbosity is in the dispositions, not
 the mechanism. If codex r3 + codex-ops r3 also land <code>proceed</code>
 (zero findings), watch should call convergence and the spec is
 claim-ready.</li>
+</ul>
+<h3
+id="pdt---codex-ops-r3-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:14 PDT - Codex-ops R3 on 059 coord-emit rejection observability
+spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Pinned-request <code>codex-ops</code>
+review queue tick (<code>MY_REVIEWER=codex-ops</code>) for
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r3/request.md</code>,
+correlation_id <code>de5b6405-45fd-41d2-8b82-81e6dfa3bfb3</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=de5b6405-45fd-41d2-8b82-81e6dfa3bfb3</code>;
+bind-validated the pinned request; read the R3 request, reviewer schema,
+pinned spec artifact
+<code>backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+at <code>d6be1400929e61fc145a9e3addf90d9ee7d5880c</code>, and runtime
+context in <code>tools/review-queue/coord-emit.sh</code>,
+<code>tests/coord/coord-emit-wrapper-transport.test.ts</code>,
+<code>r2/combined.md</code>, and <code>r2/codex-ops.md</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, rebased, and pushed
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r3/codex-ops.md</code>
+as <code>d41d3c3</code>, verdict <code>proceed_after_patches</code>,
+findings: one MEDIUM stale Tests-section sentence still says curl’s own
+stderr is intentionally allowed.</li>
+<li><strong>Sources:</strong> Artifact blob
+<code>6cb0fa483480b35dc19029118805884839ec9f58</code>; request path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r3/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r3/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; coord wrapper call
+was best-effort and not parsed for response content.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested R3 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed, and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R3 closed the requested frontmatter, AC1,
+AC3, Out-of-Scope #7, and exit-0-invariant focus items. The remaining
+operational issue is a single contradictory test-discipline sentence:
+unattended daemon-down launchd ticks require zero stderr end-to-end, so
+the spec must not preserve language that permits raw curl
+diagnostics.</li>
 </ul>
 </body>
 </html>
