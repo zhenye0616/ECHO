@@ -2198,6 +2198,9 @@ href="#pdt-claude-strategist-watcher-r3-tick-on-060-combined-r3-patches-r4-dispa
 id="toc-pdt-claude-strategist-watcher-r3-tick-on-060-combined-r3-patches-r4-dispatch-decay-632">2026-05-17
 14:44 PDT — Claude strategist watcher r3 tick on 060 — combined + r3
 patches + r4 dispatch (decay 6→3→2)</a></li>
+<li><a href="#pdt-claude-r4-review-tick-review-queue-claude"
+id="toc-pdt-claude-r4-review-tick-review-queue-claude">2026-05-17 14:46
+PDT — claude r4 review tick (review-queue-claude)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25385,6 +25388,88 @@ site I also missed), the strategist should consider scope-trimming MORE
 aggressively at r5 — drop the “v0 candidate fix” V1 hint from F1’s note,
 shorten R5 risks paragraph, etc. — to starve the patch surface
 itself.</li>
+</ul>
+<h3 id="pdt-claude-r4-review-tick-review-queue-claude">2026-05-17 14:46
+PDT — claude r4 review tick (review-queue-claude)</h3>
+<ul>
+<li><strong>Trigger:</strong> 060 r4 dispatched downstream after
+strategist applied 1 MED + 1 LOW r3 codex dispositions; pinned-request
+mode via <code>coord_invoke</code>,
+<code>ECHO_COORD_CORRELATION_ID=76285b18-f62f-48e1-984f-ce2f4867c4f6</code>,
+<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/request.md</code>.</li>
+<li><strong>Query inputs:</strong>
+spec_commit_sha=<code>37751e3ba2c3eacaf756d08fb4a5f8620f0be821</code>
+(artifact); diff base for delta-focused
+review=<code>34f29a8..37751e3</code>;
+lens=conceptual/architectural/scope-drift.</li>
+<li><strong>Returned:</strong> <code>verdict: proceed</code>,
+<code>findings: []</code> (zero). Response committed at
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/claude.md</code>
+(~177 lines); commit <code>450c96c</code> on origin/main.</li>
+<li><strong>Sources:</strong> spec at
+<code>37751e3:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+(via <code>git show</code>); r3 codex.md, r3 claude.md, r3 combined.md
+(commit-context inputs only); commit message at <code>37751e3</code> for
+disposition rationale;
+<code>git diff 34f29a8 37751e3 -- backlog/ready/...md</code> for delta
+scope. No MCP tool calls inside the review itself (fresh-eyes-at-SHA:
+spec + request only).</li>
+<li><strong>Verdict:</strong> ✅ right — patch decay continues on
+predicted curve (6→3→2 at r3; r4 claude is 0). Two r3 codex dispositions
+verified clean: F1 MED applied disposition-discipline REMOVAL (deleted
+<code>prefer:"newest_first"</code> rather than adding a fetch-resort
+pipeline); F2 LOW extended codex’s 3-site fix to 4 sites the strategist
+found via own grep; line 146 rename-origin annotation preserved.</li>
+<li><strong>Note:</strong> (observations only — backlog inputs, not fix
+designs)
+<ul>
+<li><strong>(1) r3 codex MED was an ORIGINAL-spec bug, not
+r2-patch-induced</strong> (the commit message names this honestly).
+Codex traced <code>prefer:"newest_first"</code> all the way to
+<code>src/trace/cluster.ts:151-156</code>’s lex-sort. This validates the
+r3 prediction (the prior journal entry) that “claude verifies
+disposition-discipline correctly but underestimates codex’s
+deeper-code-tracing capability.” Pattern held at r3, may not repeat at
+r4 since r3 patches are small enough to leave little code-tracing
+surface.</li>
+<li><strong>(2) r3 strategist F1 disposition is the textbook case of
+<code>skills/review-queue-watch.md</code>’s “prefer removal over deeper
+patching”.</strong> Two alternative paths existed: (a) add mechanism
+(fetch up-to-50, resort client-side), (b) remove the misleading
+parameter and tell the truth about lex-id-order behavior. Strategist
+picked (b), explicitly named the rule in the commit message (“Per
+disposition discipline: removed mechanism rather than added”), and
+parked the chronology-correct version as “V1 candidate fix if dogfooding
+flags it.” This is the disposition-discipline rule working as
+designed.</li>
+<li><strong>(3) F2 LOW disposition reveals the right shape of
+reviewer-list claims.</strong> When codex enumerates “3 sites” the
+strategist should fix “3-plus-whatever-grep-also-finds,” not “exactly 3
+named.” Strategist did this (found 4th site at line 26). This is correct
+scope-completion, not scope-expansion — the right discipline.</li>
+<li><strong>(4) Cycle decay is now 6→3→2→0 (predicted), one round longer
+than the 040/042/045 historical 6→3→0 shape.</strong> The extra round is
+explained by codex r3 catching an original-spec bug that 3 prior rounds
+of reviews (r1 codex, r1 claude, r2 codex, r2 claude, r3 claude) all
+missed. Worth tracking whether “claude conceptual lens misses
+original-spec implementability bugs” generalizes — if yes, that’s a
+v1.7+ skills update for review-queue-claude.md (e.g., “trace MCP-tool
+parameter values to source for at least the cluster/search
+primitives”).</li>
+<li><strong>(5) AC8 founder-activation count remains zero across all 4
+rounds.</strong> Founder set polling cadence at the start; zero
+substantive dispatch messages thereafter. 039 loop-close gate continues
+to hold at 060 through r4.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) If codex r4 lands
+<code>proceed</code> with zero findings, this is the cleanest possible
+4-round convergence (6→3→2→0). If codex r4 finds another
+deeper-code-tracing bug at MED+, the strategist should consider whether
+item 060 has reached “diminishing-returns review rounds” territory — at
+some point the dogfooding journal itself (AC8) is a better V1-input
+signal than further round-N spec polishing. The empirical AC8 gate
+exists precisely because spec-polishing has bounded value once the v0 is
+shippable.</li>
 </ul>
 </body>
 </html>
