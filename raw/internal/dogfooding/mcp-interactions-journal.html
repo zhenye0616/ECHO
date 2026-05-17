@@ -2173,6 +2173,11 @@ patches + r2 dispatch</a></li>
 id="toc-pdt-claude-r2-review-tick-on-060-proceed-zero-findings">2026-05-17
 14:25 PDT — Claude r2 review tick on 060 (proceed, zero
 findings)</a></li>
+<li><a
+href="#pdt-codex-r2-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-codex-r2-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:28 PDT — Codex r2 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24984,6 +24989,55 @@ name as a domain term rather than a typed schema reference). Worth
 noting as a recurring lens-blind-spot for narrow-spec reviews: claude
 rarely catches “field/route doesn’t exist” bugs unless explicitly
 prompted to verify code references.</li>
+</ul>
+<h3
+id="pdt-codex-r2-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:28 PDT — Codex r2 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> One Codex-side review queue tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r2/request.md</code>,
+correlation_id <code>89132706-a1a8-4d12-a0c8-e244236512bd</code>, after
+r1 patches landed at artifact SHA
+<code>74cb4641853e55a54e5dd733d4c9521c8b2db11b</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+selected the scan-pick request; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=89132706-a1a8-4d12-a0c8-e244236512bd</code>;
+read the pinned spec via
+<code>git show 74cb4641853e55a54e5dd733d4c9521c8b2db11b:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+checked <code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/{find-clusters,search-memories,get-atom,get-atoms}.ts</code>,
+<code>src/mcp/util/source-app.ts</code>,
+<code>tools/serve-trace.ts</code>,
+<code>tools/review-queue/coord-emit.sh</code>, and current Raycast API
+docs through Context7.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r2/codex.md</code>;
+upstream duplicate check passed;
+<code>commit-reviewer-response.sh</code> revalidated, committed,
+rebased, and pushed as <code>1fc309d</code>; verdict
+<code>proceed_after_patches</code>, findings: 3 medium.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r2/request.md</code>;
+artifact path
+<code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>74cb464</code>; committed response path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r2/codex.md</code>;
+code-reference checks for MCP HTTP headers, retrieval tool shapes,
+source-app mapping, trace viewer routing, and Raycast API surface.</li>
+<li><strong>Verdict:</strong> ✅ right — the tick produced exactly one
+Codex response at the request SHA with the expected atomic write,
+validation, duplicate check, and push path.</li>
+<li><strong>Note:</strong> r2 did not converge cleanly: the remaining
+issues are spec-shape patches introduced or exposed by the r1 repair
+pass, not objections to the Raycast v0 direction. The highest-signal
+catches were that <code>source-app.ts</code> is required by the body but
+omitted from <code>files_to_modify</code>, the documented fetch fallback
+lacks the transport-required
+<code>Accept: application/json, text/event-stream</code> header, and the
+journal template now has 7-field / 6-field / canonical-schema drift
+exactly where AC8 depends on comparable dogfooding data.</li>
 </ul>
 </body>
 </html>
