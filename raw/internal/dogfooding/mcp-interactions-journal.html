@@ -2036,6 +2036,10 @@ href="#pdt---codex-r10-on-057b-coord-active-trigger-implementation"
 id="toc-pdt---codex-r10-on-057b-coord-active-trigger-implementation">2026-05-16
 15:00 PDT - Codex R10 on 057b coord active-trigger
 implementation</a></li>
+<li><a href="#pdt-founder-driven-live-test-of-coord-layer-057a-057b"
+id="toc-pdt-founder-driven-live-test-of-coord-layer-057a-057b">2026-05-16
+16:14 PDT — founder-driven live test of coord layer (057a +
+057b)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23165,6 +23169,129 @@ non-deferred r9 findings: both Python active-trigger hooks now include
 bind-failure branches preserve the <code>tick_end(bind_failed)</code>
 emission before <code>exit 1</code>. The test-injection concern and
 remaining AC8 expansion stayed out of scope per the request.</li>
+</ul>
+<h3
+id="pdt-founder-driven-live-test-of-coord-layer-057a-057b">2026-05-16
+16:14 PDT — founder-driven live test of coord layer (057a + 057b)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked Claude Code to “live test my
+coor[d] layer.” Goal: end-to-end exercise of <code>coord_emit</code> +
+<code>coord_status</code> +
+<code>wait_for_new_turns(source_prefix=coord:…)</code> + the
+non-pollution invariant against the running daemon at
+<code>127.0.0.1:38478</code>.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li><code>echo_ping(message="live-test coord layer 2026-05-16")</code> —
+daemon liveness probe.</li>
+<li>HTTP <code>tools/call coord_emit</code> ×3 via direct curl (the
+<code>coord-emit.sh</code> wrapper path silently swallowed the first
+call due to a tier-key mismatch — see Note). Emissions:
+<ol type="1">
+<li><code>coord_emit{event_type=tick_start, schema_version=1, tier=round, correlation_id=9adb7edd-…, X-Echo-Role=claude}</code>
+— round-tier open.</li>
+<li><code>coord_emit{event_type=scheduler_health, schema_version=1, tier=scheduler, tick_run_id=f99b6cbd-…, X-Echo-Role=codex}</code>
+— scheduler-tier open (still-open at journaling time → expected_by
+23:17:55Z).</li>
+<li>Background-delayed (<code>sleep 2</code>)
+<code>coord_emit{event_type=tick_end, correlation_id=9adb7edd-…, X-Echo-Role=claude}</code>
+— closes the round-tier pair, fired DURING the wait_for_new_turns
+call.</li>
+</ol></li>
+<li><code>search_memories(source_prefix="coord:", since=2026-05-16T23:13:00Z, limit=10)</code>
+— visibility check via coord prefix.</li>
+<li><code>search_memories(since=2026-05-16T23:15:00Z, limit=20)</code> —
+vanilla call to verify non-pollution.</li>
+<li><code>wait_for_new_turns(sources=["coord:claude"], since=2026-05-16T23:13:00Z, timeout=5)</code>
+— replay-of-existing case (returns immediately with the prior tick_start
+atom).</li>
+<li><code>wait_for_new_turns(sources=["coord:claude"], since=2026-05-16T23:16:32.777Z, timeout=15)</code>
+— live-wake case (background tick_end emit fires ~2s in).</li>
+<li><code>get_atoms(atom_ids=["1d6dbe49-…"])</code> — body fetch on the
+wait-returned id.</li>
+<li>HTTP <code>tools/call coord_status{}</code> (no args;
+<code>X-Echo-Role: claude</code> header).</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>echo_ping →
+<code>{pong:true, ts:2026-05-16T23:13:48.605Z}</code>.</li>
+<li>coord_emit #1 (tick_start) → atom id
+<code>127c1439-ee47-49ac-8ccc-19280ea272b9</code>, server-derived
+<code>source=coord:claude</code> (caller <code>subject_role</code>
+ignored in favor of header → AC5 identity gate holds).</li>
+<li>coord_emit #2 (scheduler_health) → atom id
+<code>05a4d238-851f-4e10-83b5-b736849761cc</code>,
+<code>source=coord:codex</code>.</li>
+<li>coord_emit #3 (tick_end, background) → atom id
+<code>1d6dbe49-cb25-4bab-8f6d-c45e40bf5c1e</code>.</li>
+<li>search_memories(source_prefix=coord:) → 2 matches;
+<code>metadata.surface=coord</code>, <code>session_id=echo:coord</code>,
+full
+<code>metadata.coord{event_type, schema_version, tier, subject_role, tick-key, payload}</code>
+mirror preserved.</li>
+<li>search_memories(vanilla, since=23:15:00Z) → <strong>0
+matches</strong> even though coord atoms exist in window → non-pollution
+invariant holds.</li>
+<li>wait_for_new_turns (replay-of-existing) → returned in &lt;1s with
+<code>turn_ids=["127c1439-…"]</code>, <code>timed_out=false</code>,
+<code>next_since=2026-05-16T23:16:32.777Z</code>.</li>
+<li>wait_for_new_turns (live-wake) → returned in ~2-3s with
+<code>turn_ids=["1d6dbe49-…"]</code>, <code>timed_out=false</code>,
+<code>next_since=2026-05-16T23:16:53.052Z</code>. Body fetch confirmed
+<code>event_type=tick_end, correlation_id=9adb7edd-…, payload={closes:tick_start, test:live-wake}</code>.</li>
+<li>coord_status → <code>daemon_uptime_sec=2905</code>,
+<code>last_reconstruction_watermark=75917</code>; open_deadlines
+includes our still-open scheduler_health
+(<code>expected_by=23:17:55.777Z</code>); per_role_last_tick.claude
+shows our
+<code>last_tick_start=23:15:55 / last_tick_end=23:16:50 / last_tick_duration_sec=55</code>;
+per_role_last_tick.codex shows our
+<code>last_scheduler_health=23:15:55</code>; <code>recent_missed</code>
+carries a pre-existing 22:31 e2e fixture miss (unrelated).</li>
+</ul></li>
+<li><strong>Sources:</strong> No JSONL/git capture-side sources — this
+run only invoked the coord seam, which writes via the dedicated
+<code>src/coord/internal-emitter.ts</code> path. Atoms verified via
+<code>search_memories(source_prefix=coord:)</code> (sources:
+<code>coord:claude</code>, <code>coord:codex</code>) and
+<code>wait_for_new_turns(sources=["coord:claude"])</code> (source:
+<code>coord:claude</code>). No cursor/claude_code/codex/git capture
+surfaces exercised. Conversely, <code>search_memories(vanilla)</code>
+excluded those same atoms via the dedicated
+<code>search-memories.ts</code> <code>coord:</code> filter, NOT via a
+shared <code>withFsExclusion</code> helper (per coord-layer.md line 64
+contract).</li>
+<li><strong>Verdict:</strong> ✅ right — every advertised behavior held:
+round-vs-scheduler tier validation, server-derived <code>source</code>
+from <code>X-Echo-Role</code>, three-way visibility contract
+(<code>search_memories(coord:)</code> shows,
+<code>wait_for_new_turns(coord:…)</code> wakes, vanilla
+<code>search_memories()</code> hides), live-wake latency ~2s end-to-end,
+<code>coord_status</code> open-deadlines + per-role-last-tick +
+reconstruction watermark all populated.</li>
+<li><strong>Note:</strong> One operator-side friction surfaced.
+<code>tools/review-queue/coord-emit.sh tick_start --tick-run-id=…</code>
+returned <code>rc=0</code> and emitted no atom because (a)
+<code>tick_start</code> is round-tier, requiring
+<code>--correlation-id</code>, AND (b) the wrapper’s
+<code>curl … || true</code> swallowed the daemon’s <code>isError</code>
+JSON-RPC response. The best-effort <code>|| true</code> is load-bearing
+for queue durability when the daemon is down (per the script’s own
+header comment citing r1 codex-ops F2 HIGH), but it ALSO silences
+caller-side bugs like tier mismatch. The direct curl call from this
+session surfaced the error text
+(<code>coord_emit: round-tier event 'tick_start' requires correlation_id (non-empty string)</code>)
+immediately. The script’s exit-status contract (“callers MUST NOT branch
+on this script’s exit status”) means operators have no programmatic
+signal that an emit was rejected.</li>
+<li><strong>Conjecture:</strong> (observation only — not a fix design)
+The silent-failure surface area might warrant a separate stderr line
+when the daemon responds with <code>isError:true</code>, distinct from
+the daemon-down case. The signal would be advisory (still exit 0, still
+preserve queue durability), and would have caught my own tier-key
+mistake at the first call instead of forcing a direct-curl reproduction.
+Backlog material, not inline.</li>
 </ul>
 </body>
 </html>
