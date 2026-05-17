@@ -25,11 +25,16 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-17T08:53:29Z"
 branch: "agent/coord-emit-surface-daemon-rejection"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--coord-emit-surface-daemon-rejection"
+head_sha: "6d19336770a659c58b9e0d44a043b79681a79318"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  AC1: `tools/review-queue/coord-emit.sh` now captures HTTP status + body via `curl -w '\n%{http_code}'` and curl rc via `|| curl_rc=$?`; suppresses curl's own stderr via `2>/dev/null` so the daemon-unreachable branch produces zero bytes. Three-state stderr contract per spec: success → silent; isError:true → `coord-emit.sh: daemon rejected <event_type>: <text truncated to 500 chars>`; HTTP non-2xx → `coord-emit.sh: daemon returned HTTP <status>: <first 200 chars>`; exit 0 in every branch. Bash 3.2.57-portable (no jq; substring isError detection + awk match for `"text":"..."` + sed unescape).
+  AC2: only `tools/review-queue/coord-emit.sh` and `tests/coord/coord-emit-wrapper-transport.test.ts` modified. `git diff --stat` confirms.
+  AC3: three new test cases in `tests/coord/coord-emit-wrapper-transport.test.ts` covering rejection / unreachable / HTTP 500. Added `pickClosedPort()` helper (bind-port-0-then-close) and `runWrapperAsync()` helper (async spawn — needed because `spawnSync` blocks the libuv event loop and the in-process MCP daemon / 500-fixture can't respond during curl's wait window). Existing happy-path test extended with stdout/stderr-empty assertions per the AC3 test-discipline clause.
+  All 7 wrapper-transport tests pass; full coord suite (22 files / 122 tests) passes; full repo suite (98 files / 1124 tests) passes; `npm run lint` clean; `tsc --noEmit` clean.
+  Reviewer note: `runWrapperAsync` is the load-bearing test-side fix that lets cases (i) and (iii) actually exercise the wrapper's parsing path. The four pre-existing tests are structurally tolerant of the spawnSync-blocks-the-event-loop issue (their assertions are status-only or storage-side, which survive curl timeouts); the new ones can't be.
 ---
 
 # coord-emit.sh distinguishes daemon-rejection from daemon-unreachable
