@@ -2075,6 +2075,11 @@ href="#pdt---codex-r2-on-059-coord-emit-rejection-observability-spec"
 id="toc-pdt---codex-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
 01:02 PDT - Codex R2 on 059 coord-emit rejection observability
 spec</a></li>
+<li><a
+href="#pdt-strategist-watcher-r2-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection"
+id="toc-pdt-strategist-watcher-r2-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:08 PDT — Strategist watcher r2 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23729,6 +23734,51 @@ issue is frontmatter drift:
 <code>files_to_modify</code>/<code>spec_refs</code> still say “two new
 cases” and permit old unreachable framing, which is exactly the kind of
 pre-body summary a builder can follow during claim prep.</li>
+</ul>
+<h3
+id="pdt-strategist-watcher-r2-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:08 PDT — Strategist watcher r2 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</h3>
+<ul>
+<li><strong>Trigger:</strong> All three R2 reviewer responses landed
+(codex@6c40075 / codex-ops@3d28501 / claude@b06eb81); founder asked to
+check r2 ahead of the 01:20 scheduled wakeup.</li>
+<li><strong>Query inputs:</strong> 3 × <code>coord_invoke</code> for r3
+reviewers (codex, codex-ops, claude) with <code>correlation_id</code>
+from r3/request.md frontmatter, via <code>127.0.0.1:38478/mcp</code>
+POST + <code>X-Echo-Role: claude</code>. No coord_emit, no
+search_memories, no wait_for_new_turns.</li>
+<li><strong>Returned:</strong> combine.py wrote r2/combined.md as
+<code>proceed_after_patches</code>, escalated_to_founder:false. 2 MED
+findings, both distinct (no convergent column). 3 × coord_invoke 200 OK
+with fresh reviewer_invoked_id UUIDs.</li>
+<li><strong>Sources:</strong> Spec at <code>033867c</code> (R2
+artifact_sha) → patched to <code>d6be140</code> via spec-r2-patches
+commit; r3 request at <code>061f9f5</code>; combined.md at
+r2/combined.md. No file-side capture surfaces involved.</li>
+<li><strong>Verdict:</strong> ✅ right — combine.py +
+dispatch-next-round.py both correct; 2-finding round is a healthy decay
+from r1’s 7 (7→2 matches the 9→5→2→1→2 shape from 046’s empirical
+baseline). Spec patches were narrow (8+/7-, 1 line of frontmatter + 1
+AC1 bullet + 1 AC3 assertion tightening + 1 Out-of-Scope rewrite).
+Claude was first to verdict <code>proceed</code> (zero findings) on this
+round; codex caught real builder-facing frontmatter drift that bypasses
+the body; codex-ops caught the curl-native-stderr leak that defeats
+AC1’s silent-on-unreachable intent in production launchd ticks. Three
+distinct lenses again.</li>
+<li><strong>Note:</strong> <strong>r2’s 2 MED findings are exactly the
+failure-mode r1 was supposed to close but didn’t reach into.</strong>
+Codex’s frontmatter-drift catch is a meta-pattern (the body says X, the
+structured frontmatter still says pre-X — builders read frontmatter
+first). Codex-ops’s curl-stderr finding is a deeper instance of the same
+silent-failure class the spec itself is trying to fix: r1 locked “silent
+on unreachable” at the wrapper-emission level, but the wrapper’s curl
+invocation still leaks curl’s native error lines, which IS exactly the
+kind of opacity the original journal observation (“the wrapper exited
+rc=0 with no atom and no signal”) was about. The spec is now
+load-bearing on the meta-claim: silence means silence, end-to-end. r3 is
+the verification round; if it lands {proceed/proceed/proceed} the spec
+is claim-ready.</li>
 </ul>
 </body>
 </html>
