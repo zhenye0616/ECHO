@@ -20,3 +20,5 @@
 2026-05-16T06:54:50Z PUSH-RACE-FALLBACK: journal: strategist watcher r1 escalation on 057b sha=48433097c9a674459ba1830df4122f601049fc56
 2026-05-17T08:02:20Z PUSH-RACE-FALLBACK: journal: codex-ops r2 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=5c79c6ed021f6e9adae2b24b02903f1e5064adc9
 2026-05-17T08:25:57Z PUSH-RACE-FALLBACK: journal: codex r4 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=dd1450b7c8ec380bfd340f53a3091a98179e03d9
+2026-05-17T08:45:21Z PUSH-RACE-FALLBACK: journal: codex-ops r5 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=441e7f0eec40a69c990f18dcc6265341cf480821
+2026-05-17T08:47:28Z PUSH-RACE-FALLBACK: journal: codex-ops r5 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=af3c32a554ccd0b4930a4a0e24730efa0388e099
