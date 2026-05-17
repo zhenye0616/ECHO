@@ -1,0 +1,39 @@
+---
+item_id: "2026-05-17-059-coord-emit-surface-daemon-rejection"
+round: 5
+reviewer: "claude"
+artifact_sha: "05bb181"
+completed_at: '2026-05-17T08:42:10Z'
+verdict: "proceed"
+findings: []
+---
+
+# Claude review — conceptual / architectural / drift lens (r5)
+
+Verdict: `proceed`. No new findings.
+
+**The r4→r5 diff is one line: Out of Scope #12 is added; nothing else changes.** `git diff 15f7463 05bb181 -- backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md` is a single insertion at line 147 (the new OoS #12 bullet). No AC text moves, no risk text moves, no mechanism is added. The build surface remains `tools/review-queue/coord-emit.sh` + `tests/coord/coord-emit-wrapper-transport.test.ts` (AC2's `git diff --stat` gate at line 195 still holds).
+
+**R5 focus_hints — all three checks pass on the artifact at `05bb181`:**
+
+- ✅ **OoS #12 names the 200-non-MCP-body case explicitly.** The bullet enumerates three concrete shapes — "stale `ECHO_MCP_URL` pointing at a local web service that returns 200 with HTTP", "unrelated 200 JSON payload", and "malformed JSON-RPC reply that lacks `result.isError` / `result.content[0].text`". It also names the originating finding by citation ("Codex-ops r4 F1 (MED) recommended an explicit 'unexpected 2xx' branch + a 200-non-MCP fixture"), so a future reviewer scanning OoS for "what got punted" sees both the case and its origin in one bullet.
+
+- ✅ **Framed as operator-side responsibility, symmetric with OoS #5.** OoS #12 reads: "Wrong-URL-configuration is a third state but it's an operator-side responsibility (validating `ECHO_MCP_URL` at install/launchd-load time), not daemon-side behavior. The existing AC1 parser falls through silently in this case, which is symmetric with OoS #5's 'auto-correction of operator mistakes' posture — the wrapper does NOT compensate for misconfiguration." The symmetry hook to OoS #5 is named inline, not implied — a reviewer doesn't have to construct the analogy themselves. This is the correct conceptual framing: 059's two-state split (rejection vs unreachable) is a daemon-protocol disambiguation; 200-non-MCP is a transport-layer misconfiguration that the wrapper is not the right layer to detect (and detecting it requires a "what counts as MCP-shaped?" schema check that itself can drift as the daemon's response shape evolves).
+
+- ✅ **Deferral rationale reads as a load-bearing scope decision, not a punt.** Three load-bearing elements: (a) explicit founder-memory anchors — "deferred per friction-first / narrow-spec discipline" maps to `project_friction_first_prioritization` (friction-fix specs only) and `project_v15_cleanup_pause` (reduce/clarify, not add); (b) a concrete reopen criterion tied to the surfacing channel — "If a 'wrong ECHO_MCP_URL' incident lands in `raw/internal/dogfooding/mcp-interactions-journal.md` empirically, file a follow-on spec"; (c) a forward-compatibility note that the existing parser extends cleanly when reopened — "the parser already extracts `result.content[0].text`, so detecting `result` absent is a small extension." Together these read as "we've designed the wrapper so this is one bullet away from supported, but we're declining to enable it until the surfacing channel surfaces it" — that's a scope-discipline posture with a defined trigger, not a "we don't want to deal with this" punt.
+
+**Strategist-drift pattern check (`skills/review-queue-watch.md` — "prefer removal/locking over deeper patching when findings target a recent-round patch").** The r5 patch is the *paradigm-correct* response to a new-gap finding caught at r4. Codex-ops r4 F1 named a real third state; the strategist's options were (i) add a 5th branch + a 200-non-MCP fixture, expanding mechanism on a narrow-class spec, or (ii) document the deferral with a concrete reopen trigger and a symmetry hook to the existing scope-discipline OoS items. The strategist chose (ii). Diff is +1 line in Out of Scope, zero new ACs, zero new tests, zero new mechanism. This is the *opposite* of the patching-deeper failure mode the discipline warns about — and the strategist applied the same pattern at r3 (prose scrub, zero mechanism) and now at r5 (OoS addition, zero mechanism). Two consecutive rounds of zero-mechanism patches in response to reviewer findings is the healthy decay-shape for a narrow-class spec converging.
+
+**No V1 / form-factor / cohort drift introduced by OoS #12.** Substrate-layer observability gate stays on the wrapper script; no new layer, no new surface, no autonomous action, no cohort-shifted UI. OoS #12 actually *tightens* scope by naming the 200-non-MCP case as out-of-bounds explicitly — future builders or reviewers encountering "but couldn't we also detect…?" have a documented answer that points to the dogfooding journal as the trigger channel.
+
+**Cross-item coherence holds at r5.** OoS #12's reopen pattern ("file a follow-on spec adding the 5th branch") echoes OoS #11's "second spec is the trigger" rule and After-Completion's "second spec is the trigger to write the principle." Three different surfaces in the same spec now point at the same dogfooding-journal-driven scope-expansion gate — that consistency is load-bearing for a project whose drift-prevention discipline rests on "spec is source of truth; overriding requires a decision file." A future builder or reviewer who wants to add the 5th branch knows exactly where the empirical trigger lives.
+
+**Architectural invariant still bit-exact.** Exit-0-unconditional re-asserted in AC1 (line 81), Out of Scope #1 (line 136), and Definition of Done (line 194). 057b r1 codex-ops F2 HIGH load-bearing contract (queue durability when daemon is down) preserved. AC2 caller-prose-unchanged gate intact. The OoS #12 addition does not alter the three-state stderr contract (success silent / rejection one line / HTTP non-2xx one line / unreachable silent) — the 200-non-MCP case falls into the "success silent" path silently in the deferred design, which OoS #12 itself states verbatim.
+
+**Spec growth check.** R1 baseline ~90 lines → r3 ~203 lines → r4 ~203 lines → r5 ~204 lines. The r5 diff is +1 line; cumulative spec growth across r3–r5 is dominated by scope-locking text (Out of Scope items 11 and 12, the prose scrub at r3), not new mechanism. The build surface has not grown at all since r1 — still two files. The "spec verbosity vs build verbosity" canary (AC2's diff-stat clause) continues to hold.
+
+**Cross-item coherence — 057b cite.** R5 patch does not touch the 057b r1 codex-ops F2 HIGH citation (still the right anchor for the queue-durability contract), the original journal entry citation (2026-05-16 16:14 PDT), or the `src/coord/validate.ts` cross-reference. All cross-item anchors are intact.
+
+**Why proceed (not proceed_after_patches).** Every r4 disposition checkpoint surfaced in combined.md is now closed by the r5 single-line patch: OoS #12 is present, names the 200-non-MCP case explicitly, mirrors OoS #5's operator-mistakes framing, and supplies a concrete dogfooding-journal-driven reopen trigger. My r1 verdict was `proceed_after_patches`; r2, r3, and r4 were all `proceed`; r5 reaffirms cleanly. The conceptual lens converges; if codex and codex-ops also verdict `proceed` at r5, the spec is dispatch-ready (the dispatch commit at HEAD shows the watcher already moved in that direction; r5 is the closing-the-loop check).
+
+**No overlap concerns with codex / codex-ops at r5.** Codex-ops r4 raised the divergent finding that drove the OoS #12 patch; if r5 codex-ops believes the deferral is wrong, the focus_hints invite a load-bearing pushback with concrete operational impact (an actual misconfiguration incident or quantified launchd-log noise). If r5 codex-ops also verdicts `proceed`, the deferral is consensus, not strategist override. The conceptual lens has no independent stake in re-litigating the operational call.
