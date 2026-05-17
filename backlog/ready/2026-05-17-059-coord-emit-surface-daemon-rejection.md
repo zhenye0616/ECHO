@@ -7,7 +7,7 @@ estimate: 0.25-0.5d
 created: 2026-05-17
 blocked_by: []
 task_state_ref: 2026-05-17-059-coord-emit-surface-daemon-rejection
-requested_reviewers: ["codex", "codex-ops"]
+requested_reviewers: ["codex", "codex-ops", "claude"]
 files_to_modify:
   - tools/review-queue/coord-emit.sh  # AC1 — capture HTTP body + status; on isError:true OR HTTP 4xx/5xx, print one stderr line distinguishing rejection from unreachable; still exit 0
   - tests/coord/coord-emit-wrapper-transport.test.ts  # AC3 — extend with two new cases: (i) daemon rejects (tier-key mismatch on tick_start) → wrapper exit 0 + stderr line includes "coord_emit rejected" + the daemon's error message; (ii) daemon unreachable (no server on the chosen port) → wrapper exit 0 + stderr line includes the existing "daemon-down" framing OR nothing extra (preserve current behavior)
