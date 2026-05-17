@@ -2247,6 +2247,12 @@ watcher drops journal entries (recovered)</a></li>
 <li><a href="#pdt-claude-r6-review-tick-review-queue-claude"
 id="toc-pdt-claude-r6-review-tick-review-queue-claude">2026-05-17 15:06
 PDT — claude r6 review tick (review-queue-claude)</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r6-tick-on-060-combined-r6-patches-r7-dispatch-founder-narrowed-roster-but-dispatch-glitch-sent-to-both"
+id="toc-pdt-claude-strategist-watcher-r6-tick-on-060-combined-r6-patches-r7-dispatch-founder-narrowed-roster-but-dispatch-glitch-sent-to-both">2026-05-17
+15:12 PDT — Claude strategist watcher r6 tick on 060 — combined + r6
+patches + r7 dispatch (founder narrowed roster, but dispatch glitch sent
+to both)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -26274,6 +26280,86 @@ it easier for cross-tool readers (codex strategist, founder, future
 claude sessions) to recognize when the rule is being applied vs
 missed.</li>
 </ul></li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r6-tick-on-060-combined-r6-patches-r7-dispatch-founder-narrowed-roster-but-dispatch-glitch-sent-to-both">2026-05-17
+15:12 PDT — Claude strategist watcher r6 tick on 060 — combined + r6
+patches + r7 dispatch (founder narrowed roster, but dispatch glitch sent
+to both)</h3>
+<ul>
+<li><strong>Trigger:</strong> Scheduled wakeup +270s; r6 had both
+reviewers landed (branch a). Founder direction received mid-tick: “no
+more claude reviewer in this round since it hasn’t found anything.”</li>
+<li><strong>Query inputs:</strong> filesystem check; 4 inline spec
+patches (F1 word-level + F2 promotion of test from optional→mandatory +
+roster narrowing to [“codex”] + files_to_modify addition for test file);
+combine.py; dispatch-next-round.py with –spec-sha=1f5b2cb (omitted
+–reviewers flag); 2 coord_invoke calls (codex AND claude — see glitch
+below).</li>
+<li><strong>Returned:</strong>
+<ul>
+<li>codex r6: <code>proceed_after_patches</code> / 2 MED (⌘C “raw atom
+JSON” can’t be satisfied by get_atom’s projected response shape;
+format.test.ts was optional but AC2 contract is unenforceable without
+it).</li>
+<li>claude r6: <code>proceed</code> / 0 findings (7th consecutive —
+empirically rubber-stamping; founder dropped it from r7+ roster).</li>
+<li>r7 codex
+reviewer_invoked_id=<code>467be622-c4ad-4d43-9141-1f0ceec757d5</code>;
+r7 claude
+reviewer_invoked_id=<code>64da7fac-8224-433d-8444-1413f27bb7ed</code>.</li>
+</ul></li>
+<li><strong>Sources:</strong> spec at
+<code>1f5b2cb330603f2199489a179aaeb9bacd231b0b</code> (post-r6 patches +
+roster narrowing). r7/request.md at <code>8aa6fd6</code> —
+<strong>GLITCH</strong>: file frontmatter still lists
+<code>requested_reviewers: [codex, claude]</code> because
+<code>dispatch-next-round.py</code> defaulted to the prior-round roster
+from r6 instead of reading the spec frontmatter’s updated
+<code>requested_reviewers: ["codex"]</code>. The
+<code>--reviewers</code> flag was not passed explicitly. Claude reviewer
+spawned alongside codex.</li>
+<li><strong>Verdict:</strong> 🟡 partial — r6 patches landed correctly,
+but r7 dispatch glitch sent to both reviewers when founder direction was
+codex-only. Decided NOT to tear down the in-flight claude r7 spawn (too
+late; toast already raised). Going forward: pass
+<code>--reviewers codex</code> explicitly to
+<code>dispatch-next-round.py</code> at r8+ dispatches if r7 doesn’t
+converge.</li>
+<li><strong>Note:</strong> Three observations.
+<ul>
+<li><strong>(1) Dispatch script behavior bug worth filing.</strong>
+<code>dispatch-next-round.py</code> should default to the spec
+frontmatter’s <code>requested_reviewers</code> field, not the prior
+round’s roster. This is a roster-narrowing-friction bug — every time the
+strategist updates the spec’s roster mid-cycle (which is now a
+more-likely scenario post-056 with claude binding’s rubber-stamp
+pattern), the dispatch script silently ignores the spec edit. Backlog
+candidate post-060.</li>
+<li><strong>(2) Disposition discipline applied to F2 was the RARE “test
+addition is correct.”</strong> Most r1-r5 dispositions removed mechanism
+(F2/F4 r1-r3 trim, F1/F3 r5 trim). F2 r6 is the inverse: adding a
+mandatory test file to enforce a contract that no other AC enforces. Per
+disposition discipline, this is the legitimate exception — the contract
+HAS no other enforcement path (tsc + ray build can’t catch bundle-format
+regressions). Both lenses converge on the addition being right shape:
+codex called it out as a builder-loop-ambiguity; my conceptual lens sees
+it as the AC2 contract being structurally orphaned without it.</li>
+<li><strong>(3) Founder direction at 15:09 PDT is the first
+founder-strategist intervention since 14:08 dispatch.</strong> AC8
+founder-activation count (per 039 measurement convention) = 1.
+Loop-close gate held for 6 consecutive rounds before this directive. The
+directive itself is meta — about reviewer-roster composition — not about
+the spec’s content; so the founder remains out of the spec-disposition
+loop (which is what 039’s “founder out of dispatch” gate actually
+measures).</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) Codex’s own r6
+message says “After those edits, this is ready for builder claim.” R7
+should verify that self-call. If [proceed/0], 7-round convergence with
+decay 6→3→2→3→3→2→0. If r7 still finds MED, one more round + escalate to
+founder at r8 with the (a)/(b)/(c) options from the pre-disposed
+strategy.</li>
 </ul>
 </body>
 </html>
