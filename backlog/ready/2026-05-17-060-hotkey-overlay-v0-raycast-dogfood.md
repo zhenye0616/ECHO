@@ -7,7 +7,7 @@ estimate: 0.5-1d
 created: 2026-05-17
 blocked_by: []
 task_state_ref: 2026-05-17-060-hotkey-overlay-v0-raycast-dogfood
-requested_reviewers: ["codex", "claude"]
+requested_reviewers: ["codex"]
 files_to_modify:
   - tools/raycast-echo/package.json  # AC1 — Raycast extension manifest (commands, preferences, dependencies); name "echo-context"; one command "search-context" with title "Search ECHO Context"
   - tools/raycast-echo/src/search-context.tsx  # AC1 + AC2 — the command entry point; React/Raycast list view; two-state (empty input → find_clusters, typed → debounced search_memories); detail pane via get_atom / get_atoms; action menu per AC2
@@ -16,6 +16,7 @@ files_to_modify:
   - tools/raycast-echo/tsconfig.json  # AC1 — TS config matching Raycast's expected shape (target ES2022, strict)
   - tools/raycast-echo/assets/icon.png  # AC1 (R5 codex F1 — MED) — Raycast manifest requires an icon asset; any 512×512 PNG suffices for v0 (placeholder is fine; v0 is single-user; visual polish is V1 territory)
   - tools/raycast-echo/README.md  # AC4 — install + dogfooding instructions (3 sections: install via `ray develop`, hotkey binding via Raycast preferences, dogfooding-journal expectation per AC8)
+  - tools/raycast-echo/test/format.test.ts  # AC5 (R6 codex F2 — MED) — MANDATORY pure-Node Vitest covering the format.ts contract: assertions for (a) one fs source (derivedApp → cursor/claude_code/codex), (b) one git source (derivedApp → git), (c) source with no matching prefix (derivedApp → unknown fallback), (d) single-atom bundle shape, (e) multi-atom bundle with `\n---\n` separators. Pure Node, no Raycast runtime — runs under `vitest` or root `npm test`. Locks the AC2 format contract that tsc + ray build cannot enforce.
   - docs/BACKLOG.md  # add Ready-table row pointing at this item
 spec_refs:
   - wiki/surfaces/hotkey-overlay.md  # the planned V1 surface this v0 will INFORM but not yet build — V1 quality bar (<100ms summon, <500ms retrieval, native chrome) does NOT apply to v0
@@ -70,7 +71,7 @@ The action menu (Raycast's `ActionPanel`):
 - `⌘↩` → `Clipboard.copy(bundle)` then `Clipboard.paste(bundle)` (the latter requires its `content` argument per `@raycast/api@1.104.17` types — `Clipboard.paste(content: string | number | Content)`; R4 codex F1 — MED). Equivalent shape: `Action.Paste content={bundle}` declared in the ActionPanel; builder picks whichever idiom yields cleaner React/Raycast code and notes in `agent_notes`.
 - `⌘O` → open the atom's source file in default app (skip if source is a `git:` or `fs:` prefix without a resolvable on-disk path — toast "no source file" instead)
 - `⌘B` → open `http://127.0.0.1:38479/` (trace viewer index) in default browser. (R2 codex F2 — MED — `tools/serve-trace.ts:161-176` only routes exact `/` or `/index.html` today; a `?atom=<id>` deep-link route does not exist and would 404. Per-atom deep-linking is V1 territory and explicitly out of scope for v0; if the builder finds it gratifying to add, file a follow-on backlog item — do NOT include here.)
-- `⌘C` → copy raw atom JSON for debugging (`JSON.stringify(atom, null, 2)`)
+- `⌘C` → copy the `get_atom` response JSON for debugging (`JSON.stringify(atom, null, 2)` where `atom` is the response from `get_atom(match.id)`). (R6 codex F1 — MED: relabeled from "raw atom JSON" — `get_atom` deliberately returns a *projected* atom shape (content verbatim, metadata projected/capped, embedding excluded; can be `{atom:null, error_code:...}`). With OoS #2 forbidding new MCP tools, the projected response IS what's accessible from the allowed surface; v0 ships it as-is. True raw storage JSON is V1 territory if dogfooding demands it.)
 
 The "assembled markdown bundle" format (in `src/lib/format.ts`):
 
@@ -145,7 +146,7 @@ No new daemon code. The extension imports `@modelcontextprotocol/sdk` and connec
 
 - `cd tools/raycast-echo && npx tsc --noEmit` reports zero errors.
 - `cd tools/raycast-echo && npx ray build` produces a valid Raycast bundle without errors. The bundle is NOT committed; the root `.gitignore` already ignores `node_modules/` and `dist/` (R2 codex F4 — LOW removed the redundant per-extension `.gitignore` mention).
-- No new unit tests required (this is a UI shell over four existing MCP tools that have their own test coverage). The "test" is AC8's empirical dogfooding bar.
+- **`tools/raycast-echo/test/format.test.ts` exists and passes** (R6 codex F2 — MED — upgraded from "builder's option" to mandatory): covers the 5 assertions enumerated in `files_to_modify`. AC5 verification runs under `vitest` (pure Node; no Raycast runtime needed). The format.ts contract (`derivedApp` mapping, PDT timestamp header, verbatim content body, `\n---\n` cluster separator) is otherwise unenforceable — `tsc --noEmit` + `ray build` would pass even if the bundle silently regressed to wrong source-app names, UTC timestamps, or missing separators.
 
 _(R2 codex F3 — MED: AC6/AC7 were originally in Acceptance Criteria, which conflicted with builder-loop semantics — the builder cannot prove a multi-day dogfooding threshold before moving the item to review. They are now AC8/AC9 in a separate Post-Merge Gate section below, and removed from Definition of Done. AC1–AC5 are the only builder-verifiable gates; the item moves to `pending_review/` once those pass.)_
 
@@ -196,7 +197,7 @@ These are NOT builder-verified. They are founder-verified over the days followin
 
 No new unit tests. The four MCP tools called (`find_clusters`, `search_memories`, `get_atom`, `get_atoms`) have existing test coverage in `tests/mcp/` and `tests/trace/`. The "test" for v0 is AC5's `tsc --noEmit` clean + `ray build` clean; AC8's empirical dogfooding bar is the V1-trigger gate, not a builder-time test.
 
-If the builder feels strongly about a smoke test, the cheapest acceptable shape is a single Vitest file at `tools/raycast-echo/test/format.test.ts` that asserts the `formatBundle(atoms)` function in `src/lib/format.ts` produces the exact markdown shape per AC2. That test runs in pure Node (no Raycast runtime needed). Builder's option, not a requirement.
+**`tools/raycast-echo/test/format.test.ts` is REQUIRED** (R6 codex F2 — MED — upgraded from "builder's option" to mandatory). Pure-Node Vitest, no Raycast runtime. Five assertions covering `derivedApp(source)` for fs / git / unknown-fallback inputs, single-atom bundle shape, and multi-atom `\n---\n` separator. Locks the AC2 format contract that the build-gate ACs cannot enforce.
 
 ## Definition of Done
 
