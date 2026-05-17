@@ -2188,6 +2188,11 @@ href="#pdt-claude-r3-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
 id="toc-pdt-claude-r3-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 14:36 PDT — Claude r3 review tick on 060
 hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-codex-r3-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-codex-r3-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:38 PDT — Codex r3 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25223,6 +25228,56 @@ across 5+ more items, the convergence call template could be refactored
 to make this lens-split explicit (the focus_hints already lean this way;
 making it the <em>default</em> shape would lower the strategist’s
 per-cycle cognitive load).</li>
+</ul>
+<h3
+id="pdt-codex-r3-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:38 PDT — Codex r3 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> Active-trigger Codex-side review queue
+tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r3/request.md</code>,
+correlation_id <code>b287bfd0-b5e0-411c-93af-f3f347cc52ad</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=b287bfd0-b5e0-411c-93af-f3f347cc52ad</code>;
+bind-validated the pinned request; read the artifact via
+<code>git show 34f29a83cf604c0c02d58a54bab655562c77ee37:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+checked <code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/{find-clusters,search-memories,get-atom,get-atoms}.ts</code>,
+<code>src/mcp/util/source-app.ts</code>,
+<code>src/trace/{index,cluster}.ts</code>,
+<code>tools/serve-trace.ts</code>, <code>.gitignore</code>, and current
+Raycast API docs through Context7.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r3/codex.md</code>;
+first temp response failed the pre-link YAML gate and was discarded
+before canonical write; regenerated with block-scalar findings; upstream
+duplicate check passed; <code>commit-reviewer-response.sh</code>
+revalidated, committed, rebased, and pushed as <code>7f597fd</code>;
+verdict <code>proceed_after_patches</code>, findings: 1 medium + 1
+low.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r3/request.md</code>;
+artifact path
+<code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>34f29a8</code>; committed response path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r3/codex.md</code>;
+code-reference checks for retrieval tool output shape, source-app
+mapping, trace viewer routing, cluster atom ordering, and Raycast API
+surface.</li>
+<li><strong>Verdict:</strong> ✅ right — the tick produced exactly one
+Codex response at the pinned request SHA with atomic write, pre-link
+validation, upstream duplicate guard, helper-side validation, and retry
+push. The nonzero finding set means r3 did not converge from the Codex
+implementability lens.</li>
+<li><strong>Note:</strong> The new MED is a true implementation-shape
+catch: <code>find_clusters</code> exposes <code>atom_ids</code> in
+lexicographic id order, so the spec’s <code>slice(0,3)</code> before
+<code>prefer: newest_first</code> selects arbitrary cluster members and
+then sorts only that truncated subset. The LOW stale-numbering catch is
+cleanup from the r2 AC6/AC7 to AC8/AC9 rewrite.</li>
 </ul>
 </body>
 </html>
