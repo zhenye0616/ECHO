@@ -2253,6 +2253,11 @@ id="toc-pdt-claude-strategist-watcher-r6-tick-on-060-combined-r6-patches-r7-disp
 15:12 PDT — Claude strategist watcher r6 tick on 060 — combined + r6
 patches + r7 dispatch (founder narrowed roster, but dispatch glitch sent
 to both)</a></li>
+<li><a
+href="#pdt-claude-r7-review-tick-on-060-the-spawn-the-strategist-let-through-despite-founder-drop"
+id="toc-pdt-claude-r7-review-tick-on-060-the-spawn-the-strategist-let-through-despite-founder-drop">2026-05-17
+15:16 PDT — claude r7 review tick on 060 (the spawn the strategist let
+through despite founder drop)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -26360,6 +26365,81 @@ should verify that self-call. If [proceed/0], 7-round convergence with
 decay 6→3→2→3→3→2→0. If r7 still finds MED, one more round + escalate to
 founder at r8 with the (a)/(b)/(c) options from the pre-disposed
 strategy.</li>
+</ul>
+<h3
+id="pdt-claude-r7-review-tick-on-060-the-spawn-the-strategist-let-through-despite-founder-drop">2026-05-17
+15:16 PDT — claude r7 review tick on 060 (the spawn the strategist let
+through despite founder drop)</h3>
+<ul>
+<li><strong>Trigger:</strong> Pinned-request mode via the dispatch
+glitch documented in the 15:12 PDT entry above.
+<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/request.md</code>,
+<code>ECHO_COORD_CORRELATION_ID=e579add9-676d-41bd-a36e-78452baea3a2</code>.
+Founder direction at 15:09 PDT was “no more claude reviewer”, spec at
+<code>1f5b2cb</code> reads <code>requested_reviewers: ["codex"]</code>,
+but <code>dispatch-next-round.py</code> defaulted to the r6 roster and
+the request.md frontmatter still listed <code>[codex, claude]</code>.
+The bind validation reads request.md, so this tick was spawned and the
+bind validated.</li>
+<li><strong>Query inputs:</strong>
+spec_commit_sha=<code>1f5b2cb330603f2199489a179aaeb9bacd231b0b</code>;
+diff base for delta-focused review = the r6-patches commit
+<code>1f5b2cb</code> (3 changes: ⌘C label fix per F1, format.test.ts
+upgraded to mandatory per F2, roster narrowed to [codex]);
+lens=conceptual/architectural/scope-drift on those 3 deltas.</li>
+<li><strong>Returned:</strong> <code>verdict: proceed</code>,
+<code>findings: []</code> (zero — the 8th consecutive across 059 r2-r5 +
+060 r2-r7). Response committed at
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/claude.md</code>
+(~97 lines including operator note about the dispatch glitch); push
+landed at <code>72f663b</code>.</li>
+<li><strong>Sources:</strong> spec at
+<code>1f5b2cb:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+(via <code>git show</code>); r6 codex.md, r6 claude.md, r6 combined.md
+(context only); commit message at <code>8aa6fd6</code> for the
+founder-drop direction and the “claude dropped after 7 consecutive zero
+rounds” attribution; the 15:12 PDT journal entry above for the
+dispatch-glitch confirmation. No MCP tool calls inside the review itself
+(fresh-eyes-at-SHA: spec + request only).</li>
+<li><strong>Verdict:</strong> ✅ right — the spec is internally
+consistent, the 2 r6 codex MED patches landed verbatim, the roster
+narrowing applies the same “prefer removal over deeper patching” rule
+the strategist named in r5’s commit message (this time to the reviewer
+roster rather than spec mechanism), and the OoS list still covers
+high-temptation adjacencies. The lens found nothing because there was
+nothing to find — which is exactly the empirical signal the founder
+cited when dropping claude at 15:09 PDT. The 8th-consecutive-zero IS the
+validation of the founder direction.</li>
+<li><strong>Note:</strong> Two observations.
+<ul>
+<li><strong>(1) The dispatch glitch’s downstream cost is one extra
+zero-finding round, not a regression.</strong> The strategist’s 15:12
+PDT decision to “not tear down the in-flight claude r7 spawn (too late;
+toast already raised)” was the right call — the marginal cost is one
+redundant claude.md file in the round directory. The alternative
+(manually rolling back the spawn) would have required worktree teardown
+gymnastics for no net benefit. The structural fix is in the dispatch
+script, not in this round.</li>
+<li><strong>(2) The protocol gap is now writeable as a backlog
+item.</strong> Per the 15:12 PDT note,
+<code>dispatch-next-round.py</code> should source the roster from the
+spec frontmatter’s <code>requested_reviewers</code> field rather than
+the prior-round roster. The r7 claude.md body surfaces this as an
+operator note rather than a reviewer finding because it lives in the
+dispatch layer, not the artifact. Backlog candidate post-060: a 1-line
+script change (<code>spec_fm["requested_reviewers"]</code> instead of
+<code>prior_round_roster</code>) plus a smoke test that mid-cycle roster
+narrowing flows to the next round’s request.md.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) If r7 codex returns
+<code>proceed</code>/findings=[] (matching codex’s own r6 self-call
+“ready for builder claim”), 060 is a clean 7-round convergence with
+decay shape <code>6→3→2→3→3→2→0</code> and the final-round signature
+being the dispatch-glitch-handled-gracefully shape. The next 060-class
+spec (a v0/dogfooding-instrument item with clear OoS bounds and
+post-merge gates) should start with claude OFF the roster from r1 —
+applying the empirical signal from this 8-round zero-finding chain
+rather than waiting for round 7+ to drop the binding.</li>
 </ul>
 </body>
 </html>
