@@ -14,7 +14,7 @@ files_to_modify:
   - tools/raycast-echo/src/lib/mcp.ts  # AC1 — thin MCP client wrapper over the daemon's StreamableHTTPServerTransport at http://127.0.0.1:38478/mcp; uses @modelcontextprotocol/sdk client; one helper per tool call (findClusters, searchMemories, getAtom, getAtoms); no X-Echo-Role header (these tools don't need it)
   - tools/raycast-echo/src/lib/format.ts  # AC2 — markdown bundle formatter: header line `## <source_app> · <PDT timestamp>` then content body; concatenates multi-atom selections with `---` separators
   - tools/raycast-echo/tsconfig.json  # AC1 — TS config matching Raycast's expected shape (target ES2022, strict)
-  - tools/raycast-echo/README.md  # AC4 — install + dogfooding instructions (3 sections: install via `ray develop`, hotkey binding via Raycast preferences, dogfooding-journal expectation per AC6)
+  - tools/raycast-echo/README.md  # AC4 — install + dogfooding instructions (3 sections: install via `ray develop`, hotkey binding via Raycast preferences, dogfooding-journal expectation per AC8)
   - docs/BACKLOG.md  # add Ready-table row pointing at this item
 spec_refs:
   - wiki/surfaces/hotkey-overlay.md  # the planned V1 surface this v0 will INFORM but not yet build — V1 quality bar (<100ms summon, <500ms retrieval, native chrome) does NOT apply to v0
@@ -23,7 +23,7 @@ spec_refs:
   - wiki/principles/compose-not-capture.md  # architectural commitment; v0 calls existing capture surfaces' retrieval primitives only — does not add new capture or new MCP tools
   - wiki/product/v1-spec.md  # V1 scope locked 2026-04-30; the hotkey overlay is one of two `planned` surfaces (other: audit-page); this v0 is the first build step toward V1, NOT the V1 itself
   - src/mcp/server.ts  # the daemon-side HTTP endpoint the extension consumes: `http://127.0.0.1:38478/mcp`, StreamableHTTPServerTransport, sessionIdGenerator:undefined (stateless), enableJsonResponse:true; tools called: find_clusters, search_memories, get_atom, get_atoms (X-Echo-Role NOT required for any of these)
-  - raw/internal/dogfooding/mcp-interactions-journal.md  # the dogfooding sink — AC6's "≥10 entries / ≥3 days" defines v0 done; journal entries become the V1 spec inputs
+  - raw/internal/dogfooding/mcp-interactions-journal.md  # the dogfooding sink — AC8's "≥10 entries / ≥3 days" defines v0 done; journal entries become the V1 spec inputs
   - https://developers.raycast.com/api-reference  # external; Raycast extension API docs (List, ActionPanel, Clipboard, showToast); builder reads the relevant subset
 
 # --- agent-managed fields (filled in during run) ---
@@ -45,7 +45,7 @@ The V1 hotkey overlay spec at `wiki/surfaces/hotkey-overlay.md` is `status: plan
 
 This spec ships the ugly version. The chrome is whatever Raycast renders; the keyboard binding is whatever Raycast lets the founder bind; the retrieval is whatever the daemon's existing MCP tools return. The only thing this spec is responsible for is putting ⌘⇧E in the founder's hands today so that V1's questions ("is the composer shape right?" "what cards should we render?" "how does paste-and-launch feel?") get answered with dogfooding data instead of theory.
 
-**The V1 spec is deliberately deferred.** AC7 below makes this explicit: no V1 backlog item is written until v0 dogfooding surfaces ≥10 journal entries across ≥3 calendar days AND the founder can articulate the top-3 retrieval-quality issues to fix in V1. The dogfooding journal IS the V1 spec input.
+**The V1 spec is deliberately deferred.** AC9 below makes this explicit: no V1 backlog item is written until v0 dogfooding surfaces ≥10 journal entries across ≥3 calendar days AND the founder can articulate the top-3 retrieval-quality issues to fix in V1. The dogfooding journal IS the V1 spec input.
 
 ## The minimum-viable shape
 
@@ -60,7 +60,7 @@ A Raycast extension at `tools/raycast-echo/` with one command, `Search ECHO Cont
 
 Selecting a list item populates Raycast's detail pane:
 
-- Cluster selected → `get_atoms(cluster.atom_ids.slice(0,3), format:"minimal", prefer:"newest_first")`, concatenated with `---` separators
+- Cluster selected → `get_atoms(cluster.atom_ids.slice(0,3), format:"minimal")`, concatenated with `---` separators. (R3 codex F1 — MED dropped `prefer:"newest_first"`: `connectedComponents` in `src/trace/cluster.ts:151-156` sorts cluster IDs lexicographically before passing them through `find_clusters`, so `slice(0,3)` selects 3 lex-ordered atoms and `prefer:newest_first` would only sort those 3 — not the cluster's newest 3. V0 accepts "3 representative atoms" in lex-id order; whether chronology-correct selection matters enough for V1 is a v0-dogfooding-discovery question. Codex's recommended alternative — "fetch up to the `get_atoms` max [50] and display the newest returned atoms" — is the V1 candidate fix if dogfooding flags it.)
 - Search match selected → `get_atom(match.id)`, single body verbatim
 
 The action menu (Raycast's `ActionPanel`):
@@ -208,7 +208,7 @@ _(Builder-verifiable scope only. R2 codex F3 — MED: AC8/AC9 are post-merge fou
 ## After Completion (Strategist Notes)
 
 - **No wiki update on v0 ship.** `wiki/surfaces/hotkey-overlay.md` stays `status: planned`. The wiki updates only when V1 ships, per CLAUDE.md. This is doubly important here: a v0 page would prematurely lock the form the V1 spec is supposed to learn from.
-- **The first V1 spec input is the dogfooding journal**, not the existing wiki page. When AC6 fires, the strategist's job is to read the ≥10 journal entries, distill the top-3 retrieval-quality issues, and write a fresh V1 backlog item (`2026-XX-XX-06X-hotkey-overlay-v1-...`). The V1 spec MAY contradict the current `wiki/surfaces/hotkey-overlay.md` content — that's the point of the v0 → V1 sequencing.
+- **The first V1 spec input is the dogfooding journal**, not the existing wiki page. When AC8 fires, the strategist's job is to read the ≥10 journal entries, distill the top-3 retrieval-quality issues, and write a fresh V1 backlog item (`2026-XX-XX-06X-hotkey-overlay-v1-...`). The V1 spec MAY contradict the current `wiki/surfaces/hotkey-overlay.md` content — that's the point of the v0 → V1 sequencing.
 - **Update `raw/internal/dogfooding/mcp-interactions-journal.md` post-merge** with a "v0 hotkey overlay shipped" entry containing the binding command and a reminder of the **7-field** template (Trigger / Query inputs / Returned / Sources / **Repo** / Verdict / Note) defined in AC4 for ⌘⇧E invocations specifically (R3 codex F3 — MED — corrects an earlier 6-field reference here that contradicted AC4/AC8/DoD). One-liner, not a writeup. **Note:** the canonical cross-tool journal template per CLAUDE.md preamble remains 6-field for every other MCP caller; the **Repo** addition is v0-Raycast-scoped only per the R2 claude F2 disposition. If V1 dogfooding shows the **Repo** field is generally useful for other callers, a separate operating-model item promotes it to the cross-tool template.
 - **Optional follow-on if v0 dogfooding goes well:** spec the audit page (the other `planned` surface in `wiki/product/v1-spec.md`). Independent of the hotkey overlay V1; can be written in parallel once founder has bandwidth.
 - **If v0 dogfooding goes badly** (founder doesn't use it, journal stays empty after 3 days): write a strategist conversation note in `raw/internal/decisions/` analyzing why — wrong host shell (should have been B or C in Q2), wrong retrieval shape, wrong trigger ergonomics, etc. Then either iterate v0 with a follow-on backlog item, or rethink V1 entirely.
