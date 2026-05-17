@@ -2214,6 +2214,11 @@ patches + r5 dispatch (decay 6→3→2→3)</a></li>
 <li><a href="#pdt-claude-r5-review-tick-review-queue-claude"
 id="toc-pdt-claude-r5-review-tick-review-queue-claude">2026-05-17 14:55
 PDT — claude r5 review tick (review-queue-claude)</a></li>
+<li><a
+href="#pdt-codex-r5-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-codex-r5-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:59 PDT — Codex r5 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25739,6 +25744,53 @@ Either path is healthy. The deeper lesson — strategist greps cited
 library symbols against actual exports BEFORE r1 dispatch — is the
 natural backlog candidate post-convergence (already named in the r4
 strategist journal entry).</li>
+</ul>
+<h3
+id="pdt-codex-r5-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:59 PDT — Codex r5 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> Codex-side review queue tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/request.md</code>,
+correlation_id <code>dd5eaf66-3889-42b7-b913-930f650dc8c2</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+selected the r5 request through scan-pick; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=dd5eaf66-3889-42b7-b913-930f650dc8c2</code>;
+read the artifact via
+<code>git show 21e2012cde1a0d193f8f58f375a1843725e25730:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+checked the reviewer schema, MCP retrieval tool shapes,
+<code>src/mcp/util/source-app.ts</code>, Raycast primary docs through
+Context7, and <code>@raycast/api@1.104.17</code> package types.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/codex.md</code>;
+first local generation attempt failed before any temp/canonical write
+due unescaped Python f-string braces; regenerated cleanly; upstream
+duplicate check passed; <code>commit-reviewer-response.sh</code>
+revalidated, committed, rebased, and pushed as <code>9a2410a</code>;
+verdict <code>proceed_after_patches</code>, findings: 3 medium.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/request.md</code>;
+artifact path
+<code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>21e2012</code>; committed response path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/codex.md</code>;
+<code>src/mcp/server.ts</code>;
+<code>src/mcp/tools/{find-clusters,search-memories,get-atom,get-atoms}.ts</code>;
+Raycast manifest/List/action docs; <code>@raycast/api@1.104.17</code>
+type surface.</li>
+<li><strong>Verdict:</strong> right — the tick produced exactly one
+Codex response at the pinned request SHA with atomic write, pre-link
+validation, upstream duplicate guard, helper-side validation, and retry
+push. The nonzero finding set means r5 still does not converge from the
+implementability lens.</li>
+<li><strong>Note:</strong> The new findings are still claim-blocking but
+narrow: AC1 under-specifies required Raycast manifest metadata and an
+icon asset for the <code>ray build</code> gate; AC2 needs
+<code>List filtering={false}</code> so remote
+<code>search_memories</code> matches are not double-filtered by Raycast
+against truncated rendered text; AC2 also needs explicit cluster-row
+behavior for atom-specific actions (<code>Cmd+O</code> and
+<code>Cmd+C</code>) because clusters hydrate multiple atoms.</li>
 </ul>
 </body>
 </html>
