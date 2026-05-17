@@ -2140,6 +2140,15 @@ href="#pdt-strategist-watcher-r5-tick-on-2026-05-17-059-coord-emit-surface-daemo
 id="toc-pdt-strategist-watcher-r5-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection-converged">2026-05-17
 01:48 PDT — Strategist watcher r5 tick on
 2026-05-17-059-coord-emit-surface-daemon-rejection — CONVERGED</a></li>
+<li><a href="#pdt-claude-cold-start-connect-to-my-qa-session-post-clear"
+id="toc-pdt-claude-cold-start-connect-to-my-qa-session-post-clear">2026-05-17
+13:42 PDT — Claude cold-start “connect to my Q&amp;A session”
+(post-/clear)</a></li>
+<li><a
+href="#pdt-claude-rehydrate-followup-check-the-most-recent-interactions-correction-to-1342-entry"
+id="toc-pdt-claude-rehydrate-followup-check-the-most-recent-interactions-correction-to-1342-entry">2026-05-17
+13:48 PDT — Claude rehydrate-followup “check the most recent
+interactions” (correction to 13:42 entry)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24456,6 +24465,170 @@ are founder-strategist interactions, not founder-reviewer-dispatch
 interactions, which is what the 039 loop-close gate measures. Zero
 founder→reviewer dispatch messages across all 5 rounds. The cycle
 held.</li>
+</ul>
+<h3
+id="pdt-claude-cold-start-connect-to-my-qa-session-post-clear">2026-05-17
+13:42 PDT — Claude cold-start “connect to my Q&amp;A session”
+(post-/clear)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder ran <code>/clear</code> then asked
+“use echo and connect to my Q&amp;A session” — pure cold-start orienting
+query, no spec/code context yet. Goal: rehydrate the live Q&amp;A thread
+the previous Claude was conducting with founder before the clear.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li><code>echo_ping(message="connect to Q&amp;A session")</code> —
+sanity check daemon.</li>
+<li><code>find_clusters(repo_path=/Users/zhenye/Desktop/Project_echo)</code>
+— no since/until (relied on no-args auto-expand).</li>
+<li><code>get_atoms(atom_ids=[da1a3588, deca2093], prefer=newest_first)</code>
+— materialize the two <code>resolved:false</code> open-loop hints.</li>
+<li><code>search_memories(query="Q&amp;A", repo_path=..., since=2026-05-16T00:00:00, limit=10)</code>
+— disambiguate which conversation the founder meant.</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>ping ok (ts 2026-05-17T20:42:15Z).</li>
+<li>1 cluster, 193 atoms, source_breakdown={git:90, claude_code:103},
+time_range 2026-05-16T20:54Z → 2026-05-17T20:40Z. 24 open-loop hints, 22
+resolved / 2 unresolved. Auto-expand warning fired (single-source-recent
+→ widened 4h→24h).</li>
+<li>Atom <code>da1a3588</code> (23:10 PDT yesterday): innocuous wiki
+index/manifest count reconciliation (64 entries). NOT Q&amp;A-relevant —
+false-positive open-loop.</li>
+<li>Atom <code>deca2093</code> (22:02 PDT yesterday): the “manual
+kickstart vs launchd tradeoff” answer (felt-not-seen / coord-deadlines /
+057a/b context). Q&amp;A-flavored but stale by ~10h.</li>
+<li><code>search_memories(query="Q&amp;A")</code> returned 10 matches;
+two were the gold: (1) <code>b449d2dd</code> at 08:18 PDT today — the
+live “per-repo vs per-device” Q&amp;A turn ending with “Want me to spec
+that config-promotion as a backlog item, or stay in Q&amp;A and move to
+the next layer?”; (2) <code>18604e6f</code> at 07:50 PDT — Haiku
+subagent role-agnostic architecture deep-map (28KB). Also
+<code>110e217d</code> (same subagent run). The actually-live session ID
+is <code>e3fa3405-b264-40ce-b63d-2625aa1e8138</code>.</li>
+</ul></li>
+<li><strong>Sources:</strong> find_clusters source_breakdown={git:90,
+claude_code:103}; resolve path for live Q&amp;A session =
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e3fa3405-b264-40ce-b63d-2625aa1e8138.jsonl</code>;
+prep subagent jsonls at
+<code>.../e3fa3405-.../subagents/agent-a1773509577048bc5.jsonl</code>
+(07:50 role-arch map) and
+<code>.../subagents/agent-a0d6ac91b68d806d6.jsonl</code> (yesterday
+23:07 coord-layer map). NO atoms from cursor or codex sources surfaced
+for the Q&amp;A thread itself — pure Claude-Code session.</li>
+<li><strong>Verdict:</strong> 🟡 partial. find_clusters returned a
+single mega-cluster with
+<code>label:"discussion about Project_echo"</code> (generic) — useful as
+a 24h envelope but the cluster itself didn’t pinpoint the Q&amp;A
+thread. The two <code>resolved:false</code> open-loop hints were noise
+(one wiki-index reconciliation, one stale launchd answer). The actual
+rehydration win came from the
+<code>search_memories(query="Q&amp;A")</code> shot, which surfaced both
+prep subagent runs AND the live in-flight turn with the unanswered “spec
+vs continue Q&amp;A” question — exactly what the founder asked for. Net:
+rehydrated successfully, but only because I knew to search the literal
+token “Q&amp;A” as a fallback after find_clusters underspecified.</li>
+<li><strong>Note:</strong> Two observations.
+<ul>
+<li><strong>(a) The “single mega-cluster of mixed work” failure
+mode.</strong> With 24h lookback and a busy day (5-round review cycle +
+Q&amp;A prep + Q&amp;A itself), find_clusters bucketed everything under
+one cluster. The cluster’s <code>label</code> was the generic
+“discussion about Project_echo” rather than e.g. “founder Q&amp;A on
+role-agnostic architecture” or “059 review cycle r1-r5.” For cold-start
+“what was I doing” queries this is the right shape; for “find the
+Q&amp;A thread specifically” it’s underspecified.</li>
+<li><strong>(b) Open-loop hints had noise.</strong> Both
+<code>resolved:false</code> atoms were dead ends — one was a routine
+“index updated?” reconciliation, the other was a 10h-stale tradeoff
+Q&amp;A turn. The true open loop (the unanswered “spec config-promotion
+item OR continue Q&amp;A?” prompt) was a <code>resolved:true</code>
+because the next turn after the founder’s question was the assistant’s
+answer, which the open-loop heuristic treats as closure even though the
+founder never accepted/rejected the offered branch.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) The open-loop signal
+seems to be “did anyone speak after the question?” not “did the asker
+confirm a path forward?” A question that ends with a binary offer (“A or
+B?”) and gets answered with text rather than a confirmation should
+perhaps stay <code>resolved:false</code> until a subsequent user turn
+explicitly picks a branch. Backlog candidate, not a fix.</li>
+</ul>
+<h3
+id="pdt-claude-rehydrate-followup-check-the-most-recent-interactions-correction-to-1342-entry">2026-05-17
+13:48 PDT — Claude rehydrate-followup “check the most recent
+interactions” (correction to 13:42 entry)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder pushed back on prior turn: “check
+the most recent interactions from earlier.” The 13:42 cold-start entry
+surfaced the 08:18 PDT per-repo/per-device turn as the open thread,
+which was 11 turns stale.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li><code>echo_resolve_mru(sources=['claude_code'], repo_path=...)</code>
+— returned <code>2c579b2d-...jsonl</code> which is THIS session
+(post-/clear). Not the live Q&amp;A session — MRU correctly resolved the
+most-recent claude_code session, but my goal was the Q&amp;A session
+specifically, which is the SECOND-most-recent.</li>
+<li><code>search_memories(source=fs:/Users/.../e3fa3405-...jsonl, limit=15)</code>
+— direct exact-source pull, no <code>query</code> token, ordered DESC by
+timestamp. Returned 15 turns spanning 23:09 PDT (yesterday) → 20:40 PDT
+(today) on the Q&amp;A session.</li>
+</ul></li>
+<li><strong>Returned:</strong> 15 atoms, all from session
+<code>e3fa3405-b264-40ce-b63d-2625aa1e8138</code> (claude_code). True
+chronological arc — 14 turn pairs visible across ~22h with the long-gap
+split exactly where the 059 review cycle ran in background (09:03 →
+20:09 PDT). Most-recent turn (turn 22, 20:40 PDT): founder ran a
+pseudo-live overlay test, typed “coord layer deadline tracker” as the
+query; prior Claude surfaced a real 7-codex-storm ops anomaly at 03:53
+PDT against a stale 057b r1 request that no longer exists.</li>
+<li><strong>Sources:</strong> Exact source =
+<code>fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e3fa3405-b264-40ce-b63d-2625aa1e8138.jsonl</code>.
+NO codex/cursor/git atoms surfaced (single-source pull by design). 14
+turn pairs covered; one earlier turn (10) was a Haiku subagent dispatch
+for the role-agnostic deep-map.</li>
+<li><strong>Verdict:</strong> ✅ right (corrective). The
+<code>echo_resolve_mru({sources:['claude_code'], repo_path:...})</code>
+shot was a wasted call — it resolved to this current session because
+this current session IS the newest claude_code session under the repo,
+and resolve_mru has no “skip the calling session” semantics. The actual
+fix was the exact-source
+<code>search_memories({source: &lt;jsonl-path&gt;, limit:15})</code>
+shot, which I should have called first since I already knew the session
+ID from the prior cold-start entry.</li>
+<li><strong>Note:</strong> Two observations.
+<ul>
+<li><strong>(a) “Find my live Q&amp;A session” needs a different
+primitive than <code>echo_resolve_mru</code>.</strong> MRU correctly
+returns “newest source under predicate,” but the Q&amp;A session is by
+definition NOT the newest — it’s the second-newest, behind whichever
+fresh session the founder just spawned via /clear. A future primitive
+<code>echo_resolve_mru({sources, skip_calling_session: true})</code> or
+<code>echo_resolve_mru({sources, exclude_session: &lt;self_id&gt;})</code>
+would close this. Today’s workaround: if you know the session ID from
+prior context (find_clusters atom_ids → derive session via
+metadata.session_id), pull it exact-source.</li>
+<li><strong>(b) “Open loop” rehydration via
+<code>search_memories(query=token)</code> was sound, but the token was
+wrong.</strong> I searched “Q&amp;A” in the prior turn, which surfaced
+the 08:18 PDT turn (final word literally “Q&amp;A or…”) but missed the
+20:31/20:40 PDT pseudo-live-overlay-test exchange, which doesn’t contain
+the literal token “Q&amp;A” anywhere. Direct exact-source pull was the
+right call from the start, not “search by a noun the founder used in the
+cold-start prompt.” Lesson for next cold-start: if a session ID is
+reachable from the cluster atoms, prefer exact-source over keyword
+search.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) The “rehydrate the
+live session, not the calling session” pattern is going to recur every
+time the founder /clears mid-thread. Backlog candidate: a dedicated
+<code>echo_resume_prior_session()</code> MCP tool that takes
+<code>source_app</code> + <code>repo_path</code> +
+<code>exclude_session_id=self</code> and returns the {source,
+last_N_turns} envelope of the second-newest matching session. Skip the
+two-step (resolve → exact-source search) entirely.</li>
 </ul>
 </body>
 </html>
