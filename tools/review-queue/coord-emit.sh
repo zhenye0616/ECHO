@@ -29,9 +29,32 @@
 #
 # Exit semantics (r1 codex-ops F2 HIGH best-effort):
 #   ALWAYS exits 0 — daemon-down does NOT abort the queue tick. Curl's
-#   non-zero rc is swallowed via `|| true`. Queue durability is preserved
-#   when the daemon is unreachable. Callers MUST NOT branch on this
-#   script's exit status.
+#   non-zero rc is swallowed. Queue durability is preserved when the
+#   daemon is unreachable. Callers MUST NOT branch on this script's
+#   exit status.
+#
+# Stderr semantics (059 — silent-failure observability gap):
+#   The wrapper distinguishes three daemon-response states on stderr while
+#   keeping exit 0 in every branch. Advisory only; automation must continue
+#   to ignore exit status and downstream tooling is unchanged.
+#     success (HTTP 2xx + isError absent/false)
+#       → silent (no stderr).
+#     daemon rejection (HTTP 2xx + JSON-RPC result.isError === true)
+#       → one stderr line: `coord-emit.sh: daemon rejected <event_type>:
+#         <verbatim daemon error text, truncated to 500 chars + …[truncated]>`
+#     daemon HTTP non-2xx
+#       → one stderr line: `coord-emit.sh: daemon returned HTTP <status>:
+#         <first 200 chars of body or <empty>>`
+#     daemon unreachable (curl_rc != 0)
+#       → ZERO bytes of stderr. Curl's own stderr is suppressed via
+#         `2>/dev/null` on the curl invocation; no env flag, no opt-in
+#         verbose mode. Locked by r1 codex-ops F1 + claude F1 convergent
+#         AND r2 codex-ops F1 MED — the silent-on-unreachable contract
+#         covers the ENTIRE stderr stream, not just the wrapper's own
+#         `coord-emit.sh:` emissions.
+#   The exit-0-unconditional invariant is reinforced: there is no
+#   `--strict` flag, no `EXIT_ON_REJECT=1` env var, no exit-non-zero
+#   branch (Out of Scope #1).
 
 set -u
 
@@ -94,13 +117,76 @@ url="${ECHO_MCP_URL:-http://127.0.0.1:${ECHO_MCP_PORT:-38478}/mcp}"
 # Accept header MUST include both application/json AND text/event-stream
 # — the StreamableHTTPServerTransport rejects requests lacking either
 # format hint (its content-negotiation matrix is strict).
-curl -sS \
+#
+# Capture body + HTTP status via `-w '\n%{http_code}'` so the body is
+# everything except the trailing line and the status is the trailing
+# line. Suppress curl's OWN stderr via `2>/dev/null` — without this,
+# curl's native `(7) Connection refused` / `(28) Timed out` lines would
+# leak into launchd logs on every daemon-down tick, defeating the
+# silent-on-unreachable contract (r2 codex-ops F1 MED). The only stderr
+# this wrapper emits in production comes from the three branches below.
+response=$(curl -sS \
   --connect-timeout 2 --max-time 5 \
   -H "X-Echo-Role: ${REVIEWER_NAME}" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
+  -w '\n%{http_code}' \
   -X POST "$url" \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"coord_emit\",\"arguments\":{\"event_type\":\"${event_type}\",\"schema_version\":1,\"emitted_at\":\"${emitted_at}\",\"subject_role\":\"${REVIEWER_NAME}\",${tier_key},\"payload\":${payload}}},\"id\":1}" \
-  >/dev/null 2>&1 || true
+  2>/dev/null) || curl_rc=$?
+curl_rc="${curl_rc:-0}"
+
+# Daemon unreachable — silent on stderr (locked V1 contract: r1
+# codex-ops F1 + claude F1, r2 codex-ops F1 MED). curl's own stderr is
+# already suppressed above; we emit nothing of our own here either.
+if [ "$curl_rc" -ne 0 ]; then
+  exit 0
+fi
+
+# Split body / status. `-w '\n%{http_code}'` appends a newline + status
+# code after the response body, so the last line is the status and
+# everything before is the body. BSD sed `'$d'` deletes the last line.
+http_status=$(printf '%s' "$response" | tail -n1)
+body=$(printf '%s' "$response" | sed '$d')
+
+case "$http_status" in
+  2*)
+    # HTTP success — check for JSON-RPC isError flag. The daemon's
+    # response body is single-line per the validator's contract; a
+    # substring search is sufficient and avoids the jq dependency
+    # (macOS launchd bash 3.2.57 + BSD toolchain only — see AC1
+    # parsing-constraint clause).
+    if printf '%s' "$body" | grep -q '"isError":true\|"isError": true'; then
+      # Extract result.content[0].text. Single-pass awk match for
+      # `"text":"…"`. The daemon emits content[0] as a single-string
+      # object so there is exactly one such pattern in the body.
+      text=$(printf '%s' "$body" | awk 'match($0, /"text":"[^"]*"/){print substr($0, RSTART+8, RLENGTH-9); exit}')
+      # Unescape `\"` → `"` (single-pass, per AC1 parsing constraint).
+      # If parsing produced nothing, fall through with an empty text —
+      # the wrapper still emits the rejection line + event_type so
+      # operators see SOME signal (not a body-dump per r1 claude F2).
+      text=$(printf '%s' "$text" | sed 's/\\"/"/g' | tr '\n' ' ')
+      # Truncate to 500 chars + …[truncated] marker. bash 3.2.57
+      # supports ${var:offset:length}.
+      if [ "${#text}" -gt 500 ]; then
+        text="${text:0:500}…[truncated]"
+      fi
+      echo "coord-emit.sh: daemon rejected ${event_type}: ${text}" >&2
+    fi
+    # Success path (isError absent / false) is intentionally silent.
+    ;;
+  *)
+    # HTTP non-2xx (4xx / 5xx, including wrong-transport like a stale
+    # ECHO_MCP_URL hitting a non-MCP service). Print one stderr line
+    # carrying the status + first 200 chars of body.
+    body_head=$(printf '%s' "$body" | tr '\n' ' ')
+    if [ -z "$body_head" ]; then
+      body_head="<empty>"
+    elif [ "${#body_head}" -gt 200 ]; then
+      body_head="${body_head:0:200}"
+    fi
+    echo "coord-emit.sh: daemon returned HTTP ${http_status}: ${body_head}" >&2
+    ;;
+esac
 
 exit 0
