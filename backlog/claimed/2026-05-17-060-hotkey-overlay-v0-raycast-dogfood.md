@@ -29,9 +29,9 @@ spec_refs:
   - https://developers.raycast.com/api-reference  # external; Raycast extension API docs (List, ActionPanel, Clipboard, showToast); builder reads the relevant subset
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-17T22:40:23Z"
+branch: "agent/hotkey-overlay-v0-raycast-dogfood"
 worktree: ""
 head_sha: ""
 pr_url: ""
