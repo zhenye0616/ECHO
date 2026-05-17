@@ -2070,6 +2070,11 @@ href="#pdt---codex-ops-r2-on-059-coord-emit-rejection-observability-spec"
 id="toc-pdt---codex-ops-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
 01:01 PDT - Codex-ops R2 on 059 coord-emit rejection observability
 spec</a></li>
+<li><a
+href="#pdt---codex-r2-on-059-coord-emit-rejection-observability-spec"
+id="toc-pdt---codex-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:02 PDT - Codex R2 on 059 coord-emit rejection observability
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23674,6 +23679,56 @@ suppress curl’s own stderr on <code>curl_rc != 0</code> and assert empty
 stderr so daemon restarts do not refill
 <code>~/Library/Logs/echo-review-queue-*.log</code> with
 connection-refused noise.</li>
+</ul>
+<h3
+id="pdt---codex-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:02 PDT - Codex R2 on 059 coord-emit rejection observability spec</h3>
+<ul>
+<li><strong>Source agent:</strong> Codex.</li>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); scan-pick selected
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> ZERO ECHO memory/search reads. Pulled
+<code>origin/main</code>; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=06297318-1195-4ad4-bc3d-6fd64d664136</code>;
+read the R2 request, reviewer schema, pinned spec artifact
+<code>backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+at <code>033867c910afcdbc1f9e42822b6a5fdccefef215</code>, and the coord
+wrapper/test/validator/package context at that SHA.</li>
+<li><strong>Returned:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, rebased over sibling R2 responses,
+and pushed
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/codex.md</code>
+as <code>6c40075</code>, verdict <code>proceed_after_patches</code>,
+findings: one MEDIUM stale-frontmatter contradiction against the locked
+AC3 test contract.</li>
+<li><strong>Read sources:</strong> Artifact SHA
+<code>033867c910afcdbc1f9e42822b6a5fdccefef215</code>; request path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; inspected context
+paths <code>tools/review-queue/coord-emit.sh</code>,
+<code>tests/coord/coord-emit-wrapper-transport.test.ts</code>,
+<code>src/coord/validate.ts</code>, and <code>package.json</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — one Codex review was written
+for the requested 059 R2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The R2 body now carries the locked contracts
+requested by the prior round: <code>pickClosedPort()</code>, no
+<code>/coord-emit\.sh:/</code> wrapper stderr on unreachable, an
+in-process <code>node:http</code> 500 fixture, truncation instead of
+body-dump fallback, and concrete out-of-scope callsites. The remaining
+issue is frontmatter drift:
+<code>files_to_modify</code>/<code>spec_refs</code> still say “two new
+cases” and permit old unreachable framing, which is exactly the kind of
+pre-body summary a builder can follow during claim prep.</li>
 </ul>
 </body>
 </html>
