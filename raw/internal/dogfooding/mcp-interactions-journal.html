@@ -1095,6 +1095,11 @@ PDT — Cursor asks to use ECHO for Claude-written spec review</a></li>
 <li><a href="#pdt-cursor-reviews-claude-written-036-spec"
 id="toc-pdt-cursor-reviews-claude-written-036-spec">01:18 PDT — Cursor
 reviews Claude-written 036 spec</a></li>
+<li><a
+href="#pdt---codex-r6-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt---codex-r6-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+15:09 PDT - Codex r6 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 <li><a href="#pdt-codex-resumes-claudes-cursor-root-cause-investigation"
 id="toc-pdt-codex-resumes-claudes-cursor-root-cause-investigation">01:20
 PDT — Codex resumes Claude’s Cursor root-cause investigation</a></li>
@@ -10301,6 +10306,48 @@ target.</li>
 used as context retrieval, but spec review should still anchor on the
 backlog file when present; the capture gap being reviewed can itself
 make the latest Cursor/Claude turn incomplete.</li>
+</ul>
+<h3
+id="pdt---codex-r6-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+15:09 PDT - Codex r6 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> Pinned Codex-side review queue tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/request.md</code>,
+correlation_id <code>867a690d-0900-4cb0-bafb-c67a8900174a</code>.</li>
+<li><strong>Tool and query inputs:</strong> Pulled
+<code>origin/main</code>; emitted best-effort ECHO coord call via
+<code>tools/review-queue/coord-emit.sh tick_start --correlation-id=867a690d-0900-4cb0-bafb-c67a8900174a</code>;
+read the artifact via
+<code>git show a5e93c203a1c5e9e9ac05306ccd008ed565dd348:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+inspected request/schema files plus code-grounding paths
+<code>src/mcp/server.ts</code>, <code>src/mcp/util/source-app.ts</code>,
+<code>src/mcp/tools/{find-clusters,get-atoms,get-atom}.ts</code>,
+<code>tools/serve-trace.ts</code>, and smoke-test raw MCP contracts.
+Checked current npm metadata for <code>@raycast/api@1.104.17</code> and
+<code>@modelcontextprotocol/sdk@1.29.0</code>; no ECHO retrieval MCP
+calls were made.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/codex.md</code>;
+upstream duplicate check passed;
+<code>commit-reviewer-response.sh</code> revalidated, committed,
+rebased, and pushed as <code>96c0ec4</code>. Verdict
+<code>proceed_after_patches</code>; findings: 2 medium.</li>
+<li><strong>Verdict:</strong> right - exactly one Codex response was
+written for the pinned round at the requested artifact SHA, and the
+queue response is now durable on <code>origin/main</code>.</li>
+<li><strong>Note:</strong> The r6 findings shifted away from Raycast
+manifest/API typo surface and into two narrower
+implementability/testability issues: <code>Cmd-C</code> cannot literally
+copy raw storage JSON through the in-scope <code>get_atom</code> API,
+and the pure formatter contract needs a required smoke test because
+<code>tsc</code>/<code>ray build</code> cannot catch wrong headers,
+source-app mapping, timestamps, or separators.</li>
+<li><strong>Conjecture:</strong> If the strategist patches those two
+points without adding new Raycast mechanism, r7 should plausibly
+converge. If r7 still finds issues, the remaining surface is likely the
+spec’s detailed UI/action prose rather than the daemon or dependency
+contract.</li>
 </ul>
 <h3 id="pdt-codex-resumes-claudes-cursor-root-cause-investigation">01:20
 PDT — Codex resumes Claude’s Cursor root-cause investigation</h3>

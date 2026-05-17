@@ -2014,6 +2014,15 @@ Multi-call meta-entry capturing the full cross-tool spec-review iteration on `ba
 - **Conjecture:** For newly-written specs, ECHO should be used as context retrieval, but spec review should still anchor on the backlog file when present; the capture gap being reviewed can itself make the latest Cursor/Claude turn incomplete.
 
 
+### 2026-05-17 15:09 PDT - Codex r6 review tick on 060 hotkey-overlay-v0-raycast-dogfood
+
+- **Trigger:** Pinned Codex-side review queue tick for `backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/request.md`, correlation_id `867a690d-0900-4cb0-bafb-c67a8900174a`.
+- **Tool and query inputs:** Pulled `origin/main`; emitted best-effort ECHO coord call via `tools/review-queue/coord-emit.sh tick_start --correlation-id=867a690d-0900-4cb0-bafb-c67a8900174a`; read the artifact via `git show a5e93c203a1c5e9e9ac05306ccd008ed565dd348:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md`; inspected request/schema files plus code-grounding paths `src/mcp/server.ts`, `src/mcp/util/source-app.ts`, `src/mcp/tools/{find-clusters,get-atoms,get-atom}.ts`, `tools/serve-trace.ts`, and smoke-test raw MCP contracts. Checked current npm metadata for `@raycast/api@1.104.17` and `@modelcontextprotocol/sdk@1.29.0`; no ECHO retrieval MCP calls were made.
+- **Returned shape:** Wrote and pre-link validated `backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/codex.md`; upstream duplicate check passed; `commit-reviewer-response.sh` revalidated, committed, rebased, and pushed as `96c0ec4`. Verdict `proceed_after_patches`; findings: 2 medium.
+- **Verdict:** right - exactly one Codex response was written for the pinned round at the requested artifact SHA, and the queue response is now durable on `origin/main`.
+- **Note:** The r6 findings shifted away from Raycast manifest/API typo surface and into two narrower implementability/testability issues: `Cmd-C` cannot literally copy raw storage JSON through the in-scope `get_atom` API, and the pure formatter contract needs a required smoke test because `tsc`/`ray build` cannot catch wrong headers, source-app mapping, timestamps, or separators.
+- **Conjecture:** If the strategist patches those two points without adding new Raycast mechanism, r7 should plausibly converge. If r7 still finds issues, the remaining surface is likely the spec's detailed UI/action prose rather than the daemon or dependency contract.
+
 ### 01:20 PDT — Codex resumes Claude's Cursor root-cause investigation
 
 - **Source agent:** Codex / GPT-5.5
