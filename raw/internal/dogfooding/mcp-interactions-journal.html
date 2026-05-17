@@ -2219,6 +2219,11 @@ href="#pdt-codex-r5-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
 id="toc-pdt-codex-r5-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 14:59 PDT — Codex r5 review tick on 060
 hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r5-tick-on-060-combined-aggressive-scope-trim-r6-dispatch-decay-plateau-33"
+id="toc-pdt-claude-strategist-watcher-r5-tick-on-060-combined-aggressive-scope-trim-r6-dispatch-decay-plateau-33">2026-05-17
+15:03 PDT — Claude strategist watcher r5 tick on 060 — combined +
+AGGRESSIVE SCOPE-TRIM + r6 dispatch (decay plateau 3→3)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25791,6 +25796,94 @@ icon asset for the <code>ray build</code> gate; AC2 needs
 against truncated rendered text; AC2 also needs explicit cluster-row
 behavior for atom-specific actions (<code>Cmd+O</code> and
 <code>Cmd+C</code>) because clusters hydrate multiple atoms.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r5-tick-on-060-combined-aggressive-scope-trim-r6-dispatch-decay-plateau-33">2026-05-17
+15:03 PDT — Claude strategist watcher r5 tick on 060 — combined +
+AGGRESSIVE SCOPE-TRIM + r6 dispatch (decay plateau 3→3)</h3>
+<ul>
+<li><strong>Trigger:</strong> Scheduled wakeup +270s after r5
+dispatch.</li>
+<li><strong>Query inputs:</strong> combine.py
+(combined_verdict=proceed_after_patches, escalated:false, 3 divergent
+codex MED); 3 inline spec patches per pre-disposed AGGRESSIVE SCOPE-TRIM
+strategy; dispatch-next-round.py with –spec-sha=a5e93c2; 2 coord_invoke
+calls for r6.</li>
+<li><strong>Returned:</strong>
+<ul>
+<li>codex r5 findings: F1 (MED) Raycast manifest enumeration
+insufficient for <code>ray build</code> (needs description, icon,
+author, platforms, categories, command description, icon asset); F2
+(MED) List default-filtering re-filters truncated subtitles (silent
+false-empty state); F3 (MED) action menu can’t operate on cluster rows
+for atom-specific actions.</li>
+<li>All 3 dispositioned per pre-disposed strategy: F1 SCOPE-TRIM (delete
+manifest field enumeration; defer to <code>ray build</code> gate; add
+<code>assets/icon.png</code> to files_to_modify); F2 one-line addition
+(<code>filtering={false}</code> on List); F3 SCOPE-TRIM (split menu by
+row type — cluster 3 actions, match 5 actions).</li>
+<li>r6 codex
+reviewer_invoked_id=<code>a951f6b5-6714-4974-af4a-e6bc15cf2db5</code>;
+r6 claude
+reviewer_invoked_id=<code>1ba52fe8-ce06-43f4-b34a-69445e3098d9</code>.
+Both 200 OK.</li>
+</ul></li>
+<li><strong>Sources:</strong> spec at
+<code>a5e93c203a1c5e9e9ac05306ccd008ed565dd348</code> (post-r5 trim).
+r6/request.md at <code>089c611</code>. <strong>Commit-hygiene
+note:</strong> the r5-patch commit <code>a5e93c2</code> bundled the
+user’s separate-purpose 061 spec work
+(<code>backlog/ready/2026-05-17-061-doc-leanout.md</code> +
+<code>backlog/_followups.md</code> + <code>docs/BACKLOG.md</code> 061
+row) into the same commit as my r5 patches because they were in the
+working tree when I staged. Not ideal commit hygiene; founder can squash
+later if needed.</li>
+<li><strong>Verdict:</strong> ✅ right but plateau detected. Decay shape
+now 6→3→2→3→3 — codex r5 still found 3 MED on different spec surface
+than r4 (manifest, List filter, action-row asymmetry). NOT API-name
+typos this round, but adjacent Raycast-behavior contracts
+(<code>ray build</code> requirements, List filtering semantics, row-type
+action semantics). My pre-disposed strategy (delete spec body’s API-name
+citations) applied to F1 successfully. F2/F3 are minimal additions /
+scope-trim splits.</li>
+<li><strong>Note:</strong> Three observations on the plateau.
+<ul>
+<li><strong>(1) Decay-shape plateau at 3 findings/round for 2 rounds
+running</strong> (r4: 2 MED + 1 LOW = 3; r5: 3 MED). Per
+<code>skills/review-queue-watch.md</code> the “decompose-or-defer
+asymptote at 5+” trigger has NOT fired (we’re at 3 not 5+). But the spec
+hasn’t decayed past 3-per-round either, which is the asymptote pattern
+at LOWER amplitude. The aggressive scope-trim of F1 (deleting the
+manifest field list) is the strategist’s bet that codex’s deeper-tracing
+of API-correctness will find less surface to chew on at r6.</li>
+<li><strong>(2) Claude predicted “bimodal: 0 OR 1 LOW” at r5; actual was
+3 MED.</strong> Third consecutive round of claude-prediction-inversion.
+Confirms the pattern: conceptual lens reliably under-predicts codex’s
+deeper-API-tracing yield. Calibration: if I were to write a “strategist
+meta-disposition” rule, it would be “if claude predicts ≤1 finding for
+codex, expect 2-3.”</li>
+<li><strong>(3) Time budget:</strong> dispatch sequence has been 14:08
+r1 → 14:20 r2 → 14:32 r3 → 14:44 r4 → 14:53 r5 → 15:03 r6 (each ~10 min
+wall-time / round). 5 closed rounds in 55 min. Wall-clock-to-convergence
+is approaching the upper bound of the historical 042/045 range (those
+were ~50 min for 3-round cycles); current 060 is 5 closed + r6 in flight
+at the same time-budget for 3 historical rounds.
+Spec-with-Raycast-API-citations genre is materially more expensive than
+spec-without per round count.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) If r6 lands
+[proceed, proceed] zero, the SCOPE-TRIM strategy paid off — 6-round
+convergence with decay 6→3→2→3→3→0 and 14+3=17 cumulative findings
+dispositioned. If r6 lands ≥1 MED on r5-trim surface (the
+manifest-deferral introduces new ambiguity, the filtering={false} text
+reads wrong, the action-menu split creates a 4th-action edge case),
+aggressive trim wasn’t aggressive enough and r7 should trim further
+(e.g., consolidate the spec body’s “behavior” sections into 3-bullet
+ACs, drop the architectural narrative entirely, let builder discover
+everything via <code>ray develop</code> interactive feedback loop). If
+r6 finds more pre-existing API-correctness bugs codex hadn’t traced yet,
+the spec has more pre-existing-bug surface than 5 rounds revealed and
+convergence-soon estimate is wrong.</li>
 </ul>
 </body>
 </html>
