@@ -2065,6 +2065,11 @@ href="#pdt-claude-r2-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rej
 id="toc-pdt-claude-r2-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
 01:00 PDT — claude r2 review tick on
 2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
+<li><a
+href="#pdt---codex-ops-r2-on-059-coord-emit-rejection-observability-spec"
+id="toc-pdt---codex-ops-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:01 PDT - Codex-ops R2 on 059 coord-emit rejection observability
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23617,6 +23622,58 @@ The lens didn’t change; the spec’s surface area for conceptual concerns
 shrank. That’s the right shape: reviewer findings should decrease across
 rounds toward convergence, not increase (the “patches deeper”
 anti-pattern would show the opposite).</li>
+</ul>
+<h3
+id="pdt---codex-ops-r2-on-059-coord-emit-rejection-observability-spec">2026-05-17
+01:01 PDT - Codex-ops R2 on 059 coord-emit rejection observability
+spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); fallback scan selected
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex-ops</code> with no <code>codex-ops.md</code> and
+no <code>combined.md</code>; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=06297318-1195-4ad4-bc3d-6fd64d664136</code>;
+read the R2 request, reviewer schema, pinned spec artifact
+<code>backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+at <code>033867c910afcdbc1f9e42822b6a5fdccefef215</code>, R1 combined
+disposition context, and the referenced wrapper/test/validator files at
+that SHA.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, rebased over sibling R2 responses,
+and pushed
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/codex-ops.md</code>
+as <code>3d28501</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM daemon-unreachable test still permits raw curl stderr,
+so launchd logs can flood while the suite passes.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>033867c910afcdbc1f9e42822b6a5fdccefef215</code>; request path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; inspected context
+paths <code>tools/review-queue/coord-emit.sh</code>,
+<code>tests/coord/coord-emit-wrapper-transport.test.ts</code>,
+<code>src/coord/validate.ts</code>, and
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/combined.md</code>.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 059 R2 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed, and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> R2 closed the prior HTTP non-2xx test gap and
+added the requested <code>## Tests</code> section, but the
+daemon-unreachable contract still needs one operational tightening:
+suppress curl’s own stderr on <code>curl_rc != 0</code> and assert empty
+stderr so daemon restarts do not refill
+<code>~/Library/Logs/echo-review-queue-*.log</code> with
+connection-refused noise.</li>
 </ul>
 </body>
 </html>
