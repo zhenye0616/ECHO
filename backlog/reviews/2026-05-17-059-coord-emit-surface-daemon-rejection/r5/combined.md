@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R5.` All three reviewers (codex, codex-ops, claude) verdict `proceed` with zero findings. Decay shape: 7 → 2 → 2 → 1 → 0 over five rounds — healthy monotonic convergence with one new-gap finding at r4 (scope-trimmed via OoS #12) and no r3-recent-patch-introduced bugs (the r3 plateau was convergent stale-language, not divergent new bugs). claude reviewer ran 4 consecutive `proceed` zero-finding rounds (r2-r5), providing strong empirical signal for the 056 `required:false`→`required:true` flip. The spec is now ready for builder claim — any agent may atomically claim from `backlog/ready/`.
 
