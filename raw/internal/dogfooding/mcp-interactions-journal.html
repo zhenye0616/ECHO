@@ -2224,6 +2224,21 @@ href="#pdt-claude-strategist-watcher-r5-tick-on-060-combined-aggressive-scope-tr
 id="toc-pdt-claude-strategist-watcher-r5-tick-on-060-combined-aggressive-scope-trim-r6-dispatch-decay-plateau-33">2026-05-17
 15:03 PDT — Claude strategist watcher r5 tick on 060 — combined +
 AGGRESSIVE SCOPE-TRIM + r6 dispatch (decay plateau 3→3)</a></li>
+<li><a
+href="#pdt-codex-read-only-consultee-combines-doc-leanout-audits-046-ac6-journal-by-proxy"
+id="toc-pdt-codex-read-only-consultee-combines-doc-leanout-audits-046-ac6-journal-by-proxy">2026-05-17
+14:48 PDT — codex read-only consultee combines doc-leanout audits (046
+AC6 journal-by-proxy)</a></li>
+<li><a
+href="#pdt-claude-orchestrator-pulls-codex-strategists-parallel-synthesis-via-echo-cross-tool-combine"
+id="toc-pdt-claude-orchestrator-pulls-codex-strategists-parallel-synthesis-via-echo-cross-tool-combine">2026-05-17
+14:55 PDT — Claude orchestrator pulls codex strategist’s parallel
+synthesis via ECHO (cross-tool combine)</a></li>
+<li><a
+href="#pdt-claude-strategist-commits-061-spec-rebase-race-with-060-r5-watcher-drops-journal-entries-recovered"
+id="toc-pdt-claude-strategist-commits-061-spec-rebase-race-with-060-r5-watcher-drops-journal-entries-recovered">2026-05-17
+15:05 PDT — Claude strategist commits 061 spec; rebase race with 060 r5
+watcher drops journal entries (recovered)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25884,6 +25899,263 @@ everything via <code>ray develop</code> interactive feedback loop). If
 r6 finds more pre-existing API-correctness bugs codex hadn’t traced yet,
 the spec has more pre-existing-bug surface than 5 rounds revealed and
 convergence-soon estimate is wrong.</li>
+</ul>
+<h3
+id="pdt-codex-read-only-consultee-combines-doc-leanout-audits-046-ac6-journal-by-proxy">2026-05-17
+14:48 PDT — codex read-only consultee combines doc-leanout audits (046
+AC6 journal-by-proxy)</h3>
+<ul>
+<li><strong>Source agent:</strong> codex consultee, session
+<code>019e37e5-00ee-71c3-aa32-ae1b531731e1</code>, <code>gpt-5.5</code>,
+sandbox <code>read-only</code>, invoked by claude orchestrator via
+<code>codex exec - &lt; /tmp/echo-leanout-codex-prompt.md</code>
+(orchestrator-journaled by claude per CLAUDE.md “Journal-by-proxy for
+read-only consultees (046 AC6)”). <em>Re-appended 15:08 PDT — original
+15:00 PDT entry was lost in a parallel 060 r5 watcher commit rebase;
+re-instated separately. The interleaving with 060’s 14:46-14:59 PDT
+entries is faithful to the actual physical-time arc.</em></li>
+<li><strong>Trigger:</strong> Founder direction “codex combine the
+findings in its session use echo to retrieve the context” after claude
+orchestrator dispatched 3 parallel Explore subagents auditing MD+HTML
+bloat (raw/internal/, backlog/, wiki+docs+skills+worktree) for spec
+061.</li>
+<li><strong>Query inputs:</strong> 18 MCP calls total over the
+consultee’s ~5-min session. In execution order:
+<code>get_recent_work_context</code> ×3 (first two with local
+<code>-07:00</code> offset windows → 0/0; UTC retry succeeded),
+<code>search_memories</code> ×11 (literal phrase queries “MD HTML bloat
+audit”, “dogfooding journal twin”, “backlog complete reviews archive”,
+“wiki skills worktree audit” all returned 0 across both offset and UTC
+windows; source-tail searches with no time filter proved data existed),
+<code>find_clusters</code> ×2 (local-offset → 0 clusters; UTC → 4
+clusters / 42 atoms), <code>echo_resolve_mru</code> ×1 (returned a
+separate claude_code session, not the orchestrator’s),
+<code>get_atoms</code> ×1 (9 atoms returned, 3 dropped due to envelope
+cap), <code>get_atom</code> ×2 (1 ✅ full atom = orchestrator synthesis;
+1 ❌ <code>atom_too_large_for_wire</code> for the 32,739-byte Agent B
+subagent report).</li>
+<li><strong>Returned:</strong> Successfully retrieved the orchestrator’s
+full synthesis atom and partial subagent atoms; produced an independent
+combined proposal with 5 highest-leverage moves, a 10-rule append
+ruleset, 4 founder decisions, and a 6-step implementation order. Three
+new dogfooding findings surfaced: (i) <strong>local-offset time-window
+filter bug</strong> (any <code>since=...T...-07:00</code> window
+returned 0 atoms while same window as <code>...Z</code> UTC returned
+matching results — reproducible across all three retrieval tools); (ii)
+<strong>literal-phrase <code>search_memories</code> queries are too
+brittle</strong> (every literal audit-phrase query returned 0;
+<code>find_clusters</code> with UTC was the only reliable discovery
+path); (iii) <strong>MCP envelope at 25KB caps <code>get_atom</code>
+recovery</strong> (33KB Agent B atom returned
+<code>atom_too_large_for_wire</code> with source path fallback —
+documented behavior but limited the consultee’s full recovery).</li>
+<li><strong>Sources:</strong> Per the consultee’s own MCP-call log,
+<code>source_breakdown={git:26, claude_code:11, codex:5}</code> on the
+successful UTC <code>get_recent_work_context</code>, top cluster
+<code>work on Project_echo</code>. Subagent atom IDs surfaced:
+<code>a213c7e6...</code> (orchestrator synthesis, fully recovered),
+<code>670788c1...</code> (Agent B report, envelope-clipped),
+<code>e5bfbf39...</code> (Agent C report, recovered). Repo-scoped
+throughout
+(<code>repo_path=/Users/zhenye/Desktop/Project_echo</code>).</li>
+<li><strong>Verdict:</strong> 🟡 partial — substantive synthesis
+succeeded, but only after switching to UTC. First two
+<code>get_recent_work_context</code> calls and four literal
+<code>search_memories</code> calls were wasted on the offset-window bug.
+Discovery path that actually worked: <code>find_clusters</code> UTC →
+inspect <code>atom_ids</code> → <code>get_atom</code> for the
+orchestrator synthesis. Subagent reports B (envelope-overflow) and A
+(only surfaced via synthesis snippets) were partial recoveries; the
+consultee filled the gaps by reading the repo directly via
+<code>du</code>/<code>find</code>/<code>stat</code>.</li>
+<li><strong>Note:</strong> Three observations on this session’s
+retrieval quality. <strong>(a)</strong> The local-offset bug is the
+highest-leverage friction surfaced — every AI client whose default
+timestamps include the local offset (likely most non-server bindings)
+will silently get empty windows. Codex consultee was the first to
+consciously timestamp with <code>date '+%Y-%m-%dT%H:%M:%S%z'</code>,
+which is why this surfaced. <strong>(b)</strong> Subagent results DO
+propagate through Claude Code’s capture path — Agents A/B/C are visible
+as atoms — but the 25KB envelope caps <code>get_atom</code> recovery on
+the largest reports. The documented workaround (read the jsonl source
+path) is operational but not ergonomic for a cross-tool consult.
+<strong>(c)</strong> The “literal phrase as search_memories query”
+failure mode is now a four-data-point pattern (codex strategist
+2026-05-17 21:30Z; orchestrator’s prior 13:48 PDT entry “Find my live
+Q&amp;A session”; this consultee’s four 0-match phrase queries; and an
+earlier 14:50 PDT search-by-noun miss). <code>find_clusters</code> is
+structurally the right discovery primitive;
+<code>search_memories(query=phrase)</code> is for exact-token retrieval
+(paths, SHAs, error codes), not paraphrased intent.</li>
+<li><strong>Conjecture:</strong> (observation only) The local-offset bug
+surfaced here is the kind of friction that should land in
+<code>_followups.md</code> for a future spec, NOT inlined into the
+doc-leanout spec under drafting. Founder agreed; appended to
+<code>backlog/_followups.md</code> per spec 061 AC7. The
+atom-too-large-for-wire / search-brittleness observations also stay as
+followup signals — feature work, not bug work.</li>
+</ul>
+<h3
+id="pdt-claude-orchestrator-pulls-codex-strategists-parallel-synthesis-via-echo-cross-tool-combine">2026-05-17
+14:55 PDT — Claude orchestrator pulls codex strategist’s parallel
+synthesis via ECHO (cross-tool combine)</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder direction “there is codex
+strategist that already combine the findings pull that context as well”
+— a separate codex session (workspace-write, not the read-only
+consultee) had independently combined the same doc-bloat audit findings
+~10 min before this turn, with no orchestrator visibility into its
+output. <em>Re-appended 15:08 PDT — same rebase-loss recovery as the
+prior entry.</em></li>
+<li><strong>Query inputs:</strong> Three MCP calls in sequence: (1)
+<code>echo_resolve_mru(sources=['codex'], repo_path='/Users/zhenye/Desktop/Project_echo')</code>
+to find the most-recent codex source under this repo; (2)
+<code>find_clusters(since='2026-05-17T19:30:00Z', until='2026-05-17T22:30:00Z', repo_path='/Users/zhenye/Desktop/Project_echo')</code>
+using a UTC window (deliberate — the prior codex consultee’s findings
+included a local-offset filter bug, so I used UTC from the start); (3)
+<code>get_atoms(atom_ids=[3 IDs from cluster ctx_b5e24732], prefer='newest_first')</code>
+to fetch the bodies.</li>
+<li><strong>Returned:</strong> (1) <code>echo_resolve_mru</code>
+returned the consultee session <code>019e37e5-...</code> as MRU codex —
+correctly newest, but the strategist session I was looking for was the
+second-newest (<code>019e2dd1-...</code>). Same “MRU resolves to calling
+session” friction the 13:48 PDT entry surfaced for claude_code; recurs
+for codex when an orchestrator has just spawned a child codex. (2)
+<code>find_clusters</code> returned 2 clusters / 59 atoms: cluster 1
+(<code>ctx_26556c2a</code>, rank 1, 55 atoms,
+<code>{claude_code:21, git:35}</code>, label “work on Project_echo”)
+covered the in-progress 060 review cycle; cluster 2
+(<code>ctx_b5e24732</code>, rank 2, 3 atoms, <code>{codex:3}</code>,
+label “discussion about ECHO”, time_range 21:30:42Z → 21:47:54Z) was the
+codex strategist’s session — exactly the target. (3)
+<code>get_atoms</code> returned all 3 atoms (0 dropped), surfacing turns
+3+4 of the codex strategist session: turn 3 “logs/.md/html bloat — what
+to get rid of and appending logic” (founder→codex strategist
+same-question as the user message that opened this drafting session) and
+turn 4 “use echo and understand the same review with claude. combine the
+findings and see if anything you missed.”</li>
+<li><strong>Sources:</strong> Resolved codex source
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/17/rollout-2026-05-17T14-43-35-019e37e5-00ee-71c3-aa32-ae1b531731e1.jsonl</code>
+(the consultee, NOT the target). Target session resolved indirectly via
+the cluster atom metadata:
+<code>fs:/Users/zhenye/.codex/sessions/2026/05/15/rollout-2026-05-15T15-46-08-019e2dd1-8bc6-7772-8820-a345907bd4c5.jsonl</code>
+(workspace-write codex, separate from my read-only consultee).
+<code>repo_path</code> scoped throughout. Atom <code>6b8e38dc-...</code>
+carried turn 3 (founder’s bloat question + codex strategist’s initial
+synthesis); atom <code>3abc6a9b-...</code> carried turn 4 (codex’s
+self-combine with claude side via ECHO). Atom <code>845c6d79-...</code>
+was the consultee’s turn 0, included for completeness.</li>
+<li><strong>Verdict:</strong> ✅ right — UTC window +
+<code>find_clusters</code> worked first-try (confirming codex
+consultee’s finding that UTC is the reliable discovery path); cluster
+2’s small-codex-only shape made it instantly distinguishable from the
+dominant 060 review cluster. <code>get_atoms</code> returned all 3 atoms
+without envelope-clipping (no atom was &gt;25KB — turn 3 was 2840 bytes
+elided, turn 4 was 2427 bytes elided, both well under the cap).</li>
+<li><strong>Note:</strong> Three observations on the cross-tool combine.
+<strong>(a)</strong> The codex strategist’s recommendations were
+<em>stronger</em> than mine on the journal: it said <strong>freeze the
+monolith now</strong> rather than my draft’s “rotate at 3M threshold” —
+empirically validated, since the codex strategist had run the same
+<code>du</code> measurements I’d done and reached a sharper conclusion.
+Adopted into spec 061 AC2 verbatim. <strong>(b)</strong> Codex
+strategist surfaced a content-policy refinement nobody else caught:
+<strong>drop zero-MCP-call reviewer-tick entries from future journal
+policy</strong> — exactly the kind of journal-spam-cleanup that today’s
+14:46/14:50/14:55/14:59 PDT review-cycle entries demonstrate (most have
+<code>Query inputs: none</code> for MCP). Adopted into spec 061 AC3.
+<strong>(c)</strong> Codex strategist claimed it had “logged this ECHO
+use per current policy and regenerated the HTML twin” — but a
+<code>git log</code> check of the journal showed no leanout-related
+commits from the strategist session. Either the strategist’s commit was
+reverted before reaching origin, or the claim was over-stated. Worth
+noting as a cross-tool-trust observation: agent self-reporting of
+journaling discipline is not verifiable from inside the same turn.</li>
+<li><strong>Conjecture:</strong> (observation only) The 3-way combine
+(claude orchestrator’s Explores + codex consultee + codex strategist’s
+prior synthesis) is the first time three independent AI-strategist
+syntheses on the same operational question have triangulated to the same
+root causes. The convergence pattern (HTML twins / journal monolith /
+backlog complete/ accumulation) increases confidence in the spec; the
+divergences (journal rotation timing, reviews-tree archival,
+zero-MCP-call filter) explicitly become founder-decision points in the
+spec preamble. This shape — “spec preamble cites which findings
+triangulated vs which diverged across N AI syntheses” — may be worth
+codifying for future operational specs.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-commits-061-spec-rebase-race-with-060-r5-watcher-drops-journal-entries-recovered">2026-05-17
+15:05 PDT — Claude strategist commits 061 spec; rebase race with 060 r5
+watcher drops journal entries (recovered)</h3>
+<ul>
+<li><strong>Trigger:</strong> First commit attempt for spec 061
+(doc-leanout) + journal-append + _followups append + BACKLOG.md row +
+HTML regen. Five files staged.</li>
+<li><strong>Query inputs:</strong> No MCP calls this tick. Pure git:
+<code>git add &lt;5 paths&gt;</code> → <code>git commit -m "..."</code>
+→ push-with-retry implicit rebase against <code>origin/main</code>.</li>
+<li><strong>Returned:</strong> Commit collided with 060 r5 watcher’s
+parallel <code>a929a73 spec-r5-patches: 060</code> (founder
+direction-applied AGGRESSIVE SCOPE-TRIM landed concurrently from
+<code>$TMPDIR/echo-claude-DC79C7D6-...</code> worktree). Rebase
+auto-resolved 3 of 5 files cleanly into the watcher’s commit (renamed
+<code>a929a73</code> → <code>a5e93c2</code> on rebase):
+<code>backlog/ready/2026-05-17-061-doc-leanout.md</code> (195 added) +
+<code>backlog/_followups.md</code> (8 added) +
+<code>docs/BACKLOG.md</code> (1 added) — all my changes preserved IN the
+watcher’s commit. But the journal MD + HTML twin auto-resolver kept the
+watcher’s side and dropped my 14:48 + 14:55 PDT entries entirely. Net:
+061 spec landed on <code>origin/main</code> via <code>a5e93c2</code>,
+but the journal-by-proxy + cross-tool-combine entries were lost.</li>
+<li><strong>Sources:</strong> Conflict path 1:
+<code>raw/internal/dogfooding/mcp-interactions-journal.md</code> (both
+sides appended new entries at EOF; auto-resolver picked watcher’s).
+Conflict path 2:
+<code>raw/internal/dogfooding/mcp-interactions-journal.html</code>
+(regenerated twin of MD; auto-resolved to watcher’s regenerated
+version). The watcher’s worktree-isolated push completed seconds before
+mine; push-with-retry’s <code>git pull --rebase</code> then chose the
+remote-tip side at the journal EOF. Worth noting: the rebase merged my
+changes INTO the watcher’s commit (preserving authorship as the founder,
+losing my Claude co-author trailer), which is a side effect of
+<code>--rebase-merges</code> + the watcher’s commit being topologically
+newer.</li>
+<li><strong>Verdict:</strong> 🟡 partial — spec landed, journal did not.
+Recovery: re-append the two lost entries (this entry + the two above) in
+a separate commit. No data loss (entries reconstructed from this
+session’s working memory).</li>
+<li><strong>Note:</strong> Two observations on the rebase-collision
+shape. <strong>(a) Side-by-side worktrees + append-only journal is a
+structural collision attractor.</strong> The 060 watcher’s
+<code>$TMPDIR</code> worktree and the orchestrator’s main-repo working
+tree both append to the same canonical journal file (per CLAUDE.md).
+When both push within seconds of each other, rebase’s “auto-resolve EOF
+append conflict by picking remote tip” silently drops one side. This is
+the load-bearing case for 061 AC2’s monthly-shard pattern — if both
+writers had been appending to separate shard files (or even better: the
+shard filename incorporated the role / write-session), no collision.
+<strong>(b) Cross-author commit absorption is a discovery.</strong> I
+expected the rebase to either succeed cleanly OR leave my commit as a
+separate ref ahead of the watcher’s. Instead it MERGED my staged changes
+into the watcher’s commit body (re-SHA’d
+<code>a929a73 → a5e93c2</code>). The commit message still says
+“spec-r5-patches: 060 — 3 codex MED” but the diff includes my 061 spec.
+This is misleading audit trail — anyone reading
+<code>git log --oneline</code> won’t see a “spec: 061 doc-leanout”
+commit. Followup-worthy observation: review-queue’s auto-rebase behavior
+under concurrent commits may need a “rebase-or-fail” toggle so the human
+(or strategist) can decide whether absorption-into-other-author’s-commit
+is desired.</li>
+<li><strong>Conjecture:</strong> (observation only) This is the second
+time today the journal’s append-only-single-file pattern has produced a
+structural friction (first: codex strategist’s 21:30Z journal-append
+never reached origin; now: my 14:48/14:55 PDT entries dropped in
+rebase). Two data points in ~3h of cross-tool work. Spec 061 AC2’s
+monthly-shard adoption is empirically more urgent than the spec body
+framed it — the codex-strategist’s “freeze monolith now” recommendation
+was structurally correct, not just stylistic preference. Builder of 061
+should treat AC2 as the highest-priority AC, not a nice-to-have
+alongside AC1/AC4.</li>
 </ul>
 </body>
 </html>
