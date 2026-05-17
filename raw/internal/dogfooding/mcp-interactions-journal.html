@@ -154,6 +154,446 @@
     ul.task-list{list-style: none;}
     .display.math{display: block; text-align: center; margin: 0.5rem auto;}
   </style>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #1a1a1a;
+      --muted: #5a5a5a;
+      --label: #7a3e9d;
+      --accent: #0a66c2;
+      --code-bg: #eef1f4;
+      --border: #d8dde2;
+      --card-bg: #ffffff;
+    }
+    html {
+      line-height: 1.55;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      color: var(--fg);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      max-width: 56em;
+      margin: 0 auto;
+      padding: 2em 3em 4em;
+    }
+    @media (max-width: 700px) {
+      body { padding: 1em; font-size: 14px; }
+    }
+    h1.title {
+      font-size: 1.8em;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.4em;
+      margin-top: 0.5em;
+    }
+    h1 { font-size: 1.7em; }
+    h2 {
+      font-size: 1.35em;
+      margin-top: 2.4em;
+      padding-top: 0.6em;
+      border-top: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1.05em;
+      margin-top: 2em;
+      padding: 0.55em 0.9em;
+      background: var(--card-bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    h4 {
+      font-size: 0.98em;
+      color: var(--muted);
+      margin-top: 1.6em;
+      font-weight: 600;
+    }
+    h5, h6 { font-size: 0.95em; color: var(--muted); }
+    p { margin: 0.8em 0; }
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.86em;
+      background: var(--code-bg);
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 0.8em 1em;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.85em;
+      line-height: 1.45;
+      border: 1px solid var(--border);
+    }
+    pre code { background: transparent; padding: 0; font-size: inherit; }
+    ul, ol { padding-left: 1.5em; margin: 0.7em 0; }
+    li { margin: 0.3em 0; }
+    li > ul, li > ol { margin: 0.3em 0; }
+    /* Field labels: bulleted lines that start with "**Trigger:**", "**Sources:**", etc.
+       Pandoc renders these as <li><strong>Label:</strong> content</li>. */
+    li > strong:first-child {
+      color: var(--label);
+      font-variant: small-caps;
+      letter-spacing: 0.03em;
+      font-weight: 600;
+    }
+    /* But in headings/paragraphs we want strong to read normal */
+    h1 strong, h2 strong, h3 strong, h4 strong, p > strong {
+      color: inherit;
+      font-variant: normal;
+      letter-spacing: normal;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:visited { color: var(--accent); }
+    blockquote {
+      border-left: 3px solid var(--border);
+      padding: 0.2em 1em;
+      color: var(--muted);
+      margin: 1em 0;
+      background: var(--card-bg);
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1em 0;
+      font-size: 0.92em;
+      width: 100%;
+    }
+    th, td {
+      padding: 0.5em 0.8em;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--code-bg); font-weight: 600; }
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2.8em 0;
+    }
+    /* TOC */
+    nav#TOC {
+      font-size: 0.88em;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1em 1.5em;
+      margin: 1.5em 0 2.5em;
+    }
+    nav#TOC > ul { padding-left: 1.2em; margin: 0.4em 0; }
+    nav#TOC ul ul { padding-left: 1.2em; font-size: 0.96em; }
+    nav#TOC li { margin: 0.15em 0; }
+    details.toc {
+      margin: 1.5em 0 2.2em;
+    }
+    summary.toc-summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      position: relative;
+      padding: 0.55em 0.9em 0.55em 1.7em;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 3px;
+      font-weight: 650;
+    }
+    summary.toc-summary::-webkit-details-marker { display: none; }
+    summary.toc-summary::before {
+      content: '▸';
+      position: absolute;
+      left: 0.55em;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85em;
+      color: var(--muted);
+      transition: transform 0.12s ease;
+    }
+    details.toc[open] > summary.toc-summary::before {
+      transform: translateY(-50%) rotate(90deg);
+    }
+    details.toc > nav#TOC {
+      margin: 0.8em 0 0;
+    }
+    /* Subtle anchor for collapsible section headers */
+    h2, h3, h4 { scroll-margin-top: 1em; }
+
+    /* ── Collapsible entries ──────────────────────────────────────────────
+       A small DOMContentLoaded script (below) wraps H3/H4 entries and selected
+       non-date H2 sections into <details> elements. Date H2 headings stay on the
+       surface as scan anchors; accumulating summary/backlog/notes sections
+       collapse. The generated index/TOC is wrapped separately.
+       The MD source is untouched; collapsibility lives entirely in the HTML
+       twin so the in-the-moment append discipline is unchanged. */
+
+    .entry-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      padding: 0.55em 0;
+      margin: 0.4em 0 1.2em;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0.4em;
+      align-items: center;
+    }
+    .entry-toolbar button {
+      font-family: inherit;
+      font-size: 0.84em;
+      padding: 0.32em 0.85em;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--fg);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .entry-toolbar button:hover { background: var(--code-bg); }
+    .entry-toolbar .hint {
+      font-size: 0.8em;
+      color: var(--muted);
+      margin-left: 0.6em;
+    }
+
+    details.entry { margin: 0.4em 0; }
+    details.entry.level-2 { margin-top: 2.1em; }
+    details.entry.level-3 { margin-top: 1.6em; }
+    details.entry.level-4 { margin-top: 0.7em; }
+
+    /* The original H2/H3/H4 styling now lives on the summary, scoped by level. */
+    summary.entry-summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      position: relative;
+      padding-left: 1.5em;
+    }
+    summary.entry-summary::-webkit-details-marker { display: none; }
+    summary.entry-summary::before {
+      content: '▸';
+      position: absolute;
+      left: 0.45em;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85em;
+      color: var(--muted);
+      transition: transform 0.12s ease;
+    }
+    details.entry[open] > summary.entry-summary::before {
+      transform: translateY(-50%) rotate(90deg);
+    }
+
+    summary.entry-summary.level-2 {
+      font-size: 1.35em;
+      font-weight: 650;
+      margin-top: 0.4em;
+      padding: 0.65em 0.9em 0.6em 1.7em;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    summary.entry-summary.level-3 {
+      font-size: 1.05em;
+      font-weight: 600;
+      padding: 0.55em 0.9em 0.55em 1.7em;
+      background: var(--card-bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    summary.entry-summary.level-4 {
+      font-size: 0.98em;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 0.4em 0.4em 0.4em 1.5em;
+      border-bottom: 1px dashed var(--border);
+    }
+    summary.entry-summary:hover { background: var(--code-bg); }
+
+    /* Reset the inner heading element (h2/h3/h4 that's now wrapped in <summary>)
+       so it inherits summary styles instead of the base h3/h4 ones. */
+    summary.entry-summary > h2,
+    summary.entry-summary > h3,
+    summary.entry-summary > h4 {
+      display: inline;
+      font: inherit;
+      color: inherit;
+      margin: 0;
+      padding: 0;
+      background: none;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      font-weight: inherit;
+    }
+
+    /* Indent nested details a touch while preserving scanability. */
+    details.entry.level-2[open] > details.entry.level-3 {
+      margin-left: 0.45em;
+    }
+    details.entry.level-3[open] > details.entry.level-4 {
+      margin-left: 0.6em;
+    }
+
+    /* Print: open everything, drop chrome */
+    @media print {
+      body { background: white; padding: 0; max-width: none; font-size: 11pt; }
+      .entry-toolbar { display: none; }
+      details.entry > * { display: block !important; }
+      summary.entry-summary {
+        list-style: none;
+        padding-left: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+      summary.entry-summary::before { display: none; }
+      summary.entry-summary.level-2 { background: transparent; box-shadow: none; border-left: none; }
+      summary.entry-summary.level-3 { background: transparent; box-shadow: none; }
+      nav#TOC { page-break-after: always; }
+    }
+  </style>
+
+  <script>
+    (function () {
+      function init() {
+        var body = document.body;
+        if (!body || body.dataset.entriesWrapped === '1') return;
+
+        // Bottom-up: wrap H4 and H3 first. Then wrap selected H2 sections while
+        // leaving date H2 headings visible on the page surface.
+        wrapHeadingLevel(4);
+        wrapHeadingLevel(3);
+        wrapHeadingLevel(2);
+        wrapTOC();
+
+        installToolbar();
+        installHashOpener();
+        body.dataset.entriesWrapped = '1';
+      }
+
+      function wrapHeadingLevel(level) {
+        var tag = 'h' + level;
+        // Snapshot before mutating. Skip headings that are already inside a summary
+        // (defensive — shouldn't happen given bottom-up order) or inside the TOC.
+        var headings = Array.prototype.filter.call(
+          document.getElementsByTagName(tag),
+          function (h) {
+            if (h.closest('summary.entry-summary')) return false;
+            if (h.closest('nav#TOC')) return false;
+            if (h.classList.contains('title')) return false;
+            if (level === 2 && !shouldWrapH2(h)) return false;
+            return true;
+          }
+        );
+        // Stop tags: any heading at this level or higher (including h1.title).
+        var stopTags = {};
+        for (var l = 1; l <= level; l++) stopTags['H' + l] = true;
+
+        headings.forEach(function (heading) {
+          var details = document.createElement('details');
+          details.className = 'entry level-' + level;
+
+          var summary = document.createElement('summary');
+          summary.className = 'entry-summary level-' + level;
+
+          // Move heading element itself into the summary so its id and content
+          // are preserved verbatim (TOC anchors keep working, screen readers
+          // still see an h3/h4).
+          var parent = heading.parentNode;
+          parent.insertBefore(details, heading);
+          details.appendChild(summary);
+          summary.appendChild(heading);
+
+          // Mirror the heading id onto the details so linking opens it.
+          if (heading.id) details.id = heading.id + '--entry';
+
+          // Pull subsequent siblings into details until we hit a stop heading.
+          while (details.nextSibling) {
+            var sib = details.nextSibling;
+            if (sib.nodeType === 1 && stopTags[sib.tagName]) break;
+            details.appendChild(sib);
+          }
+        });
+      }
+
+      function shouldWrapH2(heading) {
+        var text = (heading.textContent || '').trim();
+        // Date sections should stay visible. They are the main scan surface.
+        if (/^\d{4}-\d{2}-\d{2}\b/.test(text)) return false;
+        // This is just the parent label for the date sequence; collapsing it
+        // would hide the whole journal body behind one affordance.
+        if (text === 'Interactions By Date') return false;
+        return true;
+      }
+
+      function wrapTOC() {
+        var toc = document.querySelector('nav#TOC');
+        if (!toc || toc.closest('details.toc')) return;
+
+        var details = document.createElement('details');
+        details.className = 'toc';
+
+        var summary = document.createElement('summary');
+        summary.className = 'toc-summary';
+        summary.textContent = 'Index';
+
+        var parent = toc.parentNode;
+        parent.insertBefore(details, toc);
+        details.appendChild(summary);
+        details.appendChild(toc);
+      }
+
+      function installToolbar() {
+        var toolbar = document.createElement('div');
+        toolbar.className = 'entry-toolbar';
+        toolbar.innerHTML =
+          '<button type="button" data-act="expand">Expand all</button>' +
+          '<button type="button" data-act="collapse">Collapse all</button>' +
+          '<span class="hint">click the index, summary sections, interactions, or calls to expand · date headings stay visible</span>';
+        // Insert before the collapsible TOC (or, if no TOC, before the first body child).
+        var anchor = document.querySelector('details.toc') || document.querySelector('nav#TOC') || document.body.firstChild;
+        document.body.insertBefore(toolbar, anchor);
+
+        toolbar.addEventListener('click', function (e) {
+          var btn = e.target.closest && e.target.closest('button[data-act]');
+          if (!btn) return;
+          var open = btn.getAttribute('data-act') === 'expand';
+          document.querySelectorAll('details.entry, details.toc').forEach(function (d) {
+            d.open = open;
+          });
+        });
+      }
+
+      function installHashOpener() {
+        function openTo(hash) {
+          if (!hash) return;
+          var id = hash.charAt(0) === '#' ? hash.slice(1) : hash;
+          var el = document.getElementById(id);
+          if (!el) return;
+          var cur = el;
+          while (cur && cur !== document.body) {
+            if (cur.tagName === 'DETAILS') cur.open = true;
+            cur = cur.parentElement;
+          }
+          // Re-scroll so the now-revealed target lines up.
+          try { el.scrollIntoView({ block: 'start' }); } catch (_) {}
+        }
+        window.addEventListener('hashchange', function () { openTo(location.hash); });
+        // Defer until after the layout settles.
+        setTimeout(function () { openTo(location.hash); }, 0);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
   <!--[if lt IE 9]>
     <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
   <![endif]-->
@@ -1724,6 +2164,11 @@ href="#pdt-codex-r1-review-tick-on-2026-05-17-060-hotkey-overlay-v0-raycast-dogf
 id="toc-pdt-codex-r1-review-tick-on-2026-05-17-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 14:14 PDT — Codex r1 review tick on
 2026-05-17-060-hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r1-tick-on-060-combined-r1-patches-r2-dispatch"
+id="toc-pdt-claude-strategist-watcher-r1-tick-on-060-combined-r1-patches-r2-dispatch">2026-05-17
+14:20 PDT — Claude strategist watcher r1 tick on 060 — combined + r1
+patches + r2 dispatch</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24398,6 +24843,89 @@ wants friendly source labels, but the existing retrieval tools expose
 raw source strings on matches and atoms. That is a good v0-spec fix
 because it keeps the Raycast implementation honest without adding new
 MCP tools.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r1-tick-on-060-combined-r1-patches-r2-dispatch">2026-05-17
+14:20 PDT — Claude strategist watcher r1 tick on 060 — combined + r1
+patches + r2 dispatch</h3>
+<ul>
+<li><strong>Trigger:</strong> First wakeup tick found both r1 reviewers
+landed (codex.md AND claude.md present) — branch (a) of the watcher
+checklist. Note: at the watcher’s initial fetch (14:13 PDT) only
+claude.md was present; codex.md landed during the wakeup turn itself
+(timestamps: claude completed_at 21:10:25Z, codex completed_at 21:13:03Z
+— codex spent ~5 min wall-time on a 4-finding-review vs claude’s ~2 min
+on a 2-finding-review).</li>
+<li><strong>Query inputs:</strong> Two MCP calls + two scripts:
+<ul>
+<li><code>combine.py --no-git</code> → wrote <code>r1/combined.md</code>
+envelope (<code>combined_verdict: proceed_after_patches</code>,
+<code>escalated_to_founder: false</code>, no convergent findings, 6
+divergent — codex F1-F4 + claude F5-F6).</li>
+<li>Inline spec patches applied to
+<code>backlog/ready/2026-05-17-060-...md</code> (6 edits across 9
+sections; 4 MED dispositions + 2 LOW).</li>
+<li><code>dispatch-next-round.py 2026-05-17-060-... 1 --verdict proceed_after_patches --patches-applied true --class narrow --spec-sha 74cb4641...</code>
+→ wrote <code>r2/request.md</code> (new correlation_id
+<code>89132706-a1a8-4d12-a0c8-e244236512bd</code>).</li>
+<li><code>coord_invoke(role=codex, ...)</code> +
+<code>coord_invoke(role=claude, ...)</code> for r2 reviewers via the
+same JSON-RPC HTTP recipe.</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>r2 codex
+<code>reviewer_invoked_id=d70ef380-92b9-481a-986d-f7da0ad5dad1</code>
+(run-codex-reviewer.sh).</li>
+<li>r2 claude
+<code>reviewer_invoked_id=f42cc783-aa80-4ed9-85f0-56142c0a590b</code>
+(run-claude-reviewer.sh).</li>
+<li>Both 200 OK; spawned cleanly.</li>
+</ul></li>
+<li><strong>Sources:</strong> Spec at
+<code>74cb4641853e55a54e5dd733d4c9521c8b2db11b</code> (post-r1 patches).
+r2/request.md at <code>a75fd4f</code>. r1/combined.md dispositioned
+(next_round=2 link populated by dispatch-next-round.py).</li>
+<li><strong>Verdict:</strong> ✅ right. Disposition discipline held
+cleanly — F2 and F4 are REMOVALS (no deep-link mechanism in v0; no
+per-extension .gitignore mention), not deeper-patching additions. F3 is
+a structural move (AC6/AC7 → AC8/AC9 in separate “Post-Merge Gate”
+section), preserving the same gate intent without polluting builder-DoD
+semantics. F1, F5, F6 are narrow language patches.</li>
+<li><strong>Note:</strong> Three observations on r1’s signal.
+<ul>
+<li><strong>(1) Reviewer differentiation was best-case at r1.</strong>
+Zero convergent findings — codex and claude had ZERO <code>where:</code>
+overlap. Codex took 4 implementability-shape findings (source_app shape,
+trace-viewer route, DoD vs post-merge-gate semantics, gitignore
+taxonomy). Claude took 2 conceptual-shape findings (tools/ placement
+intent, multi-repo journal signal). This is materially cleaner
+lens-separation than 059’s [codex, codex-ops] pairing produced — those
+reviewers had ~70% <code>where:</code> overlap. First empirical evidence
+that the [codex, claude] roster produces better non-overlapping coverage
+than [codex, codex-ops] for narrow-shape specs. Worth carrying forward
+into post-056 roster-decision discipline.</li>
+<li><strong>(2) Codex’s F3 (AC6/AC7 vs DoD semantic conflict) was the
+most important catch</strong> — it would have shipped a
+structurally-incoherent spec where the builder couldn’t move the item to
+review without violating the DoD they’re held to. That’s the kind of
+conceptual-bug-disguised-as-implementability-detail that justifies
+having an implementability lens in the roster alongside the conceptual
+one.</li>
+<li><strong>(3) The first 060 cycle is shape-following 042 (3-round /
+50min / AC8=0 founder activations)</strong> — narrow spec, codex+1
+roster, no escalation boundary crossed at r1, clear patch path. If r2
+lands [proceed, proceed] with 0-2 LOW, convergence by r3 is plausible.
+If r2 finds bugs IN THE r1 PATCHES (the strategist-drift pattern from
+057a/057b), the cycle extends.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) The
+“AC6/AC7-as-post-merge-gate” pattern is reusable — any spec where the AC
+requires founder behavior over time (dogfooding gates, founder-decided
+thresholds, multi-day signal accumulation) should adopt the “Post-Merge
+Gate (V1 spec trigger)” section convention instead of stuffing into AC +
+DoD. Backlog candidate after 060 ships: codify the pattern in
+skills/role-typed-task-state.md or a new section in CLAUDE.md.</li>
 </ul>
 </body>
 </html>
