@@ -2080,6 +2080,11 @@ href="#pdt-strategist-watcher-r2-tick-on-2026-05-17-059-coord-emit-surface-daemo
 id="toc-pdt-strategist-watcher-r2-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
 01:08 PDT — Strategist watcher r2 tick on
 2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
+<li><a
+href="#pdt-claude-r3-review-tick-on-059-coord-emit-surface-daemon-rejection-verification-round"
+id="toc-pdt-claude-r3-review-tick-on-059-coord-emit-surface-daemon-rejection-verification-round">2026-05-17
+01:14 PDT — claude r3 review tick on 059
+coord-emit-surface-daemon-rejection (verification round)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23779,6 +23784,71 @@ rc=0 with no atom and no signal”) was about. The spec is now
 load-bearing on the meta-claim: silence means silence, end-to-end. r3 is
 the verification round; if it lands {proceed/proceed/proceed} the spec
 is claim-ready.</li>
+</ul>
+<h3
+id="pdt-claude-r3-review-tick-on-059-coord-emit-surface-daemon-rejection-verification-round">2026-05-17
+01:14 PDT — claude r3 review tick on 059
+coord-emit-surface-daemon-rejection (verification round)</h3>
+<ul>
+<li><strong>Trigger:</strong> active-trigger reviewer tick fired with
+<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r3/request.md</code>
+and
+<code>ECHO_COORD_CORRELATION_ID=de5b6405-45fd-41d2-8b82-81e6dfa3bfb3</code>
+after watch dispatched r3 against spec_commit_sha <code>d6be140</code>
+(the r2-patches commit).</li>
+<li><strong>Query inputs:</strong>
+<code>mcp__echo__coord_emit tick_start --correlation-id=de5b6405-…</code>
+(pinned-request bind validated: correlation match, claude in
+requested_reviewers roster, no prior claude.md, no combined.md).
+Artifact read via
+<code>git show d6be1400929e61fc145a9e3addf90d9ee7d5880c:backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+(203 lines). Prior-round context: r2/combined.md (2 divergent MED, both
+<code>accepted — patched</code>) + r1/combined.md + my own r2/CLAUDE.md
+(proceed, no new findings).</li>
+<li><strong>Returned:</strong> Verdict <code>proceed</code>, zero
+findings. Both r2 dispositions verified observable in the d6be140
+artifact: (a) codex F1 frontmatter sync — line 12 now records the
+curl-stderr-redirect requirement, line 13 names all three AC3 cases with
+<code>coord-emit.sh: daemon rejected tick_start</code> +
+<code>requires correlation_id</code> + <code>pickClosedPort()</code>
+literals; (b) codex-ops F1 curl-stderr-suppression — AC1 line 74 carries
+the new <code>2&gt;/dev/null</code> bullet, AC3 test (ii) (lines
+122-123) and Tests case 2 (lines 169-171) pin
+<code>r.stderr.toString() === ''</code>, Out of Scope #7 (line 142)
+locks the contract end-to-end including curl’s native
+<code>(7) Connection refused</code> lines.</li>
+<li><strong>Sources:</strong> Spec at <code>d6be140</code> (R3
+artifact_sha); r3 request frontmatter at <code>061f9f5</code>;
+r2/combined.md at r2/combined.md; r1/combined.md at r1/combined.md; my
+own r2/CLAUDE.md (in-thread); diff
+<code>git diff 033867c..d6be140 -- backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+for r2-patches change-set verification. No file-side capture surfaces
+involved.</li>
+<li><strong>Verdict:</strong> ✅ right — r2 patches were the right shape
+(tightening, not adding mechanism): codex F1 was pure docs-frontmatter
+alignment, codex-ops F1 was suppression (redirect curl’s native stderr
+to /dev/null — making the wrapper do LESS). Neither drifted into
+<code>coord_status</code> rejection counters or an opt-in verbose env
+flag; both temptations are affirmatively forbidden in Out of Scope
+#7+#9. The “spec is no longer a choose-your-own-adventure” property held
+through r2 patches. Architectural invariant (exit-0-unconditional)
+preserved bit-exact in AC1 + Out of Scope #1 + Definition of Done.</li>
+<li><strong>Note:</strong> <strong>r3 is the convergence-verification
+round, and from claude’s conceptual lens it converges.</strong> The
+shape now matches the disposition-discipline pattern from
+<code>skills/review-queue-watch.md</code>: “prefer removal/locking over
+deeper patching when findings target a recent-round patch.” r2’s MED
+findings both targeted r1’s locked dispositions (frontmatter summary
+drift; curl-stderr leak through the AC1 unreachable branch), and r2’s
+patches closed them by tightening rather than expanding. Spec growth
+90→203 lines across r1+r2 is concentrated in Out-of-Scope items (5→11) +
+explicit Tests section + the <code>pickClosedPort()</code> helper — the
+AC2 diff-stat gate keeps the <em>build</em> narrow even as the
+<em>spec</em> grows. The strategist-drift “diff grows each round”
+failure mode is NOT present here; verbosity is in the dispositions, not
+the mechanism. If codex r3 + codex-ops r3 also land <code>proceed</code>
+(zero findings), watch should call convergence and the spec is
+claim-ready.</li>
 </ul>
 </body>
 </html>
