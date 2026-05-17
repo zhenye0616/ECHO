@@ -2268,6 +2268,11 @@ href="#pdt-codex-r7-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
 id="toc-pdt-codex-r7-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 15:20 PDT — Codex r7 review tick on 060
 hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r7-terminal-tick-on-060-converged"
+id="toc-pdt-claude-strategist-watcher-r7-terminal-tick-on-060-converged">2026-05-17
+15:22 PDT — Claude strategist watcher r7 terminal tick on 060 —
+CONVERGED</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -26526,6 +26531,92 @@ check showed the request correlation matched the env, so I restarted the
 validation path correctly and completed the review. The actual response
 commit is valid; the extra coord atom is noise from the reviewer runner
 invocation, not queue-state disagreement.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r7-terminal-tick-on-060-converged">2026-05-17
+15:22 PDT — Claude strategist watcher r7 terminal tick on 060 —
+CONVERGED</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked “make sure codex is active”
+mid-poll; checked launchd + ps + ~/Library/Logs and confirmed codex r7
+had just finished writing <code>proceed/[]</code> to r7/codex.md at
+<code>c01df5d</code>.</li>
+<li><strong>Query inputs:</strong> filesystem checks (launchctl list, ps
+aux, log tail); combine.py –no-git; inline disposition of empty
+combined.md with 7-round summary; dispatch-next-round.py with –verdict
+proceed –patches-applied false –class narrow (terminal mode — wrote
+next_round=null marker).</li>
+<li><strong>Returned:</strong> r7/combined.md at <code>fe44845</code>,
+<code>combined_verdict: proceed</code>,
+<code>escalated_to_founder: false</code>, <code>next_round: null</code>.
+Spec at <code>1f5b2cb</code> is claim-ready by any builder binding.</li>
+<li><strong>Sources:</strong> all 7 rounds’ artifacts on origin/main;
+codex r7 launchd log confirmed codex was running and emitted
+<code>tick_end</code> cleanly. Verified active codex processes via ps
+(~25% CPU + idle parent processes).</li>
+<li><strong>Verdict:</strong> ✅ CONVERGED. 7-round cycle, ~70 min
+wall-time, decay 6→3→2→3→3→2→0, 19 findings dispositioned (13 MED + 4
+LOW + 0 HIGH), zero escalations, AC8 founder-activation=1 (the
+roster-narrowing meta-direction at r6/r7 boundary).</li>
+<li><strong>Note:</strong> Six observations from the full cycle.
+<ul>
+<li><strong>(1) “make sure codex is active” was the right founder
+intervention</strong> — it surfaced that codex r7 had ALREADY landed
+proceed/0 between my last poll (15:19) and the founder’s question
+(15:24), and my next scheduled wakeup wouldn’t have fired until 15:24.
+Founder’s “check the active state” intuition caught what the polling
+cadence missed. Useful pattern: when a poll-loop is in flight,
+founder-initiated state-checks can short-circuit a wakeup-cycle
+latency.</li>
+<li><strong>(2) Codex r7 landed proceed/0 — the FIRST zero-finding codex
+round in the cycle.</strong> Decay 6→3→2→3→3→2→0 is the textbook
+asymptotic-to-zero shape; the r4-r5 plateau at 3 was codex’s
+library-type lens fully engaging (Raycast API surface area); the r6 drop
+to 2 + r7 drop to 0 was the AGGRESSIVE SCOPE-TRIM (F1 manifest defer +
+F3 menu split) starving the API-citation surface as predicted in the r5
+watcher tick conjecture. Pre-disposition strategy worked.</li>
+<li><strong>(3) The [codex, claude] roster’s two empirical
+observations</strong> — claude was non-load-bearing across 7 rounds (8
+if counting the dispatch-glitch r7 spawn), and codex was load-bearing in
+6/7 rounds with the post-r6 self-call “ready for builder claim” verified
+at r7. Strong empirical case for: (i) the post-056 claude binding’s
+<code>required:false→true</code> flip is wrong direction; (ii)
+<code>[codex]</code>-only roster is sufficient for narrow-shape specs;
+(iii) claude binding’s value-add is conceptual review of
+structural-shape SPECS, not narrow-shape ones.</li>
+<li><strong>(4) Dispatch-layer gap discovered.</strong>
+<code>dispatch-next-round.py</code> defaults to the prior-round roster
+from request.md, not the spec frontmatter’s updated
+<code>requested_reviewers</code>. Founder’s roster-narrowing edit at
+r6→r7 was effectively silently ignored by the script. Backlog candidate
+post-conv: tighten the dispatch script to source roster from spec
+frontmatter OR require explicit –reviewers flag.</li>
+<li><strong>(5) Strategist-side commit-hygiene blemish.</strong> a5e93c2
+bundled the founder’s separate-purpose 061 spec work
+(<code>backlog/ready/2026-05-17-061-doc-leanout.md</code>) into the same
+commit as my 060 r5 patches. Working tree staging captured both because
+<code>git add backlog/...</code> was too broad. Founder can squash later
+if needed. Lesson: at commit time, explicitly add file paths, not
+directory paths.</li>
+<li><strong>(6) 17 cumulative findings on a “narrow” spec is HIGH for
+the genre.</strong> Historical narrow-spec cycles (042/045) ran 3 rounds
+at ~10 findings cumulative. 060’s 7 rounds / 19 findings is 2× the
+cumulative cost. The genre-driver is
+spec-with-external-library-citations: codex’s deeper-tracing through
+<code>@raycast/api</code> + <code>@raycast/utils</code> types + Raycast
+docs found pre-existing-spec issues each round that conceptual review
+couldn’t catch. Backlog candidate post-conv: spec-self-review checklist
+item — “if spec cites external library symbols, grep those symbols
+against the library’s actual exports BEFORE r1 dispatch.”</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) 060 is now
+claim-ready. Next: founder triggers builder binding (Cursor’s Claude
+recommended per memory
+<code>feedback_delegate_cursor_work_to_cursor</code>, OR Codex via
+<code>/process-backlog</code>, OR Claude Code). Once 060 ships and v0
+dogfooding gate (AC8) fires, the V1 hotkey-overlay backlog item gets
+specced from the dogfooding journal entries — that’s the closed loop the
+spec was designed for.</li>
 </ul>
 </body>
 </html>
