@@ -2149,6 +2149,11 @@ href="#pdt-claude-rehydrate-followup-check-the-most-recent-interactions-correcti
 id="toc-pdt-claude-rehydrate-followup-check-the-most-recent-interactions-correction-to-1342-entry">2026-05-17
 13:48 PDT — Claude rehydrate-followup “check the most recent
 interactions” (correction to 13:42 entry)</a></li>
+<li><a
+href="#pdt-claude-strategist-initiates-060-r1-review-cycle-codex-claude"
+id="toc-pdt-claude-strategist-initiates-060-r1-review-cycle-codex-claude">2026-05-17
+14:08 PDT — Claude strategist initiates 060 r1 review cycle [codex,
+claude]</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24629,6 +24634,95 @@ time the founder /clears mid-thread. Backlog candidate: a dedicated
 <code>exclude_session_id=self</code> and returns the {source,
 last_N_turns} envelope of the second-newest matching session. Skip the
 two-step (resolve → exact-source search) entirely.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-initiates-060-r1-review-cycle-codex-claude">2026-05-17
+14:08 PDT — Claude strategist initiates 060 r1 review cycle [codex,
+claude]</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder direction “use a claude reviewer
+and one codex reviewer until the spec converge, check on the progress
+every 4.5 mins” right after the V0 hotkey-overlay spec landed in
+<code>backlog/ready/</code>. Roster updated from the as-specced
+<code>[codex, codex-ops]</code> to founder’s directive
+<code>[codex, claude]</code>.</li>
+<li><strong>Query inputs:</strong> Two MCP calls, both
+<code>coord_invoke</code> via direct JSON-RPC POST to
+<code>http://127.0.0.1:38478/mcp</code> (the canonical recipe lifted
+verbatim from <code>skills/review-queue-watch.md:155-208</code>):
+<ul>
+<li><code>coord_invoke(role="codex", request_path=".../r1/request.md", correlation_id="00b6e82d-1a2a-4771-86ef-f5109c73cf17")</code>
+with <code>X-Echo-Role: claude</code>.</li>
+<li><code>coord_invoke(role="claude", request_path=".../r1/request.md", correlation_id="00b6e82d-1a2a-4771-86ef-f5109c73cf17")</code>
+with <code>X-Echo-Role: claude</code>.</li>
+</ul></li>
+<li><strong>Returned:</strong>
+<ul>
+<li>codex →
+<code>reviewer_invoked_id=4f06850d-ff0e-4655-aa6f-14e48b692578</code>,
+<code>wrapper_path=tools/review-queue/run-codex-reviewer.sh</code> —
+daemon spawned the codex wrapper.</li>
+<li>claude →
+<code>reviewer_invoked_id=8a61bf86-bab6-4e4b-9b08-d1ffff9cda06</code>,
+<code>wrapper_path=tools/review-queue/run-claude-reviewer.sh</code> —
+daemon spawned the claude wrapper.</li>
+<li>Both calls returned full structuredContent within ~200ms each; HTTP
+200; no rejection / no retry.</li>
+</ul></li>
+<li><strong>Sources:</strong> New artifacts on <code>origin/main</code>:
+<ul>
+<li><code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>e26d2ccb42647d019a40b2f7b4c573fdb40d5fec</code> (spec + roster
+edit).</li>
+<li><code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r1/request.md</code>
+at <code>e7acd5e165b4fb108572bcfa2a435e7961150a2a</code> (request
+artifact; <code>correlation_id=00b6e82d-...</code>,
+<code>class=narrow</code>,
+<code>requested_reviewers=[codex, claude]</code>).</li>
+<li>Coord substrate state: daemon’s deadline tracker now has two open
+<code>reviewer_invoked</code> deadlines for the same correlation_id (one
+per role), each expecting a <code>tick_start</code> within 90s and
+<code>tick_end</code> within 600s default.</li>
+</ul></li>
+<li><strong>Verdict:</strong> ✅ right — both wrappers spawned cleanly,
+daemon ack’d both with structuredContent (the load-bearing 057a/b
+contract), no silent-rejection (the 059 failure-class). claude reviewer
+is firing through <code>coord_invoke</code> only (no launchd plist
+installed for claude — verified
+<code>ls ~/Library/LaunchAgents/ | grep claude</code> returns empty), so
+this cycle is also a live empirical test of the post-056 claude-binding
+active-trigger path.</li>
+<li><strong>Note:</strong> First 060 cycle. Three observations to track
+this round:
+<ul>
+<li><strong>(1)</strong> Claude reviewer has no launchd-fallback wrapper
+installed yet on this machine. If the daemon-spawned
+<code>run-claude-reviewer.sh</code> fails or times out, no redundant
+path picks it up — single_reviewer_timeout would fire and the watcher
+would escalate. Worth watching whether claude responds within its 600s
+<code>tick_start.max_deadline_sec</code>.</li>
+<li><strong>(2)</strong> Founder’s 4.5-min (270s) polling cadence is the
+strategist watcher cadence; reviewer-response deadlines (300s for
+<code>reviewer_invoked.max</code>, 1200s for
+<code>tick_start.max</code>) are coarser. Expected timing: first poll at
++270s likely finds both responses NOT YET present; second poll at +540s
+likely finds at least codex (typical 60-180s wall-time); third poll at
++810s should find both.</li>
+<li><strong>(3)</strong> Spec is “narrow” (small surface area, no new
+MCP tools, no new daemon code). Expected r1 finding density: low. If r1
+lands <code>[proceed, proceed]</code> with ≤2 findings total,
+convergence in 1-2 rounds is plausible (matches 042’s 3-round / 50min
+shape). If r1 lands ≥5 findings or has divergent verdicts, the cycle
+extends.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) The single-codex +
+single-claude pairing is novel — until now claude reviewer has only
+ridden alongside an established codex pair (059’s r1-r5 cycle). This is
+the first time claude is one of TWO reviewers without codex-ops as
+ballast. If claude diverges from codex on a load-bearing finding, the
+{proceed*, pushback} boundary is more likely to escalate to founder (no
+third-reviewer tiebreaker). Worth watching as a binding-discipline test
+in addition to the 060 spec review itself.</li>
 </ul>
 </body>
 </html>
