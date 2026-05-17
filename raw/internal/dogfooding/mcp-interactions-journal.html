@@ -2040,6 +2040,11 @@ implementation</a></li>
 id="toc-pdt-founder-driven-live-test-of-coord-layer-057a-057b">2026-05-16
 16:14 PDT — founder-driven live test of coord layer (057a +
 057b)</a></li>
+<li><a
+href="#pdt---codex-ops-r1-on-059-coord-emit-rejection-observability-spec"
+id="toc-pdt---codex-ops-r1-on-059-coord-emit-rejection-observability-spec">2026-05-17
+00:47 PDT - Codex-ops R1 on 059 coord-emit rejection observability
+spec</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23292,6 +23297,56 @@ the daemon-down case. The signal would be advisory (still exit 0, still
 preserve queue durability), and would have caught my own tier-key
 mistake at the first call instead of forcing a direct-curl reproduction.
 Backlog material, not inline.</li>
+</ul>
+<h3
+id="pdt---codex-ops-r1-on-059-coord-emit-rejection-observability-spec">2026-05-17
+00:47 PDT - Codex-ops R1 on 059 coord-emit rejection observability
+spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one <code>codex-ops</code> review
+queue tick (<code>MY_REVIEWER=codex-ops</code>); first pending codex-ops
+response was
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex-ops</code> with no <code>codex-ops.md</code> and
+no <code>combined.md</code>; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=c4a5ccea-5964-4ab6-96ef-3dd3fdf51131</code>;
+read the R1 request, reviewer schema, pinned spec artifact
+<code>backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+at <code>b36af1276b9387c8962579940dbb72a2fc69d12b</code>, and the
+relevant coord wrapper/test/validator context at that SHA.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, and pushed
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/codex-ops.md</code>
+as <code>ba42161</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM unresolved daemon-unreachable stderr contract; MEDIUM
+AC1 HTTP 4xx/5xx observability branch lacks a runtime test.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>b36af1276b9387c8962579940dbb72a2fc69d12b</code>; request path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/codex-ops.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; inspected context
+paths <code>tools/review-queue/coord-emit.sh</code>,
+<code>tests/coord/coord-emit-wrapper-transport.test.ts</code>,
+<code>src/coord/validate.ts</code>,
+<code>src/mcp/tools/coord-emit.ts</code>, and
+<code>src/mcp/server.ts</code>.</li>
+<li><strong>Verdict:</strong> right - one codex-ops review was written
+for the requested 059 R1 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The spec targets the exact friction captured
+in the 2026-05-16 16:14 PDT live coord test. The operational review asks
+the next round to make daemon-down stderr behavior deterministic and to
+test the reachable-but-wrong-service HTTP branch, because those are the
+failure modes operators see unattended in launchd logs.</li>
 </ul>
 </body>
 </html>
