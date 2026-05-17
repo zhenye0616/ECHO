@@ -2201,6 +2201,11 @@ patches + r4 dispatch (decay 6→3→2)</a></li>
 <li><a href="#pdt-claude-r4-review-tick-review-queue-claude"
 id="toc-pdt-claude-r4-review-tick-review-queue-claude">2026-05-17 14:46
 PDT — claude r4 review tick (review-queue-claude)</a></li>
+<li><a
+href="#pdt-codex-r4-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-codex-r4-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:50 PDT — Codex r4 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25470,6 +25475,58 @@ some point the dogfooding journal itself (AC8) is a better V1-input
 signal than further round-N spec polishing. The empirical AC8 gate
 exists precisely because spec-polishing has bounded value once the v0 is
 shippable.</li>
+</ul>
+<h3
+id="pdt-codex-r4-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:50 PDT — Codex r4 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> Active-trigger Codex-side review queue
+tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/request.md</code>,
+correlation_id <code>76285b18-f62f-48e1-984f-ce2f4867c4f6</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=76285b18-f62f-48e1-984f-ce2f4867c4f6</code>;
+bind-validated the pinned request; read the artifact via
+<code>git show 37751e3ba2c3eacaf756d08fb4a5f8620f0be821:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+checked <code>tools/review-queue/schemas/reviewer.schema.json</code>,
+<code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/{find-clusters,search-memories,get-atom,get-atoms}.ts</code>,
+<code>src/mcp/util/source-app.ts</code>,
+<code>src/trace/{index,cluster}.ts</code>,
+<code>tools/serve-trace.ts</code>, <code>.gitignore</code>, current
+Raycast docs, and current <code>@raycast/api</code> /
+<code>@raycast/utils</code> package types.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/codex.md</code>;
+upstream duplicate check passed;
+<code>commit-reviewer-response.sh</code> revalidated, committed,
+rebased, and pushed as <code>cbe2203</code>; verdict
+<code>proceed_after_patches</code>, findings: 2 medium + 1 low.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/request.md</code>;
+artifact path
+<code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>37751e3</code>; committed response path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r4/codex.md</code>;
+Raycast Clipboard/Toast/Actions/Manifest docs;
+<code>@raycast/api@1.104.17</code> and <code>@raycast/utils@2.2.4</code>
+type surfaces.</li>
+<li><strong>Verdict:</strong> ✅ right — the tick produced exactly one
+Codex response at the pinned request SHA with atomic write, pre-link
+validation, upstream duplicate guard, helper-side validation, and retry
+push. The nonzero finding set means r4 did not converge from the Codex
+implementability lens.</li>
+<li><strong>Note:</strong> Two r4 catches are current-Raycast-API
+literal issues that AC5 would turn into build failures or builder churn:
+<code>Clipboard.paste()</code> requires content, and the toast enum is
+<code>Toast.Style.Failure</code>, not bare <code>Style.Failure</code>.
+The third catch is dependency-surface hygiene: the spec’s only stated
+reason for <code>@raycast/utils</code> is a debounced-value-style hook,
+but the current package exports no such hook, so the 200ms debounce
+should be implemented locally or the dependency note should name a real
+API.</li>
 </ul>
 </body>
 </html>
