@@ -2050,6 +2050,11 @@ href="#pdt-claude-reviewer-tick-on-059-r1-coord-emit-silent-rejection-observabil
 id="toc-pdt-claude-reviewer-tick-on-059-r1-coord-emit-silent-rejection-observability">2026-05-17
 00:50 PDT — claude reviewer tick on 059 R1 (coord-emit silent-rejection
 observability)</a></li>
+<li><a
+href="#pdt-strategist-watcher-r1-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection"
+id="toc-pdt-strategist-watcher-r1-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+00:53 PDT — Strategist watcher r1 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23412,6 +23417,80 @@ second instance lands. My findings are reviewer-disposition closures
 the parallel-wrapper-edit door before a builder is tempted to also fix
 <code>coord_invoke</code> mid-commit. No overlap with codex; both rounds
 converge on <code>proceed_after_patches</code>.</li>
+</ul>
+<h3
+id="pdt-strategist-watcher-r1-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+00:53 PDT — Strategist watcher r1 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</h3>
+<ul>
+<li><strong>Trigger:</strong> All three R1 reviewer responses landed for
+059 (codex@d674b1f / codex-ops@ba42161 / claude@476ef3d, combined at
+1b52884). Founder requested “start the review loop on full auto until
+convergence.” Strategist invoked <code>/review-queue-watch</code> skill
+manually for r1 disposition.</li>
+<li><strong>Query inputs:</strong>
+<ul>
+<li>3 × <code>coord_invoke</code> (via curl POST to
+<code>127.0.0.1:38478/mcp</code> with <code>X-Echo-Role: claude</code>)
+for r2 reviewers (codex, codex-ops, claude), each with
+<code>correlation_id=06297318-1195-4ad4-bc3d-6fd64d664136</code> (r2’s
+request frontmatter) and
+<code>request_path=backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>.
+This is the AC7 active-trigger path per 057b — first observed firing on
+a 3-reviewer round.</li>
+<li>No <code>coord_emit</code>, no <code>search_memories</code>, no
+<code>wait_for_new_turns</code> during this tick.</li>
+</ul></li>
+<li><strong>Returned:</strong> 3 × 200 OK from
+<code>coord_invoke</code>, each with a fresh
+<code>reviewer_invoked_id</code> UUID and a <code>wrapper_path</code>
+pointing back at
+<code>/Users/zhenye/Desktop/Project_echo/tools/review-queue/run-&lt;role&gt;-reviewer.sh</code>.
+All three wrappers spawned in-process (the active-trigger
+latency-optimized path); launchd remains as the redundant 10-min
+cadence.</li>
+<li><strong>Sources:</strong> Spec at <code>b36af127</code> (R1
+artifact_sha) → patched to
+<code>033867c910afcdbc1f9e42822b6a5fdccefef215</code> via
+spec-r1-patches commit; r2 request path on <code>origin/main</code> at
+HEAD <code>5a82fa9</code>; combined.md disposition table at
+<code>r1/combined.md</code>. No file-side capture surfaces
+(Cursor/Claude Code/Codex/git) involved — pure coord-layer write
+path.</li>
+<li><strong>Verdict:</strong> ✅ right — combine.py wrote
+<code>proceed_after_patches</code> /
+<code>escalated_to_founder: false</code> correctly; all 7 findings
+accepted-and-patched (1 MED <code>## Tests</code> section + 1 LOW
+port-1→pickClosedPort + 1 MED+1 LOW lock-unreachable-to-silent + 1 MED
+add-HTTP-non-2xx-test + 1 LOW truncation-not-body-dump + 1 LOW
+OoS-#11-no-pattern-generalization); 5 of 7 patches were spec-tightening
+(closing reviewer-disposition open questions in AC1/R1) — the kind of
+pre-build hygiene that 057-era cross-tool-spec-review proved
+load-bearing. Spec grew 83+/16- (202 lines total); all three reviewers
+fired coord_invoke cleanly.</li>
+<li><strong>Note:</strong> Three notable observations. (a) <strong>First
+three-reviewer round</strong> since 056 shipped claude with
+<code>required:false</code>; the watcher’s combine.py treated claude as
+a peer reviewer (its findings show as 3 LOW rows in the divergent table)
+rather than triggering single-reviewer-timeout, suggesting
+<code>required:false</code> doesn’t change combine roll-up semantics,
+only the watcher’s tolerance for absence. (b) <strong>Cross-reviewer
+convergence on the locked-unreachable-branch finding</strong> —
+codex-ops MED at line 75 and claude LOW at line 75 made the same
+recommendation independently (silent, no env-flag, no third state).
+Two-reviewer convergence on a previously-deferred design question is a
+strong signal to lock; single-reviewer would be weaker. (c)
+<strong>Claude reviewer’s lens differentiation</strong> — Out of Scope
+#11 (no parse-isError auto-generalization to other <code>|| true</code>
+wrappers) is exactly the “strategist drift via patching deeper”
+failure-class CLAUDE.md names. Claude caught the symmetric door
+(parallel-wrapper edits) that AC2’s caller-prose gate doesn’t cover.
+Empirically this is the kind of finding the conceptual/architectural
+reviewer lens is supposed to produce, vs codex’s spec-shape
+(<code>## Tests</code> section) + portability (port-1) findings and
+codex-ops’s runtime-path (HTTP non-2xx fixture) finding. Three
+reviewers, three distinct lenses, all non-overlapping
+<code>where:</code> lines — best-case decomposition.</li>
 </ul>
 </body>
 </html>
