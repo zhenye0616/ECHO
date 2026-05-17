@@ -2263,6 +2263,11 @@ href="#pdt-claude-strategist-watcher-r7-tick-on-060-claude-landed-but-irrelevant
 id="toc-pdt-claude-strategist-watcher-r7-tick-on-060-claude-landed-but-irrelevant-codex-pending">2026-05-17
 15:19 PDT — Claude strategist watcher r7 tick on 060 (claude landed but
 irrelevant; codex pending)</a></li>
+<li><a
+href="#pdt-codex-r7-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-codex-r7-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+15:20 PDT — Codex r7 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -26473,6 +26478,54 @@ response will drive the disposition.</li>
 proceed/0, 7-round convergence (codex’s own r6 self-call “ready for
 builder claim” verified). If codex finds ≥1 MED → escalate per
 (a)/(b)/(c).</li>
+</ul>
+<h3
+id="pdt-codex-r7-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+15:20 PDT — Codex r7 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> Codex-side review queue tick for
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/request.md</code>,
+pinned-request mode with correlation_id
+<code>e579add9-676d-41bd-a36e-78452baea3a2</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>; read
+<code>request.md</code>; emitted <code>coord-emit.sh tick_start</code>;
+read the artifact via
+<code>git show 1f5b2cb330603f2199489a179aaeb9bacd231b0b:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>;
+checked <code>src/mcp/server.ts</code>,
+<code>src/mcp/tools/{find-clusters,search-memories,get-atom,get-atoms}.ts</code>,
+<code>src/mcp/util/source-app.ts</code>,
+<code>tools/serve-trace.ts</code>, and current Raycast docs through
+Context7 for List filtering, Clipboard/Paste, Toast, manifest, and CLI
+assumptions.</li>
+<li><strong>Returned shape:</strong> Wrote and pre-link validated
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/codex.md</code>;
+upstream duplicate check passed;
+<code>commit-reviewer-response.sh</code> revalidated, committed,
+rebased, and pushed as <code>c01df5d</code>; verdict
+<code>proceed</code>, findings <code>[]</code>.</li>
+<li><strong>Sources:</strong> Request path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/request.md</code>;
+artifact path
+<code>backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+at <code>1f5b2cb</code>; committed response path
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r7/codex.md</code>;
+code anchors listed above. No retrieval calls to ECHO content tools;
+coord emissions only.</li>
+<li><strong>Verdict:</strong> ✅ right — Codex’s r6 self-call (“after
+those edits, ready for builder claim”) verified. The r6 patches landed
+in the implementable shape: <code>Cmd-C</code> now copies the accessible
+<code>get_atom</code> response rather than promising raw storage JSON,
+and the formatter contract is mandatory in <code>files_to_modify</code>,
+AC5, and Tests.</li>
+<li><strong>Note:</strong> One operational wrinkle: my first pinned
+bind-validation shell had a quoting bug and emitted a spurious
+<code>tick_end</code> with
+<code>bind_failed: correlation_id_mismatch</code>; a direct frontmatter
+check showed the request correlation matched the env, so I restarted the
+validation path correctly and completed the review. The actual response
+commit is valid; the extra coord atom is noise from the reviewer runner
+invocation, not queue-state disagreement.</li>
 </ul>
 </body>
 </html>
