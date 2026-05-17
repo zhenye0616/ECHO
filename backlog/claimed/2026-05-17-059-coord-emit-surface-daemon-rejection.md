@@ -22,10 +22,10 @@ spec_refs:
   - tools/review-queue/_run_reviewer.sh  # caller — scheduler-tier `coord-emit.sh scheduler_health[_done] --tick-run-id=…`; the launchd-tick path that motivated the entire coord layer's existence (058a/058b were specced because this path failed silently); the silent-rejection mode here would re-introduce a similar opacity at a tier boundary
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-17T00:40:00Z"
+branch: "agent/coord-emit-surface-daemon-rejection"
+worktree: "~/Desktop/Project_echo--coord-emit-surface-daemon-rejection"
 head_sha: ""
 pr_url: ""
 review_notes: ""
