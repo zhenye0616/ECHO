@@ -2154,6 +2154,11 @@ href="#pdt-claude-strategist-initiates-060-r1-review-cycle-codex-claude"
 id="toc-pdt-claude-strategist-initiates-060-r1-review-cycle-codex-claude">2026-05-17
 14:08 PDT — Claude strategist initiates 060 r1 review cycle [codex,
 claude]</a></li>
+<li><a
+href="#pdt-claude-r1-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
+id="toc-pdt-claude-r1-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:10 PDT — claude r1 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24723,6 +24728,63 @@ ballast. If claude diverges from codex on a load-bearing finding, the
 {proceed*, pushback} boundary is more likely to escalate to founder (no
 third-reviewer tiebreaker). Worth watching as a binding-discipline test
 in addition to the 060 spec review itself.</li>
+</ul>
+<h3
+id="pdt-claude-r1-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
+14:10 PDT — claude r1 review tick on 060
+hotkey-overlay-v0-raycast-dogfood</h3>
+<ul>
+<li><strong>Trigger:</strong> pinned-mode launchd/coord-dispatched
+reviewer tick
+(<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r1/request.md</code>,
+correlation_id <code>00b6e82d-1a2a-4771-86ef-f5109c73cf17</code>); spec
+was committed at <code>e26d2cc</code> (15 min prior per
+<code>git log</code>); roster <code>[codex, claude]</code>.</li>
+<li><strong>Query inputs:</strong> none (review tick — no MCP tool calls
+this turn; pure read of the artifact at
+<code>git show e26d2cc:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>)</li>
+<li><strong>Returned:</strong> verdict <code>proceed</code> with 2
+<code>low</code> advisory findings (F1: <code>tools/</code> taxonomy
+clarification one-liner; F2: AC4 README “active repo” 7th-field
+convention to disambiguate cross-repo dogfooding signal). Committed
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r1/claude.md</code>
+at SHA <code>1c3565a</code>.</li>
+<li><strong>Sources:</strong> artifact-at-SHA (the spec body itself, 204
+lines), <code>wiki/surfaces/hotkey-overlay.md</code> (V1 surface this v0
+informs — <code>status: planned</code>),
+<code>wiki/product/v1-spec.md</code> (V1 scope lock — referenced in
+spec_refs),
+<code>wiki/principles/{drift-prevention, felt-not-seen, compose-not-capture, clipboard-and-launch}</code>
+(cited inline in the review),
+<code>tools/review-queue/schemas/reviewer.schema.json</code> (verdict
+enum + frontmatter shape), <code>backlog/ready/</code> and
+<code>backlog/complete/</code> listings (cross-item coherence check —
+clean, no related items). No ECHO MCP tool calls this turn.</li>
+<li><strong>Verdict:</strong> ✅ right — the spec reads as a deliberate
+anti-drift exemplar (14-item OoS list, explicit V1 deferral in AC7, no
+new MCP tools, no synthesis, honest principle-tradeoff disclosure on
+<code>felt-not-seen</code>). The two findings are advisory, not
+blocking.</li>
+<li><strong>Note:</strong> Two observations about the review experience
+itself: (a) Reviewing a spec whose entire point is “defer V1 design
+until empirical signal arrives” required a different mental posture than
+reviewing a substrate-change spec — the question shifted from “is this
+technically correct?” to “is this honestly deferred or quietly
+drifting?” The discipline check became “do the OoS items match the
+high-temptation drift adjacencies?” — they did. (b) The conceptual lens
+noticed the <code>tools/</code> directory placement as borderline
+taxonomy; codex’s implementability lens may not surface that. Worth
+watching whether the watcher union-find collapses or distinguishes the
+two reviewer voices on items like this where one finding type is
+conceptual-only.</li>
+<li><strong>Conjecture:</strong> (observation only) For “v0 dogfooding
+to inform V1” specs going forward, the claude lens may find itself doing
+more “is the OoS list comprehensive?” checking and less “does this
+contradict a principle?” checking — because the v0/V1 sequencing pattern
+internalizes principle-honoring in the deferral structure itself. If
+this pattern recurs (audit-page v0, browser-extension v0), there may be
+a meta-finding worth surfacing about how the strategist should template
+v0 specs to encode the deferral discipline consistently.</li>
 </ul>
 </body>
 </html>
