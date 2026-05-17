@@ -1,7 +1,7 @@
 ---
 id: 2026-05-17-060-hotkey-overlay-v0-raycast-dogfood
 title: V0 hotkey overlay — Raycast extension for founder dogfooding (V1 spec deferred until v0 surfaces friction)
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-17
@@ -33,10 +33,11 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-17T22:40:23Z"
 branch: "agent/hotkey-overlay-v0-raycast-dogfood"
 worktree: ""
-head_sha: ""
+head_sha: "0857e346064ff7090cd642d7ad0520e9ed43cb61"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Built the v0 Raycast extension at `tools/raycast-echo/` on branch `agent/hotkey-overlay-v0-raycast-dogfood`. The extension declares the required Raycast manifest and dependencies, uses a thin fetch-based MCP JSON-RPC client against `http://127.0.0.1:38478/mcp` with the required `Accept: application/json, text/event-stream` header, renders the two-state List with `filtering={false}`, hydrates details through `get_atom`/`get_atoms`, and implements the required copy/paste/source/trace/raw-JSON actions by row type. The formatter mirrors the daemon source-app prefix map in reverse and is covered by the required 5 pure-Node Vitest assertions. Verification passed: `npm test`, `npm run typecheck`, and `npx ray build`. Notes for reviewers: `@modelcontextprotocol/sdk` is declared per AC1, but the implementation uses the spec's R1 fetch fallback to avoid Raycast bundler transport risk; the task-state ref directory did not exist, so the final builder-state refresh was a no-op.
 ---
 
 # V0 hotkey overlay — Raycast extension for founder dogfooding
