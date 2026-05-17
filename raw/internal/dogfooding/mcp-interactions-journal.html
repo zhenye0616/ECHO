@@ -2211,6 +2211,9 @@ href="#pdt-claude-strategist-watcher-r4-tick-on-060-combined-r4-patches-r5-dispa
 id="toc-pdt-claude-strategist-watcher-r4-tick-on-060-combined-r4-patches-r5-dispatch-decay-6323">2026-05-17
 14:53 PDT — Claude strategist watcher r4 tick on 060 — combined + r4
 patches + r5 dispatch (decay 6→3→2→3)</a></li>
+<li><a href="#pdt-claude-r5-review-tick-review-queue-claude"
+id="toc-pdt-claude-r5-review-tick-review-queue-claude">2026-05-17 14:55
+PDT — claude r5 review tick (review-queue-claude)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25638,6 +25641,104 @@ candidate post-conv: spec-self-review checklist item “if spec cites
 external library symbols, strategist greps those symbols against the
 library’s actual exports BEFORE r1 dispatch” — would have caught
 F1+F2+F3 before any review round.</li>
+</ul>
+<h3 id="pdt-claude-r5-review-tick-review-queue-claude">2026-05-17 14:55
+PDT — claude r5 review tick (review-queue-claude)</h3>
+<ul>
+<li><strong>Trigger:</strong> 060 r5 dispatched downstream after
+strategist applied 2 MED + 1 LOW r4 codex dispositions; pinned-request
+mode via <code>coord_invoke</code>,
+<code>ECHO_COORD_CORRELATION_ID=dd5eaf66-3889-42b7-b913-930f650dc8c2</code>,
+<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/request.md</code>.</li>
+<li><strong>Query inputs:</strong>
+spec_commit_sha=<code>21e2012cde1a0d193f8f58f375a1843725e25730</code>
+(artifact); diff base for delta-focused review = the r4-patches commit
+<code>21e2012</code> (only spec file changed: 3 hunks at lines
+69/117/131); lens=conceptual/architectural/scope-drift on r4 Raycast API
+correctness patches.</li>
+<li><strong>Returned:</strong> <code>verdict: proceed</code>,
+<code>findings: []</code> (zero). Response committed at
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r5/claude.md</code>
+(~210 lines); commit <code>3d2f9b9</code> on origin/main (rebased
+through 3 parallel journal/dispatch commits without conflict).</li>
+<li><strong>Sources:</strong> spec at
+<code>21e2012:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+(via <code>git show</code>); r4 codex.md, r4 claude.md, r4 combined.md
+(commit-context inputs only); commit message at <code>21e2012</code> for
+the strategist’s own r4-patch rationale + r5 dispatch framing (“no
+4th-API-typo-bomb”);
+<code>git show 21e2012 -- backlog/ready/2026-05-17-060-...md</code> for
+delta diff (3 hunks at lines 69/117/131). No MCP tool calls inside the
+review itself (fresh-eyes-at-SHA: spec + request only).</li>
+<li><strong>Verdict:</strong> ✅ right — all 3 r4 codex patches verified
+landed verbatim at lines 69, 117, 131. F2 disposition is a clean second
+application of “prefer removal over deeper patching” (after r3 F1’s
+removal of <code>prefer:newest_first</code>) — strategist deleted
+<code>@raycast/utils</code> dep entry rather than naming a replacement
+debounce package. F1 is surgical argument addition + builder-latitude
+clause naming <code>Action.Paste</code> as equivalent. F3 is one-word
+literal correction. Spec is <em>smaller</em> after r4 (one fewer runtime
+dep); annotations preserve cross-round traceability.</li>
+<li><strong>Note:</strong> (observations only — backlog inputs, not fix
+designs)
+<ul>
+<li><strong>(1) Two-round-running disposition discipline REMOVAL
+pattern.</strong> r3 F1 = removed <code>prefer:newest_first</code>; r4
+F2 = removed <code>@raycast/utils</code> dep. Both are textbook
+applications of the <code>skills/review-queue-watch.md</code> “prefer
+removal over deeper patching” rule, both happened on the same item, both
+were correctly named by the strategist in commit messages. If this
+pattern holds across 2+ more items (i.e., implementability-lens findings
+keep producing REMOVAL dispositions rather than ADDITIONS), worth
+surfacing as a strategist-pre-flight check: “Before patching, ask: can
+the cited mechanism be removed entirely?”</li>
+<li><strong>(2) Claude prediction calibration is now formally
+lower-bounded.</strong> Per the r4 strategist journal entry,
+“conceptual-lens prediction is a LOWER bound on codex’s finding count,
+not an upper bound.” My r5 prediction inside this review is “0 claude
+(this review); codex r5 prediction is bimodal — 0 OR 1 LOW on a
+4th-API-typo-bomb.” Per the lower-bound rule, that means codex r5 will
+produce 0, 1, or more findings. I am consciously not over-claiming
+convergence; the strategist’s pre-disposition for r5 (delete the API
+citations if r5 finds more) is the right hedge.</li>
+<li><strong>(3) The strategist’s pre-disposition at r4 changes the r5
+risk shape.</strong> Combined.md r4 commits in advance to “remove the
+API name citations from the spec body” if r5 lands more API-literal
+findings. This is the disposition-discipline rule pre-deployed at r4 — a
+structural change to how the cycle handles compounding finding surfaces.
+Worth tracking: did this pre-disposition reduce strategist tick latency
+at r5? (Empirical answer needs r5 watcher tick to land first; not
+visible from inside my reviewer tick.)</li>
+<li><strong>(4) AC8 founder-activation count remains zero across all 5
+rounds.</strong> Founder set polling cadence at the start; zero
+substantive dispatch messages thereafter. 039 loop-close gate continues
+to hold at 060 through r5 — the strongest evidence yet that the [codex,
+claude] roster can autonomously run a 5-round spec to convergence
+without founder intervention. Per memory
+<code>project_loop_close_gate.md</code>, this is the empirical close
+definition the gate was specifically designed to confirm.</li>
+<li><strong>(5) The conceptual lens has now produced 0 findings for 4
+consecutive rounds (r2-r5).</strong> This is approaching the
+steady-state shape the r3 journal entry conjectured: “claude becomes the
+disposition-discipline auditor, codex becomes the spec-correctness
+auditor.” 4 rounds of zero-findings is enough data to ask whether the
+conceptual lens should fire LESS frequently on mature rounds (e.g., r3+
+rounds skip claude if the prior round was a clean proceed) — but the
+<em>cost</em> of running claude r3-r5 is low (~5-10 min per tick, no
+founder load) and the <em>signal</em> of “conceptual lens still sees no
+drift” is itself a useful disposition input for the strategist. Probably
+keep firing.</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) If codex r5 also
+lands <code>proceed</code>/0, this is a 5-round convergence at the
+6→3→2→3→0 decay shape and 060 becomes the empirical reference case for
+“spec-with-external-library-citations” review cycles. If codex r5 lands
+≥1 finding, the strategist’s pre-disposed r5 plan (“delete the API
+citations”) collapses the surface in one patch and r6 should be clean.
+Either path is healthy. The deeper lesson — strategist greps cited
+library symbols against actual exports BEFORE r1 dispatch — is the
+natural backlog candidate post-convergence (already named in the r4
+strategist journal entry).</li>
 </ul>
 </body>
 </html>
