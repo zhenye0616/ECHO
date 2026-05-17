@@ -2178,6 +2178,11 @@ href="#pdt-codex-r2-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood"
 id="toc-pdt-codex-r2-review-tick-on-060-hotkey-overlay-v0-raycast-dogfood">2026-05-17
 14:28 PDT — Codex r2 review tick on 060
 hotkey-overlay-v0-raycast-dogfood</a></li>
+<li><a
+href="#pdt-claude-strategist-watcher-r2-tick-on-060-combined-r2-patches-r3-dispatch-not-converged"
+id="toc-pdt-claude-strategist-watcher-r2-tick-on-060-combined-r2-patches-r3-dispatch-not-converged">2026-05-17
+14:32 PDT — Claude strategist watcher r2 tick on 060 — combined + r2
+patches + r3 dispatch (NOT converged)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -25038,6 +25043,89 @@ lacks the transport-required
 <code>Accept: application/json, text/event-stream</code> header, and the
 journal template now has 7-field / 6-field / canonical-schema drift
 exactly where AC8 depends on comparable dogfooding data.</li>
+</ul>
+<h3
+id="pdt-claude-strategist-watcher-r2-tick-on-060-combined-r2-patches-r3-dispatch-not-converged">2026-05-17
+14:32 PDT — Claude strategist watcher r2 tick on 060 — combined + r2
+patches + r3 dispatch (NOT converged)</h3>
+<ul>
+<li><strong>Trigger:</strong> First scheduled wakeup at +270s found
+claude r2 landed proceed/0; mid-turn codex r2 landed with 3 NEW MED
+findings (race: published a stale “codex pending” journal draft, then
+dropped it on remote-tip discovery).</li>
+<li><strong>Query inputs:</strong> combine.py –no-git (envelope:
+<code>proceed_after_patches</code>, escalated:false, 3 divergent codex
+findings, 0 convergent); 3 inline spec patches; dispatch-next-round.py
+with –verdict=proceed_after_patches –patches-applied=true
+–spec-sha=34f29a83; two coord_invoke calls for r3 reviewers.</li>
+<li><strong>Returned:</strong>
+<ul>
+<li>codex r2 findings: F1 (MED) — derivedApp helper path
+<code>tools/raycast-echo/src/lib/source-app.ts</code> not in
+files_to_modify; F2 (MED) — fetch fallback missing required
+<code>Accept: application/json, text/event-stream</code> (same
+constraint as 057b r9 codex F1 HIGH for coord_invoke); F3 (MED) —
+journal-template inconsistency between AC4/AC8/DoD (7-field) and After
+Completion (6-field).</li>
+<li>All 3 dispositioned + patched: F1 REMOVAL (fold derivedApp into
+format.ts, already listed — no new file); F2 ADDITION (one-line Accept
+header to R1 fallback recipe); F3 CONSISTENCY (reconciled all 4
+references at 7-field + explicit cross-tool-template disclaimer).</li>
+<li>r3 codex
+reviewer_invoked_id=<code>54fedce4-730b-4852-88a1-8a48259bfe63</code>;
+r3 claude
+reviewer_invoked_id=<code>f5000b5a-9d5e-41c0-8e10-3e6e0ce19014</code>.
+Both 200 OK.</li>
+</ul></li>
+<li><strong>Sources:</strong> spec at
+<code>34f29a83cf604c0c02d58a54bab655562c77ee37</code> (post-r2 patches).
+r3/request.md at <code>83b7712</code> with new correlation
+<code>b287bfd0-b5e0-411c-93af-f3f347cc52ad</code>.</li>
+<li><strong>Verdict:</strong> ✅ right but cycle longer than r1
+conjectured. R2 was NOT zero-finding — codex caught r1-patch-induced
+surface area (the derivedApp helper’s intended path wasn’t reflected in
+files_to_modify, the fetch fallback recipe was missing the Accept header
+constraint, and one back-reference contradicted the new 7-field
+template). This is precisely the “patches can grow new bugs” failure
+mode 057a/057b r4/r6 dramatized — a successful r1 disposition can
+introduce its OWN inconsistencies on adjacent spec surface area.
+Disposition discipline at r2 held: F1 was REMOVAL (one fewer file), F2
+was minimum-viable addition (one line, cross-referenced), F3 was
+word-level consistency. No “deeper patches” anti-pattern.</li>
+<li><strong>Note:</strong> Three observations on the r2 codex catch.
+<ul>
+<li><strong>(1) F2 was a HIGH-quality structural catch.</strong> The
+Accept-header constraint is the EXACT silent-failure mode that 057b r9
+codex F1 HIGH locked for <code>coord_invoke</code>. The fetch fallback I
+wrote into R1 at the initial spec didn’t carry that constraint. Codex’s
+pattern-matching across past r-cycle findings is now spec-policing
+across the project’s cumulative learning — that’s the real value of the
+implementability lens at r2+ vs the conceptual lens.</li>
+<li><strong>(2) F1 was a builder-loop-ambiguity catch — same shape as F3
+codex r1</strong> (AC6/AC7-vs-DoD). The strategist (me) tends to write
+spec body text that names files the frontmatter doesn’t enumerate, and
+the implementability lens consistently catches it. Backlog candidate
+post-conv: a spec-self-review checklist item that grep’s body-paragraph
+file mentions against <code>files_to_modify</code> enumeration.</li>
+<li><strong>(3) Claude r2 zero-findings + codex r2 three-MED is the
+inverse of the r1 lens-split</strong> (where claude had 2 LOW + codex 4
+MED). Net “claude verifies disposition discipline / codex catches
+new-surface bugs” pattern emerging — that’s a <em>cleaner</em> lens
+split than I’d expect from training-data overlap. If the same shape
+holds at r3 (claude verifies r2 patches landed, codex catches r2-induced
+surface bugs), the cycle decays in rounds rather than asymptotes — the
+conditional convergence target shifts from “2-round” (the r1 conjecture)
+to “3-round” (the historical 040/042/045 shape).</li>
+</ul></li>
+<li><strong>Conjecture:</strong> (observation only) If codex r3 lands
+<code>proceed</code>/zero AND claude r3 also <code>proceed</code>/zero,
+this becomes a 3-round convergence with the cleanest historical decay
+shape (6 → 3 → 0). If codex r3 lands ≥1 new MED on r2-patch surface
+(Accept header recipe wrong shape, helper-folded-into-format.ts breaks
+an unrelated test, 7-field consistency missed a fifth reference), the
+cycle is heading toward 4+ rounds and the patches are themselves
+becoming the bug surface — that’s the strategist-drift signal to
+consider trimming spec text rather than patching deeper at r4.</li>
 </ul>
 </body>
 </html>
