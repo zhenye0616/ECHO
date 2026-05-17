@@ -14,6 +14,7 @@ files_to_modify:
   - tools/raycast-echo/src/lib/mcp.ts  # AC1 — thin MCP client wrapper over the daemon's StreamableHTTPServerTransport at http://127.0.0.1:38478/mcp; uses @modelcontextprotocol/sdk client; one helper per tool call (findClusters, searchMemories, getAtom, getAtoms); no X-Echo-Role header (these tools don't need it)
   - tools/raycast-echo/src/lib/format.ts  # AC2 — markdown bundle formatter: header line `## <source_app> · <PDT timestamp>` then content body; concatenates multi-atom selections with `---` separators
   - tools/raycast-echo/tsconfig.json  # AC1 — TS config matching Raycast's expected shape (target ES2022, strict)
+  - tools/raycast-echo/assets/icon.png  # AC1 (R5 codex F1 — MED) — Raycast manifest requires an icon asset; any 512×512 PNG suffices for v0 (placeholder is fine; v0 is single-user; visual polish is V1 territory)
   - tools/raycast-echo/README.md  # AC4 — install + dogfooding instructions (3 sections: install via `ray develop`, hotkey binding via Raycast preferences, dogfooding-journal expectation per AC8)
   - docs/BACKLOG.md  # add Ready-table row pointing at this item
 spec_refs:
@@ -113,7 +114,7 @@ No new daemon code. The extension imports `@modelcontextprotocol/sdk` and connec
 
 ### AC1 — Extension scaffold installable via `ray develop`
 
-- `tools/raycast-echo/package.json` declares a Raycast extension with `name: "echo-context"`, `title: "ECHO Context"`, one command (`name: "search-context"`, `title: "Search ECHO Context"`, `mode: "view"`).
+- `tools/raycast-echo/package.json` declares a **valid Raycast extension manifest that passes `npx ray build`** — at minimum `name: "echo-context"`, `title: "ECHO Context"`, plus whatever additional fields (`description`, `icon`, `author`, `platforms`, `categories`, per-command `description`, etc.) Raycast's current manifest schema requires for `ray build` to succeed (R5 codex F1 — MED: rather than enumerate every required field here and risk drift against Raycast's evolving schema, the spec defers to `ray build`'s actual gate at AC5; builder consults `https://developers.raycast.com/information/manifest` for the current required-field set and reports the final list in `agent_notes`). One command: `name: "search-context"`, `title: "Search ECHO Context"`, `mode: "view"`.
 - Dependencies: `@raycast/api`, `@modelcontextprotocol/sdk`. No other runtime deps. (R4 codex F2 — MED dropped `@raycast/utils` from the dependency list: `@raycast/utils@2.2.4` exports no `useDebouncedValue` / debounce hook in its public types, so listing it would either force the builder to import a nonexistent symbol or carry an unused runtime dep. Implement the AC2 200ms debounce locally with React `useState` + `useEffect` + `setTimeout` (~10 lines) — standard React idiom, no Raycast-specific helper needed.)
 - `tools/raycast-echo/tsconfig.json` compiles cleanly under `npx ray develop` (Raycast's bundler). Strict TS.
 - `tools/raycast-echo/README.md` documents two steps: (1) `cd tools/raycast-echo && npm install && npx ray develop`, (2) bind a hotkey via Raycast Preferences → Extensions → ECHO Context → Search ECHO Context → Hotkey (suggested: ⌘⇧E).
@@ -122,8 +123,11 @@ No new daemon code. The extension imports `@modelcontextprotocol/sdk` and connec
 
 - Empty input: `find_clusters()` no-args; renders each cluster as a list item with title/subtitle per the table above. Empty result set → list message "no recent context — typing will search the full corpus."
 - Typed input: 200ms debounce, then `search_memories({query, limit:15})`. Empty result → list message "no matches for `<query>`."
+- The List component MUST set `filtering={false}` (R5 codex F2 — MED) so Raycast's built-in client-side filtering does NOT re-filter the already-returned MCP matches against rendered title/subtitle — without this, a match whose query token occurs in `content[121..]` (past the 120-char subtitle truncation) silently disappears from the rendered list, producing a false empty state.
 - Selecting a list item populates the detail pane via `get_atoms` (cluster) or `get_atom` (match) as specified above. Detail body is markdown-rendered.
-- ActionPanel attached to every list item with five actions: ↩ Copy / ⌘↩ Paste / ⌘O Open Source / ⌘B Open in Trace Viewer (opens `http://127.0.0.1:38479/`) / ⌘C Copy Raw JSON, behaviors per the spec body.
+- **ActionPanel — different shape per row type** (R5 codex F3 — MED — atom-specific actions don't have a single atom to operate on for cluster rows):
+  - **Cluster row** → 3 actions: `↩` Copy (bundle of first 3 atoms) / `⌘↩` Paste (same bundle) / `⌘B` Open in Trace Viewer (opens `http://127.0.0.1:38479/`). NO `⌘O` / `⌘C` — those need a single atom.
+  - **Search-match row** → 5 actions: `↩` Copy / `⌘↩` Paste / `⌘O` Open Source (the match's atom's source file) / `⌘B` Open in Trace Viewer / `⌘C` Copy Raw Atom JSON.
 - Format of the copied bundle matches `src/lib/format.ts`: `## <derivedApp(atom.source)> · <PDT timestamp>\n\n<content>` per atom, atoms separated by `\n---\n`. `derivedApp` is the inline helper described in the spec body (R2 codex F1).
 
 ### AC3 — Daemon-unreachable handled gracefully
