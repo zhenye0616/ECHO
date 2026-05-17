@@ -66,7 +66,7 @@ Selecting a list item populates Raycast's detail pane:
 The action menu (Raycast's `ActionPanel`):
 
 - `↩` (primary) → write the assembled markdown bundle to the OS clipboard via Raycast's `Clipboard.copy()`; show toast "ECHO context copied"
-- `⌘↩` → `Clipboard.copy()` then `Clipboard.paste()` (Raycast's paste-into-frontmost-app helper)
+- `⌘↩` → `Clipboard.copy(bundle)` then `Clipboard.paste(bundle)` (the latter requires its `content` argument per `@raycast/api@1.104.17` types — `Clipboard.paste(content: string | number | Content)`; R4 codex F1 — MED). Equivalent shape: `Action.Paste content={bundle}` declared in the ActionPanel; builder picks whichever idiom yields cleaner React/Raycast code and notes in `agent_notes`.
 - `⌘O` → open the atom's source file in default app (skip if source is a `git:` or `fs:` prefix without a resolvable on-disk path — toast "no source file" instead)
 - `⌘B` → open `http://127.0.0.1:38479/` (trace viewer index) in default browser. (R2 codex F2 — MED — `tools/serve-trace.ts:161-176` only routes exact `/` or `/index.html` today; a `?atom=<id>` deep-link route does not exist and would 404. Per-atom deep-linking is V1 territory and explicitly out of scope for v0; if the builder finds it gratifying to add, file a follow-on backlog item — do NOT include here.)
 - `⌘C` → copy raw atom JSON for debugging (`JSON.stringify(atom, null, 2)`)
@@ -114,7 +114,7 @@ No new daemon code. The extension imports `@modelcontextprotocol/sdk` and connec
 ### AC1 — Extension scaffold installable via `ray develop`
 
 - `tools/raycast-echo/package.json` declares a Raycast extension with `name: "echo-context"`, `title: "ECHO Context"`, one command (`name: "search-context"`, `title: "Search ECHO Context"`, `mode: "view"`).
-- Dependencies: `@raycast/api`, `@raycast/utils` (for `useDebouncedValue`-style hooks), `@modelcontextprotocol/sdk`. No other runtime deps.
+- Dependencies: `@raycast/api`, `@modelcontextprotocol/sdk`. No other runtime deps. (R4 codex F2 — MED dropped `@raycast/utils` from the dependency list: `@raycast/utils@2.2.4` exports no `useDebouncedValue` / debounce hook in its public types, so listing it would either force the builder to import a nonexistent symbol or carry an unused runtime dep. Implement the AC2 200ms debounce locally with React `useState` + `useEffect` + `setTimeout` (~10 lines) — standard React idiom, no Raycast-specific helper needed.)
 - `tools/raycast-echo/tsconfig.json` compiles cleanly under `npx ray develop` (Raycast's bundler). Strict TS.
 - `tools/raycast-echo/README.md` documents two steps: (1) `cd tools/raycast-echo && npm install && npx ray develop`, (2) bind a hotkey via Raycast Preferences → Extensions → ECHO Context → Search ECHO Context → Hotkey (suggested: ⌘⇧E).
 
@@ -128,7 +128,7 @@ No new daemon code. The extension imports `@modelcontextprotocol/sdk` and connec
 
 ### AC3 — Daemon-unreachable handled gracefully
 
-- If the daemon at `http://127.0.0.1:38478/mcp` is unreachable (connection refused / timeout / non-2xx), the extension shows a Raycast toast with `Style.Failure`, title `"ECHO daemon unreachable"`, message `"Check 'npm run daemon' in Project_echo"`. The toast appears within 2 seconds of the failed call; the extension does NOT hang, does NOT retry automatically, does NOT cache.
+- If the daemon at `http://127.0.0.1:38478/mcp` is unreachable (connection refused / timeout / non-2xx), the extension shows a Raycast toast with `Toast.Style.Failure` (R4 codex F3 — LOW corrected from `Style.Failure` — the enum lives under `Toast.Style.*` per `@raycast/api` types; bare `Style` is not exported), title `"ECHO daemon unreachable"`, message `"Check 'npm run daemon' in Project_echo"`. The toast appears within 2 seconds of the failed call; the extension does NOT hang, does NOT retry automatically, does NOT cache.
 - On daemon recovery (any subsequent call succeeds), the extension renders normally; no special "back online" UI.
 
 ### AC4 — README documents the dogfooding contract
