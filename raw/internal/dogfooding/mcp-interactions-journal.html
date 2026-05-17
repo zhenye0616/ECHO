@@ -2055,6 +2055,11 @@ href="#pdt-strategist-watcher-r1-tick-on-2026-05-17-059-coord-emit-surface-daemo
 id="toc-pdt-strategist-watcher-r1-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
 00:53 PDT — Strategist watcher r1 tick on
 2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
+<li><a
+href="#pdt-claude-r2-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection"
+id="toc-pdt-claude-r2-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:00 PDT — claude r2 review tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -23491,6 +23496,74 @@ reviewer lens is supposed to produce, vs codex’s spec-shape
 codex-ops’s runtime-path (HTTP non-2xx fixture) finding. Three
 reviewers, three distinct lenses, all non-overlapping
 <code>where:</code> lines — best-case decomposition.</li>
+</ul>
+<h3
+id="pdt-claude-r2-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:00 PDT — claude r2 review tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</h3>
+<ul>
+<li><strong>Trigger:</strong> <code>coord_invoke</code> from the watcher
+fired the claude reviewer skill on r2 of spec 059 (the
+coord-emit-surface-daemon-rejection observability fix). Pinned-request
+mode via <code>ECHO_COORD_REQUEST_PATH</code> env binding;
+correlation_id <code>06297318-1195-4ad4-bc3d-6fd64d664136</code>.</li>
+<li><strong>Query inputs:</strong>
+<code>coord-emit.sh tick_start --correlation-id=06297318-1195-4ad4-bc3d-6fd64d664136</code>
+at tick-start (Step 2);
+<code>coord-emit.sh tick_end --correlation-id=… --payload='{"outcome":"completed"}'</code>
+planned at tick-end (Step 7). Artifact read via
+<code>git show 033867c:backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+(the r1-patches commit applied via spec-r1-patches: 059 — apply r1
+dispositions across all 7 findings).</li>
+<li><strong>Returned:</strong> Pre-link YAML gate PASS on
+<code>/tmp/echo-rq-claude-response.md</code>; atomic
+<code>os.link</code> into <code>backlog/reviews/.../r2/claude.md</code>
+succeeded after <code>git fetch origin main</code> confirmed no upstream
+duplicate; <code>commit-reviewer-response.sh</code> validation passed;
+review-r2 commit <code>58f2669</code> rebased onto
+<code>origin/main</code> <code>623b722</code> → pushed as
+<code>b06eb81</code> to <code>origin/main</code> via
+<code>push-with-retry.sh</code>.</li>
+<li><strong>Sources:</strong> R2 request at
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r2/request.md</code>
+(correlation_id 06297318); spec under review at
+<code>git show 033867c:backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md</code>
+(202 lines); r1 context at <code>r1/combined.md</code> (7 findings all
+accepted — patched) + <code>r1/CLAUDE.md</code> (my prior round’s
+verdict + 3 LOW findings); r1 patches commit <code>033867c</code> (83
+insertions / 16 deletions). No file-side capture surfaces (Cursor/Claude
+Code/Codex/git extractors) involved.</li>
+<li><strong>Verdict:</strong> ✅ right — verdict <code>proceed</code>
+with empty findings list. Three focus_hints from r1 combined.md all
+checked off: <code>## Tests</code> section well-formed between Risks and
+DoD; port-0-bind-close pattern with TOCTOU window documented; HTTP
+non-2xx test (iii) uses in-process <code>node:http</code> fixture (NOT
+MCP daemon); 500-char truncation is single-shape contract; Out of Scope
+#11 names concrete callsites (<code>coord_invoke</code>,
+<code>push-with-retry.sh</code>, scheduler-tier emitters in
+<code>_run_reviewer.sh</code>); DoD bullets align 1:1 with AC1/AC2/AC3.
+The r1 patches <em>locked</em> dispositions (silent-on-unreachable,
+truncation-not-body-dump, parallel-wrapper-edit gate) rather than
+expanded mechanism — exact shape of disposition-discipline from
+<code>skills/review-queue-watch.md</code>.</li>
+<li><strong>Note:</strong> Two observations. (a) <strong>R2 was the
+convergence round on a friction-fix spec.</strong> Three reviewers,
+seven r1 findings, all accepted-and-patched into spec at SHA
+<code>033867c</code>, and r2 produces <code>proceed</code> from at least
+one reviewer (claude) with zero new findings. If codex + codex-ops also
+produce <code>proceed</code> (without re-introducing patches), this
+round closes to <code>proceed</code> without escalation — the watcher’s
+combined.md will roll up to <code>proceed</code>. This is the “spec
+converges in 2 rounds” shape the 047-era friction-fix prioritization is
+designed to produce: narrow scope + thorough r1 reviewer coverage → r2
+is verification-only. (b) <strong>Claude lens at r2 was structurally
+lighter than r1</strong> — at r1 my lens produced 3 LOW findings (close
+open dispositions + close parallel-wrapper door); at r2 the same lens
+produces zero findings because r1’s patches closed the open questions.
+The lens didn’t change; the spec’s surface area for conceptual concerns
+shrank. That’s the right shape: reviewer findings should decrease across
+rounds toward convergence, not increase (the “patches deeper”
+anti-pattern would show the opposite).</li>
 </ul>
 </body>
 </html>
