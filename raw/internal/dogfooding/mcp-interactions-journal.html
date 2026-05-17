@@ -2115,6 +2115,11 @@ href="#pdt---codex-ops-r4-on-059-coord-emit-rejection-observability-spec"
 id="toc-pdt---codex-ops-r4-on-059-coord-emit-rejection-observability-spec">2026-05-17
 01:24 PDT - Codex-ops R4 on 059 coord-emit rejection observability
 spec</a></li>
+<li><a
+href="#pdt-strategist-watcher-r4-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection"
+id="toc-pdt-strategist-watcher-r4-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:38 PDT — Strategist watcher r4 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24164,6 +24169,54 @@ that returns HTTP 200 with a non-MCP body: without an explicit
 unexpected-2xx branch and fixture, <code>ECHO_MCP_URL</code> can still
 be stale, the wrapper can still exit 0, and no coord atom or stderr
 signal is guaranteed.</li>
+</ul>
+<h3
+id="pdt-strategist-watcher-r4-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:38 PDT — Strategist watcher r4 tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</h3>
+<ul>
+<li><strong>Trigger:</strong> Founder asked to check r4 ahead of the
+01:42 scheduled wakeup. All three r4 responses landed.</li>
+<li><strong>Query inputs:</strong> 3 × <code>coord_invoke</code> for r5
+reviewers (codex/codex-ops/claude).</li>
+<li><strong>Returned:</strong> combine.py wrote r4/combined.md as
+<code>proceed_after_patches</code>, escalated:false. 1 MED finding
+(codex-ops F1, NEW gap on line 75 — 200-non-MCP-body silent path). Codex
++ claude both <code>proceed</code> with zero findings. 3 × coord_invoke
+200 OK.</li>
+<li><strong>Sources:</strong> Spec at <code>7d8f86a</code> → patched to
+<code>05bb181</code> via spec-r4-patches; r5 request at
+<code>79cd803</code>.</li>
+<li><strong>Verdict:</strong> ✅ right — but with a judgment call.
+Codex-ops r4 caught a real same-class silent-failure: a stale
+<code>ECHO_MCP_URL</code> pointed at a non-MCP service returning 200 OK
+falls into the wrapper’s success path with no atom and no stderr. The
+fix would be a 5th branch + 200-non-MCP fixture (codex-ops’s
+recommendation). Disposition: scope-trim + defer per friction-first /
+v1.5-cleanup-pause discipline. The third state (wrong-URL configuration)
+is symmetric with OoS #5 (no auto-correction of operator mistakes), so
+OoS #12 is honest spec hygiene rather than a punt. Codex-ops r5 reviewer
+gets explicit pushback room in the focus_hints if it disagrees.</li>
+<li><strong>Note:</strong> Decay 7→2→2→1. The r4 finding is the FIRST
+new-gap-not-stale-language one across the cycle (r1 was original
+surface, r2 was stale-AC1, r3 was stale-pre-r2-language, r4 is
+new-third-state). The decompose-or-defer signal from
+skills/review-queue-watch.md (asymptote at 5+) hasn’t fired — r4 went
+DOWN to 1, not plateaued at 2-3 with new findings each round. That
+suggests scope-trim was the right call: had I expanded scope by adding
+the 5th branch, r5 would have likely surfaced bugs in the new mechanism
+(the “recently-added mechanism becomes the new bug surface” pattern from
+057a r4/r6). If r5 lands {proceed/proceed/proceed} the spec is
+claim-ready. If codex-ops r5 pushes back load-bearing on the scope-trim,
+the decision was wrong and the 5th branch goes in r5 — but this is the
+kind of judgment call a 3-reviewer roster is supposed to surface, not
+the kind to second-guess pre-emptively. <strong>Also: claude reviewer at
+3 consecutive <code>proceed</code> zero findings.</strong> That’s a
+strong empirical signal for the 056
+<code>required:false</code>→<code>required:true</code> flip — claude’s
+conceptual/architectural lens caught r1’s drift-prevention finding (OoS
+#11), then stayed appropriately silent when subsequent rounds were
+spec-shape / operational territory.</li>
 </ul>
 </body>
 </html>
