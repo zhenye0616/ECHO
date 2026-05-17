@@ -2239,6 +2239,9 @@ href="#pdt-claude-strategist-commits-061-spec-rebase-race-with-060-r5-watcher-dr
 id="toc-pdt-claude-strategist-commits-061-spec-rebase-race-with-060-r5-watcher-drops-journal-entries-recovered">2026-05-17
 15:05 PDT — Claude strategist commits 061 spec; rebase race with 060 r5
 watcher drops journal entries (recovered)</a></li>
+<li><a href="#pdt-claude-r6-review-tick-review-queue-claude"
+id="toc-pdt-claude-r6-review-tick-review-queue-claude">2026-05-17 15:06
+PDT — claude r6 review tick (review-queue-claude)</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -26156,6 +26159,74 @@ framed it — the codex-strategist’s “freeze monolith now” recommendation
 was structurally correct, not just stylistic preference. Builder of 061
 should treat AC2 as the highest-priority AC, not a nice-to-have
 alongside AC1/AC4.</li>
+</ul>
+<h3 id="pdt-claude-r6-review-tick-review-queue-claude">2026-05-17 15:06
+PDT — claude r6 review tick (review-queue-claude)</h3>
+<ul>
+<li><strong>Trigger:</strong> 060 r6 dispatched downstream after
+strategist applied 3 codex MED r5 dispositions with self-named
+“AGGRESSIVE SCOPE-TRIM” (commit <code>a5e93c2</code>); pinned-request
+mode via <code>coord_invoke</code>,
+<code>ECHO_COORD_CORRELATION_ID=867a690d-0900-4cb0-bafb-c67a8900174a</code>,
+<code>ECHO_COORD_REQUEST_PATH=backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/request.md</code>.</li>
+<li><strong>Query inputs:</strong>
+spec_commit_sha=<code>a5e93c203a1c5e9e9ac05306ccd008ed565dd348</code>
+(artifact); diff base for delta-focused review = the r5-patches commit
+<code>a5e93c2</code> (only spec file changed);
+lens=conceptual/architectural/scope-drift on r5 codex MEDs (manifest
+enumeration / List filtering / cluster-vs-match action asymmetry).</li>
+<li><strong>Returned:</strong> <code>verdict: proceed</code>,
+<code>findings: []</code> (zero). Response committed at
+<code>backlog/reviews/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood/r6/claude.md</code>
+(~235 lines); commit <code>4c24433</code> rebased through 3 parallel
+commits and pushed to origin/main as <code>4458b2d</code> HEAD.</li>
+<li><strong>Sources:</strong> spec at
+<code>a5e93c2:backlog/ready/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md</code>
+(via <code>git show</code>); r5 codex.md, r5 claude.md, r5 combined.md
+(commit-context inputs only); commit message at <code>a5e93c2</code> for
+the strategist’s “AGGRESSIVE SCOPE-TRIM” framing and the 6→3→2→3→3
+decay-shape attribution;
+<code>git log --oneline -5 a5e93c2 -- backlog/ready/...md</code> for
+round-by-round patch lineage. No MCP tool calls inside the review itself
+(fresh-eyes-at-SHA: spec + request only).</li>
+<li><strong>Verdict:</strong> ✅ right — all 3 r5 codex patches verified
+landed in a shape that is <em>smaller</em> (F1, F3) or the smallest
+possible addition (F2). F1 = removal: deleted the brittle manifest-field
+enumeration; bound the contract to <code>ray build</code> and added an
+icon.png placeholder with a “visual polish is V1 territory” inline
+foreclosure. F3 = scope-trim: split the action menu by row type
+(cluster: 3 actions, match: 5) which <em>removes</em> the cluster-row
+ambiguity rather than papering it over with “first atom” heuristics. F2
+= single-line addition: <code>filtering={false}</code> on the List
+component. Three-round-running disposition discipline REMOVAL pattern
+now established: r3 F1 (<code>prefer:newest_first</code> removed); r4 F2
+(<code>@raycast/utils</code> dep removed); r5 F1+F3 (manifest
+enumeration removed, cluster-action ambiguity removed). The strategist
+named this discipline explicitly in the commit message for the first
+time.</li>
+<li><strong>Note:</strong> (observations only — backlog inputs, not fix
+designs)
+<ul>
+<li><strong>(1) Decay-shape plateau resolved by scope-trim, not deeper
+patches.</strong> The 6→3→2→3→3 plateau looked at r5 like it could
+become an asymptote (codex’s library-type lens going one layer deeper
+each round indefinitely). The strategist’s response — name the plateau,
+name the discipline, apply SCOPE-TRIM aggressively — is the right shape.
+Two of three r5 patches deleted spec content; the third was the minimum
+possible addition. The conceptual-lens prediction for r6 codex was 0 OR
+1 LOW; if r6 codex lands 0, this is a clean 6-round convergence with the
+final-round signature being the SCOPE-TRIM rule.</li>
+<li><strong>(2) Strategist self-attribution of disposition discipline is
+now explicit.</strong> Past commit messages applied the rule but did not
+always name it. The r5-patches commit (“AGGRESSIVE SCOPE-TRIM applied”)
+names the rule, names the alternative path that was rejected (“rather
+than patch deeper”), and pre-positions the next round’s likely outcome
+(“R6 dispatched to verify trims landed without scope expansion”). This
+is the rule becoming legible in the strategist’s own voice, which makes
+it easier for cross-tool readers (codex strategist, founder, future
+claude sessions) to recognize when the rule is being applied vs
+missed.</li>
+</ul></li>
 </ul>
 </body>
 </html>
