@@ -19,3 +19,4 @@
 2026-05-14T08:44:06Z SANDBOX-GIT-BLOCKED: combine: r1 on 2026-05-14-048-process-backlog-builder-state-handoff-refresh wrote combined.md, but internal git pull/add/commit/push hit sandbox .git write restrictions; strategist committed combined.md and R1 spec patch manually in the same turn.
 2026-05-16T06:54:50Z PUSH-RACE-FALLBACK: journal: strategist watcher r1 escalation on 057b sha=48433097c9a674459ba1830df4122f601049fc56
 2026-05-17T08:02:20Z PUSH-RACE-FALLBACK: journal: codex-ops r2 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=5c79c6ed021f6e9adae2b24b02903f1e5064adc9
+2026-05-17T08:25:57Z PUSH-RACE-FALLBACK: journal: codex r4 review tick on 2026-05-17-059-coord-emit-surface-daemon-rejection sha=dd1450b7c8ec380bfd340f53a3091a98179e03d9
