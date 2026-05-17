@@ -2046,6 +2046,11 @@ id="toc-pdt---codex-ops-r1-on-059-coord-emit-rejection-observability-spec">2026-
 00:47 PDT - Codex-ops R1 on 059 coord-emit rejection observability
 spec</a></li>
 <li><a
+href="#pdt---codex-r1-on-059-coord-emit-rejection-observability-spec"
+id="toc-pdt---codex-r1-on-059-coord-emit-rejection-observability-spec">2026-05-17
+00:48 PDT - Codex R1 on 059 coord-emit rejection observability
+spec</a></li>
+<li><a
 href="#pdt-claude-reviewer-tick-on-059-r1-coord-emit-silent-rejection-observability"
 id="toc-pdt-claude-reviewer-tick-on-059-r1-coord-emit-silent-rejection-observability">2026-05-17
 00:50 PDT — claude reviewer tick on 059 R1 (coord-emit silent-rejection
@@ -23362,6 +23367,54 @@ in the 2026-05-16 16:14 PDT live coord test. The operational review asks
 the next round to make daemon-down stderr behavior deterministic and to
 test the reachable-but-wrong-service HTTP branch, because those are the
 failure modes operators see unattended in launchd logs.</li>
+</ul>
+<h3
+id="pdt---codex-r1-on-059-coord-emit-rejection-observability-spec">2026-05-17
+00:48 PDT - Codex R1 on 059 coord-emit rejection observability spec</h3>
+<ul>
+<li><strong>Trigger:</strong> Execute one Codex-side review queue tick
+(<code>MY_REVIEWER=codex</code>); first pending Codex response was
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/request.md</code>.</li>
+<li><strong>Query inputs:</strong> Pulled <code>origin/main</code>;
+scanned <code>backlog/reviews/**/r*/request.md</code> for rounds
+requesting <code>codex</code> with no <code>codex.md</code> and no
+<code>combined.md</code>; emitted best-effort
+<code>coord-emit.sh tick_start --correlation-id=c4a5ccea-5964-4ab6-96ef-3dd3fdf51131</code>;
+read the R1 request, reviewer schema, pinned spec artifact at
+<code>b36af1276b9387c8962579940dbb72a2fc69d12b</code>, and the
+code-grounding refs <code>tools/review-queue/coord-emit.sh</code>,
+<code>tests/coord/coord-emit-wrapper-transport.test.ts</code>,
+<code>src/coord/validate.ts</code>, <code>src/mcp/server.ts</code>, and
+<code>src/mcp/tools/coord-emit.ts</code>.</li>
+<li><strong>Returned shape:</strong> Wrote, pre-link validated, checked
+upstream duplicate state, committed, rebased, and pushed
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/codex.md</code>
+as <code>d674b1f</code>, verdict <code>proceed_after_patches</code>,
+findings: MEDIUM missing mandatory standalone <code>## Tests</code>
+section; LOW unreachable-daemon test overclaims <code>127.0.0.1:1</code>
+determinism.</li>
+<li><strong>Sources:</strong> Artifact SHA
+<code>b36af1276b9387c8962579940dbb72a2fc69d12b</code>; request path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/request.md</code>;
+committed response path
+<code>backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r1/codex.md</code>;
+schema path
+<code>tools/review-queue/schemas/reviewer.schema.json</code>; helper
+paths <code>tools/review-queue/validate_response_yaml.py</code>,
+<code>tools/review-queue/commit-reviewer-response.sh</code>,
+<code>tools/review-queue/push-with-retry.sh</code>; coord wrapper call
+was best-effort and not parsed for response content.</li>
+<li><strong>Verdict:</strong> right - one Codex review was written for
+the requested 059 R1 round, anchored to the requested spec SHA,
+validated before link, checked against upstream duplicate response
+state, committed and pushed before this observation-only journal
+entry.</li>
+<li><strong>Note:</strong> The spec’s core behavior is implementable
+against the current daemon response shape: the wrapper currently
+discards the JSON-RPC body, while the daemon returns tool-level
+<code>isError: true</code> with validator text for the wrong-tier
+<code>tick_start --tick-run-id</code> case. The requested patch should
+be limited to spec cleanup before build.</li>
 </ul>
 <h3
 id="pdt-claude-reviewer-tick-on-059-r1-coord-emit-silent-rejection-observability">2026-05-17
