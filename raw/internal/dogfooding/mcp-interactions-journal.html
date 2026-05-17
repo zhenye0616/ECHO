@@ -2100,6 +2100,11 @@ href="#pdt-strategist-watcher-r3-tick-on-2026-05-17-059-coord-emit-surface-daemo
 id="toc-pdt-strategist-watcher-r3-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
 01:24 PDT — Strategist watcher r3 tick on
 2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
+<li><a
+href="#pdt-claude-r4-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection"
+id="toc-pdt-claude-r4-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:23 PDT — claude r4 review tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</a></li>
 </ul></li>
 </ul></li>
 </ul>
@@ -24004,6 +24009,53 @@ roster is designed to produce. If r4 lands {proceed/proceed/proceed} the
 spec is claim-ready. If r4 finds new stale language (a real risk — the
 spec has accumulated ~210 lines across 3 rounds of patches), I’ll do a
 full grep-scrub pass before r5 rather than another targeted patch.</li>
+</ul>
+<h3
+id="pdt-claude-r4-review-tick-on-2026-05-17-059-coord-emit-surface-daemon-rejection">2026-05-17
+01:23 PDT — claude r4 review tick on
+2026-05-17-059-coord-emit-surface-daemon-rejection</h3>
+<ul>
+<li><strong>Trigger:</strong> review-queue-claude pinned-request tick
+fired by coord_invoke; request at
+backlog/reviews/2026-05-17-059-coord-emit-surface-daemon-rejection/r4/request.md
+(correlation_id c5114b18-521b-4820-8eca-ec76cf08d2f5).</li>
+<li><strong>Query inputs:</strong> spec_commit_sha=15f7463;
+artifact_path=backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md;
+requested_reviewers=[codex, codex-ops, claude]; round=4.</li>
+<li><strong>Returned:</strong> verdict=<code>proceed</code>; 0 findings.
+Response written to backlog/reviews/…/r4/claude.md and pushed in commit
+adca5a3 (review-r4: claude on
+2026-05-17-059-coord-emit-surface-daemon-rejection).</li>
+<li><strong>Sources:</strong> /tmp/echo-rq-artifact.md (git show
+15f7463:backlog/ready/2026-05-17-059-coord-emit-surface-daemon-rejection.md,
+203 lines); r3/combined.md focus_hints; prior r3/claude.md (verdict
+proceed, also zero findings); git log on artifact_path confirmed r3
+scrub at 15f7463
+(<code>spec-r3-patches: 059 — scrub stale pre-r2 language</code>).</li>
+<li><strong>Verdict:</strong> ✅ right — all three r3 combined
+focus_hints verified against the r3-scrubbed artifact: (1) line 82
+enumerates all four state-cells with
+curl-stderr-suppressed-via-2&gt;/dev/null contract; (2) line 183 reads
+“suppressed by the wrapper” with ‘not “intentionally allowed”’ in the
+inline-quoted-forbidden form; (3) grep sweep for “opt-in
+verbose”/“intentionally allowed”/“or preserve current” finds 5 hits, all
+in negative-form contract reinforcement (lines 76, 82, 142, 152, 183).
+Strategist-drift “patches grow each round” pattern NOT present — r3 was
+a pure docs scrub adding zero ACs / zero OoS items / zero mechanism.
+Four-round arc {r1 proceed_after_patches, r2 proceed, r3 proceed, r4
+proceed} from the conceptual lens.</li>
+<li><strong>Note:</strong> R4 from the claude (conceptual/drift) lens is
+the cleanest confirmation tick yet — the spec is observably converged on
+the conceptual axis (verdict <code>proceed</code> three rounds running;
+r3’s scrub addressed the codex+codex-ops convergent line-82/183
+phrasings; no new conceptual concerns surfaced). If codex and codex-ops
+r4 verdicts also land <code>proceed</code>, the spec is claim-ready and
+the round-4 combined should converge without escalation. If either
+sibling finds a remaining implementability or runtime gap, those stand
+independently of the conceptual proceed.</li>
+<li><strong>Conjecture:</strong> (none — the four-round arc held the
+healthy shape the strategist-drift discipline predicts; nothing to
+suggest about algorithm/config changes.)</li>
 </ul>
 </body>
 </html>
