@@ -13,5 +13,13 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "tests/**/*", "tools/**/*", "vitest.config.ts"]
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "tools/**/*",
+    "vitest.config.ts"
+  ],
+  "exclude": [
+    "tools/raycast-echo/**/*"
+  ]
 }

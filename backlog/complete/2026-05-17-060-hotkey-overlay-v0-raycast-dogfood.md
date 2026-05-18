@@ -35,7 +35,28 @@ branch: "agent/hotkey-overlay-v0-raycast-dogfood"
 worktree: ""
 head_sha: "0857e346064ff7090cd642d7ad0520e9ed43cb61"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-17 via founder reconciliation.
+  
+  Conflicts resolved:
+  - None (clean merge; sidecar predicted no conflicts; branch added new tools/raycast-echo/ files only).
+  
+  C3.5 cross-vendor consult: none invoked
+  
+  Fixups applied:
+  - root .gitignore: added `tools/raycast-echo/raycast-env.d.ts` (regenerable; per Raycast convention).
+  - root tsconfig.json: added `"exclude": ["tools/raycast-echo/**/*"]` (post-merge structural fix; root tsconfig was greedily including the extension's self-contained TS project, breaking root typecheck on the new `.tsx` file's JSX. Extension has its own tsconfig with `jsx: "react-jsx"` per AC1.)
+  
+  Fixups deferred to follow-up items:
+  - None.
+  
+  Verify: 1105/1126 tests pass (21 skipped, 0 failed); lint, typecheck, and tools/sync-skills.sh --check all clean post-merge.
+  
+  Follow-up items (non-blocking):
+  - Consider checking whether an `fs:` source path exists before calling Raycast `open()` so stale captured source paths show the same `no source file` toast as non-file sources.
+  - Consider adding a package-lock for `tools/raycast-echo/` if the v0 dogfooding tool needs reproducible installs.
+  - Post-merge gate (AC8/AC9 — founder-verified): founder uses ⌘⇧E ≥10 times across ≥3 calendar days; each invocation logged to raw/internal/dogfooding/mcp-interactions-journal.md with the 7-field template (T/Q/R/S/Repo/V/N). When fired, write the V1 hotkey-overlay backlog item from the dogfooding journal inputs.
+
 agent_notes: |
   Built the v0 Raycast extension at `tools/raycast-echo/` on branch `agent/hotkey-overlay-v0-raycast-dogfood`. The extension declares the required Raycast manifest and dependencies, uses a thin fetch-based MCP JSON-RPC client against `http://127.0.0.1:38478/mcp` with the required `Accept: application/json, text/event-stream` header, renders the two-state List with `filtering={false}`, hydrates details through `get_atom`/`get_atoms`, and implements the required copy/paste/source/trace/raw-JSON actions by row type. The formatter mirrors the daemon source-app prefix map in reverse and is covered by the required 5 pure-Node Vitest assertions. Verification passed: `npm test`, `npm run typecheck`, and `npx ray build`. Notes for reviewers: `@modelcontextprotocol/sdk` is declared per AC1, but the implementation uses the spec's R1 fetch fallback to avoid Raycast bundler transport risk; the task-state ref directory did not exist, so the final builder-state refresh was a no-op.
 ---
