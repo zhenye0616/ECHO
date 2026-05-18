@@ -86,9 +86,9 @@ When this skill executes inside a Claude Code session:
 
 When this skill executes inside a codex CLI session, the protocol body above (Step A, the per-item prompt template, Step C–E) is unchanged; codex's dispatch primitive is what differs from Claude Code's. This section is operational guidance specific to that primitive.
 
-### Synced adapter
+### Codex skill install
 
-- `adapters/codex/skills/review-pending/SKILL.md` (tracked in repo; deployed to `~/.codex/skills/review-pending/SKILL.md` via `tools/install-codex-adapters.sh`).
+- `tools/install-echo-codex-skills.sh` renders this canonical skill into `~/.codex/skills/ECHO:review-pending/SKILL.md` with Codex-shaped frontmatter. Re-run that installer after editing canonical `skills/*.md`; there is no repo-side Codex adapter snapshot.
 
 ### Sandbox semantics (per-child)
 
