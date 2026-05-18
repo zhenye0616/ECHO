@@ -1,0 +1,38 @@
+{
+  "name": "echo-context",
+  "title": "ECHO Context",
+  "description": "Search and paste ECHO context from the local daemon.",
+  "icon": "icon.png",
+  "author": "zhenye",
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "commands": [
+    {
+      "name": "search-context",
+      "title": "Search ECHO Context",
+      "description": "Search recent ECHO context and copy or paste markdown bundles.",
+      "mode": "view"
+    }
+  ],
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ./package.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@raycast/api": "^1.104.17"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
