@@ -28,7 +28,27 @@ branch: "agent/coord-emit-surface-daemon-rejection"
 worktree: "~/Desktop/Project_echo--coord-emit-surface-daemon-rejection"
 head_sha: "6d19336770a659c58b9e0d44a043b79681a79318"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-17 via founder reconciliation.
+  
+  Conflicts resolved:
+  - None (clean merge; sidecar predicted no conflicts; main untouched on both files since branch claim).
+  
+  C3.5 cross-vendor consult: none invoked
+  
+  Fixups applied:
+  - None.
+  
+  Fixups deferred to follow-up items:
+  - None.
+  
+  Verify: 1105/1126 tests pass (21 skipped, 0 failed); lint and typecheck clean post-merge; tools/sync-skills.sh --check OK.
+  
+  Follow-up items (non-blocking):
+  - If empirical journal evidence ever shows a daemon error message containing escaped quotes (\"), file a follow-on spec to swap the awk extraction for a JSON-aware reader. Current substring extractor degrades gracefully — purely a relay-fidelity refinement.
+  - If a third wrapper-stderr spec lands, consider extracting a wrapperEnv(handle, role) test helper. Until then, copy-paste is honest per Out-of-Scope #11.
+  - Optional one-line addition to wiki/architecture/coord-active-trigger-and-role-emission.md per strategist After-Completion notes — only if a natural insertion point already exists.
+
 agent_notes: |
   AC1: `tools/review-queue/coord-emit.sh` now captures HTTP status + body via `curl -w '\n%{http_code}'` and curl rc via `|| curl_rc=$?`; suppresses curl's own stderr via `2>/dev/null` so the daemon-unreachable branch produces zero bytes. Three-state stderr contract per spec: success → silent; isError:true → `coord-emit.sh: daemon rejected <event_type>: <text truncated to 500 chars>`; HTTP non-2xx → `coord-emit.sh: daemon returned HTTP <status>: <first 200 chars>`; exit 0 in every branch. Bash 3.2.57-portable (no jq; substring isError detection + awk match for `"text":"..."` + sed unescape).
   AC2: only `tools/review-queue/coord-emit.sh` and `tests/coord/coord-emit-wrapper-transport.test.ts` modified. `git diff --stat` confirms.
