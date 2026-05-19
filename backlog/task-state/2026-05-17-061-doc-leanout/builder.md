@@ -2,12 +2,19 @@
 task_id: 2026-05-17-061-doc-leanout
 role: builder
 writer: codex-builder
-last_updated: 2026-05-19T04:23:36Z
+last_updated: 2026-05-19T04:37:10Z
+handoff_branch: agent/doc-leanout
+handoff_head_sha: 1d0b8840327946964d0817541878df3e0fda2954
+handoff_run_log: raw/internal/agent-runs/2026-05-18-2026-05-17-061-doc-leanout.md
 ---
 
 ## current_thesis
 
 Claimed 061 as Codex builder. The task is operating-model doc-surface leanout: remove committed raw/internal HTML twins, freeze and shard the MCP journal, add zero-MCP-call journal skip policy, convert exactly one completed backlog item to the new stub/archive pattern, remove one stale local worktree, repair review-queue setup docs, delete stale STATUS, and append the TZ-offset retrieval bug to followups.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 1d0b8840327946964d0817541878df3e0fda2954.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -21,7 +28,7 @@ Claimed 061 as Codex builder. The task is operating-model doc-surface leanout: r
 
 ## open_questions
 
-- None blocking at claim. Escalate if any listed deletion/rename is missing, the stale worktree is dirty, or an AC requires a file outside `files_to_modify`.
+- Review caveat: broad `mcp-interactions-journal.md` references remain in historical/OoS files and in review-queue skill prose that AC3 explicitly excluded. Current policy surfaces (`CLAUDE.md`, `AGENTS.md`, new shard) are updated; reviewers should decide whether review-queue skill prose needs a followup.
 
 ## dont_touch
 
@@ -39,4 +46,4 @@ Claimed 061 as Codex builder. The task is operating-model doc-surface leanout: r
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-17-061-doc-leanout.md
+- spec: backlog/pending_review/2026-05-17-061-doc-leanout.md
