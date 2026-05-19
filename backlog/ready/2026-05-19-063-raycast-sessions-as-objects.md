@@ -19,14 +19,15 @@ files_to_modify:
   - tools/raycast-echo/src/lib/sessions.ts  # AC6 — NEW. Session checkpoint persistence layer. Schema: { id, question, agentKind, startedAt, completedAt, status: "running"|"done"|"cancelled"|"errored", answer, auditCalls, subprocessLogPath, sourceBreakdown, evidenceClusters }. LocalStorage-backed. Cap at MAX_SESSIONS (default 100, last-write-wins eviction). Includes one-time migration that reads the old `echo.recent-asks` key, converts each ask to a session with status="historical", writes the new key, and deletes the old key.
   - tools/raycast-echo/src/lib/recent-asks.ts  # AC10 — DELETE. Replaced by sessions.ts. The one-time migration in sessions.ts preserves the last-3 history.
   - tools/raycast-echo/src/lib/audit.ts  # AC3 — EXTEND. Already fetches GET /mcp/recent-calls?since=…&until=… per item 062. Add a per-call body shape that the AuditTimeline component reads (no new daemon work; just expose what's already returned in a typed shape).
-  - tools/raycast-echo/test/sessions.test.ts  # AC8 — NEW. Vitest. Tests: write + read roundtrip, migration from recent-asks, MAX_SESSIONS eviction, status transitions, dedup-on-relaunch policy.
+  - tools/raycast-echo/src/lib/agent-runner.ts  # AC3, AC4, AC6, AC8 — EXTEND (was spec_ref in r1; promoted to files_to_modify per r1 codex F1 + codex-ops F1). Currently returns `{ events, cancel }` and keeps `sessionPath` private (existing code at lines 93, 227-245, 248-255). Expose the absolute per-session log path so SessionDetail [Open]/[Tail] target the correct file (NOT `latest.log`, which races under overlapping runs). Contract: extend `AgentRun` to include `sessionLogPath: string | null` (null only when log creation failed), set synchronously before `startAgent()` returns, immutable for the lifetime of the run. Existing private `sessionPath` becomes the source.
+  - tools/raycast-echo/test/agent-runner.test.ts  # AC8.5 — EXTEND existing (already 9 tests). Add: two overlapping `startAgent` calls return distinct non-null `sessionLogPath` values pointing to different files; closing one runner does NOT affect the other's log path.
+  - tools/raycast-echo/test/sessions.test.ts  # AC8 — NEW. Vitest. Tests: write + read roundtrip, migration from recent-asks, MAX_SESSIONS eviction, status transitions, dedup-on-relaunch policy, AC6.6 startup reconciliation (stale running rows → cancelled).
   - tools/raycast-echo/test/audit-timeline.test.tsx  # AC8 — NEW. Component test for AuditTimeline rendering modes (live · done · errored · empty).
   - tools/raycast-echo/test/session-detail.test.tsx  # AC8 — NEW. Component test for SessionDetail render + ⌘R fork action behavior (writes a new session row with prior packet as context, does NOT mutate the source session).
   - tools/raycast-echo/README.md  # AC9 — UPDATE: replace the "Ask ECHO" usage section with the new five-state UX walkthrough; add Sessions concept note (one object model: ask = session); document ⌘R "Ask again from this" semantics (fork, not continuation).
   # NOTE: docs/BACKLOG.md is NOT in this list per docs/AGENT_INSTRUCTIONS.md:363; strategist adds the Ready-table row at spec-commit time.
 spec_refs:
   - tools/raycast-echo/src/echo.tsx  # current 1069-line surface being restructured
-  - tools/raycast-echo/src/lib/agent-runner.ts  # subprocess tee log already lands at SESSION_LOG_DIR per item cca021b; SessionDetail surfaces that path
   - tools/raycast-echo/src/lib/mcp.ts  # existing MCP client wrapper; unchanged
   - tools/raycast-echo/src/lib/launch.ts  # existing launch actions; reused verbatim
   - tools/raycast-echo/src/lib/agent-profiles.ts  # existing; unchanged
@@ -122,29 +123,31 @@ interface Session {
   agentKind: "claude" | "codex" | "custom";
   startedAt: string;                       // ISO UTC
   completedAt: string | null;              // ISO UTC, null while running
-  status: "running" | "done" | "cancelled" | "errored" | "historical";
+  status: "running" | "done" | "cancelled" | "errored" | "historical";  // canonical enum; NO "warm" value (warm is a derived selector — see AC1.1)
   answer: string;                          // accumulated agent stdout markdown
-  auditCalls: AuditCall[];                 // copy of /mcp/recent-calls slice for this run
-  subprocessLogPath: string;               // absolute path to tee log
-  sourceBreakdown: Record<string, number>; // from audit result_shape where derivable; else {}
-  evidenceClusters: string[];              // top cluster labels from audit; capped at 5
+  auditCalls: AuditCall[];                 // [startedAt, completedAt-or-now] slice of process-global /mcp/recent-calls ring buffer; concurrent MCP calls from other surfaces (parallel Claude Code, Cursor, coord ticks, tail-mcp.sh) WILL appear here — known V1.6 limitation per AC3.6 + Risk #6
+  subprocessLogPath: string | null;        // absolute path to per-session tee log; null only when log creation failed; set synchronously by startAgent before it returns (see agent-runner.ts contract change)
+  sourceBreakdown: Record<string, number>; // best-effort: only set when derivable from current audit result_shape; else {} (see AC4.2 + OoS #9)
+  evidenceClusters: string[];              // best-effort: only set when derivable from current audit result_shape; else [] (capped at 5; see AC4.2)
+  forkedFrom: string | null;               // source session id when this row was created via ⌘R "Ask again from this"; null otherwise (see AC4.5)
 }
 ```
 
-Sessions are written/updated as the run progresses: pre-spawn writes the row with status="running"; spawn-exit transitions to "done"/"errored"/"cancelled"; concurrent UI subscribes via React state + LocalStorage `useEffect`.
+Sessions are written/updated as the run progresses: pre-spawn writes the row with status="running" AND captures `sessionLogPath` synchronously from `startAgent`; spawn-exit transitions to "done"/"errored"/"cancelled" and writes `completedAt`; the React layer subscribes via state + a LocalStorage `useEffect`. On `useSessions()` first read at Raycast start, AC6.6 reconciliation transitions any stale `running` rows to `cancelled` so leaked rows cannot bypass MAX_SESSIONS eviction.
 
 ## Components
 
 ### `src/lib/sessions.ts` (new)
-- `useSessions()` hook returning `{ sessions, warmSession, recordSessionStart, recordSessionUpdate, recordSessionEnd, forkSession }`.
-- One-time migration on first read: read old `echo.recent-asks` key → convert each to status="historical" session → write new `echo.sessions` key → delete old key. Idempotent (second call no-ops if migration marker set).
-- Cap at `MAX_SESSIONS = 100`. Eviction: oldest `startedAt` first; `status="warm"` (the most-recent done session) is never evicted; `status="running"` is never evicted.
+- `useSessions()` hook returning `{ sessions, warmSession, recordSessionStart, recordSessionUpdate, recordSessionEnd, forkSession }`. `warmSession` is a DERIVED selector — the most-recent `status="done"` row — NOT a status value.
+- One-time migration on first read: read old `echo.recent-asks` key → convert each to status="historical" session → write new `echo.sessions.v1` key → delete old key. Idempotent (second call no-ops if migration marker set).
+- Cap at `MAX_SESSIONS = 100`. Eviction priority: `status="historical"` first, then oldest `startedAt`. Never evict: any `status="running"` row, OR the single most-recent `status="done"` row (the derived warm session).
+- AC6.6 startup reconciliation runs immediately after migration on first read — see AC6.6.
 
 ### `src/components/EmptyState.tsx` (new)
 - State 1 render. Sections: Resume (1 row, warm session) · Open loops · Today (clusters from existing `useClusters()`) · Today's sessions · Yesterday · Older. Each session row: source-app icon, question title, accessory text `HH:MM · agent · N calls`.
 
 ### `src/components/TypingState.tsx` (new)
-- State 2 render. Top row: synthetic `Ask ECHO about "<query>"` with `border-left: 2px solid #d97757` styling (Raycast `accessories` + `keywords` for visual elevation). Below: matching atoms + matching clusters, identical to current behavior.
+- State 2 render. Top row: synthetic `Ask ECHO about "<query>"` with `Color.OrangeRed` accessory icon + `subtitle="<agentKind> · ↩"` for visual elevation (Raycast `List.Item` exposes `icon`, `accessories`, `subtitle`, `keywords`, `actions`, `detail` — there is no `style`/CSS prop; r1 codex F4). Below: matching atoms + matching clusters, identical to current behavior.
 
 ### `src/components/AnswerView.tsx` (extracted from echo.tsx, then extended)
 - State 3 render. Two-column markdown via Raycast `Detail.Metadata`. Left: streamed answer (existing behavior). Right: AuditTimeline component (new). Running pill in nav title with elapsed seconds.
@@ -205,10 +208,11 @@ Sessions are written/updated as the run progresses: pre-spawn writes the row wit
 - **AC3.3** Currently-running call (status="pending" in the daemon's ring buffer) renders with a "running" pill + elapsed seconds, no `result_shape`.
 - **AC3.4** When `/mcp/recent-calls` fetch errors, AuditTimeline degrades to a single row "Audit unavailable — daemon at <host>:<port> not reachable" with `Color.Red`. The answer stream is unaffected.
 - **AC3.5** AuditTimeline does NOT fetch any data the daemon doesn't already serve. If the daemon's `result_shape` is too coarse for `top_source` derivation, the row simply omits that line. No daemon-side changes are in scope.
+- **AC3.6** AuditTimeline's `auditCalls` is the `[startedAt, until=now-on-poll-or-completedAt-on-done]` time-slice of the daemon's PROCESS-GLOBAL `/mcp/recent-calls` ring buffer (r1 codex-ops F2). The daemon's request-log filters by time/status only (see `src/mcp/request-log.ts:105-112`, `src/mcp/server.ts:135-147`); concurrent MCP calls from other surfaces DURING the same window (parallel Claude Code sessions, Cursor MCP clients, coord ticks, `tools/tail-mcp.sh` polling, the watcher's own pulls) WILL be included in this session's `auditCalls`. This is a known V1.6 limitation — see Risk #6. NO client-side run-correlation lock is in scope for V1.6; AC9.4 gates the dogfooding-driven decision on whether to file a daemon-side `correlation_id` follow-up. UI text in SessionDetail should hint at this: "Audit window may include unrelated MCP calls from concurrent surfaces."
 
 ### AC4: State 4 (SessionDetail) is the load-bearing screen
 - **AC4.1** Full answer renders verbatim from `session.answer`.
-- **AC4.2** Metadata sidebar (Raycast `Detail.Metadata`) shows: Run (agent, model where derivable, MCP-call count, duration, status), Evidence used (source-breakdown chips), Sources (top-5 source paths or commit SHAs), Subprocess log (path + bytes + Open + Tail actions).
+- **AC4.2** Metadata sidebar (Raycast `Detail.Metadata`) shows: **Run** (agent, model where derivable, MCP-call count, duration, status), **Evidence used** (source-breakdown chips — BEST-EFFORT; omitted when not derivable from current `/mcp/recent-calls` result_shape per r1 codex F2), **Sources** (top-5 source paths or commit SHAs — BEST-EFFORT; omitted when not derivable, since the daemon's current request-log projects counts and content-lengths only, NOT source paths / SHAs / atom IDs / source_breakdown — see OoS #9 for the daemon-enhancement follow-up), **Subprocess log** (path from `session.subprocessLogPath` + bytes from `fs.statSync` + `[Open]` via `Action.Open` + `[Tail]` push a Detail view streaming the tail). If `subprocessLogPath === null` (log creation failed), the Subprocess log block shows "Log unavailable — agent-runner emitted no path (see agent-runner.ts error event)".
 - **AC4.3** Audit timeline renders below the answer with `mode="completed"` styling (no live polling).
 - **AC4.4** Action panel primary actions: ↩ Open in Cursor, ⌘1 Send to Claude.ai, ⌘2 Send to ChatGPT, ⌘C Copy packet, ⌘R Ask again from this, ⌘N New ask, ⌘O Open log.
 - **AC4.5** ⌘R "Ask again from this" produces a new AnswerView whose initial question is prefilled as:
@@ -220,7 +224,7 @@ Sessions are written/updated as the run progresses: pre-spawn writes the row wit
   Follow-up:
   [empty — user types]
   ```
-  The user's typed follow-up is appended verbatim. The source session is NOT modified. A new session row is created with status="running" and `forked_from: <source_id>` metadata.
+  The user's typed follow-up is appended verbatim. The source session is NOT modified. A new session row is created with `status="running"` and `forkedFrom: <source_id>` (matching the Session interface field; NOT a separate `forked_from` map entry).
 
 ### AC5: State 5 (SessionsList) is reachable + filterable
 - **AC5.1** ⌘S from any state pushes SessionsList.
@@ -233,7 +237,11 @@ Sessions are written/updated as the run progresses: pre-spawn writes the row wit
 - **AC6.2** `recordSessionStart` writes a new row with status="running" before the subprocess is spawned. If the spawn fails synchronously, status transitions to "errored" with the error message in `answer`.
 - **AC6.3** `recordSessionUpdate` is called via debounced flush (existing 80ms FLUSH_INTERVAL_MS) and writes the current answer + auditCalls to the row.
 - **AC6.4** `recordSessionEnd` is called on subprocess exit (clean, cancelled, or errored); writes completedAt + final status + final sourceBreakdown + final evidenceClusters.
-- **AC6.5** Cap: MAX_SESSIONS=100. Eviction priority: `status="historical"` first, then oldest `startedAt`. Never evict: status="running" + the single most-recent status="done" session (the warm session).
+- **AC6.5** Cap: MAX_SESSIONS=100. Eviction priority: `status="historical"` first, then oldest `startedAt`. Never evict: any `status="running"` row, OR the single most-recent `status="done"` row (the derived warm session — NOT a status value).
+- **AC6.6** Startup reconciliation (r1 codex-ops F3): on `useSessions()` first read AFTER the AC6.1 migration, scan all rows with `status="running"`. For each row, transition to `status="cancelled"` with `completedAt = new Date().toISOString()` and the sentinel `answer` suffix `"\n\n[session reconciled at startup — Raycast extension was closed before completion]"` when EITHER:
+  - **(a)** `Date.now() - new Date(startedAt).getTime() > MAX_RUNTIME_MS` (default `MAX_RUNTIME_MS = 300_000` ms = 5 min — matches `agent-runner.ts`'s existing 5-min ceiling), OR
+  - **(b)** `subprocessLogPath !== null && fs.statSync(subprocessLogPath).mtimeMs < Date.now() - 60_000` (log file untouched for >60s — agent process is dead).
+  Reconciliation is idempotent (already-cancelled rows are skipped). Prevents immortal `running` rows from bypassing MAX_SESSIONS eviction.
 
 ### AC7: Component split reduces echo.tsx to ≤400 lines
 - **AC7.1** Post-refactor, `wc -l tools/raycast-echo/src/echo.tsx` returns ≤400.
@@ -241,15 +249,18 @@ Sessions are written/updated as the run progresses: pre-spawn writes the row wit
 - **AC7.3** `npx tsc --noEmit` clean; `npx ray build` clean; existing tests pass.
 
 ### AC8: Tests cover the new persistence + UI surfaces
-- **AC8.1** `test/sessions.test.ts`: 8 tests minimum — write-read roundtrip, migration from recent-asks, MAX_SESSIONS eviction, status transitions (running → done, running → errored, running → cancelled), warm-session protection from eviction, fork creates new row, fork does not mutate source.
+- **AC8.1** `test/sessions.test.ts`: 9 tests minimum — write-read roundtrip, migration from recent-asks (idempotent on second read), MAX_SESSIONS eviction, status transitions (running → done, running → errored, running → cancelled), warm-session derived selector returns most-recent done, eviction protection for warm-session derived selector, fork creates new row with `forkedFrom`, fork does not mutate source.
 - **AC8.2** `test/audit-timeline.test.tsx`: 4 tests minimum — live mode render with pending row, completed mode render, errored daemon render, empty audit array.
-- **AC8.3** `test/session-detail.test.tsx`: 3 tests minimum — full render with all sidebar fields populated, fork action writes new session, action panel surfaces all primary actions.
-- **AC8.4** Total project test count: ≥45 (current 32 + at least 13 new).
+- **AC8.3** `test/session-detail.test.tsx`: 3 tests minimum — full render with all sidebar fields populated (including the `subprocessLogPath === null` fallback string per AC4.2), fork action writes new session with `forkedFrom`, action panel surfaces all primary actions.
+- **AC8.4** Total project test count: ≥48 (current 32 + at least 16 new).
+- **AC8.5** `test/agent-runner.test.ts` (extend existing): two overlapping `startAgent` calls return distinct non-null `sessionLogPath` values pointing to different files; closing one runner does NOT affect the other's `sessionLogPath`. Closes r1 codex-ops F1's "tests two overlapping runs storing distinct paths" requirement.
+- **AC8.6** `test/sessions.test.ts` (additional, AC6.6-specific): 2 tests minimum — stale `running` row (startedAt > MAX_RUNTIME_MS) is reconciled to `cancelled` on first read; non-stale `running` row is left untouched; second read after reconciliation is a no-op (idempotent).
 
 ### AC9: Dogfooding gate before retiring this spec
 - **AC9.1** ≥10 journal entries in `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` referencing the new five-state UX, across ≥3 distinct days.
 - **AC9.2** ≥1 journal entry per pain (#1, #2, #3, #4) confirming the new UX addresses it OR clearly identifying a remaining gap.
 - **AC9.3** README updated with the new UX walkthrough; the prior `recent-asks` mention is removed.
+- **AC9.4** ≥1 journal entry explicitly addressing AC3.6 audit-contamination: either confirming concurrent-call contamination is invisible/acceptable in practice, OR providing a falsifiable example where contamination materially hurt the SessionDetail inspectability UX. If the latter, file a daemon-enhancement follow-up spec for run-correlation (e.g. `correlation_id` field in request-log + audit query filter). The follow-up is OUT of scope for this item.
 
 ### AC10: Recent-asks deprecation
 - **AC10.1** `src/lib/recent-asks.ts` deleted. All imports across echo.tsx + components updated to use sessions.ts.
@@ -262,7 +273,7 @@ The following are EXPLICITLY rejected; an agent who finds itself building any of
 1. **Multi-turn chat threads** — A and B from the brainstorm. The fork mechanic (⌘R) is the only continuity affordance.
 2. **Daemon-side conversation memory** — no chat state in the MCP server, no thread IDs, no server-side session store.
 3. **Custom on-disk session format beyond LocalStorage + existing tee log files** — JSON in LocalStorage is the contract; tee log path is the existing contract from cca021b.
-4. **New daemon endpoints** — AuditTimeline consumes `/mcp/recent-calls` as-is. If `result_shape` is insufficient for top-source derivation, the row degrades; do NOT amend the daemon contract.
+4. **New daemon endpoints OR run-correlation in the existing endpoint** — AuditTimeline consumes `/mcp/recent-calls` exactly as defined in item 062 AC5. If `result_shape` is insufficient for top-source derivation, the row degrades. The concurrent-call contamination (r1 codex-ops F2) is acknowledged in AC3.6 + Risk #6, NOT fixed here; do NOT amend the daemon contract in this spec. The daemon-side `correlation_id` follow-up is gated by AC9.4's dogfooding evidence.
 5. **Browser-tab primary detection** — `detectPrimary()` desktop-app-only behavior is preserved.
 6. **A persistent companion window outside Raycast** — rejected as a destination app.
 7. **"Newline = ask, no newline = retrieve" magic** — the synthetic Ask row is the explicit primary action.
@@ -277,6 +288,7 @@ The following are EXPLICITLY rejected; an agent who finds itself building any of
 3. **LocalStorage capacity.** 100 sessions × ~5KB each ≈ 500KB. Raycast LocalStorage has no documented hard cap; if dogfooding shows OOM, drop to MAX_SESSIONS=50 + truncate answer body to 8KB per row.
 4. **Migration from recent-asks loses data.** The migration is one-shot. Mitigation: include a defensive backup-write to a `echo.recent-asks.backup` key before the delete; AC6.1 test asserts both the new key has the rows AND the backup key has the original JSON verbatim.
 5. **`echo.tsx` ≤400 line target is hard.** Current 1069 lines; some shared helpers may resist extraction. Mitigation: if the AC7.1 target is missed by ≤50 lines, builder may negotiate to 450 in agent_notes; >450 is a hard reject.
+6. **Audit contamination from concurrent MCP calls.** `/mcp/recent-calls?since=…&until=…` is a PROCESS-GLOBAL ring buffer; the `[startedAt, completedAt]` time-slice will include MCP calls from any other surface (parallel Claude Code, Cursor, `tools/tail-mcp.sh`, coord ticks) that lands in the same window. In single-user dogfooding the probability is low but real. AC3.6 acknowledges the limitation; AC9.4 gates the dogfooding-driven decision on whether to file a daemon-side `correlation_id` follow-up. Mitigation: client-side run-correlation (env-var-passed session ID + agent forwards as header) is rejected as out-of-scope (requires both daemon AND agent-binary changes — codex/claude are external CLIs we don't control). Acceptable for V1.6; NOT acceptable for V1.7+ unattended/production use.
 
 ## After Completion (Strategist Notes)
 
