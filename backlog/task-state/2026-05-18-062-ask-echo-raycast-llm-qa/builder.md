@@ -2,12 +2,19 @@
 task_id: 2026-05-18-062-ask-echo-raycast-llm-qa
 role: builder
 writer: codex-builder
-last_updated: 2026-05-19T04:43:21Z
+last_updated: 2026-05-19T04:46:52Z
+handoff_branch: agent/ask-echo-raycast-llm-qa
+handoff_head_sha: 3d8a4b594381da099dbb846971cc5f11741d2f8f
+handoff_run_log: raw/internal/agent-runs/2026-05-18-2026-05-18-062-ask-echo-raycast-llm-qa.md
 ---
 
 ## current_thesis
 
 Claimed 062 as Codex builder. The task is to add the Ask ECHO Raycast single-shot Q&A command plus daemon MCP request auditing, but implementation is blocked before code because the spec's `files_to_modify` includes `docs/BACKLOG.md` while builder instructions forbid builder edits to that file.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-05-18-2026-05-18-062-ask-echo-raycast-llm-qa.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -25,6 +32,10 @@ Claimed 062 as Codex builder. The task is to add the Ask ECHO Raycast single-sho
 
 - BLOCKED: should `docs/BACKLOG.md` be removed from this item's `files_to_modify` / handled by the strategist, or should the builder no-write rule for `docs/BACKLOG.md` be explicitly amended for this item?
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 
 - Do not build multi-turn, threaded, follow-up, or chat-bubble UI.
@@ -38,4 +49,4 @@ Claimed 062 as Codex builder. The task is to add the Ask ECHO Raycast single-sho
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-18-062-ask-echo-raycast-llm-qa.md
+- spec: backlog/pending_review/2026-05-18-062-ask-echo-raycast-llm-qa.md

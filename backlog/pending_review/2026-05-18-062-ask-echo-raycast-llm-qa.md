@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-062-ask-echo-raycast-llm-qa
 title: Ask ECHO — Raycast Q&A command backed by a vendor-agnostic headless agent (codex / claude / custom) consuming ECHO MCP
-status: claimed
+status: pending_review
 priority: MED
 estimate: 1-2d
 created: 2026-05-18
@@ -43,10 +43,14 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-19T04:43:21Z"
 branch: "agent/ask-echo-raycast-llm-qa"
 worktree: "/Users/zhenye/Desktop/Project_echo--ask-echo-raycast-llm-qa"
-head_sha: ""
+head_sha: "3d8a4b594381da099dbb846971cc5f11741d2f8f"
 pr_url: ""
 review_notes: |
 agent_notes: |
+  BLOCKED: The spec lists `docs/BACKLOG.md` in `files_to_modify`, but `docs/AGENT_INSTRUCTIONS.md` and the process-backlog skill both explicitly forbid builder edits to `docs/BACKLOG.md`.
+  Tried: Confirmed `docs/BACKLOG.md` does not already contain a 062 row; claimed the item, created the required builder-state pointer, created and pushed `agent/ask-echo-raycast-llm-qa` at `3d8a4b594381da099dbb846971cc5f11741d2f8f`, and stopped before implementation.
+  Best-guess answer: remove `docs/BACKLOG.md` from this item's builder `files_to_modify` and let the strategist/founder update the backlog index separately; confidence medium-high.
+  Why I escalated rather than guessing: active backlog item instructions conflict with global builder no-write rules, and AGENTS.md says to stop and surface conflicts rather than choosing an interpretation.
 ---
 
 ## Summary
