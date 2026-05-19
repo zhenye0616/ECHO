@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASK_ECHO_SYSTEM_PROMPT, buildAskEchoPrompt } from "../src/lib/system-prompt";
+import { ASK_ECHO_SYSTEM_PROMPT, buildAskEchoPrompt, buildUnifiedAskPrompt } from "../src/lib/system-prompt";
 
 describe("Ask ECHO system prompt", () => {
   it("matches the pinned prompt snapshot", () => {
@@ -36,5 +36,14 @@ describe("Ask ECHO system prompt", () => {
 
   it("appends the user question without mutating the pinned system body", () => {
     expect(buildAskEchoPrompt("  what changed?  ")).toBe(`${ASK_ECHO_SYSTEM_PROMPT}\n\nQuestion:\nwhat changed?\n`);
+  });
+
+  it("exports a stricter unified prompt with a hard answer cap", () => {
+    const prompt = buildUnifiedAskPrompt("  what should ship next?  ");
+
+    expect(typeof buildUnifiedAskPrompt).toBe("function");
+    expect(prompt).toEqual(expect.any(String));
+    expect(prompt).toContain("3 to 6 bullets");
+    expect(prompt).toContain("what should ship next?");
   });
 });

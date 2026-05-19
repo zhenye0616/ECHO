@@ -3,12 +3,15 @@ export type AgentKind = "codex" | "claude" | "custom";
 export interface AgentProfilePreferences {
   agentKind?: string;
   customCommand?: string;
+  claudeOauthToken?: string;
 }
 
 export interface AgentInvocation {
   binary: string;
   args: string[];
   stdin: string;
+  cwd?: string;
+  env?: Record<string, string>;
 }
 
 export class AgentProfileError extends Error {
@@ -26,7 +29,9 @@ export function resolveAgentInvocation(
 ): AgentInvocation {
   const agentKind = normalizeAgentKind(kind ?? preferences.agentKind);
   if (agentKind === "claude") {
-    return { binary: "claude", args: ["-p"], stdin: prompt };
+    const token = preferences.claudeOauthToken?.trim();
+    const env = token !== undefined && token.length > 0 ? { CLAUDE_CODE_OAUTH_TOKEN: token } : undefined;
+    return { binary: "claude", args: ["-p"], stdin: prompt, cwd: repoPath, env };
   }
   if (agentKind === "custom") {
     return resolveCustomInvocation(preferences.customCommand, repoPath, prompt);

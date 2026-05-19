@@ -24,6 +24,7 @@ interface AskEchoPreferences {
   agentKind?: string;
   customCommand?: string;
   repoPath?: string;
+  claudeOauthToken?: string;
 }
 
 interface AskFormValues {
