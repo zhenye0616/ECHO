@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-062-ask-echo-raycast-llm-qa
 title: Ask ECHO — Raycast Q&A command backed by a vendor-agnostic headless agent (codex / claude / custom) consuming ECHO MCP
-status: pending_review
+status: ready
 priority: MED
 estimate: 1-2d
 created: 2026-05-18
@@ -20,7 +20,7 @@ files_to_modify:
   - tools/raycast-echo/README.md  # AC7 — add "Ask ECHO" section: install assumptions (codex and/or claude on PATH), preferences walkthrough, dogfooding template adapted for ⌘⇧A (Trigger / Query inputs incl. agent kind / Returned incl. tool-call count / Sources from sidebar / Verdict / Note)
   - src/mcp/server.ts  # AC5 — (a) introduce a `registerTool(server, name, schema, handler)` wrapper that intercepts every tool call to record start/end/status/duration into the ring buffer below; (b) refactor existing per-tool `server.registerTool(...)` call sites (find_clusters, search_memories, get_atoms, get_atom, echo_ping, plus any others) to go through the wrapper; (c) add path dispatch for `GET /mcp/recent-calls` BEFORE the existing `methodNotAllowed` branch, preserving the POST `/mcp` JSON-RPC behavior verbatim; loopback-only inherited from existing bind. Confirmed 2026-05-18 by codex reviewer: no existing request log exists; this wrapper IS the new mechanism, not an exposure of existing state.
   - src/mcp/request-log.ts  # AC5 — REQUIRED (not conditional; codex reviewer confirmed no existing log). In-memory ring buffer (cap 1000) of recent MCP tool invocations. Pure module, no external deps. Records `{ ts, tool, args_shape, result_shape, duration_ms, status: "pending" | "ok" | "error" }`. Updated in-place when a tool call transitions pending → ok/error. Redaction posture per AC5 redaction allowlist (no raw atom content, no full queries, no full paths, no arbitrary result JSON).
-  - docs/BACKLOG.md  # add Ready-table row pointing at this item
+  # NOTE: `docs/BACKLOG.md` is intentionally NOT in this list. Per docs/AGENT_INSTRUCTIONS.md:363 builders MUST NOT write to docs/BACKLOG.md (founder/strategist territory). The Ready-table row for this item was added by the strategist when the spec was committed; see commit history. Earlier revisions of this spec listed docs/BACKLOG.md here, which was a strategist pattern-bug inherited from item 060's spec — the bug was caught by builder agent 78D5AB0F at 2026-05-19T04:43:21Z; see agent_notes archived in commit 27ce831.
 spec_refs:
   - tools/raycast-echo/src/search-context.tsx  # sibling command; preserves the existing UI/UX conventions (APP_META palette, toast patterns); Ask ECHO does NOT modify this file — purely additive
   - tools/raycast-echo/src/lib/mcp.ts  # existing MCP client wrapper — Ask ECHO does NOT call MCP directly; it spawns an agent which calls MCP. mcp.ts is only consulted as a reference pattern.
@@ -39,18 +39,15 @@ spec_refs:
   - https://developers.raycast.com/api-reference/preferences  # external; per-extension preferences API for the agentKind dropdown + customCommand textfield
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-05-19T04:43:21Z"
-branch: "agent/ask-echo-raycast-llm-qa"
-worktree: "/Users/zhenye/Desktop/Project_echo--ask-echo-raycast-llm-qa"
-head_sha: "3d8a4b594381da099dbb846971cc5f11741d2f8f"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
 pr_url: ""
 review_notes: |
 agent_notes: |
-  BLOCKED: The spec lists `docs/BACKLOG.md` in `files_to_modify`, but `docs/AGENT_INSTRUCTIONS.md` and the process-backlog skill both explicitly forbid builder edits to `docs/BACKLOG.md`.
-  Tried: Confirmed `docs/BACKLOG.md` does not already contain a 062 row; claimed the item, created the required builder-state pointer, created and pushed `agent/ask-echo-raycast-llm-qa` at `3d8a4b594381da099dbb846971cc5f11741d2f8f`, and stopped before implementation.
-  Best-guess answer: remove `docs/BACKLOG.md` from this item's builder `files_to_modify` and let the strategist/founder update the backlog index separately; confidence medium-high.
-  Why I escalated rather than guessing: active backlog item instructions conflict with global builder no-write rules, and AGENTS.md says to stop and surface conflicts rather than choosing an interpretation.
+  Prior claim by agent 78D5AB0F at 2026-05-19T04:43:21Z (branch agent/ask-echo-raycast-llm-qa @ 3d8a4b5) correctly escalated a strategist pattern-bug (docs/BACKLOG.md in files_to_modify) per docs/AGENT_INSTRUCTIONS.md:363. Strategist resolved by (a) removing docs/BACKLOG.md from files_to_modify, (b) adding the Ready-table row directly, (c) deleting the empty agent branch. Item is reset to ready/ and may be re-claimed by any builder. The 78D5AB0F escalation was correct behavior, not a failure.
 ---
 
 ## Summary
