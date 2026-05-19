@@ -14,6 +14,8 @@
 # Forensic / dogfooding dump artifacts — kept on disk for analysis but regeneratable
 # from source; don't commit (large JSON dumps that bloat history without adding value).
 raw/internal/dogfooding/**/full-response.json
+raw/internal/**/*.html
+!raw/internal/dogfooding/journal-style.html
 
 # Claude Code agent runtime logs
 .claude/logs/

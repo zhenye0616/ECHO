@@ -385,6 +385,10 @@ After the loop completes, output:
 - The follow-up queue contents (`backlog/_followups.md`).
 - A reminder: *"Strategist conversation: <ids> are now in `complete/`. Their After-Completion sections need to be promoted to `wiki/` next."*
 
+### Wiki promotion (post-merge)
+
+After wiki promotion of an item lands in `wiki/`, convert its `backlog/complete/<id>.md` file to the stub schema and move the full original body to `backlog/archive/shipped/<YYYY-MM>/<id>.md`. The stub schema is documented in `backlog/archive/README.md`.
+
 ### Live checkout bringup (founder-in-the-loop, replaces C9b auto-kickstart)
 
 After Step D's summary, surface this exact prompt and wait for founder `continue`:

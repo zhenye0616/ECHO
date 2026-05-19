@@ -35,16 +35,20 @@ tools/review-queue/status-codex-reviewer-launchd.sh
 tools/review-queue/uninstall-codex-reviewer-launchd.sh
 ```
 
-The install script writes the plist with `StartInterval=600` (10 minutes), `RunAtLoad=false`, and `KeepAlive=false` (one-shot per tick), uses `launchctl bootstrap gui/<uid>` on macOS Sonoma+ and falls back to `launchctl load -w` on older macOS, and routes the launchd stream captures to `/dev/null` (the wrapper writes a unified log to `~/Library/Logs/echo-review-queue-codex.log` with its own timestamped preamble per tick).
+The install script shipped in item 041 writes the plist with `StartInterval=600` (10 minutes), `RunAtLoad=false`, and `KeepAlive=false` (one-shot per tick), uses `launchctl bootstrap gui/<uid>` on macOS Sonoma+ and falls back to `launchctl load -w` on older macOS, and routes the launchd stream captures to `/dev/null` (the wrapper writes a unified log to `~/Library/Logs/echo-review-queue-codex.log` with its own timestamped preamble per tick).
 
-The wrapper itself (`tools/review-queue/run-codex-reviewer.sh`) reads `${ECHO_REVIEW_QUEUE_REPO_ROOT}` (default `~/Desktop/Project_echo`) so launchd-driven ticks operate against the production repo while the smoke test isolates by setting the env var to a tmpdir. The canonical Codex invocation pinned by the wrapper is:
+The driver (`tools/review-queue/run-codex-reviewer.sh`) delegates to `tools/review-queue/_run_reviewer.sh`, which reads `${ECHO_REVIEW_QUEUE_REPO_ROOT}` (default `~/Desktop/Project_echo`) so launchd-driven ticks operate against the production repo while the smoke test isolates by setting the env var to a tmpdir. Since item 050, the wrapper does **not** run Codex in the founder's live checkout and does not use any sentinel-file lock. Each tick performs `git fetch origin main`, creates a detached ephemeral worktree at `$TMPDIR/echo-codex-<uuid>` pinned to `origin/main`, routes Codex into that worktree via CWD + `ECHO_REVIEW_QUEUE_REPO_ROOT` + prompt path + `codex -C`, and removes the worktree on exit. The live checkout's `.git/index` is not a reviewer write surface.
+
+The canonical raw Codex invocation shape is:
 
 ```bash
-codex exec -C "$ECHO_REVIEW_QUEUE_REPO_ROOT" --sandbox danger-full-access - < "$ECHO_REVIEW_QUEUE_REPO_ROOT/.claude/commands/review-queue-codex.md"
+codex exec -C ~/Desktop/Project_echo --sandbox danger-full-access - < ~/Desktop/Project_echo/.claude/commands/review-queue-codex.md
 ```
 
+Inside the launchd wrapper, the same shape is evaluated against the ephemeral worktree (`-C "$WT"` and `< "$WT/.claude/commands/review-queue-codex.md"`), not the live checkout.
+
 Why these flags:
-- `--sandbox danger-full-access` — the prior `workspace-write` setting denied `.git/FETCH_HEAD` writes on macOS and broke every tick. `danger-full-access` is correct for this background reviewer process; the wrapper runs the prompt as a single non-interactive tick under launchd.
+- `--sandbox danger-full-access` — the prior `workspace-write` setting denied `.git/FETCH_HEAD` writes on macOS and broke every tick. `danger-full-access` is correct for this background reviewer process; the wrapper creates/removes worktrees, fetches/pushes, and runs the prompt as a single non-interactive tick under launchd.
 - `--ask-for-approval` is **not** passed — the flag does not exist on Codex CLI v0.130.0, and the runtime preamble already defaults headless `codex exec` to `never`.
 - `<` redirection rather than `cat | codex exec` — survives shell-paste edge cases the pipe variant does not. See memory note `reference_codex_review_queue_invocation.md`.
 

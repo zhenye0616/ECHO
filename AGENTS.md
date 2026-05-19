@@ -173,9 +173,9 @@ Keep the V1 tape-above-desk from `CLAUDE.md` in mind:
 
 ## ECHO MCP Dogfooding Log
 
-Every Codex interaction with ECHO must be logged to the canonical cross-tool journal:
+Every Codex interaction with ECHO must be logged to the canonical current-month cross-tool journal shard:
 
-`raw/internal/dogfooding/mcp-interactions-journal.md`
+`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md`)
 
 This applies to every call to ECHO MCP tools, including:
 
@@ -183,6 +183,8 @@ This applies to every call to ECHO MCP tools, including:
 - `search_memories`
 - `echo_ping`
 - any equivalent local CLI, curl, or MCP-client call against ECHO
+
+If a Codex invocation reads files / runs git / runs scripts but makes zero ECHO MCP calls, do not journal it. Mechanical activity belongs in review responses, commits, and run logs; the journal is for MCP-call discipline and surprising ECHO retrieval failures.
 
 Log in the moment, using the journal's local-time template. Include:
 
