@@ -5,6 +5,7 @@ import { DeadlineTracker, type DeadlineTrackerHandle } from '../coord/deadlines.
 import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
+import { instrumentMcpServer, readRecentMcpCalls, type RecentMcpCallStatus } from './request-log.js';
 import { registerCoordEmit } from './tools/coord-emit.js';
 import { registerCoordInvoke } from './tools/coord-invoke.js';
 import { registerCoordStatus } from './tools/coord-status.js';
@@ -101,20 +102,62 @@ async function readJsonBody(req: import('node:http').IncomingMessage): Promise<u
 function methodNotAllowed(
   res: import('node:http').ServerResponse,
   method: string | undefined,
+  allow = 'POST',
 ): void {
   res.statusCode = 405;
-  res.setHeader('Allow', 'POST');
+  res.setHeader('Allow', allow);
   res.setHeader('content-type', 'application/json');
   res.end(
     JSON.stringify({
       jsonrpc: '2.0',
       error: {
         code: -32000,
-        message: `Method Not Allowed: ${method ?? 'unknown'} (POST only)`,
+        message: `Method Not Allowed: ${method ?? 'unknown'} (${allow} only)`,
       },
       id: null,
     }),
   );
+}
+
+function handleRecentCalls(
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+  host: string,
+  boundPort: number,
+): boolean {
+  const url = new URL(req.url ?? '/', `http://${host}:${boundPort}`);
+  if (url.pathname !== '/mcp/recent-calls') return false;
+  if (req.method !== 'GET') {
+    methodNotAllowed(res, req.method, 'GET');
+    return true;
+  }
+
+  const since = parseNumberParam(url.searchParams.get('since'), 0);
+  const until = parseNumberParam(url.searchParams.get('until'), Number.POSITIVE_INFINITY);
+  const status = parseStatusParam(url.searchParams.get('status'));
+  if (since === null || until === null || status === null) {
+    res.statusCode = 400;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ error: 'invalid recent-calls query parameters' }));
+    return true;
+  }
+
+  res.statusCode = 200;
+  res.setHeader('content-type', 'application/json');
+  res.end(JSON.stringify({ calls: readRecentMcpCalls({ since, until, ...(status !== undefined ? { status } : {}) }) }));
+  return true;
+}
+
+function parseNumberParam(raw: string | null, fallback: number): number | null {
+  if (raw === null || raw === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseStatusParam(raw: string | null): RecentMcpCallStatus | undefined | null {
+  if (raw === null || raw === '') return undefined;
+  if (raw === 'pending' || raw === 'ok' || raw === 'error') return raw;
+  return null;
 }
 
 export async function startMcpServer(
@@ -188,6 +231,7 @@ export async function startMcpServer(
           : null;
 
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
+    instrumentMcpServer(mcp);
     registerEchoPing(mcp);
     registerSearchMemories(mcp, storage);
     // Deprecated wrapper — kept registered until the 2026-05-17 follow-up
@@ -253,6 +297,10 @@ export async function startMcpServer(
 
   const httpServer: HttpServer = createServer((req, res) => {
     void (async () => {
+      if (handleRecentCalls(req, res, host, boundPort)) {
+        return;
+      }
+
       if (req.method !== 'POST') {
         methodNotAllowed(res, req.method);
         return;
