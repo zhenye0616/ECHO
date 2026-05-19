@@ -1,6 +1,7 @@
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
+import { homedir } from "node:os";
 import { ECHO_MCP_URL } from "./mcp";
 import type { AgentInvocation } from "./agent-profiles";
 
@@ -23,6 +24,26 @@ export interface AgentRunnerOptions {
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RUNTIME_MS = 5 * 60_000;
 const STDERR_TAIL_LIMIT = 4096;
+
+// Raycast's Node runtime hands the extension an env with PATH=undefined,
+// so bare-name binaries (e.g. "codex", "claude") fail `which` even when
+// they exist on disk. resolvePathEnv() falls back to a PATH covering the
+// directories GUI-launched processes commonly need to reach.
+const FALLBACK_PATH_DIRS = [
+  "/usr/local/bin",
+  "/opt/homebrew/bin",
+  "/usr/bin",
+  "/bin",
+  "/usr/sbin",
+  "/sbin",
+];
+
+export function resolvePathEnv(env: NodeJS.ProcessEnv = process.env): string {
+  const existing = env.PATH;
+  if (existing && existing.length > 0) return existing;
+  const home = homedir();
+  return [...FALLBACK_PATH_DIRS, `${home}/.local/bin`, `${home}/.cargo/bin`].join(":");
+}
 
 export async function probeEchoDaemon(timeoutMs = 1_000): Promise<boolean> {
   const controller = new AbortController();
@@ -48,9 +69,14 @@ export async function findExecutable(binary: string): Promise<boolean> {
   }
 
   return new Promise((resolve) => {
-    execFile("which", [binary], { timeout: 1_000 }, (err, stdout) => {
-      resolve(err === null && stdout.trim().length > 0);
-    });
+    execFile(
+      "which",
+      [binary],
+      { timeout: 1_000, env: { ...process.env, PATH: resolvePathEnv() } },
+      (err, stdout) => {
+        resolve(err === null && stdout.trim().length > 0);
+      },
+    );
   });
 }
 
@@ -74,6 +100,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
     detached: false,
     env: {
       ...process.env,
+      PATH: resolvePathEnv(),
       NO_COLOR: "1",
       TERM: "dumb",
     },

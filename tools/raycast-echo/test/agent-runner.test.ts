@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { startAgent, stripTerminalControl, type AgentRunnerEvent } from "../src/lib/agent-runner";
+import {
+  findExecutable,
+  resolvePathEnv,
+  startAgent,
+  stripTerminalControl,
+  type AgentRunnerEvent,
+} from "../src/lib/agent-runner";
 
 async function collect(events: AsyncIterable<AgentRunnerEvent>): Promise<AgentRunnerEvent[]> {
   const out: AgentRunnerEvent[] = [];
@@ -27,6 +33,30 @@ describe("agent runner", () => {
     expect(footer).toBeDefined();
     expect(footer?.type === "footer" ? footer.markdown : "").toContain("boom");
     expect(footer?.type === "footer" ? footer.markdown : "").not.toContain("\x1b");
+  });
+
+  it("resolvePathEnv returns process.env.PATH when set", () => {
+    expect(resolvePathEnv({ PATH: "/foo:/bar" })).toBe("/foo:/bar");
+  });
+
+  it("resolvePathEnv falls back to GUI-safe defaults when PATH is undefined", () => {
+    const resolved = resolvePathEnv({});
+    expect(resolved).toContain("/usr/local/bin");
+    expect(resolved).toContain("/opt/homebrew/bin");
+    expect(resolved).toContain("/usr/bin");
+  });
+
+  it("findExecutable resolves bare-name binaries when process.env.PATH is undefined", async () => {
+    const previous = process.env.PATH;
+    delete process.env.PATH;
+    try {
+      // /bin/sh is universally present; verifies the absolute-path branch.
+      await expect(findExecutable("/bin/sh")).resolves.toBe(true);
+      // 'sh' is in /bin or /usr/bin; verifies fallback PATH is wired into the `which` execFile env.
+      await expect(findExecutable("sh")).resolves.toBe(true);
+    } finally {
+      if (previous !== undefined) process.env.PATH = previous;
+    }
   });
 
   it("handles stdout chunks split mid-escape-sequence", async () => {
