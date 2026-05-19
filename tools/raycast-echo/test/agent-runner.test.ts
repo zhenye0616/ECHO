@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, chmodSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findExecutable,
   resolvePathEnv,
+  SESSION_LOG_DIR,
   startAgent,
   stripTerminalControl,
   type AgentRunnerEvent,
@@ -14,6 +18,21 @@ async function collect(events: AsyncIterable<AgentRunnerEvent>): Promise<AgentRu
 }
 
 describe("agent runner", () => {
+  let sessionLogDir: string;
+
+  beforeEach(() => {
+    sessionLogDir = mkdtempSync(join(tmpdir(), "echo-agent-runner-"));
+  });
+
+  afterEach(() => {
+    try {
+      chmodSync(sessionLogDir, 0o700);
+    } catch {
+      // Directory may already be gone.
+    }
+    rmSync(sessionLogDir, { recursive: true, force: true });
+  });
+
   it("strips bold ANSI escapes from stdout text", () => {
     expect(stripTerminalControl("\x1b[1mhello\x1b[0m")).toBe("hello");
   });
@@ -79,4 +98,81 @@ describe("agent runner", () => {
       .join("");
     expect(stdout).toBe("hello");
   });
+
+  it("tees subprocess stdout and stderr to a per-session log", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.stdout.write('hello stdout\\n'); process.stderr.write('hello stderr\\n');"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
+    );
+
+    await collect(run.events);
+
+    const logPath = onlySessionLogPath(sessionLogDir);
+    const text = readFileSync(logPath, "utf8");
+    expect(text).toContain("=== ECHO agent session ");
+    expect(text).toContain(`${process.execPath} -e`);
+    expect(text).toContain("hello stdout\n");
+    expect(text).toContain("[stderr] hello stderr\n");
+    expect(SESSION_LOG_DIR).toContain(".config/raycast/extensions/echo-context/sessions");
+  });
+
+  it("updates latest.log to point at the newest per-session log", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.stdout.write('latest target\\n');"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
+    );
+
+    await collect(run.events);
+
+    const sessionPath = onlySessionLogPath(sessionLogDir);
+    const latestPath = join(sessionLogDir, "latest.log");
+    expect(existsSync(latestPath)).toBe(true);
+
+    const stat = lstatSync(latestPath);
+    if (stat.isSymbolicLink()) {
+      expect(realpathSync(latestPath)).toBe(realpathSync(sessionPath));
+    } else {
+      expect(readFileSync(latestPath, "utf8").trim()).toBe(sessionPath);
+    }
+  });
+
+  it("continues the run when the session log directory is unwritable", async () => {
+    chmodSync(sessionLogDir, 0);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const run = startAgent(
+        {
+          binary: process.execPath,
+          args: ["-e", "process.stdout.write('still runs\\n');"],
+          stdin: "",
+        },
+        { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
+      );
+
+      const events = await collect(run.events);
+      const stdout = events
+        .filter((event): event is Extract<AgentRunnerEvent, { type: "stdout" }> => event.type === "stdout")
+        .map((event) => event.text)
+        .join("");
+      expect(stdout).toBe("still runs\n");
+      expect(events.some((event) => event.type === "exit" && event.code === 0)).toBe(true);
+    } finally {
+      warn.mockRestore();
+      chmodSync(sessionLogDir, 0o700);
+    }
+  });
 });
+
+function onlySessionLogPath(dir: string): string {
+  const logs = readdirSync(dir).filter((name) => name.endsWith(".log") && name !== "latest.log");
+  expect(logs).toHaveLength(1);
+  return join(dir, logs[0]);
+}

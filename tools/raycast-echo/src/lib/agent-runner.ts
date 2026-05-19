@@ -1,7 +1,8 @@
-import { constants } from "node:fs";
+import { constants, createWriteStream, mkdirSync, renameSync, rmSync, symlinkSync, type WriteStream } from "node:fs";
 import { access } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { ECHO_MCP_URL } from "./mcp";
 import type { AgentInvocation } from "./agent-profiles";
 
@@ -19,11 +20,13 @@ export interface AgentRun {
 export interface AgentRunnerOptions {
   idleTimeoutMs?: number;
   maxRuntimeMs?: number;
+  sessionLogDir?: string;
 }
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RUNTIME_MS = 5 * 60_000;
 const STDERR_TAIL_LIMIT = 4096;
+export const SESSION_LOG_DIR = join(homedir(), ".config", "raycast", "extensions", "echo-context", "sessions");
 
 // Raycast's Node runtime hands the extension an env with PATH=undefined,
 // so bare-name binaries (e.g. "codex", "claude") fail `which` even when
@@ -87,6 +90,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   const stderrTail = new BoundedTextBuffer(STDERR_TAIL_LIMIT);
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
   const maxRuntimeMs = options.maxRuntimeMs ?? DEFAULT_MAX_RUNTIME_MS;
+  const sessionLog = createSessionLog(invocation, options.sessionLogDir ?? SESSION_LOG_DIR);
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let maxTimer: ReturnType<typeof setTimeout> | null = null;
@@ -135,12 +139,14 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
 
   child.once("error", (err) => {
     clearTimers();
+    void sessionLog?.close();
     queue.push({ type: "error", error: err });
     queue.push({ type: "footer", markdown: `**Agent failed to start**\n\n${stripTerminalControl(err.message)}` });
     queue.close();
   });
 
   child.stderr.on("data", (chunk: Buffer) => {
+    sessionLog?.writeStderr(chunk);
     stderrTail.append(stderrStripper.write(chunk.toString("utf8")));
   });
   child.stderr.on("error", (err) => {
@@ -161,7 +167,9 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
 
   const stdoutPump = (async () => {
     for await (const chunk of child.stdout) {
-      const text = stdoutStripper.write(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk));
+      const raw = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      sessionLog?.writeStdout(raw);
+      const text = stdoutStripper.write(raw.toString("utf8"));
       if (text.length === 0) continue;
       armIdleTimer();
       queue.push({ type: "stdout", text });
@@ -178,6 +186,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
       const trailingOut = stdoutStripper.flush();
       if (trailingOut.length > 0) queue.push({ type: "stdout", text: trailingOut });
       stderrTail.append(stderrStripper.flush());
+      await sessionLog?.close();
 
       if (stdinError !== null && !cancelled && !exceededMaxRuntime) {
         queue.push({
@@ -203,9 +212,127 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
       if (exited || cancelled) return;
       cancelled = true;
       queue.push({ type: "footer", markdown: "**Cancelled.**" });
+      void sessionLog?.close();
       if (child.pid !== undefined) void killProcessTree(child.pid);
     },
   };
+}
+
+interface SessionLog {
+  writeStdout(chunk: Buffer): void;
+  writeStderr(chunk: Buffer): void;
+  close(): Promise<void>;
+}
+
+function createSessionLog(invocation: AgentInvocation, logDir: string): SessionLog | null {
+  const openedAt = new Date().toISOString();
+  const filename = `${openedAt.replace(/[:.]/g, "-")}.log`;
+  const sessionPath = join(logDir, filename);
+
+  let stream: WriteStream;
+  try {
+    mkdirSync(logDir, { recursive: true });
+    stream = createWriteStream(sessionPath, { flags: "a" });
+  } catch (err) {
+    warnSessionLogFailure("open session log", err);
+    return null;
+  }
+
+  const log = new WriteStreamSessionLog(stream);
+  stream.on("error", (err) => log.disable(err));
+  updateLatestSessionLog(logDir, sessionPath);
+  log.writeRaw(`=== ECHO agent session ${openedAt} · ${invocation.binary} ${invocation.args.join(" ")} ===\n`);
+  return log;
+}
+
+function updateLatestSessionLog(logDir: string, sessionPath: string): void {
+  const latestPath = join(logDir, "latest.log");
+  const latestTmpPath = join(logDir, `.latest.${process.pid}.${Date.now()}.tmp`);
+  try {
+    rmSync(latestTmpPath, { force: true });
+    symlinkSync(sessionPath, latestTmpPath);
+    renameSync(latestTmpPath, latestPath);
+  } catch {
+    try {
+      rmSync(latestTmpPath, { force: true });
+    } catch {
+      // Best-effort cleanup only.
+    }
+  }
+}
+
+class WriteStreamSessionLog implements SessionLog {
+  private disabled = false;
+  private stderrAtLineStart = true;
+  private closePromise: Promise<void> | null = null;
+
+  constructor(private readonly stream: WriteStream) {}
+
+  writeStdout(chunk: Buffer): void {
+    this.writeRaw(chunk);
+  }
+
+  writeStderr(chunk: Buffer): void {
+    const text = chunk.toString("utf8");
+    if (text.length === 0) return;
+    let out = "";
+    for (const ch of text) {
+      if (this.stderrAtLineStart) {
+        out += "[stderr] ";
+        this.stderrAtLineStart = false;
+      }
+      out += ch;
+      if (ch === "\n") this.stderrAtLineStart = true;
+    }
+    this.writeRaw(out);
+  }
+
+  writeRaw(chunk: string | Buffer): void {
+    if (this.disabled || this.closePromise !== null) return;
+    try {
+      this.stream.write(chunk, (err) => {
+        if (err !== null && err !== undefined) this.disable(err);
+      });
+    } catch (err) {
+      this.disable(err);
+    }
+  }
+
+  disable(err: unknown): void {
+    if (!this.disabled) warnSessionLogFailure("write session log", err);
+    this.disabled = true;
+  }
+
+  close(): Promise<void> {
+    if (this.closePromise !== null) return this.closePromise;
+    if (this.disabled) {
+      this.closePromise = Promise.resolve();
+      return this.closePromise;
+    }
+    this.closePromise = new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve();
+      };
+      this.stream.once("finish", finish);
+      this.stream.once("close", finish);
+      this.stream.once("error", finish);
+      try {
+        this.stream.end();
+      } catch (err) {
+        this.disable(err);
+        finish();
+      }
+    });
+    return this.closePromise;
+  }
+}
+
+function warnSessionLogFailure(action: string, err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  console.warn(`ECHO session log tee failed to ${action}: ${message}`);
 }
 
 export function stripTerminalControl(input: string): string {

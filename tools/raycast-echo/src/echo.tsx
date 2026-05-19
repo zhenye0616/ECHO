@@ -742,30 +742,74 @@ function AnswerView({
   const [topClusters, setTopClusters] = useState<FindClustersCluster[]>([]);
   const [auditCalls, setAuditCalls] = useState<AuditCall[] | null>(null);
   const [auditUnavailable, setAuditUnavailable] = useState(false);
+  const [auditPollingActive, setAuditPollingActive] = useState(false);
   const [startupError, setStartupError] = useState<string | null>(null);
   const runnerRef = useRef<AgentRun | null>(null);
+  const auditCancelRef = useRef<(() => void) | null>(null);
 
   // Resolve invocation + collect top clusters in parallel
   useEffect(() => {
     let disposed = false;
+    let auditInterval: ReturnType<typeof setInterval> | null = null;
+
+    function clearAuditInterval() {
+      if (auditInterval !== null) clearInterval(auditInterval);
+      auditInterval = null;
+      if (!disposed) setAuditPollingActive(false);
+    }
+    auditCancelRef.current = clearAuditInterval;
+
+    async function pollAudit() {
+      if (disposed) {
+        clearAuditInterval();
+        return;
+      }
+      try {
+        const audit = await fetchRecentCalls({ since: launchTs - 2_000, until: Date.now() + 2_000 });
+        if (disposed) return;
+        setAuditCalls(audit.calls);
+      } catch {
+        if (disposed) return;
+        setAuditUnavailable(true);
+        clearAuditInterval();
+      }
+    }
+
+    setAuditPollingActive(true);
+    auditInterval = setInterval(() => {
+      void pollAudit();
+    }, 600);
 
     async function startup() {
       let invocation: AgentInvocation;
       try {
         invocation = resolveAgentInvocation(agentKind, preferences, repoPath, buildUnifiedAskPrompt(query));
       } catch (err) {
-        setStartupError((err as AgentProfileError).message);
-        setIsLoading(false);
+        if (!disposed) {
+          clearAuditInterval();
+          setStartupError((err as AgentProfileError).message);
+          setIsLoading(false);
+        }
         return;
       }
-      if (!(await probeEchoDaemon())) {
-        setStartupError("ECHO daemon unreachable at 38478");
-        setIsLoading(false);
+      const daemonAvailable = await probeEchoDaemon();
+      if (disposed) return;
+      if (!daemonAvailable) {
+        if (!disposed) {
+          clearAuditInterval();
+          setStartupError("ECHO daemon unreachable at 38478");
+          setIsLoading(false);
+        }
         return;
       }
-      if (!(await findExecutable(invocation.binary))) {
-        setStartupError(`Agent '${invocation.binary}' not found`);
-        setIsLoading(false);
+      const executableAvailable = await findExecutable(invocation.binary);
+      if (disposed) return;
+      if (!executableAvailable) {
+        if (!disposed) {
+          clearAuditInterval();
+          setStartupError(`Agent '${invocation.binary}' not found`);
+          setIsLoading(false);
+        }
         return;
       }
       // Top 3 clusters from the daemon (best-effort; failure is silent)
@@ -775,6 +819,7 @@ function AnswerView({
       } catch {
         // ignore
       }
+      if (disposed) return;
 
       let buffer = "";
       let lastFlushAt = 0;
@@ -816,6 +861,7 @@ function AnswerView({
           appendFooter(`**Agent error**\n\n${event.error.message}`);
         } else if (event.type === "exit") {
           sawExit = true;
+          clearAuditInterval();
           flushNow();
           setIsLoading(false);
           try {
@@ -827,12 +873,17 @@ function AnswerView({
           }
         }
       }
-      if (!disposed && !sawExit) setIsLoading(false);
+      if (!disposed && !sawExit) {
+        clearAuditInterval();
+        setIsLoading(false);
+      }
     }
 
     void startup();
     return () => {
       disposed = true;
+      clearAuditInterval();
+      auditCancelRef.current = null;
       runnerRef.current?.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -914,6 +965,8 @@ function AnswerView({
           primary={primary}
           calls={auditCalls}
           unavailable={auditUnavailable}
+          isLoading={isLoading}
+          pollingActive={auditPollingActive}
         />
       }
       actions={
@@ -929,7 +982,10 @@ function AnswerView({
               <Action
                 title="Cancel"
                 icon={Icon.XMarkCircle}
-                onAction={() => runnerRef.current?.cancel()}
+                onAction={() => {
+                  auditCancelRef.current?.();
+                  runnerRef.current?.cancel();
+                }}
               />
             </ActionPanel.Section>
           ) : (
@@ -975,11 +1031,15 @@ function AnswerMetadata({
   primary,
   calls,
   unavailable,
+  isLoading,
+  pollingActive,
 }: {
   agentKind: string;
   primary: PrimaryDetection | null;
   calls: AuditCall[] | null;
   unavailable: boolean;
+  isLoading: boolean;
+  pollingActive: boolean;
 }) {
   return (
     <Detail.Metadata>
@@ -987,8 +1047,11 @@ function AnswerMetadata({
       <Detail.Metadata.Label title="Primary" text={primary?.hint ?? "Cursor (default)"} />
       <Detail.Metadata.Separator />
       {unavailable ? <Detail.Metadata.Label title="Audit" text="Audit unavailable" /> : null}
+      {!unavailable && isLoading && pollingActive && calls !== null ? (
+        <Detail.Metadata.Label title="Audit" text={`Live (${calls.length} calls so far)`} />
+      ) : null}
       {!unavailable && calls === null ? <Detail.Metadata.Label title="Audit" text="Waiting" /> : null}
-      {!unavailable && calls !== null && calls.length === 0 ? (
+      {!unavailable && !isLoading && calls !== null && calls.length === 0 ? (
         <Detail.Metadata.Label title="Audit" text="No MCP calls" />
       ) : null}
       {!unavailable && calls !== null
