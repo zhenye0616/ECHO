@@ -1,5 +1,6 @@
 {
   "name": "echo-context",
+  "version": "0.2.0",
   "title": "ECHO Context",
   "description": "Search and paste ECHO context from the local daemon.",
   "icon": "icon.png",
@@ -18,6 +19,43 @@
       "title": "Search ECHO Context",
       "description": "Search recent ECHO context and copy or paste markdown bundles.",
       "mode": "view"
+    },
+    {
+      "name": "ask-context",
+      "title": "Ask ECHO",
+      "description": "Ask a single-shot question through a local agent connected to ECHO MCP.",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "agentKind",
+          "type": "dropdown",
+          "required": true,
+          "title": "Agent",
+          "description": "Headless agent profile to run.",
+          "default": "codex",
+          "data": [
+            { "title": "Codex", "value": "codex" },
+            { "title": "Claude", "value": "claude" },
+            { "title": "Custom", "value": "custom" }
+          ]
+        },
+        {
+          "name": "customCommand",
+          "type": "textfield",
+          "required": false,
+          "title": "Custom Command",
+          "description": "Used only when Agent is Custom. Supports {question} and {repoPath}.",
+          "placeholder": "my-agent --prompt {question}"
+        },
+        {
+          "name": "repoPath",
+          "type": "textfield",
+          "required": true,
+          "title": "Repository Path",
+          "description": "Working directory passed to the agent profile.",
+          "default": "~/Desktop/Project_echo"
+        }
+      ]
     }
   ],
   "scripts": {
