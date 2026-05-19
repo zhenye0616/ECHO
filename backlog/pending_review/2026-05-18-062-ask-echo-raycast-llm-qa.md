@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-062-ask-echo-raycast-llm-qa
 title: Ask ECHO — Raycast Q&A command backed by a vendor-agnostic headless agent (codex / claude / custom) consuming ECHO MCP
-status: claimed
+status: pending_review
 priority: MED
 estimate: 1-2d
 created: 2026-05-18
@@ -43,11 +43,11 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-19T04:57:44Z"
 branch: "agent/ask-echo-raycast-llm-qa"
 worktree: "/Users/zhenye/Desktop/Project_echo--ask-echo-raycast-llm-qa"
-head_sha: ""
+head_sha: "8af996e7646aaab3fd45f8c8ca9e949c16a4e74d"
 pr_url: ""
 review_notes: |
 agent_notes: |
-  Prior claim by agent 78D5AB0F at 2026-05-19T04:43:21Z (branch agent/ask-echo-raycast-llm-qa @ 3d8a4b5) correctly escalated a strategist pattern-bug (docs/BACKLOG.md in files_to_modify) per docs/AGENT_INSTRUCTIONS.md:363. Strategist resolved by (a) removing docs/BACKLOG.md from files_to_modify, (b) adding the Ready-table row directly, (c) deleting the empty agent branch. Item is reset to ready/ and may be re-claimed by any builder. The 78D5AB0F escalation was correct behavior, not a failure.
+  BLOCKED: Manual Raycast GUI verification from the Tests section was not runnable in this headless CLI session, and AC1's "customCommand visible only for custom" preference behavior is not exposed by the documented Raycast manifest schema. Tried: implemented the command and daemon audit path; ran focused daemon tests, Raycast vitest tests, root typecheck, Raycast typecheck, `npx ray build`, and the full root `npm test` suite successfully. Best guess: implementation is reviewable and ready for founder/Raycast dogfood, with the custom command preference always visible but documented/inert unless Agent is custom. Why escalated: the spec requires builder-verified real Cmd+Shift+A profile/cancellation/daemon-restart checks before a complete handoff.
 ---
 
 ## Summary
@@ -176,4 +176,3 @@ Add a second Raycast command, **Ask ECHO** (suggested binding ⌘⇧A), that tur
 - **Round-2 reviewers on 2026-05-18 (commit `7fee33c`)** — same lens split — produced 7 findings combined (all MED/LOW, no HIGH, no structural), confirming the round-1 patches landed as intended. Folded into AC2 (Raycast-crash cleanup wording corrected), AC4 (preflight HEAD probe must treat 405 as reachable — both reviewers), AC5 (wrapper insertion point now allows monkeypatch alternative to reduce blast radius; pending-eviction no-op semantics; isError-envelope status classification), and AC6 + Tests (new `recent-calls-endpoint.test.ts` integration test; pending-evicted-then-completes case in `request-log.test.ts`). The narrowing of findings round-over-round (15 → 7, all severity-reduced) is the convergence signal — not a flat zero. Per disposition-discipline, the round-2 ops finding "AC5 overconstrains the wrapper refactor" was a recent-round-patch flag and was resolved by widening the spec (allow EITHER refactor OR monkeypatch), not deepening it.
 - **Round-3 reviewers on 2026-05-18 (commit `e5d1037`)** — same lens split — produced 3 unique findings (1 MED overlap + 1 MED ops-only + 1 LOW ops-only), all folded. The overlap (both reviewers independently) was an overclaim: the round-2 integration test only invoked `echo_ping` but AC5/AC6 claimed it proved "every registered tool is logged" — Tests now requires per-tool invocation enumerated against the runtime registration list. The ops-only adds were ANSI/control-sequence stripping in the runner (AC2 + `agent-runner.test.ts`) and a ±2 s safety pad on the audit-fetch `since`/`until` to absorb wall-clock drift between Raycast and daemon (AC3). All three are localized operational discoveries, not patches-on-patches; no recent-round-patch fragility was flagged. Trace: 15 → 7 → 3 unique findings, severity ceiling HIGH → MED → MED. **Strategist call: functionally converged.** A round-4 would likely surface 1-2 LOW polish items; the cost-of-finding has crossed the cost-of-folding line.
 - **Cross-tool dogfooding payoff.** This item is itself a dogfooding artifact of the cross-tool protocol — every successful Ask-ECHO invocation is one more data point for "AI clients consume ECHO MCP as peers, no special-casing per vendor." Logging that explicitly in the journal makes the artifact double-duty.
-
