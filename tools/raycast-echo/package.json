@@ -15,6 +15,50 @@
   ],
   "commands": [
     {
+      "name": "echo",
+      "title": "ECHO",
+      "description": "Unified omnibox — search retrieves, ask synthesizes, both end at the launch row into Cursor / Claude / ChatGPT.",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "agentKind",
+          "type": "dropdown",
+          "required": true,
+          "title": "Agent",
+          "description": "Headless agent profile used by Ask.",
+          "default": "codex",
+          "data": [
+            { "title": "Codex", "value": "codex" },
+            { "title": "Claude", "value": "claude" },
+            { "title": "Custom", "value": "custom" }
+          ]
+        },
+        {
+          "name": "customCommand",
+          "type": "textfield",
+          "required": false,
+          "title": "Custom Command",
+          "description": "Used only when Agent is Custom. Supports {question} and {repoPath}.",
+          "placeholder": "my-agent --prompt {question}"
+        },
+        {
+          "name": "repoPath",
+          "type": "textfield",
+          "required": true,
+          "title": "Repository Path",
+          "description": "Working directory passed to the agent profile.",
+          "default": "~/Desktop/Project_echo"
+        },
+        {
+          "name": "claudeOauthToken",
+          "type": "password",
+          "required": false,
+          "title": "Claude OAuth Token",
+          "description": "Used only when Agent is Claude. Generate in Terminal with `claude setup-token`."
+        }
+      ]
+    },
+    {
       "name": "search-context",
       "title": "Search ECHO Context",
       "description": "Search recent ECHO context and copy or paste markdown bundles.",
