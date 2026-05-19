@@ -1,7 +1,7 @@
 ---
 id: 2026-05-18-062-ask-echo-raycast-llm-qa
 title: Ask ECHO — Raycast Q&A command backed by a vendor-agnostic headless agent (codex / claude / custom) consuming ECHO MCP
-status: ready
+status: claimed
 priority: MED
 estimate: 1-2d
 created: 2026-05-18
@@ -39,10 +39,10 @@ spec_refs:
   - https://developers.raycast.com/api-reference/preferences  # external; per-extension preferences API for the agentKind dropdown + customCommand textfield
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-19T04:43:21Z"
+branch: "agent/ask-echo-raycast-llm-qa"
+worktree: "/Users/zhenye/Desktop/Project_echo--ask-echo-raycast-llm-qa"
 head_sha: ""
 pr_url: ""
 review_notes: |
