@@ -54,6 +54,13 @@
           "title": "Repository Path",
           "description": "Working directory passed to the agent profile.",
           "default": "~/Desktop/Project_echo"
+        },
+        {
+          "name": "claudeOauthToken",
+          "type": "password",
+          "required": false,
+          "title": "Claude OAuth Token",
+          "description": "Used only when Agent is Claude. Generate in Terminal with `claude setup-token`. Lets the Raycast-spawned subprocess reuse your Claude subscription without prompting for /login (Raycast cannot access the macOS Keychain item Terminal uses)."
         }
       ]
     }

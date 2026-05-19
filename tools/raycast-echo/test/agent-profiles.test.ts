@@ -14,6 +14,18 @@ describe("agent profiles", () => {
     expect(invocation.binary).toBe("claude");
     expect(invocation.args).toEqual(["-p"]);
     expect(invocation.stdin).toBe("prompt");
+    expect(invocation.cwd).toBe("/repo");
+    expect(invocation.env).toBeUndefined();
+  });
+
+  it("injects CLAUDE_CODE_OAUTH_TOKEN when supplied so Raycast bypasses the Keychain prompt", () => {
+    const invocation = resolveAgentInvocation("claude", { claudeOauthToken: "sk-ant-oat-xyz" }, "/repo", "prompt");
+    expect(invocation.env).toEqual({ CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat-xyz" });
+  });
+
+  it("ignores a blank claude OAuth token", () => {
+    const invocation = resolveAgentInvocation("claude", { claudeOauthToken: "   " }, "/repo", "prompt");
+    expect(invocation.env).toBeUndefined();
   });
 
   it("defaults absent agent kind to codex", () => {

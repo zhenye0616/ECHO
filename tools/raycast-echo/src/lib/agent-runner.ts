@@ -98,11 +98,13 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   const child = spawn(invocation.binary, invocation.args, {
     stdio: ["pipe", "pipe", "pipe"],
     detached: false,
+    cwd: invocation.cwd,
     env: {
       ...process.env,
       PATH: resolvePathEnv(),
       NO_COLOR: "1",
       TERM: "dumb",
+      ...(invocation.env ?? {}),
     },
   });
 
