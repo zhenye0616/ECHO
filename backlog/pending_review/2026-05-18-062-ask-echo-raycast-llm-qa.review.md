@@ -2,7 +2,16 @@
 item_id: 2026-05-18-062-ask-echo-raycast-llm-qa
 verdict: merge with founder fixups
 reviewed_at: 2026-05-19T05:50:00Z
-test_counts: { passed: 1137, failed: 0, skipped: 21 }
+amended_at: 2026-05-19T06:33:00Z
+amended_head_sha: 30e124d0020da888713b4ea032bc74e0967b394c
+amended_note: |
+  Empirical dogfood at 06:21 PDT surfaced that Raycast's Node runtime hands
+  the extension process.env.PATH=undefined, so the AC4 preflight `which`
+  failed for both default profiles even when /usr/local/bin/codex was on
+  disk. Patched on the agent branch in commit 30e124d: resolvePathEnv()
+  fallback + spawn/which env wiring + 3 new tests. Sidecar verdict
+  unchanged; the patch is strictly additive to the reviewed surface.
+test_counts: { passed: 1140, failed: 0, skipped: 21 }
 ---
 
 ## Verdict
