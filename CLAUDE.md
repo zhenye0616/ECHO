@@ -154,9 +154,11 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 ### Dogfooding journal discipline (every AI client)
 
-**Every ECHO MCP call must be logged to `raw/internal/dogfooding/mcp-interactions-journal.md` in the moment** — not at end-of-session, not at end-of-day. This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool, cross-item, and ever-growing — it's the canonical log, not a per-window file. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+**Every ECHO MCP call must be logged to the current month's shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` in the moment** — currently `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md`. Do not append to the frozen historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; monthly shards are the canonical log. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
 
 **What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
+
+**Skip-rule for zero-MCP-call entries.** If a reviewer tick (or any AI-client invocation) reads files / runs git / runs scripts but makes **zero `mcp__echo__*` calls**, do NOT journal it. The journal's signal is MCP-call discipline + surprising failures; mechanical activity without ECHO retrieval is not journal-worthy. Operational artifacts (review responses, commit messages, agent-run logs) already capture that work. Exception: a reviewer tick that *expected to* make an MCP call but *failed to* (sandbox error, transport error, etc.) IS journaled — that's a surprising failure.
 
 **Required entry shape** (the template lives in the journal preamble; copy it verbatim):
 
@@ -177,16 +179,16 @@ The **Sources** field is non-optional. Source-volume bias and silent omission (e
 
 **Journal-by-proxy for read-only consultees (046 AC6).** A read-only consultee (e.g., `codex exec --sandbox read-only`, a subagent without write capability, or any future binding that lacks repo-write) MAY call ECHO MCP only if it immediately reports `tool name / inputs / returned shape / sources / verdict / note` to its orchestrator in the same turn. The orchestrator MUST journal the call in the same turn, attributed to the consultee — e.g. `Source agent: codex strategist (consulting; orchestrator-journaled by claude)`. The in-the-moment rule is NOT weakened: the consultee's report and the orchestrator's journal entry are part of the same turn, not deferred. Worked example: the journal entry at `2026-05-13 16:45 PDT — closed-loop event` (codex strategist reads prior codex strategist via ECHO; claude orchestrator journals the call) demonstrates the shape. Cross-referenced in `skills/role-typed-task-state.md` and `skills/using-superpowers.md` so non-Claude bindings see the same rule.
 
-**Keep the HTML twin in sync.** The journal has a rendered HTML twin at `raw/internal/dogfooding/mcp-interactions-journal.html` (matching the MD/HTML pairing convention used elsewhere under `raw/internal/`). The MD remains the canonical write target — it's the only format that's ergonomic to append in-the-moment — but after appending entries, regenerate the HTML in the same response so readers always have the better-formatted view. One-liner:
+**HTML twins are no longer committed.** Local regeneration is optional — anyone who wants a styled view can run the pandoc one-liner against the current month's journal shard and view the generated HTML locally. The MD shard is the canonical authoritative format. One-liner:
 
 ```
 pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 \
   -H raw/internal/dogfooding/journal-style.html \
-  raw/internal/dogfooding/mcp-interactions-journal.md \
-  -o raw/internal/dogfooding/mcp-interactions-journal.html
+  raw/internal/dogfooding/mcp-interactions-journal-2026-05.md \
+  -o raw/internal/dogfooding/mcp-interactions-journal-2026-05.html
 ```
 
-Commit the `.md` and `.html` together. Same pattern applies to other `raw/internal/` notes that already have `.html` twins (decisions, dogfooding writeups) — when you edit the MD, regenerate the HTML in the same commit.
+Do not commit regenerated HTML twins. On the first MCP-call journal append of each new calendar month, create a fresh `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` shard with the same preamble template and update this current-shard pointer.
 
 ### Drift Prevention Applies to Agents Too
 
