@@ -46,6 +46,50 @@ worktree: "/Users/zhenye/Desktop/Project_echo--ask-echo-raycast-llm-qa"
 head_sha: "30e124d0020da888713b4ea032bc74e0967b394c"
 pr_url: ""
 review_notes: |
+  Merged on 2026-05-19 via founder reconciliation.
+
+  Conflicts resolved: none — clean merge as predicted by the sidecar's
+  "Expected merge conflicts" section (main had rewritten search-context.tsx
+  in 8d1bc9f, which this branch correctly left untouched per OoS#11).
+
+  C3.5 cross-vendor consult: none invoked — no conflicts to consult on.
+
+  Fixups applied:
+  - PATH-undefined defect surfaced during pre-merge dogfood (06:21 PDT).
+    Raycast's Node runtime hands the extension process.env.PATH=undefined,
+    so AC4's `which <bare-name>` preflight silently failed for the codex
+    AND claude default profiles — surfaced as "Agent not found" toast.
+    Patched on the agent branch (commit 30e124d): resolvePathEnv() fallback
+    + spawn/which env wiring + 3 new tests. Empirically validated: under
+    custom-profile with absolute paths codex answered "pong"; under default
+    profile after the patch claude resolved and ran (exited 1 with
+    `Not logged in · Please run /login` — AC4 footer rendered correctly).
+    Diagnosed via [ECHO-DEBUG] instrumentation in findExecutable streamed
+    through `log stream --predicate 'subsystem CONTAINS
+    "com.raycast.extensions.echo-context"'`; instrumentation reverted
+    before commit.
+
+  Fixups deferred to follow-up items:
+  - Add AbortController timeout (~3s) to fetchRecentCalls in
+    tools/raycast-echo/src/lib/audit.ts so a hung (but reachable) daemon
+    falls through to "Audit unavailable" instead of an indefinite
+    "Waiting" sidebar.
+  - Investigate Raycast pref ActionPanel toggles for conditional
+    visibility of customCommand once dogfooding signal warrants it.
+  - Optional cleanup script for Raycast-crashes-mid-run orphan agent
+    processes (README documents `pkill` recourse today).
+
+  Verify (inside ephemeral merger worktree): root npm test 1114 pass /
+  21 skip; tools/raycast-echo npm test 26 pass (3 new PATH-fallback
+  cases); both tsc --noEmit clean; lint (task-state) clean; ray build ok;
+  tools/sync-skills.sh --check ok.
+
+  AC9 (post-merge, founder-gated): ≥5 journal entries with marker line
+  `**Surface:** Ask ECHO` across ≥2 calendar days, ≥1 ✅ and ≥1 🟡/❌.
+  The PATH-undefined incident is itself the first such entry — log it
+  to mcp-interactions-journal-2026-05.md when convenient.
+
+  Follow-up items (non-blocking): listed above.
 agent_notes: |
   BLOCKED: Manual Raycast GUI verification from the Tests section was not runnable in this headless CLI session, and AC1's "customCommand visible only for custom" preference behavior is not exposed by the documented Raycast manifest schema. Tried: implemented the command and daemon audit path; ran focused daemon tests, Raycast vitest tests, root typecheck, Raycast typecheck, `npx ray build`, and the full root `npm test` suite successfully. Best guess: implementation is reviewable and ready for founder/Raycast dogfood, with the custom command preference always visible but documented/inert unless Agent is custom. Why escalated: the spec requires builder-verified real Cmd+Shift+A profile/cancellation/daemon-restart checks before a complete handoff.
 ---
