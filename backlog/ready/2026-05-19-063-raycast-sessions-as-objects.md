@@ -1,0 +1,289 @@
+---
+id: 2026-05-19-063-raycast-sessions-as-objects
+title: Raycast ECHO — sessions as objects (D + narrow C persistence model)
+status: ready
+priority: HIGH
+estimate: 2-3d
+created: 2026-05-19
+blocked_by: []
+task_state_ref: 2026-05-19-063-raycast-sessions-as-objects
+requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  - tools/raycast-echo/src/echo.tsx  # AC1, AC2, AC7 — restructure as a thin router across the five states (Empty / Typing / Live / SessionDetail / SessionsBrowse); split AnswerView, SessionDetail, SessionsList, Empty into separate component files (see below). Target: shrink echo.tsx from 1069 lines to ≤400 lines by extracting components.
+  - tools/raycast-echo/src/components/EmptyState.tsx  # AC1 — NEW. State 1: Resume row (warm last session) + Open loops · Today + Today's sessions + Yesterday. Reads from sessions.ts + existing useClusters().
+  - tools/raycast-echo/src/components/TypingState.tsx  # AC2 — NEW. State 2: synthetic "Ask ECHO about \"<query>\"" row at top + matching atoms/clusters. Visually distinct primary row.
+  - tools/raycast-echo/src/components/AnswerView.tsx  # AC3, AC4, AC7 — EXTRACTED from echo.tsx (was lines 726–1016). Adds AuditTimeline subcomponent for State 3 (live) and State 4 (resumed) rendering of per-call detail.
+  - tools/raycast-echo/src/components/AuditTimeline.tsx  # AC3 — NEW. Renders audit-call rows: tool · args_shape · result_shape · duration · status. Shape derived strictly from what the daemon endpoint already serves per item 062 AC5; no new daemon work.
+  - tools/raycast-echo/src/components/SessionsList.tsx  # AC5 — NEW. State 5: ⌘S sessions browse, grouped by day (Today / Yesterday / This week / Older). Filterable by source-app via List.Dropdown.
+  - tools/raycast-echo/src/components/SessionDetail.tsx  # AC4 — NEW. State 4 load-bearing screen: full answer + audit timeline + evidence chips + sources + subprocess log path with [Open] + [Tail] + launch row + ⌘R fork.
+  - tools/raycast-echo/src/lib/sessions.ts  # AC6 — NEW. Session checkpoint persistence layer. Schema: { id, question, agentKind, startedAt, completedAt, status: "running"|"done"|"cancelled"|"errored", answer, auditCalls, subprocessLogPath, sourceBreakdown, evidenceClusters }. LocalStorage-backed. Cap at MAX_SESSIONS (default 100, last-write-wins eviction). Includes one-time migration that reads the old `echo.recent-asks` key, converts each ask to a session with status="historical", writes the new key, and deletes the old key.
+  - tools/raycast-echo/src/lib/recent-asks.ts  # AC10 — DELETE. Replaced by sessions.ts. The one-time migration in sessions.ts preserves the last-3 history.
+  - tools/raycast-echo/src/lib/audit.ts  # AC3 — EXTEND. Already fetches GET /mcp/recent-calls?since=…&until=… per item 062. Add a per-call body shape that the AuditTimeline component reads (no new daemon work; just expose what's already returned in a typed shape).
+  - tools/raycast-echo/test/sessions.test.ts  # AC8 — NEW. Vitest. Tests: write + read roundtrip, migration from recent-asks, MAX_SESSIONS eviction, status transitions, dedup-on-relaunch policy.
+  - tools/raycast-echo/test/audit-timeline.test.tsx  # AC8 — NEW. Component test for AuditTimeline rendering modes (live · done · errored · empty).
+  - tools/raycast-echo/test/session-detail.test.tsx  # AC8 — NEW. Component test for SessionDetail render + ⌘R fork action behavior (writes a new session row with prior packet as context, does NOT mutate the source session).
+  - tools/raycast-echo/README.md  # AC9 — UPDATE: replace the "Ask ECHO" usage section with the new five-state UX walkthrough; add Sessions concept note (one object model: ask = session); document ⌘R "Ask again from this" semantics (fork, not continuation).
+  # NOTE: docs/BACKLOG.md is NOT in this list per docs/AGENT_INSTRUCTIONS.md:363; strategist adds the Ready-table row at spec-commit time.
+spec_refs:
+  - tools/raycast-echo/src/echo.tsx  # current 1069-line surface being restructured
+  - tools/raycast-echo/src/lib/agent-runner.ts  # subprocess tee log already lands at SESSION_LOG_DIR per item cca021b; SessionDetail surfaces that path
+  - tools/raycast-echo/src/lib/mcp.ts  # existing MCP client wrapper; unchanged
+  - tools/raycast-echo/src/lib/launch.ts  # existing launch actions; reused verbatim
+  - tools/raycast-echo/src/lib/agent-profiles.ts  # existing; unchanged
+  - tools/raycast-echo/src/lib/system-prompt.ts  # existing; unchanged
+  - src/mcp/server.ts  # daemon's /mcp/recent-calls endpoint per item 062 AC5; consumed by AuditTimeline; NOT modified
+  - src/mcp/request-log.ts  # ring buffer per item 062 AC5; provides the shape AuditTimeline renders
+  - backlog/complete/2026-05-18-062-ask-echo-raycast-llm-qa.md  # predecessor; this spec replaces its UX with a richer session model
+  - backlog/complete/2026-05-17-060-hotkey-overlay-v0-raycast-dogfood.md  # v0 dogfood that motivated this spec
+  - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # the 2026-05-19 15:20 PDT codex strategist consult entry is the design-rationale source of truth for this spec
+  - wiki/surfaces/hotkey-overlay.md  # planned V1 surface; this spec promotes it toward "shipped"
+  - wiki/principles/compose-not-capture.md  # the architectural commitment this spec honors; ⌘R "Ask again from this" is the canonical worked example of giving continuity without becoming a destination
+  - wiki/principles/felt-not-seen.md  # Raycast invisible-when-not-summoned; preserved
+  - wiki/principles/context-as-moat.md  # "never ship a chat UI" — this spec is the structural defense
+  - wiki/principles/drift-prevention.md  # Pattern 5 (chat UI trap) is the temptation this spec explicitly refuses
+  - https://developers.raycast.com/api-reference/user-interface/list  # List + List.Section + List.Item.Detail + List.Dropdown
+  - https://developers.raycast.com/api-reference/user-interface/detail  # Detail.Metadata
+  - https://developers.raycast.com/api-reference/storage  # LocalStorage API for sessions persistence
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+review_notes: ""
+agent_notes: ""
+---
+
+# Raycast ECHO — sessions as objects (D + narrow C persistence model)
+
+## Background
+
+Item 062 shipped Ask ECHO as a single-shot Q&A surface. The unified `echo` command from item 060 fused search + ask. Headless-agent observability (per-session tee logs, live audit polling, `tail-mcp.sh`) shipped in commit `cca021b` on 2026-05-19.
+
+During live dogfooding on 2026-05-19, the founder named four pains in the Raycast surface:
+
+1. **Sessions exist but no details** — per-session subprocess log files exist on disk but the UI doesn't surface their content.
+2. **Atom counts but no info** — the audit sidebar shows "Live (N calls so far)" without per-call detail.
+3. **Navigation unclear** — the omnibox has multiple modes (open loops / today / recent asks / typing / cluster-detail / answer) but transitions are not obvious.
+4. **No persistent Q&A** — each AnswerView is one-shot; exit destroys the state; re-fire from scratch.
+
+The founder framed this as wanting "persistent Q&A sessions." A peer codex strategist consult on 2026-05-19 15:20 PDT (journaled in `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md`) reframed the diagnosis: the root pain is **loss of continuity and inspectability**, not absence of chat. Building chat threads would violate the V1 wedge (ECHO is not a destination) and the `compose-not-capture` + `context-as-moat` ("never ship a chat UI") principles.
+
+This spec implements codex's recommendation: ship **D (sessions list) + narrow C (warm resume)**, explicitly reject A (rolling chat) and B (topic threads).
+
+## Goals
+
+1. Make every ask a **durable, inspectable, relaunchable object** — a session.
+2. Surface the per-session subprocess log + the per-call audit detail in the UI, killing pains #1 and #2.
+3. Collapse the omnibox's modes into one coherent object model (search result · ask session · cluster detail), killing pain #3.
+4. Keep the last session warm across Raycast exits + offer sessions browse (⌘S) for prior work, killing pain #4 without becoming a chat surface.
+5. Reduce `echo.tsx` from 1069 lines to ≤400 by extracting per-state components — a project_v15_cleanup-aligned reduction, not new architecture.
+
+## Non-goals
+
+Codex's explicit cut list, mirrored here:
+
+- **No infinite chat transcript.** Answers are bullets; sessions are objects; conversations are not modeled.
+- **No topic-thread management.** No notion of "this ask continues a prior ask" except via the ⌘R fork mechanic (which writes a NEW session row, not a turn in an existing one).
+- **No daemon-side conversation memory.** The daemon stays MCP-only; no chat state, no thread IDs, no server-side session store.
+- **No custom session DB beyond Raycast `LocalStorage` + existing tee log files.** Sessions live in LocalStorage; subprocess output lives in `~/.config/raycast/extensions/echo-context/sessions/<ts>.log` (already in place per cca021b). No new on-disk format, no new MCP tool, no daemon changes.
+- **No "continue conversation" semantics.** ⌘R "Ask again from this" forks. It does NOT add a turn to a thread.
+- **No UI that makes ECHO the place where the work finishes.** Launch row (Open in Cursor / Send to Claude.ai / Send to ChatGPT / Copy packet) remains the primary CTA in every session detail view.
+- **No new daemon endpoints.** AuditTimeline consumes `GET /mcp/recent-calls` exactly as defined in item 062 AC5; if the daemon's `result_shape` is insufficient (e.g. for "top source" derivation), the UI either degrades gracefully or files a follow-up — it does NOT amend the daemon contract in this spec.
+- **No browser-tab primary detection.** `detectPrimary()` desktop-app-only behavior preserved from item 062.
+
+## Architecture overview
+
+One Raycast command (`echo`), five UI states, one object model:
+
+```
+┌─ State 1: Empty ─┐  ⌘N   ┌─ State 2: Typing ─┐  ↩    ┌─ State 3: Live ─┐  done  ┌─ State 4: SessionDetail ─┐
+│  Resume warm    │ ────▶ │  Synthetic Ask row │ ────▶ │  Streaming +    │ ─────▶ │  Full answer + audit +   │
+│  Open loops     │       │  + matching atoms  │       │  live audit     │        │  sources + log + launch  │
+│  Today's sess.  │       │  + clusters        │       │  timeline       │        │  + ⌘R fork              │
+└──────────────────┘       └────────────────────┘       └─────────────────┘        └──────────────────────────┘
+       │                                                                                       │
+       │ ⌘S                                                                                    │ ⌘R fork
+       ▼                                                                                       ▼
+┌─ State 5: SessionsList ─┐                                                          (writes a NEW session
+│  Today / Yesterday /    │ ← all states navigate here via ⌘S                          row; does NOT mutate
+│  This week / Older      │                                                            the source session)
+└─────────────────────────┘
+```
+
+**Session object** (the single load-bearing data model):
+
+```ts
+interface Session {
+  id: string;                              // e.g. "ses_2026-05-19T21-58-32-353Z_a7f3"
+  question: string;
+  agentKind: "claude" | "codex" | "custom";
+  startedAt: string;                       // ISO UTC
+  completedAt: string | null;              // ISO UTC, null while running
+  status: "running" | "done" | "cancelled" | "errored" | "historical";
+  answer: string;                          // accumulated agent stdout markdown
+  auditCalls: AuditCall[];                 // copy of /mcp/recent-calls slice for this run
+  subprocessLogPath: string;               // absolute path to tee log
+  sourceBreakdown: Record<string, number>; // from audit result_shape where derivable; else {}
+  evidenceClusters: string[];              // top cluster labels from audit; capped at 5
+}
+```
+
+Sessions are written/updated as the run progresses: pre-spawn writes the row with status="running"; spawn-exit transitions to "done"/"errored"/"cancelled"; concurrent UI subscribes via React state + LocalStorage `useEffect`.
+
+## Components
+
+### `src/lib/sessions.ts` (new)
+- `useSessions()` hook returning `{ sessions, warmSession, recordSessionStart, recordSessionUpdate, recordSessionEnd, forkSession }`.
+- One-time migration on first read: read old `echo.recent-asks` key → convert each to status="historical" session → write new `echo.sessions` key → delete old key. Idempotent (second call no-ops if migration marker set).
+- Cap at `MAX_SESSIONS = 100`. Eviction: oldest `startedAt` first; `status="warm"` (the most-recent done session) is never evicted; `status="running"` is never evicted.
+
+### `src/components/EmptyState.tsx` (new)
+- State 1 render. Sections: Resume (1 row, warm session) · Open loops · Today (clusters from existing `useClusters()`) · Today's sessions · Yesterday · Older. Each session row: source-app icon, question title, accessory text `HH:MM · agent · N calls`.
+
+### `src/components/TypingState.tsx` (new)
+- State 2 render. Top row: synthetic `Ask ECHO about "<query>"` with `border-left: 2px solid #d97757` styling (Raycast `accessories` + `keywords` for visual elevation). Below: matching atoms + matching clusters, identical to current behavior.
+
+### `src/components/AnswerView.tsx` (extracted from echo.tsx, then extended)
+- State 3 render. Two-column markdown via Raycast `Detail.Metadata`. Left: streamed answer (existing behavior). Right: AuditTimeline component (new). Running pill in nav title with elapsed seconds.
+- On spawn-end transition: writes session.completedAt, status, answer, auditCalls, subprocessLogPath, sourceBreakdown to sessions.ts. View pushes to SessionDetail on next idle (or stays in the same view; either way the session is durable).
+
+### `src/components/AuditTimeline.tsx` (new)
+- Renders an array of `AuditCall` rows. Each row shows:
+  - timestamp (PDT, `HH:MM:SS` + `(+N.Ns)` relative to first call)
+  - tool name (color-coded by tool family)
+  - args_shape (compact one-line: `since=…, until=…, format=minimal`)
+  - result_shape (e.g. `→ 4 clusters · 30 atoms · 12ms` or `→ 0 matches` or `⏳ running · N.Ns elapsed` for pending)
+  - top source (derived from result_shape where the tool's contract includes source_breakdown; ELSE omitted)
+- Empty state: "Audit unavailable — daemon may not be reachable." Per-row error state: red status pill + truncated error.
+
+### `src/components/SessionsList.tsx` (new)
+- State 5 render. Day-grouped List.Section. List.Dropdown filters: all / claude / codex / custom. Per-row accessories: `HH:MM · agent · N calls · M atoms`. ActionPanel: ↩ Open · ⌘R Ask again from this · ⌘D Delete · ⌘F Filter.
+
+### `src/components/SessionDetail.tsx` (new)
+- State 4 render — load-bearing screen. Layout:
+  - Title bar: question + agent + ISO timestamp + status pill
+  - Main markdown column: full streamed answer (bulletted, fenced where the agent fenced)
+  - Metadata sidebar:
+    - **Run**: agent · model (if derivable) · N MCP calls · duration · status
+    - **Evidence used**: source-breakdown chips
+    - **Sources**: jsonl / commit / repo paths from audit (cap 5)
+    - **Subprocess log**: path + bytes + `[Open]` (opens via `Action.Open`) + `[Tail]` (push a Detail view streaming the tail)
+  - Audit timeline (full): same component as State 3, rendered with completed-state styling
+  - Action panel (primary): ↩ Open in Cursor · ⌘1 Send to Claude.ai · ⌘2 Send to ChatGPT · ⌘C Copy packet · ⌘R Ask again from this · ⌘N New ask · ⌘O Open log
+
+### `src/echo.tsx` (restructured)
+- Reduce to a thin router: parse search input + recent-session state, branch to EmptyState / TypingState / AnswerView / SessionDetail / SessionsList. Shared hooks (`usePrimary`, `useDebouncedValue`, `useClusters`, `useMatches`) remain in `echo.tsx` or move into `src/lib/` if cleanly extractable. Hard cap: 400 lines.
+
+## Data flow
+
+1. **Cold open (Raycast ⌘⇧E):** `EchoContext` reads sessions.ts. If `warmSession` exists, EmptyState renders with Resume row at top. User types → TypingState; user presses ↩ on Ask row → AnswerView spawns agent + `recordSessionStart` writes a row with `status="running"`.
+2. **Live run:** AnswerView streams stdout into the session.answer field (debounced flush at 80ms — existing FLUSH_INTERVAL_MS). AuditTimeline polls `/mcp/recent-calls?since=startedAt` every 600ms (existing 600ms interval); updates session.auditCalls.
+3. **Run completes:** subprocess exit handler calls `recordSessionEnd` → status="done" → completedAt set → answer frozen → auditCalls frozen → sourceBreakdown derived from final audit pass.
+4. **User exits Raycast and reopens:** EmptyState renders with new warm session (the one just completed) at top. User ⌘S to browse → SessionsList. User ↩ on a row → SessionDetail.
+5. **⌘R fork from SessionDetail:** invokes `forkSession(sourceId)` → returns a pre-filled question string with the prior packet as context (specific format: see Acceptance Criteria AC4.5) → pushes AnswerView with new question; the source session is unmodified.
+
+## Acceptance criteria
+
+### AC1: State 1 (Empty) renders the four canonical sections in order
+- **AC1.1** When `sessions.warmSession !== null`, a single `<List.Section title="Resume">` with one row renders at the top. Row title: warm session's question (truncated to 60 chars + ellipsis). Accessory: `<relative time> · <agent> · <N> calls`.
+- **AC1.2** Below Resume: `<List.Section title="Open loops · Today">` from existing `useClusters()`, behavior preserved from current echo.tsx.
+- **AC1.3** Below Open loops: `<List.Section title="Today's sessions">` listing all sessions whose `startedAt` is within the founder's local-day window (PDT). Each row: source-app icon, question title, accessory `HH:MM · agent · N calls`.
+- **AC1.4** Below Today's sessions: `<List.Section title="Yesterday">` and `<List.Section title="This week">` with the same row shape. Sessions older than 7 days are NOT surfaced in EmptyState (browse via ⌘S → SessionsList).
+- **AC1.5** Empty corpus: when `sessions.length === 0`, EmptyState shows only Open loops · Today, then a placeholder row "Your first ask becomes a session." with no actions.
+
+### AC2: State 2 (Typing) elevates the Ask row
+- **AC2.1** When `query.length > 0`, the first row of the result list is `<List.Item title="Ask ECHO about \"<query>\"" />` with `Color.OrangeRed` accessory icon + `subtitle="codex · ↩"` (or current agentKind).
+- **AC2.2** Below the Ask row: matching atoms (from `useMatches(query)`) and matching clusters (from `useClusters` with substring filter), behavior preserved from current echo.tsx.
+- **AC2.3** Pressing ↩ on the Ask row pushes AnswerView with the typed query. The synthetic row is not present in EmptyState.
+
+### AC3: State 3 (Live) shows per-call audit detail
+- **AC3.1** AnswerView while `isLoading === true` renders Raycast `Detail.Metadata` with an `<AuditTimeline calls={auditCalls} mode="live" />` block.
+- **AC3.2** Each AuditTimeline row renders: `timestamp` (HH:MM:SS · `(+N.Ns)` relative), `tool` (color-coded), `args_shape` (compact one-line), `result_shape` (compact one-line), and `top_source` (derived from result_shape where the tool's contract includes source_breakdown; omitted otherwise).
+- **AC3.3** Currently-running call (status="pending" in the daemon's ring buffer) renders with a "running" pill + elapsed seconds, no `result_shape`.
+- **AC3.4** When `/mcp/recent-calls` fetch errors, AuditTimeline degrades to a single row "Audit unavailable — daemon at <host>:<port> not reachable" with `Color.Red`. The answer stream is unaffected.
+- **AC3.5** AuditTimeline does NOT fetch any data the daemon doesn't already serve. If the daemon's `result_shape` is too coarse for `top_source` derivation, the row simply omits that line. No daemon-side changes are in scope.
+
+### AC4: State 4 (SessionDetail) is the load-bearing screen
+- **AC4.1** Full answer renders verbatim from `session.answer`.
+- **AC4.2** Metadata sidebar (Raycast `Detail.Metadata`) shows: Run (agent, model where derivable, MCP-call count, duration, status), Evidence used (source-breakdown chips), Sources (top-5 source paths or commit SHAs), Subprocess log (path + bytes + Open + Tail actions).
+- **AC4.3** Audit timeline renders below the answer with `mode="completed"` styling (no live polling).
+- **AC4.4** Action panel primary actions: ↩ Open in Cursor, ⌘1 Send to Claude.ai, ⌘2 Send to ChatGPT, ⌘C Copy packet, ⌘R Ask again from this, ⌘N New ask, ⌘O Open log.
+- **AC4.5** ⌘R "Ask again from this" produces a new AnswerView whose initial question is prefilled as:
+  ```
+  Continuing from "<source question>" (asked <HH:MM PDT>). Previous answer:
+
+  <source answer body>
+
+  Follow-up:
+  [empty — user types]
+  ```
+  The user's typed follow-up is appended verbatim. The source session is NOT modified. A new session row is created with status="running" and `forked_from: <source_id>` metadata.
+
+### AC5: State 5 (SessionsList) is reachable + filterable
+- **AC5.1** ⌘S from any state pushes SessionsList.
+- **AC5.2** Sessions grouped by day: Today / Yesterday / This week (Mon–today) / Older. Day buckets are PDT-anchored.
+- **AC5.3** List.Dropdown filter with options: all · claude · codex · custom (matching distinct agentKind values present in the corpus).
+- **AC5.4** Each row's ActionPanel: ↩ Open (push SessionDetail), ⌘R Ask again from this (fork — same as AC4.5), ⌘D Delete (with `Action.Confirmation`), ⌘F Filter.
+
+### AC6: Sessions persistence
+- **AC6.1** `useSessions()` reads from `LocalStorage` key `echo.sessions.v1`. On first read (key absent), runs the one-time migration: read `echo.recent-asks`, convert each entry to a session row with status="historical" + minimal fields (no auditCalls, no answer body, no log path; just question + at + agent), write `echo.sessions.v1`, delete `echo.recent-asks`. Idempotent.
+- **AC6.2** `recordSessionStart` writes a new row with status="running" before the subprocess is spawned. If the spawn fails synchronously, status transitions to "errored" with the error message in `answer`.
+- **AC6.3** `recordSessionUpdate` is called via debounced flush (existing 80ms FLUSH_INTERVAL_MS) and writes the current answer + auditCalls to the row.
+- **AC6.4** `recordSessionEnd` is called on subprocess exit (clean, cancelled, or errored); writes completedAt + final status + final sourceBreakdown + final evidenceClusters.
+- **AC6.5** Cap: MAX_SESSIONS=100. Eviction priority: `status="historical"` first, then oldest `startedAt`. Never evict: status="running" + the single most-recent status="done" session (the warm session).
+
+### AC7: Component split reduces echo.tsx to ≤400 lines
+- **AC7.1** Post-refactor, `wc -l tools/raycast-echo/src/echo.tsx` returns ≤400.
+- **AC7.2** Per-component files target sizes: AnswerView ≤300, SessionDetail ≤250, SessionsList ≤150, EmptyState ≤120, TypingState ≤120, AuditTimeline ≤120.
+- **AC7.3** `npx tsc --noEmit` clean; `npx ray build` clean; existing tests pass.
+
+### AC8: Tests cover the new persistence + UI surfaces
+- **AC8.1** `test/sessions.test.ts`: 8 tests minimum — write-read roundtrip, migration from recent-asks, MAX_SESSIONS eviction, status transitions (running → done, running → errored, running → cancelled), warm-session protection from eviction, fork creates new row, fork does not mutate source.
+- **AC8.2** `test/audit-timeline.test.tsx`: 4 tests minimum — live mode render with pending row, completed mode render, errored daemon render, empty audit array.
+- **AC8.3** `test/session-detail.test.tsx`: 3 tests minimum — full render with all sidebar fields populated, fork action writes new session, action panel surfaces all primary actions.
+- **AC8.4** Total project test count: ≥45 (current 32 + at least 13 new).
+
+### AC9: Dogfooding gate before retiring this spec
+- **AC9.1** ≥10 journal entries in `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` referencing the new five-state UX, across ≥3 distinct days.
+- **AC9.2** ≥1 journal entry per pain (#1, #2, #3, #4) confirming the new UX addresses it OR clearly identifying a remaining gap.
+- **AC9.3** README updated with the new UX walkthrough; the prior `recent-asks` mention is removed.
+
+### AC10: Recent-asks deprecation
+- **AC10.1** `src/lib/recent-asks.ts` deleted. All imports across echo.tsx + components updated to use sessions.ts.
+- **AC10.2** Migration in AC6.1 preserves the last 3 historical asks as status="historical" sessions; no founder data lost.
+
+## Out of scope (don't drift)
+
+The following are EXPLICITLY rejected; an agent who finds itself building any of them should STOP and move the item to `pending_review/` with a drift-event note in `agent_notes`:
+
+1. **Multi-turn chat threads** — A and B from the brainstorm. The fork mechanic (⌘R) is the only continuity affordance.
+2. **Daemon-side conversation memory** — no chat state in the MCP server, no thread IDs, no server-side session store.
+3. **Custom on-disk session format beyond LocalStorage + existing tee log files** — JSON in LocalStorage is the contract; tee log path is the existing contract from cca021b.
+4. **New daemon endpoints** — AuditTimeline consumes `/mcp/recent-calls` as-is. If `result_shape` is insufficient for top-source derivation, the row degrades; do NOT amend the daemon contract.
+5. **Browser-tab primary detection** — `detectPrimary()` desktop-app-only behavior is preserved.
+6. **A persistent companion window outside Raycast** — rejected as a destination app.
+7. **"Newline = ask, no newline = retrieve" magic** — the synthetic Ask row is the explicit primary action.
+8. **Top-level tabs ("Search" / "Ask")** — preserves the split this surface is meant to dissolve.
+9. **Daemon-side audit enhancement (top-source derivation, atom-ID-per-call surfacing)** — recognized as a real gap in `backlog/_followups.md` "Evidence-from-audit decoupling"; defer to a separate spec when dogfooding shows it's the bottleneck.
+10. **Recent-asks compatibility shim or grace period** — the AC10.1 deletion is one-shot; the AC6.1 migration is one-shot. No backwards-compat layer.
+
+## Risks
+
+1. **Codex's diagnosis is wrong and the founder really does want chat.** If post-merge dogfooding shows the ⌘R fork mechanic is insufficient and the founder repeatedly asks for multi-turn within a session, this spec is the wrong answer. Mitigation: AC9 explicitly journals signal per-pain; if pain #4 isn't addressed by ⌘R, file a follow-up spec with the empirical evidence.
+2. **AuditTimeline's per-call detail is too noisy.** The mockup shows 4 audit rows; a real run may produce 15+. Mitigation: collapse repeated calls of the same tool ("find_clusters ×3" with expandable detail); cap at MAX_AUDIT_ROWS=20 with "+N more" overflow.
+3. **LocalStorage capacity.** 100 sessions × ~5KB each ≈ 500KB. Raycast LocalStorage has no documented hard cap; if dogfooding shows OOM, drop to MAX_SESSIONS=50 + truncate answer body to 8KB per row.
+4. **Migration from recent-asks loses data.** The migration is one-shot. Mitigation: include a defensive backup-write to a `echo.recent-asks.backup` key before the delete; AC6.1 test asserts both the new key has the rows AND the backup key has the original JSON verbatim.
+5. **`echo.tsx` ≤400 line target is hard.** Current 1069 lines; some shared helpers may resist extraction. Mitigation: if the AC7.1 target is missed by ≤50 lines, builder may negotiate to 450 in agent_notes; >450 is a hard reject.
+
+## After Completion (Strategist Notes)
+
+When this item lands in `backlog/complete/`, the strategist should:
+
+1. **Promote `wiki/surfaces/hotkey-overlay.md`** from `status: planned` to `status: shipped` (or `status: shipped (v1.6)` if a finer-grained marker is in use). Add a "Sessions as objects" section documenting the five states + the ⌘R fork mechanic + the explicit non-goals.
+2. **Update `wiki/principles/compose-not-capture.md`** with the ⌘R fork mechanic as a worked example: how to give users continuity without becoming a destination. This is the canonical pattern other surfaces (browser extension, future hotkey overlays) should mirror.
+3. **Cross-link `wiki/principles/context-as-moat.md`** to this item: the "never ship a chat UI" commitment was structurally enforced by codex's strategist consult + this spec's Out-of-Scope list.
+4. **Consider a new principle page `wiki/principles/asks-as-objects.md`** if the sessions model proves load-bearing across other surfaces (browser extension, future overlay). Defer until ≥2 surfaces adopt the pattern.
+5. **Update `docs/STATUS.md`** Raycast-surface row.
