@@ -6,7 +6,7 @@
 // One omnibox surface:
 //   • Empty input → Open loops · Today · Recent asks
 //   • Typing      → synthetic "Ask ECHO about <query>" row + matching clusters/atoms
-//   • Ask answer  → streamed agent output + evidence + launch row in the ActionPanel
+//   • Ask answer  → streamed agent output + top clusters + launch row in the ActionPanel
 //   • Cluster     → existing cluster-detail behavior + "Ask about this" bridge
 //
 // Raycast doesn't expose a true sticky-footer primitive, so the launch row is
@@ -25,8 +25,9 @@ import {
   Toast,
   useNavigation,
   showToast,
+  type Keyboard,
 } from "@raycast/api";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   derivedApp,
   formatAtomBundle,
@@ -39,7 +40,6 @@ import {
   type SearchMatch,
   EchoDaemonError,
   findClusters,
-  getAtoms,
   searchMemories,
 } from "./lib/mcp";
 import {
@@ -205,6 +205,12 @@ async function showDaemonToast() {
     title: "ECHO daemon unreachable",
     message: "Check 'npm run daemon' in Project_echo",
   });
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim().length > 0) return err.message;
+  if (typeof err === "string" && err.trim().length > 0) return err;
+  return "Unknown launch error";
 }
 
 function useClusters() {
@@ -405,7 +411,7 @@ function AskRow({
         "",
         `> "${query}"`,
         "",
-        "Press ⏎ to synthesize. ECHO will produce a short answer, show the evidence it used, and offer a one-keystroke launch into Cursor / Claude / ChatGPT.",
+        "Press ⏎ to synthesize. ECHO will produce a short answer, show top recent clusters, and offer a one-keystroke launch into Cursor / Claude / ChatGPT.",
         "",
         "**ECHO won't finish the work — your AI tool will.**",
       ].join("\n")}
@@ -621,6 +627,99 @@ function RecentAskRow({
   );
 }
 
+type LaunchDestinationTargetId = Exclude<LaunchTargetId, "copy">;
+
+interface LaunchActionRow {
+  target: LaunchTargetId;
+  label: string;
+  shortcutLabel: string;
+  shortcut?: Keyboard.Shortcut;
+  pasteIntoFrontmost: boolean;
+}
+
+const DESTINATION_PRIORITY: readonly LaunchDestinationTargetId[] = ["cursor", "claude_web", "chatgpt"];
+
+function launchActionLabel(target: LaunchTargetId): string {
+  switch (target) {
+    case "cursor":
+      return "Send to Cursor";
+    case "claude_app":
+      return "Send to Claude";
+    case "claude_web":
+      return "Send to Claude.ai";
+    case "chatgpt":
+      return "Send to ChatGPT";
+    case "copy":
+      return "Copy Context + Prompt";
+  }
+}
+
+function launchActionIcon(target: LaunchTargetId): Icon {
+  switch (target) {
+    case "cursor":
+      return Icon.Code;
+    case "claude_app":
+    case "claude_web":
+      return Icon.Stars;
+    case "chatgpt":
+      return Icon.Globe;
+    case "copy":
+      return Icon.Clipboard;
+  }
+}
+
+function isClaudeTarget(target: LaunchTargetId): boolean {
+  return target === "claude_app" || target === "claude_web";
+}
+
+function sameLaunchSlot(a: LaunchTargetId, b: LaunchTargetId): boolean {
+  if (isClaudeTarget(a) && isClaudeTarget(b)) return true;
+  return a === b;
+}
+
+function primaryDestination(primary: PrimaryDetection | null): LaunchDestinationTargetId {
+  if (primary?.id === "cursor" || primary?.id === "claude_app" || primary?.id === "claude_web" || primary?.id === "chatgpt") {
+    return primary.id;
+  }
+  return "cursor";
+}
+
+function buildLaunchActions(primary: PrimaryDetection | null): LaunchActionRow[] {
+  const primaryTarget = primaryDestination(primary);
+  const rows: LaunchActionRow[] = [
+    {
+      target: primaryTarget,
+      label: launchActionLabel(primaryTarget),
+      shortcutLabel: "↩",
+      pasteIntoFrontmost: primary?.id === "cursor",
+    },
+  ];
+
+  DESTINATION_PRIORITY
+    .filter((target) => !sameLaunchSlot(target, primaryTarget))
+    .slice(0, 2)
+    .forEach((target, index) => {
+      const key: "1" | "2" = index === 0 ? "1" : "2";
+      rows.push({
+        target,
+        label: launchActionLabel(target),
+        shortcutLabel: index === 0 ? "⌘1" : "⌘2",
+        shortcut: { modifiers: ["cmd"], key },
+        pasteIntoFrontmost: false,
+      });
+    });
+
+  rows.push({
+    target: "copy",
+    label: launchActionLabel("copy"),
+    shortcutLabel: "⌘⇧C",
+    shortcut: { modifiers: ["cmd", "shift"], key: "c" },
+    pasteIntoFrontmost: false,
+  });
+
+  return rows;
+}
+
 // ============================================================
 // AnswerView — pushed Detail with streamed agent output + launch row
 // ============================================================
@@ -640,13 +739,13 @@ function AnswerView({
 
   const [answer, setAnswer] = useState("Waiting for agent output…");
   const [isLoading, setIsLoading] = useState(true);
-  const [evidence, setEvidence] = useState<FindClustersCluster[]>([]);
+  const [topClusters, setTopClusters] = useState<FindClustersCluster[]>([]);
   const [auditCalls, setAuditCalls] = useState<AuditCall[] | null>(null);
   const [auditUnavailable, setAuditUnavailable] = useState(false);
   const [startupError, setStartupError] = useState<string | null>(null);
   const runnerRef = useRef<AgentRun | null>(null);
 
-  // Resolve invocation + collect evidence (top clusters) in parallel
+  // Resolve invocation + collect top clusters in parallel
   useEffect(() => {
     let disposed = false;
 
@@ -669,10 +768,10 @@ function AnswerView({
         setIsLoading(false);
         return;
       }
-      // Evidence: top 3 clusters from the daemon (best-effort; failure is silent)
+      // Top 3 clusters from the daemon (best-effort; failure is silent)
       try {
         const r = await findClusters();
-        if (!disposed) setEvidence(r.clusters.slice(0, 3));
+        if (!disposed) setTopClusters(r.clusters.slice(0, 3));
       } catch {
         // ignore
       }
@@ -721,7 +820,8 @@ function AnswerView({
           setIsLoading(false);
           try {
             const audit = await fetchRecentCalls({ since: launchTs - 2_000, until: Date.now() + 2_000 });
-            if (!disposed) setAuditCalls(audit.calls);
+            if (disposed) return;
+            setAuditCalls(audit.calls);
           } catch {
             if (!disposed) setAuditUnavailable(true);
           }
@@ -751,18 +851,19 @@ function AnswerView({
     );
   }
 
-  const evidenceMarkdown = evidence.length > 0
-    ? evidence.map((c) => `- ${c.label?.trim() ?? c.cluster_id} (${c.atom_ids.length} atoms)`).join("\n")
+  const topClustersMarkdown = topClusters.length > 0
+    ? topClusters.map((c) => `- ${c.label?.trim() ?? c.cluster_id} (${c.atom_ids.length} atoms)`).join("\n")
     : "";
 
+  const launchActions = buildLaunchActions(primary);
   const launchBlock = renderLaunchBlock(primary);
   const fullMarkdown = [
     `# Ask ECHO`,
     "",
-    `_synthesizing from ${evidence.length} clusters · "${query}"_`,
+    `_synthesizing from ${topClusters.length} clusters · "${query}"_`,
     "",
     answer.trim(),
-    evidence.length > 0 ? "\n---\n\n**Evidence used**\n\n" + evidenceMarkdown : "",
+    topClusters.length > 0 ? "\n---\n\n**Top recent clusters**\n\n" + topClustersMarkdown : "",
     "\n---\n",
     launchBlock,
   ].join("\n");
@@ -771,20 +872,36 @@ function AnswerView({
     return {
       question: query,
       answer,
-      evidenceMarkdown: evidenceMarkdown.length > 0 ? evidenceMarkdown : undefined,
+      evidenceMarkdown: topClustersMarkdown.length > 0 ? topClustersMarkdown : undefined,
     };
   }
 
   async function fire(target: LaunchTargetId) {
-    const outcome = await launchTo(target, packet());
-    await showLaunchToast(outcome);
-    await onLaunch(query, target);
+    try {
+      const outcome = await launchTo(target, packet());
+      await showLaunchToast(outcome);
+      await onLaunch(query, target);
+    } catch (err) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Launch failed",
+        message: errorMessage(err),
+      });
+    }
   }
 
   async function pasteToPrimaryCursor() {
-    const outcome = await pasteIntoFrontmost(packet());
-    await showLaunchToast(outcome);
-    await onLaunch(query, "cursor");
+    try {
+      const outcome = await pasteIntoFrontmost(packet());
+      await showLaunchToast(outcome);
+      await onLaunch(query, "cursor");
+    } catch (err) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Launch failed",
+        message: errorMessage(err),
+      });
+    }
   }
 
   return (
@@ -801,67 +918,41 @@ function AnswerView({
       }
       actions={
         <ActionPanel>
-          {primary?.id === "cursor" ? (
-            <Action
-              title="Send to Cursor"
-              icon={{ source: Icon.Code, tintColor: LAUNCH_TINT.cursor }}
-              onAction={pasteToPrimaryCursor}
-            />
-          ) : null}
-          {primary?.id === "claude_app" ? (
-            <Action
-              title="Send to Claude"
-              icon={{ source: Icon.Stars, tintColor: LAUNCH_TINT.claude_app }}
-              onAction={() => fire("claude_app")}
-            />
-          ) : null}
-          {primary?.id === "chatgpt" ? (
-            <Action
-              title="Send to ChatGPT"
-              icon={{ source: Icon.Globe, tintColor: LAUNCH_TINT.chatgpt }}
-              onAction={() => fire("chatgpt")}
-            />
-          ) : null}
-          {primary === null ? (
-            <Action
-              title="Send to Cursor"
-              icon={{ source: Icon.Code, tintColor: LAUNCH_TINT.cursor }}
-              onAction={() => fire("cursor")}
-            />
-          ) : null}
-          <Action
-            title="Send to Claude.ai"
-            icon={{ source: Icon.Stars, tintColor: LAUNCH_TINT.claude_web }}
-            shortcut={{ modifiers: ["cmd"], key: "1" }}
-            onAction={() => fire("claude_web")}
-          />
-          <Action
-            title="Send to ChatGPT"
-            icon={{ source: Icon.Globe, tintColor: LAUNCH_TINT.chatgpt }}
-            shortcut={{ modifiers: ["cmd"], key: "2" }}
-            onAction={() => fire("chatgpt")}
-          />
-          <Action
-            title="Copy Context + Prompt"
-            icon={{ source: Icon.Clipboard, tintColor: LAUNCH_TINT.copy }}
-            shortcut={{ modifiers: ["cmd", "shift"], key: "c" }}
-            onAction={() => fire("copy")}
-          />
-          <ActionPanel.Section>
-            <Action.CopyToClipboard
-              title="Copy Answer Only"
-              icon={Icon.Document}
-              shortcut={{ modifiers: ["cmd"], key: "c" }}
-              content={answer}
-            />
-            {isLoading ? (
+          {isLoading ? (
+            <ActionPanel.Section>
+              <Action.CopyToClipboard
+                title="Copy Partial Output"
+                icon={Icon.Document}
+                shortcut={{ modifiers: ["cmd"], key: "c" }}
+                content={answer}
+              />
               <Action
                 title="Cancel"
                 icon={Icon.XMarkCircle}
                 onAction={() => runnerRef.current?.cancel()}
               />
-            ) : null}
-          </ActionPanel.Section>
+            </ActionPanel.Section>
+          ) : (
+            <>
+              {launchActions.map((row) => (
+                <Action
+                  key={`${row.shortcutLabel}-${row.target}`}
+                  title={row.label}
+                  icon={{ source: launchActionIcon(row.target), tintColor: LAUNCH_TINT[row.target] }}
+                  shortcut={row.shortcut}
+                  onAction={row.pasteIntoFrontmost ? pasteToPrimaryCursor : () => fire(row.target)}
+                />
+              ))}
+              <ActionPanel.Section>
+                <Action.CopyToClipboard
+                  title="Copy Answer Only"
+                  icon={Icon.Document}
+                  shortcut={{ modifiers: ["cmd"], key: "c" }}
+                  content={answer}
+                />
+              </ActionPanel.Section>
+            </>
+          )}
         </ActionPanel>
       }
     />
@@ -869,24 +960,13 @@ function AnswerView({
 }
 
 function renderLaunchBlock(primary: PrimaryDetection | null): string {
-  const primaryLabel = primary === null
-    ? "Send to Cursor"
-    : primary.id === "cursor"
-      ? `Send to Cursor — ${primary.hint}`
-      : primary.id === "claude_app"
-        ? `Send to Claude — ${primary.hint}`
-        : primary.id === "chatgpt"
-          ? `Send to ChatGPT — ${primary.hint}`
-          : "Send to Cursor";
+  const rows = buildLaunchActions(primary);
   return [
     "## Launch with this context",
     "",
     "_ECHO won't finish the work — your AI tool will._",
     "",
-    `- **↩** ${primaryLabel}`,
-    "- **⌘1** Send to Claude.ai",
-    "- **⌘2** Send to ChatGPT",
-    "- **⌘⇧C** Copy context + prompt",
+    ...rows.map((row) => `- **${row.shortcutLabel}** ${row.label}`),
   ].join("\n");
 }
 
