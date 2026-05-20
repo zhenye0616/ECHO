@@ -53,7 +53,26 @@ branch: "agent/raycast-sessions-as-objects"
 worktree: "/Users/zhenye/Desktop/Project_echo--raycast-sessions-as-objects"
 head_sha: "0053952096c4c35d26fe22e3ffd6052698312113"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-20 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean merge.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none — sidecar verdict was "merge as-is" with an empty pre-merge punch list.
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: root 1114 passed / 0 failed / 21 skipped; tools/raycast-echo 69 passed / 0 failed; lint clean; typecheck clean; sync-skills check OK.
+
+  Follow-up items (non-blocking) — appended to backlog/_followups.md:
+  - Strengthen tools/raycast-echo/test/sessions.test.ts "final flush ordering" test (AC8.12(c)) to use the delayed-async setItem mock pattern from the per-id-chain test (around line 239), so fire-and-forget regressions are caught. The load-bearing primitive is already covered by the AC8.12(d) per-id-chain test.
+  - tools/raycast-echo/src/components/SessionDetail.tsx tailLog (:132-138): cap readFileSync to last ~64KB via fs.openSync + fs.readSync from EOF, to keep tail responsive when subprocess logs grow past ~1MB.
+  - AC9.1–AC9.5 dogfooding gates: need ≥10 journal entries across ≥3 days, ≥1 entry per pain (#1, #2, #3, #4), ≥1 entry on AC3.6 audit-contamination behavior, ≥1 entry on AC6.7 per-row-keys claim (Risk #7).
 agent_notes: |
   Implemented Raycast sessions-as-objects on branch agent/raycast-sessions-as-objects at 0053952096c4c35d26fe22e3ffd6052698312113.
   Core ACs covered: five-state router, extracted components, per-row LocalStorage session persistence, recent-asks migration + backup, stale-running reconciliation, per-session log path exposure, audit timeline rendering, SessionsList filtering/delete policy, fork prompt, and recent-asks deletion.
