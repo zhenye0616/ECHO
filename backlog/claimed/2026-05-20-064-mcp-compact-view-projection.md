@@ -32,9 +32,9 @@ spec_refs:
   - wiki/surfaces/mcp-get-atoms.md  # current contract for get_atoms; this spec adds `view` parameter
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: null
-claimed_at: null
-branch: null
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-20T22:47:41Z"
+branch: "agent/mcp-compact-view-projection"
 head_sha: null
 pr_url: null
 agent_notes: null
