@@ -1,7 +1,7 @@
 ---
 id: 2026-05-20-064-mcp-compact-view-projection
 title: MCP `view: "compact"` projection — substrate-level human-noise filter on `find_clusters` + `get_atoms`
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-05-20
@@ -35,9 +35,10 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-20T22:47:41Z"
 branch: "agent/mcp-compact-view-projection"
-head_sha: null
-pr_url: null
-agent_notes: null
+head_sha: "e42d2467d4f451dbfe84172e60bc09a1ec860646"
+pr_url: ""
+agent_notes: |
+  Implemented on branch `agent/mcp-compact-view-projection` at `e42d2467d4f451dbfe84172e60bc09a1ec860646`. Added shared compact projection for `find_clusters` and `get_atoms`, preserved rich/default behavior, switched Raycast MCP calls to `view: "compact"`, added the requested daemon/Raycast tests, and journaled a live Raycast-client compact probe against a feature-branch daemon. `tools/raycast-echo/src/components/EmptyState.tsx` needed a one-line null-safe `rank_reason` read to keep the new relaxed Raycast cluster type compiling.
 ---
 
 # Why

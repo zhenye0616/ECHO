@@ -2,12 +2,19 @@
 task_id: 2026-05-20-064-mcp-compact-view-projection
 role: builder
 writer: codex-builder
-last_updated: 2026-05-20T22:47:41Z
+last_updated: 2026-05-20T23:24:09Z
+handoff_branch: agent/mcp-compact-view-projection
+handoff_head_sha: e42d2467d4f451dbfe84172e60bc09a1ec860646
+handoff_run_log: raw/internal/agent-runs/2026-05-20-2026-05-20-064-mcp-compact-view-projection.md
 ---
 
 ## current_thesis
 
 Claimed 064 as Codex builder. The task is to add opt-in `view: "compact"` projection to the existing `find_clusters` and `get_atoms` MCP tools, then switch Raycast's MCP client to request compact while keeping rich/default behavior byte-identical.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at e42d2467d4f451dbfe84172e60bc09a1ec860646.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -37,4 +44,4 @@ Claimed 064 as Codex builder. The task is to add opt-in `view: "compact"` projec
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-20-064-mcp-compact-view-projection.md
+- spec: backlog/pending_review/2026-05-20-064-mcp-compact-view-projection.md
