@@ -109,15 +109,47 @@ describe("agent runner", () => {
       { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
     );
 
+    expect(run.sessionLogPath).not.toBeNull();
     await collect(run.events);
 
     const logPath = onlySessionLogPath(sessionLogDir);
+    expect(run.sessionLogPath).toBe(logPath);
     const text = readFileSync(logPath, "utf8");
     expect(text).toContain("=== ECHO agent session ");
     expect(text).toContain(`${process.execPath} -e`);
     expect(text).toContain("hello stdout\n");
     expect(text).toContain("[stderr] hello stderr\n");
     expect(SESSION_LOG_DIR).toContain(".config/raycast/extensions/echo-context/sessions");
+  });
+
+  it("returns distinct immutable session log paths for overlapping runs", async () => {
+    const first = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "setTimeout(() => { process.stdout.write('first\\n'); }, 35);"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
+    );
+    const second = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.stdout.write('second\\n');"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir },
+    );
+
+    expect(first.sessionLogPath).not.toBeNull();
+    expect(second.sessionLogPath).not.toBeNull();
+    expect(first.sessionLogPath).not.toBe(second.sessionLogPath);
+    first.cancel();
+
+    await Promise.all([collect(first.events), collect(second.events)]);
+
+    expect(first.sessionLogPath).not.toBe(second.sessionLogPath);
+    expect(existsSync(first.sessionLogPath ?? "")).toBe(true);
+    expect(existsSync(second.sessionLogPath ?? "")).toBe(true);
   });
 
   it("updates latest.log to point at the newest per-session log", async () => {
