@@ -73,11 +73,18 @@ export function AnswerView({ query, agentKind, preferences, repoPath, forkedFrom
       buffer += `${sep}${footer}\n`;
       void flushNow();
     };
+    const auditFingerprint = (calls: readonly AuditCall[]): string =>
+      calls.map((c) => `${c.ts}|${c.tool}|${c.status}|${c.duration_ms ?? "-"}`).join(",");
+    let lastAuditFingerprint = "";
     const pollAudit = async (until?: number) => {
       try {
         const audit = await fetchRecentCalls({ since: launchTs - 2_000, until: until ?? Date.now() + 2_000 });
         latestAudit = audit.calls;
-        if (!disposed) setAuditCalls(audit.calls);
+        if (disposed) return;
+        const fp = auditFingerprint(audit.calls);
+        if (fp === lastAuditFingerprint) return;
+        lastAuditFingerprint = fp;
+        setAuditCalls(audit.calls);
       } catch {
         if (!disposed) setAuditUnavailable(true);
       }
@@ -92,10 +99,10 @@ export function AnswerView({ query, agentKind, preferences, repoPath, forkedFrom
         setIsLoading(false);
         return;
       }
-      const daemonAvailable = await probeEchoDaemon();
+      const probe = await probeEchoDaemon();
       if (disposed) return;
-      if (!daemonAvailable) {
-        setStartupError("ECHO daemon unreachable at 38478");
+      if (!probe.ok) {
+        setStartupError(`ECHO daemon unreachable at 38478 — ${probe.reason}`);
         setIsLoading(false);
         return;
       }

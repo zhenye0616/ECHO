@@ -12,7 +12,7 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   derivedApp,
   formatAtomBundle,
@@ -23,6 +23,7 @@ import {
 import {
   EchoDaemonError,
   findClusters,
+  getAtoms,
   searchMemories,
   type FindClustersCluster,
   type SearchMatch,
@@ -61,6 +62,7 @@ export default function EchoContext() {
   const agentKind = normalizeAgentKind(preferences.agentKind);
   const repoPath = expandHome(preferences.repoPath ?? DEFAULT_REPO_PATH);
   const { clusters, isLoadingClusters } = useClusters();
+  const clusterPreviews = useClusterPreviews(clusters);
   const { matches, isLoadingMatches } = useMatches(query);
   const primary = usePrimary();
   const { sessions, warmSession } = useSessions();
@@ -92,7 +94,13 @@ export default function EchoContext() {
   }
 
   const renderCluster = (cluster: FindClustersCluster) => (
-    <ClusterRow key={cluster.cluster_id} cluster={cluster} primary={primary} onAsk={runAsk} />
+    <ClusterRow
+      key={cluster.cluster_id}
+      cluster={cluster}
+      previews={clusterPreviews.get(cluster.cluster_id) ?? null}
+      primary={primary}
+      onAsk={runAsk}
+    />
   );
   const renderMatch = (match: SearchMatch) => <MatchRow key={match.id} match={match} />;
 
@@ -193,19 +201,69 @@ function usePrimary(): PrimaryDetection | null {
   return primary;
 }
 
-function ClusterRow({ cluster, primary, onAsk }: { cluster: FindClustersCluster; primary: PrimaryDetection | null; onAsk: (query: string) => void }) {
+const CLUSTER_PREVIEW_ATOMS_PER_CLUSTER = 3;
+
+// Fetches the first N atom bodies per cluster in a single batched get_atoms
+// call so ClusterRow's detail panel can show actual evidence instead of just
+// `source_breakdown` counts. Fingerprint keyed on (cluster_id, sampled atom
+// ids) — re-fetches only when the cluster set or the sampled ids change.
+function useClusterPreviews(clusters: readonly FindClustersCluster[]): Map<string, EchoAtom[]> {
+  const [previews, setPreviews] = useState<Map<string, EchoAtom[]>>(new Map());
+  const sample = useMemo(
+    () => clusters.map((c) => ({ cluster_id: c.cluster_id, ids: c.atom_ids.slice(0, CLUSTER_PREVIEW_ATOMS_PER_CLUSTER) })),
+    [clusters],
+  );
+  const fingerprint = useMemo(
+    () => sample.map((s) => `${s.cluster_id}:${s.ids.join("|")}`).join(","),
+    [sample],
+  );
+  useEffect(() => {
+    const uniqueIds = Array.from(new Set(sample.flatMap((s) => s.ids)));
+    if (uniqueIds.length === 0) {
+      setPreviews(new Map());
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await getAtoms(uniqueIds);
+        if (cancelled) return;
+        const byId = new Map(r.atoms.map((a) => [a.id, a]));
+        const next = new Map<string, EchoAtom[]>();
+        for (const s of sample) {
+          const atoms = s.ids.map((id) => byId.get(id)).filter((a): a is EchoAtom => Boolean(a));
+          if (atoms.length > 0) next.set(s.cluster_id, atoms);
+        }
+        setPreviews(next);
+      } catch {
+        // Best-effort. Detail panel falls back to metadata-only when previews are empty.
+      }
+    })();
+    return () => { cancelled = true; };
+  // sample is derived from fingerprint; the effect re-runs when the fingerprint changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint]);
+  return previews;
+}
+
+function ClusterRow({ cluster, previews, primary, onAsk }: { cluster: FindClustersCluster; previews: readonly EchoAtom[] | null; primary: PrimaryDetection | null; onAsk: (query: string) => void }) {
   const askQuery = cluster.label?.trim().length ? `tell me about "${cluster.label.trim()}"` : "summarize this cluster";
+  const isOpenLoop = cluster.rank_reason.includes("has_open_loop");
+  const titleText = cluster.label?.trim() || atomsLabel(cluster.atom_ids.length);
+  const sourcesSummary = sourceBreakdownSummary(cluster.source_breakdown);
+  const subtitle = [isOpenLoop ? "Open loop" : null, sourcesSummary].filter((s) => s !== null && s.length > 0).join(" · ");
+  const bundle = clusterBundleMarkdown(cluster, previews);
   return (
     <List.Item
       icon={appIconFor(dominantApp(cluster))}
-      title={cluster.label?.trim() || `${cluster.atom_ids.length} atoms`}
-      subtitle={cluster.rank_reason.includes("has_open_loop") ? "Open loop" : `${cluster.atom_ids.length} atoms`}
+      title={titleText}
+      subtitle={subtitle.length > 0 ? subtitle : atomsLabel(cluster.atom_ids.length)}
       accessories={[{ text: formatRelativeTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) }]}
-      detail={<List.Item.Detail markdown={clusterBundleMarkdown(cluster)} />}
+      detail={<List.Item.Detail markdown={bundle} />}
       actions={
         <ActionPanel>
-          <Action title="Ask ECHO about This Cluster" icon={Icon.Stars} shortcut={{ modifiers: ["cmd"], key: "a" }} onAction={() => onAsk(askQuery)} />
-          <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={clusterBundleMarkdown(cluster)} />
+          <Action title="Ask ECHO about This Cluster" icon={Icon.Stars} onAction={() => onAsk(askQuery)} />
+          <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={bundle} />
           <Action title="Paste in Frontmost App" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} onAction={() => void pasteCluster(cluster, primary)} />
         </ActionPanel>
       }
@@ -220,8 +278,8 @@ function MatchRow({ match }: { match: SearchMatch }) {
       icon={appIconFor(app)}
       title={titleForMatch(match)}
       subtitle={narrativeForMatch(match)}
-      accessories={[{ text: formatRelativeTime(match.timestamp), tooltip: formatPdtTimestamp(match.timestamp) }]}
-      detail={<List.Item.Detail markdown={match.content} />}
+      accessories={matchAccessories(match)}
+      detail={<List.Item.Detail markdown={matchDetailMarkdown(match)} />}
       actions={
         <ActionPanel>
           <Action.CopyToClipboard title="Copy Atom" icon={Icon.Clipboard} content={formatAtomBundle([match as unknown as EchoAtom])} />
@@ -230,6 +288,37 @@ function MatchRow({ match }: { match: SearchMatch }) {
       }
     />
   );
+}
+
+const INTERESTING_METADATA_KEYS = ["session_id", "composer_id", "workspace_id", "repo_root", "role", "model", "file", "path", "branch", "tool", "type"] as const;
+
+function matchAccessories(match: SearchMatch): { text: string; tooltip?: string }[] {
+  const acc: { text: string; tooltip?: string }[] = [];
+  if ((match.truncations ?? []).length > 0) {
+    acc.push({ text: "…", tooltip: `truncated: ${(match.truncations ?? []).join(", ")}` });
+  }
+  acc.push({ text: formatRelativeTime(match.timestamp), tooltip: formatPdtTimestamp(match.timestamp) });
+  return acc;
+}
+
+function matchDetailMarkdown(match: SearchMatch): string {
+  const headerLines: string[] = [];
+  headerLines.push(`_${formatPdtTimestamp(match.timestamp)} · \`${match.source}\`_`);
+  const metaPairs: string[] = [];
+  for (const key of INTERESTING_METADATA_KEYS) {
+    const raw = match.metadata?.[key];
+    if (raw === undefined || raw === null) continue;
+    const value = typeof raw === "string" ? raw : JSON.stringify(raw);
+    if (value.length === 0) continue;
+    const trimmed = value.length > 80 ? `${value.slice(0, 80)}…` : value;
+    metaPairs.push(`\`${key}\`: ${trimmed}`);
+  }
+  if (metaPairs.length > 0) headerLines.push(`_${metaPairs.join(" · ")}_`);
+  const truncations = match.truncations ?? [];
+  if (truncations.length > 0) {
+    headerLines.push(`> ⚠️ Truncated: ${truncations.join(", ")}${match.bytes_elided ? ` (~${match.bytes_elided}B elided)` : ""}`);
+  }
+  return [...headerLines, "", "---", "", match.content].join("\n");
 }
 
 function dominantApp(c: FindClustersCluster): DerivedApp {
@@ -249,13 +338,61 @@ function appIconFor(app: DerivedApp) {
   return { source: meta.icon, tintColor: meta.color };
 }
 
-function clusterBundleMarkdown(c: FindClustersCluster): string {
-  const sources = Object.entries(c.source_breakdown)
+function atomsLabel(n: number): string {
+  return n === 1 ? "1 atom" : `${n} atoms`;
+}
+
+function sourceBreakdownSummary(breakdown: Record<string, number>): string {
+  return Object.entries(breakdown)
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1])
-    .map(([app, n]) => `- ${APP_META[app as DerivedApp]?.label ?? app}: ${n}`)
-    .join("\n");
-  return [`# ${c.label?.trim() ?? `${c.atom_ids.length} atoms`}`, "", sources, "", `<!-- ECHO cluster ${c.cluster_id} -->`].join("\n");
+    .map(([app, n]) => `${APP_META[app as DerivedApp]?.label ?? app}×${n}`)
+    .join(" · ");
+}
+
+const CLUSTER_PREVIEW_SNIPPET_CHARS = 280;
+
+function clusterPreviewSnippet(content: string | undefined): string {
+  const text = (content ?? "").trim();
+  if (text.length === 0) return "_(empty atom)_";
+  const collapsed = text.replace(/\s+/g, " ");
+  return collapsed.length > CLUSTER_PREVIEW_SNIPPET_CHARS
+    ? `${collapsed.slice(0, CLUSTER_PREVIEW_SNIPPET_CHARS)}…`
+    : collapsed;
+}
+
+function clusterBundleMarkdown(c: FindClustersCluster, previews: readonly EchoAtom[] | null): string {
+  const title = c.label?.trim() || atomsLabel(c.atom_ids.length);
+  const isOpenLoop = c.rank_reason.includes("has_open_loop");
+  const breakdown = sourceBreakdownSummary(c.source_breakdown);
+  const span = `${formatPdtTimestamp(c.time_range.from)} → ${formatPdtTimestamp(c.time_range.to)}`;
+  const metaLine = [isOpenLoop ? "Open loop" : null, atomsLabel(c.atom_ids.length), breakdown, span]
+    .filter((s) => s !== null && s.length > 0)
+    .join(" · ");
+  const otherReasons = c.rank_reason.filter((r) => r !== "has_open_loop");
+  const whyLine = otherReasons.length > 0 ? `_why: ${otherReasons.join(", ")}_` : "";
+
+  let evidenceBlock: string;
+  if (previews === null) {
+    evidenceBlock = "_loading preview…_";
+  } else if (previews.length === 0) {
+    evidenceBlock = "_(no atom preview available)_";
+  } else {
+    evidenceBlock = previews
+      .map((a) => {
+        const appLabel = APP_META[derivedApp(a.source)]?.label ?? derivedApp(a.source);
+        const truncated = (a.truncations ?? []).length > 0 ? " · _truncated_" : "";
+        return `### ${appLabel} · ${formatPdtTimestamp(a.timestamp)}${truncated}\n\n${clusterPreviewSnippet(a.content)}`;
+      })
+      .join("\n\n");
+    const remaining = c.atom_ids.length - previews.length;
+    if (remaining > 0) evidenceBlock += `\n\n_+${remaining} more atom${remaining === 1 ? "" : "s"} in this cluster_`;
+  }
+
+  const lines = [`# ${title}`, "", `_${metaLine}_`];
+  if (whyLine.length > 0) lines.push(whyLine);
+  lines.push("", "**Preview**", "", evidenceBlock, "", `<!-- ECHO cluster ${c.cluster_id} -->`);
+  return lines.join("\n");
 }
 
 function titleForMatch(m: SearchMatch): string {
@@ -275,7 +412,7 @@ function narrativeForMatch(m: SearchMatch): string {
 
 async function pasteCluster(cluster: FindClustersCluster, primary: PrimaryDetection | null) {
   try {
-    const outcome = await pasteIntoFrontmost({ question: cluster.label ?? "cluster", answer: clusterBundleMarkdown(cluster) });
+    const outcome = await pasteIntoFrontmost({ question: cluster.label ?? "cluster", answer: clusterBundleMarkdown(cluster, null) });
     await showLaunchToast(outcome);
   } catch (err) {
     await showToast({ style: Toast.Style.Failure, title: "Paste failed", message: err instanceof Error ? err.message : String(err) });

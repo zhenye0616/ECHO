@@ -58,6 +58,43 @@ describe("agent runner", () => {
     expect(resolvePathEnv({ PATH: "/foo:/bar" })).toBe("/foo:/bar");
   });
 
+  it("does not emit the stalled footer when the agent emits output then goes quiet", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: [
+          "-e",
+          "process.stdout.write('hello\\n'); setTimeout(() => process.exit(0), 1200);",
+        ],
+        stdin: "",
+      },
+      { idleTimeoutMs: 500, maxRuntimeMs: 5_000 },
+    );
+
+    const events = await collect(run.events);
+    const stalled = events.find(
+      (event) => event.type === "footer" && event.markdown.includes("Agent appears stalled"),
+    );
+    expect(stalled).toBeUndefined();
+  });
+
+  it("emits the stalled footer when the agent produces zero bytes before the idle timeout", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "setTimeout(() => process.exit(0), 1500);"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 500, maxRuntimeMs: 5_000 },
+    );
+
+    const events = await collect(run.events);
+    const stalled = events.find(
+      (event) => event.type === "footer" && event.markdown.includes("Agent appears stalled"),
+    );
+    expect(stalled).toBeDefined();
+  });
+
   it("resolvePathEnv falls back to GUI-safe defaults when PATH is undefined", () => {
     const resolved = resolvePathEnv({});
     expect(resolved).toContain("/usr/local/bin");

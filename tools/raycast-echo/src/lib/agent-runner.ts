@@ -49,17 +49,51 @@ export function resolvePathEnv(env: NodeJS.ProcessEnv = process.env): string {
   return [...FALLBACK_PATH_DIRS, `${home}/.local/bin`, `${home}/.cargo/bin`].join(":");
 }
 
-export async function probeEchoDaemon(timeoutMs = 1_000): Promise<boolean> {
+export type ProbeResult = { ok: true } | { ok: false; reason: string };
+
+// Cold-start failure mode: Raycast's undici keeps an HTTP keep-alive pool
+// per-origin; after the daemon idles for hours that pool socket can be
+// half-dead. The first HEAD probe sends bytes into a closed socket and
+// hangs until the abort timer fires (observed: AbortError at ~1000ms while
+// the daemon was healthy and answered curl in <100ms). Plus, the JS event
+// loop is congested at command launch ("Native search bar is N events
+// ahead of JS"), which can delay the fetch resolver past a tight deadline.
+//
+// Fix: 3s budget, force a fresh connection (Connection: close) so a
+// poisoned pooled socket can't sink the probe, and one retry on AbortError
+// so a single cold-start hiccup doesn't show the user a daemon-down error.
+const PROBE_TIMEOUT_MS = 3_000;
+const PROBE_ATTEMPTS = 2;
+
+async function probeOnce(timeoutMs: number): Promise<{ ok: true; elapsedMs: number } | { ok: false; reason: string; elapsedMs: number }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
   try {
-    await fetch(ECHO_MCP_URL, { method: "HEAD", signal: controller.signal });
-    return true;
-  } catch {
-    return false;
+    await fetch(ECHO_MCP_URL, {
+      method: "HEAD",
+      signal: controller.signal,
+      headers: { connection: "close" },
+    });
+    return { ok: true, elapsedMs: Date.now() - started };
+  } catch (err) {
+    const e = err as { name?: string; message?: string; cause?: { code?: string; message?: string } };
+    const causeCode = e.cause?.code ?? "";
+    const reason = `${e.name ?? "Error"}: ${e.message ?? "(no message)"}${causeCode ? ` [cause.code=${causeCode}]` : ""}`;
+    return { ok: false, reason, elapsedMs: Date.now() - started };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function probeEchoDaemon(): Promise<ProbeResult> {
+  const reasons: string[] = [];
+  for (let attempt = 1; attempt <= PROBE_ATTEMPTS; attempt += 1) {
+    const result = await probeOnce(PROBE_TIMEOUT_MS);
+    if (result.ok) return { ok: true };
+    reasons.push(`attempt${attempt}: ${result.reason} (after ${result.elapsedMs}ms)`);
+  }
+  return { ok: false, reason: `${reasons.join("; ")} (url=${ECHO_MCP_URL})` };
 }
 
 export async function findExecutable(binary: string): Promise<boolean> {
@@ -172,7 +206,13 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
       sessionLog?.writeStdout(raw);
       const text = stdoutStripper.write(raw.toString("utf8"));
       if (text.length === 0) continue;
-      armIdleTimer();
+      // First stdout proves the agent is past any interactive auth prompt;
+      // clear the idle timer permanently. Mid-run quiet stretches (model
+      // thinking, slow MCP calls) are bounded by maxRuntimeMs, not this.
+      if (idleTimer !== null) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
       queue.push({ type: "stdout", text });
     }
   })().catch((err: unknown) => {
