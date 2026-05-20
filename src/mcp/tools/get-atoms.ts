@@ -14,6 +14,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { CaptureEvent, Storage } from '../../storage/interface.js';
+import { compactAtom, type CompactAtom, type ViewMode } from '../wire-shape/compact.js';
 import { projectMatch, type ProjectedMatch } from '../wire-shape/match.js';
 
 const SCHEMA_VERSION = 1;
@@ -51,6 +52,7 @@ export const GET_ATOMS_DESCRIPTION =
 
 const formatSchema = z.enum(['minimal']);
 const preferSchema = z.enum(['as_requested', 'newest_first']);
+const viewSchema = z.enum(['compact', 'rich']);
 
 export type GetAtomsPrefer = 'as_requested' | 'newest_first';
 
@@ -59,6 +61,7 @@ export interface GetAtomsParams {
   fields?: string[];
   format?: 'minimal';
   prefer?: GetAtomsPrefer;
+  view?: ViewMode;
 }
 
 /** Atom shape on the wire. Mirrors ProjectedMatch but keeps the spec's
@@ -96,6 +99,12 @@ export interface GetAtomsResult {
 
 const ALWAYS_KEEP_FIELDS = new Set(['id', 'source', 'timestamp', 'truncations']);
 
+function validateView(view: unknown): ViewMode {
+  if (view === undefined) return 'rich';
+  if (view === 'compact' || view === 'rich') return view;
+  throw new Error('get_atoms: view must be one of "compact" or "rich"');
+}
+
 /** Project a CaptureEvent through the shared `projectMatch` (so caps +
  *  projector reshapes match search/tail), then optionally narrow to the
  *  caller's `fields[]`. Returns the atom shape AND its serialized byte
@@ -103,6 +112,7 @@ const ALWAYS_KEEP_FIELDS = new Set(['id', 'source', 'timestamp', 'truncations'])
 function projectAtom(
   e: CaptureEvent,
   fields: Set<string> | undefined,
+  view: ViewMode,
 ): { atom: GetAtomsAtom; bytes: number } {
   const projected: ProjectedMatch = projectMatch(e);
 
@@ -146,8 +156,33 @@ function projectAtom(
 
   if (fieldsOmitted) atom.truncations.push('fields_omitted');
 
-  const bytes = JSON.stringify(atom).length;
-  return { atom, bytes };
+  const shaped: GetAtomsAtom =
+    view === 'compact' ? applyCompactFields(compactAtom(atom), fields) : atom;
+  const bytes = JSON.stringify(shaped).length;
+  return { atom: shaped, bytes };
+}
+
+function applyCompactFields(atom: CompactAtom, fields: Set<string> | undefined): GetAtomsAtom {
+  if (fields === undefined) return atom;
+  const out: CompactAtom = {
+    id: atom.id,
+    source: atom.source,
+    timestamp: atom.timestamp,
+    truncations: [...atom.truncations],
+  };
+  let fieldsOmitted = false;
+  if (fields.has('content')) {
+    if (atom.content !== undefined) out.content = atom.content;
+  } else if (atom.content !== undefined) {
+    fieldsOmitted = true;
+  }
+  if (fields.has('metadata')) {
+    if (atom.metadata !== undefined) out.metadata = atom.metadata;
+  } else if (atom.metadata !== undefined) {
+    fieldsOmitted = true;
+  }
+  if (fieldsOmitted) out.truncations.push('fields_omitted');
+  return out;
 }
 
 /** Build the iteration order for the prefix-drop loop, given the caller's
@@ -220,6 +255,7 @@ export async function getAtoms(storage: Storage, params: GetAtomsParams): Promis
   void format;
 
   const prefer: GetAtomsPrefer = preferIn ?? 'as_requested';
+  const view = validateView(params.view);
 
   const fieldsSet = fields !== undefined && fields.length > 0 ? new Set(fields) : undefined;
 
@@ -251,7 +287,7 @@ export async function getAtoms(storage: Storage, params: GetAtomsParams): Promis
       continue;
     }
 
-    const { atom } = projectAtom(ev, fieldsSet);
+    const { atom } = projectAtom(ev, fieldsSet, view);
 
     // Tentatively add; check envelope.
     atoms.push(atom);
@@ -339,6 +375,7 @@ export function registerGetAtoms(server: McpServer, storage: Storage): void {
         fields: z.array(z.string()).optional(),
         format: formatSchema.optional(),
         prefer: preferSchema.optional(),
+        view: viewSchema.optional(),
       },
       outputSchema: getAtomsOutputSchema,
       annotations: { readOnlyHint: true },

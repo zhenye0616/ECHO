@@ -27,6 +27,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Storage } from '../../storage/interface.js';
 import type { Cluster, ResponseFormat } from '../../trace/types.js';
+import { compactCluster, type ViewMode } from '../wire-shape/compact.js';
 // Item 038 / AC3: find_clusters calls the canonical cluster engine directly
 // (skeleton wire-shape constants still come from the deprecated tool shim
 // — they describe the MCP-tool surface, not the engine).
@@ -69,12 +70,14 @@ export const FIND_CLUSTERS_DESCRIPTION =
   ")}. No atom bodies. `result_caps` describes response-level budget application; per-cluster `atom_ids_truncated: true` + `atom_ids_total: N` fires if a single cluster's atom_ids[] would dominate the ceiling.";
 
 const formatSchema = z.enum(['skeleton']);
+const viewSchema = z.enum(['compact', 'rich']);
 
 export interface FindClustersParams {
   since?: string;
   until?: string;
   window_hours?: number;
   format?: 'skeleton';
+  view?: ViewMode;
   /** Item 037 / AC4: absolute repo root path. Pass-through to the
    *  underlying `recent_work_context` query; scopes the candidate set
    *  cross-source by `metadata.repo_root`. Echoed in `query.repo_path`. */
@@ -129,6 +132,12 @@ export interface FindClustersResult {
     truncated: boolean;
   };
   warnings: string[];
+}
+
+function validateView(view: unknown): ViewMode {
+  if (view === undefined) return 'rich';
+  if (view === 'compact' || view === 'rich') return view;
+  throw new Error('find_clusters: view must be one of "compact" or "rich"');
 }
 
 function clipOpenLoopHintsArray<T>(arr: readonly T[], cap: number): { kept: T[]; omitted: number } {
@@ -194,6 +203,7 @@ export async function findClusters(
   // even though we don't use the skeleton wire shape ourselves — atoms
   // map is computed but discarded; cost is bounded by MAX_LIMIT events.
   const format: ResponseFormat = params.format ?? 'skeleton';
+  const view = validateView(params.view);
   const rwc = await getRecentWorkContext(
     storage,
     {
@@ -211,7 +221,8 @@ export async function findClusters(
     now,
   );
 
-  const projectedClusters = rwc.clusters.map(projectCluster);
+  const richClusters = rwc.clusters.map(projectCluster);
+  const projectedClusters = view === 'compact' ? richClusters.map(compactCluster) : richClusters;
   const perClusterCapFired = projectedClusters.some((c) => c.atom_ids_truncated === true);
 
   // Apply the response-level envelope ceiling. Trim trailing clusters
@@ -225,36 +236,49 @@ export async function findClusters(
   const sizeBudget = FIND_CLUSTERS_RESPONSE_BYTE_CEILING - CAP_WARNING_RESERVE_BYTES;
   let clusters = projectedClusters;
   let responseCapFired = false;
-  const buildResult = (cs: FindClustersCluster[], extraWarnings: string[]): FindClustersResult => ({
-    schema_version: SCHEMA_VERSION,
-    tool: 'find_clusters',
-    query: {
-      since: rwc.query.since,
-      until: rwc.query.until,
-      window_hours: rwc.query.window_hours,
-      format,
-      // Item 037 / AC4: surface the same normalised path the underlying
-      // storage filter saw, so callers see what scoped their result set
-      // (and can detect a trailing-slash normalisation).
-      repo_path: rwc.query.repo_path,
-    },
-    clusters: cs,
-    result_caps: {
-      clusters_returned: cs.length,
-      clusters_total: rwc.truncation.clusters_total,
-      atoms_returned: cs.reduce((s, c) => s + c.atom_ids.length, 0),
-      atoms_total_in_window: rwc.truncation.atoms_total_in_window,
-      // truncated reflects ANY truncation: upstream (rwc cluster cap),
-      // per-cluster (atom_ids hard cap), or response-level (this trim).
-      // Previously only mirrored upstream — consumers relying on this
-      // signal couldn't tell when atom_ids[] was clipped per-cluster or
-      // when trailing clusters were dropped to fit the envelope.
-      truncated: rwc.truncation.truncated || perClusterCapFired || responseCapFired,
-    },
-    warnings: [...rwc.warnings, ...extraWarnings],
-  });
+  const buildResult = (cs: FindClustersCluster[], extraWarnings: string[]): FindClustersResult => {
+    if (view === 'compact') {
+      return {
+        schema_version: SCHEMA_VERSION,
+        tool: 'find_clusters',
+        clusters: cs,
+        warnings: [...rwc.warnings, ...extraWarnings],
+      } as unknown as FindClustersResult;
+    }
+    return {
+      schema_version: SCHEMA_VERSION,
+      tool: 'find_clusters',
+      query: {
+        since: rwc.query.since,
+        until: rwc.query.until,
+        window_hours: rwc.query.window_hours,
+        format,
+        // Item 037 / AC4: surface the same normalised path the underlying
+        // storage filter saw, so callers see what scoped their result set
+        // (and can detect a trailing-slash normalisation).
+        repo_path: rwc.query.repo_path,
+      },
+      clusters: cs,
+      result_caps: {
+        clusters_returned: cs.length,
+        clusters_total: rwc.truncation.clusters_total,
+        atoms_returned: cs.reduce((s, c) => s + c.atom_ids.length, 0),
+        atoms_total_in_window: rwc.truncation.atoms_total_in_window,
+        // truncated reflects ANY truncation: upstream (rwc cluster cap),
+        // per-cluster (atom_ids hard cap), or response-level (this trim).
+        // Previously only mirrored upstream — consumers relying on this
+        // signal couldn't tell when atom_ids[] was clipped per-cluster or
+        // when trailing clusters were dropped to fit the envelope.
+        truncated: rwc.truncation.truncated || perClusterCapFired || responseCapFired,
+      },
+      warnings: [...rwc.warnings, ...extraWarnings],
+    };
+  };
 
-  while (clusters.length > 0 && JSON.stringify(buildResult(clusters, [])).length > sizeBudget) {
+  while (
+    clusters.length > 0 &&
+    JSON.stringify(buildResult(clusters as FindClustersCluster[], [])).length > sizeBudget
+  ) {
     clusters = clusters.slice(0, -1);
     responseCapFired = true;
   }
@@ -265,27 +289,31 @@ export async function findClusters(
       ]
     : [];
 
-  return buildResult(clusters, extraWarnings);
+  return buildResult(clusters as FindClustersCluster[], extraWarnings);
 }
 
 const findClustersOutputSchema = {
   schema_version: z.literal(1),
   tool: z.literal('find_clusters'),
-  query: z.object({
-    since: z.string(),
-    until: z.string(),
-    window_hours: z.number(),
-    format: z.literal('skeleton'),
-    repo_path: z.string().nullable(),
-  }),
+  query: z
+    .object({
+      since: z.string(),
+      until: z.string(),
+      window_hours: z.number(),
+      format: z.literal('skeleton'),
+      repo_path: z.string().nullable(),
+    })
+    .optional(),
   clusters: z.array(z.record(z.string(), z.unknown())),
-  result_caps: z.object({
-    clusters_returned: z.number(),
-    clusters_total: z.number(),
-    atoms_returned: z.number(),
-    atoms_total_in_window: z.number(),
-    truncated: z.boolean(),
-  }),
+  result_caps: z
+    .object({
+      clusters_returned: z.number(),
+      clusters_total: z.number(),
+      atoms_returned: z.number(),
+      atoms_total_in_window: z.number(),
+      truncated: z.boolean(),
+    })
+    .optional(),
   warnings: z.array(z.string()),
 };
 
@@ -299,6 +327,7 @@ export function registerFindClusters(server: McpServer, storage: Storage): void 
         until: isoString.optional(),
         window_hours: z.number().min(0.1).max(168).optional(),
         format: formatSchema.optional(),
+        view: viewSchema.optional(),
         repo_path: z
           .string()
           .optional()
@@ -320,7 +349,11 @@ export function registerFindClusters(server: McpServer, storage: Storage): void 
       } catch (err) {
         // Item 037 / AC4: repo_path validation errors thrown from the
         // underlying `getRecentWorkContext` surface via `isError`.
-        if (err instanceof Error && err.message.startsWith('get_recent_work_context: ')) {
+        if (
+          err instanceof Error &&
+          (err.message.startsWith('get_recent_work_context: ') ||
+            err.message.startsWith('find_clusters: '))
+        ) {
           return {
             isError: true,
             content: [{ type: 'text', text: err.message }],

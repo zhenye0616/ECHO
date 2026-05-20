@@ -199,7 +199,7 @@ function ClusterRow({ cluster, primary, onAsk }: { cluster: FindClustersCluster;
     <List.Item
       icon={appIconFor(dominantApp(cluster))}
       title={cluster.label?.trim() || `${cluster.atom_ids.length} atoms`}
-      subtitle={cluster.rank_reason.includes("has_open_loop") ? "Open loop" : `${cluster.atom_ids.length} atoms`}
+      subtitle={cluster.rank_reason?.includes("has_open_loop") === true ? "Open loop" : `${cluster.atom_ids.length} atoms`}
       accessories={[{ text: formatRelativeTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) }]}
       detail={<List.Item.Detail markdown={clusterBundleMarkdown(cluster)} />}
       actions={
@@ -255,7 +255,7 @@ function clusterBundleMarkdown(c: FindClustersCluster): string {
     .sort((a, b) => b[1] - a[1])
     .map(([app, n]) => `- ${APP_META[app as DerivedApp]?.label ?? app}: ${n}`)
     .join("\n");
-  return [`# ${c.label?.trim() ?? `${c.atom_ids.length} atoms`}`, "", sources, "", `<!-- ECHO cluster ${c.cluster_id} -->`].join("\n");
+  return [`# ${c.label?.trim() ?? `${c.atom_ids.length} atoms`}`, "", sources].join("\n");
 }
 
 function titleForMatch(m: SearchMatch): string {

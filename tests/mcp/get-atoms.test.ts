@@ -83,6 +83,86 @@ describe('get_atoms', () => {
     expect(r.atoms[0]!.truncations).toContain('fields_omitted');
   });
 
+  it('view defaults to rich and view="rich" is byte-identical to the default envelope', async () => {
+    const store = new MemoryStorage();
+    const id1 = await store.append(
+      evShape(1, { metadata: { session_id: 'abc', repo_root: '/repo' } }),
+    );
+    const defaultResult = await getAtoms(store, { atom_ids: [id1] });
+    const richResult = await getAtoms(store, { atom_ids: [id1], view: 'rich' });
+    expect(JSON.stringify(richResult)).toBe(JSON.stringify(defaultResult));
+  });
+
+  it('view="compact" returns compact-shaped atoms and drops rich debug fields', async () => {
+    const store = new MemoryStorage();
+    const id1 = await store.append(
+      evShape(1, {
+        source: 'fs:/Users/dev/.codex/sessions/2026/05/20/rollout.jsonl',
+        metadata: {
+          session_id: 'sess_codex',
+          repo_root: '/repo',
+          cwd: '/repo',
+          had_tool_use: true,
+          tool_call_total: 2,
+          tool_calls: [
+            { name: 'exec_command', args: 'a'.repeat(2_000), output: 'b'.repeat(2_000) },
+            { name: 'apply_patch', args: 'patch', output: 'ok' },
+          ],
+          codex: {
+            model: 'gpt-5.5',
+            reasoning_effort: 'xhigh',
+            cli_version: '0.128.0',
+            sandbox_policy_type: 'workspace-write',
+          },
+          git: { sha: 'abc', branch: 'agent/compact', origin_url: 'https://example.test/repo.git' },
+          git_state: { branch: 'agent/compact', head_sha: 'abc' },
+        },
+      }),
+    );
+
+    const r = await getAtoms(store, { atom_ids: [id1], view: 'compact' });
+    const atom = r.atoms[0] as unknown as Record<string, unknown>;
+
+    expect(atom['id']).toBe(id1);
+    expect(atom['source']).toBe('fs:/Users/dev/.codex/sessions/2026/05/20/rollout.jsonl');
+    expect(atom['timestamp']).toBe('2026-05-09T10:01:00.000Z');
+    expect(atom['content']).toBe('turn 1 body');
+    expect(atom['truncations']).toContain('metadata.tool_calls:projected');
+    expect(atom['content_bytes_elided']).toBeUndefined();
+    expect(atom['metadata_bytes_elided']).toBeUndefined();
+    expect(atom['metadata']).toEqual({
+      session_id: 'sess_codex',
+      repo_root: '/repo',
+      tool_call_total: 2,
+      had_tool_use: true,
+      tool_calls_by_name: { exec_command: 1, apply_patch: 1 },
+      codex: { model: 'gpt-5.5', reasoning_effort: 'xhigh' },
+      git: { branch: 'agent/compact' },
+    });
+  });
+
+  it('view="compact" composes with fields[] while preserving always-on fields', async () => {
+    const store = new MemoryStorage();
+    const id1 = await store.append(
+      evShape(1, {
+        metadata: {
+          session_id: 'sess',
+          repo_root: '/repo',
+          files_referenced: ['/repo/a.ts'],
+        },
+      }),
+    );
+
+    const r = await getAtoms(store, { atom_ids: [id1], view: 'compact', fields: ['content'] });
+    expect(r.atoms[0]).toEqual({
+      id: id1,
+      source: 'fs:/tmp/sess-1.jsonl',
+      timestamp: '2026-05-09T10:01:00.000Z',
+      truncations: ['fields_omitted'],
+      content: 'turn 1 body',
+    });
+  });
+
   it('rejects empty atom_ids', async () => {
     const store = new MemoryStorage();
     await expect(getAtoms(store, { atom_ids: [] })).rejects.toThrow(/non-empty/);
@@ -92,6 +172,14 @@ describe('get_atoms', () => {
     const store = new MemoryStorage();
     const ids = Array.from({ length: GET_ATOMS_MAX_IDS + 1 }, (_, i) => `id-${i}`);
     await expect(getAtoms(store, { atom_ids: ids })).rejects.toThrow(/max/);
+  });
+
+  it('rejects unknown view values with accepted enum members in the message', async () => {
+    const store = new MemoryStorage();
+    const id1 = await store.append(evShape(1));
+    await expect(getAtoms(store, { atom_ids: [id1], view: 'debug' as never })).rejects.toThrow(
+      /compact.*rich|rich.*compact/,
+    );
   });
 
   it('deterministic prefix-drop on response budget overflow — drops the overflow atom AND every remaining requested ID (NOT a hole in the middle)', async () => {
@@ -133,6 +221,46 @@ describe('get_atoms', () => {
     expect(droppedIds).toEqual(expectedTail);
     // Envelope respects the 25k ceiling.
     expect(JSON.stringify(r).length).toBeLessThanOrEqual(25_000);
+  });
+
+  it('view="compact" sizes prefix-drop on post-compact atom bytes', async () => {
+    const store = new MemoryStorage();
+    const ids: string[] = [];
+    for (let i = 0; i < 50; i++) {
+      ids.push(
+        await store.append(
+          evShape(i, {
+            source: `fs:/Users/dev/.codex/sessions/2026/05/20/rollout-${i}.jsonl`,
+            content: 'small body',
+            metadata: {
+              session_id: `s${i}`,
+              repo_root: '/repo',
+              had_tool_use: true,
+              tool_call_total: 50,
+              tool_calls: Array.from({ length: 50 }, () => ({
+                name: 'exec_command',
+                args: 'x'.repeat(2_000),
+                output: 'y'.repeat(2_000),
+              })),
+              codex: {
+                model: 'gpt-5.5',
+                reasoning_effort: 'xhigh',
+                sandbox_policy_type: 'workspace-write',
+                approval_policy: 'on-request',
+              },
+              git: { branch: 'agent/compact', sha: `sha-${i}` },
+            },
+          }),
+        ),
+      );
+    }
+
+    const rich = await getAtoms(store, { atom_ids: ids });
+    const compact = await getAtoms(store, { atom_ids: ids, view: 'compact' });
+
+    expect(rich.atoms_dropped).toBeGreaterThan(0);
+    expect(compact.atoms_dropped).toBeLessThan(rich.atoms_dropped);
+    expect(JSON.stringify(compact).length).toBeLessThanOrEqual(25_000);
   });
 
   it('first projected atom alone exceeds 25k → atoms=[], all IDs dropped, warning surfaced', async () => {

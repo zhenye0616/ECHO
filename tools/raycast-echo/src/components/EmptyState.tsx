@@ -26,7 +26,7 @@ export function EmptyState({
   onOpenSessions: () => void;
   onForkSession: (session: Session) => void;
 }) {
-  const openLoops = clusters.filter((c) => c.rank_reason.includes("has_open_loop")).slice(0, 3);
+  const openLoops = clusters.filter((c) => c.rank_reason?.includes("has_open_loop") === true).slice(0, 3);
   const buckets = bucketSessionsForEmpty(sessions);
   return (
     <List
