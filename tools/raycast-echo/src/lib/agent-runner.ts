@@ -15,6 +15,7 @@ export type AgentRunnerEvent =
 export interface AgentRun {
   events: AsyncIterable<AgentRunnerEvent>;
   cancel: () => void;
+  sessionLogPath: string | null;
 }
 
 export interface AgentRunnerOptions {
@@ -208,6 +209,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
 
   return {
     events: queue,
+    sessionLogPath: sessionLog?.path ?? null,
     cancel: () => {
       if (exited || cancelled) return;
       cancelled = true;
@@ -219,6 +221,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
 }
 
 interface SessionLog {
+  path: string;
   writeStdout(chunk: Buffer): void;
   writeStderr(chunk: Buffer): void;
   close(): Promise<void>;
@@ -238,7 +241,7 @@ function createSessionLog(invocation: AgentInvocation, logDir: string): SessionL
     return null;
   }
 
-  const log = new WriteStreamSessionLog(stream);
+  const log = new WriteStreamSessionLog(sessionPath, stream);
   stream.on("error", (err) => log.disable(err));
   updateLatestSessionLog(logDir, sessionPath);
   log.writeRaw(`=== ECHO agent session ${openedAt} · ${invocation.binary} ${invocation.args.join(" ")} ===\n`);
@@ -266,7 +269,7 @@ class WriteStreamSessionLog implements SessionLog {
   private stderrAtLineStart = true;
   private closePromise: Promise<void> | null = null;
 
-  constructor(private readonly stream: WriteStream) {}
+  constructor(readonly path: string, private readonly stream: WriteStream) {}
 
   writeStdout(chunk: Buffer): void {
     this.writeRaw(chunk);

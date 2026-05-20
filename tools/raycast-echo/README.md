@@ -10,16 +10,17 @@
 
 The extension is a local dogfooding tool, not a Raycast Store package. It registers a single command, `ECHO`, and relies on Raycast for the hotkey and window chrome.
 
-## ECHO (unified omnibox)
+## ECHO (sessions as objects)
 
-`ECHO` is a single Raycast command that fuses search and Q&A into one omnibox surface. Implements "Direction C — sticky launch footer" from the 2026-05-19 design handoff.
+`ECHO` is a single Raycast command with one object model: every ask becomes a durable session. Search results and open loops still appear in the omnibox, but answers now persist as inspectable packets with an audit timeline and launch actions.
 
-- **Empty input** → Open loops · Today · Recent asks (last 3, persisted via `LocalStorage`).
-- **Typing** → synthetic *Ask ECHO about "<query>"* row at top + matching clusters + matching atoms beneath.
-- **Ask answer** → streamed agent output (capped to 3-6 bullets via `buildUnifiedAskPrompt`) + Top recent clusters + a launch row in the `ActionPanel` (↩ autopastes into the frontmost AI tool, ⌘1 / ⌘2 send to the other two, ⌘⇧C copies the context packet).
-- **Cluster inspect** → cluster detail + "Ask about this" bridge action.
+- **Empty** -> Resume latest session, Open loops · Today, Today's sessions, Yesterday, This week.
+- **Typing** -> synthetic *Ask ECHO about "<query>"* row at top, followed by matching clusters and atoms.
+- **Live** -> streamed agent output plus per-call audit detail from `/mcp/recent-calls`.
+- **Session detail** -> full answer, audit timeline, log path, evidence summary, and launch actions for Cursor / Claude.ai / ChatGPT / copy.
+- **Sessions browse** -> Cmd+S opens all sessions grouped by Today / Yesterday / This week / Older, filterable by agent kind.
 
-The product rule is enforced structurally: ECHO assembles a context packet, then hands off to your real AI tool (Cursor / Claude / ChatGPT). ECHO never finishes the work — your AI tool does.
+Sessions are packets, not chat threads. Cmd+R **Ask again from this** forks a new ask from the selected session's question and answer; it does not append a turn to the original session or create a row until the forked ask is submitted.
 
 Preferences:
 
@@ -36,8 +37,8 @@ ECHO dogfooding journal template:
 **Surface:** ECHO
 **Trigger:**
 **Tool and query inputs:** agent=<codex|claude|custom>; query=<summary or length>; primary=<cursor|claude_app|chatgpt|none>; repo_path_present=<true|false>
-**Returned shape:** tool_call_count=<count>; answer_bullets=<count>; launched_to=<cursor|claude_web|claude_app|chatgpt|copy|cancelled>
-**Sources:** <copy the audit-sidebar rows, e.g. search_memories · 42ms · ok>
+**Returned shape:** session_id=<id>; status=<running|done|cancelled|errored>; tool_call_count=<count>; answer_bullets=<count>; launched_to=<cursor|claude_web|claude_app|chatgpt|copy|cancelled>
+**Sources:** <copy the Session Detail audit rows>
 **Verdict:** <right|partial|wrong>
 **Note:**
 **Conjecture:**
@@ -45,6 +46,6 @@ ECHO dogfooding journal template:
 
 ## Dogfooding (v0 contract)
 
-> Every invocation of ⌘⇧E should be logged to `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `mcp-interactions-journal-2026-05.md`) using the template above. The v0 is "done" when the journal contains ≥10 entries across ≥3 calendar days AND the founder can articulate the top-3 retrieval-quality + launch-completion issues to fix in V1.
+> Every invocation of ⌘⇧E should be logged to `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `mcp-interactions-journal-2026-05.md`) using the template above. This session model is "done" when the journal contains ≥10 entries across ≥3 calendar days, covers the four original pains, and includes explicit notes on audit-window contamination and overlapping-session durability.
 
 This is not a multi-user installable. Do not publish it to the Raycast Store. Do not add Sentry, analytics, telemetry, or other phone-home behavior.

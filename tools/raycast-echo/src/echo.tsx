@@ -1,33 +1,18 @@
-// echo.tsx — ECHO unified overlay (⌘⇧E).
-//
-// Implements "Direction C — sticky launch footer" from the ECHO Unified
-// Overlay v2 design handoff (api.anthropic.com/v1/design/h/RUJMrBiUzdvBv9LgCVL2Jw).
-//
-// One omnibox surface:
-//   • Empty input → Open loops · Today · Recent asks
-//   • Typing      → synthetic "Ask ECHO about <query>" row + matching clusters/atoms
-//   • Ask answer  → streamed agent output + top clusters + launch row in the ActionPanel
-//   • Cluster     → existing cluster-detail behavior + "Ask about this" bridge
-//
-// Raycast doesn't expose a true sticky-footer primitive, so the launch row is
-// expressed as: (1) primary actions in the answer view's ActionPanel (↩, ⌘1,
-// ⌘2, ⌘3, ⌘⇧C), and (2) a closing "Launch with this context" block at the
-// bottom of the markdown body. Together they give the launch action the
-// visual + keyboard gravity the design calls for.
+// echo.tsx — thin router for the Raycast ECHO five-state surface.
 
 import {
   Action,
   ActionPanel,
   Color,
-  Detail,
   Icon,
   List,
   Toast,
-  useNavigation,
+  getPreferenceValues,
+  popToRoot,
   showToast,
-  type Keyboard,
+  useNavigation,
 } from "@raycast/api";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   derivedApp,
   formatAtomBundle,
@@ -36,61 +21,30 @@ import {
   type EchoAtom,
 } from "./lib/format";
 import {
-  type FindClustersCluster,
-  type SearchMatch,
   EchoDaemonError,
   findClusters,
   searchMemories,
+  type FindClustersCluster,
+  type SearchMatch,
 } from "./lib/mcp";
-import {
-  detectPrimary,
-  launchTo,
-  pasteIntoFrontmost,
-  showLaunchToast,
-  type LaunchTargetId,
-  type PrimaryDetection,
-} from "./lib/launch";
-import { useRecentAsks, type RecentAsk } from "./lib/recent-asks";
-import {
-  resolveAgentInvocation,
-  type AgentInvocation,
-  AgentProfileError,
-} from "./lib/agent-profiles";
-import {
-  findExecutable,
-  probeEchoDaemon,
-  startAgent,
-  type AgentRun,
-} from "./lib/agent-runner";
-import { buildUnifiedAskPrompt } from "./lib/system-prompt";
-import { fetchRecentCalls, type AuditCall } from "./lib/audit";
-import { getPreferenceValues } from "@raycast/api";
+import { detectPrimary, pasteIntoFrontmost, showLaunchToast, type PrimaryDetection } from "./lib/launch";
+import { normalizeAgentKind, type AgentKind } from "./lib/agent-profiles";
+import { useSessions, formatRelativeTime, type Session } from "./lib/sessions";
+import { EmptyState } from "./components/EmptyState";
+import { TypingState, ForkTypingState } from "./components/TypingState";
+import { AnswerView } from "./components/AnswerView";
+import { SessionsList } from "./components/SessionsList";
+import { SessionDetail } from "./components/SessionDetail";
 import { homedir } from "node:os";
 
-// ============================================================
-// Constants
-// ============================================================
 const DEFAULT_REPO_PATH = "~/Desktop/Project_echo";
-const FLUSH_INTERVAL_MS = 80;
 
-const APP_META: Record<
-  DerivedApp,
-  { label: string; color: { light: string; dark: string }; icon: Icon }
-> = {
+const APP_META: Record<DerivedApp, { label: string; color: { light: string; dark: string }; icon: Icon }> = {
   claude_code: { label: "Claude", color: { light: "#d97757", dark: "#d97757" }, icon: Icon.Stars },
   cursor: { label: "Cursor", color: { light: "#3b82f6", dark: "#3b82f6" }, icon: Icon.Code },
   codex: { label: "Codex", color: { light: "#a855f7", dark: "#a855f7" }, icon: Icon.Terminal },
   git: { label: "Git", color: { light: "#f1502f", dark: "#f1502f" }, icon: Icon.CodeBlock },
   unknown: { label: "Atom", color: { light: "#6e6e73", dark: "#a1a1a6" }, icon: Icon.Dot },
-};
-
-const ASK_TINT = { light: "#ff6363", dark: "#ff6363" };
-const LAUNCH_TINT: Record<LaunchTargetId, { light: string; dark: string }> = {
-  cursor: { light: "#3b82f6", dark: "#3b82f6" },
-  claude_app: { light: "#d97757", dark: "#d97757" },
-  claude_web: { light: "#d97757", dark: "#d97757" },
-  chatgpt: { light: "#10a37f", dark: "#10a37f" },
-  copy: { light: "#9ca3af", dark: "#9ca3af" },
 };
 
 interface EchoPreferences {
@@ -100,147 +54,107 @@ interface EchoPreferences {
   claudeOauthToken?: string;
 }
 
-// ============================================================
-// Helpers shared with search-context.tsx (kept inline to avoid
-// disturbing the legacy command's file during this rollout)
-// ============================================================
-const MIN = 60 * 1000;
-const HOUR = 60 * MIN;
-const DAY = 24 * HOUR;
+export default function EchoContext() {
+  const [query, setQuery] = useState("");
+  const { push } = useNavigation();
+  const preferences = getPreferenceValues<EchoPreferences>();
+  const agentKind = normalizeAgentKind(preferences.agentKind);
+  const repoPath = expandHome(preferences.repoPath ?? DEFAULT_REPO_PATH);
+  const { clusters, isLoadingClusters } = useClusters();
+  const { matches, isLoadingMatches } = useMatches(query);
+  const primary = usePrimary();
+  const { sessions, warmSession } = useSessions();
 
-function isDerivedApp(value: string): value is DerivedApp {
-  return value === "cursor" || value === "claude_code" || value === "codex" || value === "git" || value === "unknown";
-}
-
-function dominantApp(c: FindClustersCluster): DerivedApp {
-  let best: DerivedApp = "unknown";
-  let bestN = -1;
-  for (const [app, n] of Object.entries(c.source_breakdown)) {
-    if (n > bestN && isDerivedApp(app)) {
-      bestN = n;
-      best = app;
-    }
+  function openSessions() {
+    push(<SessionsList onForkSession={openFork} onNewAsk={newAsk} onOpenSessions={openSessions} />);
   }
-  return best;
-}
-
-function formatRelTime(iso: string, now = Date.now()): string {
-  const dt = now - new Date(iso).getTime();
-  if (dt < MIN) return "just now";
-  if (dt < HOUR) return `${Math.floor(dt / MIN)}m`;
-  if (dt < DAY) return `${Math.floor(dt / HOUR)}h`;
-  return `${Math.floor(dt / DAY)}d`;
-}
-
-function appIconFor(app: DerivedApp) {
-  const m = APP_META[app];
-  return { source: m.icon, tintColor: m.color };
-}
-
-function narrativeForCluster(c: FindClustersCluster): string {
-  const dom = dominantApp(c);
-  const label = APP_META[dom].label;
-  if (c.rank_reason.includes("has_open_loop")) return `Open loop — last touched in ${label}`;
-  if (c.rank_reason.includes("dense")) return `${c.atom_ids.length} atoms, mostly in ${label}`;
-  return `Recent activity in ${label}`;
-}
-
-function narrativeForMatch(m: SearchMatch): string {
-  switch (derivedApp(m.source)) {
-    case "git": return `committed to ${repoName(m.source)}`;
-    case "cursor": return `while editing ${basename(m.source)}`;
-    case "claude_code": return "in conversation with Claude";
-    case "codex": return "asked Codex";
-    default: return "captured atom";
+  function openSession(session: Session) {
+    push(<SessionDetail session={session} onFork={openFork} onNewAsk={newAsk} onOpenSessions={openSessions} />);
   }
-}
+  function openFork(session: Session) {
+    push(<ForkTypingState source={session} agentKind={agentKind} onAsk={runAsk} onOpenSessions={openSessions} />);
+  }
+  function newAsk() {
+    setQuery("");
+    popToRoot({ clearSearchBar: true });
+  }
+  function runAsk(question: string, forkedFrom?: string | null) {
+    push(
+      <AnswerView
+        query={question}
+        agentKind={agentKind}
+        preferences={preferences}
+        repoPath={repoPath}
+        forkedFrom={forkedFrom}
+        onOpenSessions={openSessions}
+      />,
+    );
+  }
 
-function repoName(source: string): string {
-  const m = source.match(/git:.*?\/([^/#]+?)(?:\.git)?(?:#.*)?$/);
-  return m?.[1] ?? "repo";
-}
+  const renderCluster = (cluster: FindClustersCluster) => (
+    <ClusterRow key={cluster.cluster_id} cluster={cluster} primary={primary} onAsk={runAsk} />
+  );
+  const renderMatch = (match: SearchMatch) => <MatchRow key={match.id} match={match} />;
 
-function basename(source: string): string {
-  const m = source.match(/([^/]+)$/);
-  return m?.[1] ?? source;
-}
+  if (query.length === 0) {
+    return (
+      <EmptyState
+        query={query}
+        setQuery={setQuery}
+        clusters={clusters}
+        isLoading={isLoadingClusters}
+        sessions={sessions}
+        warmSession={warmSession}
+        renderCluster={renderCluster}
+        onOpenSession={openSession}
+        onOpenSessions={openSessions}
+        onForkSession={openFork}
+      />
+    );
+  }
 
-function titleForMatch(m: SearchMatch): string {
-  const firstLine = m.content.split("\n").find((l) => l.trim().length > 0) ?? "";
-  return firstLine.length > 90 ? firstLine.slice(0, 90) + "…" : firstLine || "(empty)";
-}
-
-function expandHome(path: string): string {
-  if (path === "~") return homedir();
-  if (path.startsWith("~/")) return `${homedir()}${path.slice(1)}`;
-  return path;
-}
-
-function isOpenLoop(c: FindClustersCluster): boolean {
-  return c.rank_reason.includes("has_open_loop");
-}
-
-function isToday(c: FindClustersCluster, now = Date.now()): boolean {
-  const t = new Date(c.time_range.to).getTime();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  return t >= today.getTime();
-}
-
-// ============================================================
-// Data hooks
-// ============================================================
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [d, setD] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setD(value), delayMs);
-    return () => clearTimeout(t);
-  }, [value, delayMs]);
-  return d;
-}
-
-async function showDaemonToast() {
-  await showToast({
-    style: Toast.Style.Failure,
-    title: "ECHO daemon unreachable",
-    message: "Check 'npm run daemon' in Project_echo",
-  });
-}
-
-function errorMessage(err: unknown): string {
-  if (err instanceof Error && err.message.trim().length > 0) return err.message;
-  if (typeof err === "string" && err.trim().length > 0) return err;
-  return "Unknown launch error";
+  const lower = query.toLowerCase();
+  const clusterMatches = clusters.filter((c) => c.label?.toLowerCase().includes(lower) ?? false).slice(0, 5);
+  return (
+    <TypingState
+      query={query}
+      setQuery={setQuery}
+      agentKind={agentKind}
+      isLoading={isLoadingMatches || isLoadingClusters}
+      clusterMatches={clusterMatches}
+      matches={matches}
+      renderCluster={renderCluster}
+      renderMatch={renderMatch}
+      onAsk={runAsk}
+      onOpenSessions={openSessions}
+    />
+  );
 }
 
 function useClusters() {
   const [clusters, setClusters] = useState<FindClustersCluster[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingClusters, setIsLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const r = await findClusters();
-        if (!cancelled) {
-          setClusters(r.clusters);
-          setIsLoading(false);
-        }
+        if (!cancelled) setClusters(r.clusters);
       } catch (err) {
-        if (!cancelled) {
-          setIsLoading(false);
-          if (err instanceof EchoDaemonError) await showDaemonToast();
-        }
+        if (!cancelled && err instanceof EchoDaemonError) await showDaemonToast();
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, []);
-  return { clusters, isLoadingClusters: isLoading };
+  return { clusters, isLoadingClusters };
 }
 
 function useMatches(query: string) {
   const debounced = useDebouncedValue(query, 200);
   const [matches, setMatches] = useState<SearchMatch[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMatches, setIsLoading] = useState(false);
   useEffect(() => {
     if (debounced.length === 0) {
       setMatches([]);
@@ -252,20 +166,25 @@ function useMatches(query: string) {
     void (async () => {
       try {
         const r = await searchMemories(debounced, 50);
-        if (!cancelled) {
-          setMatches(r.matches);
-          setIsLoading(false);
-        }
+        if (!cancelled) setMatches(r.matches);
       } catch (err) {
-        if (!cancelled) {
-          setIsLoading(false);
-          if (err instanceof EchoDaemonError) await showDaemonToast();
-        }
+        if (!cancelled && err instanceof EchoDaemonError) await showDaemonToast();
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [debounced]);
-  return { matches, isLoadingMatches: isLoading };
+  return { matches, isLoadingMatches };
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 function usePrimary(): PrimaryDetection | null {
@@ -274,286 +193,26 @@ function usePrimary(): PrimaryDetection | null {
   return primary;
 }
 
-// ============================================================
-// Main view
-// ============================================================
-export default function EchoContext() {
-  const [query, setQuery] = useState("");
-  const { clusters, isLoadingClusters } = useClusters();
-  const { matches, isLoadingMatches } = useMatches(query);
-  const primary = usePrimary();
-  const { items: recentAsks, record: recordAsk } = useRecentAsks();
-
-  // ----- Empty input → Open loops · Today · Recent asks -----
-  if (query.length === 0) {
-    const openLoops = clusters.filter(isOpenLoop).slice(0, 3);
-    const today = clusters.filter((c) => !isOpenLoop(c) && isToday(c)).slice(0, 5);
-    return (
-      <List
-        searchText={query}
-        onSearchTextChange={setQuery}
-        filtering={false}
-        throttle={false}
-        isLoading={isLoadingClusters}
-        searchBarPlaceholder="Ask anything, or search your memory…"
-        isShowingDetail
-      >
-        {openLoops.length > 0 && (
-          <List.Section title="Open loops" subtitle={`${openLoops.length}`}>
-            {openLoops.map((c) => (
-              <ClusterRow key={c.cluster_id} cluster={c} primary={primary} onLaunch={recordAsk} />
-            ))}
-          </List.Section>
-        )}
-        {today.length > 0 && (
-          <List.Section title="Today" subtitle={`${today.length}`}>
-            {today.map((c) => (
-              <ClusterRow key={c.cluster_id} cluster={c} primary={primary} onLaunch={recordAsk} />
-            ))}
-          </List.Section>
-        )}
-        {recentAsks.length > 0 && (
-          <List.Section title="Recent asks" subtitle={`${recentAsks.length}`}>
-            {recentAsks.map((ra) => (
-              <RecentAskRow key={ra.id} ask={ra} primary={primary} onLaunch={recordAsk} />
-            ))}
-          </List.Section>
-        )}
-        <List.EmptyView
-          icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-          title="ECHO is listening."
-          description="Nothing clustered yet. Open Cursor, start a Claude session, or make a commit — your context will appear within the minute."
-        />
-      </List>
-    );
-  }
-
-  // ----- Typing → synthetic ask row + clusters + atoms -----
-  const clusterMatches = clusters
-    .filter((c) => (c.label?.toLowerCase().includes(query.toLowerCase()) ?? false))
-    .slice(0, 5);
-  const packetClusters = clusterMatches.length > 0 ? clusterMatches : clusters.slice(0, 3);
-  const packetAtomCount = packetClusters.reduce((acc, c) => acc + c.atom_ids.length, 0);
-
-  return (
-    <List
-      searchText={query}
-      onSearchTextChange={setQuery}
-      filtering={false}
-      throttle={false}
-      isLoading={isLoadingMatches || isLoadingClusters}
-      searchBarPlaceholder="Ask anything, or search your memory…"
-      isShowingDetail
-    >
-      <List.Section title="Ask">
-        <AskRow
-          query={query}
-          packetClusters={packetClusters.length}
-          packetAtoms={packetAtomCount}
-          primary={primary}
-          onLaunch={recordAsk}
-        />
-      </List.Section>
-      {clusterMatches.length > 0 && (
-        <List.Section title="Clusters" subtitle={`${clusterMatches.length}`}>
-          {clusterMatches.map((c) => (
-            <ClusterRow key={c.cluster_id} cluster={c} primary={primary} onLaunch={recordAsk} />
-          ))}
-        </List.Section>
-      )}
-      {matches.length > 0 && (
-        <List.Section title="Atoms" subtitle={`${matches.length}`}>
-          {matches.map((m) => (
-            <MatchRow key={m.id} match={m} />
-          ))}
-        </List.Section>
-      )}
-      <List.EmptyView
-        icon={{ source: Icon.MagnifyingGlass, tintColor: Color.SecondaryText }}
-        title={`No atoms match "${query}"`}
-        description={
-          isLoadingMatches
-            ? "Searching…"
-            : "ECHO does keyword search. Press ⏎ on the Ask row above to synthesize from recent memory anyway."
-        }
-      />
-    </List>
-  );
-}
-
-// ============================================================
-// The synthetic Ask row
-// ============================================================
-function AskRow({
-  query,
-  packetClusters,
-  packetAtoms,
-  primary,
-  onLaunch,
-}: {
-  query: string;
-  packetClusters: number;
-  packetAtoms: number;
-  primary: PrimaryDetection | null;
-  onLaunch: (q: string, t: LaunchTargetId) => Promise<void>;
-}) {
-  const { push } = useNavigation();
-  const accessories: List.Item.Accessory[] = [
-    { tag: { value: `${packetClusters} clusters · ${packetAtoms} atoms`, color: ASK_TINT } },
-  ];
-
-  const detail = (
-    <List.Item.Detail
-      markdown={[
-        `# Ask ECHO`,
-        "",
-        `_will synthesize from ${packetClusters} clusters · ${packetAtoms} atoms_`,
-        "",
-        `> "${query}"`,
-        "",
-        "Press ⏎ to synthesize. ECHO will produce a short answer, show top recent clusters, and offer a one-keystroke launch into Cursor / Claude / ChatGPT.",
-        "",
-        "**ECHO won't finish the work — your AI tool will.**",
-      ].join("\n")}
-    />
-  );
-
+function ClusterRow({ cluster, primary, onAsk }: { cluster: FindClustersCluster; primary: PrimaryDetection | null; onAsk: (query: string) => void }) {
+  const askQuery = cluster.label?.trim().length ? `tell me about "${cluster.label.trim()}"` : "summarize this cluster";
   return (
     <List.Item
-      icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-      title={`Ask ECHO about "${query}"`}
-      subtitle="will synthesize from memory"
-      accessories={accessories}
-      detail={detail}
-      actions={
-        <ActionPanel>
-          <Action
-            title="Ask ECHO"
-            icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-            onAction={() => push(<AnswerView query={query} primary={primary} onLaunch={onLaunch} />)}
-          />
-        </ActionPanel>
-      }
-    />
-  );
-}
-
-// ============================================================
-// Cluster row (works in both empty + typing states)
-// ============================================================
-function ClusterRow({
-  cluster,
-  primary,
-  onLaunch,
-}: {
-  cluster: FindClustersCluster;
-  primary: PrimaryDetection | null;
-  onLaunch: (q: string, t: LaunchTargetId) => Promise<void>;
-}) {
-  const { push } = useNavigation();
-  const dom = dominantApp(cluster);
-  const accessories: List.Item.Accessory[] = [];
-  if (isOpenLoop(cluster)) {
-    accessories.push({ icon: { source: Icon.RotateClockwise, tintColor: Color.Orange }, tooltip: "Open loop" });
-  }
-  accessories.push({ text: formatRelTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) });
-
-  const askQuery = cluster.label?.trim().length
-    ? `tell me about "${cluster.label.trim()}"`
-    : "summarize this cluster";
-
-  return (
-    <List.Item
-      icon={appIconFor(dom)}
+      icon={appIconFor(dominantApp(cluster))}
       title={cluster.label?.trim() || `${cluster.atom_ids.length} atoms`}
-      subtitle={narrativeForCluster(cluster)}
-      accessories={accessories}
-      detail={
-        <List.Item.Detail
-          metadata={
-            <List.Item.Detail.Metadata>
-              <List.Item.Detail.Metadata.Label title="Atoms" text={`${cluster.atom_ids.length}`} />
-              <List.Item.Detail.Metadata.Label
-                title="Time range"
-                text={`${formatPdtTimestamp(cluster.time_range.from)} – ${formatPdtTimestamp(cluster.time_range.to)}`}
-              />
-              <List.Item.Detail.Metadata.Separator />
-              <List.Item.Detail.Metadata.TagList title="Sources">
-                {Object.entries(cluster.source_breakdown)
-                  .filter(([, n]) => n > 0)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([app, n]) => {
-                    const meta = isDerivedApp(app) ? APP_META[app] : APP_META.unknown;
-                    return (
-                      <List.Item.Detail.Metadata.TagList.Item
-                        key={app}
-                        text={`${meta.label} · ${n}`}
-                        color={meta.color}
-                      />
-                    );
-                  })}
-              </List.Item.Detail.Metadata.TagList>
-              {cluster.rank_reason.length > 0 && (
-                <List.Item.Detail.Metadata.TagList title="Ranked by">
-                  {cluster.rank_reason.map((r) => (
-                    <List.Item.Detail.Metadata.TagList.Item
-                      key={r}
-                      text={r.replace(/_/g, " ")}
-                      color={r === "has_open_loop" ? Color.Orange : Color.SecondaryText}
-                    />
-                  ))}
-                </List.Item.Detail.Metadata.TagList>
-              )}
-            </List.Item.Detail.Metadata>
-          }
-        />
-      }
+      subtitle={cluster.rank_reason.includes("has_open_loop") ? "Open loop" : `${cluster.atom_ids.length} atoms`}
+      accessories={[{ text: formatRelativeTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) }]}
+      detail={<List.Item.Detail markdown={clusterBundleMarkdown(cluster)} />}
       actions={
         <ActionPanel>
-          <Action
-            title="Ask ECHO about This Cluster"
-            icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-            onAction={() => push(<AnswerView query={askQuery} primary={primary} onLaunch={onLaunch} />)}
-            shortcut={{ modifiers: ["cmd"], key: "a" }}
-          />
-          <Action.CopyToClipboard
-            title="Copy Bundle to Clipboard"
-            content={clusterBundleMarkdown(cluster)}
-            icon={Icon.Clipboard}
-          />
-          <Action.Paste
-            title="Paste in Frontmost App"
-            content={clusterBundleMarkdown(cluster)}
-            icon={Icon.ArrowDown}
-            shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-          />
+          <Action title="Ask ECHO about This Cluster" icon={Icon.Stars} shortcut={{ modifiers: ["cmd"], key: "a" }} onAction={() => onAsk(askQuery)} />
+          <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={clusterBundleMarkdown(cluster)} />
+          <Action title="Paste in Frontmost App" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} onAction={() => void pasteCluster(cluster, primary)} />
         </ActionPanel>
       }
     />
   );
 }
 
-function clusterBundleMarkdown(c: FindClustersCluster): string {
-  const sources = Object.entries(c.source_breakdown)
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([app, n]) => `- ${(isDerivedApp(app) ? APP_META[app].label : app)}: ${n}`)
-    .join("\n");
-  return [
-    `# ${c.label?.trim() ?? `${c.atom_ids.length} atoms`}`,
-    `_${formatPdtTimestamp(c.time_range.from)} – ${formatPdtTimestamp(c.time_range.to)} · ${c.atom_ids.length} atoms_`,
-    "",
-    `> ${narrativeForCluster(c)}`,
-    "",
-    sources,
-    "",
-    `<!-- ECHO cluster ${c.cluster_id} -->`,
-  ].join("\n");
-}
-
-// ============================================================
-// Match row — kept lightweight; deep inspect lives in search-context
-// ============================================================
 function MatchRow({ match }: { match: SearchMatch }) {
   const app = derivedApp(match.source);
   return (
@@ -561,509 +220,75 @@ function MatchRow({ match }: { match: SearchMatch }) {
       icon={appIconFor(app)}
       title={titleForMatch(match)}
       subtitle={narrativeForMatch(match)}
-      accessories={[{ text: formatRelTime(match.timestamp), tooltip: formatPdtTimestamp(match.timestamp) }]}
-      detail={
-        <List.Item.Detail
-          markdown={[
-            `**${match.source}**  `,
-            `_${formatPdtTimestamp(match.timestamp)}_`,
-            "",
-            app === "cursor" || app === "git" ? "```\n" + match.content + "\n```" : match.content,
-          ].join("\n")}
-        />
-      }
+      accessories={[{ text: formatRelativeTime(match.timestamp), tooltip: formatPdtTimestamp(match.timestamp) }]}
+      detail={<List.Item.Detail markdown={match.content} />}
       actions={
         <ActionPanel>
-          <Action.CopyToClipboard
-            title="Copy Atom"
-            content={formatAtomBundleSingle(match)}
-            icon={Icon.Clipboard}
-          />
-          <Action.Paste
-            title="Paste in Frontmost App"
-            content={formatAtomBundleSingle(match)}
-            icon={Icon.ArrowDown}
-            shortcut={{ modifiers: ["cmd", "shift"], key: "return" }}
-          />
+          <Action.CopyToClipboard title="Copy Atom" icon={Icon.Clipboard} content={formatAtomBundle([match as unknown as EchoAtom])} />
+          <Action.Paste title="Paste in Frontmost App" icon={Icon.ArrowDown} content={formatAtomBundle([match as unknown as EchoAtom])} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} />
         </ActionPanel>
       }
     />
   );
 }
 
-function formatAtomBundleSingle(m: SearchMatch): string {
-  return formatAtomBundle([m as unknown as EchoAtom]);
-}
-
-// ============================================================
-// Recent ask row (empty state)
-// ============================================================
-function RecentAskRow({
-  ask,
-  primary,
-  onLaunch,
-}: {
-  ask: RecentAsk;
-  primary: PrimaryDetection | null;
-  onLaunch: (q: string, t: LaunchTargetId) => Promise<void>;
-}) {
-  const { push } = useNavigation();
-  return (
-    <List.Item
-      icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-      title={`"${ask.question}"`}
-      subtitle={`relaunched to ${ask.launchedTo}`}
-      accessories={[{ text: formatRelTime(ask.at), tooltip: formatPdtTimestamp(ask.at) }]}
-      actions={
-        <ActionPanel>
-          <Action
-            title="Re-Run This Ask"
-            icon={{ source: Icon.Stars, tintColor: ASK_TINT }}
-            onAction={() => push(<AnswerView query={ask.question} primary={primary} onLaunch={onLaunch} />)}
-          />
-        </ActionPanel>
-      }
-    />
-  );
-}
-
-type LaunchDestinationTargetId = Exclude<LaunchTargetId, "copy">;
-
-interface LaunchActionRow {
-  target: LaunchTargetId;
-  label: string;
-  shortcutLabel: string;
-  shortcut?: Keyboard.Shortcut;
-  pasteIntoFrontmost: boolean;
-}
-
-const DESTINATION_PRIORITY: readonly LaunchDestinationTargetId[] = ["cursor", "claude_web", "chatgpt"];
-
-function launchActionLabel(target: LaunchTargetId): string {
-  switch (target) {
-    case "cursor":
-      return "Send to Cursor";
-    case "claude_app":
-      return "Send to Claude";
-    case "claude_web":
-      return "Send to Claude.ai";
-    case "chatgpt":
-      return "Send to ChatGPT";
-    case "copy":
-      return "Copy Context + Prompt";
-  }
-}
-
-function launchActionIcon(target: LaunchTargetId): Icon {
-  switch (target) {
-    case "cursor":
-      return Icon.Code;
-    case "claude_app":
-    case "claude_web":
-      return Icon.Stars;
-    case "chatgpt":
-      return Icon.Globe;
-    case "copy":
-      return Icon.Clipboard;
-  }
-}
-
-function isClaudeTarget(target: LaunchTargetId): boolean {
-  return target === "claude_app" || target === "claude_web";
-}
-
-function sameLaunchSlot(a: LaunchTargetId, b: LaunchTargetId): boolean {
-  if (isClaudeTarget(a) && isClaudeTarget(b)) return true;
-  return a === b;
-}
-
-function primaryDestination(primary: PrimaryDetection | null): LaunchDestinationTargetId {
-  if (primary?.id === "cursor" || primary?.id === "claude_app" || primary?.id === "claude_web" || primary?.id === "chatgpt") {
-    return primary.id;
-  }
-  return "cursor";
-}
-
-function buildLaunchActions(primary: PrimaryDetection | null): LaunchActionRow[] {
-  const primaryTarget = primaryDestination(primary);
-  const rows: LaunchActionRow[] = [
-    {
-      target: primaryTarget,
-      label: launchActionLabel(primaryTarget),
-      shortcutLabel: "↩",
-      pasteIntoFrontmost: primary?.id === "cursor",
-    },
-  ];
-
-  DESTINATION_PRIORITY
-    .filter((target) => !sameLaunchSlot(target, primaryTarget))
-    .slice(0, 2)
-    .forEach((target, index) => {
-      const key: "1" | "2" = index === 0 ? "1" : "2";
-      rows.push({
-        target,
-        label: launchActionLabel(target),
-        shortcutLabel: index === 0 ? "⌘1" : "⌘2",
-        shortcut: { modifiers: ["cmd"], key },
-        pasteIntoFrontmost: false,
-      });
-    });
-
-  rows.push({
-    target: "copy",
-    label: launchActionLabel("copy"),
-    shortcutLabel: "⌘⇧C",
-    shortcut: { modifiers: ["cmd", "shift"], key: "c" },
-    pasteIntoFrontmost: false,
-  });
-
-  return rows;
-}
-
-// ============================================================
-// AnswerView — pushed Detail with streamed agent output + launch row
-// ============================================================
-function AnswerView({
-  query,
-  primary,
-  onLaunch,
-}: {
-  query: string;
-  primary: PrimaryDetection | null;
-  onLaunch: (q: string, t: LaunchTargetId) => Promise<void>;
-}) {
-  const preferences = getPreferenceValues<EchoPreferences>();
-  const agentKind = preferences.agentKind ?? "codex";
-  const repoPath = expandHome(preferences.repoPath ?? DEFAULT_REPO_PATH);
-  const launchTs = useMemo(() => Date.now(), []);
-
-  const [answer, setAnswer] = useState("Waiting for agent output…");
-  const [isLoading, setIsLoading] = useState(true);
-  const [topClusters, setTopClusters] = useState<FindClustersCluster[]>([]);
-  const [auditCalls, setAuditCalls] = useState<AuditCall[] | null>(null);
-  const [auditUnavailable, setAuditUnavailable] = useState(false);
-  const [auditPollingActive, setAuditPollingActive] = useState(false);
-  const [startupError, setStartupError] = useState<string | null>(null);
-  const runnerRef = useRef<AgentRun | null>(null);
-  const auditCancelRef = useRef<(() => void) | null>(null);
-
-  // Resolve invocation + collect top clusters in parallel
-  useEffect(() => {
-    let disposed = false;
-    let auditInterval: ReturnType<typeof setInterval> | null = null;
-
-    function clearAuditInterval() {
-      if (auditInterval !== null) clearInterval(auditInterval);
-      auditInterval = null;
-      if (!disposed) setAuditPollingActive(false);
-    }
-    auditCancelRef.current = clearAuditInterval;
-
-    async function pollAudit() {
-      if (disposed) {
-        clearAuditInterval();
-        return;
-      }
-      try {
-        const audit = await fetchRecentCalls({ since: launchTs - 2_000, until: Date.now() + 2_000 });
-        if (disposed) return;
-        setAuditCalls(audit.calls);
-      } catch {
-        if (disposed) return;
-        setAuditUnavailable(true);
-        clearAuditInterval();
-      }
-    }
-
-    setAuditPollingActive(true);
-    auditInterval = setInterval(() => {
-      void pollAudit();
-    }, 600);
-
-    async function startup() {
-      let invocation: AgentInvocation;
-      try {
-        invocation = resolveAgentInvocation(agentKind, preferences, repoPath, buildUnifiedAskPrompt(query));
-      } catch (err) {
-        if (!disposed) {
-          clearAuditInterval();
-          setStartupError((err as AgentProfileError).message);
-          setIsLoading(false);
-        }
-        return;
-      }
-      const daemonAvailable = await probeEchoDaemon();
-      if (disposed) return;
-      if (!daemonAvailable) {
-        if (!disposed) {
-          clearAuditInterval();
-          setStartupError("ECHO daemon unreachable at 38478");
-          setIsLoading(false);
-        }
-        return;
-      }
-      const executableAvailable = await findExecutable(invocation.binary);
-      if (disposed) return;
-      if (!executableAvailable) {
-        if (!disposed) {
-          clearAuditInterval();
-          setStartupError(`Agent '${invocation.binary}' not found`);
-          setIsLoading(false);
-        }
-        return;
-      }
-      // Top 3 clusters from the daemon (best-effort; failure is silent)
-      try {
-        const r = await findClusters();
-        if (!disposed) setTopClusters(r.clusters.slice(0, 3));
-      } catch {
-        // ignore
-      }
-      if (disposed) return;
-
-      let buffer = "";
-      let lastFlushAt = 0;
-      let flushTimer: ReturnType<typeof setTimeout> | null = null;
-      let sawExit = false;
-
-      function clearFlushTimer() {
-        if (flushTimer !== null) clearTimeout(flushTimer);
-        flushTimer = null;
-      }
-      function flushNow() {
-        if (disposed) return;
-        clearFlushTimer();
-        lastFlushAt = Date.now();
-        setAnswer(buffer.length > 0 ? buffer : "Waiting for agent output…");
-      }
-      function scheduleFlush() {
-        const elapsed = Date.now() - lastFlushAt;
-        if (elapsed >= FLUSH_INTERVAL_MS) flushNow();
-        else if (flushTimer === null) flushTimer = setTimeout(flushNow, FLUSH_INTERVAL_MS - elapsed);
-      }
-      function appendFooter(footer: string) {
-        const sep = buffer.trim().length > 0 ? "\n\n---\n\n" : "";
-        buffer += `${sep}${footer}\n`;
-        flushNow();
-      }
-
-      const run = startAgent(invocation);
-      runnerRef.current = run;
-
-      for await (const event of run.events) {
-        if (disposed) return;
-        if (event.type === "stdout") {
-          buffer += event.text;
-          scheduleFlush();
-        } else if (event.type === "footer") {
-          appendFooter(event.markdown);
-        } else if (event.type === "error") {
-          appendFooter(`**Agent error**\n\n${event.error.message}`);
-        } else if (event.type === "exit") {
-          sawExit = true;
-          clearAuditInterval();
-          flushNow();
-          setIsLoading(false);
-          try {
-            const audit = await fetchRecentCalls({ since: launchTs - 2_000, until: Date.now() + 2_000 });
-            if (disposed) return;
-            setAuditCalls(audit.calls);
-          } catch {
-            if (!disposed) setAuditUnavailable(true);
-          }
-        }
-      }
-      if (!disposed && !sawExit) {
-        clearAuditInterval();
-        setIsLoading(false);
-      }
-    }
-
-    void startup();
-    return () => {
-      disposed = true;
-      clearAuditInterval();
-      auditCancelRef.current = null;
-      runnerRef.current?.cancel();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
-
-  if (startupError !== null) {
-    return (
-      <Detail
-        markdown={`# Ask ECHO\n\n**Could not start the agent.**\n\n${startupError}`}
-        actions={
-          <ActionPanel>
-            <Action.OpenInBrowser title="Open Daemon Trace Viewer" url="http://127.0.0.1:38479/" />
-          </ActionPanel>
-        }
-      />
-    );
-  }
-
-  const topClustersMarkdown = topClusters.length > 0
-    ? topClusters.map((c) => `- ${c.label?.trim() ?? c.cluster_id} (${c.atom_ids.length} atoms)`).join("\n")
-    : "";
-
-  const launchActions = buildLaunchActions(primary);
-  const launchBlock = renderLaunchBlock(primary);
-  const fullMarkdown = [
-    `# Ask ECHO`,
-    "",
-    `_synthesizing from ${topClusters.length} clusters · "${query}"_`,
-    "",
-    answer.trim(),
-    topClusters.length > 0 ? "\n---\n\n**Top recent clusters**\n\n" + topClustersMarkdown : "",
-    "\n---\n",
-    launchBlock,
-  ].join("\n");
-
-  function packet() {
-    return {
-      question: query,
-      answer,
-      evidenceMarkdown: topClustersMarkdown.length > 0 ? topClustersMarkdown : undefined,
-    };
-  }
-
-  async function fire(target: LaunchTargetId) {
-    try {
-      const outcome = await launchTo(target, packet());
-      await showLaunchToast(outcome);
-      await onLaunch(query, target);
-    } catch (err) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Launch failed",
-        message: errorMessage(err),
-      });
+function dominantApp(c: FindClustersCluster): DerivedApp {
+  let best: DerivedApp = "unknown";
+  let bestN = -1;
+  for (const [app, n] of Object.entries(c.source_breakdown)) {
+    if (n > bestN && app in APP_META) {
+      bestN = n;
+      best = app as DerivedApp;
     }
   }
+  return best;
+}
 
-  async function pasteToPrimaryCursor() {
-    try {
-      const outcome = await pasteIntoFrontmost(packet());
-      await showLaunchToast(outcome);
-      await onLaunch(query, "cursor");
-    } catch (err) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Launch failed",
-        message: errorMessage(err),
-      });
-    }
+function appIconFor(app: DerivedApp) {
+  const meta = APP_META[app];
+  return { source: meta.icon, tintColor: meta.color };
+}
+
+function clusterBundleMarkdown(c: FindClustersCluster): string {
+  const sources = Object.entries(c.source_breakdown)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([app, n]) => `- ${APP_META[app as DerivedApp]?.label ?? app}: ${n}`)
+    .join("\n");
+  return [`# ${c.label?.trim() ?? `${c.atom_ids.length} atoms`}`, "", sources, "", `<!-- ECHO cluster ${c.cluster_id} -->`].join("\n");
+}
+
+function titleForMatch(m: SearchMatch): string {
+  const firstLine = m.content.split("\n").find((line) => line.trim().length > 0) ?? "";
+  return firstLine.length > 90 ? `${firstLine.slice(0, 90)}...` : firstLine || "(empty)";
+}
+
+function narrativeForMatch(m: SearchMatch): string {
+  switch (derivedApp(m.source)) {
+    case "git": return "committed to repo";
+    case "cursor": return "while editing";
+    case "claude_code": return "in conversation with Claude";
+    case "codex": return "asked Codex";
+    default: return "captured atom";
   }
-
-  return (
-    <Detail
-      isLoading={isLoading}
-      markdown={fullMarkdown}
-      metadata={
-        <AnswerMetadata
-          agentKind={agentKind}
-          primary={primary}
-          calls={auditCalls}
-          unavailable={auditUnavailable}
-          isLoading={isLoading}
-          pollingActive={auditPollingActive}
-        />
-      }
-      actions={
-        <ActionPanel>
-          {isLoading ? (
-            <ActionPanel.Section>
-              <Action.CopyToClipboard
-                title="Copy Partial Output"
-                icon={Icon.Document}
-                shortcut={{ modifiers: ["cmd"], key: "c" }}
-                content={answer}
-              />
-              <Action
-                title="Cancel"
-                icon={Icon.XMarkCircle}
-                onAction={() => {
-                  auditCancelRef.current?.();
-                  runnerRef.current?.cancel();
-                }}
-              />
-            </ActionPanel.Section>
-          ) : (
-            <>
-              {launchActions.map((row) => (
-                <Action
-                  key={`${row.shortcutLabel}-${row.target}`}
-                  title={row.label}
-                  icon={{ source: launchActionIcon(row.target), tintColor: LAUNCH_TINT[row.target] }}
-                  shortcut={row.shortcut}
-                  onAction={row.pasteIntoFrontmost ? pasteToPrimaryCursor : () => fire(row.target)}
-                />
-              ))}
-              <ActionPanel.Section>
-                <Action.CopyToClipboard
-                  title="Copy Answer Only"
-                  icon={Icon.Document}
-                  shortcut={{ modifiers: ["cmd"], key: "c" }}
-                  content={answer}
-                />
-              </ActionPanel.Section>
-            </>
-          )}
-        </ActionPanel>
-      }
-    />
-  );
 }
 
-function renderLaunchBlock(primary: PrimaryDetection | null): string {
-  const rows = buildLaunchActions(primary);
-  return [
-    "## Launch with this context",
-    "",
-    "_ECHO won't finish the work — your AI tool will._",
-    "",
-    ...rows.map((row) => `- **${row.shortcutLabel}** ${row.label}`),
-  ].join("\n");
+async function pasteCluster(cluster: FindClustersCluster, primary: PrimaryDetection | null) {
+  try {
+    const outcome = await pasteIntoFrontmost({ question: cluster.label ?? "cluster", answer: clusterBundleMarkdown(cluster) });
+    await showLaunchToast(outcome);
+  } catch (err) {
+    await showToast({ style: Toast.Style.Failure, title: "Paste failed", message: err instanceof Error ? err.message : String(err) });
+  }
+  void primary;
 }
 
-function AnswerMetadata({
-  agentKind,
-  primary,
-  calls,
-  unavailable,
-  isLoading,
-  pollingActive,
-}: {
-  agentKind: string;
-  primary: PrimaryDetection | null;
-  calls: AuditCall[] | null;
-  unavailable: boolean;
-  isLoading: boolean;
-  pollingActive: boolean;
-}) {
-  return (
-    <Detail.Metadata>
-      <Detail.Metadata.Label title="Agent" text={agentKind} />
-      <Detail.Metadata.Label title="Primary" text={primary?.hint ?? "Cursor (default)"} />
-      <Detail.Metadata.Separator />
-      {unavailable ? <Detail.Metadata.Label title="Audit" text="Audit unavailable" /> : null}
-      {!unavailable && isLoading && pollingActive && calls !== null ? (
-        <Detail.Metadata.Label title="Audit" text={`Live (${calls.length} calls so far)`} />
-      ) : null}
-      {!unavailable && calls === null ? <Detail.Metadata.Label title="Audit" text="Waiting" /> : null}
-      {!unavailable && !isLoading && calls !== null && calls.length === 0 ? (
-        <Detail.Metadata.Label title="Audit" text="No MCP calls" />
-      ) : null}
-      {!unavailable && calls !== null
-        ? calls.map((call, i) => (
-            <Detail.Metadata.Label key={`${call.ts}-${i}`} title={`Call ${i + 1}`} text={formatAuditCall(call)} />
-          ))
-        : null}
-    </Detail.Metadata>
-  );
+async function showDaemonToast() {
+  await showToast({ style: Toast.Style.Failure, title: "ECHO daemon unreachable", message: "Check 'npm run daemon' in Project_echo" });
 }
 
-function formatAuditCall(call: AuditCall): string {
-  const duration = call.duration_ms === null ? "pending" : `${Math.round(call.duration_ms)}ms`;
-  return `${call.tool} · ${duration} · ${call.status}`;
+function expandHome(path: string): string {
+  if (path === "~") return homedir();
+  if (path.startsWith("~/")) return `${homedir()}${path.slice(1)}`;
+  return path;
 }

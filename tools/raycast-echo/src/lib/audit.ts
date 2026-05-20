@@ -13,6 +13,15 @@ export interface AuditResponse {
   calls: AuditCall[];
 }
 
+export interface AuditCallBody {
+  timestampMs: number;
+  tool: string;
+  argsShape: Record<string, unknown>;
+  resultShape: Record<string, unknown>;
+  durationMs: number | null;
+  status: AuditStatus;
+}
+
 export interface FetchAuditOptions {
   since: number;
   until?: number;
@@ -54,6 +63,17 @@ export function parseAuditResponse(raw: unknown): AuditResponse {
   }
   const calls = (raw as { calls: unknown[] }).calls.map(parseAuditCall);
   return { calls };
+}
+
+export function toAuditCallBody(call: AuditCall): AuditCallBody {
+  return {
+    timestampMs: call.ts,
+    tool: call.tool,
+    argsShape: call.args_shape,
+    resultShape: call.result_shape,
+    durationMs: call.duration_ms,
+    status: call.status,
+  };
 }
 
 function parseAuditCall(raw: unknown): AuditCall {
