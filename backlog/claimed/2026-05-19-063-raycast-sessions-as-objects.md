@@ -47,9 +47,9 @@ spec_refs:
   - https://developers.raycast.com/api-reference/storage  # LocalStorage API for sessions persistence
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-20T04:08:29Z"
+branch: "agent/raycast-sessions-as-objects"
 worktree: ""
 head_sha: ""
 pr_url: ""
