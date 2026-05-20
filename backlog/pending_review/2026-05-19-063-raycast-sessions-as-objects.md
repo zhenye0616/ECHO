@@ -1,7 +1,7 @@
 ---
 id: 2026-05-19-063-raycast-sessions-as-objects
 title: Raycast ECHO — sessions as objects (D + narrow C persistence model)
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 2-3d
 created: 2026-05-19
@@ -50,11 +50,17 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-20T04:08:29Z"
 branch: "agent/raycast-sessions-as-objects"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--raycast-sessions-as-objects"
+head_sha: "0053952096c4c35d26fe22e3ffd6052698312113"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Implemented Raycast sessions-as-objects on branch agent/raycast-sessions-as-objects at 0053952096c4c35d26fe22e3ffd6052698312113.
+  Core ACs covered: five-state router, extracted components, per-row LocalStorage session persistence, recent-asks migration + backup, stale-running reconciliation, per-session log path exposure, audit timeline rendering, SessionsList filtering/delete policy, fork prompt, and recent-asks deletion.
+  Verification passed: tools/raycast-echo npx tsc --noEmit; tools/raycast-echo npm test -- --reporter=dot (69 tests); tools/raycast-echo npx ray build; root npm run typecheck; root npm test -- --reporter=dot (1114 passed, 21 skipped); git diff --check.
+  Scope note: added tools/raycast-echo/vitest.config.ts, tools/raycast-echo/test/raycast-api-mock.ts, and changed tools/raycast-echo/package.json test script because @raycast/api has no runtime entry for Vitest TSX component tests. This was required to satisfy AC8 component-test coverage.
+  AC9.1/AC9.2/AC9.4/AC9.5 are post-merge dogfooding gates and remain founder/strategist verification items; AC9.3 README update is complete.
+  No ECHO MCP calls were made during this builder run, so no dogfooding journal entry was required.
 ---
 
 # Raycast ECHO — sessions as objects (D + narrow C persistence model)
