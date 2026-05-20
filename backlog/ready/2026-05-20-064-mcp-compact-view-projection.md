@@ -1,0 +1,145 @@
+---
+id: 2026-05-20-064-mcp-compact-view-projection
+title: MCP `view: "compact"` projection — substrate-level human-noise filter on `find_clusters` + `get_atoms`
+status: ready
+priority: HIGH
+estimate: 1-1.5d
+created: 2026-05-20
+blocked_by: []
+requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  - src/mcp/tools/find-clusters.ts  # AC1, AC4, AC7 — accept `view?: "compact" | "rich"` (default "rich"); when compact, run cluster array through the new compact projector before envelope emission; suppress `query` echo + `result_caps` from envelope; keep `warnings[]`. The existing `format?: "skeleton"` parameter is orthogonal to `view` (skeleton controls atom-body inclusion; view controls field hygiene).
+  - src/mcp/tools/get-atoms.ts  # AC1, AC5 — accept `view?: "compact" | "rich"` (default "rich"); when compact, run atom array through the new compact projector after the existing wire-shape projection. The existing `fields?: string[]` projection composes with `view`: `view=compact` defines the default keep-list; `fields=[...]` further restricts; `view=rich + fields=[...]` retains rich keep-list further restricted.
+  - src/mcp/wire-shape/compact.ts  # AC3 — NEW. Single module exporting `compactCluster(cluster)` and `compactAtom(atom)`. Defines the canonical KEEP/DROP rules per Section 2 of the design (this spec). Imported by both tools; no per-tool duplication. Lives alongside the existing `match.ts` cap projector (which compact composes WITH, not replaces).
+  - src/mcp/wire-shape/match.ts  # AC2, AC3 — no semantic change; verify the existing per-content + per-key projector still runs in compact path (compact removes FIELDS, match.ts caps SIZES; they compose).
+  - tools/raycast-echo/src/lib/mcp.ts  # AC6 — `findClusters()` and `getAtoms()` both pass `view: "compact"` in their tools/call args. Existing TypeScript types (`FindClustersCluster`, `EchoAtom`) remain — compact is a structural subset of rich, so no new types needed; optional fields stay optional.
+  - tools/raycast-echo/src/echo.tsx  # AC6 — remove the client-side `<!-- ECHO cluster ${c.cluster_id} -->` HTML-comment emission in `clusterBundleMarkdown` (it was Raycast-side debug bleed; compact does NOT carry cluster_id into the rendered markdown header anyway — the field is still in JSON for follow-up calls).
+  - test/mcp/wire-shape/compact.test.ts  # AC3, AC4, AC5 — NEW. Unit tests for `compactCluster` + `compactAtom` covering each KEEP/DROP field with representative atoms from each source (claude_code, cursor, codex, git). Includes the AC5 size-reduction assertion: a 50-tool-call codex atom drops from `metadata_bytes_elided` ~207KB to <2KB in compact mode.
+  - test/mcp/tools/find-clusters.test.ts  # AC2 (existing) + AC4 — EXTEND. Add: `view: "compact"` produces compact-shaped clusters; default + `view: "rich"` produce byte-identical-to-current envelopes (regression guard for AC2). AC7 fixture: a cluster whose label matches `/^discussion about [0-9a-f-]{36}$/` returns `label: null` under compact, unchanged under rich.
+  - test/mcp/tools/get-atoms.test.ts  # AC2 (existing) + AC5 — EXTEND. Add: `view: "compact"` produces compact-shaped atoms; default + `view: "rich"` produce byte-identical-to-current envelopes; `view=compact + fields=["content"]` composes (compact keep-list ∩ fields).
+  - tools/raycast-echo/test/mcp.test.ts  # AC6 — IF EXISTS, extend to assert both `findClusters()` and `getAtoms()` POST bodies include `view: "compact"`. If it doesn't exist, this AC is satisfied by AC2's daemon-side coverage; do NOT introduce a new test file just for the round-trip.
+  # NOTE: docs/BACKLOG.md is NOT in this list per docs/AGENT_INSTRUCTIONS.md; strategist adds the Ready-table row at spec-commit time.
+spec_refs:
+  - src/mcp/tools/search-memories.ts  # NOT modified — explicitly deferred (see OoS#1)
+  - src/mcp/tools/get-atom.ts  # NOT modified — explicitly deferred (see OoS#1)
+  - src/mcp/server.ts  # not modified; parameter dispatch already passes args through verbatim
+  - src/storage/interface.ts  # CaptureEvent type — unchanged
+  - tools/raycast-echo/src/echo.tsx:252  # current `clusterBundleMarkdown` site that emits the debug HTML comment
+  - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # 2026-05-20 14:03–14:08 PDT entries (claude + codex parallel data-shape probes), plus the 14:08 codex-strategist consult verdict that motivated this spec
+  - wiki/principles/compose-not-capture.md  # explicitly addressed in Why (the codex strategist consult clarified this principle does NOT defend raw MCP output)
+  - wiki/surfaces/mcp-find-clusters.md  # current contract for find_clusters; this spec adds `view` parameter
+  - wiki/surfaces/mcp-get-atoms.md  # current contract for get_atoms; this spec adds `view` parameter
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: null
+claimed_at: null
+branch: null
+head_sha: null
+pr_url: null
+agent_notes: null
+---
+
+# Why
+
+Founder is shipping a Raycast extension where **humans** read MCP results directly in a 5-second hotkey-overlay interaction. ECHO MCP wire-shape was designed assuming consumers are AI agents capable of self-denoising. The high-signal fields a human needs (the question/answer, files touched, who/when, was-it-truncated) are interleaved with substrate noise that AI consumers tolerate but humans cannot: opaque bubble UUIDs, byte offsets, nested `codex.{sandbox_*, permission_*}` config blocks that bloat `metadata_bytes_elided` to ~207KB on a single codex atom, debug `rank_reason` values like `"recent_activity"`/`"dense"` that are already implied by sort order, the daemon's pass-through HTML comment `<!-- ECHO cluster ${id} -->` that leaks into rendered markdown.
+
+The strategist's first instinct was per-consumer filtering (Raycast renders, daemon stays pass-through). Codex strategist consult on 2026-05-20 14:08 PDT (codex turn `5ddf5995` does NOT contain the consult — the consult was a separate `codex exec --sandbox read-only` invocation; verdict captured at journal lines 371+ that day) reframed it: **the fields claude labelled noise are NOT Raycast-specific; they're substrate leakage.** If every future consumer (V1 browser extension per `wiki/product/v1-spec.md`, future overlay surfaces) has to re-learn what to hide, ECHO is exporting capture/runtime internals through its substrate contract. `compose-not-capture` does not defend raw MCP output — composition means ECHO normalises cross-tool context, not that consumers must stare at every capture artifact.
+
+The smallest correct change is a **projection knob on the existing tools** (codex's exact words). Add `view?: "compact" | "rich"`; default to `rich` so agents are unaffected; have Raycast request `compact`. Future consumers inherit the same compact projection for free.
+
+# Acceptance Criteria
+
+## AC1 — Parameter wired (both tools)
+
+- `find_clusters` and `get_atoms` accept optional `view?: "compact" | "rich"` in their input schema. Validation: unknown values isError with a clear message naming the two accepted enum members.
+- `view` is independent of the existing `format` (find_clusters' `"skeleton"`) and `fields` (get_atoms' projection) parameters.
+
+## AC2 — Default is rich; existing behaviour byte-identical
+
+- Calls without `view` produce **byte-identical output** to the current daemon (regression guard via fixture comparison in `test/mcp/tools/find-clusters.test.ts` + `test/mcp/tools/get-atoms.test.ts`).
+- Calls with `view: "rich"` produce byte-identical output to calls without `view`.
+- Existing tests for both tools pass unchanged (no migration in tests beyond adding new cases).
+
+## AC3 — Compact projection lives in shared module
+
+- Single new file `src/mcp/wire-shape/compact.ts` exports `compactCluster(cluster) → CompactCluster` and `compactAtom(atom) → CompactAtom`.
+- Both tools import the same projector — zero per-tool duplication of KEEP/DROP rules.
+- `src/mcp/wire-shape/match.ts` (the existing per-content + per-key cap projector) is **composed with**, not replaced: in compact mode, atoms run through `match.ts`'s caps first (size hygiene), then through `compact.ts`'s field filter (noise hygiene).
+- Unit tests in `test/mcp/wire-shape/compact.test.ts` cover every KEEP and every DROP rule with a representative atom from each of the four sources (claude_code, cursor, codex, git).
+
+## AC4 — Cluster compact contract
+
+Under `view: "compact"`, each cluster in the response carries **only** these fields:
+
+- KEEP: `cluster_id`, `atom_ids`, `source_breakdown`, `time_range.from`, `time_range.to`, `label` (per AC7), `open_loop_hints`, `atom_ids_truncated`, `atom_ids_total`.
+- DROP: `rank` (sort order already conveys it), `rank_reason` values other than `"has_open_loop"` (drop `"recent_activity"`, `"dense"`, `"matches_artifact_hint"`; if `"has_open_loop"` is present, emit `rank_reason: ["has_open_loop"]`; if not, omit the field entirely).
+
+Top-level envelope under compact:
+
+- KEEP: `schema_version`, `tool`, `clusters[]`, `warnings[]` (actionable like `[AUTO_EXPAND]`).
+- DROP: `query` (the echoed args), `result_caps`.
+
+## AC5 — Atom compact contract
+
+Under `view: "compact"`, each atom in the response carries **only** these fields (after `match.ts`'s existing per-content + per-key caps have already run):
+
+- KEEP (universal): `id`, `source`, `timestamp`, `content`, `truncations`.
+- KEEP (universal metadata when present): `metadata.session_id`, `metadata.repo_root`, `metadata.tool_call_total` (only when > 0), `metadata.had_tool_use`, `metadata.tool_calls_by_name`, `metadata.files_referenced` (cross-source — when present).
+- KEEP (per-source promoted metadata):
+  - **claude_code**: `metadata.model`, `metadata.permission_mode` (only when value !== `"default"`), `metadata.branch`.
+  - **cursor**: `metadata.is_continuation` (only when `true`), `metadata.context` (only the sub-fields `attached_files`, `referenced_files`, `deleted_files` if present), `metadata.thinking` (only when present AND not already substring-prefix of `content`).
+  - **codex**: `metadata.codex.model`, `metadata.codex.reasoning_effort`, `metadata.git.branch`.
+- DROP (per-source debug/plumbing):
+  - Universal: `metadata.mtime`, `metadata.byte_offset`, `metadata.tool_calls` (the projected name array — redundant with `tool_calls_by_name`), `metadata.tool_calls_truncated`.
+  - claude_code: `metadata.cli_version`, `metadata.project`, `metadata.git_state` (subsumed by `branch`).
+  - cursor: `metadata.composer_id`, `metadata.user_bubble_id`, `metadata.assistant_bubble_id`, `metadata.assistant_bubble_ids`, `metadata.bubble_text_sources`, `metadata.continuation_of_assistant_bubble_id`.
+  - codex: ALL of `metadata.codex.{cli_version, model_provider, personality, approval_policy, sandbox_policy_type, permission_profile_type, permission_file_system_type, permission_network, file_system_sandbox_kind, sandbox_network_access, sandbox_exclude_tmpdir_env_var, sandbox_exclude_slash_tmp, sandbox_writable_roots}`, `metadata.codex.source`, `metadata.git.{sha, origin_url}`, `metadata.git_state`, `metadata.cwd` (redundant with `repo_root`).
+  - All sources: `bytes_elided`, `metadata_bytes_elided`, `metadata_keys_projected`, `metadata_keys_elided` (the `truncations` array already conveys the bit a human needs).
+- KEEP top-level envelope: `schema_version`, `tool`, `atoms[]`, `atoms_dropped`, `atoms_dropped_ids`, `warnings[]`.
+
+Size assertion (test fixture in `test/mcp/wire-shape/compact.test.ts`): a representative codex atom with 50 `exec_command` tool calls (matching the live shape of atom `014b6f8a-2615-49c4-a032-57d958c47a09`, ~207KB metadata_bytes_elided in rich) returns with `JSON.stringify(atom.metadata).length < 2048` in compact.
+
+## AC6 — Raycast switches to compact
+
+- `tools/raycast-echo/src/lib/mcp.ts`'s `findClusters()` and `getAtoms()` POST bodies include `view: "compact"` in `params.arguments`.
+- No new TypeScript types — compact is a structural subset of rich; existing `FindClustersCluster` + `EchoAtom` types already declare the compact-keep fields as required/optional with the correct shape.
+- The client-side `<!-- ECHO cluster ${c.cluster_id} -->` HTML-comment emission in `clusterBundleMarkdown` (`tools/raycast-echo/src/echo.tsx:258`) is removed — it was Raycast-side debug bleed and the cluster_id is still on the JSON for follow-up calls.
+
+## AC7 — UUID-shaped labels emit as `null` under compact
+
+- When `find_clusters` would emit a `label` matching the regex `/^discussion about [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/`, under `view: "compact"` the field is emitted as `label: null` instead. Under `view: "rich"` the label is unchanged (rich preserves the UUID-fallback string for agent debugging).
+- Justification: every consumer that sees a UUID-shaped label has to detect-and-suppress it. Doing it once at the daemon seam is the substrate-hygiene pattern; doing it per-consumer is the leakage pattern this spec exists to fix.
+- Bounded: ONLY the explicit `"discussion about <uuid>"` form. Any other label content (descriptive nouns, file paths, free-form strings) passes through unchanged.
+
+## AC8 — Dogfooding journal entry on first compact call
+
+- The first time Raycast issues a successful `find_clusters({view: "compact"})` or `get_atoms({view: "compact"})` call against a live daemon, a dogfooding journal entry (per CLAUDE.md preamble) appears in the current month's shard with `view=compact` in the **Query inputs** field. This is the agent's responsibility — claim-time builder writes one entry; not enforced by code.
+- Purpose: makes compact dogfooding visible in the journal so we can detect (within 3 days) if compact dropped a field the human actually needed. If observed, the followup is to add the field back to the KEEP list — small targeted patch, not a redesign.
+
+# Out of Scope (Don't Drift)
+
+1. **`search_memories` and `get_atom` compact mode.** Explicitly deferred. Raycast doesn't need them on the resume path today. If Raycast (or another consumer) needs them, separate item. Don't proactively add `view` to all four tools — codex's strategist consult was explicit that the smallest correct change is the two tools Raycast actually uses.
+2. **Rendering / layout / icon work in Raycast.** This spec stops at "Raycast asks for compact and the bytes flow through unchanged structurally." How clusters and atoms are rendered (subtitle composition, file-chip rows, tool-use badges, truncation indicators) is the **next** brainstorm — not this spec. If the builder is tempted to add UI affordances "while they're in the file," stop.
+3. **Relaxing the existing `WIRE_SHAPE_CAPS.match_content` 2023-char content cap.** Compact does NOT relax that cap. The cap is correct for both modes (size hygiene is independent of field hygiene).
+4. **Migration of agent consumers to compact.** Agents keep getting `rich` (default). No breaking changes anywhere. If a future agent consumer benefits from compact, that's a per-consumer opt-in, not a default flip.
+5. **Daemon-side cluster labeling improvements.** The underlying reason UUID-fallback labels happen at all (the labeling pass falling through to UUID echo when no clean noun is extractable) is a separate concern. AC7 papers over the symptom at the wire seam; the root cause is a different backlog item.
+6. **A new `*_for_display` MCP tool.** Codex's verdict was explicit: surface proliferation for one consumer is the wrong shape. Stop.
+7. **Removing or deprecating `rich` mode.** Both modes ship and are supported indefinitely. Do not add deprecation warnings on `rich` calls.
+8. **Changing the `WIRE_SHAPE_CAPS` numeric values.** The 2023-char `match_content` cap, the per-key `match_metadata_value` cap, etc. are all unchanged. Compact removes fields; it does not change caps.
+9. **New `compose-not-capture` wiki page or principle revision.** The codex strategist consult clarified the principle's scope (it does not defend raw MCP output); that clarification is a journal observation, not a wiki revision. If the founder later promotes the clarification, separate item.
+10. **Bundling this with the planned Raycast UI redesign.** This spec is the substrate prerequisite that unblocks the UI redesign. Do not let the UI redesign creep into this spec — the UI brainstorm explicitly happens AFTER this lands.
+
+# After Completion (Strategist Notes)
+
+Wiki promotion targets when this item lands in `complete/`:
+
+- **`wiki/surfaces/mcp-find-clusters.md`** — add a `view` parameter section under "Input schema"; document the compact-mode KEEP/DROP rules; cross-link to a new `wiki/principles/substrate-projection-not-consumer-projection.md` or fold the principle into an existing page.
+- **`wiki/surfaces/mcp-get-atoms.md`** — same `view` parameter section + KEEP/DROP rules.
+- **NEW `wiki/principles/substrate-projection-not-consumer-projection.md`** (or named more concisely) — the codex-strategist clarification of `compose-not-capture`'s scope, captured as a standalone principle so future consumers inherit it. Cite this item's spec as the reasoning trail. Cross-link from `wiki/principles/compose-not-capture.md`.
+- **`wiki/principles/compose-not-capture.md`** — minimal edit: add a clarification paragraph noting that compose-not-capture concerns ECHO's relationship to the tools it ingests FROM, not the relationship between ECHO's substrate and ECHO's consumers. (One paragraph; do not rewrite the page.)
+
+Cross-link backlog items that this spec unblocks:
+
+- The pending Raycast UI redesign (no item ID yet — to be written after this lands). Reference this item as the substrate prerequisite.
+
+Add a journal entry on wiki-promotion noting that the 064-clarified principle ("substrate projection, not consumer projection") was derived from a codex strategist consult, demonstrating the codex-as-strategist binding cycle (per the V1 wedge's "vendor-agnostic at ≥2 bindings" gate per `project_friction_first_prioritization.md`).
