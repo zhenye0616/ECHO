@@ -875,9 +875,48 @@ Filed at merge time; the test-injection finding (r9 codex F2) was already filed 
 
 ## 2026-05-21 — harness seam review (strategist + codex consultation)
 
-Strategist (Claude Code) ran a three-layer review of `src/` substrate, `src/mcp/`+`src/daemon/` server, and `tools/`. Codex was invoked read-only as an independent consultee (`codex exec --sandbox read-only`, zero MCP calls, no journal entry needed per skip-rule) to verify findings at HEAD. The twelve gaps below are the codex-verified output. Verdict: **ship-worthy V1 dogfooding rig, no hard blocker.** Top two priorities flagged inline.
+Strategist (Claude Code) ran a three-layer review of `src/` substrate, `src/mcp/`+`src/daemon/` server, and `tools/`. Codex was invoked read-only as an independent consultee (`codex exec --sandbox read-only`, zero MCP calls, no journal entry needed per skip-rule) to verify findings at HEAD. The twelve gaps below are the codex-verified output. Verdict: **ship-worthy V1 dogfooding rig, no hard blocker.**
 
-### Severity: high
+### Framing — protocol invariants vs flow-specific conveniences
+
+The harness should be **flexible but robust**. The current builder→4-reviewer→watcher→combine→dispatch pipeline is ONE concrete instantiation of the coordination protocol — it will change. So fixes are sorted by whether they harden a **protocol invariant** (durable across flow rewrites) or patch a **flow-specific accident** (would be re-implemented or discarded if the flow changed).
+
+**Invariants are the priority.** Flow-specific fixes are hygiene only — invest if they're hitting current friction, otherwise let the convenience layer adapt to the next flow shape on its own.
+
+### Protocol invariants — fix on-merit, regardless of current cardinality
+
+These statements hold under any pipeline shape (1 reviewer or 10, mkdir locks or distributed leases, combine.py or a successor watcher):
+
+- **SEAM 1 — Atomic state transitions.** Any backlog item state change touching >1 file or field lands in ONE commit, or is fully self-resumable from disk inspection. Concrete instance today: `skills/process-backlog.md:177-188 + :189-195 + :264-271` does `git mv` → frontmatter edit → builder.md patch → commit in four steps. Stage the mutations first, `git mv` last, single commit covers all. The invariant remains correct if tomorrow there are 7 reviewers or a different state machine. **[Priority]**
+
+- **SEAM 2 — In-flight operations observable across process restart.** `src/mcp/request-log.ts:31-34` is in-memory only; SIGTERM mid-handler loses the call. Invariant: any operation in `pending` at shutdown must surface SOMEWHERE on the next boot (persisted ring tail, journal, log). Mechanism is open — `tail-mcp.sh` integration is one path, MCP-call durability hook is another. **[Priority]**
+
+- **SEAM 5 — Partial-write tolerance for concurrent-readable files.** Any file readable by another process WHILE being written must be guarded against zero-size or unterminated reads. `tools/review-queue/combine.py:482-486` reads `<slug>.md` without `stat().st_size > 0` + frontmatter-close check. Invariant survives any future watcher replacing combine.py.
+
+- **SEAM 7 — Durability before ack.** `src/mcp/tools/coord-emit.ts:143-179` returns 200 OK after WAL buffer write but BEFORE fsync (`src/storage/sqlite.ts:60-62` synchronous=NORMAL). Either (a) ack contract = "in WAL buffer, host-crash window of ~5s exists" (documented), or (b) opt durability-critical paths into per-statement `synchronous=FULL`. Invariant is the explicit contract, not the implementation. The same gap will recur for any future tool that needs hard durability.
+
+- **SEAM 8 — At-most-one tick per role per correlation_id.** Same-role concurrent execution must be impossible by construction, not by best-effort upstream-existence check. `tools/review-queue/_run_reviewer.sh` + `skills/review-queue-codex.md:199-207` ("does not close the race"). Mkdir lock is one mechanism; coord_emit-tracked "tick_in_progress" record is another. Don't prescribe — preserve the invariant under whatever scheduler comes next.
+
+- **SEAM 9 — Shared resources self-heal on SIGKILL.** Worktrees, locks, and any disk-resident coordination state must be reclaimable by future ticks without manual intervention. `tools/review-queue/_run_reviewer.sh:92-105` skips registered worktrees without liveness check; `tools/backlog/run-codex-builder.sh:70-74` documents `rm -rf` as the manual recovery. Detector should walk shared-state inventory, check PID liveness + mtime, GC zombies. Invariant survives whatever owns the worktree next.
+
+- **SEAM 10 — Idempotent and cheap to re-run.** Every operation in the pipeline must be safe to invoke twice, and the second invocation should be near-free when nothing has changed. `tools/review-queue/combine.py:267-269 + :777-799` re-parses every tick; mtime short-circuit makes the no-op case ~O(file_stat). Invariant generalizes to any future watcher / scheduler.
+
+### Flow-specific conveniences — hygiene only, would not survive a flow rewrite
+
+These patch the current pipeline; if the flow shape changes, they go away rather than transfer. Invest only if hitting current friction:
+
+- **SEAM 3 — Smoke-test tool list freshness** (`tools/mcp-integration-smoke.sh:191-203` hardcoded 8 tools; server registers 13). Hygiene. If the next CI shape is contract-test-based, this disappears.
+- **SEAM 4 — Raycast tool-name strings** (`tools/raycast-echo/src/lib/mcp.ts:91-113`). The *underlying* invariant — "MCP tool-name surfaces must be type-generated from canonical server" — IS protocol-level and will recur with the browser extension. The Raycast-specific fix is throwaway; the codegen pipeline is durable. Build the codegen, treat Raycast as the first consumer.
+- **SEAM 6 — Codex installer `--check`** (`tools/install-echo-codex-skills.sh:166-187` has no drift check vs `tools/sync-skills.sh:49-56`). Same shape as SEAM 4: the invariant is "every skill-adapter must have drift detection"; the specific Codex installer fix is throwaway because a third adapter will arrive eventually. Generalize the rendering pipeline so drift detection is built-in, not bolted on per adapter.
+- **SEAM 11 — 50%-timeout warning** (`tools/review-queue/combine.py:290-315`). Assumes timeout-based escalation model. Defer until founder feels the wait-cost.
+
+### Docs only
+
+- **SEAM 12 — `source_breakdown` absent from `search_memories` / `get_atoms`** ✅ BY DESIGN. `source_breakdown` is cluster-scoped (`find-clusters.ts:100,:177` + `src/trace/types.ts:84-88`); atom-level tools (`search-memories.ts:64-100`, `get-atoms.ts:87-98`) intentionally omit. Document in tool descriptors so future readers don't read CLAUDE.md's "Sources field non-optional" as a bug.
+
+- **SEAM 13 — Trace renderers stale comments** ❌ Strategist's first-pass concern was rebutted by codex. `tools/render-trace.ts:63-70`, `tools/serve-trace.ts:64-91`, `tools/stream-watch.ts:46-65` wrap `MemoryStorage`, not `SqliteStorage`. No lock conflict ever existed. Comments suggesting SqliteStorage wrapping should be corrected. One-line fix per file.
+
+### Original severity-grouped detail (preserved for reference)
 
 - **[PRIORITY 1] `claimed → pending_review` handoff is non-atomic.** ✅ CONFIRMED. In `skills/process-backlog.md`, `ensure_stage` does the `git mv` (`:177-188`), the backlog-item frontmatter edit is manual/prose (`:189-195`), the `builder.md` task-state pointer is patched later by `tools/task-state/patch-builder-state.py` (`:326-330`, patches `builder.md` handoff fields — NOT the backlog item's `head_sha`/`pr_url`), and one final commit/push closes the sequence (`:264-271`). Failure window: after `git mv` but before frontmatter edit / builder-state refresh / final commit. Crash leaves `pending_review/<item>.md` with stale handoff fields and stale `builder.md`; if accidentally committed, reviewers see a bad handoff. If not committed, rerun can be blocked by a dirty index and the claim scan may miss the item. Fix: stage the frontmatter edit + builder-state patch inline before the `git mv`, then one commit covers all three mutations. Trigger: do as soon as V1.5 unpauses — every builder cycle is exposed.
 
