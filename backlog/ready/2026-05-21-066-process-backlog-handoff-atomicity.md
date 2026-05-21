@@ -1,23 +1,26 @@
 ---
 id: 2026-05-21-066-process-backlog-handoff-atomicity
-title: process-backlog claimed→pending_review handoff is atomic on disk, not just in commit (close the working-tree partial-state window)
+title: "P1 - Atomic state transition (consumer: process-backlog work-item stage move)"
 status: ready
 priority: HIGH
 estimate: 0.25-0.5d
 created: 2026-05-21
 blocked_by: []
 task_state_ref: 2026-05-21-066-process-backlog-handoff-atomicity
-requested_reviewers: ["codex", "codex-ops"]
+requested_reviewers: []  # resolved by current routing configuration; P1 does not hardcode vendors
 files_to_modify:
-  - skills/process-backlog.md  # AC1 — reorder E2/E2.5/E2.6 so all three mutations (item frontmatter edit, builder.md patcher, stage rename) accumulate in working tree FIRST, then a single `git mv` (rename) + `git add` (other paths) + `git commit` closes the handoff. Frontmatter edit MUST happen on the source file under `backlog/claimed/<id>.md` BEFORE `git mv`. Patcher runs against `backlog/task-state/<id>/builder.md` (separate path) BEFORE `git mv`. Single commit covers all three (rename-with-edits + builder.md + run log).
-  - .claude/commands/process-backlog.md  # AC2 — regenerated via `tools/sync-skills.sh`; never hand-edited. Reviewer confirms `tools/sync-skills.sh --check` is clean post-edit.
-  - tests/skills/process-backlog-handoff-atomicity.test.ts  # AC3 — new test file (skill prose can't be unit-tested directly, but the prose's bash IS executable; this test transcribes the canonical sequence from the skill into an executable harness against a throwaway git repo and asserts the four invariants below). The test is the structural pin against future drift in the skill's bash blocks.
+  - skills/process-backlog.md  # current consumer: make the work-item stage move satisfy P1 with a bounded publish block and deterministic recovery from on-disk state
+  - .claude/commands/process-backlog.md  # generated adapter; refresh only through tools/sync-skills.sh
+  - tests/skills/atomic-state-transition-harness.test.ts  # reusable P1 harness plus current-consumer specialization
 spec_refs:
-  - skills/process-backlog.md  # E2 line 177-184 (ensure_stage doing git mv FIRST), E2 lines 189-195 (prose-only frontmatter edit AFTER the rename — the load-bearing bug), E2.5 lines 224-252 (patcher writes builder.md, then git add POINTER), E2.6 lines 264-271 (single final commit) — the current ordering puts staged-rename + unstaged-edits in the working tree window between E2's git mv and E2.6's commit
-  - tools/task-state/patch-builder-state.py  # the patcher writes to backlog/task-state/<id>/builder.md on disk; this AC pulls its invocation EARLIER in the sequence (before git mv) so the builder.md mutation is also in working tree before any index operation
-  - backlog/_followups.md  # PRIORITY 1 entry under "2026-05-21 — harness seam review (strategist + codex consultation)" — the in-the-moment finding that motivates this spec
-  - backlog/complete/2026-05-14-048-process-backlog-builder-state-handoff-refresh.md  # the spec that landed E2.5's patcher invocation; this 066 reorder MUST preserve 048's load-bearing invariants (patcher is the only canonical site, lint-fails-as-hard-stop, locked_decisions byte-preserved)
-  - raw/internal/decisions/  # if a builder finds the reorder breaks a non-obvious downstream invariant, log the drift-event here per CLAUDE.md's drift-prevention rule
+  - backlog/_followups.md  # P1 primitive plus 2026-05-21 065 postmortem rows P1/P6/P7/P11, which empirically validate the primitive and name the merger as the next P1 consumer
+  - skills/process-backlog.md  # current consumer whose work-item stage move instantiates P1
+  - skills/merge-and-cleanup.md  # named future P1 consumer; read C7/C8/C9/C11 and failure modes to shape the generic fixture, but do not modify it in 066
+  - tools/task-state/patch-builder-state.py  # current consumer dependency; records --spec-path verbatim into canonical_anchors.spec
+  - tools/sync-skills.sh  # adapter sync check for process skill changes
+  - backlog/reviews/2026-05-21-066-process-backlog-handoff-atomicity/r1/codex.md  # r1 technical corrections that must remain pinned
+  - backlog/reviews/2026-05-21-066-process-backlog-handoff-atomicity/r1/codex-ops.md  # r1 technical corrections that must remain pinned
+  - raw/internal/decisions/  # drift-event destination if the primitive exposes a non-obvious coupling
 
 # --- agent-managed fields (filled in during run) ---
 claimed_by: ""
@@ -30,226 +33,346 @@ review_notes: ""
 agent_notes: ""
 ---
 
-# process-backlog claimed→pending_review handoff is atomic on disk, not just in commit
+# P1 - Atomic state transition (consumer: process-backlog work-item stage move)
 
 ## Why this spec exists
 
-`skills/process-backlog.md` claims a single-commit atomicity guarantee for the claimed→pending_review handoff (E2.6 line 264 comment: "this commit captures all three (item move, run log, builder.md refresh) atomically"). The single COMMIT is atomic. The **working-tree window** that produces that commit is not.
+`backlog/_followups.md` now names P1 - Atomic state transition as a priority reliability primitive:
 
-Concretely, the current prose orders the three mutations like this:
+> Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone.
 
-```
-E2.   git mv backlog/claimed/<id>.md backlog/pending_review/<id>.md   ← stages rename
-      (prose) edit frontmatter of backlog/pending_review/<id>.md      ← creates UNSTAGED edits
-E2.5. patch-builder-state.py builder.md                               ← UNSTAGED disk mutation
-      git add backlog/task-state/<id>/builder.md
-E2.6. git add backlog/pending_review/ "$LOG"                          ← stages frontmatter edits
-      git commit -m "review: <id>"
-      git push origin main
-```
+The current process-backlog work-item stage move is the first consumer. It changes more than one durable surface: the work item changes stage, handoff fields are written, task-state anchors may be refreshed, and the run log is added. The current draft made those specific steps safer, but still read as a patch to one role pipeline. This respec makes P1 the load-bearing contract and treats the existing stage move as a worked example.
 
-Between E2's `git mv` and E2.6's `git commit`, the working tree contains: a staged rename + unstaged frontmatter edits on the moved file + (after the patcher fires) unstaged builder.md edits. **Anything that observes or commits the repo state during this window can produce or see a half-finished handoff.**
+The trigger is operational: as soon as multiple actors can run the same workflow family, a half-finished stage transition becomes observable by another process. P1 prevents that class of bug without baking in today's role names, tool vendors, actor count, lock mechanism, durability substrate, or human recovery path.
 
-The concrete failure modes:
+### Evidence base
 
-1. **Process crash mid-handoff** (signal, kernel kill, `kill -9` on the parent shell, OOM, network blip during patcher's python startup) leaves a staged-rename plus unstaged dirty files. Rerun under the existing prose:
-   - `git pull --rebase origin main` (line 187) **aborts** on dirty working tree.
-   - Builder must hand-clean: `git restore --staged --worktree backlog/claimed/ backlog/pending_review/ backlog/task-state/<id>/` before retry.
-   - `ensure_stage`'s idempotent re-detect (line 180 `ls backlog/*/$item`) sees the file under `pending_review/` (because filesystem rename succeeded) and returns 0 — but the frontmatter is still un-edited and builder.md is unflushed. Next rerun ends up running the prose "edit frontmatter" step on a file that was supposed to be edited last attempt. Builder agents are not idempotent on this path — they will write `head_sha` for the CURRENT attempt, not the prior attempt that died mid-commit.
+The 2026-05-21 065 merge postmortem in `backlog/_followups.md` moved this from abstract risk to observed evidence. Row P1 records a rebase replay that dropped a multi-surface backlog-stage transition from an earlier local merge commit. Row P6 records cleanup running before C11 push, leaving branch/worktree cleanup ahead of the durable publish boundary. Row P7 records three repeated rebase retries that re-presented the same conflict work instead of replaying a resolved transition cheaply. Row P11 records three founder escalations after push-rejection retry paths exhausted the skill's programmatic resolver. Together, those rows prove the primitive applies beyond `process-backlog`: the `skills/merge-and-cleanup.md` publish sequence is the named second P1 consumer.
 
-2. **Parallel-agent racey commit.** Two builders running in two worktrees both call `git commit` against `main`. The atomic-claim flow at the START of process-backlog (skills line ~85-115) prevents two builders from CLAIMING the same item, but the handoff at the END is on a different code path — and if a second agent's prose runs against a working tree that another agent dirtied (e.g., shared main checkout, founder running both in parallel sessions on the same repo), one agent's `git add backlog/pending_review/` can pick up the OTHER agent's unstaged frontmatter mid-edit. The committed file has the wrong agent's `head_sha`, or worse — half of one edit and half of another.
+## The architectural primitive (P1, restated for this spec's scope)
 
-3. **Watcher or external observer reading working-tree state mid-handoff.** Strategist watcher / dispatcher / a parallel `tools/review-queue/_run_reviewer.sh` invocation that reads `backlog/pending_review/<id>.md` between E2 line 183 and E2.6 line 270 sees: file exists at new path, frontmatter has the OLD `claimed_by`/`branch` values (because the edit hasn't happened yet), `head_sha` is empty. A reviewer triggered by this state opens a review against a non-existent commit.
+P1 applies to any actor executing a multi-stage state transition that touches more than one file, field, row, object, ref, or durable marker.
 
-The trigger for this becoming an active exposure: **V1.5 unpause** (`project_v15_cleanup_pause` memory). The current quiet period has masked the seam because the handoff cadence is roughly once a day. Once builder agents resume parallel cycles, every handoff is a live window for one of the three modes above.
+The invariant:
 
-## The root cause
+1. A multi-surface transition MUST publish through one durable boundary that observers can treat as the transition point, OR every non-published intermediate state MUST contain enough on-disk information for a process to classify it and deterministically resume, finish, or roll it back.
+2. Before the durable boundary, observers MUST NOT see the target state as complete unless the recovery procedure can prove completion from on-disk state alone.
+3. After the durable boundary, observers MUST see all required surfaces for the transition together, with no missing handoff fields, stale anchors, orphaned side artifacts, or prematurely cleaned supporting resources.
+4. Recovery MUST NOT require a person to decide whether a partial transition should be finished or reverted. The procedure may choose a conservative rollback-and-replay path, but the choice must be encoded in executable checks.
 
-The prose ORDERS mutations so that the irreversible state change (`git mv`, which is both a filesystem rename AND a staged index mutation) happens BEFORE the editable working-tree mutations (frontmatter edit + builder.md patch). This forces a working-tree window where the index is dirty in one direction (staged rename) and the working tree is dirty in the other direction (unstaged content edits on the renamed file).
+"Fully self-resumable from on-disk state" means the recovery procedure can inspect only durable local state and answer:
 
-The single-commit comment at E2.6 line 268-269 is true but misleading: it describes the *commit's* atomicity, not the *prose-execution path's* atomicity. The two are not the same thing — the commit is the LAST step; everything before it is observable to other readers/writers of the repo.
+- Which transition, if any, is in progress.
+- Which source and destination states are involved.
+- Which paths, refs, fields, or resources are allowed to be dirty for that transition.
+- Whether the transition is already durably published.
+- Which deterministic action to run next: no-op, finish, rollback, or rollback-and-replay.
+- Whether recovery succeeded, expressed as a clean observable state or a machine-readable failure.
 
-The fix is to invert the order. All three mutations accumulate as filesystem-only changes (no `git add`, no `git mv`) until everything is on disk; then a single `git mv` + `git add` + `git commit` sequence closes the window in seconds (no awaiting external work between staging and commit).
+What P1 does not assume:
 
-## The minimum-viable fix
+- No specific role name. The primitive applies to actors and processes, not to the current pipeline's role labels.
+- No specific vendor or model. Vendor selection is routing configuration, not the transition contract.
+- No specific actor count. The primitive must hold for one actor, many actors, or a future scheduler.
+- No human-in-loop dependency. Human escalation may be configured for policy, but cannot be required to recover a partial transition.
+- No specific durability substrate. A Git commit is one possible durable boundary. A rename plus commit, multi-commit sequence, pushed ref, database transaction, append-only log entry, object-store manifest, or message-bus commit can also satisfy the primitive if the fixture declares that boundary explicitly.
+- No global serialization requirement. Two transitions for different keys may run concurrently if they cannot observe or mutate each other's intermediate surfaces. P1 forbids unscoped intermediate visibility, not legitimate parallelism.
+- No specific lock primitive. A lock can reduce concurrency, but P1 is still required if a transition mutates multiple surfaces.
 
-Reorder E2 / E2.5 / E2.6 so that:
+## Worked example - current consumer
 
-1. **All disk mutations happen first**, all unstaged: frontmatter edit on the source file (still under `backlog/claimed/<id>.md`); patcher writes `backlog/task-state/<id>/builder.md` (its final path). The patcher is called with `--spec-path "backlog/pending_review/<id>.md"` — i.e. the post-rename path — because the patcher records that argument **verbatim** into `canonical_anchors.spec` without reading the file from disk (verified against `tools/task-state/patch-builder-state.py:289-310`).
-2. **Then a tight staged-commit block** does, back-to-back with no external waits: `git mv claimed/<id>.md pending_review/<id>.md` (stages the rename at the OLD blob), `git add pending_review/<id>.md` (stages the edited frontmatter at the destination — REQUIRED because `git mv` after working-tree edits stages the rename of the old blob but leaves the destination's edited content as unstaged modification per empirical verification on macOS git 2.x), `git add backlog/task-state/<id>/builder.md $LOG`, `git commit`, `git push`. Four index ops in milliseconds.
+The current consumer is the process-backlog work-item stage move that takes one work item from `backlog/claimed/` to `backlog/pending_review/` after implementation work is complete. In today's implementation, that transition also writes handoff fields, may refresh `backlog/task-state/<id>/builder.md`, and adds `raw/internal/agent-runs/<date>-<id>.md`.
 
-The crash-safety property this gives, by configuration:
+The violation today is not that the final Git commit is non-atomic. The violation is that the transition has an observable pre-commit window where the destination path can exist before all required fields and side artifacts are staged together. A reader can see a work item at the target stage with stale or empty handoff metadata, or a rerun can encounter a dirty index and require human cleanup.
 
-- **Pre-mutation** (before Step 1): file under `backlog/claimed/`, frontmatter intact, builder.md as last committed, index clean, working tree clean.
-- **Mid-prose, pre-`git mv`** (after Step 1 or Step 2): frontmatter edit on `claimed/<id>.md` is in working tree only (unstaged); builder.md edit may also be in working tree only. **Index is still clean.** No `pending_review/` file exists. A crash here is recoverable via `git restore --worktree backlog/claimed/<id>.md backlog/task-state/<id>/builder.md` to revert and rerun from Step 1. **No observable partial handoff** because the file is still at the source path on disk.
-- **Mid-`git mv`-to-`git commit` window** (Step 3): staged rename + (after `git add` for destination) staged frontmatter + (after subsequent `git add`s) staged builder.md + staged log. Working tree contents match the index at each substep. The window is bounded by `git add` invocations only — no python startup, no external waits. A crash leaves a partially-staged set of changes; the prose's rerun step (`git pull --rebase origin main`) will abort on dirty index. Documented recovery: `git restore --staged --worktree backlog/claimed/<id>.md backlog/pending_review/<id>.md backlog/task-state/<id>/builder.md "$LOG"` to revert and rerun, OR `git commit -m "review: <id>"` to finish the partial commit if all expected paths are already staged (verify with `git diff --cached --name-only` before deciding which recovery path applies).
-- **Post-commit**: file under `backlog/pending_review/` with edited frontmatter, builder.md patched, run log committed, all in one commit on `main`. Working tree clean, index clean. Rerun = idempotent no-op (the prose's `[ -f "$DEST" ] && exit 0` idempotency check at top of E2 detects target-stage presence and exits 0).
+This consumer satisfies P1 by using Git as its local durable boundary and by adding a deterministic rollback-and-replay recovery recipe for all partial pre-boundary states. The mechanism is local to this consumer:
 
-## Architectural invariant
+- Edit handoff metadata while the item is still at the source path.
+- Run the task-state patcher before the rename, but pass the final destination path as `--spec-path` because the patcher records that string verbatim into `canonical_anchors.spec`.
+- Enter a tight publish block: `git mv`, explicit `git add "$DEST"`, add remaining touched paths, then `git commit`.
+- If a crash occurs before the commit, recover from on-disk state by rolling the allowed touched surfaces back to the source state and replaying the transition.
+- If the commit exists, treat the transition as published and do not replay.
 
-**The prose execution has exactly two extended states and one bounded-narrow window. At every observation point, the repo state is one of:**
+The explicit `git add "$DEST"` after `git mv` is required. The reviewed throwaway-repo reproduction showed that `git mv` after editing the source stages the rename at the old blob while leaving the destination's edited contents unstaged. Without `git add "$DEST"`, the commit can publish stale handoff fields and leave the edited destination dirty.
 
-1. **Pre-Step-3 (extended, may include external waits)**: file under `backlog/claimed/<id>.md`; index is clean (relative to HEAD); working tree may have unstaged edits to `claimed/<id>.md` and `backlog/task-state/<id>/builder.md`. `backlog/pending_review/<id>.md` does NOT exist on disk. The patcher's python startup and any prose-level work (frontmatter edit) happens in this state. A crash here recovers via `git restore --worktree backlog/claimed/<id>.md backlog/task-state/<id>/builder.md` and rerun from Step 1. **No partial handoff is observable** to other readers because the item is still at the source path.
-
-2. **Step-3 bounded window (`git mv` → `git commit`)**: index is progressively-staged across N `git add` calls in milliseconds; no python, no external waits. The window's substates are:
-    - **3.a (`git mv` just ran)**: staged rename at OLD blob; destination working-tree contents (edited frontmatter) UNSTAGED on `pending_review/<id>.md`. `builder.md` and `$LOG` UNSTAGED.
-    - **3.b (`git add "$DEST"` just ran)**: staged rename + staged edited frontmatter. `builder.md` and `$LOG` still UNSTAGED.
-    - **3.c (`git add "$POINTER" "$LOG"` ran)**: all four mutations staged. Working tree clean relative to index. **Recoverable via `git commit -m "review: <id>"` to finish the partial commit**, OR `git restore --staged --worktree backlog/claimed/<id>.md backlog/pending_review/<id>.md backlog/task-state/<id>/builder.md "$LOG"` to revert to state #1.
-    - A crash at 3.a or 3.b leaves a partially-staged index. Recovery: `git restore --staged --worktree …` (full path list) to revert to state #1.
-
-3. **Post-commit (extended, stable)**: file under `backlog/pending_review/<id>.md` with edited frontmatter, builder.md patched, run log committed, all in ONE commit on `main`. Working tree clean, index clean. Rerun = idempotent no-op via the top-of-E2 `[ -f "$DEST" ] && [ ! -f "$ITEM_FILE" ] && exit 0` check.
-
-The Step-3 bounded window is the only place a "partial-staged" configuration is observable, and it is constructed to be unobservable in practice: bounded by milliseconds of local `git` invocations with no external waits, no python, no I/O on remote resources. The prose-level discipline that enforces this is "Step 3 runs as one shell block with no inserted commands"; builders that add observability scaffolding or extra checks inside Step 3 violate the invariant.
+These mechanism choices are local to this consumer. A future consumer, such as the `merge-and-cleanup` publish sequence, inherits P1's invariant and the harness contract but not this Git path layout, patcher call, file names, or single-commit recipe.
 
 ## Acceptance Criteria
 
-### AC1 — `skills/process-backlog.md` reorders E2 / E2.5 / E2.6 so disk mutations precede index operations
+### AC1 - P1 is codified as a generic structural test contract
 
-- **Modified file:** `skills/process-backlog.md`. Edit replaces the existing E2 + E2.5 + E2.6 bash blocks (lines ~174-272).
-- **New ordering (canonical bash transcript):**
+Add a reusable P1 test harness in `tests/skills/atomic-state-transition-harness.test.ts`. The harness MUST be parameterized over a consumer fixture instead of hardcoding this spec's paths.
 
-  ```bash
-  cd ~/Desktop/Project_echo
-  git pull --rebase origin main
+The fixture interface MUST include the equivalent of:
 
-  ITEM_FILE="backlog/claimed/$(basename $ITEM_FILE)"   # source path, BEFORE rename
-  DEST="backlog/pending_review/$(basename $ITEM_FILE)" # destination path, AFTER rename
+```ts
+type DurableBoundaryObservation = {
+  kind: "git-commit" | "rename-plus-commit" | "multi-commit" | "pushed-ref" | "non-git";
+  count: number;
+  token: string;
+  published: boolean;
+  observerScope: "local" | "remote" | "external";
+};
 
-  # Idempotency: if a prior partial run already moved the file (or another
-  # builder already handed off this item), exit cleanly.
-  [ -f "$DEST" ] && [ ! -f "$ITEM_FILE" ] && exit 0
+type P1ConsumerFixture = {
+  name: string;
+  transitionKey: string;
+  allowedTouchedSurfacePrefixes: string[];
+  setup(): Promise<void>;
+  touchedSurfaces(): Promise<string[]>;
+  observe(): Promise<{
+    durableBoundary: DurableBoundaryObservation;
+    sourceVisible: boolean;
+    targetVisible: boolean;
+    targetComplete: boolean;
+    stagedOrPreparedSurfaces: string[];
+    dirtySurfaces: string[];
+  }>;
+  prePublishSteps: Array<{
+    name: string;
+    run(): Promise<void>;
+    allowedDirtySurfaces: string[];
+    targetMayBeVisible: boolean;
+  }>;
+  publishThroughDurableBoundary(): Promise<DurableBoundaryObservation>;
+  recover(): Promise<void>;
+  assertPublished(boundary: DurableBoundaryObservation): Promise<void>;
+  assertCleanSourceState(): Promise<void>;
+  assertNoConcurrentTransitionsOnSameKey?(other: P1ConsumerFixture): Promise<void>;
+};
+```
 
-  # Step 1 — frontmatter edit on the source file (still under claimed/).
-  # Edit head_sha / pr_url / agent_notes IN-PLACE on $ITEM_FILE.
-  # (prose: head_sha=<sha>, pr_url=<url-or-empty>, agent_notes=…)
+This interface is the explicit cross-consumer contract. Any future P1 consumer implements the fixture; the harness validates the primitive without knowing consumer-specific path names, command names, stage labels, or storage substrate.
 
-  # Step 2 — builder-state patcher refresh (scope-detected). The patcher
-  # records --spec-path verbatim into canonical_anchors.spec without reading
-  # the file from disk; we therefore pass the FINAL destination path here so
-  # the committed builder.md's anchor never points at a removed claimed/ path.
-  TASK_ID="${ITEM_ID}"
-  POINTER="backlog/task-state/$TASK_ID/builder.md"
-  HAS_TASK_STATE_REF=$(
-    awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' "$ITEM_FILE"
-  )
-  if [ -n "$HAS_TASK_STATE_REF" ] || [ -f "$POINTER" ]; then
-    python3 tools/task-state/patch-builder-state.py \
-      --task-id "$TASK_ID" \
-      --outcome "$OUTCOME" \
-      --spec-path "$DEST" \
-      --branch "agent/$SLUG" \
-      --head-sha "$HEAD_SHA" \
-      --run-log "$LOG"
-    if [ -f "$POINTER" ]; then
-      python3 tools/task-state/lint.py "$POINTER"   # hard stop on failure
+The generic harness MUST assert these P1 properties for any fixture:
+
+1. Before `publishThroughDurableBoundary()`, every named crash point is either still source-visible with no completed target state, or `recover()` can deterministically return to a clean source state.
+2. `targetMayBeVisible: true` is permitted on a pre-publish step. The harness MUST NOT assume target visibility is always false before publish. Instead, if the target is visible before the declared durable boundary, the fixture must prove the state is either not complete or is recoverable from on-disk state alone. This is what lets the same contract fit the future merger consumer, where `backlog/complete/<id>.md` can exist locally before C11 push.
+3. `recover()` does not prompt, branch on prose instructions, or require an operator decision. It runs from fixture-provided on-disk state only.
+4. After `publishThroughDurableBoundary()`, the fixture reports its durable boundary. The harness asserts `published === true`, validates the declared boundary shape, and calls `assertPublished()` to prove every required surface moved together. The harness does not dictate whether the boundary is one commit, a rename plus commit, a multi-commit sequence, a pushed ref, or a non-git transaction.
+5. Re-running `recover()` after a published transition is a no-op.
+6. The harness does not know this consumer's path names. Paths, expected file status entries, durability tokens, and recovery commands come from the fixture.
+7. Concurrency assertions are key-scoped, not global. A fixture may expose `assertNoConcurrentTransitionsOnSameKey()` for same-item protection, but the harness MUST NOT fail merely because two transitions on different `transitionKey` values run at the same time. It must assert that different-key transitions do not observe each other's intermediate touched surfaces.
+
+The test file MUST include at least one small generic harness-only fixture where `targetMayBeVisible` is false before publish and one harness-only fixture where `targetMayBeVisible` is true before publish. These fixtures are not workflow implementations; they exist only to prove the contract is substrate- and visibility-neutral. AC3 remains the only real consumer specialization in 066.
+
+This AC is the reusable gate for future P1 consumers. It is not a new workflow, scheduler, lock manager, or storage abstraction.
+
+### AC2 - The current consumer implements P1 with a deterministic publish and recovery recipe
+
+Modify `skills/process-backlog.md` so the work-item stage move uses the following shape. Variable names may be adapted to the surrounding prose, but the ordering, recovery guard, prefix check, and review corrections are load-bearing.
+
+Canonical current-consumer transcript:
+
+```bash
+cd ~/Desktop/Project_echo
+
+ITEM_BASENAME="$(basename "$ITEM_FILE")"
+ITEM_FILE="backlog/claimed/$ITEM_BASENAME"
+DEST="backlog/pending_review/$ITEM_BASENAME"
+TASK_ID="${ITEM_ID}"
+POINTER="backlog/task-state/$TASK_ID/builder.md"
+
+# P1 recovery surfaces are the set of file paths this consumer's transition
+# touches and is allowed to roll back through git restore/rm. Do not reuse this
+# list as "all dirty files in the repo"; it is consumer-owned transition scope.
+P1_ALLOWED_RECOVERY_PREFIXES=("backlog/" "backlog/task-state/" "raw/internal/agent-runs/")
+P1_TOUCHED_SURFACES=("$ITEM_FILE" "$DEST" "$POINTER" "$LOG")
+
+p1_assert_allowed_recovery_surfaces() {
+  local path prefix ok
+  for path in "$@"; do
+    case "$path" in
+      ""|/*|../*|*/../*|*/..|.)
+        echo "ERROR: unsafe P1 recovery path: $path" >&2
+        return 2
+        ;;
+    esac
+
+    ok=0
+    for prefix in "${P1_ALLOWED_RECOVERY_PREFIXES[@]}"; do
+      case "$path" in
+        "$prefix"*) ok=1 ;;
+      esac
+    done
+    if [ "$ok" -ne 1 ]; then
+      echo "ERROR: P1 recovery path outside allowed prefixes: $path" >&2
+      return 2
     fi
+  done
+}
+
+recover_p1_stage_move() {
+  local surfaces=("$@")
+
+  p1_assert_allowed_recovery_surfaces "${surfaces[@]}" || return $?
+
+  if git cat-file -e "HEAD:$DEST" 2>/dev/null; then
+    # Already published in HEAD. Nothing to recover.
+    return 0
   fi
 
-  # Step 3 — stage flip + atomic commit. Four index ops in milliseconds, no
-  # python startup or external waits in this window:
-  #   (a) git mv stages the rename at the OLD blob;
-  #   (b) git add $DEST stages the destination's CURRENT contents (the edited
-  #       frontmatter), required because git mv on macOS git 2.x leaves the
-  #       destination's working-tree edits as unstaged modification — verified
-  #       empirically by r1 codex-ops F4 on a throwaway repo;
-  #   (c) git add $POINTER + $LOG stages the remaining paths;
-  #   (d) git commit captures all four mutations in one commit.
-  git mv "$ITEM_FILE" "$DEST"
-  git add "$DEST"
-  [ -f "$POINTER" ] && git add "$POINTER"
-  git add "$LOG"
-  git commit -m "review: $ITEM_ID"
-  git push origin main
-  ```
+  STATUS="$(git status --porcelain -- "${surfaces[@]}")"
+  [ -z "$STATUS" ] && return 0
 
-  Two load-bearing decisions, pinned:
+  # Rollback must run BEFORE pull/rebase. A pull/rebase against a dirty index or
+  # dirty touched surface can abort or replay on top of a partial transition,
+  # turning a deterministic rollback into human triage. The safe order is:
+  # classify local partial state -> roll back only this consumer's touched
+  # surfaces -> verify clean -> pull/rebase -> replay the transition.
+  git restore --staged --worktree -- "${surfaces[@]}" 2>/dev/null || true
 
-  1. **Patcher's `--spec-path` is the DESTINATION path (`$DEST`), invoked BEFORE `git mv`.** Verified against `tools/task-state/patch-builder-state.py:289-310,403-407`: the patcher writes `--spec-path` verbatim into `canonical_anchors.spec` and does NOT read the file from disk. Passing `$DEST` before the rename produces a builder.md whose anchor is correct AT COMMIT TIME (when the rename completes in the same commit). Builders MUST NOT swap to `$ITEM_FILE` for "consistency" — that breaks cold-start/task-state consumers immediately after handoff (r1 codex-ops F5 HIGH).
-  2. **Explicit `git add "$DEST"` after `git mv`.** `git mv` on git 2.x stages the rename of the OLD blob but leaves working-tree edits on the destination unstaged. Without the explicit `git add "$DEST"`, the commit would publish `pending_review/<id>.md` with the pre-edit frontmatter (empty `head_sha` / `pr_url` / `agent_notes`) and leave the edited file as a permanent dirty diff. Builders MUST NOT remove the `git add "$DEST"` line.
+  for path in "${surfaces[@]}"; do
+    if ! git cat-file -e "HEAD:$path" 2>/dev/null; then
+      rm -f -- "$path"
+    fi
+  done
 
-- **Lint-failure escalation contract preserved:** the existing rule "lint failure means escalation, not silent shipping" stays verbatim. Crash between lint and `git mv` is recoverable: nothing has been staged yet, so a rerun starts from a clean working tree (modulo the partially-written builder.md, which the patcher overwrites idempotently on rerun).
+  git diff --quiet -- "${surfaces[@]}"
+  git diff --cached --quiet -- "${surfaces[@]}"
+}
 
-- **`ensure_stage` helper retired or repurposed.** The helper at lines 177-184 currently does the `git mv` inside a function — the new prose calls `git mv` inline so the rename happens at a known prose-step, not opaquely. If `ensure_stage` is preserved for the BLOCKED/escalated path or for E2.5's scope-detect, the spec MUST justify it in `agent_notes`; otherwise it is removed. The pre-existing idempotency case (re-run already at target stage) is handled inline at the very top of the new prose, BEFORE any edits: `[ -f "$DEST" ] && [ ! -f "$ITEM_FILE" ] && exit 0`. The two-condition form (destination present AND source absent) guards against a partial-prior-run state where both files coexist on disk; in that state the rerun must continue (not exit) to complete or rollback.
+recover_p1_stage_move "${P1_TOUCHED_SURFACES[@]}"
+git pull --rebase origin main
 
-- **Comment block update:** the existing comment at E2.6 lines 264-271 ("this commit captures all three … atomically") is replaced with a stronger invariant: "All three mutations are accumulated in the working tree FIRST (steps 1+2); the `git mv` + `git add` + `git commit` (step 3) is the only git index/object work and runs in seconds with no external waits. There is no observable state where some-but-not-all of {rename, frontmatter, builder.md} are partially-staged."
+# Idempotency after pull: a completed prior run is a no-op.
+if git cat-file -e "HEAD:$DEST" 2>/dev/null && [ ! -f "$ITEM_FILE" ]; then
+  exit 0
+fi
 
-### AC2 — Adapter sync stays clean
+# Step 1 - edit handoff metadata on the source path.
+# Edit head_sha / pr_url / agent_notes in place on $ITEM_FILE.
 
-- Run `tools/sync-skills.sh` after the canonical edit. The Claude Code adapter at `.claude/commands/process-backlog.md` is rewritten as a byte-identical copy of the canonical.
-- Reviewer MUST verify: `tools/sync-skills.sh --check` exits 0 post-edit.
-- The Codex adapter installer (`tools/install-echo-codex-skills.sh`) is NOT modified; the user's installed codex-side copy refreshes the next time the founder runs the installer. Out of scope #4 covers this.
+# Step 2 - refresh task-state pointer if this item uses one. The patcher
+# records --spec-path verbatim into canonical_anchors.spec without reading
+# the file from that path, so pass the final destination path before git mv.
+HAS_TASK_STATE_REF=$(
+  awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' "$ITEM_FILE"
+)
+if [ -n "$HAS_TASK_STATE_REF" ] || [ -f "$POINTER" ]; then
+  python3 tools/task-state/patch-builder-state.py \
+    --task-id "$TASK_ID" \
+    --outcome "$OUTCOME" \
+    --spec-path "$DEST" \
+    --branch "agent/$SLUG" \
+    --head-sha "$HEAD_SHA" \
+    --run-log "$LOG"
+  if [ -f "$POINTER" ]; then
+    python3 tools/task-state/lint.py "$POINTER"
+  fi
+fi
 
-### AC3 — `tests/skills/process-backlog-handoff-atomicity.test.ts` pins the four invariants
+# Step 3 - durable publish block. No subprocess that can wait on network,
+# no prose edit, and no tool startup belongs between git mv and git commit.
+git mv "$ITEM_FILE" "$DEST"
+git add "$DEST"
+[ -f "$POINTER" ] && git add "$POINTER"
+git add "$LOG"
+git commit -m "review: $ITEM_ID"
+git push origin main
+```
 
-- **New test file** at `tests/skills/process-backlog-handoff-atomicity.test.ts`. Vitest, in-process, no real git push (uses a throwaway repo via `git init` + local commits only).
-- **Test 1 — pre-mutation state is clean.** Create a throwaway repo, add an item under `backlog/claimed/<id>.md` with frontmatter `claimed_by: X, head_sha: ""`, plus `backlog/task-state/<id>/builder.md` with a valid pointer. Assert: `git status --porcelain` is empty. Then execute the new prose's Step 1 + Step 2 (frontmatter edit + patcher). Assert: `git status --porcelain` shows ONLY unstaged modifications to `backlog/claimed/<id>.md` and `backlog/task-state/<id>/builder.md` (NO staged changes, NO renames-in-index). The item file is still at the source path on disk.
-- **Test 2 — single-commit atomicity, including destination CONTENT.** Continue Test 1's repo state. Execute Step 3 (`git mv` + `git add "$DEST"` + `git add` for builder.md + `git add` for log + `git commit`). Assert: exactly ONE new commit on HEAD; `git diff-tree -r -M --no-commit-id --name-status HEAD` (the `-r` forces recursion past directory rollups; the `-M` forces rename detection — both required per r1 codex F3/codex-ops F6 MED — `--name-status` without these can collapse to a top-level `M backlog` row or to a D/A pair instead of the expected `R<NNN>` status) shows the rename (R-status with similarity ≥80%) for the item file PLUS a modify (M) for `backlog/task-state/<id>/builder.md` PLUS an add (A) for the run log. Assert: `git status --porcelain` is empty. **Additional load-bearing assertion (r1 codex-ops F4 fix):** read the COMMITTED contents of `backlog/pending_review/<id>.md` via `git show HEAD:backlog/pending_review/<id>.md` and assert that the frontmatter contains the edited `head_sha` value (not the empty pre-edit value). This pins that `git add "$DEST"` actually staged the edited frontmatter — without that line, the test fails here, surfacing the central r1 bug.
-- **Test 3 — mid-step-2 crash is recoverable from clean working tree.** Simulate a crash by aborting the prose between Step 1 (frontmatter edited) and the patcher call. Run `git restore --worktree backlog/claimed/<id>.md` to undo. Assert: `git status --porcelain` is empty; rerun from Step 1 succeeds and produces one commit.
-- **Test 4 — no staged-index-mutation BEFORE Step 3.** During Step 1 + Step 2 execution, snapshot `git status --porcelain` at each intermediate point (after frontmatter edit; after patcher; before `git mv`). At every snapshot, assert that the index has ZERO staged changes (working tree may be dirty with unstaged edits to `claimed/<id>.md` and `builder.md`; index must be clean). This is the load-bearing pin against future drift that re-introduces a pre-Step-3 staged operation (e.g., a builder "helpfully" adding `git add backlog/task-state/<id>/builder.md` right after the patcher to "stage things as we go" — that creates the partial-staged window the spec is trying to eliminate). The narrowed invariant (per the §Architectural invariant rewrite above) makes the Step-3 window the SOLE legitimate place for staged-index changes; this test is the structural gate.
+The recovery guard's surface list is parameterized by design. For this consumer, the touched file surfaces are the source item path, destination item path, optional builder pointer, and run log. For the future merger consumer, a separate `recover_p1_merge_publish()` should use the same shape with that consumer's touched surfaces, such as pending-review item, complete item, sidecar, and any branch/worktree resources guarded by equivalent consumer-specific checks. 066 does not implement that merger function.
 
-The four tests run via `npm test`; they share a per-test throwaway repo (created in `os.tmpdir()`, cleaned in `afterEach`). No CI changes; vitest picks up the file by default.
+Load-bearing corrections preserved from r1 review:
+
+1. `git add "$DEST"` after `git mv` is required. It stages the edited destination contents; `git mv` alone can stage the rename at the old blob.
+2. `--spec-path "$DEST"` is required even though the patcher runs before `git mv`, because the patcher records that argument verbatim into `canonical_anchors.spec`.
+3. Tests that inspect the commit shape MUST use `git diff-tree -r -M --no-commit-id --name-status HEAD` or an equivalent recursive, rename-detecting command.
+
+The generated command adapter MUST be refreshed with `tools/sync-skills.sh`, and `tools/sync-skills.sh --check` MUST exit 0 after the edit.
+
+### AC3 - The reusable P1 harness has a current-consumer specialization
+
+In `tests/skills/atomic-state-transition-harness.test.ts`, instantiate the AC1 harness for the process-backlog stage move.
+
+The specialization MUST parameterize:
+
+- Source path: `backlog/claimed/<id>.md`.
+- Destination path: `backlog/pending_review/<id>.md`.
+- Side-effect paths: `backlog/task-state/<id>/builder.md` when present, plus `raw/internal/agent-runs/<date>-<id>.md`.
+- Transition key: the work-item id.
+- Expected durable boundary: one local Git commit for the transition.
+- Expected committed file status: one rename for the item file, one modify for the task-state pointer when present, and one add for the run log.
+- Recovery recipe: the rollback-and-replay guard from AC2, not manual `git status` interpretation.
+
+Required current-consumer tests:
+
+1. Pre-publish edits do not expose the target stage. After handoff metadata edit and task-state patcher execution, the item is still under the source path, the target path does not exist, and the index has no staged changes for the transition surfaces.
+2. The publish block creates one durable boundary containing all required surfaces. Assert with `git diff-tree -r -M --no-commit-id --name-status HEAD` so the harness sees file-level rename/modify/add entries and does not depend on local Git config.
+3. The committed destination contents include the edited handoff metadata. Read via `git show HEAD:backlog/pending_review/<id>.md` and assert `head_sha` is the edited value, proving `git add "$DEST"` is present.
+4. A crash after source metadata edit but before `git mv` is recovered by the recipe without an operator decision; after recovery, source state is clean and replay can publish.
+5. A crash after `git mv` but before `git add "$DEST"` is recovered by the same recipe without an operator decision; after recovery, source state is clean and replay can publish.
+6. Recovery refuses to run if the touched-surface list contains an absolute path, a `..` traversal, or a path outside the documented allowed prefixes. This pins the guard against a future bug that would otherwise run `git restore` or `rm` against unrelated work.
+7. Running recovery after the published commit is a no-op.
+
+The tests use throwaway local repos only. They do not push to a remote and do not test concurrency scheduling beyond the AC1 fixture-level key scoping contract.
 
 ## Out of Scope (Don't Drift)
 
-1. **Restructuring the atomic-claim flow at the start of process-backlog** (lines ~85-115). This spec is the HANDOFF window only. The claim window has its own atomicity rules (single commit, push-rejected-detects-race) that are out of scope.
-2. **Adding a builder-side retry-on-push-rejected loop in the handoff.** Push rejection in handoff means another agent committed first; the existing prose at E2.6 line 271 already does `git push origin main` and a failed push surfaces as a shell error. No retry, no rebase loop. (This is symmetric with 059's no-retry-on-rejection rule.)
-3. **Auto-correcting partial-staged states detected at rerun.** If a builder reruns into a dirty index from a crashed prior attempt, the prose surfaces the dirty state (via `git pull --rebase`'s abort) and the builder hand-cleans. No auto-`git restore`, no auto-`git stash`. Auto-correction would mask the underlying bug the reorder is trying to prevent.
-4. **Modifying the Codex adapter copy of the skill.** `tools/install-echo-codex-skills.sh` regenerates the codex-side copy on next install; the founder's machine will pick up the new canonical at the next install run. No direct edit to the codex-side rendered file.
-5. **Touching `tools/task-state/patch-builder-state.py`.** The patcher's contract is fixed (lint-failure-as-hard-stop, locked_decisions byte-preserved). If the reorder reveals a hidden coupling (e.g., patcher requires the spec file to be at a specific path), file a follow-on spec — don't widen 066. AC1's parenthetical about `--spec-path` already pins the calling convention; reviewers MUST verify against current patcher code.
-6. **End-to-end test against a real `git push origin main`.** All Tests 1-4 run against a throwaway local repo. The launchd / production / multi-agent race tests are explicitly out of scope; the AC4 "no observable partial-staged state" invariant is the structural gate.
-7. **Adding a `--strict` or `--check-clean-before-commit` flag to any tool.** The new prose is a discipline change in the skill, not a guardrail added to a script. Out of scope #3 (no auto-correction) covers the symmetric concern.
-8. **Refactoring `ensure_stage` into a shared helper used across stages.** If retained, it stays scoped to its current use; no extraction into `_lib.sh` or similar. The reorder may make the helper unnecessary — that's a deletion, not a refactor.
-9. **Changing the commit message format.** `review: <id>` stays verbatim. The reviewer-side parsers (`combine.py`, `dispatch-next-round.py`, watcher consumers) match on this string; changing it would silently break downstream tooling.
-10. **Documenting the working-tree window in `wiki/`.** Per CLAUDE.md, wiki edits happen AFTER items land in `complete/`. The After-Completion section below names which page to update post-shipment.
+1. Generalizing this item to P2-P12. P1 is the only primitive consumed here; P6/P7/P11 are evidence and compatibility checks, not additional deliverables.
+2. Pre-building future P1 consumers. This spec ships ONLY the backlog-stage-move consumer plus the reusable harness. The `merge-and-cleanup` publish sequence is a known future P1 consumer and shapes the AC1 fixture contract, but the merger fix is a follow-on spec, not a 066 AC. Do not edit `skills/merge-and-cleanup.md` in this item.
+3. Modifying `tools/task-state/patch-builder-state.py`. This item relies on its current `--spec-path` behavior and pins the caller contract.
+4. Changing the storage layer, lock primitive, claim algorithm, routing system, or scheduler.
+5. Adding a new global recovery daemon. The current consumer gets a deterministic recovery guard; broader boot-time recovery is a separate consumer if needed.
+6. Changing commit message formats, backlog directory taxonomy, run-log schema, or task-state schema.
+7. Adding human escalation as the recovery mechanism. A machine-readable hard failure is acceptable when an unexpected dirty surface is detected; asking a person to decide normal recovery is not.
+8. Editing `wiki/` before shipment.
 
 ## Risks
 
-- **R1 — patcher's `--spec-path` is verbatim-recorded (NOT a runtime read).** Verified r1 by codex F1 + codex-ops F5 against `tools/task-state/patch-builder-state.py:289-310,403-407`: the patcher writes `--spec-path` verbatim into `canonical_anchors.spec` without reading the file at that path. The canonical transcript exploits this by passing `$DEST` (the destination path) BEFORE `git mv` has run. At commit time the rename completes in the same commit, so the anchor and the on-disk path are consistent. **If a future patcher refactor changes this contract** (e.g. starts reading spec frontmatter from `--spec-path`), this AC breaks immediately — the spec MUST be re-reviewed before that refactor lands. Out of Scope #5 already forbids modifying the patcher in this spec; this risk note is the explicit interlock for the symmetric direction.
+- Git substrate lock-in. The invariant must stay substrate-neutral. Only the worked example and AC2/AC3 current-consumer specialization may rely on Git commands.
+- Lock-primitive confusion. A future lock can reduce concurrent entry, but it does not replace P1; multi-surface transitions still need atomic publication or deterministic recovery.
+- Mechanism-vs-invariant confusion. The `git mv` / `git add "$DEST"` / patcher recipe is not the P1 contract. It is only how this consumer satisfies the contract.
+- Recovery recipe too broad. The guard must clean only the known transition surfaces. A broad reset, stash, checkout, or unconstrained `rm` would violate repo discipline and risk deleting unrelated work.
+- Recovery recipe too manual. If the implementation documents "inspect `git status` and choose" instead of executable branching, it fails P1.
+- Test transcription drift. The harness should keep the current-consumer commands close to the skill transcript and name the source section in comments so future edits update both.
+- Patcher contract coupling. If a later change makes the patcher read `--spec-path` from disk, this consumer's pre-rename call with destination path must be re-reviewed.
 
-- **R2 — `git mv` does NOT stage destination working-tree edits.** Empirically verified r1 (codex-ops F4 HIGH on a throwaway repo, codex's reproducer for F1/F2/F3): `git mv src dst` AFTER editing `src` produces a staged R100-ish rename at the OLD blob plus an unstaged modification on `dst`. The earlier draft of this risk note claimed the opposite — that claim was wrong. The fix is an explicit `git add "$DEST"` immediately after `git mv` (Step 3.b in the canonical transcript). The two commands run back-to-back with no external waits; the index-dirty window between them is bounded by `git add`'s execution time (milliseconds). Test 2 explicitly asserts the COMMITTED destination file contains the edited frontmatter, which fails loudly if a future builder removes the `git add "$DEST"` line.
+### Forward-compatibility with P1-consumer-#2 (merger)
 
-- **R3 — vitest harness for skill-prose execution.** The tests transcribe the skill's bash into TypeScript-driven `spawnSync('bash', …)` calls. Drift between the skill's actual bash and the test transcription is a risk. Mitigation: the test file's header comment SHALL include a line-range reference to the canonical skill block (e.g., `// transcribed from skills/process-backlog.md:174-272 — UPDATE this test alongside any prose change`). Reviewer recommends this be enforced via a pre-commit hook in a follow-on spec; not 066's scope.
-
-- **R4 — `tools/sync-skills.sh` drift if the canonical changes shape.** The sync script does a byte-identical copy; no transformation. Risk is zero if the script runs after every canonical edit. AC2 explicitly requires the post-edit `--check` to confirm.
-
-- **R5 — operator already-running prose during the spec rollout.** A builder mid-handoff at the moment 066 lands could be on the old prose. Mitigation: the new prose's first line is the idempotent stage-detect (Test 1's setup); a builder on old prose that completes won't trigger this spec's path. If a builder is BLOCKED mid-old-prose at landing time, the founder runs the hand-cleanup recipe in AC1's "rerun" paragraph manually. One-time, low-frequency.
+The 065 postmortem names `skills/merge-and-cleanup.md` as the next P1 consumer: C7 moves the item to `backlog/complete/`, C8 commits, C9 currently cleans worktree/branches, and C11 pushes. 066 does not pre-build that merger fix; it will be a separate spec following this pattern. 066 does validate that `P1ConsumerFixture` is shaped to accept the merger as a second instantiation by generalizing durable boundaries beyond one commit, allowing `targetMayBeVisible: true` before publish, and scoping concurrency by `transitionKey` rather than globally. The merger fix's spec should cite 066 as its parent invariant and reuse the harness; if the harness needs extension at that point, that extension should be additive and non-breaking.
 
 ## Tests
 
-All test changes land in **`tests/skills/process-backlog-handoff-atomicity.test.ts`** (new file).
+Run:
 
-**Four cases, in this order:**
+```bash
+npm test -- tests/skills/atomic-state-transition-harness.test.ts
+tools/sync-skills.sh --check
+git diff --check
+```
 
-1. **Pre-mutation state is clean** (per AC3 Test 1).
-2. **Single-commit atomicity** (per AC3 Test 2).
-3. **Mid-step-2 crash recoverable from clean working tree** (per AC3 Test 3).
-4. **No observable partial-staged state during steps 1 and 2** (per AC3 Test 4 — the load-bearing structural pin).
+The test file must cover both layers:
 
-**Test discipline / no-regression invariants:**
+- Generic P1 harness tests from AC1, proving the reusable contract is path-, consumer-, substrate-, boundary-, and visibility-parameterized.
+- Current-consumer specialization tests from AC3, proving the process-backlog stage move publishes all required surfaces together and recovers from crash points without human decision.
 
-- Tests use throwaway repos in `os.tmpdir()` via `node:fs/promises`. No real network, no real `git push`. The skill's `git push origin main` step is OMITTED from the test transcription — the AC pins atomicity through the `git commit`, and push is an unrelated concern.
-- Each test asserts on `git status --porcelain` output (textual; exact-match expected to be either empty or a specific shape per the documented invariant).
-- Tests do NOT assert on absolute paths or timestamps in commit metadata; they assert on file-name-status (rename vs modify vs add) via `git diff-tree -r -M --no-commit-id --name-status HEAD`. The `-r` and `-M` flags are non-negotiable — without them the diff-tree output collapses to directory-level rows or to D/A pairs that miss rename detection (r1 codex F3 + codex-ops F6 MED, both verified on throwaway repos).
-- The four tests run independently; failures localize to which invariant broke.
+The current-consumer commit-shape assertion MUST use:
 
-**Out of scope for tests:**
+```bash
+git diff-tree -r -M --no-commit-id --name-status HEAD
+```
 
-- Bash-unit-level testing of the skill's `awk`/`grep` pipelines. The end-to-end-through-git-commit assertions exercise them.
-- Concurrency tests (two builders racing on one item). The atomic-claim flow at the start of process-backlog covers that; 066 is the handoff-end window.
-- Property-based tests on the JSON shape of `backlog/task-state/<id>/builder.md`. The patcher has its own tests (`tools/task-state/lint.py` is the schema gate); 066's tests check ATOMICITY, not patcher-content correctness.
+The committed-content assertion MUST read the destination from the commit object, not the working tree:
+
+```bash
+git show HEAD:backlog/pending_review/<id>.md
+```
 
 ## Definition of Done
 
-- AC1: `skills/process-backlog.md` reordered per the canonical bash transcript; all three mutations precede the first git index operation; ensure_stage is removed or inlined per the AC1 paragraph; comment block updated to state the working-tree-clean invariant.
-- AC2: `.claude/commands/process-backlog.md` is byte-identical to `skills/process-backlog.md` post-sync; `tools/sync-skills.sh --check` exits 0.
-- AC3: `tests/skills/process-backlog-handoff-atomicity.test.ts` exists, four cases pass via `npm test`.
-- All ACs verified locally before pushing the feature branch (per founder memory on commit + push discipline).
-- `npm run lint`, `npm run typecheck` clean.
+- The P1 invariant is represented by a reusable, parameterized test harness.
+- The harness interface supports target-visible-before-boundary consumers and durable boundaries beyond a single commit without knowing consumer-specific paths.
+- The process-backlog stage move is implemented as one current-consumer specialization of that harness.
+- The current consumer's publish block includes `git mv "$ITEM_FILE" "$DEST"`, explicit `git add "$DEST"`, remaining path adds, and one commit.
+- The task-state patcher is called with `--spec-path "$DEST"` before the rename.
+- Recovery from pre-commit crash points is deterministic from on-disk state, prefix-guarded to the consumer's touched surfaces, run before pull/rebase, and requires no human decision.
+- `tools/sync-skills.sh --check`, the P1 test file, and `git diff --check` pass locally.
 
 ## After Completion (Strategist Notes)
 
-- **No new wiki page.** This is a discipline-fix on a shipped operating-model surface (skills/process-backlog.md). The cross-tool protocol is already documented in CLAUDE.md's "Cross-tool protocol lives in `skills/`" section.
-- **Optional one-paragraph update to `wiki/operating-model/wave-1-2-3-retrospective.md`** (if a "drift-prevention" subsection exists post-promotion) recording the working-tree-window-as-bug pattern. Only if a natural insertion point exists; don't restructure.
-- **Update `backlog/_followups.md`** — when the spec lands in `complete/`, strike the PRIORITY 1 entry under the 2026-05-21 harness seam review section and add a one-line back-reference to the 066 spec.
-- **Do NOT promote a new principle page** about working-tree atomicity. One spec is not a pattern; if a *second* spec in the same class lands (e.g., the same pattern in `skills/merge-and-cleanup.md` or `skills/review-pending.md`), that's the trigger.
-- **If the patcher behavior surfaces a hidden coupling** (R1), file a follow-on item refining `tools/task-state/patch-builder-state.py`'s `--spec-path` contract.
+- After the item lands in `backlog/complete/`, promote P1 into `wiki/principles/atomic-state-transitions.md` or the nearest existing operating-model principles page if the strategist decides the primitive is now durable enough for wiki. The wiki text should document the invariant, not the process-backlog mechanism.
+- Update `backlog/_followups.md` under P1 to annotate the current consumer as satisfied by 066 once shipped.
+- File the `merge-and-cleanup` P1 consumer as a separate follow-on spec if it is not already filed. That spec should cite 066, instantiate the harness, and address C7/C8/C9/C11 ordering without widening 066.
+- If the recovery guard reveals a broader boot-time recovery need, file a separate spec for that consumer rather than folding it into this item.
