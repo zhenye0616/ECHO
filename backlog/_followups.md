@@ -875,29 +875,45 @@ Filed at merge time; the test-injection finding (r9 codex F2) was already filed 
 
 ## 2026-05-21 — harness primitives review
 
-The current builder→reviewer→watcher pipeline is one instantiation of a coordination protocol. The primitives below are durable: they hold under any future shape — different reviewer cardinality, different scheduling, different storage substrate, different consumer mix. Each is a contract that any future flow consumer must satisfy. Mechanisms are not prescribed.
+The goal is a cross-tool multi-agent harness where any AI tool with the right capability can play any role, agents collaborate via structured handoffs, and work converges without a human in the loop. The current builder→reviewer→watcher pipeline is ONE instantiation. The primitives below are flow-agnostic, role-agnostic, and agent-agnostic — they hold under any future shape (different agent mix, different role assignments, different scheduling, different collaboration patterns).
 
-### Core primitives
+Each primitive is a contract every flow consumer must satisfy. Mechanisms are not prescribed. Specific tool vendors, role names, and cardinalities are configuration, not protocol.
 
-**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: backlog-item stage moves.* **[Priority]**
+### Reliability primitives
 
-**P2 — In-flight observability across restart.** Any operation in a `pending` / `in-flight` state at the moment of process shutdown MUST surface on the next boot — via a persisted log, a recovered ring tail, or a journal entry. The mechanism is open; the property is not. *Current consumer: MCP request log.* **[Priority]**
+**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: work-item stage moves.* **[Priority]**
 
-**P3 — Partial-write tolerance.** Any file readable by another process while it is being written MUST be guarded so the reader sees either the prior complete version or recognizes the in-progress write and waits — never a torn intermediate. *Current consumer: review-response files read by the watcher.*
+**P2 — In-flight observability across restart.** Any operation in `pending` / `in-flight` state at process shutdown MUST surface on the next boot. The mechanism is open; the property is not. *Current consumer: in-process tool-call log.* **[Priority]**
+
+**P3 — Partial-write tolerance.** Any artifact readable by another actor while it is being written MUST be guarded so the reader sees either the prior complete version or recognizes the in-progress write and waits — never a torn intermediate. *Current consumer: typed handoff artifacts between actors.*
 
 **P4 — Explicit durability contract.** Every write that produces an `ack` MUST publish its durability level (in-buffer / WAL-buffered / fsync'd / replicated). Implicit "OK = durable" is the bug. *Current consumer: coord-emit ack semantics under WAL=NORMAL.*
 
-**P5 — At-most-one concurrent ownership.** Any claimable resource (lease, lock, worktree, task slot) MUST be ownable by exactly one holder by construction, not by best-effort upstream-existence check. *Current consumer: per-role concurrent execution.*
+**P5 — At-most-one concurrent ownership.** Any claimable resource (work item, lease, lock, role slot) MUST be ownable by exactly one holder by construction, not by best-effort upstream-existence check. *Current consumer: concurrent execution of same work-class by multiple actors.*
 
-**P6 — SIGKILL-safe self-heal.** Any shared resource left orphaned by a non-graceful process death MUST be reclaimable by a future process without human intervention. Liveness check + age threshold + GC are one shape; any equivalent property holds. *Current consumer: worktrees and mkdir-locks left behind by killed ticks.*
+**P6 — SIGKILL-safe self-heal.** Any shared resource orphaned by a non-graceful process death MUST be reclaimable without human intervention. *Current consumer: orphaned coordination resources (worktrees, locks).*
 
-**P7 — Idempotent and near-free re-run.** Every pipeline operation MUST be safe to invoke twice; the second invocation MUST be near-free when nothing changed. *Current consumer: watcher tick re-parse on no-change ticks.*
+**P7 — Idempotent and near-free re-run.** Every operation MUST be safe to invoke twice; the no-change second invocation MUST be near-free. *Current consumer: recurring scanning operations.*
+
+**P8 — Attributable audit trail.** Every state mutation in the harness MUST be attributable to a specific actor's specific action with a durable record (who, what, when, why-correlation). Multi-agent systems decay without it. *Current consumer: git commits + dogfooding journal.*
+
+### Collaboration primitives
+
+**P9 — Capability self-description + capability-matched routing.** Every agent MUST publish a machine-readable capability profile (which tools it can call, which work-classes it accepts, which perspectives it brings). Work items carry a required-capability tag. Assignment selects any agent whose profile matches — specific vendor / model / hardcoded role names are configuration, not protocol. Adding a new agent is a profile entry, not a code change. *Current friction: review-queue dispatches to literal `[codex, codex-ops]` role names; a new agent with codex-equivalent strengths can't be substituted without code changes in the dispatcher.*
+
+**P10 — Structured inter-agent messages.** Agents communicate via typed messages with explicit fields (sender, recipient, type, payload, correlation_id, expiry, required-response-by). No prose-parsing across agents; no filesystem-layout-as-semantics. The protocol is the contract; the medium (files, MCP calls, message bus) is mechanism. *Current consumer: review-request / review-response handoff that's currently filesystem-prose-conventions.*
+
+**P11 — Programmatic convergence without human-in-loop.** Every divergence or escalation path MUST have a programmatic resolver: tiebreaker agent, capability-weighted vote, delegation to a higher-trust agent, deferred-with-explicit-reason. Human-in-loop is an opt-in configuration, not a structural dependency. The watcher's `escalated_to_founder: true` is fine as one path; the absence of any other path is the bug. *Current friction: divergent verdicts unconditionally route to founder; no programmatic resolver exists for cases where the divergence is dispositionable in software.*
+
+**P12 — Trust + sandbox per agent.** Every agent action MUST run inside an explicit sandbox / permission scope tied to that agent's trust level. New agents enter at lowest-trust; trust earned via track record. The harness MUST refuse capabilities an agent's trust doesn't grant, by construction. *Current friction: all agents currently run with effectively-equal trust; codex needs `--sandbox danger-full-access` to write commits, which is the right scope for trusted agents but is also the only available scope.*
 
 ### Cross-cutting capabilities (durable across flow shape, not invariants)
 
-**C1 — Tool-name codegen across surfaces.** Any consumer that names an MCP tool MUST get the name from a generated source pinned to the server's registry — never a string literal in the consumer. Adding a new consumer is then a config change. *Current consumers: Raycast extension, integration smoke test.*
+**C1 — Tool-name codegen across surfaces.** Any consumer that names an MCP tool MUST get the name from a generated source pinned to the server's registry. *Current consumers: Raycast extension, integration smoke test.*
 
-**C2 — Adapter-drift detection.** Every rendering pipeline that produces a derived adapter from a canonical source MUST surface drift without manual `cmp` checks. Adding a third adapter should be a config change, not a per-adapter detector. *Current consumers: Claude-Code adapter (has detection), Codex-installer adapter (lacks it).*
+**C2 — Adapter-drift detection.** Every rendering pipeline that produces a derived adapter from a canonical source MUST surface drift without manual `cmp` checks. *Current consumers: Claude-Code adapter (has detection), Codex-installer adapter (lacks it).*
+
+**C3 — Per-agent + per-work-item cost accounting.** Every agent action incurs measurable cost (tokens, wall time, $); the harness MUST track and surface cost per-agent and per-work-item. No invisible compute. Becomes load-bearing as soon as multiple agents compete for the same work-class. *Current consumer: each agent today self-reports tokens in its tick log; no aggregator.*
 
 ### Docs hygiene
 
@@ -906,4 +922,4 @@ The current builder→reviewer→watcher pipeline is one instantiation of a coor
 
 ### Priority signal
 
-**[Priority]**-tagged primitives drive the next round of specs. Others fix on-merit when a journal entry names the friction, a spec touching the same code lands, or a flow-shape change broadens the surface.
+**[Priority]**-tagged primitives (P1, P2) drive the next round of specs. The collaboration primitives (P9-P12) are higher-order and define the multi-agent target state — they don't all need specs immediately, but every NEW spec should be checked against them: does this lock in a vendor, a role name, a cardinality, or a human-in-loop dependency? If so, generalize before shipping.
