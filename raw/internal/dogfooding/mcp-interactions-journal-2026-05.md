@@ -461,7 +461,6 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - compact works against the branch's live MCP server and the Raycast client issues `view=compact`. The resident 38478 daemon should be restarted after merge to pick up the new projection.
 - **Note:** This entry intentionally records both the stale-daemon miss and the successful branch-daemon probe. The miss is useful dogfooding signal: a consumer can pass a new MCP arg and still receive rich shape if the local daemon process has not been restarted.
 
-
 ### 2026-05-20 23:11 PDT - codex-ops r5 review tick on 065 raycast cluster resume
 
 - **Trigger:** Launchd-fallback codex-ops reviewer tick selected `backlog/reviews/2026-05-20-065-raycast-cluster-resume/r5/request.md` and reviewed the r5 pinned spec artifact through the operational/runtime lens.
@@ -470,3 +469,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** Review response file above; request correlation `33ee0634-7333-4301-a668-0d635b969235`; artifact blob `f2d6389aea78cf437aa9260dd6e793a78e7274cf`; spec anchors AC4, AC7, AC8, and OoS#3; local code anchor `tools/raycast-echo/src/components/AnswerView.tsx:130-165`.
 - **Verdict:** right - the r4 ownership signal is now operationally explicit, but the running-session replay path still needs an abandoned-row contract before builder claim.
 - **Note:** The response commit was pushed before this observation-only journal entry. The tick ran from a clean temporary clone because the live checkout had unrelated unstaged changes; the first push attempt hit DNS/push-race noise, then `push-with-retry.sh` rebased over the sibling codex response and confirmed the upstream `codex-ops.md` response.
+
+### 2026-05-20 23:11 PDT - Codex r5 review tick on 065 Raycast cluster resume
+
+- **Trigger:** Codex-side review queue tick selected `backlog/reviews/2026-05-20-065-raycast-cluster-resume/r5/request.md` for the final narrow verification round on the r4 ownership patch.
+- **Query inputs:** ECHO coord call: `coord_emit(event_type=tick_start, reviewer=codex, correlation_id=33ee0634-7333-4301-a668-0d635b969235)`. Queue/file reads used the R5 request, reviewer schema, pinned artifact `backlog/ready/2026-05-20-065-raycast-cluster-resume.md` at `f2d6389aea78cf437aa9260dd6e793a78e7274cf`, r4 combined/codex/codex-ops context, and current Raycast code anchors in `sessions.ts`, `AnswerView.tsx`, `echo.tsx`, `TypingState.tsx`, `EmptyState.tsx`, and `agent-runner.ts`.
+- **Returned:** Wrote and pushed `backlog/reviews/2026-05-20-065-raycast-cluster-resume/r5/codex.md` at review commit `090c7b5`, verdict `proceed_after_patches`, finding: MED ownership flag still does not disambiguate an owner-created running session from a pre-existing running replay hit returned by the default-intent lookup.
+- **Sources:** Review response file above; request correlation `33ee0634-7333-4301-a668-0d635b969235`; artifact blob/commit `f2d6389aea78cf437aa9260dd6e793a78e7274cf`; spec anchors AC4 and AC8; queue context `backlog/reviews/2026-05-20-065-raycast-cluster-resume/r4/combined.md`.
+- **Verdict:** right - the r4 owner/waiter flag fixes same-intent waiters, but the spec still needs one explicit replay-vs-created discriminator so a default-intent owner that finds an already-running session cannot start a duplicate agent.
+- **Note:** The response commit was present on `origin/main` before this observation-only journal entry. `tick_end` will be emitted after this journal push per the current reviewer command ordering. The live checkout had unrelated dirty files, so this tick used an isolated temporary clone for the operational commits. HTML twins were not regenerated or committed because `CLAUDE.md` makes the May monthly Markdown shard canonical and says not to commit regenerated HTML twins.
