@@ -18,6 +18,7 @@ export function TypingState({
   onAsk,
   onOpenSessions,
   banner,
+  showDetail,
 }: {
   query: string;
   setQuery: (query: string) => void;
@@ -30,6 +31,7 @@ export function TypingState({
   onAsk: (question: string, forkedFrom?: string | null) => void;
   onOpenSessions: () => void;
   banner?: string;
+  showDetail: boolean;
 }) {
   return (
     <List
@@ -39,7 +41,7 @@ export function TypingState({
       throttle={false}
       isLoading={isLoading}
       searchBarPlaceholder="Ask anything, or search your memory..."
-      isShowingDetail
+      isShowingDetail={showDetail}
     >
       <AskRow
         query={query}
@@ -68,11 +70,13 @@ export function ForkTypingState({
   agentKind,
   onAsk,
   onOpenSessions,
+  showDetail,
 }: {
   source: Session;
   agentKind: string;
   onAsk: (question: string, forkedFrom?: string | null) => void;
   onOpenSessions: () => void;
+  showDetail: boolean;
 }) {
   const prefill = source.question;
   const [typed, setTyped] = useState(prefill);
@@ -89,6 +93,7 @@ export function ForkTypingState({
       onAsk={(value) => onAsk(buildForkPrompt(source, value), source.id)}
       onOpenSessions={onOpenSessions}
       banner={`Forking from session ${formatPdtTime(source.startedAt)} PDT — add your follow-up below and press ↩ to ask`}
+      showDetail={showDetail}
     />
   );
 }

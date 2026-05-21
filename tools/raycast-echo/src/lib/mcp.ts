@@ -37,6 +37,11 @@ export interface SearchResult {
   warnings: string[];
 }
 
+export interface FindClustersOpenLoopHint {
+  atom_id: string;
+  resolved: boolean;
+}
+
 export interface FindClustersCluster {
   cluster_id: string;
   rank?: number;
@@ -45,6 +50,7 @@ export interface FindClustersCluster {
   source_breakdown: Record<string, number>;
   time_range: { from: string; to: string };
   label?: string | null;
+  open_loop_hints?: FindClustersOpenLoopHint[];
 }
 
 export interface FindClustersResult {
@@ -94,8 +100,17 @@ export async function getAtom(id: string): Promise<GetAtomResult> {
   return callTool<GetAtomResult>("get_atom", { id });
 }
 
-export async function getAtoms(atomIds: readonly string[], format: "minimal" = "minimal"): Promise<GetAtomsResult> {
-  return callTool<GetAtomsResult>("get_atoms", { atom_ids: [...atomIds], format, view: "compact" });
+export async function getAtoms(
+  atomIds: readonly string[],
+  options: { format?: "minimal"; prefer?: "as_requested" | "newest_first" } = {},
+): Promise<GetAtomsResult> {
+  const args: Record<string, unknown> = {
+    atom_ids: [...atomIds],
+    format: options.format ?? "minimal",
+    view: "compact",
+  };
+  if (options.prefer !== undefined) args.prefer = options.prefer;
+  return callTool<GetAtomsResult>("get_atoms", args);
 }
 
 async function callTool<T>(name: string, args: Record<string, unknown>, timeoutMs = 2_000): Promise<T> {

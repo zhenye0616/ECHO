@@ -14,6 +14,7 @@ export function EmptyState({
   onOpenSession,
   onOpenSessions,
   onForkSession,
+  showDetail,
 }: {
   query: string;
   setQuery: (query: string) => void;
@@ -25,6 +26,7 @@ export function EmptyState({
   onOpenSession: (session: Session) => void;
   onOpenSessions: () => void;
   onForkSession: (session: Session) => void;
+  showDetail: boolean;
 }) {
   const openLoops = clusters.filter((c) => c.rank_reason?.includes("has_open_loop") === true).slice(0, 3);
   const buckets = bucketSessionsForEmpty(sessions);
@@ -36,7 +38,7 @@ export function EmptyState({
       throttle={false}
       isLoading={isLoading}
       searchBarPlaceholder="Ask anything, or search your memory..."
-      isShowingDetail
+      isShowingDetail={showDetail}
     >
       {warmSession !== null ? (
         <List.Section title="Resume">

@@ -8,6 +8,7 @@ import { launchTo, showLaunchToast, type LaunchTargetId } from "../lib/launch";
 import { buildUnifiedAskPrompt } from "../lib/system-prompt";
 import {
   drainInflightWrites,
+  formatRelativeTime,
   recordSessionEnd,
   recordSessionStart,
   recordSessionUpdate,
@@ -16,6 +17,27 @@ import {
 import { AuditTimeline } from "./AuditTimeline";
 
 const FLUSH_INTERVAL_MS = 80;
+
+function clusterAnswerLine(c: FindClustersCluster): string {
+  const rawLabel = c.label?.trim();
+  const stripped = rawLabel ? rawLabel.replace(/^discussion about\s+/i, "").trim() : "";
+  const label = stripped || rawLabel || "Recent cluster";
+  const atoms = c.atom_ids.length === 1 ? "1 atom" : `${c.atom_ids.length} atoms`;
+  const sources = Object.entries(c.source_breakdown)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([app, n]) => `${app}×${n}`)
+    .join(" · ");
+  const hints = c.open_loop_hints ?? [];
+  const loopBit = (() => {
+    if (hints.length === 0) return null;
+    const unresolved = hints.filter((h) => h.resolved === false).length;
+    return unresolved > 0 ? `⚠ ${unresolved}/${hints.length} open` : `✓ ${hints.length}/${hints.length}`;
+  })();
+  const recency = formatRelativeTime(c.time_range.to);
+  const parts = [atoms, sources, loopBit, recency].filter((p): p is string => typeof p === "string" && p.length > 0);
+  return `- ${label} — ${parts.join(" · ")}`;
+}
 
 export interface AnswerViewProps {
   query: string;
@@ -133,6 +155,18 @@ export function AnswerView({ query, agentKind, preferences, repoPath, forkedFrom
           buffer += event.text;
           scheduleFlush();
         } else if (event.type === "footer") {
+          // The runner emits a "stalled" footer purely on stdout-idle (30s
+          // default), unaware of MCP tool activity. Suppress it when the
+          // audit timeline shows the agent has issued any MCP call since
+          // launch — that's proof of life even when stdout hasn't started.
+          // Re-poll audit synchronously so we're not racing the 600ms poll.
+          const isStalledFooter = event.markdown.startsWith("**Agent appears stalled**");
+          if (isStalledFooter) {
+            await pollAudit();
+            if (latestAudit.length > 0) {
+              continue;
+            }
+          }
           appendFooter(event.markdown);
         } else if (event.type === "error") {
           appendFooter(`**Agent error**\n\n${event.error.message}`);
@@ -176,11 +210,7 @@ export function AnswerView({ query, agentKind, preferences, repoPath, forkedFrom
   }
 
   const topClustersMarkdown = topClusters
-    .map((c) => {
-      const label = c.label?.trim() || "Recent cluster";
-      const atoms = c.atom_ids.length === 1 ? "1 atom" : `${c.atom_ids.length} atoms`;
-      return `- ${label} (${atoms})`;
-    })
+    .map((c) => clusterAnswerLine(c))
     .join("\n");
   const fullMarkdown = [
     "# Ask ECHO",
