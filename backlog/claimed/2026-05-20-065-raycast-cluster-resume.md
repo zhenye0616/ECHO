@@ -30,9 +30,9 @@ spec_refs:
   - wiki/product/v1-spec.md  # V1 cohort (indie AI builders) + form-factor constraints driving the "no destination app" stance
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-21T06:19:39Z"
+branch: "agent/raycast-cluster-resume"
 head_sha: ""
 pr_url: ""
 agent_notes: |
