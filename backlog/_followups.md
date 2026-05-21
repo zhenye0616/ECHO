@@ -873,79 +873,37 @@ Filed at merge time; the test-injection finding (r9 codex F2) was already filed 
 
 ---
 
-## 2026-05-21 — harness seam review (strategist + codex consultation)
+## 2026-05-21 — harness primitives review
 
-Strategist (Claude Code) ran a three-layer review of `src/` substrate, `src/mcp/`+`src/daemon/` server, and `tools/`. Codex was invoked read-only as an independent consultee (`codex exec --sandbox read-only`, zero MCP calls, no journal entry needed per skip-rule) to verify findings at HEAD. The twelve gaps below are the codex-verified output. Verdict: **ship-worthy V1 dogfooding rig, no hard blocker.**
+The current builder→reviewer→watcher pipeline is one instantiation of a coordination protocol. The primitives below are durable: they hold under any future shape — different reviewer cardinality, different scheduling, different storage substrate, different consumer mix. Each is a contract that any future flow consumer must satisfy. Mechanisms are not prescribed.
 
-### Framing — protocol invariants vs flow-specific conveniences
+### Core primitives
 
-The harness should be **flexible but robust**. The current builder→4-reviewer→watcher→combine→dispatch pipeline is ONE concrete instantiation of the coordination protocol — it will change. So fixes are sorted by whether they harden a **protocol invariant** (durable across flow rewrites) or patch a **flow-specific accident** (would be re-implemented or discarded if the flow changed).
+**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: backlog-item stage moves.* **[Priority]**
 
-**Invariants are the priority.** Flow-specific fixes are hygiene only — invest if they're hitting current friction, otherwise let the convenience layer adapt to the next flow shape on its own.
+**P2 — In-flight observability across restart.** Any operation in a `pending` / `in-flight` state at the moment of process shutdown MUST surface on the next boot — via a persisted log, a recovered ring tail, or a journal entry. The mechanism is open; the property is not. *Current consumer: MCP request log.* **[Priority]**
 
-### Protocol invariants — fix on-merit, regardless of current cardinality
+**P3 — Partial-write tolerance.** Any file readable by another process while it is being written MUST be guarded so the reader sees either the prior complete version or recognizes the in-progress write and waits — never a torn intermediate. *Current consumer: review-response files read by the watcher.*
 
-These statements hold under any pipeline shape (1 reviewer or 10, mkdir locks or distributed leases, combine.py or a successor watcher):
+**P4 — Explicit durability contract.** Every write that produces an `ack` MUST publish its durability level (in-buffer / WAL-buffered / fsync'd / replicated). Implicit "OK = durable" is the bug. *Current consumer: coord-emit ack semantics under WAL=NORMAL.*
 
-- **SEAM 1 — Atomic state transitions.** Any backlog item state change touching >1 file or field lands in ONE commit, or is fully self-resumable from disk inspection. Concrete instance today: `skills/process-backlog.md:177-188 + :189-195 + :264-271` does `git mv` → frontmatter edit → builder.md patch → commit in four steps. Stage the mutations first, `git mv` last, single commit covers all. The invariant remains correct if tomorrow there are 7 reviewers or a different state machine. **[Priority]**
+**P5 — At-most-one concurrent ownership.** Any claimable resource (lease, lock, worktree, task slot) MUST be ownable by exactly one holder by construction, not by best-effort upstream-existence check. *Current consumer: per-role concurrent execution.*
 
-- **SEAM 2 — In-flight operations observable across process restart.** `src/mcp/request-log.ts:31-34` is in-memory only; SIGTERM mid-handler loses the call. Invariant: any operation in `pending` at shutdown must surface SOMEWHERE on the next boot (persisted ring tail, journal, log). Mechanism is open — `tail-mcp.sh` integration is one path, MCP-call durability hook is another. **[Priority]**
+**P6 — SIGKILL-safe self-heal.** Any shared resource left orphaned by a non-graceful process death MUST be reclaimable by a future process without human intervention. Liveness check + age threshold + GC are one shape; any equivalent property holds. *Current consumer: worktrees and mkdir-locks left behind by killed ticks.*
 
-- **SEAM 5 — Partial-write tolerance for concurrent-readable files.** Any file readable by another process WHILE being written must be guarded against zero-size or unterminated reads. `tools/review-queue/combine.py:482-486` reads `<slug>.md` without `stat().st_size > 0` + frontmatter-close check. Invariant survives any future watcher replacing combine.py.
+**P7 — Idempotent and near-free re-run.** Every pipeline operation MUST be safe to invoke twice; the second invocation MUST be near-free when nothing changed. *Current consumer: watcher tick re-parse on no-change ticks.*
 
-- **SEAM 7 — Durability before ack.** `src/mcp/tools/coord-emit.ts:143-179` returns 200 OK after WAL buffer write but BEFORE fsync (`src/storage/sqlite.ts:60-62` synchronous=NORMAL). Either (a) ack contract = "in WAL buffer, host-crash window of ~5s exists" (documented), or (b) opt durability-critical paths into per-statement `synchronous=FULL`. Invariant is the explicit contract, not the implementation. The same gap will recur for any future tool that needs hard durability.
+### Cross-cutting capabilities (durable across flow shape, not invariants)
 
-- **SEAM 8 — At-most-one tick per role per correlation_id.** Same-role concurrent execution must be impossible by construction, not by best-effort upstream-existence check. `tools/review-queue/_run_reviewer.sh` + `skills/review-queue-codex.md:199-207` ("does not close the race"). Mkdir lock is one mechanism; coord_emit-tracked "tick_in_progress" record is another. Don't prescribe — preserve the invariant under whatever scheduler comes next.
+**C1 — Tool-name codegen across surfaces.** Any consumer that names an MCP tool MUST get the name from a generated source pinned to the server's registry — never a string literal in the consumer. Adding a new consumer is then a config change. *Current consumers: Raycast extension, integration smoke test.*
 
-- **SEAM 9 — Shared resources self-heal on SIGKILL.** Worktrees, locks, and any disk-resident coordination state must be reclaimable by future ticks without manual intervention. `tools/review-queue/_run_reviewer.sh:92-105` skips registered worktrees without liveness check; `tools/backlog/run-codex-builder.sh:70-74` documents `rm -rf` as the manual recovery. Detector should walk shared-state inventory, check PID liveness + mtime, GC zombies. Invariant survives whatever owns the worktree next.
+**C2 — Adapter-drift detection.** Every rendering pipeline that produces a derived adapter from a canonical source MUST surface drift without manual `cmp` checks. Adding a third adapter should be a config change, not a per-adapter detector. *Current consumers: Claude-Code adapter (has detection), Codex-installer adapter (lacks it).*
 
-- **SEAM 10 — Idempotent and cheap to re-run.** Every operation in the pipeline must be safe to invoke twice, and the second invocation should be near-free when nothing has changed. `tools/review-queue/combine.py:267-269 + :777-799` re-parses every tick; mtime short-circuit makes the no-op case ~O(file_stat). Invariant generalizes to any future watcher / scheduler.
+### Docs hygiene
 
-### Flow-specific conveniences — hygiene only, would not survive a flow rewrite
+— Tool descriptors should state field scope (cluster vs atom) explicitly so omissions don't read as bugs.
+— Stale code comments claiming behavior the code no longer implements should be corrected when the next reader notices.
 
-These patch the current pipeline; if the flow shape changes, they go away rather than transfer. Invest only if hitting current friction:
+### Priority signal
 
-- **SEAM 3 — Smoke-test tool list freshness** (`tools/mcp-integration-smoke.sh:191-203` hardcoded 8 tools; server registers 13). Hygiene. If the next CI shape is contract-test-based, this disappears.
-- **SEAM 4 — Raycast tool-name strings** (`tools/raycast-echo/src/lib/mcp.ts:91-113`). The *underlying* invariant — "MCP tool-name surfaces must be type-generated from canonical server" — IS protocol-level and will recur with the browser extension. The Raycast-specific fix is throwaway; the codegen pipeline is durable. Build the codegen, treat Raycast as the first consumer.
-- **SEAM 6 — Codex installer `--check`** (`tools/install-echo-codex-skills.sh:166-187` has no drift check vs `tools/sync-skills.sh:49-56`). Same shape as SEAM 4: the invariant is "every skill-adapter must have drift detection"; the specific Codex installer fix is throwaway because a third adapter will arrive eventually. Generalize the rendering pipeline so drift detection is built-in, not bolted on per adapter.
-- **SEAM 11 — 50%-timeout warning** (`tools/review-queue/combine.py:290-315`). Assumes timeout-based escalation model. Defer until founder feels the wait-cost.
-
-### Docs only
-
-- **SEAM 12 — `source_breakdown` absent from `search_memories` / `get_atoms`** ✅ BY DESIGN. `source_breakdown` is cluster-scoped (`find-clusters.ts:100,:177` + `src/trace/types.ts:84-88`); atom-level tools (`search-memories.ts:64-100`, `get-atoms.ts:87-98`) intentionally omit. Document in tool descriptors so future readers don't read CLAUDE.md's "Sources field non-optional" as a bug.
-
-- **SEAM 13 — Trace renderers stale comments** ❌ Strategist's first-pass concern was rebutted by codex. `tools/render-trace.ts:63-70`, `tools/serve-trace.ts:64-91`, `tools/stream-watch.ts:46-65` wrap `MemoryStorage`, not `SqliteStorage`. No lock conflict ever existed. Comments suggesting SqliteStorage wrapping should be corrected. One-line fix per file.
-
-### Original severity-grouped detail (preserved for reference)
-
-- **[PRIORITY 1] `claimed → pending_review` handoff is non-atomic.** ✅ CONFIRMED. In `skills/process-backlog.md`, `ensure_stage` does the `git mv` (`:177-188`), the backlog-item frontmatter edit is manual/prose (`:189-195`), the `builder.md` task-state pointer is patched later by `tools/task-state/patch-builder-state.py` (`:326-330`, patches `builder.md` handoff fields — NOT the backlog item's `head_sha`/`pr_url`), and one final commit/push closes the sequence (`:264-271`). Failure window: after `git mv` but before frontmatter edit / builder-state refresh / final commit. Crash leaves `pending_review/<item>.md` with stale handoff fields and stale `builder.md`; if accidentally committed, reviewers see a bad handoff. If not committed, rerun can be blocked by a dirty index and the claim scan may miss the item. Fix: stage the frontmatter edit + builder-state patch inline before the `git mv`, then one commit covers all three mutations. Trigger: do as soon as V1.5 unpauses — every builder cycle is exposed.
-
-- **[PRIORITY 2] MCP request-log loses in-flight calls on SIGTERM.** ✅ CONFIRMED (§9 codex finding, missed by strategist's first pass). `src/mcp/request-log.ts:31-34` is a process-memory ring buffer; entries start `pending` and only transition to `done`/`error` if the wrapper resumes (`:64-101`). SIGTERM triggers `src/daemon/lifecycle.ts:70-87,:126-127` shutdown and `src/mcp/server.ts:363-372` closes all connections — any tool handler in-flight at that moment is killed without ring-buffer finalization. `tools/tail-mcp.sh:36-55` can show "daemon unreachable → back online" but has no persisted "N calls killed during shutdown" diagnostic. Fix options: (a) persist the ring buffer to disk on SIGTERM with explicit `killed_during_shutdown` status, (b) have `tail-mcp.sh` emit a banner on daemon-restart detection. Trigger: do before any unattended/launchd operation increases above current cadence.
-
-### Severity: medium
-
-- **Smoke-test tool list is hardcoded and stale.** ✅ CONFIRMED. `tools/mcp-integration-smoke.sh:191-203` hardcodes the exact 8-tool set. HEAD `src/mcp/server.ts:249-279` registers `get_role_state`, `list_task_states`, `coord_emit`, `coord_status`, `coord_invoke` in addition to the 8 — none are exercised by the smoke test. Fix: drive expected list from `tools/list` MCP response or a manifest, or switch to "at least these tools exist" rather than "exactly these tools." Low cost.
-
-- **Raycast calls tool names as untyped string literals.** ✅ CONFIRMED. `tools/raycast-echo/src/lib/mcp.ts:91-113` calls `find_clusters`, `search_memories`, `getAtom`, `getAtoms` as string literals, sent as JSON-RPC params (`:116-132`). No shared typed name source with server registrations — a rename in `src/mcp/tools/` breaks Raycast at runtime, not at type-check time. Fix: codegen TS types from `tools/list`, or add a vitest that pings every tool name at extension boot.
-
-- **`combine.py` has no zero-size/partial-final guard.** ⚠️ PARTIAL. Strategist's race claim is mostly wrong: `tools/review-queue/combine.py:482-486` reads exact requested paths (not glob), and canonical writers use `os.link` (`tools/review-queue/_lib.py:91-99`) which is atomic. Real residual gap: if a noncanonical writer creates `<slug>.md` before completing, `combine.py` sees `exists()` true and parses it, emitting terminal `malformed_reviewer_response` (`combine.py:494-497`). Fix: skip zero-size files and require trailing newline / valid frontmatter close in `read_response()`.
-
-- **Codex-skill installer has no `--check` mode.** ⚠️ PARTIAL. Claude adapter drift IS detectable: `tools/sync-skills.sh:49-56` compares canonical `skills/*.md` to `.claude/commands/*.md` via `cmp -s`. Codex side is different: `tools/install-echo-codex-skills.sh:166-187` renders into `~/.codex/skills/...` with metadata wrapping, overwrites managed targets silently on rerun, and has no `--check` equivalent. Fix: add `--check` that re-renders to a temp file and compares against the installed target (or compares `synced_content_sha256` from the `.echo-managed` marker against the canonical's SHA).
-
-- **`coord_emit` acks before WAL fsync.** ⚠️ PARTIAL (§9 codex finding). `src/mcp/tools/coord-emit.ts:143-179` awaits `storage.append` before responding, and `src/storage/sqlite.ts:77-90` `insertStmt.run` is synchronous — but SQLite WAL uses `synchronous = NORMAL` (`:60-62`), explicitly avoiding per-append fsync. Process crash is fine (WAL preserves the transaction); **host/power crash** between ack and WAL flush can lose an acknowledged coord atom. Lowest-cost mitigation: documentation only (note the WAL=NORMAL trade-off in `src/coord/deadlines.ts` and `coord_emit` docstrings). Code fix: opt coord_emit's specific path into `synchronous=FULL` via a per-statement pragma if/when host-crash durability matters more than write latency.
-
-- **Reviewer same-reviewer duplicate overlap is documented-not-closed.** ⚠️ PARTIAL (§9 codex finding). `tools/review-queue/_run_reviewer.sh:108-123` uses `git fetch` + detached worktrees (not `git pull --rebase` in the live checkout). Cross-reviewer push races are handled by `tools/review-queue/push-with-retry.sh:39-43` with two `pull --rebase=merges && push HEAD:main` retries. Same-reviewer duplicate overlap is only narrowed by an upstream existence check and `skills/review-queue-codex.md:199-207` explicitly says "does not close the race." Fix: serialize same-reviewer ticks via a per-reviewer mkdir lock (mirror the builder lock at `tools/backlog/run-codex-builder.sh:68-77`).
-
-- **Reviewer worktree cleanup on `kill -9` is manual.** ⚠️ PARTIAL (§9 codex finding). `tools/review-queue/_run_reviewer.sh:132-142` uses trap-based cleanup; `:92-105` skips registered worktrees regardless of mtime. A `kill -9` leaves registered survivors that are then never reclaimed. Item 050 documents the cleanup as manual/follow-up. The builder side has the same mkdir-lock + manual `rm -rf` path (`tools/backlog/run-codex-builder.sh:70-74`). Fix: stale-lock detector that checks PID liveness + lock-dir mtime, GC's both worktree registrations and mkdir-locks older than N hours with no live PID.
-
-### Severity: low (efficiency / hygiene)
-
-- **`combine.py` re-parses every tick regardless of change.** ✅ CONFIRMED. `tools/review-queue/combine.py:267-269` short-circuits only if `combined.md` exists, then rebuilds eligible rounds every invocation (`:777-799`). No `mtime(combined.md) > max(mtime(<slug>.md))` fast-path. Fix: skip when `combined.md` mtime is newer than every `<slug>.md` mtime. Efficiency only, not correctness.
-
-- **No early-warning at ~50% of reviewer timeout.** ✅ CONFIRMED. `tools/review-queue/combine.py:290-315` gates eligibility at full timeout only; `src/coord/deadlines.ts:247-260` fires misses only after `expected_by`. Founder waits full timeout before noticing a hung reviewer. Fix: emit a diagnostic atom via `coord_emit` (or a console warning in `combine.py`) at 50% of each reviewer's `timeout_hours`.
-
-### Verified by-design / docs only
-
-- **`source_breakdown` absent from `search_memories` / `get_atoms`.** ✅ BY DESIGN. `src/mcp/tools/search-memories.ts:64-100,:301-319` returns matches/query/warnings only; `src/mcp/tools/get-atoms.ts:87-98,:338-345` returns atom bodies + drop info. `source_breakdown` is cluster-scoped, lives on `find-clusters.ts:100,:177` + `src/trace/types.ts:84-88`. Action: document this in tool descriptors so future readers don't mistake the omission for a bug.
-
-- **Trace renderers do NOT share daemon SQLite.** ❌ REBUTTED (strategist's first-pass concern was wrong). `tools/render-trace.ts:63-70`, `tools/serve-trace.ts:64-91`, `tools/stream-watch.ts:46-65` all wrap `MemoryStorage`; only `src/daemon/index.ts:16-37` constructs `SqliteStorage` from `ECHO_DB_PATH`/`ECHO_DATA_DIR`. No SQLite lock conflict risk. Stale comments in those three tool files suggesting SqliteStorage wrapping should be corrected. Action: one-line comment cleanup in each renderer.
+**[Priority]**-tagged primitives drive the next round of specs. Others fix on-merit when a journal entry names the friction, a spec touching the same code lands, or a flow-shape change broadens the surface.
