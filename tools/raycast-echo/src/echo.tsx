@@ -325,7 +325,7 @@ function MatchRow({ match, onToggleDetail }: { match: SearchMatch; onToggleDetai
   );
 }
 
-const INTERESTING_METADATA_KEYS = ["session_id", "composer_id", "workspace_id", "repo_root", "role", "model", "file", "path", "branch", "tool", "type"] as const;
+const INTERESTING_METADATA_KEYS = ["session_id", "composer_id", "workspace_id", "repo_root", "role", "model", "reasoning_effort", "is_continuation", "context", "thinking", "file", "path", "branch", "tool", "type"] as const;
 
 function matchAccessories(match: SearchMatch): { text: string; tooltip?: string }[] {
   const acc: { text: string; tooltip?: string }[] = [];
@@ -549,7 +549,19 @@ function clusterBundleMarkdown(c: FindClustersCluster, previews: readonly EchoAt
 }
 
 function titleForMatch(m: SearchMatch): string {
-  const firstLine = m.content.split("\n").find((line) => line.trim().length > 0) ?? "";
+  // Source-aware first-line extraction. Codex bakes USER + ASSISTANT into a
+  // single content string per turn-pair (see daemon-side codex.ts turn-pair
+  // assembly); the naive first-line scan would land on the USER prompt's
+  // first line, which for tool/reviewer ticks is a verbose system-prompt
+  // prefix. Skip past the ASSISTANT: marker when present so the title
+  // reflects what the agent actually said. Other sources fall through to the
+  // existing first-non-empty-line behavior.
+  let body = m.content;
+  if (derivedApp(m.source) === "codex") {
+    const idx = body.indexOf("\nASSISTANT:");
+    if (idx !== -1) body = body.slice(idx + "\nASSISTANT:".length);
+  }
+  const firstLine = body.split("\n").find((line) => line.trim().length > 0) ?? "";
   return firstLine.length > 90 ? `${firstLine.slice(0, 90)}...` : firstLine || "(empty)";
 }
 
