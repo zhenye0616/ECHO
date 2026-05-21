@@ -4,6 +4,12 @@ import type { ReactNode } from "react";
 import type { FindClustersCluster, SearchMatch } from "../lib/mcp";
 import { buildForkPrompt, formatPdtTime, type Session } from "../lib/sessions";
 
+export interface TypingStateAskOptions {
+  forkedFrom?: string | null;
+  clusterId?: string;
+  forceFreshAgent?: boolean;
+}
+
 const ASK_TINT = { light: "#ff6363", dark: "#ff6363" };
 
 export function TypingState({
@@ -28,7 +34,7 @@ export function TypingState({
   matches: readonly SearchMatch[];
   renderCluster: (cluster: FindClustersCluster) => ReactNode;
   renderMatch: (match: SearchMatch) => ReactNode;
-  onAsk: (question: string, forkedFrom?: string | null) => void;
+  onAsk: (question: string, options?: TypingStateAskOptions) => void;
   onOpenSessions: () => void;
   banner?: string;
   showDetail: boolean;
@@ -74,7 +80,7 @@ export function ForkTypingState({
 }: {
   source: Session;
   agentKind: string;
-  onAsk: (question: string, forkedFrom?: string | null) => void;
+  onAsk: (question: string, options?: TypingStateAskOptions) => void;
   onOpenSessions: () => void;
   showDetail: boolean;
 }) {
@@ -90,7 +96,7 @@ export function ForkTypingState({
       matches={[]}
       renderCluster={() => null}
       renderMatch={() => null}
-      onAsk={(value) => onAsk(buildForkPrompt(source, value), source.id)}
+      onAsk={(value) => onAsk(buildForkPrompt(source, value), { forkedFrom: source.id, clusterId: source.clusterId })}
       onOpenSessions={onOpenSessions}
       banner={`Forking from session ${formatPdtTime(source.startedAt)} PDT — add your follow-up below and press ↩ to ask`}
       showDetail={showDetail}

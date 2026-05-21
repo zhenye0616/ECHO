@@ -2,7 +2,7 @@ import { constants, createWriteStream, mkdirSync, renameSync, rmSync, symlinkSyn
 import { access } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { ECHO_MCP_URL } from "./mcp";
 import type { AgentInvocation } from "./agent-profiles";
 
@@ -22,12 +22,19 @@ export interface AgentRunnerOptions {
   idleTimeoutMs?: number;
   maxRuntimeMs?: number;
   sessionLogDir?: string;
+  sessionLogPath?: string;
 }
 
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RUNTIME_MS = 5 * 60_000;
 const STDERR_TAIL_LIMIT = 4096;
 export const SESSION_LOG_DIR = join(homedir(), ".config", "raycast", "extensions", "echo-context", "sessions");
+
+export function allocateSessionLogPath(_invocation: AgentInvocation, sessionLogDir: string = SESSION_LOG_DIR): string {
+  const openedAt = new Date().toISOString();
+  const filename = `${openedAt.replace(/[:.]/g, "-")}.log`;
+  return join(sessionLogDir, filename);
+}
 
 // Raycast's Node runtime hands the extension an env with PATH=undefined,
 // so bare-name binaries (e.g. "codex", "claude") fail `which` even when
@@ -125,7 +132,11 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   const stderrTail = new BoundedTextBuffer(STDERR_TAIL_LIMIT);
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
   const maxRuntimeMs = options.maxRuntimeMs ?? DEFAULT_MAX_RUNTIME_MS;
-  const sessionLog = createSessionLog(invocation, options.sessionLogDir ?? SESSION_LOG_DIR);
+  const sessionLog = createSessionLog(
+    invocation,
+    options.sessionLogDir ?? SESSION_LOG_DIR,
+    options.sessionLogPath ?? null,
+  );
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let maxTimer: ReturnType<typeof setTimeout> | null = null;
@@ -267,14 +278,14 @@ interface SessionLog {
   close(): Promise<void>;
 }
 
-function createSessionLog(invocation: AgentInvocation, logDir: string): SessionLog | null {
+function createSessionLog(invocation: AgentInvocation, logDir: string, preallocatedPath: string | null): SessionLog | null {
   const openedAt = new Date().toISOString();
-  const filename = `${openedAt.replace(/[:.]/g, "-")}.log`;
-  const sessionPath = join(logDir, filename);
+  const sessionPath = preallocatedPath ?? join(logDir, `${openedAt.replace(/[:.]/g, "-")}.log`);
+  const latestSymlinkDir = preallocatedPath !== null ? dirname(preallocatedPath) : logDir;
 
   let stream: WriteStream;
   try {
-    mkdirSync(logDir, { recursive: true });
+    mkdirSync(latestSymlinkDir, { recursive: true });
     stream = createWriteStream(sessionPath, { flags: "a" });
   } catch (err) {
     warnSessionLogFailure("open session log", err);
@@ -283,7 +294,7 @@ function createSessionLog(invocation: AgentInvocation, logDir: string): SessionL
 
   const log = new WriteStreamSessionLog(sessionPath, stream);
   stream.on("error", (err) => log.disable(err));
-  updateLatestSessionLog(logDir, sessionPath);
+  updateLatestSessionLog(latestSymlinkDir, sessionPath);
   log.writeRaw(`=== ECHO agent session ${openedAt} · ${invocation.binary} ${invocation.args.join(" ")} ===\n`);
   return log;
 }

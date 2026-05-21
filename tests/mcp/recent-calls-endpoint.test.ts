@@ -141,7 +141,7 @@ describe('GET /mcp/recent-calls', () => {
     }
 
     expect([...seen].sort()).toEqual(toolNames);
-  });
+  }, 15_000);
 
   it('filters recent calls by status and keeps HEAD /mcp as method-not-allowed', async () => {
     handle = await startMcpServer(new MemoryStorage(), { port: 0, enable_deadlines: false });

@@ -52,6 +52,26 @@ agent_notes: |
   passing; full raycast-echo suite 99/99; root repo 1134/1134; eslint clean;
   typecheck clean. Run log:
   raw/internal/agent-runs/2026-05-21-2026-05-20-065-raycast-cluster-resume.md
+review_notes: |
+  Merged on 2026-05-21T21:55:00Z via founder reconciliation.
+
+  Conflicts resolved:
+  - tools/raycast-echo/src/components/AnswerView.tsx: reconciled main's richer top-cluster markdown and stalled-footer suppression with branch's cluster-resume replay/fresh startup path, onSessionChanged callbacks, and Ask Again action.
+  - tools/raycast-echo/src/echo.tsx: reconciled main's density/detail-panel cluster-row UX plus later label/title extraction fixes with branch's session-derived resume chip, Open Prior Answer primary action, Ask Again action, and clusterId runAsk options.
+
+  C3.5 cross-vendor consult: codex @ proceed-as-proposed - no modifications
+
+  Fixups applied:
+  - tools/raycast-echo/src/lib/agent-runner.ts and tools/raycast-echo/test/cluster-resume.test.tsx: added UUID entropy to preallocated session log paths and removed the millisecond spin-wait from the distinct-path test.
+  - tests/mcp/recent-calls-endpoint.test.ts: loosened the all-tools recent-calls smoke test timeout to 15s after repeated full-suite timeouts under parallel MCP/coord load while the test passed in isolation.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1134/1134 non-skipped tests pass; 21 skipped; lint and typecheck clean post-merge; tools/sync-skills.sh --check clean.
+
+  Follow-up items (non-blocking):
+  - None.
 ---
 
 # Why

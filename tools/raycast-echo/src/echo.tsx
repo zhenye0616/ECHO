@@ -55,6 +55,12 @@ interface EchoPreferences {
   claudeOauthToken?: string;
 }
 
+export interface RunAskOptions {
+  forkedFrom?: string | null;
+  clusterId?: string;
+  forceFreshAgent?: boolean;
+}
+
 export default function EchoContext() {
   const [query, setQuery] = useState("");
   // Default detail panel CLOSED so list rows get full Raycast width — without
@@ -71,7 +77,7 @@ export default function EchoContext() {
   const clusterPreviews = useClusterPreviews(clusters);
   const { matches, isLoadingMatches } = useMatches(query);
   const primary = usePrimary();
-  const { sessions, warmSession } = useSessions();
+  const { sessions, warmSession, refresh: refreshSessions } = useSessions();
 
   function openSessions() {
     push(<SessionsList onForkSession={openFork} onNewAsk={newAsk} onOpenSessions={openSessions} />);
@@ -86,15 +92,19 @@ export default function EchoContext() {
     setQuery("");
     popToRoot({ clearSearchBar: true });
   }
-  function runAsk(question: string, forkedFrom?: string | null) {
+  function runAsk(question: string, options: RunAskOptions = {}) {
     push(
       <AnswerView
         query={question}
         agentKind={agentKind}
         preferences={preferences}
         repoPath={repoPath}
-        forkedFrom={forkedFrom}
+        forkedFrom={options.forkedFrom}
+        clusterId={options.clusterId}
+        forceFreshAgent={options.forceFreshAgent}
         onOpenSessions={openSessions}
+        onSessionChanged={() => void refreshSessions()}
+        onAskAgainFromCluster={(cid) => runAsk(question, { clusterId: cid, forceFreshAgent: true })}
       />,
     );
   }
@@ -105,6 +115,7 @@ export default function EchoContext() {
       cluster={cluster}
       previews={clusterPreviews.get(cluster.cluster_id) ?? null}
       primary={primary}
+      sessions={sessions}
       onAsk={runAsk}
       onToggleDetail={toggleDetail}
     />
@@ -259,17 +270,50 @@ function useClusterPreviews(clusters: readonly FindClustersCluster[]): Map<strin
   return previews;
 }
 
-function ClusterRow({ cluster, previews, primary, onAsk, onToggleDetail }: { cluster: FindClustersCluster; previews: readonly EchoAtom[] | null; primary: PrimaryDetection | null; onAsk: (query: string) => void; onToggleDetail: () => void }) {
+export interface ClusterResumeState {
+  primaryActionTitle: string;
+  primaryActionIcon: Icon;
+  resumeChip: { text: string; tooltip?: string } | null;
+}
+
+const CLUSTER_RESUME_STATUSES: ReadonlyArray<Session["status"]> = ["running", "done"];
+
+export function deriveClusterResumeState(cluster: FindClustersCluster, sessions: readonly Session[]): ClusterResumeState {
+  const latest = sessions.find((s) => s.clusterId === cluster.cluster_id && CLUSTER_RESUME_STATUSES.includes(s.status));
+  if (latest === undefined) {
+    return {
+      primaryActionTitle: "Ask ECHO about This Cluster",
+      primaryActionIcon: Icon.Stars,
+      resumeChip: null,
+    };
+  }
+  if (latest.status === "running") {
+    return {
+      primaryActionTitle: "Open Prior Answer",
+      primaryActionIcon: Icon.Document,
+      resumeChip: { text: "Running", tooltip: `started ${formatRelativeTime(latest.startedAt)}` },
+    };
+  }
+  return {
+    primaryActionTitle: "Open Prior Answer",
+    primaryActionIcon: Icon.Document,
+    resumeChip: { text: `Answered ${formatRelativeTime(latest.completedAt ?? latest.startedAt)}` },
+  };
+}
+
+export function ClusterRow({ cluster, previews, primary, sessions, onAsk, onToggleDetail }: { cluster: FindClustersCluster; previews: readonly EchoAtom[] | null; primary: PrimaryDetection | null; sessions: readonly Session[]; onAsk: (query: string, options?: RunAskOptions) => void; onToggleDetail: () => void }) {
   const askQuery = cluster.label?.trim().length ? `tell me about "${cluster.label.trim()}"` : "summarize this cluster";
   const titleText = displayLabel(cluster.label) ?? labelFromPreviews(previews) ?? atomsLabel(cluster.atom_ids.length);
   const sourcesSummary = sourceBreakdownSummary(cluster.source_breakdown);
   const subtitle = sourcesSummary.length > 0 ? sourcesSummary : atomsLabel(cluster.atom_ids.length);
   const bundle = clusterBundleMarkdown(cluster, previews);
+  const resume = deriveClusterResumeState(cluster, sessions);
 
   // With detail panel closed by default, rows get the full Raycast width and
-  // can carry three accessory chips comfortably: open-loop status, dominant
-  // file (when one clearly dominates), and recency. Each is gated on
-  // meaningful data so empty/codex-only clusters don't get spurious chips.
+  // can carry several accessory chips comfortably: open-loop status, dominant
+  // file (when one clearly dominates), session-resume state (when a prior
+  // cluster session exists), and recency. Each is gated on meaningful data
+  // so empty/codex-only clusters don't get spurious chips.
   const accessories: { text: string; tooltip?: string }[] = [];
   const loopChip = openLoopChipText(cluster);
   if (loopChip !== null) {
@@ -284,7 +328,11 @@ function ClusterRow({ cluster, previews, primary, onAsk, onToggleDetail }: { clu
     const top = topFilesFromPreviews(previews, 1)[0];
     accessories.push({ text: fileChip, tooltip: top !== undefined ? `${top.path} (${top.count}× across recent atoms)` : undefined });
   }
+  if (resume.resumeChip !== null) {
+    accessories.push(resume.resumeChip);
+  }
   accessories.push({ text: formatRelativeTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) });
+
 
   return (
     <List.Item
@@ -295,7 +343,8 @@ function ClusterRow({ cluster, previews, primary, onAsk, onToggleDetail }: { clu
       detail={<List.Item.Detail markdown={bundle} />}
       actions={
         <ActionPanel>
-          <Action title="Ask ECHO about This Cluster" icon={Icon.Stars} onAction={() => onAsk(askQuery)} />
+          <Action title={resume.primaryActionTitle} icon={resume.primaryActionIcon} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id })} />
+          <Action title="Ask Again from This Cluster" icon={Icon.RotateClockwise} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id, forceFreshAgent: true })} />
           <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={bundle} />
           <Action title="Paste in Frontmost App" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} onAction={() => void pasteCluster(cluster, primary)} />
           <Action title="Toggle Detail Panel" icon={Icon.Sidebar} shortcut={{ modifiers: ["cmd", "shift"], key: "d" }} onAction={onToggleDetail} />

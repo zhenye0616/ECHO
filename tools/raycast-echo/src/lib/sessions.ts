@@ -20,6 +20,7 @@ export interface Session {
   sourceBreakdown: Record<string, number>;
   evidenceClusters: string[];
   forkedFrom: string | null;
+  clusterId?: string;
 }
 
 export interface SessionStartInput {
@@ -28,6 +29,7 @@ export interface SessionStartInput {
   subprocessLogPath: string | null;
   startedAt?: string;
   forkedFrom?: string | null;
+  clusterId?: string;
 }
 
 export interface SessionEndPatch {
@@ -78,6 +80,55 @@ export function selectWarmSession(sessions: readonly Session[]): Session | null 
   return sessions.find((session) => session.status === "done") ?? null;
 }
 
+const DEFAULT_CLUSTER_LOOKUP_STATUSES: readonly SessionStatus[] = ["running", "done"];
+
+export async function findLatestSessionForCluster(
+  clusterId: string | undefined,
+  statuses: ReadonlyArray<SessionStatus> = DEFAULT_CLUSTER_LOOKUP_STATUSES,
+): Promise<Session | null> {
+  if (clusterId === undefined || clusterId.length === 0) return null;
+  const allowed = new Set<SessionStatus>(statuses);
+  const sessions = await listSessions();
+  for (const session of sessions) {
+    if (session.clusterId !== clusterId) continue;
+    if (!allowed.has(session.status)) continue;
+    return session;
+  }
+  return null;
+}
+
+export type ClusterSessionIntent = "default" | "fresh";
+export interface AcquiredClusterSession {
+  session: Session;
+  source: "existing" | "created";
+  createdByThisCall: boolean;
+}
+
+interface FactoryResult {
+  session: Session;
+  source: "existing" | "created";
+}
+
+const clusterSessionInflight = new Map<string, Promise<FactoryResult>>();
+
+export function acquireOrAwaitClusterSession(
+  clusterId: string,
+  intent: ClusterSessionIntent,
+  factory: () => Promise<FactoryResult>,
+): Promise<AcquiredClusterSession> {
+  const key = `${clusterId}#${intent}`;
+  const existing = clusterSessionInflight.get(key);
+  if (existing !== undefined) {
+    return existing.then((result) => ({ ...result, createdByThisCall: false }));
+  }
+  const ownerPromise = factory();
+  clusterSessionInflight.set(key, ownerPromise);
+  ownerPromise.catch(() => undefined).finally(() => {
+    if (clusterSessionInflight.get(key) === ownerPromise) clusterSessionInflight.delete(key);
+  });
+  return ownerPromise.then((result) => ({ ...result, createdByThisCall: true }));
+}
+
 export async function recordSessionStart(input: SessionStartInput): Promise<Session> {
   await ensureMigrated();
   const startedAt = input.startedAt ?? new Date().toISOString();
@@ -94,6 +145,7 @@ export async function recordSessionStart(input: SessionStartInput): Promise<Sess
     sourceBreakdown: {},
     evidenceClusters: [],
     forkedFrom: input.forkedFrom ?? null,
+    clusterId: input.clusterId,
   };
   await LocalStorage.setItem(sessionRowKey(session.id), JSON.stringify(session));
   await enforceSessionCap();
@@ -234,6 +286,7 @@ export function canDeleteSession(session: Session): boolean {
 export function resetSessionsModuleForTests(): void {
   migrationPromise = null;
   for (const key of Object.keys(inflight)) delete inflight[key];
+  clusterSessionInflight.clear();
 }
 
 async function ensureMigrated(): Promise<void> {
@@ -437,6 +490,7 @@ function normalizeSession(value: unknown): Session | null {
   if (value === null || typeof value !== "object") return null;
   const o = value as Record<string, unknown>;
   if (typeof o["id"] !== "string" || typeof o["question"] !== "string" || typeof o["startedAt"] !== "string") return null;
+  const clusterId = typeof o["clusterId"] === "string" && o["clusterId"].length > 0 ? o["clusterId"] : undefined;
   return {
     id: o["id"],
     question: o["question"],
@@ -450,6 +504,7 @@ function normalizeSession(value: unknown): Session | null {
     sourceBreakdown: isRecordOfNumbers(o["sourceBreakdown"]) ? o["sourceBreakdown"] : {},
     evidenceClusters: Array.isArray(o["evidenceClusters"]) ? o["evidenceClusters"].filter((x): x is string => typeof x === "string").slice(0, 5) : [],
     forkedFrom: typeof o["forkedFrom"] === "string" ? o["forkedFrom"] : null,
+    clusterId,
   };
 }
 
