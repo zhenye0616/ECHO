@@ -33,9 +33,25 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T06:19:39Z"
 branch: "agent/raycast-cluster-resume"
-head_sha: ""
+head_sha: "13d99ee1fe717a14006a11f1821c0f7d9d7b8229"
 pr_url: ""
 agent_notes: |
+  AC1–AC8 implemented per the post-r5 CLAIM-READY spec. Session.clusterId is
+  persisted + round-tripped through normalizeSession; findLatestSessionForCluster
+  + acquireOrAwaitClusterSession(clusterId, intent, factory) live in sessions.ts.
+  acquireAnswerSessionForCluster extracted from AnswerView as a testable seam
+  with three outcomes (replay | owner | error). ClusterRow derives state
+  synchronously from useSessions(); primary action flips to "Open Prior Answer"
+  when a running/done session exists. "Ask Again from This Cluster" (cmd-shift-r)
+  is always exposed. Log path is pre-allocated via allocateSessionLogPath so the
+  persisted subprocessLogPath matches the file startAgent opens. AC7 callback
+  contract: onSessionChanged fires after recordSessionStart + recordSessionEnd
+  (owner-only); EchoContext threads useSessions().refresh into it. Storage
+  migration is purely additive (legacy rows without clusterId load cleanly).
+  Tests: 15 new in cluster-resume.test.tsx + 11 new in sessions.test.ts, all
+  passing; full raycast-echo suite 99/99; root repo 1134/1134; eslint clean;
+  typecheck clean. Run log:
+  raw/internal/agent-runs/2026-05-21-2026-05-20-065-raycast-cluster-resume.md
 ---
 
 # Why
