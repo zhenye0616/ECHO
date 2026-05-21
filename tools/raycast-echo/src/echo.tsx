@@ -390,12 +390,18 @@ function displayLabel(label: string | null | undefined): string | null {
 }
 
 // When the daemon's labeler returns null (small or mixed clusters), derive a
-// label from the dominant `repo_root` across previews so the row shows
-// "Project_echo" instead of the meaningless "12 atoms" fallback. Skips temp
-// working-tree paths (codex spawns under /var/folders/.../echo-codex-...)
-// since their basename is a session UUID, not a project name.
+// label from previews in two passes: (1) dominant `repo_root` basename when
+// available — works for claude_code + codex atoms, skips temp working trees;
+// (2) first non-empty USER line of the most-recent preview content — works
+// for cursor atoms (which lack repo_root because the extractor doesn't
+// resolve workspace_id → folder name yet) and any other source where
+// repo_root isn't populated. Pass (2) is truncated to ~40 chars so it fits
+// the row title without crowding the chips. Daemon-side fix for cursor
+// repo_root is V1.5+ (see backlog/_followups.md).
 function labelFromPreviews(previews: readonly EchoAtom[] | null): string | null {
   if (previews === null || previews.length === 0) return null;
+
+  // Pass 1: dominant repo_root basename.
   const counts = new Map<string, number>();
   for (const a of previews) {
     const root = (a.metadata as { repo_root?: unknown } | undefined)?.repo_root;
@@ -404,9 +410,23 @@ function labelFromPreviews(previews: readonly EchoAtom[] | null): string | null 
     counts.set(root, (counts.get(root) ?? 0) + 1);
   }
   const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (top === undefined) return null;
-  const basename = top[0].split("/").filter((s) => s.length > 0).pop();
-  return basename ?? null;
+  if (top !== undefined) {
+    const basename = top[0].split("/").filter((s) => s.length > 0).pop();
+    if (basename !== undefined && basename.length > 0) return basename;
+  }
+
+  // Pass 2: first non-empty USER line from the most-recent preview.
+  for (const a of previews) {
+    const content = (a.content ?? "").trim();
+    if (content.length === 0) continue;
+    let body = content;
+    if (body.startsWith("USER:")) body = body.slice("USER:".length).trimStart();
+    const firstLine = body.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "";
+    if (firstLine.length === 0) continue;
+    return firstLine.length > 40 ? `${firstLine.slice(0, 39)}…` : firstLine;
+  }
+
+  return null;
 }
 
 function sourceBreakdownSummary(breakdown: Record<string, number>): string {
