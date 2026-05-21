@@ -208,6 +208,112 @@ describe('find_clusters', () => {
     expect(typeof r.result_caps.truncated).toBe('boolean');
   });
 
+  it('view defaults to rich and view="rich" is byte-identical to the default envelope', async () => {
+    const store = new MemoryStorage();
+    const file = `${PROJECT_ECHO}/src/rich-parity.ts`;
+    for (let i = 0; i < 4; i++) {
+      await store.append(
+        claudeCodeTurn(i, file, `2026-05-09T10:${i.toString().padStart(2, '0')}:00.000Z`),
+      );
+    }
+
+    const params = {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+    };
+    const defaultResult = await findClusters(store, params);
+    const richResult = await findClusters(store, { ...params, view: 'rich' });
+
+    expect(JSON.stringify(richResult)).toBe(JSON.stringify(defaultResult));
+  });
+
+  it('rejects unknown view values with accepted enum members in the message', async () => {
+    const store = new MemoryStorage();
+    await expect(findClusters(store, { view: 'debug' as never })).rejects.toThrow(
+      /compact.*rich|rich.*compact/,
+    );
+  });
+
+  it('view="compact" emits the compact envelope and cluster shape', async () => {
+    const store = new MemoryStorage();
+    const file = `${PROJECT_ECHO}/src/compact-shape.ts`;
+    for (let i = 0; i < 3; i++) {
+      const turn = claudeCodeTurn(i, file, `2026-05-09T10:0${i}:00.000Z`);
+      turn.content = `USER: still open?\n\nASSISTANT: maybe?`;
+      await store.append(turn);
+    }
+
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+      view: 'compact',
+    });
+
+    expect(r.query).toBeUndefined();
+    expect(r.result_caps).toBeUndefined();
+    expect(r.warnings).toEqual([]);
+    expect(r.clusters.length).toBeGreaterThan(0);
+    const cluster = r.clusters[0] as unknown as Record<string, unknown>;
+    expect(cluster['cluster_id']).toBeDefined();
+    expect(cluster['atom_ids']).toBeDefined();
+    expect(cluster['source_breakdown']).toBeDefined();
+    expect(cluster['time_range']).toBeDefined();
+    expect(cluster['open_loop_hints']).toBeDefined();
+    expect(cluster['rank']).toBeUndefined();
+    expect(cluster['rank_reason']).toEqual(['has_open_loop']);
+  });
+
+  it('view="compact" preserves open_loop_hints_omitted when hint capping fires', async () => {
+    const store = new MemoryStorage();
+    const file = `${PROJECT_ECHO}/src/compact-hints.ts`;
+    for (let i = 0; i < 35; i++) {
+      const turn = claudeCodeTurn(
+        i,
+        file,
+        `2026-05-09T10:${i.toString().padStart(2, '0')}:00.000Z`,
+      );
+      turn.content = `USER: still confused?\n\nASSISTANT: iteration ${i}`;
+      await store.append(turn);
+    }
+
+    const r = await findClusters(store, {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+      view: 'compact',
+    });
+
+    const clipped = r.clusters.find((c) => (c.open_loop_hints_omitted ?? 0) > 0);
+    expect(clipped).toBeDefined();
+    expect(clipped!.open_loop_hints.length).toBe(30);
+    expect(clipped!.open_loop_hints_omitted).toBe(5);
+  });
+
+  it('view="compact" emits UUID fallback labels as null while rich preserves them', async () => {
+    const store = new MemoryStorage();
+    const sessionId = '11111111-2222-3333-4444-555555555555';
+    for (let i = 0; i < 2; i++) {
+      await store.append({
+        source: `fs:/Users/redacted/.claude/projects/-Users-redacted-Desktop-Project-echo/${sessionId}.jsonl`,
+        timestamp: `2026-05-09T10:0${i}:00.000Z`,
+        content: `USER: question ${i}\n\nASSISTANT: answer ${i}`,
+        metadata: {
+          session_id: sessionId,
+          turn_index: i,
+        },
+      });
+    }
+    const params = {
+      since: '2026-05-09T09:00:00.000Z',
+      until: '2026-05-09T12:00:00.000Z',
+    };
+
+    const rich = await findClusters(store, { ...params, view: 'rich' });
+    const compact = await findClusters(store, { ...params, view: 'compact' });
+
+    expect(rich.clusters[0]!.label).toBe(`discussion about ${sessionId}`);
+    expect((compact.clusters[0] as unknown as Record<string, unknown>)['label']).toBeNull();
+  });
+
   it('per-cluster atom_ids hard cap fires only when cluster size exceeds PER_CLUSTER_ATOM_IDS_HARD_CAP (safety net, not routine)', async () => {
     const store = new MemoryStorage();
     const sharedFile = `${PROJECT_ECHO}/src/giant.ts`;
@@ -307,6 +413,37 @@ describe('find_clusters', () => {
     expect(r.result_caps.truncated).toBe(true);
     // Warning surfaced so the consumer knows what happened.
     expect(r.warnings.some((w) => w.includes('[FIND_CLUSTERS_RESPONSE_CAP]'))).toBe(true);
+  });
+
+  it('view="compact" sizes the response cap after compact projection', async () => {
+    const store = new MemoryStorage();
+    const CLUSTERS = 10;
+    const ATOMS_PER_CLUSTER = 60;
+    for (let cluster = 0; cluster < CLUSTERS; cluster++) {
+      const file = `${PROJECT_ECHO}/src/compact_budget_${cluster}.ts`;
+      const hour = 10 + cluster;
+      for (let i = 0; i < ATOMS_PER_CLUSTER; i++) {
+        const totalSeconds = i * 14;
+        const minute = Math.floor(totalSeconds / 60);
+        const second = totalSeconds % 60;
+        const ts = `2026-05-09T${hour.toString().padStart(2, '0')}:${minute
+          .toString()
+          .padStart(2, '0')}:${second.toString().padStart(2, '0')}.000Z`;
+        const t = claudeCodeTurn(cluster * 1000 + i, file, ts);
+        t.content = `USER: still confused about ${file}?\n\nASSISTANT: what about iteration ${i}?`;
+        await store.append(t);
+      }
+    }
+
+    const params = {
+      since: '2026-05-09T00:00:00.000Z',
+      until: '2026-05-10T00:00:00.000Z',
+    };
+    const rich = await findClusters(store, params);
+    const compact = await findClusters(store, { ...params, view: 'compact' });
+
+    expect(JSON.stringify(compact).length).toBeLessThanOrEqual(FIND_CLUSTERS_RESPONSE_BYTE_CEILING);
+    expect(compact.clusters.length).toBeGreaterThanOrEqual(rich.clusters.length);
   });
 
   // V1.6 (item 032) AC4 — integration test: 24h-spanning fixture where 4h

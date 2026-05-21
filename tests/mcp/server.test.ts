@@ -1,10 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  startMcpServer,
-  type McpServerHandle,
-} from '../../src/mcp/server.js';
+import { startMcpServer, type McpServerHandle } from '../../src/mcp/server.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import { captureStdout } from '../fixtures/stdout.js';
 
@@ -23,10 +20,7 @@ interface CallToolResultLike {
   content?: ToolContent[];
 }
 
-async function withClient<T>(
-  url: string,
-  fn: (client: Client) => Promise<T>,
-): Promise<T> {
+async function withClient<T>(url: string, fn: (client: Client) => Promise<T>): Promise<T> {
   const transport = new StreamableHTTPClientTransport(new URL(url));
   const client = new Client({ name: 'echo-test', version: '0.0.0' });
   await client.connect(transport);
@@ -71,9 +65,7 @@ describe('startMcpServer', () => {
     const storage = new MemoryStorage();
     handle = await startMcpServer(storage, { port: 0 });
 
-    const tools = await withClient(handle.url, async (client) =>
-      client.listTools(),
-    );
+    const tools = await withClient(handle.url, async (client) => client.listTools());
 
     const found = tools.tools.find((t) => t.name === 'echo_ping');
     expect(found).toBeDefined();
@@ -118,6 +110,71 @@ describe('startMcpServer', () => {
     expect(parsed.received).toBeUndefined();
   });
 
+  it('tools/call find_clusters view=compact passes structuredContent validation', async () => {
+    const storage = new MemoryStorage();
+    for (let i = 0; i < 2; i++) {
+      await storage.append({
+        source: `fs:/Users/redacted/.claude/projects/demo/session.jsonl`,
+        timestamp: `2026-05-20T10:0${i}:00.000Z`,
+        content: `USER: q${i}\n\nASSISTANT: a${i}`,
+        metadata: {
+          session_id: 'sess_compact',
+          turn_index: i,
+          files_referenced: ['/repo/a.ts'],
+        },
+      });
+    }
+    handle = await startMcpServer(storage, { port: 0, enable_deadlines: false });
+
+    const result = (await withClient(handle.url, async (client) =>
+      client.callTool({
+        name: 'find_clusters',
+        arguments: {
+          since: '2026-05-20T09:00:00.000Z',
+          until: '2026-05-20T11:00:00.000Z',
+          view: 'compact',
+        },
+      }),
+    )) as CallToolResultLike & { structuredContent?: Record<string, unknown>; isError?: boolean };
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toBeDefined();
+    expect(result.structuredContent?.['query']).toBeUndefined();
+    expect(result.structuredContent?.['result_caps']).toBeUndefined();
+    expect(result.structuredContent?.['clusters']).toBeDefined();
+  });
+
+  it('tools/call get_atoms view=compact passes structuredContent validation', async () => {
+    const storage = new MemoryStorage();
+    const id = await storage.append({
+      source: 'fs:/Users/dev/.codex/sessions/2026/05/20/rollout.jsonl',
+      timestamp: '2026-05-20T10:00:00.000Z',
+      content: 'USER: q\n\nASSISTANT: a',
+      metadata: {
+        session_id: 'sess_codex',
+        repo_root: '/repo',
+        tool_calls: [{ name: 'exec_command', args: 'x'.repeat(2_000), output: 'y'.repeat(2_000) }],
+        tool_call_total: 1,
+        codex: { model: 'gpt-5.5', reasoning_effort: 'xhigh', sandbox_policy_type: 'read-only' },
+        git: { branch: 'agent/compact', sha: 'abc' },
+      },
+    });
+    handle = await startMcpServer(storage, { port: 0, enable_deadlines: false });
+
+    const result = (await withClient(handle.url, async (client) =>
+      client.callTool({
+        name: 'get_atoms',
+        arguments: { atom_ids: [id], view: 'compact' },
+      }),
+    )) as CallToolResultLike & { structuredContent?: Record<string, unknown>; isError?: boolean };
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toBeDefined();
+    expect(result.structuredContent?.['atoms']).toBeDefined();
+    expect(result.structuredContent?.['atoms_dropped']).toBe(0);
+    expect(result.structuredContent?.['warnings']).toEqual([]);
+  });
+
   it('stop() closes the listener so subsequent connections fail', async () => {
     const storage = new MemoryStorage();
     handle = await startMcpServer(storage, { port: 0 });
@@ -142,9 +199,7 @@ describe('startMcpServer', () => {
       const startedLine = writes.find((line) => {
         try {
           const entry = JSON.parse(line.trim()) as Record<string, unknown>;
-          return (
-            entry['source'] === 'mcp.server' && entry['message'] === 'started'
-          );
+          return entry['source'] === 'mcp.server' && entry['message'] === 'started';
         } catch {
           return false;
         }
@@ -262,10 +317,7 @@ describe('startMcpServer', () => {
     const storage = new MemoryStorage();
     handle = await startMcpServer(storage, { port: 0 });
 
-    for (const headers of [
-      undefined,
-      { 'Mcp-Session-Id': 'whatever' } as Record<string, string>,
-    ]) {
+    for (const headers of [undefined, { 'Mcp-Session-Id': 'whatever' } as Record<string, string>]) {
       const res = await fetch(handle.url, {
         method: 'GET',
         headers,
@@ -286,10 +338,7 @@ describe('startMcpServer', () => {
     const storage = new MemoryStorage();
     handle = await startMcpServer(storage, { port: 0 });
 
-    for (const headers of [
-      undefined,
-      { 'Mcp-Session-Id': 'whatever' } as Record<string, string>,
-    ]) {
+    for (const headers of [undefined, { 'Mcp-Session-Id': 'whatever' } as Record<string, string>]) {
       const res = await fetch(handle.url, {
         method: 'DELETE',
         headers,

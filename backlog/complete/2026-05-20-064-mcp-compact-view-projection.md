@@ -39,6 +39,27 @@ head_sha: "e42d2467d4f451dbfe84172e60bc09a1ec860646"
 pr_url: ""
 agent_notes: |
   Implemented on branch `agent/mcp-compact-view-projection` at `e42d2467d4f451dbfe84172e60bc09a1ec860646`. Added shared compact projection for `find_clusters` and `get_atoms`, preserved rich/default behavior, switched Raycast MCP calls to `view: "compact"`, added the requested daemon/Raycast tests, and journaled a live Raycast-client compact probe against a feature-branch daemon. `tools/raycast-echo/src/components/EmptyState.tsx` needed a one-line null-safe `rank_reason` read to keep the new relaxed Raycast cluster type compiling.
+review_notes: |
+  Merged on 2026-05-20 via founder reconciliation.
+
+  Conflicts resolved:
+  - tools/raycast-echo/src/echo.tsx: take HEAD wholesale for `ClusterRow` props (richer titleText/subtitle from `aeca3c7` diagnostic restructure) and for `sourceBreakdownSummary` + `clusterBundleMarkdown` (rich evidence/preview/metaLine/whyLine block), with the `<!-- ECHO cluster ${c.cluster_id} -->` trailing line REMOVED per 064's AC. Three outside-conflict-marker `rank_reason` reads converted to null-safe (`?.includes(...) ?? false` and `(c.rank_reason ?? []).filter(...)`) to honor 064 AC6's relaxation of `FindClustersCluster.rank_reason` to optional.
+
+  C3.5 cross-vendor consult: codex @ proceed-with-modifications — applied 1 modification: `AnswerView.tsx:178` rewrote opaque `c.cluster_id` UUID fallback to `"Recent cluster"` literal (also switched `??` to `||` for empty-string label hygiene), preventing 064's compact `label: null` from leaking UUIDs into the human-facing "Top recent clusters" markdown.
+
+  Fixups applied:
+  - (none — sidecar listed none; merge proceeded directly to conflict handling)
+
+  Fixups deferred to follow-up items:
+  - (none)
+
+  Verify: 1133/1155 root tests pass (1 pre-declared flake, 21 skipped); 73/73 Raycast tests pass; lint, typecheck, and sync-skills --check all clean post-merge.
+
+  Follow-up items (non-blocking) — see backlog/_followups.md:
+  - Add wire-shape test that exercises `src/mcp/wire-shape/compact.ts:184` `inferSourceKind` returning `'unknown'` so the universal-only fallback path is explicitly pinned.
+  - Promote the rich/compact dispatch in `src/mcp/tools/find-clusters.ts:240-247` to a typed `CompactFindClustersResult` (currently relies on `as unknown as FindClustersResult` cast).
+  - Restart resident daemon on 127.0.0.1:38478 after merge so live Raycast hits the new projection (covered by post-Step-D founder-in-the-loop bringup pause).
+  - Investigate `tests/mcp/recent-calls-endpoint.test.ts` 5s timeout flake separately — pre-existing on main, accepted at C5 by founder for this merge.
 ---
 
 # Why

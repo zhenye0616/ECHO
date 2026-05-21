@@ -175,7 +175,13 @@ export function AnswerView({ query, agentKind, preferences, repoPath, forkedFrom
     );
   }
 
-  const topClustersMarkdown = topClusters.map((c) => `- ${c.label?.trim() ?? c.cluster_id} (${c.atom_ids.length} atoms)`).join("\n");
+  const topClustersMarkdown = topClusters
+    .map((c) => {
+      const label = c.label?.trim() || "Recent cluster";
+      const atoms = c.atom_ids.length === 1 ? "1 atom" : `${c.atom_ids.length} atoms`;
+      return `- ${label} (${atoms})`;
+    })
+    .join("\n");
   const fullMarkdown = [
     "# Ask ECHO",
     "",

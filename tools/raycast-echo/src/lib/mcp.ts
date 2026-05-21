@@ -39,12 +39,12 @@ export interface SearchResult {
 
 export interface FindClustersCluster {
   cluster_id: string;
-  rank: number;
-  rank_reason: string[];
+  rank?: number;
+  rank_reason?: string[];
   atom_ids: string[];
   source_breakdown: Record<string, number>;
   time_range: { from: string; to: string };
-  label?: string;
+  label?: string | null;
 }
 
 export interface FindClustersResult {
@@ -83,7 +83,7 @@ export class EchoDaemonError extends Error {
 }
 
 export async function findClusters(): Promise<FindClustersResult> {
-  return callTool<FindClustersResult>("find_clusters", {});
+  return callTool<FindClustersResult>("find_clusters", { view: "compact" });
 }
 
 export async function searchMemories(query: string, limit = 15): Promise<SearchResult> {
@@ -95,7 +95,7 @@ export async function getAtom(id: string): Promise<GetAtomResult> {
 }
 
 export async function getAtoms(atomIds: readonly string[], format: "minimal" = "minimal"): Promise<GetAtomsResult> {
-  return callTool<GetAtomsResult>("get_atoms", { atom_ids: [...atomIds], format });
+  return callTool<GetAtomsResult>("get_atoms", { atom_ids: [...atomIds], format, view: "compact" });
 }
 
 async function callTool<T>(name: string, args: Record<string, unknown>, timeoutMs = 2_000): Promise<T> {

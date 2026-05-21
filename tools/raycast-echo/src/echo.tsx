@@ -248,7 +248,7 @@ function useClusterPreviews(clusters: readonly FindClustersCluster[]): Map<strin
 
 function ClusterRow({ cluster, previews, primary, onAsk }: { cluster: FindClustersCluster; previews: readonly EchoAtom[] | null; primary: PrimaryDetection | null; onAsk: (query: string) => void }) {
   const askQuery = cluster.label?.trim().length ? `tell me about "${cluster.label.trim()}"` : "summarize this cluster";
-  const isOpenLoop = cluster.rank_reason.includes("has_open_loop");
+  const isOpenLoop = cluster.rank_reason?.includes("has_open_loop") ?? false;
   const titleText = cluster.label?.trim() || atomsLabel(cluster.atom_ids.length);
   const sourcesSummary = sourceBreakdownSummary(cluster.source_breakdown);
   const subtitle = [isOpenLoop ? "Open loop" : null, sourcesSummary].filter((s) => s !== null && s.length > 0).join(" · ");
@@ -363,13 +363,13 @@ function clusterPreviewSnippet(content: string | undefined): string {
 
 function clusterBundleMarkdown(c: FindClustersCluster, previews: readonly EchoAtom[] | null): string {
   const title = c.label?.trim() || atomsLabel(c.atom_ids.length);
-  const isOpenLoop = c.rank_reason.includes("has_open_loop");
+  const isOpenLoop = c.rank_reason?.includes("has_open_loop") ?? false;
   const breakdown = sourceBreakdownSummary(c.source_breakdown);
   const span = `${formatPdtTimestamp(c.time_range.from)} → ${formatPdtTimestamp(c.time_range.to)}`;
   const metaLine = [isOpenLoop ? "Open loop" : null, atomsLabel(c.atom_ids.length), breakdown, span]
     .filter((s) => s !== null && s.length > 0)
     .join(" · ");
-  const otherReasons = c.rank_reason.filter((r) => r !== "has_open_loop");
+  const otherReasons = (c.rank_reason ?? []).filter((r) => r !== "has_open_loop");
   const whyLine = otherReasons.length > 0 ? `_why: ${otherReasons.join(", ")}_` : "";
 
   let evidenceBlock: string;
@@ -391,7 +391,7 @@ function clusterBundleMarkdown(c: FindClustersCluster, previews: readonly EchoAt
 
   const lines = [`# ${title}`, "", `_${metaLine}_`];
   if (whyLine.length > 0) lines.push(whyLine);
-  lines.push("", "**Preview**", "", evidenceBlock, "", `<!-- ECHO cluster ${c.cluster_id} -->`);
+  lines.push("", "**Preview**", "", evidenceBlock);
   return lines.join("\n");
 }
 
