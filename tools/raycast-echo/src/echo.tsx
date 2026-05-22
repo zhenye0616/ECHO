@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   derivedApp,
   formatAtomBundle,
+  formatHeroLine,
   formatPdtTimestamp,
   type DerivedApp,
   type EchoAtom,
@@ -31,7 +32,7 @@ import {
 import { detectPrimary, pasteIntoFrontmost, showLaunchToast, type PrimaryDetection } from "./lib/launch";
 import { normalizeAgentKind, type AgentKind } from "./lib/agent-profiles";
 import { useSessions, formatRelativeTime, type Session } from "./lib/sessions";
-import { EmptyState } from "./components/EmptyState";
+import { EmptyState, agentIcon } from "./components/EmptyState";
 import { TypingState, ForkTypingState } from "./components/TypingState";
 import { AnswerView } from "./components/AnswerView";
 import { SessionsList } from "./components/SessionsList";
@@ -77,7 +78,7 @@ export default function EchoContext() {
   const clusterPreviews = useClusterPreviews(clusters);
   const { matches, isLoadingMatches } = useMatches(query);
   const primary = usePrimary();
-  const { sessions, warmSession, refresh: refreshSessions } = useSessions();
+  const { sessions, refresh: refreshSessions } = useSessions();
 
   function openSessions() {
     push(<SessionsList onForkSession={openFork} onNewAsk={newAsk} onOpenSessions={openSessions} />);
@@ -120,6 +121,18 @@ export default function EchoContext() {
       onToggleDetail={toggleDetail}
     />
   );
+  const renderHeroCluster = (cluster: FindClustersCluster, linkedSession: Session | null) => (
+    <ClusterRow
+      key={`hero-${cluster.cluster_id}`}
+      cluster={cluster}
+      previews={clusterPreviews.get(cluster.cluster_id) ?? null}
+      primary={primary}
+      sessions={sessions}
+      onAsk={runAsk}
+      onToggleDetail={toggleDetail}
+      heroPresentation={buildHeroPresentation(cluster, linkedSession)}
+    />
+  );
   const renderMatch = (match: SearchMatch) => <MatchRow key={match.id} match={match} onToggleDetail={toggleDetail} />;
 
   if (query.length === 0) {
@@ -130,8 +143,7 @@ export default function EchoContext() {
         clusters={clusters}
         isLoading={isLoadingClusters}
         sessions={sessions}
-        warmSession={warmSession}
-        renderCluster={renderCluster}
+        renderHeroCluster={renderHeroCluster}
         onOpenSession={openSession}
         onOpenSessions={openSessions}
         onForkSession={openFork}
@@ -276,6 +288,18 @@ export interface ClusterResumeState {
   resumeChip: { text: string; tooltip?: string } | null;
 }
 
+interface ClusterAccessory {
+  text: string;
+  tooltip?: string;
+}
+
+interface ClusterHeroPresentation {
+  title: string;
+  subtitle: string;
+  linkedSession: Session | null;
+  accessory: ClusterAccessory;
+}
+
 const CLUSTER_RESUME_STATUSES: ReadonlyArray<Session["status"]> = ["running", "done"];
 
 export function deriveClusterResumeState(cluster: FindClustersCluster, sessions: readonly Session[]): ClusterResumeState {
@@ -301,7 +325,40 @@ export function deriveClusterResumeState(cluster: FindClustersCluster, sessions:
   };
 }
 
-export function ClusterRow({ cluster, previews, primary, sessions, onAsk, onToggleDetail }: { cluster: FindClustersCluster; previews: readonly EchoAtom[] | null; primary: PrimaryDetection | null; sessions: readonly Session[]; onAsk: (query: string, options?: RunAskOptions) => void; onToggleDetail: () => void }) {
+export function unresolvedOpenLoopCount(cluster: FindClustersCluster): number {
+  return (cluster.open_loop_hints ?? []).filter((h) => h.resolved === false).length;
+}
+
+function buildHeroPresentation(cluster: FindClustersCluster, linkedSession: Session | null): ClusterHeroPresentation {
+  const app = dominantApp(cluster);
+  const sourceSummary = sourceBreakdownSummary(cluster.source_breakdown);
+  return {
+    title: formatHeroLine(cluster.label, unresolvedOpenLoopCount(cluster)),
+    subtitle: formatRelativeTime(cluster.time_range.to),
+    linkedSession,
+    accessory: linkedSession !== null
+      ? { text: linkedSession.agentKind, tooltip: `linked session started ${formatRelativeTime(linkedSession.startedAt)}` }
+      : { text: APP_META[app].label, tooltip: sourceSummary.length > 0 ? sourceSummary : undefined },
+  };
+}
+
+export function ClusterRow({
+  cluster,
+  previews,
+  primary,
+  sessions,
+  onAsk,
+  onToggleDetail,
+  heroPresentation,
+}: {
+  cluster: FindClustersCluster;
+  previews: readonly EchoAtom[] | null;
+  primary: PrimaryDetection | null;
+  sessions: readonly Session[];
+  onAsk: (query: string, options?: RunAskOptions) => void;
+  onToggleDetail: () => void;
+  heroPresentation?: ClusterHeroPresentation;
+}) {
   const askQuery = cluster.label?.trim().length ? `tell me about "${cluster.label.trim()}"` : "summarize this cluster";
   const titleText = displayLabel(cluster.label) ?? labelFromPreviews(previews) ?? atomsLabel(cluster.atom_ids.length);
   const sourcesSummary = sourceBreakdownSummary(cluster.source_breakdown);
@@ -314,7 +371,37 @@ export function ClusterRow({ cluster, previews, primary, sessions, onAsk, onTogg
   // file (when one clearly dominates), session-resume state (when a prior
   // cluster session exists), and recency. Each is gated on meaningful data
   // so empty/codex-only clusters don't get spurious chips.
-  const accessories: { text: string; tooltip?: string }[] = [];
+  const accessories = heroPresentation !== undefined
+    ? [heroPresentation.accessory]
+    : clusterAccessories(cluster, previews, resume);
+
+
+  return (
+    <List.Item
+      icon={heroPresentation?.linkedSession !== undefined && heroPresentation.linkedSession !== null ? agentIcon(heroPresentation.linkedSession.agentKind) : appIconFor(dominantApp(cluster))}
+      title={heroPresentation?.title ?? titleText}
+      subtitle={heroPresentation?.subtitle ?? subtitle}
+      accessories={accessories}
+      detail={<List.Item.Detail markdown={bundle} />}
+      actions={
+        <ActionPanel>
+          <Action title={resume.primaryActionTitle} icon={resume.primaryActionIcon} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id })} />
+          <Action title="Ask Again from This Cluster" icon={Icon.RotateClockwise} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id, forceFreshAgent: true })} />
+          <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={bundle} />
+          <Action title="Paste in Frontmost App" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} onAction={() => void pasteCluster(cluster, primary)} />
+          <Action title="Toggle Detail Panel" icon={Icon.Sidebar} shortcut={{ modifiers: ["cmd", "shift"], key: "d" }} onAction={onToggleDetail} />
+        </ActionPanel>
+      }
+    />
+  );
+}
+
+function clusterAccessories(
+  cluster: FindClustersCluster,
+  previews: readonly EchoAtom[] | null,
+  resume: ClusterResumeState,
+): ClusterAccessory[] {
+  const accessories: ClusterAccessory[] = [];
   const loopChip = openLoopChipText(cluster);
   if (loopChip !== null) {
     const stats = openLoopStats(cluster);
@@ -332,26 +419,7 @@ export function ClusterRow({ cluster, previews, primary, sessions, onAsk, onTogg
     accessories.push(resume.resumeChip);
   }
   accessories.push({ text: formatRelativeTime(cluster.time_range.to), tooltip: formatPdtTimestamp(cluster.time_range.to) });
-
-
-  return (
-    <List.Item
-      icon={appIconFor(dominantApp(cluster))}
-      title={titleText}
-      subtitle={subtitle}
-      accessories={accessories}
-      detail={<List.Item.Detail markdown={bundle} />}
-      actions={
-        <ActionPanel>
-          <Action title={resume.primaryActionTitle} icon={resume.primaryActionIcon} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id })} />
-          <Action title="Ask Again from This Cluster" icon={Icon.RotateClockwise} shortcut={{ modifiers: ["cmd", "shift"], key: "r" }} onAction={() => onAsk(askQuery, { clusterId: cluster.cluster_id, forceFreshAgent: true })} />
-          <Action.CopyToClipboard title="Copy Bundle" icon={Icon.Clipboard} content={bundle} />
-          <Action title="Paste in Frontmost App" icon={Icon.ArrowDown} shortcut={{ modifiers: ["cmd", "shift"], key: "return" }} onAction={() => void pasteCluster(cluster, primary)} />
-          <Action title="Toggle Detail Panel" icon={Icon.Sidebar} shortcut={{ modifiers: ["cmd", "shift"], key: "d" }} onAction={onToggleDetail} />
-        </ActionPanel>
-      }
-    />
-  );
+  return accessories;
 }
 
 function MatchRow({ match, onToggleDetail }: { match: SearchMatch; onToggleDetail: () => void }) {

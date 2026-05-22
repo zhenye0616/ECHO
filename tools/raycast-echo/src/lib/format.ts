@@ -78,3 +78,13 @@ export function formatAtom(atom: EchoAtom): string {
 export function formatAtomBundle(atoms: readonly EchoAtom[]): string {
   return atoms.map(formatAtom).join("\n---\n");
 }
+
+export function formatHeroLine(label: string | null | undefined, unresolvedCount: number): string {
+  const trimmed = label?.trim();
+  const base = trimmed === undefined || trimmed.length === 0 ? "Untitled work" : truncate(trimmed, 60);
+  return `Continue: ${base} · ${unresolvedCount} open`;
+}
+
+function truncate(value: string, limit: number): string {
+  return value.length <= limit ? value : `${value.slice(0, limit - 3)}...`;
+}

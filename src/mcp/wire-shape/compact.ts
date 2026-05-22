@@ -13,6 +13,11 @@ export interface CompactClusterInput {
   open_loop_hints_omitted?: number;
 }
 
+export type CompactRankReason =
+  | 'has_open_loop'
+  | 'has_unresolved_open_loop'
+  | 'code_session_anchor';
+
 export interface CompactCluster {
   cluster_id: string;
   atom_ids: string[];
@@ -23,7 +28,7 @@ export interface CompactCluster {
   open_loop_hints_omitted?: number;
   atom_ids_truncated?: true;
   atom_ids_total?: number;
-  rank_reason?: ['has_open_loop'];
+  rank_reason?: CompactRankReason[];
 }
 
 export interface CompactAtomInput {
@@ -46,6 +51,15 @@ export interface CompactAtom {
 
 const UUID_FALLBACK_LABEL =
   /^discussion about [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const COMPACT_RANK_REASONS = new Set<string>([
+  'has_open_loop',
+  'has_unresolved_open_loop',
+  'code_session_anchor',
+]);
+
+function isCompactRankReason(reason: string): reason is CompactRankReason {
+  return COMPACT_RANK_REASONS.has(reason);
+}
 
 export function compactCluster(cluster: CompactClusterInput): CompactCluster {
   const out: CompactCluster = {
@@ -63,9 +77,8 @@ export function compactCluster(cluster: CompactClusterInput): CompactCluster {
   }
   if (cluster.atom_ids_truncated !== undefined) out.atom_ids_truncated = cluster.atom_ids_truncated;
   if (cluster.atom_ids_total !== undefined) out.atom_ids_total = cluster.atom_ids_total;
-  if (cluster.rank_reason?.includes('has_open_loop') === true) {
-    out.rank_reason = ['has_open_loop'];
-  }
+  const rankReason = (cluster.rank_reason ?? []).filter(isCompactRankReason);
+  if (rankReason.length > 0) out.rank_reason = rankReason;
   return out;
 }
 
