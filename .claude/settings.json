@@ -21,7 +21,9 @@
       "Bash(cargo:*)",
       "Bash(pytest:*)",
       "Bash(node:*)",
-      "Bash(date:*)"
+      "Bash(date:*)",
+      "Bash(git push origin main)",
+      "Bash(git push origin HEAD:main:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -31,7 +33,12 @@
       "Bash(scp:*)"
     ],
     "ask": [
-      "Bash(git push origin main:*)"
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push origin --delete:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git commit --amend:*)"
     ]
   }
 }

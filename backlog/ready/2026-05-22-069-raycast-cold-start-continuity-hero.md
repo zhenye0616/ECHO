@@ -1,0 +1,212 @@
+---
+id: 2026-05-22-069-raycast-cold-start-continuity-hero
+title: "Raycast cold-start continuity hero — confidence-gated 'where you left off' row, replacing the over-approximating Open loops list"
+status: ready
+priority: HIGH
+estimate: 0.5-1d
+created: 2026-05-22
+blocked_by: []
+task_state_ref: 2026-05-22-069-raycast-cold-start-continuity-hero
+requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  - src/trace/rank.ts  # AC1 — replace the over-approximating has_open_loop signal with has_unresolved_open_loop (counts only hints whose `resolved === false`); add code_session_anchor signal; ranking chain unchanged
+  - src/trace/types.ts  # AC1 — extend RankSignals to include has_unresolved_open_loop + code_session_anchor; keep has_open_loop for backwards compat (deprecated but not removed in V1)
+  - tools/raycast-echo/src/components/EmptyState.tsx  # AC2 — replace `Open loops · Today` section (lines 31-49) with a single conditional `Continue` hero row gated by the V1 confidence contract
+  - tools/raycast-echo/src/echo.tsx  # AC2 — surface unresolved-count + selected code anchor to the hero render path
+  - tools/raycast-echo/src/lib/format.ts  # AC2 — formatHeroLine(label?, unresolvedCount, codeAnchor?) helper, kept narrow
+  - tests/trace/rank.test.ts  # AC3 — new cases pinning the unresolved-only semantics and the code_session_anchor signal
+  - tools/raycast-echo/test/empty-state-hero.test.tsx  # AC3 — new file pinning the four hero-gate decision branches (running session / gate-pass / gate-fail / cold-start)
+
+spec_refs:
+  - tools/raycast-echo/src/echo.tsx  # current landing surface; `warmSession` Resume + Open loops · Today + sessions buckets
+  - tools/raycast-echo/src/components/EmptyState.tsx  # the over-approximating Open loops · Today section that this spec replaces (lines 31-49); filters by `c.rank_reason?.includes("has_open_loop") === true` and shows up to 3
+  - tools/raycast-echo/src/lib/sessions.ts  # `status: "running"` detection (lines 8-24, 85-98) — first gate of the hero contract
+  - src/trace/rank.ts  # current `hasOpenLoop = cluster.open_loop_hints.length > 0` at lines 79-87 — counts resolved hints, the over-approximation bug this spec fixes
+  - src/trace/hints.ts  # `OpenLoopHintEnriched.resolved` boolean (line 76) — the field the new signal must consult
+  - src/trace/types.ts  # `RankSignals` shape (line 104) — extension target
+  - src/mcp/internal/cluster-engine.ts  # cluster engine that emits open_loop_hints into clusters (lines 200-280) — read-only reference; not modified
+  - src/mcp/wire-shape/compact.ts  # passes through rank_reason in compact projection — read to ensure no wire-shape change is needed for the new signal
+  - src/capture/sources.ts  # current capture sources (Cursor + Claude Code + Codex + git only) — boundary for what an open loop can be derived from
+  - backlog/complete/2026-05-19-063-raycast-sessions-as-objects.md  # sessions-as-objects model that the hero links to
+  - backlog/complete/2026-05-20-065-raycast-cluster-resume.md  # cluster-resume singleflight; hero respects existing session-lookup behavior
+  - backlog/_followups.md  # codex strategist consult on confidence contract (2026-05-22 brainstorm); cold-start friction taxonomy
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+review_notes: ""
+agent_notes: ""
+---
+
+# Raycast cold-start continuity hero
+
+## Why this spec exists
+
+ECHO Raycast's landing view today (`tools/raycast-echo/src/components/EmptyState.tsx:31-49`) shows up to three clusters filtered by `c.rank_reason?.includes("has_open_loop")`. The signal name implies these are unfinished threads worth resuming, but the underlying definition counts **any** open-loop hint — including hints that the resolver in `src/trace/hints.ts:39-95` already marked `resolved: true`. The over-approximation means the section regularly elevates threads where the user already answered their own question or where a later turn closed the loop.
+
+The product brief from the founder reframes the landing view: *"ECHO is the first thing to open to check where the user left off from last session. Display minimum amount of clean info to assist the user get their train of thought back on one or multiple projects, with the option to dive into details with their own choice of coding agent."* That's a continuity-first surface, not a feed. The current Open-loops section serves the feed reading and burns trust the first time it surfaces a closed loop.
+
+069 closes the gap by (a) tightening the open-loop signal to count only unresolved hints, and (b) replacing the up-to-three Open-loops list with a single confidence-gated **Continue** hero row that fires only when ECHO has strong evidence the user has somewhere specific to resume.
+
+## Cold-start friction this addresses (from the codex consult)
+
+At first open of the day the operator reconstructs five things in priority order:
+
+1. *What was I trying to finish?* — picked up by hero label/title.
+2. *What was the unresolved next step?* — picked up by the `<N> open` unresolved-count badge.
+3. *What changed in code since I last reasoned?* — V1.5+; out of scope (see Out of Scope §3).
+4. *Which agent/tool holds the latest useful reasoning?* — partially served today by `agentKind` on the secondary list rows; not expanded in 069.
+5. *Can I resume without duplicating work?* — already shipped by 065 (cluster_id singleflight); 069 preserves the click-through path unchanged.
+
+069 closes items 1 and 2 explicitly. The rest are deferred.
+
+## The minimum-viable fix (80% ROI cut)
+
+**What ships in 069:**
+
+- One new `RankSignals` field: `has_unresolved_open_loop` (counts hints where `resolved === false`).
+- One new `RankSignals` field: `code_session_anchor` (cluster has any of: `repo_root` artifact, file-ref artifacts, a git-source atom, a linked session via `cluster_id`, OR ≥3 distinct apps in `source_breakdown`).
+- The existing `has_open_loop` field is **kept** for backwards compatibility; nothing else in the codebase changes because of it. It is marked deprecated in a header comment and no longer drives Raycast UI.
+- Raycast `EmptyState`'s "Open loops · Today" section (`tools/raycast-echo/src/components/EmptyState.tsx:31-49`) is **replaced** with a single conditional `Continue` hero row, gated by the V1 confidence contract below.
+- Hero text shape: `Continue: <label or newest USER preview, truncated 60 chars> · <N> open` — where `<N>` is the count of unresolved hints in the elevated cluster. **No "dominant file/repo" suffix in V1** (deferred per Out of Scope §1).
+- All existing surfaces below the hero (sessions buckets, search bar, EmptyView) are untouched.
+
+**The V1 confidence contract.** Hero fires iff EITHER:
+
+- A `running` session exists in `useSessions()` (`tools/raycast-echo/src/lib/sessions.ts:85-98`) — this is the existing `warmSession` path, just promoted to the hero slot, OR
+- The top cluster (rank 0 from `findClusters({since: -18h})`) satisfies ALL THREE:
+  - `has_unresolved_open_loop === true`
+  - `time_range.most_recent` is within the last 18h
+  - `code_session_anchor === true`
+
+Otherwise: no hero row. The user sees only the existing sessions buckets and search bar. No fallback to "best guess" — the V1 contract explicitly prefers an empty hero slot over a low-confidence promotion (codex consult: *"the costly failure is trust erosion: if the first row is often wrong, the user starts scanning past ECHO's opinion"*).
+
+**Why the 18h window.** Operator-cohort heuristic for "last session boundary" — sleep, weekend break, after-lunch context switch. Below 18h, freshness is meaningful; above, the user almost certainly does NOT mean "resume yesterday's work" without explicit query. Tunable in V1.5 from dogfooding evidence.
+
+## Architectural invariant
+
+The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO cannot anchor it to (a) a running session, OR (b) all three of {unresolved hint, fresh, code-anchored}. There is no fallback / "best guess" hero. Trust is preserved by making the hero's appearance itself the confidence signal: it appears iff ECHO is confident.
+
+## Acceptance Criteria
+
+### AC1 — `src/trace/rank.ts` gains `has_unresolved_open_loop` + `code_session_anchor` signals; `has_open_loop` preserved but deprecated
+
+- `RankSignals` (`src/trace/types.ts:104`) extends to include `has_unresolved_open_loop: boolean` and `code_session_anchor: boolean`.
+- `signalsFor(cluster)` (around `src/trace/rank.ts:79-87`):
+  - `has_unresolved_open_loop` = `cluster.open_loop_hints.some(h => h.resolved === false)`.
+  - `code_session_anchor` = any of:
+    - cluster has any artifact whose `kind` is `repo_root`, `file_ref`, OR `commit` (kinds enumerated in `src/normalize/artifacts.ts` — reviewer to confirm exact kind names against current code)
+    - cluster's `atom_ids` include at least one atom with `source_app === 'git'`
+    - cluster has a `cluster_id` for which `useSessions()` returns at least one session (this lookup is Raycast-side; the rank signal is the looser substrate-side check: cluster has `cluster_id !== undefined`)
+    - `Object.keys(cluster.source_breakdown).length >= 3`
+- `has_open_loop` is unchanged in semantics for backwards compat; a header comment at `src/trace/rank.ts` documents that it is **deprecated for V1+ UI use** and Raycast must consume `has_unresolved_open_loop`. Existing tests that assert on `has_open_loop` are not modified.
+- `rank_reason` strings: when `has_unresolved_open_loop` is true, append `'has_unresolved_open_loop'` to `rank_reason`. The existing `'has_open_loop'` reason continues to be emitted whenever the old condition holds (a cluster can have both reasons in `rank_reason`; that's fine for V1).
+- The 5-key ranking chain (`hint > openLoop > recent > size > ...`) is **unchanged**. The new signals are surfaced for downstream consumers; they do not (yet) re-order the chain.
+
+### AC2 — Raycast `EmptyState` replaces "Open loops · Today" with a single confidence-gated Continue hero row
+
+- **Removed:** the `Open loops · Today` `<List.Section>` (currently at `tools/raycast-echo/src/components/EmptyState.tsx:31-49`).
+- **Added:** a `Continue` hero `<List.Section title="Continue">` containing exactly zero or one `<List.Item>`, computed by:
+
+  ```ts
+  function pickHero(clusters, sessions): HeroPick | null {
+    const running = sessions.find((s) => s.status === 'running');
+    if (running) return { kind: 'running', session: running };
+    const top = clusters[0];
+    if (!top) return null;
+    const fresh = (Date.now() - new Date(top.time_range.most_recent).getTime()) < 18 * 60 * 60 * 1000;
+    const reasons = top.rank_reason ?? [];
+    const unresolved = reasons.includes('has_unresolved_open_loop');
+    const anchored = reasons.includes('code_session_anchor');  // emitted by AC1 when signal true
+    if (fresh && unresolved && anchored) return { kind: 'cluster', cluster: top };
+    return null;
+  }
+  ```
+
+  - AC1 must additionally include `'code_session_anchor'` in `rank_reason` whenever the signal is true (one line in `rankReasonsFor`).
+  - When `pickHero` returns `null`, the `<List.Section title="Continue">` is omitted entirely (no empty section header).
+
+- **Hero row content:**
+  - Title: `formatHeroLine(label, unresolvedCount)` returns `Continue: <label-or-preview> · <N> open` where `<label-or-preview>` is `cluster.label` if present (truncated to 60 chars) else the newest USER atom's text preview from `cluster.atom_ids[last]` (also 60 chars; same truncation as `truncate(value, 60)` at `tools/raycast-echo/src/components/EmptyState.tsx:130-134`).
+  - Subtitle: `formatRelativeTime(cluster.time_range.most_recent)` (`tools/raycast-echo/src/lib/sessions.ts` already exports this).
+  - Accessories: agent icon resolved from the linked session if any, else from `source_breakdown` (codex.tsx-equivalent: highest-count source = primary agent). One accessory only.
+  - Action panel: identical to the existing cluster-row actions (`renderCluster(cluster)`'s ActionPanel in `echo.tsx`), so cluster-resume (065) and ask-again behaviors are preserved.
+  - For the `running` session variant: identical to the existing `SessionRow` content, but rendered inside the `Continue` section instead of `Resume` (the section title becomes the unified label; the old `Resume` section is removed in favor of `Continue`).
+
+- **No new visual styling** beyond Raycast's standard `List.Item` accessories. No iconography changes. No color tinting changes beyond `agentIcon()`.
+
+### AC3 — Tests pin the contract
+
+- `tests/trace/rank.test.ts`: three new cases
+  1. Cluster with two hints, both `resolved: true` → `has_unresolved_open_loop === false`, `has_open_loop === true` (the old signal still fires; the new one doesn't).
+  2. Cluster with one hint `resolved: false` and three distinct source_apps → `has_unresolved_open_loop === true`, `code_session_anchor === true`, both reasons appear in `rank_reason`.
+  3. Cluster with a single hint `resolved: false` but only one source app and no repo/file/git/cluster_id anchors → `has_unresolved_open_loop === true`, `code_session_anchor === false` (anchor is independent of hint).
+
+- `tools/raycast-echo/test/empty-state-hero.test.tsx` (new file): four cases pinning the hero-pick decision tree
+  1. Running session exists → hero shows the running session row; no cluster-derived hero even if a high-confidence cluster also exists.
+  2. No running session; top cluster passes all three gates → hero shows the cluster row with `Continue: <label> · <N> open` title.
+  3. No running session; top cluster has unresolved hint and code anchor but `time_range.most_recent` is 20h ago → no hero (18h gate fails).
+  4. No running session; top cluster has unresolved hint and is fresh but `code_session_anchor === false` → no hero.
+
+- All existing tests in `tests/raycast-echo/` and `tests/trace/` continue to pass without modification.
+
+## Out of Scope (Don't Drift)
+
+1. **"Dominant file/repo" suffix on hero text.** The codex consult proposed `Continue: <label> · <N> open · <dominant file/repo>`. V1 ships only `Continue: <label> · <N> open`. The dominant-anchor selection logic (top file_ref by atom count, fallback to repo_root, fallback to dominant source_app) is V1.5; defer.
+2. **Additive ranking boosts** (failed tool, dirty git state, recent commit in cluster) — codex listed these as boosts above the gates. V1 ships gate-only. Boosts are V1.5+; they re-order the rank chain and need their own dogfooding window.
+3. **Cold-start friction items 3, 4, 5** (code-change diff visibility, agent-mix in hero, resume-singleflight UI). Items 3 and 4 are V1.5+; item 5 is already shipped via 065.
+4. **Adaptive grouping in secondary list** (the F/G/A decision from the brainstorm). V1 keeps the existing time-bucketed sections (Today / Yesterday / This week) unchanged. Adaptive grouping is V1.5+ if dogfooding shows the time buckets are insufficient for multi-project visibility.
+5. **Frontmost-app anchored hero.** Codex flagged that `tools/raycast-echo/src/lib/launch.ts:28-40` detects only app *name*, not CWD. Frontmost-CWD-based hero elevation requires a Cursor-side or shell-hook extension to expose working-directory at launch time; deferred until that exists.
+6. **Removing the deprecated `has_open_loop` signal.** Kept in place; only the Raycast UI consumer is migrated. Removal across MCP wire-shape, ranking, etc., is a separate cleanup spec — file as 069-follow-up only if a real consumer is found to depend on it post-merge.
+7. **Tuning the 18h window from config or env.** Hardcoded constant in V1. Tuning happens via a follow-up spec when dogfooding has 2+ data points of "the hero should/shouldn't have fired for this case."
+8. **New MCP tools or wire-shape changes.** No new MCP tool; no new fields in `find_clusters` wire shape beyond what `rank_reason` already conveys (the two new reason strings are additive to the existing `string[]`).
+9. **Per-tool / per-AI personalization.** The hero is the same shape regardless of which coding agent the user prefers; the `agentKind` preference already shipped (062/065) governs handoff target, not hero contents.
+10. **Visual polish.** No new icon set, no color theme changes, no animations. Standard Raycast `List.Item` patterns only.
+
+## Risks
+
+- **R1 — `has_unresolved_open_loop` is too tight in practice.** If the resolver in `src/trace/hints.ts` is more eager than the user's mental model (marks loops resolved when the user still considers them open), the hero will under-fire. Mitigation: AC3 Test 1 pins the resolved-vs-unresolved distinction; dogfooding within first 2 weeks of merge will surface false-negatives. V1.5 follow-up may tighten the resolver's R1.Q / R1.AQ / R1.TODO rules.
+
+- **R2 — `code_session_anchor` is too permissive.** `≥3 distinct apps in source_breakdown` could elevate a cluster spanning Cursor + Codex + git that's actually just incidental cross-tool noise. Mitigation: the gate is AND-composed with `has_unresolved_open_loop` and the 18h window; pure noise without an unresolved hint cannot promote.
+
+- **R3 — Removing the Open loops · Today list eliminates a section users may have depended on.** Users who currently scan that section will see only sessions buckets if no hero fires. Mitigation: the new contract is strictly higher-precision; what users were scanning was mostly noise. If dogfooding surfaces "I want to see the old list back," that's a follow-up spec for a `View → All open loops` action behind cmd-shift-O or similar — not a 069-scope rollback.
+
+- **R4 — Time-based 18h gate jitters around session boundaries.** Open a thread at 5pm, sleep, open Raycast at 9am next morning = 16h, hero fires. Same thread at 5pm Friday, open Monday morning = 63h, hero does NOT fire even though the user clearly means to resume. V1 accepts this as the V1.5 tuning surface; the cost of false-non-fire is "user types into search bar" — much cheaper than false-fire (trust erosion).
+
+- **R5 — `formatHeroLine` truncation collides with `cluster.label` quality.** If cluster labels are themselves noisy (UUID-fallback or low-quality auto-generated), the 60-char truncation reveals that noise. Mitigation: AC2 falls back to the newest USER atom preview when `cluster.label` is undefined; the truncate function matches existing patterns. Label quality is a separate substrate concern (item 064's compact view projection already addressed the worst UUID-fallback case).
+
+## Tests
+
+All test changes are additive — no existing test rewrites.
+
+- `tests/trace/rank.test.ts` — three new cases per AC3.
+- `tools/raycast-echo/test/empty-state-hero.test.tsx` — new file, four cases per AC3.
+
+Verify steps:
+- `npm test -- tests/trace/rank.test.ts tools/raycast-echo/test/empty-state-hero.test.tsx`
+- `npm test`
+- `npm run lint`
+- `npm run typecheck`
+
+## Definition of Done
+
+- AC1: `src/trace/rank.ts` exports `has_unresolved_open_loop` and `code_session_anchor` signals; deprecation comment present on `has_open_loop`; `rank_reason` strings include the two new reasons when their signals are true.
+- AC2: `tools/raycast-echo/src/components/EmptyState.tsx` no longer renders "Open loops · Today"; renders a single conditional `Continue` hero row per the `pickHero` decision tree; existing surfaces below the hero are byte-identical to pre-merge (modulo the unrelated reverts the merge naturally picks up).
+- AC3: All seven new test cases pass; all existing tests in `tests/trace/`, `tests/raycast-echo/`, and elsewhere continue to pass.
+- `npm test`, `npm run lint`, `npm run typecheck` all clean.
+- The merged code dogfoods cleanly on a real Raycast open: hero appears when expected, does NOT appear when expected (sanity check before review-pending).
+
+## After Completion (Strategist Notes)
+
+- **Wiki page candidate:** `wiki/surfaces/raycast-extension.md` (does not yet exist). If 069 ships AND a second Raycast-surface spec lands, write the page then. Single-spec basis = not enough; defer.
+- **Update `wiki/surfaces/mcp-find-clusters.md`** with one line noting the two new `rank_reason` strings (`has_unresolved_open_loop`, `code_session_anchor`) and what they mean.
+- **`backlog/_followups.md` annotations:** when 069 lands in `complete/`, append two entries:
+  - "Dominant file/repo suffix on hero text (V1.5)" — Out of Scope §1
+  - "Adaptive grouping in secondary list (V1.5+, dogfooding-evidence-gated)" — Out of Scope §4
+  - "Tune 18h window from dogfooding evidence (≥2 false-non-fire data points)" — Out of Scope §7
+- **Trigger for `has_open_loop` removal spec:** if no consumer outside the legacy ranking path is found to depend on it within 4 weeks of merge, file a one-paragraph cleanup spec to delete the signal and its `rank_reason` string. Until then, deprecated-but-present is fine.
+- **No new principle page.** Continuity-first surface design is one occurrence; promote on second occurrence per project rule.
