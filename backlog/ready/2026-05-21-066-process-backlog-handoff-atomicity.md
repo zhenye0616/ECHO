@@ -174,10 +174,12 @@ TASK_ID="${ITEM_ID}"
 POINTER="backlog/task-state/$TASK_ID/builder.md"
 
 # P1 recovery surfaces are the set of file paths this consumer's transition
-# touches and is allowed to roll back through git restore/rm. Do not reuse this
-# list as "all dirty files in the repo"; it is consumer-owned transition scope.
-P1_ALLOWED_RECOVERY_PREFIXES=("backlog/" "backlog/task-state/" "raw/internal/agent-runs/")
-P1_TOUCHED_SURFACES=("$ITEM_FILE" "$DEST" "$POINTER" "$LOG")
+# CREATES OR MUTATES. The run log ($LOG) is intentionally NOT in this set: it
+# is pre-existing agent-authored content written during E1 (before this stage
+# move), and the recovery procedure must NOT touch it — see r2 codex F2.
+# The transition only `git add`s $LOG inside the publish block (Step 3).
+P1_ALLOWED_RECOVERY_PREFIXES=("backlog/" "backlog/task-state/")
+P1_TOUCHED_SURFACES=("$ITEM_FILE" "$DEST" "$POINTER")
 
 p1_assert_allowed_recovery_surfaces() {
   local path prefix ok
@@ -202,43 +204,93 @@ p1_assert_allowed_recovery_surfaces() {
   done
 }
 
+# Returns 0 if `origin/main:$DEST` exists (boundary observed remotely).
+# This is the *real* durable boundary for this consumer — a local commit
+# alone is NOT sufficient (r2 codex F1 + codex-ops F5 convergent HIGH). The
+# next-process observability gate is the pushed ref on origin/main.
+p1_boundary_published_remotely() {
+  git fetch --quiet origin main 2>/dev/null || return 1
+  git cat-file -e "origin/main:$DEST" 2>/dev/null
+}
+
+# Detect the partial state where the local commit exists but the push
+# failed. recover_p1_stage_move's job is then to retry the push via the
+# existing push-with-retry pattern, NOT to roll back the local commit.
+p1_local_commit_unpushed() {
+  git cat-file -e "HEAD:$DEST" 2>/dev/null && ! p1_boundary_published_remotely
+}
+
 recover_p1_stage_move() {
   local surfaces=("$@")
+  local path
 
   p1_assert_allowed_recovery_surfaces "${surfaces[@]}" || return $?
 
-  if git cat-file -e "HEAD:$DEST" 2>/dev/null; then
-    # Already published in HEAD. Nothing to recover.
+  # State 1: boundary already observed remotely. Idempotent no-op.
+  if p1_boundary_published_remotely; then
     return 0
   fi
 
+  # State 2: local commit exists but push didn't land. Retry push (r2 codex F1 +
+  # codex-ops F5). DO NOT roll back the local commit — the commit is the
+  # half-finished transition that just needs its boundary observed remotely.
+  if p1_local_commit_unpushed; then
+    tools/review-queue/push-with-retry.sh "publish: $ITEM_ID" || return 3
+    p1_boundary_published_remotely || return 3
+    return 0
+  fi
+
+  # State 3: pre-commit dirty state. Roll back only this consumer's touched
+  # surfaces, then verify clean, then return so the caller can pull/rebase
+  # and replay. Rollback must run BEFORE pull/rebase — see comment block below.
   STATUS="$(git status --porcelain -- "${surfaces[@]}")"
   [ -z "$STATUS" ] && return 0
 
-  # Rollback must run BEFORE pull/rebase. A pull/rebase against a dirty index or
-  # dirty touched surface can abort or replay on top of a partial transition,
-  # turning a deterministic rollback into human triage. The safe order is:
-  # classify local partial state -> roll back only this consumer's touched
-  # surfaces -> verify clean -> pull/rebase -> replay the transition.
-  git restore --staged --worktree -- "${surfaces[@]}" 2>/dev/null || true
-
+  # Per-surface dispatch (r2 codex-ops F4): `git restore` aborts on pathspecs
+  # not in HEAD. Filter into "tracked-in-HEAD" (restore) vs "transition-created
+  # untracked" (unstage + rm) so neither branch can silently fail the way the
+  # earlier hidden `2>/dev/null || true` could.
   for path in "${surfaces[@]}"; do
-    if ! git cat-file -e "HEAD:$path" 2>/dev/null; then
+    if git cat-file -e "HEAD:$path" 2>/dev/null; then
+      git restore --staged --worktree -- "$path" || return 4
+    else
+      git rm --cached --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
       rm -f -- "$path"
     fi
   done
 
-  git diff --quiet -- "${surfaces[@]}"
-  git diff --cached --quiet -- "${surfaces[@]}"
+  # Verify clean. Return 5 (distinct code) if any touched surface is still
+  # dirty post-recovery — this is a hard failure, NOT human triage. The
+  # caller's `|| exit $?` guard turns this into a non-zero process exit
+  # without proceeding to pull/rebase.
+  git diff --quiet -- "${surfaces[@]}" || return 5
+  git diff --cached --quiet -- "${surfaces[@]}" || return 5
+
+  # Rollback ordering: this function runs BEFORE pull/rebase. A pull/rebase
+  # against a dirty index or dirty touched surface can abort or replay on top
+  # of a partial transition, turning a deterministic rollback into human
+  # triage. The safe order is: classify local partial state -> roll back only
+  # this consumer's touched surfaces -> verify clean -> pull/rebase ->
+  # replay the transition.
 }
 
-recover_p1_stage_move "${P1_TOUCHED_SURFACES[@]}"
-git pull --rebase origin main
+# Caller MUST guard the return code (r2 codex F3) — recovery failures must
+# block pull/publish. Without `|| exit $?`, the transcript can proceed to
+# pull/rebase on top of a partial-but-not-recovered state.
+recover_p1_stage_move "${P1_TOUCHED_SURFACES[@]}" || exit $?
 
-# Idempotency after pull: a completed prior run is a no-op.
-if git cat-file -e "HEAD:$DEST" 2>/dev/null && [ ! -f "$ITEM_FILE" ]; then
+# Re-check the remote boundary after recovery. If recovery's State 2 branch
+# retried the push successfully, we exit here without pulling — the boundary
+# is observed remotely and the transition is complete.
+if p1_boundary_published_remotely; then
   exit 0
 fi
+
+git pull --rebase origin main
+
+# Idempotency after pull: a completed prior run that already reached the
+# remote boundary is observed via p1_boundary_published_remotely (above), so
+# we only reach here if there's real publish work to do.
 
 # Step 1 - edit handoff metadata on the source path.
 # Edit head_sha / pr_url / agent_notes in place on $ITEM_FILE.
@@ -264,21 +316,50 @@ fi
 
 # Step 3 - durable publish block. No subprocess that can wait on network,
 # no prose edit, and no tool startup belongs between git mv and git commit.
+# After git commit, push-with-retry.sh is the boundary publisher — its
+# success is what makes origin/main:$DEST observable, which IS the durable
+# boundary for this consumer (r2 codex F1 + codex-ops F5).
 git mv "$ITEM_FILE" "$DEST"
 git add "$DEST"
 [ -f "$POINTER" ] && git add "$POINTER"
 git add "$LOG"
 git commit -m "review: $ITEM_ID"
-git push origin main
+tools/review-queue/push-with-retry.sh "review: $ITEM_ID"
+
+# Final boundary verification: the push-with-retry helper is the publisher,
+# but the boundary CONTRACT requires us to confirm the remote observed it.
+# If this check fails after push-with-retry returned 0, we have a serious
+# integrity problem (network split or remote rejected the push silently) —
+# exit non-zero so the next process can re-run recovery's State 2 branch.
+p1_boundary_published_remotely || { echo "ERROR: push reported success but origin/main:$DEST not visible" >&2; exit 6; }
 ```
 
-The recovery guard's surface list is parameterized by design. For this consumer, the touched file surfaces are the source item path, destination item path, optional builder pointer, and run log. For the future merger consumer, a separate `recover_p1_merge_publish()` should use the same shape with that consumer's touched surfaces, such as pending-review item, complete item, sidecar, and any branch/worktree resources guarded by equivalent consumer-specific checks. 066 does not implement that merger function.
+The recovery guard's surface list is parameterized by design. For this consumer, the touched file surfaces are the source item path, destination item path, and optional builder pointer — the run log is **explicitly excluded** because it is pre-existing agent-authored content that the transition only `git add`s (r2 codex F2). For the future merger consumer, a separate `recover_p1_merge_publish()` should use the same shape with that consumer's touched surfaces (pending-review item, complete item, sidecar, branch/worktree resources) and that consumer's own boundary definition. 066 does not implement that merger function.
+
+**The durable boundary for this consumer is `origin/main:$DEST` existing**, not the local commit. A local commit is a necessary intermediate state but not the boundary observers gate on. The `p1_boundary_published_remotely` helper IS the observability gate; `push-with-retry.sh` is the publisher. The corresponding `DurableBoundaryObservation` declared by this consumer's fixture is:
+
+```ts
+{
+  kind: "pushed-ref",
+  count: 1,
+  token: "origin/main:" + DEST,
+  published: <result of p1_boundary_published_remotely>,
+  observerScope: "remote",
+}
+```
 
 Load-bearing corrections preserved from r1 review:
 
 1. `git add "$DEST"` after `git mv` is required. It stages the edited destination contents; `git mv` alone can stage the rename at the old blob.
 2. `--spec-path "$DEST"` is required even though the patcher runs before `git mv`, because the patcher records that argument verbatim into `canonical_anchors.spec`.
 3. Tests that inspect the commit shape MUST use `git diff-tree -r -M --no-commit-id --name-status HEAD` or an equivalent recursive, rename-detecting command.
+
+Load-bearing corrections from r2 review:
+
+4. The durable boundary is `origin/main:$DEST`, NOT the local commit (r2 codex F1 + codex-ops F5 convergent HIGH). Recovery's State 2 branch retries `push-with-retry.sh` when the local commit exists but the remote doesn't observe `$DEST` yet. AC3's specialization includes a remote-backed test that crashes between `git commit` and `push-with-retry.sh` and asserts the rerun retries the push.
+5. `$LOG` is NOT in `P1_TOUCHED_SURFACES` (r2 codex F2). The recovery procedure does not touch agent-authored content; it only rolls back transition-created mutations on `$ITEM_FILE`, `$DEST`, `$POINTER`.
+6. `recover_p1_stage_move`'s return code IS gated (r2 codex F3). The caller does `recover_p1_stage_move "${P1_TOUCHED_SURFACES[@]}" || exit $?` — a recovery failure (return 3/4/5) is a hard process exit, NOT a fall-through to pull/rebase.
+7. `git restore` is per-surface and split by HEAD existence (r2 codex-ops F4). For paths in HEAD, use `git restore --staged --worktree`; for transition-created untracked paths, use `git rm --cached --ignore-unmatch` followed by `rm -f`. No `2>/dev/null || true` hiding failures; each branch returns a distinct non-zero code if it can't complete.
 
 The generated command adapter MUST be refreshed with `tools/sync-skills.sh`, and `tools/sync-skills.sh --check` MUST exit 0 after the edit.
 
@@ -290,23 +371,29 @@ The specialization MUST parameterize:
 
 - Source path: `backlog/claimed/<id>.md`.
 - Destination path: `backlog/pending_review/<id>.md`.
-- Side-effect paths: `backlog/task-state/<id>/builder.md` when present, plus `raw/internal/agent-runs/<date>-<id>.md`.
+- Transition-touched paths (the `P1_TOUCHED_SURFACES` set): source item path, destination item path, optional builder pointer at `backlog/task-state/<id>/builder.md`. **The run log at `raw/internal/agent-runs/<date>-<id>.md` is NOT a touched surface for recovery purposes** — it is pre-existing agent-authored content that the publish block only `git add`s. (r2 codex F2)
 - Transition key: the work-item id.
-- Expected durable boundary: one local Git commit for the transition.
+- Expected durable boundary: `kind: "pushed-ref"`, `observerScope: "remote"`, `token: "origin/main:" + DEST`. (r2 codex F1 + codex-ops F5)
 - Expected committed file status: one rename for the item file, one modify for the task-state pointer when present, and one add for the run log.
-- Recovery recipe: the rollback-and-replay guard from AC2, not manual `git status` interpretation.
+- Recovery recipe: the three-state rollback-and-replay guard from AC2 (`p1_boundary_published_remotely` no-op / `p1_local_commit_unpushed` retry-push / pre-commit-dirty per-surface rollback), with caller-side `|| exit $?` return-code gating.
+
+**Test infrastructure note:** AC3 tests require a working `origin` remote so the boundary (`origin/main:$DEST`) is observable. Tests MUST use a **local bare repo as `origin`** — `git init --bare $TMPDIR/echo-test-origin-<uuid>.git` + `git remote add origin <bare>` + push to it. No real-network test, no GitHub. The local bare repo gives full push/fetch semantics without any external dependency. Each test gets its own bare repo, cleaned in `afterEach`.
 
 Required current-consumer tests:
 
-1. Pre-publish edits do not expose the target stage. After handoff metadata edit and task-state patcher execution, the item is still under the source path, the target path does not exist, and the index has no staged changes for the transition surfaces.
-2. The publish block creates one durable boundary containing all required surfaces. Assert with `git diff-tree -r -M --no-commit-id --name-status HEAD` so the harness sees file-level rename/modify/add entries and does not depend on local Git config.
-3. The committed destination contents include the edited handoff metadata. Read via `git show HEAD:backlog/pending_review/<id>.md` and assert `head_sha` is the edited value, proving `git add "$DEST"` is present.
-4. A crash after source metadata edit but before `git mv` is recovered by the recipe without an operator decision; after recovery, source state is clean and replay can publish.
-5. A crash after `git mv` but before `git add "$DEST"` is recovered by the same recipe without an operator decision; after recovery, source state is clean and replay can publish.
-6. Recovery refuses to run if the touched-surface list contains an absolute path, a `..` traversal, or a path outside the documented allowed prefixes. This pins the guard against a future bug that would otherwise run `git restore` or `rm` against unrelated work.
-7. Running recovery after the published commit is a no-op.
+1. **Pre-publish edits do not expose the target stage.** After handoff metadata edit and task-state patcher execution, the item is still under the source path, the target path does not exist, and the index has no staged changes for the transition surfaces.
+2. **The publish block creates one durable boundary containing all required surfaces.** Assert with `git diff-tree -r -M --no-commit-id --name-status HEAD` against the LOCAL commit's tree (rename/modify/add entries). Then assert the boundary is also OBSERVED REMOTELY by running `git fetch origin main` and checking `origin/main:$DEST` exists.
+3. **The committed destination contents include the edited handoff metadata.** Read via `git show HEAD:backlog/pending_review/<id>.md` and assert `head_sha` is the edited value, proving `git add "$DEST"` is present. Then run `git show origin/main:backlog/pending_review/<id>.md` and assert the same — proving the boundary is what observers see, not just the local index.
+4. **Crash after source metadata edit but before `git mv`** is recovered by the recipe without an operator decision; after recovery, source state is clean and replay can publish.
+5. **Crash after `git mv` but before `git add "$DEST"`** is recovered by the same recipe without an operator decision; after recovery, source state is clean and replay can publish.
+6. **Recovery refuses to run if the touched-surface list contains an absolute path, a `..` traversal, or a path outside the documented allowed prefixes.** This pins the guard against a future bug that would otherwise run `git restore` or `rm` against unrelated work.
+7. **Running recovery after the published commit is a no-op.** The `p1_boundary_published_remotely` State 1 branch fires; nothing else runs.
+8. **(NEW — r2 codex-ops F4) Crash with `$DEST` absent from HEAD and `$ITEM_FILE` dirty.** Simulate a partial pre-`git mv` state: $ITEM_FILE has uncommitted frontmatter edits; $DEST and $POINTER do NOT exist on disk or in HEAD. Run recovery. Assert: the in-HEAD path ($ITEM_FILE) gets `git restore`d cleanly; the not-in-HEAD paths are no-ops (no `git restore` failure surfaces); recovery returns 0. Without the per-surface dispatch fix, the old `git restore --staged --worktree -- "${surfaces[@]}"` aborted on the not-in-HEAD pathspec, leaving $ITEM_FILE dirty.
+9. **(NEW — r2 codex F1 + codex-ops F5) Crash after `git commit` but before `push-with-retry.sh` succeeds.** Simulate by committing locally, then making the bare-repo push fail (e.g., temporarily remove the bare repo's write perms, OR pre-push a divergent commit). Run recovery. Assert: `p1_local_commit_unpushed` returns true; recovery's State 2 branch fires; after the bare repo is restored, recovery's push-with-retry call succeeds and `p1_boundary_published_remotely` returns true. The local commit is NOT rolled back — it IS the partial state, just not yet observed remotely.
+10. **(NEW — r2 codex F2) `$LOG` is preserved through recovery.** Setup: $LOG exists on disk as a tracked file with agent-authored content. Crash mid-transition (after frontmatter edit, before `git mv`). Run recovery. Assert: `$LOG` content is bit-identical to before recovery (recovery did NOT call `git restore` or `rm` against it because $LOG is not in P1_TOUCHED_SURFACES).
+11. **(NEW — r2 codex F3) Recovery's non-zero return blocks publish.** Setup: corrupt the recovery preconditions (e.g., make `git restore` fail on a tracked path by stashing a permissions issue, OR pass an unsafe surface that fails the prefix-guard). Assert: recovery returns non-zero (3/4/5 depending on the failure); the caller's `|| exit $?` triggers process exit BEFORE `git pull --rebase` runs. The test inspects the process exit code and asserts no pull occurred.
 
-The tests use throwaway local repos only. They do not push to a remote and do not test concurrency scheduling beyond the AC1 fixture-level key scoping contract.
+The tests use throwaway local repos PLUS a local bare repo as origin (per the test infrastructure note above). They do not test real-network or concurrency scheduling beyond the AC1 fixture-level key scoping contract.
 
 ## Out of Scope (Don't Drift)
 
@@ -363,12 +450,13 @@ git show HEAD:backlog/pending_review/<id>.md
 ## Definition of Done
 
 - The P1 invariant is represented by a reusable, parameterized test harness.
-- The harness interface supports target-visible-before-boundary consumers and durable boundaries beyond a single commit without knowing consumer-specific paths.
-- The process-backlog stage move is implemented as one current-consumer specialization of that harness.
-- The current consumer's publish block includes `git mv "$ITEM_FILE" "$DEST"`, explicit `git add "$DEST"`, remaining path adds, and one commit.
+- The harness interface supports target-visible-before-boundary consumers and durable boundaries beyond a single local commit (including `pushed-ref` with `observerScope: "remote"`) without knowing consumer-specific paths.
+- The process-backlog stage move is implemented as one current-consumer specialization of that harness, declaring its boundary as `kind: "pushed-ref"`, `observerScope: "remote"`, `token: "origin/main:" + DEST`.
+- The current consumer's publish block runs `git mv "$ITEM_FILE" "$DEST"` + explicit `git add "$DEST"` + remaining path adds + `git commit` + `tools/review-queue/push-with-retry.sh` + `p1_boundary_published_remotely` final verification.
 - The task-state patcher is called with `--spec-path "$DEST"` before the rename.
-- Recovery from pre-commit crash points is deterministic from on-disk state, prefix-guarded to the consumer's touched surfaces, run before pull/rebase, and requires no human decision.
-- `tools/sync-skills.sh --check`, the P1 test file, and `git diff --check` pass locally.
+- Recovery from pre-commit dirty state AND post-commit-pre-push state is deterministic from on-disk state, prefix-guarded to the consumer's touched surfaces, run before pull/rebase, has per-surface dispatch (HEAD-existing vs untracked), gates its return code via `|| exit $?`, and requires no human decision.
+- The run log (`$LOG`) is NOT in the recovery surface set; agent-authored content is never touched by the recovery procedure.
+- `tools/sync-skills.sh --check`, the P1 test file (including the new remote-backed tests 8/9/10/11), and `git diff --check` pass locally.
 
 ## After Completion (Strategist Notes)
 
