@@ -156,7 +156,14 @@ function parseNumberParam(raw: string | null, fallback: number): number | null {
 
 function parseStatusParam(raw: string | null): RecentMcpCallStatus | undefined | null {
   if (raw === null || raw === '') return undefined;
-  if (raw === 'pending' || raw === 'ok' || raw === 'error') return raw;
+  if (
+    raw === 'pending' ||
+    raw === 'ok' ||
+    raw === 'error' ||
+    raw === 'killed_during_shutdown'
+  ) {
+    return raw;
+  }
   return null;
 }
 

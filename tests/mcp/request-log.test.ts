@@ -1,14 +1,36 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   beginRecentMcpCall,
   failRecentMcpCall,
   finishRecentMcpCall,
+  flushRecentMcpCallLog,
   readRecentMcpCalls,
   resetRecentMcpCallLogForTests,
 } from '../../src/mcp/request-log.js';
 
+// 067 AC3 — Mechanism pin for the atomic tmp-then-rename write contract.
+// `node:fs` ESM namespace properties are non-configurable in Node 22, so
+// `vi.spyOn(fs, 'writeFileSync')` throws "Cannot redefine property". The
+// spec ("or equivalent module-level spy") permits this `vi.mock` factory
+// — it wraps `writeFileSync` / `renameSync` with vi.fn delegates that
+// pass through to the real fs while letting the assertion test observe
+// invocation order and arguments. All other fs functions (mkdtempSync,
+// readFileSync, rmSync, existsSync) are passed through verbatim.
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    writeFileSync: vi.fn(actual.writeFileSync),
+    renameSync: vi.fn(actual.renameSync),
+  };
+});
+
 afterEach(() => {
   resetRecentMcpCallLogForTests();
+  vi.clearAllMocks();
 });
 
 function okResult(structuredContent: Record<string, unknown>) {
@@ -116,5 +138,124 @@ describe('recent MCP request log', () => {
     expect(calls).toHaveLength(1000);
     expect(calls[0]?.ts).toBe(1);
     expect(calls.some((call) => call.ts === 0)).toBe(false);
+  });
+});
+
+describe('flushRecentMcpCallLog', () => {
+  function withTmpDir<T>(fn: (dir: string) => T): T {
+    const dir = mkdtempSync(join(tmpdir(), 'echo-mcp-shutdown-flush-'));
+    try {
+      return fn(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  function readJsonLines(path: string): Record<string, unknown>[] {
+    const raw = readFileSync(path, 'utf8');
+    if (raw.length === 0) return [];
+    return raw
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  it('flushes a mixed-status ring: ok + error + pending → killed_during_shutdown', () => {
+    withTmpDir((dir) => {
+      const path = join(dir, 'mcp-shutdown.jsonl');
+      const okId = beginRecentMcpCall('echo_ping', { message: 'a' }, 100);
+      finishRecentMcpCall(okId, 'echo_ping', okResult({ pong: true, received: 'a' }), 110);
+      const errId = beginRecentMcpCall('search_memories', { query: 'q' }, 120);
+      failRecentMcpCall(errId, 'search_memories', new Error('boom'), 125);
+      const pendingId = beginRecentMcpCall('find_clusters', {}, 200);
+      void pendingId;
+
+      flushRecentMcpCallLog(path, 500);
+
+      const lines = readJsonLines(path);
+      expect(lines).toHaveLength(3);
+      expect(lines.map((entry) => entry['status'])).toEqual([
+        'ok',
+        'error',
+        'killed_during_shutdown',
+      ]);
+      const killed = lines[2];
+      expect(killed?.['tool']).toBe('find_clusters');
+      expect(killed?.['duration_ms']).toBe(300);
+
+      // The in-memory ring is rewritten in place for the killed entry.
+      const ring = readRecentMcpCalls();
+      expect(ring[2]?.status).toBe('killed_during_shutdown');
+      expect(ring[2]?.duration_ms).toBe(300);
+    });
+  });
+
+  it('writes an empty file when the ring is empty', () => {
+    withTmpDir((dir) => {
+      const path = join(dir, 'mcp-shutdown.jsonl');
+      flushRecentMcpCallLog(path, 1000);
+      expect(existsSync(path)).toBe(true);
+      expect(readFileSync(path, 'utf8')).toBe('');
+    });
+  });
+
+  it('overwrites with the full current ring on repeated flush, not an append', () => {
+    withTmpDir((dir) => {
+      const path = join(dir, 'mcp-shutdown.jsonl');
+      beginRecentMcpCall('echo_ping', { message: 'first' }, 100);
+      flushRecentMcpCallLog(path, 200);
+      expect(readJsonLines(path)).toHaveLength(1);
+
+      beginRecentMcpCall('echo_ping', { message: 'second' }, 300);
+      flushRecentMcpCallLog(path, 400);
+
+      const lines = readJsonLines(path);
+      expect(lines).toHaveLength(2);
+      expect(lines.every((entry) => entry['status'] === 'killed_during_shutdown')).toBe(true);
+      // Second call's duration measured from its own ts (300) to flush (400).
+      expect(lines[1]?.['duration_ms']).toBe(100);
+      // First call was already killed in the first flush; second flush
+      // re-measures from its original ts (100) to the new flush time (400)
+      // because the rewriter only acts on `pending` entries — once killed,
+      // duration_ms is preserved from the first flush.
+      expect(lines[0]?.['duration_ms']).toBe(100);
+    });
+  });
+
+  it('writes atomically via tmp-then-rename (mechanism pin)', () => {
+    withTmpDir((dir) => {
+      const path = join(dir, 'mcp-shutdown.jsonl');
+      beginRecentMcpCall('echo_ping', { message: 'pin' }, 100);
+
+      // Clear any prior invocations from this test's own setup (mkdtempSync
+      // doesn't call these, but other tests in this file do).
+      const writeMock = vi.mocked(writeFileSync);
+      const renameMock = vi.mocked(renameSync);
+      writeMock.mockClear();
+      renameMock.mockClear();
+
+      flushRecentMcpCallLog(path, 200);
+
+      // (a) writeFileSync is called with a path ending in `.tmp`, never the
+      // final path directly.
+      expect(writeMock).toHaveBeenCalled();
+      const writeTarget = writeMock.mock.calls[0]?.[0];
+      expect(typeof writeTarget === 'string' && writeTarget.endsWith('.tmp')).toBe(true);
+      expect(writeTarget).not.toBe(path);
+
+      // (b) renameSync is called with (path + '.tmp', path) after the
+      // writeFileSync invocation order.
+      expect(renameMock).toHaveBeenCalledWith(path + '.tmp', path);
+      const writeOrder = writeMock.mock.invocationCallOrder[0] ?? 0;
+      const renameOrder = renameMock.mock.invocationCallOrder[0] ?? 0;
+      expect(renameOrder).toBeGreaterThan(writeOrder);
+
+      // (c) the final file at `path` contains the expected JSONL contents
+      // (proves the rename actually moved the file).
+      const lines = readJsonLines(path);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.['tool']).toBe('echo_ping');
+      expect(lines[0]?.['status']).toBe('killed_during_shutdown');
+    });
   });
 });

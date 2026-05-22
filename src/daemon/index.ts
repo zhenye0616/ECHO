@@ -7,6 +7,7 @@ import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { isNonEmptyString } from '../guards.js';
+import { flushRecentMcpCallLog } from '../mcp/request-log.js';
 import { startMcpServer } from '../mcp/server.js';
 import type { Storage } from '../storage/interface.js';
 import { MemoryStorage } from '../storage/memory.js';
@@ -37,7 +38,8 @@ function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; disp
   return { storage: sqlite, backend: 'sqlite', dispose: () => sqlite.close() };
 }
 
-acquirePidLockOrExit(resolveDataDir());
+const dataDir = resolveDataDir();
+acquirePidLockOrExit(dataDir);
 
 const { storage, backend, dispose } = createStorage();
 
@@ -57,6 +59,11 @@ await startLifecycle({
   extraPayload: { mcp_port: mcp.port, mcp_url: mcp.url },
   onShutdown: async () => {
     await mcp.stop();
+    try {
+      flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl'));
+    } catch (err) {
+      process.stderr.write(`[daemon] mcp-shutdown-flush failed: ${(err as Error).message}\n`);
+    }
     await cursorExtractor.stop();
     await codexExtractor.stop();
     await claudeCodeExtractor.stop();
