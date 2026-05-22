@@ -27,7 +27,7 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T23:00:00Z"
 branch: "agent/process-backlog-handoff-atomicity"
 worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
-head_sha: "c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5"
+head_sha: "329e946156abb601682e3b7638b4c26c233d58b4"
 pr_url: ""
 review_notes: ""
 agent_notes: |
@@ -65,6 +65,13 @@ agent_notes: |
   passed, 1 skipped; 1168 tests passed, 21 skipped); npm run lint passed;
   npm run typecheck passed; tools/sync-skills.sh --check passed; git diff
   --check passed.
+  Third review fixups applied at 329e946156abb601682e3b7638b4c26c233d58b4:
+  added `set -euo pipefail` to the canonical handoff transcript and embedded
+  test script, updated the hard-stop prose to name the fail-fast contract, and
+  added test 3b proving `lint.py` failure exits before `git mv`, commit, or
+  push. Observed verification: npm test passed (101 files passed, 1 skipped;
+  1170 tests passed, 21 skipped); npm run lint passed; npm run typecheck
+  passed; tools/sync-skills.sh --check passed; git diff --check passed.
 ---
 
 # P1 - Atomic state transition (consumer: process-backlog work-item stage move)
