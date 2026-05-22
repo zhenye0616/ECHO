@@ -25,10 +25,10 @@ spec_refs:
   - skills/review-queue-watch.md  # lines 101-116 are the disposition discipline: prefer dropping or splitting recently-added mechanism over patching deeper.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-21T20:30:00Z"
+branch: "agent/mcp-request-log-shutdown-flush"
+worktree: "~/Desktop/Project_echo--mcp-request-log-shutdown-flush"
 head_sha: ""
 pr_url: ""
 review_notes: ""
