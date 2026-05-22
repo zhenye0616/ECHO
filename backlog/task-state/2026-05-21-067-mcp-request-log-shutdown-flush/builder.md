@@ -2,12 +2,19 @@
 task_id: 2026-05-21-067-mcp-request-log-shutdown-flush
 role: builder
 writer: claude-code-builder
-last_updated: 2026-05-21T20:30:00Z
+last_updated: 2026-05-22T06:10:48Z
+handoff_branch: agent/mcp-request-log-shutdown-flush
+handoff_head_sha: 4e17baa6cbd0f6ee4a087c6a1afb0612a01d01eb
+handoff_run_log: raw/internal/agent-runs/2026-05-21-2026-05-21-067-mcp-request-log-shutdown-flush.md
 ---
 
 ## current_thesis
 
 Claimed 067 as Claude Code builder. AC1 adds `killed_during_shutdown` status + `flushRecentMcpCallLog(path, now?)` with atomic tmp-then-rename in `src/mcp/request-log.ts`, and widens `parseStatusParam` in `src/mcp/server.ts`. AC2 wires the flush into the existing `src/daemon/index.ts:54-66` onShutdown closure after `await mcp.stop()` and before extractor/watcher teardown, isolated by inline try/catch + stderr write per AC2 failure-isolation contract. AC3 extends `tests/mcp/request-log.test.ts` with four cases (mixed-status, empty-ring, repeated-flush, atomic-write mechanism via writeFileSync/renameSync spies). AC4 adds new `tests/daemon/lifecycle-shutdown-flush.test.ts` with Tests i/ii (in-process stop+flush), iii (source-text assertion of daemon wiring — replaces r1 surrogate runtime test per r2 dispositioning), iv (flush-failure isolation via direct closure mirror). No `src/daemon/lifecycle.ts` interface change.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 4e17baa6cbd0f6ee4a087c6a1afb0612a01d01eb.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -33,5 +40,5 @@ Claimed 067 as Claude Code builder. AC1 adds `killed_during_shutdown` status + `
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-21-067-mcp-request-log-shutdown-flush.md
+- spec: backlog/pending_review/2026-05-21-067-mcp-request-log-shutdown-flush.md
 - reviews: backlog/reviews/2026-05-21-067-mcp-request-log-shutdown-flush/

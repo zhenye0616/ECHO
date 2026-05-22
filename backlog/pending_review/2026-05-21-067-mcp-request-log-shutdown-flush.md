@@ -29,10 +29,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T20:30:00Z"
 branch: "agent/mcp-request-log-shutdown-flush"
 worktree: "~/Desktop/Project_echo--mcp-request-log-shutdown-flush"
-head_sha: ""
+head_sha: "4e17baa6cbd0f6ee4a087c6a1afb0612a01d01eb"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Implemented AC1–AC4 of the r4-converged spec. AC1: `RecentMcpCallStatus` widened with `killed_during_shutdown`; `flushRecentMcpCallLog(path, now?)` exported with atomic tmp-then-rename (best-effort tmp cleanup on error); `parseStatusParam` extended. AC2: `dataDir` bound once at module scope in `src/daemon/index.ts`; flush wired between `await mcp.stop()` and `cursorExtractor.stop()` inside an inline try/catch that writes the error to stderr so failure cannot short-circuit subsequent teardown. AC3: four new unit cases including the atomic-write mechanism pin — used `vi.mock('node:fs', factory)` instead of `vi.spyOn` because Node 22 ESM marks the `node:fs` namespace non-configurable (spec's "or equivalent module-level spy" wording permits this; documented inline). AC4: new integration file with Tests i/ii (in-process stop+flush via direct request-log API seeding), Test iii (source-text assertions on daemon wiring; replaces r1 surrogate runtime test per r2 dispositioning), Test iv (flush-failure isolation via direct closure mirror).
+
+  Tests: 15/15 focused + 1142/1142 full suite pass. Lint + typecheck clean. No new dependencies; no wiki edits; no files outside `files_to_modify`.
 ---
 
 # MCP request log persists in-flight calls on SIGTERM
