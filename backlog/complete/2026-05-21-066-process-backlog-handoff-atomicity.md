@@ -29,7 +29,30 @@ branch: "agent/process-backlog-handoff-atomicity"
 worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
 head_sha: "329e946156abb601682e3b7638b4c26c233d58b4"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-21 (PDT) / 2026-05-22T06:00Z via founder reconciliation. Verdict from
+  /review-pending sidecar (2026-05-22T06:34:29Z): "merge as-is" (test_counts: 1170 passed, 0 failed).
+
+  Conflicts resolved:
+  - None. Clean ort-strategy merge; only three files changed (skills/process-backlog.md,
+    .claude/commands/process-backlog.md, tests/skills/atomic-state-transition-harness.test.ts).
+
+  C3.5 cross-vendor consult: none invoked — no conflicts surfaced, sidecar's expected-conflicts
+  list said "none expected" and was correct.
+
+  Fixups applied:
+  - None. Sidecar declared no pre-merge fixups.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1170/1170 tests pass (21 skipped, unchanged from main); lint clean; typecheck clean;
+  tools/sync-skills.sh --check OK (adapter is byte-identical to canonical skill).
+
+  Follow-up items (non-blocking):
+  - Make caller-provided variable names around skills/process-backlog.md (OUTCOME, HEAD_SHA, LOG)
+    even more explicit in prose so future agents don't misread the canonical P1 transcript as a
+    standalone shell snippet. Filed to backlog/_followups.md in C10.
 agent_notes: |
   AC1+AC2+AC3 implemented. Step E2 of skills/process-backlog.md replaced with
   the canonical P1 transcript: rollback-only recover_p1_stage_move with prefix

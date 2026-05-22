@@ -171,105 +171,229 @@ fi
 
 Required sections (per attempt): what implemented, files modified with branch + head_sha, decisions, acceptance per criterion, verbatim test output, open questions, drift events, and (if resumed) what previous-attempt state was kept vs discarded.
 
-### E2. Move Item to pending_review (idempotent upsert)
+### E2. Move Item to pending_review — P1 atomic stage transition
+
+The stage move from `backlog/claimed/` to `backlog/pending_review/` is the
+current consumer of **P1 — Atomic state transition** (see
+`backlog/_followups.md` "P1 - Atomic state transition" for the primitive
+contract). The transcript below satisfies P1 by:
+
+- using `origin/main:$DEST` as the **durable boundary** (a local commit alone
+  is not the boundary — observers gate on the pushed ref);
+- running a **rollback-only** `recover_p1_stage_move` before pull/rebase so a
+  crashed previous attempt converges from on-disk state without operator input;
+- running a **separate caller-side finish-path block** that retries
+  `push-with-retry.sh` when the local commit exists but the boundary is not yet
+  observed remotely (the local commit is finished, not rolled back); and
+- staging the destination contents explicitly with `git add "$DEST"` after
+  `git mv` so the publish commit carries the edited handoff metadata rather
+  than the old blob.
+
+The recovery guard's touched-surface set is the source item path, destination
+item path, and optional builder pointer at `backlog/task-state/<id>/builder.md`.
+The run log (`$LOG`) is **explicitly excluded** because it is pre-existing
+agent-authored content that the publish block only `git add`s; the recovery
+procedure never touches it.
 
 ```bash
-ensure_stage() {
-  local item="$1" target="$2"
-  local current
-  current=$(ls backlog/*/"$item" 2>/dev/null | head -1)
-  [ -z "$current" ] && { echo "ERROR: $item not found in any stage" >&2; return 1; }
-  [ "$current" = "backlog/$target/$item" ] && return 0
-  git mv "$current" "backlog/$target/$item"
-}
+set -euo pipefail
 
 cd ~/Desktop/Project_echo
-git pull --rebase origin main
-ensure_stage "$(basename $ITEM_FILE)" "pending_review"
-# edit frontmatter:
+
+ITEM_BASENAME="$(basename "$ITEM_FILE")"
+ITEM_FILE="backlog/claimed/$ITEM_BASENAME"
+DEST="backlog/pending_review/$ITEM_BASENAME"
+TASK_ID="${ITEM_ID}"
+POINTER="backlog/task-state/$TASK_ID/builder.md"
+
+# P1 recovery surfaces are the set of file paths this consumer's transition
+# CREATES OR MUTATES. The run log ($LOG) is intentionally NOT in this set: it
+# is pre-existing agent-authored content written during E1 (before this stage
+# move), and the recovery procedure must NOT touch it.
+P1_ALLOWED_RECOVERY_PREFIXES=("backlog/" "backlog/task-state/")
+P1_TOUCHED_SURFACES=("$ITEM_FILE" "$DEST" "$POINTER")
+
+p1_assert_allowed_recovery_surfaces() {
+  local path prefix ok
+  for path in "$@"; do
+    case "$path" in
+      ""|/*|../*|*/../*|*/..|.)
+        echo "ERROR: unsafe P1 recovery path: $path" >&2
+        return 2
+        ;;
+    esac
+    ok=0
+    for prefix in "${P1_ALLOWED_RECOVERY_PREFIXES[@]}"; do
+      case "$path" in
+        "$prefix"*) ok=1 ;;
+      esac
+    done
+    if [ "$ok" -ne 1 ]; then
+      echo "ERROR: P1 recovery path outside allowed prefixes: $path" >&2
+      return 2
+    fi
+  done
+}
+
+# Durable-boundary observability gate for this consumer.
+p1_boundary_published_remotely() {
+  git fetch --quiet origin main 2>/dev/null || return 1
+  git cat-file -e "origin/main:$DEST" 2>/dev/null
+}
+
+# Detect the post-commit-pre-push partial state. The caller-side finish-path
+# block (NOT recover_p1_stage_move, which is rollback-only) retries push.
+p1_local_commit_unpushed() {
+  git cat-file -e "HEAD:$DEST" 2>/dev/null && ! p1_boundary_published_remotely
+}
+
+recover_p1_stage_move() {
+  local surfaces=("$@")
+  local path STATUS
+
+  p1_assert_allowed_recovery_surfaces "${surfaces[@]}" || return $?
+
+  # Idempotent done — boundary is already observed remotely.
+  if p1_boundary_published_remotely; then
+    return 0
+  fi
+
+  # Post-commit, pre-push — defer to the caller's finish-path block.
+  # Rolling back a committed transition would discard work; finishing it
+  # belongs in a separate block so this function's contract stays rollback-only.
+  if p1_local_commit_unpushed; then
+    return 0
+  fi
+
+  STATUS="$(git status --porcelain -- "${surfaces[@]}")"
+  [ -z "$STATUS" ] && return 0
+
+  # Per-surface dispatch: `git restore` aborts on pathspecs not known to git
+  # (neither in HEAD nor in the index), so split into "tracked (HEAD or index)"
+  # vs "truly untracked". The tracked branch handles both pre-rename in-HEAD
+  # paths AND staged-but-not-in-HEAD paths (e.g., a `git mv` left a rename
+  # staged at the destination before the crash). For staged-only paths,
+  # `git restore --staged --worktree` removes them from both index and worktree
+  # cleanly; `git rm --cached` (without -f) refuses when the staged blob
+  # differs from both HEAD and worktree, which is exactly the post-`git mv`
+  # crash state. No hidden failure suppression in either branch.
+  for path in "${surfaces[@]}"; do
+    if git cat-file -e "HEAD:$path" 2>/dev/null || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      git restore --staged --worktree -- "$path" || return 4
+    else
+      git rm --cached --ignore-unmatch -- "$path" || return 4
+      [ -e "$path" ] && { rm -f -- "$path" || return 4; }
+    fi
+  done
+
+  # Hard fail if any touched surface remains dirty. Not human triage.
+  git diff --quiet -- "${surfaces[@]}" || return 5
+  git diff --cached --quiet -- "${surfaces[@]}" || return 5
+}
+
+# Recovery's non-zero return MUST block pull/publish. Without `|| exit $?`,
+# pull/rebase can run on top of a partial-but-not-recovered state.
+# Documented return codes:
+#   2 — prefix-guard violation (unsafe path or outside allowed prefixes)
+#   4 — per-surface dispatch failure (real error from git restore / git rm / rm)
+#   5 — post-recovery dirty-check failure
+recover_p1_stage_move "${P1_TOUCHED_SURFACES[@]}" || exit $?
+
+# Idempotent done — boundary already observed remotely; nothing else to do.
+if p1_boundary_published_remotely; then
+  exit 0
+fi
+
+# Caller-side finish path. When the local commit exists but the boundary is
+# not yet observed remotely, retry the push; verify the boundary; exit.
+# Independent exit codes (NOT returned from recover_p1_stage_move):
+#   3 — caller's push-with-retry.sh failed in the finish-path block
+#   6 — push reported success but origin/main:$DEST not visible
+if p1_local_commit_unpushed; then
+  tools/review-queue/push-with-retry.sh "review: $ITEM_ID" || exit 3
+  p1_boundary_published_remotely || { echo "ERROR: push reported success but origin/main:$DEST not visible" >&2; exit 6; }
+  exit 0
+fi
+
+# Pull with --autostash. The surrounding E1 may have just written/appended
+# the agent-authored run log ($LOG), and push-with-retry.sh can append a
+# PUSH-RACE-FALLBACK entry to raw/internal/queue-errors.md. Both are tracked
+# and may be dirty when this transcript runs; --autostash stashes/restores
+# them around the rebase so the pull does not abort on "unstaged changes".
+git -c rebase.autoStash=true pull --rebase origin main || exit $?
+
+# Step 1 — edit handoff metadata on the source path.
+# Edit head_sha / pr_url / agent_notes in place on $ITEM_FILE.
+# (Agent-driven; performed via Edit/Write tools, not via bash.)
 #   head_sha: "<sha pushed>"
 #   pr_url: "<if PR opened, else empty>"
 #   agent_notes: |
 #     <one-paragraph summary if work succeeded>
 #     OR
 #     BLOCKED: <specific question> | Tried: <...> | Best guess: <...> | Why escalated: <rule>
-```
 
-### E2.5. Final builder-state refresh (protocol-wide)
-
-This step is the **only canonical implementation site** for keeping
-`backlog/task-state/<task-id>/builder.md` current at handoff. Binding-specific
-sections may reference it, but must NOT duplicate their own final-handoff
-patch logic.
-
-**Detect builder-state scope.** Run this step iff EITHER condition holds:
-
-- the item's frontmatter `task_state_ref:` is non-empty, OR
-- `backlog/task-state/<task-id>/builder.md` already exists on disk.
-
-If neither holds, skip ahead to E3's final commit; nothing to refresh.
-
-**Choose the outcome.** Use `--outcome complete` for a successful handoff
-(work landed, tests passing, ready for review). Use `--outcome escalated`
-for the blocked/uncertain handoff path where `agent_notes` is framed as the
-BLOCKED escalation rather than a one-paragraph summary.
-
-**Call the patcher.** It updates frontmatter `last_updated` + the
-`handoff_*` metadata keys, refreshes the patcher-owned `## current_thesis`
-and (when needed) `## open_questions` marker blocks, and rewrites
-`## canonical_anchors` to the schema-compliant `spec` (+ preserved
-`reviews`) shape pointing at `backlog/pending_review/<item>.md`.
-`## locked_decisions` and `## dont_touch` are preserved byte-for-byte.
-
-```bash
-TASK_ID="${ITEM_ID}"                  # backlog item id == task-state directory name
-POINTER="backlog/task-state/$TASK_ID/builder.md"
-
-# Builder-state scope detection. Read frontmatter via grep — the item file
-# is the one we just moved into pending_review/.
+# E2.5. Final builder-state refresh (protocol-wide). This is the only
+# canonical implementation site; binding-specific notes defer here rather
+# than duplicating final-handoff logic. The patcher records --spec-path
+# verbatim into canonical_anchors.spec without reading the file from that
+# path, so pass the final destination path BEFORE git mv. `--outcome
+# complete` on the success path; `--outcome escalated` on the BLOCKED
+# escalation path. Use `OUTCOME=complete` or `OUTCOME=escalated` accordingly.
 HAS_TASK_STATE_REF=$(
-  awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' \
-    "backlog/pending_review/$(basename $ITEM_FILE)"
+  awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' "$ITEM_FILE"
 )
-
 if [ -n "$HAS_TASK_STATE_REF" ] || [ -f "$POINTER" ]; then
-  # OUTCOME=complete on the success path; OUTCOME=escalated on the BLOCKED path.
   python3 tools/task-state/patch-builder-state.py \
     --task-id "$TASK_ID" \
     --outcome "$OUTCOME" \
-    --spec-path "backlog/pending_review/$(basename $ITEM_FILE)" \
+    --spec-path "$DEST" \
     --branch "agent/$SLUG" \
     --head-sha "$HEAD_SHA" \
     --run-log "$LOG"
-
-  # The helper is a no-op when the pointer is missing (compatibility for items
-  # that set task_state_ref before the builder adopted builder.md). Only
-  # lint + stage the path if it exists post-patch.
+  # The helper is a no-op when the pointer is missing (compatibility for
+  # items that set task_state_ref before the builder adopted builder.md).
   if [ -f "$POINTER" ]; then
     python3 tools/task-state/lint.py "$POINTER"   # hard stop on failure
-    git add "$POINTER"
   fi
 fi
-```
 
-If lint fails, STOP — do not push stale builder state. Treat lint failure as
-a hard stop and escalate per the Stopping Conditions section. The protocol
-rule is "lint failure means escalation, not silent shipping."
-
-**Idempotency note.** Re-running E2.5 updates only the `last_updated`
-timestamp plus the same lifecycle / anchor fields, and never creates a
-second pointer path or rewrites `## locked_decisions`. A crashed run
-resumed via reconciliation produces the same logical pointer state.
-
-### E2.6. Commit + push (single final commit)
-
-```bash
-git add backlog/pending_review/ "$LOG"
-# E2.5 already staged the pointer if it exists; this commit captures all
-# three (item move, run log, builder.md refresh) atomically.
+# E2.6. Commit + push (single final commit) — durable publish block. No
+# subprocess that can wait on network, no prose edit, and no tool startup
+# belongs between git mv and git commit. After git commit, push-with-retry.sh
+# is the boundary publisher — its success is what makes origin/main:$DEST
+# observable, which IS the durable boundary for this consumer.
+git mv "$ITEM_FILE" "$DEST"
+git add "$DEST"
+[ -f "$POINTER" ] && git add "$POINTER"
+git add "$LOG"
 git commit -m "review: $ITEM_ID"
-git push origin main
+tools/review-queue/push-with-retry.sh "review: $ITEM_ID"
+
+# Final boundary verification. push-with-retry.sh is the publisher; the
+# boundary CONTRACT requires us to confirm the remote observed it.
+p1_boundary_published_remotely || { echo "ERROR: push reported success but origin/main:$DEST not visible" >&2; exit 6; }
 ```
+
+**Why `git add "$DEST"` is required.** `git mv` after editing the source
+stages the rename at the *old* blob while leaving the edited destination
+contents unstaged. Without `git add "$DEST"`, the commit publishes stale
+handoff metadata and leaves the edited destination dirty.
+
+**Why `--spec-path "$DEST"` even though the patcher runs before `git mv`.**
+The patcher records its `--spec-path` argument verbatim into
+`canonical_anchors.spec`; it never reads the file from that path. Passing the
+final destination path before the rename lets the pointer ship pointing at
+the post-publish location.
+
+**Lint failure is a hard stop, not silent shipping.** The transcript runs
+under `set -euo pipefail`. If `tools/task-state/lint.py "$POINTER"` exits
+non-zero, the script exits non-zero, the publish block does not run, and the
+operator escalates per the Stopping Conditions section.
+
+**Idempotency.** Re-running this transcript after a successful publish is a
+no-op via the `p1_boundary_published_remotely` early-return. A re-run after a
+crash converges via either `recover_p1_stage_move` (pre-commit dirty state)
+or the caller-side finish-path block (post-commit-pre-push state).
 
 ### E3. STOP
 

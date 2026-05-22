@@ -974,3 +974,6 @@ When a future merge (or any multi-agent operation) triggers a primitive, append 
 - **P11 → `merge_resolver` capability.** Spec candidate: a new capability profile (`auto_rebase_on_disjoint_main_advance`) that any agent can advertise; the merger queries the capability registry before halting to the founder.
 
 None of these are required for V1 cleanup — the 066/067 priority specs come first — but they are the next-friction candidates the next merge will surface.
+
+<!-- from merge of 2026-05-21-066-process-backlog-handoff-atomicity, 2026-05-21 -->
+- Make caller-provided variable names around `skills/process-backlog.md` (`OUTCOME`, `HEAD_SHA`, `LOG`) more explicit in prose so future agents do not misread the canonical P1 transcript as a standalone shell snippet. (from 066 merge sidecar follow-ups)
