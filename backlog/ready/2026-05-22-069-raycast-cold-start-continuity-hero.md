@@ -81,7 +81,7 @@ At first open of the day the operator reconstructs five things in priority order
 
 **The V1 confidence contract.** Hero fires iff EITHER:
 
-- A `running` session exists in `useSessions()` (`tools/raycast-echo/src/lib/sessions.ts:85-98`) — this is the existing `warmSession` path, just promoted to the hero slot, OR
+- A `running` session exists in `useSessions()` — specifically `sessions.find(s => s.status === 'running')`. **NOT** the existing `selectWarmSession()` helper at `tools/raycast-echo/src/lib/sessions.ts:79-80`, which returns the first `done` session. The Continue hero MUST NOT fire on a lone `done` warm session — that would replicate the old Resume behavior of promoting a completed prior answer, which the V1 contract explicitly rejects (r3 codex F1). OR
 - The top cluster (rank 0 from `findClusters({since: <18h-ago>, view: "compact"})`) satisfies ALL THREE:
   - `has_unresolved_open_loop === true`
   - `time_range.to` is within the last 18h
@@ -172,12 +172,13 @@ The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO can
   1. Cluster has rank_reason `['has_open_loop', 'has_unresolved_open_loop', 'code_session_anchor']` → compact projection preserves all three in the same order.
   2. Cluster has rank_reason `['some_future_reason', 'has_open_loop']` → compact projection emits only `['has_open_loop']` (allowlist filtering; future-reason is dropped until explicitly allowed).
 
-- `tools/raycast-echo/test/empty-state-hero.test.tsx` (new file): five cases pinning the hero-pick decision tree
+- `tools/raycast-echo/test/empty-state-hero.test.tsx` (new file): six cases pinning the hero-pick decision tree
   1. Running session exists → hero shows the running session row; no cluster-derived hero even if a high-confidence cluster also exists.
   2. No running session; top cluster passes all three gates (unresolved + 18h-fresh via `time_range.to` + `code_session_anchor` reason in `rank_reason`) → hero shows the cluster row with `Continue: <label> · <N> open` title.
   3. No running session; top cluster has unresolved hint and code anchor but `time_range.to` is 20h ago → no hero (18h gate fails).
   4. No running session; top cluster has unresolved hint and is fresh but neither `code_session_anchor` is in `rank_reason` nor any session in `sessions` has matching `clusterId` → no hero.
-  5. **New (r1 codex F2 + codex-ops F7):** No running session; top cluster has unresolved hint and is fresh but only `code_session_anchor === false`; HOWEVER, `sessions` includes one session whose `clusterId` matches `top.cluster_id` → hero fires via the Raycast-side session-anchor fallback. Pins that the linked-session anchor is preserved despite being removed from the substrate rank signal.
+  5. **(r1 codex F2 + codex-ops F7):** No running session; top cluster has unresolved hint and is fresh but only `code_session_anchor === false`; HOWEVER, `sessions` includes one session whose `clusterId` matches `top.cluster_id` → hero fires via the Raycast-side session-anchor fallback. Pins that the linked-session anchor is preserved despite being removed from the substrate rank signal.
+  6. **New (r3 codex F1):** No running session; `sessions` contains exactly one `done` session (the kind `selectWarmSession()` would return as the old "warm" session); top cluster fails the unresolved/fresh/anchored gate → no hero. Pins that the old Resume-warm-session behavior does NOT bleed into the new Continue hero (which V1 explicitly rejects).
 
 - All existing tests in `tools/raycast-echo/test/` (per-package Vitest) and `tests/` (root Vitest) continue to pass without modification.
 
@@ -210,10 +211,10 @@ The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO can
 
 All test changes are additive — no existing test rewrites.
 
-- `tests/trace/rank.test.ts` — three new cases per AC3.
+- `tests/trace/rank.test.ts` — five new cases per AC3.
 - `tests/mcp/wire-shape/compact-rank-reason.test.ts` — new file, two cases per AC3 (r1 codex F1 + codex-ops F5).
 - `tools/raycast-echo/test/mcp-find-clusters-since.test.ts` — new file, one case per AC3 (r2 codex F1).
-- `tools/raycast-echo/test/empty-state-hero.test.tsx` — new file, five cases per AC3 (r1 codex F2 + codex-ops F7 added the linked-session-anchor case).
+- `tools/raycast-echo/test/empty-state-hero.test.tsx` — new file, six cases per AC3 (r1 codex F2 + codex-ops F7 added the linked-session-anchor case; r3 codex F1 added the done-warm-session negative case).
 
 Verify steps (r1 codex F4: root `npm typecheck` excludes `tools/raycast-echo/**`, so root commands alone do NOT cover the edited TSX; per-package commands are required):
 
@@ -233,7 +234,7 @@ All seven of the above must pass before the builder moves 069 to `pending_review
 - AC1: `src/trace/rank.ts` exports `has_unresolved_open_loop` and `code_session_anchor` signals; deprecation comment present on `has_open_loop`; `rank_reason` strings include the two new reasons when their signals are true; the tautological `cluster_id !== undefined` predicate is NOT in the substrate signal.
 - AC1b: `src/mcp/wire-shape/compact.ts` widens `rank_reason` to the three-string allowlist; future reason strings remain filtered out until explicitly allowed.
 - AC2: `tools/raycast-echo/src/components/EmptyState.tsx` no longer renders "Open loops · Today"; renders a single conditional `Continue` hero row per the `pickHero` decision tree (uses `time_range.to`, the Raycast-side linked-session anchor, and the substrate's `code_session_anchor` reason); existing surfaces below the hero are byte-identical to pre-merge (modulo the unrelated reverts the merge naturally picks up).
-- AC3: All thirteen new test cases pass (5 rank + 2 compact wire-shape + 1 raycast mcp-since + 5 hero); all existing tests in `tests/trace/`, `tests/mcp/`, `tools/raycast-echo/test/`, and elsewhere continue to pass.
+- AC3: All fourteen new test cases pass (5 rank + 2 compact wire-shape + 1 raycast mcp-since + 6 hero); all existing tests in `tests/trace/`, `tests/mcp/`, `tools/raycast-echo/test/`, and elsewhere continue to pass.
 - All seven verify commands above (root + Raycast package) clean.
 - The merged code dogfoods cleanly on a real Raycast open: hero appears when expected, does NOT appear when expected (sanity check before review-pending).
 
