@@ -881,9 +881,9 @@ Each primitive is a contract every flow consumer must satisfy. Mechanisms are no
 
 ### Reliability primitives
 
-**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: work-item stage moves.* **[Priority]**
+**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: work-item stage moves.* ✅ **CLOSED by 066 merge `bc8042f` (2026-05-21).** Mechanism: `skills/process-backlog.md:250-292` `recover_p1_stage_move` (rollback-only, prefix-guarded, per-surface dispatch) runs BEFORE pull/rebase; bounded publish block + `p1_boundary_published_remotely` idempotency check means the boundary is either fully observed on origin/main or fully rolled back. Exit codes 2/4/5/6 cover each failure mode without human triage. 1484-line test harness (`tests/skills/atomic-state-transition-harness.test.ts`) covers the matrix. Invariant holds under any future flow that adopts the same harness contract.
 
-**P2 — In-flight observability across restart.** Any operation in `pending` / `in-flight` state at process shutdown MUST surface on the next boot. The mechanism is open; the property is not. *Current consumer: in-process tool-call log.* **[Priority]**
+**P2 — In-flight observability across restart.** Any operation in `pending` / `in-flight` state at process shutdown MUST surface on the next boot. The mechanism is open; the property is not. *Current consumer: in-process tool-call log.* ✅ **CLOSED by 067 merge `d7bf3b9` (2026-05-21).** Mechanism: `src/mcp/request-log.ts:137-165` `flushRecentMcpCallLog(path, now?)` walks the ring buffer, flips every `pending` entry to `killed_during_shutdown` with `duration_ms` measured against shutdown timestamp, then atomically writes the snapshot via tmp-then-rename (POSIX `rename(2)` atomicity guarantees readers see prior-complete OR new-complete, never a torn write). Wired in `src/daemon/index.ts:63` between `mcp.stop()` and watcher teardown, isolated by try/catch so flush failures don't poison the rest of teardown. New `RecentMcpCallStatus` variant `killed_during_shutdown` (`src/mcp/request-log.ts:21`) is parseable by future tail-mcp consumers. **Deferred fixup:** real long-running MCP call test for AC4 Test (i) waived per founder; documented at line 982 below.
 
 **P3 — Partial-write tolerance.** Any artifact readable by another actor while it is being written MUST be guarded so the reader sees either the prior complete version or recognizes the in-progress write and waits — never a torn intermediate. *Current consumer: typed handoff artifacts between actors.*
 
@@ -922,7 +922,13 @@ Each primitive is a contract every flow consumer must satisfy. Mechanisms are no
 
 ### Priority signal
 
-**[Priority]**-tagged primitives (P1, P2) drive the next round of specs. The collaboration primitives (P9-P12) are higher-order and define the multi-agent target state — they don't all need specs immediately, but every NEW spec should be checked against them: does this lock in a vendor, a role name, a cardinality, or a human-in-loop dependency? If so, generalize before shipping.
+**Post-066/067 update (2026-05-22):** P1 and P2 are closed. The next-tier priority is driven by the 065-merge postmortem's observed-instance evidence: P5 (at-most-one ownership), P7 (idempotent + cheap re-run), P10 (typed inter-agent messages), and P11 (programmatic convergence) all triggered hardest in the same merge, and P5/P7/P11 each triggered 3× in one merge. These four cluster on the strategist↔merger boundary — the next round of specs should target that boundary specifically.
+
+**Independent low-cost candidates** (filable today, no spec dependency):
+- **P6 one-line fix** — reorder C9 (cleanup) ↔ C11 (push) in `skills/merge-and-cleanup.md` so cleanup runs only after push succeeds.
+- **P7 one-line fix** — switch `git pull --rebase origin main` → `git pull --rebase=merges` in `skills/merge-and-cleanup.md` so conflict resolution survives rebase retries.
+
+The collaboration primitives (P9-P12) define the multi-agent target state — they don't all need specs immediately, but every NEW spec should be checked against them: does this lock in a vendor, a role name, a cardinality, or a human-in-loop dependency? If so, generalize before shipping.
 
 ### Postmortem — 2026-05-21 065 merge primitives validation
 

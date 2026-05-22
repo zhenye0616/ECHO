@@ -114,9 +114,9 @@ The server is wired into the daemon (`src/daemon/index.ts`):
 
 1. Boot order: PID lock → fs-watcher → git-watcher → MCP server (`startMcpServer`) → lifecycle.
 2. The daemon's `started` log payload carries `mcp_port` and `mcp_url` (passed through `LifecycleOptions.extraPayload`); the `mcp.server started` log line additionally carries `host`, `port`, `url`.
-3. Shutdown order (`onShutdown` chain): `mcp.stop()` → `gitWatcher.stop()` → `fsWatcher.stop()` → `dispose()` (closes storage). MCP shuts down first so in-flight tool calls don't see storage disappear under them.
+3. Shutdown order (`onShutdown` chain): `mcp.stop()` → `flushRecentMcpCallLog(<dataDir>/mcp-shutdown.jsonl)` → `gitWatcher.stop()` → `fsWatcher.stop()` → `dispose()` (closes storage). MCP shuts down first so in-flight tool calls don't see storage disappear under them.
 
-`mcp.stop()` closes the HTTP listener (with `closeAllConnections`), then closes every active session's `McpServer`.
+`mcp.stop()` closes the HTTP listener (with `closeAllConnections`), then closes every active session's `McpServer`. Immediately after, `flushRecentMcpCallLog` (item [[2026-05-21-067-mcp-request-log-shutdown-flush|067]]) walks the in-process request-log ring buffer and atomically (tmp-then-rename) writes a JSONL snapshot of all entries to `<dataDir>/mcp-shutdown.jsonl`, flipping any still-`pending` entry to status `killed_during_shutdown` so graceful-SIGTERM in-flight calls survive the restart as forensic evidence. Wrapped in try/catch so flush failures don't poison the rest of teardown. SIGKILL / OOM / panic remain an explicit accepted gap (the in-memory ring is lost); the next-boot operator-visible banner is split to sibling stub `2026-05-21-068-tail-mcp-shutdown-banner`.
 
 ## V1 Targets
 
