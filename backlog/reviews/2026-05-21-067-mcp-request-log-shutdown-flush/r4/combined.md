@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after r4`. Both reviewers returned `proceed` with zero findings against the patched SHA e911b6f. Spec converged across 4 rounds: r1 fixed atomic-write/teardown-isolation/signature/wiring-test issues; r2 dropped the surrogate runtime test for a source-text assertion (removal-over-deeper-patching); r3 tightened the architectural invariant for ring overflow and added the atomic-write mechanism assertion. No outstanding findings remain. 067 is claim-ready for any builder agent.
 
