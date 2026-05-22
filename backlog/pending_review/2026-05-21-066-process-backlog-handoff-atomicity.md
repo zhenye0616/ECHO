@@ -27,10 +27,28 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T23:00:00Z"
 branch: "agent/process-backlog-handoff-atomicity"
 worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
-head_sha: ""
+head_sha: "e6822d7f85a2e099013a2cf439ae8cf10deb5c33"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  AC1+AC2+AC3 implemented. Step E2 of skills/process-backlog.md replaced with
+  the canonical P1 transcript: rollback-only recover_p1_stage_move with prefix
+  guard + per-surface dispatch covering tracked-in-HEAD AND staged-but-not-in-HEAD
+  paths; caller-side finish-path block; --autostash post-recovery pull; explicit
+  git add "$DEST"; patcher with --spec-path "$DEST" before rename. Adapter at
+  .claude/commands/process-backlog.md refreshed via tools/sync-skills.sh.
+  tests/skills/atomic-state-transition-harness.test.ts adds the AC1 reusable
+  harness (P1ConsumerFixture interface, generic invariant assertions, two
+  neutral fixtures, key-scoped concurrency) plus 14 AC3 current-consumer tests
+  using a local bare repo as origin. All 32 tests pass. sync-skills.sh --check
+  passes; git diff --check clean; tsc --noEmit clean.
+  One judgment call documented in the run log (Decision #1) — broadened the
+  per-surface dispatch filter from "in HEAD" to "tracked (HEAD or index)" to
+  fix AC3 test 5 (post-git-mv crash recovery); the original r2 codex-ops F4
+  filter excluded staged-but-not-in-HEAD paths and routed them to
+  `git rm --cached`, which refuses without -f when staged content is unique.
+  The broadened filter preserves r2's intent (avoid git restore aborts on
+  unknown paths) while fixing the test-5 gap.
 ---
 
 # P1 - Atomic state transition (consumer: process-backlog work-item stage move)
