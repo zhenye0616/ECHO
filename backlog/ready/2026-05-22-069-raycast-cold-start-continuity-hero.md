@@ -14,6 +14,7 @@ files_to_modify:
   - tools/raycast-echo/src/components/EmptyState.tsx  # AC2 — replace `Open loops · Today` section (lines 31-49) with a single conditional `Continue` hero row gated by the V1 confidence contract
   - tools/raycast-echo/src/echo.tsx  # AC2 — surface unresolved-count + selected code anchor to the hero render path
   - tools/raycast-echo/src/lib/format.ts  # AC2 — formatHeroLine(label?, unresolvedCount) helper, kept narrow (no codeAnchor in V1 per r1 codex F3)
+  - tools/raycast-echo/src/lib/mcp.ts  # AC2 (r2 codex F1) — Raycast client passes explicit 18h `since` arg to findClusters so the daemon's lookback matches the V1 freshness window (current client at :91-93 sends only {view: "compact"})
   - src/mcp/wire-shape/compact.ts  # AC1b (r1 codex F1 + codex-ops F5) — widen the compact projection's rank_reason allowlist to include the two new reason strings; pure passthrough, no semantic change
   - tests/trace/rank.test.ts  # AC3 — new cases pinning the unresolved-only semantics and the code_session_anchor signal
   - tests/mcp/wire-shape/compact-rank-reason.test.ts  # AC3b (r1 patches) — pin that has_unresolved_open_loop + code_session_anchor survive the compact projection
@@ -71,19 +72,20 @@ At first open of the day the operator reconstructs five things in priority order
 **What ships in 069:**
 
 - One new `RankSignals` field: `has_unresolved_open_loop` (counts hints where `resolved === false`).
-- One new `RankSignals` field: `code_session_anchor` (cluster has any of: `repo_root` artifact, file-ref artifacts, a git-source atom, a linked session via `cluster_id`, OR ≥3 distinct apps in `source_breakdown`).
+- One new `RankSignals` field: `code_session_anchor` (cluster has any of: artifact with `type` ∈ `{'repo','file','commit'}` per `src/normalize/artifacts.ts`, an atom with `source.app === 'git'`, OR ≥3 distinct apps in `source_breakdown`). **Linked-session anchoring lives Raycast-side**, NOT in this substrate signal — see AC2's `pickHero` (r1 codex F2 + codex-ops F7).
 - The existing `has_open_loop` field is **kept** for backwards compatibility; nothing else in the codebase changes because of it. It is marked deprecated in a header comment and no longer drives Raycast UI.
 - Raycast `EmptyState`'s "Open loops · Today" section (`tools/raycast-echo/src/components/EmptyState.tsx:31-49`) is **replaced** with a single conditional `Continue` hero row, gated by the V1 confidence contract below.
-- Hero text shape: `Continue: <label or newest USER preview, truncated 60 chars> · <N> open` — where `<N>` is the count of unresolved hints in the elevated cluster. **No "dominant file/repo" suffix in V1** (deferred per Out of Scope §1).
+- Hero text shape: `Continue: <label or 'Untitled work'> · <N> open` — where `<N>` is the count of unresolved hints in the elevated cluster. **No "dominant file/repo" suffix in V1** (deferred per Out of Scope §1). **No atom-preview fallback in V1** (r1 codex F3: compact clusters carry IDs not bodies; preview fetch path is V1.5+).
 - All existing surfaces below the hero (sessions buckets, search bar, EmptyView) are untouched.
+- The Raycast client passes an explicit 18h `since` arg to `findClusters` so the daemon's lookback matches the contract's freshness window (r2 codex F1: the current client at `tools/raycast-echo/src/lib/mcp.ts:91-93` sends only `{ view: "compact" }`, and the daemon defaults to 4h with conditional 24h auto-expansion, which can hide a valid 16h continuity cluster or let an auto-expanded older cluster occupy rank 0).
 
 **The V1 confidence contract.** Hero fires iff EITHER:
 
 - A `running` session exists in `useSessions()` (`tools/raycast-echo/src/lib/sessions.ts:85-98`) — this is the existing `warmSession` path, just promoted to the hero slot, OR
-- The top cluster (rank 0 from `findClusters({since: -18h})`) satisfies ALL THREE:
+- The top cluster (rank 0 from `findClusters({since: <18h-ago>, view: "compact"})`) satisfies ALL THREE:
   - `has_unresolved_open_loop === true`
-  - `time_range.most_recent` is within the last 18h
-  - `code_session_anchor === true`
+  - `time_range.to` is within the last 18h
+  - Either substrate-anchored (`'code_session_anchor'` in `rank_reason`) OR Raycast-side linked-session anchored (`sessions.some(s => s.clusterId === top.cluster_id)`)
 
 Otherwise: no hero row. The user sees only the existing sessions buckets and search bar. No fallback to "best guess" — the V1 contract explicitly prefers an empty hero slot over a low-confidence promotion (codex consult: *"the costly failure is trust erosion: if the first row is often wrong, the user starts scanning past ECHO's opinion"*).
 
@@ -91,7 +93,7 @@ Otherwise: no hero row. The user sees only the existing sessions buckets and sea
 
 ## Architectural invariant
 
-The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO cannot anchor it to (a) a running session, OR (b) all three of {unresolved hint, fresh, code-anchored}. There is no fallback / "best guess" hero. Trust is preserved by making the hero's appearance itself the confidence signal: it appears iff ECHO is confident.
+The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO cannot anchor it to (a) a running session, OR (b) all three of `{unresolved hint, fresh (time_range.to within 18h), anchored}` — where "anchored" is the disjunction of the substrate's `code_session_anchor` reason AND the Raycast-side linked-session check (`sessions.some(s => s.clusterId === top.cluster_id)`). There is no fallback / "best guess" hero. Trust is preserved by making the hero's appearance itself the confidence signal: it appears iff ECHO is confident.
 
 ## Acceptance Criteria
 
@@ -156,10 +158,15 @@ The Raycast landing view NEVER promotes a cluster to the hero slot when ECHO can
 
 ### AC3 — Tests pin the contract
 
-- `tests/trace/rank.test.ts`: three new cases
+- `tests/trace/rank.test.ts`: five new cases (r2 codex F2: add the two anchor-branch tests that pin the r1 field-name corrections)
   1. Cluster with two hints, both `resolved: true` → `has_unresolved_open_loop === false`, `has_open_loop === true` (the old signal still fires; the new one doesn't).
-  2. Cluster with one hint `resolved: false` and three distinct apps in `source_breakdown` → `has_unresolved_open_loop === true`, `code_session_anchor === true`, both reasons appear in `rank_reason`.
-  3. Cluster with a single hint `resolved: false` but only one source app and no repo/file/commit artifacts and no atom with `source.app === 'git'` → `has_unresolved_open_loop === true`, `code_session_anchor === false` (anchor is independent of hint; **and** importantly: the `cluster_id` being present does NOT make the cluster anchored — that branch was removed per r1 codex F2 + codex-ops F7).
+  2. Cluster with one hint `resolved: false` and three distinct apps in `source_breakdown` → `has_unresolved_open_loop === true`, `code_session_anchor === true` (source-breakdown branch), both reasons appear in `rank_reason`.
+  3. Cluster with one hint `resolved: false`, one source app, no git atom, BUT carrying an artifact with `type: 'file'` (or `'repo'` or `'commit'`) → `code_session_anchor === true` (artifact-anchor branch). Pins r1 codex F2 + codex-ops F7 field-name corrections: the test must FAIL on an implementation that checks `artifact.kind === 'repo_root'` or `'file_ref'`.
+  4. Cluster with one hint `resolved: false`, one source app, no artifacts, BUT carrying at least one atom whose `source.app === 'git'` → `code_session_anchor === true` (git-source-atom branch). Pins r1 codex F2 + codex-ops F7: the test must FAIL on an implementation that checks `source_app` instead of `source.app`.
+  5. Cluster with a single hint `resolved: false` but only one source app and no repo/file/commit artifacts and no atom with `source.app === 'git'` → `has_unresolved_open_loop === true`, `code_session_anchor === false` (anchor is independent of hint; **and** importantly: the `cluster_id` being present does NOT make the cluster anchored — that branch was removed per r1 codex F2 + codex-ops F7).
+
+- `tools/raycast-echo/test/mcp-find-clusters-since.test.ts` (new file, r2 codex F1): one case pinning the explicit `since` arg
+  1. `findClusters()` (no args) issues a POST to `/mcp` whose JSON-RPC `params.arguments` includes `since: <ISO timestamp 18h before now>` and `view: "compact"`. The test must FAIL on an implementation that sends only `{ view: "compact" }`.
 
 - `tests/mcp/wire-shape/compact-rank-reason.test.ts` (new file, r1 codex F1 + codex-ops F5): two cases pinning the compact projection
   1. Cluster has rank_reason `['has_open_loop', 'has_unresolved_open_loop', 'code_session_anchor']` → compact projection preserves all three in the same order.
@@ -205,6 +212,7 @@ All test changes are additive — no existing test rewrites.
 
 - `tests/trace/rank.test.ts` — three new cases per AC3.
 - `tests/mcp/wire-shape/compact-rank-reason.test.ts` — new file, two cases per AC3 (r1 codex F1 + codex-ops F5).
+- `tools/raycast-echo/test/mcp-find-clusters-since.test.ts` — new file, one case per AC3 (r2 codex F1).
 - `tools/raycast-echo/test/empty-state-hero.test.tsx` — new file, five cases per AC3 (r1 codex F2 + codex-ops F7 added the linked-session-anchor case).
 
 Verify steps (r1 codex F4: root `npm typecheck` excludes `tools/raycast-echo/**`, so root commands alone do NOT cover the edited TSX; per-package commands are required):
@@ -225,7 +233,7 @@ All seven of the above must pass before the builder moves 069 to `pending_review
 - AC1: `src/trace/rank.ts` exports `has_unresolved_open_loop` and `code_session_anchor` signals; deprecation comment present on `has_open_loop`; `rank_reason` strings include the two new reasons when their signals are true; the tautological `cluster_id !== undefined` predicate is NOT in the substrate signal.
 - AC1b: `src/mcp/wire-shape/compact.ts` widens `rank_reason` to the three-string allowlist; future reason strings remain filtered out until explicitly allowed.
 - AC2: `tools/raycast-echo/src/components/EmptyState.tsx` no longer renders "Open loops · Today"; renders a single conditional `Continue` hero row per the `pickHero` decision tree (uses `time_range.to`, the Raycast-side linked-session anchor, and the substrate's `code_session_anchor` reason); existing surfaces below the hero are byte-identical to pre-merge (modulo the unrelated reverts the merge naturally picks up).
-- AC3: All ten new test cases pass (3 rank + 2 compact wire-shape + 5 hero); all existing tests in `tests/trace/`, `tests/mcp/`, `tools/raycast-echo/test/`, and elsewhere continue to pass.
+- AC3: All thirteen new test cases pass (5 rank + 2 compact wire-shape + 1 raycast mcp-since + 5 hero); all existing tests in `tests/trace/`, `tests/mcp/`, `tools/raycast-echo/test/`, and elsewhere continue to pass.
 - All seven verify commands above (root + Raycast package) clean.
 - The merged code dogfoods cleanly on a real Raycast open: hero appears when expected, does NOT appear when expected (sanity check before review-pending).
 
