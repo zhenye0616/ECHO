@@ -31,7 +31,45 @@ branch: "agent/mcp-request-log-shutdown-flush"
 worktree: "~/Desktop/Project_echo--mcp-request-log-shutdown-flush"
 head_sha: "4e17baa6cbd0f6ee4a087c6a1afb0612a01d01eb"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-21 (PDT) / 2026-05-22T07:00Z via founder reconciliation. Verdict from
+  /review-pending sidecar (2026-05-22T06:47:02Z): "merge with founder fixups" (test_counts:
+  1142 passed, 0 failed).
+
+  Spec converged through 4 review rounds (r1→r4) before claim — see
+  backlog/reviews/2026-05-21-067-mcp-request-log-shutdown-flush/r4/combined.md
+  for the convergence trail (final verdict: both reviewers proceed, zero findings).
+
+  Conflicts resolved:
+  - None. Clean ort-strategy merge; five files changed (src/daemon/index.ts,
+    src/mcp/request-log.ts, src/mcp/server.ts, tests/daemon/lifecycle-shutdown-flush.test.ts,
+    tests/mcp/request-log.test.ts).
+
+  C3.5 cross-vendor consult: none invoked — no conflicts surfaced, sidecar's expected-conflicts
+  list said "none expected" and was correct.
+
+  Fixups applied:
+  - None. The sole fixup ("replace AC4 Test (i) with real long-running MCP call OR waive AC
+    wording") was waived per founder decision at the C4 pause. Rationale: a real long-blocking
+    MCP call fixture does not exist, would require new test infrastructure, and would hit
+    exactly the pending→killed-vs-error race ambiguity that AC4 R1 in the spec already flagged.
+    The builder's documented test seam (unwrapped beginRecentMcpCall) still pins the
+    load-bearing property (pending→killed transition + ok/killed ordering in the flushed JSONL);
+    the wrapper-side behavior is covered indirectly by Test (iv)'s failure-isolation contract
+    and by the AC3 unit tests in tests/mcp/request-log.test.ts.
+
+  Fixups deferred to follow-up items:
+  - Real long-running MCP call test for AC4 Test (i). Deferred to follow-up queue per founder
+    waiver above. Trigger: dogfooding journal entry indicating the wrapper-side
+    pending→killed_during_shutdown transition behaved unexpectedly in production, OR a second
+    consumer of the same shutdown-flush pattern surfacing the same test-discipline gap.
+
+  Verify: 1178/1178 tests pass (21 skipped, unchanged from main; +8 net new tests from 067 on
+  top of the 1170 post-066 baseline); lint clean; typecheck clean; tools/sync-skills.sh --check
+  OK (no skill changes in 067).
+
+  Follow-up items (non-blocking):
+  - None from the sidecar. The deferred fixup above is the only follow-up tracked.
 agent_notes: |
   Implemented AC1–AC4 of the r4-converged spec. AC1: `RecentMcpCallStatus` widened with `killed_during_shutdown`; `flushRecentMcpCallLog(path, now?)` exported with atomic tmp-then-rename (best-effort tmp cleanup on error); `parseStatusParam` extended. AC2: `dataDir` bound once at module scope in `src/daemon/index.ts`; flush wired between `await mcp.stop()` and `cursorExtractor.stop()` inside an inline try/catch that writes the error to stderr so failure cannot short-circuit subsequent teardown. AC3: four new unit cases including the atomic-write mechanism pin — used `vi.mock('node:fs', factory)` instead of `vi.spyOn` because Node 22 ESM marks the `node:fs` namespace non-configurable (spec's "or equivalent module-level spy" wording permits this; documented inline). AC4: new integration file with Tests i/ii (in-process stop+flush via direct request-log API seeding), Test iii (source-text assertions on daemon wiring; replaces r1 surrogate runtime test per r2 dispositioning), Test iv (flush-failure isolation via direct closure mirror).
 

@@ -977,3 +977,6 @@ None of these are required for V1 cleanup — the 066/067 priority specs come fi
 
 <!-- from merge of 2026-05-21-066-process-backlog-handoff-atomicity, 2026-05-21 -->
 - Make caller-provided variable names around `skills/process-backlog.md` (`OUTCOME`, `HEAD_SHA`, `LOG`) more explicit in prose so future agents do not misread the canonical P1 transcript as a standalone shell snippet. (from 066 merge sidecar follow-ups)
+
+<!-- from merge of 2026-05-21-067-mcp-request-log-shutdown-flush, 2026-05-21 -->
+- Real long-running MCP call test for AC4 Test (i) in `tests/daemon/lifecycle-shutdown-flush.test.ts` — waived during 067 merge (founder decision). Builder used unwrapped `beginRecentMcpCall` seam to deterministically produce a pending entry; a real wrapped MCP call across `mcp.stop()` would either complete cleanly or race into `error`, both hitting the AC4 R1 strict-vs-lenient ambiguity. Trigger to revisit: dogfooding journal entry indicating wrapper-side `pending → killed_during_shutdown` behaved unexpectedly in production, OR a second consumer of the shutdown-flush pattern surfacing the same gap. (from 067 merge sidecar deferred fixup)

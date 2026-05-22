@@ -1,7 +1,24 @@
+import { renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-export type RecentMcpCallStatus = 'pending' | 'ok' | 'error';
+// 067 — Graceful-shutdown forensic artifact contract.
+//
+// `flushRecentMcpCallLog(path, now?)` writes the current ring snapshot as
+// JSONL to `path` during daemon shutdown, rewriting any still-`pending`
+// entry in place to `killed_during_shutdown` with `duration_ms` measured
+// from the entry's `ts` to the flush time. The write is atomic via
+// tmp-then-rename (POSIX `rename(2)`): a consumer reading the path sees
+// either the prior complete file or the new complete file, never a
+// truncated mid-write artifact.
+//
+// Accepted contract gap: non-graceful death (SIGKILL, OOM, panic before
+// the hook runs, host power loss) provides no execution window for the
+// flush, so the dying ring is lost. A write-on-every-call shadow log is
+// the only mechanism that could close that gap; deferred until ops
+// evidence justifies the latency and surface area.
+
+export type RecentMcpCallStatus = 'pending' | 'ok' | 'error' | 'killed_during_shutdown';
 
 export interface RecentMcpCall {
   ts: number;
@@ -115,6 +132,37 @@ export function readRecentMcpCalls(filters: RecentMcpCallFilters = {}): RecentMc
 export function resetRecentMcpCallLogForTests(): void {
   calls.length = 0;
   nextCallId = 1;
+}
+
+export function flushRecentMcpCallLog(path: string, now = Date.now()): void {
+  for (const entry of calls) {
+    if (entry.status !== 'pending') continue;
+    entry.status = 'killed_during_shutdown';
+    entry.duration_ms = Math.max(0, now - entry.ts);
+  }
+  const body =
+    calls.length === 0
+      ? ''
+      : calls.map((entry) => JSON.stringify(publicClone(entry))).join('\n') + '\n';
+  // writeFileSync is intentional: shutdown may drain the event loop the
+  // instant the hook returns, so an async write could be aborted mid-flight.
+  // Atomicity is via tmp-then-rename: POSIX rename(2) is atomic, so any
+  // consumer reading `path` sees either the prior complete file or the new
+  // complete file, never a truncated mid-write artifact.
+  const tmp = path + '.tmp';
+  try {
+    writeFileSync(tmp, body);
+    renameSync(tmp, path);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // Best-effort cleanup: leaking the tmp file is acceptable, destroying
+      // the prior breadcrumb is not. ENOENT here is expected when the
+      // failure happened before tmp was created.
+    }
+    throw err;
+  }
 }
 
 function publicClone(entry: MutableRecentMcpCall): RecentMcpCall {
