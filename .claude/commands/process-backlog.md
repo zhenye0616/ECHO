@@ -329,12 +329,13 @@ git -c rebase.autoStash=true pull --rebase origin main || exit $?
 #     OR
 #     BLOCKED: <specific question> | Tried: <...> | Best guess: <...> | Why escalated: <rule>
 
-# Step 2 — refresh task-state pointer if this item uses one. The patcher
-# records --spec-path verbatim into canonical_anchors.spec without reading
-# the file from that path, so pass the final destination path BEFORE git mv.
-# `--outcome complete` on the success path; `--outcome escalated` on the
-# BLOCKED escalation path. Use `OUTCOME=complete` or `OUTCOME=escalated`
-# accordingly.
+# E2.5. Final builder-state refresh (protocol-wide). This is the only
+# canonical implementation site; binding-specific notes defer here rather
+# than duplicating final-handoff logic. The patcher records --spec-path
+# verbatim into canonical_anchors.spec without reading the file from that
+# path, so pass the final destination path BEFORE git mv. `--outcome
+# complete` on the success path; `--outcome escalated` on the BLOCKED
+# escalation path. Use `OUTCOME=complete` or `OUTCOME=escalated` accordingly.
 HAS_TASK_STATE_REF=$(
   awk '/^---$/{c++; next} c==1 && /^task_state_ref:/{print; exit}' "$ITEM_FILE"
 )
@@ -353,11 +354,11 @@ if [ -n "$HAS_TASK_STATE_REF" ] || [ -f "$POINTER" ]; then
   fi
 fi
 
-# Step 3 — durable publish block. No subprocess that can wait on network,
-# no prose edit, and no tool startup belongs between git mv and git commit.
-# After git commit, push-with-retry.sh is the boundary publisher — its
-# success is what makes origin/main:$DEST observable, which IS the durable
-# boundary for this consumer.
+# E2.6. Commit + push (single final commit) — durable publish block. No
+# subprocess that can wait on network, no prose edit, and no tool startup
+# belongs between git mv and git commit. After git commit, push-with-retry.sh
+# is the boundary publisher — its success is what makes origin/main:$DEST
+# observable, which IS the durable boundary for this consumer.
 git mv "$ITEM_FILE" "$DEST"
 git add "$DEST"
 [ -f "$POINTER" ] && git add "$POINTER"

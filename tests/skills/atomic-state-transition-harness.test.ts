@@ -106,6 +106,60 @@ const VALID_OBSERVER_SCOPES: ReadonlyArray<DurableBoundaryObservation['observerS
   'external',
 ];
 
+function dirtySurfacePath(surface: string): string {
+  const trimmed = surface.trim();
+  const porcelain = trimmed.match(/^[ MADRCU?!]{1,2}\s+(.+)$/);
+  const path = porcelain ? porcelain[1] : trimmed;
+  return path.includes(' -> ') ? path.split(' -> ').pop()! : path;
+}
+
+function assertPrePublishObservation(
+  fixture: P1ConsumerFixture,
+  step: PrePublishStep,
+  obs: ObservedState,
+): void {
+  if (obs.targetVisible && !step.targetMayBeVisible) {
+    throw new Error(
+      `[${fixture.name}/${step.name}] target visible at a step that did not declare targetMayBeVisible:true`,
+    );
+  }
+
+  const allowed = new Set(step.allowedDirtySurfaces);
+  for (const raw of obs.dirtySurfaces) {
+    const path = dirtySurfacePath(raw);
+    expect(
+      allowed.has(raw) || allowed.has(path),
+      `[${fixture.name}/${step.name}] dirty surface ${raw} must be declared in allowedDirtySurfaces`,
+    ).toBe(true);
+  }
+}
+
+async function convergeFromPartialState(
+  fixture: P1ConsumerFixture,
+): Promise<DurableBoundaryObservation | undefined> {
+  // Property 3: recovery is deterministic from on-disk state alone — no
+  // prompts, no operator decisions. Runs to completion or throws.
+  await fixture.recover();
+
+  const postRecover = await fixture.observe();
+  if (postRecover.durableBoundary.published) {
+    return postRecover.durableBoundary;
+  }
+
+  if (
+    typeof fixture.finishUnpublishedTransition === 'function' &&
+    (postRecover.targetVisible || postRecover.targetComplete)
+  ) {
+    const boundary = await fixture.finishUnpublishedTransition();
+    if (boundary.published) {
+      return boundary;
+    }
+  }
+
+  await fixture.assertCleanSourceState();
+  return undefined;
+}
+
 async function runP1Harness(fixture: P1ConsumerFixture): Promise<void> {
   await fixture.setup();
 
@@ -119,44 +173,35 @@ async function runP1Harness(fixture: P1ConsumerFixture): Promise<void> {
     ).toBe(true);
   }
 
-  // Properties 1+2: run all pre-publish steps in order, observing after each.
-  // The harness MUST NOT assume target visibility is always false before
-  // publish; instead, the fixture declares which steps may make the target
-  // visible.
-  for (const step of fixture.prePublishSteps) {
-    await step.run();
+  // Properties 1+2: test every named pre-publish step as its own crash point.
+  // Each iteration starts from the recovered source state, replays steps up to
+  // that crash point, checks the step's visibility/dirty-surface declaration,
+  // then proves deterministic convergence from that on-disk state.
+  let publishedBoundary: DurableBoundaryObservation | undefined;
+  for (let crashIndex = 0; crashIndex < fixture.prePublishSteps.length; crashIndex += 1) {
+    await fixture.assertCleanSourceState();
+    for (let replayIndex = 0; replayIndex <= crashIndex; replayIndex += 1) {
+      await fixture.prePublishSteps[replayIndex].run();
+    }
+
+    const step = fixture.prePublishSteps[crashIndex];
     const obs = await fixture.observe();
-    if (obs.targetVisible && !step.targetMayBeVisible) {
-      throw new Error(
-        `[${fixture.name}/${step.name}] target visible at a step that did not declare targetMayBeVisible:true`,
-      );
+    assertPrePublishObservation(fixture, step, obs);
+
+    publishedBoundary = await convergeFromPartialState(fixture);
+    if (publishedBoundary) {
+      if (crashIndex !== fixture.prePublishSteps.length - 1) {
+        throw new Error(
+          `[${fixture.name}/${step.name}] finishUnpublishedTransition published before later prePublishSteps could be exercised`,
+        );
+      }
+      break;
     }
   }
 
-  // Property 3: recovery is deterministic from on-disk state alone — no
-  // prompts, no operator decisions. Runs to completion or throws.
-  await fixture.recover();
-
-  // Property 1: after recovery, the consumer reaches one of three convergent
-  // outcomes — rollback-to-source, idempotent-noop, or deterministic-finish.
-  // The harness probes the post-recovery state via observe() to decide which.
-  const postRecover = await fixture.observe();
-
-  let publishedBoundary: DurableBoundaryObservation;
-  if (postRecover.durableBoundary.published) {
-    // Idempotent no-op: the boundary was already observed before the harness
-    // ran (unusual for a freshly-set-up fixture, but allowed by the contract).
-    publishedBoundary = postRecover.durableBoundary;
-  } else if (
-    postRecover.targetVisible &&
-    !postRecover.sourceVisible &&
-    typeof fixture.finishUnpublishedTransition === 'function'
-  ) {
-    // The fixture's prePublishSteps committed the transition locally without
-    // publishing the boundary. Use the declared finish path.
-    publishedBoundary = await fixture.finishUnpublishedTransition!();
-  } else {
-    // Rollback succeeded — assert clean source, replay steps, then publish.
+  if (!publishedBoundary) {
+    // Rollback succeeded for every crash point — replay all steps, then
+    // publish through the fixture's declared durable boundary.
     await fixture.assertCleanSourceState();
     for (const step of fixture.prePublishSteps) {
       await step.run();
@@ -552,6 +597,20 @@ describe('AC1 — generic P1 harness contract', () => {
     };
     try {
       await expect(runP1Harness(bad)).rejects.toThrow(/allowedTouchedSurfacePrefixes/);
+    } finally {
+      teardown(env);
+    }
+  });
+
+  it('rejects a fixture whose pre-publish step dirties an undeclared surface', async () => {
+    const { fixture, env } = makeFixtureA('bad-dirty');
+    fixture.prePublishSteps[0] = {
+      ...fixture.prePublishSteps[0],
+      allowedDirtySurfaces: [],
+    };
+
+    try {
+      await expect(runP1Harness(fixture)).rejects.toThrow(/allowedDirtySurfaces/);
     } finally {
       teardown(env);
     }
