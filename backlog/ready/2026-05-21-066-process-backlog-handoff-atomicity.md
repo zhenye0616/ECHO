@@ -85,13 +85,14 @@ The current consumer is the process-backlog work-item stage move that takes one 
 
 The violation today is not that the final Git commit is non-atomic. The violation is that the transition has an observable pre-commit window where the destination path can exist before all required fields and side artifacts are staged together. A reader can see a work item at the target stage with stale or empty handoff metadata, or a rerun can encounter a dirty index and require human cleanup.
 
-This consumer satisfies P1 by using Git as its local durable boundary and by adding a deterministic rollback-and-replay recovery recipe for all partial pre-boundary states. The mechanism is local to this consumer:
+This consumer satisfies P1 by using **the pushed ref `origin/main:$DEST`** as its durable boundary (not the local commit alone) and by combining a rollback-only recovery procedure with a separate caller-side finish path for the post-commit-pre-push state. The mechanism is local to this consumer:
 
 - Edit handoff metadata while the item is still at the source path.
 - Run the task-state patcher before the rename, but pass the final destination path as `--spec-path` because the patcher records that string verbatim into `canonical_anchors.spec`.
-- Enter a tight publish block: `git mv`, explicit `git add "$DEST"`, add remaining touched paths, then `git commit`.
-- If a crash occurs before the commit, recover from on-disk state by rolling the allowed touched surfaces back to the source state and replaying the transition.
-- If the commit exists, treat the transition as published and do not replay.
+- Enter a tight publish block: `git mv`, explicit `git add "$DEST"`, add remaining touched paths, `git commit`, then `tools/review-queue/push-with-retry.sh` to advance the boundary to `origin/main:$DEST`.
+- If a crash occurs before the local commit, the caller's `recover_p1_stage_move` rolls allowed touched surfaces back to the source state; the caller then replays the transition.
+- **If a crash occurs after the local commit but before the boundary is observed remotely**, the caller's separate finish-path block (`if p1_local_commit_unpushed; then push-with-retry.sh + boundary verification`) advances the commit to the remote boundary — the local commit is NOT rolled back, it is finished.
+- If `origin/main:$DEST` is already observed, the transition is complete; the caller exits 0 via the idempotent `p1_boundary_published_remotely` check.
 
 The explicit `git add "$DEST"` after `git mv` is required. The reviewed throwaway-repo reproduction showed that `git mv` after editing the source stages the rename at the old blob while leaving the destination's edited contents unstaged. Without `git add "$DEST"`, the commit can publish stale handoff fields and leave the edited destination dirty.
 
