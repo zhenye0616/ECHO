@@ -35,9 +35,9 @@ spec_refs:
   - backlog/_followups.md  # codex strategist consult on confidence contract (2026-05-22 brainstorm); cold-start friction taxonomy
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-22T20:42:15Z"
+branch: "agent/raycast-cold-start-continuity-hero"
 worktree: ""
 head_sha: ""
 pr_url: ""
