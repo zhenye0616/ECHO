@@ -532,6 +532,168 @@ function makeFixtureB(transitionKey = 'B'): { fixture: P1ConsumerFixture; env: R
 }
 
 // ---------------------------------------------------------------------------
+// AC1 — shared-substrate fixtures for the key-scoped concurrency property.
+// They intentionally use one in-memory substrate so the test proves
+// different transition keys do not observe each other's intermediate surfaces
+// without relying on separate temp repos for isolation.
+// ---------------------------------------------------------------------------
+
+type MemoryTransition = {
+  sourceVisible: boolean;
+  targetVisible: boolean;
+  targetComplete: boolean;
+  dirtySurfaces: Set<string>;
+  published: boolean;
+  token: string;
+};
+
+type SharedMemorySubstrate = {
+  records: Map<string, MemoryTransition>;
+  observations: Map<string, string[]>;
+  nextToken: number;
+};
+
+function makeSharedMemorySubstrate(): SharedMemorySubstrate {
+  return {
+    records: new Map(),
+    observations: new Map(),
+    nextToken: 1,
+  };
+}
+
+function recordMemoryObservation(
+  substrate: SharedMemorySubstrate,
+  key: string,
+  surfaces: string[],
+): void {
+  const existing = substrate.observations.get(key) ?? [];
+  existing.push(...surfaces);
+  substrate.observations.set(key, existing);
+}
+
+function makeSharedMemoryFixture(
+  substrate: SharedMemorySubstrate,
+  transitionKey: string,
+): P1ConsumerFixture {
+  const SRC = `mem/${transitionKey}/source`;
+  const DEST = `mem/${transitionKey}/dest`;
+
+  const state = (): MemoryTransition => {
+    const found = substrate.records.get(transitionKey);
+    if (!found) throw new Error(`missing memory transition ${transitionKey}`);
+    return found;
+  };
+
+  return {
+    name: `shared-memory-${transitionKey}`,
+    transitionKey,
+    allowedTouchedSurfacePrefixes: [`mem/${transitionKey}/`],
+    async setup() {
+      if (!substrate.records.has(transitionKey)) {
+        substrate.records.set(transitionKey, {
+          sourceVisible: true,
+          targetVisible: false,
+          targetComplete: false,
+          dirtySurfaces: new Set(),
+          published: false,
+          token: '',
+        });
+      }
+      if (!substrate.observations.has(transitionKey)) {
+        substrate.observations.set(transitionKey, []);
+      }
+    },
+    async touchedSurfaces() {
+      return [SRC, DEST];
+    },
+    async observe() {
+      const s = state();
+      const visible = [
+        s.sourceVisible ? SRC : '',
+        s.targetVisible ? DEST : '',
+        ...s.dirtySurfaces,
+      ].filter(Boolean);
+      recordMemoryObservation(substrate, transitionKey, visible);
+      return {
+        durableBoundary: {
+          kind: 'non-git',
+          count: s.published ? 1 : 0,
+          token: s.token,
+          published: s.published,
+          observerScope: 'external',
+        },
+        sourceVisible: s.sourceVisible,
+        targetVisible: s.targetVisible,
+        targetComplete: s.targetComplete,
+        stagedOrPreparedSurfaces: [],
+        dirtySurfaces: [...s.dirtySurfaces],
+      };
+    },
+    prePublishSteps: [
+      {
+        name: 'dirty-source',
+        async run() {
+          state().dirtySurfaces.add(SRC);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        },
+        allowedDirtySurfaces: [SRC],
+        targetMayBeVisible: false,
+      },
+      {
+        name: 'target-visible-before-publish',
+        async run() {
+          const s = state();
+          s.sourceVisible = false;
+          s.targetVisible = true;
+          s.dirtySurfaces.add(DEST);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        },
+        allowedDirtySurfaces: [SRC, DEST],
+        targetMayBeVisible: true,
+      },
+    ],
+    async publishThroughDurableBoundary() {
+      const s = state();
+      s.sourceVisible = false;
+      s.targetVisible = true;
+      s.targetComplete = true;
+      s.dirtySurfaces.clear();
+      s.published = true;
+      s.token = `mem-commit-${substrate.nextToken++}`;
+      return {
+        kind: 'non-git',
+        count: 1,
+        token: s.token,
+        published: true,
+        observerScope: 'external',
+      };
+    },
+    async recover() {
+      const s = state();
+      if (s.published) return;
+      s.sourceVisible = true;
+      s.targetVisible = false;
+      s.targetComplete = false;
+      s.dirtySurfaces.clear();
+    },
+    async assertPublished(boundary) {
+      const s = state();
+      expect(boundary.published).toBe(true);
+      expect(s.published).toBe(true);
+      expect(s.targetComplete).toBe(true);
+    },
+    async assertCleanSourceState() {
+      const s = state();
+      expect(s.published).toBe(false);
+      expect(s.sourceVisible).toBe(true);
+      expect(s.targetVisible).toBe(false);
+      expect(s.targetComplete).toBe(false);
+      expect([...s.dirtySurfaces]).toEqual([]);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // AC1 tests — generic harness against the two neutral fixtures.
 // ---------------------------------------------------------------------------
 
@@ -616,15 +778,21 @@ describe('AC1 — generic P1 harness contract', () => {
     }
   });
 
-  it('key-scoped concurrency: two fixtures with distinct transitionKeys do not interfere', async () => {
-    const A = makeFixtureA('A1');
-    const B = makeFixtureA('A2');
-    try {
-      await Promise.all([runP1Harness(A.fixture), runP1Harness(B.fixture)]);
-    } finally {
-      teardown(A.env);
-      teardown(B.env);
-    }
+  it('key-scoped concurrency: two fixtures with distinct transitionKeys in one substrate do not interfere', async () => {
+    const substrate = makeSharedMemorySubstrate();
+    const fixtureA = makeSharedMemoryFixture(substrate, 'A1');
+    const fixtureB = makeSharedMemoryFixture(substrate, 'A2');
+
+    await Promise.all([runP1Harness(fixtureA), runP1Harness(fixtureB)]);
+
+    const observedA = substrate.observations.get('A1') ?? [];
+    const observedB = substrate.observations.get('A2') ?? [];
+    expect(observedA.length).toBeGreaterThan(0);
+    expect(observedB.length).toBeGreaterThan(0);
+    expect(observedA.every((surface) => surface.startsWith('mem/A1/'))).toBe(true);
+    expect(observedB.every((surface) => surface.startsWith('mem/A2/'))).toBe(true);
+    expect(substrate.records.get('A1')?.published).toBe(true);
+    expect(substrate.records.get('A2')?.published).toBe(true);
   });
 });
 
@@ -717,6 +885,7 @@ recover_p1_stage_move() {
     if git cat-file -e "HEAD:\$path" 2>/dev/null || git ls-files --error-unmatch -- "\$path" >/dev/null 2>&1; then
       git restore --staged --worktree -- "\$path" || return 4
     else
+      git rm --cached --ignore-unmatch -- "\$path" || return 4
       [ -e "\$path" ] && { rm -f -- "\$path" || return 4; }
     fi
   done
@@ -1169,9 +1338,32 @@ exec ${realGit} "$@"
     env = makeConsumerEnv();
     expectClean(runHandoff(env, 'recover'));
     applyMetadataEdit(env, 'deadbeef');
-    // Benign case: $DEST untracked AND absent — recovery proceeds cleanly.
-    const benign = runHandoff(env, 'recover');
-    expectClean(benign);
+    // Benign case: $DEST/$POINTER are untracked AND absent. Recovery must
+    // still run the git-rm cleanup branch with --ignore-unmatch, then proceed.
+    const fakeGitDir = mkdtempSync(join(tmpdir(), 'echo-fakegit-'));
+    const gitLog = join(fakeGitDir, 'git.log');
+    const realGit = execSync('which git').toString().trim();
+    writeFileSync(
+      join(fakeGitDir, 'git'),
+      `#!/bin/bash
+printf '%s\\n' "$*" >> "$ECHO_FAKE_GIT_LOG"
+exec ${realGit} "$@"
+`,
+      { mode: 0o755 },
+    );
+    chmodSync(join(fakeGitDir, 'git'), 0o755);
+    try {
+      const benign = runHandoff(env, 'recover', {
+        PATH: `${fakeGitDir}:${process.env.PATH ?? ''}`,
+        ECHO_FAKE_GIT_LOG: gitLog,
+      });
+      expectClean(benign);
+      const calls = readFileSync(gitLog, 'utf-8');
+      expect(calls).toContain(`rm --cached --ignore-unmatch -- ${env.destRel}`);
+      expect(calls).toContain(`rm --cached --ignore-unmatch -- ${env.pointerRel}`);
+    } finally {
+      rmSync(fakeGitDir, { recursive: true, force: true });
+    }
     teardown(env);
     env = null;
 
@@ -1240,6 +1432,7 @@ describe('skills/process-backlog.md — P1 transcript markers (pins skill ↔ te
     'recover_p1_stage_move',
     'git mv "$ITEM_FILE" "$DEST"',
     'git add "$DEST"',
+    'git rm --cached --ignore-unmatch -- "$path"',
     'tools/review-queue/push-with-retry.sh',
     'git -c rebase.autoStash=true pull --rebase origin main',
     '--spec-path "$DEST"',

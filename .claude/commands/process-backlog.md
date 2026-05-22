@@ -279,6 +279,7 @@ recover_p1_stage_move() {
     if git cat-file -e "HEAD:$path" 2>/dev/null || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
       git restore --staged --worktree -- "$path" || return 4
     else
+      git rm --cached --ignore-unmatch -- "$path" || return 4
       [ -e "$path" ] && { rm -f -- "$path" || return 4; }
     fi
   done
