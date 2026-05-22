@@ -9,19 +9,20 @@ blocked_by: []
 task_state_ref: 2026-05-21-067-mcp-request-log-shutdown-flush
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  - src/mcp/request-log.ts  # AC1 — extend RecentMcpCallStatus to include 'killed_during_shutdown'; add flushRecentMcpCallLog(path: string): Promise<void> that (a) marks every still-`pending` entry's status to 'killed_during_shutdown' and stamps duration_ms = (now - ts) for visibility, (b) writes the full ring buffer as JSONL to <path> via writeFileSync (synchronous to survive imminent process exit), (c) returns after the write completes. Existing readRecentMcpCalls / instrumentMcpServer signatures unchanged.
-  - src/daemon/index.ts  # AC2 — onShutdown hook (lines 58-66) calls `await flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl'))` AFTER `mcp.stop()` returns and BEFORE the watcher stops + dispose. dataDir is the value lifecycle.ts:18-22 returns (`resolveDataDir()`); reuse via existing handle plumbing.
-  - src/daemon/lifecycle.ts  # AC2 — minor: expose dataDir on LifecycleHandle (already returned via `{ storage, dataDir }` at line 131; daemon/index.ts currently discards it via destructuring on line 54 — the spec extends the destructure to capture and pass it to the onShutdown closure).
-  - tests/mcp/request-log.test.ts  # AC3 — extend with THREE new cases: (i) flush with mixed pending + ok + error entries → JSONL file exists, has correct line count, pending entries are rewritten to 'killed_during_shutdown', ok/error preserved verbatim; (ii) flush on empty ring → file is created and empty (zero lines); (iii) flush is idempotent on repeated call → second call overwrites file with current ring contents (which may differ if the ring was mutated between calls).
-  - tests/daemon/lifecycle-shutdown-flush.test.ts  # AC4 — new test file: starts an MCP server via startMcpServer({port: 0}), fires a few real tool calls (echo_ping), starts one tool call but cancels mid-flight via aborting the HTTP client, then triggers the onShutdown hook directly and asserts the shutdown JSONL exists at the expected path with the in-flight entry marked 'killed_during_shutdown'.
+  - src/mcp/request-log.ts  # AC1 — extend RecentMcpCallStatus with 'killed_during_shutdown'; add flushRecentMcpCallLog(path, now?) that rewrites still-pending entries, synchronously writes the current ring as JSONL, and leaves steady-state begin/finish/fail/read/instrument paths unchanged.
+  - src/mcp/server.ts  # AC1 — extend parseStatusParam at lines 157-160 so '/mcp/recent-calls?status=killed_during_shutdown' is accepted once the status exists.
+  - src/daemon/index.ts  # AC2 — onShutdown hook at lines 54-66 calls flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl')) after mcp.stop() and before watcher/extractor teardown; no lifecycle.ts interface change required.
+  - tests/mcp/request-log.test.ts  # AC3 — add mixed-status flush, empty-ring flush, and repeated-flush overwrite/idempotency coverage.
+  - tests/daemon/lifecycle-shutdown-flush.test.ts  # AC4 — new integration test for the same in-process stop+flush sequence the shutdown hook uses; no real SIGTERM.
 
 spec_refs:
-  - src/mcp/request-log.ts  # the in-memory ring buffer + finalize-on-callback-return pattern that loses pending entries on process exit; lines 31-34 (calls[] is process-memory), 51-61 (status transition only on cb return/throw), 79-103 (finishRecentMcpCall / failRecentMcpCall — both no-ops if the entry id is missing)
-  - src/daemon/lifecycle.ts  # shutdown() at lines 70-87 calls onShutdownHook then releasePidLock + clearInterval; the hook is the only operator-side flush point; resolveDataDir at lines 18-22 owns the canonical path for `<dataDir>/mcp-shutdown.jsonl`
-  - src/daemon/index.ts  # lines 58-66 — the onShutdown closure that stops MCP + watchers; the spec inserts the flush AFTER mcp.stop and BEFORE watcher stops, so any in-flight callback torn down by `httpServer.closeAllConnections()` has its `pending` entry visible to the flush
-  - src/mcp/server.ts  # lines 363-375 — `stop()` calls `httpServer.close()` (graceful wait) then `closeAllConnections?.()` (rip TCP); this is the moment the in-flight callback's connection dies; the callback itself may continue executing for some short time, but the wrapper's finishRecentMcpCall may not fire if the event loop is drained before the callback yields
-  - backlog/_followups.md  # PRIORITY 2 entry under "2026-05-21 — harness seam review" — the in-the-moment finding that motivates this spec
-  - CLAUDE.md  # "Dogfooding journal discipline" section — every `mcp__echo__*` call must be journaled; the same audit-grade rationale applies to the daemon's own internal log of which calls fired during the now-ending process lifetime
+  - src/mcp/request-log.ts  # lines 31-34 are the process-memory ring; lines 51-61 finalize only when the wrapped callback returns/throws; lines 79-103 finish/fail no-op if the entry has already disappeared.
+  - src/daemon/lifecycle.ts  # lines 18-22 define the canonical dataDir; lines 70-87 run the shutdown hook; lines 96-131 show the lifecycle handle already exposes dataDir.
+  - src/daemon/index.ts  # lines 40 and 54-66 are the current pid-lock/dataDir and onShutdown wiring; the flush belongs inside this closure after mcp.stop().
+  - src/mcp/server.ts  # lines 157-160 parse recent-call status filters; lines 363-374 stop the server by close() then closeAllConnections?.().
+  - backlog/_followups.md  # lines 886, 904, 943, and 968-974 define P2, P10, the P2 postmortem mechanism for merge-pause recovery, and surfaced sibling spec candidates.
+  - CLAUDE.md  # lines 203-207 warn against strategist drift by patching deeper instead of removing/re-scoping.
+  - skills/review-queue-watch.md  # lines 101-116 are the disposition discipline: prefer dropping or splitting recently-added mechanism over patching deeper.
 
 # --- agent-managed fields (filled in during run) ---
 claimed_by: ""
@@ -38,225 +39,134 @@ agent_notes: ""
 
 ## Why this spec exists
 
-`src/mcp/request-log.ts` is the daemon's internal audit trail of every MCP tool call — what was invoked, with what arg-shape, when, and how it finished. `tools/tail-mcp.sh` consumes it for live operator visibility. The journal discipline in CLAUDE.md treats every `mcp__echo__*` invocation as audit-grade signal that the dogfooding loop depends on.
+`src/mcp/request-log.ts` is the daemon's live audit trail for MCP tool calls, but it is currently only an in-process ring buffer (`src/mcp/request-log.ts:31-34`). During graceful daemon shutdown, `src/daemon/lifecycle.ts:70-87` runs the onShutdown hook; `src/daemon/index.ts:54-66` stops MCP; and `src/mcp/server.ts:363-374` closes the HTTP server plus active connections. Any wrapped tool callback that has not returned by then can remain `pending`, and the entire ring disappears when the process exits.
 
-But the ring buffer is **process memory only** (line 34, `const calls: MutableRecentMcpCall[] = []`). It has no persistence layer. Three failure modes lose data:
+067 exists to close that controllable, common loss window for the current P2 consumer: the in-process MCP request log. It does not attempt to solve every restart-observability case in the harness. The narrow fix is to synchronously write the current request-log ring to `<dataDir>/mcp-shutdown.jsonl` during graceful shutdown, rewriting any still-`pending` entry to `killed_during_shutdown` so the dying process leaves an explicit forensic artifact.
 
-1. **Graceful SIGTERM during in-flight calls.** A launchd restart, a `kill <pid>`, a `Ctrl-C` on the daemon, an OS update — all fire SIGTERM. `src/daemon/lifecycle.ts:70-87` runs the shutdown sequence; `src/daemon/index.ts:58-66` stops MCP via `mcp.stop()` which calls `httpServer.close()` followed immediately by `httpServer.closeAllConnections?.()` (`src/mcp/server.ts:367-372`). Any tool callback running at that moment has its connection ripped out, then the event loop drains and node exits — the callback's `finishRecentMcpCall` / `failRecentMcpCall` may never get to run. The corresponding entry stays `pending` forever. **It is also lost entirely** because the buffer is in-memory and the process is about to exit. The operator looking at `tail-mcp.sh` sees "daemon back online" once the new process starts; there is no breadcrumb of what was killed.
+## Mapping to harness primitives
 
-2. **All previously-completed entries are also lost.** Even for tool calls that DID complete (`ok` / `error`) before SIGTERM, the ring buffer goes away with the process. Operators investigating "did the daemon serve that request before the restart?" have no way to check — they see only post-restart entries.
+**P2 — In-flight observability across restart.** P2's contract at `backlog/_followups.md:886` says any `pending` / in-flight operation at process shutdown MUST surface on the next boot. 067 satisfies the daemon-side durable-artifact half for the current in-process tool-call-log consumer under graceful SIGTERM/SIGINT. It deliberately does not claim full P2 closure: operator-visible next-boot surfacing is split to sibling stub `2026-05-21-068-tail-mcp-shutdown-banner`, and non-graceful death is an accepted contract limit recorded below.
 
-3. **Crash / panic / SIGKILL.** Identical loss of all entries; this is accepted as the worst case (no opportunity to flush). But the graceful SIGTERM path — which is by far the most common and the only one currently producing silent data loss in a controllable way — has no excuse.
+**P8 — Attributable audit trail.** The flushed JSONL strengthens P8 for daemon MCP calls by preserving tool name, projected arg/result shape, timing, and final shutdown status across restart. It complements, but does not replace, CLAUDE.md's dogfooding journal discipline for AI-client-side MCP calls.
 
-The trigger for closing this seam: the project is moving toward more unattended / launchd-driven cycles (review-queue reviewer ticks, periodic merges, eventual cron-style schedule). Every restart of those processes will lose the in-flight request log unless this fix lands. The exposure scales with daemon-restart frequency.
+**P10 — Structured inter-agent messages.** P10 is considered and rejected for 067. This artifact is not an inter-agent handoff; no downstream agent is expected to parse prose or infer meaning from filesystem layout. It is a structured operator-forensic JSONL file at a documented daemon-owned path. The P2 postmortem row at `backlog/_followups.md:943` proposed `coord_emit` + daemon storage for merge-pause recovery because that case is an inter-agent coordination event. Different consumers, different mechanisms.
 
-## The root cause
+## Why JSONL-on-disk, not `coord_emit`
 
-The request-log module was designed as an **in-process debug aide**, not as an audit trail. The ring buffer is sized at 1000 entries, sharded against process lifetime, with no on-disk shadow. The shutdown path in `lifecycle.ts:70-87` and `daemon/index.ts:58-66` has no hook into the request log — `shutdown()` calls the onShutdownHook (which stops watchers + MCP) and `releasePidLock()`, but the request log is invisible to both.
+`coord_emit` is the right mechanism when one actor needs to hand typed state to another actor across a restart, such as `merge_paused` / `merge_blocked`. The MCP shutdown log has a different consumer: an operator investigating what the daemon served before it died. JSONL-on-disk keeps the artifact local, inspectable with shell tools, bounded by the existing 1000-entry ring, and independent of the coord substrate. If a future workflow needs agents to consume shutdown records as coordination events, that is a new P10-facing spec, not hidden scope in 067.
 
-The mismatch: the dogfooding journal discipline (CLAUDE.md) requires every MCP call be logged in-the-moment as audit-grade signal. The daemon's own internal log of the same events is NOT audit-grade — it disappears at every restart. Future tooling (a "what did the daemon serve between restart X and restart Y?" forensic query) cannot be built on top of a log that disappears.
+## Root cause and minimum viable fix
 
-The narrowest fix: a single new export `flushRecentMcpCallLog(path: string)` that the onShutdown hook calls AFTER `mcp.stop()` returns. After `mcp.stop()`, the HTTP server is closed and connections are ripped — so any callback still running has lost its ability to respond and is unlikely to call `finishRecentMcpCall`. Flush at this point: mark all `pending` entries with status `killed_during_shutdown`, write the full ring as JSONL to disk, and the operator has a deterministic record of the dying process's last 1000 calls plus an explicit accounting of which were torn down mid-flight.
+The request-log module was built as a live debug aid: `beginRecentMcpCall` appends to memory, and `finishRecentMcpCall` / `failRecentMcpCall` update entries only after the wrapped callback returns or throws. The daemon shutdown path has no request-log hook, so graceful restarts lose both completed entries and still-pending entries.
 
-## The minimum-viable fix
+The minimum viable fix is one request-log export plus one daemon hook:
 
-1. **New `RecentMcpCallStatus` value: `'killed_during_shutdown'`.** This is the load-bearing distinction — operators reading the shutdown JSONL must be able to tell, per entry, whether the call completed cleanly before death, errored cleanly before death, or was torn down by shutdown. The new status does NOT appear in steady-state (the ring buffer transitions are `pending → ok` or `pending → error` only); it appears only in the flushed JSONL.
-
-2. **New `flushRecentMcpCallLog(path: string)` export.** Synchronous write (uses `node:fs.writeFileSync`) to survive imminent event-loop drain. One JSONL line per entry in the ring buffer. Status field reflects current state at flush time — `pending` entries are rewritten to `killed_during_shutdown` AS PART OF THE FLUSH (in-memory mutation; the ring buffer is dying anyway, but the test asserts the rewritten state to pin the behavior). Each line includes ts (epoch ms), tool, args_shape, result_shape, duration_ms, status.
-
-3. **Wire into `src/daemon/index.ts` onShutdown hook.** The flush call goes AFTER `mcp.stop()` returns (so HTTP is closed; in-flight callbacks are torn down OR have completed) and BEFORE watcher stops (which is unrelated and shouldn't be blocked by the flush). The flush path is `<dataDir>/mcp-shutdown.jsonl`, overwritten on each shutdown (no rotation — operators check the file post-restart; one file is sufficient for V1).
-
-4. **Lifecycle handle plumbs `dataDir`.** Currently `src/daemon/index.ts` line 54 destructures `{ storage, backend, dispose }` from `createStorage()` but ignores the `dataDir` value `startLifecycle` returns (lifecycle.ts:131 returns `{ storage, dataDir }`). The spec extends the destructure to capture `dataDir` and pass it into the onShutdown closure for the flush path. Minor change; preserves the existing lifecycle contract.
+1. Add status value `killed_during_shutdown`.
+2. Add `flushRecentMcpCallLog(path: string, now = Date.now()): void`.
+3. In `src/daemon/index.ts`, call the flush after `await mcp.stop()` and before extractor/watcher teardown.
+4. Keep the implementation request-log-local. Do not add a generic shutdown-flush helper in 067; the second occurrence rule remains the trigger for extracting shared extractor/watcher support.
 
 ## Architectural invariant
 
-**Every entry that was visible to `readRecentMcpCalls()` during the daemon's lifetime is recoverable from `<dataDir>/mcp-shutdown.jsonl` after a graceful SIGTERM.** No entry is lost without operator-visible signal. Entries that were `pending` at shutdown time are explicitly tagged `killed_during_shutdown` so operators can distinguish "completed-before-death" from "torn-down-by-shutdown" at a glance.
+After graceful SIGTERM/SIGINT, every entry that was visible to `readRecentMcpCalls()` during the dying daemon's lifetime is recoverable from `<dataDir>/mcp-shutdown.jsonl`. Entries that completed before shutdown preserve their `ok` / `error` status. Entries still `pending` at flush time are rewritten in-place to `killed_during_shutdown` and receive a `duration_ms` measured from their original `ts` to the flush time.
 
-The invariant **does NOT cover SIGKILL / panic / OOM**. Those failure modes are accepted as worst-case (no flush opportunity); operators investigating those scenarios have to rely on launchd's own restart logs + any external mirror. V1 scope is graceful SIGTERM.
+**Explicit accepted gap against P2:** this invariant does not cover SIGKILL, OOM kill, process panic before the hook runs, or host power loss. Those cases provide no shutdown execution window, so 067 cannot flush. A write-on-every-call shadow log is the only mechanism that can close that gap; it is deferred until ops evidence shows the extra latency and surface area are justified.
 
 ## Acceptance Criteria
 
 ### AC1 — `src/mcp/request-log.ts` gains `killed_during_shutdown` status + `flushRecentMcpCallLog` export
 
-- **Modified file:** `src/mcp/request-log.ts`.
-- **New status:** `RecentMcpCallStatus` type at line 4 extends to `'pending' | 'ok' | 'error' | 'killed_during_shutdown'`.
-- **New export:**
-
-  ```ts
-  export function flushRecentMcpCallLog(path: string, now: number = Date.now()): void {
-    // Pre-flush: rewrite every still-pending entry to killed_during_shutdown
-    // and stamp duration_ms for visibility (now - entry.ts). The ring buffer
-    // is about to die with the process; this in-place mutation makes the
-    // dying state explicit in the flushed JSONL.
-    for (const entry of calls) {
-      if (entry.status === 'pending') {
-        entry.status = 'killed_during_shutdown';
-        entry.duration_ms = Math.max(0, now - entry.ts);
-      }
-    }
-    // Synchronous write — must survive imminent event-loop drain on SIGTERM.
-    // One JSONL line per entry; trailing newline; no JSON-array wrapper (so a
-    // partial write at least leaves valid leading lines parseable).
-    const lines = calls.map((entry) => JSON.stringify(publicClone(entry)));
-    const body = lines.length === 0 ? '' : lines.join('\n') + '\n';
-    writeFileSync(path, body);
-  }
-  ```
-
-  Synchronous on purpose. Async fs would race the event-loop drain — `await` on a write to a slow disk could be cancelled by node's exit, partially writing the file or skipping the write entirely. `writeFileSync` blocks the thread until the write completes, which is what we want.
-
-- **No changes** to `beginRecentMcpCall`, `finishRecentMcpCall`, `failRecentMcpCall`, `readRecentMcpCalls`, `instrumentMcpServer`. Steady-state code paths are untouched.
-- **`parseStatusParam` in `src/mcp/server.ts:157-161` extends** to accept `'killed_during_shutdown'` as a valid query param value. Operators may want to query the live ring for that status (it won't appear during normal operation, but the API surface should accept it for consistency once the flush has run on a previous boot and an operator imports the JSONL into a new context). This is a one-line addition.
-- **Header / module comment update:** add a paragraph documenting the new shutdown-flush contract: "On graceful SIGTERM, `flushRecentMcpCallLog` is invoked by the daemon's onShutdown hook AFTER `mcp.stop()` returns. The flush writes every ring-buffer entry as JSONL to `<dataDir>/mcp-shutdown.jsonl` (overwritten each shutdown). Entries that were still `pending` at flush time are rewritten in-place to `killed_during_shutdown`. SIGKILL / panic / OOM bypass the flush; those failure modes accept full ring-buffer loss as worst-case."
+- **Modified files:** `src/mcp/request-log.ts`, `src/mcp/server.ts`.
+- `RecentMcpCallStatus` at `src/mcp/request-log.ts:4` becomes `'pending' | 'ok' | 'error' | 'killed_during_shutdown'`.
+- `flushRecentMcpCallLog(path: string, now = Date.now()): void`:
+  - rewrites every still-`pending` entry to `killed_during_shutdown`;
+  - stamps `duration_ms = Math.max(0, now - entry.ts)` on rewritten entries;
+  - writes one `JSON.stringify(publicClone(entry))` line per ring entry;
+  - writes `''` for an empty ring and `lines.join('\n') + '\n'` for a non-empty ring;
+  - uses `writeFileSync` intentionally because shutdown may drain the event loop immediately after the hook returns.
+- No changes to `beginRecentMcpCall`, `finishRecentMcpCall`, `failRecentMcpCall`, `readRecentMcpCalls`, or `instrumentMcpServer` steady-state behavior.
+- `parseStatusParam` at `src/mcp/server.ts:157-160` accepts `killed_during_shutdown` as a valid status filter.
+- Add a short module comment documenting the graceful-shutdown contract and the explicit non-graceful-death gap.
+- **Gap 3 decision:** do not add `src/daemon/shutdown-flush.ts` in 067. Keep the transform/write loop simple and local so a later extractor/watcher spec can extract it cleanly on second occurrence.
 
 ### AC2 — `src/daemon/index.ts` onShutdown hook calls the flush
 
-- **Modified files:** `src/daemon/index.ts`, `src/daemon/lifecycle.ts` (minor — expose `dataDir` on the lifecycle handle, already returned, so just plumbing it through the destructure).
-
-- **`src/daemon/lifecycle.ts`:** the `LifecycleHandle` interface already includes `dataDir: string` (line 98). No interface change; the existing return value is now consumed. The spec MUST verify no other consumer is silently broken (a `grep` for `startLifecycle(` should turn up only `src/daemon/index.ts`).
-
-- **`src/daemon/index.ts`:** import `flushRecentMcpCallLog` from `../mcp/request-log.js`. Capture `dataDir` from the `startLifecycle` return:
+- **Modified file:** `src/daemon/index.ts`.
+- Bind the canonical data dir once from `resolveDataDir()` and use that same value for the pid lock and shutdown flush path, or consume `startLifecycle()`'s existing `dataDir` handle without changing `src/daemon/lifecycle.ts`.
+- Import `flushRecentMcpCallLog` from `../mcp/request-log.js`.
+- In the onShutdown closure at `src/daemon/index.ts:58-66`, call:
 
   ```ts
-  const lifecycle = await startLifecycle({
-    storage,
-    storageBackend: backend,
-    extraPayload: { mcp_port: mcp.port, mcp_url: mcp.url },
-    onShutdown: async () => {
-      await mcp.stop();
-      flushRecentMcpCallLog(join(lifecycle.dataDir, 'mcp-shutdown.jsonl'));
-      await cursorExtractor.stop();
-      await codexExtractor.stop();
-      await claudeCodeExtractor.stop();
-      await gitWatcher.stop();
-      await fsWatcher.stop();
-      dispose();
-    },
-  });
+  await mcp.stop();
+  flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl'));
+  await cursorExtractor.stop();
   ```
 
-  Note the **closure ordering**: `mcp.stop()` runs FIRST (HTTP closes, connections rip, callbacks tear down). Then `flushRecentMcpCallLog` runs (captures the current ring state, including any callback that just got torn down without finalization). Then watchers stop + dispose. The order is load-bearing — flushing before `mcp.stop` would miss the killed-during-shutdown entries; flushing after watchers would risk a watcher's own exit handler racing the write.
-
-  **Captured closure variable (`lifecycle`).** TypeScript hoisting: `lifecycle` is declared in the same statement that consumes it inside the closure. ESLint may flag this as use-before-define; the closure doesn't execute until shutdown time, so the reference is safe. If the linter flags it, the alternative is a two-step `const dataDir = resolveDataDir(); … onShutdown: async () => { … flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl')); … }` — both work; reviewer picks.
-
-- **No changes** to `extractors`, `watchers`, `storage` initialization, or the `acquirePidLockOrExit` call at line 40.
+- The ordering is load-bearing: `mcp.stop()` first closes/rips active MCP connections; the flush then records the coherent ring snapshot; extractor/watcher teardown follows.
+- No changes to extractor startup, watcher startup, storage initialization, or lifecycle interface definitions.
 
 ### AC3 — Unit tests in `tests/mcp/request-log.test.ts`
 
-- **Extend existing test file** (do NOT create a new file for unit-level coverage). Three new cases:
-
-- **Test (i) — flush with mixed pending + ok + error entries.** Setup: `resetRecentMcpCallLogForTests()`; begin three calls (`beginRecentMcpCall(tool='a', …)`, `beginRecentMcpCall('b', …)`, `beginRecentMcpCall('c', …)`); finish two of them (one `ok`, one `error`); leave the third `pending`. Call `flushRecentMcpCallLog(tmpPath)`. Assert:
-  - `fs.readFileSync(tmpPath, 'utf8')` parses as three JSON lines.
-  - Line 1 has `status === 'ok'`; line 2 has `status === 'error'`; line 3 has `status === 'killed_during_shutdown'`.
-  - Line 3's `duration_ms` is non-null (the flush stamped it).
-  - Ring buffer post-flush: `readRecentMcpCalls()` shows the third entry's status is now `'killed_during_shutdown'` (in-place mutation visible to in-process readers).
-
-- **Test (ii) — flush with empty ring.** Setup: `resetRecentMcpCallLogForTests()`; call `flushRecentMcpCallLog(tmpPath)` with no entries. Assert:
-  - File exists at `tmpPath`.
-  - File contents are exactly the empty string (zero bytes) — NOT a newline-only file. This pins the body-construction to `lines.length === 0 ? '' : lines.join('\n') + '\n'`; a future refactor that writes `\n` unconditionally fails here.
-
-- **Test (iii) — flush is idempotent on repeated call.** Setup: `resetRecentMcpCallLogForTests()`; begin one call (pending); flush; begin a second call (also pending); flush again. Assert:
-  - First flush wrote one line with `status: 'killed_during_shutdown'`.
-  - Second flush wrote two lines, both `status: 'killed_during_shutdown'` (the first entry was already killed; the second was pending at the second flush and gets rewritten).
-  - File contents are overwritten, not appended (second flush is the full current ring, not a delta).
-
-- All tests use `os.tmpdir()` + `path.join(tmpdir, 'mcp-shutdown-test-' + uuid + '.jsonl')`; `afterEach` deletes the temp file. No shared state across cases.
+- Extend the existing test file; do not create a second unit-test file.
+- Add a mixed-status flush case: begin three calls, finish one `ok`, fail one `error`, leave one `pending`, flush to a temp JSONL path, and assert three lines with statuses `ok`, `error`, `killed_during_shutdown`. Also assert the pending entry's `duration_ms` is non-null and `readRecentMcpCalls()` now shows the in-place killed status.
+- Add an empty-ring case: `flushRecentMcpCallLog(tmpPath)` creates the file with exactly `''` contents.
+- Add an idempotent overwrite case: flush once with one pending call, add a second pending call, flush again, and assert the file contains the full current ring of two killed entries rather than an appended delta.
+- Tests use per-case temp paths and remove them in cleanup.
 
 ### AC4 — Integration test in `tests/daemon/lifecycle-shutdown-flush.test.ts`
 
-- **New test file.** Vitest, in-process, exercises the full server-lifecycle flush path.
+- New Vitest file that exercises the same in-process stop+flush sequence used by the shutdown hook; no real SIGTERM or child process.
+- Test (i): start `startMcpServer(..., { port: 0 })`, make one completed `echo_ping` call, start one long-enough MCP call and verify it is visible as `pending` via `readRecentMcpCalls()`, then run `await mcp.stop()` followed by `flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl'))`. Assert the completed call is present as `ok` and the in-flight call is present as `killed_during_shutdown`.
+- Test (ii): with the same fixture shape, assert the flush file exists at exactly `join(dataDir, 'mcp-shutdown.jsonl')` and contains the expected tool name.
+- Cleanup stops the server if needed and removes the temp data dir. Shared request-log state is reset between tests.
 
-- **Test (i) — real shutdown flushes in-flight call as killed_during_shutdown.** Setup:
-  1. Create a throwaway dataDir (`os.tmpdir()/echo-test-<uuid>`).
-  2. Call `startMcpServer({port: 0, …})` to get an ephemeral MCP server.
-  3. Fire one synchronous tool call (`echo_ping`) and await its result — verify it transitions `pending → ok` cleanly.
-  4. Fire a second tool call (`wait_for_new_turns` with a short timeout, OR `echo_ping` — pick one that produces a detectable in-flight `pending` window). Abort the HTTP request mid-flight via `AbortController.abort()`.
-  5. While the second call is still in `pending` state in the ring (verify via `readRecentMcpCalls`), invoke the equivalent of the onShutdown closure manually: `await mcp.stop()` then `flushRecentMcpCallLog(join(dataDir, 'mcp-shutdown.jsonl'))`.
-  6. Read the JSONL file. Assert:
-     - It has at least two lines (the completed `echo_ping` + the aborted call).
-     - The completed call's line has `status: 'ok'`.
-     - The aborted call's line has `status: 'killed_during_shutdown'` (the wrapper's `failRecentMcpCall` may or may not have fired before the abort; the flush guarantees the killed status either way IF the entry was still pending — if `failRecentMcpCall` did fire and the status is `'error'`, the test should accept either as a pass since both are "deterministic, audit-grade" outcomes; what fails the test is the entry remaining `'pending'` post-flush or being absent entirely). **Reviewer MUST decide** whether to assert exactly `'killed_during_shutdown'` (strict — but may be flaky if `failRecentMcpCall` wins the race) OR accept `'killed_during_shutdown' OR 'error'` (more robust). The narrowest correct assertion is: status is NOT `'pending'` and NOT absent.
+## Out of Scope (Dispositioned)
 
-- **Test (ii) — flush file lives at the expected dataDir path.** Setup: same as Test (i). Fire one tool call; let it complete; manually invoke the flush. Assert: `fs.existsSync(join(dataDir, 'mcp-shutdown.jsonl'))` returns true. Parse the file; assert the entry's tool name matches what was called.
-
-- Both AC4 tests use vitest's `afterEach` to call `mcp.stop()` (if not already stopped) and `fs.rm(dataDir, {recursive: true, force: true})` to clean up. No shared state.
-
-- **No real SIGTERM in the test.** The AC4 tests directly invoke `mcp.stop()` + `flushRecentMcpCallLog` — they exercise the same code path that the SIGTERM handler invokes via the onShutdown hook, without spawning a child process and sending a signal. This is symmetric with how `tests/coord/coord-emit-wrapper-transport.test.ts` uses in-process fixtures (per item 059's AC3 test discipline).
-
-## Out of Scope (Don't Drift)
-
-1. **Rotating / archiving `mcp-shutdown.jsonl` across restarts.** Each shutdown overwrites the file; the operator sees the MOST RECENT dying breath, not historical ones. If a workflow needs the prior shutdown's log, the operator can copy the file before the next restart. Rotation is V1.5+ scope.
-
-2. **Reading the JSONL back into the ring buffer on next boot.** Out of scope — the next process's ring starts empty. Operators inspect `mcp-shutdown.jsonl` separately; the live ring is the live ring. If future tooling wants a "merge prior shutdown into live ring on boot" feature, it gets its own spec.
-
-3. **`tail-mcp.sh` banner integration ("Previous shutdown lost N calls").** The followup naming P2 mentioned `tail-mcp.sh:36-55` could emit a banner on daemon-restart detection; that's a follow-on. 067's scope is the daemon-side flush only. The file path is documented; tail-mcp.sh integration is a small follow-on spec.
-
-4. **SIGKILL / OOM / panic survival.** Those failure modes bypass the onShutdown hook entirely (the kernel rips the process). No spec can write a file from a SIGKILL'd process. Documented as accepted worst-case in the architectural invariant. If future ops experience makes this a real problem, a write-on-every-call shadow log is the V2+ design — out of scope.
-
-5. **Persisting to SQLite (the existing daemon storage backend).** The ring buffer is per-process diagnostic state; SQLite is for atoms (the cross-restart durable substrate). Conflating the two would mean every tool call writes to SQLite, which is a substantial latency + concurrency change. JSONL on shutdown is the narrow fix; SQLite-shadow is a separate design.
-
-6. **Adding a `mcp_status` MCP tool that exposes the current ring.** The `/mcp/recent-calls` HTTP endpoint at `src/mcp/server.ts:130-148` already serves this; no new MCP tool. (Per `tail-mcp.sh`'s existence.)
-
-7. **Bounding the JSONL file size.** The ring buffer is capped at 1000 entries (line 31, `MAX_CALLS`); each entry's `args_shape` / `result_shape` is the projected/redacted shape, not raw payloads (lines 135-238). The flushed file is bounded by `MAX_CALLS * max-line-size ≈ 1000 * 2KB = 2MB`. No additional size cap.
-
-8. **Adding a `flushOnSIGTERM` config flag.** The flush is always-on for SIGTERM. No opt-out. Out of scope #4 covers the SIGKILL case (no opt-in needed — kernel rips us).
-
-9. **Augmenting the journal discipline in CLAUDE.md.** The journal is operator-side (every AI client must log MCP calls). 067 is daemon-side (daemon logs its own view of MCP calls). The two are independent audit trails with different consumers. Out of scope to merge.
-
-10. **Modifying `/mcp/recent-calls` endpoint to read from the JSONL.** The endpoint serves the live ring; if a future operator UI wants "show me what was killed in the last shutdown", it reads the file directly. No endpoint changes.
-
-11. **Generalizing the flush pattern to extractors / watchers.** Each capture surface has its own audit-trail design (the jsonl shards, the SQLite atoms). 067's flush is request-log-specific. Out of scope to flush the watchers' in-memory state on shutdown.
+1. **[keep as OoS] Rotating or archiving `mcp-shutdown.jsonl`.** Each shutdown overwrites the most recent dying-process artifact.
+2. **[keep as OoS] Reading JSONL back into the live ring on next boot.** The next daemon's ring remains live-process state only.
+3. **[promoted to sibling spec: 2026-05-21-068-tail-mcp-shutdown-banner] `tail-mcp.sh` next-boot banner.** This is the operator-awareness half of P2 and should be specced separately against `tools/tail-mcp.sh`.
+4. **[keep as OoS] Write-on-every-call shadow log for SIGKILL/OOM/panic survival.** The accepted contract limit is recorded in the Architectural Invariant, not buried here.
+5. **[keep as OoS] Persisting request-log entries to SQLite.** SQLite is the durable atom substrate; making every MCP call a DB write is a separate latency/concurrency design.
+6. **[keep as OoS] Adding an `mcp_status` MCP tool.** `/mcp/recent-calls` already exposes the live ring.
+7. **[keep as OoS] Adding a second JSONL size cap.** The 1000-entry ring and projected/redacted shapes bound the file for V1.
+8. **[keep as OoS] Adding a `flushOnSIGTERM` config flag.** Graceful shutdown flush is always on.
+9. **[keep as OoS] Changing CLAUDE.md journal discipline.** Client-side dogfooding journal and daemon-side request log remain independent audit trails.
+10. **[keep as OoS] Teaching `/mcp/recent-calls` to read the shutdown JSONL.** The endpoint serves the live ring only.
+11. **[keep as OoS] Generalizing shutdown flush to extractors/watchers.** 067 must not block future extraction, but the second concrete consumer should trigger the shared helper.
 
 ## Risks
 
-- **R1 — Race between `mcp.stop()` and `flushRecentMcpCallLog`.** `mcp.stop()` calls `httpServer.close()` (waits for in-flight connections to drain naturally; bounded by node's HTTP default keep-alive timeout) followed by `httpServer.closeAllConnections?.()` (rips the rest). Between those two, a callback may finalize cleanly (status → `'ok'`) OR be torn down mid-execution (status stays `'pending'`, becomes `'killed_during_shutdown'` at flush). **The race is not deterministic**, but the flush captures a coherent snapshot of whatever state the ring is in at flush time. Test (i) under AC4 acknowledges this — the strict-vs-lenient assertion is reviewer's call.
-
-- **R2 — `writeFileSync` on slow disk during shutdown.** Synchronous write blocks the event loop until disk acks. macOS SSD: microseconds. Spinning disk / network-mounted disk: potentially seconds. If launchd's stop timeout is short (default 20s for SIGTERM before SIGKILL), the flush might be cut off mid-write. **Mitigation:** the JSONL format is line-oriented; a partial write leaves valid leading lines parseable. Operator can recover any successfully-written entries. This is acceptable for V1 — the alternative (async with no shutdown wait) loses entries silently, which is exactly what 067 closes.
-
-- **R3 — TypeScript closure capture of `lifecycle` in `daemon/index.ts`.** AC2 captures `lifecycle.dataDir` inside an arrow closure whose declaration is in the same `await startLifecycle({ … onShutdown: async () => { … lifecycle.dataDir … } })` expression. Hoisting / temporal dead zone: the closure executes at shutdown time, not at definition time, so `lifecycle` is bound by then. ESLint's `no-use-before-define` may flag this; the alternative (precompute `const dataDir = resolveDataDir(...)` before the call and use that in the closure) sidesteps the lint flag and the type system entirely. Either works; reviewer picks.
-
-- **R4 — `flushRecentMcpCallLog` being called twice in rapid succession.** If shutdown fires SIGINT then SIGTERM (rare but possible from a frustrated operator), `shutdown()`'s `shuttingDown` guard at lifecycle.ts line 71 prevents re-entry. The flush runs once. Even if it didn't, `writeFileSync` with the same path just overwrites; idempotency is preserved by file-system semantics. Tested in AC3 Test (iii).
-
-- **R5 — Behavior change in `parseStatusParam`.** Adding `'killed_during_shutdown'` as an accepted query param is a non-breaking widening (previously the value would have been rejected; now it's accepted). No existing client expects it to be rejected (the value cannot appear in a live ring under steady-state operation; only after a flush has happened and the next daemon imported it, which is out of scope for 067 anyway). Documented as a one-liner in AC1.
-
-- **R6 — `now` parameter on `flushRecentMcpCallLog`.** Mirrors the same pattern in `beginRecentMcpCall` / `finishRecentMcpCall` / `failRecentMcpCall` (lines 64, 79, 96) — a `now = Date.now()` default lets tests inject deterministic timestamps. Reviewer should confirm the default-argument shape matches the existing style.
+- **R1 — Stop/flush race.** A callback may finalize cleanly during `mcp.stop()` or remain pending until flush. The invariant is not exact killed-vs-error timing; it is that no visible ring entry is absent or left pending after graceful shutdown.
+- **R2 — Synchronous disk write during shutdown.** `writeFileSync` can block on slow storage. JSONL keeps successfully written leading lines parseable if the process is later killed by an external stop timeout.
+- **R3 — DataDir plumbing drift.** `src/daemon/index.ts` already calls `resolveDataDir()` at line 40 while lifecycle resolves it again internally. The implementation should bind one canonical value for the pid lock and flush path, or consume the lifecycle handle; it should not introduce a third path resolver.
+- **R4 — Scope creep into P10 coordination.** Do not emit coord events in 067. The merge-pause postmortem needs typed events; the request-log forensic artifact does not.
 
 ## Tests
 
-All test changes:
+Run the focused tests added by AC3/AC4, then the repo-standard checks:
 
-1. **`tests/mcp/request-log.test.ts`** — extended with three new cases per AC3.
-2. **`tests/daemon/lifecycle-shutdown-flush.test.ts`** — new file with two cases per AC4.
+- `npm test -- tests/mcp/request-log.test.ts tests/daemon/lifecycle-shutdown-flush.test.ts`
+- `npm test`
+- `npm run lint`
+- `npm run typecheck`
 
-**Test discipline / no-regression invariants:**
-
-- All existing tests in `tests/mcp/request-log.test.ts` continue to pass (line 11's `resetRecentMcpCallLogForTests()` is unchanged; the new `killed_during_shutdown` status does not appear in any existing assertion).
-- AC4's integration test uses an ephemeral port (`port: 0`) and an ephemeral dataDir (`os.tmpdir()`). No interference with any running daemon or shared state.
-- No live-network test; no real launchd / system SIGTERM. The flush is exercised by direct function call in the test, which is the same code path the SIGTERM handler invokes (per AC2's closure ordering).
-
-**Out of scope for tests:**
-
-- Process-level test where a child Node process is spawned, sent SIGTERM, and the child's `mcp-shutdown.jsonl` is inspected. AC2 + AC4's in-process tests cover the wiring; the SIGTERM-handler-runs-onShutdown path is covered by lifecycle.ts's existing tests if any (reviewer to verify; `grep -r "SIGTERM" tests/`). Spawning a real child + signaling is overkill for V1.
-- Property-based tests on JSON-shape of the flushed file. The three AC3 cases pin the file format precisely.
-- Tests on slow-disk behavior (R2). Disk-speed mocking is out of scope.
+No test should spawn a real daemon child process, send OS signals, write outside temp dirs, or require live network beyond loopback ephemeral ports.
 
 ## Definition of Done
 
-- AC1: `src/mcp/request-log.ts` exports `flushRecentMcpCallLog`; `RecentMcpCallStatus` includes `'killed_during_shutdown'`; module comment documents the new contract.
-- AC2: `src/daemon/index.ts` calls `flushRecentMcpCallLog(join(lifecycle.dataDir, 'mcp-shutdown.jsonl'))` after `mcp.stop()` and before watcher stops; `src/daemon/lifecycle.ts` requires no interface change (handle already exposes `dataDir`).
-- AC3: `tests/mcp/request-log.test.ts` has three new passing cases.
-- AC4: `tests/daemon/lifecycle-shutdown-flush.test.ts` exists with two passing cases.
-- `npm test`, `npm run lint`, `npm run typecheck` all clean.
-- All ACs verified locally before pushing the feature branch.
+- AC1: `flushRecentMcpCallLog` exists; status includes `killed_during_shutdown`; `/mcp/recent-calls` accepts the widened status filter; module comment documents the contract.
+- AC2: the daemon shutdown hook flushes to `<dataDir>/mcp-shutdown.jsonl` after `mcp.stop()` and before extractor/watcher teardown.
+- AC3: request-log unit tests cover mixed, empty, and repeated flush behavior.
+- AC4: lifecycle integration test proves the stop+flush path writes the expected file and does not leave the in-flight call pending or absent.
+- No `src/daemon/lifecycle.ts` interface change is required.
+- `npm test`, `npm run lint`, and `npm run typecheck` pass before the builder moves 067 to review.
 
 ## After Completion (Strategist Notes)
 
-- **No new wiki page.** This is a daemon-internal observability fix; no end-user-facing surface changes. The MCP server architecture page (`wiki/surfaces/mcp-server.md` or equivalent) already documents the request-log; this is an implementation detail under that surface.
+- No wiki edit during build. If this later ships and there is a natural insertion point, the strategist may add one sentence to the MCP server/storage architecture docs noting the graceful-shutdown request-log artifact.
+- When 067 moves to `complete/`, update `backlog/_followups.md` to mark the request-log graceful-SIGTERM portion of P2 as shipped, while leaving the next-boot banner and non-graceful shadow-log gaps explicit.
+- If extractor/watcher shutdown queues produce a second concrete occurrence, spec the shared helper then; do not pre-build it in 067.
 
-- **Optional one-paragraph update to `wiki/architecture/storage.md`** (or `wiki/surfaces/mcp-server.md` if more appropriate) recording that the request log now flushes to `<dataDir>/mcp-shutdown.jsonl` on graceful SIGTERM. Land only if a natural insertion point exists; don't restructure.
+## Sibling specs surfaced during respec
 
-- **Update `backlog/_followups.md`** — when the spec lands in `complete/`, strike the PRIORITY 2 entry under the 2026-05-21 harness seam review section and add a one-line back-reference to the 067 spec.
-
-- **Trigger for `tail-mcp.sh` banner spec.** Out of Scope #3 deferred the operator-facing banner. If founder journals an entry like "I had to manually `cat ~/Library/Application Support/ECHO/mcp-shutdown.jsonl` to figure out what was killed during the last restart", file a follow-on spec adding the banner to `tail-mcp.sh`.
-
-- **Do NOT promote a new principle page** about persistence-on-shutdown. One spec is not a pattern; if a second flush-on-shutdown spec lands (e.g., for extractor in-memory state, watcher pending queues), that's the trigger.
+- `2026-05-21-068-tail-mcp-shutdown-banner` — teach `tools/tail-mcp.sh` to surface `<dataDir>/mcp-shutdown.jsonl` on next daemon boot, including a count of entries rewritten to `killed_during_shutdown`. This closes the operator-awareness half of P2 that 067 intentionally splits out.
