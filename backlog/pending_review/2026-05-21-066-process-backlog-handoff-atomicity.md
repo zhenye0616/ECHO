@@ -27,7 +27,7 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T23:00:00Z"
 branch: "agent/process-backlog-handoff-atomicity"
 worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
-head_sha: "e6822d7f85a2e099013a2cf439ae8cf10deb5c33"
+head_sha: "af56e4bdeda7953732ddbf8915515a9383a20248"
 pr_url: ""
 review_notes: ""
 agent_notes: |
@@ -49,6 +49,13 @@ agent_notes: |
   `git rm --cached`, which refuses without -f when staged content is unique.
   The broadened filter preserves r2's intent (avoid git restore aborts on
   unknown paths) while fixing the test-5 gap.
+  Review fixups applied at af56e4bdeda7953732ddbf8915515a9383a20248:
+  restored the E2.5/E2.6 process-backlog protocol markers, updated the generic
+  P1 harness to verify every pre-publish step as an independent crash point,
+  and asserted dirtySurfaces against allowedDirtySurfaces. Observed verification:
+  npm test passed (101 files passed, 1 skipped; 1167 tests passed, 21 skipped);
+  npm run lint passed; npm run typecheck passed; tools/sync-skills.sh --check
+  passed; git diff --check passed.
 ---
 
 # P1 - Atomic state transition (consumer: process-backlog work-item stage move)
