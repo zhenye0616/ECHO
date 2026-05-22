@@ -3,7 +3,7 @@
 - **Agent persona:** `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405` (Claude Code, in-session via /process-backlog)
 - **Branch:** `agent/process-backlog-handoff-atomicity`
 - **Worktree:** `~/Desktop/Project_echo--process-backlog-handoff-atomicity`
-- **Head SHA at handoff:** `e6822d7f85a2e099013a2cf439ae8cf10deb5c33`
+- **Head SHA at latest review handoff:** `c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5`
 
 ## Run 1 (2026-05-21)
 
@@ -40,7 +40,34 @@ AC1, AC2, AC3 of `2026-05-21-066-process-backlog-handoff-atomicity` ("P1 — Ato
 | `.claude/commands/process-backlog.md` | Refreshed via `tools/sync-skills.sh` (byte-equivalent to canonical) | +210 / -75 |
 | `tests/skills/atomic-state-transition-harness.test.ts` | New file — AC1 harness + neutral fixtures + AC3 14 tests + skill marker pin | +1158 / 0 |
 
-Head SHA on `agent/process-backlog-handoff-atomicity` at push: `e6822d7f85a2e099013a2cf439ae8cf10deb5c33`.
+Head SHA on `agent/process-backlog-handoff-atomicity` at latest push: `c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5`.
+
+### Review fixups
+
+Two review-fixup commits landed after the original handoff:
+
+- `af56e4bdeda7953732ddbf8915515a9383a20248` restored the `E2.5. Final builder-state refresh (protocol-wide)` and `E2.6. Commit + push (single final commit)` markers, updated the generic harness to verify every pre-publish step as an independent crash point, and asserted each observation's `dirtySurfaces` against the step's `allowedDirtySurfaces`.
+- `c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5` restored the benign `git rm --cached --ignore-unmatch -- "$path"` cleanup call in the untracked branch, pinned it in the embedded handoff script and structural markers, expanded test 12 to prove the benign git-rm path plus real `rm` failure path, and replaced the separate-repo concurrency check with a same-substrate different-key fixture.
+
+Latest observed verification after `c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5`:
+
+```
+$ npm test
+Test Files  101 passed | 1 skipped (102)
+Tests       1168 passed | 21 skipped (1189)
+
+$ npm run lint
+pass
+
+$ npm run typecheck
+pass
+
+$ tools/sync-skills.sh --check
+OK: all Claude command adapters match canonical skills/
+
+$ git diff --check
+pass
+```
 
 ### Acceptance status
 

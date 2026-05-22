@@ -27,7 +27,7 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-21T23:00:00Z"
 branch: "agent/process-backlog-handoff-atomicity"
 worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
-head_sha: "af56e4bdeda7953732ddbf8915515a9383a20248"
+head_sha: "c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5"
 pr_url: ""
 review_notes: ""
 agent_notes: |
@@ -56,6 +56,15 @@ agent_notes: |
   npm test passed (101 files passed, 1 skipped; 1167 tests passed, 21 skipped);
   npm run lint passed; npm run typecheck passed; tools/sync-skills.sh --check
   passed; git diff --check passed.
+  Second review fixups applied at c4ec6b0ffdfac9ca939f31b3d11f1760367ee0e5:
+  restored the benign `git rm --cached --ignore-unmatch -- "$path"` cleanup
+  branch, pinned it in the embedded handoff script and structural markers,
+  expanded test 12 to prove the benign git-rm path plus real rm failure path,
+  and replaced the separate-repo concurrency check with a same-substrate
+  different-key fixture. Observed verification: npm test passed (101 files
+  passed, 1 skipped; 1168 tests passed, 21 skipped); npm run lint passed;
+  npm run typecheck passed; tools/sync-skills.sh --check passed; git diff
+  --check passed.
 ---
 
 # P1 - Atomic state transition (consumer: process-backlog work-item stage move)
