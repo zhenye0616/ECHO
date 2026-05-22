@@ -807,7 +807,7 @@ const HANDOFF_SCRIPT = `#!/usr/bin/env bash
 # P1 handoff transcript — embedded from skills/process-backlog.md Step E.
 # Kept byte-equivalent to AC2 of 066. Test fixture invokes with PHASE in
 # {recover, publish}.
-set -u
+set -euo pipefail
 
 PHASE="\${PHASE:?PHASE required}"
 
@@ -1171,6 +1171,44 @@ describe('AC3 — process-backlog stage move (current-consumer specialization)',
     expect(remoteBody).toMatch(/agent_notes: "completed by test"/);
   });
 
+  it('test 3b — lint failure is fail-fast before git mv, commit, or push', () => {
+    env = makeConsumerEnv({ withPointer: true });
+    expectClean(runHandoff(env, 'recover'));
+    applyMetadataEdit(env, 'deadbeef');
+
+    const headBefore = git(env.repo, 'rev-parse', 'HEAD');
+    const fakePythonDir = mkdtempSync(join(tmpdir(), 'echo-fakepython-'));
+    const realPython = execSync('command -v python3').toString().trim();
+    writeFileSync(
+      join(fakePythonDir, 'python3'),
+      `#!/bin/bash
+for arg in "$@"; do
+  if [ "$arg" = "tools/task-state/lint.py" ]; then
+    echo "lint failed by test" >&2
+    exit 42
+  fi
+done
+exec ${realPython} "$@"
+`,
+      { mode: 0o755 },
+    );
+    chmodSync(join(fakePythonDir, 'python3'), 0o755);
+
+    try {
+      const r = runHandoff(env, 'publish', {
+        PATH: `${fakePythonDir}:${process.env.PATH ?? ''}`,
+      });
+      expect(r.status, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(42);
+      expect(existsSync(join(env.repo, env.itemFileRel))).toBe(true);
+      expect(existsSync(join(env.repo, env.destRel))).toBe(false);
+      expect(git(env.repo, 'rev-parse', 'HEAD')).toBe(headBefore);
+      git(env.repo, 'fetch', '--quiet', 'origin', 'main');
+      expect(tryGit(env.repo, 'cat-file', '-e', `origin/main:${env.destRel}`).code).not.toBe(0);
+    } finally {
+      rmSync(fakePythonDir, { recursive: true, force: true });
+    }
+  });
+
   it('test 4 — crash after metadata edit before git mv is recovered without operator decision; replay publishes', () => {
     env = makeConsumerEnv();
     // First attempt simulates the crash: recover + applyMetadataEdit + (NOTHING)
@@ -1426,6 +1464,7 @@ describe('skills/process-backlog.md — P1 transcript markers (pins skill ↔ te
   const skill = readFileSync(SKILL_PATH, 'utf-8');
 
   it.each([
+    'set -euo pipefail',
     'P1_ALLOWED_RECOVERY_PREFIXES=("backlog/" "backlog/task-state/")',
     'p1_boundary_published_remotely',
     'p1_local_commit_unpushed',

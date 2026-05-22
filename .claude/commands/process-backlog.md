@@ -196,6 +196,8 @@ agent-authored content that the publish block only `git add`s; the recovery
 procedure never touches it.
 
 ```bash
+set -euo pipefail
+
 cd ~/Desktop/Project_echo
 
 ITEM_BASENAME="$(basename "$ITEM_FILE")"
@@ -383,9 +385,9 @@ The patcher records its `--spec-path` argument verbatim into
 final destination path before the rename lets the pointer ship pointing at
 the post-publish location.
 
-**Lint failure is a hard stop, not silent shipping.** If
-`tools/task-state/lint.py "$POINTER"` exits non-zero, the script exits
-non-zero (the un-`set +e`'d default), the publish block does not run, and the
+**Lint failure is a hard stop, not silent shipping.** The transcript runs
+under `set -euo pipefail`. If `tools/task-state/lint.py "$POINTER"` exits
+non-zero, the script exits non-zero, the publish block does not run, and the
 operator escalates per the Stopping Conditions section.
 
 **Idempotency.** Re-running this transcript after a successful publish is a
