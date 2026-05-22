@@ -23,10 +23,10 @@ spec_refs:
   - raw/internal/decisions/  # drift-event destination if the primitive exposes a non-obvious coupling
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-21T23:00:00Z"
+branch: "agent/process-backlog-handoff-atomicity"
+worktree: "~/Desktop/Project_echo--process-backlog-handoff-atomicity"
 head_sha: ""
 pr_url: ""
 review_notes: ""
