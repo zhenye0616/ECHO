@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after r4`. Both reviewers returned `proceed` with zero findings against the patched SHA d3f13c3. Spec converged across 4 rounds: r1 (divergent verdict, 3 HIGH + 1 MED — compact projection, code_session_anchor tautology + field names, time_range fields, verification commands) → r2 (4 MED + LOW — narrative consistency, explicit 18h since, missing anchor-branch tests) → r3 (2 MED/LOW — warmSession clarification, stale test counts) → r4 terminal. 069 is claim-ready for any builder agent.
 
