@@ -4,7 +4,7 @@ role: builder
 writer: codex-builder
 last_updated: 2026-05-24T21:32:57Z
 handoff_branch: agent/raycast-cold-start-continuity-hero
-handoff_head_sha: 4eea5fd6
+handoff_head_sha: 4eea5fd76602181065b1a49373208eecc51638ed
 handoff_run_log: raw/internal/agent-runs/2026-05-24-2026-05-22-069-raycast-cold-start-continuity-hero.md
 ---
 
