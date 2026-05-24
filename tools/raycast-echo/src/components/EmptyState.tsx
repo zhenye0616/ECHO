@@ -20,6 +20,7 @@ export function EmptyState({
   onOpenSessions,
   onForkSession,
   showDetail,
+  nowMs,
 }: {
   query: string;
   setQuery: (query: string) => void;
@@ -31,8 +32,9 @@ export function EmptyState({
   onOpenSessions: () => void;
   onForkSession: (session: Session) => void;
   showDetail: boolean;
+  nowMs?: number;
 }) {
-  const hero = pickHero(clusters, sessions);
+  const hero = pickHero(clusters, sessions, nowMs);
   const buckets = bucketSessionsForEmpty(sessions);
   return (
     <List

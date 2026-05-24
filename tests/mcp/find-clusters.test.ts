@@ -260,7 +260,11 @@ describe('find_clusters', () => {
     expect(cluster['time_range']).toBeDefined();
     expect(cluster['open_loop_hints']).toBeDefined();
     expect(cluster['rank']).toBeUndefined();
-    expect(cluster['rank_reason']).toEqual(['has_open_loop']);
+    expect(cluster['rank_reason']).toEqual([
+      'has_open_loop',
+      'has_unresolved_open_loop',
+      'code_session_anchor',
+    ]);
   });
 
   it('view="compact" preserves open_loop_hints_omitted when hint capping fires', async () => {

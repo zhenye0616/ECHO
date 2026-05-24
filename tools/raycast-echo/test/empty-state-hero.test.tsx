@@ -53,6 +53,7 @@ function renderEmptyState(input: {
     onOpenSessions: vi.fn(),
     onForkSession: vi.fn(),
     showDetail: false,
+    nowMs: NOW,
   }) as React.ReactElement<{ children?: React.ReactNode }>;
 }
 
