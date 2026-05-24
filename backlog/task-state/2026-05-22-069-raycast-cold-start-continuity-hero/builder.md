@@ -2,12 +2,19 @@
 task_id: 2026-05-22-069-raycast-cold-start-continuity-hero
 role: builder
 writer: codex-builder
-last_updated: 2026-05-22T20:42:15Z
+last_updated: 2026-05-24T21:32:57Z
+handoff_branch: agent/raycast-cold-start-continuity-hero
+handoff_head_sha: 4eea5fd6
+handoff_run_log: raw/internal/agent-runs/2026-05-24-2026-05-22-069-raycast-cold-start-continuity-hero.md
 ---
 
 ## current_thesis
 
 Claimed 069 as Codex builder. The task is to replace Raycast's over-approximating "Open loops · Today" landing section with a single confidence-gated Continue hero, backed by narrower rank signals for unresolved open loops and code/session anchoring.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 4eea5fd6.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -35,4 +42,4 @@ Claimed 069 as Codex builder. The task is to replace Raycast's over-approximatin
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-22-069-raycast-cold-start-continuity-hero.md
+- spec: backlog/pending_review/2026-05-22-069-raycast-cold-start-continuity-hero.md

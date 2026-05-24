@@ -38,11 +38,32 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-22T20:42:15Z"
 branch: "agent/raycast-cold-start-continuity-hero"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--raycast-cold-start-continuity-hero"
+head_sha: "4eea5fd6"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  AC1 + AC1b + AC2 + AC3 implemented across rank.ts/types.ts (new
+  has_unresolved_open_loop + code_session_anchor signals, has_open_loop
+  preserved deprecated), compact wire-shape passthrough (allowlist
+  widened to the two new reasons), Raycast EmptyState (single Continue
+  hero replacing Open loops · Today, gated by V1 confidence contract),
+  Raycast findClusters() (explicit 18h since), plus four new test files
+  pinning unresolved-only rank semantics, compact passthrough, Raycast
+  since arg, and the six hero decision branches. Codex builder run
+  pushed bca36f3 then ended mid-pipeline (orphaned without running
+  tests, writing the run log, or transitioning state). Claude Code
+  Opus 4.7 adopted the orphan 2026-05-24: AC verification surfaced two
+  shipped-broken gaps the builder hadn't caught — stale rank_reason
+  singleton in tests/mcp/find-clusters.test.ts and missing nowMs
+  forwarding from EmptyState component down to pickHero. Finishing
+  patches at 4eea5fd6 (+9/-2). After patches: root npm test 1185/0,
+  root tsc clean, Raycast npm test 106/0, Raycast typecheck clean.
+  Drift log: orphan-adoption patches stayed surgical — only the two
+  failing tests + one source change required to pass them; no
+  additional refactoring, fixture sprawl, or contract broadening.
+  See run log at raw/internal/agent-runs/2026-05-24-...md for full
+  detail of both runs.
 ---
 
 # Raycast cold-start continuity hero
