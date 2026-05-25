@@ -10,7 +10,13 @@
 
 *Items added during conversation that need spec refinement before agents can claim them.*
 
-*(none — add as we discuss)*
+| ID (reserved) | Title | Depends on | Source |
+|---|---|---|---|
+| 2026-05-25-073-onboarding-wizard | ECHO Pro onboarding wizard — steps 2-5: detect agents + detect projects + wire adapters + probe MCP round-trip | 070 + 071 + 072 | `raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md` §"Onboarding wizard — 6 steps" + §"Implied backlog decomposition". The 6-step arc with auto-detect (layered: config files + running processes + atom-store `source_breakdown` over last 30d), project enumeration (distinct `metadata.repo_root` from atoms, ranked by activity over last 7d), wiring via 072's `syncAll()`, and per-agent MCP probe via `mcp__echo__echo_ping`. UI/CLI surface TBD at spec time (might be Raycast Detail, terminal TUI, or Mac app window — install topology decision is deferred). Failure modes already enumerated in decision archive: detect-but-wire-fail → skip-and-continue; probe timeout → surface stderr + retry/skip; daemon down → refuse + `echo doctor` one-liner; user-edited inside markers → refuse + diff. Estimate at spec time. |
+| 2026-05-25-074-echo-cli-binary | `echo` CLI binary — `init` / `run` / `doctor` / `uninstall` + runtime role-plugging | 070 + 071 + 072 + 073 | Decision archive §"Coord layer architecture" + §"Implied backlog decomposition". `echo init` launches 073 wizard. `echo run <workflow> [--project PATH]` matches role requirements against onboarded agent capabilities (per 071's controlled vocabulary), picks an agent per role, dispatches. `echo doctor` reports daemon status + agent wiring health + state-file consistency. `echo uninstall` rolls back 072's adapter writes via stored `~/.echo/state/onboarding.json`. CLI ergonomics: `cwd` is implicit project root if `--project` absent (codex consult 2026-05-25 recommendation). Estimate at spec time. |
+| 2026-05-25-075-first-demo-workflow | First-session demo workflow (lead candidate: cross-vendor change review with diff-source priority `PR > unpushed > uncommitted > HEAD~1..HEAD`) | 074 + founder dogfooding | Decision archive §"What's deferred" — founder will dogfood the onboarding end-to-end as a customer first; the demo question is meant to resolve itself based on what the founder actually wants to do in their first session. Codex's preliminary recommendation (cross-vendor change review reformulated from PR-only to any-diff with auto-detected substrate priority) is the lead hypothesis. Specced after 074 ships AND founder completes their own onboarding run as a customer. Estimate at spec time. |
+
+*Note: IDs 073-075 are reserved to prevent collision while these subsystems remain unspecced. Next free id is 076.*
 
 ---
 
