@@ -199,9 +199,18 @@ export const DEFAULT_ROLE_FILENAMES: readonly string[] = [
 - Empty array where non-empty is required (`skills`, `mcp_servers`, `capabilities`, `required_fields`) → message names the field
 - TOML parse failure → wrapped in `RoleValidationError` with the original parser message
 
-**AC2.4 — Skills-array reference check.** The loader validates that every entry in `skills` corresponds to an existing `skills/<name>.md` file. Repo root is discovered by walking upward from `sourcePath` until a directory containing both `package.json` AND a `skills/` directory is found (this matches how other tools in this repo locate the root from worktrees + main repo equally). The check is intentional dogfooding of the "skills are the cross-tool protocol" decision: the role file cannot reference a skill that doesn't exist in the canonical skill library.
+**AC2.4 — Skills-array reference check (two-step).** The loader validates that every entry in `skills` corresponds to an existing skill file. Resolution proceeds in two steps:
 
-**AC2.5 — TOML parser dependency.** Add `smol-toml@^1.3.1` as a `dependencies` entry in `package.json`. Rationale: pure-JS, zero-dep, TOML 1.0.0 compliant, ESM-native (matches the repo's `module: NodeNext` setup), 25kB. Alternatives considered: `@iarna/toml` (stale, CJS-only, doesn't fully implement 1.0.0); `@ltd/j-toml` (heavier; doesn't add value for our shape). Choosing the smaller pure-JS option keeps the substrate's dependency surface tight. If a future capability (e.g., format-preserving round-trip writes) needs a different parser, swap behind the same `Role` interface.
+1. **Skill name grammar:** each entry MUST match `^[a-z][a-z0-9-]*$`. Names containing `/`, `..`, dots, capital letters, underscores, or other characters throw `RoleValidationError` with message naming the rejected entry AND the grammar. This blocks traversal-shaped entries (`../escape`, `../../etc/passwd`, `./local`) and environment-specific aliases at the schema layer, BEFORE any filesystem access.
+2. **Skill location + containment:** the candidate path is `<skillsRoot>/<name>.md`. When `opts.skillsRoot` is undefined, `skillsRoot` is discovered by walking upward from `sourcePath` until a directory containing both `package.json` AND a `skills/` subdir is found (this matches how other tools in this repo locate the root from worktrees + main repo equally). The resolved absolute path MUST remain inside `skillsRoot` — i.e., `path.resolve(candidate)` startsWith `path.resolve(skillsRoot) + path.sep`. A constructed candidate that escapes the root throws `RoleValidationError` even if it happens to exist on disk. Only then is `fs.statSync` used; missing-file throws with the resolved path.
+
+The check is intentional dogfooding of the "skills are the cross-tool protocol" decision: the role file cannot reference a skill that doesn't exist in the canonical skill library, AND cannot use the role file as a generic file-existence oracle outside that library.
+
+**R1 r1 patch (codex-ops Finding 3):** the explicit grammar + path-containment check were folded in to close path-traversal risk surfaced by the `skillsRoot` overload. Without these, a join-only implementation could accept traversal-shaped entries when the user-supplied `skillsRoot` happens to live next to a sensitive directory.
+
+**AC2.5 — TOML parser dependency.** Add `smol-toml@^1.6.1` as a `dependencies` entry in `package.json`. **Floor is 1.6.1, NOT lower** — earlier versions are flagged by GHSA-v3rj-xjv7-4jmq (parser DoS, fixed in 1.6.1), and this loader will eventually parse user-authored role TOMLs from `~/.echo/roles/`. The lockfile MUST resolve to 1.6.1 or newer; CI's `npm audit --audit-level=high` will fail otherwise. Rationale for smol-toml: pure-JS, zero-dep, TOML 1.0.0 compliant, ESM-native (matches the repo's `module: NodeNext` setup), 25kB. Alternatives considered: `@iarna/toml` (stale, CJS-only, doesn't fully implement 1.0.0); `@ltd/j-toml` (heavier; doesn't add value for our shape). Choosing the smaller pure-JS option keeps the substrate's dependency surface tight. If a future capability (e.g., format-preserving round-trip writes) needs a different parser, swap behind the same `Role` interface.
+
+**R1 r1 patch (codex Finding 2):** floor bumped from `^1.3.1` to `^1.6.1` per GHSA-v3rj-xjv7-4jmq.
 
 ### AC3 — Three canonical default role files shipped at `assets/echo-roles/`
 
@@ -284,6 +293,22 @@ Description aligned to `docs/AGENT_INSTRUCTIONS.md`'s loop description. `process
 12. Empty `mcp_servers` array → throws; message names `mcp_servers`.
 13. Missing `[role.output].required_fields` → throws; message names `required_fields`.
 14. Parse error (malformed TOML) → throws `RoleValidationError` wrapping the parser error.
+15. Missing `skills` array entirely → throws; message names `skills`.
+16. Missing `[role.requires]` table → throws; message names `[role.requires]`.
+17. Missing `mcp_servers` field → throws; message names `mcp_servers`.
+18. Missing `capabilities` field → throws; message names `capabilities`.
+19. Missing `[role.output]` table → throws; message names `[role.output]`.
+20. Missing `output.format` field → throws; message names `format`.
+21. Unknown key inside `[role.requires]` (e.g., `[role.requires].secrets`) → throws; message names `secrets`.
+22. Unknown key inside `[role.output]` (e.g., `[role.output].max_tokens`) → throws; message names `max_tokens`.
+23. **`skillsRoot` overload success:** `loadRoleFromFile(path, { skillsRoot: '<tmpdir>/skills' })` where the tmp `skills/` contains stubs for the referenced skill names → loads successfully without walking upward.
+24. **`skillsRoot` overload failure (wrong root):** `loadRoleFromFile(path, { skillsRoot: '<tmpdir>/empty' })` → throws; message names the missing skill and the resolved path under the supplied root.
+25. **`skillsRoot` overload disables walk:** when `opts.skillsRoot` is set, the loader does NOT fall back to walking from `sourcePath` even if walking would have found the skill → throws as in #24.
+26. **Skill name grammar — traversal-shaped:** `skills = ["../escape"]` → throws `RoleValidationError`; message names `../escape` and the grammar `^[a-z][a-z0-9-]*$`. The check fires BEFORE filesystem lookup (must NOT depend on whether the would-be path exists).
+27. **Skill name grammar — capital letter:** `skills = ["Foo"]` → throws; message names the grammar.
+28. **Skill name grammar — dot in name:** `skills = ["foo.bar"]` → throws; message names the grammar.
+
+**R1 r1 patch (codex Finding 3 + codex-ops Finding 3):** test cases 15-22 cover the missing-table/missing-field rejection promises in AC2.3 that were previously implicit; cases 23-25 pin the `skillsRoot` overload added to AC2.2; cases 26-28 pin the skill-name grammar added to AC2.4.
 
 **AC4.2 — `tests/echo-home/default-roles.test.ts`** (smoke-test the shipped defaults).
 
@@ -295,6 +320,12 @@ Description aligned to `docs/AGENT_INSTRUCTIONS.md`'s loop description. `process
 6. `builder.skills` includes `'process-backlog'` (regression pin: the canonical builder skill must always be present).
 7. `strategist.skills` includes `'review-queue-watch'` (regression pin: the canonical strategist orchestration skill must always be present).
 8. `DEFAULT_ROLE_FILENAMES` exactly equals the sorted basenames present at `assets/echo-roles/` (regression pin: the constant is the single source of truth consumed by 072; if a future spec adds a 4th default role TOML, the constant MUST be updated in the same commit or this test fails — the test is the trip-wire that prevents 072 from silently lagging 071).
+9. **`assertDefaults: false` default — partial dir, no throw:** `loadRolesFromDir('<tmpdir>/partial')` where only `builder.toml` is present → returns 1 role, no throw. Verifies generic dir loads do not silently expand to integrity assertions.
+10. **`assertDefaults: true` success:** `loadRolesFromDir('assets/echo-roles', { assertDefaults: true })` → returns 3 roles, no throw.
+11. **`assertDefaults: true` failure (missing reviewer):** `loadRolesFromDir('<tmpdir>/partial', { assertDefaults: true })` with only `builder.toml` present → throws `RoleValidationError` with message `"installation integrity: missing default role reviewer"`. Pins the failure mode codex-ops flagged: partially-populated `~/.echo/roles/` from a 072 mid-failure must fail loud, not silently degrade.
+12. **`assertDefaults: true` failure (missing strategist):** same shape as #11 with builder + reviewer present → throws `"installation integrity: missing default role strategist"`.
+
+**R1 r1 patch (codex-ops Finding 2):** tests 9-12 added to pin the `assertDefaults` contract codex-ops flagged as missing. Without these, a 072 partial-failure leaving only `builder.toml` in `~/.echo/roles/` would be treated as a valid one-role system by downstream consumers; 074's role-plugging matcher could then silently degrade.
 
 **AC4.3 — All existing tests continue to pass.** No edits to existing test files.
 
@@ -342,8 +373,8 @@ Description aligned to `docs/AGENT_INSTRUCTIONS.md`'s loop description. `process
 
 All additive — no existing test rewrites.
 
-- `tests/echo-home/roles.test.ts` — 14 cases per AC4.1.
-- `tests/echo-home/default-roles.test.ts` — 7 cases per AC4.2.
+- `tests/echo-home/roles.test.ts` — 28 cases per AC4.1 (14 original + 14 added in r1 patch: 8 missing-table/field + 3 `skillsRoot` overload + 3 grammar/traversal).
+- `tests/echo-home/default-roles.test.ts` — 12 cases per AC4.2 (8 original + 4 `assertDefaults` integrity cases added in r1 patch). Net new across AC4 from r1 patches: +18 cases.
 
 Verify steps:
 
@@ -358,9 +389,9 @@ All five verify commands must pass before the builder moves 071 to `pending_revi
 ## Definition of Done
 
 - AC1: schema documented in code comments on `src/echo-home/roles.ts`; controlled vocabulary, enum values, and unknown-key rejection all implemented.
-- AC2: `src/echo-home/roles.ts` exports `Role`, `Capability`, `RoleValidationError`, `loadRoleFromFile`, `loadRolesFromDir`, `DEFAULT_ROLE_FILENAMES`. Barrel `src/echo-home/index.ts` re-exports the public surface. `smol-toml@^1.3.1` is in `package.json` `dependencies` and `package-lock.json`. The optional `skillsRoot` overload from R3 is implemented and documented.
+- AC2: `src/echo-home/roles.ts` exports `Role`, `Capability`, `RoleValidationError`, `RoleLoadOptions`, `loadRoleFromFile`, `loadRolesFromDir`, `DEFAULT_ROLE_FILENAMES`. Both `loadRoleFromFile` and `loadRolesFromDir` accept `RoleLoadOptions` (`skillsRoot?`, `assertDefaults?`) as part of the public contract — not R3-only prose. Barrel `src/echo-home/index.ts` re-exports the public surface. `smol-toml@^1.6.1` is in `package.json` `dependencies` and `package-lock.json` resolves to 1.6.1 or newer (GHSA-v3rj-xjv7-4jmq compliant; `npm audit --audit-level=high` gates this). The skill-name grammar (`^[a-z][a-z0-9-]*$`) + path-containment check (resolved skill path must remain inside `skillsRoot`) are enforced BEFORE existence lookup per AC2.4.
 - AC3: `assets/echo-roles/{strategist,reviewer,builder}.toml` all exist; each conforms to the AC1 schema; each skill referenced resolves to `skills/<name>.md`.
-- AC4: all 14 loader cases + 7 default-roles cases pass.
+- AC4: all 28 loader cases + 12 default-roles cases pass (40 total; up from 21 in r1 draft per the R1 r1 disposition patches).
 - All five verify commands clean.
 
 ## After Completion (Strategist Notes)
