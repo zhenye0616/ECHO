@@ -41,7 +41,23 @@ branch: "agent/raycast-cold-start-continuity-hero"
 worktree: "~/Desktop/Project_echo--raycast-cold-start-continuity-hero"
 head_sha: "4eea5fd76602181065b1a49373208eecc51638ed"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-25 via founder reconciliation.
+
+  Conflicts resolved: none — clean merge, sidecar predicted no conflicts and git merge-tree was correct.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - Founder/manual — opened Raycast at 2026-05-25 ~01:58 PDT pre-merge (showed pre-merge Resume section as expected); real Continue-hero verification deferred to post-Step-D live-checkout bringup.
+
+  Fixups deferred to follow-up items:
+  - (none)
+
+  Verify: root 1185/0 tests pass (21 skipped); raycast 106/0; lint clean; typecheck clean (root + raycast); sync-skills --check clean.
+
+  Follow-up items (non-blocking):
+  - Update empty view copy at tools/raycast-echo/src/components/EmptyState.tsx:64 (still says "Open loops and sessions appear here" after the visible Open-loops section was removed).
 agent_notes: |
   AC1 + AC1b + AC2 + AC3 implemented across rank.ts/types.ts (new
   has_unresolved_open_loop + code_session_anchor signals, has_open_loop
