@@ -3,32 +3,38 @@ import type { ReactNode } from "react";
 import type { FindClustersCluster } from "../lib/mcp";
 import { bucketSessionsForEmpty, formatPdtTime, formatRelativeTime, type Session } from "../lib/sessions";
 
+const HERO_FRESHNESS_MS = 18 * 60 * 60 * 1000;
+
+export type HeroPick =
+  | { kind: "running"; session: Session }
+  | { kind: "cluster"; cluster: FindClustersCluster; linkedSession: Session | null };
+
 export function EmptyState({
   query,
   setQuery,
   clusters,
   isLoading,
   sessions,
-  warmSession,
-  renderCluster,
+  renderHeroCluster,
   onOpenSession,
   onOpenSessions,
   onForkSession,
   showDetail,
+  nowMs,
 }: {
   query: string;
   setQuery: (query: string) => void;
   clusters: readonly FindClustersCluster[];
   isLoading: boolean;
   sessions: readonly Session[];
-  warmSession: Session | null;
-  renderCluster: (cluster: FindClustersCluster) => ReactNode;
+  renderHeroCluster: (cluster: FindClustersCluster, linkedSession: Session | null) => ReactNode;
   onOpenSession: (session: Session) => void;
   onOpenSessions: () => void;
   onForkSession: (session: Session) => void;
   showDetail: boolean;
+  nowMs?: number;
 }) {
-  const openLoops = clusters.filter((c) => c.rank_reason?.includes("has_open_loop") === true).slice(0, 3);
+  const hero = pickHero(clusters, sessions, nowMs);
   const buckets = bucketSessionsForEmpty(sessions);
   return (
     <List
@@ -40,14 +46,13 @@ export function EmptyState({
       searchBarPlaceholder="Ask anything, or search your memory..."
       isShowingDetail={showDetail}
     >
-      {warmSession !== null ? (
-        <List.Section title="Resume">
-          <SessionRow session={warmSession} onOpenSession={onOpenSession} onForkSession={onForkSession} onOpenSessions={onOpenSessions} />
+      {hero !== null ? (
+        <List.Section title="Continue">
+          {hero.kind === "running" ? (
+            <SessionRow session={hero.session} onOpenSession={onOpenSession} onForkSession={onForkSession} onOpenSessions={onOpenSessions} />
+          ) : renderHeroCluster(hero.cluster, hero.linkedSession)}
         </List.Section>
       ) : null}
-      <List.Section title="Open loops · Today" subtitle={`${openLoops.length}`}>
-        {openLoops.map((cluster) => renderCluster(cluster))}
-      </List.Section>
       <SessionSection title="Today's sessions" sessions={buckets.today} onOpenSession={onOpenSession} onForkSession={onForkSession} onOpenSessions={onOpenSessions} />
       <SessionSection title="Yesterday" sessions={buckets.yesterday} onOpenSession={onOpenSession} onForkSession={onForkSession} onOpenSessions={onOpenSessions} />
       <SessionSection title="This week" sessions={buckets.thisWeek} onOpenSession={onOpenSession} onForkSession={onForkSession} onOpenSessions={onOpenSessions} />
@@ -59,6 +64,29 @@ export function EmptyState({
       <List.EmptyView icon={{ source: Icon.Stars, tintColor: Color.SecondaryText }} title="ECHO is listening." description="Open loops and sessions appear here as you work." />
     </List>
   );
+}
+
+export function pickHero(
+  clusters: readonly FindClustersCluster[],
+  sessions: readonly Session[],
+  nowMs = Date.now(),
+): HeroPick | null {
+  const running = sessions.find((s) => s.status === "running");
+  if (running !== undefined) return { kind: "running", session: running };
+
+  const top = clusters[0];
+  if (top === undefined || top.time_range?.to === undefined) return null;
+  const topToMs = new Date(top.time_range.to).getTime();
+  if (Number.isNaN(topToMs)) return null;
+
+  const fresh = nowMs - topToMs < HERO_FRESHNESS_MS;
+  const reasons = top.rank_reason ?? [];
+  const unresolved = reasons.includes("has_unresolved_open_loop");
+  const substrateAnchored = reasons.includes("code_session_anchor");
+  const linkedSession = sessions.find((s) => s.clusterId === top.cluster_id) ?? null;
+  const anchored = substrateAnchored || linkedSession !== null;
+  if (fresh && unresolved && anchored) return { kind: "cluster", cluster: top, linkedSession };
+  return null;
 }
 
 function SessionSection(props: { title: string; sessions: readonly Session[]; onOpenSession: (session: Session) => void; onForkSession: (session: Session) => void; onOpenSessions: () => void }) {

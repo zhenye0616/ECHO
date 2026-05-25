@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ArtifactRef } from '../../src/normalize/types.js';
 import type { NormalizedContextEvent } from '../../src/normalize/types.js';
-import { rankClusters, rankReasonsFor } from '../../src/trace/rank.js';
+import { rankClusters, rankReasonsFor, signalsFor } from '../../src/trace/rank.js';
 import type { Cluster, Query } from '../../src/trace/types.js';
 import { makeAtom } from './fixtures/atoms.js';
 
@@ -13,12 +14,13 @@ function makeCluster(opts: {
   atom_ids: string[];
   open_loop_hints?: Cluster['open_loop_hints'];
   source_breakdown?: Record<string, number>;
+  anchor_artifacts?: ArtifactRef[];
 }): Cluster {
   return {
     cluster_id: opts.id,
     rank: 0,
     rank_reason: [],
-    anchor_artifacts: [],
+    anchor_artifacts: opts.anchor_artifacts ?? [],
     atom_ids: opts.atom_ids,
     edges: [],
     open_loop_hints: opts.open_loop_hints ?? [],
@@ -102,6 +104,122 @@ describe('rankReasonsFor', () => {
       source_breakdown: { cursor: 1, claude_code: 1, git: 1 },
     });
     expect(rankReasonsFor(c, new Map(), QUERY)).toContain('cross_tool');
+  });
+
+  it('keeps legacy has_open_loop true while has_unresolved_open_loop stays false for resolved hints', () => {
+    const c = makeCluster({
+      id: 'ctx_resolved',
+      atom_ids: [],
+      open_loop_hints: [
+        {
+          atom_id: 'evt_a',
+          kind: 'contains_todo',
+          text: 'TODO: x',
+          confidence: 'high',
+          resolved: true,
+          resolved_by_atom_id: 'evt_b',
+        },
+        {
+          atom_id: 'evt_c',
+          kind: 'ends_with_question',
+          text: 'done?',
+          confidence: 'high',
+          resolved: true,
+          resolved_by_atom_id: 'evt_d',
+        },
+      ],
+    });
+    const signals = signalsFor(c, new Map(), QUERY);
+    expect(signals.has_open_loop).toBe(true);
+    expect(signals.has_unresolved_open_loop).toBe(false);
+    expect(rankReasonsFor(c, new Map(), QUERY)).toContain('has_open_loop');
+    expect(rankReasonsFor(c, new Map(), QUERY)).not.toContain('has_unresolved_open_loop');
+  });
+
+  it('fires has_unresolved_open_loop and code_session_anchor via three source apps', () => {
+    const c = makeCluster({
+      id: 'ctx_cross_tool',
+      atom_ids: [],
+      source_breakdown: { cursor: 1, claude_code: 1, codex: 1 },
+      open_loop_hints: [
+        {
+          atom_id: 'evt_a',
+          kind: 'contains_todo',
+          text: 'TODO: x',
+          confidence: 'high',
+          resolved: false,
+        },
+      ],
+    });
+    const signals = signalsFor(c, new Map(), QUERY);
+    const reasons = rankReasonsFor(c, new Map(), QUERY);
+    expect(signals.has_unresolved_open_loop).toBe(true);
+    expect(signals.code_session_anchor).toBe(true);
+    expect(reasons).toContain('has_unresolved_open_loop');
+    expect(reasons).toContain('code_session_anchor');
+  });
+
+  it('fires code_session_anchor from repo/file/commit anchor artifact type', () => {
+    const c = makeCluster({
+      id: 'ctx_file_anchor',
+      atom_ids: [],
+      source_breakdown: { codex: 1 },
+      anchor_artifacts: [{ provider: 'local_fs', type: 'file', id: '/repo/src/app.ts' }],
+      open_loop_hints: [
+        {
+          atom_id: 'evt_a',
+          kind: 'contains_todo',
+          text: 'TODO: x',
+          confidence: 'high',
+          resolved: false,
+        },
+      ],
+    });
+    expect(signalsFor(c, new Map(), QUERY).code_session_anchor).toBe(true);
+  });
+
+  it('fires code_session_anchor from any atom whose source.app is git', () => {
+    const gitAtom = makeAtom({
+      id: 'evt_git',
+      app: 'git',
+      occurred_at: '2026-05-06T08:30:00.000Z',
+      artifacts: [],
+    });
+    const c = makeCluster({
+      id: 'ctx_git_atom',
+      atom_ids: ['evt_git'],
+      source_breakdown: { codex: 1 },
+      open_loop_hints: [
+        {
+          atom_id: 'evt_a',
+          kind: 'contains_todo',
+          text: 'TODO: x',
+          confidence: 'high',
+          resolved: false,
+        },
+      ],
+    });
+    expect(signalsFor(c, buildAtomMap([gitAtom]), QUERY).code_session_anchor).toBe(true);
+  });
+
+  it('does not treat cluster_id alone as code_session_anchor', () => {
+    const c = makeCluster({
+      id: 'ctx_unanchored',
+      atom_ids: [],
+      source_breakdown: { codex: 1 },
+      open_loop_hints: [
+        {
+          atom_id: 'evt_a',
+          kind: 'contains_todo',
+          text: 'TODO: x',
+          confidence: 'high',
+          resolved: false,
+        },
+      ],
+    });
+    const signals = signalsFor(c, new Map(), QUERY);
+    expect(signals.has_unresolved_open_loop).toBe(true);
+    expect(signals.code_session_anchor).toBe(false);
   });
 });
 

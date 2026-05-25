@@ -101,7 +101,9 @@ export interface RecentWorkContextResponse {
 export interface RankSignals {
   recent_activity: boolean;
   matches_artifact_hint: boolean;
+  has_unresolved_open_loop: boolean;
   has_open_loop: boolean;
+  code_session_anchor: boolean;
   dense: boolean;
   cross_tool: boolean;
 }

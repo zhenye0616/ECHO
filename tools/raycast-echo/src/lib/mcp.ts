@@ -88,8 +88,11 @@ export class EchoDaemonError extends Error {
   }
 }
 
+const FIND_CLUSTERS_LOOKBACK_HOURS = 18;
+
 export async function findClusters(): Promise<FindClustersResult> {
-  return callTool<FindClustersResult>("find_clusters", { view: "compact" });
+  const since = new Date(Date.now() - FIND_CLUSTERS_LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
+  return callTool<FindClustersResult>("find_clusters", { since, view: "compact" });
 }
 
 export async function searchMemories(query: string, limit = 15): Promise<SearchResult> {

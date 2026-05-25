@@ -4,6 +4,11 @@ import { artifactKey } from './cluster.js';
 import type { Cluster, Query, RankSignals } from './types.js';
 
 const RECENT_HOURS = 1;
+const CODE_SESSION_ARTIFACT_TYPES = new Set(['repo', 'file', 'commit']);
+
+// Deprecated for V1+ UI use: `has_open_loop` intentionally preserves the
+// legacy "any hint exists" semantics for compatibility. New UI should consume
+// `has_unresolved_open_loop`, which excludes hints already marked resolved.
 
 // V1.6 (item 032) — options for the no-args auto-expand demotion path.
 // When `demoteSingleSourceRecent` is true, a new PRIMARY sort key is added
@@ -40,6 +45,8 @@ export function rankReasonsFor(
   if (signals.recent_activity) reasons.push('recent_activity');
   if (signals.matches_artifact_hint) reasons.push('matches_artifact_hint');
   if (signals.has_open_loop) reasons.push('has_open_loop');
+  if (signals.has_unresolved_open_loop) reasons.push('has_unresolved_open_loop');
+  if (signals.code_session_anchor) reasons.push('code_session_anchor');
   if (signals.dense) reasons.push('dense');
   if (signals.cross_tool) reasons.push('cross_tool');
   return reasons;
@@ -77,14 +84,29 @@ export function signalsFor(
   }
 
   const hasOpenLoop = cluster.open_loop_hints.length > 0;
+  const hasUnresolvedOpenLoop = cluster.open_loop_hints.some((h) => h.resolved === false);
+  const hasCodeArtifact = cluster.anchor_artifacts.some((a) =>
+    CODE_SESSION_ARTIFACT_TYPES.has(a.type),
+  );
+  let hasGitAtom = false;
+  for (const id of cluster.atom_ids) {
+    const a = atomsById.get(id);
+    if (a?.source.app === 'git') {
+      hasGitAtom = true;
+      break;
+    }
+  }
   const dense = cluster.atom_ids.length >= 5;
   const distinctApps = Object.keys(cluster.source_breakdown).length;
   const crossTool = distinctApps >= 3;
+  const codeSessionAnchor = hasCodeArtifact || hasGitAtom || crossTool;
 
   return {
     recent_activity: recent,
     matches_artifact_hint: touchesHint,
+    has_unresolved_open_loop: hasUnresolvedOpenLoop,
     has_open_loop: hasOpenLoop,
+    code_session_anchor: codeSessionAnchor,
     dense,
     cross_tool: crossTool,
   };
