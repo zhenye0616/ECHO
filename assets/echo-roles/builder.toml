@@ -1,0 +1,12 @@
+[role]
+description = "Claims a backlog item, works in an isolated git worktree on a feature branch, implements to acceptance criteria only, ships to backlog/pending_review/. One item per run. Drifts are caught by the explicit Out-of-Scope section of each spec."
+sandbox = "workspace-write"
+skills = ["process-backlog", "process-backlog-batch", "role-typed-task-state", "using-superpowers"]
+
+[role.requires]
+mcp_servers = ["echo"]
+capabilities = ["fs.read", "fs.write", "git.read", "git.write", "mcp.echo.read", "mcp.echo.write"]
+
+[role.output]
+format = "markdown"
+required_fields = ["run-log", "agent_notes"]
