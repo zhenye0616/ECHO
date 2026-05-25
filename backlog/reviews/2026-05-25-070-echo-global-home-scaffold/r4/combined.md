@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R4`. Both codex and codex-ops returned `proceed` with zero findings against `f2edac95807666bef63657bcc72a5a74782cc74f`. The R1→R4 trajectory followed the disposition-discipline win condition: each round's spec changes after R1 were removal-only (drop r1's `wx`-as-crash-atomic claim, drop r1's microtask Test 4 in r2; soften r2's Test 3 over-claim in r3), and findings count fell monotonically (5 → 5 → 1 → 0). 070 is now ready for a builder to claim.
 
