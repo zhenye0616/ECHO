@@ -40,10 +40,23 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-25T16:31:00-0700"
 branch: "agent/role-definition-format-and-defaults"
 worktree: "/Users/zhenye/Desktop/Project_echo--role-definition-format-and-defaults"
-head_sha: ""
+head_sha: "afa3fc5386f8fa2306e7601584ebd971b00db4e3"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Implemented AC1-AC4 on `agent/role-definition-format-and-defaults` at
+  afa3fc5386f8fa2306e7601584ebd971b00db4e3. Added strict TOML role loading
+  and validation in `src/echo-home/roles.ts`, a barrel export from
+  `src/echo-home/index.ts`, canonical default role assets under
+  `assets/echo-roles/`, and 38 focused tests covering schema happy paths,
+  required-field failures, controlled vocabularies, explicit skillsRoot
+  behavior, default asset loading, and assertDefaults installation integrity.
+  Added `smol-toml@^1.6.1` via `npm install` and updated the lockfile.
+  Verification: `npm test -- tests/echo-home/roles.test.ts
+  tests/echo-home/default-roles.test.ts` 38/38 passed; `npm run typecheck`
+  clean; `npm run lint` clean; full `npm test` 1223 passed / 21 skipped;
+  `git diff --check` clean. No ECHO MCP calls were made, so no dogfooding
+  journal entry was required.
 ---
 
 # Role definition format + 3 default roles
