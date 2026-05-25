@@ -26,10 +26,10 @@ spec_refs:
   - backlog/complete/2026-05-22-069-raycast-cold-start-continuity-hero.md  # format reference for this spec's frontmatter + section structure
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-25T16:14:13-0700"
+branch: "agent/echo-global-home-scaffold"
+worktree: "/Users/zhenye/Desktop/Project_echo--echo-global-home-scaffold"
 head_sha: ""
 pr_url: ""
 review_notes: ""
