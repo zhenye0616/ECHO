@@ -65,8 +65,8 @@ The integration point in the existing daemon is the bootstrap section at `src/da
 
 ```
 ~/.echo/
-├── skills/              # empty; populated by 071
-├── roles/               # empty; populated by 071
+├── skills/              # empty; populated by 072 (adapter sync engine copies repo skills/ here)
+├── roles/               # empty; populated by 072 (adapter sync engine copies assets/echo-roles/ here on first install)
 ├── adapters/            # empty; populated by 072 (cached per-agent adapter outputs)
 └── state/
     ├── onboarding.json  # initial empty-state written here; mutated by 073
@@ -85,10 +85,10 @@ export interface OnboardingState {
   created_at: string;            // ISO8601, set on first write, never mutated after
   last_updated_at: string;       // ISO8601, set on first write, updated by 073 on each wire/probe
   completed: boolean;            // wizard finished end-to-end at least once
-  agents: AgentProfile[];        // appended by 073 as agents are detected + wired
+  agents: OnboardedAgentProfile[];  // appended by 073 as agents are detected + wired
 }
 
-export interface AgentProfile {
+export interface OnboardedAgentProfile {
   id: 'codex' | 'claude-code' | 'cursor' | string;  // free-form for future agents
   detected_at: string;           // ISO8601 — when detection step saw this agent
   wired_at: string | null;       // ISO8601 — when AGENTS.md / config write completed; null if skipped/failed
@@ -137,7 +137,7 @@ Initial state written by `ensureEchoHome()`:
   - If `process.env['ECHO_HOME']` is non-empty (per `isNonEmptyString`), `root` = `path.resolve(process.env['ECHO_HOME'])`.
   - Else `root` = `path.join(os.homedir(), '.echo')`.
 - All sub-paths are derived from `root` via `path.join`; no string concatenation with `/`.
-- Exports the TypeScript interfaces `OnboardingState`, `AgentProfile`, `ProjectsState`, `ProjectRecord` exactly as shown in the spec body above (field names, types, optionality).
+- Exports the TypeScript interfaces `OnboardingState`, `OnboardedAgentProfile`, `ProjectsState`, `ProjectRecord` exactly as shown in the spec body above (field names, types, optionality). The `OnboardedAgentProfile` name is deliberately distinct from 072's `AdapterSyncProfile` (a transient sync-input DTO); collision avoidance is load-bearing because both types live under `src/echo-home/`.
 - Exports two named Ajv-compiled validators: `validateOnboardingState`, `validateProjectsState`. Each is a typed `ValidateFunction<T>` from `ajv`. Ajv import shape matches existing usage in the repo — grep `ajv` to confirm before writing.
 - Module-load cost is bounded — no I/O at import time. Path resolution + Ajv schema compile only.
 
@@ -196,7 +196,7 @@ Initial state written by `ensureEchoHome()`:
 
 ## Out of Scope (Don't Drift)
 
-1. **Writing skill `.md` files into `~/.echo/skills/`.** The directory is created empty in 070; populating it (canonical skills synced from `skills/`) is 071's responsibility. Do not copy/sync any files into `skills/`.
+1. **Writing skill `.md` files into `~/.echo/skills/`.** The directory is created empty in 070; populating it (canonical skills synced from the in-repo `skills/`) is 072's responsibility (adapter sync engine). Do not copy/sync any files into `skills/`.
 2. **Role TOML format + default role files.** Schema lives in 071. 070 creates only the empty `roles/` directory.
 3. **Adapter writes (AGENTS.md, CLAUDE.md, config.toml).** 072 owns merge-with-markers logic. 070 does NOT write to `~/.codex/`, `~/.claude/`, `~/.cursor/`, or any other agent-owned directory.
 4. **Onboarding wizard UI or CLI.** 073 owns step-by-step UX; 070's `ensureEchoHome()` is silent unless logging.

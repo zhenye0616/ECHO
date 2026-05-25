@@ -118,6 +118,8 @@ The loader rejects any capability not in this set. Adding to the vocabulary is a
 
 **AC1.6 — Unknown top-level keys are a HARD ERROR.** A TOML that contains, for example, `[role.metadata]` or `[role.author]` is rejected. Why: silent-ignore allows drift toward incompatible future shapes. Strict-by-default; expand the schema explicitly when a new key earns its keep.
 
+**AC1.7 — Role TOMLs are intentionally unversioned in V1.** Unlike 070's `onboarding.json` / `projects.json` which carry `schema_version: 1`, role TOMLs ship no `[role].schema_version` field. The strict-unknown-key rejection (AC1.6) + additive-only schema evolution + explicit follow-up migration specs for any breaking change collectively serve the same role as JSON state versioning. If a future spec needs in-file version negotiation (e.g., user-authored roles need to declare schema-compat), it adds `[role].schema_version` then and migrates the three default TOMLs explicitly. Do not preemptively add the field in 071. The "additive-only" language in After Completion §1 refers to this discipline, not to a numeric version field.
+
 ### AC2 — TypeScript loader/validator at `src/echo-home/roles.ts`
 
 **AC2.1 — File location and reason.** New file at `src/echo-home/roles.ts`. The existing `src/coord/roles.ts` (057a) is a *different concept* — it loads per-role-per-event-type SLA config for the coord-event layer. Conflating them would force one module to grow two unrelated schemas. The barrel file `src/echo-home/index.ts` re-exports the public surface (`Role`, `loadRoleFromFile`, `loadRolesFromDir`, `RoleValidationError`).
@@ -153,6 +155,15 @@ export class RoleValidationError extends Error {
 
 export function loadRoleFromFile(filePath: string): Role;
 export function loadRolesFromDir(dirPath: string): Role[];   // skips dotfiles; sorts by name; throws on any single-file failure
+
+// Canonical list of role filenames shipped by 071. Single source of truth — 072's
+// syncDefaultRoles / syncAll consume this constant instead of hardcoding the list.
+// Order is the canonical sort order returned by loadRolesFromDir.
+export const DEFAULT_ROLE_FILENAMES: readonly string[] = [
+  'builder.toml',
+  'reviewer.toml',
+  'strategist.toml',
+] as const;
 ```
 
 **AC2.3 — Validation behaviors.** Each of the following MUST throw `RoleValidationError` with a message that includes the file path and the offending field name:
@@ -263,6 +274,7 @@ Description aligned to `docs/AGENT_INSTRUCTIONS.md`'s loop description. `process
 5. The reviewer role's `required_fields` includes exactly `'verdict'`, `'reviewer'`, `'findings'`.
 6. `builder.skills` includes `'process-backlog'` (regression pin: the canonical builder skill must always be present).
 7. `strategist.skills` includes `'review-queue-watch'` (regression pin: the canonical strategist orchestration skill must always be present).
+8. `DEFAULT_ROLE_FILENAMES` exactly equals the sorted basenames present at `assets/echo-roles/` (regression pin: the constant is the single source of truth consumed by 072; if a future spec adds a 4th default role TOML, the constant MUST be updated in the same commit or this test fails — the test is the trip-wire that prevents 072 from silently lagging 071).
 
 **AC4.3 — All existing tests continue to pass.** No edits to existing test files.
 
@@ -326,7 +338,7 @@ All five verify commands must pass before the builder moves 071 to `pending_revi
 ## Definition of Done
 
 - AC1: schema documented in code comments on `src/echo-home/roles.ts`; controlled vocabulary, enum values, and unknown-key rejection all implemented.
-- AC2: `src/echo-home/roles.ts` exports `Role`, `Capability`, `RoleValidationError`, `loadRoleFromFile`, `loadRolesFromDir`. Barrel `src/echo-home/index.ts` re-exports the public surface. `smol-toml@^1.3.1` is in `package.json` `dependencies` and `package-lock.json`. The optional `skillsRoot` overload from R3 is implemented and documented.
+- AC2: `src/echo-home/roles.ts` exports `Role`, `Capability`, `RoleValidationError`, `loadRoleFromFile`, `loadRolesFromDir`, `DEFAULT_ROLE_FILENAMES`. Barrel `src/echo-home/index.ts` re-exports the public surface. `smol-toml@^1.3.1` is in `package.json` `dependencies` and `package-lock.json`. The optional `skillsRoot` overload from R3 is implemented and documented.
 - AC3: `assets/echo-roles/{strategist,reviewer,builder}.toml` all exist; each conforms to the AC1 schema; each skill referenced resolves to `skills/<name>.md`.
 - AC4: all 14 loader cases + 7 default-roles cases pass.
 - All five verify commands clean.
