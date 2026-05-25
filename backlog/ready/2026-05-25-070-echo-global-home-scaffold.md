@@ -6,7 +6,7 @@ priority: HIGH
 estimate: 0.5-1d
 created: 2026-05-25
 blocked_by: []
-task_state_ref: ""
+task_state_ref: "backlog/task-state/2026-05-25-070-echo-global-home-scaffold/strategist.md"
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - src/echo-home/paths.ts  # NEW — canonical path constants + state-file schema types; sole module that knows the ~/.echo/ layout
@@ -131,7 +131,7 @@ Initial state written by `ensureEchoHome()`:
 
 ### AC1 — `src/echo-home/paths.ts` exports canonical paths + schema types
 
-- New file `src/echo-home/paths.ts`. No external imports beyond `node:os`, `node:path`, and `../guards.js`.
+- New file `src/echo-home/paths.ts`. No external imports beyond `node:os`, `node:path`, `ajv`, and `../guards.js`. (`ajv` is required for the validators below; the repo's existing import shape is `import { Ajv, type AnySchema, type ValidateFunction } from 'ajv';` — match it. No other third-party imports.)
 - Exports a frozen object `ECHO_HOME_PATHS` with at minimum: `root`, `skills`, `roles`, `adapters`, `state`, `stateOnboarding`, `stateProjects`. All values are absolute, normalized strings resolved once at module load.
 - Resolution rule, mirroring `src/daemon/lifecycle.ts:18-22`:
   - If `process.env['ECHO_HOME']` is non-empty (per `isNonEmptyString`), `root` = `path.resolve(process.env['ECHO_HOME'])`.
@@ -154,7 +154,7 @@ Initial state written by `ensureEchoHome()`:
   ```
 - Behavior:
   1. `mkdirSync(root, { recursive: true })` and the four sub-dirs (`skills`, `roles`, `adapters`, `state`).
-  2. For each of `stateOnboarding`, `stateProjects`: if the file does NOT exist, write the initial-state JSON shown in the spec body (with `created_at` / `last_updated_at` / `last_refreshed_at` set to `new Date().toISOString()`); if it DOES exist, leave it untouched (do NOT read, do NOT validate, do NOT rewrite).
+  2. For each of `stateOnboarding`, `stateProjects`: **atomic absent-only create**. Use `writeFileSync(path, json, { flag: 'wx' })` (Node maps `wx` to `O_CREAT | O_EXCL`, which is atomic at the filesystem layer — a partial write cannot leak a half-written file because the kernel either creates the inode + writes the full payload, or fails). On `EEXIST`: catch and treat as a successful no-op (file already there; do NOT read, do NOT validate, do NOT rewrite). On any other error: re-throw. This is the load-bearing invariant against concurrent-first-create races (two processes share an `ECHO_HOME`; one wins the `O_EXCL`, the other gets `EEXIST` and treats it as success) AND against interrupted writes (a SIGKILL between `open` and `write` cannot strand a half-written JSON because `wx` writes are not durably visible until the inode is fully populated — at worst the file does not exist, and the next call retries cleanly). Do NOT use a check-then-write pattern; do NOT use a temp-file-plus-rename pattern (rename overwrites and would break the absent-only contract). The initial-state JSON payload itself sets `created_at` / `last_updated_at` / `last_refreshed_at` to `new Date().toISOString()`.
   3. Populate `created_dirs` / `created_files` arrays with the paths actually created in this call (so a second call returns empty arrays).
 - The function is synchronous and idempotent: calling it twice in a row produces an empty-arrays second result with no filesystem mutations between calls (verified by AC4 Test 3).
 - Errors propagate (do not swallow). The daemon caller is responsible for downgrading exceptions to non-fatal logs (AC3).
@@ -188,9 +188,10 @@ Initial state written by `ensureEchoHome()`:
   2. **Pinning the env-override branch**: because paths are resolved at module load, set `process.env['ECHO_HOME']` to a tmpdir path BEFORE the dynamic import, then `await import('../../src/echo-home/paths.js')` and assert `root` equals the resolved tmpdir. (Use `vi.resetModules()` between tests; the pattern is established in this repo — grep for existing `vi.resetModules()` usage to confirm.)
   3. `validateOnboardingState(<the initial-state object literal>)` returns `true`; passing an object missing `schema_version` returns `false`. Same shape for `validateProjectsState`.
 - `tests/echo-home/scaffold.test.ts` — three cases:
-  1. **Fresh tmpdir**: set `ECHO_HOME` to a fresh `mkdtempSync` path, dynamic-import scaffold, call `ensureEchoHome()`. Assert all four sub-dirs exist, both state files exist on disk, `created_dirs.length === 5` (root + four sub-dirs), `created_files.length === 2`, and `validateOnboardingState(JSON.parse(...))` returns `true` for the file contents.
+  1. **Fresh tmpdir**: set `ECHO_HOME` to `path.join(mkdtempSync(...), 'echo-home')` — a child path under the mkdtemp parent that does NOT yet exist (mkdtemp creates the parent, but the `echo-home` child must be created by `ensureEchoHome()` for the root-creation count to be reported). Dynamic-import scaffold, call `ensureEchoHome()`. Assert all four sub-dirs exist, both state files exist on disk, `created_dirs.length === 5` (root + four sub-dirs), `created_files.length === 2`, and `validateOnboardingState(JSON.parse(...))` returns `true` for the file contents.
   2. **Idempotency**: from the same fresh tmpdir as Test 1, immediately call `ensureEchoHome()` a second time. Assert both result arrays are empty AND the on-disk `created_at` field of `onboarding.json` is byte-identical to the first call's value (proves no rewrite). Use `fs.statSync(...).mtimeMs` as a secondary check that the file wasn't touched.
   3. **Partial-state recovery**: pre-create `<tmpdir>/state/onboarding.json` with a hand-rolled JSON `{"hand_edited": true}` BEFORE calling `ensureEchoHome()`. Assert the function still creates the missing dirs + the missing `projects.json` BUT does NOT overwrite the hand-rolled file (its contents remain `{"hand_edited": true}` byte-for-byte). This is the load-bearing semantic that lets wizard-progress survive daemon restarts.
+  4. **Concurrent-first-create race**: from a fresh tmpdir with no state files, call `ensureEchoHome()` twice in parallel via `Promise.all([Promise.resolve().then(() => ensureEchoHome()), Promise.resolve().then(() => ensureEchoHome())])` (the function itself is sync, but `Promise.resolve().then(...)` schedules both invocations on the microtask queue so they interleave at the JS layer; `wx`'s atomicity is enforced by the OS, not by the JS layer). Assert exactly one call reports `created_files.length === 2` and the other reports `created_files.length === 0` (the `EEXIST` loser); both `state/onboarding.json` and `state/projects.json` exist on disk with valid initial-state JSON content (i.e., `validateOnboardingState(JSON.parse(...))` and `validateProjectsState(JSON.parse(...))` both return `true`); no half-written file is left behind. This pins the atomic-create contract from AC2.2 against the runtime failure mode codex-ops flagged.
 - All tests use OS tmpdirs and clean up via `rmSync(..., { recursive: true })` in `afterEach`. No test touches the real `~/.echo/`.
 - Tests live under `tests/echo-home/` (new directory), matching the existing pattern of one test directory per `src/<subsystem>/`.
 
