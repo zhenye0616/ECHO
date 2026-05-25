@@ -989,3 +989,6 @@ None of these are required for V1 cleanup — the 066/067 priority specs come fi
 
 <!-- from merge of 2026-05-22-069-raycast-cold-start-continuity-hero, 2026-05-25 -->
 - Update empty view copy at `tools/raycast-echo/src/components/EmptyState.tsx:64` — still says "Open loops and sessions appear here" after the visible Open-loops section was removed in 069. (from 069 review sidecar follow-up)
+
+<!-- from 069 post-merge dogfooding, 2026-05-25 -->
+- Empty landing view has no top-level ActionPanel — when no hero fires AND today/yesterday/this-week buckets are empty (a normal cold-start state under the new V1 confidence contract), the user has no discoverable path to "browse last week's sessions". ⌘S Browse Sessions binding lives only on individual session rows (`tools/raycast-echo/src/components/EmptyState.tsx:119`). Minimum-viable fix: add a list-level `<List.EmptyView actions={...}>` with a Browse Sessions action, OR add a persistent "Browse all sessions →" row that always renders below the hero/buckets. (surfaced during 069 dogfooding when founder asked "but there is no way to review what i have done last week?")
