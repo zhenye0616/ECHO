@@ -27,5 +27,16 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**`claim-ready after R4`.** Both reviewers (codex + codex-ops) verdict `proceed` with empty findings lists. Combined verdict `proceed`. No further rounds needed. Spec is ready for builder claim via `process-backlog`.
+
+## Review history
+
+| Round | codex | codex-ops | Findings dispositioned | Spec patch commit |
+|---|---|---|---|---|
+| r1 | proceed_after_patches | proceed_after_patches | 5 (1 convergent + 4 divergent) | `f61cc96` |
+| r2 | proceed_after_patches | proceed_after_patches | 3 (1 convergent + 2 divergent, stale-prose carryover) | `3a82e5f` |
+| r3 | proceed_after_patches | proceed | 1 (divergent LOW, lineage parenthetical) | `adde8ca` |
+| r4 | **proceed** | **proceed** | 0 — **convergence** | — |
+
+Net effect of review loop: smol-toml floor 1.3.1 → 1.6.1 (GHSA-v3rj-xjv7-4jmq); `RoleLoadOptions` made public-contract (was R3 prose); `assertDefaults` added to close partial-install integrity gap; AC2.4 grammar + path-containment two-step added; +18 test cases (21 → 40 total).
 
