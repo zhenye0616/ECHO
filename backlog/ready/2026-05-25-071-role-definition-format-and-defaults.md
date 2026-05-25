@@ -153,8 +153,28 @@ export class RoleValidationError extends Error {
   constructor(message: string, public readonly filePath: string, public readonly field?: string);
 }
 
-export function loadRoleFromFile(filePath: string): Role;
-export function loadRolesFromDir(dirPath: string): Role[];   // skips dotfiles; sorts by name; throws on any single-file failure
+export interface RoleLoadOptions {
+  // Override for the directory containing skills/<name>.md used by AC2.4's
+  // skill-existence check. When undefined, the loader walks upward from
+  // sourcePath to find a directory containing both package.json AND a skills/
+  // subdir (repo-rooted default; works from worktrees + main repo). When set
+  // (typical for ~/.echo/-rooted consumers in 072/074), the loader resolves
+  // skills against this directory directly without walking. Both code paths
+  // enforce AC2.4's two-step grammar + path-containment check.
+  skillsRoot?: string;
+  // If true, loadRolesFromDir asserts every entry in DEFAULT_ROLE_FILENAMES is
+  // present in dirPath. Missing defaults throw RoleValidationError with message
+  // "installation integrity: missing default role <name>" — a louder, distinct
+  // failure mode than per-file validation, intended for ~/.echo/roles/ post-
+  // install integrity checks (where a partially-populated dir from a 072
+  // mid-failure must not be treated as a valid one-role system). Off by default
+  // so generic dir loads (test fixtures, arbitrary user dirs) still return only
+  // discovered roles.
+  assertDefaults?: boolean;
+}
+
+export function loadRoleFromFile(filePath: string, opts?: RoleLoadOptions): Role;
+export function loadRolesFromDir(dirPath: string, opts?: RoleLoadOptions): Role[];   // skips dotfiles; sorts by name; throws on any single-file failure
 
 // Canonical list of role filenames shipped by 071. Single source of truth — 072's
 // syncDefaultRoles / syncAll consume this constant instead of hardcoding the list.
