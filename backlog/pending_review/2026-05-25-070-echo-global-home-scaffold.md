@@ -30,10 +30,24 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-25T16:14:13-0700"
 branch: "agent/echo-global-home-scaffold"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-global-home-scaffold"
-head_sha: ""
+head_sha: "9a010eb9471ae43dcf119dc005011b329e533b9f"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Implemented AC1-AC4 on `agent/echo-global-home-scaffold` at
+  9a010eb9471ae43dcf119dc005011b329e533b9f. Added `src/echo-home/paths.ts`
+  as the canonical `~/.echo/` path/schema module with `ECHO_HOME` override,
+  state interfaces, and Ajv validators; added `src/echo-home/scaffold.ts`
+  with synchronous idempotent directory creation and absent-only `wx` state
+  file writes; wired daemon startup to call `ensureEchoHome()` after PID lock
+  and before extractor/MCP startup with non-fatal logging; added six
+  `tests/echo-home/` cases for path resolution, schema validation,
+  idempotency, and existing-state preservation. Verification: `npm test --
+  tests/echo-home/` 6/6 pass; `npm run typecheck` clean; `npm run lint`
+  clean; `npx prettier --check <touched files>` clean; `git diff --check`
+  clean; full `npm test` 1191 passed / 21 skipped. Manual daemon check with
+  temp `ECHO_HOME` verified first start creates 5 dirs + 2 files and second
+  start logs no `echo_home_initialized` while still starting MCP.
 ---
 
 # ECHO global home (`~/.echo/`) scaffold
