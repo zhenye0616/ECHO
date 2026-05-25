@@ -36,10 +36,10 @@ spec_refs:
   - src/coord/roles.ts                                                     # NAMING-CONFLICT REFERENCE: this is the coord-layer per-role-per-event-type SLA loader (057a), a different concept from 071's role-definition format; the new loader MUST live at src/echo-home/roles.ts to avoid overloading the existing module
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-25T16:31:00-0700"
+branch: "agent/role-definition-format-and-defaults"
+worktree: "/Users/zhenye/Desktop/Project_echo--role-definition-format-and-defaults"
 head_sha: ""
 pr_url: ""
 review_notes: ""
