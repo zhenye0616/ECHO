@@ -8,7 +8,7 @@ created: 2026-05-25
 blocked_by:
   - 2026-05-25-070-echo-global-home-scaffold
   - 2026-05-25-071-role-definition-format-and-defaults
-task_state_ref: ""
+task_state_ref: 2026-05-25-072-adapter-sync-engine
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - src/echo-home/adapter-sync.ts  # AC6 — new file; orchestrating syncAll(profile) + SyncResult shape; calls into the per-adapter modules below
@@ -17,13 +17,15 @@ files_to_modify:
   - src/echo-home/adapters/cursor-config.ts  # AC3 — new file; JSON mutator for ~/.cursor/mcp.json (target mcpServers.echo only)
   - src/echo-home/adapters/skill-sync.ts  # AC4 — new file; copies ~/.echo/skills/<name>.md → ~/.claude/commands/<name>.md (ECHO-owned, overwritten on re-sync). Also exports populateEchoSkills() which copies the in-repo skills/ source-of-truth into ~/.echo/skills/ — called by syncAll before agent dispatch.
   - src/echo-home/adapters/role-sync.ts  # AC5 — new file; copies default role TOMLs from assets/echo-roles/ to ~/.echo/roles/ on first install; refuses to overwrite user edits
-  - package.json  # adds the chosen TOML library dependency (see Risks R1 — library choice gated on AC2)
-  - tests/echo-home/adapters/markers.test.ts  # AC7 — new file; pins append, replace (idempotent), preserve-outside, conflict-on-inside-edit
-  - tests/echo-home/adapters/codex-config.test.ts  # AC7 — new file; pins add, update, no-op-on-no-change, conflict, comment/formatting preservation
-  - tests/echo-home/adapters/cursor-config.test.ts  # AC7 — new file; pins add, update, no-op-on-no-change, other keys preserved
-  - tests/echo-home/adapters/skill-sync.test.ts  # AC7 — new file; pins overwrite-on-resync, missing-target-dir-created, skill-removal-from-source NOT mirrored (V1 leaves stale files; see Out of Scope §3)
-  - tests/echo-home/adapters/role-sync.test.ts  # AC7 — new file; pins first-install copy, user-edit refusal, missing-source-default skip
-  - tests/echo-home/adapter-sync.test.ts  # AC7 — new file; pins syncAll partial-failure (some agents ok, some return conflict), result shape, per-agent isolation
+  - src/echo-home/adapters/atomic-write.ts  # AC7 — new file; unique-tmp + mode-preserving atomic write helper; ALL adapters use this (no per-adapter inline writeFile+rename)
+  - tests/echo-home/adapters/atomic-write.test.ts  # AC9 — new file; pins unique-tmp suffix shape, mode preservation on existing file, 0600 for new secret-sensitive paths, umask default for non-sensitive paths, concurrent-overlap (two parallel calls do not stomp each other)
+  - package.json  # adds smol-toml dep (per AC2 byte-range editor primary path)
+  - tests/echo-home/adapters/markers.test.ts  # AC9 — new file; pins append, replace (idempotent), preserve-outside, conflict-on-inside-edit
+  - tests/echo-home/adapters/codex-config.test.ts  # AC9 — new file; pins add, update, no-op-on-no-change, conflict, comment/formatting preservation
+  - tests/echo-home/adapters/cursor-config.test.ts  # AC9 — new file; pins add, update, no-op-on-no-change, other keys preserved
+  - tests/echo-home/adapters/skill-sync.test.ts  # AC9 — new file; pins overwrite-on-resync, missing-target-dir-created, skill-removal-from-source NOT mirrored (V1 leaves stale files; see Out of Scope §3)
+  - tests/echo-home/adapters/role-sync.test.ts  # AC9 — new file; pins first-install copy, user-edit refusal, missing-source-default skip
+  - tests/echo-home/adapter-sync.test.ts  # AC9 — new file; pins syncAll partial-failure (some agents ok, some return conflict), result shape, per-agent isolation
 spec_refs:
   - tools/sync-skills.sh  # prior art for skill-file sync (Claude Code real-file copy posture); 072 ports this logic into TypeScript and runs it twice: once to populate ~/.echo/skills/ from the in-repo skills/, then again to fan out from ~/.echo/skills/ to per-user ~/.claude/commands/
   - raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md  # design archive — merge-strategy table at lines 50-55; rationale at lines 56-57
@@ -78,33 +80,39 @@ Re-running `syncAll(...)` with identical inputs is a no-op for every file. This 
 
 - Exports `mergeWithMarkers(opts: { filePath: string; echoSection: string; previousEchoSection?: string }): MarkerResult`.
 - Constants: `BEGIN_MARKER = '<!-- BEGIN ECHO -->'`, `END_MARKER = '<!-- END ECHO -->'`. Literal strings; no whitespace tolerance in V1 (a hand-edit that changes the markers themselves is treated as no-markers-present, which falls into the append branch — see R3).
-- **Append branch (markers absent in current file):** the file is read; if it does not contain `BEGIN_MARKER`, the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result atomically (write to `<filePath>.tmp` + `rename`). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`.
+- **Append branch (markers absent in current file):** the file is read; if it does not contain `BEGIN_MARKER`, the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result via the unique-tmp atomic-write pattern in AC7 (do NOT use a fixed `<filePath>.tmp` — see AC7 for the per-call temp path + mode-preservation rules). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`.
 - **Replace branch (markers present, content inside equals `previousEchoSection`):** the inside-markers content is replaced with `echoSection`. Everything outside the markers is preserved byte-for-byte. Atomic write. Returns `{ action: 'replace', filePath }`. If `previousEchoSection` is omitted, this branch is unreachable — see Conflict branch.
 - **No-op branch (markers present, content inside equals `echoSection`):** the file is not written. Returns `{ action: 'noop', filePath }`. This is what makes re-running idempotent.
 - **Conflict branch (markers present, content inside differs from BOTH `previousEchoSection` AND `echoSection`):** the function does **not** write. Returns `{ action: 'conflict', filePath, conflict: { currentInside: string, expectedInside: string, proposedInside: string, unifiedDiff: string } }`. The `unifiedDiff` is a plain-text diff between `currentInside` and `proposedInside` produced by a small in-tree diff routine (no external library dependency for this — line-by-line is sufficient; see R4).
-- **Idempotency requirement.** Calling `mergeWithMarkers` twice in a row with identical inputs produces: first call → `action: 'replace'` (or `'append'` on a fresh file), second call → `action: 'noop'`. Pinned by AC7's markers.test.ts.
-- The function never reads or writes any file other than `filePath` and `<filePath>.tmp`. No backup files in V1 (see Out of Scope §6).
+- **Idempotency requirement.** Calling `mergeWithMarkers` twice in a row with identical inputs produces: first call → `action: 'replace'` (or `'append'` on a fresh file), second call → `action: 'noop'`. Pinned by AC9's markers.test.ts.
+- The function never reads or writes any file other than `filePath` and the per-call unique temp path (see AC7). No backup files in V1 (see Out of Scope §6).
 
 ### AC2 — `src/echo-home/adapters/codex-config.ts` implements TOML mutator for `~/.codex/config.toml`
 
 - Exports `syncCodexMcpBlock(opts: { filePath: string; serverConfig: { url: string; enabled?: boolean; [k: string]: unknown }; previousServerConfig?: Record<string, unknown> }): TomlMutatorResult`.
-- Targets exactly the `[mcp_servers.echo]` table. All other tables (`[mcp_servers.<otherName>]`, `[projects.*]`, top-level keys like `model`, `personality`) are preserved byte-for-byte including comments and blank lines wherever the library allows.
-- **TOML library choice.** Use `smol-toml` (preserves comments + formatting; actively maintained; pure TS; works in node). The builder MUST verify on first read that `smol-toml`'s parse/stringify round-trips a copy of the founder's real `~/.codex/config.toml` (which has 15+ `[projects.*]` tables, a top-level `[notice.model_migrations]`, and the existing `[mcp_servers.echo]` block) without losing keys, comments, or table order. If round-trip is lossy in ways material to this spec, the builder escalates with a recommendation to use `@iarna/toml` (lossier but stable) + a hand-rolled key-targeted patch that uses string-range editing to preserve formatting outside the target table. See R1.
-- **Add branch:** file exists but no `[mcp_servers.echo]` table → append the table at the end of the file (after a trailing blank line if not already present). Atomic write. Returns `{ action: 'add' }`.
-- **Update branch:** table exists, current contents match `previousServerConfig` (key-by-key deep equal) → replace the table contents with `serverConfig`. Atomic write. Returns `{ action: 'update' }`.
+- Targets exactly the `[mcp_servers.echo]` table. All other tables (`[mcp_servers.<otherName>]`, `[projects.*]`, top-level keys like `model`, `personality`) are preserved **byte-for-byte** including comments, blank lines, and table order.
+- **TOML strategy — key-targeted byte-range editor (primary path).** Codex r1 review (2026-05-25) verified that `smol-toml@1.6.1` does NOT preserve comments through parse/stringify — it round-trips as a value-only parser. Therefore comment-preserving parse-and-restringify is infeasible with any TOML library currently in the dependency surface. The implementation uses string-range surgery:
+  1. Scan the file's bytes line-by-line to locate the `[mcp_servers.echo]` table header and the byte offset of the next table header (or EOF). The range `[headerStart, nextHeaderStart)` is the "target slice."
+  2. Parse ONLY the target slice with `smol-toml` (or `@iarna/toml` — either works; choose `smol-toml` for ESM-native fit) into a plain JS object. This gives the structured `currentValue` for `previousServerConfig` / `serverConfig` comparison.
+  3. For add/update branches, stringify `serverConfig` via `smol-toml` and splice it into the original byte stream at the target range; everything outside the slice is preserved verbatim, byte-for-byte.
+  4. For no-op / conflict branches no write occurs and the rest of the file is never touched.
+- This means the parser is used as a value-comparator on a tiny scoped slice, not as a whole-file document model. The "lossy parser preserves outside region" guarantee comes from byte-range surgery, not the parser. No external dependency beyond `smol-toml` (pure-JS, ESM-native, ~25kB; already chosen by 071 for its own loader).
+- **Add branch:** file exists but no `[mcp_servers.echo]` table → append the table at the end of the file (after a trailing blank line if not already present). Atomic write via AC7's unique-tmp pattern, preserving the existing file mode. Returns `{ action: 'add' }`.
+- **Update branch:** table exists, current contents match `previousServerConfig` (key-by-key deep equal of the parsed slice) → replace the byte slice covering the target table with the new stringified table. AC7 atomic write + mode preservation. Returns `{ action: 'update' }`.
 - **No-op branch:** table exists, contents already match `serverConfig` → no write. Returns `{ action: 'noop' }`. (Idempotency.)
-- **Conflict branch:** table exists, contents match neither `previousServerConfig` nor `serverConfig` → no write. Returns `{ action: 'conflict', conflict: { currentValue, expectedValue, proposedValue, unifiedDiff } }`.
-- **Missing file:** if `filePath` does not exist, the function creates it with just the target table. Returns `{ action: 'add' }`. (Onboarding-first-run case where the user has never run codex.)
-- The function does NOT touch any other `[mcp_servers.<name>]` table even when one happens to share fields with echo's.
+- **Conflict branch:** table exists, contents match neither `previousServerConfig` nor `serverConfig` → no write. Returns `{ action: 'conflict', conflict: { currentValue, expectedValue, proposedValue, unifiedDiff } }`. **Conflict payloads may carry secret-bearing fields (e.g. an `Authorization` header in a future serverConfig); 072 does NOT redact them — see AC8 (caller redaction contract).**
+- **Missing file:** if `filePath` does not exist, the function creates it with just the target table, mode `0600` (see AC7 mode rules). Returns `{ action: 'add' }`. (Onboarding-first-run case where the user has never run codex.)
+- The function does NOT touch any other `[mcp_servers.<name>]` table even when one happens to share fields with echo's. The byte-range editor guarantees this structurally.
 
 ### AC3 — `src/echo-home/adapters/cursor-config.ts` implements JSON mutator for `~/.cursor/mcp.json`
 
 - Exports `syncCursorMcpEntry(opts: { filePath: string; serverConfig: { url: string; headers?: Record<string, string>; [k: string]: unknown }; previousServerConfig?: Record<string, unknown> }): JsonMutatorResult`.
 - Targets exactly `mcpServers.echo` (nested object). All other entries in `mcpServers.*` and any sibling top-level keys are preserved.
 - Path is `~/.cursor/mcp.json` on macOS (verified against founder's machine — file exists with this exact shape: `{ "mcpServers": { "dart": {...}, "supabase": {...}, "echo": {...} } }`). Document at the top of the file: "Cursor does not yet publish a stable contract for the per-user MCP config path. If Cursor renames or relocates this file in a future release, the cursor-config adapter must be updated." See R2.
-- **Add / Update / No-op / Conflict branches** mirror AC2's TOML branches: same semantics, same return shape.
+- **Add / Update / No-op / Conflict branches** mirror AC2's TOML branches: same semantics, same return shape. Conflict payloads may carry secret-bearing fields (`headers.Authorization`, bearer tokens, etc.); 072 does NOT redact — see AC8.
 - **Formatting preservation:** parse with `JSON.parse`, mutate the target subtree, write back with `JSON.stringify(obj, null, 2) + '\n'`. Existing whitespace exotica (tabs, trailing commas — which JSON.parse rejects anyway) is not preserved; this is a known tradeoff because no widely-used JSON-with-comments parser is in the project's dependency surface. Add a one-line note in the file's header comment block of `cursor-config.ts` documenting the tradeoff.
-- **Missing file:** create with `{ "mcpServers": { "echo": <serverConfig> } }` and write atomically. Returns `{ action: 'add' }`.
+- **All writes** use AC7's unique-tmp atomic-write pattern with mode preservation. Existing `~/.cursor/mcp.json` files often start at `0600` because Cursor writes auth headers; downgrading to `0644` on update would be a security regression.
+- **Missing file:** create with `{ "mcpServers": { "echo": <serverConfig> } }`, mode `0600`. Returns `{ action: 'add' }`.
 
 ### AC4 — `src/echo-home/adapters/skill-sync.ts` populates `~/.echo/skills/` from the repo, then fans out to Claude Code's per-user commands directory
 
@@ -162,10 +170,10 @@ Both functions share the same return shape and same overwrite posture; the only 
     };
     // What ECHO section content to merge into the instructions file (per-agent rendered upstream)
     echoSection?: string;
-    previousEchoSection?: string;  // last-known ECHO write, for conflict detection
+    previousEchoSection?: string;  // last-known ECHO write, for conflict detection (caller-owned persistence — see "previous* persistence" note below)
     // What MCP server config to wire (URL is the daemon endpoint)
     mcpServerConfig?: { url: string; [k: string]: unknown };
-    previousMcpServerConfig?: Record<string, unknown>;
+    previousMcpServerConfig?: Record<string, unknown>;  // caller-owned persistence (see below)
   }
   interface SyncAllOpts {
     echoMcpUrl?: string;
@@ -177,30 +185,96 @@ Both functions share the same return shape and same overwrite posture; the only 
   }
   ```
 - **Repo-root resolution.** `syncAll` resolves `repoRoot` by walking upward from `import.meta.url` until a directory containing `package.json` AND a `skills/` directory is found (same convention as 071's role-loader). This is how the engine locates both the in-repo `skills/` source (for AC4.1) and the in-repo `assets/echo-roles/` source (for AC5). 072 does NOT depend on any helper from 070 for this; the resolution is local to `adapter-sync.ts`.
+- **`previous*` persistence is caller-owned.** The conflict-detection model needs the last ECHO-rendered `echoSection` / `serverConfig` to distinguish an ECHO version-bump from a user hand-edit (per parent design merge-strategy table). 072 does NOT persist these values. Persistence of last-known wiring belongs to the caller (073's wizard + 074's CLI), which will use `~/.echo/adapters/` (the directory 070 reserves for this purpose; 073 writes; 074 reads on subsequent re-sync). 072 ships pure mechanics: the caller passes `previous*` in if it has them; if absent, the conflict branch is unreachable and the adapter falls through to the append/add branch on first install or the noop branch on identical bytes. This is the explicit deferral codex r1 asked for — `~/.echo/adapters/` is NOT 072's responsibility, and the call-graph is unambiguous: 073 reads → calls 072 → writes back → 073 caches.
 - **Execution order inside `syncAll`** (deterministic, single-process):
-  1. `populateEchoSkills({ sourceDir: <repoRoot>/skills, targetDir: ECHO_HOME_PATHS.skills })` — runs ONCE before any agent dispatch. This is the load-bearing fix for the "nothing populates `~/.echo/skills/`" gap: it must happen before `syncClaudeSkills` so the second-hop copy has bytes to read. Failure surfaces as a `SyncResult` field (`skillsPopulated: SkillSyncResult | { ok: false; error: string }`), NOT a thrown exception — caller decides how to react.
+  1. `populateEchoSkills({ sourceDir: <repoRoot>/skills, targetDir: ECHO_HOME_PATHS.skills })` — runs ONCE before any agent dispatch. This is the load-bearing fix for the "nothing populates `~/.echo/skills/`" gap: it must happen before `syncClaudeSkills` so the second-hop copy has bytes to read. The function does NOT throw; failure is captured into the `skillsPopulated` field. **If `skillsPopulated.ok === false`**, the engine SKIPS the claude-code second-hop copy (`syncClaudeSkills`) but still runs the markers merge for the claude-code instructions file (CLAUDE.md is safe to update even when skill copy fails). All other agent kinds dispatch normally. `overallOk` becomes `false`.
   2. For each profile, dispatch on `kind`:
      - `codex` → `markers.mergeWithMarkers` for `instructionsFile`, `codex-config.syncCodexMcpBlock` for `configFile`.
-     - `claude-code` → `markers.mergeWithMarkers` for `instructionsFile`, `skill-sync.syncClaudeSkills` for `commandsDir` (sourceDir = `ECHO_HOME_PATHS.skills`).
+     - `claude-code` → `markers.mergeWithMarkers` for `instructionsFile`, `skill-sync.syncClaudeSkills` for `commandsDir` (sourceDir = `ECHO_HOME_PATHS.skills`) — **skipped if `skillsPopulated.ok === false`**.
      - `cursor` → `cursor-config.syncCursorMcpEntry` for `configFile`.
   3. After per-agent dispatch, call `role-sync.syncDefaultRoles` ONCE (roles are global to `~/.echo/`, not per-agent). Pass `sourceDir = opts.rolesSourceDir`, `targetDir = ECHO_HOME_PATHS.roles`, `defaults = opts.defaultRoles ?? DEFAULT_ROLE_FILENAMES` (imported from 071).
 - Aggregate into `SyncResult`:
   ```ts
+  type SkillsPopulatedResult =
+    | (SkillSyncResult & { ok: true })
+    | { ok: false; sourceDir: string; targetDir: string; error: string };
+
   interface SyncResult {
-    skillsPopulated: SkillSyncResult;  // first-hop populate ran before any agent dispatch (AC4.1)
+    skillsPopulated: SkillsPopulatedResult;  // first-hop populate; failure does NOT throw and DOES flip overallOk
     agents: Array<
-      | { agent: AgentKind; ok: true; files_written: string[]; actions: Array<{ file: string; action: string }> }
-      | { agent: AgentKind; ok: false; conflicts: SyncConflict[]; files_written: string[] }
+      | { agent: AgentKind; ok: true; files_written: string[]; actions: Array<{ file: string; action: string }>; skipped?: string[] }
+      | { agent: AgentKind; ok: false; conflicts: SyncConflict[]; files_written: string[]; skipped?: string[] }
     >;
     roles: RoleSyncResult;
-    overallOk: boolean;  // true iff every agent.ok === true AND no role result is 'user-modified' (unless opts.allowUserModifiedRoles)
+    overallOk: boolean;  // true iff skillsPopulated.ok === true AND every agent.ok === true AND no role result is 'user-modified' (unless opts.allowUserModifiedRoles)
   }
   ```
+  - When the claude-code fan-out is skipped due to populate failure, the claude-code agent entry sets `skipped: ['syncClaudeSkills']` and remains `ok: true` for the parts that did run (markers merge). `overallOk` is still `false` because `skillsPopulated.ok === false` already flipped it.
 - **Partial-failure is normal**, not a failure of `syncAll`. If codex returns a conflict on `~/.codex/config.toml` but cursor and claude-code both succeed, the result reports two `ok: true` agents and one `ok: false` agent. The caller (wizard / CLI) decides whether to proceed, retry, or abort.
-- **No transactional rollback.** Files that were written successfully stay written even if a later agent in the loop fails. This is acceptable because each file write is itself atomic (tmp + rename) and conflict-detecting; a half-applied run is recoverable by re-running after the conflict is resolved.
-- `syncAll` is the ONLY public entrypoint; per-adapter functions are also exported for direct test use but the wizard / CLI must go through `syncAll` so cross-agent ordering + populate-skills-first + roles-once invariants are preserved.
+- **No transactional rollback.** Files that were written successfully stay written even if a later agent in the loop fails. This is acceptable because each file write is itself atomic (AC7 unique-tmp + rename) and conflict-detecting; a half-applied run is recoverable by re-running after the conflict is resolved.
+- `syncAll` is the ONLY public entrypoint; per-adapter functions are also exported for direct test use but the wizard / CLI must go through `syncAll` so cross-agent ordering + populate-skills-first + roles-once + populate-failure-blocks-fanout invariants are preserved.
 
-### AC7 — Tests pin the contract
+### AC7 — Atomic-write contract: unique temp path + file mode preservation
+
+Every adapter that writes (markers.ts, codex-config.ts, cursor-config.ts, skill-sync.ts, role-sync.ts) MUST use the same atomic-write helper exported from `src/echo-home/adapters/atomic-write.ts` (new file shipped under AC7 — sixth file in `src/echo-home/adapters/`). The helper is a single ~40-line module; centralizing it prevents per-adapter drift.
+
+**AC7.1 — Public surface.**
+
+```ts
+export interface AtomicWriteOpts {
+  filePath: string;        // canonical target
+  content: string | Buffer;
+  // mode rules (see AC7.3):
+  //  - if filePath already exists: ALWAYS preserve existing mode via fs.fstatSync(fd).mode after rename — engineered via copy-mode-then-rename
+  //  - if filePath is new and the file is in this allowlist of secret-bearing targets, write at 0600:
+  //    [~/.codex/config.toml, ~/.cursor/mcp.json] (extensible via opts.secretSensitive)
+  //  - otherwise new files use the umask default
+  secretSensitive?: boolean;  // override the allowlist; true forces 0600 even for new files
+}
+export function atomicWrite(opts: AtomicWriteOpts): void;
+```
+
+**AC7.2 — Unique temp path.** The temp filename uses the shape `<filePath>.<process.pid>.<crypto.randomUUID().slice(0, 8)>.tmp`. This prevents the collision codex-ops r1 surfaced: two overlapping `syncAll` invocations on the same machine (e.g. a wizard retry while `echo init` is still running) writing to the same `<filePath>.tmp` and one process renaming the other's bytes onto the final path. The PID + random suffix makes the temp path per-invocation unique. After successful rename, the temp file does not exist; on caught exception the helper attempts a best-effort `unlinkSync` of the temp path.
+
+**AC7.3 — Mode preservation rules.**
+
+1. **Existing-file path.** Before opening the temp file, read the existing file's mode via `fs.statSync(filePath).mode`. Open the temp file with that mode (`fs.openSync(tmp, 'w', mode)`). The subsequent `rename` swaps inodes but preserves the temp file's mode bits. Result: if the existing file was `0600`, the new file is `0600`. **No silent downgrade.**
+
+2. **Missing-file path, secret-bearing target.** If `filePath` does not exist AND (`opts.secretSensitive === true` OR `filePath` is `~/.codex/config.toml` or `~/.cursor/mcp.json` per a small allowlist in `atomic-write.ts`), create with mode `0600`. Both files can contain `Authorization` headers, bearer tokens, or auth env-strings.
+
+3. **Missing-file path, non-secret target.** AGENTS.md, CLAUDE.md, skills, role TOMLs — use the umask default (typically `0644`). These files are intended to be world-readable instructions; forcing `0600` would break editor file-watchers and feels needlessly opaque.
+
+**AC7.4 — Refactor instruction.** Each adapter ships with its AC1–AC5 contract phrasing referencing "atomic write" — those calls go through `atomicWrite()`, NOT through a per-adapter inline `writeFile + rename`. The header comments of each adapter file note this delegation.
+
+### AC8 — Conflict-payload secret-redaction contract is caller-owned
+
+Per codex-ops r1: `cursor-config.ts` and `codex-config.ts` conflict payloads can carry secret-bearing fields (`headers.Authorization`, bearer tokens, future env-pinned secrets). 072 deliberately does **NOT** redact these values — redaction belongs at the render boundary, not in the engine, because:
+
+- The engine has no general way to identify what's secret in arbitrary user-extensible `serverConfig` shapes (today: `url`, `headers`; tomorrow: who knows).
+- Different callers want different rendering: a CLI may want partial display ("[REDACTED bearer token]"), a log line may want fully omitted, an `echo doctor` output may want a hash for fingerprinting.
+- Redacting at the engine layer would force callers to opt-OUT of safety, which is the wrong default.
+
+**AC8.1 — Contract.** The `SyncConflict` interface includes a deliberate comment:
+
+```ts
+interface SyncConflict {
+  filePath: string;
+  // currentValue/expectedValue/proposedValue MAY contain user-bearing secrets
+  // (e.g. Authorization headers in mcpServers.echo). Callers MUST redact before
+  // rendering to terminal output, log lines, or any external surface. See
+  // 074's render-conflicts module for the canonical redaction pattern.
+  currentValue?: unknown;
+  expectedValue?: unknown;
+  proposedValue?: unknown;
+  unifiedDiff?: string;
+}
+```
+
+**AC8.2 — Drift catch.** No code in 072 ever writes a conflict-payload value to a logger, `console.log`, or any output stream. The only place such values appear is in the returned `SyncResult`. AC9 includes one negative test that grep-scans the built adapter bundle for `console.` calls inside the adapter source — if any appear, the test fails. (Defensive: prevents a future patch from "helpfully" logging conflict details.)
+
+**AC8.3 — Followup pointer.** The on-completion strategist note files a follow-up in `backlog/_followups.md` to require 074 to ship `redactConflictPayload(conflict): SyncConflict` before any user-facing render. 072 documents the requirement; 074 implements it.
+
+### AC9 — Tests pin the contract
 
 Each adapter has its own test file; the orchestrator has one integration test. All tests use temp directories (`fs.mkdtemp(os.tmpdir() + '/echo-072-')`) — no test reads or writes the founder's real `~/.codex/`, `~/.claude/`, or `~/.cursor/`.
 
@@ -212,15 +286,16 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   5. File with user content above and below the markers → after a replace, the above/below content is byte-identical (preservation invariant).
   6. Marker present but malformed (e.g., `BEGIN` without matching `END`) → treated as no-markers-present (append branch). Pins R3.
 
-- `tests/echo-home/adapters/codex-config.test.ts` — six cases:
+- `tests/echo-home/adapters/codex-config.test.ts` — seven cases:
   1. File has no `[mcp_servers.echo]` → `action: 'add'`; file now contains the table; all other tables byte-identical.
-  2. Existing `[mcp_servers.echo]` matches `previousServerConfig`, new `serverConfig` differs → `action: 'update'`; only that table changes; other tables and comments preserved (the test fixture must include a `[projects.X]` table and at least one comment to validate the preservation claim).
+  2. Existing `[mcp_servers.echo]` matches `previousServerConfig`, new `serverConfig` differs → `action: 'update'`; only that table changes; other tables AND inline comments preserved byte-for-byte (the test fixture must include a `[projects.X]` table and at least one inline `# comment` to validate the preservation claim against the byte-range editor — this is the regression pin for codex r1 H1).
   3. Existing matches new `serverConfig` → `action: 'noop'`, no write.
   4. Existing differs from both → `action: 'conflict'`, no write.
-  5. File does not exist → file is created with just `[mcp_servers.echo]`.
+  5. File does not exist → file is created with just `[mcp_servers.echo]`, mode `0600` (codex config is on the secret-sensitive allowlist).
   6. File contains a `[mcp_servers.other]` block; after sync, the `other` block is byte-identical (zero collateral damage on sibling MCP servers).
+  7. **Mode preservation on existing file** — `chmod 0600 <fixture>` before sync; perform an update; assert post-sync mode is still `0600` (pin AC7 / codex-ops r1 H3).
 
-- `tests/echo-home/adapters/cursor-config.test.ts` — five cases mirroring AC2 (add / update / noop / conflict / missing-file). Plus one preservation case: file contains `mcpServers.dart` (stdio shape) and `mcpServers.supabase` (URL shape); after `mcpServers.echo` is added, both sibling entries are unchanged.
+- `tests/echo-home/adapters/cursor-config.test.ts` — seven cases mirroring AC2 (add / update / noop / conflict / missing-file). Plus one preservation case: file contains `mcpServers.dart` (stdio shape) and `mcpServers.supabase` (URL shape); after `mcpServers.echo` is added, both sibling entries are unchanged. Plus one mode-preservation case: `chmod 0600` fixture before sync; assert mode preserved post-update (pin AC7).
 
 - `tests/echo-home/adapters/skill-sync.test.ts` — eight cases (four per function, since both `populateEchoSkills` (AC4.1) and `syncClaudeSkills` (AC4.2) share the overwrite-posture contract and both must be exercised):
   Per-function cases (parameterized over the two exports):
@@ -235,12 +310,22 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   3. Target dir has `reviewer.toml` hand-edited (differs from source) → `reviewer.toml` returns `action: 'user-modified'`, file is NOT overwritten; `strategist.toml` and `builder.toml` return `'noop'` or `'copied'` as appropriate.
   4. Source dir missing `builder.toml` → `builder.toml` returns `action: 'source-missing'`; the other two are unaffected.
 
-- `tests/echo-home/adapter-sync.test.ts` — five cases:
+- `tests/echo-home/adapters/atomic-write.test.ts` — six cases (pins AC7):
+  1. **Unique temp suffix** — call `atomicWrite` 100 times in a tight loop against the same `filePath` (synchronously), capture every temp filename observed via `fs.readdirSync(dirname)` during a stubbed-out rename. Assert every temp name is unique AND matches the regex `^<basename>\.\d+\.[a-f0-9]{8}\.tmp$`.
+  2. **Mode preservation on existing file** — `chmod 0600 <file>` before sync; call `atomicWrite`; assert post-rename mode is still `0600` (use `fs.statSync(file).mode & 0o777`).
+  3. **0600 for new secret-sensitive file** — `filePath` is a fresh tmpdir path matching the `.codex/config.toml` allowlist suffix; call `atomicWrite` with no `secretSensitive` opt; assert post-create mode is `0600`.
+  4. **0600 for new explicit-secret file** — `filePath` is a non-allowlist path; call with `secretSensitive: true`; assert mode `0600`.
+  5. **Umask default for new non-sensitive file** — `filePath` is e.g. a fresh CLAUDE.md path; call without `secretSensitive`; assert mode equals `0o666 & ~umask` (typically `0o644`).
+  6. **Concurrent-overlap is safe** — spawn two `atomicWrite` calls concurrently (using `Promise.all` over two synchronous-style wrappers in different async ticks) targeting the same `filePath` with different content. Assert: both calls complete without exception; the final file content equals exactly one of the two payloads (no garbled mix); both temp paths were unlinked by end of test. (Pins the codex-ops r1 M3 concurrent-overlap finding.)
+
+- `tests/echo-home/adapter-sync.test.ts` — seven cases:
   1. Three agents (codex, claude-code, cursor) all succeed → `overallOk: true`, three `ok: true` entries, `files_written` lists every file actually touched.
   2. Codex returns conflict on `config.toml`; claude-code and cursor succeed → `overallOk: false`, codex entry has `ok: false` with a populated `conflicts` array; the other two are `ok: true`; the files that were successfully written by claude-code and cursor are NOT rolled back (pin "no transactional rollback").
   3. All three agents succeed but `reviewer.toml` is user-modified in `~/.echo/roles/` → agents are all `ok: true`, but `result.roles.results` includes the `'user-modified'` entry; `overallOk` is true iff caller opted-in via `opts.allowUserModifiedRoles` (default false — `overallOk: false` when the option is off).
   4. **Populate-skills-runs-first** (pins AC6 ordering invariant). `repoSkillsDir` contains 5 .md skill files; `ECHO_HOME_PATHS.skills` starts empty; the `claude-code` profile's `commandsDir` also starts empty. After `syncAll`, `~/.echo/skills/` contains all 5 files AND `~/.claude/commands/` contains all 5 files. Pin via execution-order assertion: a mock or instrumented version of `populateEchoSkills` records its invocation timestamp, and `syncClaudeSkills` records its invocation timestamp; `populateEchoSkills` must be strictly earlier.
-  5. **Default-role list comes from 071's constant.** With `opts.defaultRoles` omitted, `syncAll` calls `syncDefaultRoles` with a `defaults` array byte-equal to `DEFAULT_ROLE_FILENAMES` imported from `src/echo-home/roles.ts`. (Pins F4 fix — the default-roles list is single-sourced from 071.)
+  5. **Default-role list comes from 071's constant.** With `opts.defaultRoles` omitted, `syncAll` calls `syncDefaultRoles` with a `defaults` array byte-equal to `DEFAULT_ROLE_FILENAMES` imported from `src/echo-home/roles.ts`.
+  6. **Populate-skills failure blocks claude-code fan-out + flips overallOk** (pins AC6 failure path / codex-ops r1 H2). `opts.repoSkillsDir` is set to a path that does not exist. `populateEchoSkills` returns the `{ ok: false, error }` variant; `syncAll` does NOT throw; `result.skillsPopulated.ok === false`; the claude-code agent entry exists with `skipped: ['syncClaudeSkills']` (CLAUDE.md merge still ran); codex + cursor agents are `ok: true`; `result.overallOk === false`. The test additionally asserts that the claude-code `commandsDir` was NEVER touched (no partial-write of stale bytes from an earlier sync).
+  7. **Conflict payload is not logged** (pins AC8 redaction caller-contract / codex-ops r1 M4). Capture `process.stderr` + `process.stdout` during a `syncAll` call that produces a cursor-config conflict whose `serverConfig.headers.Authorization` is `'Bearer secret-token-xyz'`. Assert the captured streams contain NEITHER the literal token NOR the surrounding header string. The conflict object IS in the returned `SyncResult` (callers can render with redaction); 072 itself does not emit.
 
 Run convention: `npm test -- tests/echo-home/`.
 
@@ -259,11 +344,11 @@ Run convention: `npm test -- tests/echo-home/`.
 
 ## Risks
 
-- **R1 — TOML library choice may not preserve formatting + comments.** `smol-toml` is the lead candidate based on its docs claim of round-trip fidelity, but no one on the team has stress-tested it against a real ~30-table user config. The first builder action on AC2 is a verification: parse the founder's actual `~/.codex/config.toml` (copy to a temp file for testing), then stringify, then diff. If the diff is non-trivial in any way that loses user data, escalate before adding `smol-toml` to dependencies. Fallback library: `@iarna/toml` (lossier, but lossless on the small block ECHO actually mutates) combined with a string-range patch that inserts/replaces only the `[mcp_servers.echo]` block via line-offset surgery — leaving the rest of the file as raw bytes the library never touches. If the fallback is chosen, AC7's codex-config.test.ts case 2 (preserve sibling tables + comments) MUST still pass.
+- **R1 — TOML library choice may not preserve formatting + comments.** `smol-toml` is the lead candidate based on its docs claim of round-trip fidelity, but no one on the team has stress-tested it against a real ~30-table user config. The first builder action on AC2 is a verification: parse the founder's actual `~/.codex/config.toml` (copy to a temp file for testing), then stringify, then diff. If the diff is non-trivial in any way that loses user data, escalate before adding `smol-toml` to dependencies. Fallback library: `@iarna/toml` (lossier, but lossless on the small block ECHO actually mutates) combined with a string-range patch that inserts/replaces only the `[mcp_servers.echo]` block via line-offset surgery — leaving the rest of the file as raw bytes the library never touches. If the fallback is chosen, AC9's codex-config.test.ts case 2 (preserve sibling tables + comments) MUST still pass.
 
 - **R2 — Cursor's MCP config path stability.** `~/.cursor/mcp.json` is the path on the founder's machine today, but Cursor has not published a long-term contract for it. If Cursor renames or relocates this file in a future release, the cursor-config adapter breaks silently. Mitigation: AC3's missing-file branch creates the path if absent, which means an updated Cursor that uses a new path will leave the old file dormant rather than crashing — the wizard / CLI will report `ok: true` but the wiring won't be active. Detecting this requires probing (item 073's step 5); 072 cannot detect it from the sync side alone. Flagged here so future Cursor breakage has a known landing zone for the fix.
 
-- **R3 — Marker malformation edge cases.** If a user hand-edits an AGENTS.md to have `BEGIN` but no `END` (or vice versa, or nested), the markers.ts treats the file as having no markers (append branch). This is intentionally permissive — refusing to act would block onboarding for the rare malformed-markers case — but it does mean the user's broken markers persist alongside a new correct block. Documented in AC7 case 6; users self-resolve by removing the malformed markers.
+- **R3 — Marker malformation edge cases.** If a user hand-edits an AGENTS.md to have `BEGIN` but no `END` (or vice versa, or nested), the markers.ts treats the file as having no markers (append branch). This is intentionally permissive — refusing to act would block onboarding for the rare malformed-markers case — but it does mean the user's broken markers persist alongside a new correct block. Documented in AC9 case 6; users self-resolve by removing the malformed markers.
 
 - **R4 — In-tree diff library vs. external dependency.** `unifiedDiff` in conflict results is a line-by-line plain-text diff produced by an in-tree routine. The routine does not need to be a full Myers-diff — a simple "lines in current but not proposed / lines in proposed but not current" listing is sufficient for the wizard to render a preview. Adding a real diff library (`diff`, `jsdiff`) is a follow-up if the simple form proves unreadable in dogfooding. Builder must NOT add a diff library without escalation per drift rule 3.
 
@@ -276,11 +361,12 @@ Run convention: `npm test -- tests/echo-home/`.
 All test files are listed in `files_to_modify`. Coverage targets:
 
 - `markers.ts` — 6 cases pinning append / replace / noop / conflict / outside-preservation / malformed-markers.
-- `codex-config.ts` — 6 cases pinning add / update / noop / conflict / missing-file / sibling-table-preservation.
-- `cursor-config.ts` — 5 cases mirroring + 1 sibling-entry-preservation.
+- `codex-config.ts` — 7 cases pinning add / update (with comment preservation) / noop / conflict / missing-file-0600 / sibling-table-preservation / mode-preservation.
+- `cursor-config.ts` — 7 cases mirroring + sibling-entry-preservation + mode-preservation.
 - `skill-sync.ts` — 8 cases (4 per exported function: `populateEchoSkills` and `syncClaudeSkills`), pinning create-target-dir / idempotent-overwrite / stale-file-preservation / hand-edit-overwrite for both hops.
 - `role-sync.ts` — 4 cases pinning first-install-copy / noop / user-modified-refusal / source-missing.
-- `adapter-sync.ts` — 5 cases pinning all-ok / partial-failure / user-modified-role-and-overallOk-semantics / populate-skills-runs-first / default-role-list-from-071.
+- `atomic-write.ts` — 6 cases pinning unique-temp-suffix / mode-preservation-existing / 0600-for-new-secret-sensitive / 0600-for-explicit-secret / umask-default-for-non-secret / concurrent-overlap-safety.
+- `adapter-sync.ts` — 7 cases pinning all-ok / partial-failure / user-modified-role-and-overallOk-semantics / populate-skills-runs-first / default-role-list-from-071 / populate-failure-blocks-fanout / conflict-not-logged.
 
 Verify commands (root only — no Raycast package edits in this spec):
 
@@ -294,14 +380,17 @@ All four must pass before the builder moves 072 to `pending_review/`.
 ## Definition of Done
 
 - AC1: `markers.ts` exports `mergeWithMarkers` with the four-action contract; idempotent re-run produces `'noop'`; user content outside markers preserved byte-for-byte.
-- AC2: `codex-config.ts` exports `syncCodexMcpBlock` with the five-action contract (add/update/noop/conflict/missing-file); TOML library choice verified against founder's real config; sibling tables + comments preserved.
+- AC2: `codex-config.ts` exports `syncCodexMcpBlock` using the **byte-range editor primary path** (per codex r1 H1 verification: smol-toml does NOT preserve comments through parse/stringify, so parse-and-restringify is structurally not the path); five-action contract (add/update/noop/conflict/missing-file); sibling tables + comments preserved byte-for-byte.
 - AC3: `cursor-config.ts` exports `syncCursorMcpEntry` with the same five-action contract; sibling `mcpServers.*` entries preserved.
 - AC4: `skill-sync.ts` exports `populateEchoSkills` (in-repo `skills/` → `~/.echo/skills/`) and `syncClaudeSkills` (`~/.echo/skills/` → `~/.claude/commands/`); both create target dir if missing, copy all skills (overwrite posture), leave stale target files in place.
 - AC5: `role-sync.ts` exports `syncDefaultRoles`; first-install copies defaults; user-modified roles refused; source-missing sentinel returned; `skillsRoot` handoff for 073/074 is documented (= `ECHO_HOME_PATHS.skills`).
-- AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; per-agent dispatch wires the right adapters; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071.
-- AC7: All test files pass. Existing tests in `tests/` (root Vitest) continue to pass.
+- AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; populate-failure flips `overallOk` to false AND skips the claude-code `syncClaudeSkills` fan-out (CLAUDE.md merge still runs); per-agent dispatch wires the right adapters; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071; `previous*` persistence is explicitly caller-owned (073 + 074 will cache via `~/.echo/adapters/`; 072 does not touch that directory).
+- AC7: `atomic-write.ts` exports `atomicWrite` with unique-tmp filename (`<file>.<pid>.<8hex>.tmp`), mode preservation on existing-file path, `0600` for new secret-sensitive paths (codex config + cursor mcp.json allowlist), umask-default for non-sensitive paths. All AC1–AC5 adapters delegate to this helper (no inline `writeFile + rename` in any adapter).
+- AC8: `SyncConflict` interface documents that payloads may contain user-bearing secrets; the inline comment names `Authorization` headers explicitly; no 072 code logs conflict-payload values; a grep-based negative test pins this.
+- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×6, adapter-sync ×7 — 45 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
 - All four verify commands above clean.
-- TOML library decision documented in `src/echo-home/adapters/codex-config.ts` header comment, including the verification result against the founder's real config.
+- `task_state_ref` set to `2026-05-25-072-adapter-sync-engine` AND `backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md` exists pinning the spec at the artifact SHA.
+- TOML strategy decision (byte-range editor primary path; smol-toml used only for value-comparison on the target slice) documented in `src/echo-home/adapters/codex-config.ts` header comment, including the codex r1 verification result against the founder's real config.
 
 ## After Completion (Strategist Notes)
 
