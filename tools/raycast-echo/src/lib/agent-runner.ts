@@ -25,7 +25,15 @@ export interface AgentRunnerOptions {
   sessionLogPath?: string;
 }
 
-const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
+// 60s pre-first-byte budget. The unified-prompt Ask flow encourages MCP
+// retrieval + repo grep before the agent emits, and on cold start codex
+// can routinely take 30-50s of tool-use reasoning before the first stdout
+// byte. The previous 30s default fired false-positive stalled footers
+// against a healthy run (observed 2026-05-25 post-system-prompt patch
+// when codex correctly answered "065" but produced first byte at ~35s).
+// True auth-prompt stalls don't recover — maxRuntimeMs (5 min) still
+// catches those.
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RUNTIME_MS = 5 * 60_000;
 const STDERR_TAIL_LIMIT = 4096;
 export const SESSION_LOG_DIR = join(homedir(), ".config", "raycast", "extensions", "echo-context", "sessions");

@@ -240,11 +240,20 @@ export function AnswerView({
           buffer += event.text;
           scheduleFlush();
         } else if (event.type === "footer") {
-          if (event.markdown.includes("Agent appears stalled") && !sawStdout) {
-            sawStalled = true;
-            if (!cancelledRef.current) setAgentStatus("stalled");
+          if (event.markdown.includes("Agent appears stalled")) {
+            // Surface stall via Status label only, not as a footer in the
+            // answer body. The idle-timer pre-first-byte trips on healthy
+            // slow-tool-use runs too (the 2026-05-25 codex-065 case), and
+            // injecting an alarmist footer that gets followed by the real
+            // answer pollutes the handoff packet. The Status label still
+            // shows "stalled", recovering to "streaming" on first byte.
+            if (!sawStdout) {
+              sawStalled = true;
+              if (!cancelledRef.current) setAgentStatus("stalled");
+            }
+          } else {
+            appendFooter(event.markdown);
           }
-          appendFooter(event.markdown);
         } else if (event.type === "error") {
           if (!cancelledRef.current) setAgentStatus("errored");
           appendFooter(`**Agent error**\n\n${event.error.message}`);
