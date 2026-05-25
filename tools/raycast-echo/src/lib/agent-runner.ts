@@ -9,7 +9,7 @@ import type { AgentInvocation } from "./agent-profiles";
 export type AgentRunnerEvent =
   | { type: "stdout"; text: string }
   | { type: "footer"; markdown: string }
-  | { type: "exit"; code: number | null; signal: NodeJS.Signals | null }
+  | { type: "exit"; code: number | null; signal: NodeJS.Signals | null; stdoutBytesSeen: number }
   | { type: "error"; error: Error };
 
 export interface AgentRun {
@@ -144,6 +144,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   let cancelled = false;
   let exceededMaxRuntime = false;
   let stdinError: Error | null = null;
+  let stdoutBytesSeen = 0;
 
   const child = spawn(invocation.binary, invocation.args, {
     stdio: ["pipe", "pipe", "pipe"],
@@ -224,6 +225,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
         clearTimeout(idleTimer);
         idleTimer = null;
       }
+      stdoutBytesSeen += text.length;
       queue.push({ type: "stdout", text });
     }
   })().catch((err: unknown) => {
@@ -251,9 +253,19 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
           type: "footer",
           markdown: `**Agent exited with code ${code ?? "unknown"}**${tail.length > 0 ? `\n\n${tail}` : ""}`,
         });
+      } else if (code === 0 && stdoutBytesSeen === 0 && !cancelled && !exceededMaxRuntime) {
+        // The 2026-05-25 02:18:59 codex case: clean exit-0 with zero stdout
+        // bytes. The agent ran and quit without emitting an answer. Without
+        // this footer the UI is left showing "Waiting for agent output..."
+        // forever, hiding the real failure mode from the founder.
+        const tail = stderrTail.toString();
+        queue.push({
+          type: "footer",
+          markdown: `**Agent exited cleanly without producing any answer**\n\nThe agent ran and exited with code 0 but emitted no output. The question may have been too thin for the agent to interpret, the agent silently dropped the request, or upstream tools errored before any bytes reached stdout.${tail.length > 0 ? `\n\n${tail}` : ""}`,
+        });
       }
 
-      queue.push({ type: "exit", code, signal });
+      queue.push({ type: "exit", code, signal, stdoutBytesSeen });
       queue.close();
     })();
   });

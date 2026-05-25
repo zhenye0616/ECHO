@@ -154,6 +154,9 @@ export function AnswerView({
   const [auditUnavailable, setAuditUnavailable] = useState(false);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [agentStatus, setAgentStatus] = useState<
+    "starting" | "streaming" | "stalled" | "done" | "errored" | "cancelled" | "empty" | "replay"
+  >("starting");
   const runnerRef = useRef<AgentRun | null>(null);
   const cancelledRef = useRef(false);
 
@@ -213,6 +216,7 @@ export function AnswerView({
       const body = matched.answer.trim().length > 0 ? matched.answer : "_No answer captured._";
       setAnswer(`${banner}\n\n${body}`);
       setAuditCalls(matched.auditCalls);
+      setAgentStatus("replay");
       setIsLoading(false);
     };
 
@@ -224,14 +228,25 @@ export function AnswerView({
       runnerRef.current = run;
       auditInterval = setInterval(() => void pollAudit(), 600);
 
+      let sawStdout = false;
+      let sawStalled = false;
       for await (const event of run.events) {
         if (disposed) return;
         if (event.type === "stdout") {
+          if (!sawStdout) {
+            sawStdout = true;
+            if (!cancelledRef.current) setAgentStatus("streaming");
+          }
           buffer += event.text;
           scheduleFlush();
         } else if (event.type === "footer") {
+          if (event.markdown.includes("Agent appears stalled") && !sawStdout) {
+            sawStalled = true;
+            if (!cancelledRef.current) setAgentStatus("stalled");
+          }
           appendFooter(event.markdown);
         } else if (event.type === "error") {
+          if (!cancelledRef.current) setAgentStatus("errored");
           appendFooter(`**Agent error**\n\n${event.error.message}`);
         } else if (event.type === "exit") {
           clearAuditInterval();
@@ -239,11 +254,26 @@ export function AnswerView({
           await pollAudit(Date.now() + 2_000);
           const finalAnswer = buffer.length > 0 ? buffer : answer;
           setAnswer(finalAnswer);
+          const terminalStatus = cancelledRef.current
+            ? "cancelled"
+            : event.code !== 0
+            ? "errored"
+            : event.stdoutBytesSeen === 0
+            ? "empty"
+            : sawStalled
+            ? "stalled"
+            : "done";
+          setAgentStatus(terminalStatus);
           if (sessionId !== null) {
             await drainInflightWrites(sessionId);
             await recordSessionUpdate(sessionId, { answer: finalAnswer, auditCalls: latestAudit });
             await recordSessionEnd(sessionId, {
-              status: cancelledRef.current ? "cancelled" : event.code === 0 ? "done" : "errored",
+              status:
+                terminalStatus === "cancelled"
+                  ? "cancelled"
+                  : terminalStatus === "errored"
+                  ? "errored"
+                  : "done",
               sourceBreakdown: {},
               evidenceClusters: [],
             });
@@ -379,7 +409,7 @@ export function AnswerView({
         <Detail.Metadata>
           <Detail.Metadata.Label title="Agent" text={agentKind} />
           <Detail.Metadata.Label title="Session" text={session?.id ?? "starting"} />
-          <Detail.Metadata.Label title="Status" text={isLoading ? "running" : "terminal"} />
+          <Detail.Metadata.Label title="Status" text={agentStatus} />
           <AuditTimeline calls={auditUnavailable ? null : auditCalls} mode={auditUnavailable ? "errored" : isLoading ? "live" : "completed"} />
         </Detail.Metadata>
       }

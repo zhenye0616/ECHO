@@ -95,6 +95,47 @@ describe("agent runner", () => {
     expect(stalled).toBeDefined();
   });
 
+  it("emits an exited-cleanly-without-output footer when an agent quits with code 0 and zero stdout (2026-05-25 codex-065 silent-failure case)", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.exit(0);"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000 },
+    );
+
+    const events = await collect(run.events);
+    const empty = events.find(
+      (event) =>
+        event.type === "footer" && event.markdown.includes("exited cleanly without producing any answer"),
+    );
+    expect(empty).toBeDefined();
+    const exit = events.find((event): event is Extract<AgentRunnerEvent, { type: "exit" }> => event.type === "exit");
+    expect(exit?.stdoutBytesSeen).toBe(0);
+    expect(exit?.code).toBe(0);
+  });
+
+  it("exit event carries stdoutBytesSeen reflecting the number of stdout bytes the runner observed", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.stdout.write('abcde\\n');"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000 },
+    );
+
+    const events = await collect(run.events);
+    const exit = events.find((event): event is Extract<AgentRunnerEvent, { type: "exit" }> => event.type === "exit");
+    expect(exit?.stdoutBytesSeen).toBeGreaterThanOrEqual(5);
+    const emptyFooter = events.find(
+      (event) =>
+        event.type === "footer" && event.markdown.includes("exited cleanly without producing any answer"),
+    );
+    expect(emptyFooter).toBeUndefined();
+  });
+
   it("resolvePathEnv falls back to GUI-safe defaults when PATH is undefined", () => {
     const resolved = resolvePathEnv({});
     expect(resolved).toContain("/usr/local/bin");
