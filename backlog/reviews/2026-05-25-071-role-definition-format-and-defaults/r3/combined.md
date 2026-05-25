@@ -7,7 +7,7 @@ cursor_response: null
 codex-ops_response: codex-ops.md
 claude_response: null
 patch_commit_sha: null
-next_round: null
+next_round: 4
 combined_verdict: proceed_after_patches
 escalated_to_founder: false
 ---
@@ -24,9 +24,11 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | LOW | codex | backlog/ready/2026-05-25-071-role-definition-format-and-defaults.md:364 | _strategist fills_ | _strategist fills_ |
+| 1 | LOW | codex | backlog/ready/2026-05-25-071-role-definition-format-and-defaults.md:364 | PATCHED INLINE (adde8ca) | R3 risk lineage parenthetical removed. Risk now states the patched mitigation directly. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`needs R4 — focus_hints below.` codex-ops already at `proceed`, no findings. codex's single LOW finding was PATCHED INLINE in commit adde8ca. R4 verifies the cleanup landed.
+
+**R4 focus_hints:** Confirm R3 risk section (line ~364) no longer contains the "previously elided from AC2.2" lineage parenthetical. No other changes since r3. `proceed` if cleanup landed.
 
