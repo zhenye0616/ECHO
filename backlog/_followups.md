@@ -1049,3 +1049,9 @@ The structural framing — **roles MUST be conflict-free by construction across 
 
 <!-- from merge of 2026-05-25-072-adapter-sync-engine, 2026-05-25 -->
 - Founder product call on R6: keep fully ECHO-owned Claude command files (current behavior — `~/.claude/commands/<name>.md` overwritten on resync), or spec a future marker-merge migration so user-edited command files survive. (from 072 merge sidecar follow-ups)
+
+<!-- from merge of 2026-05-25-073-onboarding-wizard, 2026-05-25 -->
+- R8 dogfooding trigger: file a 075-class "claude-code MCP adapter" spec the first time a user hits `reason: 'mcp-not-configured'` in probe. (from 073 merge sidecar follow-ups)
+- Probe-stability hardening (V1.5+): arm a SIGKILL escalation in `probe.ts:realSpawn` after a grace period beyond `timeoutMs` so stubborn children that ignore SIGTERM don't hang the wizard promise. (from 073 merge sidecar follow-ups)
+- R5 trigger: if dogfooding surfaces concurrent-wizard-induced cache divergence, file the wizard-level mutex / `withLock(callback)` extension spec. (from 073 merge sidecar follow-ups)
+- Cosmetic: `probe.ts:84-86` `authRequired` substring `auth` may false-positive on "author"/"authority" in stderr — matches the literal AC6.3 spec but flag if dogfooding shows mis-routing to `auth-required`. (from 073 merge sidecar follow-ups)
