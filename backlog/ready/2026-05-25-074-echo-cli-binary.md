@@ -499,8 +499,15 @@ export async function dispatchWorkflow(opts: {
   projectRoot: string;                                  // resolved per J8
   signal?: AbortSignal;                                 // SIGINT forwarding from the CLI; AC5.4 step 9 installs the handlers that abort this controller
   receivedSignal?: { current: 'SIGINT' | 'SIGTERM' | null };  // r2 codex-ops F2 — mutable ref the parent SIGINT/SIGTERM handler writes the signal name into before calling controller.abort(); the dispatcher reads it to populate DispatchOutcome.signal
+  signalGate?: {                                        // r4 codex F3 MED — TEST-ONLY scheduler hook so AC7.4 cases 12a/12b can deterministically inject SIGTERM in the between-step + post-final-step gaps
+    beforeNextSpawn?: () => Promise<void>;              // awaited at the top of each loop iteration (after step 0's signal.aborted check, before step 1's pickedAgent check); production defaults to Promise.resolve()
+  };
 }): Promise<DispatchOutcome[]>;
 ```
+
+**`signalGate` test seam (r4 codex F3 MED).** `signalGate` is purely a test scaffolding hook — production never sets it; the default-no-op (`await undefined ?? Promise.resolve()`) is a single microtask that adds no observable behavior. Its job is to give the AC7.4 cases 12a/12b a DETERMINISTIC point to inject `process.emit('SIGTERM')` AFTER step N's outcome is recorded but BEFORE step N+1's spawn iteration begins — closing the timing-nondeterminism in the r3-added cases. A symmetric `runRun`-side gate (`beforeExitDerivation`) lives in AC5.4's signature for case 12b's post-final-step injection — see AC5.4 below.
+
+The seam is intentionally narrow: only the between-iteration boundary (one hook). Mid-step signal delivery uses the existing `signal: AbortSignal` (no gate needed); post-final-step uses the `runRun`-level gate (one hook). This bounded surface is what keeps the seam from becoming a generic scheduler/test framework.
 
 For each step (sequential, no parallelism per J3):
 
@@ -533,19 +540,24 @@ export async function runRun(opts: {
   workflowsDir?: string;                                 // default ECHO_HOME_PATHS.workflows
   rolesDir?: string;                                     // default ECHO_HOME_PATHS.roles
   stateOnboardingPath?: string;                          // default ECHO_HOME_PATHS.stateOnboarding
+  stateProjectsPath?: string;                            // r4 codex F2 MED fix — default ECHO_HOME_PATHS.stateProjects; J8 needs this to fall back to `default_project` when --project absent + cwd-git-root absent
   spawn?: typeof import('node:child_process').spawn;
   now?: () => Date;
+  signalGate?: {                                        // r4 codex F3 MED — TEST-ONLY scheduler hook; forwards `beforeNextSpawn` to dispatchWorkflow; adds `beforeExitDerivation` for the post-final-step case 12b injection point
+    beforeNextSpawn?: () => Promise<void>;              // forwarded to dispatchWorkflow opts.signalGate
+    beforeExitDerivation?: () => Promise<void>;         // awaited AFTER dispatchWorkflow resolves + outcomes rendered, BEFORE step 10's computeExitCode runs; production no-op
+  };
 }): Promise<number>;
 ```
 
-1. Resolve project root per J8.
+1. Resolve project root per J8 — explicit flag > cwd's nearest git root > onboarding-state `default_project` > error. Implementation (r4 codex F2 MED fix — earlier spec said "fall back to `default_project` from `projects.json`" but `runRun` didn't read `projects.json`): (a) if `opts.projectFlag` is non-empty → use it verbatim. (b) else walk upward from `process.cwd()` until `.git/` is found → use that directory. (c) else read `opts.stateProjectsPath` (default `ECHO_HOME_PATHS.stateProjects`) via 070's `validateProjectsState`; if `projects.default_project` is a non-empty string → use it. (d) else error with the J8 copy ("no project context — pass `--project <path>` or run from a git repository or run `echoctl init` to pick a default") and exit 1. The resolved `projectRoot` flows into `dispatchWorkflow` per AC5.3's `cwd: projectRoot` invariant.
 2. Locate workflow file: `path.join(workflowsDir, `${workflowName}.toml`)`. Missing → error: "no workflow `<name>` — installed workflows: <listWorkflows()>" (exit 1).
 3. If `workflowsDir` itself is empty or missing → error: "no workflows installed. The 075 backlog item ships the first one; until then, `echoctl run` has nothing to dispatch." Exit 1.
 4. `loadWorkflow()` (AC5.1). Validation error → exit 1 with the error message.
 5. `loadRolesFromDir(rolesDir, { skillsRoot: ECHO_HOME_PATHS.skills, assertDefaults: true })` (r2 codex F1 HIGH fix — 071's loader walks upward from `sourcePath` searching for `package.json + skills/`; from `~/.echo/roles/` no such ancestor exists, so the load fails before any matching. Passing `skillsRoot` explicitly bypasses the walk and resolves skill files under the canonical `~/.echo/skills/` directory populated by 072's `populateEchoSkills`). Failure → exit 1 with the error message.
 6. Read `onboarding.json` via 070's validator. Validation error → exit 1.
 7. `matchRolesToAgents()` (AC5.2). If any `AgentMatch.reason !== 'matched'`, print the unmatched roles' reasons (using the explicit `no-onboarded-agent` vs `capability-mismatch` taxonomy from AC5.2 — `no-onboarded-agent` ⇒ "no wired agents at all" remediation; `capability-mismatch` ⇒ "agents wired but under-permissioned" remediation) and exit 1 WITHOUT spawning anything (no partial dispatches when the plan is broken).
-8. **Install SIGINT/SIGTERM handlers (r2 codex-ops F2 HIGH).** BEFORE calling `dispatchWorkflow`, create `const controller = new AbortController()` and `const receivedSignal = { current: null as 'SIGINT' | 'SIGTERM' | null }`. Register handlers:
+8. **Install SIGINT/SIGTERM handlers (r2 codex-ops F2 HIGH + r4 codex-ops F1 MED handler-lifetime fix).** BEFORE calling `dispatchWorkflow`, create `const controller = new AbortController()` and `const receivedSignal = { current: null as 'SIGINT' | 'SIGTERM' | null }`. Register handlers AND wrap THE ENTIRE flow (dispatch + render + exit-code derivation) in the try/finally — `process.off` MUST fire ONLY after the return value is computed (r4 codex-ops F1 MED fix — earlier sketch unregistered handlers BEFORE the exit-code derivation, opening a window where a SIGTERM arriving between dispatch resolution and step 10 evaluation would not be observed by `receivedSignal.current`):
    ```ts
    const onSig = (sig: 'SIGINT' | 'SIGTERM') => () => {
      receivedSignal.current = sig;
@@ -555,14 +567,25 @@ export async function runRun(opts: {
    const onSigTerm = onSig('SIGTERM');
    process.on('SIGINT', onSigInt);
    process.on('SIGTERM', onSigTerm);
-   try { /* dispatch */ } finally {
+   try {
+     const outcomes = await dispatchWorkflow({ ..., signal: controller.signal, receivedSignal,
+       signalGate: opts.signalGate ? { beforeNextSpawn: opts.signalGate.beforeNextSpawn } : undefined });
+     // Render BEFORE exit-code derivation so the JSON / human output reflects the full outcome set
+     // even when the signal-flag check is about to override the exit code.
+     renderOutcomes(outcomes, { json: opts.json });
+     // Test-only gate (r4 codex F3 MED) — production no-op; AC7.4 case 12b injects SIGTERM here.
+     await (opts.signalGate?.beforeExitDerivation?.() ?? Promise.resolve());
+     // Step 10 (below) reads receivedSignal.current as its FIRST priority — handlers must still
+     // be installed here for any post-render-pre-return SIGTERM to be observable.
+     return computeExitCode(outcomes, receivedSignal);
+   } finally {
      process.off('SIGINT', onSigInt);
      process.off('SIGTERM', onSigTerm);
    }
    ```
-   The named-handler pattern is mandatory (Node `removeListener` matches by function identity; anonymous wrappers cannot be unregistered — matches the 072 lock-release discipline).
-9. `dispatchWorkflow({ ..., signal: controller.signal, receivedSignal })` (AC5.3). Print outcomes (or JSON-emit if `--json`).
-10. **Exit code derivation (r3 codex-ops F1 HIGH closure — closes the between-step + post-final-step SIGTERM gaps the r2 patch left open):** The priority order below is load-bearing — the `receivedSignal.current` check fires FIRST, BEFORE any outcome inspection:
+   The named-handler pattern is mandatory (Node `removeListener` matches by function identity; anonymous wrappers cannot be unregistered — matches the 072 lock-release discipline). The finally-after-return-value-computed ordering is load-bearing for the r3 + r4 SIGTERM-gap closures — the handler MUST outlive the exit-code derivation.
+9. `dispatchWorkflow` invocation is INSIDE the try block (see step 8's sketch). It receives `{ ..., signal: controller.signal, receivedSignal }`. Print outcomes (or JSON-emit if `--json`) inside the try block, BEFORE the exit-code derivation.
+10. **Exit code derivation (r3 codex-ops F1 HIGH closure — closes the between-step + post-final-step SIGTERM gaps the r2 patch left open; `computeExitCode` runs INSIDE the try block per step 8):** The priority order below is load-bearing — the `receivedSignal.current` check fires FIRST, BEFORE any outcome inspection:
     - **First priority — signal flag wins regardless of outcomes:** If `receivedSignal.current === 'SIGTERM'` → exit 143. If `receivedSignal.current === 'SIGINT'` → exit 130. This check fires even when ALL dispatched outcomes are successful — it closes the gap where SIGTERM arrives in the between-step gap OR after the final child exits 0 but before this exit-code derivation runs (in either case `controller.abort()` fired and set `receivedSignal.current`, but no in-flight child existed to produce an `interrupted` outcome). The signal flag is the single source of truth for "this process was interrupted."
     - **Second priority — interrupted outcome derived signals (defense-in-depth):** If any `DispatchOutcome.error === 'interrupted'` AND `signal === 'SIGTERM'` → exit 143. SIGINT → 130. (Reached only if the first-priority check missed somehow — e.g., a future code change unsets `receivedSignal.current` between abort and exit derivation.)
     - **Third priority — normal success:** If every dispatched outcome has `spawn !== null && spawn.exitCode === 0` AND `receivedSignal.current === null` → exit 0.
@@ -642,7 +665,7 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 2. Two wired agents → prompt enumerates exactly those files; `y` confirms; both adapters inverted; exit 0.
 3. `--yes` skips the prompt → same result.
 4. Marker file missing → `stripEchoMarkers` returns noop; uninstall reports it but continues; exit 0.
-5. Marker file is a symlink → reports conflict, does NOT touch; exit 0 (non-fatal per-agent).
+5. **Marker file is a symlink → cleanupConflicts entry + ECHO block NOT touched + exit 1** (r4 C1 fix — both reviewers caught this case 5 contradicting AC4.1 step 4's "any cleanupConflicts → exit 1" contract; the earlier wording "exit 0 non-fatal per-agent" was a pre-r2-disposition leftover). Per-agent isolation IS preserved: any NON-symlinked sibling files (e.g., another agent's marker file in the same uninstall) ARE still cleaned up; the conflict is reported per-file via `cleanupConflicts: [{ agent: 'claude-code', file: '~/.claude/CLAUDE.md', reason: 'symlink-target' }]`. The load-bearing assertion is observability: automation sees exit 1 and can act on the residual config rather than treating uninstall as complete.
 6. `--purge-state` → second prompt confirms; `~/.echo/` removed; `rm -rf` is recursive + force.
 7. `--purge-state` + `--yes` → both prompts auto-confirmed.
 8. Codex config has hand-edited `[mcp_servers.echo]` (key reordered) → AC4.3 still deletes the table; the inverse does NOT diff-and-conflict (uninstall is "remove regardless").
@@ -667,12 +690,13 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 10. `${VAR}` substitution: prompt `"Review at ${ref}"` with `inputs = { ref = "HEAD" }` → spawn receives `"Review at HEAD"`. Missing var → ValidationError pre-dispatch.
 11. **Sandbox mapping carried via AgentMatch.resolvedSandbox (r2 codex F2 HIGH verification — was r1 C1).** Workflow with one step whose role has `sandbox = "workspace-write"` and `requires.capabilities = ["fs.write", "git.write"]` → matched agent is codex; **assert `match.resolvedSandbox === 'workspace-write'`** (proves the matcher populated the field); fake spawn receives `args` containing `['exec', '--sandbox', 'workspace-write', '--', <prompt>]` (proves the dispatcher reads from `match.resolvedSandbox`, NOT from a `roles[]` parameter — no `roles` arg is passed to `dispatchWorkflow` in this test). Repeat with `sandbox = "read-only"` → `match.resolvedSandbox === 'read-only'` + args contain `'--sandbox', 'read-only'`.
 12. **SIGTERM mid-workflow → exit 143, NOT exit 0 (r2 codex-ops F2 HIGH verification).** Fixture: two-step workflow; step 1's fake spawn exits 0; while step 2's fake spawn is in flight (a controllable promise), the test triggers `process.emit('SIGTERM')`. Assert: `runRun` returns 143 (NOT 0); outcomes array contains step 1 (success) + step 2 (`error: 'interrupted', signal: 'SIGTERM'`); the in-flight child got a SIGTERM (verified via the fake spawn's `kill` recorder). Repeat with SIGINT → exit 130. **The load-bearing assertion is that exit is NEVER 0 on a signal-interrupted workflow regardless of how many earlier steps succeeded.**
-12a. **SIGTERM between steps → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the between-step gap r2 left open).** Fixture: two-step workflow; step 1's fake spawn exits 0; the test arranges for SIGTERM to fire AFTER step 1's await resolves but BEFORE step 2's spawn is called (e.g., by `setImmediate(() => process.emit('SIGTERM'))` in the fake spawn's completion handler for step 1). Assert: `runRun` returns 143; outcomes array contains step 1 (success); step 2 either has `error: 'interrupted', signal: 'SIGTERM'` (AC5.3 step 0 pre-iteration check caught it) OR is absent (loop broke before iteration), but EITHER WAY `runRun`'s AC5.4 step 10 priority check sees `receivedSignal.current === 'SIGTERM'` and exits 143. Pins the first-priority `receivedSignal` check is load-bearing — the test must pass even when no `interrupted` outcome is in the array (close the gap where the signal arrives in the iteration boundary itself).
-12b. **SIGTERM after final step succeeds → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the post-final-step gap).** Fixture: ONE-step workflow; step 1's fake spawn exits 0; AFTER step 1's await resolves AND BEFORE `runRun` reaches the exit-code derivation, fire SIGTERM (e.g., via a Promise.race that injects the signal between `dispatchWorkflow` resolution and the next microtask). Assert: `runRun` returns 143 EVEN THOUGH every outcome in the array is successful — the load-bearing assertion is `runRun` sees `receivedSignal.current === 'SIGTERM'` in step 10 and exits 143 regardless of outcomes. This is the case where the second-priority "interrupted-outcome derived signal" path would FAIL but the first-priority `receivedSignal` check succeeds.
+12a. **SIGTERM between steps → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the between-step gap r2 left open; r4 codex F3 MED — uses the new `signalGate.beforeNextSpawn` test seam for deterministic timing).** Fixture: two-step workflow; step 1's fake spawn exits 0; the test passes `signalGate: { beforeNextSpawn: () => { process.emit('SIGTERM'); return Promise.resolve(); } }` to `runRun`. The `dispatchWorkflow` loop awaits `signalGate.beforeNextSpawn()` at the top of EACH iteration (after the step 0 signal.aborted check), so SIGTERM is delivered EXACTLY when the loop is at the iteration boundary — no `setImmediate` race, no scheduler indeterminism. Assert: `runRun` returns 143; outcomes array contains step 1 (success); step 2 has `error: 'interrupted', signal: 'SIGTERM'` (step 0's signal.aborted check fires on iteration entry); AC5.4 step 10's first-priority `receivedSignal.current === 'SIGTERM'` check fires regardless of outcomes. Without the gate, the test was non-deterministic; with it, the between-step window is the EXACT injection point.
+12b. **SIGTERM after final step succeeds → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the post-final-step gap; r4 codex F3 MED + r4 codex-ops F1 MED — uses `signalGate.beforeExitDerivation` test seam AND verifies handler outlives derivation).** Fixture: ONE-step workflow; step 1's fake spawn exits 0; the test passes `signalGate: { beforeExitDerivation: () => { process.emit('SIGTERM'); return Promise.resolve(); } }` to `runRun`. `runRun`'s AC5.4 step 8 awaits this gate AFTER `dispatchWorkflow` resolves + outcomes are rendered AND BEFORE `computeExitCode` runs — the EXACT post-final-step window. Assert: (a) `runRun` returns 143 even though every outcome in the array is successful — the load-bearing first-priority `receivedSignal.current` check fires. (b) The SIGINT/SIGTERM handlers ARE still installed at exit-derivation time (the `try { dispatch + render + derive } finally { off }` ordering from AC5.4 step 8); a test sub-assertion verifies `process.listenerCount('SIGTERM') >= 1` BEFORE `computeExitCode` returns and `=== 0` after `runRun` returns. This sub-assertion is the load-bearing case 12b pin — it catches a regression where the handler is unregistered before the gate's SIGTERM fires.
 13. **Spawn ENOENT → cli-unavailable outcome (r2 codex-ops F3 MED verification).** Fixture: fake spawn throws ENOENT for `codex`. Assert: `DispatchOutcome.spawn === null`, `error === 'cli-unavailable: codex not found on PATH'`; subsequent steps skipped; exit 1. The error message contains the literal binary name.
 14. **K4 matcher reason taxonomy in runRun output (r2 codex F4 MED verification).** Two sub-fixtures:
     - (a) Zero onboarded agents wired (empty `onboarded[]`) + a workflow needing `reviewer` role → `runRun` exits 1 with `match.reason === 'no-onboarded-agent'` for the step.
     - (b) One onboarded codex with `capabilities: ['mcp.echo.read']` only + a role requiring `['fs.write']` → `runRun` exits 1 with `match.reason === 'capability-mismatch'` (NOT `no-onboarded-agent` — agents exist but are under-permissioned).
+15. **J8 default-project fallback (r4 codex F2 MED verification).** Fixture: cwd is a tmpdir with NO `.git/` (git-rootless), `opts.projectFlag` is unset, `opts.stateProjectsPath` points to a `projects.json` with `default_project: '/fixture/repo'`. Assert: `runRun` resolves `projectRoot` to `/fixture/repo`; the fake spawn receives `opts.cwd === '/fixture/repo'`. Negative sub-case: same fixture but `default_project: null` → `runRun` exits 1 with the J8 error copy ("no project context — pass `--project <path>` or run from a git repository or run `echoctl init` to pick a default"). Pins the missing-since-r3 `projects.json` read in `runRun` step 1.
 
 **AC7.5 — Inverse-adapter tests.** One file per inverse module. Each pins the round-trip invariant: a file that 072 wrote (with markers / MCP entry), passed through the inverse, equals the same file MINUS the ECHO-owned region, byte-for-byte outside that region. Negative cases: parse errors → conflict; missing entries → noop; symlinks → conflict.
 
