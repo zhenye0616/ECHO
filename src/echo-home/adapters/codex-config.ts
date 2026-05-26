@@ -321,6 +321,9 @@ export function syncCodexMcpBlock(opts: CodexConfigOpts): CodexConfigResult {
   }
 
   const proposedEcho = mergeWithUserOwnedKeys(currentEcho, previousServerConfig, serverConfig);
+  if (deepEqual(currentEcho, proposedEcho)) {
+    return { action: 'noop' };
+  }
 
   if (
     previousServerConfig !== undefined &&

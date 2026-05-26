@@ -90,6 +90,19 @@ describe('syncCodexMcpBlock', () => {
     expect(readFileSync(target).equals(before)).toBe(true);
   });
 
+  it('noop: merged desired config equals current without a previous cache → no write', () => {
+    const target = join(tmpRoot, 'config.toml');
+    const serverConfig = { url: 'http://127.0.0.1:38478/mcp' };
+    const original = `[mcp_servers.echo]\nurl = "${serverConfig.url}"\n\n[mcp_servers.echo.headers]\n`;
+    writeFileSync(target, original);
+    const before = readFileSync(target);
+
+    const result = syncCodexMcpBlock({ filePath: target, serverConfig });
+
+    expect(result.action).toBe('noop');
+    expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
   it('conflict: existing differs from both previous and new → no write', () => {
     const target = join(tmpRoot, 'config.toml');
     writeFileSync(target, `[mcp_servers.echo]\nurl = "http://user-edited:9999/mcp"\nenabled = false\n`);
@@ -102,6 +115,21 @@ describe('syncCodexMcpBlock', () => {
     expect(result.action).toBe('conflict');
     if (result.action !== 'conflict') return;
     expect(result.conflict.kind).toBe('config');
+    expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
+  it('conflict: different current echo without a previous cache still does not write', () => {
+    const target = join(tmpRoot, 'config.toml');
+    const original = `[mcp_servers.echo]\nurl = "http://user-edited"\n\n[mcp_servers.echo.headers]\n`;
+    writeFileSync(target, original);
+    const before = readFileSync(target);
+
+    const result = syncCodexMcpBlock({
+      filePath: target,
+      serverConfig: { url: 'http://127.0.0.1:38478/mcp' },
+    });
+
+    expect(result.action).toBe('conflict');
     expect(readFileSync(target).equals(before)).toBe(true);
   });
 

@@ -1,5 +1,6 @@
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { buildSourceAppMap, type SourceApp } from '../../mcp/util/source-app.js';
 import { resolveDbPath } from '../../daemon/lifecycle.js';
 import type { CaptureEvent, Storage } from '../../storage/interface.js';
@@ -28,6 +29,8 @@ const SCAN_LIMIT = 50_000;
 const DEFAULT_WINDOW_DAYS = 7;
 const DEFAULT_RETURN_LIMIT = 25;
 const EPHEMERAL_REVIEWER_WORKTREE = /^echo-[a-zA-Z0-9-]+-[0-9A-Fa-f-]{36}$/;
+const TMP_RESOLVED = resolve(tmpdir());
+const TMP_REAL = realpathSync(tmpdir());
 
 function isoDaysBefore(now: Date, days: number): string {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -54,10 +57,40 @@ function repoRootOf(event: CaptureEvent): string | null {
 }
 
 function isEphemeralReviewerWorktree(repoRoot: string): boolean {
-  const relativeToTmp = relative(resolve(tmpdir()), repoRoot);
   const isUnderTmp =
-    relativeToTmp.length > 0 && !relativeToTmp.startsWith('..') && !isAbsolute(relativeToTmp);
+    repoRoot.startsWith(`${TMP_REAL}${sep}`) || repoRoot.startsWith(`${TMP_RESOLVED}${sep}`);
   return isUnderTmp && EPHEMERAL_REVIEWER_WORKTREE.test(basename(repoRoot));
+}
+
+function hasGitDirectory(repoRoot: string): boolean {
+  try {
+    return lstatSync(join(repoRoot, '.git')).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function collapseToGitRoot(repoRoot: string): string {
+  let cur = repoRoot;
+  for (let depth = 0; depth <= 10; depth++) {
+    if (hasGitDirectory(cur)) return cur;
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  return repoRoot;
+}
+
+function isSiblingWorktree(repoRoot: string): boolean {
+  const base = basename(repoRoot);
+  const dashIdx = base.indexOf('--');
+  if (dashIdx <= 0) return false;
+  const sibling = join(dirname(repoRoot), base.slice(0, dashIdx));
+  try {
+    return existsSync(sibling) && lstatSync(sibling).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function classifySource(source: string, sourceMap: Record<SourceApp, string>): ProjectSource {
@@ -84,9 +117,11 @@ export async function detectProjects(deps: DetectProjectsDeps = {}): Promise<Det
     const byRepo = new Map<string, DetectedProject>();
 
     for (const row of rows) {
-      const repoRoot = repoRootOf(row);
+      let repoRoot = repoRootOf(row);
       if (repoRoot === null) continue;
       if (isEphemeralReviewerWorktree(repoRoot)) continue;
+      repoRoot = collapseToGitRoot(repoRoot);
+      if (isSiblingWorktree(repoRoot)) continue;
       const existing = byRepo.get(repoRoot);
       const project =
         existing ??

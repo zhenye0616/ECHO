@@ -151,7 +151,7 @@ function runSpawn(opts: {
 
 export async function dispatchWorkflow(opts: DispatchOpts): Promise<DispatchOutcome[]> {
   const outcomes: DispatchOutcome[] = [];
-  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const timeoutMs = opts.timeoutMs ?? 300_000;
   const spawn = opts.spawn ?? nodeSpawn;
   for (let i = 0; i < opts.workflow.steps.length; i++) {
     const step = opts.workflow.steps[i]!;

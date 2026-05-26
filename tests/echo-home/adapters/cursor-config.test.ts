@@ -104,6 +104,23 @@ describe('syncCursorMcpEntry', () => {
     expect(readFileSync(target).equals(before)).toBe(true);
   });
 
+  it('noop: merged desired config equals current without a previous cache → no write', () => {
+    const target = join(tmpRoot, 'mcp.json');
+    const serverConfig = { url: 'http://127.0.0.1:38478/mcp' };
+    const original = `${JSON.stringify(
+      { mcpServers: { echo: { url: serverConfig.url, headers: {} } } },
+      null,
+      2,
+    )}\n`;
+    writeFileSync(target, original);
+    const before = readFileSync(target);
+
+    const result = syncCursorMcpEntry({ filePath: target, serverConfig });
+
+    expect(result.action).toBe('noop');
+    expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
   it('conflict: existing differs from both previous and new → no write', () => {
     const target = join(tmpRoot, 'mcp.json');
     writeFileSync(
@@ -116,6 +133,27 @@ describe('syncCursorMcpEntry', () => {
       serverConfig: SERVER_V1,
       previousServerConfig: { url: 'http://old:1234/mcp' },
     });
+    expect(result.action).toBe('conflict');
+    expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
+  it('conflict: different current echo without a previous cache still does not write', () => {
+    const target = join(tmpRoot, 'mcp.json');
+    writeFileSync(
+      target,
+      JSON.stringify(
+        { mcpServers: { echo: { url: 'http://user-edited', headers: {} } } },
+        null,
+        2,
+      ),
+    );
+    const before = readFileSync(target);
+
+    const result = syncCursorMcpEntry({
+      filePath: target,
+      serverConfig: { url: 'http://127.0.0.1:38478/mcp' },
+    });
+
     expect(result.action).toBe('conflict');
     expect(readFileSync(target).equals(before)).toBe(true);
   });

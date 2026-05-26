@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dispatchWorkflow,
   renderPrompt,
@@ -50,7 +50,29 @@ function fakeSpawn(calls: Array<{ cmd: string; args: string[]; cwd?: string }>):
   }) as unknown as DispatchSpawn;
 }
 
+function hangingSpawn(kills: string[]): DispatchSpawn {
+  return (() => {
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter & { setEncoding: () => void };
+      stderr: EventEmitter & { setEncoding: () => void };
+      kill: (signal?: string) => boolean;
+    };
+    child.stdout = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
+    child.kill = (signal = 'SIGTERM') => {
+      kills.push(signal);
+      queueMicrotask(() => child.emit('close', -1));
+      return true;
+    };
+    return child;
+  }) as unknown as DispatchSpawn;
+}
+
 describe('dispatchWorkflow', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('substitutes inputs and passes project cwd plus codex sandbox args', async () => {
     const calls: Array<{ cmd: string; args: string[]; cwd?: string }> = [];
     const outcomes = await dispatchWorkflow({
@@ -106,6 +128,26 @@ describe('dispatchWorkflow', () => {
 
     expect(calls).toHaveLength(1);
     expect(outcomes[1]).toMatchObject({ error: 'interrupted', signal: 'SIGTERM' });
+  });
+
+  it('uses a 300s default timeout before killing the spawned agent', async () => {
+    vi.useFakeTimers();
+    const kills: string[] = [];
+    const promise = dispatchWorkflow({
+      workflow: workflow(),
+      matches: [match('reviewer'), match('builder')],
+      spawn: hangingSpawn(kills),
+      projectRoot: '/fixture/repo',
+    });
+
+    await vi.advanceTimersByTimeAsync(299_999);
+    expect(kills).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    const outcomes = await promise;
+
+    expect(kills).toEqual(['SIGTERM']);
+    expect(outcomes[0]!.spawn).toMatchObject({ timedOut: true, exitCode: -1 });
+    expect(outcomes).toHaveLength(1);
   });
 
   it('throws for missing prompt input before spawning', async () => {

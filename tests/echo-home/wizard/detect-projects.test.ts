@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -191,6 +191,60 @@ describe('detectProjects', () => {
       now: new Date('2026-05-02T00:00:00.000Z'),
     });
     expect(projects.map((project) => project.repoRoot)).toEqual([repoRoot]);
+  });
+
+  it('filters realpath tmp reviewer roots and sibling worktrees while collapsing subdirs to git roots', async () => {
+    const sources = buildSourceAppMap();
+    const tmpReviewerRoot = join(
+      realpathSync(tmpdir()),
+      'echo-merger-66666666-6666-4666-8666-666666666666',
+    );
+    const desktop = join(tmpRoot, 'Desktop');
+    const siblingRepo = join(desktop, 'sibling-repo');
+    const siblingWorktree = join(desktop, 'sibling-repo--worktree-slug');
+    const realProject = join(tmpRoot, 'some-real-project');
+    const subdirOne = join(realProject, 'subdir', 'whatever');
+    const subdirTwo = join(realProject, 'subdir2', 'other');
+    const fakeRootWithoutGit = join(tmpRoot, 'fake-root', 'nested');
+    const tmpRealProject = join(tmpdir(), 'my-project');
+    mkdirSync(siblingRepo, { recursive: true });
+    mkdirSync(join(realProject, '.git'), { recursive: true });
+    const { detectProjects } = await loadModule();
+
+    const projects = await detectProjects({
+      atomStore: new FakeStore([
+        event('git:tmp', '2026-05-01T00:00:00.000Z', tmpReviewerRoot),
+        event('git:worktree', '2026-05-01T00:01:00.000Z', siblingWorktree),
+        event(`${sources.codex}a`, '2026-05-01T00:02:00.000Z', subdirOne),
+        event(`${sources.cursor}b`, '2026-05-01T00:03:00.000Z', subdirTwo),
+        event('custom:source', '2026-05-01T00:04:00.000Z', subdirTwo),
+        event('git:fake', '2026-05-01T00:05:00.000Z', fakeRootWithoutGit),
+        event('git:tmp-real', '2026-05-01T00:06:00.000Z', tmpRealProject),
+      ]),
+      now: new Date('2026-05-02T00:00:00.000Z'),
+    });
+
+    const roots = projects.map((project) => project.repoRoot);
+    const collapsed = projects.find((project) => project.repoRoot === resolve(realProject));
+    expect(roots).not.toContain(resolve(tmpReviewerRoot));
+    expect(roots).not.toContain(resolve(siblingWorktree));
+    expect(collapsed).toMatchObject({
+      repoRoot: resolve(realProject),
+      atomCount: 3,
+      sourceBreakdown: { codex: 1, cursor: 1, other: 1 },
+    });
+    expect(roots).toContain(resolve(fakeRootWithoutGit));
+    expect(roots).toContain(resolve(tmpRealProject));
+  });
+
+  it('keeps double-dash repo roots when the base sibling does not exist', async () => {
+    const repoRoot = join(tmpRoot, 'lonely-repo--slug');
+    const { detectProjects } = await loadModule();
+    const projects = await detectProjects({
+      atomStore: new FakeStore([event('git:a', '2026-05-01T00:00:00.000Z', repoRoot)]),
+      now: new Date('2026-05-02T00:00:00.000Z'),
+    });
+    expect(projects.map((project) => project.repoRoot)).toEqual([resolve(repoRoot)]);
   });
 
   it('does not create a missing production database on fresh install', async () => {

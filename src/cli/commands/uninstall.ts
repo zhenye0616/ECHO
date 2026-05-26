@@ -6,7 +6,7 @@ import {
   validateOnboardingState,
   type OnboardingState,
 } from '../../echo-home/paths.js';
-import type { AgentKind } from '../../echo-home/wizard/detect-agents.js';
+import { AGENT_KINDS, type AgentKind } from '../../echo-home/wizard/detect-agents.js';
 import { makeTtyPrompt, type PromptImpl } from '../io/prompt.js';
 import { removeCodexMcpEntry } from '../inverse/codex-config.js';
 import { removeCursorMcpEntry } from '../inverse/cursor-config.js';
@@ -32,6 +32,7 @@ export interface CleanupConflict {
 }
 
 interface CleanupSummary {
+  trackedWiredAgents: AgentKind[];
   cleanupConflicts: CleanupConflict[];
   actions: string[];
   purged: boolean;
@@ -42,7 +43,7 @@ function writeLine(stream: Pick<NodeJS.WritableStream, 'write'>, line: string): 
 }
 
 function isAgentKind(value: string): value is AgentKind {
-  return value === 'codex' || value === 'claude-code' || value === 'cursor';
+  return (AGENT_KINDS as readonly string[]).includes(value);
 }
 
 function readState(): OnboardingState | null {
@@ -97,6 +98,52 @@ function recordCursor(summary: CleanupSummary, filePath: string): void {
   }
 }
 
+function trackedWiredAgents(state: OnboardingState | null): AgentKind[] {
+  if (state === null) return [];
+  const wired = new Set<AgentKind>();
+  for (const agent of state.agents) {
+    if (isAgentKind(agent.id) && agent.wired_at !== null) wired.add(agent.id);
+  }
+  return AGENT_KINDS.filter((agent) => wired.has(agent));
+}
+
+function filesToInspect(home: string): string[] {
+  return [
+    join(home, '.codex/AGENTS.md'),
+    join(home, '.codex/config.toml'),
+    join(home, '.claude/CLAUDE.md'),
+    join(home, '.claude/commands'),
+    join(home, '.cursor/mcp.json'),
+  ];
+}
+
+function cleanupAgent(summary: CleanupSummary, agent: AgentKind, home: string): void {
+  if (agent === 'codex') {
+    recordMarker(summary, 'codex', join(home, '.codex/AGENTS.md'));
+    recordCodex(summary, join(home, '.codex/config.toml'));
+  } else if (agent === 'claude-code') {
+    recordMarker(summary, 'claude-code', join(home, '.claude/CLAUDE.md'));
+    const removed = removeEchoClaudeSkills({
+      skillNames: skillNames(),
+      targetDir: join(home, '.claude/commands'),
+    });
+    summary.actions.push(
+      `claude-code: skills removed=${removed.removed.length} skipped=${removed.skipped.length}`,
+    );
+    for (const skipped of removed.skipped) {
+      if (skipped.reason === 'user-modified' || skipped.reason === 'symlink') {
+        summary.cleanupConflicts.push({
+          agent: 'claude-code',
+          file: join(home, '.claude/commands', skipped.filename),
+          reason: skipped.reason,
+        });
+      }
+    }
+  } else if (agent === 'cursor') {
+    recordCursor(summary, join(home, '.cursor/mcp.json'));
+  }
+}
+
 async function confirmed(opts: UninstallOpts, message: string): Promise<boolean> {
   if (opts.yes) return true;
   return await (opts.prompt ?? makeTtyPrompt()).readConfirm(message, { default: false });
@@ -109,6 +156,12 @@ function emitSummary(opts: UninstallOpts, summary: CleanupSummary): void {
     writeLine(stdout, JSON.stringify({ event: 'uninstall.summary', ...summary }));
     return;
   }
+  writeLine(
+    stdout,
+    `Tracked wired agents: ${
+      summary.trackedWiredAgents.length === 0 ? 'none' : summary.trackedWiredAgents.join(', ')
+    }`,
+  );
   for (const action of summary.actions) writeLine(stdout, action);
   if (summary.cleanupConflicts.length > 0) {
     writeLine(stdout, 'Cleanup conflicts:');
@@ -125,27 +178,8 @@ function emitSummary(opts: UninstallOpts, summary: CleanupSummary): void {
 export async function runUninstall(opts: UninstallOpts = {}): Promise<number> {
   const home = opts.homeDir ?? homedir();
   const state = readState();
-  if (state === null || state.agents.length === 0) {
-    if (!opts.quiet)
-      writeLine(opts.stdout ?? process.stdout, 'Nothing to uninstall - no onboarding state found');
-    return 0;
-  }
-  const wired = state.agents.filter((agent) => isAgentKind(agent.id) && agent.wired_at !== null);
-  if (wired.length === 0) {
-    if (!opts.quiet)
-      writeLine(opts.stdout ?? process.stdout, 'Nothing to uninstall - no wired agents found');
-    return 0;
-  }
   if (!opts.yes) {
-    const files = wired
-      .map((agent) => {
-        if (agent.id === 'codex')
-          return [join(home, '.codex/AGENTS.md'), join(home, '.codex/config.toml')];
-        if (agent.id === 'claude-code')
-          return [join(home, '.claude/CLAUDE.md'), join(home, '.claude/commands')];
-        return [join(home, '.cursor/mcp.json')];
-      })
-      .flat();
+    const files = filesToInspect(home);
     writeLine(
       opts.stdout ?? process.stdout,
       `Files to inspect:\n${files.map((file) => `- ${file}`).join('\n')}`,
@@ -153,33 +187,13 @@ export async function runUninstall(opts: UninstallOpts = {}): Promise<number> {
     if (!(await confirmed(opts, 'Remove ECHO adapter writes?'))) return 0;
   }
 
-  const summary: CleanupSummary = { cleanupConflicts: [], actions: [], purged: false };
-  for (const agent of wired) {
-    if (agent.id === 'codex') {
-      recordMarker(summary, 'codex', join(home, '.codex/AGENTS.md'));
-      recordCodex(summary, join(home, '.codex/config.toml'));
-    } else if (agent.id === 'claude-code') {
-      recordMarker(summary, 'claude-code', join(home, '.claude/CLAUDE.md'));
-      const removed = removeEchoClaudeSkills({
-        skillNames: skillNames(),
-        targetDir: join(home, '.claude/commands'),
-      });
-      summary.actions.push(
-        `claude-code: skills removed=${removed.removed.length} skipped=${removed.skipped.length}`,
-      );
-      for (const skipped of removed.skipped) {
-        if (skipped.reason === 'user-modified' || skipped.reason === 'symlink') {
-          summary.cleanupConflicts.push({
-            agent: 'claude-code',
-            file: join(home, '.claude/commands', skipped.filename),
-            reason: skipped.reason,
-          });
-        }
-      }
-    } else if (agent.id === 'cursor') {
-      recordCursor(summary, join(home, '.cursor/mcp.json'));
-    }
-  }
+  const summary: CleanupSummary = {
+    trackedWiredAgents: trackedWiredAgents(state),
+    cleanupConflicts: [],
+    actions: [],
+    purged: false,
+  };
+  for (const agent of AGENT_KINDS) cleanupAgent(summary, agent, home);
 
   if (opts.purgeState) {
     if (summary.cleanupConflicts.length > 0 && !opts.forcePurge) {

@@ -101,6 +101,24 @@ function fakeSpawn(
   }) as unknown as DispatchSpawn;
 }
 
+function hangingSpawn(kills: string[]): DispatchSpawn {
+  return (() => {
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter & { setEncoding: () => void };
+      stderr: EventEmitter & { setEncoding: () => void };
+      kill: (signal?: string) => boolean;
+    };
+    child.stdout = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
+    child.kill = (signal = 'SIGTERM') => {
+      kills.push(signal);
+      queueMicrotask(() => child.emit('close', -1));
+      return true;
+    };
+    return child;
+  }) as unknown as DispatchSpawn;
+}
+
 describe('runRun', () => {
   beforeEach(() => {
     originalEchoHome = process.env.ECHO_HOME;
@@ -113,6 +131,7 @@ describe('runRun', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     if (originalEchoHome === undefined) delete process.env.ECHO_HOME;
     else process.env.ECHO_HOME = originalEchoHome;
     rmSync(tmpRoot, { recursive: true, force: true });
@@ -226,5 +245,75 @@ describe('runRun', () => {
     expect(code).toBe(1);
     expect(stdout).toContain('reviewer: exit 2');
     expect(stdout).toContain('stderr:\nreview crashed');
+  });
+
+  it('passes timeoutMs override through to dispatch', async () => {
+    vi.useFakeTimers();
+    writeDefaults();
+    writeState();
+    writeWorkflow();
+    const kills: string[] = [];
+    const { runRun } = await loadRun();
+
+    const promise = runRun({
+      workflowName: 'review',
+      projectFlag: projectRoot,
+      spawn: hangingSpawn(kills),
+      quiet: true,
+      timeoutMs: 600_000,
+    });
+
+    await vi.advanceTimersByTimeAsync(599_999);
+    expect(kills).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    const code = await promise;
+
+    expect(code).toBe(1);
+    expect(kills).toEqual(['SIGTERM']);
+  });
+
+  it('parses --timeout seconds from argv and forwards milliseconds to runRun', async () => {
+    let captured: { workflowName?: string; timeoutMs?: number } | null = null;
+    vi.doMock('../../src/cli/commands/run.js', () => ({
+      runRun: async (opts: { workflowName?: string; timeoutMs?: number }) => {
+        captured = opts;
+        return 0;
+      },
+    }));
+
+    try {
+      const { main } = await import('../../src/cli/index.js');
+      const code = await main(['run', 'review', '--timeout', '600']);
+
+      expect(code).toBe(0);
+      expect(captured).toMatchObject({ workflowName: 'review', timeoutMs: 600_000 });
+    } finally {
+      vi.doUnmock('../../src/cli/commands/run.js');
+    }
+  });
+
+  it('rejects invalid --timeout values as usage errors', async () => {
+    let called = false;
+    vi.doMock('../../src/cli/commands/run.js', () => ({
+      runRun: async () => {
+        called = true;
+        return 0;
+      },
+    }));
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    try {
+      const { main } = await import('../../src/cli/index.js');
+      const code = await main(['run', 'review', '--timeout', '0']);
+
+      expect(code).toBe(2);
+      expect(called).toBe(false);
+      expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+        'Usage: echoctl run',
+      );
+    } finally {
+      stderr.mockRestore();
+      vi.doUnmock('../../src/cli/commands/run.js');
+    }
   });
 });
