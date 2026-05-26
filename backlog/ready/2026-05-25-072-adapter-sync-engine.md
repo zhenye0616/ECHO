@@ -81,7 +81,8 @@ Re-running `syncAll(...)` with identical inputs is **byte-equivalent convergence
 - Exports `mergeWithMarkers(opts: { filePath: string; echoSection: string; previousEchoSection?: string }): MarkerResult`.
 - Constants: `BEGIN_MARKER = '<!-- BEGIN ECHO -->'`, `END_MARKER = '<!-- END ECHO -->'`. Literal strings; no whitespace tolerance in V1 (a hand-edit that changes the markers themselves is treated as no-markers-present, which falls into the append branch — see R3).
 - **Pre-read symlink guard (codex-ops r11 M1).** Before reading `filePath` to inspect markers, `fs.lstatSync(filePath)`. If the file exists AND is a symlink, return `{ action: 'conflict', filePath, conflict: { kind: 'target-symlink', filePath, targetIsSymlink: true } }` WITHOUT reading the linked target. This matches the AC8 TargetSymlinkConflict no-byte-payload guarantee — the engine never reads outside the intended file. A missing `filePath` is fine (we'll create it via the append branch). A regular file proceeds to the branch logic below.
-- **Append branch (markers absent in current file):** the file is read; if it does not contain `BEGIN_MARKER`, the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result via the unique-tmp atomic-write pattern in AC7 (do NOT use a fixed `<filePath>.tmp` — see AC7 for the per-call temp path + mode-preservation rules). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`.
+- **Marker-pair detection rule (codex r12 M1).** The file content has a "well-formed marker pair" iff: (a) it contains exactly one `BEGIN_MARKER` occurrence AND exactly one `END_MARKER` occurrence AND (b) the BEGIN appears before the END. Any other state (BEGIN-only, END-only, multiple of either, END-before-BEGIN, nested) is "no well-formed pair" → falls into the append branch. AC1 branches below all use this single detection rule.
+- **Append branch (no well-formed pair in current file):** the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result via the unique-tmp atomic-write pattern in AC7 (do NOT use a fixed `<filePath>.tmp` — see AC7 for the per-call temp path + mode-preservation rules). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`. Malformed-marker cases (R3) hit this branch — the user's broken markers persist alongside the new well-formed block; users self-resolve.
 - **Replace branch (markers present, content inside equals `previousEchoSection`):** the inside-markers content is replaced with `echoSection`. Everything outside the markers is preserved byte-for-byte. Atomic write. Returns `{ action: 'replace', filePath }`. If `previousEchoSection` is omitted, this branch is unreachable — the function falls through to Noop (if `currentInside === echoSection`) or Conflict (otherwise). See "previous* absent rule" below.
 - **No-op branch (markers present, content inside equals `echoSection`):** the file is not written. Returns `{ action: 'noop', filePath }`. This is what makes re-running idempotent.
 - **Conflict branch (markers present, content inside differs from BOTH `previousEchoSection` AND `echoSection`):** the function does **not** write. Returns `{ action: 'conflict', filePath, conflict: { currentInside: string, expectedInside: string, proposedInside: string, unifiedDiff: string } }`. The `unifiedDiff` is a plain-text diff between `currentInside` and `proposedInside` produced by a small in-tree diff routine (no external library dependency for this — line-by-line is sufficient; see R4).
@@ -320,7 +321,18 @@ The two functions deliberately do NOT share a return type (codex r6 M2 cleanup) 
     }
   }
   ```
-  Registration shape: `const exitHandler = () => releaseLockIfOwned(lockPath, acquisitionToken); process.once('exit', exitHandler);` — using `.once` and then `process.removeListener('exit', exitHandler)` in the `finally` block prevents stale-handler accumulation in long-lived callers (074 daemon, future watcher). The handler is unregistered on every successful return AND every thrown-then-caught path.
+  Registration shape (codex-ops r12 M1 — covers SIGINT/SIGTERM as well as normal exit):
+  ```ts
+  const handler = () => releaseLockIfOwned(lockPath, acquisitionToken);
+  process.once('exit', handler);
+  process.once('SIGINT', () => { handler(); process.exit(130); });
+  process.once('SIGTERM', () => { handler(); process.exit(143); });
+  // ...inside finally:
+  process.removeListener('exit', handler);
+  process.removeListener('SIGINT', handler);
+  process.removeListener('SIGTERM', handler);
+  ```
+  Default node behavior: SIGINT/SIGTERM during a sync would `process.exit()` WITHOUT firing the 'exit' handler, leaving the lockfile present. The scoped signal handlers above release the owned lock first, then re-raise with conventional shell-signal exit codes (130 = SIGINT, 143 = SIGTERM). Owner-token verification (`releaseLockIfOwned`) means a token-mismatched lock is left alone — same correctness guarantee as the in-band release. The handlers are unregistered in `finally` to prevent stale-handler accumulation in long-lived callers (074 daemon, future watcher).
 - **Lock-failure result shape (codex r8 M2 — distinguish errno codes):** when lock acquisition fails, `syncAll` returns the shape below. The `syncLock.code` distinguishes "another sync in progress" (lockfile EEXIST) from "filesystem setup error" (state-dir mkdir failure):
   ```ts
   {
@@ -347,8 +359,9 @@ File-level symlink guards (AC4.1 / AC4.2 / AC5 / AC7.2a) protect individual entr
 - `ECHO_HOME_PATHS.skills` (`~/.echo/skills/`) — boundary: `ECHO_HOME_PATHS.root`
 - `ECHO_HOME_PATHS.roles` (`~/.echo/roles/`) — boundary: `ECHO_HOME_PATHS.root`
 - `ECHO_HOME_PATHS.state` (`~/.echo/state/`) — boundary: `ECHO_HOME_PATHS.root`
-- The **resolved** `commandsDir` used by claude-code (codex r11 H1 — either caller-passed via `profile.paths.commandsDir` OR the default `path.resolve(os.homedir(), '.claude/commands')`) — boundary: the parent of the agent-home dir (`~/.claude` itself); walk from there to leaf.
+- The **resolved** `commandsDir` used by claude-code (codex r11 H1 — either caller-passed via `profile.paths.commandsDir` OR the default `path.resolve(os.homedir(), '.claude/commands')`) — boundary: `path.dirname(commandsDir)` (the directly-enclosing dir; for the default that's `~/.claude`; for `<tmpdir>/x/.claude/commands` it's `<tmpdir>/x/.claude`). The walk checks just two nodes: the boundary itself + the leaf. (codex r12 L1 — precise rule.)
 - The **resolved** `targetDir` for role-sync (typically same as `ECHO_HOME_PATHS.roles`) — boundary: same as `ECHO_HOME_PATHS.root`.
+- The **resolved** `path.dirname(instructionsFile)` for codex (default: `~/.codex/`) and claude-code (default: `~/.claude/`) profiles (codex-ops r12 M2 — closes the ancestor-symlink bypass). Boundary: the parent of that dir (e.g. `~/` for the defaults). Walk: boundary + the dirname. This catches `~/.codex` itself being a symlink, which would otherwise route `lstatSync(AGENTS.md)` through to a regular file at the resolved location and skip AC1's pre-read symlink guard.
 
 **AC6a.2 — `assertPathComponentsAreNotSymlinks(dirPath, rootBoundary)` semantics — bounded walk** (codex-ops r11 H1). The function walks from `rootBoundary` toward `dirPath`, calling `fs.lstatSync` on each EXISTING component. **It does NOT walk above `rootBoundary`** — system-level symlinks like macOS `/var` → `/private/var` or `/tmp` → `/private/tmp` are outside our concern; we only care that the ECHO-managed subtree (or the agent-home subtree we're about to write into) is symlink-free. Non-existent leaves are fine (they'll be created by `mkdirSync` later).
 
@@ -385,6 +398,24 @@ export interface AtomicWriteOpts {
   followSymlink?: boolean;
 }
 export function atomicWrite(opts: AtomicWriteOpts): void;
+// Failure contract (codex r12 M2): atomicWrite ALWAYS throws on failure
+// (never returns a result-like object). Throws `AtomicWriteError extends Error`
+// with stable `code` field matching the AdapterError code enum:
+//   - 'EACCES' / 'ENOSPC' / 'ENOTDIR' / 'ENOENT' / 'EISDIR' / 'EROFS' for fs errors
+//   - 'ELOOP' for symlink-loop on followSymlink: true path
+//   - 'EEXIST' (here meaning "target is a symlink and followSymlink: false") —
+//     the AdapterError code's "wrong-type-at-path" repurposing
+// Per-adapter callers (AC1/2/3/4/5) wrap atomicWrite calls in try/catch and
+// translate AtomicWriteError into their own structured outputs:
+//   - AC1 markers: target-symlink (EEXIST) → TargetSymlinkConflict
+//   - AC4 skill-sync: target-symlink (EEXIST) → push filename onto skipped[]
+//   - AC2/AC3 config: target-symlink with followSymlink:true never throws EEXIST
+//     for this reason (the symlink is resolved+followed, not refused)
+//   - syncAll: any uncaught AtomicWriteError lands on the agent's errors[]
+//     via the AC6 try/catch wrapper.
+export class AtomicWriteError extends Error {
+  constructor(public readonly code: AdapterError['code'], public readonly file: string, message: string);
+}
 ```
 
 **AC7.2 — Unique temp path.** The temp filename uses the shape `<filePath>.<process.pid>.<crypto.randomUUID().slice(0, 8)>.tmp`. This prevents the collision codex-ops r1 surfaced: two overlapping `syncAll` invocations on the same machine (e.g. a wizard retry while `echo init` is still running) writing to the same `<filePath>.tmp` and one process renaming the other's bytes onto the final path. The PID + random suffix makes the temp path per-invocation unique. After successful rename, the temp file does not exist; on caught exception the helper attempts a best-effort `unlinkSync` of the temp path.
@@ -566,6 +597,9 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   30b. **Preflight EACCES on ancestor → caught** (pins codex-ops r10 M2). Set up an ancestor directory with `chmod 0000` so `lstatSync` fails with EACCES. Call `syncAll`. Assert: `result.directorySymlink` with `code: 'EACCES'`, no exception escapes. Cleanup via chmod 0700 in afterEach.
   30c. **Default `commandsDir` is guarded** (pins codex r11 H1). Profile: `{ kind: 'claude-code', paths: { instructionsFile: <tmp>/.claude/CLAUDE.md /* but commandsDir OMITTED */ }, echoSection: '...' }`. Pre-create `<homedir-stub>/.claude/commands` as a symlink. Patch `os.homedir()` to return the stub. Call `syncAll`. Assert: `result.directorySymlink` populated with `file: '<homedir-stub>/.claude/commands'` (the resolved default path), proving the guard ran against the defaulted commandsDir, not just caller-passed ones.
   30d. **macOS-style tmpdir (`/var` → `/private/var`) does NOT trip the guard** (pins codex-ops r11 H1). Run `syncAll` with `ECHO_HOME` set to a path under `os.tmpdir()` (which on macOS resolves through `/var` → `/private/var`). Assert: `result.directorySymlink` is undefined; the bounded walk did not traverse above `ECHO_HOME_PATHS.root`; agents run normally. Companion case: `os.tmpdir()` under macOS-CI is `/private/var/folders/...` (no symlink there) — same expected outcome.
+  30e. **Instruction-file dirname is guarded** (pins codex-ops r12 M2). Pre-create `<tmpdir>/.codex` ITSELF as a symlink to `<tmpdir>/redirected/`. Run `syncAll` with a codex profile using default paths. Assert: `result.directorySymlink` populated with `file: <tmpdir>/.codex`; no files written under `<tmpdir>/redirected/`. Companion case for `<tmpdir>/.claude` as a symlink with claude-code profile.
+  30f. **SIGINT during held lock releases it** (pins codex-ops r12 M1). Spawn `syncAll` as a child process via `child_process.fork`, which acquires the lock and then sleeps (insert a long-running mocked adapter). From the parent, send SIGINT. Wait for child to exit with code 130. Assert: lockfile is gone; another `syncAll` call from the parent succeeds. Companion case: a process with a token-mismatched lock (someone else's token in the lockfile) receives SIGINT — assert the lockfile is NOT unlinked (the foreign owner is protected).
+  30g. **AtomicWriteError thrown on target symlink (followSymlink:false)** (pins codex r12 M2). Pre-create `<tmpdir>/.claude/commands/strategist.md` as a symlink. Mock `mergeWithMarkers` away; directly exercise `populateEchoSkills` → `atomicWrite(<commands>/strategist.md, content, { followSymlink: false })`. Assert: throws `AtomicWriteError` with `code: 'EEXIST'`, `file: <symlinked path>`, the linked target file is unchanged. Negative case: with `followSymlink: true`, the same setup writes to the resolved target without throwing.
   31. **Role bytes are not logged** (pins AC8.2 / codex-ops r9 M2). Pre-seed `<echoHome>/roles/reviewer.toml` with custom content containing the unique string `'unique-secret-role-content-xyz123'`. Capture stderr + stdout during a `syncAll` call that triggers the user-modified branch. Assert: the captured streams contain NEITHER the unique string NOR any substring of the role content. The `SyncResult.roles.results[].conflict.userBytes` IS populated with the content (callers can render with redaction); 072 itself does not emit.
 
 Run convention: `npm test -- tests/echo-home/`.
@@ -607,7 +641,7 @@ All test files are listed in `files_to_modify`. Coverage targets:
 - `skill-sync.ts` — 8 cases (4 per exported function: `populateEchoSkills` and `syncClaudeSkills`), pinning create-target-dir / idempotent-overwrite / stale-file-preservation / hand-edit-overwrite for both hops.
 - `role-sync.ts` — 4 cases pinning first-install-copy / noop / user-modified-refusal / source-missing.
 - `atomic-write.ts` — 7 cases pinning unique-temp-suffix / mode-preservation-existing / 0600-for-allowlist-exact-match / 0600-for-explicit-secret / NOT-0600-for-non-allowlist-suffix / umask-default-for-non-secret / concurrent-overlap-no-corruption.
-- `adapter-sync.ts` — 35 cases (above plus: default-commandsDir-guarded, macOS-tmpdir-not-tripped, marker-symlink-target-never-read).
+- `adapter-sync.ts` — 38 cases (above plus: default-commandsDir-guarded, macOS-tmpdir-not-tripped, marker-symlink-target-never-read, instruction-file-dirname-guarded, sigint-releases-owned-lock, atomic-write-error-on-target-symlink).
 
 Verify commands (root only — no Raycast package edits in this spec):
 
@@ -628,7 +662,7 @@ All four must pass before the builder moves 072 to `pending_review/`.
 - AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; populate-failure flips `overallOk` to false AND skips the claude-code `syncClaudeSkills` fan-out (CLAUDE.md merge still runs); per-agent dispatch wires the right adapters; **every per-profile call wrapped in try/catch — no exception escapes `syncAll`** — filesystem and parse errors land in the per-agent `errors[]` array with `AdapterError` shape; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071; `previous*` persistence is explicitly caller-owned (073 + 074 will cache via `~/.echo/adapters/`; 072 does not touch that directory); `paths` field defaults documented per-agent (`os.homedir()`-based) and resolved at adapter call time; **per-user advisory lock at `ECHO_HOME_PATHS.state/adapter-sync.lock`** is one-shot (no retry loop, no auto stale-recovery — codex r6 H1 + codex-ops r6 H1 removal). Lockfile present → `result.syncLock` populated with manual-cleanup message; recovery is the user's responsibility (or future 074 `echo doctor`).
 - AC7: `atomic-write.ts` exports `atomicWrite` with unique-tmp filename (`<file>.<pid>.<8hex>.tmp`), mode preservation on existing-file path, `0600` for new files that **exact-match** (post `path.resolve`) the `SECRET_SENSITIVE_ALLOWLIST` (codex config + cursor mcp.json under the runtime-resolved `os.homedir()`), `0600` when `opts.secretSensitive === true`, umask-default otherwise. All AC1–AC5 adapters delegate to this helper (no inline `writeFile + rename` in any adapter).
 - AC8: `SyncConflict` interface documents that payloads may contain user-bearing secrets; the inline comment names `Authorization` headers explicitly; no 072 code logs conflict-payload values; a grep-based negative test pins this.
-- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×7, adapter-sync ×35 — 74 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
+- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×7, adapter-sync ×38 — 77 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
 - All four verify commands above clean.
 - `task_state_ref` set to `2026-05-25-072-adapter-sync-engine` AND `backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md` exists pinning the spec at the artifact SHA.
 - TOML strategy decision (byte-range editor primary path; smol-toml used only for value-comparison on the target slice) documented in `src/echo-home/adapters/codex-config.ts` header comment, including the codex r1 verification result against the founder's real config.
