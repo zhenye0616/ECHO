@@ -65,6 +65,35 @@ describe('syncCursorMcpEntry', () => {
     expect(parsed.mcpServers.echo).toEqual(SERVER_V1);
   });
 
+  it('update: user-added key is preserved while desired echo keys are rewritten', () => {
+    const target = join(tmpRoot, 'mcp.json');
+    writeFileSync(
+      target,
+      JSON.stringify(
+        {
+          mcpServers: {
+            echo: { url: 'http://old:1234/mcp', headers: { 'X-User': 'keep' } },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const result = syncCursorMcpEntry({
+      filePath: target,
+      serverConfig: { url: 'http://new:5678/mcp' },
+      previousServerConfig: { url: 'http://old:1234/mcp' },
+    });
+    expect(result.action).toBe('update');
+    const parsed = JSON.parse(readFileSync(target, 'utf8')) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(parsed.mcpServers.echo).toEqual({
+      url: 'http://new:5678/mcp',
+      headers: { 'X-User': 'keep' },
+    });
+  });
+
   it('noop: existing echo equals new serverConfig → no write', () => {
     const target = join(tmpRoot, 'mcp.json');
     const original = `${JSON.stringify({ mcpServers: { echo: SERVER_V1 } }, null, 2)}\n`;
@@ -89,6 +118,33 @@ describe('syncCursorMcpEntry', () => {
     });
     expect(result.action).toBe('conflict');
     expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
+  it('conflict: proposedValue preserves user-added keys around desired echo keys', () => {
+    const target = join(tmpRoot, 'mcp.json');
+    writeFileSync(
+      target,
+      JSON.stringify(
+        {
+          mcpServers: {
+            echo: { url: 'http://edited:9999/mcp', headers: { 'X-User': 'keep' } },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const result = syncCursorMcpEntry({
+      filePath: target,
+      serverConfig: { url: 'http://new:5678/mcp' },
+      previousServerConfig: { url: 'http://original:1234/mcp' },
+    });
+    expect(result.action).toBe('conflict');
+    if (result.action !== 'conflict') return;
+    expect(result.conflict.proposedValue).toEqual({
+      url: 'http://new:5678/mcp',
+      headers: { 'X-User': 'keep' },
+    });
   });
 
   it('missing file: creates with mcpServers.echo at 0600', () => {

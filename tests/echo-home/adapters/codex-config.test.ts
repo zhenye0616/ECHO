@@ -63,6 +63,23 @@ describe('syncCodexMcpBlock', () => {
     expect(content.includes('url = "http://localhost:7117/mcp"')).toBe(true);
   });
 
+  it('update: user-added key is preserved while desired echo keys are rewritten', () => {
+    const target = join(tmpRoot, 'config.toml');
+    writeFileSync(
+      target,
+      `[mcp_servers.echo]\nurl = "http://old:1234/mcp"\nenabled = true\n`,
+    );
+    const result = syncCodexMcpBlock({
+      filePath: target,
+      serverConfig: { url: 'http://new:5678/mcp' },
+      previousServerConfig: { url: 'http://old:1234/mcp' },
+    });
+    expect(result.action).toBe('update');
+    const content = readFileSync(target, 'utf8');
+    expect(content).toContain('url = "http://new:5678/mcp"');
+    expect(content).toContain('enabled = true');
+  });
+
   it('noop: existing already matches new → no write', () => {
     const target = join(tmpRoot, 'config.toml');
     const block = `[mcp_servers.echo]\nenabled = true\nurl = "http://localhost:7117/mcp"\n`;
@@ -86,6 +103,25 @@ describe('syncCodexMcpBlock', () => {
     if (result.action !== 'conflict') return;
     expect(result.conflict.kind).toBe('config');
     expect(readFileSync(target).equals(before)).toBe(true);
+  });
+
+  it('conflict: proposedValue preserves user-added keys around desired echo keys', () => {
+    const target = join(tmpRoot, 'config.toml');
+    writeFileSync(
+      target,
+      `[mcp_servers.echo]\nurl = "http://edited:9999/mcp"\nenabled = true\n`,
+    );
+    const result = syncCodexMcpBlock({
+      filePath: target,
+      serverConfig: { url: 'http://new:5678/mcp' },
+      previousServerConfig: { url: 'http://original:1234/mcp' },
+    });
+    expect(result.action).toBe('conflict');
+    if (result.action !== 'conflict') return;
+    expect(result.conflict.proposedValue).toEqual({
+      url: 'http://new:5678/mcp',
+      enabled: true,
+    });
   });
 
   it('missing file: creates with just the target block at 0600', () => {

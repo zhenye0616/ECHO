@@ -23,6 +23,12 @@ function confirmFromText(value: string, fallback: boolean | undefined): boolean 
   throw new NonInteractiveError(`invalid confirmation answer: ${value}`);
 }
 
+function formatReadPromptMessage(message: string, defaultValue: string | undefined): string {
+  if (defaultValue === undefined) return `${message}: `;
+  if (defaultValue.length === 0) return `${message} [Enter to skip]: `;
+  return `${message} [default: ${defaultValue}; Enter to accept]: `;
+}
+
 export function makeTtyPrompt(): PromptImpl {
   if (!processStdin.isTTY) {
     return {
@@ -52,7 +58,7 @@ export function makeTtyPrompt(): PromptImpl {
 
   return {
     async readPrompt(message, opts) {
-      const answer = await ask(opts?.default === undefined ? `${message} ` : `${message} `);
+      const answer = await ask(formatReadPromptMessage(message, opts?.default));
       if (answer.trim().length === 0 && opts?.default !== undefined) return opts.default;
       return answer;
     },

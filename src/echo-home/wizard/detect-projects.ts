@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { basename, isAbsolute, relative, resolve } from 'node:path';
 import { buildSourceAppMap, type SourceApp } from '../../mcp/util/source-app.js';
 import { resolveDbPath } from '../../daemon/lifecycle.js';
 import type { CaptureEvent, Storage } from '../../storage/interface.js';
@@ -26,6 +27,7 @@ export interface DetectProjectsDeps {
 const SCAN_LIMIT = 50_000;
 const DEFAULT_WINDOW_DAYS = 7;
 const DEFAULT_RETURN_LIMIT = 25;
+const EPHEMERAL_REVIEWER_WORKTREE = /^echo-[a-zA-Z0-9-]+-[0-9A-Fa-f-]{36}$/;
 
 function isoDaysBefore(now: Date, days: number): string {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -49,6 +51,13 @@ function repoRootOf(event: CaptureEvent): string | null {
   const raw = event.metadata?.['repo_root'];
   if (typeof raw !== 'string' || raw.trim().length === 0) return null;
   return resolve(raw);
+}
+
+function isEphemeralReviewerWorktree(repoRoot: string): boolean {
+  const relativeToTmp = relative(resolve(tmpdir()), repoRoot);
+  const isUnderTmp =
+    relativeToTmp.length > 0 && !relativeToTmp.startsWith('..') && !isAbsolute(relativeToTmp);
+  return isUnderTmp && EPHEMERAL_REVIEWER_WORKTREE.test(basename(repoRoot));
 }
 
 function classifySource(source: string, sourceMap: Record<SourceApp, string>): ProjectSource {
@@ -77,6 +86,7 @@ export async function detectProjects(deps: DetectProjectsDeps = {}): Promise<Det
     for (const row of rows) {
       const repoRoot = repoRootOf(row);
       if (repoRoot === null) continue;
+      if (isEphemeralReviewerWorktree(repoRoot)) continue;
       const existing = byRepo.get(repoRoot);
       const project =
         existing ??

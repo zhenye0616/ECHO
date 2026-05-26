@@ -109,7 +109,7 @@ async function probeOne(
   const args =
     agent === 'codex'
       ? ['exec', '--sandbox', 'read-only', '--', PROMPT]
-      : ['--print', '--no-stream', '--output-format', 'text', '--', PROMPT];
+      : ['--print', '--output-format', 'text', '--', PROMPT];
 
   let result: SpawnResult;
   try {

@@ -40,7 +40,7 @@ function argsFor(
   if (agent === 'claude-code') {
     return {
       cmd: 'claude',
-      args: ['--print', '--no-stream', '--output-format', 'text', '--', prompt],
+      args: ['--print', '--output-format', 'text', '--', prompt],
     };
   }
   return null;

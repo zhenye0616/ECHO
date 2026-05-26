@@ -201,6 +201,29 @@ describe('wire', () => {
     expect(seen[0]!.previousMcpServerConfig).toEqual({ url: 'old' });
   });
 
+  it('writes only desired mcp server config to cache after successful sync', async () => {
+    await writeInitialState();
+    const cache = makeCache([
+      {
+        schema_version: 1,
+        agent: 'codex',
+        last_written_at: '2026-05-20T00:00:00.000Z',
+        echoSection: 'old section',
+        mcpServerConfig: { url: 'http://old:1234/mcp', enabled: true },
+      },
+    ]);
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      cache: cache.cache,
+      syncAll: async () => successResult(['codex']),
+    });
+    expect(cache.writes[0]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+  });
+
   it('preserves existing detected_at while updating wired_at', async () => {
     const path = await writeInitialState();
     const raw = JSON.parse(readFileSync(path, 'utf8')) as {
