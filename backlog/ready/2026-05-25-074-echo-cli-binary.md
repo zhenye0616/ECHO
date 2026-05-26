@@ -29,7 +29,8 @@ files_to_modify:
   - src/cli/workflow/dispatch.ts                        # AC5.3 — sequential spawn per workflow step; reuses 073's probe-style spawn shape (codex exec / claude --print)
   - src/echo-home/paths.ts                              # AC5.1 minor — extend ECHO_HOME_PATHS with `workflows: join(root, 'workflows')` + frozen invariant preserved
   - src/echo-home/scaffold.ts                           # AC5.1 minor — mkdirSync workflows/ in the recursive sweep; idempotent semantics preserved
-  - package.json                                        # AC1 — add `bin: { echoctl: "./dist/cli/index.js" }` (r2 codex-ops F1 HIGH: binary renamed from `echo` to avoid POSIX shell builtin collision) + a `build:cli` script that vite-node-compiles or tsc-emits src/cli/ to dist/; daemon path unchanged
+  - package.json                                        # AC1 — add `bin: { echoctl: "./dist/cli/index.js" }` (r2 codex-ops F1 HIGH: binary renamed from `echo` to avoid POSIX shell builtin collision) + `files: ["dist/**/*.js", "dist/**/*.d.ts", "package.json", "README.md"]` allowlist (r5 codex F2 + r6 codex F1: ensures multi-file dist/ AND transitive imports from src/echo-home/, src/daemon/, src/guards.ts get packed) + `build:cli: "tsc -p tsconfig.cli.json"` script; daemon path unchanged
+  - tsconfig.cli.json                                   # AC1 NEW (r6 codex F2 MED) — extends ./tsconfig.json; pins outDir=dist, rootDir=src, include=src/**/*, exclude=tests+tools+*.test.ts; emits the union of CLI + transitive 070-073 modules for packed install
   - tests/cli/init.test.ts                              # AC7
   - tests/cli/doctor.test.ts                            # AC7
   - tests/cli/uninstall.test.ts                         # AC7
@@ -112,16 +113,36 @@ The decision archive leaves several mechanics underspecified. The calls below ar
 
 ### AC1 — `src/cli/index.ts` is the entrypoint with argv-driven subcommand dispatch
 
-**AC1.1 — Shebang + bin field + files allowlist.** The file's first line is `#!/usr/bin/env node`. `package.json` gains:
+**AC1.1 — Shebang + bin field + files allowlist + tsconfig.cli.json.** The file's first line is `#!/usr/bin/env node`. `package.json` gains:
 
 ```json
 "bin": { "echoctl": "./dist/cli/index.js" },
-"files": ["dist/cli/**/*.js", "dist/cli/**/*.d.ts", "package.json", "README.md"]
+"files": ["dist/**/*.js", "dist/**/*.d.ts", "package.json", "README.md"]
 ```
 
-The `files` allowlist (r5 codex F2 MED fix — was missing) is LOAD-BEARING: `dist/` is in `.gitignore`, AC1.1 produces a multi-file emit (`dist/cli/index.js` + `dist/cli/commands/*.js` + `dist/cli/workflow/*.js` + `dist/cli/inverse/*.js` + `dist/cli/io/*.js`), and without `files`, `npm pack` would include ONLY the `bin` target itself (per npm's default-includes rules) — meaning a packed/global install would have `echoctl --version` succeed (the bin entry resolves) but `echoctl doctor` fail with `ERR_MODULE_NOT_FOUND` for `./commands/doctor.js`. **npm semantics: when `files` is set, it SUPERSEDES `.gitignore`** — gitignored paths still get packed if the allowlist names them. AC1.5 smoke test covers this end-to-end by invoking a subcommand against a freshly-packed install.
+The `files` allowlist (r5 codex F2 MED fix — was missing; r6 codex F1 HIGH fix — BROADENED from `dist/cli/**` to `dist/**` so transitive runtime imports are packed) is LOAD-BEARING. The CLI imports from `src/echo-home/*`, `src/daemon/*`, `src/guards.ts`, `src/storage/*`, `src/mcp/util/*` (per AC2.1 / AC2.5 / AC3.3 / AC4.4 / AC5.4 references); a plain `tsc` emit puts those at `dist/echo-home/`, `dist/daemon/`, `dist/guards.js`, etc. — NOT under `dist/cli/`. The earlier narrower `dist/cli/**` allowlist would have silently omitted these → `echoctl --version` would pass + `echoctl doctor --help` would pass (no transitive imports) + `echoctl doctor` (real invocation) would fail with `ERR_MODULE_NOT_FOUND`. **npm semantics: when `files` is set, it SUPERSEDES `.gitignore`** — gitignored paths still get packed if the allowlist names them.
 
-A new script `"build:cli": "tsc -p tsconfig.cli.json"` (or vite-node bundle equivalent — builder picks the smaller-deps option) emits `dist/cli/`. The daemon's existing `vite-node`-based scripts are unchanged. The `build:cli` script is invoked manually for now (no auto-build in `prepare`); the AC1.5 smoke test runs it explicitly before packing.
+**`tsconfig.cli.json` (r6 codex F2 MED — was referenced but missing).** A new file at `tsconfig.cli.json` in the repo root pinning the emit shape:
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "noEmit": false,
+    "incremental": false,
+    "tsBuildInfoFile": null
+  },
+  "include": ["src/**/*"],
+  "exclude": ["tests/**/*", "tools/**/*", "**/*.test.ts"]
+}
+```
+
+This emits the union of `src/cli/` + `src/echo-home/` + `src/daemon/` + `src/guards.ts` + `src/storage/` + `src/mcp/` etc. to `dist/`, matching the broadened `files` allowlist. Tests + tools are excluded so the tarball stays tight. The daemon's existing `npm run daemon` script (`vite-node src/daemon/index.ts`) is unchanged — `tsconfig.cli.json`'s emit is for the packed CLI install, NOT for the daemon's development-time invocation.
+
+A new script `"build:cli": "tsc -p tsconfig.cli.json"` emits `dist/`. The daemon's existing `vite-node`-based scripts are unchanged. The `build:cli` script is invoked manually for now (no auto-build in `prepare`); the AC1.5 smoke test runs it explicitly before packing.
 
 **AC1.2 — Subcommand dispatch.** Uses `node:util`'s `parseArgs` with `allowPositionals: true` and `strict: true`. Top-level grammar:
 
@@ -149,9 +170,9 @@ The dispatcher catches all subcommand-thrown exceptions, prints the message + a 
 
 1. **Build first (r3 codex F2 MED — hermeticity fix).** Run `child_process.spawnSync('npm', ['run', 'build:cli'], { cwd: repoRoot })` BEFORE the install step. AC1.1 deliberately omits a `prepare`/`postinstall` hook (would slow every `npm install` for non-CLI dev paths); the smoke test owns the build. Without this step, a fresh-clone CI run would install a missing `dist/cli/index.js` (broken bin) OR a re-run after `dist/` was deleted would silently pass against stale local build output. Assert build exit status === 0; assert `dist/cli/index.js` exists post-build; assert at least one sibling file exists at `dist/cli/commands/doctor.js` (regression-pin for AC1.1's multi-file `files` allowlist).
 2. In a tmpdir, runs `npm pack` then `npm install -g --prefix <tmp-prefix> <packed-tarball>` to install the just-built bin into an isolated prefix.
-3. **Reach + subcommand smoke (r5 codex F2 MED — extended to catch the multi-file packaging gap).** Invoke two commands against the installed binary, both via `child_process.spawnSync('bash', ['-c', '<cmd>'], { env: { ...process.env, PATH: '<tmp-prefix>/bin:' + process.env.PATH } })`:
+3. **Reach + subcommand smoke (r5 codex F2 MED — extended to catch the multi-file packaging gap; r6 codex F1 HIGH — strengthened to exercise transitive imports).** Invoke two commands against the installed binary, both via `child_process.spawnSync('bash', ['-c', '<cmd>'], { env: { ...process.env, PATH: '<tmp-prefix>/bin:' + process.env.PATH, ECHO_HOME: '<tmp-echo-home>', ECHO_MCP_PORT: '<unreachable-port-like-39999>' } })`:
    - **(3a) `--version` reach:** `echoctl --version` → assert `result.status === 0` AND `result.stdout.trim() === <expected version from package.json>`. This pins the bin entry resolution (regression-pin against the shell-builtin collision).
-   - **(3b) Subcommand resolution:** `echoctl doctor --help` → assert `result.status === 0` AND the output contains the expected help-text marker (e.g., `"echoctl doctor"` substring). This pins that `dist/cli/commands/doctor.js` ACTUALLY made it into the npm tarball — if AC1.1's `files` allowlist is missing or wrong, this will fail with `ERR_MODULE_NOT_FOUND`, NOT with a help-text mismatch.
+   - **(3b) Real subcommand (transitive imports — r6 codex F1 HIGH):** `echoctl doctor --json` against a tmp `ECHO_HOME` with no daemon running on `ECHO_MCP_PORT` → assert `result.status === 1` AND the parsed JSON output contains `"overall": "broken"` (per AC3.6's truth table: daemon unreachable + no pid lock → `broken`). This invocation actually exercises the import graph (`echoctl doctor` imports from `src/cli/commands/doctor.ts` which imports from `src/echo-home/paths.ts`, `src/daemon/lifecycle.ts`, etc.). If AC1.1's `files` allowlist is missing OR the tsconfig.cli.json `include` is wrong, this test fails with `ERR_MODULE_NOT_FOUND` for a transitive import — exactly what the broader allowlist is designed to prevent. The earlier `echoctl doctor --help` variant was insufficient because `--help` typically short-circuits before transitive imports load.
 4. Negative case: assert `bash -c 'echo --version'` does NOT invoke the CLI (it invokes the shell builtin). This is the regression-pin against future re-renames to a builtin-collision shape.
 
 The test runs only on CI environments where `npm` is on PATH; on local dev runs without that prerequisite, it's gated to a `vitest.skipUnless(hasNpm)` and reported as `skipped` rather than failing. Builder note: this is the single test that catches `bin`-collision class bugs across the npm + shell + PATH stack. If this test is too slow for the default suite (~5s for `npm run build:cli` + ~5s for `npm pack` + `npm install -g`), tag it as `slow` and run on CI only.
