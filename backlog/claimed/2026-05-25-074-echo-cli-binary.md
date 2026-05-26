@@ -56,6 +56,13 @@ spec_refs:
   - src/daemon/index.ts:27-32  # resolveMcpPort — `echoctl init` mirrors this resolver to build `mcpServerUrl`
   - skills/process-backlog.md  # reviewer guidance — 074 is a CLI item, NOT a substrate item; minimal new deps
   - CLAUDE.md  # operating model — CLI touches none of the operating-model files; reference only
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-26T07:18:05Z"
+branch: "agent/echo-cli-binary"
+worktree: "/Users/zhenye/Desktop/Project_echo--echo-cli-binary"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 # `echoctl` CLI binary (init / doctor / uninstall / run)
