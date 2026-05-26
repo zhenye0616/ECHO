@@ -3,8 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "echoctl": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "package.json",
+    "README.md"
+  ],
   "scripts": {
     "test": "vitest run",
+    "build:cli": "tsc -p tsconfig.cli.json",
     "daemon": "vite-node src/daemon/index.ts",
     "daemon:install": "scripts/launchd/install.sh",
     "daemon:uninstall": "scripts/launchd/uninstall.sh",

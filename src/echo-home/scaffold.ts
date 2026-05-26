@@ -53,6 +53,7 @@ export function ensureEchoHome(): EnsureEchoHomeResult {
   ensureDir(ECHO_HOME_PATHS.root, createdDirs);
   ensureDir(ECHO_HOME_PATHS.skills, createdDirs);
   ensureDir(ECHO_HOME_PATHS.roles, createdDirs);
+  ensureDir(ECHO_HOME_PATHS.workflows, createdDirs);
   ensureDir(ECHO_HOME_PATHS.adapters, createdDirs);
   ensureDir(ECHO_HOME_PATHS.state, createdDirs);
 
