@@ -2,15 +2,19 @@
 task_id: 2026-05-25-072-adapter-sync-engine
 role: builder
 writer: claude-code-builder
-last_updated: 2026-05-26T02:40:35Z
+last_updated: 2026-05-26T03:06:55Z
 handoff_branch: agent/adapter-sync-engine
-handoff_head_sha: ""
+handoff_head_sha: 0e4b20420bd0e418f8c79052b8fdf55de7a4f9b8
 handoff_run_log: raw/internal/agent-runs/2026-05-26-2026-05-25-072-adapter-sync-engine.md
 ---
 
 ## current_thesis
 
 Claimed 072 as Claude Code builder on 2026-05-26. Implement the adapter sync engine — seven new files under `src/echo-home/` plus seven new test files — that lets a caller idempotently mutate per-agent MCP wiring (TOML/JSON), merge an ECHO section into AGENTS.md/CLAUDE.md, populate `~/.echo/skills/` from the in-repo `skills/` directory and fan out to `~/.claude/commands/`, and copy default role TOMLs once. All file writes go through a shared `atomicWrite` helper with unique-temp filenames, mode preservation, and 0600 for secret-bearing targets. Orchestrator `syncAll` runs a directory-symlink preflight, acquires a one-shot advisory lock, runs `populateEchoSkills`, dispatches per-agent adapters, then runs `syncDefaultRoles` once. Spec converged at r18 (codex + codex-ops both `proceed`, zero findings).
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 0e4b20420bd0e418f8c79052b8fdf55de7a4f9b8.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -39,4 +43,4 @@ Claimed 072 as Claude Code builder on 2026-05-26. Implement the adapter sync eng
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-25-072-adapter-sync-engine.md
+- spec: backlog/pending_review/2026-05-25-072-adapter-sync-engine.md

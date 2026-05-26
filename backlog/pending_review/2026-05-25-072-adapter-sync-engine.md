@@ -41,11 +41,34 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-26T02:40:35Z"
 branch: "agent/adapter-sync-engine"
-worktree: ""
-head_sha: ""
+worktree: "~/Desktop/Project_echo--adapter-sync-engine"
+head_sha: "0e4b20420bd0e418f8c79052b8fdf55de7a4f9b8"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  All AC1-AC9 implemented; 68 new test cases pass; full suite 1297 passed / 21 skipped;
+  lint + typecheck clean. Branch agent/adapter-sync-engine at SHA
+  0e4b20420bd0e418f8c79052b8fdf55de7a4f9b8.
+
+  Notable choices the reviewer should validate:
+  - codex-config.ts TOML header detection allows inline `# comment` after the
+    closing bracket (otherwise sibling tables with inline comments would be
+    swept into the byte-range slice; AC2 cases 2 and 9 pin this).
+  - atomic-write.ts exports `__setAtomicWriteTestHook(hook)` as a test-only
+    surface because `vi.spyOn` cannot mock node:fs namespace imports'
+    renameSync (property is non-configurable). Documented inline.
+  - The directory-symlink preflight (AC6a) also walks from
+    `dirname(dirname(instructionsFile|configFile))` to
+    `dirname(instructionsFile|configFile)` so macOS `/var → /private/var`
+    sits below the boundary and is ignored.
+
+  R6 judgment call (Claude Code skills fully ECHO-owned vs marker-merge per
+  file) remains open per spec; flagged here for founder consideration before
+  merge.
+
+  Also: added the required `## canonical_anchors` block to the strategist's
+  task-state pointer (it was missing the schema-required heading; lint
+  failed without it). Single-line structural fix; not a content/spec change.
 ---
 
 # Adapter sync engine
