@@ -23,13 +23,13 @@ files_to_modify:
   - src/cli/inverse/markers.ts                          # AC4.2 — strip <!-- BEGIN ECHO --> ... <!-- END ECHO --> block from CLAUDE.md / AGENTS.md; preserve everything outside
   - src/cli/inverse/codex-config.ts                     # AC4.3 — TOML parse → delete `mcp_servers.echo` table → atomicWrite with secretSensitive: true
   - src/cli/inverse/cursor-config.ts                    # AC4.3 — JSON parse → delete `mcpServers.echo` key → atomicWrite with secretSensitive: true
-  - src/cli/inverse/skills.ts                           # AC4.4 — remove ~/.claude/commands/<skill>.md files (only those listed in DEFAULT_ROLE_FILENAMES → role.skills union)
+  - src/cli/inverse/skills.ts                           # AC4.4 — remove ~/.claude/commands/<skill>.md files whose contents byte-equal their `~/.echo/skills/<skill>.md` counterpart (r2 codex F5 disposition: byte-equality ownership proof, no marker; r2 codex F3 disposition: enumerate ~/.echo/skills/*.md as the skillNames source — covers all 072-copied files including those not referenced by any default role)
   - src/cli/workflow/load.ts                            # AC5.1 — TOML loader/validator for ~/.echo/workflows/<name>.toml; reuses smol-toml from 071
   - src/cli/workflow/match.ts                           # AC5.2 — role-matcher: scans onboarded agents from onboarding.json, picks an agent per role whose capabilities ⊇ role.requires.capabilities
   - src/cli/workflow/dispatch.ts                        # AC5.3 — sequential spawn per workflow step; reuses 073's probe-style spawn shape (codex exec / claude --print)
   - src/echo-home/paths.ts                              # AC5.1 minor — extend ECHO_HOME_PATHS with `workflows: join(root, 'workflows')` + frozen invariant preserved
   - src/echo-home/scaffold.ts                           # AC5.1 minor — mkdirSync workflows/ in the recursive sweep; idempotent semantics preserved
-  - package.json                                        # AC1 — add `bin: { echo: "./dist/cli/index.js" }` + a `build:cli` script that vite-node-compiles or tsc-emits src/cli/ to dist/; daemon path unchanged
+  - package.json                                        # AC1 — add `bin: { echoctl: "./dist/cli/index.js" }` (r2 codex-ops F1 HIGH: binary renamed from `echo` to avoid POSIX shell builtin collision) + a `build:cli` script that vite-node-compiles or tsc-emits src/cli/ to dist/; daemon path unchanged
   - tests/cli/init.test.ts                              # AC7
   - tests/cli/doctor.test.ts                            # AC7
   - tests/cli/uninstall.test.ts                         # AC7
@@ -123,7 +123,7 @@ A new script `"build:cli": "tsc -p tsconfig.cli.json"` (or vite-node bundle equi
 **AC1.2 — Subcommand dispatch.** Uses `node:util`'s `parseArgs` with `allowPositionals: true` and `strict: true`. Top-level grammar:
 
 ```
-echo <subcommand> [--flag ...] [positional args]
+echoctl <subcommand> [--flag ...] [positional args]
 ```
 
 Recognized subcommands: `init`, `doctor`, `uninstall`, `run`, `--help`, `--version`. Anything else exits 2 with usage. `--help` / `-h` at the top level prints all subcommands; `--help` after a subcommand prints that subcommand's help only. `--version` reads `package.json`'s `version` field and prints it.
@@ -135,7 +135,7 @@ Recognized subcommands: `init`, `doctor`, `uninstall`, `run`, `--help`, `--versi
 - `2` — usage error (bad flag, unknown subcommand, missing required positional)
 - `130` / `143` — SIGINT / SIGTERM (forwarded to child processes during `echoctl run` dispatch)
 
-The dispatcher catches all subcommand-thrown exceptions, prints the message + a 1-line "see `echo <cmd> --help`" pointer, and exits `1`. Uncaught exceptions outside the dispatcher (programming bugs) propagate the default Node exit `1` and stack trace.
+The dispatcher catches all subcommand-thrown exceptions, prints the message + a 1-line "see `echoctl <cmd> --help`" pointer, and exits `1`. Uncaught exceptions outside the dispatcher (programming bugs) propagate the default Node exit `1` and stack trace.
 
 **AC1.4 — `--quiet` and `--json` global flags.** Both default off.
 
@@ -144,12 +144,13 @@ The dispatcher catches all subcommand-thrown exceptions, prints the message + a 
 
 **AC1.5 — Shell-reachability smoke test (r2 codex-ops F1 HIGH).** A NEW test at `tests/cli/shell-reachable.test.ts` pins that the linked binary is actually reachable from a real shell. The test:
 
-1. In a tmpdir, runs `npm pack` to produce a tarball of the current repo's tooling output, OR equivalently runs `npm install -g <path>` against a tmp prefix.
-2. Invokes the binary via `child_process.spawnSync('bash', ['-c', 'echoctl --version'])` with `PATH=<tmp-prefix>/bin:$PATH`.
-3. Asserts `result.status === 0` AND `result.stdout.trim() === <expected version>`.
-4. Negative case: asserts `bash -c 'echo --version'` does NOT invoke the CLI (it invokes the shell builtin). This is the regression-pin against future re-renames to a builtin-collision shape.
+1. **Build first (r3 codex F2 MED — hermeticity fix).** Run `child_process.spawnSync('npm', ['run', 'build:cli'], { cwd: repoRoot })` BEFORE the install step. AC1.1 deliberately omits a `prepare`/`postinstall` hook (would slow every `npm install` for non-CLI dev paths); the smoke test owns the build. Without this step, a fresh-clone CI run would install a missing `dist/cli/index.js` (broken bin) OR a re-run after `dist/` was deleted would silently pass against stale local build output. Assert build exit status === 0; assert `dist/cli/index.js` exists post-build.
+2. In a tmpdir, runs `npm pack` then `npm install -g --prefix <tmp-prefix> <packed-tarball>` to install the just-built bin into an isolated prefix.
+3. Invokes the binary via `child_process.spawnSync('bash', ['-c', 'echoctl --version'])` with `PATH=<tmp-prefix>/bin:$PATH`.
+4. Asserts `result.status === 0` AND `result.stdout.trim() === <expected version from package.json>`.
+5. Negative case: asserts `bash -c 'echo --version'` does NOT invoke the CLI (it invokes the shell builtin). This is the regression-pin against future re-renames to a builtin-collision shape.
 
-The test runs only on CI environments where `npm` is on PATH; on local dev runs without that prerequisite, it's gated to a `vitest.skipUnless(hasNpm)` and reported as `skipped` rather than failing. Builder note: this is the single test that catches `bin`-collision class bugs across the npm + shell + PATH stack. If this test is too slow for the default suite (~5s for `npm pack`), tag it as `slow` and run on CI only.
+The test runs only on CI environments where `npm` is on PATH; on local dev runs without that prerequisite, it's gated to a `vitest.skipUnless(hasNpm)` and reported as `skipped` rather than failing. Builder note: this is the single test that catches `bin`-collision class bugs across the npm + shell + PATH stack. If this test is too slow for the default suite (~5s for `npm run build:cli` + ~5s for `npm pack` + `npm install -g`), tag it as `slow` and run on CI only.
 
 ### AC2 — `src/cli/commands/init.ts` orchestrates 073's wizard end-to-end with TTY prompts
 
@@ -249,7 +250,31 @@ export async function runDoctor(opts: DoctorOpts): Promise<number>;
 
 `DoctorOpts` includes test seams for `probeAgents`, `fetch` (for MCP /mcp HTTP probe), and `now`. Returns exit code: `0` if `overall === 'healthy'`, `1` if `'degraded'` or `'broken'`.
 
-**AC3.2 — Daemon probe.** Resolve port via the same logic as AC2.2. Send a single HTTP POST to `http://127.0.0.1:<port>/mcp` with a minimal MCP `initialize` request body; treat any 2xx response (within 2s) as `mcpReachable: true`. Connection-refused / ENOTFOUND / timeout → `false`. Also stat the PID lock file at `<dataDir>/daemon.pid` (the canonical filename per `src/daemon/lifecycle.ts:55`; r1 codex-ops F5 MED fix — earlier spec text said `echo.pid` which the daemon does NOT write, so `pidLockHeld` would have been permanently `false`); `pidLockHeld: true` if the file exists AND is readable. The two signals are reported independently; a stale PID lock without a reachable daemon is the recoverable-stale-lock shape (`overall = 'degraded'` per AC3.6's truth table).
+**AC3.2 — Daemon probe.** Resolve port via the same logic as AC2.2. Send a single HTTP POST to `http://127.0.0.1:<port>/mcp` with the headers + JSON-RPC `initialize` envelope below (r3 codex F4 MED fix — the daemon's `StreamableHTTPServerTransport` content-negotiates and 406-rejects POSTs missing either header):
+
+```ts
+// Required headers
+{
+  'Content-Type': 'application/json',
+  'Accept': 'application/json, text/event-stream',
+}
+
+// JSON-RPC initialize body (matches src/mcp/server.ts contract — uses the same shape the existing watcher dispatch helper uses for active-trigger calls)
+{
+  jsonrpc: '2.0',
+  method: 'initialize',
+  params: {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'echoctl-doctor', version: <echoVersion from AC2.2> },
+  },
+  id: 1,
+}
+```
+
+Treat any 2xx response (within 2s) as `mcpReachable: true`. Connection-refused / ENOTFOUND / timeout / 406 (missing-header bug regression catch) → `false`. AC7.2 fixtures pin both headers' presence by intercepting the fake `fetch` and asserting `init.headers['Accept']` + `init.headers['Content-Type']` exactly match the strings above.
+
+Also stat the PID lock file at `<dataDir>/daemon.pid` (the canonical filename per `src/daemon/lifecycle.ts:55`; r1 codex-ops F5 MED fix — earlier spec text said `echo.pid` which the daemon does NOT write, so `pidLockHeld` would have been permanently `false`); `pidLockHeld: true` if the file exists AND is readable. The two signals are reported independently; a stale PID lock without a reachable daemon is the recoverable-stale-lock shape (`overall = 'degraded'` per AC3.6's truth table).
 
 **AC3.3 — `~/.echo/` integrity.** Stat `ECHO_HOME_PATHS.root`. Read `stateOnboarding` and `stateProjects` via 070's `validateOnboardingState` / `validateProjectsState`. Any validation failure → `schemaVersion: 'mismatch'`. Missing files → `'missing'`. Otherwise `1`. Does NOT auto-recreate; that's `echoctl init`'s job.
 
@@ -479,6 +504,8 @@ export async function dispatchWorkflow(opts: {
 
 For each step (sequential, no parallelism per J3):
 
+0. **Pre-iteration `signal.aborted` check (r3 codex-ops F1 HIGH — defense-in-depth for the between-step gap).** Before processing the step (i.e., at the top of each loop iteration), check `opts.signal?.aborted === true`. If true, append `DispatchOutcome` for the current step with `spawn: null, error: 'interrupted', signal: opts.receivedSignal?.current ?? 'SIGTERM'` and BREAK the loop (no further steps). Combined with `runRun`'s AC5.4 step 10 priority check, this closes the between-step gap where SIGTERM arrives after step N exits 0 but before step N+1's spawn() call. NOTE: the load-bearing primary closure for this gap is AC5.4 step 10's `receivedSignal.current` priority check (which fires regardless of outcomes); step 0 here is defense-in-depth so the outcome array correctly records the interrupted step for observability.
+
 1. If the corresponding `AgentMatch.pickedAgent` is null: skip with `error: <match.reason>`; do NOT spawn. Append to outcomes.
 2. **Read the sandbox flag from `match.resolvedSandbox`** (r2 codex F2 HIGH fix — earlier spec told the dispatcher to "look up the Role" but the public signature accepts only `workflow + matches`, breaking the data flow; carrying `resolvedSandbox` on `AgentMatch` keeps the dispatcher pure-from-matches). The mapping into spawn args:
    - `resolvedSandbox === 'workspace-write'` → spawn arg `--sandbox workspace-write` (codex) / no equivalent flag for claude (claude's permissions are global; constraining per-step is out-of-scope for V1).
@@ -489,7 +516,7 @@ For each step (sequential, no parallelism per J3):
    - `codex` → `spawn('codex', ['exec', '--sandbox', <fromStep2>, '--', <prompt>], { cwd: projectRoot, env: process.env })`.
    - `claude-code` → `spawn('claude', ['--print', '--no-stream', '--output-format', 'text', '--', <prompt>], { cwd: projectRoot, env: process.env })`.
    - `cursor` → never matched in practice (cursor's role profile has no automatable capability surface in V1). If somehow matched, skip with `error: 'cursor-not-dispatchable'`.
-   **On `ENOENT`** (binary not on the spawn's effective PATH; r2 codex-ops F3 MED): catch the spawn error, append `DispatchOutcome` with `spawn: null, error: 'cli-unavailable: <agent> not found on PATH'`. Do NOT auto-normalize PATH (Heisenbug across shells); do NOT persist binary paths in onboarding.json (scope creep); the actionable error message + the documented limitation (in After-Completion) are sufficient. Per AC5.3 step 5, the workflow then STOPS — subsequent steps skipped — and `runRun` returns non-zero. The user's escape hatch is `--agent <role>=<absolute-path>` (already in AC5.4's grammar) OR ensuring the agent binary is on the launching env's PATH.
+   **On `ENOENT`** (binary not on the spawn's effective PATH; r2 codex-ops F3 MED): catch the spawn error, append `DispatchOutcome` with `spawn: null, error: 'cli-unavailable: <agent> not found on PATH'`. Do NOT auto-normalize PATH (Heisenbug across shells); do NOT persist binary paths in onboarding.json (scope creep); the actionable error message + the documented limitation are sufficient. Per AC5.3 step 5, the workflow then STOPS — subsequent steps skipped — and `runRun` returns non-zero. **PATH requirement (r3 codex F3 + codex-ops F3 — replaces the earlier false `--agent <abs-path>` escape-hatch claim per 058 disposition-discipline removal):** `echoctl run` under launchd / cron / Raycast / minimal-PATH launching contexts requires the agent binaries (`codex`, `claude`) on the launching environment's PATH. The launchd plist pattern used by 072's daemon install (which sets PATH explicitly) is the reference recipe. A future `--agent <role>=<absolute-path>` override is a follow-up item if dogfooding surfaces real demand; the current `agentOverrides: ReadonlyMap<string, AgentKind>` does NOT support paths, and adding path support would mean a new override type + parser regex + matcher validation + dispatch wiring + new test cases — out of V1 scope.
 4. Wait for exit (or `timeoutMs` — SIGTERM the child, set `timedOut: true`). Append the outcome.
 5. **Step failure handling:** if a step's `spawn.exitCode !== 0` OR `spawn === null` (the ENOENT branch above), the dispatcher STOPS — subsequent steps are not run. The outcome array is returned with all completed steps + the failing step (subsequent steps are not in the array). V1 posture; 075-or-later may add `[step].continue_on_failure` if dogfooding shows the need.
 6. **`signal.aborted` mid-step (r2 codex-ops F2 HIGH fix — earlier spec returned partial outcomes silently so `runRun` could exit 0 on a SIGTERM-interrupted workflow):** kill the in-flight child (SIGTERM), append `DispatchOutcome` with `spawn: { ...partialSpawn, exitCode: -1, timedOut: false }, error: 'interrupted', signal: opts.receivedSignal` (the signal name is set by `runRun`'s SIGINT/SIGTERM handler before calling `controller.abort()`). The outcome array contains all completed steps + the interrupted step. `runRun` (AC5.4 step 9) reads the `error: 'interrupted'` outcome and exits with the corresponding shell signal exit code (130 / 143), never 0.
@@ -535,13 +562,13 @@ export async function runRun(opts: {
    ```
    The named-handler pattern is mandatory (Node `removeListener` matches by function identity; anonymous wrappers cannot be unregistered — matches the 072 lock-release discipline).
 9. `dispatchWorkflow({ ..., signal: controller.signal, receivedSignal })` (AC5.3). Print outcomes (or JSON-emit if `--json`).
-10. **Exit code derivation (r2 codex-ops F2 HIGH):**
-    - If any `DispatchOutcome` has `error === 'interrupted'` AND `signal === 'SIGTERM'` → exit 143.
-    - Else if any has `error === 'interrupted'` AND `signal === 'SIGINT'` → exit 130.
-    - Else if every dispatched outcome has `spawn !== null && spawn.exitCode === 0` → exit 0.
-    - Else → exit 1.
+10. **Exit code derivation (r3 codex-ops F1 HIGH closure — closes the between-step + post-final-step SIGTERM gaps the r2 patch left open):** The priority order below is load-bearing — the `receivedSignal.current` check fires FIRST, BEFORE any outcome inspection:
+    - **First priority — signal flag wins regardless of outcomes:** If `receivedSignal.current === 'SIGTERM'` → exit 143. If `receivedSignal.current === 'SIGINT'` → exit 130. This check fires even when ALL dispatched outcomes are successful — it closes the gap where SIGTERM arrives in the between-step gap OR after the final child exits 0 but before this exit-code derivation runs (in either case `controller.abort()` fired and set `receivedSignal.current`, but no in-flight child existed to produce an `interrupted` outcome). The signal flag is the single source of truth for "this process was interrupted."
+    - **Second priority — interrupted outcome derived signals (defense-in-depth):** If any `DispatchOutcome.error === 'interrupted'` AND `signal === 'SIGTERM'` → exit 143. SIGINT → 130. (Reached only if the first-priority check missed somehow — e.g., a future code change unsets `receivedSignal.current` between abort and exit derivation.)
+    - **Third priority — normal success:** If every dispatched outcome has `spawn !== null && spawn.exitCode === 0` AND `receivedSignal.current === null` → exit 0.
+    - **Otherwise** → exit 1.
     
-    The signal-handler-installed-then-aborted path always produces an `interrupted` outcome (AC5.3 step 6 guarantees it); there is NO path where an interrupted workflow can exit 0.
+    The first-priority check is the load-bearing primary; the second-priority check is defense-in-depth from the r2 disposition. Together: NO path exists where an interrupted process exits 0, regardless of WHEN the signal arrived (mid-step, between-step, post-final-step).
 
 ### AC6 — `src/cli/io/prompt.ts` + `src/cli/io/render.ts` are the only I/O primitives
 
@@ -607,6 +634,7 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 7. `--json` mode → emits the `DoctorReport` on one line.
 8. Cursor has `wired_at: null` (detected but skipped during init) → `probeOutcome: null`; not counted as failure.
 9. **Cursor probe outcome `manual-only` → counted as healthy** (per AC3.6 row: manual-only is NOT a failure).
+10. **MCP probe headers + envelope (r3 codex F4 MED verification).** Fake `fetch` records the call; assert `init.headers['Accept'] === 'application/json, text/event-stream'` AND `init.headers['Content-Type'] === 'application/json'`. Assert body parses as JSON-RPC with `method === 'initialize'`, `params.protocolVersion === '2025-06-18'`, `params.clientInfo.name === 'echoctl-doctor'`. Negative case: with the headers omitted, a real-mode test against the daemon's transport returns 406; this assertion is run only when the integration suite is active (gated).
 
 **AC7.3 — `uninstall.test.ts` (9 cases).**
 
@@ -639,6 +667,8 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 10. `${VAR}` substitution: prompt `"Review at ${ref}"` with `inputs = { ref = "HEAD" }` → spawn receives `"Review at HEAD"`. Missing var → ValidationError pre-dispatch.
 11. **Sandbox mapping carried via AgentMatch.resolvedSandbox (r2 codex F2 HIGH verification — was r1 C1).** Workflow with one step whose role has `sandbox = "workspace-write"` and `requires.capabilities = ["fs.write", "git.write"]` → matched agent is codex; **assert `match.resolvedSandbox === 'workspace-write'`** (proves the matcher populated the field); fake spawn receives `args` containing `['exec', '--sandbox', 'workspace-write', '--', <prompt>]` (proves the dispatcher reads from `match.resolvedSandbox`, NOT from a `roles[]` parameter — no `roles` arg is passed to `dispatchWorkflow` in this test). Repeat with `sandbox = "read-only"` → `match.resolvedSandbox === 'read-only'` + args contain `'--sandbox', 'read-only'`.
 12. **SIGTERM mid-workflow → exit 143, NOT exit 0 (r2 codex-ops F2 HIGH verification).** Fixture: two-step workflow; step 1's fake spawn exits 0; while step 2's fake spawn is in flight (a controllable promise), the test triggers `process.emit('SIGTERM')`. Assert: `runRun` returns 143 (NOT 0); outcomes array contains step 1 (success) + step 2 (`error: 'interrupted', signal: 'SIGTERM'`); the in-flight child got a SIGTERM (verified via the fake spawn's `kill` recorder). Repeat with SIGINT → exit 130. **The load-bearing assertion is that exit is NEVER 0 on a signal-interrupted workflow regardless of how many earlier steps succeeded.**
+12a. **SIGTERM between steps → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the between-step gap r2 left open).** Fixture: two-step workflow; step 1's fake spawn exits 0; the test arranges for SIGTERM to fire AFTER step 1's await resolves but BEFORE step 2's spawn is called (e.g., by `setImmediate(() => process.emit('SIGTERM'))` in the fake spawn's completion handler for step 1). Assert: `runRun` returns 143; outcomes array contains step 1 (success); step 2 either has `error: 'interrupted', signal: 'SIGTERM'` (AC5.3 step 0 pre-iteration check caught it) OR is absent (loop broke before iteration), but EITHER WAY `runRun`'s AC5.4 step 10 priority check sees `receivedSignal.current === 'SIGTERM'` and exits 143. Pins the first-priority `receivedSignal` check is load-bearing — the test must pass even when no `interrupted` outcome is in the array (close the gap where the signal arrives in the iteration boundary itself).
+12b. **SIGTERM after final step succeeds → exit 143, NOT exit 0 (r3 codex-ops F1 HIGH verification — closes the post-final-step gap).** Fixture: ONE-step workflow; step 1's fake spawn exits 0; AFTER step 1's await resolves AND BEFORE `runRun` reaches the exit-code derivation, fire SIGTERM (e.g., via a Promise.race that injects the signal between `dispatchWorkflow` resolution and the next microtask). Assert: `runRun` returns 143 EVEN THOUGH every outcome in the array is successful — the load-bearing assertion is `runRun` sees `receivedSignal.current === 'SIGTERM'` in step 10 and exits 143 regardless of outcomes. This is the case where the second-priority "interrupted-outcome derived signal" path would FAIL but the first-priority `receivedSignal` check succeeds.
 13. **Spawn ENOENT → cli-unavailable outcome (r2 codex-ops F3 MED verification).** Fixture: fake spawn throws ENOENT for `codex`. Assert: `DispatchOutcome.spawn === null`, `error === 'cli-unavailable: codex not found on PATH'`; subsequent steps skipped; exit 1. The error message contains the literal binary name.
 14. **K4 matcher reason taxonomy in runRun output (r2 codex F4 MED verification).** Two sub-fixtures:
     - (a) Zero onboarded agents wired (empty `onboarded[]`) + a workflow needing `reviewer` role → `runRun` exits 1 with `match.reason === 'no-onboarded-agent'` for the step.
@@ -725,6 +755,6 @@ Items I am least sure about; reviewers should pressure-test:
 
 - **R1 (J1 — no CLI framework).** Defensible if you accept the dep-tightness premise; reviewers from a CLI-UX background may disagree. Counter-argument: indie AI builders dogfooding the CLI for hours will hit `parseArgs`'s rough edges (no auto `--help` generation, error messages are sparse). If reviewers push back HARD, the swap-in is to `commander` (single dep, well-maintained, no peer-dep cascade). Don't engineer for both.
 - **R2 (J4 — deterministic agent picking).** A "round-robin" or "least-recently-used" picker is theoretically more parallelizable. V1: deterministic is testable + debuggable; non-determinism is V1.5+ at the earliest.
-- **R3 (AC4.4 — skill-file marker).** The "<!-- echo-owned-skill -->" marker is a defensible safety net, but it does retroactively require a 072 change. Reviewers should confirm 072's `syncClaudeSkills` doesn't already emit something equivalent (e.g., a frontmatter `owner: echo` field). If it does, the spec text should reference that marker shape instead.
+- **R3 (AC4.4 — skill-file ownership proof) — RESOLVED in r1.** The originally-proposed `<!-- echo-owned-skill -->` first-line marker was dropped per 058 disposition-discipline (conflicted with existing YAML frontmatter); r1 disposition replaced it with byte-equality ownership against `~/.echo/skills/<skill>.md`. r2 disposition further corrected the enumeration source (from `role.skills` union to `enumerate ~/.echo/skills/*.md`). Both r1 + r2 corrections require ZERO 072 changes; the byte-equality + directory-enumeration approach is robust. Documented here for the convergence audit trail; no live decision remaining.
 - **R4 (AC5.4 — workflow runtime without workflows).** Shipping a `run` command that always errors until 075 lands feels weird. The alternative is splitting 074 → "074a init/doctor/uninstall" + "074b run" — but that fragments the CLI's first impression. Single-binary is cleaner; the error message just has to be good.
 - **R5 (R7 — raw HTTP MCP probe).** Reviewers familiar with MCP spec evolution should flag if the SDK is moving toward a different initialize-handshake.
