@@ -1,6 +1,6 @@
 ---
 id: 2026-05-25-074-echo-cli-binary
-title: "`echo` CLI binary — init / doctor / uninstall / run subcommands; runtime role-plugging that picks an agent per role from onboarded capabilities"
+title: "`echoctl` CLI binary — init / doctor / uninstall / run subcommands; runtime role-plugging that picks an agent per role from onboarded capabilities"
 status: ready
 priority: HIGH
 estimate: 2-3d
@@ -51,17 +51,19 @@ spec_refs:
   - backlog/{ready,pending_review,complete}/2026-05-25-073-onboarding-wizard.md  # exports createWizard, Wizard, DetectedAgent, DetectedProject, WireResult, ProbeOutcome, WizardSummary. STAGE-STABLE — 074 is blocked_by 073, so by claim time 073 is in complete/. Builder reads via filename lookup across the three stage directories.
   - src/cli/io/prompt.ts  # NOTE: this file does not exist yet — created by AC6. The path is listed in files_to_modify above.
   - src/mcp/server.ts:363  # `http://${host}:${boundPort}/mcp` — canonical MCP URL shape; 074 reconstructs `mcpServerUrl` from `ECHO_MCP_PORT` (default 38478) for the wizard handoff
-  - src/daemon/lifecycle.ts  # resolveDataDir + resolveDbPath — `echo doctor` reuses for daemon-path attribution
-  - src/daemon/index.ts:27-32  # resolveMcpPort — `echo init` mirrors this resolver to build `mcpServerUrl`
+  - src/daemon/lifecycle.ts  # resolveDataDir + resolveDbPath — `echoctl doctor` reuses for daemon-path attribution
+  - src/daemon/index.ts:27-32  # resolveMcpPort — `echoctl init` mirrors this resolver to build `mcpServerUrl`
   - skills/process-backlog.md  # reviewer guidance — 074 is a CLI item, NOT a substrate item; minimal new deps
   - CLAUDE.md  # operating model — CLI touches none of the operating-model files; reference only
 ---
 
-# `echo` CLI binary (init / doctor / uninstall / run)
+# `echoctl` CLI binary (init / doctor / uninstall / run)
 
 ## Why this spec exists
 
-The 2026-05-25 ECHO Pro design (`raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md`, §"Coord layer architecture") ships the paid tier as a coord layer that lives under `~/.echo/`. 070 created the scaffold; 071 defined role TOMLs; 072 built the adapter sync engine; 073 built the UX-free wizard library. **074 is the surface** — a single `echo` binary that the user types to onboard (`init`), to verify health (`doctor`), to uninstall (`uninstall`), and to run multi-agent workflows (`run`).
+The 2026-05-25 ECHO Pro design (`raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md`, §"Coord layer architecture") ships the paid tier as a coord layer that lives under `~/.echo/`. 070 created the scaffold; 071 defined role TOMLs; 072 built the adapter sync engine; 073 built the UX-free wizard library. **074 is the surface** — a single `echoctl` binary that the user types to onboard (`init`), to verify health (`doctor`), to uninstall (`uninstall`), and to run multi-agent workflows (`run`).
+
+**Binary rename rationale (r2 codex-ops F1 HIGH fix; supersedes the decision-archive `echo` reference).** The decision archive at `raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md` lists `/usr/local/bin/echo` as the CLI path. That was wrong: `echo` is a POSIX shell builtin in bash, zsh, and dash; `npm link` cannot make `echo init` invoke this CLI because the shell intercepts the builtin before PATH lookup (resulting in `echo init` printing literally `"init\n"`). The binary is renamed to `echoctl` here — following the `kubectl` / `systemctl` / `launchctl` convention — to be (a) reachable from any standard shell, (b) distinctive (no builtin collision), (c) self-documenting ("ECHO control"). The product name "ECHO" is unchanged; only the verb the user types moves. After-Completion logs the decision-archive update.
 
 The binary is small by design. The hard mechanics live downstream:
 
@@ -75,7 +77,7 @@ The split rule: anything that decides *what* to onboard, sync, or wire belongs u
 ## Architectural sketch
 
 ```
-$ echo init                                 $ echo doctor               $ echo uninstall          $ echo run <workflow> [--project P]
+$ echoctl init                                 $ echoctl doctor               $ echoctl uninstall          $ echoctl run <workflow> [--project P]
        │                                          │                          │                            │
        ▼                                          ▼                          ▼                            ▼
   cli/commands/init.ts                       cli/commands/doctor.ts     cli/commands/uninstall.ts    cli/commands/run.ts
@@ -98,13 +100,13 @@ $ echo init                                 $ echo doctor               $ echo u
 The decision archive leaves several mechanics underspecified. The calls below are the spec author's picks; reviewers should push back if any feels wrong.
 
 - **J1. No third-party CLI framework.** No `commander`, no `yargs`, no `inquirer`, no `chalk`. Arg parsing uses `node:util`'s `parseArgs` (built-in since Node 18, already used elsewhere in the repo's tooling shape). Prompts use `node:readline/promises`. Color is raw ANSI escape sequences gated on `process.stdout.isTTY`. Rationale: the substrate keeps deps tight (the repo today has 7 runtime deps — ajv, ajv-formats, better-sqlite3, chokidar, mcp-sdk, smol-toml; CLI frameworks would ~triple that surface for marginal UX gain). If `parseArgs` proves limiting in dogfooding, the swap-in is bounded; it can happen later.
-- **J2. `echo run` ships the runtime even though 075 has no workflows yet.** The mechanism (workflow loader + role-matcher + dispatcher) is small and self-contained; shipping it now means 075 only has to write `<workflow>.toml` files, not invent runtime semantics. When no workflow files exist OR the named workflow is not found, `echo run` errors with installation guidance (AC5.4). The pre-075 binary still type-checks and tests cleanly; the matcher's only at-runtime input is `onboarding.json`.
+- **J2. `echoctl run` ships the runtime even though 075 has no workflows yet.** The mechanism (workflow loader + role-matcher + dispatcher) is small and self-contained; shipping it now means 075 only has to write `<workflow>.toml` files, not invent runtime semantics. When no workflow files exist OR the named workflow is not found, `echoctl run` errors with installation guidance (AC5.4). The pre-075 binary still type-checks and tests cleanly; the matcher's only at-runtime input is `onboarding.json`.
 - **J3. Workflow file format is intentionally minimal.** V1 ships: `[workflow]` table with `name` + `description`; a `[[step]]` array where each step has `role` (a name matching a `~/.echo/roles/<name>.toml`), `prompt` (string), and optional `inputs` (string-string map). Steps run sequentially; no parallelism, no branching, no error-recovery DSL. Anything more sophisticated is a 075-or-later concern. Rationale: dogfooding will reveal what the workflow language actually needs to express; speculating now is exactly the strategist-drift failure mode that 058 named.
 - **J4. Role-matcher picks the highest-capability agent deterministically; no UX prompt mid-`run`.** If multiple onboarded agents satisfy a role's `requires.capabilities`, the matcher picks the one whose `OnboardedAgentProfile` was wired earliest (`wired_at` ascending). This is stable across re-runs and trivially testable. Per-invocation override (`--agent <role>=<id>`) is supported on the `run` command for users who want to pin; without it, dispatch is silent + deterministic. A mid-run prompt would block automated workflow invocation, which is exactly the use case `run` exists to serve.
-- **J5. Uninstall is destructive but explicit, and conservative by default.** `echo uninstall` removes the ECHO marker block + MCP server entries by default. It does NOT remove `~/.echo/` (state, skills, role TOMLs, adapter cache) unless `--purge-state` is passed. Reason: a user re-running `echo init` after a temporary `echo uninstall` should not lose their detected-projects history. `--purge-state` is the "I'm leaving for good" branch. Both modes require an interactive `y/N` confirmation unless `--yes` is passed. The confirmation prompt enumerates exactly which files will be touched (read from `onboarding.json`'s `agents[].wired_at`); no surprise writes.
-- **J6. `echo doctor` is read-only.** It does NOT remove orphaned `adapter-sync.lock` files automatically (072's H1 disposition was "the engine never auto-removes a present lockfile"). `doctor` surfaces the lockfile's mtime + the suggested `rm` command and exits non-zero. A `--fix` flag is explicitly out of scope for V1 (075-or-later); the user runs `rm` themselves. Rationale: doctor's contract is "report"; making it a writer would either re-introduce the TOCTOU mechanism 072 r3-r6 explicitly removed, or duplicate it adjacent. Either is regression risk.
+- **J5. Uninstall is destructive but explicit, and conservative by default.** `echoctl uninstall` removes the ECHO marker block + MCP server entries by default. It does NOT remove `~/.echo/` (state, skills, role TOMLs, adapter cache) unless `--purge-state` is passed. Reason: a user re-running `echoctl init` after a temporary `echoctl uninstall` should not lose their detected-projects history. `--purge-state` is the "I'm leaving for good" branch. Both modes require an interactive `y/N` confirmation unless `--yes` is passed. The confirmation prompt enumerates exactly which files will be touched (read from `onboarding.json`'s `agents[].wired_at`); no surprise writes.
+- **J6. `echoctl doctor` is read-only.** It does NOT remove orphaned `adapter-sync.lock` files automatically (072's H1 disposition was "the engine never auto-removes a present lockfile"). `doctor` surfaces the lockfile's mtime + the suggested `rm` command and exits non-zero. A `--fix` flag is explicitly out of scope for V1 (075-or-later); the user runs `rm` themselves. Rationale: doctor's contract is "report"; making it a writer would either re-introduce the TOCTOU mechanism 072 r3-r6 explicitly removed, or duplicate it adjacent. Either is regression risk.
 - **J7. The CLI binary is a thin shell; all integration tests use fakes.** No CLI test spawns a real daemon, real `codex exec`, or real `claude --print`. Tests inject the same dependency-injection seams 073 exposed (`detectAgentsDeps.atomStore`, `probeDeps.spawn`, etc.) plus a new `cli/io/prompt.ts` swap (`readPrompt`, `readConfirm`, `readSelect` swapped for canned answers). Production builds of the CLI dynamic-resolve the real implementations. Integration depth: each command's test asserts end-to-end behavior (exit code + stdout match) with fakes wired in.
-- **J8. `--project` resolution: explicit flag > cwd's nearest git root > onboarding-state `default_project` > error.** When `--project` is passed, the CLI uses it verbatim (no validation against git-rootedness — user knows their own setup). When absent, walk upward from `cwd` until `.git/` is found; if not found, fall back to `default_project` from `projects.json`. If both are absent, the command errors with "no project context — pass `--project <path>` or run from a git repository or run `echo init` to pick a default." Per codex consult in the decision archive: "D as product model, A as CLI default."
+- **J8. `--project` resolution: explicit flag > cwd's nearest git root > onboarding-state `default_project` > error.** When `--project` is passed, the CLI uses it verbatim (no validation against git-rootedness — user knows their own setup). When absent, walk upward from `cwd` until `.git/` is found; if not found, fall back to `default_project` from `projects.json`. If both are absent, the command errors with "no project context — pass `--project <path>` or run from a git repository or run `echoctl init` to pick a default." Per codex consult in the decision archive: "D as product model, A as CLI default."
 
 ## Acceptance Criteria
 
@@ -113,7 +115,7 @@ The decision archive leaves several mechanics underspecified. The calls below ar
 **AC1.1 — Shebang + bin field.** The file's first line is `#!/usr/bin/env node`. `package.json` gains:
 
 ```json
-"bin": { "echo": "./dist/cli/index.js" }
+"bin": { "echoctl": "./dist/cli/index.js" }
 ```
 
 A new script `"build:cli": "tsc -p tsconfig.cli.json"` (or vite-node bundle equivalent — builder picks the smaller-deps option) emits `dist/cli/`. The daemon's existing `vite-node`-based scripts are unchanged. The `build:cli` script is invoked manually for now (no auto-build in `prepare`); a follow-up item will wire it into the install flow if needed.
@@ -131,7 +133,7 @@ Recognized subcommands: `init`, `doctor`, `uninstall`, `run`, `--help`, `--versi
 - `0` — success
 - `1` — runtime error (subcommand-specific; copy in stderr)
 - `2` — usage error (bad flag, unknown subcommand, missing required positional)
-- `130` / `143` — SIGINT / SIGTERM (forwarded to child processes during `echo run` dispatch)
+- `130` / `143` — SIGINT / SIGTERM (forwarded to child processes during `echoctl run` dispatch)
 
 The dispatcher catches all subcommand-thrown exceptions, prints the message + a 1-line "see `echo <cmd> --help`" pointer, and exits `1`. Uncaught exceptions outside the dispatcher (programming bugs) propagate the default Node exit `1` and stack trace.
 
@@ -139,6 +141,15 @@ The dispatcher catches all subcommand-thrown exceptions, prints the message + a 
 
 - `--quiet` suppresses all non-error stdout. Useful for shell-scripting.
 - `--json` switches all stdout to newline-delimited JSON. Every line is one structured event with at least `{ event: string, ... }`. Errors go to stderr as plain text regardless. Both flags can stack (`--quiet --json` prints only the final-result JSON line + drops progress events). Tests pin a small fixed set of `event` strings per subcommand (AC7).
+
+**AC1.5 — Shell-reachability smoke test (r2 codex-ops F1 HIGH).** A NEW test at `tests/cli/shell-reachable.test.ts` pins that the linked binary is actually reachable from a real shell. The test:
+
+1. In a tmpdir, runs `npm pack` to produce a tarball of the current repo's tooling output, OR equivalently runs `npm install -g <path>` against a tmp prefix.
+2. Invokes the binary via `child_process.spawnSync('bash', ['-c', 'echoctl --version'])` with `PATH=<tmp-prefix>/bin:$PATH`.
+3. Asserts `result.status === 0` AND `result.stdout.trim() === <expected version>`.
+4. Negative case: asserts `bash -c 'echo --version'` does NOT invoke the CLI (it invokes the shell builtin). This is the regression-pin against future re-renames to a builtin-collision shape.
+
+The test runs only on CI environments where `npm` is on PATH; on local dev runs without that prerequisite, it's gated to a `vitest.skipUnless(hasNpm)` and reported as `skipped` rather than failing. Builder note: this is the single test that catches `bin`-collision class bugs across the npm + shell + PATH stack. If this test is too slow for the default suite (~5s for `npm pack`), tag it as `slow` and run on CI only.
 
 ### AC2 — `src/cli/commands/init.ts` orchestrates 073's wizard end-to-end with TTY prompts
 
@@ -150,7 +161,7 @@ export async function runInit(opts: InitOpts): Promise<number>;
 
 `InitOpts` includes a `wizardFactory?: typeof createWizard` test seam (default = production `createWizard`), a `prompt?: PromptImpl` seam (default = the readline-backed implementation in `cli/io/prompt.ts`), and a `now?: () => Date` (default = `() => new Date()`). Returns the exit code.
 
-**AC2.1.0 — Non-TTY fail-closed guard (r1 codex-ops F2 HIGH).** BEFORE invoking any wizard method, `runInit` MUST check `process.stdin.isTTY`. If false (the process was piped / cron / launchd-spawned without a controlling TTY), exit `2` immediately with stderr message `"echo init: non-interactive — a TTY is required. Pipe-driven onboarding via an answer file is a future item."` and DO NOT call `wizardFactory`, `wizard.detectAgents`, or any other wizard method. This guard fires AT THE TOP of `runInit`, before `mcpServerUrl` / `echoVersion` resolution. Rationale: AC6.1's `makeTtyPrompt` falls back to prompt defaults when stdin is not a TTY (Enter ⇒ default = "all detected agents", Enter ⇒ default = "skip default project"); under a pipe, a successful default-cascade would proceed into `wizard.wire()` and mutate `~/.codex`, `~/.claude`, `~/.cursor`, and `~/.echo` WITHOUT any human confirmation. The guard makes init's "needs human confirmation" contract enforceable, independent of how the prompt library is wired. The follow-up `--answer-file` non-interactive path is logged in After-Completion; do NOT add it in this spec.
+**AC2.1.0 — Non-TTY fail-closed guard (r1 codex-ops F2 HIGH).** BEFORE invoking any wizard method, `runInit` MUST check `process.stdin.isTTY`. If false (the process was piped / cron / launchd-spawned without a controlling TTY), exit `2` immediately with stderr message `"echoctl init: non-interactive — a TTY is required. Pipe-driven onboarding via an answer file is a future item."` and DO NOT call `wizardFactory`, `wizard.detectAgents`, or any other wizard method. This guard fires AT THE TOP of `runInit`, before `mcpServerUrl` / `echoVersion` resolution. Rationale: AC6.1's `makeTtyPrompt` falls back to prompt defaults when stdin is not a TTY (Enter ⇒ default = "all detected agents", Enter ⇒ default = "skip default project"); under a pipe, a successful default-cascade would proceed into `wizard.wire()` and mutate `~/.codex`, `~/.claude`, `~/.cursor`, and `~/.echo` WITHOUT any human confirmation. The guard makes init's "needs human confirmation" contract enforceable, independent of how the prompt library is wired. The follow-up `--answer-file` non-interactive path is logged in After-Completion; do NOT add it in this spec.
 
 The flow (post-guard) is exactly the 6 steps of the decision archive:
 
@@ -158,8 +169,8 @@ The flow (post-guard) is exactly the 6 steps of the decision archive:
 2. **Detect agents** — call `wizard.detectAgents()`. Render the `DetectedAgent[]` as a numbered list with confidence bucket + signal summary. Prompt: "Confirm subset to wire (default: all `high` + `medium` confidence): [Enter / type comma-separated kinds]." Empty input = default; explicit list = the user's pick (validated against `AgentKind` union).
 3. **Detect projects** — call `wizard.detectProjects()`. Render the `DetectedProject[]` ranked by activity. Prompt: "Pick default project (1-N), or Enter to skip." Skip stores `defaultProjectRepoRoot: null`.
 4. **Wire** — call `wizard.wire({ selectedAgents, defaultProjectRepoRoot, repoRoot? })` (the `repoRoot?` recovery seam fires only when the AC5.7 retry path is taken — see AC2.3). Render `WireResult`: per-agent action (added/updated/conflict/error), conflict diffs if any. On any conflict, surface 072's pre-built diff + the message-quoted `rm` instruction (for `syncLock`) verbatim; do NOT paraphrase.
-5. **Probe** — call `wizard.probe(selectedAgents)`. Render `ProbeOutcome[]`. For `cursor` and `mcp-not-configured` outcomes, print the corresponding remediation copy from AC2.4. Probe failures do NOT block onboarding from completing — the user can finish and address probe failures via `echo doctor` later.
-6. **Done** — call `wizard.markCompleted()`. Print "You're ready" + the suggested next-action hint (V1: `echo run <workflow>` — TBD copy; 075 will populate) + the path to `~/.echo/state/onboarding.json` + the `echo uninstall` command. Exit 0.
+5. **Probe** — call `wizard.probe(selectedAgents)`. Render `ProbeOutcome[]`. For `cursor` and `mcp-not-configured` outcomes, print the corresponding remediation copy from AC2.4. Probe failures do NOT block onboarding from completing — the user can finish and address probe failures via `echoctl doctor` later.
+6. **Done** — call `wizard.markCompleted()`. Print "You're ready" + the suggested next-action hint (V1: `echoctl run <workflow>` — TBD copy; 075 will populate) + the path to `~/.echo/state/onboarding.json` + the `echoctl uninstall` command. Exit 0.
 
 **AC2.2 — `mcpServerUrl` + `echoVersion` plumbing.** `runInit` resolves both before calling `createWizard`:
 
@@ -172,18 +183,18 @@ The flow (post-guard) is exactly the 6 steps of the decision archive:
 
 | Reason | Copy |
 |---|---|
-| `cli-unavailable` | "<binary> not found on PATH. Install it (see <vendor docs URL>) and run `echo doctor` to re-probe." |
-| `auth-required` | "<binary> is not logged in. Run `<binary> login` and then `echo doctor`." |
+| `cli-unavailable` | "<binary> not found on PATH. Install it (see <vendor docs URL>) and run `echoctl doctor` to re-probe." |
+| `auth-required` | "<binary> is not logged in. Run `<binary> login` and then `echoctl doctor`." |
 | `manual-only` (cursor) | "Cursor has no headless CLI. Open Cursor and run any prompt to confirm ECHO MCP is reachable." |
-| `mcp-not-configured` (claude-code) | "Claude Code does not have ECHO MCP configured. Run `claude mcp add echo <url>` and then `echo doctor`." (the URL is `mcpServerUrl` from AC2.2) |
-| `timeout` | "<binary> took longer than 5s to respond. Re-run `echo doctor` once if this persists." |
-| `unexpected-output` | "<binary> responded but did not echo `pong`. Detail: <first 200 chars>. Run `echo doctor` to retry." |
+| `mcp-not-configured` (claude-code) | "Claude Code does not have ECHO MCP configured. Run `claude mcp add echo <url>` and then `echoctl doctor`." (the URL is `mcpServerUrl` from AC2.2) |
+| `timeout` | "<binary> took longer than 5s to respond. Re-run `echoctl doctor` once if this persists." |
+| `unexpected-output` | "<binary> responded but did not echo `pong`. Detail: <first 200 chars>. Run `echoctl doctor` to retry." |
 
 The exact copy is reviewer-tunable; the spec invariant is that every `ProbeOutcome.reason` has a single, deterministic remediation string. Tests assert presence of the binary name + the relevant remediation hint string for each reason.
 
 **AC2.5 — Populate `OnboardedAgentProfile.capabilities` from a static per-agent map (r1 C1 — codex F1 + codex-ops F1, both HIGH).**
 
-073's `wizard.wire()` writes `OnboardedAgentProfile.capabilities: []` for every newly-wired agent (070 schema only requires `string[]`; 073 doesn't populate it). The default role TOMLs at `assets/echo-roles/` declare non-empty `[role.requires].capabilities` (e.g., builder requires `fs.write`, `git.write`, `mcp.echo.write`). Consequence: 074's `echo run` matcher reads `capabilities: []`, computes `capabilities ⊇ role.requires.capabilities → false`, and EVERY workflow step fails with `no-onboarded-agent` or `capability-mismatch`. The role-plugging mechanism is dead on arrival after a successful `echo init`.
+073's `wizard.wire()` writes `OnboardedAgentProfile.capabilities: []` for every newly-wired agent (070 schema only requires `string[]`; 073 doesn't populate it). The default role TOMLs at `assets/echo-roles/` declare non-empty `[role.requires].capabilities` (e.g., builder requires `fs.write`, `git.write`, `mcp.echo.write`). Consequence: 074's `echoctl run` matcher reads `capabilities: []`, computes `capabilities ⊇ role.requires.capabilities → false`, and EVERY workflow step fails with `no-onboarded-agent` or `capability-mismatch`. The role-plugging mechanism is dead on arrival after a successful `echoctl init`.
 
 Resolution: 074's `init` is the SOLE writer of `capabilities`. After `wizard.wire()` returns successfully (any subset of `ok: true` agents), and BEFORE `wizard.probe()`, `runInit` reads `~/.echo/state/onboarding.json`, joins each successfully-wired agent's profile to the static map below, and writes the merged state back via `atomicWrite` (`secretSensitive: false`).
 
@@ -213,7 +224,7 @@ export const AGENT_CAPABILITIES_BY_KIND: Readonly<Record<AgentKind, readonly Cap
 Properties (asserted by AC7.1 and a new AC7.7 case):
 - Every entry value is a subset of 071's `Capability` union (`fs.read|fs.write|git.read|git.write|network|mcp.echo.read|mcp.echo.write`); typecheck enforces this via the `Readonly<Record<AgentKind, readonly Capability[]>>` type.
 - Order is canonical (the order shown above); the merge writes back in canonical order regardless of prior state so a re-run is byte-stable.
-- Re-running `echo init` with an agent already wired AND already-populated capabilities → no change if the agents' kinds AND the map are unchanged (idempotent mutation).
+- Re-running `echoctl init` with an agent already wired AND already-populated capabilities → no change if the agents' kinds AND the map are unchanged (idempotent mutation).
 - If 073's wire reports `ok: false` for an agent (conflict / error), 074's init does NOT populate that agent's capabilities (keeps the existing `[]` or prior value); the failed agent will be skipped by the matcher until a successful re-wire.
 
 070 + 073 stay unchanged — 074's CLI surface owns the capability decision, not the substrate. This keeps 070's schema generic (`capabilities: string[]`) and preserves 073's "wizard library is UX-free" posture (073 still records the agents; it just doesn't claim to know which capabilities they grant).
@@ -240,7 +251,7 @@ export async function runDoctor(opts: DoctorOpts): Promise<number>;
 
 **AC3.2 — Daemon probe.** Resolve port via the same logic as AC2.2. Send a single HTTP POST to `http://127.0.0.1:<port>/mcp` with a minimal MCP `initialize` request body; treat any 2xx response (within 2s) as `mcpReachable: true`. Connection-refused / ENOTFOUND / timeout → `false`. Also stat the PID lock file at `<dataDir>/daemon.pid` (the canonical filename per `src/daemon/lifecycle.ts:55`; r1 codex-ops F5 MED fix — earlier spec text said `echo.pid` which the daemon does NOT write, so `pidLockHeld` would have been permanently `false`); `pidLockHeld: true` if the file exists AND is readable. The two signals are reported independently; a stale PID lock without a reachable daemon is the recoverable-stale-lock shape (`overall = 'degraded'` per AC3.6's truth table).
 
-**AC3.3 — `~/.echo/` integrity.** Stat `ECHO_HOME_PATHS.root`. Read `stateOnboarding` and `stateProjects` via 070's `validateOnboardingState` / `validateProjectsState`. Any validation failure → `schemaVersion: 'mismatch'`. Missing files → `'missing'`. Otherwise `1`. Does NOT auto-recreate; that's `echo init`'s job.
+**AC3.3 — `~/.echo/` integrity.** Stat `ECHO_HOME_PATHS.root`. Read `stateOnboarding` and `stateProjects` via 070's `validateOnboardingState` / `validateProjectsState`. Any validation failure → `schemaVersion: 'mismatch'`. Missing files → `'missing'`. Otherwise `1`. Does NOT auto-recreate; that's `echoctl init`'s job.
 
 **AC3.4 — Sync-lock probe.** Stat `path.join(ECHO_HOME_PATHS.state, 'adapter-sync.lock')`. If present, populate `syncLock.mtimeIso` (so the user can judge staleness) and `syncLock.cleanupCommand` with the shell-quoted `rm -- '<path>'` form (mirroring 072's `syncLock.message` shape). Doctor does NOT remove the file (J6).
 
@@ -267,7 +278,8 @@ The table is encoded in a `computeOverall(report: DoctorReport): 'healthy' \| 'd
 
 ```ts
 export interface UninstallOpts {
-  purgeState?: boolean;            // --purge-state: also rm -rf ~/.echo/
+  purgeState?: boolean;            // --purge-state: also rm -rf ~/.echo/ (gated by zero cleanup conflicts; see AC4.1 step 5)
+  forcePurge?: boolean;            // --force-purge: overrides the conflict-safety gate on --purge-state (r2 codex-ops F4 MED)
   yes?: boolean;                    // --yes: skip the interactive confirmation
   // test seams
   prompt?: PromptImpl;
@@ -285,11 +297,17 @@ Reads `OnboardingState` from `~/.echo/state/onboarding.json`. If the state file 
    - `codex` → call `inverse/markers.ts` on `~/.codex/AGENTS.md`; call `inverse/codex-config.ts` on `~/.codex/config.toml`.
    - `claude-code` → call `inverse/markers.ts` on `~/.claude/CLAUDE.md`; call `inverse/skills.ts` for the skill files (see AC4.4 for which).
    - `cursor` → call `inverse/cursor-config.ts` on `~/.cursor/mcp.json`.
-   - Errors per agent are non-fatal: log + continue. Final summary reports per-agent outcome.
-4. If `--purge-state`: prompt a second time ("This will permanently remove `~/.echo/` including all detected-projects history and adapter caches. Continue? [y/N]"), then `rmSync(ECHO_HOME_PATHS.root, { recursive: true, force: true })`.
-5. Print a 1-line summary + the path to `~/.echo/state/onboarding.json` if it still exists (for transparency).
+   - Per-agent errors do NOT abort the loop (continue to the next agent), but they ARE tracked into `cleanupConflicts: { agent: AgentKind; file: string; reason: string }[]` for exit-code derivation + the `--purge-state` safety gate.
+4. **Exit code derivation (r2 codex-ops F4 MED fix — earlier spec exited 0 even on partial-failure summaries, hiding the residual-config risk from automation):**
+   - `cleanupConflicts.length === 0` AND no programming-level errors → exit 0.
+   - `cleanupConflicts.length > 0` → exit 1; the human-readable summary names each unresolved file + its reason; the JSON output lists `cleanupConflicts` verbatim.
+5. **`--purge-state` safety gate (r2 codex-ops F4 MED).** Only proceeds if `cleanupConflicts.length === 0`. Branch:
+   - **No conflicts:** prompt a second time ("This will permanently remove `~/.echo/` including all detected-projects history and adapter caches. Continue? [y/N]"), then `rmSync(ECHO_HOME_PATHS.root, { recursive: true, force: true })`.
+   - **Conflicts present AND `--purge-state` requested AND `--force-purge` NOT requested:** refuse with stderr message naming the un-cleaned files + the AgentKind they belong to + the recommendation to resolve manually (or re-run with `--force-purge`). Exit 1. `~/.echo/` is NOT removed; the in-progress cleanup state is preserved for the user to triage.
+   - **Conflicts present AND `--force-purge` requested:** print a stern warning enumerating the residual ECHO config in `~/.codex` / `~/.claude` / `~/.cursor` (read from the conflict list), prompt `[y/N]` (skipped on `--yes`), then `rmSync(ECHO_HOME_PATHS.root, ...)`. Exit 0 (the user explicitly accepted the residual-config risk).
+6. Print a 1-line summary + the path to `~/.echo/state/onboarding.json` if it still exists (for transparency).
 
-Exit `0` on success (including partial-failure summary), `1` only on a programming-level error (e.g., prompt impl threw).
+`UninstallOpts` gains `forcePurge?: boolean` (the `--force-purge` flag).
 
 **AC4.2 — `inverse/markers.ts`.**
 
@@ -354,7 +372,13 @@ For each `<skill>.md` filename:
 
 Rationale for byte-equality as the ownership proof: `~/.echo/skills/<skill>.md` is the canonical source-of-truth that 072's `syncClaudeSkills` copied FROM. If the target byte-matches the source, the target is verifiably what ECHO wrote (no marker required); if it differs, the user edited it post-sync (or it was never written by ECHO). The check is robust under: (a) ECHO updating skill contents over time (re-sync rewrites both; byte-equality holds), (b) user-edited targets (differ; preserved), (c) third-party skills the user installed alongside ECHO's (no `<echoSkillsDir>` counterpart; source-missing). No mutation of 072 needed.
 
-`skillNames` is computed by the caller as the union of `role.skills` across all three default role TOMLs loaded via `loadRolesFromDir(ECHO_HOME_PATHS.roles)`. If `~/.echo/roles/` is empty or missing, fall back to a hardcoded set: the canonical V1 list as it appears in 071's `assets/echo-roles/*.toml` (the spec MUST resolve this list at write-time, not embed it — query the in-tree role TOMLs).
+**`skillNames` source: enumerate `~/.echo/skills/*.md`** (r2 codex F3 MED fix — earlier spec scoped to "union of `role.skills` across default role TOMLs" but 072's `syncClaudeSkills` copies EVERY `.md` from `~/.echo/skills/` to `~/.claude/commands/`, not just the role-referenced subset. At the pinned SHA, `~/.echo/skills/review-queue-cursor.md` is copied even though no default role names it — under the role.skills enumeration, uninstall would leave that file orphaned). The runUninstall caller computes `skillNames` as `readdirSync(ECHO_HOME_PATHS.skills).filter(f => f.endsWith('.md')).map(f => f.replace(/\.md$/, ''))` — the source-of-truth for what ECHO actually copied. **Degenerate cases:**
+
+- `~/.echo/skills/` missing → `skillNames: []`; `removeEchoClaudeSkills` is a no-op (empty `removed[]`, empty `skipped[]`); not an error.
+- `~/.echo/skills/` empty → same as missing; no-op.
+- `~/.echo/skills/<x>.md` exists but `~/.claude/commands/<x>.md` does NOT exist → that filename ends up in `skipped` with `reason: 'missing'`; not an error.
+
+This enumeration source also REMOVES 074's uninstall-path dependency on a valid `loadRolesFromDir` (one less failure mode at uninstall time). The role-TOML load is no longer relevant to AC4.4; it's only used by AC5 (which has its own `skillsRoot: ECHO_HOME_PATHS.skills` per r2 codex F1 disposition).
 
 ### AC5 — `src/cli/commands/run.ts` loads a workflow, matches roles to agents, dispatches
 
@@ -406,6 +430,7 @@ export interface AgentMatch {
   role: string;                   // workflow step's role name
   pickedAgent: AgentKind | null;  // null if no onboarded agent satisfies
   reason: 'matched' | 'no-onboarded-agent' | 'role-unknown' | 'capability-mismatch';
+  resolvedSandbox?: 'read-only' | 'workspace-write';   // r2 codex F2 HIGH fix — carries Role.sandbox so the dispatcher needs no roles[] reference; populated iff reason === 'matched'
 }
 
 export function matchRolesToAgents(opts: {
@@ -416,13 +441,19 @@ export function matchRolesToAgents(opts: {
 }): readonly AgentMatch[];
 ```
 
-For each step:
+For each step (reason taxonomy clarified per r2 codex F4 MED — the r1 ambiguity between AC5.2 and AC7.7 case 8 is resolved by the explicit rules below):
 
-1. Look up `Role` by `step.role` in `roles[]`. Not found → `reason: 'role-unknown'`.
-2. If `override.has(step.role)`: pick the override directly. Validate the override agent is in `onboarded[]` AND its `capabilities` ⊇ `role.requires.capabilities`; otherwise `reason: 'capability-mismatch'`.
-3. Otherwise: filter `onboarded[]` to those with `capabilities` ⊇ `role.requires.capabilities`. Empty → `reason: 'no-onboarded-agent'`. Non-empty → pick the one with earliest `wired_at` (deterministic; J4). `reason: 'matched'`.
+1. Look up `Role` by `step.role` in `roles[]`. Not found → `reason: 'role-unknown'`; do NOT populate `resolvedSandbox`.
+2. If `override.has(step.role)`: pick the override directly. Validate (a) the override agent IS in `onboarded[]` AND (b) its `capabilities` ⊇ `role.requires.capabilities`. If (a) fails → `reason: 'no-onboarded-agent'`; if (b) fails → `reason: 'capability-mismatch'`. Otherwise → `reason: 'matched'` + `resolvedSandbox: role.sandbox`.
+3. Otherwise (no override):
+   - **Step 3a — collect the agent pool.** Filter `onboarded[]` to entries whose `wired_at !== null` AND whose `kind` is one of the AgentKinds the role could plausibly accept (V1 = all three; future capability-typed roles may scope further). Call this `pool`.
+   - **Step 3b — `no-onboarded-agent` branch.** If `pool` is empty → `reason: 'no-onboarded-agent'`. **Semantic:** the user has zero wired agents capable of any role of this shape. Distinct from 3c.
+   - **Step 3c — capability filter.** Filter `pool` to entries whose `capabilities` ⊇ `role.requires.capabilities`. If the filtered set is empty (pool was non-empty; agents exist but are under-permissioned) → `reason: 'capability-mismatch'`. **Semantic:** agents are wired but their populated capabilities (per AC2.5's `AGENT_CAPABILITIES_BY_KIND`) lack what the role requires — typical when a role requires a capability not in the V1 vocabulary.
+   - **Step 3d — pick.** Non-empty filtered set → pick the entry with earliest `wired_at` (deterministic; J4). `reason: 'matched'` + `resolvedSandbox: role.sandbox`.
 
-The matcher does NOT spawn anything; it's pure. The dispatcher (AC5.3) reads its output.
+The two-stage filtering (3b before 3c) is load-bearing: it lets callers distinguish "wire more agents" (3b) from "this role's capability requirement is unsatisfiable with the current default capability map" (3c) — two genuinely different remediation paths.
+
+The matcher does NOT spawn anything; it's pure. The dispatcher (AC5.3) reads `match.resolvedSandbox` directly — no `roles[]` parameter needed.
 
 **AC5.3 — Dispatcher at `cli/workflow/dispatch.ts`.**
 
@@ -432,6 +463,7 @@ export interface DispatchOutcome {
   match: AgentMatch;
   spawn: { exitCode: number; stdout: string; stderr: string; timedOut: boolean; elapsedMs: number } | null;
   error?: string;
+  signal?: 'SIGINT' | 'SIGTERM';                        // r2 codex-ops F2 — populated on interrupted outcomes; runRun reads this to derive the 130/143 exit code
 }
 
 export async function dispatchWorkflow(opts: {
@@ -440,24 +472,27 @@ export async function dispatchWorkflow(opts: {
   spawn?: typeof import('node:child_process').spawn;   // test seam
   timeoutMs?: number;                                   // default 60_000 — longer than probe's 5s; real work
   projectRoot: string;                                  // resolved per J8
-  signal?: AbortSignal;                                 // SIGINT forwarding from the CLI
+  signal?: AbortSignal;                                 // SIGINT forwarding from the CLI; AC5.4 step 9 installs the handlers that abort this controller
+  receivedSignal?: { current: 'SIGINT' | 'SIGTERM' | null };  // r2 codex-ops F2 — mutable ref the parent SIGINT/SIGTERM handler writes the signal name into before calling controller.abort(); the dispatcher reads it to populate DispatchOutcome.signal
 }): Promise<DispatchOutcome[]>;
 ```
 
 For each step (sequential, no parallelism per J3):
 
 1. If the corresponding `AgentMatch.pickedAgent` is null: skip with `error: <match.reason>`; do NOT spawn. Append to outcomes.
-2. Look up the `Role` for `step.role` to compute the sandbox flag (r1 codex-ops F1 HIGH fix — earlier spec hardcoded `--sandbox read-only` even when default builder/strategist roles declare `sandbox = "workspace-write"`, so the child agent would run under WEAKER permissions than its role contract requires). The mapping is:
-   - `role.sandbox === 'workspace-write'` → spawn arg `--sandbox workspace-write` (codex) / no equivalent flag for claude (claude's permissions are global and out-of-scope to constrain per-step in V1).
-   - `role.sandbox === 'read-only'` → spawn arg `--sandbox read-only` (codex) / no equivalent flag for claude.
-   The sandbox value is taken FROM THE MATCHED ROLE, not from a workflow-step field; future workflow-step-level overrides are out of scope.
-3. Spawn per agent kind (mirrors 073's probe AC6.2 commands; the prompt is the step's `prompt` with `${VAR}` substituted from `inputs`). **All spawns MUST pass `{ cwd: opts.projectRoot, env: process.env }`** (r1 codex-ops F4 MED fix — earlier spec resolved `projectRoot` per J8 but never threaded it into the spawn, so `echo run --project /repo` from a different cwd would launch the child against the caller's cwd instead of `/repo`).
+2. **Read the sandbox flag from `match.resolvedSandbox`** (r2 codex F2 HIGH fix — earlier spec told the dispatcher to "look up the Role" but the public signature accepts only `workflow + matches`, breaking the data flow; carrying `resolvedSandbox` on `AgentMatch` keeps the dispatcher pure-from-matches). The mapping into spawn args:
+   - `resolvedSandbox === 'workspace-write'` → spawn arg `--sandbox workspace-write` (codex) / no equivalent flag for claude (claude's permissions are global; constraining per-step is out-of-scope for V1).
+   - `resolvedSandbox === 'read-only'` → spawn arg `--sandbox read-only` (codex) / no equivalent flag for claude.
+   - `resolvedSandbox === undefined` (only possible when `reason !== 'matched'`, which Step 1 already returned on): unreachable; if hit, throw a programmer-error.
+   The sandbox value is taken FROM THE MATCHED ROLE (carried via `AgentMatch.resolvedSandbox`), NOT from a workflow-step field; future workflow-step-level overrides are out of scope.
+3. Spawn per agent kind (mirrors 073's probe AC6.2 commands; the prompt is the step's `prompt` with `${VAR}` substituted from `inputs`). **All spawns MUST pass `{ cwd: opts.projectRoot, env: process.env }`** (r1 codex-ops F4 MED fix — earlier spec resolved `projectRoot` per J8 but never threaded it into the spawn, so `echoctl run --project /repo` from a different cwd would launch the child against the caller's cwd instead of `/repo`).
    - `codex` → `spawn('codex', ['exec', '--sandbox', <fromStep2>, '--', <prompt>], { cwd: projectRoot, env: process.env })`.
    - `claude-code` → `spawn('claude', ['--print', '--no-stream', '--output-format', 'text', '--', <prompt>], { cwd: projectRoot, env: process.env })`.
    - `cursor` → never matched in practice (cursor's role profile has no automatable capability surface in V1). If somehow matched, skip with `error: 'cursor-not-dispatchable'`.
+   **On `ENOENT`** (binary not on the spawn's effective PATH; r2 codex-ops F3 MED): catch the spawn error, append `DispatchOutcome` with `spawn: null, error: 'cli-unavailable: <agent> not found on PATH'`. Do NOT auto-normalize PATH (Heisenbug across shells); do NOT persist binary paths in onboarding.json (scope creep); the actionable error message + the documented limitation (in After-Completion) are sufficient. Per AC5.3 step 5, the workflow then STOPS — subsequent steps skipped — and `runRun` returns non-zero. The user's escape hatch is `--agent <role>=<absolute-path>` (already in AC5.4's grammar) OR ensuring the agent binary is on the launching env's PATH.
 4. Wait for exit (or `timeoutMs` — SIGTERM the child, set `timedOut: true`). Append the outcome.
-5. **Step failure handling:** if a step's `spawn.exitCode !== 0`, the dispatcher STOPS — subsequent steps are not run. The outcome array is returned with all completed steps + the failing step (subsequent steps are not in the array). This is the V1 posture; 075-or-later may add `[step].continue_on_failure` if dogfooding shows the need.
-6. `signal.aborted` mid-step: SIGTERM the child, exit the loop, return the partial outcome array.
+5. **Step failure handling:** if a step's `spawn.exitCode !== 0` OR `spawn === null` (the ENOENT branch above), the dispatcher STOPS — subsequent steps are not run. The outcome array is returned with all completed steps + the failing step (subsequent steps are not in the array). V1 posture; 075-or-later may add `[step].continue_on_failure` if dogfooding shows the need.
+6. **`signal.aborted` mid-step (r2 codex-ops F2 HIGH fix — earlier spec returned partial outcomes silently so `runRun` could exit 0 on a SIGTERM-interrupted workflow):** kill the in-flight child (SIGTERM), append `DispatchOutcome` with `spawn: { ...partialSpawn, exitCode: -1, timedOut: false }, error: 'interrupted', signal: opts.receivedSignal` (the signal name is set by `runRun`'s SIGINT/SIGTERM handler before calling `controller.abort()`). The outcome array contains all completed steps + the interrupted step. `runRun` (AC5.4 step 9) reads the `error: 'interrupted'` outcome and exits with the corresponding shell signal exit code (130 / 143), never 0.
 
 **AC5.4 — Top-level `runRun()` orchestrator.**
 
@@ -478,12 +513,35 @@ export async function runRun(opts: {
 
 1. Resolve project root per J8.
 2. Locate workflow file: `path.join(workflowsDir, `${workflowName}.toml`)`. Missing → error: "no workflow `<name>` — installed workflows: <listWorkflows()>" (exit 1).
-3. If `workflowsDir` itself is empty or missing → error: "no workflows installed. The 075 backlog item ships the first one; until then, `echo run` has nothing to dispatch." Exit 1.
+3. If `workflowsDir` itself is empty or missing → error: "no workflows installed. The 075 backlog item ships the first one; until then, `echoctl run` has nothing to dispatch." Exit 1.
 4. `loadWorkflow()` (AC5.1). Validation error → exit 1 with the error message.
-5. `loadRolesFromDir(rolesDir, { assertDefaults: true })` (071). Failure → exit 1.
+5. `loadRolesFromDir(rolesDir, { skillsRoot: ECHO_HOME_PATHS.skills, assertDefaults: true })` (r2 codex F1 HIGH fix — 071's loader walks upward from `sourcePath` searching for `package.json + skills/`; from `~/.echo/roles/` no such ancestor exists, so the load fails before any matching. Passing `skillsRoot` explicitly bypasses the walk and resolves skill files under the canonical `~/.echo/skills/` directory populated by 072's `populateEchoSkills`). Failure → exit 1 with the error message.
 6. Read `onboarding.json` via 070's validator. Validation error → exit 1.
-7. `matchRolesToAgents()` (AC5.2). If any `AgentMatch.reason !== 'matched'`, print the unmatched roles' reasons and exit 1 WITHOUT spawning anything (no partial dispatches when the plan is broken).
-8. `dispatchWorkflow()` (AC5.3). Print outcomes (or JSON-emit if `--json`). Exit 0 iff every dispatched step's `spawn.exitCode === 0`; otherwise exit 1.
+7. `matchRolesToAgents()` (AC5.2). If any `AgentMatch.reason !== 'matched'`, print the unmatched roles' reasons (using the explicit `no-onboarded-agent` vs `capability-mismatch` taxonomy from AC5.2 — `no-onboarded-agent` ⇒ "no wired agents at all" remediation; `capability-mismatch` ⇒ "agents wired but under-permissioned" remediation) and exit 1 WITHOUT spawning anything (no partial dispatches when the plan is broken).
+8. **Install SIGINT/SIGTERM handlers (r2 codex-ops F2 HIGH).** BEFORE calling `dispatchWorkflow`, create `const controller = new AbortController()` and `const receivedSignal = { current: null as 'SIGINT' | 'SIGTERM' | null }`. Register handlers:
+   ```ts
+   const onSig = (sig: 'SIGINT' | 'SIGTERM') => () => {
+     receivedSignal.current = sig;
+     controller.abort();
+   };
+   const onSigInt = onSig('SIGINT');
+   const onSigTerm = onSig('SIGTERM');
+   process.on('SIGINT', onSigInt);
+   process.on('SIGTERM', onSigTerm);
+   try { /* dispatch */ } finally {
+     process.off('SIGINT', onSigInt);
+     process.off('SIGTERM', onSigTerm);
+   }
+   ```
+   The named-handler pattern is mandatory (Node `removeListener` matches by function identity; anonymous wrappers cannot be unregistered — matches the 072 lock-release discipline).
+9. `dispatchWorkflow({ ..., signal: controller.signal, receivedSignal })` (AC5.3). Print outcomes (or JSON-emit if `--json`).
+10. **Exit code derivation (r2 codex-ops F2 HIGH):**
+    - If any `DispatchOutcome` has `error === 'interrupted'` AND `signal === 'SIGTERM'` → exit 143.
+    - Else if any has `error === 'interrupted'` AND `signal === 'SIGINT'` → exit 130.
+    - Else if every dispatched outcome has `spawn !== null && spawn.exitCode === 0` → exit 0.
+    - Else → exit 1.
+    
+    The signal-handler-installed-then-aborted path always produces an `interrupted` outcome (AC5.3 step 6 guarantees it); there is NO path where an interrupted workflow can exit 0.
 
 ### AC6 — `src/cli/io/prompt.ts` + `src/cli/io/render.ts` are the only I/O primitives
 
@@ -545,7 +603,7 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 3. `~/.echo/state/onboarding.json` has `schema_version: 2` → `schemaVersion: 'mismatch'`, `broken`, exit 1.
 4. `adapter-sync.lock` present with mtime → `syncLock.present: true`, `cleanupCommand` includes shell-quoted `rm`, `overall: 'degraded'`, exit 1.
 5. One agent probe fails (`auth-required`) → `degraded`, exit 1, report names the agent + reason.
-6. `~/.echo/` does not exist → `broken`, exit 1, suggests `echo init`.
+6. `~/.echo/` does not exist → `broken`, exit 1, suggests `echoctl init`.
 7. `--json` mode → emits the `DoctorReport` on one line.
 8. Cursor has `wired_at: null` (detected but skipped during init) → `probeOutcome: null`; not counted as failure.
 9. **Cursor probe outcome `manual-only` → counted as healthy** (per AC3.6 row: manual-only is NOT a failure).
@@ -562,6 +620,10 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 8. Codex config has hand-edited `[mcp_servers.echo]` (key reordered) → AC4.3 still deletes the table; the inverse does NOT diff-and-conflict (uninstall is "remove regardless").
 9. **Skills directory contains a user-modified `<skill>.md` (target byte-differs from `~/.echo/skills/<skill>.md`) → skipped with `reason: 'user-modified'`; byte-equal files removed** (r1 codex F5 MED verification — earlier wording said `reason: 'not-owned'` against a first-line marker which was dropped; AC4.4 now uses byte-equality so the reason set is `'missing' | 'source-missing' | 'user-modified' | 'symlink'`).
 10. **Skills directory contains a `<skill>.md` whose `~/.echo/skills/` counterpart is absent → skipped with `reason: 'source-missing'`** (r1 codex F5 MED verification).
+11. **`review-queue-cursor.md` removal (r2 codex F3 MED verification).** Fixture: `~/.echo/skills/review-queue-cursor.md` exists + byte-equal copy at `~/.claude/commands/review-queue-cursor.md` + NO default role lists `review-queue-cursor` in its `[role].skills`. Uninstall removes `~/.claude/commands/review-queue-cursor.md` (proving AC4.4's `skillNames` source enumerates `~/.echo/skills/*.md` rather than the role.skills union).
+12. **Partial-failure exit 1 (r2 codex-ops F4 MED verification).** Fixture: 072-stripped marker file is a symlink (cleanup conflict) → uninstall exits 1; `cleanupConflicts` contains the entry; ECHO block in non-symlinked sibling files IS still removed (per-agent isolation preserved). Without `--purge-state` requested, `~/.echo/` is NOT touched.
+13. **`--purge-state` blocked by conflict (r2 codex-ops F4 MED verification).** Same conflict fixture as #12, but `--purge-state --yes` requested → uninstall refuses the purge with stderr message naming the un-cleaned file; exit 1; `~/.echo/` still exists; no `rmSync` call.
+14. **`--force-purge` overrides the safety gate (r2 codex-ops F4 MED verification).** Same fixture + `--force-purge --yes` → prints the stern warning + the residual-config list, then `rmSync(ECHO_HOME_PATHS.root, ...)` fires; exit 0; `~/.echo/` is gone; per-agent residuals (the unresolved symlinked marker file) remain in place AS DOCUMENTED.
 
 **AC7.4 — `run.test.ts` (10 cases).**
 
@@ -575,7 +637,12 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 8. Step timeout (5s spawn returns `timedOut: true`) → outcome records `timedOut: true`; subsequent steps skipped; exit 1.
 9. **`--project /fixture/repo` from a git-rootless cwd → fake spawn receives `opts.cwd === '/fixture/repo'`** (r1 codex-ops F4 MED verification — load-bearing assertion is the `cwd` field, not just J8's resolution).
 10. `${VAR}` substitution: prompt `"Review at ${ref}"` with `inputs = { ref = "HEAD" }` → spawn receives `"Review at HEAD"`. Missing var → ValidationError pre-dispatch.
-11. **Sandbox mapping from role (r1 C1 verification — codex-ops F1 HIGH).** Workflow with one step whose role has `sandbox = "workspace-write"` and `requires.capabilities = ["fs.write", "git.write"]` → matched agent is codex (whose capabilities ⊇ those required per AC2.5); fake spawn receives `args` containing `['exec', '--sandbox', 'workspace-write', '--', <prompt>]`. Repeat with `sandbox = "read-only"` → `args` contains `'--sandbox', 'read-only'`.
+11. **Sandbox mapping carried via AgentMatch.resolvedSandbox (r2 codex F2 HIGH verification — was r1 C1).** Workflow with one step whose role has `sandbox = "workspace-write"` and `requires.capabilities = ["fs.write", "git.write"]` → matched agent is codex; **assert `match.resolvedSandbox === 'workspace-write'`** (proves the matcher populated the field); fake spawn receives `args` containing `['exec', '--sandbox', 'workspace-write', '--', <prompt>]` (proves the dispatcher reads from `match.resolvedSandbox`, NOT from a `roles[]` parameter — no `roles` arg is passed to `dispatchWorkflow` in this test). Repeat with `sandbox = "read-only"` → `match.resolvedSandbox === 'read-only'` + args contain `'--sandbox', 'read-only'`.
+12. **SIGTERM mid-workflow → exit 143, NOT exit 0 (r2 codex-ops F2 HIGH verification).** Fixture: two-step workflow; step 1's fake spawn exits 0; while step 2's fake spawn is in flight (a controllable promise), the test triggers `process.emit('SIGTERM')`. Assert: `runRun` returns 143 (NOT 0); outcomes array contains step 1 (success) + step 2 (`error: 'interrupted', signal: 'SIGTERM'`); the in-flight child got a SIGTERM (verified via the fake spawn's `kill` recorder). Repeat with SIGINT → exit 130. **The load-bearing assertion is that exit is NEVER 0 on a signal-interrupted workflow regardless of how many earlier steps succeeded.**
+13. **Spawn ENOENT → cli-unavailable outcome (r2 codex-ops F3 MED verification).** Fixture: fake spawn throws ENOENT for `codex`. Assert: `DispatchOutcome.spawn === null`, `error === 'cli-unavailable: codex not found on PATH'`; subsequent steps skipped; exit 1. The error message contains the literal binary name.
+14. **K4 matcher reason taxonomy in runRun output (r2 codex F4 MED verification).** Two sub-fixtures:
+    - (a) Zero onboarded agents wired (empty `onboarded[]`) + a workflow needing `reviewer` role → `runRun` exits 1 with `match.reason === 'no-onboarded-agent'` for the step.
+    - (b) One onboarded codex with `capabilities: ['mcp.echo.read']` only + a role requiring `['fs.write']` → `runRun` exits 1 with `match.reason === 'capability-mismatch'` (NOT `no-onboarded-agent` — agents exist but are under-permissioned).
 
 **AC7.5 — Inverse-adapter tests.** One file per inverse module. Each pins the round-trip invariant: a file that 072 wrote (with markers / MCP entry), passed through the inverse, equals the same file MINUS the ECHO-owned region, byte-for-byte outside that region. Negative cases: parse errors → conflict; missing entries → noop; symlinks → conflict.
 
@@ -591,10 +658,12 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 
 **AC7.6 — Workflow loader tests.** All strict-validation behaviors mirrored from 071's pattern: unknown keys, **`schema_version === 1` round-trip + `schema_version: 2` mismatch throws** (r1 codex F3 MED verification — using `schema_version` not `version`, and the typed `Workflow.schemaVersion` field is exposed by the loader, not silently discarded), filename/name disagreement, empty steps, role name grammar, missing required fields.
 
-**AC7.7 — Workflow matcher tests (8 cases — was 6).** 6 cases covering each branch of the `AgentMatch.reason` enum + the override-precedence + the wired_at tie-breaker determinism. Plus 2 new cases (r1 C1 verification):
+**AC7.7 — Workflow matcher tests (10 cases — was 8).** 6 cases covering each branch of the `AgentMatch.reason` enum + the override-precedence + the wired_at tie-breaker determinism. Plus 4 new cases (r1 C1 + r2 K2/K4 verification):
 
-7. **`AGENT_CAPABILITIES_BY_KIND` matcher path.** With three onboarded agents whose `capabilities` were populated per AC2.5 + a workflow step whose role requires `['fs.write', 'mcp.echo.write']`, the matcher returns `pickedAgent: 'codex'` (or `'claude-code'` depending on earliest `wired_at`); never `'cursor'` (cursor's `['mcp.echo.read']` lacks the required write capabilities).
-8. **Capabilities-empty matcher path.** With an `OnboardedAgentProfile.capabilities: []` (e.g., from an `ok: false` agent that 074's init left unpopulated per AC2.5), the matcher returns `reason: 'capability-mismatch'` against any non-empty-`requires.capabilities` role. Pins the load-bearing C1 invariant: an unsuccessfully-wired agent is NEVER picked.
+7. **`AGENT_CAPABILITIES_BY_KIND` matcher path.** With three onboarded agents whose `capabilities` were populated per AC2.5 + a workflow step whose role requires `['fs.write', 'mcp.echo.write']`, the matcher returns `pickedAgent: 'codex'` (or `'claude-code'` depending on earliest `wired_at`); never `'cursor'` (cursor's `['mcp.echo.read']` lacks the required write capabilities). **AND `match.resolvedSandbox` equals `role.sandbox`** (r2 K2 verification).
+8. **K4 distinction (r2 codex F4 MED verification).** With `onboarded: []` + a role with non-empty `requires.capabilities` → `reason: 'no-onboarded-agent'` (NOT `capability-mismatch`). With `onboarded: [{ kind: 'codex', capabilities: [] }]` + the SAME role → `reason: 'capability-mismatch'` (pool non-empty after step 3a; capability filter at step 3c yields empty). The two cases differ ONLY in whether `onboarded[]` is empty; both used to wrongly return the same reason in the r1 spec.
+9. **`resolvedSandbox` undefined when not matched (r2 K2 verification).** `reason: 'role-unknown'` → `resolvedSandbox === undefined`. `reason: 'no-onboarded-agent'` → `resolvedSandbox === undefined`. `reason: 'capability-mismatch'` → `resolvedSandbox === undefined`. Only `reason: 'matched'` populates it. Pins the load-bearing invariant: the dispatcher (AC5.3) can rely on `resolvedSandbox` being present iff it would actually spawn.
+10. **Override path populates resolvedSandbox (r2 K2 verification).** With `override: new Map([['reviewer', 'codex']])` + a valid pick → `reason: 'matched'` + `resolvedSandbox === role.sandbox` (the override doesn't skip the sandbox lookup).
 
 ### AC8 — Builder doc updates
 
@@ -605,17 +674,17 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 ## Out of Scope (Don't Drift)
 
 1. **No daemon-side changes.** The CLI is a pure consumer of 070-073's surfaces. If the builder finds a missing daemon hook, file a follow-up; do not edit `src/daemon/`.
-2. **No interactive `--fix` in doctor.** The reviewer-debated lockfile auto-cleanup from 072 r3-r6 stays gone. `echo doctor` reports; the user runs `rm`.
+2. **No interactive `--fix` in doctor.** The reviewer-debated lockfile auto-cleanup from 072 r3-r6 stays gone. `echoctl doctor` reports; the user runs `rm`.
 3. **No workflow library content.** 074 ships the runtime; the actual `<workflow>.toml` files (cross-vendor change review, etc.) are 075's domain.
 4. **No new dependencies.** `parseArgs` + `readline/promises` + raw ANSI + the existing `smol-toml` for TOML loading. No commander/yargs/inquirer/chalk/picocolors.
-5. **No `init --resume` flag.** 073's `createWizard` is idempotent within a session, but re-entry from an interrupted prior `echo init` is a follow-up if dogfooding surfaces the need. V1 path: re-run `echo init` from the top.
-6. **No global `echo` install logic.** `echo init` does NOT add the binary to PATH, install a launchd plist, or change `~/.zshrc`. The install topology decision is explicitly deferred in the design archive ("After wizard UX is implemented; install is the wrapper around the wizard"). For V1, users run `npm run build:cli && npm link` themselves. A follow-up item will handle distribution.
+5. **No `init --resume` flag.** 073's `createWizard` is idempotent within a session, but re-entry from an interrupted prior `echoctl init` is a follow-up if dogfooding surfaces the need. V1 path: re-run `echoctl init` from the top.
+6. **No global `echo` install logic.** `echoctl init` does NOT add the binary to PATH, install a launchd plist, or change `~/.zshrc`. The install topology decision is explicitly deferred in the design archive ("After wizard UX is implemented; install is the wrapper around the wizard"). For V1, users run `npm run build:cli && npm link` themselves. A follow-up item will handle distribution.
 7. **No upgrade / migration path.** The CLI does not detect "I am newer than the previously-installed CLI" and reconcile state-file schema versions. Schema version mismatches are surfaced by `doctor`; the user reinstalls or runs the migration tool (which does not yet exist) themselves.
 8. **No telemetry / usage reporting.** The CLI emits no network requests except the local MCP probe in `doctor`. The "feedback / report-an-issue" copy in the Done step is a printed string, not a callback.
 9. **No `--verbose` / log-level tuning.** Logging is a single level: progress events to stdout (suppressible via `--quiet`), errors to stderr, structured events via `--json`. If dogfooding surfaces the need for debug logging, it's a follow-up.
 10. **No multi-host / remote-daemon support.** `mcpServerUrl` is always `http://127.0.0.1:<port>/mcp`. Remote ECHO daemons (team / shared) are V2+ per the 2026-05-17 memory note ("Defer team-shape ... to V2+").
 11. **No `acquirePidLockPath()` export from `src/daemon/lifecycle.ts`** (r1 codex-ops F5 MED). The PID lock filename `'daemon.pid'` is duplicated in 074's `doctor.ts` rather than imported from the daemon module — this is intentional. Reason: 074 is supposed to be a pure consumer of the daemon's filesystem outputs (per Out-of-Scope #1 "no daemon-side changes"). If the daemon ever renames `daemon.pid`, that change is owned by the daemon item making the rename; updating both sites (daemon + doctor) is a one-line PR-time edit. The alternative — exporting a constant — would force every PR-touching daemon paths to coordinate across modules, which is exactly the coupling 074 is supposed to avoid.
-12. **No `--answer-file` non-interactive path** (r1 codex-ops F2 HIGH disposition). AC2.1.0's non-TTY guard fails closed; supporting unattended `echo init` is a follow-up item once dogfooding produces real demand (CI install scripts, immutable-infra provisioning, etc.). Until then: TTY required.
+12. **No `--answer-file` non-interactive path** (r1 codex-ops F2 HIGH disposition). AC2.1.0's non-TTY guard fails closed; supporting unattended `echoctl init` is a follow-up item once dogfooding produces real demand (CI install scripts, immutable-infra provisioning, etc.). Until then: TTY required.
 
 ## Risks + open questions
 
@@ -625,14 +694,14 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
 - **R4 — `<!-- echo-owned-skill -->` marker addition to 072 — DROPPED in r1 disposition** (r1 codex F5 MED). The originally-proposed first-line marker conflicted with existing skill YAML frontmatter; AC4.4 now uses byte-equality against `~/.echo/skills/<skill>.md` as the ownership proof, requiring zero 072 change. The byte-equality approach is robust under: ECHO updating skill contents (re-sync rewrites both; byte-equality holds), user-edited targets (differ; preserved), third-party skills (no source counterpart; `source-missing`). Documented here for reviewer audit trail; no live risk remaining.
 - **R5 — Workflow file format collisions with 075.** 075 will write the first `<workflow>.toml`. If 075's spec process surfaces fields that 074's loader rejects (strict-unknown-keys), 074 needs an additive update. The format is intentionally minimal in V1; 075 may add fields. Builder note: adding fields is reviewer-prerogative on 075, not 074. Don't over-design upfront.
 - **R6 — Non-TTY `init` behavior.** AC7.1 case 10 says non-TTY init exits 2. But a CI-style "install ECHO non-interactively with these answers" use case might emerge in dogfooding. Out of scope for V1; reopen if surfaced.
-- **R7 — `echo doctor` MCP probe via raw HTTP.** Doctor doesn't use the `@modelcontextprotocol/sdk` client — it sends a single HTTP POST with a minimal `initialize` body. Why: the SDK client adds session-lifecycle complexity (subscribe / list_tools / etc.) that doctor doesn't need. The risk is that a future MCP spec change to the initialize handshake breaks the probe. Mitigation: doctor's MCP probe is a smoke-test ("any 2xx within 2s = reachable"), not a strict-conformance check.
-- **R8 — Shell-quoting consistency.** `echo doctor`'s `cleanupCommand` and 072's `syncLock.message` both shell-quote a path. The CLI MUST use the SAME shell-quote helper that 072 uses (codex-ops r16 M3). The builder either imports it from 072 (if exported) or duplicates the POSIX single-quote-wrap-with-`'\''` shape EXACTLY. Tests pin byte-equality with a path containing spaces + quotes + brackets.
+- **R7 — `echoctl doctor` MCP probe via raw HTTP.** Doctor doesn't use the `@modelcontextprotocol/sdk` client — it sends a single HTTP POST with a minimal `initialize` body. Why: the SDK client adds session-lifecycle complexity (subscribe / list_tools / etc.) that doctor doesn't need. The risk is that a future MCP spec change to the initialize handshake breaks the probe. Mitigation: doctor's MCP probe is a smoke-test ("any 2xx within 2s = reachable"), not a strict-conformance check.
+- **R8 — Shell-quoting consistency.** `echoctl doctor`'s `cleanupCommand` and 072's `syncLock.message` both shell-quote a path. The CLI MUST use the SAME shell-quote helper that 072 uses (codex-ops r16 M3). The builder either imports it from 072 (if exported) or duplicates the POSIX single-quote-wrap-with-`'\''` shape EXACTLY. Tests pin byte-equality with a path containing spaces + quotes + brackets.
 
 ## Definition of done
 
 1. All 7 ACs pass — full Vitest suite green (including the 1351 existing tests post-073 merge), lint clean, typecheck clean, prettier clean.
 2. `npm run build:cli && node dist/cli/index.js --help` prints the subcommand list with no runtime errors.
-3. The four-subcommand acceptance: `echo init` runs end-to-end against a tmpdir ECHO_HOME with fake atom store + fake spawn and exits 0; `echo doctor` against the same returns `healthy`; `echo uninstall --yes` cleans up; `echo run <name>` errors cleanly when no workflows exist.
+3. The four-subcommand acceptance: `echoctl init` runs end-to-end against a tmpdir ECHO_HOME with fake atom store + fake spawn and exits 0; `echoctl doctor` against the same returns `healthy`; `echoctl uninstall --yes` cleans up + exits 0 only if zero cleanup conflicts; `echoctl run <name>` errors cleanly when no workflows exist. **`echoctl --version` from a real `bash -c` invocation against an npm-linked install returns the package version + exits 0** (AC1.5 shell-reachability pin).
 4. No new runtime dependencies in `package.json` beyond what 070-073 already pulled in.
 5. `inverse/skills.ts` byte-equality check verified against the real `~/.echo/skills/` populated by 072 (no 072 changes needed; r1 codex F5 disposition).
 6. Agent run-log entry at `raw/internal/agent-runs/<run-date>-2026-05-25-074-echo-cli-binary.md` documenting drift events (if any), AC mapping, and final test counts.
@@ -645,7 +714,8 @@ All under `tests/cli/`. Vitest. Each test sets a tmpdir as `ECHO_HOME` and tears
   - `wiki/surfaces/onboarding-wizard.md` — UPDATE from 073's pending wiki promotion to include the Step 1 / Step 6 UX framing that 074 added.
   - `wiki/architecture/coord-layer.md` — UPDATE to add `~/.echo/workflows/` to the directory layout + a "Role-plugging at runtime" subsection citing 074's matcher behavior (J4 deterministic tie-break).
 - **Workflow-file-format documentation.** Once 075 ships its first workflow, the format gets a `wiki/architecture/workflow-format.md` page. Until then, the format lives only in 074's spec body.
-- **Trigger to reopen the deferred questions (decision-archive § "What's deferred"):** after 074 ships AND founder completes their own `echo init` as a customer, surface the first-demo question (→ 075) and install-topology question (brew vs pkg vs Raycast Store) in the strategist conversation that follows. Per the decision archive, this is the unblocking trigger for 075.
+- **Trigger to reopen the deferred questions (decision-archive § "What's deferred"):** after 074 ships AND founder completes their own `echoctl init` as a customer, surface the first-demo question (→ 075) and install-topology question (brew vs pkg vs Raycast Store) in the strategist conversation that follows. Per the decision archive, this is the unblocking trigger for 075.
+- **Update the decision archive** (`raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md` §"Coord layer architecture"): the `/usr/local/bin/echo` path should be updated to `/usr/local/bin/echoctl` post-shipment to match the bin entry. The product-name "ECHO" framing is preserved; only the CLI verb moves. r2 codex-ops F1 HIGH binary-rename rationale lives in this spec's "Binary rename rationale" section; the decision-archive update is just a one-line path correction.
 - **Update `docs/BACKLOG.md`:** remove the "*Note: IDs 074-075 are reserved...*" line about 074 once 074 is in `complete/` (075 is still reserved).
 - **Drift watchlist:** the `run` subcommand is the most likely strategist-drift surface in follow-up rounds (workflow file format expansion, parallel steps, error-recovery DSL, capability/sandbox flags). Per 058's disposition-discipline rule: when reviewers propose mechanism here, ask first "could the workflow simply be split / rewritten instead?" Prefer removal of complexity over deeper patching.
 
