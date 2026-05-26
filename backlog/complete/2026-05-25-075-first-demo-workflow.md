@@ -40,6 +40,27 @@ head_sha: "cca609c2eca507e88ea2633e023bab4b570c388d"
 pr_url: ""
 agent_notes: |
   Implemented 075 on `agent/first-demo-workflow` at `cca609c2eca507e88ea2633e023bab4b570c388d`. Added the shipped `change-review` workflow asset, workflow-sync helper and `syncAll()` wiring, workflow dir symlink guard + `overallOk` policy, packed asset allowlist hygiene, real-asset load/match tests, workflow-sync + adapter-sync coverage, and the narrow human-mode `echoctl run` renderer lift for captured stdout/nonzero stderr. Verification passed: focused 075 vitest suite 46/46, `npm run typecheck`, `npm run lint`, full `npm test` 1393 passed / 21 skipped, and `git diff --check`. No ECHO MCP calls were made, so no dogfooding journal entry was required.
+review_notes: |
+  Merged on 2026-05-26 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean `git merge --no-ff` — sidecar predicted no conflicts; origin/main untouched on all 11 modified paths).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict was `merge as-is`; pre-merge punch list empty).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: 1393/1414 tests pass (21 skipped, 0 failed); lint, typecheck, and `tools/sync-skills.sh --check` all clean post-merge.
+
+  Follow-up items (non-blocking, filed to `backlog/_followups.md`):
+  - Flaky `tests/coord/coord-volume-perf.test.ts` 300ms perf budget (unrelated to 075).
+  - 074-inherited packed-install allowlist gap for `assets/echo-roles/**` + `skills/**` (AC9.3 non-claim — separate spec).
+  - `echoctl doctor` extension to validate user-modified `~/.echo/workflows/*.toml` via `loadWorkflow` (AC3.5 layering choice — 076 follow-up).
+  - Multi-step `outcome.spawn.stdout` block separator in `renderOutcomes` human mode (defer to spec that introduces multi-step workflows).
 ---
 
 # First demo workflow — `change-review` (workflow asset + workflow-sync engine)
