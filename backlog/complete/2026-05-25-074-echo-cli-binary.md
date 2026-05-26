@@ -63,6 +63,45 @@ branch: "agent/echo-cli-binary-restart"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-cli-binary-restart"
 head_sha: "c3797e77e0d238073651eb9d498ba1f9fb8774a3"
 pr_url: ""
+review_notes: |
+  Merged on 2026-05-26 via founder reconciliation. (Replay-after-push-reject:
+  the initial merger worktree's push raced an inbound `a98957d` spec commit
+  for 075; redone cleanly on top of a98957d.)
+
+  Conflicts resolved:
+  - None. `git merge --no-ff c3797e77` applied cleanly. Branch was additive
+    across src/cli/ (new tree) + tests/cli/ (new tree) + small extension
+    hunks to src/echo-home/{paths,scaffold}.ts (workflows slot) +
+    package.json (bin/scripts) + tsconfig.cli.json (new file). The inbound
+    a98957d touched only backlog/ready/2026-05-25-075-first-demo-workflow.md
+    + docs/BACKLOG.md — disjoint surfaces.
+
+  Lockfile drift reconciled in-place: branch's package-lock.json was stale
+  relative to its own package.json (agent added `bin: { echoctl: ... }`
+  without re-running npm install). `npm install` during C5 produced a
+  3-line addition matching the new bin field; staged into the merge.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None. Sidecar verdict was "merge as-is" with zero blocking fixups.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1376/1376 tests pass; 21 skipped; lint clean; typecheck clean;
+  build:cli clean (tsc -p tsconfig.cli.json); tools/sync-skills.sh --check
+  clean. (Verify ran on the first merge attempt against an identical tree;
+  the replay introduced no code changes — only the merge commit's parent
+  pointer differs.)
+
+  Follow-up items (non-blocking):
+  - Strategist post-merge: update `raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md:45` `/usr/local/bin/echo` → `/usr/local/bin/echoctl` per the r2 codex-ops F1 binary-rename decision (After-Completion).
+  - Doc-only: comment the `wired_at` lexicographic-sort assumption in `src/cli/workflow/match.ts:22-24`.
+  - Edge case: `--force-purge` without `--purge-state` is a no-op semantically AND silently downgrades exit 1 → 0 if conflicts existed (`src/cli/commands/uninstall.ts:184,207`). Decide policy.
+  - Cosmetic: BOM-regex asymmetry at `src/cli/inverse/codex-config.ts:29,32` (post-BOM in practice — future-proofing nit).
+  - Init capability change-detection uses `JSON.stringify` equality (order-sensitive) at `src/cli/commands/init.ts:170` — correct via frozen `AGENT_CAPABILITIES_BY_KIND` but worth a comment.
+  - HARNESS GAP (this merge): `/merge-and-cleanup` C11 piped `git push origin HEAD:main` through `tail -3`, which masked git's non-zero exit when the push was rejected. The subsequent `&&` chain proceeded to tear down the merger worktree before the push failure was caught. File a backlog item to harden C11: capture exit code via `${PIPESTATUS[0]}` or short-circuit-via-`if` rather than `&&`, OR explicitly NOT pipe the push output. Recovery cost this time was ~1 minute (replay was trivial) but the failure mode is silent — future invocations could lose conflict-laden cleanup work.
 agent_notes: |
   Implemented the `echoctl` CLI binary on `agent/echo-cli-binary-restart`: init/doctor/uninstall/run commands, prompt/render helpers, inverse adapter cleanup modules, workflow load/match/dispatch runtime, `~/.echo/workflows` scaffold support, package bin/build metadata, and focused CLI + scaffold tests. Verification passed: `npm run typecheck`, `npm run build:cli`, `npm run lint`, `npm test`, `npx vitest run tests/cli tests/echo-home/scaffold.test.ts`, and `git diff --check`.
 ---
