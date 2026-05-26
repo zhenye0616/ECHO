@@ -1074,6 +1074,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** partial - r3 closes the major source-prefix, DB-path, and no-dispatch prose gaps from r2, but the test fixtures and frontmatter write scope still need small patches before builder claim is low-friction.
 - **Note:** The response commit and `tick_end` coord emission completed before this observation-only journal entry. The reviewer command still references the old unsharded journal and HTML twin; current `CLAUDE.md`/`AGENTS.md` policy makes the May monthly Markdown shard canonical and says generated HTML twins are local-only, so this tick writes only this shard.
 
+### 2026-05-25 20:29 PDT - codex-ops r4 review tick on 073 onboarding wizard
+
+- **Trigger:** Manual codex-ops review queue tick selected `backlog/reviews/2026-05-25-073-onboarding-wizard/r4/request.md` after pulling `origin/main` and reviewed the pinned r4 onboarding-wizard artifact through the operational/runtime lens.
+- **Query inputs:** ECHO coord call: `coord_emit(event_type=tick_start, reviewer=codex-ops, correlation_id=dcd97789-e20a-43e7-a117-b4d5e65ede7e)`. Queue/file reads used the r4 request focus hints, reviewer schema, pinned artifact `backlog/ready/2026-05-25-073-onboarding-wizard.md` at `02ab43b0e4020c4f04a81cf52514061dc561a2e9`, current storage contracts, the pinned 072 no-dispatch / repo-root contract, prior local reviewer-response formatting examples, and current `CLAUDE.md`/`AGENTS.md` journal policy.
+- **Returned:** Wrote and pushed `backlog/reviews/2026-05-25-073-onboarding-wizard/r4/codex-ops.md` at review commit `4ab0c82`, verdict `proceed`, with no codex-ops runtime findings.
+- **Sources:** Review response file above; request correlation `dcd97789-e20a-43e7-a117-b4d5e65ede7e`; artifact commit `02ab43b0e4020c4f04a81cf52514061dc561a2e9`; spec anchors `backlog/ready/2026-05-25-073-onboarding-wizard.md:14-25`, `:89-98`, `:180-202`, `:337-345`, `:387`, `:408-424`, `:431-469`, `:503`, `:580-603`, `:626-642`, `:659`, and `:695`; 072 anchors `backlog/pending_review/2026-05-25-072-adapter-sync-engine.md:369-377` and `:654-655`.
+- **Verdict:** right - the r4 artifact closes the prior runtime gaps around real source-prefix detection, daemon DB-path parity, 072 top-level no-dispatch sentinels, recoverable repo-root failures, write-scope coverage, and the documented Claude Code MCP manual-prerequisite path.
+- **Note:** The response commit was pushed before this observation-only journal entry. Per command ordering, coord `tick_end` is emitted after this sibling journal commit. The reviewer command still references the old unsharded journal and HTML twin, but `CLAUDE.md` makes the May monthly Markdown shard canonical and says not to commit regenerated HTML twins, so this tick writes only this shard.
+
 ### 2026-05-25 20:29 PDT - codex r4 review tick on 073 onboarding wizard
 
 - **Trigger:** Codex-side review queue tick selected `backlog/reviews/2026-05-25-073-onboarding-wizard/r4/request.md` after pulling `origin/main` and reviewed the pinned r4 onboarding-wizard artifact through the implementability/code-grounded lens.
