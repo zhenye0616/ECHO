@@ -24,6 +24,7 @@ import {
   renderWireResult,
 } from '../io/render.js';
 import { makeTtyPrompt, type PromptImpl } from '../io/prompt.js';
+import { ensureEchoHome } from '../../echo-home/scaffold.js';
 
 export const AGENT_CAPABILITIES_BY_KIND: Readonly<Record<AgentKind, readonly Capability[]>> =
   Object.freeze({
@@ -192,6 +193,7 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     );
     return 2;
   }
+  ensureEchoHome();
 
   try {
     const mcpServerUrl = `http://127.0.0.1:${resolveMcpPort()}/mcp`;

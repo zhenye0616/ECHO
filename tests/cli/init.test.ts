@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -118,6 +118,72 @@ describe('runInit', () => {
     expect(code).toBe(2);
     expect(wizardFactory).not.toHaveBeenCalled();
     expect(errors.join('')).toContain('non-interactive');
+    expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
+    expect(existsSync(join(echoHome, 'state/projects.json'))).toBe(false);
+  });
+
+  it('bootstraps echo home before the interactive wizard touches state', async () => {
+    const created: boolean[] = [];
+    const wizardFactory = (() => {
+      created.push(
+        existsSync(join(echoHome, 'state/onboarding.json')) &&
+          existsSync(join(echoHome, 'state/projects.json')),
+      );
+      let selected: AgentKind[] = [];
+      return {
+        async detectAgents() {
+          return [detected('codex', 'high')];
+        },
+        async detectProjects() {
+          return [];
+        },
+        async wire(opts) {
+          selected = opts.selectedAgents;
+          return successWire(selected);
+        },
+        async probe() {
+          return selected.map((agent) => ({ agent, probed: true as const, latencyMs: 1 }));
+        },
+        async summary() {
+          return {
+            detected: null,
+            projects: null,
+            wired: null,
+            probed: null,
+            onboardingStateSnapshot: null,
+          };
+        },
+        async markCompleted() {
+          const state = JSON.parse(
+            readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8'),
+          ) as {
+            completed: boolean;
+          };
+          state.completed = true;
+          writeFileSync(
+            join(echoHome, 'state/onboarding.json'),
+            `${JSON.stringify(state, null, 2)}\n`,
+          );
+        },
+      } satisfies Wizard;
+    }) as never;
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: true },
+      wizardFactory,
+      prompt: makeNonInteractivePrompt({
+        'Welcome to ECHO setup. This takes about two minutes.': true,
+        'Confirm subset to wire': '',
+        'Pick default project': '',
+      }),
+      quiet: true,
+    });
+
+    expect(code).toBe(0);
+    expect(created).toEqual([true]);
+    expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(true);
+    expect(existsSync(join(echoHome, 'state/projects.json'))).toBe(true);
   });
 
   it('wires selected agents, populates capabilities, and marks onboarding complete', async () => {
