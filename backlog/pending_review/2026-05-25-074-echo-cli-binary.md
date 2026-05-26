@@ -60,9 +60,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-26T07:18:05Z"
 branch: "agent/echo-cli-binary"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-cli-binary"
-head_sha: ""
+head_sha: "2933e7f74e39501f25dcdabfb58dc39619684535"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC1.5 requires creating `tests/cli/shell-reachable.test.ts`, but that file is not listed in `files_to_modify`.
+  Tried: Claimed the item, created `agent/echo-cli-binary`, read the required global context, the item spec, the builder pointer, and the relevant 070-073 API/spec refs before editing code.
+  Best-guess answer: add `tests/cli/shell-reachable.test.ts` to `files_to_modify` because AC1.5 names that path explicitly; confidence high.
+  Why I escalated rather than guessing: builder rule "Touch only files listed in `files_to_modify`; if you need another file, escalate."
 ---
 
 # `echoctl` CLI binary (init / doctor / uninstall / run)
