@@ -1,7 +1,7 @@
 ---
 id: 2026-05-25-073-onboarding-wizard
 title: "ECHO Pro onboarding wizard — staged library API for detect-agents / detect-projects / wire / probe (steps 2-5), consumed by 074's CLI"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1.5-2.5d
 created: 2026-05-25
@@ -48,10 +48,10 @@ spec_refs:
   - CLAUDE.md  # operating model — wizard touches none of the operating-model files; this ref is for grounding only
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-26T04:20:55Z"
+branch: "agent/onboarding-wizard"
+worktree: "/Users/zhenye/Desktop/Project_echo--onboarding-wizard"
 head_sha: ""
 pr_url: ""
 review_notes: ""
