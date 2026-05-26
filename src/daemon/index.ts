@@ -6,7 +6,9 @@ import { startCursorExtractor } from '../capture/extractors/cursor.js';
 import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
+import { ensureEchoHome } from '../echo-home/scaffold.js';
 import { isNonEmptyString } from '../guards.js';
+import { createLogger } from '../logging/index.js';
 import { flushRecentMcpCallLog } from '../mcp/request-log.js';
 import { startMcpServer } from '../mcp/server.js';
 import type { Storage } from '../storage/interface.js';
@@ -40,6 +42,20 @@ function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; disp
 
 const dataDir = resolveDataDir();
 acquirePidLockOrExit(dataDir);
+
+const echoHomeLog = createLogger('daemon.echo-home');
+try {
+  const result = ensureEchoHome();
+  if (result.created_dirs.length > 0 || result.created_files.length > 0) {
+    echoHomeLog.info('echo_home_initialized', {
+      root: result.root,
+      created_dirs: result.created_dirs,
+      created_files: result.created_files,
+    });
+  }
+} catch (err) {
+  echoHomeLog.error('echo_home_init_failed', { message: (err as Error).message });
+}
 
 const { storage, backend, dispose } = createStorage();
 
