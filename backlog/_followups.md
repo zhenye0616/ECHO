@@ -1040,3 +1040,9 @@ The structural framing — **roles MUST be conflict-free by construction across 
 - Hoist the duplicate `process.env['ECHO_HOME']` read in `src/echo-home/paths.ts:6-8` to a single local for clarity. (from 070 merge sidecar follow-ups)
 - After 071 also lands, evaluate R2 (lazy Ajv compile threshold) per 070's spec guidance. (from 070 merge sidecar follow-ups)
 - Cosmetic: `src/echo-home/scaffold.ts:16-18` uses `'code' in err` narrowing; `(err as NodeJS.ErrnoException).code` is the more common shape elsewhere in this repo. (from 070 merge sidecar follow-ups)
+
+<!-- from merge of 2026-05-25-071-role-definition-format-and-defaults, 2026-05-25 -->
+- Extend `src/echo-home/index.ts` (071's barrel) to re-export `paths` + `scaffold` (070's public surface) — canonical import path for downstream consumers (072+). (from 071 merge sidecar follow-ups; cross-ref 070's follow-up of same shape)
+- Relabel `discoverSkillsRoot` failure-path error field from `'skills'` to `'skillsRoot'` for clearer downstream error attribution (`src/echo-home/roles.ts:159`). (from 071 merge sidecar follow-ups)
+- Stabilization spec for the 3 pre-existing flakies that surfaced during 071 review: `tests/trace/build.test.ts` (perf), `tests/capture/surfaces/git-watcher.test.ts` (timeout), `tests/coord/coord-status.test.ts` (seed loop). All independent of 071's diff. (from 071 merge sidecar follow-ups)
+- If strict 1:1 spec-item ↔ `it()` block mapping is desired by future review-queue tooling, split the merged composite tests at `tests/echo-home/default-roles.test.ts:104, :113`. (from 071 merge sidecar follow-ups)
