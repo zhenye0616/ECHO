@@ -82,6 +82,33 @@ function simpleUnifiedDiff(a: unknown, b: unknown): string {
   return lines.join('\n');
 }
 
+function hasOwn(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function previousKeysUnchanged(
+  current: Record<string, unknown>,
+  previous: Record<string, unknown>,
+): boolean {
+  for (const [key, value] of Object.entries(previous)) {
+    if (!hasOwn(current, key) || !deepEqual(current[key], value)) return false;
+  }
+  return true;
+}
+
+function mergeWithUserOwnedKeys(
+  current: Record<string, unknown>,
+  previous: Record<string, unknown> | undefined,
+  desired: Record<string, unknown>,
+): Record<string, unknown> {
+  const preserved: Record<string, unknown> = {};
+  const previousKeys = previous ?? {};
+  for (const [key, value] of Object.entries(current)) {
+    if (!hasOwn(previousKeys, key)) preserved[key] = value;
+  }
+  return { ...preserved, ...desired };
+}
+
 function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
@@ -136,9 +163,28 @@ export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
     return { action: 'noop' };
   }
 
-  if (previousServerConfig !== undefined && deepEqual(currentEcho, previousServerConfig)) {
+  if (!isPlainObject(currentEcho)) {
+    return {
+      action: 'conflict',
+      conflict: {
+        kind: 'config',
+        filePath,
+        currentValue: currentEcho,
+        expectedValue: previousServerConfig,
+        proposedValue: serverConfig,
+        unifiedDiff: simpleUnifiedDiff(currentEcho, serverConfig),
+      },
+    };
+  }
+
+  const proposedEcho = mergeWithUserOwnedKeys(currentEcho, previousServerConfig, serverConfig);
+
+  if (
+    previousServerConfig !== undefined &&
+    previousKeysUnchanged(currentEcho, previousServerConfig)
+  ) {
     const newDoc: Record<string, unknown> = { ...root };
-    newDoc['mcpServers'] = { ...mcpServers, echo: serverConfig };
+    newDoc['mcpServers'] = { ...mcpServers, echo: proposedEcho };
     atomicWrite({
       filePath,
       content: `${JSON.stringify(newDoc, null, 2)}\n`,
@@ -155,8 +201,8 @@ export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
       filePath,
       currentValue: currentEcho,
       expectedValue: previousServerConfig,
-      proposedValue: serverConfig,
-      unifiedDiff: simpleUnifiedDiff(currentEcho, serverConfig),
+      proposedValue: proposedEcho,
+      unifiedDiff: simpleUnifiedDiff(currentEcho, proposedEcho),
     },
   };
 }

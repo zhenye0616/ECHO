@@ -257,6 +257,33 @@ function simpleUnifiedDiff(a: unknown, b: unknown): string {
   return lines.join('\n');
 }
 
+function hasOwn(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function previousKeysUnchanged(
+  current: Record<string, unknown>,
+  previous: Record<string, unknown>,
+): boolean {
+  for (const [key, value] of Object.entries(previous)) {
+    if (!hasOwn(current, key) || !deepEqual(current[key], value)) return false;
+  }
+  return true;
+}
+
+function mergeWithUserOwnedKeys(
+  current: Record<string, unknown>,
+  previous: Record<string, unknown> | undefined,
+  desired: Record<string, unknown>,
+): Record<string, unknown> {
+  const preserved: Record<string, unknown> = {};
+  const previousKeys = previous ?? {};
+  for (const [key, value] of Object.entries(current)) {
+    if (!hasOwn(previousKeys, key)) preserved[key] = value;
+  }
+  return { ...preserved, ...desired };
+}
+
 function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
@@ -293,8 +320,13 @@ export function syncCodexMcpBlock(opts: CodexConfigOpts): CodexConfigResult {
     return { action: 'noop' };
   }
 
-  if (previousServerConfig !== undefined && deepEqual(currentEcho, previousServerConfig)) {
-    const rendered = renderTargetBlock(serverConfig);
+  const proposedEcho = mergeWithUserOwnedKeys(currentEcho, previousServerConfig, serverConfig);
+
+  if (
+    previousServerConfig !== undefined &&
+    previousKeysUnchanged(currentEcho, previousServerConfig)
+  ) {
+    const rendered = renderTargetBlock(proposedEcho);
     // Preserve trailing newline structure: if original slice ended with \n\n,
     // keep one of those; rendered already ends with \n.
     const newContent = `${original.slice(0, slice.start)}${rendered}${original.slice(slice.end)}`;
@@ -309,8 +341,8 @@ export function syncCodexMcpBlock(opts: CodexConfigOpts): CodexConfigResult {
       filePath,
       currentValue: currentEcho,
       expectedValue: previousServerConfig,
-      proposedValue: serverConfig,
-      unifiedDiff: simpleUnifiedDiff(currentEcho, serverConfig),
+      proposedValue: proposedEcho,
+      unifiedDiff: simpleUnifiedDiff(currentEcho, proposedEcho),
     },
   };
 }
