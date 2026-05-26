@@ -182,7 +182,8 @@ The two functions deliberately do NOT share a return type (codex r6 M2 cleanup) 
 - For each role in `defaults`:
   - If `targetDir/<role>` does not exist → copy from `sourceDir/<role>`. Returns `{ role, action: 'copied' }`.
   - If `targetDir/<role>` exists and content is byte-identical to `sourceDir/<role>` → no write. Returns `{ role, action: 'noop' }` (idempotent re-run).
-  - If `targetDir/<role>` exists and content differs → **do not overwrite**. Returns `{ role, action: 'user-modified', conflict: { filePath, sourceBytes, userBytes } }`. The user owns the file after first install; their edits win permanently. The caller surfaces the result; the engine never overwrites. To reset, the user `rm`s the file and re-runs sync.
+  - **Read-time symlink guard (codex r9 M1):** before reading `targetDir/<role>` to compute `userBytes`, `lstatSync` the path. If it's a symlink, return `{ role, action: 'user-modified', conflict: { filePath, targetIsSymlink: true, userBytes: null } }` WITHOUT reading the linked target. This prevents `userBytes` from carrying arbitrary file content from outside `~/.echo/roles/` (the user could have symlinked a role TOML to `~/.ssh/config` or any other file). The caller surfaces the conflict; the engine never follows.
+  - If `targetDir/<role>` exists, is a regular file, and content differs → **do not overwrite**. Returns `{ role, action: 'user-modified', conflict: { filePath, sourceBytes, userBytes } }`. The user owns the file after first install; their edits win permanently. The caller surfaces the result; the engine never overwrites. To reset, the user `rm`s the file and re-runs sync. **AC8 redaction applies to `userBytes`** (codex-ops r9 M2 — see expanded AC8 below).
   - If `sourceDir/<role>` does not exist → `{ role, action: 'source-missing' }`. (Defensive — 071 should ship all three; this branch is a sentinel for an upstream bug.)
   - **On filesystem error** (EACCES on `targetDir` write, ENOSPC, ENOTDIR on `targetDir` parent, EACCES reading `sourceDir/<role>`, etc.): returns `{ role, action: 'error', error: AdapterError }`. Does NOT throw. `syncAll` reads this and surfaces via `result.rolesErrors` (see below).
 - Aggregate return:
@@ -249,9 +250,7 @@ The two functions deliberately do NOT share a return type (codex r6 M2 cleanup) 
   3. After per-agent dispatch, call `role-sync.syncDefaultRoles` ONCE (roles are global to `~/.echo/`, not per-agent). Pass `sourceDir = opts.rolesSourceDir`, `targetDir = ECHO_HOME_PATHS.roles`, `defaults = opts.defaultRoles ?? DEFAULT_ROLE_FILENAMES` (imported from 071).
 - Aggregate into `SyncResult`:
   ```ts
-  type SkillsPopulatedResult =
-    | (SkillSyncResult & { ok: true })
-    | { ok: false; sourceDir: string; targetDir: string; error: string };
+  type SkillsPopulatedResult = PopulateEchoSkillsResult;  // alias — same shape as AC4.1's return; the `ok: true` variant has copied/skipped/targetDir, the `ok: false` variant has sourceDir/targetDir/error. NO separate `SkillSyncResult` type (codex r9 L1 cleanup; that name was a stale reference from earlier rounds).
 
   interface AdapterError {
     code:
@@ -275,9 +274,11 @@ The two functions deliberately do NOT share a return type (codex r6 M2 cleanup) 
     roles: RoleSyncResult;
     syncLock?: AdapterError;     // populated ONLY when lock acquisition failed (EEXIST present, EACCES, etc.). When set, agents/roles run did not happen and `overallOk` is false. See "lock-failure result shape" below.
     repoRoot?: AdapterError;     // populated ONLY when repo-root walk-upward failed and caller did not pass opts.repoRoot. When set, agents/roles run did not happen and `overallOk` is false. (codex-ops r7 M2)
+    directorySymlink?: AdapterError;  // populated when any ECHO-owned directory exists as a symlink (AC6a). When set, no agent/role work ran. (codex-ops r9 M1)
     overallOk: boolean;  // true iff:
                         //   syncLock is absent
                         //   AND repoRoot is absent (codex-ops r7 M2)
+                        //   AND directorySymlink is absent (codex-ops r9 M1)
                         //   AND skillsPopulated.ok === true
                         //   AND every agent.ok === true
                         //   AND every role result has action in {'copied', 'noop'} OR ('user-modified' AND opts.allowUserModifiedRoles)
@@ -333,6 +334,20 @@ The two functions deliberately do NOT share a return type (codex r6 M2 cleanup) 
   
   The caller (074 / 073) can distinguish "lock conflict" (`syncLock.code === 'RETRY_CONFLICT'`) — "another sync running, or stale lockfile to clean up" — from "filesystem setup failure" (`code in {'ENOTDIR', 'EACCES', ...}`) — "your ECHO_HOME path or perms are broken; run `echo doctor`". Different UX, same field.
 - `syncAll` is the ONLY public entrypoint; per-adapter functions are also exported for direct test use but the wizard / CLI must go through `syncAll` so cross-agent ordering + populate-skills-first + roles-once + populate-failure-blocks-fanout + per-user-lock invariants are preserved.
+
+### AC6a — Directory-component symlink guard (codex-ops r9 M1)
+
+File-level symlink guards (AC4.1 / AC4.2 / AC5 / AC7.2a) protect individual entries within a target directory but do NOT protect against the target directory ITSELF being a symlink. A stale or hostile symlink at `~/.echo/skills/` → `/tmp/exfil/` would make `mkdirSync(..., { recursive: true })` and `readdirSync` operate through it; per-entry `lstatSync` then sees regular files at the *resolved* location, and the file-level guards don't fire.
+
+**AC6a.1 — Guarded directories.** Before any operation against the following ECHO-owned directories, `syncAll` calls `assertDirIsNotSymlink(dirPath)`:
+- `ECHO_HOME_PATHS.skills` (`~/.echo/skills/`)
+- `ECHO_HOME_PATHS.roles` (`~/.echo/roles/`)
+- `ECHO_HOME_PATHS.state` (`~/.echo/state/`)
+- For each caller-passed `commandsDir` (`~/.claude/commands/` typically) AND `targetDir` for role-sync.
+
+**AC6a.2 — `assertDirIsNotSymlink` semantics.** `fs.lstatSync(dirPath)` once at sync start. If the entry exists AND `.isSymbolicLink()` returns true, abort with an `AdapterError({ code: 'EEXIST' /* repurposed: path exists as wrong type */, operation: 'stat', file: dirPath, message: 'ECHO-owned directory <path> is a symlink — refusing to operate. Resolve manually before re-running.' })`. The error is surfaced via a new top-level `SyncResult.directorySymlink?: AdapterError` field (sibling to `syncLock` and `repoRoot`). When set, `overallOk: false`; no agent/role work runs. Note: a non-existent path is FINE (we'll `mkdirSync` it); only an existing symlink is the problem.
+
+**AC6a.3 — Why this is not in AC7 (`atomicWrite`).** `atomicWrite` operates on file targets; directory symlinks are upstream. Putting the guard at `syncAll` entry means it runs once per invocation, not per file write.
 
 ### AC7 — Atomic-write contract: unique temp path + file mode preservation
 
@@ -390,33 +405,49 @@ Pin: AC9 case 21 (codex/cursor write-through preserved) + new AC9 case 22 (claud
 
 **AC7.4 — Refactor instruction.** Each adapter ships with its AC1–AC5 contract phrasing referencing "atomic write" — those calls go through `atomicWrite()`, NOT through a per-adapter inline `writeFile + rename`. The header comments of each adapter file note this delegation.
 
-### AC8 — Conflict-payload secret-redaction contract is caller-owned
+### AC8 — Caller-owned secret-redaction contract for ALL byte-bearing result fields
 
-Per codex-ops r1: `cursor-config.ts` and `codex-config.ts` conflict payloads can carry secret-bearing fields (`headers.Authorization`, bearer tokens, future env-pinned secrets). 072 deliberately does **NOT** redact these values — redaction belongs at the render boundary, not in the engine, because:
+Per codex-ops r1: `cursor-config.ts` and `codex-config.ts` conflict payloads can carry secret-bearing fields. Per codex-ops r9 M2: `syncDefaultRoles` user-modified payloads can ALSO contain user secrets (role TOMLs are user-owned AI instructions and may include personal context, model API keys in custom roles, etc.). 072 deliberately does **NOT** redact these values — redaction belongs at the render boundary, not in the engine, because:
 
-- The engine has no general way to identify what's secret in arbitrary user-extensible `serverConfig` shapes (today: `url`, `headers`; tomorrow: who knows).
-- Different callers want different rendering: a CLI may want partial display ("[REDACTED bearer token]"), a log line may want fully omitted, an `echo doctor` output may want a hash for fingerprinting.
+- The engine has no general way to identify what's secret in arbitrary user-extensible shapes.
+- Different callers want different rendering (partial display, full omit, hash for fingerprinting).
 - Redacting at the engine layer would force callers to opt-OUT of safety, which is the wrong default.
 
-**AC8.1 — Contract.** The `SyncConflict` interface includes a deliberate comment:
+**AC8.1 — Fields covered by the caller-redaction contract.**
+
+1. `SyncConflict.currentValue`, `.expectedValue`, `.proposedValue`, `.unifiedDiff` (from codex-config / cursor-config adapter conflicts) — may contain `Authorization` headers, bearer tokens.
+2. `MarkerConflict.currentInside`, `.proposedInside`, `.expectedInside`, `.unifiedDiff` (from markers adapter conflicts on AGENTS.md / CLAUDE.md) — may contain user-prefixed instructions that include local context, paths, etc.
+3. **`RolePerFileResult.conflict.userBytes` AND `.sourceBytes`** (codex-ops r9 M2 — added in this round) — user-modified role TOMLs are user-owned files and the bytes may include personal context or credentials.
+
+All three carry the same caller-redaction obligation. The inline interface comments name the redaction requirement at every site:
 
 ```ts
 interface SyncConflict {
   filePath: string;
   // currentValue/expectedValue/proposedValue MAY contain user-bearing secrets
-  // (e.g. Authorization headers in mcpServers.echo). Callers MUST redact before
-  // rendering to terminal output, log lines, or any external surface. See
-  // 074's render-conflicts module for the canonical redaction pattern.
+  // (Authorization headers in mcpServers.echo). Callers MUST redact before
+  // rendering. See 074's render-conflicts module for canonical redaction.
   currentValue?: unknown;
   expectedValue?: unknown;
   proposedValue?: unknown;
   unifiedDiff?: string;
 }
+
+interface RolePerFileConflict {
+  filePath: string;
+  // userBytes is the user-modified content; sourceBytes is the canonical default
+  // 071 shipped. Both MAY contain personal/credential context. Callers MUST redact.
+  // targetIsSymlink, if true, means userBytes is null (the symlinked content was
+  // never read — codex r9 M1 guard).
+  sourceBytes: Buffer | null;
+  userBytes: Buffer | null;
+  targetIsSymlink?: boolean;
+}
 ```
 
-**AC8.2 — Drift catch.** No code in 072 ever writes a conflict-payload value to a logger, `console.log`, or any output stream. The only place such values appear is in the returned `SyncResult`. AC9 includes one negative test that grep-scans the built adapter bundle for `console.` calls inside the adapter source — if any appear, the test fails. (Defensive: prevents a future patch from "helpfully" logging conflict details.)
+**AC8.2 — Drift catch.** No code in 072 ever writes ANY of the AC8.1 fields to a logger, `console.log`, or any output stream. The only place those values appear is in the returned `SyncResult`. AC9 includes one negative test that grep-scans the built adapter bundle for `console.` and `process.stdout.write` / `process.stderr.write` calls inside the adapter source — if any appear, the test fails. (Defensive: prevents a future patch from "helpfully" logging conflict / user-bytes details.) The test now covers `role-sync.ts` in addition to the config adapters.
 
-**AC8.3 — Followup pointer.** The on-completion strategist note files a follow-up in `backlog/_followups.md` to require 074 to ship `redactConflictPayload(conflict): SyncConflict` before any user-facing render. 072 documents the requirement; 074 implements it.
+**AC8.3 — Followup pointer.** The on-completion strategist note files a follow-up in `backlog/_followups.md` to require 074 to ship `redactSyncResult(result): RedactedSyncResult` covering ALL AC8.1 fields before any user-facing render. 072 documents the requirement; 074 implements it.
 
 ### AC9 — Tests pin the contract
 
@@ -491,7 +522,10 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   25. **Missing required input falsifies agent + overallOk** (pins codex-ops r8 H1). Profile: `{ kind: 'codex', paths: {...}, mcpServerConfig: undefined, echoSection: '<some>' }` — codex requires both `mcpServerConfig` and `echoSection`; one is missing. Call `syncAll`. Assert: codex agent is `ok: false` with `errors[].code === 'MISSING_REQUIRED_INPUT'` naming the missing field; `agent.files_written === []`; `overallOk: false`. NOT `ok: true with skipped: [...]` (that was the r5 bug; codex-ops r8 H1 correction).
   26. **Marker target is a symlink → conflict** (pins codex r8 M3). Pre-seed `<tmpdir>/.claude/CLAUDE.md` as a symlink to `<some-other-path>/CLAUDE.md`. Call `syncAll` with claude-code profile. Assert: claude-code agent is `ok: false`; the conflict object includes `targetIsSymlink: true`; the symlink at `~/.claude/CLAUDE.md` is unchanged; the linked target file is unchanged.
   27. **`populateEchoSkills` target is a symlink → skipped** (pins codex r8 M3). Pre-seed `<echoHome>/skills/some.md` as a symlink. Call `syncAll`. Assert: `populateEchoSkills.skipped` includes `'some.md'`; `skillsPopulated.ok: true` (the OTHER skills copied fine); subsequent `syncClaudeSkills` second-hop continues; overall result has codex/cursor/claude-code agents based on their normal paths.
-  28. **TOML byte-range editor handles `[mcp_servers.echo.headers]` subtable** (pins codex-ops r8 M1). Pre-seed `~/.codex/config.toml` with both `[mcp_servers.echo]` block AND a subtable `[mcp_servers.echo.headers]\nX-Auth = "old"`. Call `syncAll` with `mcpServerConfig.headers = { 'X-Auth': 'new' }` and matching `previousServerConfig`. The byte-range slice MUST include the subtable (the AC2 step 1 rule "next sibling table header" applies — but `[mcp_servers.echo.headers]` is a CHILD of `mcp_servers.echo`, not a sibling, so it remains in-slice). Assert: after sync, the file contains exactly ONE `X-Auth = "new"` line (the subtable was rewritten, not duplicated); no orphan `[mcp_servers.echo.headers]` block remains; other sibling tables byte-identical.
+  28. **TOML byte-range editor handles `[mcp_servers.echo.headers]` subtable** (pins codex-ops r8 M1). Pre-seed `~/.codex/config.toml` with both `[mcp_servers.echo]` block AND a subtable `[mcp_servers.echo.headers]\nX-Auth = "old"`. Call `syncAll` with `mcpServerConfig.headers = { 'X-Auth': 'new' }` and matching `previousServerConfig`. The byte-range slice MUST include the subtable (the AC2 step 1 rule "next non-descendant table header" applies — `[mcp_servers.echo.headers]` is a CHILD of `mcp_servers.echo`). Assert: after sync, the file contains exactly ONE `X-Auth = "new"` line (the subtable was rewritten, not duplicated); no orphan `[mcp_servers.echo.headers]` block remains; other sibling tables byte-identical.
+  29. **role-sync target is a symlink → user-modified with userBytes:null** (pins codex r9 M1). Pre-create `<echoHome>/roles/reviewer.toml` as a symlink to `<some-other-path>/secret.txt` containing `'secret-content'`. Call `syncAll`. Assert: `result.roles.results[]` contains `{ role: 'reviewer.toml', action: 'user-modified', conflict: { filePath, targetIsSymlink: true, userBytes: null } }`. The fixture file at `<some-other-path>/secret.txt` was NEVER read (verified by attaching an `fs.readFileSync` spy that records calls — assert no call mentions `secret.txt`). The string `'secret-content'` does NOT appear anywhere in the returned `SyncResult`.
+  30. **Directory-component symlink → directorySymlink AdapterError** (pins codex-ops r9 M1 / AC6a). Pre-create `<echoHome>/skills` as a symlink to `<some-other-path>/skills-dir/`. Call `syncAll`. Assert: it resolves; `result.directorySymlink` is populated with `code: 'EEXIST'`, `file: '<echoHome>/skills'`, message naming the symlink-refusal; `agents: []`; `result.overallOk: false`. The fixture-dir contents are NOT read. Companion case for `<echoHome>/roles`, `<echoHome>/state`, and the caller-passed `commandsDir`.
+  31. **Role bytes are not logged** (pins AC8.2 / codex-ops r9 M2). Pre-seed `<echoHome>/roles/reviewer.toml` with custom content containing the unique string `'unique-secret-role-content-xyz123'`. Capture stderr + stdout during a `syncAll` call that triggers the user-modified branch. Assert: the captured streams contain NEITHER the unique string NOR any substring of the role content. The `SyncResult.roles.results[].conflict.userBytes` IS populated with the content (callers can render with redaction); 072 itself does not emit.
 
 Run convention: `npm test -- tests/echo-home/`.
 
@@ -532,7 +566,7 @@ All test files are listed in `files_to_modify`. Coverage targets:
 - `skill-sync.ts` — 8 cases (4 per exported function: `populateEchoSkills` and `syncClaudeSkills`), pinning create-target-dir / idempotent-overwrite / stale-file-preservation / hand-edit-overwrite for both hops.
 - `role-sync.ts` — 4 cases pinning first-install-copy / noop / user-modified-refusal / source-missing.
 - `atomic-write.ts` — 7 cases pinning unique-temp-suffix / mode-preservation-existing / 0600-for-allowlist-exact-match / 0600-for-explicit-secret / NOT-0600-for-non-allowlist-suffix / umask-default-for-non-secret / concurrent-overlap-no-corruption.
-- `adapter-sync.ts` — 28 cases pinning all-ok / partial-failure-conflict / user-modified-role-and-overallOk / populate-runs-first / default-roles-from-071 / populate-failure-blocks-fanout / conflict-not-logged / malformed-cursor-json-error-variant / EACCES-error-variant-via-parent-or-mock / per-user-lock-acquire-release / lockfile-present-then-removable / lock-setup-fs-failure-to-syncLock / exit-handler-unregistered / owner-token-verification / no-temp-leak-on-EEXIST / previous-absent-conflict / first-run-parent-dir / symlink-skipped-source / roles-error-channel / overallOk-falsifies-on-role-source-missing / symlinked-dotfile-write-through / symlinked-claude-target-skipped / repo-root-not-found / toml-renderer-vocabulary / missing-required-input-falsifies / marker-target-symlink-conflict / populate-target-symlink-skipped / codex-echo-headers-subtable.
+- `adapter-sync.ts` — 31 cases pinning all-ok / partial-failure-conflict / user-modified-role-and-overallOk / populate-runs-first / default-roles-from-071 / populate-failure-blocks-fanout / conflict-not-logged / malformed-cursor-json-error-variant / EACCES-error-variant-via-parent-or-mock / per-user-lock-acquire-release / lockfile-present-then-removable / lock-setup-fs-failure-to-syncLock / exit-handler-unregistered / owner-token-verification / no-temp-leak-on-EEXIST / previous-absent-conflict / first-run-parent-dir / symlink-skipped-source / roles-error-channel / overallOk-falsifies-on-role-source-missing / symlinked-dotfile-write-through / symlinked-claude-target-skipped / repo-root-not-found / toml-renderer-vocabulary / missing-required-input-falsifies / marker-target-symlink-conflict / populate-target-symlink-skipped / codex-echo-headers-subtable / role-target-symlink-no-read / directory-component-symlink-error / role-bytes-not-logged.
 
 Verify commands (root only — no Raycast package edits in this spec):
 
@@ -553,7 +587,7 @@ All four must pass before the builder moves 072 to `pending_review/`.
 - AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; populate-failure flips `overallOk` to false AND skips the claude-code `syncClaudeSkills` fan-out (CLAUDE.md merge still runs); per-agent dispatch wires the right adapters; **every per-profile call wrapped in try/catch — no exception escapes `syncAll`** — filesystem and parse errors land in the per-agent `errors[]` array with `AdapterError` shape; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071; `previous*` persistence is explicitly caller-owned (073 + 074 will cache via `~/.echo/adapters/`; 072 does not touch that directory); `paths` field defaults documented per-agent (`os.homedir()`-based) and resolved at adapter call time; **per-user advisory lock at `ECHO_HOME_PATHS.state/adapter-sync.lock`** is one-shot (no retry loop, no auto stale-recovery — codex r6 H1 + codex-ops r6 H1 removal). Lockfile present → `result.syncLock` populated with manual-cleanup message; recovery is the user's responsibility (or future 074 `echo doctor`).
 - AC7: `atomic-write.ts` exports `atomicWrite` with unique-tmp filename (`<file>.<pid>.<8hex>.tmp`), mode preservation on existing-file path, `0600` for new files that **exact-match** (post `path.resolve`) the `SECRET_SENSITIVE_ALLOWLIST` (codex config + cursor mcp.json under the runtime-resolved `os.homedir()`), `0600` when `opts.secretSensitive === true`, umask-default otherwise. All AC1–AC5 adapters delegate to this helper (no inline `writeFile + rename` in any adapter).
 - AC8: `SyncConflict` interface documents that payloads may contain user-bearing secrets; the inline comment names `Authorization` headers explicitly; no 072 code logs conflict-payload values; a grep-based negative test pins this.
-- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×7, adapter-sync ×28 — 67 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
+- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×7, adapter-sync ×31 — 70 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
 - All four verify commands above clean.
 - `task_state_ref` set to `2026-05-25-072-adapter-sync-engine` AND `backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md` exists pinning the spec at the artifact SHA.
 - TOML strategy decision (byte-range editor primary path; smol-toml used only for value-comparison on the target slice) documented in `src/echo-home/adapters/codex-config.ts` header comment, including the codex r1 verification result against the founder's real config.
