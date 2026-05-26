@@ -54,7 +54,36 @@ branch: "agent/onboarding-wizard"
 worktree: "/Users/zhenye/Desktop/Project_echo--onboarding-wizard"
 head_sha: "896f89d926d7bbdb8c21faadacc5667409a6a7d6"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-25 via founder reconciliation.
+
+  Conflicts resolved:
+  - None. Branch was additive (10 new wizard src files + 7 new wizard test
+    files + 2 daemon-refactor hunks promoting resolveDbPath). `git merge
+    --no-ff` applied cleanly.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None. Sidecar verdict was "merge as-is" with zero blocking fixups.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1351/1351 tests pass; 21 skipped; lint clean; typecheck clean;
+  tools/sync-skills.sh --check clean. Test count matches sidecar and
+  agent's claim byte-for-byte.
+
+  Follow-up items (non-blocking):
+  - R8 dogfooding trigger: file a 075-class "claude-code MCP adapter" spec
+    the first time a user hits `reason: 'mcp-not-configured'` in probe.
+  - Probe-stability hardening (V1.5+): arm a SIGKILL escalation in
+    probe.ts:realSpawn after a grace period beyond timeoutMs.
+  - R5 trigger: if dogfooding surfaces concurrent-wizard cache divergence,
+    file the wizard-level withLock(callback) extension spec.
+  - Cosmetic: probe.ts:84-86 authRequired substring `auth` may false-
+    positive on "author"/"authority" in stderr (spec-faithful per AC6.3
+    but flag if dogfooding shows mis-routing).
 agent_notes: |
   Implemented the UX-free onboarding wizard library API for detect-agents, detect-projects, adapter cache, ECHO-section rendering, wire orchestration, per-agent probes, and createWizard() summary/state flow. Feature branch agent/onboarding-wizard is pushed at 896f89d926d7bbdb8c21faadacc5667409a6a7d6; verification passed: typecheck, lint, targeted wizard tests (53 passed), prettier check, and full npm test (1351 passed, 21 skipped).
 ---
