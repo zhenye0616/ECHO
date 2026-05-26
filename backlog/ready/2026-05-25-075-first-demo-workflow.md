@@ -22,7 +22,6 @@ files_to_modify:
   - package.json                                       # AC9 (r1 codex-ops F1 HIGH) — extend `files` allowlist with `assets/echo-workflows/**` so the default workflow ships in packed/npm-install installs; scripts/deps unchanged
   - src/cli/commands/run.ts                            # AC10 (r3 codex F1 HIGH) — NARROW lift of 074 out-of-scope: extend renderOutcomes() in human (non-JSON) mode to print the captured spawn.stdout + spawn.stderr; one block per outcome below the existing `${role}: exit <code>` line; the dispatcher capture is unchanged
   - tests/cli/run.test.ts                              # AC10.2 — extend; assert human-mode rendering prints the captured spawn.stdout (so demo findings are visible to the user, not silently dropped)
-  - docs/BACKLOG.md                                    # AC8 — move 075 from Inbox to Ready (admin)
 spec_refs:
   - raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md  # source design — §"What's deferred" (first-session demo), §"Coord layer architecture" (role-plugging at runtime)
   - backlog/{ready,pending_review,complete}/2026-05-25-074-echo-cli-binary.md  # exports loadWorkflow, matchRolesToAgents, dispatchWorkflow, Workflow, WorkflowStep, AgentMatch. STAGE-STABLE — blocked_by gates claim until 074 is in complete/.
@@ -287,9 +286,9 @@ All cases use `os.tmpdir()` + a tmpdir created in `beforeEach` (mirrors 072's ro
 
 **AC7.3 — Asset-fixture freshness.** A test (in `tests/cli/workflow-load.test.ts` per AC4.1) asserts the SHIPPED `assets/echo-workflows/change-review.toml` parses cleanly, so a content edit that breaks the schema (e.g., adding an unknown key) fails CI immediately.
 
-### AC8 — Backlog row migration
+### AC8 — Backlog row migration (strategist-owned; NO builder action)
 
-Move 075's row from `docs/BACKLOG.md`'s "Inbox" section to the "Ready" table with `Priority: HIGH`, `Estimate: 1-2d`, `Notes: First demo workflow asset + workflow-sync engine; lead hypothesis is cross-vendor change review. Founder dogfoods after merge.`
+`docs/BACKLOG.md` row migration is strategist work, NOT builder work — `docs/AGENT_INSTRUCTIONS.md:359` explicitly lists `docs/BACKLOG.md` under "What You Must Not Write" ("founder regenerates manually after approval"). The strategist moved 075's row from Inbox → Ready when this spec was authored + pushed (commit `a98957d`). The builder MUST NOT touch `docs/BACKLOG.md`. This AC is a marker for spec-completeness only; it has no builder deliverable. (Originally a builder-facing AC; corrected post-r5 convergence after builder escalation surfaced the rule conflict.)
 
 ### AC9 — `package.json` `files` allowlist hygiene (r2 codex-ops F1 + codex F1 disposition: REMOVAL per 058 — packed-install correctness is OUT OF SCOPE for 075)
 
