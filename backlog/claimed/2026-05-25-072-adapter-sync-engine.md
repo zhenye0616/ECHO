@@ -38,9 +38,9 @@ spec_refs:
   - src/echo-home/  # 070's home for this module family — 070 ships paths.ts + scaffold.ts; 071 adds roles.ts + index.ts; 072 adds adapter-sync.ts + adapters/*.ts (no shared types.ts — each module defines its own DTOs)
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-26T02:40:35Z"
+branch: "agent/adapter-sync-engine"
 worktree: ""
 head_sha: ""
 pr_url: ""
