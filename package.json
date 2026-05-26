@@ -10,7 +10,8 @@
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "package.json",
-    "README.md"
+    "README.md",
+    "assets/echo-workflows/**"
   ],
   "scripts": {
     "test": "vitest run",

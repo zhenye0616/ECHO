@@ -37,6 +37,11 @@ describe('echoctl shell reachability', () => {
       });
       expect(pack.status, pack.stderr).toBe(0);
       const tarball = join(tmpRoot, pack.stdout.trim().split(/\r?\n/).at(-1)!);
+      const tarList = spawnSync('tar', ['tf', tarball], { encoding: 'utf8' });
+      expect(tarList.status, tarList.stderr).toBe(0);
+      expect(tarList.stdout.split(/\r?\n/)).toContain(
+        'package/assets/echo-workflows/change-review.toml',
+      );
       const prefix = join(tmpRoot, 'prefix');
       const install = spawnSync('npm', ['install', '-g', '--prefix', prefix, tarball], {
         cwd: repoRoot,
