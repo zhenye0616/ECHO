@@ -44,7 +44,47 @@ branch: "agent/adapter-sync-engine"
 worktree: "~/Desktop/Project_echo--adapter-sync-engine"
 head_sha: "0e4b20420bd0e418f8c79052b8fdf55de7a4f9b8"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-25 via founder reconciliation.
+
+  Conflicts resolved:
+  - None. Branch was fully additive (15 new files, 1 modified task-state pointer);
+    `git merge-tree` reported no conflicts and `git merge --no-ff --no-commit`
+    applied cleanly.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - src/echo-home/adapter-sync.ts:793 handleClaudeSkills — when syncClaudeSkills
+    returns zero copied files, push an AdapterError (code EEXIST, operation
+    write) so the claude-code agent flips ok:false. Message distinguishes
+    "skipped non-empty" (symlink-target case the reviewer flagged) from
+    "source empty". This closes the false-success path on a commandsDir
+    full of pre-staged symlinks.
+  - tests/echo-home/adapter-sync.test.ts — added regression test
+    "all commandsDir targets pre-staged as symlinks → claude-code ok:false
+    / overallOk:false" asserting both the ok-flag flip and the AdapterError
+    shape (EEXIST + "copied 0 files" in message). Pins the fixup against
+    future regressions.
+  - src/echo-home/adapters/codex-config.ts — TomlParseError contract
+    adjustment per reviewer's "OR explicitly adjust the contract" branch.
+    @iarna/toml does not yield byte offsets; all 4 call sites passed
+    constant 0; no test asserted on the field. Dropped the byteOffset
+    constructor param and removed the misleading "(offset 0)" prefix from
+    the super-message. A future fixup that actually plumbs offsets (e.g.,
+    hand-counting at the slice boundary or switching parsers) can re-add
+    the field with non-zero semantics; deferring the shape decision keeps
+    the door open.
+
+  Fixups deferred to follow-up items:
+  - None. All 3 sidecar pre-merge fixups applied in this merge.
+
+  Verify: 1298/1298 tests pass (sidecar's 1297 + the new regression test);
+  21 skipped; lint clean; typecheck clean; tools/sync-skills.sh --check clean.
+
+  Follow-up items (non-blocking):
+  - Founder product call on R6: keep fully ECHO-owned Claude command files,
+    or spec a future marker-merge migration (filed to backlog/_followups.md).
 agent_notes: |
   All AC1-AC9 implemented; 68 new test cases pass; full suite 1297 passed / 21 skipped;
   lint + typecheck clean. Branch agent/adapter-sync-engine at SHA

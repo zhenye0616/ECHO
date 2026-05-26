@@ -34,6 +34,10 @@ written_by: strategist-072-r18-converged
 - 071's role TOML schema or default role files. 072 only copies bytes via `syncDefaultRoles`.
 - The reserved `~/.echo/adapters/` directory. 072 explicitly defers this to 073/074. Do NOT add cache writes in 072 even if convenient.
 
+## canonical_anchors
+
+- spec: backlog/claimed/2026-05-25-072-adapter-sync-engine.md
+
 ## handoff_head_sha
 
 Set by builder on claim. **Convergence SHA: `f1148aa8ea38705a70a61d870ca1d8eb1fff9b55`** (r18, 2026-05-26).
