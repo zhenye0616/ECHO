@@ -27,7 +27,7 @@ const COMMAND_HELP: Record<string, string> = {
   init: 'Usage: echoctl init [--json] [--quiet]',
   doctor: 'Usage: echoctl doctor [--json] [--quiet]',
   uninstall: 'Usage: echoctl uninstall [--yes] [--purge-state] [--force-purge] [--json] [--quiet]',
-  run: 'Usage: echoctl run <workflow> [--project <path>] [--agent <role>=<agent>] [--json] [--quiet]',
+  run: 'Usage: echoctl run <workflow> [--project <path>] [--agent <role>=<agent>] [--timeout <seconds>] [--json] [--quiet]',
 };
 
 function peelGlobal(argv: readonly string[]): { globals: GlobalOpts; rest: string[] } {
@@ -74,6 +74,13 @@ function parseAgentOverride(value: string): [string, AgentKind] {
     throw new Error(`invalid --agent kind: ${agent}`);
   }
   return [role, agent];
+}
+
+function parseTimeoutSeconds(value: string | undefined): number | null | undefined {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0 || !Number.isInteger(n)) return null;
+  return n;
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
@@ -129,11 +136,17 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         options: {
           project: { type: 'string' },
           agent: { type: 'string', multiple: true, default: [] },
+          timeout: { type: 'string' },
         },
       });
       const workflowName = parsed.positionals[0];
       if (workflowName === undefined || parsed.positionals.length > 1) {
         print(process.stderr, COMMAND_HELP.run);
+        return 2;
+      }
+      const timeoutSeconds = parseTimeoutSeconds(parsed.values.timeout);
+      if (timeoutSeconds === null) {
+        print(process.stderr, `${COMMAND_HELP.run}\ninvalid --timeout: expected a positive integer`);
         return 2;
       }
       const overrides = new Map<string, AgentKind>();
@@ -146,6 +159,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         workflowName,
         projectFlag: parsed.values.project,
         agentOverrides: overrides,
+        timeoutMs: timeoutSeconds === undefined ? undefined : timeoutSeconds * 1000,
       });
     }
 

@@ -26,6 +26,7 @@ export interface RunOpts {
   stateOnboardingPath?: string;
   stateProjectsPath?: string;
   spawn?: DispatchSpawn;
+  timeoutMs?: number;
   now?: () => Date;
   cwd?: string;
   stdout?: Pick<NodeJS.WritableStream, 'write'>;
@@ -194,6 +195,7 @@ export async function runRun(opts: RunOpts): Promise<number> {
         workflow,
         matches,
         spawn: opts.spawn,
+        timeoutMs: opts.timeoutMs,
         projectRoot,
         signal: controller.signal,
         receivedSignal,
