@@ -14,12 +14,15 @@ requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - src/echo-home/wizard/detect-agents.ts          # AC1 — layered scan: config files + atom-store activity → DetectedAgent[]
   - src/echo-home/wizard/detect-projects.ts        # AC2 — atom-store group-by-repo_root over last 7d → DetectedProject[]
+  - src/echo-home/wizard/atom-store-readonly.ts    # AC1.3 production opener — fs.existsSync + better-sqlite3 readonly + query_only pragma; consumed by detect-agents.ts + detect-projects.ts (codex r3 F2 — required by AC1.3 prose, must be in write-scope)
   - src/echo-home/wizard/adapter-cache.ts          # AC3 — read/write ~/.echo/adapters/<agent>.json (the previous* cache 072 AC6 said is caller-owned)
   - src/echo-home/wizard/render-echo-section.ts    # AC4 — per-agent markdown renderer for the BEGIN ECHO / END ECHO body 072's markers.ts splices in
   - src/echo-home/wizard/wire.ts                   # AC5 — orchestrator: load previous*, build AdapterSyncProfile[], call 072's syncAll, persist new previous*, mutate ~/.echo/state/onboarding.json
   - src/echo-home/wizard/probe.ts                  # AC6 — per-agent best-effort spawn-and-check (codex / claude-code automated; cursor manual-only)
   - src/echo-home/wizard/run-wizard.ts             # AC7 — top-level createWizard() factory returning a staged API; 074 drives flow
   - src/echo-home/wizard/index.ts                  # AC7 — barrel re-export of the public surface
+  - src/daemon/lifecycle.ts                        # AC1.3 — promote daemon-private `resolveDbPath()` to an exported helper alongside `resolveDataDir`. Wizard imports from here. (codex r3 F2 / codex r2 F2.)
+  - src/daemon/index.ts                            # AC1.3 — re-import promoted `resolveDbPath` from lifecycle.ts (delete the local copy). No behavior change for the daemon; pure refactor. (codex r3 F2.)
   - tests/echo-home/wizard/detect-agents.test.ts   # AC8
   - tests/echo-home/wizard/detect-projects.test.ts # AC8
   - tests/echo-home/wizard/adapter-cache.test.ts   # AC8
@@ -88,7 +91,7 @@ Every method is async; every method returns a typed result. None of them prompts
 The brainstorm sketch leaves several mechanics unspecified. The calls below are the spec author's picks; reviewers should push back if any of them feel wrong.
 
 - **J1. Staged library API, not callback pipeline.** `createWizard()` returns an object with `detectAgents()`, `detectProjects()`, `wire()`, `probe()`, `summary()`. The UI calls them in order, surfaces user confirmation between steps, and decides whether to retry/skip on a failure. A callback-driven `runWizard(opts, onStep)` pipeline was rejected because steps 2 and 3 require user confirmation before step 4, which would force the UI to suspend the pipeline mid-call — awkward.
-- **J2. Atom-store access via direct SQLite, not MCP.** 073 imports `AtomStore` from `src/storage/interface.ts` and opens the existing SQLite DB at `resolveDataDir()`-based path. The MCP route would force the daemon to be running and would route reads through HTTP+JSON for no benefit. Tests inject a fake `AtomStore` impl.
+- **J2. Atom-store access via direct SQLite, not MCP.** 073 imports `Storage` (NOT `AtomStore` — that name does not exist) from `src/storage/interface.ts` and opens the existing SQLite DB via the wizard-local `openExistingAtomStoreReadOnly()` helper at `src/echo-home/wizard/atom-store-readonly.ts` (see AC1.3 "Production opener"). The DB path comes from the daemon's `resolveDbPath()` resolver — `ECHO_DB_PATH > ECHO_DATA_DIR > Application Support default` (see AC1.3 "DB path resolution must mirror the daemon"). The helper opens better-sqlite3 with `{ readonly: true, fileMustExist: true }` + `pragma query_only=ON` and skips migrations + canonicalizeTimestamps, so detection never creates a daemon DB or contends with a running daemon. The MCP route would force the daemon to be running and would route reads through HTTP+JSON for no benefit. Tests inject a fake `Storage` impl. (Originally written with the wrong type names + DB-path-resolution drift; rewritten in r3 to match AC1.3 per codex-ops r3 F5.)
 - **J3. "Running processes" detection is OUT of scope.** The design archive mentions "config files + running processes + atom-store `source_breakdown`." The "running processes" signal is dropped: it conflates "installed" with "running right now" (which is brittle and not what onboarding cares about). Config-file presence + atom-store activity over 30d is sufficient; a process scan adds no decision value.
 - **J4. Probe spawns the agent's CLI directly; cursor is manual-only.** `codex exec --sandbox read-only` and `claude --print --no-stream` are stable enough to drive a probe. Cursor has no headless CLI in V1, so its probe returns `{ probed: false, reason: 'manual-only' }` and the wizard surfaces an instruction string for the user.
 - **J5. Adapter cache is per-agent JSON, NOT a single onboarding-wide file.** `~/.echo/adapters/codex.json`, `~/.echo/adapters/claude-code.json`, `~/.echo/adapters/cursor.json`. Per-agent files are smaller and survive partial failures cleanly: if writing `claude-code.json` fails, `codex.json` is already on disk and untouched.
@@ -331,6 +334,15 @@ export interface WireOpts {
   defaultProjectRepoRoot: string | null;           // user's confirmed pick from AC2; null = skipped
   mcpServerUrl: string;                            // canonical daemon URL — caller resolves; wizard does NOT introspect the daemon
   echoVersion: string;                             // package.json version — caller passes through
+  // Override for 072's `repoRoot` resolution (codex-ops r3 F4 — recovery
+  // pass-through for the AC5.7 `repoRoot` sentinel). When `syncAll` returns
+  // `repoRoot` populated (packaged/bundled install where the source tree
+  // isn't adjacent to the engine), the caller can re-invoke `wire()` with
+  // an explicit `repoRoot` and the wizard passes it through to
+  // `syncAll(profiles, { repoRoot })`. Without this seam the AC5.7 sentinel
+  // is observable but not recoverable. Default: undefined → 072's
+  // import.meta.url walk applies.
+  repoRoot?: string;
   // Test injection: override 072's syncAll. Production uses the real export.
   syncAll?: typeof import('../adapter-sync.js').syncAll;
   // Test injection: override the adapter cache module. Production uses ./adapter-cache.js exports.
@@ -372,7 +384,7 @@ export async function wire(opts: WireOpts): Promise<WireResult>;
    }
    ```
 
-**AC5.3 — Dispatch phase.** Call `syncAll(profiles, { /* no opts; defaults are correct */ })`. Capture the result verbatim into `WireResult.syncResult`. Do not mutate or sanitize.
+**AC5.3 — Dispatch phase.** Call `syncAll(profiles, opts.repoRoot ? { repoRoot: opts.repoRoot } : undefined)`. Per codex-ops r3 F4, `opts.repoRoot` is the recovery seam for the AC5.7 `repoRoot` sentinel: when 072 first returns `repoRoot` populated, the caller passes an explicit `opts.repoRoot` on retry and the wizard forwards it to `syncAll`. When unset, 072 uses its `import.meta.url`-walk default. Capture the result verbatim into `WireResult.syncResult`. Do not mutate or sanitize.
 
 **AC5.4 — Cache-update phase.** For each profile that resulted in an agent entry with `ok: true` AND no conflicts: write the `AdapterCacheRecord` with the newly-rendered values. For `ok: false` agents OR conflict outcomes: do NOT update the cache — the previous record remains the last-known-good baseline for the next retry. Record the per-agent outcome in `cacheUpdates[]`.
 
@@ -418,7 +430,7 @@ The broader race window — between `cache.read` and the onboarding-state write,
 ```ts
 export type ProbeOutcome =
   | { agent: AgentKind; probed: true; latencyMs: number }
-  | { agent: AgentKind; probed: false; reason: 'cli-unavailable' | 'timeout' | 'manual-only' | 'auth-required' | 'unexpected-output'; detail?: string };
+  | { agent: AgentKind; probed: false; reason: 'cli-unavailable' | 'timeout' | 'manual-only' | 'auth-required' | 'mcp-not-configured' | 'unexpected-output'; detail?: string };
 
 export interface ProbeDeps {
   // Test injection: override the child-process spawner. Production uses node:child_process.spawn.
@@ -434,18 +446,27 @@ export async function probeAgents(agents: AgentKind[], deps?: ProbeDeps): Promis
 **AC6.2 — Per-agent probe shape.**
 
 - **`codex`.** Spawn `codex exec --sandbox read-only -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Probe succeeds iff `exitCode === 0` AND the trimmed last line of stdout JSON-parses to an object containing `ok: true` (the echo_ping schema). `latencyMs` is wall-clock time from spawn to stdout-parsed.
-- **`claude-code`.** Spawn `claude --print --no-stream --output-format text -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Same success criterion.
+- **`claude-code`.** Spawn `claude --print --no-stream --output-format text -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Same success criterion **conditional on Claude Code already having ECHO MCP configured** — see §"Claude Code MCP wiring gap" below (codex-ops r3 F3).
 - **`cursor`.** Returns `{ agent: 'cursor', probed: false, reason: 'manual-only' }` without spawning anything. Cursor has no headless CLI in V1; the wizard's caller (074) is responsible for surfacing a "please open Cursor and try invoking ECHO" prompt to the user. The wizard does NOT mark cursor's `probed_at` in `onboarding.json` — that field stays null until 074 collects manual confirmation.
 
-**AC6.3 — Failure mapping.**
+**Claude Code MCP wiring gap (codex-ops r3 F3 HIGH — V1 documented limitation).** 072's claude-code adapter writes `~/.claude/CLAUDE.md` markers + copies skill files to `~/.claude/commands/`. It does NOT write to `~/.claude.json` (the global Claude Code config) or per-project `.claude/mcp.json` — those are the only files that wire ECHO as an MCP server for Claude Code. Consequence: on a fresh machine that has never been wired to ECHO, `wire()` reports `ok: true` for claude-code (markers + skills succeeded), but the AC6.2 probe asking Claude Code to call `mcp__echo__echo_ping` fails with `unexpected-output` because Claude Code doesn't know the tool exists.
+
+**V1 acceptance:** the wizard documents this clearly rather than adding a 4th adapter mid-flight. Claude Code MCP wiring is OUT OF SCOPE for 073 + 072 (see Out of Scope §14, new). Until a follow-up adapter lands, the user MUST run `claude mcp add echo <url>` (or equivalent UI step) before the AC6.2 probe will succeed. 074 surfaces this in the Step 5 / probe-results screen as actionable text (74 owns the copy; 073 only emits the structured `reason`).
+
+**Per AC6.3, claude-code probe failures matching the "mcp not configured" stderr/stdout patterns map to `reason: 'mcp-not-configured'`** so 074 can render the right remediation copy. This keeps the failure observable + actionable rather than buried in a generic `unexpected-output`. Followed up by R8 + Out of Scope §14 + DoD update.
+
+**AC6.3 — Failure mapping.** Rows are evaluated in order; first match wins.
 
 | Observed | reason |
 |---|---|
 | spawn throws ENOENT (binary not on PATH) | `cli-unavailable` |
 | spawn exits with non-zero and stderr contains "auth" / "login" / "not authenticated" (case-insensitive substring) | `auth-required` |
+| **(claude-code only)** combined stdout+stderr (case-insensitive) contains any of: "no such tool", "unknown tool", "mcp__echo__echo_ping" + "not found"/"unavailable", "mcp server" + "not configured"/"not found" | `mcp-not-configured` (codex-ops r3 F3) |
 | `timedOut === true` | `timeout` |
 | `exitCode === 0` but stdout does not parse / does not contain `ok: true` | `unexpected-output` (with `detail` = first 200 chars of stdout) |
 | any other spawn error | `unexpected-output` (with `detail` = error message) |
+
+The `mcp-not-configured` row fires only for claude-code per the gap documented in AC6.2 (codex / cursor have their MCP wired by 072 or by Cursor's own UI; only claude-code is the V1-gap path). For codex / cursor, an "MCP not configured" symptom routes through `unexpected-output` as before.
 
 **AC6.4 — Mutating onboarding-state.** `probeAgents()` does NOT directly mutate `~/.echo/state/onboarding.json`. The caller (run-wizard.ts AC7) consumes the `ProbeOutcome[]` and writes back via the same onboarding-state mutator wire.ts uses. Reason: keep probe.ts pure-spawn so it's trivially testable; persistence orchestration lives in the wizard orchestrator.
 
@@ -479,7 +500,7 @@ export interface WizardSummary {
 export interface Wizard {
   detectAgents(): Promise<DetectedAgent[]>;
   detectProjects(): Promise<DetectedProject[]>;
-  wire(opts: Pick<WireOpts, 'selectedAgents' | 'defaultProjectRepoRoot'>): Promise<WireResult>;
+  wire(opts: Pick<WireOpts, 'selectedAgents' | 'defaultProjectRepoRoot' | 'repoRoot'>): Promise<WireResult>;
   probe(agents: AgentKind[]): Promise<ProbeOutcome[]>;
   // READ-ONLY snapshot of the wizard's last-known state plus a fresh re-read
   // of `onboarding.json`. summary() never mutates `completed` (or any other
@@ -556,14 +577,14 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 8. `selectedAgents: ['cursor']` only → no call to `renderEchoSection`; profile has `echoSection: undefined`; cache write still records `echoSection: null` per AC3.2.
 9. `syncAll` throws unexpectedly (mock throws) → wire catches and returns a result with synthesized failure shape; no onboarding-state mutation; no cache update.
 10. `now` injection determines the `renderedAt` substring in the rendered echoSection AND the `last_written_at` in cache writes; pinned to identical ISO8601 across both surfaces.
-11a. **Lock-acquisition-failure path (AC5.7 — `syncLock` populated; codex r1 F2 + codex r2 F3 fixture fix).** Mock `syncAll` to return 072's actual lock-failure shape per 072 AC6 lines 346-361 (NOT the earlier `EEXIST` / `~/.echo/locks/sync.lock` / `pid + since` shape — that was incorrect):
+11a. **Lock-acquisition-failure path (AC5.7 — `syncLock` populated; codex r1 F2 + codex r3 F1 fixture fix).** Mock `syncAll` to return 072's actual top-level-sentinel `SyncResult` shape (per 072 lines 369-377; the `skillsPopulated`/`roles` fields here are NOT the "agents ran" success shape — when a top-level sentinel fires no agent or role dispatch happens, so these fields carry their "sync_skipped" sentinels):
 
    ```ts
    {
      overallOk: false,
      agents: [],
-     skillsPopulated: { ok: true, copied: [], skipped: [], targetDir: '<tmp>/skills' },
-     roles: { ok: true, written: [], skipped: [], targetDir: '<tmp>/roles' },
+     skillsPopulated: { ok: false, sourceDir: '', targetDir: '', error: 'sync_skipped:lock_unavailable' },
+     roles: { results: [], rolesErrors: [] },
      syncLock: {
        code: 'RETRY_CONFLICT',
        operation: 'lock',
@@ -575,9 +596,11 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 
    Assert: `cacheUpdates` is `[]`; `onboardingStateUpdated` is `false`; `~/.echo/state/onboarding.json` is byte-identical before and after the call (SHA-256 hash pre/post); no adapter-cache file is written for any selected agent; `wire()` does NOT throw. Fixture mirrors 072 AC9 case 11; drift fails this test — deliberate cross-spec consistency guard.
 
-11b. **Repo-root-not-found path (AC5.7 — `repoRoot` populated; codex-ops r2 F3).** Mock `syncAll` to return `{ overallOk: false, agents: [], skillsPopulated: {ok:true,copied:[],skipped:[],targetDir:'<tmp>/skills'}, roles: {ok:true,written:[],skipped:[],targetDir:'<tmp>/roles'}, repoRoot: { code: 'UNKNOWN', operation: 'stat', file: '<some-tmp-path>', message: 'could not locate repo root (no package.json + skills/ adjacent); caller must pass opts.repoRoot' } }`. Same assertions as 11a: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 AC9 case 22.
+11b. **Repo-root-not-found path (AC5.7 — `repoRoot` populated; codex-ops r2 F3 + codex r3 F1 fixture + case-number fix).** Same base shape as 11a (skillsPopulated `sync_skipped:repo_root_unresolved`, roles `{ results: [], rolesErrors: [] }`, agents `[]`, overallOk false), with `repoRoot: { code: 'UNKNOWN', operation: 'stat', file: '<some-tmp-path>', message: 'could not locate repo root (no package.json + skills/ adjacent); caller must pass opts.repoRoot' }` in place of `syncLock`. Same assertions as 11a: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 **AC9 case 23** (not 22 — case 22 is the claude-skill symlink case).
 
-11c. **Directory-symlink-preflight-fail path (AC5.7 — `directorySymlink` populated; codex-ops r2 F3).** Mock `syncAll` to return `{ overallOk: false, agents: [], skillsPopulated: {ok:true,copied:[],skipped:[],targetDir:'<tmp>/skills'}, roles: {ok:true,written:[],skipped:[],targetDir:'<tmp>/roles'}, directorySymlink: { code: 'EEXIST', operation: 'stat', file: '<tmp>/.echo/skills', message: '<tmp>/.echo/skills is a symlink — refusing to operate. Resolve manually before re-running.' } }`. Same assertions: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 AC9 case 30.
+11c. **Directory-symlink-preflight-fail path (AC5.7 — `directorySymlink` populated; codex-ops r2 F3 + codex r3 F1 fixture fix).** Same base shape as 11a (skillsPopulated `sync_skipped:preflight_directory_symlink`, roles `{ results: [], rolesErrors: [] }`, agents `[]`, overallOk false), with `directorySymlink: { code: 'EEXIST', operation: 'stat', file: '<tmp>/.echo/skills', message: '<tmp>/.echo/skills is a symlink — refusing to operate. Resolve manually before re-running.' }` in place of `syncLock`. Same assertions: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 AC9 case 30.
+
+**Cross-spec consistency note:** the literal `sync_skipped:<reason>` strings on `skillsPopulated.error` for 11b/11c are wizard-side expectations — 072 only fully specs the `sync_skipped:lock_unavailable` string today. The builder should match the AC8.5 fixtures against whatever 072 emits at claim time; if 072's strings differ (or only one is specced), update 11b/11c's expected `error` substring rather than 072's emission. This is the bullet codex r3 F1 cautioned about: typed mocks must match real `SyncResult` output, not invented shapes.
 
 **AC8.6 — `probe.test.ts` (8 cases).**
 
@@ -615,6 +638,7 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 11. **Cursor auto-probe.** Manual-only in V1. If Cursor ships a headless CLI in a future release, a follow-up spec adds the spawn path.
 12. **Atom-store backfill.** If the user has no atoms (fresh install), the wizard reports empty project list. No backfilling from filesystem scans.
 13. **Concurrent wizard invocations.** 073 inherits 072's per-user lock (acquired inside `syncAll`); no separate wizard-level lock in V1. When two `echo init` runs race, the second `syncAll` call returns the lock-failure `SyncResult` shape per 072 AC6 (with `syncLock` populated and `agents: []`); 073's `wire()` handles that path explicitly per AC5.7 (no cache writes, no onboarding-state mutation, `onboardingStateUpdated: false`). The broader race window outside `syncAll` is documented in R5 with a follow-up trigger.
+14. **Claude Code MCP wiring (codex-ops r3 F3).** 072 does not write to `~/.claude.json` or per-project `.claude/mcp.json`; therefore 073 cannot finalize Claude Code's MCP-server registration with ECHO. The wizard's wire step is `ok: true` for claude-code on success of markers + skills copy, but the AC6 probe is conditional on the user having previously run `claude mcp add echo <url>` (or equivalent). The Step 5 results screen surfaces `reason: 'mcp-not-configured'` with actionable text. A follow-up spec (suggested 075-class — "claude-code MCP adapter") will close this gap; until then 073 + 074 ship V1 with this manual-prerequisite. Trigger: log a follow-up the moment dogfooding shows a single confused user hitting the `mcp-not-configured` path.
 
 ## Risks
 
@@ -631,6 +655,8 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 - **R6 — Atom-store query latency on large stores.** `detectProjects` does a group-by over 7d of atoms; on the founder's machine with ~weeks of dense data, this could be slow. Mitigation: the underlying SQLite store already has indexes on `timestamp` and `source` (from earlier items); add an index on `metadata.repo_root` if 037 didn't already. If query takes > 250ms on the founder's machine at claim time, the builder STOPS and adds the index in the same spec; do not ship a wizard that hangs onboarding.
 
 - **R7 — `package.json` version read is a runtime import.** The caller passes `echoVersion` into `createWizard`; the wizard does not introspect `package.json`. Avoids the test-fragility of pinning version strings. 074 reads `package.json` at startup and passes it through.
+
+- **R8 — Claude Code MCP wiring is a manual prerequisite (codex-ops r3 F3).** 072 does not write to `~/.claude.json` / per-project `.claude/mcp.json`. The wizard's claude-code wire step (markers + skills copy) succeeds, but the AC6 probe asking Claude Code to call `mcp__echo__echo_ping` fails on machines without prior `claude mcp add echo <url>` setup. **Mitigation:** AC6.3 maps the failure to `reason: 'mcp-not-configured'`; 074 surfaces remediation copy on the Step 5 screen. **DoD update:** the manual-run section below reflects this — "claude probe succeeds OR returns `mcp-not-configured` with founder having previously wired ECHO via `claude mcp add`". **Follow-up trigger:** the first time dogfooding shows a user hitting the `mcp-not-configured` path, file a 075-class "claude-code MCP adapter" spec that extends 072 with a writer for `~/.claude.json` (or whichever Claude Code config file is canonical at that point).
 
 ## Tests
 
@@ -666,7 +692,7 @@ All four verify commands must pass before the builder moves 073 to `pending_revi
 - AC7: `run-wizard.ts` exposes `createWizard()` returning a staged `Wizard` object with `detectAgents`, `detectProjects`, `wire`, `probe`, `summary`, `markCompleted`; `index.ts` re-exports the public surface.
 - AC8: all 52 new test cases pass; no existing test edits.
 - All four verify commands clean.
-- A manual run on the founder's machine: detect returns the expected three agents at `high` confidence; project enumeration returns the expected ranked list including `Project_echo`; wire produces no-conflict outcomes against the current state of `~/.codex/config.toml` and `~/.cursor/mcp.json`; probes against codex + claude succeed; cursor returns `manual-only`. Founder validates `onboarding.json` reflects the run.
+- A manual run on the founder's machine: detect returns the expected three agents at `high` confidence; project enumeration returns the expected ranked list including `Project_echo`; wire produces no-conflict outcomes against the current state of `~/.codex/config.toml` and `~/.cursor/mcp.json`; the codex probe succeeds; **the claude-code probe either succeeds (if the founder has previously run `claude mcp add echo <url>`) OR returns `reason: 'mcp-not-configured'` with the documented remediation copy — both are acceptable per R8 / Out of Scope §14**; cursor returns `manual-only`. Founder validates `onboarding.json` reflects the run.
 
 ## After Completion (Strategist Notes)
 
