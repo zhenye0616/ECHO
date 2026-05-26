@@ -27,5 +27,14 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R6.** Both codex + codex-ops verdicts are `proceed` with zero findings. The spec converged across 6 rounds:
+
+- **r1 → r2 patches:** atom-store read-only opener (HIGH); AC5.7 syncLock no-dispatch path (MED); completed-flag ownership unambiguous (MED).
+- **r2 → r3 patches:** source-prefix matching via `buildSourceAppMap()` (HIGH); `resolveDbPath()` env-precedence promotion to `lifecycle.ts` (MED); AC5.7 three-sentinel coverage (MED).
+- **r3 → r4 patches:** AC8.5 fixtures match 072 `SyncResult` shape (MED); `files_to_modify` expanded (MED); `mcp-not-configured` reason for claude-code probe — V1 limitation w/ R8 + Out of Scope §14 (HIGH); `WireOpts.repoRoot` pass-through (MED); J2 rewritten to match AC1.3 (MED).
+- **r4 → r5 patches:** AC8.6 case 9 pins `mcp-not-configured` (MED); `CreateWizardOpts` jsdoc terminology fix (LOW).
+- **r5 → r6 patches:** `echo_ping` probe success criterion is `pong: true` + string `ts` per real `src/mcp/tools/echo-ping.ts:7` schema (HIGH spec/code-divergence fix).
+- **r6:** both reviewers `proceed`. Zero findings.
+
+The spec is claim-ready: 53 tests across 7 files, all production paths now match real `Storage` + `echo_ping` + 072 `SyncResult` contracts.
 
