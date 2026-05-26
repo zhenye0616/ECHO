@@ -1,7 +1,7 @@
 ---
 id: 2026-05-25-074-echo-cli-binary
 title: "`echoctl` CLI binary — init / doctor / uninstall / run subcommands; runtime role-plugging that picks an agent per role from onboarded capabilities"
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 2-3d
 created: 2026-05-25
@@ -61,9 +61,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-26T07:31:38Z"
 branch: "agent/echo-cli-binary-restart"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-cli-binary-restart"
-head_sha: ""
+head_sha: "c3797e77e0d238073651eb9d498ba1f9fb8774a3"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the `echoctl` CLI binary on `agent/echo-cli-binary-restart`: init/doctor/uninstall/run commands, prompt/render helpers, inverse adapter cleanup modules, workflow load/match/dispatch runtime, `~/.echo/workflows` scaffold support, package bin/build metadata, and focused CLI + scaffold tests. Verification passed: `npm run typecheck`, `npm run build:cli`, `npm run lint`, `npm test`, `npx vitest run tests/cli tests/echo-home/scaffold.test.ts`, and `git diff --check`.
 ---
 
 # `echoctl` CLI binary (init / doctor / uninstall / run)

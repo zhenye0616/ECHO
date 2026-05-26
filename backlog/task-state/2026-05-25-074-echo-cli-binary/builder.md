@@ -3,18 +3,18 @@ task_id: 2026-05-25-074-echo-cli-binary
 role: builder
 binding: codex
 claim_branch: agent/echo-cli-binary-restart
-last_updated: 2026-05-26T07:31:38Z
-handoff_outcome: in_progress
-handoff_branch: ""
-handoff_head_sha: ""
-handoff_run_log: ""
+last_updated: 2026-05-26T08:11:36Z
+handoff_outcome: complete
+handoff_branch: agent/echo-cli-binary-restart
+handoff_head_sha: c3797e77e0d238073651eb9d498ba1f9fb8774a3
+handoff_run_log: raw/internal/agent-runs/2026-05-26-2026-05-25-074-echo-cli-binary.md
 ---
 
 ## current_thesis
 Claim re-opened for 074 on a fresh branch (`agent/echo-cli-binary-restart`) because the prior `origin/agent/echo-cli-binary` branch was an orphan at the old claim SHA with no implementation work. AC1.5's required `tests/cli/shell-reachable.test.ts` path is now listed in `files_to_modify`, so proceed with the full `echoctl` CLI implementation against the corrected spec.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: IN PROGRESS — fresh branch claim after prior escalation resolved by spec patch.
+- Lifecycle: COMPLETE — ready for review at c3797e77e0d238073651eb9d498ba1f9fb8774a3.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -41,4 +41,4 @@ Claim re-opened for 074 on a fresh branch (`agent/echo-cli-binary-restart`) beca
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-25-074-echo-cli-binary.md
+- spec: backlog/pending_review/2026-05-25-074-echo-cli-binary.md
