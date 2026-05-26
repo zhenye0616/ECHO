@@ -102,7 +102,7 @@ function fakeSpawn(
 }
 
 function hangingSpawn(kills: string[]): DispatchSpawn {
-  return ((_cmd: string, _args: string[], _opts?: { cwd?: string }) => {
+  return (() => {
     const child = new EventEmitter() as EventEmitter & {
       stdout: EventEmitter & { setEncoding: () => void };
       stderr: EventEmitter & { setEncoding: () => void };
