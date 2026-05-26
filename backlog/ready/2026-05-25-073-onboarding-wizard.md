@@ -481,7 +481,9 @@ export interface CreateWizardOpts {
   mcpServerUrl: string;
   echoVersion: string;
   // All deps below are test-injection seams; production omits them and the
-  // module resolves the defaults (real AtomStore, real syncAll, real spawn).
+  // module resolves the defaults (real read-only Storage opener via
+  // openExistingAtomStoreReadOnly + resolveDbPath, real syncAll, real spawn).
+  // (codex r4 F2 — earlier "real AtomStore" was the stale non-existent type name.)
   detectAgentsDeps?: DetectAgentsDeps;
   detectProjectsDeps?: DetectProjectsDeps;
   wireDepsOverride?: Partial<WireOpts>;
@@ -602,7 +604,7 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 
 **Cross-spec consistency note:** the literal `sync_skipped:<reason>` strings on `skillsPopulated.error` for 11b/11c are wizard-side expectations — 072 only fully specs the `sync_skipped:lock_unavailable` string today. The builder should match the AC8.5 fixtures against whatever 072 emits at claim time; if 072's strings differ (or only one is specced), update 11b/11c's expected `error` substring rather than 072's emission. This is the bullet codex r3 F1 cautioned about: typed mocks must match real `SyncResult` output, not invented shapes.
 
-**AC8.6 — `probe.test.ts` (8 cases).**
+**AC8.6 — `probe.test.ts` (9 cases).**
 
 1. Codex spawn returns `exitCode: 0, stdout: '{"ok":true}'` → `{ probed: true, latencyMs > 0 }`.
 2. Codex spawn returns `exitCode: 0, stdout: 'no clue what to do'` → `{ probed: false, reason: 'unexpected-output' }`; `detail` is the truncated stdout.
@@ -612,6 +614,7 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 6. Claude spawn happy path → `{ probed: true }`. (Same shape as codex; distinct binary name in the spawn args.)
 7. Cursor → `{ probed: false, reason: 'manual-only' }`, no spawn invocation (asserted by the injected spawn fake recording zero calls).
 8. Mixed array `['codex', 'cursor', 'claude-code']` → results returned in input order; sequential spawn order verified by the fake.
+9. **Claude-code MCP-not-configured (codex r4 F1).** `it.each([...])` over the AC6.3 stderr/stdout patterns — `"mcp__echo__echo_ping not found"`, `"unknown tool: mcp__echo__echo_ping"`, `"mcp server not configured"`, `"no such tool: mcp__echo__echo_ping"`. Claude spawn returns each variant in the combined stdout+stderr; assert `{ agent: 'claude-code', probed: false, reason: 'mcp-not-configured' }` for every variant. Companion sub-case in the same test file: a CODEX spawn returning `"mcp server not configured"` → `unexpected-output` (NOT `mcp-not-configured`), pinning the claude-code-only scope of the AC6.3 row.
 
 **AC8.7 — `run-wizard.test.ts` (5 integration cases).**
 
@@ -667,14 +670,14 @@ All additive — no existing test rewrites.
 - 6 cases — `tests/echo-home/wizard/adapter-cache.test.ts`
 - 4 cases — `tests/echo-home/wizard/render-echo-section.test.ts`
 - 13 cases — `tests/echo-home/wizard/wire.test.ts` (10 base + 11a/11b/11c)
-- 8 cases — `tests/echo-home/wizard/probe.test.ts`
+- 9 cases — `tests/echo-home/wizard/probe.test.ts` (8 base + claude-code mcp-not-configured)
 - 5 cases — `tests/echo-home/wizard/run-wizard.test.ts`
 
-**Total: 52 new test cases across 7 files.**
+**Total: 53 new test cases across 7 files.**
 
 Verify steps:
 
-- `npm test -- tests/echo-home/wizard/` — all 52 pass.
+- `npm test -- tests/echo-home/wizard/` — all 53 pass.
 - `npm test` — full suite, all tests pass (1268+ before regressions).
 - `npm run lint` — clean.
 - `npm run typecheck` — clean.
@@ -690,7 +693,7 @@ All four verify commands must pass before the builder moves 073 to `pending_revi
 - AC5: `wire.ts` builds `AdapterSyncProfile[]` from selected agents + cache + render, calls 072's `syncAll`, updates per-agent cache ONLY for successful non-conflict outcomes, mutates `onboarding.json` (detected_at preserved, wired_at on success, wire_error set on failure, completed never flipped here). On ANY of `syncResult.{syncLock|repoRoot|directorySymlink}` populated → no cache writes, no onboarding-state mutation, `onboardingStateUpdated: false` (AC5.7).
 - AC6: `probe.ts` spawns each agent's CLI with a 5s timeout (codex + claude-code) and returns `manual-only` for cursor; maps spawn failures to typed `reason` codes; sequential, not parallel.
 - AC7: `run-wizard.ts` exposes `createWizard()` returning a staged `Wizard` object with `detectAgents`, `detectProjects`, `wire`, `probe`, `summary`, `markCompleted`; `index.ts` re-exports the public surface.
-- AC8: all 52 new test cases pass; no existing test edits.
+- AC8: all 53 new test cases pass; no existing test edits.
 - All four verify commands clean.
 - A manual run on the founder's machine: detect returns the expected three agents at `high` confidence; project enumeration returns the expected ranked list including `Project_echo`; wire produces no-conflict outcomes against the current state of `~/.codex/config.toml` and `~/.cursor/mcp.json`; the codex probe succeeds; **the claude-code probe either succeeds (if the founder has previously run `claude mcp add echo <url>`) OR returns `reason: 'mcp-not-configured'` with the documented remediation copy — both are acceptable per R8 / Out of Scope §14**; cursor returns `manual-only`. Founder validates `onboarding.json` reflects the run.
 
