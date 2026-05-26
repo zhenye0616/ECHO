@@ -32,7 +32,40 @@ branch: "agent/echo-global-home-scaffold"
 worktree: "/Users/zhenye/Desktop/Project_echo--echo-global-home-scaffold"
 head_sha: "9a010eb9471ae43dcf119dc005011b329e533b9f"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-25 via founder reconciliation.
+
+  Conflicts resolved: (none — pure-additive merge, sidecar predicted no conflicts and
+  none surfaced. New files only: src/echo-home/paths.ts, src/echo-home/scaffold.ts,
+  tests/echo-home/paths.test.ts, tests/echo-home/scaffold.test.ts; +16 lines in
+  src/daemon/index.ts at the post-PID-lock seam.)
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied: (none — sidecar verdict was merge as-is with zero pre-merge fixups.)
+
+  Fixups deferred to follow-up items: (none.)
+
+  Verify: 1191/1212 tests pass (21 skipped, 0 failed); lint clean; typecheck clean;
+  sync-skills.sh --check OK. lint:task-state surfaced a non-blocking informational
+  warning on backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md
+  (missing-required-block: canonical_anchors); pre-existing on main at 79b9264, not
+  introduced by this merge, linter exits 0.
+
+  Follow-up items (non-blocking, filed to backlog/_followups.md):
+  - Consider hoisting the duplicate process.env['ECHO_HOME'] read in paths.ts:6-8
+    to a single local for clarity.
+  - After 071 also lands, evaluate R2 (lazy Ajv compile threshold) per the spec's
+    own guidance.
+  - Cosmetic: scaffold.ts:16-18 uses 'code' in err narrowing; (err as
+    NodeJS.ErrnoException).code is the more common shape elsewhere in this repo.
+
+  Review trajectory (cross-tool full-auto, 4 rounds to terminal at 7eb1869):
+  r1 codex + codex-ops both proceed_after_patches (5 findings: 2H/2M/1L); r2 both
+  proceed_after_patches (5 findings) with monotonic removal-only patches dropping
+  the r1 wx-is-crash-atomic over-claim + microtask Test 4; r3 codex-ops proceed/0,
+  codex 1 MED on Test 3 over-claim — softened via removal; r4 both proceed/0.
+  Disposition-discipline win condition met (findings 5→5→1→0).
 agent_notes: |
   Implemented AC1-AC4 on `agent/echo-global-home-scaffold` at
   9a010eb9471ae43dcf119dc005011b329e533b9f. Added `src/echo-home/paths.ts`
