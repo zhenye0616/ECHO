@@ -44,7 +44,7 @@ function realSpawn(
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
-    }, opts?.timeoutMs ?? 5000);
+    }, opts?.timeoutMs ?? 30_000);
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
@@ -146,7 +146,7 @@ export async function probeAgents(
   agents: AgentKind[],
   deps: ProbeDeps = {},
 ): Promise<ProbeOutcome[]> {
-  const timeoutMs = deps.timeoutMs ?? 5000;
+  const timeoutMs = deps.timeoutMs ?? 30_000;
   const spawn = deps.spawn ?? realSpawn;
   const out: ProbeOutcome[] = [];
   for (const agent of agents) {

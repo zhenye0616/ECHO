@@ -96,7 +96,7 @@ export function buildRemediationCopy(mcpServerUrl: string): RemediationCopy {
     'mcp-not-configured': () =>
       `Claude Code does not have ECHO MCP configured. Run \`claude mcp add echo ${mcpServerUrl}\` and then \`echoctl doctor\`.`,
     timeout: (outcome) =>
-      `${outcome.agent} took longer than 5s to respond. Re-run \`echoctl doctor\` once if this persists.`,
+      `${outcome.agent} took longer than 30s to respond. Re-run \`echoctl doctor\` once if this persists.`,
     'unexpected-output': (outcome) =>
       `${outcome.agent} responded but did not echo \`pong\`. Detail: ${(outcome.detail ?? '').slice(0, 200)}. Run \`echoctl doctor\` to retry.`,
   };

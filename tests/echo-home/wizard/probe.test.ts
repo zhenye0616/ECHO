@@ -55,6 +55,33 @@ describe('probeAgents', () => {
     expect(out[0]).toMatchObject({ probed: false, reason: 'timeout' });
   });
 
+  it('passes the 30s default timeout to injected spawn', async () => {
+    const timeouts: number[] = [];
+    const out = await probeAgents(['codex'], {
+      spawn: async (_cmd, _args, opts) => {
+        timeouts.push(opts?.timeoutMs ?? 0);
+        return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
+      },
+    });
+
+    expect(out[0]!.probed).toBe(true);
+    expect(timeouts).toEqual([30_000]);
+  });
+
+  it('lets an explicit timeout override the 30s default', async () => {
+    const timeouts: number[] = [];
+    const out = await probeAgents(['codex'], {
+      timeoutMs: 5_000,
+      spawn: async (_cmd, _args, opts) => {
+        timeouts.push(opts?.timeoutMs ?? 0);
+        return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
+      },
+    });
+
+    expect(out[0]!.probed).toBe(true);
+    expect(timeouts).toEqual([5_000]);
+  });
+
   it('probes claude-code successfully with the same echo_ping payload contract', async () => {
     const out = await probeAgents(['claude-code'], {
       spawn: async (cmd, args) => {
