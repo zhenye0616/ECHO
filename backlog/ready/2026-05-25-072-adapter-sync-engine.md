@@ -20,6 +20,7 @@ files_to_modify:
   - src/echo-home/adapters/atomic-write.ts  # AC7 — new file; unique-tmp + mode-preserving atomic write helper; ALL adapters use this (no per-adapter inline writeFile+rename)
   - tests/echo-home/adapters/atomic-write.test.ts  # AC9 — new file; pins unique-tmp suffix shape, mode preservation on existing file, 0600 for new secret-sensitive paths, umask default for non-sensitive paths, concurrent-overlap (two parallel calls do not stomp each other)
   - package.json  # adds smol-toml dep (per AC2 byte-range editor primary path)
+  - package-lock.json  # MUST be updated alongside package.json (codex r17 M2 — npm ci breaks otherwise)
   - tests/echo-home/adapters/markers.test.ts  # AC9 — new file; pins append, replace (idempotent), preserve-outside, conflict-on-inside-edit
   - tests/echo-home/adapters/codex-config.test.ts  # AC9 — new file; pins add, update, no-op-on-no-change, conflict, comment/formatting preservation
   - tests/echo-home/adapters/cursor-config.test.ts  # AC9 — new file; pins add, update, no-op-on-no-change, other keys preserved
@@ -423,17 +424,32 @@ export function atomicWrite(opts: AtomicWriteOpts): void;
 //     for this reason (the symlink is resolved+followed, not refused)
 //   - syncAll: any uncaught AtomicWriteError lands on the agent's errors[]
 //     via the AC6 try/catch wrapper.
+// Local code union to avoid a cross-module type dependency (codex r17 M2 —
+// AdapterError is defined in adapter-sync.ts; we don't want atomic-write.ts
+// to import the orchestrator's types). This union is a SUBSET of
+// AdapterError['code'] that atomic-write actually emits; adapter-sync.ts's
+// try/catch widens it back to AdapterError['code'] when surfacing via
+// agent.errors[].
+export type AtomicWriteErrorCode =
+  | 'EACCES' | 'ENOSPC' | 'ENOTDIR' | 'ENOENT' | 'EISDIR' | 'EROFS' | 'EEXIST' | 'ELOOP' | 'UNKNOWN';
+
 export class AtomicWriteError extends Error {
-  constructor(public readonly code: AdapterError['code'], public readonly file: string, message: string);
+  constructor(public readonly code: AtomicWriteErrorCode, public readonly file: string, message: string);
 }
 ```
 
 **AC7.2 — Unique temp path.** The temp filename uses the shape `<filePath>.<process.pid>.<crypto.randomUUID().slice(0, 8)>.tmp`. This prevents the collision codex-ops r1 surfaced: two overlapping `syncAll` invocations on the same machine (e.g. a wizard retry while `echo init` is still running) writing to the same `<filePath>.tmp` and one process renaming the other's bytes onto the final path. The PID + random suffix makes the temp path per-invocation unique. After successful rename, the temp file does not exist; on caught exception the helper attempts a best-effort `unlinkSync` of the temp path.
 
-**AC7.2a — Symlinked target handling — caller-opt-in (codex-ops r6 M2 + codex-ops r7 H1 + codex-ops r16 M1).** `atomicWrite` accepts an additional opt: `followSymlink?: boolean` (default `false`). When `false`, `lstatSync(filePath)` — if the target is a symlink, `atomicWrite` throws `AtomicWriteError({ code: 'EEXIST' })`; the symlinked target is treated as "not the intended target." When `true`:
-1. `resolvedPath = fs.realpathSync(filePath)` — the final write destination.
-2. **Both the temp file AND the rename target derive from `resolvedPath`** (codex-ops r16 M1): `tempPath = <resolvedPath>.<pid>.<uuid>.tmp` and the rename writes onto `resolvedPath`, NOT onto `filePath`. This avoids `EXDEV` (cross-device link) when `filePath` is a symlink across filesystems (common dotfiles workflow: `~/.codex/config.toml -> /Volumes/Dotfiles/codex.toml`) AND preserves the symlink at `filePath` (the rename never touches it).
-3. Mode-preservation in AC7.3 reads `fs.statSync(resolvedPath).mode` for the existing-file branch (the resolved target's mode, not the symlink's).
+**AC7.2a — Symlinked target handling — caller-opt-in (codex-ops r6 M2 + r7 H1 + r16 M1; first-run-safe per codex r17 H1 + codex-ops r17 M1).** `atomicWrite` accepts `followSymlink?: boolean` (default `false`). Branch order at the start of every call:
+
+1. **`fs.lstatSync(filePath)` first** to determine the target's current state. Three cases:
+   - **Missing (`ENOENT`):** `existingMode` is undefined; `writePath = filePath`; `tempPath = <filePath>.<pid>.<uuid>.tmp`. Proceed to write with the new-file mode rules in AC7.3 (codex r17 H1 + codex-ops r17 M1 fix — `realpathSync` is NEVER called on a missing path). This branch handles first-run codex/cursor config creation.
+   - **Regular file:** `existingMode = lstat.mode & 0o777`; `writePath = filePath`; `tempPath = <filePath>.<pid>.<uuid>.tmp`. Proceed with existing-file mode rules.
+   - **Symlink:** branch on `followSymlink`:
+     - `false` → throw `AtomicWriteError({ code: 'EEXIST' })`.
+     - `true` → `resolvedPath = fs.realpathSync(filePath)`. **Then re-lstat `resolvedPath`** to determine if the resolved target is missing/regular (recursive symlinks beyond one hop are unusual; if they're present, `realpathSync` already resolved them). `writePath = resolvedPath`; `tempPath = <resolvedPath>.<pid>.<uuid>.tmp`; the rename writes onto `resolvedPath`, NEVER onto `filePath`. Avoids `EXDEV` (cross-device link) AND preserves the symlink at `filePath`. If `realpathSync` throws (broken/dangling symlink), throw `AtomicWriteError({ code: 'ENOENT' /* dangling-symlink-target */ })`.
+
+2. **Mode-preservation (AC7.3)** uses the lstat'd mode for regular files OR `fs.statSync(resolvedPath).mode` for the follow-symlink branch (not the symlink's own mode).
 
 **Per-adapter scope:**
 - **AC2 (codex-config) + AC3 (cursor-config)** call `atomicWrite` with `followSymlink: true` — these are user-managed dotfiles whose symlinks-into-a-repo are common and worth preserving (codex-ops r6 M2 worked example).
@@ -560,7 +576,7 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   2. Existing `[mcp_servers.echo]` matches `previousServerConfig`, new `serverConfig` differs → `action: 'update'`; only that table changes; other tables AND inline comments preserved byte-for-byte (the test fixture must include a `[projects.X]` table and at least one inline `# comment` to validate the preservation claim against the byte-range editor — this is the regression pin for codex r1 H1). **Additionally assert the post-update file STILL contains the literal line `[mcp_servers.echo]` as its target table header (pins codex r3 H1 — guards against a literal implementation that stringifies only `serverConfig` and loses the header).**
   3. Existing matches new `serverConfig` → `action: 'noop'`, no write.
   4. Existing differs from both → `action: 'conflict'`, no write.
-  5. File does not exist → file is created with just `[mcp_servers.echo]`, mode `0600` (codex config is on the secret-sensitive allowlist).
+  5. File does not exist → file is created with just `[mcp_servers.echo]`, mode `0600` (codex config is on the secret-sensitive allowlist). **Pins codex r17 H1 + codex-ops r17 M1: missing-file + followSymlink:true must NOT call realpathSync (no ENOENT).** First-run create works even though `secretSensitive: true` is passed.
   6. File contains a `[mcp_servers.other]` block; after sync, the `other` block is byte-identical (zero collateral damage on sibling MCP servers).
   7. **Mode preservation on existing file** — `chmod 0600 <fixture>` before sync; perform an update; assert post-sync mode is still `0600` (pin AC7 / codex-ops r1 H3).
   7a. **secretSensitive clamps existing `0644` to `0600`** (pins codex-ops r16 M2). Pre-create `~/.codex/config.toml` at mode `0644` with a valid existing `[mcp_servers.echo]` block. Call `syncAll` with new `mcpServerConfig`. Assert: post-sync mode is `0600` (clamped). Without this rule, a previously broken/world-readable config would stay readable after ECHO adds auth bytes. Companion case for `~/.cursor/mcp.json`.
