@@ -57,8 +57,15 @@ describe('probeAgents', () => {
 
   it('probes claude-code successfully with the same echo_ping payload contract', async () => {
     const out = await probeAgents(['claude-code'], {
-      spawn: async (cmd) => {
+      spawn: async (cmd, args) => {
         expect(cmd).toBe('claude');
+        expect(args).toEqual([
+          '--print',
+          '--output-format',
+          'text',
+          '--',
+          'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.',
+        ]);
         return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
       },
     });

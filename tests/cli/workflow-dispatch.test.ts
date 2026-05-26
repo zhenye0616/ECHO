@@ -25,6 +25,15 @@ function match(role: string): AgentMatch {
   return { role, pickedAgent: 'codex', reason: 'matched', resolvedSandbox: 'workspace-write' };
 }
 
+function claudeMatch(role: string): AgentMatch {
+  return {
+    role,
+    pickedAgent: 'claude-code',
+    reason: 'matched',
+    resolvedSandbox: 'workspace-write',
+  };
+}
+
 function fakeSpawn(calls: Array<{ cmd: string; args: string[]; cwd?: string }>): DispatchSpawn {
   return ((cmd: string, args: string[], opts?: { cwd?: string }) => {
     calls.push({ cmd, args, cwd: opts?.cwd });
@@ -54,6 +63,26 @@ describe('dispatchWorkflow', () => {
     expect(outcomes).toHaveLength(2);
     expect(calls[0]).toMatchObject({ cmd: 'codex', cwd: '/fixture/repo' });
     expect(calls[0]!.args).toEqual(['exec', '--sandbox', 'workspace-write', '--', 'Review HEAD']);
+  });
+
+  it('passes claude-code print args without a streaming flag', async () => {
+    const calls: Array<{ cmd: string; args: string[]; cwd?: string }> = [];
+    const outcomes = await dispatchWorkflow({
+      workflow: workflow(),
+      matches: [claudeMatch('reviewer'), match('builder')],
+      spawn: fakeSpawn(calls),
+      projectRoot: '/fixture/repo',
+    });
+
+    expect(outcomes).toHaveLength(2);
+    expect(calls[0]).toMatchObject({ cmd: 'claude', cwd: '/fixture/repo' });
+    expect(calls[0]!.args).toEqual([
+      '--print',
+      '--output-format',
+      'text',
+      '--',
+      'Review HEAD',
+    ]);
   });
 
   it('stops before the next spawn when the tail signal gate aborts', async () => {
