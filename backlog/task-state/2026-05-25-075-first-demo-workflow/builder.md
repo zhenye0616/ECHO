@@ -2,12 +2,19 @@
 task_id: 2026-05-25-075-first-demo-workflow
 role: builder
 writer: codex-builder
-last_updated: 2026-05-26T21:18:31Z
+last_updated: 2026-05-26T21:35:04Z
+handoff_branch: agent/first-demo-workflow
+handoff_head_sha: cca609c2eca507e88ea2633e023bab4b570c388d
+handoff_run_log: raw/internal/agent-runs/2026-05-26-2026-05-25-075-first-demo-workflow.md
 ---
 
 ## current_thesis
 
 Claimed 075 as Codex builder. Implement the first `change-review` workflow asset plus default workflow sync, real-asset workflow load/match tests, packed asset allowlist hygiene, and the narrow human-mode `echoctl run` renderer lift so captured review output is visible.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at cca609c2eca507e88ea2633e023bab4b570c388d.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -34,4 +41,4 @@ Claimed 075 as Codex builder. Implement the first `change-review` workflow asset
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-25-075-first-demo-workflow.md
+- spec: backlog/pending_review/2026-05-25-075-first-demo-workflow.md

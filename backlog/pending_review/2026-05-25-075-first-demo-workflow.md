@@ -1,7 +1,7 @@
 ---
 id: 2026-05-25-075-first-demo-workflow
 title: "First demo workflow — `change-review` workflow asset + workflow-sync engine"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1-2d
 created: 2026-05-25
@@ -36,9 +36,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-26T21:18:31Z"
 branch: "agent/first-demo-workflow"
 worktree: "/Users/zhenye/Desktop/Project_echo--first-demo-workflow"
-head_sha: ""
+head_sha: "cca609c2eca507e88ea2633e023bab4b570c388d"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented 075 on `agent/first-demo-workflow` at `cca609c2eca507e88ea2633e023bab4b570c388d`. Added the shipped `change-review` workflow asset, workflow-sync helper and `syncAll()` wiring, workflow dir symlink guard + `overallOk` policy, packed asset allowlist hygiene, real-asset load/match tests, workflow-sync + adapter-sync coverage, and the narrow human-mode `echoctl run` renderer lift for captured stdout/nonzero stderr. Verification passed: focused 075 vitest suite 46/46, `npm run typecheck`, `npm run lint`, full `npm test` 1393 passed / 21 skipped, and `git diff --check`. No ECHO MCP calls were made, so no dogfooding journal entry was required.
 ---
 
 # First demo workflow — `change-review` (workflow asset + workflow-sync engine)
