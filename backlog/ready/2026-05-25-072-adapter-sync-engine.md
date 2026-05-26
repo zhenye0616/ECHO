@@ -31,8 +31,8 @@ spec_refs:
   - raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md  # design archive — merge-strategy table at lines 50-55; rationale at lines 56-57
   - ~/.codex/config.toml  # canonical shape of the codex config file the TOML mutator targets; specifically the [mcp_servers.echo] block at the end of the user's existing file
   - ~/.cursor/mcp.json  # canonical shape of cursor's MCP config (mcpServers.{name} keys with url + headers, or command + args + env for stdio servers)
-  - backlog/ready/2026-05-25-070-echo-global-home-scaffold.md  # 070 defines the ~/.echo/ directory layout this spec writes into, and exports ECHO_HOME_PATHS + OnboardedAgentProfile (distinct from 072's AdapterSyncProfile)
-  - backlog/ready/2026-05-25-071-role-definition-format-and-defaults.md  # 071 defines the role TOML schema, exports DEFAULT_ROLE_FILENAMES (consumed by AC5/AC6), and ships the canonical asset path that role-sync copies from
+  - backlog/{ready,pending_review,complete}/2026-05-25-070-echo-global-home-scaffold.md  # 070 defines the ~/.echo/ directory layout this spec writes into, and exports ECHO_HOME_PATHS + OnboardedAgentProfile. STAGE-STABLE: 072 is blocked on 070, so by claim time 070 will be in complete/. Builder reads via filename lookup across the three stage directories.
+  - backlog/{ready,pending_review,complete}/2026-05-25-071-role-definition-format-and-defaults.md  # 071 defines the role TOML schema, exports DEFAULT_ROLE_FILENAMES (consumed by AC5/AC6), and ships the canonical asset path that role-sync copies from. STAGE-STABLE: 072 is blocked on 071, so by claim time 071 will be in complete/. Builder reads via filename lookup across the three stage directories.
   - .claude/commands/  # current adapter target for skills (real-file copies); 072 generalizes this to per-user ~/.claude/commands/ at runtime
   - src/echo-home/  # 070's home for this module family — 070 ships paths.ts + scaffold.ts; 071 adds roles.ts + index.ts; 072 adds adapter-sync.ts + adapters/*.ts (no shared types.ts — each module defines its own DTOs)
 
@@ -162,11 +162,13 @@ Both functions share the same return shape and same overwrite posture; the only 
   type AgentKind = 'codex' | 'claude-code' | 'cursor';
   interface AdapterSyncProfile {
     kind: AgentKind;
-    // Adapter paths — caller-provided for testability; default to per-user $HOME locations
-    paths: {
-      configFile?: string;        // codex: ~/.codex/config.toml; cursor: ~/.cursor/mcp.json; claude-code: unused
-      instructionsFile?: string;  // codex: ~/.codex/AGENTS.md; claude-code: ~/.claude/CLAUDE.md; cursor: unused
-      commandsDir?: string;       // claude-code only: ~/.claude/commands/
+    // Adapter paths — caller-provided for testability; if `paths` itself is OMITTED, each adapter
+    // resolves the per-agent default below. If `paths` is provided but a specific field is omitted,
+    // the same per-agent default applies for THAT field (mix-and-match supported for test ergonomics).
+    paths?: {
+      configFile?: string;        // codex default: path.resolve(os.homedir(), '.codex/config.toml'); cursor default: path.resolve(os.homedir(), '.cursor/mcp.json'); claude-code: unused
+      instructionsFile?: string;  // codex default: path.resolve(os.homedir(), '.codex/AGENTS.md'); claude-code default: path.resolve(os.homedir(), '.claude/CLAUDE.md'); cursor: unused
+      commandsDir?: string;       // claude-code default: path.resolve(os.homedir(), '.claude/commands/'); codex + cursor: unused
     };
     // What ECHO section content to merge into the instructions file (per-agent rendered upstream)
     echoSection?: string;
@@ -199,20 +201,29 @@ Both functions share the same return shape and same overwrite posture; the only 
     | (SkillSyncResult & { ok: true })
     | { ok: false; sourceDir: string; targetDir: string; error: string };
 
+  interface AdapterError {
+    code: 'EACCES' | 'ENOSPC' | 'ENOTDIR' | 'ENOENT' | 'EISDIR' | 'PARSE_ERROR' | 'RETRY_CONFLICT' | 'UNKNOWN';
+    file: string;                 // path the adapter was working on when it failed
+    operation: 'read' | 'parse' | 'write' | 'rename' | 'stat';
+    message: string;              // human-readable; safe to render (does NOT echo file contents — see AC8)
+  }
+
   interface SyncResult {
     skillsPopulated: SkillsPopulatedResult;  // first-hop populate; failure does NOT throw and DOES flip overallOk
     agents: Array<
       | { agent: AgentKind; ok: true; files_written: string[]; actions: Array<{ file: string; action: string }>; skipped?: string[] }
-      | { agent: AgentKind; ok: false; conflicts: SyncConflict[]; files_written: string[]; skipped?: string[] }
+      | { agent: AgentKind; ok: false; conflicts: SyncConflict[]; errors: AdapterError[]; files_written: string[]; skipped?: string[] }
     >;
     roles: RoleSyncResult;
     overallOk: boolean;  // true iff skillsPopulated.ok === true AND every agent.ok === true AND no role result is 'user-modified' (unless opts.allowUserModifiedRoles)
   }
   ```
   - When the claude-code fan-out is skipped due to populate failure, the claude-code agent entry sets `skipped: ['syncClaudeSkills']` and remains `ok: true` for the parts that did run (markers merge). `overallOk` is still `false` because `skillsPopulated.ok === false` already flipped it.
+  - **No exception escapes `syncAll`.** Every per-profile call is wrapped in try/catch. Filesystem errors (`EACCES`, `ENOSPC`, `ENOTDIR`, `ENOENT`, `EISDIR`), parse errors (malformed `~/.cursor/mcp.json`, malformed `~/.codex/config.toml`), and lost-update conflicts (`RETRY_CONFLICT` — see "concurrency" below) are caught and converted into `AdapterError` entries on the failing agent. The agent is then `ok: false` with the relevant `errors[]`. **Earlier agents in the loop that succeeded keep their writes**; no transactional rollback. The wizard/CLI sees a complete `SyncResult` describing exactly which agents succeeded and which need retry. `AdapterError.message` is human-readable but never includes serverConfig values, instruction-file content, or any other potentially-secret bytes (AC8 contract).
 - **Partial-failure is normal**, not a failure of `syncAll`. If codex returns a conflict on `~/.codex/config.toml` but cursor and claude-code both succeed, the result reports two `ok: true` agents and one `ok: false` agent. The caller (wizard / CLI) decides whether to proceed, retry, or abort.
 - **No transactional rollback.** Files that were written successfully stay written even if a later agent in the loop fails. This is acceptable because each file write is itself atomic (AC7 unique-tmp + rename) and conflict-detecting; a half-applied run is recoverable by re-running after the conflict is resolved.
-- `syncAll` is the ONLY public entrypoint; per-adapter functions are also exported for direct test use but the wizard / CLI must go through `syncAll` so cross-agent ordering + populate-skills-first + roles-once + populate-failure-blocks-fanout invariants are preserved.
+- **Concurrency: per-user advisory lock.** Per codex-ops r2 M2 (lost-update race between overlapping `syncAll` invocations): `syncAll` acquires an advisory lock at `path.join(ECHO_HOME_PATHS.state, 'adapter-sync.lock')` at entry and releases it at exit. Mechanism: `fs.openSync(lockPath, 'wx')` (O_CREAT | O_EXCL) writing `{pid, hostname, started_at}` JSON; on `EEXIST` retry every 250ms up to a 30-second wall-clock budget; on timeout fail with `AdapterError({code: 'RETRY_CONFLICT', operation: 'stat', file: lockPath, message: 'another sync in progress'})` and `overallOk: false`. Stale-lock recovery: if the PID inside the lockfile is not alive on this host (per `process.kill(pid, 0)` returning ESRCH), the lock is considered stale and removed before retrying. The lock file is best-effort cleaned on process exit (`process.on('exit', unlink)` plus a finally-block in `syncAll`). This is the simplest mechanism that prevents the "both processes read the same `previous*`, both rename, last write wins" lost-update path codex-ops described.
+- `syncAll` is the ONLY public entrypoint; per-adapter functions are also exported for direct test use but the wizard / CLI must go through `syncAll` so cross-agent ordering + populate-skills-first + roles-once + populate-failure-blocks-fanout + per-user-lock invariants are preserved.
 
 ### AC7 — Atomic-write contract: unique temp path + file mode preservation
 
@@ -225,11 +236,11 @@ export interface AtomicWriteOpts {
   filePath: string;        // canonical target
   content: string | Buffer;
   // mode rules (see AC7.3):
-  //  - if filePath already exists: ALWAYS preserve existing mode via fs.fstatSync(fd).mode after rename — engineered via copy-mode-then-rename
-  //  - if filePath is new and the file is in this allowlist of secret-bearing targets, write at 0600:
-  //    [~/.codex/config.toml, ~/.cursor/mcp.json] (extensible via opts.secretSensitive)
+  //  - if filePath already exists: ALWAYS preserve existing mode via fs.statSync(filePath).mode before write
+  //  - if filePath is new and EXACT-MATCH (post path.resolve) against SECRET_SENSITIVE_ALLOWLIST, write at 0600
+  //  - if opts.secretSensitive === true, write at 0600 unconditionally
   //  - otherwise new files use the umask default
-  secretSensitive?: boolean;  // override the allowlist; true forces 0600 even for new files
+  secretSensitive?: boolean;  // override the allowlist; true forces 0600 even for new files. Tests that want 0600 in a tmpdir MUST use this flag (suffix matching is not supported — see AC7.3).
 }
 export function atomicWrite(opts: AtomicWriteOpts): void;
 ```
@@ -240,7 +251,14 @@ export function atomicWrite(opts: AtomicWriteOpts): void;
 
 1. **Existing-file path.** Before opening the temp file, read the existing file's mode via `fs.statSync(filePath).mode`. Open the temp file with that mode (`fs.openSync(tmp, 'w', mode)`). The subsequent `rename` swaps inodes but preserves the temp file's mode bits. Result: if the existing file was `0600`, the new file is `0600`. **No silent downgrade.**
 
-2. **Missing-file path, secret-bearing target.** If `filePath` does not exist AND (`opts.secretSensitive === true` OR `filePath` is `~/.codex/config.toml` or `~/.cursor/mcp.json` per a small allowlist in `atomic-write.ts`), create with mode `0600`. Both files can contain `Authorization` headers, bearer tokens, or auth env-strings.
+2. **Missing-file path, secret-bearing target.** If `filePath` does not exist AND `opts.secretSensitive === true` OR `filePath` is exactly equal to one of the resolved allowlist paths, create with mode `0600`. **Allowlist matching is exact equality after `path.resolve(filePath)`** (NOT suffix matching — per codex r2 M2, suffix matching has divergent security semantics for tmpdir paths). The allowlist values are computed at module load:
+   ```ts
+   const SECRET_SENSITIVE_ALLOWLIST: readonly string[] = [
+     path.resolve(os.homedir(), '.codex/config.toml'),
+     path.resolve(os.homedir(), '.cursor/mcp.json'),
+   ];
+   ```
+   Tests that write to tmpdir paths and want `0600` MUST pass `secretSensitive: true` explicitly. Tests that exercise the allowlist itself MUST monkey-patch `os.homedir()` (via `vi.spyOn(os, 'homedir')` then `vi.resetModules()` to force re-eval) before importing `atomic-write.ts`. Both files can contain `Authorization` headers, bearer tokens, or auth env-strings — hence the `0600` default for new creates.
 
 3. **Missing-file path, non-secret target.** AGENTS.md, CLAUDE.md, skills, role TOMLs — use the umask default (typically `0644`). These files are intended to be world-readable instructions; forcing `0600` would break editor file-watchers and feels needlessly opaque.
 
@@ -310,13 +328,14 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   3. Target dir has `reviewer.toml` hand-edited (differs from source) → `reviewer.toml` returns `action: 'user-modified'`, file is NOT overwritten; `strategist.toml` and `builder.toml` return `'noop'` or `'copied'` as appropriate.
   4. Source dir missing `builder.toml` → `builder.toml` returns `action: 'source-missing'`; the other two are unaffected.
 
-- `tests/echo-home/adapters/atomic-write.test.ts` — six cases (pins AC7):
+- `tests/echo-home/adapters/atomic-write.test.ts` — seven cases (pins AC7):
   1. **Unique temp suffix** — call `atomicWrite` 100 times in a tight loop against the same `filePath` (synchronously), capture every temp filename observed via `fs.readdirSync(dirname)` during a stubbed-out rename. Assert every temp name is unique AND matches the regex `^<basename>\.\d+\.[a-f0-9]{8}\.tmp$`.
   2. **Mode preservation on existing file** — `chmod 0600 <file>` before sync; call `atomicWrite`; assert post-rename mode is still `0600` (use `fs.statSync(file).mode & 0o777`).
-  3. **0600 for new secret-sensitive file** — `filePath` is a fresh tmpdir path matching the `.codex/config.toml` allowlist suffix; call `atomicWrite` with no `secretSensitive` opt; assert post-create mode is `0600`.
-  4. **0600 for new explicit-secret file** — `filePath` is a non-allowlist path; call with `secretSensitive: true`; assert mode `0600`.
-  5. **Umask default for new non-sensitive file** — `filePath` is e.g. a fresh CLAUDE.md path; call without `secretSensitive`; assert mode equals `0o666 & ~umask` (typically `0o644`).
-  6. **Concurrent-overlap is safe** — spawn two `atomicWrite` calls concurrently (using `Promise.all` over two synchronous-style wrappers in different async ticks) targeting the same `filePath` with different content. Assert: both calls complete without exception; the final file content equals exactly one of the two payloads (no garbled mix); both temp paths were unlinked by end of test. (Pins the codex-ops r1 M3 concurrent-overlap finding.)
+  3. **0600 for new allowlisted file** — monkey-patch `os.homedir()` to return a tmpdir; `vi.resetModules()` then dynamic-import `atomic-write.ts`; `filePath = path.join(<tmpdir-home>, '.codex/config.toml')`; call `atomicWrite` with no `secretSensitive` opt; assert post-create mode is `0600`. (Pins exact-match allowlist behavior under controlled HOME.)
+  4. **0600 for explicit `secretSensitive: true`** — `filePath` is a plain tmpdir path that does NOT match the allowlist; call with `secretSensitive: true`; assert mode `0600`. (Pins the test-ergonomics escape hatch from AC7.3.)
+  5. **NOT 0600 for non-allowlisted tmpdir without flag** — `filePath` is a tmpdir path whose basename happens to be `config.toml` but whose absolute path is NOT in the allowlist; call with no `secretSensitive` opt; assert mode equals the umask default. (Negative pin against the rejected-suffix-matching alternative from codex r2 M2.)
+  6. **Umask default for new non-sensitive file** — `filePath` is e.g. a fresh CLAUDE.md path; call without `secretSensitive`; assert mode equals `0o666 & ~umask` (typically `0o644`).
+  7. **Concurrent-overlap is safe** — spawn two `atomicWrite` calls concurrently (using `Promise.all` over two synchronous-style wrappers in different async ticks) targeting the same `filePath` with different content. Assert: both calls complete without exception; the final file content equals exactly one of the two payloads (no garbled mix); both temp paths were unlinked by end of test. (Pins the codex-ops r1 M3 collision finding. NOTE: lost-update guard at the syncAll level is AC6's per-user lock; this atomic-write test only proves NO-CORRUPTION, not lost-update prevention.)
 
 - `tests/echo-home/adapter-sync.test.ts` — seven cases:
   1. Three agents (codex, claude-code, cursor) all succeed → `overallOk: true`, three `ok: true` entries, `files_written` lists every file actually touched.
@@ -326,6 +345,11 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   5. **Default-role list comes from 071's constant.** With `opts.defaultRoles` omitted, `syncAll` calls `syncDefaultRoles` with a `defaults` array byte-equal to `DEFAULT_ROLE_FILENAMES` imported from `src/echo-home/roles.ts`.
   6. **Populate-skills failure blocks claude-code fan-out + flips overallOk** (pins AC6 failure path / codex-ops r1 H2). `opts.repoSkillsDir` is set to a path that does not exist. `populateEchoSkills` returns the `{ ok: false, error }` variant; `syncAll` does NOT throw; `result.skillsPopulated.ok === false`; the claude-code agent entry exists with `skipped: ['syncClaudeSkills']` (CLAUDE.md merge still ran); codex + cursor agents are `ok: true`; `result.overallOk === false`. The test additionally asserts that the claude-code `commandsDir` was NEVER touched (no partial-write of stale bytes from an earlier sync).
   7. **Conflict payload is not logged** (pins AC8 redaction caller-contract / codex-ops r1 M4). Capture `process.stderr` + `process.stdout` during a `syncAll` call that produces a cursor-config conflict whose `serverConfig.headers.Authorization` is `'Bearer secret-token-xyz'`. Assert the captured streams contain NEITHER the literal token NOR the surrounding header string. The conflict object IS in the returned `SyncResult` (callers can render with redaction); 072 itself does not emit.
+  8. **Malformed Cursor JSON does not throw** (pins AC6 non-conflict error variant / codex r2 H2 + codex-ops r2 H1). Pre-seed `~/.cursor/mcp.json` (via temp HOME) with `{ "mcpServers": { broken syntax`. Run `syncAll` with cursor + codex + claude-code profiles. Assert: syncAll resolves (does not throw); cursor entry is `ok: false` with `errors: [{ code: 'PARSE_ERROR', operation: 'parse', file: '<resolved path>', message: <non-empty, does not contain the file's bytes> }]`; codex + claude-code agents are `ok: true` with files actually written (no transactional rollback); `overallOk: false`. Additionally assert the captured stderr/stdout contains no fragment of the malformed JSON (AC8 redaction extends to error messages).
+  9. **EACCES on instructions file does not throw** (companion pin for AC6). Pre-seed CLAUDE.md fixture at mode `0444` (read-only) so the rename fails; assert the claude-code agent entry is `ok: false` with `errors: [{ code: 'EACCES', operation: 'write' | 'rename', ... }]`; other agents are unaffected; `overallOk: false`.
+  10. **Per-user lock acquired and released** (pins AC6 concurrency / codex-ops r2 M2). With `ECHO_HOME_PATHS.state` pointed at a tmpdir, run `syncAll` and during its execution (by mocking one of the adapter functions to delay) assert that `path.join(state, 'adapter-sync.lock')` EXISTS. After the call resolves, assert the lock file is gone. After resolution, a second `syncAll` call succeeds (lock was properly released).
+  11. **Overlapping syncAll → second returns RETRY_CONFLICT** (pins AC6 lost-update prevention). Start `syncAll` A with a 5s delay injected via mock; while A is mid-flight (lock held), start `syncAll` B with the lock-acquire retry budget reduced to 500ms for test speed. Assert: B resolves (does not throw); B's `SyncResult.overallOk: false`; B has at least one `AdapterError({ code: 'RETRY_CONFLICT', file: '<lock path>', message: 'another sync in progress' })` recorded at the SyncResult level (a new top-level `result.syncLock?: AdapterError` field, OR injected into every agent's errors — choose the simpler shape; spec the chosen shape inline at the top of `adapter-sync.ts`). A still completes successfully and writes its files.
+  12. **Stale-lock recovery** (pins AC6 stale-lock cleanup). Pre-create the lock file with `pid: 999999` (assumed-dead PID — production code calls `process.kill(pid, 0)` and gets ESRCH). Call `syncAll`. Assert it succeeds (the stale lock was detected and removed before retry).
 
 Run convention: `npm test -- tests/echo-home/`.
 
@@ -365,8 +389,8 @@ All test files are listed in `files_to_modify`. Coverage targets:
 - `cursor-config.ts` — 7 cases mirroring + sibling-entry-preservation + mode-preservation.
 - `skill-sync.ts` — 8 cases (4 per exported function: `populateEchoSkills` and `syncClaudeSkills`), pinning create-target-dir / idempotent-overwrite / stale-file-preservation / hand-edit-overwrite for both hops.
 - `role-sync.ts` — 4 cases pinning first-install-copy / noop / user-modified-refusal / source-missing.
-- `atomic-write.ts` — 6 cases pinning unique-temp-suffix / mode-preservation-existing / 0600-for-new-secret-sensitive / 0600-for-explicit-secret / umask-default-for-non-secret / concurrent-overlap-safety.
-- `adapter-sync.ts` — 7 cases pinning all-ok / partial-failure / user-modified-role-and-overallOk-semantics / populate-skills-runs-first / default-role-list-from-071 / populate-failure-blocks-fanout / conflict-not-logged.
+- `atomic-write.ts` — 7 cases pinning unique-temp-suffix / mode-preservation-existing / 0600-for-allowlist-exact-match / 0600-for-explicit-secret / NOT-0600-for-non-allowlist-suffix / umask-default-for-non-secret / concurrent-overlap-no-corruption.
+- `adapter-sync.ts` — 12 cases pinning all-ok / partial-failure-conflict / user-modified-role-and-overallOk / populate-runs-first / default-roles-from-071 / populate-failure-blocks-fanout / conflict-not-logged / malformed-cursor-json-error-variant / EACCES-error-variant / per-user-lock-acquire-release / overlapping-sync-RETRY_CONFLICT / stale-lock-recovery.
 
 Verify commands (root only — no Raycast package edits in this spec):
 
@@ -384,10 +408,10 @@ All four must pass before the builder moves 072 to `pending_review/`.
 - AC3: `cursor-config.ts` exports `syncCursorMcpEntry` with the same five-action contract; sibling `mcpServers.*` entries preserved.
 - AC4: `skill-sync.ts` exports `populateEchoSkills` (in-repo `skills/` → `~/.echo/skills/`) and `syncClaudeSkills` (`~/.echo/skills/` → `~/.claude/commands/`); both create target dir if missing, copy all skills (overwrite posture), leave stale target files in place.
 - AC5: `role-sync.ts` exports `syncDefaultRoles`; first-install copies defaults; user-modified roles refused; source-missing sentinel returned; `skillsRoot` handoff for 073/074 is documented (= `ECHO_HOME_PATHS.skills`).
-- AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; populate-failure flips `overallOk` to false AND skips the claude-code `syncClaudeSkills` fan-out (CLAUDE.md merge still runs); per-agent dispatch wires the right adapters; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071; `previous*` persistence is explicitly caller-owned (073 + 074 will cache via `~/.echo/adapters/`; 072 does not touch that directory).
-- AC7: `atomic-write.ts` exports `atomicWrite` with unique-tmp filename (`<file>.<pid>.<8hex>.tmp`), mode preservation on existing-file path, `0600` for new secret-sensitive paths (codex config + cursor mcp.json allowlist), umask-default for non-sensitive paths. All AC1–AC5 adapters delegate to this helper (no inline `writeFile + rename` in any adapter).
+- AC6: `adapter-sync.ts` exports `syncAll(profiles, opts)` returning `SyncResult`; `AdapterSyncProfile` (NOT `AgentProfile` — collision avoidance vs 070's `OnboardedAgentProfile`) and all sync DTOs are defined inline; populate-skills runs BEFORE per-agent dispatch; populate-failure flips `overallOk` to false AND skips the claude-code `syncClaudeSkills` fan-out (CLAUDE.md merge still runs); per-agent dispatch wires the right adapters; **every per-profile call wrapped in try/catch — no exception escapes `syncAll`** — filesystem and parse errors land in the per-agent `errors[]` array with `AdapterError` shape; partial-failure reported per-agent without rollback; roles synced once at the end with `defaults = DEFAULT_ROLE_FILENAMES` imported from 071; `previous*` persistence is explicitly caller-owned (073 + 074 will cache via `~/.echo/adapters/`; 072 does not touch that directory); `paths` field defaults documented per-agent (`os.homedir()`-based) and resolved at adapter call time; **per-user advisory lock at `ECHO_HOME_PATHS.state/adapter-sync.lock`** prevents lost-update race between overlapping `syncAll` invocations (30s retry budget, stale-lock recovery via `process.kill(pid, 0)` ESRCH probe).
+- AC7: `atomic-write.ts` exports `atomicWrite` with unique-tmp filename (`<file>.<pid>.<8hex>.tmp`), mode preservation on existing-file path, `0600` for new files that **exact-match** (post `path.resolve`) the `SECRET_SENSITIVE_ALLOWLIST` (codex config + cursor mcp.json under the runtime-resolved `os.homedir()`), `0600` when `opts.secretSensitive === true`, umask-default otherwise. All AC1–AC5 adapters delegate to this helper (no inline `writeFile + rename` in any adapter).
 - AC8: `SyncConflict` interface documents that payloads may contain user-bearing secrets; the inline comment names `Authorization` headers explicitly; no 072 code logs conflict-payload values; a grep-based negative test pins this.
-- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×6, adapter-sync ×7 — 45 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
+- AC9: All test files pass (markers ×6, codex-config ×7, cursor-config ×7, skill-sync ×8, role-sync ×4, atomic-write ×7, adapter-sync ×12 — 51 cases total). Existing tests in `tests/` (root Vitest) continue to pass.
 - All four verify commands above clean.
 - `task_state_ref` set to `2026-05-25-072-adapter-sync-engine` AND `backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md` exists pinning the spec at the artifact SHA.
 - TOML strategy decision (byte-range editor primary path; smol-toml used only for value-comparison on the target slice) documented in `src/echo-home/adapters/codex-config.ts` header comment, including the codex r1 verification result against the founder's real config.
