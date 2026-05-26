@@ -42,7 +42,47 @@ branch: "agent/role-definition-format-and-defaults"
 worktree: "/Users/zhenye/Desktop/Project_echo--role-definition-format-and-defaults"
 head_sha: "afa3fc5386f8fa2306e7601584ebd971b00db4e3"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-25 via founder reconciliation (after 070 in same batch).
+
+  Conflicts resolved: (none — sidecar predicted union with 070 under src/echo-home/
+  and mechanical package.json/package-lock.json merge; the 'ort' strategy
+  auto-merged both. New files only: src/echo-home/roles.ts (355 lines),
+  src/echo-home/index.ts (11-line barrel), tests/echo-home/roles.test.ts,
+  tests/echo-home/default-roles.test.ts, assets/echo-roles/{strategist,reviewer,
+  builder}.toml. package.json +smol-toml@^1.6.1, package-lock.json regenerated.)
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied: (none — sidecar verdict was merge as-is with zero pre-merge fixups.)
+
+  Fixups deferred to follow-up items: (none.)
+
+  Verify: 1229/1250 tests pass (21 skipped, 0 failed; +38 new tests over the 070
+  baseline of 1191); lint clean; typecheck clean; sync-skills.sh --check OK.
+  lint:task-state surfaces the same non-blocking informational warning on
+  backlog/task-state/2026-05-25-072-adapter-sync-engine/strategist.md as the 070
+  merge (pre-existing on main at 79b9264, not introduced by this merge).
+
+  Follow-up items (non-blocking, filed to backlog/_followups.md):
+  - Extend src/echo-home/index.ts (071's barrel) to re-export paths + scaffold
+    (070's public surface) — canonical import path for downstream consumers.
+  - Relabel discoverSkillsRoot failure-path error field from 'skills' to
+    'skillsRoot' for clearer downstream error attribution (roles.ts:159).
+  - File a separate stabilization spec for the 3 pre-existing flakies
+    (tests/trace/build.test.ts, tests/capture/surfaces/git-watcher.test.ts,
+    tests/coord/coord-status.test.ts).
+  - If strict 1:1 spec-item ↔ it() block mapping is desired by future
+    review-queue tooling, split the merged composite tests at
+    default-roles.test.ts:104, :113.
+
+  Review trajectory (parallel claude_code session 5558755e, manual /tmp prompt
+  pattern bypassing canonical reviewer wrapper to avoid launchd ticker contention
+  with 070; 4 rounds to terminal at 3e0fdf8). r1 codex + codex-ops both
+  proceed_after_patches; r2 stale-prose cleanup; r3 codex 1 LOW lineage
+  parenthetical; r4 both proceed/0. The parallel-session pattern is documented
+  in backlog/_followups.md harness section "2026-05-25 070+071 parallel
+  full-auto review + merge primitives validation" postmortem.
 agent_notes: |
   Implemented AC1-AC4 on `agent/role-definition-format-and-defaults` at
   afa3fc5386f8fa2306e7601584ebd971b00db4e3. Added strict TOML role loading
