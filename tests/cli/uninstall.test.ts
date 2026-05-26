@@ -89,6 +89,59 @@ describe('runUninstall', () => {
     expect(readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8')).toContain('"completed"');
   });
 
+  it('strips stale ECHO blocks for all known agents even when state only tracks one wired agent', async () => {
+    writeState([
+      {
+        id: 'claude-code',
+        detected_at: 't',
+        wired_at: 't',
+        probed_at: null,
+        capabilities: [],
+        wire_error: null,
+      },
+    ]);
+    mkdirSync(join(home, '.claude'), { recursive: true });
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    mkdirSync(join(home, '.cursor'), { recursive: true });
+    writeFileSync(
+      join(home, '.claude/CLAUDE.md'),
+      `claude-before\n${BEGIN_MARKER}\necho\n${END_MARKER}\nclaude-after\n`,
+    );
+    writeFileSync(
+      join(home, '.codex/AGENTS.md'),
+      `codex-before\n${BEGIN_MARKER}\necho\n${END_MARKER}\ncodex-after\n`,
+    );
+    writeFileSync(
+      join(home, '.cursor/mcp.json'),
+      `${JSON.stringify(
+        {
+          mcpServers: {
+            echo: { url: 'http://127.0.0.1:38478/mcp' },
+            other: { url: 'http://example.test/mcp' },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const { runUninstall } = await loadUninstall();
+
+    const code = await runUninstall({ yes: true, homeDir: home });
+
+    const cursorConfig = JSON.parse(readFileSync(join(home, '.cursor/mcp.json'), 'utf8')) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(code).toBe(0);
+    expect(readFileSync(join(home, '.claude/CLAUDE.md'), 'utf8')).toBe(
+      'claude-before\nclaude-after\n',
+    );
+    expect(readFileSync(join(home, '.codex/AGENTS.md'), 'utf8')).toBe(
+      'codex-before\ncodex-after\n',
+    );
+    expect(cursorConfig.mcpServers).not.toHaveProperty('echo');
+    expect(cursorConfig.mcpServers).toHaveProperty('other');
+  });
+
   it('blocks purge when cleanup conflicts remain unless force-purge is set', async () => {
     writeState([
       {
