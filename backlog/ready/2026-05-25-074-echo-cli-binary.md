@@ -35,6 +35,7 @@ files_to_modify:
   - tests/cli/doctor.test.ts                            # AC7
   - tests/cli/uninstall.test.ts                         # AC7
   - tests/cli/run.test.ts                               # AC7
+  - tests/cli/shell-reachable.test.ts                   # AC1.5 — shell-reachability smoke test (r2 codex-ops F1 HIGH); pins that `echoctl --version` is reachable from a real `bash -c` against an npm-linked install
   - tests/cli/inverse-markers.test.ts                   # AC7
   - tests/cli/inverse-codex-config.test.ts              # AC7
   - tests/cli/inverse-cursor-config.test.ts             # AC7
@@ -56,17 +57,13 @@ spec_refs:
   - src/daemon/index.ts:27-32  # resolveMcpPort — `echoctl init` mirrors this resolver to build `mcpServerUrl`
   - skills/process-backlog.md  # reviewer guidance — 074 is a CLI item, NOT a substrate item; minimal new deps
   - CLAUDE.md  # operating model — CLI touches none of the operating-model files; reference only
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-05-26T07:18:05Z"
-branch: "agent/echo-cli-binary"
-worktree: "/Users/zhenye/Desktop/Project_echo--echo-cli-binary"
-head_sha: "2933e7f74e39501f25dcdabfb58dc39619684535"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
 pr_url: ""
-agent_notes: |
-  BLOCKED: AC1.5 requires creating `tests/cli/shell-reachable.test.ts`, but that file is not listed in `files_to_modify`.
-  Tried: Claimed the item, created `agent/echo-cli-binary`, read the required global context, the item spec, the builder pointer, and the relevant 070-073 API/spec refs before editing code.
-  Best-guess answer: add `tests/cli/shell-reachable.test.ts` to `files_to_modify` because AC1.5 names that path explicitly; confidence high.
-  Why I escalated rather than guessing: builder rule "Touch only files listed in `files_to_modify`; if you need another file, escalate."
+agent_notes: ""
 ---
 
 # `echoctl` CLI binary (init / doctor / uninstall / run)

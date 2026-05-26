@@ -2,19 +2,19 @@
 task_id: 2026-05-25-074-echo-cli-binary
 role: builder
 binding: codex
-claim_branch: agent/echo-cli-binary
-last_updated: 2026-05-26T07:24:24Z
-handoff_outcome: escalated
-handoff_branch: agent/echo-cli-binary
-handoff_head_sha: 2933e7f74e39501f25dcdabfb58dc39619684535
-handoff_run_log: raw/internal/agent-runs/2026-05-26-2026-05-25-074-echo-cli-binary.md
+claim_branch: ""
+last_updated: 2026-05-26T07:30:00Z
+handoff_outcome: ""
+handoff_branch: ""
+handoff_head_sha: ""
+handoff_run_log: ""
 ---
 
 ## current_thesis
-Claim opened for 074. Build the `echoctl` CLI surface as a thin consumer of 070-073: `init`, `doctor`, `uninstall`, and `run`, with no daemon-side changes, no new dependencies, and tests proving the CLI packaging and command behavior.
+Spec re-opened after escalation: AC1.5 required test path `tests/cli/shell-reachable.test.ts` is now listed in `files_to_modify`. Item is back in `backlog/ready/` and re-claimable.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-05-26-2026-05-25-074-echo-cli-binary.md for blocker.
+- Lifecycle: READY — prior escalation resolved by spec patch (see raw/internal/agent-runs/2026-05-26-2026-05-25-074-echo-cli-binary.md for the original blocker).
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -31,7 +31,7 @@ Claim opened for 074. Build the `echoctl` CLI surface as a thin consumer of 070-
 - None blocking at claim time; escalate if implementation requires files outside `files_to_modify`, a new dependency, or daemon-side changes.
 
 <!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
+- None.
 <!-- builder-state-handoff-open-questions:end -->
 
 ## dont_touch
