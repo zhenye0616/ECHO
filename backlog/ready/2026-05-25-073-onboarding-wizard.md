@@ -445,8 +445,8 @@ export async function probeAgents(agents: AgentKind[], deps?: ProbeDeps): Promis
 
 **AC6.2 — Per-agent probe shape.**
 
-- **`codex`.** Spawn `codex exec --sandbox read-only -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Probe succeeds iff `exitCode === 0` AND the trimmed last line of stdout JSON-parses to an object containing `ok: true` (the echo_ping schema). `latencyMs` is wall-clock time from spawn to stdout-parsed.
-- **`claude-code`.** Spawn `claude --print --no-stream --output-format text -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Same success criterion **conditional on Claude Code already having ECHO MCP configured** — see §"Claude Code MCP wiring gap" below (codex-ops r3 F3).
+- **`codex`.** Spawn `codex exec --sandbox read-only -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Probe succeeds iff `exitCode === 0` AND the trimmed last line of stdout JSON-parses to an object containing `pong: true` AND `typeof ts === 'string'` — the actual `echo_ping` tool contract per `src/mcp/tools/echo-ping.ts:7` (output schema is `{ pong: boolean, received?: string, ts: string }`; earlier spec text said `ok: true` which does not exist on the tool — codex r5 F1 HIGH fix). `latencyMs` is wall-clock time from spawn to stdout-parsed.
+- **`claude-code`.** Spawn `claude --print --no-stream --output-format text -- 'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.'`. Same success criterion (`pong: true` + string `ts`) **conditional on Claude Code already having ECHO MCP configured** — see §"Claude Code MCP wiring gap" below (codex-ops r3 F3).
 - **`cursor`.** Returns `{ agent: 'cursor', probed: false, reason: 'manual-only' }` without spawning anything. Cursor has no headless CLI in V1; the wizard's caller (074) is responsible for surfacing a "please open Cursor and try invoking ECHO" prompt to the user. The wizard does NOT mark cursor's `probed_at` in `onboarding.json` — that field stays null until 074 collects manual confirmation.
 
 **Claude Code MCP wiring gap (codex-ops r3 F3 HIGH — V1 documented limitation).** 072's claude-code adapter writes `~/.claude/CLAUDE.md` markers + copies skill files to `~/.claude/commands/`. It does NOT write to `~/.claude.json` (the global Claude Code config) or per-project `.claude/mcp.json` — those are the only files that wire ECHO as an MCP server for Claude Code. Consequence: on a fresh machine that has never been wired to ECHO, `wire()` reports `ok: true` for claude-code (markers + skills succeeded), but the AC6.2 probe asking Claude Code to call `mcp__echo__echo_ping` fails with `unexpected-output` because Claude Code doesn't know the tool exists.
@@ -463,7 +463,7 @@ export async function probeAgents(agents: AgentKind[], deps?: ProbeDeps): Promis
 | spawn exits with non-zero and stderr contains "auth" / "login" / "not authenticated" (case-insensitive substring) | `auth-required` |
 | **(claude-code only)** combined stdout+stderr (case-insensitive) contains any of: "no such tool", "unknown tool", "mcp__echo__echo_ping" + "not found"/"unavailable", "mcp server" + "not configured"/"not found" | `mcp-not-configured` (codex-ops r3 F3) |
 | `timedOut === true` | `timeout` |
-| `exitCode === 0` but stdout does not parse / does not contain `ok: true` | `unexpected-output` (with `detail` = first 200 chars of stdout) |
+| `exitCode === 0` but stdout does not parse / does not contain `pong: true` AND a string `ts` | `unexpected-output` (with `detail` = first 200 chars of stdout) |
 | any other spawn error | `unexpected-output` (with `detail` = error message) |
 
 The `mcp-not-configured` row fires only for claude-code per the gap documented in AC6.2 (codex / cursor have their MCP wired by 072 or by Cursor's own UI; only claude-code is the V1-gap path). For codex / cursor, an "MCP not configured" symptom routes through `unexpected-output` as before.
@@ -606,12 +606,12 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 
 **AC8.6 — `probe.test.ts` (9 cases).**
 
-1. Codex spawn returns `exitCode: 0, stdout: '{"ok":true}'` → `{ probed: true, latencyMs > 0 }`.
+1. Codex spawn returns `exitCode: 0, stdout: '{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}'` → `{ probed: true, latencyMs > 0 }`. (Matches the actual `echo_ping` output schema per codex r5 F1; the earlier `{"ok":true}` fixture would never match a real probe.) Companion sub-case in this same test: stdout `'{"pong":true}'` (ts missing) → `unexpected-output` — pinning that `ts: string` is required, not just `pong: true`.
 2. Codex spawn returns `exitCode: 0, stdout: 'no clue what to do'` → `{ probed: false, reason: 'unexpected-output' }`; `detail` is the truncated stdout.
 3. Codex spawn throws `ENOENT` → `{ probed: false, reason: 'cli-unavailable' }`.
 4. Codex spawn returns `exitCode: 1, stderr: 'Please run codex login first'` → `{ probed: false, reason: 'auth-required' }`.
 5. Codex spawn's `timedOut: true` → `{ probed: false, reason: 'timeout' }`.
-6. Claude spawn happy path → `{ probed: true }`. (Same shape as codex; distinct binary name in the spawn args.)
+6. Claude spawn happy path with `'{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}'` stdout → `{ probed: true }`. Same `pong: true` + string `ts` success criterion as codex; distinct binary name in the spawn args.
 7. Cursor → `{ probed: false, reason: 'manual-only' }`, no spawn invocation (asserted by the injected spawn fake recording zero calls).
 8. Mixed array `['codex', 'cursor', 'claude-code']` → results returned in input order; sequential spawn order verified by the fake.
 9. **Claude-code MCP-not-configured (codex r4 F1).** `it.each([...])` over the AC6.3 stderr/stdout patterns — `"mcp__echo__echo_ping not found"`, `"unknown tool: mcp__echo__echo_ping"`, `"mcp server not configured"`, `"no such tool: mcp__echo__echo_ping"`. Claude spawn returns each variant in the combined stdout+stderr; assert `{ agent: 'claude-code', probed: false, reason: 'mcp-not-configured' }` for every variant. Companion sub-case in the same test file: a CODEX spawn returning `"mcp server not configured"` → `unexpected-output` (NOT `mcp-not-configured`), pinning the claude-code-only scope of the AC6.3 row.
