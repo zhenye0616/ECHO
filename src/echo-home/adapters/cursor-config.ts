@@ -178,6 +178,9 @@ export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
   }
 
   const proposedEcho = mergeWithUserOwnedKeys(currentEcho, previousServerConfig, serverConfig);
+  if (deepEqual(currentEcho, proposedEcho)) {
+    return { action: 'noop' };
+  }
 
   if (
     previousServerConfig !== undefined &&
