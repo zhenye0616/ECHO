@@ -1,7 +1,7 @@
 ---
 id: 2026-05-25-073-onboarding-wizard
 title: "ECHO Pro onboarding wizard — staged library API for detect-agents / detect-projects / wire / probe (steps 2-5), consumed by 074's CLI"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1.5-2.5d
 created: 2026-05-25
@@ -52,10 +52,11 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-26T04:20:55Z"
 branch: "agent/onboarding-wizard"
 worktree: "/Users/zhenye/Desktop/Project_echo--onboarding-wizard"
-head_sha: ""
+head_sha: "896f89d926d7bbdb8c21faadacc5667409a6a7d6"
 pr_url: ""
 review_notes: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the UX-free onboarding wizard library API for detect-agents, detect-projects, adapter cache, ECHO-section rendering, wire orchestration, per-agent probes, and createWizard() summary/state flow. Feature branch agent/onboarding-wizard is pushed at 896f89d926d7bbdb8c21faadacc5667409a6a7d6; verification passed: typecheck, lint, targeted wizard tests (53 passed), prettier check, and full npm test (1351 passed, 21 skipped).
 ---
 
 # Onboarding wizard (steps 2–5)

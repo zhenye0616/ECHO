@@ -2,12 +2,19 @@
 task_id: 2026-05-25-073-onboarding-wizard
 role: builder
 writer: codex-builder
-last_updated: 2026-05-26T04:20:55Z
+last_updated: 2026-05-26T04:45:16Z
+handoff_branch: agent/onboarding-wizard
+handoff_head_sha: 896f89d926d7bbdb8c21faadacc5667409a6a7d6
+handoff_run_log: raw/internal/agent-runs/2026-05-25-2026-05-25-073-onboarding-wizard.md
 ---
 
 ## current_thesis
 
 Claimed 073 as Codex builder. Implement the UX-free onboarding wizard library for steps 2-5: detect agents, detect projects, manage adapter cache, render marker sections, wire selected agents through the 072 sync engine, probe agent CLIs, and expose the staged `createWizard()` API for 074.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 896f89d926d7bbdb8c21faadacc5667409a6a7d6.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -33,4 +40,4 @@ Claimed 073 as Codex builder. Implement the UX-free onboarding wizard library fo
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-25-073-onboarding-wizard.md
+- spec: backlog/pending_review/2026-05-25-073-onboarding-wizard.md
