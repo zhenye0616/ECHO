@@ -1,0 +1,404 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type {
+  AdapterSyncProfile,
+  SyncConflict,
+  SyncResult,
+} from '../../../src/echo-home/adapter-sync.js';
+import type { AgentKind } from '../../../src/echo-home/wizard/detect-agents.js';
+import type { AdapterCacheRecord } from '../../../src/echo-home/wizard/adapter-cache.js';
+
+let tmpRoot: string;
+let echoHome: string;
+let originalEchoHome: string | undefined;
+
+async function loadWire(): Promise<typeof import('../../../src/echo-home/wizard/wire.js')> {
+  return import('../../../src/echo-home/wizard/wire.js');
+}
+
+async function loadPaths(): Promise<typeof import('../../../src/echo-home/paths.js')> {
+  return import('../../../src/echo-home/paths.js');
+}
+
+async function writeInitialState(): Promise<string> {
+  const { ECHO_HOME_PATHS } = await loadPaths();
+  mkdirSync(ECHO_HOME_PATHS.state, { recursive: true });
+  const state = {
+    schema_version: 1,
+    created_at: '2026-05-20T00:00:00.000Z',
+    last_updated_at: '2026-05-20T00:00:00.000Z',
+    completed: false,
+    agents: [],
+  };
+  writeFileSync(ECHO_HOME_PATHS.stateOnboarding, `${JSON.stringify(state, null, 2)}\n`);
+  return ECHO_HOME_PATHS.stateOnboarding;
+}
+
+function sha(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function successResult(agents: AgentKind[]): SyncResult {
+  return {
+    skillsPopulated: {
+      ok: true,
+      copied: ['process-backlog.md'],
+      skipped: [],
+      targetDir: '/tmp/skills',
+    },
+    agents: agents.map((agent) => ({
+      agent,
+      ok: true as const,
+      files_written: [`/${agent}`],
+      actions: [{ file: `/${agent}`, action: 'write' }],
+    })),
+    roles: { results: [], rolesErrors: [] },
+    overallOk: true,
+  };
+}
+
+function conflict(kind: 'config' | 'marker', filePath: string): SyncConflict {
+  if (kind === 'config') return { kind, filePath };
+  return {
+    kind,
+    filePath,
+    currentInside: 'user',
+    proposedInside: 'echo',
+    unifiedDiff: '-user\n+echo\n',
+  };
+}
+
+function makeCache(seed: AdapterCacheRecord[] = []): {
+  records: Map<AgentKind, AdapterCacheRecord>;
+  writes: AdapterCacheRecord[];
+  cache: {
+    read: (kind: AgentKind) => AdapterCacheRecord | null;
+    write: (rec: AdapterCacheRecord) => void;
+  };
+} {
+  const records = new Map<AgentKind, AdapterCacheRecord>();
+  for (const rec of seed) records.set(rec.agent, rec);
+  const writes: AdapterCacheRecord[] = [];
+  return {
+    records,
+    writes,
+    cache: {
+      read: (kind) => records.get(kind) ?? null,
+      write: (rec) => {
+        writes.push(rec);
+        records.set(rec.agent, rec);
+      },
+    },
+  };
+}
+
+describe('wire', () => {
+  beforeEach(() => {
+    originalEchoHome = process.env.ECHO_HOME;
+    tmpRoot = mkdtempSync(join(tmpdir(), 'echo-073-wire-'));
+    echoHome = join(tmpRoot, 'echo-home');
+    process.env.ECHO_HOME = echoHome;
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    if (originalEchoHome === undefined) delete process.env.ECHO_HOME;
+    else process.env.ECHO_HOME = originalEchoHome;
+    rmSync(tmpRoot, { recursive: true, force: true });
+    vi.resetModules();
+  });
+
+  it('builds profiles with no previous cache and writes cache records after success', async () => {
+    await writeInitialState();
+    const cache = makeCache();
+    const seen: AdapterSyncProfile[][] = [];
+    const { wire } = await loadWire();
+    const result = await wire({
+      selectedAgents: ['codex', 'claude-code'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      cache: cache.cache,
+      syncAll: async (profiles) => {
+        seen.push(profiles);
+        return successResult(['codex', 'claude-code']);
+      },
+    });
+    expect(result.cacheUpdates).toHaveLength(2);
+    expect(cache.writes.map((rec) => rec.agent)).toEqual(['codex', 'claude-code']);
+    expect(seen[0]![0]!.previousEchoSection).toBeUndefined();
+    expect(seen[0]![0]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+  });
+
+  it('does not update cache for a conflicting agent but updates successful siblings', async () => {
+    const path = await writeInitialState();
+    const cache = makeCache();
+    const { wire } = await loadWire();
+    const result = await wire({
+      selectedAgents: ['codex', 'claude-code'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      cache: cache.cache,
+      syncAll: async () => ({
+        ...successResult([]),
+        agents: [
+          {
+            agent: 'codex',
+            ok: false,
+            conflicts: [conflict('config', '/tmp/config.toml')],
+            errors: [],
+            files_written: [],
+          },
+          {
+            agent: 'claude-code',
+            ok: true,
+            files_written: ['/tmp/claude'],
+            actions: [{ file: '/tmp/claude', action: 'write' }],
+          },
+        ],
+        overallOk: false,
+      }),
+    });
+    expect(result.cacheUpdates.map((u) => u.agent)).toEqual(['claude-code']);
+    expect(cache.writes.map((rec) => rec.agent)).toEqual(['claude-code']);
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    expect(state.agents.find((agent) => agent.id === 'codex')!.wire_error).toContain('conflict');
+  });
+
+  it('passes prior cache values into AdapterSyncProfile previous fields', async () => {
+    await writeInitialState();
+    const cache = makeCache([
+      {
+        schema_version: 1,
+        agent: 'codex',
+        last_written_at: '2026-05-20T00:00:00.000Z',
+        echoSection: 'old section',
+        mcpServerConfig: { url: 'old' },
+      },
+    ]);
+    const seen: AdapterSyncProfile[] = [];
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      cache: cache.cache,
+      syncAll: async (profiles) => {
+        seen.push(...profiles);
+        return successResult(['codex']);
+      },
+    });
+    expect(seen[0]!.previousEchoSection).toBe('old section');
+    expect(seen[0]!.previousMcpServerConfig).toEqual({ url: 'old' });
+  });
+
+  it('preserves existing detected_at while updating wired_at', async () => {
+    const path = await writeInitialState();
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    raw.agents.push({
+      id: 'codex',
+      detected_at: '2026-05-20T00:00:00.000Z',
+      wired_at: null,
+      probed_at: null,
+      capabilities: [],
+      wire_error: null,
+    });
+    writeFileSync(path, `${JSON.stringify(raw, null, 2)}\n`);
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      syncAll: async () => successResult(['codex']),
+    });
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    expect(state.agents[0]!.detected_at).toBe('2026-05-20T00:00:00.000Z');
+    expect(state.agents[0]!.wired_at).toBe('2026-05-25T10:00:00.000Z');
+  });
+
+  it('throws when onboarding state schema_version is unsupported', async () => {
+    const path = await writeInitialState();
+    writeFileSync(path, JSON.stringify({ schema_version: 2 }));
+    const { wire } = await loadWire();
+    await expect(
+      wire({
+        selectedAgents: ['codex'],
+        defaultProjectRepoRoot: null,
+        mcpServerUrl: 'http://127.0.0.1:38478',
+        echoVersion: '0.0.0',
+        syncAll: async () => successResult(['codex']),
+      }),
+    ).rejects.toThrow('invalid onboarding state');
+  });
+
+  it('clears wire_error on a later ok result', async () => {
+    const path = await writeInitialState();
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    raw.agents.push({
+      id: 'codex',
+      detected_at: '2026-05-20T00:00:00.000Z',
+      wired_at: null,
+      probed_at: null,
+      capabilities: [],
+      wire_error: 'old failure',
+    });
+    writeFileSync(path, `${JSON.stringify(raw, null, 2)}\n`);
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      syncAll: async () => successResult(['codex']),
+    });
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    expect(state.agents[0]!.wire_error).toBeNull();
+  });
+
+  it('records AdapterError messages as wire_error', async () => {
+    const path = await writeInitialState();
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      syncAll: async () => ({
+        ...successResult([]),
+        agents: [
+          {
+            agent: 'codex',
+            ok: false,
+            conflicts: [],
+            errors: [{ code: 'EACCES', file: '/x', operation: 'write', message: 'nope' }],
+            files_written: [],
+          },
+        ],
+        overallOk: false,
+      }),
+    });
+    const state = JSON.parse(readFileSync(path, 'utf8')) as {
+      agents: Array<Record<string, unknown>>;
+    };
+    expect(state.agents[0]!.wire_error).toBe('nope');
+  });
+
+  it('builds cursor-only profiles without rendering an echo section', async () => {
+    await writeInitialState();
+    const seen: AdapterSyncProfile[] = [];
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['cursor'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      syncAll: async (profiles) => {
+        seen.push(...profiles);
+        return successResult(['cursor']);
+      },
+    });
+    expect(seen[0]!.echoSection).toBeUndefined();
+    expect(seen[0]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+  });
+
+  it('wraps unexpected syncAll throws without mutating state or cache', async () => {
+    const path = await writeInitialState();
+    const before = sha(path);
+    const cache = makeCache();
+    const { wire } = await loadWire();
+    const result = await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      cache: cache.cache,
+      syncAll: async () => {
+        throw new Error('boom');
+      },
+    });
+    expect(result.onboardingStateUpdated).toBe(false);
+    expect(result.syncResult.skillsPopulated.ok).toBe(false);
+    expect(cache.writes).toEqual([]);
+    expect(sha(path)).toBe(before);
+  });
+
+  it('uses the same injected now for renderedAt and cache last_written_at', async () => {
+    await writeInitialState();
+    const cache = makeCache();
+    let section = '';
+    const { wire } = await loadWire();
+    await wire({
+      selectedAgents: ['codex'],
+      defaultProjectRepoRoot: '/repo/echo',
+      mcpServerUrl: 'http://127.0.0.1:38478',
+      echoVersion: '0.0.0',
+      now: new Date('2026-05-25T10:00:00.000Z'),
+      cache: cache.cache,
+      syncAll: async (profiles) => {
+        section = profiles[0]!.echoSection!;
+        return successResult(['codex']);
+      },
+    });
+    expect(section).toContain('rendered-at: 2026-05-25T10:00:00.000Z');
+    expect(cache.writes[0]!.last_written_at).toBe('2026-05-25T10:00:00.000Z');
+  });
+
+  it.each([
+    [
+      'syncLock',
+      { syncLock: { code: 'RETRY_CONFLICT', file: '/lock', operation: 'link', message: 'locked' } },
+    ],
+    [
+      'repoRoot',
+      { repoRoot: { code: 'UNKNOWN', file: '/repo', operation: 'stat', message: 'no repo' } },
+    ],
+    [
+      'directorySymlink',
+      { directorySymlink: { code: 'EEXIST', file: '/dir', operation: 'stat', message: 'symlink' } },
+    ],
+  ] as const)(
+    'short-circuits cache and onboarding writes for top-level %s sentinel',
+    async (_name, extra) => {
+      const path = await writeInitialState();
+      const before = sha(path);
+      const cache = makeCache();
+      const { wire } = await loadWire();
+      const result = await wire({
+        selectedAgents: ['codex'],
+        defaultProjectRepoRoot: null,
+        mcpServerUrl: 'http://127.0.0.1:38478',
+        echoVersion: '0.0.0',
+        cache: cache.cache,
+        syncAll: async () => ({
+          ...successResult([]),
+          ...extra,
+          agents: [],
+          overallOk: false,
+        }),
+      });
+      expect(result.cacheUpdates).toEqual([]);
+      expect(result.onboardingStateUpdated).toBe(false);
+      expect(cache.writes).toEqual([]);
+      expect(sha(path)).toBe(before);
+    },
+  );
+});

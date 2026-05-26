@@ -1,5 +1,4 @@
-import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { startClaudeCodeExtractor } from '../capture/extractors/claude-code.js';
 import { startCodexExtractor } from '../capture/extractors/codex.js';
 import { startCursorExtractor } from '../capture/extractors/cursor.js';
@@ -7,22 +6,18 @@ import { CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { ensureEchoHome } from '../echo-home/scaffold.js';
-import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
 import { flushRecentMcpCallLog } from '../mcp/request-log.js';
 import { startMcpServer } from '../mcp/server.js';
 import type { Storage } from '../storage/interface.js';
 import { MemoryStorage } from '../storage/memory.js';
 import { SqliteStorage } from '../storage/sqlite.js';
-import { acquirePidLockOrExit, resolveDataDir, startLifecycle } from './lifecycle.js';
-
-function resolveDbPath(): string {
-  const dbPath = process.env['ECHO_DB_PATH'];
-  if (isNonEmptyString(dbPath)) return resolve(dbPath);
-  const dataDir = process.env['ECHO_DATA_DIR'];
-  if (isNonEmptyString(dataDir)) return join(resolve(dataDir), 'echo.db');
-  return join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db');
-}
+import {
+  acquirePidLockOrExit,
+  resolveDataDir,
+  resolveDbPath,
+  startLifecycle,
+} from './lifecycle.js';
 
 function resolveMcpPort(): number {
   const raw = process.env['ECHO_MCP_PORT'];

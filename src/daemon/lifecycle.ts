@@ -21,6 +21,14 @@ export function resolveDataDir(): string {
   return join(homedir(), 'Library', 'Application Support', 'ECHO');
 }
 
+export function resolveDbPath(): string {
+  const dbPath = process.env['ECHO_DB_PATH'];
+  if (isNonEmptyString(dbPath)) return resolve(dbPath);
+  const dataDir = process.env['ECHO_DATA_DIR'];
+  if (isNonEmptyString(dataDir)) return join(resolve(dataDir), 'echo.db');
+  return join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db');
+}
+
 export function acquirePidLockOrExit(dataDir: string): void {
   if (pidLockPath !== null) return;
   pidLockPath = acquirePidLock(dataDir);
