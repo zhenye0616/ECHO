@@ -97,6 +97,16 @@ function renderOutcomes(outcomes: readonly DispatchOutcome[], opts: RunOpts): vo
     } else {
       writeLine(stdout, `${outcome.step.role}: exit ${outcome.spawn?.exitCode ?? -1}`);
     }
+    const spawn = outcome.spawn;
+    if (spawn?.stdout !== undefined && spawn.stdout.length > 0) {
+      writeLine(stdout, '');
+      stdout.write(spawn.stdout.endsWith('\n') ? spawn.stdout : `${spawn.stdout}\n`);
+    }
+    if (spawn?.stderr !== undefined && spawn.stderr.length > 0 && spawn.exitCode !== 0) {
+      writeLine(stdout, '');
+      writeLine(stdout, 'stderr:');
+      stdout.write(spawn.stderr.endsWith('\n') ? spawn.stderr : `${spawn.stderr}\n`);
+    }
   }
 }
 

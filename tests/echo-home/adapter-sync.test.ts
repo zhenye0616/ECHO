@@ -27,12 +27,19 @@ async function loadAdapterSync(): Promise<AdapterSyncModule> {
   return import('../../src/echo-home/adapter-sync.js');
 }
 
-function setupRepoMirror(): { repoRoot: string; skillsDir: string; rolesDir: string } {
+function setupRepoMirror(): {
+  repoRoot: string;
+  skillsDir: string;
+  rolesDir: string;
+  workflowsDir: string;
+} {
   const repoRoot = join(tmpRoot, 'repo');
   const skillsDir = join(repoRoot, 'skills');
   const rolesDir = join(repoRoot, 'assets', 'echo-roles');
+  const workflowsDir = join(repoRoot, 'assets', 'echo-workflows');
   mkdirSync(skillsDir, { recursive: true });
   mkdirSync(rolesDir, { recursive: true });
+  mkdirSync(workflowsDir, { recursive: true });
   // Pretend this is a repo root: package.json + skills/.
   writeFileSync(join(repoRoot, 'package.json'), '{}\n');
   // Skill fixtures.
@@ -40,7 +47,11 @@ function setupRepoMirror(): { repoRoot: string; skillsDir: string; rolesDir: str
   writeFileSync(join(skillsDir, 'beta.md'), '# beta\n');
   // Role fixtures (matching DEFAULT_ROLE_FILENAMES).
   for (const r of ROLES) writeFileSync(join(rolesDir, r), `# ${r}\nbody\n`);
-  return { repoRoot, skillsDir, rolesDir };
+  writeFileSync(
+    join(workflowsDir, 'change-review.toml'),
+    '[workflow]\nname = "change-review"\ndescription = "Review"\nschema_version = 1\n\n[[step]]\nrole = "reviewer"\nprompt = "Review"\n',
+  );
+  return { repoRoot, skillsDir, rolesDir, workflowsDir };
 }
 
 beforeEach(() => {
@@ -132,10 +143,7 @@ describe('syncAll (orchestrator)', () => {
   it('populate-skills runs before claude-code fan-out', async () => {
     const { repoRoot } = setupRepoMirror();
     const { syncAll } = await loadAdapterSync();
-    const result = await syncAll(
-      [{ kind: 'claude-code', echoSection: '## E\nx' }],
-      { repoRoot },
-    );
+    const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], { repoRoot });
     expect(result.skillsPopulated.ok).toBe(true);
     expect(existsSync(join(echoHome, 'skills', 'alpha.md'))).toBe(true);
     expect(existsSync(join(stubHome, '.claude', 'commands', 'alpha.md'))).toBe(true);
@@ -144,10 +152,10 @@ describe('syncAll (orchestrator)', () => {
   it('populate-skills failure (missing repoSkillsDir) skips claude-code fan-out and flips overallOk', async () => {
     const { repoRoot } = setupRepoMirror();
     const { syncAll } = await loadAdapterSync();
-    const result = await syncAll(
-      [{ kind: 'claude-code', echoSection: '## E\nx' }],
-      { repoRoot, repoSkillsDir: join(repoRoot, 'does-not-exist') },
-    );
+    const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], {
+      repoRoot,
+      repoSkillsDir: join(repoRoot, 'does-not-exist'),
+    });
     expect(result.skillsPopulated.ok).toBe(false);
     expect(result.overallOk).toBe(false);
     const claude = result.agents.find((a) => a.agent === 'claude-code')!;
@@ -170,6 +178,90 @@ describe('syncAll (orchestrator)', () => {
     const result = await syncAll([], { repoRoot });
     const rolesSeen = result.roles.results.map((r) => r.role).sort();
     expect(rolesSeen).toEqual([...ROLES].sort());
+  });
+
+  it('default workflow is copied into ECHO_HOME workflows and keeps overallOk true', async () => {
+    const { repoRoot, workflowsDir } = setupRepoMirror();
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([], {
+      repoRoot,
+      workflowsSourceDir: workflowsDir,
+      defaultWorkflows: ['change-review.toml'],
+    });
+
+    expect(readFileSync(join(echoHome, 'workflows', 'change-review.toml'))).toEqual(
+      readFileSync(join(workflowsDir, 'change-review.toml')),
+    );
+    expect(result.workflowsResult?.results).toEqual([
+      { workflow: 'change-review.toml', action: 'copied' },
+    ]);
+    expect(result.overallOk).toBe(true);
+  });
+
+  it('default workflow source-missing is diagnosed via workflowsResult and fails overallOk', async () => {
+    const { repoRoot } = setupRepoMirror();
+    const emptyWorkflows = join(tmpRoot, 'empty-workflows');
+    mkdirSync(emptyWorkflows);
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([], {
+      repoRoot,
+      workflowsSourceDir: emptyWorkflows,
+      defaultWorkflows: ['change-review.toml'],
+    });
+
+    expect(result.workflowsResult?.results[0]).toEqual({
+      workflow: 'change-review.toml',
+      action: 'source-missing',
+    });
+    expect(result.overallOk).toBe(false);
+  });
+
+  it('user-modified workflow is preserved and does not fail overallOk', async () => {
+    const { repoRoot } = setupRepoMirror();
+    const workflowsTarget = join(echoHome, 'workflows');
+    mkdirSync(workflowsTarget, { recursive: true });
+    const target = join(workflowsTarget, 'change-review.toml');
+    writeFileSync(target, 'user edit\n');
+    const before = statSync(target);
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([], {
+      repoRoot,
+      defaultWorkflows: ['change-review.toml'],
+    });
+
+    expect(result.workflowsResult?.results[0]?.action).toBe('user-modified');
+    expect(result.overallOk).toBe(true);
+    expect(readFileSync(target, 'utf8')).toBe('user edit\n');
+    expect(statSync(target).mtimeMs).toBe(before.mtimeMs);
+  });
+
+  it('workflow per-file error fails overallOk without blocking skills or roles', async () => {
+    const { repoRoot } = setupRepoMirror();
+    const workflowsTarget = join(echoHome, 'workflows');
+    mkdirSync(join(workflowsTarget, 'change-review.toml'), { recursive: true });
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([], {
+      repoRoot,
+      defaultWorkflows: ['change-review.toml'],
+    });
+
+    expect(result.workflowsResult?.results).toHaveLength(1);
+    expect(result.workflowsResult?.results[0]).toMatchObject({
+      workflow: 'change-review.toml',
+      action: 'error',
+    });
+    expect(result.workflowsResult?.workflowsErrors).toHaveLength(1);
+    expect(result.roles.results.map((entry) => entry.action)).toEqual([
+      'copied',
+      'copied',
+      'copied',
+    ]);
+    expect(result.skillsPopulated.ok).toBe(true);
+    expect(result.overallOk).toBe(false);
   });
 
   it('lockfile present → second sync returns RETRY_CONFLICT with shell-quoted rm hint; agents = []', async () => {
@@ -256,10 +348,7 @@ describe('syncAll (orchestrator)', () => {
     mkdirSync(join(stubHome, '.claude'), { recursive: true });
     symlinkSync(realFile, join(stubHome, '.claude', 'CLAUDE.md'));
     const { syncAll } = await loadAdapterSync();
-    const result = await syncAll(
-      [{ kind: 'claude-code', echoSection: '## E\nx' }],
-      { repoRoot },
-    );
+    const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], { repoRoot });
     const claude = result.agents.find((a) => a.agent === 'claude-code')!;
     expect(claude.ok).toBe(false);
     if (claude.ok === false) {
@@ -281,6 +370,23 @@ describe('syncAll (orchestrator)', () => {
     expect(result.directorySymlink!.code).toBe('EEXIST');
     expect(result.agents).toEqual([]);
     expect(result.overallOk).toBe(false);
+  });
+
+  it('directory-component symlink at ~/.echo/workflows short-circuits before workflow sync', async () => {
+    const { repoRoot } = setupRepoMirror();
+    mkdirSync(echoHome, { recursive: true });
+    const linkTarget = join(tmpRoot, 'redirected-workflows');
+    mkdirSync(linkTarget, { recursive: true });
+    symlinkSync(linkTarget, join(echoHome, 'workflows'));
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([], { repoRoot });
+
+    expect(result.directorySymlink).toBeDefined();
+    expect(result.directorySymlink!.file).toBe(join(echoHome, 'workflows'));
+    expect(result.overallOk).toBe(false);
+    expect(result.workflowsResult).toBeUndefined();
+    expect(readdirSync(linkTarget)).toEqual([]);
   });
 
   it('first-run: parent dirs (.codex, .cursor) are created when defaults are used', async () => {
@@ -409,10 +515,9 @@ describe('syncAll (orchestrator)', () => {
       '<!-- BEGIN ECHO -->\nold-content\n<!-- END ECHO -->\n',
     );
     const { syncAll } = await loadAdapterSync();
-    const result = await syncAll(
-      [{ kind: 'claude-code', echoSection: 'new-content' }],
-      { repoRoot },
-    );
+    const result = await syncAll([{ kind: 'claude-code', echoSection: 'new-content' }], {
+      repoRoot,
+    });
     const claude = result.agents.find((a) => a.agent === 'claude-code')!;
     expect(claude.ok).toBe(false);
   });
@@ -449,9 +554,7 @@ describe('syncAll (orchestrator)', () => {
     expect(claude.ok).toBe(false);
     expect(result.overallOk).toBe(false);
     if (!claude.ok) {
-      const zeroCopiedErr = claude.errors.find((e) =>
-        e.message.includes('copied 0 files'),
-      );
+      const zeroCopiedErr = claude.errors.find((e) => e.message.includes('copied 0 files'));
       expect(zeroCopiedErr).toBeDefined();
       expect(zeroCopiedErr!.code).toBe('EEXIST');
     }

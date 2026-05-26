@@ -24,6 +24,7 @@ import {
   type PopulateEchoSkillsResult,
 } from './adapters/skill-sync.js';
 import { syncDefaultRoles, type RoleSyncResult } from './adapters/role-sync.js';
+import { syncDefaultWorkflows, type WorkflowSyncResult } from './adapters/workflow-sync.js';
 import { AtomicWriteError } from './adapters/atomic-write.js';
 
 // =============================================================================
@@ -51,6 +52,8 @@ export interface SyncAllOpts {
   repoSkillsDir?: string;
   rolesSourceDir?: string;
   defaultRoles?: readonly string[];
+  workflowsSourceDir?: string;
+  defaultWorkflows?: readonly string[];
   allowUserModifiedRoles?: boolean;
 }
 
@@ -134,6 +137,7 @@ export interface SyncResult {
   skillsPopulated: PopulateEchoSkillsResult;
   agents: AgentResult[];
   roles: RoleSyncResult;
+  workflowsResult?: WorkflowSyncResult;
   syncLock?: AdapterError;
   repoRoot?: AdapterError;
   directorySymlink?: AdapterError;
@@ -178,6 +182,8 @@ function emptyOkResult(targetDir: string): PopulateEchoSkillsResult {
 function lockUnavailablePopulateResult(): PopulateEchoSkillsResult {
   return { ok: false, sourceDir: '', targetDir: '', error: 'sync_skipped:lock_unavailable' };
 }
+
+const DEFAULT_WORKFLOW_FILENAMES = ['change-review.toml'] as const;
 
 // -----------------------------------------------------------------------------
 // Repo-root resolution
@@ -437,11 +443,11 @@ export async function syncAll(
   const dirChecks: Array<{ path: string; boundary: string }> = [
     { path: ECHO_HOME_PATHS.skills, boundary: ECHO_HOME_PATHS.root },
     { path: ECHO_HOME_PATHS.roles, boundary: ECHO_HOME_PATHS.root },
+    { path: ECHO_HOME_PATHS.workflows, boundary: ECHO_HOME_PATHS.root },
     { path: ECHO_HOME_PATHS.state, boundary: ECHO_HOME_PATHS.root },
   ];
   for (const profile of profiles) {
-    const commandsDir =
-      profile.paths?.commandsDir ?? defaultCommandsDir(profile.kind);
+    const commandsDir = profile.paths?.commandsDir ?? defaultCommandsDir(profile.kind);
     if (isString(commandsDir)) {
       dirChecks.push({ path: commandsDir, boundary: dirname(commandsDir) });
     }
@@ -496,7 +502,10 @@ export async function syncAll(
 
   const repoSkillsDir = opts.repoSkillsDir ?? resolve(repoRootPath, 'skills');
   const rolesSourceDir = opts.rolesSourceDir ?? resolve(repoRootPath, 'assets/echo-roles');
+  const workflowsSourceDir =
+    opts.workflowsSourceDir ?? resolve(repoRootPath, 'assets/echo-workflows');
   const defaultRoles = opts.defaultRoles ?? DEFAULT_ROLE_FILENAMES;
+  const defaultWorkflows = opts.defaultWorkflows ?? DEFAULT_WORKFLOW_FILENAMES;
 
   // Step 3: acquire lock.
   const lockResult = acquireLock(ECHO_HOME_PATHS.state);
@@ -514,6 +523,7 @@ export async function syncAll(
   let skillsPopulated: PopulateEchoSkillsResult = emptyOkResult(ECHO_HOME_PATHS.skills);
   const agents: AgentResult[] = [];
   let roles: RoleSyncResult = { results: [], rolesErrors: [] };
+  let workflowsResult: WorkflowSyncResult | undefined;
 
   try {
     // Step 4: populate skills.
@@ -533,19 +543,35 @@ export async function syncAll(
       targetDir: ECHO_HOME_PATHS.roles,
       defaults: defaultRoles,
     });
+
+    // Step 7: workflows once.
+    workflowsResult = syncDefaultWorkflows({
+      sourceDir: workflowsSourceDir,
+      targetDir: ECHO_HOME_PATHS.workflows,
+      defaults: defaultWorkflows,
+    });
   } finally {
     releaseLock(lockHandle);
   }
 
-  const overallOk = computeOverallOk(skillsPopulated, agents, roles, opts);
+  const overallOk = computeOverallOk(
+    skillsPopulated,
+    agents,
+    roles,
+    workflowsResult,
+    defaultWorkflows,
+    opts,
+  );
 
-  return { skillsPopulated, agents, roles, overallOk };
+  return { skillsPopulated, agents, roles, workflowsResult, overallOk };
 }
 
 function computeOverallOk(
   skillsPopulated: PopulateEchoSkillsResult,
   agents: AgentResult[],
   roles: RoleSyncResult,
+  workflowsResult: WorkflowSyncResult | undefined,
+  defaultWorkflows: readonly string[],
   opts: SyncAllOpts,
 ): boolean {
   if (skillsPopulated.ok !== true) return false;
@@ -558,6 +584,14 @@ function computeOverallOk(
     if (r.action === 'user-modified' && opts.allowUserModifiedRoles === true) continue;
     return false;
   }
+  if (workflowsResult === undefined) return false;
+  if (workflowsResult.workflowsErrors.length > 0) return false;
+  const requiredWorkflows = new Set(defaultWorkflows);
+  for (const r of workflowsResult.results) {
+    if (r.action === 'copied' || r.action === 'noop' || r.action === 'user-modified') continue;
+    if (r.action === 'source-missing' && requiredWorkflows.has(r.workflow)) return false;
+    if (r.action === 'error') return false;
+  }
   return true;
 }
 
@@ -565,10 +599,7 @@ function computeOverallOk(
 // Per-agent dispatch
 // -----------------------------------------------------------------------------
 
-function dispatchAgent(
-  profile: AdapterSyncProfile,
-  skillsAvailable: boolean,
-): AgentResult {
+function dispatchAgent(profile: AdapterSyncProfile, skillsAvailable: boolean): AgentResult {
   const filesWritten: string[] = [];
   const actions: Array<{ file: string; action: string }> = [];
   const conflicts: SyncConflict[] = [];
@@ -576,8 +607,7 @@ function dispatchAgent(
   const skipped: string[] = [];
 
   const configFile = profile.paths?.configFile ?? defaultConfigFile(profile.kind);
-  const instructionsFile =
-    profile.paths?.instructionsFile ?? defaultInstructionsFile(profile.kind);
+  const instructionsFile = profile.paths?.instructionsFile ?? defaultInstructionsFile(profile.kind);
   const commandsDir = profile.paths?.commandsDir ?? defaultCommandsDir(profile.kind);
 
   if (profile.kind === 'codex') {

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   listWorkflows,
@@ -9,6 +10,8 @@ import {
 } from '../../src/cli/workflow/load.js';
 
 let tmpRoot: string;
+
+const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 function writeWorkflow(name: string, body: string): string {
   const path = join(tmpRoot, `${name}.toml`);
@@ -75,5 +78,35 @@ describe('workflow loader', () => {
         ),
       ),
     ).toThrow('filename');
+  });
+
+  it('loads the shipped change-review workflow asset and pins prompt invariants', () => {
+    const workflow = loadWorkflow(join(repoRoot, 'assets/echo-workflows/change-review.toml'));
+
+    expect(workflow.name).toBe('change-review');
+    expect(workflow.schemaVersion).toBe(1);
+    expect(workflow.steps).toHaveLength(1);
+    expect(workflow.steps[0]!.role).toBe('reviewer');
+    const prompt = workflow.steps[0]!.prompt;
+    expect(prompt.length).toBeGreaterThan(0);
+
+    const p1 = prompt.search(/\bgh pr view\b/);
+    const p2 = prompt.indexOf('git diff @{upstream}..HEAD');
+    const p3 = prompt.search(/\bgit diff HEAD\b(?!~)/);
+    const p4 = prompt.indexOf('git diff HEAD~1..HEAD');
+    expect(p1).toBeGreaterThanOrEqual(0);
+    expect(p2).toBeGreaterThan(p1);
+    expect(p3).toBeGreaterThan(p2);
+    expect(p4).toBeGreaterThan(p3);
+
+    expect(prompt).toContain('No findings — diff looks ready to ship.');
+    expect(prompt).toContain('No diff source available — nothing to review.');
+    expect(/priority unavailable[^.\n]*continue/i.test(prompt)).toBe(true);
+    expect(prompt).toContain('mcp__echo__get_recent_work_context');
+    expect(prompt).toContain('mcp__echo__search_memories');
+    expect(prompt).toContain('mcp__echo__find_clusters');
+    expect(prompt).toContain('Keep the review under 600 words');
+    expect(workflow.steps[0]!.inputs).toEqual({});
+    expect(Object.isFrozen(workflow.steps[0]!.inputs)).toBe(true);
   });
 });

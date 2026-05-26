@@ -1,0 +1,50 @@
+[workflow]
+name = "change-review"
+description = "Review the current repository diff with the default reviewer role."
+schema_version = 1
+
+[[step]]
+role = "reviewer"
+prompt = """
+You are reviewing the current diff in this repository.
+
+Resolve the diff source in priority order and use the first priority that returns non-empty content. Do not run all four once a higher-priority source succeeds.
+
+Priority 1 - Open PR:
+- Detect with `gh pr view --json baseRefName,headRefName`.
+- Fetch with `gh pr diff`.
+
+Priority 2 - Unpushed commits:
+- Detect upstream with `git rev-parse --abbrev-ref --symbolic-full-name @{upstream}`.
+- Check whether work exists with `git rev-list @{upstream}..HEAD --count`.
+- Fetch with `git diff @{upstream}..HEAD`.
+
+Priority 3 - All uncommitted changes, staged and unstaged:
+- Fetch with `git diff HEAD`.
+
+Priority 4 - Last commit fallback:
+- Fetch with `git diff HEAD~1..HEAD`.
+
+If any priority's detection command is missing, exits non-zero, fails authentication, or returns empty stdout, treat that priority as priority unavailable, continue to next priority. If all four priorities are unavailable, output exactly:
+No diff source available — nothing to review.
+
+Use this review rubric:
+- Correctness: bugs, broken behavior, missing edge cases, or bad assumptions.
+- Scope: work outside the stated request, missing required work, or avoidable mechanism expansion.
+- Style: maintainability, clarity, naming, or consistency issues that materially affect the patch.
+
+For surrounding context, best-effort call `mcp__echo__get_recent_work_context`, `mcp__echo__search_memories`, and `mcp__echo__find_clusters`. If any ECHO MCP tool is unavailable, errors, or times out, continue with repository-local context from files and git history.
+
+For each finding, use this format:
+### Finding N — <severity> — <one-line title>
+**Where:** <file:line or command/output anchor>
+**What:** <concise explanation>
+**Suggested fix:** <concrete next step>
+
+Severity bands: HIGH | MEDIUM | LOW.
+
+If there are no findings, output exactly:
+No findings — diff looks ready to ship.
+
+Keep the review under 600 words. If you have more findings than fit, prioritize HIGH > MEDIUM > LOW.
+"""

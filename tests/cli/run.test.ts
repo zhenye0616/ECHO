@@ -78,7 +78,10 @@ function writeWorkflow(): void {
   );
 }
 
-function fakeSpawn(calls: Array<{ args: string[]; cwd?: string }>): DispatchSpawn {
+function fakeSpawn(
+  calls: Array<{ args: string[]; cwd?: string }>,
+  result: { exitCode?: number; stdout?: string; stderr?: string } = {},
+): DispatchSpawn {
   return ((_cmd: string, args: string[], opts?: { cwd?: string }) => {
     calls.push({ args, cwd: opts?.cwd });
     const child = new EventEmitter() as EventEmitter & {
@@ -89,7 +92,11 @@ function fakeSpawn(calls: Array<{ args: string[]; cwd?: string }>): DispatchSpaw
     child.stdout = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
     child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
     child.kill = () => true;
-    queueMicrotask(() => child.emit('close', 0));
+    queueMicrotask(() => {
+      if (result.stdout !== undefined) child.stdout.emit('data', result.stdout);
+      if (result.stderr !== undefined) child.stderr.emit('data', result.stderr);
+      child.emit('close', result.exitCode ?? 0);
+    });
     return child;
   }) as unknown as DispatchSpawn;
 }
@@ -169,5 +176,55 @@ describe('runRun', () => {
 
     expect(code).toBe(143);
     expect(calls[0]!.cwd).toBe(projectRoot);
+  });
+
+  it('human mode prints captured stdout from dispatched review output', async () => {
+    writeDefaults();
+    writeState();
+    writeWorkflow();
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    let stdout = '';
+    const { runRun } = await loadRun();
+
+    const code = await runRun({
+      workflowName: 'review',
+      projectFlag: projectRoot,
+      spawn: fakeSpawn(calls, { stdout: '### Finding 1 — HIGH — sample\n' }),
+      stdout: {
+        write: (chunk: string) => {
+          stdout += chunk;
+          return true;
+        },
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('reviewer: exit 0');
+    expect(stdout).toContain('### Finding 1 — HIGH — sample');
+  });
+
+  it('human mode prints stderr block for nonzero dispatched outcomes', async () => {
+    writeDefaults();
+    writeState();
+    writeWorkflow();
+    const calls: Array<{ args: string[]; cwd?: string }> = [];
+    let stdout = '';
+    const { runRun } = await loadRun();
+
+    const code = await runRun({
+      workflowName: 'review',
+      projectFlag: projectRoot,
+      spawn: fakeSpawn(calls, { exitCode: 2, stderr: 'review crashed\n' }),
+      stdout: {
+        write: (chunk: string) => {
+          stdout += chunk;
+          return true;
+        },
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(stdout).toContain('reviewer: exit 2');
+    expect(stdout).toContain('stderr:\nreview crashed');
   });
 });
