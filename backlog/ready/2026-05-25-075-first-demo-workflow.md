@@ -18,8 +18,10 @@ files_to_modify:
   - tests/echo-home/adapter-sync.test.ts               # AC7 — extension; default-workflow sync integration case
   - tests/cli/workflow-load.test.ts                    # AC7 — extension; load the shipped change-review.toml as a real-asset case
   - tests/cli/workflow-match.test.ts                   # AC7 — extension; match real workflow against onboarded codex profile
-  - tests/cli/shell-reachable.test.ts                  # AC9.3 — extend with pack-shape assertion that change-review.toml is in the npm-pack tarball (074-owned test; alternative new tests/cli/pack-shape.test.ts allowed at builder discretion)
+  - tests/cli/shell-reachable.test.ts                  # AC9.4 — extend with pack-shape assertion that change-review.toml is in the npm-pack tarball (074-owned test; alternative new tests/cli/pack-shape.test.ts allowed at builder discretion)
   - package.json                                       # AC9 (r1 codex-ops F1 HIGH) — extend `files` allowlist with `assets/echo-workflows/**` so the default workflow ships in packed/npm-install installs; scripts/deps unchanged
+  - src/cli/commands/run.ts                            # AC10 (r3 codex F1 HIGH) — NARROW lift of 074 out-of-scope: extend renderOutcomes() in human (non-JSON) mode to print the captured spawn.stdout + spawn.stderr; one block per outcome below the existing `${role}: exit <code>` line; the dispatcher capture is unchanged
+  - tests/cli/run.test.ts                              # AC10.2 — extend; assert human-mode rendering prints the captured spawn.stdout (so demo findings are visible to the user, not silently dropped)
   - docs/BACKLOG.md                                    # AC8 — move 075 from Inbox to Ready (admin)
 spec_refs:
   - raw/internal/decisions/2026-05-25-echo-pro-paid-coord-layer-design.md  # source design — §"What's deferred" (first-session demo), §"Coord layer architecture" (role-plugging at runtime)
@@ -96,7 +98,7 @@ $ echoctl run change-review
 3. A review rubric naming THREE finding categories: **Correctness**, **Scope**, **Style**. Each gets a 1-sentence definition.
 4. A structured finding-block template the agent MUST use for each finding, with these load-bearing fields: `### Finding N — <severity> — <one-line title>`, `**Where:**`, `**What:**`, `**Suggested fix:**`. Severity bands: `HIGH | MEDIUM | LOW`.
 5. The empty-result string the agent MUST output if no findings: `No findings — diff looks ready to ship.` (exact string, including the em-dash). ADDITIONALLY (r2 codex-ops F2 MED): if ALL four priorities are unavailable (e.g., fresh-init repo with no commits + no `gh` + no upstream — all four return empty / fail), the agent MUST output the terminal string: `No diff source available — nothing to review.` (exact string, including the em-dash) and exit cleanly without producing finding blocks. This gives `echoctl run change-review` predictable, parseable output in degenerate environments instead of stalling or hallucinating findings.
-6. A reference to the three ECHO MCP tools the agent should use for surrounding context: `mcp__echo__get_recent_work_context`, `mcp__echo__search_memories`, `mcp__echo__find_clusters`.
+6. A reference to the three ECHO MCP tools the agent should use for surrounding context: `mcp__echo__get_recent_work_context`, `mcp__echo__search_memories`, `mcp__echo__find_clusters`. The prompt MUST explicitly state these MCP calls are **best-effort** (r3 codex-ops MED): if any tool is unavailable (MCP server down, client binding absent, tool missing), errors, or times out, the agent MUST continue the diff review using repository-local context (files, git log) and STILL emit one of the pinned terminal outputs from AC1.3 step 5. MCP context enhances the review; the demo MUST NOT fail when MCP is unreachable. AC4.1 pins this with a substring/regex marker.
 7. A soft length cap: "Keep the review under 600 words. If you have more findings than fit, prioritize HIGH > MEDIUM > LOW."
 
 **AC1.4 — File posture.** Trailing newline present. UTF-8 without BOM. LF line endings (not CRLF) — matches the rest of the repo. No tabs (TOML strings preserve formatting; use 2-space indent for any nested visual structure inside the prompt's heredoc).
@@ -200,8 +202,16 @@ If the `repoRoot` walk fails (per 072's `AC5.7` recovery seam), workflows-sync i
 - `Workflow.schemaVersion === 1`.
 - `Workflow.steps.length === 1`.
 - `Workflow.steps[0].role === 'reviewer'`.
-- `Workflow.steps[0].prompt` is non-empty AND contains the four exact substring markers asserting the priority chain is present: `gh pr view`, `git diff @{upstream}..HEAD`, `git diff HEAD` (the staged-aware Priority 3 marker per r1 codex F1 + codex-ops F2 disposition; the earlier ambiguous bare-`git diff` marker would match the substring inside `git diff HEAD~1..HEAD` and silently pass even if Priority 3 were missing), `git diff HEAD~1..HEAD`. The four-substring assertion is the load-bearing content invariant from AC1.3 step 2; reviewer-tunable surrounding prose does NOT break this test.
+- `Workflow.steps[0].prompt` is non-empty AND contains the priority-chain markers asserted in the order they appear in the prompt (r3 codex F2 MED — substring containment alone is insufficient because `'git diff HEAD'.includes('git diff HEAD')` also matches inside `'git diff HEAD~1..HEAD'`, so a Priority-3-omitted prompt could pass). The test MUST use:
+  1. `/\bgh pr view\b/.test(prompt)` (Priority 1 marker)
+  2. `prompt.includes('git diff @{upstream}..HEAD')` (Priority 2)
+  3. `/\bgit diff HEAD\b(?!~)/.test(prompt)` (Priority 3 — `git diff HEAD` NOT immediately followed by `~`; this distinguishes from Priority 4's `git diff HEAD~1..HEAD`)
+  4. `prompt.includes('git diff HEAD~1..HEAD')` (Priority 4)
+  5. The Priority 1 marker MUST appear at a lower string index than the Priority 2 marker, which MUST appear at a lower index than the Priority 3 regex match, which MUST appear at a lower index than the Priority 4 marker — the four-priority ORDER is load-bearing. Implement via `indexOf` ordering checks.
+  Reviewer-tunable surrounding prose does NOT break these assertions; only deletion / reordering of the load-bearing priority commands does.
 - `Workflow.steps[0].prompt` ALSO contains the two terminal-output substrings asserting the empty / no-source branches are pinned (r1 + r2 disposition): `No findings — diff looks ready to ship.` AND `No diff source available — nothing to review.` (both exact, including em-dashes). These assertions pin AC1.3 step 5's terminal-output invariants against future prose iteration.
+- `Workflow.steps[0].prompt` ALSO contains the fallthrough-rule marker (r3 codex F2 MED — without this, a builder could omit the entire AC1.3 step 2 fallthrough paragraph and still pass the priority-chain assertions): a regex match for `/priority unavailable[^.\n]*continue/i.test(prompt)` (case-insensitive, allowing punctuation/wording variation between "priority unavailable" and "continue"; this pins the load-bearing semantic "treat command-not-found / non-zero / empty as priority-unavailable, continue to next priority" against deletion).
+- `Workflow.steps[0].prompt` ALSO contains the MCP best-effort marker (r3 codex-ops MED): a regex match for `/best.effort/i.test(prompt)` AND `prompt.includes('mcp__echo__')` (the latter pins reference to ECHO MCP tools; the former pins the best-effort-on-failure semantic). Together these assert that "MCP context calls enhance the review but are not required for it to complete" survives any prose iteration.
 - `Workflow.steps[0].inputs` is the empty frozen object (no `${VAR}` substitution required).
 
 This test catches schema drift (e.g., someone deletes the `schema_version` field) AND prompt-content regression (e.g., someone removes a priority step from the chain).
@@ -254,6 +264,14 @@ All cases use `os.tmpdir()` + a tmpdir created in `beforeEach` (mirrors 072's ro
 
 **Case 3 (in `tests/echo-home/adapter-sync.test.ts`) — Workflow user-modified is NOT a failure.** `defaultWorkflows: ['change-review.toml']`, source has a fixture, `<ECHO_HOME>/workflows/change-review.toml` pre-populated with different bytes → assert `SyncResult.workflowsResult.results[0].action === 'user-modified'` AND `SyncResult.overallOk === true` (user's edit is preserved; this is healthy per AC3.5). The target file MUST be unchanged (mtime + content) after the sync.
 
+**Case 4 (in `tests/echo-home/adapter-sync.test.ts`) — Workflow per-file `error` action fails `overallOk` at the integration level (r3 codex F3 MED).** AC3.5 promises that any `workflowsResult.results[i].action === 'error'` results in `SyncResult.overallOk: false`, and `workflowsErrors.length > 0` does the same. Without an integration test that produces `action: 'error'` AND asserts the `overallOk` rollup consumes it, a builder could wire the `source-missing` branch in `computeOverallOk` and silently ignore `error` / `workflowsErrors` while passing Cases 1 + 3. The setup uses EISDIR to surface a per-file error within `syncDefaultWorkflows` AFTER `syncAll`'s state-lock and skills/roles steps have completed successfully (which is why this case CAN live at the integration level — unlike the unit-test chmod case which would block earlier steps): precreate `<ECHO_HOME>/workflows/change-review.toml` as a DIRECTORY (not a file), `defaultWorkflows: ['change-review.toml']`, source has a valid `change-review.toml` fixture → when `syncDefaultWorkflows` calls `atomicWrite` for the file path, the underlying `writeFileSync` / `rename` fails with EISDIR. Assert:
+
+- `SyncResult.workflowsResult.results.length === 1`.
+- `SyncResult.workflowsResult.results[0].action === 'error'` AND `.workflow === 'change-review.toml'`.
+- `SyncResult.workflowsResult.workflowsErrors.length === 1`.
+- `SyncResult.overallOk === false`.
+- The skills/roles results in the same `SyncResult` are unchanged (the per-file error is isolated to workflows; the rest of `syncAll` still ran successfully).
+
 **AC6.4 — `tests/echo-home/adapter-sync.test.ts` extension — workflows directory symlink guard (r1 codex F2 + codex-ops F3 disposition).** Add a case that mirrors the existing `dirChecks` test pattern in `tests/echo-home/adapter-sync.test.ts` for the skills/roles/state slots. Setup: pre-populate `<ECHO_HOME>/workflows` as a SYMLINK pointing outside ECHO_HOME (e.g., to a sibling tmp dir). Assert:
 
 - `syncAll()` returns with `directorySymlink` populated naming the workflows path.
@@ -293,13 +311,33 @@ Move 075's row from `docs/BACKLOG.md`'s "Inbox" section to the "Ready" table wit
 
 **AC9.4 — Pack-shape smoke test (narrow hygiene assertion).** Extend `tests/cli/shell-reachable.test.ts` (074-owned, in scope for extension here since 075's change makes the contract stricter for the workflow asset) with ONE assertion: after `npm pack`, `package/assets/echo-workflows/change-review.toml` is present in the tarball (via `tar tf <tarball>` or `npm pack --dry-run --json`). This pins the AC9.1 hygiene-only claim: the asset is shipped. It does NOT assert that `echoctl init` succeeds end-to-end in a packed install — that would be a false-confidence test (it would fail today on the inherited roles/skills gap), and assertions of that scope are explicitly OUT OF SCOPE for 075 per AC9.3. The single-assertion test is sufficient to catch future regressions where someone deletes the allowlist entry. If extending `shell-reachable.test.ts` proves invasive, a new `tests/cli/pack-shape.test.ts` is an acceptable alternative (builder's choice; update `files_to_modify` at PR time).
 
+### AC10 — `echoctl run` human-mode renderer surfaces captured stdout (r3 codex F1 HIGH; narrow lift of 074 out-of-scope)
+
+**Background (r3 codex F1 HIGH disposition).** At SHA `707b41e` (the r3 spec_commit_sha), `src/cli/commands/run.ts:96-98` (the human-mode branch of `renderOutcomes`) prints only `${outcome.step.role}: exit <code>` per outcome and discards the captured `outcome.spawn.stdout` entirely. The `--json` branch (line 91) DOES expose stdout via `JSON.stringify(outcomes)`. Consequence: the first-demo flow `echoctl run change-review` (the documented default per AC1.2 and the first-session arc in J7 + the design archive) prints `reviewer: exit 0` and NOTHING ELSE — the entire review (the findings the user came for) is silently dropped. Originally 075 forbade touching `src/cli/commands/run.ts` to keep blast radius bounded; r3 surfaced that the prohibition is incompatible with the demo-correctness claim. The narrow, contained lift below adds ~10 LOC to `renderOutcomes`, exclusively in the existing human-mode branch, with NO change to dispatcher capture, exit-code derivation, signal handling, or JSON-mode shape.
+
+**AC10.1 — Renderer extension.** In `src/cli/commands/run.ts`, extend `renderOutcomes()` (line ~91-101 at SHA 707b41e). The JSON branch (`opts.json === true`) is unchanged. The human-mode branch (the existing `for (const outcome of outcomes)` loop):
+
+- KEEP the existing `${role}: exit <code>` line (or `${role}: ${error}` for the error branch) as the FIRST line per outcome.
+- IF `outcome.spawn?.stdout` is non-empty, write it BELOW the exit line, with a single blank line above for visual separation.
+- IF `outcome.spawn?.stderr` is non-empty AND `outcome.spawn.exitCode !== 0`, write the stderr block AFTER the stdout block (or in its place if stdout is empty), prefixed with the line `stderr:` for the reader to distinguish.
+- `opts.quiet` continues to suppress all output (no change).
+
+This is a single-function-local change; no new exports, no dispatcher mutation, no contract drift in `DispatchOutcome`. The captured stdout/stderr already exists in the type (see `DispatchOutcome.spawn.stdout / .stderr` per 074); only the renderer changes.
+
+**AC10.2 — Test assertion.** Extend `tests/cli/run.test.ts` with a new case that constructs a fake `DispatchSpawn` returning a `stdout` of (a known marker like) `"### Finding 1 — HIGH — sample"`, exit 0, drives `runRun()` in human mode (no `--json`), and asserts the captured stdout marker appears in the test's collected stdout. A second sub-case: exit-nonzero branch outputs stderr block (asserts the `stderr:` prefix + the stderr content). This pins AC10.1 against future renderer changes that re-hide the captured output.
+
+**AC10.3 — JSON branch UNCHANGED.** Explicit non-claim: 075 does NOT modify the `--json` event shape. `run.outcomes` continues to carry the full `outcomes` array verbatim. Any consumer of the JSON stream is unaffected.
+
+**AC10.4 — Bounded scope (don't drift).** The renderer change is the ONLY mutation to `src/cli/commands/run.ts`. Do NOT touch `dispatchWorkflow` (074-domain), `matchRolesToAgents` (074-domain), `loadWorkflow` (074-domain), `computeExitCode` (074-domain), the project-resolution logic (074 J8), the signal-handling lifecycle (074 AC5.x), or `RunOpts` shape. If any of those need to change, that's a NEW spec on 074's mechanism, not 075. The line count budget for this AC is ~10 LOC in `run.ts` + ~30 LOC in the test; anything beyond that is drift and should escalate.
+
 ## Out of Scope (Don't Drift)
 
 - **NO new CLI subcommands.** Not `echoctl workflows ls`, `echoctl workflows show`, `echoctl workflows add`, nor any inspection helper. Discovery is `ls ~/.echo/workflows/`.
 - **NO per-invocation diff overrides.** Not `--diff-source <pr|branch|wt|head>`, not `--base <ref>`, not `--head <ref>`. The four-priority chain in the prompt is the only resolution mechanism.
 - **NO structured-YAML findings.** Output is the Markdown finding-block shape from AC1.3 step 4. If dogfooding shows structured output is needed, that's a 076+ spec.
 - **NO multi-step workflows / branching / parallelism / error-recovery DSL.** All 075-or-later concerns per 074 J3.
-- **NO changes to 074's `run`/`dispatch`/`match`/`load` modules.** If you find yourself wanting to edit `src/cli/workflow/*.ts`, STOP — that's drift into 074's domain. The workflow is consumed via the existing contract; if the contract needs to change, that's a new spec on 074's mechanism, not 075.
+- **NO changes to 074's `dispatch`/`match`/`load` modules.** If you find yourself wanting to edit `src/cli/workflow/*.ts`, STOP — that's drift into 074's domain. The workflow is consumed via the existing contract; if the contract needs to change, that's a new spec on 074's mechanism, not 075.
+- **Run-command renderer extension is the ONE permitted 074 surface change** (r3 codex F1 HIGH per AC10): the human-mode branch of `renderOutcomes()` in `src/cli/commands/run.ts` MAY be extended to print captured `spawn.stdout` + `spawn.stderr` (bounded ~10 LOC per AC10.4). Nothing else in `run.ts` — not the dispatcher invocation, not the project-resolution logic, not the signal handler, not `computeExitCode`, not `RunOpts`. The constraint chain is: AC10 is narrow because the first-demo flow needs the user to actually see findings; ANY other run.ts change is drift.
 - **NO changes to 070's `paths.ts` or `scaffold.ts`.** The `workflows` slot was added by 074 AC5.1 minor; the mkdir is already in `ensureEchoHome`. 075 makes ZERO mutations there.
 - **NO new role TOML.** The default `reviewer.toml` from 071 is the target role; no `change-reviewer.toml` or similar.
 - **NO wiki/operating-model edits.** Wiki updates happen post-shipment per CLAUDE.md.
