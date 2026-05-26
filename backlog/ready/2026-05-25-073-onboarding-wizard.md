@@ -33,10 +33,15 @@ spec_refs:
   - backlog/{ready,pending_review,complete}/2026-05-25-070-echo-global-home-scaffold.md  # 070 exports ECHO_HOME_PATHS + OnboardingState + ProjectsState + OnboardedAgentProfile. STAGE-STABLE: 073 is blocked_by 070, so by claim time 070 is in complete/. Builder reads via filename lookup across the three stage directories.
   - backlog/{ready,pending_review,complete}/2026-05-25-071-role-definition-format-and-defaults.md  # 071 ships role TOMLs but 073 does NOT consume them at run time; reference only — no import.
   - backlog/{ready,pending_review,complete}/2026-05-25-072-adapter-sync-engine.md  # 072 exports syncAll, AdapterSyncProfile, SyncResult, SyncConflict, AdapterError, and atomicWrite. STAGE-STABLE — 073 is blocked_by 072.
-  - src/storage/interface.ts  # AtomStore interface — 073 imports for direct SQLite atom queries (atom-store activity + repo_root group-by). The MCP path is not used in the wizard; direct read is faster and avoids requiring the daemon to be up.
-  - src/storage/sqlite.ts  # concrete SqliteAtomStore — wizard test rigs construct an in-memory variant of this for fake-atom-store tests
+  - src/storage/interface.ts  # Storage interface (NOT `AtomStore` — that name does not exist; codex r1 F1) — 073 imports for direct SQLite atom queries via `openExistingAtomStoreReadOnly()` (atom-store activity + repo_root group-by). The MCP path is not used in the wizard; direct read is faster and avoids requiring the daemon to be up.
+  - src/storage/sqlite.ts  # concrete SqliteStorage — wizard test rigs construct in-memory variants for fake-store tests. NOTE: the wizard MUST NOT construct this directly in production (it mkdirs the parent + opens R/W + runs migrations + canonicalizeTimestamps); see AC1.3 production opener.
   - src/mcp/request-log.ts  # lines 220-340 reference: echo_ping is the canonical no-op probe tool (defined here). The wizard's probe (AC6) invokes it via per-agent spawn.
-  - src/daemon/lifecycle.ts  # resolveDataDir() at lines 18-22 — the data dir env+homedir pattern, reused by wizard to locate the existing atom-store DB
+  - src/mcp/util/source-app.ts  # `buildSourceAppMap()` + `SOURCE_APP_VALUES` — canonical AgentKind→SourceApp→FS-prefix mapping the wizard MUST import for AC1.3 source matching and AC2 sourceBreakdown classification (codex r2 F1 / codex-ops r2 F1).
+  - src/daemon/index.ts  # `resolveDbPath()` (currently private at lines ~19-25) — daemon's DB-path resolver honoring `ECHO_DB_PATH` > `ECHO_DATA_DIR` > default Application Support path. The builder MUST promote this to an exported helper (suggested target: `src/daemon/lifecycle.ts` alongside `resolveDataDir`), and the wizard MUST consume it. Per AC1.3 production opener (codex r2 F2 / codex-ops r2 F2).
+  - src/daemon/lifecycle.ts  # `resolveDataDir()` at lines ~18-22 — only the data-dir layer; insufficient on its own because it ignores `ECHO_DB_PATH`. See note on `src/daemon/index.ts` above. The wizard pulls the DB-path resolver from here once promoted.
+  - src/capture/extractors/codex.ts # source-prefix evidence — the codex extractor writes `source: 'fs:$HOME/.codex/sessions/...'`. Cited by AC1.3 to motivate prefix matching.
+  - src/capture/extractors/claude-code.ts # source-prefix evidence — `source: 'fs:$HOME/.claude/projects/...'`.
+  - src/capture/extractors/cursor.ts # source-prefix evidence — `source: 'fs:$HOME/Library/Application Support/Cursor/...'`.
   - CLAUDE.md  # operating model — wizard touches none of the operating-model files; this ref is for grounding only
 
 # --- agent-managed fields (filled in during run) ---
@@ -100,11 +105,16 @@ export type AgentKind = 'codex' | 'claude-code' | 'cursor';
 
 export interface DetectedAgentSignals {
   configFile: { path: string; exists: boolean; readableMode: boolean };
-  // last-30d atom activity for this agent's source_app. `null` when the
-  // atom store is empty OR the store could not be opened (fresh install
-  // before daemon has ever run) — distinct from `{ count: 0, lastSeen: null }`
+  // last-30d atom activity for this agent's SourceApp prefix. `null` when
+  // the atom store could not be opened (fresh install before daemon has
+  // ever run, per AC1.3) — distinct from `{ count: 0, lastSeen: null }`
   // which means "store opened, found no rows for this agent."
   atomActivity: { count: number; lastSeen: string | null } | null;
+  // True when the count query hit the AC1.3 saturation limit (50_000 rows
+  // returned for this agent's source_prefix). 074 surfaces this as "50k+"
+  // rather than the literal number. Defaults to false on non-saturated
+  // results. (codex r2 F1 / codex-ops r2 F1 — additive field.)
+  atomCountSaturated: boolean;
 }
 
 export interface DetectedAgent {
@@ -148,7 +158,21 @@ export async function detectAgents(deps?: DetectAgentsDeps): Promise<DetectedAge
 
 The probe calls `fs.statSync` and reports `exists` plus `readableMode` (a bit-test of the user-read bit on `stat.mode`). It does NOT parse the file; a malformed config is still "exists." Symlinks are followed.
 
-**AC1.3 — Atom-store activity probe.** Uses the existing `Storage.query` method in `src/storage/interface.ts` (the canonical capture-event read surface; the spec earlier called this `AtomStore.queryAtoms` — that name does not exist, codex r1 F1). For each agent, the wizard queries with `source === kind` (translation: `claude-code` agent → `source: 'claude_code'`; `codex` → `'codex'`; `cursor` → `'cursor'`) and `since >= now - 30d`. The probe records `count` (rows matched) and `lastSeen` (the max `timestamp` of matched rows, ISO8601 UTC). Field-name mapping: `CaptureEvent.timestamp` is the time column; `CaptureEvent.source` is the agent identifier — the spec's earlier `ts` / `source_app` references were wrong and are corrected here.
+**AC1.3 — Atom-store activity probe.** Uses the existing `Storage.query` method in `src/storage/interface.ts` (the canonical capture-event read surface; the spec earlier called this `AtomStore.queryAtoms` — that name does not exist, codex r1 F1).
+
+**Source matching is prefix-based, NOT exact (codex r2 F1 / codex-ops r2 F1 HIGH).** Captured `CaptureEvent.source` values are not bare app names — they are FS-prefixed paths produced by the per-app extractors (e.g. `fs:$HOME/.codex/sessions/...`, `fs:$HOME/.claude/projects/...`, `fs:$HOME/Library/Application Support/Cursor/...`). The canonical mapping from `SourceApp` → source-prefix lives in `src/mcp/util/source-app.ts`'s `buildSourceAppMap()` (already consumed by `search_memories`, `wait_for_new_turns`, `echo_resolve_mru`, etc. — a single source of truth). The wizard MUST import and use `buildSourceAppMap()`; it MUST NOT inline its own copy.
+
+For each `AgentKind` the wizard:
+
+1. Maps `AgentKind` → `SourceApp`:
+   - `codex` → `'codex'`
+   - `claude-code` → `'claude_code'` (note the underscore; the SourceApp vocabulary differs from the AgentKind vocabulary)
+   - `cursor` → `'cursor'`
+2. Looks up the FS prefix via `buildSourceAppMap()[sourceApp]`.
+3. Calls `store.query({ source_prefix: <prefix>, since: <(now − 30d) ISO>, until: <now ISO>, limit: <large enough; see below> })`.
+4. Computes `count = rows.length` and `lastSeen = max(rows[i].timestamp) || null` (ISO8601 UTC).
+
+**Bounded scan + saturation flag.** `Storage.query` returns rows, not a pre-aggregated count. To bound the probe at O(window-of-recent-atoms-for-this-app) rather than O(all-rows-since-window), the wizard passes `limit: 50_000` — large enough that every realistic indie-AI-builder machine returns the full window, while still bounded so a pathological store does not OOM the wizard. If 50_000 is hit, `count` is reported as `50_000` and a new `signals.atomCountSaturated: true` field on `DetectedAgentSignals` (additive, defaults to `false`) communicates the saturation to 074 ("50k+ atoms" UX). Pinned by AC8.1 case 9.
 
 **Production opener (must be implementable as documented — codex r1 F1, codex-ops r1 F4 HIGH).** The wizard MUST NOT construct the production `SqliteStorage` directly: that constructor `mkdirSync(dirname(dbPath), { recursive: true })`s, opens with R/W, runs `migrate()`, and runs `canonicalizeTimestamps()` (which writes) — i.e. detection would create a daemon DB and contend with the live daemon on migrations. Instead, define a wizard-internal helper:
 
@@ -165,6 +189,14 @@ Semantics:
 The wizard's detect path calls this helper once, passes the returned `Storage | null` to the AC1.3 probe and AC2 detector. `null` → AC1.4 confidence-rollup's `atomActivity: null` row; AC2.3's empty-store path returns `[]`.
 
 When the store opened successfully but a query subsequently fails (DB later corrupted, locked, etc.), the error propagates — NOT swallowed (codex r1 AC8.1 case 6 already pins this).
+
+**DB path resolution must mirror the daemon (codex r2 F2 / codex-ops r2 F2 MED).** `dbPath` is NOT `resolveDataDir() + '/echo.db'`. The daemon's actual resolver (`resolveDbPath()` at `src/daemon/index.ts:19-25`) honors three sources in precedence order:
+
+1. `process.env.ECHO_DB_PATH` — if non-empty, `path.resolve(ECHO_DB_PATH)`. This is the **full DB file path**, NOT a directory.
+2. `process.env.ECHO_DATA_DIR` — if non-empty (and ECHO_DB_PATH unset), `path.join(path.resolve(ECHO_DATA_DIR), 'echo.db')`.
+3. Default: `path.join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db')`.
+
+The wizard MUST consume the same resolver, not duplicate it. **Builder step (precondition for AC1.3 production path):** promote `resolveDbPath()` from `src/daemon/index.ts` to an exported helper alongside `resolveDataDir` in `src/daemon/lifecycle.ts`, then have `src/daemon/index.ts` re-import + use it. The wizard imports `resolveDbPath` from `src/daemon/lifecycle.ts`. If the daemon's resolver later evolves, the wizard inherits the change for free. Pinned by AC8.1 case 10.
 
 **AC1.4 — Confidence rollup.**
 
@@ -186,10 +218,15 @@ The function always returns one entry per `AgentKind`, never filtered. The calle
 
 ```ts
 export interface DetectedProject {
-  repoRoot: string;                                  // absolute, normalized
-  atomCount: number;                                 // total atoms in last 7d for this repo_root
-  lastSeen: string;                                  // ISO8601 UTC, max ts over the window
-  sourceBreakdown: Record<string, number>;           // { claude_code: 12, codex: 5, git: 7, cursor: 3 }
+  repoRoot: string;                                                  // absolute, normalized
+  atomCount: number;                                                 // total atoms in last 7d for this repo_root
+  lastSeen: string;                                                  // ISO8601 UTC, max timestamp over the window
+  // Per-SourceApp counts, classified by `buildSourceAppMap()` prefix
+  // match against each row's CaptureEvent.source. Rows whose source
+  // matches no known prefix go under the literal `'other'` key. Absent
+  // keys mean zero; every present key has count > 0. (codex r2 F1 /
+  // codex-ops r2 F1.)
+  sourceBreakdown: Partial<Record<SourceApp | 'other', number>>;
 }
 
 export interface DetectProjectsDeps {
@@ -206,6 +243,10 @@ export async function detectProjects(deps?: DetectProjectsDeps): Promise<Detecte
 ```
 
 **AC2.2 — Query semantics.** Group atoms with non-empty `metadata.repo_root` over the window by `repo_root`. Atoms without `metadata.repo_root` (legacy git rows, pre-037 captures, etc.) are excluded — the wizard's job is "which projects did the user actually work in", and a row without repo metadata cannot answer that. Sort the result descending by `atomCount`, then descending by `lastSeen` as tie-breaker, then ascending by `repoRoot` lexicographically.
+
+**Source classification for `sourceBreakdown` (codex r2 F1 / codex-ops r2 F1).** Each atom's `source` field is FS-prefixed (e.g. `fs:$HOME/.codex/sessions/...`, `git:...`). The wizard classifies each row by which `buildSourceAppMap()` prefix the `source` string starts with — same canonical map AC1.3 uses. `sourceBreakdown` is keyed by `SourceApp` values (`'codex'`, `'claude_code'`, `'cursor'`, `'git'`). Rows whose `source` matches no known prefix are aggregated under the literal key `'other'`. `sourceBreakdown[k]` is the count of matched rows under that key; absent keys mean zero.
+
+**Bounded scan.** As with AC1.3, the underlying query uses `limit: 50_000`. If saturated, the function returns the top-25 projects by count over the truncated sample. A `DetectedProject` exposes no saturation flag because `detectProjects` already caps to `limit` (default 25), so a saturated input still produces a stable top-25; 074 does not need to know.
 
 **AC2.3 — Empty-store path.** When the production opener returns `null` (DB file does not exist, per AC1.3's `openExistingAtomStoreReadOnly` semantics) OR the store opens and returns zero matching rows, the function returns `[]`. No throw, no FS side effects on the missing-DB path. This is the fresh-install case; 074's UI is expected to render a "we couldn't find any projects yet — pick one manually" prompt.
 
@@ -352,13 +393,21 @@ Write back via 072's `atomicWrite` (`secretSensitive: false` — `onboarding.jso
 
 **AC5.6 — Error semantics.** Exceptions from `cache.read`, `cache.write`, and the onboarding-state read/write propagate out of `wire()`. Exceptions from `syncAll` are *not* expected — 072 AC6 says `syncAll` never throws — but a try/catch around the call wraps any leaked exception into `{ syncResult: { ...empty failed shape with errors[] populated }, ... }`. Pinned by AC8 wire.test.ts case 9.
 
-**AC5.7 — Lock-acquisition-failure / no-dispatch path (codex r1 F2).** When `syncResult.syncLock` is populated (072's per-user lock could not be acquired), no per-agent dispatch happened — `syncResult.agents` is `[]`. `wire()` MUST short-circuit at this point:
+**AC5.7 — No-dispatch / top-level safety failures (codex r1 F2 / codex-ops r2 F3).** 072 has three top-level sentinels that signal "no per-agent dispatch happened, no roles ran, `agents` is `[]`":
+
+| Sentinel field | Errno code(s) | Meaning |
+|---|---|---|
+| `syncResult.syncLock` | `RETRY_CONFLICT`, `ENOTDIR`, `EACCES`, ... | Per-user advisory lock could not be acquired (held by another `syncAll` invocation, or filesystem setup error). 072 AC6 lines 305-361. |
+| `syncResult.repoRoot` | `UNKNOWN` | `syncAll`'s upward walk did not find a `package.json + skills/` directory and the caller did not pass `opts.repoRoot`. 072 AC6 line 250. |
+| `syncResult.directorySymlink` | `EEXIST` (or errno-mapped) | Preflight detected an ECHO-owned directory as a symlink (or a non-symlink preflight error). 072 AC6a lines 364-399. |
+
+When **any** of these three fields is populated, `wire()` MUST short-circuit before AC5.4 / AC5.5 run:
 
 - Skip the cache-update phase entirely. `cacheUpdates: []`.
 - Skip the onboarding-state update phase. `onboardingStateUpdated: false`.
-- Return `{ syncResult, cacheUpdates: [], onboardingStateUpdated: false }` verbatim — the caller surfaces `syncResult.syncLock.message` (which includes the lock-holder's pid / since-time per 072 AC6) to the user.
+- Return `{ syncResult, cacheUpdates: [], onboardingStateUpdated: false }` verbatim — the caller surfaces the populated sentinel's `.message` (which is human-readable per 072's contract — shell-quoted `rm` instructions for syncLock, "caller must pass opts.repoRoot" for repoRoot, "resolve manually before re-running" for directorySymlink) to the user.
 
-This branch is distinct from per-agent `ok: false` outcomes: there, dispatch happened but specific agents failed, and per-agent `wire_error` / cache-suppression logic still applies. Here, nothing happened, so nothing should be mutated. Pinned by AC8.5 case 11 (new).
+This branch is distinct from per-agent `ok: false` outcomes: there, dispatch happened but specific agents failed, and per-agent `wire_error` / cache-suppression logic still applies. Here, nothing happened, so nothing should be mutated. Pinned by AC8.5 cases 11a / 11b / 11c (one per sentinel).
 
 The broader race window — between `cache.read` and the onboarding-state write, two concurrent `echo init` invocations could observe stale baselines or interleave their persistence — is accepted as a V1 risk (see R5). 073 does NOT add a wizard-level lock around the read-then-write sequence in V1; mitigations live at the 072 lock + idempotent-cache-write level. See R5 for the follow-up trigger condition.
 
@@ -457,16 +506,18 @@ export function createWizard(opts: CreateWizardOpts): Wizard;
 
 All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `ECHO_HOME` and tears down via `rmSync(..., { recursive: true })` in `afterEach`. None touches the real `~/.echo/`.
 
-**AC8.1 — `detect-agents.test.ts` (8 cases).**
+**AC8.1 — `detect-agents.test.ts` (10 cases).**
 
-1. All three config files present + atom store with rows for each agent → all three agents return `confidence: 'high'`, sorted alphabetically as tie-breaker.
+1. All three config files present + atom store rows with **realistic FS-prefixed sources** (`fs:$HOME/.codex/sessions/...`, `fs:$HOME/.claude/projects/...`, `fs:$HOME/Library/Application Support/Cursor/...`) for each agent → all three agents return `confidence: 'high'`, sorted alphabetically as tie-breaker. Uses `buildSourceAppMap()` to construct the prefixes so the test stays aligned with the production map (codex r2 F1 / codex-ops r2 F1).
 2. Only `.codex/config.toml` present + empty atom store → `codex` is `medium`, others `none`.
 3. Empty homedir + atom store unavailable (`atomStore: null`) → all three `none`, no throw.
-4. Empty homedir + atom store has activity → all three `medium` (config absent, atoms present).
+4. Empty homedir + atom store has activity (with realistic FS-prefixed sources) → all three `medium` (config absent, atoms present).
 5. Symlinked `.codex/config.toml` → follows the symlink; reports `exists: true`.
 6. Atom store throws on query (not `ENOENT`) → exception propagates; pinned to confirm we are NOT silently swallowing real DB errors.
-7. `now` injection: with `now: new Date('2026-05-01T00:00:00Z')` and an atom at `timestamp: '2026-03-25T00:00:00Z'` (≈37d earlier) → `count: 0` (outside window); with `timestamp: '2026-04-15T00:00:00Z'` (≈16d earlier) → `count: 1`.
-8. **Fresh-install no-FS-side-effects (codex r1 F1 / codex-ops r1 F4).** Production-path test: with `atomStore: undefined` (real production path) AND a tmpdir whose `resolveDataDir()`-derived DB path does not exist, call `detectAgents()`. Assert: `atomActivity` is `null` for all three agents (per AC1.4 fresh-install row); AND `fs.existsSync(dbPath)` is `false` after the call; AND the parent directory of `dbPath` is unchanged (no `mkdir` happened). Use `fs.readdir` on the tmpdir before/after and diff — must be identical. This is the regression guard for the spec's earlier "direct SqliteStorage construction" hazard.
+7. `now` injection: with `now: new Date('2026-05-01T00:00:00Z')` and an atom at `timestamp: '2026-03-25T00:00:00Z'` (≈37d earlier) → `count: 0` (outside window); with `timestamp: '2026-04-15T00:00:00Z'` (≈16d earlier) → `count: 1`. Atom carries an FS-prefixed source so the prefix-match path is exercised.
+8. **Fresh-install no-FS-side-effects (codex r1 F1 / codex-ops r1 F4).** Production-path test: with `atomStore: undefined` (real production path) AND a tmpdir whose `resolveDbPath()`-derived DB path does not exist, call `detectAgents()`. Assert: `atomActivity` is `null` for all three agents (per AC1.4 fresh-install row); AND `fs.existsSync(dbPath)` is `false` after the call; AND the parent directory of `dbPath` is unchanged (no `mkdir` happened). Use `fs.readdir` on the tmpdir before/after and diff — must be identical.
+9. **Saturation flag (codex r2 F1 / codex-ops r2 F1).** Inject a fake `Storage.query` that returns exactly `50_000` rows for codex's source_prefix and 1 row for claude-code. Assert codex's `signals.atomCountSaturated === true` and `signals.atomActivity.count === 50_000`; claude-code's `atomCountSaturated === false`.
+10. **`ECHO_DB_PATH` env override (codex r2 F2 / codex-ops r2 F2).** With `process.env.ECHO_DB_PATH = '<tmpdir>/custom-echo.db'` and a real SQLite DB pre-seeded at that path with one codex-source atom, call `detectAgents()`. Assert: codex's `atomActivity.count === 1`; the default Application-Support location is NOT touched (use `fs.readdir` on a tmpdir-redirected location to confirm). The test imports `resolveDbPath` from `src/daemon/lifecycle.ts` so the env-precedence assertion exercises the actual resolver.
 
 **AC8.2 — `detect-projects.test.ts` (6 cases).**
 
@@ -493,7 +544,7 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 3. Idempotency: two calls with identical context produce byte-identical strings.
 4. `agent: 'cursor'` throws (cursor does not get a marker-managed file; calling renderEchoSection for cursor is a wizard-internal bug).
 
-**AC8.5 — `wire.test.ts` (11 cases).**
+**AC8.5 — `wire.test.ts` (13 cases — 10 base + 11a/11b/11c).**
 
 1. Two agents (codex + claude-code), no prior cache → both `AdapterSyncProfile.previousEchoSection` is `undefined`; `syncAll` is called once with both profiles; both cache files written after success.
 2. Same as #1 but a conflict on codex → codex cache is NOT updated; claude-code cache IS updated; `wire_error` on codex's `OnboardedAgentProfile` set to the conflict message.
@@ -505,7 +556,28 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 8. `selectedAgents: ['cursor']` only → no call to `renderEchoSection`; profile has `echoSection: undefined`; cache write still records `echoSection: null` per AC3.2.
 9. `syncAll` throws unexpectedly (mock throws) → wire catches and returns a result with synthesized failure shape; no onboarding-state mutation; no cache update.
 10. `now` injection determines the `renderedAt` substring in the rendered echoSection AND the `last_written_at` in cache writes; pinned to identical ISO8601 across both surfaces.
-11. **Lock-acquisition-failure path (AC5.7 / codex r1 F2).** Mock `syncAll` to return the 072 lock-failure shape: `{ overallOk: false, agents: [], skillsPopulated: { ok: true, ... }, roles: { ok: true, ... }, syncLock: { code: 'EEXIST', operation: 'lock', file: '~/.echo/locks/sync.lock', message: 'lock held by pid 12345 since 2026-05-25T...Z' } }`. Assert: `cacheUpdates` is `[]`; `onboardingStateUpdated` is `false`; `~/.echo/state/onboarding.json` is byte-identical before and after the call (read SHA-256 hash pre/post); no adapter-cache file is written for any selected agent; `wire()` does NOT throw.
+11a. **Lock-acquisition-failure path (AC5.7 — `syncLock` populated; codex r1 F2 + codex r2 F3 fixture fix).** Mock `syncAll` to return 072's actual lock-failure shape per 072 AC6 lines 346-361 (NOT the earlier `EEXIST` / `~/.echo/locks/sync.lock` / `pid + since` shape — that was incorrect):
+
+   ```ts
+   {
+     overallOk: false,
+     agents: [],
+     skillsPopulated: { ok: true, copied: [], skipped: [], targetDir: '<tmp>/skills' },
+     roles: { ok: true, written: [], skipped: [], targetDir: '<tmp>/roles' },
+     syncLock: {
+       code: 'RETRY_CONFLICT',
+       operation: 'lock',
+       file: '<tmp>/state/adapter-sync.lock',
+       message: "lockfile present at \"<tmp>/state/adapter-sync.lock\" — if no other ECHO sync is running, remove it with: rm -- '<tmp>/state/adapter-sync.lock'. echo doctor will automate this in a future release.",
+     },
+   }
+   ```
+
+   Assert: `cacheUpdates` is `[]`; `onboardingStateUpdated` is `false`; `~/.echo/state/onboarding.json` is byte-identical before and after the call (SHA-256 hash pre/post); no adapter-cache file is written for any selected agent; `wire()` does NOT throw. Fixture mirrors 072 AC9 case 11; drift fails this test — deliberate cross-spec consistency guard.
+
+11b. **Repo-root-not-found path (AC5.7 — `repoRoot` populated; codex-ops r2 F3).** Mock `syncAll` to return `{ overallOk: false, agents: [], skillsPopulated: {ok:true,copied:[],skipped:[],targetDir:'<tmp>/skills'}, roles: {ok:true,written:[],skipped:[],targetDir:'<tmp>/roles'}, repoRoot: { code: 'UNKNOWN', operation: 'stat', file: '<some-tmp-path>', message: 'could not locate repo root (no package.json + skills/ adjacent); caller must pass opts.repoRoot' } }`. Same assertions as 11a: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 AC9 case 22.
+
+11c. **Directory-symlink-preflight-fail path (AC5.7 — `directorySymlink` populated; codex-ops r2 F3).** Mock `syncAll` to return `{ overallOk: false, agents: [], skillsPopulated: {ok:true,copied:[],skipped:[],targetDir:'<tmp>/skills'}, roles: {ok:true,written:[],skipped:[],targetDir:'<tmp>/roles'}, directorySymlink: { code: 'EEXIST', operation: 'stat', file: '<tmp>/.echo/skills', message: '<tmp>/.echo/skills is a symlink — refusing to operate. Resolve manually before re-running.' } }`. Same assertions: no cache writes, no onboarding mutation, `onboardingStateUpdated: false`, no throw. Fixture mirrors 072 AC9 case 30.
 
 **AC8.6 — `probe.test.ts` (8 cases).**
 
@@ -564,19 +636,19 @@ All under `tests/echo-home/wizard/`. Vitest. Each test uses an OS tmpdir for `EC
 
 All additive — no existing test rewrites.
 
-- 8 cases — `tests/echo-home/wizard/detect-agents.test.ts`
+- 10 cases — `tests/echo-home/wizard/detect-agents.test.ts`
 - 6 cases — `tests/echo-home/wizard/detect-projects.test.ts`
 - 6 cases — `tests/echo-home/wizard/adapter-cache.test.ts`
 - 4 cases — `tests/echo-home/wizard/render-echo-section.test.ts`
-- 11 cases — `tests/echo-home/wizard/wire.test.ts`
+- 13 cases — `tests/echo-home/wizard/wire.test.ts` (10 base + 11a/11b/11c)
 - 8 cases — `tests/echo-home/wizard/probe.test.ts`
 - 5 cases — `tests/echo-home/wizard/run-wizard.test.ts`
 
-**Total: 48 new test cases across 7 files.**
+**Total: 52 new test cases across 7 files.**
 
 Verify steps:
 
-- `npm test -- tests/echo-home/wizard/` — all 48 pass.
+- `npm test -- tests/echo-home/wizard/` — all 52 pass.
 - `npm test` — full suite, all tests pass (1268+ before regressions).
 - `npm run lint` — clean.
 - `npm run typecheck` — clean.
@@ -589,10 +661,10 @@ All four verify commands must pass before the builder moves 073 to `pending_revi
 - AC2: `detect-projects.ts` groups atoms by `metadata.repo_root` over 7d (configurable), returns sorted-by-activity list with `sourceBreakdown`; empty store → empty result, not throw.
 - AC3: `adapter-cache.ts` reads/writes `~/.echo/adapters/<kind>.json` via 072's `atomicWrite` with `secretSensitive: true`; rejects bad schema_version or shape; cache directory is defensively recreated on write.
 - AC4: `render-echo-section.ts` is pure, returns byte-identical markdown for identical inputs, embeds version + renderedAt fingerprint for 072's conflict-detection hand-off; throws on `agent: 'cursor'`.
-- AC5: `wire.ts` builds `AdapterSyncProfile[]` from selected agents + cache + render, calls 072's `syncAll`, updates per-agent cache ONLY for successful non-conflict outcomes, mutates `onboarding.json` (detected_at preserved, wired_at on success, wire_error set on failure, completed never flipped here). On `syncResult.syncLock` populated → no cache writes, no onboarding-state mutation, `onboardingStateUpdated: false` (AC5.7).
+- AC5: `wire.ts` builds `AdapterSyncProfile[]` from selected agents + cache + render, calls 072's `syncAll`, updates per-agent cache ONLY for successful non-conflict outcomes, mutates `onboarding.json` (detected_at preserved, wired_at on success, wire_error set on failure, completed never flipped here). On ANY of `syncResult.{syncLock|repoRoot|directorySymlink}` populated → no cache writes, no onboarding-state mutation, `onboardingStateUpdated: false` (AC5.7).
 - AC6: `probe.ts` spawns each agent's CLI with a 5s timeout (codex + claude-code) and returns `manual-only` for cursor; maps spawn failures to typed `reason` codes; sequential, not parallel.
 - AC7: `run-wizard.ts` exposes `createWizard()` returning a staged `Wizard` object with `detectAgents`, `detectProjects`, `wire`, `probe`, `summary`, `markCompleted`; `index.ts` re-exports the public surface.
-- AC8: all 48 new test cases pass; no existing test edits.
+- AC8: all 52 new test cases pass; no existing test edits.
 - All four verify commands clean.
 - A manual run on the founder's machine: detect returns the expected three agents at `high` confidence; project enumeration returns the expected ranked list including `Project_echo`; wire produces no-conflict outcomes against the current state of `~/.codex/config.toml` and `~/.cursor/mcp.json`; probes against codex + claude succeed; cursor returns `manual-only`. Founder validates `onboarding.json` reflects the run.
 
