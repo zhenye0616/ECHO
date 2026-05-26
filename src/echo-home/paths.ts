@@ -11,6 +11,7 @@ export const ECHO_HOME_PATHS = Object.freeze({
   root,
   skills: join(root, 'skills'),
   roles: join(root, 'roles'),
+  workflows: join(root, 'workflows'),
   adapters: join(root, 'adapters'),
   state: join(root, 'state'),
   stateOnboarding: join(root, 'state', 'onboarding.json'),

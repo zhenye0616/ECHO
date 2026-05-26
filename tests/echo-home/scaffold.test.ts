@@ -56,10 +56,11 @@ describe('ensureEchoHome', () => {
       ECHO_HOME_PATHS.root,
       ECHO_HOME_PATHS.skills,
       ECHO_HOME_PATHS.roles,
+      ECHO_HOME_PATHS.workflows,
       ECHO_HOME_PATHS.adapters,
       ECHO_HOME_PATHS.state,
     ]);
-    expect(result.created_dirs).toHaveLength(5);
+    expect(result.created_dirs).toHaveLength(6);
     expect(result.created_files).toEqual([
       ECHO_HOME_PATHS.stateOnboarding,
       ECHO_HOME_PATHS.stateProjects,
@@ -116,6 +117,7 @@ describe('ensureEchoHome', () => {
     expect(result.created_dirs).toEqual([
       ECHO_HOME_PATHS.skills,
       ECHO_HOME_PATHS.roles,
+      ECHO_HOME_PATHS.workflows,
       ECHO_HOME_PATHS.adapters,
     ]);
     expect(result.created_files).toEqual([ECHO_HOME_PATHS.stateProjects]);
