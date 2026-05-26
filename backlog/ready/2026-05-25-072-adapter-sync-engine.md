@@ -81,8 +81,12 @@ Re-running `syncAll(...)` with identical inputs is **byte-equivalent convergence
 - Exports `mergeWithMarkers(opts: { filePath: string; echoSection: string; previousEchoSection?: string }): MarkerResult`.
 - Constants: `BEGIN_MARKER = '<!-- BEGIN ECHO -->'`, `END_MARKER = '<!-- END ECHO -->'`. Literal strings; no whitespace tolerance in V1 (a hand-edit that changes the markers themselves is treated as no-markers-present, which falls into the append branch — see R3).
 - **Pre-read symlink guard (codex-ops r11 M1).** Before reading `filePath` to inspect markers, `fs.lstatSync(filePath)`. If the file exists AND is a symlink, return `{ action: 'conflict', filePath, conflict: { kind: 'target-symlink', filePath, targetIsSymlink: true } }` WITHOUT reading the linked target. This matches the AC8 TargetSymlinkConflict no-byte-payload guarantee — the engine never reads outside the intended file. A missing `filePath` is fine (we'll create it via the append branch). A regular file proceeds to the branch logic below.
-- **Marker-pair detection rule (codex r12 M1).** The file content has a "well-formed marker pair" iff: (a) it contains exactly one `BEGIN_MARKER` occurrence AND exactly one `END_MARKER` occurrence AND (b) the BEGIN appears before the END. Any other state (BEGIN-only, END-only, multiple of either, END-before-BEGIN, nested) is "no well-formed pair" → falls into the append branch. AC1 branches below all use this single detection rule.
-- **Append branch (no well-formed pair in current file):** the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result via the unique-tmp atomic-write pattern in AC7 (do NOT use a fixed `<filePath>.tmp` — see AC7 for the per-call temp path + mode-preservation rules). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`. Malformed-marker cases (R3) hit this branch — the user's broken markers persist alongside the new well-formed block; users self-resolve.
+- **Marker-pair detection rule (codex r12 M1 → refined by codex r14 M1 + codex-ops r14 M1 for convergence).** The file content is classified into exactly one of three states:
+  1. **No markers** — neither `BEGIN_MARKER` nor `END_MARKER` appears anywhere. Append branch is safe.
+  2. **Well-formed pair** — exactly one `BEGIN_MARKER` AND exactly one `END_MARKER`, BEGIN before END. Replace/Noop/Conflict branches per the rules below.
+  3. **Malformed** — any other state (BEGIN-only, END-only, multiple of either, END-before-BEGIN, nested). Returns `{ action: 'conflict', filePath, conflict: { kind: 'malformed-marker', filePath } }` WITHOUT writing — user must clean up the broken markers manually.
+- **Why malformed → conflict, not append (codex r14 + codex-ops r14 convergence fix):** if append'd on every malformed file, the next run would still see a malformed file (the old broken marker plus the new well-formed block = still not exactly one of each) and append again, growing the file on every retry. The conflict branch is convergent: second run sees the same malformed state, returns the same conflict, no write. Pinned by AC9 case 6 + new "malformed → second run noop-style conflict, no growth" sub-case.
+- **Append branch (no markers anywhere — state 1 above):** the function appends `\n` + `BEGIN_MARKER` + `\n` + `echoSection` + `\n` + `END_MARKER` + `\n` to the existing content and writes the result via the unique-tmp atomic-write pattern in AC7 (do NOT use a fixed `<filePath>.tmp` — see AC7 for the per-call temp path + mode-preservation rules). If the file does not exist, it is created with just the ECHO section + markers (no leading newline). Returns `{ action: 'append', filePath }`.
 - **Replace branch (markers present, content inside equals `previousEchoSection`):** the inside-markers content is replaced with `echoSection`. Everything outside the markers is preserved byte-for-byte. Atomic write. Returns `{ action: 'replace', filePath }`. If `previousEchoSection` is omitted, this branch is unreachable — the function falls through to Noop (if `currentInside === echoSection`) or Conflict (otherwise). See "previous* absent rule" below.
 - **No-op branch (markers present, content inside equals `echoSection`):** the file is not written. Returns `{ action: 'noop', filePath }`. This is what makes re-running idempotent.
 - **Conflict branch (markers present, content inside differs from BOTH `previousEchoSection` AND `echoSection`):** the function does **not** write. Returns `{ action: 'conflict', filePath, conflict: { currentInside: string, expectedInside: string, proposedInside: string, unifiedDiff: string } }`. The `unifiedDiff` is a plain-text diff between `currentInside` and `proposedInside` produced by a small in-tree diff routine (no external library dependency for this — line-by-line is sufficient; see R4).
@@ -463,7 +467,7 @@ Per codex-ops r1: `cursor-config.ts` and `codex-config.ts` conflict payloads can
 The agent-conflict shape is a **discriminated union** (codex r10 M3) — `SyncConflict = ConfigConflict | MarkerConflict | TargetSymlinkConflict`. The discriminator field is `kind`:
 
 ```ts
-type SyncConflict = ConfigConflict | MarkerConflict | TargetSymlinkConflict;
+type SyncConflict = ConfigConflict | MarkerConflict | TargetSymlinkConflict | MalformedMarkerConflict;
 
 interface ConfigConflict {
   kind: 'config';                  // codex-config / cursor-config adapter conflicts
@@ -494,6 +498,17 @@ interface TargetSymlinkConflict {
   // No byte payload — the linked target was deliberately never read (codex-ops r5 M2,
   // codex r9 M1). Caller can render "<file> is a symlink — refusing to write" without
   // any redaction concern.
+}
+
+interface MalformedMarkerConflict {
+  kind: 'malformed-marker';        // codex r14 M1 + codex-ops r14 M1: file has BEGIN-only,
+                                   // END-only, multiple markers, or out-of-order markers.
+                                   // Refused for convergence (re-running would otherwise
+                                   // grow the file on every retry). User cleans up the
+                                   // broken markers manually.
+  filePath: string;
+  // No byte payload — the file itself is the diagnostic; the caller can render
+  // "<file> has malformed ECHO markers; please remove them and re-run".
 }
 
 interface RolePerFileConflict {
@@ -530,7 +545,7 @@ Each adapter has its own test file; the orchestrator has one integration test. A
   3. File with markers + matching `echoSection` (idempotent re-run) → `action: 'noop'`, file mtime unchanged (or at minimum: file content byte-identical).
   4. File with markers but inside-content differs from BOTH previous and new → `action: 'conflict'`, no write, conflict object has `currentInside`, `expectedInside`, `proposedInside`, and a non-empty `unifiedDiff`.
   5. File with user content above and below the markers → after a replace, the above/below content is byte-identical (preservation invariant).
-  6. Marker present but malformed (e.g., `BEGIN` without matching `END`) → treated as no-markers-present (append branch). Pins R3.
+  6. Marker present but malformed (e.g., `BEGIN` without matching `END`, OR multiple BEGINs, OR END-before-BEGIN) → returns `{ action: 'conflict', conflict: { kind: 'malformed-marker', filePath } }`. NO write occurs. Run `mergeWithMarkers` a SECOND time on the same file (no cleanup between calls) — assert: identical conflict returned; file bytes byte-identical to before either call (no growth). This is the codex r14 / codex-ops r14 convergence pin.
 
 - `tests/echo-home/adapters/codex-config.test.ts` — seven cases:
   1. File has no `[mcp_servers.echo]` → `action: 'add'`; file now contains the table; all other tables byte-identical.
@@ -626,7 +641,7 @@ Run convention: `npm test -- tests/echo-home/`.
 
 - **R2 — Cursor's MCP config path stability.** `~/.cursor/mcp.json` is the path on the founder's machine today, but Cursor has not published a long-term contract for it. If Cursor renames or relocates this file in a future release, the cursor-config adapter breaks silently. Mitigation: AC3's missing-file branch creates the path if absent, which means an updated Cursor that uses a new path will leave the old file dormant rather than crashing — the wizard / CLI will report `ok: true` but the wiring won't be active. Detecting this requires probing (item 073's step 5); 072 cannot detect it from the sync side alone. Flagged here so future Cursor breakage has a known landing zone for the fix.
 
-- **R3 — Marker malformation edge cases.** If a user hand-edits an AGENTS.md to have `BEGIN` but no `END` (or vice versa, or nested), the markers.ts treats the file as having no markers (append branch). This is intentionally permissive — refusing to act would block onboarding for the rare malformed-markers case — but it does mean the user's broken markers persist alongside a new correct block. Documented in AC9 case 6; users self-resolve by removing the malformed markers.
+- **R3 — Marker malformation edge cases.** If a user hand-edits an AGENTS.md to have `BEGIN` but no `END` (or vice versa, or multiple, or out-of-order), `mergeWithMarkers` returns a `MalformedMarkerConflict` and refuses to write (convergent — r14 fix). This blocks claude-code/codex's instructions-file step for that profile until the user removes the broken markers manually; the wizard caller surfaces the diagnostic. Earlier rounds had this on the append-anyway branch but that path did not converge under retries (file would grow on every run). Trade-off accepted: a malformed-marker case requires manual cleanup; in exchange, unattended retries are safe.
 
 - **R4 — In-tree diff library vs. external dependency.** `unifiedDiff` in conflict results is a line-by-line plain-text diff produced by an in-tree routine. The routine does not need to be a full Myers-diff — a simple "lines in current but not proposed / lines in proposed but not current" listing is sufficient for the wizard to render a preview. Adding a real diff library (`diff`, `jsdiff`) is a follow-up if the simple form proves unreadable in dogfooding. Builder must NOT add a diff library without escalation per drift rule 3.
 
