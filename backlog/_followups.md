@@ -1046,3 +1046,6 @@ The structural framing — **roles MUST be conflict-free by construction across 
 - Relabel `discoverSkillsRoot` failure-path error field from `'skills'` to `'skillsRoot'` for clearer downstream error attribution (`src/echo-home/roles.ts:159`). (from 071 merge sidecar follow-ups)
 - Stabilization spec for the 3 pre-existing flakies that surfaced during 071 review: `tests/trace/build.test.ts` (perf), `tests/capture/surfaces/git-watcher.test.ts` (timeout), `tests/coord/coord-status.test.ts` (seed loop). All independent of 071's diff. (from 071 merge sidecar follow-ups)
 - If strict 1:1 spec-item ↔ `it()` block mapping is desired by future review-queue tooling, split the merged composite tests at `tests/echo-home/default-roles.test.ts:104, :113`. (from 071 merge sidecar follow-ups)
+
+<!-- from merge of 2026-05-25-072-adapter-sync-engine, 2026-05-25 -->
+- Founder product call on R6: keep fully ECHO-owned Claude command files (current behavior — `~/.claude/commands/<name>.md` overwritten on resync), or spec a future marker-merge migration so user-edited command files survive. (from 072 merge sidecar follow-ups)
