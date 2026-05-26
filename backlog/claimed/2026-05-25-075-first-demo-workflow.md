@@ -1,7 +1,7 @@
 ---
 id: 2026-05-25-075-first-demo-workflow
 title: "First demo workflow — `change-review` workflow asset + workflow-sync engine"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1-2d
 created: 2026-05-25
@@ -32,6 +32,13 @@ spec_refs:
   - src/echo-home/adapters/role-sync.ts  # the function shape syncDefaultWorkflows mirrors exactly (byte-equality preservation, user-modified protection, idempotent re-sync)
   - src/cli/workflow/load.ts  # 074 loadWorkflow contract — strict-unknown-key, schema_version === 1, filename ↔ name agreement, role-name grammar
   - src/cli/workflow/match.ts  # 074 matchRolesToAgents contract — capabilities ⊇ role.requires.capabilities + earliest wired_at tiebreak
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-26T21:18:31Z"
+branch: "agent/first-demo-workflow"
+worktree: "/Users/zhenye/Desktop/Project_echo--first-demo-workflow"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 # First demo workflow — `change-review` (workflow asset + workflow-sync engine)
