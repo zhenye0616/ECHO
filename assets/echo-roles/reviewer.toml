@@ -1,0 +1,12 @@
+[role]
+description = "Fresh-eyes-at-SHA code review. Reads the diff against acceptance criteria, surfaces correctness/scope/style findings. Read-only sandbox; never merges. Per-vendor adapters (codex, codex-ops, claude) share this role shape."
+sandbox = "read-only"
+skills = ["review-queue-codex", "review-queue-codex-ops", "review-queue-claude"]
+
+[role.requires]
+mcp_servers = ["echo"]
+capabilities = ["fs.read", "git.read", "mcp.echo.read"]
+
+[role.output]
+format = "yaml-header + markdown"
+required_fields = ["verdict", "reviewer", "findings"]
