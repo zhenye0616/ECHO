@@ -70,15 +70,21 @@ function detail(text: string): string | undefined {
 }
 
 function isEchoPingPayload(stdout: string): boolean {
+  // Scan every non-empty line; first that parses as {pong:true, ts:string} wins.
+  // Robust against agents that wrap responses in markdown code fences (claude-code
+  // 2.1.x) or print log preamble before the JSON.
   const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-  const last = lines.at(-1);
-  if (last === undefined) return false;
-  try {
-    const parsed = JSON.parse(last) as { pong?: unknown; ts?: unknown };
-    return parsed.pong === true && typeof parsed.ts === 'string';
-  } catch {
-    return false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const parsed = JSON.parse(trimmed) as { pong?: unknown; ts?: unknown };
+      if (parsed.pong === true && typeof parsed.ts === 'string') return true;
+    } catch {
+      // try next line
+    }
   }
+  return false;
 }
 
 function authRequired(stderr: string): boolean {

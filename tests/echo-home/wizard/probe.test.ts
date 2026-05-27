@@ -25,6 +25,19 @@ describe('probeAgents', () => {
     expect(out[0]).toMatchObject({ probed: false, reason: 'unexpected-output' });
   });
 
+  it('accepts pong JSON wrapped in markdown code fences (claude-code 2.1.x output)', async () => {
+    const wrapped = '```json\n{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}\n```';
+    const out = await probeAgents(['codex'], { spawn: async () => ok(wrapped) });
+    expect(out[0]!.probed).toBe(true);
+  });
+
+  it('accepts pong JSON preceded by log preamble lines', async () => {
+    const noisy =
+      '[info] spawning agent...\n[info] connecting MCP...\n{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}';
+    const out = await probeAgents(['codex'], { spawn: async () => ok(noisy) });
+    expect(out[0]!.probed).toBe(true);
+  });
+
   it('maps ENOENT spawn errors to cli-unavailable', async () => {
     const out = await probeAgents(['codex'], {
       spawn: async () => {
