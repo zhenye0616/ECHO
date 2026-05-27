@@ -39,6 +39,27 @@ worktree: "/Users/zhenye/Desktop/Project_echo--packaged-echoctl-install-boundary
 head_sha: "ad4757ddf81a75f120cc4e59968c8f5d5d220ac9"
 pr_url: ""
 agent_notes: "Implemented on branch `agent/packaged-echoctl-install-boundary` at `ad4757ddf81a75f120cc4e59968c8f5d5d220ac9`. Added packaged `echoctl daemon` lifecycle, npm-pack runtime allowlist and migration copy, launchd smoke coverage, and install docs. Verification: `npm run build:cli`, `npm run lint`, `npm run typecheck`, focused CLI vitest, `npm pack --pack-destination /private/tmp/echo-076-pack`, `npm test` (135 files / 1433 tests), and `git diff --check` passed. Direct sandboxed `npm pack` hit TS emit EPERM, so the explicit pack gate was rerun outside sandbox; the packaged smoke also exercises pack/install."
+review_notes: |
+  Merged on 2026-05-27 via founder reconciliation (sidecar verdict: merge as-is).
+
+  Conflicts resolved:
+  - None — clean merge. Sidecar predicted a conflict on the item file itself (main's reviewer-queue commit e6b0c93 vs. branch additions), but the agent's branch never touched the item-file frontmatter, so `ort` merged disjoint surfaces without contention. The move-to-complete/ happens here at C7.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None (sidecar had no pre-merge fixups).
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1433/1454 tests pass (21 skipped, matches sidecar); lint and typecheck clean post-merge; tools/sync-skills.sh --check clean.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Align `package.json` `daemon:logs` script path to `echo-daemon.{err,out}.log` (or delete — superseded by `echoctl daemon logs`).
+  - Implement real `uptime` in `echoctl daemon status` (parse `launchctl print` or compute from process start) — currently prints `unknown` while AC3.5 lists the field.
+  - Migrate `scripts/launchd/uninstall.sh` to a thin wrapper around `echoctl daemon uninstall "$@"` for parity with `install.sh`.
+  - Harness bug observed during this merge's Step-B pre-flight: the orphan-detection loop in `skills/merge-and-cleanup.md` Step B compares find-output paths (`/var/folders/...`) against `git worktree list --porcelain` paths (`/private/var/folders/...`), so registered TMPDIR worktrees older than 60min are deleted as if orphaned (macOS `/var` → `/private/var` symlink). The watcher worktree `echo-watcher-BBD8D852-…` was nuked despite being registered. Low-risk in practice (watcher lifetime is short, so stale registrations are usually genuinely orphaned), but the protection logic doesn't fire as intended — fix by canonicalizing both sides via `pwd -P` / `realpath` before string-compare.
 ---
 
 # Packaged `echoctl` install boundary
