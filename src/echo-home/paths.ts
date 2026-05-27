@@ -7,16 +7,48 @@ const root = isNonEmptyString(process.env['ECHO_HOME'])
   ? resolve(process.env['ECHO_HOME'])
   : join(homedir(), '.echo');
 
-export const ECHO_HOME_PATHS = Object.freeze({
-  root,
-  skills: join(root, 'skills'),
-  roles: join(root, 'roles'),
-  workflows: join(root, 'workflows'),
-  adapters: join(root, 'adapters'),
-  state: join(root, 'state'),
-  stateOnboarding: join(root, 'state', 'onboarding.json'),
-  stateProjects: join(root, 'state', 'projects.json'),
-});
+export interface EchoHomePaths {
+  root: string;
+  skills: string;
+  roles: string;
+  workflows: string;
+  adapters: string;
+  state: string;
+  stateOnboarding: string;
+  stateProjects: string;
+}
+
+function resolveRoot(homeOverride?: string): string {
+  if (homeOverride !== undefined) {
+    if (!isNonEmptyString(homeOverride)) throw new Error('invalid --home: expected path');
+    return resolve(homeOverride);
+  }
+  return isNonEmptyString(process.env['ECHO_HOME'])
+    ? resolve(process.env['ECHO_HOME'])
+    : join(homedir(), '.echo');
+}
+
+export function resolveEchoHomePaths(homeOverride?: string): EchoHomePaths {
+  const resolvedRoot = resolveRoot(homeOverride);
+  return Object.freeze({
+    root: resolvedRoot,
+    skills: join(resolvedRoot, 'skills'),
+    roles: join(resolvedRoot, 'roles'),
+    workflows: join(resolvedRoot, 'workflows'),
+    adapters: join(resolvedRoot, 'adapters'),
+    state: join(resolvedRoot, 'state'),
+    stateOnboarding: join(resolvedRoot, 'state', 'onboarding.json'),
+    stateProjects: join(resolvedRoot, 'state', 'projects.json'),
+  });
+}
+
+export let ECHO_HOME_PATHS = resolveEchoHomePaths(root);
+
+export function setEchoHomeRoot(homeOverride: string): EchoHomePaths {
+  ECHO_HOME_PATHS = resolveEchoHomePaths(homeOverride);
+  process.env['ECHO_HOME'] = ECHO_HOME_PATHS.root;
+  return ECHO_HOME_PATHS;
+}
 
 export interface OnboardingState {
   schema_version: 1;

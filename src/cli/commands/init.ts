@@ -1,9 +1,11 @@
 import { mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { atomicWrite } from '../../echo-home/adapters/atomic-write.js';
 import {
   ECHO_HOME_PATHS,
+  setEchoHomeRoot,
   validateOnboardingState,
   type OnboardedAgentProfile,
   type OnboardingState,
@@ -55,6 +57,10 @@ export interface InitOpts {
   json?: boolean;
   quiet?: boolean;
   color?: boolean;
+  home?: string;
+  port?: string;
+  label?: string;
+  answerFile?: string;
   stdin?: { isTTY?: boolean };
   stdout?: Pick<NodeJS.WritableStream, 'write'>;
   stderr?: Pick<NodeJS.WritableStream, 'write'>;
@@ -69,12 +75,169 @@ export type RemediationCopy = Record<
   (outcome: Extract<ProbeOutcome, { probed: false }>) => string
 >;
 
+export interface InitAnswerFile {
+  confirm_setup: boolean;
+  selected_agents: AgentKind[];
+  default_project_repo_root: string | null;
+  repo_root?: string;
+}
+
+interface LoadedAnswerFile {
+  path: string;
+  answers: InitAnswerFile;
+}
+
+export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>] [--answer-file <path>]
+
+Options:
+  --home <path>          ECHO_HOME for this init run
+  --port <n>             MCP server port written to adapter configs
+  --label <id>           accepted for daemon-isolation parity; init does not manage launchd
+  --answer-file <path>   non-interactive JSON answers
+
+Answer-file JSON schema:
+  {
+    "confirm_setup": true,
+    "selected_agents": ["codex", "claude-code", "cursor"],
+    "default_project_repo_root": null,
+    "repo_root": "/Users/me/Desktop/Project_echo"
+  }
+
+Required fields: confirm_setup, selected_agents, default_project_repo_root.
+Optional field: repo_root, only needed if init cannot locate ECHO's source tree.`;
+
+const ANSWER_REQUIRED_FIELDS = [
+  'confirm_setup',
+  'selected_agents',
+  'default_project_repo_root',
+] as const;
+const ANSWER_OPTIONAL_FIELDS = ['repo_root'] as const;
+const ANSWER_FIELDS = new Set<string>([...ANSWER_REQUIRED_FIELDS, ...ANSWER_OPTIONAL_FIELDS]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && 'code' in err;
+}
+
+function failAnswerFile(filePath: string, field: string, message: string): never {
+  throw new Error(`${filePath}: ${field}: ${message}; see \`echoctl init --help\` for schema`);
+}
+
+function parsePort(value: string, flag = '--port'): number {
+  if (!/^[0-9]+$/.test(value)) throw new Error(`invalid ${flag}: ${value}`);
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n <= 0 || n > 65535) {
+    throw new Error(`invalid ${flag}: ${value}`);
+  }
+  return n;
+}
+
 export function resolveMcpPort(): number {
   const raw = process.env['ECHO_MCP_PORT'];
   if (raw === undefined || raw.length === 0) return 38478;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isInteger(n) || n < 0 || n > 65535) return 38478;
-  return n;
+  try {
+    return parsePort(raw, 'ECHO_MCP_PORT');
+  } catch {
+    return 38478;
+  }
+}
+
+function parseNonEmptyOption(value: string | undefined, flag: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (value.trim().length === 0) throw new Error(`invalid ${flag}: expected non-empty string`);
+  return value;
+}
+
+export function parseInitArgs(args: readonly string[]): Pick<
+  InitOpts,
+  'answerFile' | 'home' | 'label' | 'port'
+> {
+  const parsed = parseArgs({
+    args: [...args],
+    strict: true,
+    allowPositionals: false,
+    options: {
+      home: { type: 'string' },
+      port: { type: 'string' },
+      label: { type: 'string' },
+      'answer-file': { type: 'string' },
+    },
+  });
+  const port = parseNonEmptyOption(parsed.values.port, '--port');
+  if (port !== undefined) parsePort(port);
+  return {
+    home: parseNonEmptyOption(parsed.values.home, '--home'),
+    port,
+    label: parseNonEmptyOption(parsed.values.label, '--label'),
+    answerFile: parseNonEmptyOption(parsed.values['answer-file'], '--answer-file'),
+  };
+}
+
+function validateAnswerFile(filePath: string, value: unknown): InitAnswerFile {
+  if (!isRecord(value)) failAnswerFile(filePath, 'root', 'expected object');
+  for (const key of Object.keys(value)) {
+    if (!ANSWER_FIELDS.has(key)) failAnswerFile(filePath, key, 'unknown field');
+  }
+  for (const field of ANSWER_REQUIRED_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(value, field)) {
+      failAnswerFile(filePath, field, 'missing required field');
+    }
+  }
+  if (typeof value['confirm_setup'] !== 'boolean') {
+    failAnswerFile(filePath, 'confirm_setup', 'expected boolean');
+  }
+  if (!Array.isArray(value['selected_agents'])) {
+    failAnswerFile(filePath, 'selected_agents', 'expected array of agent kinds');
+  }
+  const selectedAgents: AgentKind[] = [];
+  for (let i = 0; i < value['selected_agents'].length; i++) {
+    const agent = value['selected_agents'][i];
+    if (typeof agent !== 'string' || !isAgentKind(agent)) {
+      failAnswerFile(filePath, `selected_agents[${i}]`, 'expected codex, claude-code, or cursor');
+    }
+    selectedAgents.push(agent);
+  }
+  const defaultProject = value['default_project_repo_root'];
+  if (defaultProject !== null && typeof defaultProject !== 'string') {
+    failAnswerFile(filePath, 'default_project_repo_root', 'expected string or null');
+  }
+  if (typeof defaultProject === 'string' && defaultProject.trim().length === 0) {
+    failAnswerFile(filePath, 'default_project_repo_root', 'expected non-empty string or null');
+  }
+  const repoRoot = value['repo_root'];
+  if (repoRoot !== undefined && (typeof repoRoot !== 'string' || repoRoot.trim().length === 0)) {
+    failAnswerFile(filePath, 'repo_root', 'expected non-empty string');
+  }
+  return {
+    confirm_setup: value['confirm_setup'],
+    selected_agents: selectedAgents,
+    default_project_repo_root: defaultProject,
+    ...(repoRoot === undefined ? {} : { repo_root: repoRoot }),
+  };
+}
+
+function loadAnswerFile(path: string): LoadedAnswerFile {
+  const resolvedPath = resolve(path);
+  let raw: string;
+  try {
+    raw = readFileSync(resolvedPath, 'utf8');
+  } catch (err) {
+    if (isErrnoException(err) && err.code === 'ENOENT') {
+      failAnswerFile(resolvedPath, 'file', 'not found');
+    }
+    failAnswerFile(resolvedPath, 'file', `failed to read: ${(err as Error).message}`);
+  }
+  try {
+    return { path: resolvedPath, answers: validateAnswerFile(resolvedPath, JSON.parse(raw)) };
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      failAnswerFile(resolvedPath, 'root', `invalid JSON: ${err.message}`);
+    }
+    throw err;
+  }
 }
 
 export function readPackageVersion(packageJsonPath?: string): string {
@@ -186,31 +349,43 @@ function topLevelFailure(result: WireResult): string | null {
 
 export async function runInit(opts: InitOpts = {}): Promise<number> {
   const stderr = opts.stderr ?? process.stderr;
-  if (opts.stdin?.isTTY !== true && process.stdin.isTTY !== true) {
+  let answerFile: LoadedAnswerFile | null = null;
+  let mcpPort: number;
+  try {
+    if (opts.home !== undefined) setEchoHomeRoot(opts.home);
+    mcpPort = opts.port === undefined ? resolveMcpPort() : parsePort(opts.port);
+    if (opts.answerFile !== undefined) answerFile = loadAnswerFile(opts.answerFile);
+  } catch (err) {
+    writeLine(stderr, (err as Error).message);
+    return 2;
+  }
+
+  if (answerFile === null && opts.stdin?.isTTY !== true && process.stdin.isTTY !== true) {
     writeLine(
       stderr,
-      'echoctl init: non-interactive — a TTY is required. Pipe-driven onboarding via an answer file is a future item.',
+      'echoctl init: non-interactive — a TTY is required unless --answer-file <path> is provided.',
     );
     return 2;
   }
   ensureEchoHome();
 
   try {
-    const mcpServerUrl = `http://127.0.0.1:${resolveMcpPort()}/mcp`;
+    const mcpServerUrl = `http://127.0.0.1:${mcpPort}/mcp`;
     const echoVersion = readPackageVersion(opts.packageJsonPath);
     const wizard = (opts.wizardFactory ?? createWizard)({
       mcpServerUrl,
       echoVersion,
       now: opts.now,
     });
-    const prompt = opts.prompt ?? makeTtyPrompt();
+    const prompt = answerFile === null ? (opts.prompt ?? makeTtyPrompt()) : null;
     const color = opts.color ?? false;
 
-    if (
-      !(await prompt.readConfirm('Welcome to ECHO setup. This takes about two minutes.', {
+    const shouldContinue =
+      answerFile?.answers.confirm_setup ??
+      (await prompt!.readConfirm('Welcome to ECHO setup. This takes about two minutes.', {
         default: true,
-      }))
-    ) {
+      }));
+    if (!shouldContinue) {
       return 0;
     }
 
@@ -220,26 +395,45 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     const defaultAgents = agents
       .filter((agent) => agent.confidence === 'high' || agent.confidence === 'medium')
       .map((agent) => agent.kind);
-    const selectedAgents = parseAgentSelection(
-      await prompt.readPrompt('Confirm subset to wire', { default: defaultAgents.join(',') }),
-      defaultAgents,
-    );
+    const selectedAgents =
+      answerFile?.answers.selected_agents ??
+      parseAgentSelection(
+        await prompt!.readPrompt('Confirm subset to wire', { default: defaultAgents.join(',') }),
+        defaultAgents,
+      );
 
     const projects = await wizard.detectProjects();
     if (opts.json) emitJson(opts, { event: 'init.detect-projects', projects });
     else emitText(opts, renderDetectedProjects(projects, { color }));
-    const projectAnswer = await prompt.readPrompt('Pick default project', { default: '' });
-    const projectIdx = Number.parseInt(projectAnswer, 10);
-    const defaultProjectRepoRoot =
-      Number.isInteger(projectIdx) && projectIdx >= 1 && projectIdx <= projects.length
-        ? projects[projectIdx - 1]!.repoRoot
-        : null;
+    let defaultProjectRepoRoot: string | null;
+    if (answerFile !== null) {
+      defaultProjectRepoRoot = answerFile.answers.default_project_repo_root;
+    } else {
+      const projectAnswer = await prompt!.readPrompt('Pick default project', { default: '' });
+      const projectIdx = Number.parseInt(projectAnswer, 10);
+      defaultProjectRepoRoot =
+        Number.isInteger(projectIdx) && projectIdx >= 1 && projectIdx <= projects.length
+          ? projects[projectIdx - 1]!.repoRoot
+          : null;
+    }
 
     let wire = await wizard.wire({ selectedAgents, defaultProjectRepoRoot });
     if (wire.syncResult.repoRoot !== undefined) {
-      const repoRoot = await prompt.readPrompt(
-        'ECHO could not locate its source tree. Pass an explicit path',
-      );
+      let repoRoot: string;
+      if (answerFile !== null && answerFile.answers.repo_root === undefined) {
+        writeLine(
+          stderr,
+          `${answerFile.path}: repo_root: required because ECHO could not locate its source tree`,
+        );
+        return 2;
+      }
+      if (answerFile !== null) {
+        repoRoot = answerFile.answers.repo_root!;
+      } else {
+        repoRoot = await prompt!.readPrompt(
+          'ECHO could not locate its source tree. Pass an explicit path',
+        );
+      }
       wire = await wizard.wire({ selectedAgents, defaultProjectRepoRoot, repoRoot });
       if (wire.syncResult.repoRoot !== undefined) {
         writeLine(stderr, wire.syncResult.repoRoot.message);

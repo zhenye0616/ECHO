@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import type { AgentKind } from '../echo-home/wizard/detect-agents.js';
 import { runDoctor } from './commands/doctor.js';
 import { runDaemon } from './commands/daemon.js';
-import { readPackageVersion, runInit } from './commands/init.js';
+import { INIT_HELP, parseInitArgs, readPackageVersion, runInit } from './commands/init.js';
 import { runRun } from './commands/run.js';
 import { runUninstall } from './commands/uninstall.js';
 
@@ -26,7 +26,7 @@ Commands:
 `;
 
 const COMMAND_HELP: Record<string, string> = {
-  init: 'Usage: echoctl init [--json] [--quiet]',
+  init: INIT_HELP,
   doctor: 'Usage: echoctl doctor [--json] [--quiet]',
   daemon: 'Usage: echoctl daemon <install|start|stop|restart|status|logs|uninstall> [options]',
   uninstall: 'Usage: echoctl uninstall [--yes] [--purge-state] [--force-purge] [--json] [--quiet]',
@@ -109,8 +109,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === 'init') {
-      parseArgs({ args, strict: true, allowPositionals: false, options: {} });
-      return await runInit(globals);
+      return await runInit({ ...globals, ...parseInitArgs(args) });
     }
     if (command === 'doctor') {
       parseArgs({ args, strict: true, allowPositionals: false, options: {} });

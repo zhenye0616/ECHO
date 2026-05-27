@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Wizard } from '../../src/echo-home/wizard/run-wizard.js';
+import type { AdapterSyncProfile } from '../../src/echo-home/adapter-sync.js';
+import type { CreateWizardOpts, Wizard } from '../../src/echo-home/wizard/run-wizard.js';
 import type { WireResult } from '../../src/echo-home/wizard/wire.js';
 import type { AgentKind, DetectedAgent } from '../../src/echo-home/wizard/detect-agents.js';
 import { makeNonInteractivePrompt } from '../../src/cli/io/prompt.js';
@@ -34,9 +35,9 @@ function writeInitialState(): void {
   );
 }
 
-function successWire(selected: AgentKind[]): WireResult {
+function successWire(selected: AgentKind[], home = echoHome): WireResult {
   const now = '2026-05-26T00:00:01.000Z';
-  const state = JSON.parse(readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8')) as {
+  const state = JSON.parse(readFileSync(join(home, 'state/onboarding.json'), 'utf8')) as {
     agents: Array<Record<string, unknown>>;
   };
   for (const id of selected) {
@@ -49,10 +50,10 @@ function successWire(selected: AgentKind[]): WireResult {
       wire_error: null,
     });
   }
-  writeFileSync(join(echoHome, 'state/onboarding.json'), `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(join(home, 'state/onboarding.json'), `${JSON.stringify(state, null, 2)}\n`);
   return {
     syncResult: {
-      skillsPopulated: { ok: true, copied: [], skipped: [], targetDir: join(echoHome, 'skills') },
+      skillsPopulated: { ok: true, copied: [], skipped: [], targetDir: join(home, 'skills') },
       agents: selected.map((agent) => ({
         agent,
         ok: true as const,
@@ -65,6 +66,12 @@ function successWire(selected: AgentKind[]): WireResult {
     cacheUpdates: [],
     onboardingStateUpdated: true,
   };
+}
+
+function writeAnswerFile(name: string, value: unknown): string {
+  const path = join(tmpRoot, name);
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  return path;
 }
 
 function detected(kind: AgentKind, confidence: DetectedAgent['confidence']): DetectedAgent {
@@ -118,8 +125,265 @@ describe('runInit', () => {
     expect(code).toBe(2);
     expect(wizardFactory).not.toHaveBeenCalled();
     expect(errors.join('')).toContain('non-interactive');
+    expect(errors.join('')).toContain('--answer-file');
     expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
     expect(existsSync(join(echoHome, 'state/projects.json'))).toBe(false);
+  });
+
+  it('documents and parses init isolation flags', async () => {
+    const { INIT_HELP, parseInitArgs } = await loadInit();
+
+    expect(parseInitArgs([
+      '--home',
+      '/tmp/echo-home',
+      '--port',
+      '41234',
+      '--label',
+      'com.echo.daemon.walkthrough',
+      '--answer-file',
+      '/tmp/answers.json',
+    ])).toEqual({
+      home: '/tmp/echo-home',
+      port: '41234',
+      label: 'com.echo.daemon.walkthrough',
+      answerFile: '/tmp/answers.json',
+    });
+    expect(INIT_HELP).toContain('--home <path>');
+    expect(INIT_HELP).toContain('--port <n>');
+    expect(INIT_HELP).toContain('--label <id>');
+    expect(INIT_HELP).toContain('--answer-file <path>');
+    expect(() => parseInitArgs(['--port', '0'])).toThrow('invalid --port: 0');
+    expect(() => parseInitArgs(['--port', '12abc'])).toThrow('invalid --port: 12abc');
+  });
+
+  it('honors --home, --port, and --label in non-interactive answer-file mode', async () => {
+    const isolatedHome = join(tmpRoot, 'isolated-echo-home');
+    const clientHome = join(tmpRoot, 'client-home');
+    const codexConfig = join(clientHome, '.codex/config.toml');
+    const codexInstructions = join(clientHome, '.codex/AGENTS.md');
+    const cursorConfig = join(clientHome, '.cursor/mcp.json');
+    const answerFile = writeAnswerFile('answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex', 'cursor'],
+      default_project_repo_root: null,
+    });
+    const { runInit } = await loadInit();
+    const { createWizard } = await import('../../src/echo-home/wizard/run-wizard.js');
+    const { syncAll } = await import('../../src/echo-home/adapter-sync.js');
+
+    const wizardFactory = ((opts: CreateWizardOpts): Wizard =>
+      createWizard({
+        ...opts,
+        detectAgentsDeps: { homedir: clientHome, atomStore: null },
+        detectProjectsDeps: { atomStore: null },
+        probeDeps: {
+          spawn: async () => ({
+            exitCode: 0,
+            stdout: '{"pong":true,"ts":"2026-05-26T00:00:00.000Z"}\n',
+            stderr: '',
+            timedOut: false,
+          }),
+        },
+        wireDepsOverride: {
+          syncAll: async (profiles, syncOpts) =>
+            syncAll(
+              profiles.map((profile): AdapterSyncProfile => {
+                if (profile.kind === 'codex') {
+                  return {
+                    ...profile,
+                    paths: { configFile: codexConfig, instructionsFile: codexInstructions },
+                  };
+                }
+                if (profile.kind === 'cursor') {
+                  return { ...profile, paths: { configFile: cursorConfig } };
+                }
+                return profile;
+              }),
+              syncOpts,
+            ),
+        },
+      })) as never;
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41234',
+      label: 'com.echo.daemon.walkthrough',
+      quiet: true,
+      now: () => new Date('2026-05-26T00:00:00.000Z'),
+    });
+
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      completed: boolean;
+      agents: Array<{ id: AgentKind }>;
+    };
+    const cursor = JSON.parse(readFileSync(cursorConfig, 'utf8')) as {
+      mcpServers: { echo: { url: string } };
+    };
+    const codexCache = JSON.parse(
+      readFileSync(join(isolatedHome, 'adapters/codex.json'), 'utf8'),
+    ) as {
+      mcpServerConfig: { url: string };
+    };
+
+    expect(code).toBe(0);
+    expect(state.completed).toBe(true);
+    expect(state.agents.map((agent) => agent.id).sort()).toEqual(['codex', 'cursor']);
+    expect(readFileSync(codexConfig, 'utf8')).toContain(
+      'url = "http://127.0.0.1:41234/mcp"',
+    );
+    expect(cursor.mcpServers.echo.url).toBe('http://127.0.0.1:41234/mcp');
+    expect(codexCache.mcpServerConfig.url).toBe('http://127.0.0.1:41234/mcp');
+    expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
+  });
+
+  it('fails loudly when the answer file is missing', async () => {
+    const { runInit } = await loadInit();
+    const missingPath = join(tmpRoot, 'missing.json');
+    const wizardFactory = vi.fn();
+    const errors: string[] = [];
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile: missingPath,
+      wizardFactory: wizardFactory as never,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+    });
+
+    expect(code).toBe(2);
+    expect(wizardFactory).not.toHaveBeenCalled();
+    expect(errors.join('')).toContain(missingPath);
+    expect(errors.join('')).toContain('file: not found');
+  });
+
+  it('fails loudly when the answer file has malformed JSON', async () => {
+    const { runInit } = await loadInit();
+    const answerFile = join(tmpRoot, 'bad-json.json');
+    writeFileSync(answerFile, '{');
+    const wizardFactory = vi.fn();
+    const errors: string[] = [];
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: wizardFactory as never,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+    });
+
+    expect(code).toBe(2);
+    expect(wizardFactory).not.toHaveBeenCalled();
+    expect(errors.join('')).toContain(answerFile);
+    expect(errors.join('')).toContain('root: invalid JSON');
+  });
+
+  it('fails loudly when the answer file is missing a required field', async () => {
+    const { runInit } = await loadInit();
+    const answerFile = writeAnswerFile('missing-field.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+    });
+    const wizardFactory = vi.fn();
+    const errors: string[] = [];
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: wizardFactory as never,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+    });
+
+    expect(code).toBe(2);
+    expect(wizardFactory).not.toHaveBeenCalled();
+    expect(errors.join('')).toContain(answerFile);
+    expect(errors.join('')).toContain('default_project_repo_root: missing required field');
+  });
+
+  it('fails loudly when the answer file has an unknown field', async () => {
+    const { runInit } = await loadInit();
+    const answerFile = writeAnswerFile('unknown-field.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+      extra: true,
+    });
+    const wizardFactory = vi.fn();
+    const errors: string[] = [];
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: wizardFactory as never,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+    });
+
+    expect(code).toBe(2);
+    expect(wizardFactory).not.toHaveBeenCalled();
+    expect(errors.join('')).toContain(answerFile);
+    expect(errors.join('')).toContain('extra: unknown field');
+  });
+
+  it('fails loudly when repo_root is required but absent in answer-file mode', async () => {
+    const { runInit } = await loadInit();
+    const answerFile = writeAnswerFile('missing-repo-root.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const errors: string[] = [];
+    const wizardFactory = (() =>
+      ({
+        async detectAgents() {
+          return [detected('codex', 'high')];
+        },
+        async detectProjects() {
+          return [];
+        },
+        async wire() {
+          return {
+            syncResult: {
+              skillsPopulated: { ok: false, sourceDir: '', targetDir: '', error: 'missing' },
+              agents: [],
+              roles: { results: [], rolesErrors: [] },
+              repoRoot: {
+                code: 'UNKNOWN',
+                file: '/missing',
+                operation: 'stat',
+                message: 'could not locate repo root',
+              },
+              overallOk: false,
+            },
+            cacheUpdates: [],
+            onboardingStateUpdated: false,
+          } satisfies WireResult;
+        },
+        async probe() {
+          return [];
+        },
+        async summary() {
+          return {
+            detected: null,
+            projects: null,
+            wired: null,
+            probed: null,
+            onboardingStateSnapshot: null,
+          };
+        },
+        async markCompleted() {},
+      }) satisfies Wizard) as never;
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+      quiet: true,
+    });
+
+    expect(code).toBe(2);
+    expect(errors.join('')).toContain(answerFile);
+    expect(errors.join('')).toContain('repo_root: required');
   });
 
   it('bootstraps echo home before the interactive wizard touches state', async () => {
