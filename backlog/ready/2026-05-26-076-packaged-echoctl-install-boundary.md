@@ -12,7 +12,10 @@ files_to_modify:
   - package.json                                           # AC1 + AC7 — flip `private: false`; fix `files` allowlist; add `prepack` script; bin entry already exists from 074; daemon-script changes per AC3
   - src/cli/index.ts                                       # AC3 — register new `daemon` subcommand in the parseArgs dispatch
   - src/cli/commands/daemon.ts                             # AC3 NEW — daemon lifecycle commands: install / start / stop / restart / status / logs (uses `launchctl bootstrap|bootout|kickstart` per AC4)
-  - tests/cli/daemon.test.ts                               # AC3 + AC4 NEW — unit tests for the daemon lifecycle command (test seams for launchctl calls)
+  - src/coord/paths.ts                                     # AC1.5 (r1 codex F1) — packaged-install guard: when `tools/review-queue/run-<role>-reviewer.sh` is absent (packaged tarball drops dev-only wrappers per AC1.2), `coord_invoke` returns a structured "coord_invoke unavailable in packaged install" error instead of crashing; dev-repo path unchanged
+  - tests/coord/paths.test.ts                              # AC1.5 NEW — unit test for the wrapper-absent guard (test seam: pass a tmp repo root with no wrappers; assert the guard fires with the expected error code)
+  - scripts/copy-sql-migrations.js                         # AC2.2 (r1 codex F4) — NEW; pure-Node walk of src/storage/migrations/ → dist/storage/migrations/ byte-copy; idempotent; fails loudly if source dir missing
+  - tests/cli/daemon.test.ts                               # AC3 + AC4 NEW — unit tests for the daemon lifecycle command (test seams for launchctl calls); also covers AC3.3 preflight (r1 codex-ops F4), AC3.3 absolute-Node-path resolution (r1 codex-ops F3), and AC3.8 install-time override flags (r1 codex F3 / codex-ops F2)
   - tests/cli/shell-reachable.test.ts                      # AC5 — extend the existing pack-shape smoke to ALSO START the packaged daemon, probe /mcp, SIGTERM/cleanup; catches the AC2 SQL-migration bug + the AC1.4 coord-config bug
   - scripts/launchd/install.sh                             # AC3 — plist target changes from `npm run daemon` (PROJECT_DIR coupling) to `node <installed-package>/dist/daemon/index.js`; no `WorkingDirectory` set to source repo
   - scripts/launchd/uninstall.sh                           # AC4 — use `launchctl bootout` for clean stop; align with the AC4 upgrade-safe stop semantics
@@ -162,6 +165,20 @@ Each entry exists because the runtime (CLI or daemon) needs it at runtime. Speci
 
 **AC1.4 — Coord runtime config ships explicitly.** `tools/review-queue/coord-roles.json` + `tools/review-queue/reviewers.json` + `tools/review-queue/schemas/**` MUST be in the tarball (called out separately from AC1.1's list because they were the second bug codex caught — the daemon's `src/coord/roles.ts:56` validates against the JSON schemas at startup). AC5's pack-shape smoke includes a positive presence check for these specific paths.
 
+**AC1.5 — `coord_invoke` is explicitly de-scoped for packaged installs (r1 codex F1 HIGH).** AC1.2 excludes `tools/review-queue/*.sh` from the tarball as dev-only. The daemon's `coord_invoke` tool currently resolves `tools/review-queue/run-<role>-reviewer.sh` (see `src/coord/paths.ts:63-146`) and requires the wrapper to exist + be executable before spawning a reviewer. In a packaged install those wrappers are absent.
+
+The packaged daemon MUST NOT crash and MUST NOT silently fail. Patch `src/coord/paths.ts` so that when the wrapper resolves to a non-existent path, `coord_invoke` returns a structured rejection:
+
+```
+error: coord_invoke unavailable in packaged install — review-queue wrappers are dev-only.
+       run echoctl from the source repo if you need headless reviewer invocation.
+code:  ECHO_COORD_INVOKE_PACKAGED_UNAVAILABLE
+```
+
+Rationale: the V1 cross-project use case (founder using `echoctl` in `NavyPowerTwin`, `PowerTwinLab_Demo`, etc.) never invokes the operating-model review queue — those wrappers are infrastructure for THIS repo's strategist/reviewer protocol, not for end-user echoctl. De-scoping is the correct boundary; shipping all 4 `run-<role>-reviewer.sh` wrappers + their `_lib.py`/`coord-emit.sh`/`reviewers.json`/launchd plumbing would push the tarball outside its V1 purpose. Per Out-of-Scope, "review-queue substrate is operating-model-only; not part of V1 customer surface."
+
+Test (`tests/coord/paths.test.ts`): pass a tmp repo root with no `tools/review-queue/run-*-reviewer.sh` files; call the `coord_invoke` path resolver; assert it returns the `ECHO_COORD_INVOKE_PACKAGED_UNAVAILABLE` error code. Dev-repo behavior (wrappers present) unchanged — existing `coord_invoke` tests continue to pass.
+
 ### AC2 — Build artifacts are complete + runtime-correct
 
 **AC2.1 — SQL migrations copied into `dist/`.** Today, `tsc` compiles `.ts` → `.js` into `dist/` but ignores `.sql` files. The daemon's `src/storage/sqlite.ts` (line ~17 region) reads `src/storage/migrations/*.sql` at runtime to apply schema. In a packed install, those `.sql` files don't exist relative to `dist/daemon/index.js` → daemon crashes on first DB open.
@@ -207,11 +224,10 @@ echoctl daemon uninstall     # bootouts + removes plist
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.echo.daemon</string>
+  <string>{{LABEL}}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>node</string>
+    <string>{{NODE_EXEC_PATH}}</string>
     <string>{{INSTALLED_DAEMON_PATH}}</string>
   </array>
   <key>RunAtLoad</key>
@@ -229,22 +245,43 @@ echoctl daemon uninstall     # bootouts + removes plist
   <dict>
     <key>PATH</key>
     <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <key>ECHO_HOME</key>
+    <string>{{ECHO_HOME}}</string>
+    <key>ECHO_MCP_PORT</key>
+    <string>{{ECHO_MCP_PORT}}</string>
   </dict>
 </dict>
 </plist>
 ```
 
-`{{INSTALLED_DAEMON_PATH}}` resolves at install time to the absolute path of the packaged `dist/daemon/index.js` (computed via `path.resolve` from the running `echoctl` binary's location — `process.argv[1]` + `path.resolve(__dirname, '../../daemon/index.js')` or equivalent). `{{LOG_DIR}}` defaults to `~/Library/Logs/echo/` (created if absent). NO `WorkingDirectory` — the daemon must work regardless of CWD.
+Substitution semantics (resolved at install time, persisted into the plist; launchd does NOT inherit caller env after bootstrap, so EVERY runtime variable the daemon needs MUST be persisted here — r1 codex F2 / codex-ops F1 HIGH):
 
-**AC3.3 — `install` verb mechanics.** `echoctl daemon install`:
-1. Computes `{{INSTALLED_DAEMON_PATH}}` from the running binary's location
-2. Computes `{{LOG_DIR}}` (default `~/Library/Logs/echo/`); creates if absent
-3. Renders the plist with both substitutions
-4. Writes to `~/Library/LaunchAgents/com.echo.daemon.plist` (overwrites if present — upgrade-safe)
-5. If a job is already loaded (`launchctl print gui/$(id -u)/com.echo.daemon` exits 0): `launchctl bootout gui/$(id -u)/com.echo.daemon` (clean stop FIRST)
-6. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.echo.daemon.plist`
-7. Verifies the job loaded; prints success + PID
-8. Exit 0 on success; exit 1 on launchctl error; exit 2 on missing dependency (e.g., `launchctl` not found, which would mean non-macOS)
+- `{{LABEL}}` — defaults to `com.echo.daemon`; install-time override via `--label <id>` (used by AC5's smoke for test isolation per AC3.10).
+- `{{NODE_EXEC_PATH}}` (r1 codex-ops F3 MED) — absolute path to the Node binary, captured at install time via `process.execPath`. Replaces `/usr/bin/env node` because launchd's restricted `PATH` does not see nvm/asdf/mise/Volta-managed Node installs; `/usr/bin/env node` would either fail or boot the wrong Node major version. After resolving `process.execPath`, the installer MUST execute `<NODE_EXEC_PATH> --version` and assert the major version satisfies AC7.4 (`>=22`); if not, abort install with a clear error (do NOT overwrite the plist + do NOT bootout).
+- `{{INSTALLED_DAEMON_PATH}}` — absolute path of the packaged `dist/daemon/index.js`, computed via `path.resolve` from the running `echoctl` binary's location (`process.argv[1]` + `path.resolve(__dirname, '../../daemon/index.js')` or equivalent).
+- `{{LOG_DIR}}` — defaults to `~/Library/Logs/echo/`; install-time override via `--log-dir <path>` (created if absent).
+- `{{ECHO_HOME}}` — defaults to `~/.echo`; install-time override via `--home <path>` (used by AC5's smoke).
+- `{{ECHO_MCP_PORT}}` — defaults to `38478` (the canonical port); install-time override via `--port <N>` (used by AC5's smoke to avoid fighting the founder's real daemon).
+
+NO `WorkingDirectory` — the daemon must work regardless of CWD.
+
+**AC3.3 — `install` verb mechanics.** `echoctl daemon install [--label <id>] [--home <path>] [--port <N>] [--log-dir <path>] [--plist-path <path>]`:
+1. Parses optional override flags (all default to the production values listed in AC3.2; AC5 uses non-default values for test isolation per AC3.10).
+2. Computes `{{INSTALLED_DAEMON_PATH}}` from the running binary's location.
+3. Resolves `{{NODE_EXEC_PATH}}` via `process.execPath` AND runs `<NODE_EXEC_PATH> --version` to verify it satisfies AC7.4 (Node ≥ 22). On version mismatch: abort BEFORE any plist write or bootout, exit non-zero with a clear error naming the resolved binary + observed version.
+4. Computes `{{LOG_DIR}}` (default `~/Library/Logs/echo/`); creates if absent.
+5. **Preflight (r1 codex-ops F4 MED)** — BEFORE any bootout, verify that all runtime dependencies the new daemon will need are present + readable on the packaged path:
+   - `{{INSTALLED_DAEMON_PATH}}` exists and is a regular file
+   - SQL migrations: `<installed-package>/dist/storage/migrations/*.sql` glob non-empty (AC2.1 contract)
+   - Coord config: `<installed-package>/tools/review-queue/coord-roles.json` + `reviewers.json` + `schemas/` exist (AC1.4 contract)
+   - `{{LOG_DIR}}` is writable
+   If any preflight check fails, abort BEFORE bootout with a structured error naming the missing artifact + a recovery hint ("re-run `npm install -g <tarball>`; the package appears incomplete"). The currently-running daemon stays up — preflight failure NEVER converts an upgrade into an outage.
+6. Renders the plist with all substitutions (including ECHO_HOME + ECHO_MCP_PORT + NODE_EXEC_PATH).
+7. Writes to the resolved plist path (default `~/Library/LaunchAgents/com.echo.daemon.plist`; override via `--plist-path`).
+8. If a job with the resolved label is already loaded (`launchctl print gui/$(id -u)/<label>` exits 0): `launchctl bootout gui/$(id -u)/<label>` (clean stop FIRST). **Preflight (step 5) has already verified the replacement is loadable, so this bootout is safe.**
+9. `launchctl bootstrap gui/$(id -u) <plist-path>`
+10. Verifies the job loaded; prints success + PID + the resolved label/port/home (so the operator can confirm the test daemon used the isolated values).
+11. Exit 0 on success; exit 1 on launchctl error (with the bootout-failure recovery hint: "re-run `echoctl daemon install`; if the failure persists, run `echoctl daemon logs --tail 200` to inspect"); exit 2 on missing dependency or preflight failure or non-macOS `launchctl`.
 
 **AC3.4 — `start` / `stop` / `restart` semantics.** Per AC4: `launchctl bootstrap` for start; `launchctl bootout` for stop; `restart` = bootout-then-bootstrap. NEVER `kill -9` (fights launchd KeepAlive). `start` is no-op if the job is already running. `stop` exits 0 if the job is already not running.
 
@@ -264,7 +301,15 @@ Exit 0 if running + healthy; exit 1 if running + degraded; exit 2 if not running
 
 **AC3.6 — `logs` verb.** Tails the plist's `StandardOutPath` + `StandardErrorPath` files. Default behavior: last 50 lines. `--tail N` for N lines. `--follow` for follow mode. Implementation: spawn `tail` with appropriate flags + the resolved log paths.
 
-**AC3.7 — `uninstall` verb.** `launchctl bootout` then `rm ~/Library/LaunchAgents/com.echo.daemon.plist`. Does NOT touch `~/.echo/` (per J6 — packaging doesn't decide state-purge semantics; `echoctl uninstall` already handles state cleanup per 074 AC4). NOT to be confused with the top-level `echoctl uninstall` command from 074 — `echoctl daemon uninstall` only removes the daemon registration; `echoctl uninstall` (existing) removes adapter writes from agent configs.
+**AC3.7 — `uninstall` verb.** `launchctl bootout` (against the resolved label per AC3.8) then `rm <plist-path>` (resolved label/path per AC3.8). Does NOT touch `~/.echo/` (per J6 — packaging doesn't decide state-purge semantics; `echoctl uninstall` already handles state cleanup per 074 AC4). NOT to be confused with the top-level `echoctl uninstall` command from 074 — `echoctl daemon uninstall` only removes the daemon registration; `echoctl uninstall` (existing) removes adapter writes from agent configs.
+
+**AC3.8 — Test-isolation seam (r1 codex F3 / codex-ops F2 HIGH).** Every `echoctl daemon <verb>` MUST accept `--label`, `--plist-path`, `--log-dir`, `--home`, and `--port` overrides (already specced in AC3.3 for `install`; same flag surface applies to `start`, `stop`, `restart`, `status`, `logs`, `uninstall`). Overrides default to the production values (`com.echo.daemon`, `~/Library/LaunchAgents/com.echo.daemon.plist`, `~/Library/Logs/echo/`, `~/.echo`, `38478`).
+
+Why this is load-bearing: AC5's packaged smoke runs `daemon install` → `start` → probe → `stop` → `uninstall` against a real `launchctl`. Without per-test overrides, those calls would bootout the founder's live `com.echo.daemon`, overwrite the production plist with the temp tarball's daemon path, and `rm` the production plist during cleanup. The smoke must be safe to run on a machine where the founder has the real daemon installed.
+
+Production-job-safety assertion: the `daemon install` implementation MUST NOT mutate a label/plist other than the one resolved from CLI flags. In particular, an `install --label com.echo.daemon.test-<uuid>` invocation MUST NEVER call `launchctl bootout gui/$(id -u)/com.echo.daemon` (without the test suffix). Test: `tests/cli/daemon.test.ts` injects a fake `launchctl` and asserts that an install with a non-default `--label` only touches that label's job.
+
+Implementation note: the overrides flow through the same config-resolution path as the daemon's own startup (no duplicated default constants between CLI and plist rendering). This keeps "what the operator typed" and "what the daemon sees at boot" in lockstep.
 
 ### AC4 — `launchctl bootout` for clean stop/restart (KeepAlive-safe)
 
@@ -278,18 +323,27 @@ Exit 0 if running + healthy; exit 1 if running + degraded; exit 2 if not running
 
 **AC5.1 — Extend `tests/cli/shell-reachable.test.ts` (074-owned; in scope here since this spec broadens its contract).** Current test (post-074 + 075): `npm pack` → install into tmp prefix → `echoctl --version` reach + asset-presence check. Extend it with a NEW assertion BLOCK:
 
-After install + before cleanup, run:
-1. `echoctl daemon install` against a tmp `ECHO_HOME` + tmp launchd-prefix (use `LAUNCHCTL_*` envs if available, or skip on CI where launchctl isn't accessible — same skip pattern AC1.5 already uses for `hasNpm`)
-2. `echoctl daemon start`
-3. Probe `http://127.0.0.1:<port>/mcp` with the canonical JSON-RPC initialize body (same shape as 074 AC3.2's doctor probe; reuse the helper if 074 exports one)
-4. Assert: 2xx response with valid JSON-RPC body
-5. `echoctl daemon stop`
-6. `echoctl daemon uninstall`
-7. Verify the launchd job is gone (`launchctl print` exits non-zero)
+After install + before cleanup, run (using the AC3.8 isolation flags so the smoke NEVER touches the founder's production `com.echo.daemon` job):
+
+1. `echoctl daemon install --label com.echo.daemon.test-<uuid> --plist-path <tmp>/test-<uuid>.plist --home <tmp-echo-home> --port <random:40000-50000> --log-dir <tmp-log-dir>` — every value is unique per test run; the production label/plist/log-dir/home/port are NEVER passed.
+2. `echoctl daemon start --label com.echo.daemon.test-<uuid>` (or skip on CI Linux per AC5.3)
+3. Probe `http://127.0.0.1:<random-port>/mcp` with the canonical JSON-RPC initialize body (same shape as 074 AC3.2's doctor probe; reuse the helper if 074 exports one)
+4. Assert: 2xx response with valid JSON-RPC body AND `echoctl daemon status --label com.echo.daemon.test-<uuid>` reports the test ECHO_HOME + the random port (proves AC3.2's plist envs actually reached the launchd-started daemon, NOT defaults — closes r1 codex F2 / codex-ops F1 HIGH).
+5. `echoctl daemon stop --label com.echo.daemon.test-<uuid>`
+6. `echoctl daemon uninstall --label com.echo.daemon.test-<uuid> --plist-path <tmp>/test-<uuid>.plist`
+7. Verify the test launchd job is gone (`launchctl print gui/$(id -u)/com.echo.daemon.test-<uuid>` exits non-zero) AND — critically — the founder's production `com.echo.daemon` job (if present) is untouched. The test snapshots `launchctl print gui/$(id -u)/com.echo.daemon` before + after the test block; if pre-existing, the after-state PID must equal the before-state PID; if not pre-existing, both states must be "not loaded."
 
 This is the ONLY test that catches the AC2.1 (SQL migrations) bug + the AC1.4 (coord config) bug end-to-end. Without it, those bugs slip through every other type-check / lint / unit test.
 
-**AC5.2 — Test isolation.** Use a unique tmp prefix per test run (UUID-suffixed). Use a unique `ECHO_HOME` (so the test daemon doesn't fight the founder's real daemon). Use a unique port via `ECHO_MCP_PORT` (random in 40000-50000 range; avoid the canonical 38478). Cleanup runs even on test failure (`try/finally` or vitest `afterEach`).
+**AC5.2 — Test isolation (r1 codex F3 / codex-ops F2 HIGH).** Production-safety contract:
+
+- **Label** — unique `com.echo.daemon.test-<uuid>`; production `com.echo.daemon` is NEVER passed to any `echoctl daemon <verb>` invocation in the test.
+- **Plist path** — tmp file under the test prefix; the production `~/Library/LaunchAgents/com.echo.daemon.plist` is NEVER written, overwritten, or removed by the test.
+- **Log dir** — unique tmp dir per test run; cleanup deletes only this dir.
+- **ECHO_HOME** — unique tmp dir per test run; the founder's real `~/.echo/` is NEVER read or written.
+- **Port** — random in 40000-50000 range; the canonical 38478 is NEVER used (so a passing probe cannot be a false positive from the founder's real daemon answering on 38478).
+- **Cleanup** — runs even on test failure (`try/finally` or vitest `afterEach`). Cleanup MUST first verify production-job untouched (snapshot diff per AC5.1 step 7); a cleanup that finds production was mutated MUST surface a TEST FAILURE (not a cleanup error swallowed in logs).
+- **Pre-flight skip** — if the production label `com.echo.daemon` exists AND the test environment cannot snapshot+verify it (e.g., permission denied on `launchctl print`), the test SKIPS rather than runs with a poisoned safety net.
 
 **AC5.3 — CI gating.** If `launchctl` is unreachable in the test environment (e.g., CI Linux runner), skip this test block with a clear message ("skipped: launchctl not available — packaged-daemon smoke requires macOS"). Do NOT fail. Local dev runs on macOS will exercise it.
 
