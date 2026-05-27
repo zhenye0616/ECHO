@@ -1,7 +1,7 @@
 ---
 id: 2026-05-26-076-packaged-echoctl-install-boundary
 title: "Packaged `echoctl` install boundary — npm-pack tarball, packaged daemon, launchd plist targeting `dist/`, macOS-only V1; founder can use ECHO across all projects without dev-mode dependency on the source repo"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 2-3d
 created: 2026-05-26
@@ -32,6 +32,13 @@ spec_refs:
   - tools/review-queue/reviewers.json                       # ships in tarball per AC1
   - tools/review-queue/schemas/                             # whichever JSON schema files coord/roles.ts validates against; ship in tarball per AC1
   - CLAUDE.md                                               # operating-model file; this spec does not touch the operating model
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-27T06:10:32Z"
+branch: "agent/packaged-echoctl-install-boundary"
+worktree: "/Users/zhenye/Desktop/Project_echo--packaged-echoctl-install-boundary"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 # Packaged `echoctl` install boundary
