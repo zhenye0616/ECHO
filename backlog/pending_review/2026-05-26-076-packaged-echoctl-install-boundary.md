@@ -1,7 +1,7 @@
 ---
 id: 2026-05-26-076-packaged-echoctl-install-boundary
 title: "Packaged `echoctl` install boundary — npm-pack tarball, packaged daemon, launchd plist targeting `dist/`, macOS-only V1; founder can use ECHO across all projects without dev-mode dependency on the source repo"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 2-3d
 created: 2026-05-26
@@ -36,9 +36,9 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-27T06:10:32Z"
 branch: "agent/packaged-echoctl-install-boundary"
 worktree: "/Users/zhenye/Desktop/Project_echo--packaged-echoctl-install-boundary"
-head_sha: ""
+head_sha: "ad4757ddf81a75f120cc4e59968c8f5d5d220ac9"
 pr_url: ""
-agent_notes: ""
+agent_notes: "Implemented on branch `agent/packaged-echoctl-install-boundary` at `ad4757ddf81a75f120cc4e59968c8f5d5d220ac9`. Added packaged `echoctl daemon` lifecycle, npm-pack runtime allowlist and migration copy, launchd smoke coverage, and install docs. Verification: `npm run build:cli`, `npm run lint`, `npm run typecheck`, focused CLI vitest, `npm pack --pack-destination /private/tmp/echo-076-pack`, `npm test` (135 files / 1433 tests), and `git diff --check` passed. Direct sandboxed `npm pack` hit TS emit EPERM, so the explicit pack gate was rerun outside sandbox; the packaged smoke also exercises pack/install."
 ---
 
 # Packaged `echoctl` install boundary

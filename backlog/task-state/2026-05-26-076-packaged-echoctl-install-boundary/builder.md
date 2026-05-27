@@ -1,13 +1,20 @@
 ---
 task_id: 2026-05-26-076-packaged-echoctl-install-boundary
 role: builder
-last_updated: 2026-05-27T06:10:32Z
+last_updated: 2026-05-27T06:51:38Z
 claim_branch: agent/packaged-echoctl-install-boundary
 claim_sha: 4a0d6d7
+handoff_branch: agent/packaged-echoctl-install-boundary
+handoff_head_sha: ad4757ddf81a75f120cc4e59968c8f5d5d220ac9
+handoff_run_log: raw/internal/agent-runs/2026-05-26-2026-05-26-076-packaged-echoctl-install-boundary.md
 ---
 
 ## current_thesis
 Claimed for implementation. The task is an install-boundary spec: make `echoctl` usable as a packaged global CLI/launchd daemon from projects outside `Project_echo`, without turning ECHO into a destination app or broadening operating-model workflow scope.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at ad4757ddf81a75f120cc4e59968c8f5d5d220ac9.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: `npm pack` must ship only runtime files: built JS/d.ts/SQL, skills, role/workflow assets, and the coord config JSON/schema files; it must exclude source, backlog, raw, wiki, tests, review queue scripts, node_modules, coverage, and dist test artifacts.
@@ -31,4 +38,5 @@ Claimed for implementation. The task is an install-boundary spec: make `echoctl`
 - Do not touch `src/echo-home/`, `src/mcp/`, `src/coord/`, or `src/storage/` except a minimal `src/storage/sqlite.ts` migration-path fix only if AC5 proves it necessary.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-05-26-076-packaged-echoctl-install-boundary.md
+
+- spec: backlog/pending_review/2026-05-26-076-packaged-echoctl-install-boundary.md
