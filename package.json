@@ -1,21 +1,31 @@
 {
-  "name": "echo-daemon",
-  "version": "0.0.0",
-  "private": true,
+  "name": "echoctl",
+  "version": "0.1.0",
+  "private": false,
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "bin": {
     "echoctl": "./dist/cli/index.js"
   },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
+    "dist/**/*.sql",
+    "skills/**",
+    "assets/echo-roles/**",
+    "assets/echo-workflows/**",
+    "tools/review-queue/coord-roles.json",
+    "tools/review-queue/reviewers.json",
+    "tools/review-queue/schemas/**",
     "package.json",
-    "README.md",
-    "assets/echo-workflows/**"
+    "README.md"
   ],
   "scripts": {
     "test": "vitest run",
-    "build:cli": "tsc -p tsconfig.cli.json",
+    "build:cli": "tsc -p tsconfig.cli.json && node scripts/copy-sql-migrations.js",
+    "prepack": "npm run build:cli",
     "daemon": "vite-node src/daemon/index.ts",
     "daemon:install": "scripts/launchd/install.sh",
     "daemon:uninstall": "scripts/launchd/uninstall.sh",

@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-LABEL="com.echo.daemon"
-PLIST_PATH="$HOME/Library/LaunchAgents/${LABEL}.plist"
+LABEL="${ECHO_DAEMON_LABEL:-com.echo.daemon}"
+PLIST_PATH="${ECHO_DAEMON_PLIST_PATH:-$HOME/Library/LaunchAgents/${LABEL}.plist}"
 
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 rm -f "$PLIST_PATH"

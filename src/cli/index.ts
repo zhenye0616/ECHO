@@ -4,6 +4,7 @@ import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { AgentKind } from '../echo-home/wizard/detect-agents.js';
 import { runDoctor } from './commands/doctor.js';
+import { runDaemon } from './commands/daemon.js';
 import { readPackageVersion, runInit } from './commands/init.js';
 import { runRun } from './commands/run.js';
 import { runUninstall } from './commands/uninstall.js';
@@ -19,6 +20,7 @@ const HELP = `Usage: echoctl [--json] [--quiet] [--no-color] <command>
 Commands:
   init        Onboard ECHO into local AI clients
   doctor      Check daemon, state, adapter, and agent health
+  daemon      Install and control the launchd-managed daemon
   uninstall   Remove ECHO adapter writes
   run         Run a workflow from ~/.echo/workflows
 `;
@@ -26,6 +28,7 @@ Commands:
 const COMMAND_HELP: Record<string, string> = {
   init: 'Usage: echoctl init [--json] [--quiet]',
   doctor: 'Usage: echoctl doctor [--json] [--quiet]',
+  daemon: 'Usage: echoctl daemon <install|start|stop|restart|status|logs|uninstall> [options]',
   uninstall: 'Usage: echoctl uninstall [--yes] [--purge-state] [--force-purge] [--json] [--quiet]',
   run: 'Usage: echoctl run <workflow> [--project <path>] [--agent <role>=<agent>] [--timeout <seconds>] [--json] [--quiet]',
 };
@@ -98,6 +101,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const command = rest[0]!;
     const args = rest.slice(1);
     if (args.includes('--help') || args.includes('-h')) {
+      if (command === 'daemon') {
+        return await runDaemon({ ...globals, argv: args });
+      }
       print(process.stdout, COMMAND_HELP[command] ?? HELP);
       return COMMAND_HELP[command] === undefined ? 2 : 0;
     }
@@ -109,6 +115,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     if (command === 'doctor') {
       parseArgs({ args, strict: true, allowPositionals: false, options: {} });
       return await runDoctor(globals);
+    }
+    if (command === 'daemon') {
+      return await runDaemon({ ...globals, argv: args });
     }
     if (command === 'uninstall') {
       const parsed = parseArgs({
