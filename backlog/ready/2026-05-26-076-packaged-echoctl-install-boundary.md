@@ -14,7 +14,7 @@ files_to_modify:
   - src/cli/commands/daemon.ts                             # AC3 NEW — daemon lifecycle commands: install / start / stop / restart / status / logs (uses `launchctl bootstrap|bootout|kickstart` per AC4)
   - scripts/copy-sql-migrations.js                         # AC2.2 (r1 codex F4) — NEW; pure-Node walk of src/storage/migrations/ → dist/storage/migrations/ byte-copy; idempotent; fails loudly if source dir missing
   - tests/cli/daemon.test.ts                               # AC3 + AC4 NEW — unit tests for the daemon lifecycle command (test seams for launchctl calls); also covers AC3.3 preflight (r1 codex-ops F4), AC3.3 absolute-Node-path resolution (r1 codex-ops F3), AC3.3 post-bootstrap health-probe wait (r2 codex-ops F1), AC3.4.1 restart + recovery-load start preflight + probe-wait parity (r3 codex-ops F1), AC3.8 install-time override flags (r1 codex F3 / codex-ops F2), and AC3.8 restart + logs override plumbing (r2 codex-ops F2)
-  - tests/cli/shell-reachable.test.ts                      # AC5 — extend the existing pack-shape smoke to ALSO START the packaged daemon, probe /mcp, SIGTERM/cleanup; catches the AC2 SQL-migration bug + the AC1.4 coord-config bug
+  - tests/cli/shell-reachable.test.ts                      # AC5 — extend the existing pack-shape smoke to ALSO START the packaged daemon, probe /mcp, then clean up via `daemon stop $OVERRIDES` + `daemon uninstall $OVERRIDES` (NOT SIGTERM — the launchd-path cleanup is what proves the test job is removed without touching production); catches the AC2 SQL-migration bug + the AC1.4 coord-config bug
   - scripts/launchd/install.sh                             # AC3 — plist target changes from `npm run daemon` (PROJECT_DIR coupling) to `node <installed-package>/dist/daemon/index.js`; no `WorkingDirectory` set to source repo
   - scripts/launchd/uninstall.sh                           # AC4 — use `launchctl bootout` for clean stop; align with the AC4 upgrade-safe stop semantics
   - docs/echoctl-install.md                                # AC6 NEW — single canonical install doc: build → pack → install-globally → daemon-install → init → verify; upgrade path; uninstall; reset
@@ -293,9 +293,13 @@ NO `WorkingDirectory` — the daemon must work regardless of CWD.
 - Recovery-load `start` (when the resolved label is NOT loaded): same preflight + post-bootstrap probe-wait as `restart`. When the label IS already loaded, `start` is a no-op and short-circuits before any preflight/probe (no upgrade is in motion).
 - The preflight + probe-wait implementation is a single shared helper used by `install`, `restart`, and recovery-load `start` — no duplication across verbs.
 
-`tests/cli/daemon.test.ts` MUST cover the negative paths for both verbs: (a) restart with a broken `INSTALLED_DAEMON_PATH` (probe-timeout → exit non-zero, recovery hint printed, the BOOTOUT did NOT happen — preflight aborted first); (b) restart with a preflight-clean plist but a daemon that crashes on startup (bootstrap returns 0 but probe-wait times out → exit non-zero, recovery hint printed, the now-broken daemon's label is reported); (c) recovery-load start with a preflight failure (same shape as (a)).
+`tests/cli/daemon.test.ts` MUST cover the negative paths for both verbs (r4 codex F2 MED — neg-paths split cleanly into preflight-failure vs post-bootstrap probe-timeout per AC3.3 step 12's exit-code contract):
 
-**AC3.5 — `status` verb output.** Single block printed to stdout:
+- (a) **Preflight-failure on restart** — restart against a plist whose resolved `INSTALLED_DAEMON_PATH` does NOT exist (or whose `dist/storage/migrations/*.sql` glob is empty, or whose data-dir parent is not writable). Expected: preflight aborts → **exit 2**, recovery hint printed naming the missing artifact, **no `launchctl bootout` invoked**, **no `launchctl bootstrap` invoked**, no probe attempted. The previous daemon stays up.
+- (b) **Post-bootstrap probe-timeout on restart** — restart against a preflight-clean plist whose resolved daemon binary actually crashes on startup (or never opens the resolved port). Expected: preflight passes → `launchctl bootout` of the previous instance → `launchctl bootstrap` returns 0 → probe-wait times out → **exit 1**, recovery hint printed (label + port + `daemon logs --tail 50` suggestion). The now-broken daemon's label IS reported in the error; the previous daemon's label is no longer loaded (this is the upgrade-to-outage scenario AC3.3 step 10 closes for `install` and AC3.4.1 closes for `restart`).
+- (c) **Preflight-failure on recovery-load start** — same shape as (a) but driven via `start` against a label that is NOT loaded: preflight aborts → exit 2 → no bootstrap → no probe. (When the label IS loaded, `start` short-circuits with exit 0 — no-op covered by a separate positive-path test.)
+
+**AC3.5 — `status` verb output (r4 codex F1 MED — includes the AC3.8 isolation-override fields so AC5.1's positive override-proof can hold when production mtime check is conditionally deferred).** Single block printed to stdout:
 
 ```
 ECHO daemon: running
@@ -303,9 +307,14 @@ ECHO daemon: running
   binary:      /Users/<user>/.npm-global/lib/node_modules/echoctl/dist/daemon/index.js
   pid:         12345
   port:        38478
+  home:        ~/.echo
+  data-dir:    ~/Library/Application Support/ECHO
+  db-path:     ~/Library/Application Support/ECHO/echo.db
   uptime:      4h 23m
   health:      healthy   (or degraded / broken — calls into echoctl doctor's daemon section only)
 ```
+
+The `home`, `data-dir`, `db-path` fields are required output (not optional) — AC5.1 step 4's isolation assertion reads `status` output to prove the launchd-started daemon actually saw the test ECHO_HOME / ECHO_DATA_DIR / ECHO_DB_PATH from the plist, NOT defaults. Without these fields the AC5.1 assertion cannot run and the r3 conditional-mtime disposition loses its positive-proof leg.
 
 Exit 0 if running + healthy; exit 1 if running + degraded; exit 2 if not running.
 
