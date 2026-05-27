@@ -14,6 +14,7 @@ escalated_to_founder: false
 
 # Combined findings
 
+**CONVERGED.** Both reviewers landed `proceed` with zero findings at r6. Founder-directed full-auto convergence loop terminates here.
 
 ## Convergent findings
 
@@ -27,5 +28,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R6 — both codex and codex-ops returned `proceed`/0 findings against patched spec SHA from r5 disposition. Spec 076 is ready for a builder to claim from `backlog/ready/`. Loop arc: r1 (codex pushback, codex-ops PAP, 6 findings → patched) → r2 (codex pushback, codex-ops PAP, 6 findings inc. r1-overreach removal → patched) → r3 (codex PAP, codex-ops pushback, 5 findings inc. AC3.4.1 gap → patched) → r4 (both PAP, 3 test-contract/wording fixes → patched) → r5 (codex proceed/0, codex-ops PAP/2 ops-hardening → patched) → r6 (both proceed/0 — terminal).
 
