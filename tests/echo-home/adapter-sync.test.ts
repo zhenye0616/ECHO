@@ -34,15 +34,20 @@ function setupRepoMirror(): {
   workflowsDir: string;
 } {
   const repoRoot = join(tmpRoot, 'repo');
-  const skillsDir = join(repoRoot, 'skills');
+  const contributorSkillsDir = join(repoRoot, 'skills');
+  const skillsDir = join(repoRoot, 'assets', 'echo-skills');
   const rolesDir = join(repoRoot, 'assets', 'echo-roles');
   const workflowsDir = join(repoRoot, 'assets', 'echo-workflows');
+  mkdirSync(contributorSkillsDir, { recursive: true });
   mkdirSync(skillsDir, { recursive: true });
   mkdirSync(rolesDir, { recursive: true });
   mkdirSync(workflowsDir, { recursive: true });
-  // Pretend this is a repo root: package.json + skills/.
+  // Pretend this is a package root: package.json + assets/echo-skills/.
   writeFileSync(join(repoRoot, 'package.json'), '{}\n');
-  // Skill fixtures.
+  // Contributor-process skills should exist but not be customer-synced.
+  writeFileSync(join(contributorSkillsDir, 'process-backlog.md'), '# process\n');
+  writeFileSync(join(contributorSkillsDir, 'merge-and-cleanup.md'), '# merge\n');
+  // Customer skill fixtures.
   writeFileSync(join(skillsDir, 'alpha.md'), '# alpha\n');
   writeFileSync(join(skillsDir, 'beta.md'), '# beta\n');
   // Role fixtures (matching DEFAULT_ROLE_FILENAMES).
@@ -146,7 +151,10 @@ describe('syncAll (orchestrator)', () => {
     const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], { repoRoot });
     expect(result.skillsPopulated.ok).toBe(true);
     expect(existsSync(join(echoHome, 'skills', 'alpha.md'))).toBe(true);
+    expect(existsSync(join(echoHome, 'skills', 'process-backlog.md'))).toBe(false);
+    expect(existsSync(join(echoHome, 'skills', 'merge-and-cleanup.md'))).toBe(false);
     expect(existsSync(join(stubHome, '.claude', 'commands', 'alpha.md'))).toBe(true);
+    expect(existsSync(join(stubHome, '.claude', 'commands', 'process-backlog.md'))).toBe(false);
   });
 
   it('populate-skills failure (missing repoSkillsDir) skips claude-code fan-out and flips overallOk', async () => {
@@ -307,7 +315,7 @@ describe('syncAll (orchestrator)', () => {
   it('repoRoot not findable → repoRoot AdapterError; agents = []', async () => {
     const { syncAll } = await loadAdapterSync();
     // Don't set up a repo mirror — pass a tmpdir as repoRoot that has no
-    // package.json + skills.
+    // package.json + assets/echo-skills.
     const noRepo = join(tmpRoot, 'no-repo');
     mkdirSync(noRepo);
     const result = await syncAll([], { repoRoot: noRepo });
@@ -318,7 +326,7 @@ describe('syncAll (orchestrator)', () => {
     // repoSkillsDir, leaving repoRoot resolution at module-level (which will
     // succeed). The intent of this test is the unfound-walk path — we exercise
     // it by setting opts.repoRoot to a tmpdir which has neither package.json
-    // nor skills, but the orchestrator currently trusts opts.repoRoot. We
+    // nor customer skills, but the orchestrator currently trusts opts.repoRoot. We
     // therefore test the missing-source branch via repoSkillsDir.
     expect(result.repoRoot).toBeUndefined();
     // The role + skill sources won't exist; skills populate should fail.
@@ -410,7 +418,7 @@ describe('syncAll (orchestrator)', () => {
     expect(result.overallOk).toBe(true);
   });
 
-  it('symlink in repo skills/ is not propagated to ~/.echo/skills/', async () => {
+  it('symlink in repo assets/echo-skills/ is not propagated to ~/.echo/skills/', async () => {
     const { repoRoot, skillsDir } = setupRepoMirror();
     const external = join(tmpRoot, 'external-skill.md');
     writeFileSync(external, 'untouchable\n');

@@ -48,7 +48,7 @@ describe('echoctl shell reachability', () => {
           'package/dist/cli/index.js',
           'package/dist/daemon/index.js',
           'package/dist/storage/migrations/0001_initial.sql',
-          'package/skills/process-backlog.md',
+          'package/assets/echo-skills/using-echo-mcp.md',
           'package/assets/echo-roles/reviewer.toml',
           'package/assets/echo-workflows/change-review.toml',
           'package/tools/review-queue/coord-roles.json',
@@ -59,6 +59,9 @@ describe('echoctl shell reachability', () => {
       expect(tarEntries.some((entry) => entry.startsWith('package/backlog/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/raw/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/wiki/'))).toBe(false);
+      expect(tarEntries.some((entry) => entry.startsWith('package/skills/'))).toBe(false);
+      expect(tarEntries).not.toContain('package/skills/merge-and-cleanup.md');
+      expect(tarEntries).not.toContain('package/skills/process-backlog.md');
       expect(tarEntries.some((entry) => entry.startsWith('package/src/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/tests/'))).toBe(false);
       expect(tarEntries.some((entry) => /^package\/tools\/review-queue\/.*\.(py|sh)$/.test(entry))).toBe(false);

@@ -195,8 +195,8 @@ function walkUpwardForRepoRoot(startDir: string): string | null {
   for (let i = 0; i < 64; i++) {
     try {
       const hasPkg = existsSync(`${cur}${sep}package.json`);
-      const hasSkills = existsSync(`${cur}${sep}skills`);
-      if (hasPkg && hasSkills) return cur;
+      const hasEchoSkills = existsSync(`${cur}${sep}assets${sep}echo-skills`);
+      if (hasPkg && hasEchoSkills) return cur;
     } catch {
       // continue
     }
@@ -495,13 +495,13 @@ export async function syncAll(
         file: initial,
         operation: 'stat',
         message:
-          'could not locate repo root (no package.json + skills/ adjacent); caller must pass opts.repoRoot',
+          'could not locate repo root (no package.json + assets/echo-skills/ adjacent); caller must pass opts.repoRoot',
       },
       overallOk: false,
     };
   }
 
-  const repoSkillsDir = opts.repoSkillsDir ?? resolve(repoRootPath, 'skills');
+  const repoSkillsDir = opts.repoSkillsDir ?? resolve(repoRootPath, 'assets/echo-skills');
   const rolesSourceDir = opts.rolesSourceDir ?? resolve(repoRootPath, 'assets/echo-roles');
   const workflowsSourceDir =
     opts.workflowsSourceDir ?? resolve(repoRootPath, 'assets/echo-workflows');

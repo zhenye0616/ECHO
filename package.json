@@ -13,7 +13,7 @@
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "dist/**/*.sql",
-    "skills/**",
+    "assets/echo-skills/**",
     "assets/echo-roles/**",
     "assets/echo-workflows/**",
     "tools/review-queue/coord-roles.json",

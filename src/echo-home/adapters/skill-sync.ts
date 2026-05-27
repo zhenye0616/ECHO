@@ -24,7 +24,7 @@ function listMdFiles(dir: string): string[] {
 }
 
 /**
- * First-hop: copies regular .md files from in-repo skills/ into ~/.echo/skills/.
+ * First-hop: copies regular .md files from packaged assets/echo-skills/ into ~/.echo/skills/.
  * Symlinks within sourceDir are NEVER followed.
  *
  * Returns a discriminated result; never throws on missing/unreadable sourceDir.
