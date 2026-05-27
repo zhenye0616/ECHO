@@ -70,6 +70,9 @@ function detail(text: string): string | undefined {
 }
 
 function isEchoPingPayload(stdout: string): boolean {
+  // Contract: the agent emits the ping payload as COMPACT JSON on a single line
+  // (the mcp__echo__echo_ping return shape: {"pong":true,"ts":"..."}). Pretty-
+  // printed JSON spanning multiple lines is out-of-contract and will not parse.
   // Scan every non-empty line; first that parses as {pong:true, ts:string} wins.
   // Robust against agents that wrap responses in markdown code fences (claude-code
   // 2.1.x) or print log preamble before the JSON.

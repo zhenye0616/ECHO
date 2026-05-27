@@ -38,6 +38,18 @@ describe('probeAgents', () => {
     expect(out[0]!.probed).toBe(true);
   });
 
+  it('regression: accepts pong even when the last line is unparseable (old lines.at(-1) approach)', async () => {
+    // Pins that probe scans ALL lines, not just the last. If someone reverts to
+    // `lines.at(-1)`, the closing ``` fence would be the last line and JSON.parse
+    // would throw — this test would then fail.
+    const wrapped = '```json\n{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}\n```';
+    const lastLine = wrapped.trim().split('\n').filter(Boolean).at(-1);
+    expect(lastLine).toBe('```'); // sanity: the last line really IS the closing fence
+    expect(() => JSON.parse(lastLine!)).toThrow(); // sanity: parsing it would throw
+    const out = await probeAgents(['codex'], { spawn: async () => ok(wrapped) });
+    expect(out[0]!.probed).toBe(true); // but the probe still succeeds — proving it scans all lines
+  });
+
   it('maps ENOENT spawn errors to cli-unavailable', async () => {
     const out = await probeAgents(['codex'], {
       spawn: async () => {
