@@ -76,6 +76,23 @@ describe('mergeWithMarkers', () => {
     expect(result.conflict.unifiedDiff.length).toBeGreaterThan(0);
   });
 
+  it('force-replaces inside-markers content that would otherwise conflict', () => {
+    const target = join(tmpRoot, 'AGENTS.md');
+    const above = '# Top\n';
+    const below = '\n# Bottom\n';
+    writeFileSync(target, `${above}${BEGIN_MARKER}\nuser hand-edited\n${END_MARKER}${below}`);
+    const result = mergeWithMarkers({
+      filePath: target,
+      echoSection: 'new body',
+      previousEchoSection: 'old body',
+      force: true,
+    });
+    expect(result.action).toBe('replace');
+    expect(readFileSync(target, 'utf8')).toBe(
+      `${above}${BEGIN_MARKER}\nnew body\n${END_MARKER}${below}`,
+    );
+  });
+
   it('preserves content above and below markers byte-for-byte across replace', () => {
     const target = join(tmpRoot, 'AGENTS.md');
     const above = '# Top of file\nLine 2\n\n';

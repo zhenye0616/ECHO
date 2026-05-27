@@ -14,6 +14,7 @@ export interface CursorConfigOpts {
   filePath: string;
   serverConfig: { url: string; headers?: Record<string, string>; [k: string]: unknown };
   previousServerConfig?: Record<string, unknown>;
+  force?: boolean;
 }
 
 export type CursorAction = 'add' | 'update' | 'noop' | 'conflict';
@@ -114,7 +115,7 @@ function ensureParentDir(filePath: string): void {
 }
 
 export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
-  const { filePath, serverConfig, previousServerConfig } = opts;
+  const { filePath, serverConfig, previousServerConfig, force = false } = opts;
 
   if (!existsSync(filePath)) {
     ensureParentDir(filePath);
@@ -164,6 +165,17 @@ export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
   }
 
   if (!isPlainObject(currentEcho)) {
+    if (force) {
+      const newDoc: Record<string, unknown> = { ...root };
+      newDoc['mcpServers'] = { ...mcpServers, echo: serverConfig };
+      atomicWrite({
+        filePath,
+        content: `${JSON.stringify(newDoc, null, 2)}\n`,
+        secretSensitive: true,
+        followSymlink: true,
+      });
+      return { action: 'update' };
+    }
     return {
       action: 'conflict',
       conflict: {
@@ -188,6 +200,18 @@ export function syncCursorMcpEntry(opts: CursorConfigOpts): CursorConfigResult {
   ) {
     const newDoc: Record<string, unknown> = { ...root };
     newDoc['mcpServers'] = { ...mcpServers, echo: proposedEcho };
+    atomicWrite({
+      filePath,
+      content: `${JSON.stringify(newDoc, null, 2)}\n`,
+      secretSensitive: true,
+      followSymlink: true,
+    });
+    return { action: 'update' };
+  }
+
+  if (force) {
+    const newDoc: Record<string, unknown> = { ...root };
+    newDoc['mcpServers'] = { ...mcpServers, echo: serverConfig };
     atomicWrite({
       filePath,
       content: `${JSON.stringify(newDoc, null, 2)}\n`,

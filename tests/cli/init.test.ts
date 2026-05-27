@@ -7,6 +7,7 @@ import type { CreateWizardOpts, Wizard } from '../../src/echo-home/wizard/run-wi
 import type { WireResult } from '../../src/echo-home/wizard/wire.js';
 import type { AgentKind, DetectedAgent } from '../../src/echo-home/wizard/detect-agents.js';
 import { makeNonInteractivePrompt } from '../../src/cli/io/prompt.js';
+import { BEGIN_MARKER, END_MARKER } from '../../src/echo-home/adapters/markers.js';
 
 let tmpRoot: string;
 let echoHome: string;
@@ -86,6 +87,47 @@ function detected(kind: AgentKind, confidence: DetectedAgent['confidence']): Det
   };
 }
 
+async function makeCodexSyncWizardFactory(opts: {
+  clientHome: string;
+  codexConfig: string;
+  codexInstructions: string;
+}): Promise<(wizardOpts: CreateWizardOpts) => Wizard> {
+  const { createWizard } = await import('../../src/echo-home/wizard/run-wizard.js');
+  const { syncAll } = await import('../../src/echo-home/adapter-sync.js');
+  return (wizardOpts: CreateWizardOpts): Wizard =>
+    createWizard({
+      ...wizardOpts,
+      detectAgentsDeps: { homedir: opts.clientHome, atomStore: null },
+      detectProjectsDeps: { atomStore: null },
+      probeDeps: {
+        spawn: async () => ({
+          exitCode: 0,
+          stdout: '{"pong":true,"ts":"2026-05-26T00:00:00.000Z"}\n',
+          stderr: '',
+          timedOut: false,
+        }),
+      },
+      wireDepsOverride: {
+        syncAll: async (profiles, syncOpts) =>
+          syncAll(
+            profiles.map((profile): AdapterSyncProfile => {
+              if (profile.kind === 'codex') {
+                return {
+                  ...profile,
+                  paths: {
+                    configFile: opts.codexConfig,
+                    instructionsFile: opts.codexInstructions,
+                  },
+                };
+              }
+              return profile;
+            }),
+            syncOpts,
+          ),
+      },
+    });
+}
+
 describe('runInit', () => {
   beforeEach(() => {
     originalEchoHome = process.env.ECHO_HOME;
@@ -142,16 +184,19 @@ describe('runInit', () => {
       'com.echo.daemon.walkthrough',
       '--answer-file',
       '/tmp/answers.json',
+      '--force',
     ])).toEqual({
       home: '/tmp/echo-home',
       port: '41234',
       label: 'com.echo.daemon.walkthrough',
       answerFile: '/tmp/answers.json',
+      force: true,
     });
     expect(INIT_HELP).toContain('--home <path>');
     expect(INIT_HELP).toContain('--port <n>');
     expect(INIT_HELP).toContain('--label <id>');
     expect(INIT_HELP).toContain('--answer-file <path>');
+    expect(INIT_HELP).toContain('--force');
     expect(() => parseInitArgs(['--port', '0'])).toThrow('invalid --port: 0');
     expect(() => parseInitArgs(['--port', '12abc'])).toThrow('invalid --port: 12abc');
   });
@@ -237,6 +282,138 @@ describe('runInit', () => {
     expect(cursor.mcpServers.echo.url).toBe('http://127.0.0.1:41234/mcp');
     expect(codexCache.mcpServerConfig.url).toBe('http://127.0.0.1:41234/mcp');
     expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
+  });
+
+  it('force-replaces a prior ECHO marker block and records a successful wire', async () => {
+    const isolatedHome = join(tmpRoot, 'force-echo-home');
+    const clientHome = join(tmpRoot, 'force-client-home');
+    const codexConfig = join(clientHome, '.codex/config.toml');
+    const codexInstructions = join(clientHome, '.codex/AGENTS.md');
+    mkdirSync(join(clientHome, '.codex'), { recursive: true });
+    writeFileSync(
+      codexInstructions,
+      `${BEGIN_MARKER}\nuser hand-edited inside marker\n${END_MARKER}\n`,
+    );
+    writeFileSync(codexConfig, `[mcp_servers.echo]\nurl = "http://user-edited:9999/mcp"\n`);
+    const answerFile = writeAnswerFile('force-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeCodexSyncWizardFactory({
+      clientHome,
+      codexConfig,
+      codexInstructions,
+    });
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41236',
+      force: true,
+      quiet: true,
+      now: () => new Date('2026-05-26T00:00:00.000Z'),
+    });
+
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      agents: Array<{ id: AgentKind; wired_at: string | null; wire_error: string | null }>;
+    };
+    const codex = state.agents.find((agent) => agent.id === 'codex');
+    expect(code).toBe(0);
+    expect(codex?.wired_at).toBe('2026-05-26T00:00:00.000Z');
+    expect(codex?.wire_error).toBeNull();
+    expect(readFileSync(codexInstructions, 'utf8')).toContain(
+      'http://127.0.0.1:41236/mcp',
+    );
+    expect(readFileSync(codexInstructions, 'utf8')).not.toContain('user hand-edited');
+  });
+
+  it('force preserves outside-marker content byte-for-byte', async () => {
+    const isolatedHome = join(tmpRoot, 'preserve-echo-home');
+    const clientHome = join(tmpRoot, 'preserve-client-home');
+    const codexConfig = join(clientHome, '.codex/config.toml');
+    const codexInstructions = join(clientHome, '.codex/AGENTS.md');
+    const above = '# User heading\ncustom before\n\n';
+    const below = '\n## User footer\ncustom after\n';
+    mkdirSync(join(clientHome, '.codex'), { recursive: true });
+    writeFileSync(
+      codexInstructions,
+      `${above}${BEGIN_MARKER}\nold echo block with local edits\n${END_MARKER}${below}`,
+    );
+    writeFileSync(codexConfig, `[mcp_servers.echo]\nurl = "http://old:1111/mcp"\n`);
+    const answerFile = writeAnswerFile('preserve-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeCodexSyncWizardFactory({
+      clientHome,
+      codexConfig,
+      codexInstructions,
+    });
+
+    await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41237',
+      force: true,
+      quiet: true,
+      now: () => new Date('2026-05-26T00:00:00.000Z'),
+    });
+
+    const content = readFileSync(codexInstructions, 'utf8');
+    const beginIdx = content.indexOf(BEGIN_MARKER);
+    const endAfterIdx = content.indexOf(END_MARKER) + END_MARKER.length;
+    expect(content.slice(0, beginIdx)).toBe(above);
+    expect(content.slice(endAfterIdx)).toBe(below);
+    expect(content).toContain('http://127.0.0.1:41237/mcp');
+  });
+
+  it('force refuses malformed marker blocks and leaves the file untouched', async () => {
+    const isolatedHome = join(tmpRoot, 'malformed-echo-home');
+    const clientHome = join(tmpRoot, 'malformed-client-home');
+    const codexConfig = join(clientHome, '.codex/config.toml');
+    const codexInstructions = join(clientHome, '.codex/AGENTS.md');
+    mkdirSync(join(clientHome, '.codex'), { recursive: true });
+    writeFileSync(codexInstructions, `# Header\n${BEGIN_MARKER}\nbroken inside\n`);
+    writeFileSync(codexConfig, `[mcp_servers.echo]\nurl = "http://old:1111/mcp"\n`);
+    const before = readFileSync(codexInstructions);
+    const answerFile = writeAnswerFile('malformed-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeCodexSyncWizardFactory({
+      clientHome,
+      codexConfig,
+      codexInstructions,
+    });
+
+    await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41238',
+      force: true,
+      quiet: true,
+      now: () => new Date('2026-05-26T00:00:00.000Z'),
+    });
+
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      agents: Array<{ id: AgentKind; wire_error: string | null }>;
+    };
+    expect(state.agents.find((agent) => agent.id === 'codex')?.wire_error).toContain(
+      'marker block malformed; manual intervention required',
+    );
+    expect(readFileSync(codexInstructions).equals(before)).toBe(true);
   });
 
   it('fails loudly when the answer file is missing', async () => {

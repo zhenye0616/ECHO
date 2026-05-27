@@ -118,6 +118,28 @@ describe('syncCodexMcpBlock', () => {
     expect(readFileSync(target).equals(before)).toBe(true);
   });
 
+  it('force: conflicting echo block is replaced while sibling tables are preserved', () => {
+    const target = join(tmpRoot, 'config.toml');
+    const preamble = `model = "gpt-5"\n\n`;
+    const sibling = `[mcp_servers.other]\nurl = "http://other"\n`;
+    writeFileSync(
+      target,
+      `${preamble}[mcp_servers.echo]\nurl = "http://user-edited:9999/mcp"\nenabled = false\n${sibling}`,
+    );
+    const result = syncCodexMcpBlock({
+      filePath: target,
+      serverConfig: SERVER_CONFIG_V1,
+      previousServerConfig: { url: 'http://old:1234/mcp', enabled: true },
+      force: true,
+    });
+    const content = readFileSync(target, 'utf8');
+    expect(result.action).toBe('update');
+    expect(content.startsWith(preamble)).toBe(true);
+    expect(content.endsWith(sibling)).toBe(true);
+    expect(content).toContain('url = "http://localhost:7117/mcp"');
+    expect(content).not.toContain('user-edited');
+  });
+
   it('conflict: different current echo without a previous cache still does not write', () => {
     const target = join(tmpRoot, 'config.toml');
     const original = `[mcp_servers.echo]\nurl = "http://user-edited"\n\n[mcp_servers.echo.headers]\n`;

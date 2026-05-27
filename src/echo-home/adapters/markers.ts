@@ -9,6 +9,7 @@ export interface MarkerOpts {
   filePath: string;
   echoSection: string;
   previousEchoSection?: string;
+  force?: boolean;
 }
 
 export type MarkerAction = 'append' | 'replace' | 'noop' | 'conflict';
@@ -71,7 +72,7 @@ function ensureParentDir(filePath: string): void {
 }
 
 export function mergeWithMarkers(opts: MarkerOpts): MarkerResult {
-  const { filePath, echoSection, previousEchoSection } = opts;
+  const { filePath, echoSection, previousEchoSection, force = false } = opts;
 
   // Pre-read symlink guard.
   if (existsSync(filePath)) {
@@ -145,6 +146,15 @@ export function mergeWithMarkers(opts: MarkerOpts): MarkerResult {
   }
 
   if (previousEchoSection !== undefined && currentInside === previousEchoSection) {
+    const before = original.slice(0, beginIdx + BEGIN_MARKER.length);
+    const after = original.slice(endIdx);
+    const newContent = `${before}\n${echoSection}\n${after}`;
+    ensureParentDir(filePath);
+    atomicWrite({ filePath, content: newContent });
+    return { action: 'replace', filePath };
+  }
+
+  if (force) {
     const before = original.slice(0, beginIdx + BEGIN_MARKER.length);
     const after = original.slice(endIdx);
     const newContent = `${before}\n${echoSection}\n${after}`;

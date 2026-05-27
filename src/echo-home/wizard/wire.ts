@@ -19,6 +19,7 @@ export interface WireOpts {
   mcpServerUrl: string;
   echoVersion: string;
   repoRoot?: string;
+  force?: boolean;
   syncAll?: typeof realSyncAll;
   cache?: {
     read: (kind: AgentKind) => AdapterCacheRecord | null;
@@ -62,7 +63,7 @@ function conflictMessage(conflict: SyncConflict): string {
   if (conflict.kind === 'config') return `conflict on ${conflict.filePath}: config`;
   if (conflict.kind === 'marker') return `conflict on ${conflict.filePath}: marker`;
   if (conflict.kind === 'target-symlink') return `conflict on ${conflict.filePath}: target-symlink`;
-  return `conflict on ${conflict.filePath}: malformed-marker`;
+  return `conflict on ${conflict.filePath}: marker block malformed; manual intervention required`;
 }
 
 function agentResult(syncResult: SyncResult, kind: AgentKind): AgentResult | undefined {
@@ -101,6 +102,7 @@ function buildProfiles(
       previousEchoSection: prior?.echoSection ?? undefined,
       mcpServerConfig,
       previousMcpServerConfig: prior?.mcpServerConfig ?? undefined,
+      force: opts.force === true,
     });
   }
 

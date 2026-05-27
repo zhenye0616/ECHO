@@ -137,6 +137,35 @@ describe('syncCursorMcpEntry', () => {
     expect(readFileSync(target).equals(before)).toBe(true);
   });
 
+  it('force: conflicting echo entry is replaced while sibling entries are preserved', () => {
+    const target = join(tmpRoot, 'mcp.json');
+    writeFileSync(
+      target,
+      JSON.stringify(
+        {
+          mcpServers: {
+            echo: { url: 'http://user-edited', headers: { 'X-User': 'drop' } },
+            dart: { command: 'dart', args: ['mcp'] },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const result = syncCursorMcpEntry({
+      filePath: target,
+      serverConfig: SERVER_V1,
+      previousServerConfig: { url: 'http://old:1234/mcp' },
+      force: true,
+    });
+    const parsed = JSON.parse(readFileSync(target, 'utf8')) as {
+      mcpServers: Record<string, unknown>;
+    };
+    expect(result.action).toBe('update');
+    expect(parsed.mcpServers.echo).toEqual(SERVER_V1);
+    expect(parsed.mcpServers.dart).toEqual({ command: 'dart', args: ['mcp'] });
+  });
+
   it('conflict: different current echo without a previous cache still does not write', () => {
     const target = join(tmpRoot, 'mcp.json');
     writeFileSync(

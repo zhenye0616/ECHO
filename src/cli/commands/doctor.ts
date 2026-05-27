@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { resolveDataDir } from '../../daemon/lifecycle.js';
 import {
   ECHO_HOME_PATHS,
+  setEchoHomeRoot,
   validateOnboardingState,
   validateProjectsState,
   type OnboardedAgentProfile,
@@ -11,7 +13,7 @@ import {
 import { type AgentKind } from '../../echo-home/wizard/detect-agents.js';
 import { probeAgents as realProbeAgents, type ProbeOutcome } from '../../echo-home/wizard/probe.js';
 import { renderDoctorReport } from '../io/render.js';
-import { readPackageVersion, resolveMcpPort } from './init.js';
+import { parsePort, readPackageVersion, resolveMcpPort } from './init.js';
 
 export interface DoctorReport {
   daemon: {
@@ -41,12 +43,22 @@ export interface DoctorOpts {
   json?: boolean;
   quiet?: boolean;
   color?: boolean;
+  home?: string;
+  port?: string | number;
+  label?: string;
   stdout?: Pick<NodeJS.WritableStream, 'write'>;
   stderr?: Pick<NodeJS.WritableStream, 'write'>;
   probeAgents?: typeof realProbeAgents;
   fetch?: typeof fetch;
   now?: () => Date;
 }
+
+export const DOCTOR_HELP = `Usage: echoctl doctor [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>]
+
+Options:
+  --home <path>   ECHO_HOME for this doctor run
+  --port <n>      MCP server port to probe
+  --label <id>    accepted for daemon-isolation parity; doctor does not query launchd`;
 
 function writeLine(stream: Pick<NodeJS.WritableStream, 'write'>, line: string): void {
   stream.write(`${line}\n`);
@@ -58,6 +70,38 @@ export function shellQuote(s: string): string {
 
 function isAgentKind(value: string): value is AgentKind {
   return value === 'codex' || value === 'claude-code' || value === 'cursor';
+}
+
+function parseNonEmptyOption(value: string | undefined, flag: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (value.trim().length === 0) throw new Error(`invalid ${flag}: expected non-empty string`);
+  return value;
+}
+
+export function parseDoctorArgs(args: readonly string[]): Pick<DoctorOpts, 'home' | 'label' | 'port'> {
+  const parsed = parseArgs({
+    args: [...args],
+    strict: true,
+    allowPositionals: false,
+    options: {
+      home: { type: 'string' },
+      port: { type: 'string' },
+      label: { type: 'string' },
+    },
+  });
+  const port = parseNonEmptyOption(parsed.values.port, '--port');
+  if (port !== undefined) parsePort(port);
+  return {
+    home: parseNonEmptyOption(parsed.values.home, '--home'),
+    port,
+    label: parseNonEmptyOption(parsed.values.label, '--label'),
+  };
+}
+
+function resolveDoctorPort(port: DoctorOpts['port']): number {
+  if (port === undefined) return resolveMcpPort();
+  if (typeof port === 'number') return port;
+  return parsePort(port);
 }
 
 function readValidOnboarding(): OnboardingState | null {
@@ -150,7 +194,8 @@ export function computeOverall(report: DoctorReport): 'healthy' | 'degraded' | '
 }
 
 export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorReport> {
-  const port = resolveMcpPort();
+  if (opts.home !== undefined) setEchoHomeRoot(opts.home);
+  const port = resolveDoctorPort(opts.port);
   const pidLockPath = join(resolveDataDir(), 'daemon.pid');
   const pidLockHeld = existsSync(pidLockPath);
   const mcpReachable = await probeMcp(opts.fetch ?? fetch, port);
@@ -209,8 +254,19 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
 }
 
 export async function runDoctor(opts: DoctorOpts = {}): Promise<number> {
+  const stderr = opts.stderr ?? process.stderr;
+  let port: number;
   try {
-    const report = await buildDoctorReport(opts);
+    if (opts.home !== undefined) setEchoHomeRoot(opts.home);
+    if (opts.label !== undefined) parseNonEmptyOption(opts.label, '--label');
+    port = resolveDoctorPort(opts.port);
+  } catch (err) {
+    writeLine(stderr, (err as Error).message);
+    return 2;
+  }
+
+  try {
+    const report = await buildDoctorReport({ ...opts, home: undefined, port });
     if (!opts.quiet) {
       if (opts.json) writeLine(opts.stdout ?? process.stdout, JSON.stringify(report));
       else
@@ -221,7 +277,7 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<number> {
     }
     return report.overall === 'healthy' ? 0 : 1;
   } catch (err) {
-    writeLine(opts.stderr ?? process.stderr, (err as Error).message);
+    writeLine(stderr, (err as Error).message);
     return 1;
   }
 }

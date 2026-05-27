@@ -44,6 +44,7 @@ export interface AdapterSyncProfile {
   previousEchoSection?: string;
   mcpServerConfig?: { url: string; [k: string]: unknown };
   previousMcpServerConfig?: Record<string, unknown>;
+  force?: boolean;
 }
 
 export interface SyncAllOpts {
@@ -694,6 +695,7 @@ function handleMarkersForAgent(
       filePath: instructionsFile,
       echoSection: profile.echoSection,
       previousEchoSection: profile.previousEchoSection,
+      force: profile.force === true,
     });
   } catch (err) {
     errors.push(toAdapterError(err, instructionsFile, 'write'));
@@ -742,6 +744,7 @@ function handleCodexConfig(
       filePath: configFile,
       serverConfig: profile.mcpServerConfig,
       previousServerConfig: profile.previousMcpServerConfig,
+      force: profile.force === true,
     });
     if (result.action === 'conflict') {
       conflicts.push(result.conflict);
@@ -789,6 +792,7 @@ function handleCursorConfig(
       filePath: configFile,
       serverConfig: profile.mcpServerConfig,
       previousServerConfig: profile.previousMcpServerConfig,
+      force: profile.force === true,
     });
     if (result.action === 'conflict') {
       conflicts.push(result.conflict);

@@ -61,6 +61,7 @@ export interface InitOpts {
   port?: string;
   label?: string;
   answerFile?: string;
+  force?: boolean;
   stdin?: { isTTY?: boolean };
   stdout?: Pick<NodeJS.WritableStream, 'write'>;
   stderr?: Pick<NodeJS.WritableStream, 'write'>;
@@ -87,13 +88,16 @@ interface LoadedAnswerFile {
   answers: InitAnswerFile;
 }
 
-export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>] [--answer-file <path>]
+export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>] [--answer-file <path>] [--force]
 
 Options:
   --home <path>          ECHO_HOME for this init run
   --port <n>             MCP server port written to adapter configs
   --label <id>           accepted for daemon-isolation parity; init does not manage launchd
   --answer-file <path>   non-interactive JSON answers
+  --force                Replace existing ECHO marker blocks in adapter configs.
+                         Outside-marker content is preserved. Use for upgrade
+                         or re-onboarding scenarios.
 
 Answer-file JSON schema:
   {
@@ -126,7 +130,7 @@ function failAnswerFile(filePath: string, field: string, message: string): never
   throw new Error(`${filePath}: ${field}: ${message}; see \`echoctl init --help\` for schema`);
 }
 
-function parsePort(value: string, flag = '--port'): number {
+export function parsePort(value: string, flag = '--port'): number {
   if (!/^[0-9]+$/.test(value)) throw new Error(`invalid ${flag}: ${value}`);
   const n = Number(value);
   if (!Number.isSafeInteger(n) || n <= 0 || n > 65535) {
@@ -153,7 +157,7 @@ function parseNonEmptyOption(value: string | undefined, flag: string): string | 
 
 export function parseInitArgs(args: readonly string[]): Pick<
   InitOpts,
-  'answerFile' | 'home' | 'label' | 'port'
+  'answerFile' | 'force' | 'home' | 'label' | 'port'
 > {
   const parsed = parseArgs({
     args: [...args],
@@ -164,6 +168,7 @@ export function parseInitArgs(args: readonly string[]): Pick<
       port: { type: 'string' },
       label: { type: 'string' },
       'answer-file': { type: 'string' },
+      force: { type: 'boolean', default: false },
     },
   });
   const port = parseNonEmptyOption(parsed.values.port, '--port');
@@ -173,6 +178,7 @@ export function parseInitArgs(args: readonly string[]): Pick<
     port,
     label: parseNonEmptyOption(parsed.values.label, '--label'),
     answerFile: parseNonEmptyOption(parsed.values['answer-file'], '--answer-file'),
+    force: parsed.values.force === true,
   };
 }
 
@@ -417,7 +423,11 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
           : null;
     }
 
-    let wire = await wizard.wire({ selectedAgents, defaultProjectRepoRoot });
+    let wire = await wizard.wire({
+      selectedAgents,
+      defaultProjectRepoRoot,
+      force: opts.force === true,
+    });
     if (wire.syncResult.repoRoot !== undefined) {
       let repoRoot: string;
       if (answerFile !== null && answerFile.answers.repo_root === undefined) {
@@ -434,7 +444,12 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
           'ECHO could not locate its source tree. Pass an explicit path',
         );
       }
-      wire = await wizard.wire({ selectedAgents, defaultProjectRepoRoot, repoRoot });
+      wire = await wizard.wire({
+        selectedAgents,
+        defaultProjectRepoRoot,
+        repoRoot,
+        force: opts.force === true,
+      });
       if (wire.syncResult.repoRoot !== undefined) {
         writeLine(stderr, wire.syncResult.repoRoot.message);
         return 1;

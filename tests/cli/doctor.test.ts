@@ -14,11 +14,14 @@ async function loadDoctor(): Promise<typeof import('../../src/cli/commands/docto
   return import('../../src/cli/commands/doctor.js');
 }
 
-function writeState(agentReason: 'ok' | 'manual-only' | 'auth-required' = 'ok'): void {
-  mkdirSync(join(echoHome, 'state'), { recursive: true });
+function writeState(
+  agentReason: 'ok' | 'manual-only' | 'auth-required' = 'ok',
+  home = echoHome,
+): void {
+  mkdirSync(join(home, 'state'), { recursive: true });
   const now = '2026-05-26T00:00:00.000Z';
   writeFileSync(
-    join(echoHome, 'state/onboarding.json'),
+    join(home, 'state/onboarding.json'),
     `${JSON.stringify(
       {
         schema_version: 1,
@@ -41,7 +44,7 @@ function writeState(agentReason: 'ok' | 'manual-only' | 'auth-required' = 'ok'):
     )}\n`,
   );
   writeFileSync(
-    join(echoHome, 'state/projects.json'),
+    join(home, 'state/projects.json'),
     `${JSON.stringify({ schema_version: 1, last_refreshed_at: now, default_project: null, projects: [] }, null, 2)}\n`,
   );
 }
@@ -105,6 +108,57 @@ describe('runDoctor', () => {
       method: 'initialize',
       params: { protocolVersion: '2025-06-18', clientInfo: { name: 'echoctl-doctor' } },
     });
+  });
+
+  it('documents and honors --home, --port, and --label', async () => {
+    const isolatedHome = join(tmpRoot, 'isolated-echo-home');
+    writeState('ok', isolatedHome);
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, 'daemon.pid'), '123');
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const { DOCTOR_HELP, parseDoctorArgs, runDoctor } = await loadDoctor();
+    const out: string[] = [];
+
+    expect(parseDoctorArgs([
+      '--home',
+      isolatedHome,
+      '--port',
+      '41235',
+      '--label',
+      'com.echo.daemon.walkthrough',
+    ])).toEqual({
+      home: isolatedHome,
+      port: '41235',
+      label: 'com.echo.daemon.walkthrough',
+    });
+    expect(DOCTOR_HELP).toContain('--home <path>');
+    expect(DOCTOR_HELP).toContain('--port <n>');
+    expect(DOCTOR_HELP).toContain('--label <id>');
+    expect(() => parseDoctorArgs(['--port', '0'])).toThrow('invalid --port: 0');
+
+    const code = await runDoctor({
+      json: true,
+      home: isolatedHome,
+      port: '41235',
+      label: 'com.echo.daemon.walkthrough',
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      fetch: (async (url, init) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return new Response('{}', { status: 200 });
+      }) as typeof fetch,
+      probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
+    });
+
+    const report = JSON.parse(out.join('')) as {
+      daemon: { port: number };
+      echoHome: { root: string };
+      overall: string;
+    };
+    expect(code).toBe(0);
+    expect(calls[0]!.url).toBe('http://127.0.0.1:41235/mcp');
+    expect(report.daemon.port).toBe(41235);
+    expect(report.echoHome.root).toBe(isolatedHome);
+    expect(report.overall).toBe('healthy');
   });
 
   it('rolls unreachable daemon without pid lock to broken and stale pid lock to degraded', async () => {

@@ -20,6 +20,7 @@ export interface CodexConfigOpts {
   filePath: string;
   serverConfig: { url: string; enabled?: boolean; [k: string]: unknown };
   previousServerConfig?: Record<string, unknown>;
+  force?: boolean;
 }
 
 export type CodexAction = 'add' | 'update' | 'noop' | 'conflict';
@@ -289,7 +290,7 @@ function ensureParentDir(filePath: string): void {
 }
 
 export function syncCodexMcpBlock(opts: CodexConfigOpts): CodexConfigResult {
-  const { filePath, serverConfig, previousServerConfig } = opts;
+  const { filePath, serverConfig, previousServerConfig, force = false } = opts;
 
   if (!existsSync(filePath)) {
     ensureParentDir(filePath);
@@ -332,6 +333,13 @@ export function syncCodexMcpBlock(opts: CodexConfigOpts): CodexConfigResult {
     const rendered = renderTargetBlock(proposedEcho);
     // Preserve trailing newline structure: if original slice ended with \n\n,
     // keep one of those; rendered already ends with \n.
+    const newContent = `${original.slice(0, slice.start)}${rendered}${original.slice(slice.end)}`;
+    atomicWrite({ filePath, content: newContent, secretSensitive: true, followSymlink: true });
+    return { action: 'update' };
+  }
+
+  if (force) {
+    const rendered = renderTargetBlock(serverConfig);
     const newContent = `${original.slice(0, slice.start)}${rendered}${original.slice(slice.end)}`;
     atomicWrite({ filePath, content: newContent, secretSensitive: true, followSymlink: true });
     return { action: 'update' };
