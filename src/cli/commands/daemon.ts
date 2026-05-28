@@ -64,6 +64,48 @@ export interface DaemonConfig {
   daemonPath: string;
 }
 
+export interface DaemonControlOptions extends DaemonDeps {
+  label?: string;
+  plistPath?: string;
+  logDir?: string;
+  home?: string;
+  port?: string;
+  dataDir?: string;
+  dbPath?: string;
+}
+
+export interface DaemonServiceStatus {
+  installed: boolean;
+  running: boolean;
+  healthy: boolean;
+  launchdRegistered: boolean;
+  label: string;
+  plistPath: string;
+  port: number;
+}
+
+export type DaemonBringupAction = 'installed-and-started' | 'started' | 'already-running';
+
+export interface DaemonBringupResult {
+  action: DaemonBringupAction;
+  label: string;
+  plistPath: string;
+  port: number;
+}
+
+export type DaemonControlVerb = 'status' | 'install' | 'start';
+
+export class DaemonCommandError extends Error {
+  constructor(
+    public readonly verb: DaemonControlVerb,
+    public readonly code: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DaemonCommandError';
+  }
+}
+
 const DEFAULT_LABEL = 'com.echo.daemon';
 const DEFAULT_LOG_DIR = join(homedir(), 'Library', 'Logs', 'echo');
 const FIXED_LAUNCHD_PATH = '/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin';
@@ -478,6 +520,116 @@ function bootstrap(config: DaemonConfig, deps: DaemonDeps): CommandResult {
 
 function isLaunchdNotFound(result: CommandResult): boolean {
   return /not found|No such process|Could not find/i.test(`${result.stdout}\n${result.stderr}`);
+}
+
+function controlValues(opts: DaemonControlOptions): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  if (opts.label !== undefined) values['label'] = opts.label;
+  if (opts.plistPath !== undefined) values['plist-path'] = opts.plistPath;
+  if (opts.logDir !== undefined) values['log-dir'] = opts.logDir;
+  if (opts.home !== undefined) values['home'] = opts.home;
+  if (opts.port !== undefined) values['port'] = opts.port;
+  if (opts.dataDir !== undefined) values['data-dir'] = opts.dataDir;
+  if (opts.dbPath !== undefined) values['db-path'] = opts.dbPath;
+  return values;
+}
+
+export function resolveDaemonControlConfig(opts: DaemonControlOptions = {}): DaemonConfig {
+  return resolveConfig(controlValues(opts), opts);
+}
+
+function captureStream(out: string[]): Writable {
+  return { write: (chunk) => (out.push(String(chunk)), true) };
+}
+
+function capturedOutput(stdout: readonly string[], stderr: readonly string[]): string {
+  return `${stdout.join('')}${stderr.join('')}`.trim();
+}
+
+async function runDaemonControlVerb(
+  verb: Exclude<DaemonControlVerb, 'status'>,
+  config: DaemonConfig,
+  deps: DaemonDeps,
+): Promise<void> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const out = captureStream(stdout);
+  const err = captureStream(stderr);
+  const code =
+    verb === 'install'
+      ? await install(config, deps, out, err)
+      : await start(config, deps, out, err);
+  if (code !== 0) {
+    const detail = capturedOutput(stdout, stderr) || `echoctl daemon ${verb} exited ${code}`;
+    throw new DaemonCommandError(verb, code, detail);
+  }
+}
+
+export async function getDaemonStatus(
+  opts: DaemonControlOptions = {},
+): Promise<DaemonServiceStatus> {
+  const config = resolveDaemonControlConfig(opts);
+  const loaded = launchdLoaded(config, opts);
+  if (commandMissing(loaded)) {
+    throw new DaemonCommandError(
+      'status',
+      2,
+      'launchctl not found; daemon lifecycle requires macOS launchd',
+    );
+  }
+  const launchdRegistered = loaded.status === 0;
+  const healthy = launchdRegistered ? await probeOnce(config.port, opts) : false;
+  return {
+    installed: launchdRegistered || existsSync(config.plistPath),
+    running: launchdRegistered && healthy,
+    healthy,
+    launchdRegistered,
+    label: config.label,
+    plistPath: config.plistPath,
+    port: config.port,
+  };
+}
+
+export async function installDaemon(opts: DaemonControlOptions = {}): Promise<DaemonConfig> {
+  const config = resolveDaemonControlConfig(opts);
+  await runDaemonControlVerb('install', config, opts);
+  return config;
+}
+
+export async function startDaemon(opts: DaemonControlOptions = {}): Promise<DaemonConfig> {
+  const config = resolveDaemonControlConfig(opts);
+  await runDaemonControlVerb('start', config, opts);
+  return config;
+}
+
+export async function ensureDaemonRunning(
+  opts: DaemonControlOptions = {},
+): Promise<DaemonBringupResult> {
+  const status = await getDaemonStatus(opts);
+  if (!status.installed) {
+    const config = await installDaemon(opts);
+    return {
+      action: 'installed-and-started',
+      label: config.label,
+      plistPath: config.plistPath,
+      port: config.port,
+    };
+  }
+  if (!status.running) {
+    const config = await startDaemon(opts);
+    return {
+      action: 'started',
+      label: config.label,
+      plistPath: config.plistPath,
+      port: config.port,
+    };
+  }
+  return {
+    action: 'already-running',
+    label: status.label,
+    plistPath: status.plistPath,
+    port: status.port,
+  };
 }
 
 async function bootstrapAndProbe(config: DaemonConfig, deps: DaemonDeps, stderr: Writable): Promise<number> {

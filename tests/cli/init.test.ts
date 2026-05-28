@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SpawnSyncReturns } from 'node:child_process';
+import type { InitOpts } from '../../src/cli/commands/init.js';
 import type { AdapterSyncProfile } from '../../src/echo-home/adapter-sync.js';
 import type { CreateWizardOpts, Wizard } from '../../src/echo-home/wizard/run-wizard.js';
 import type { WireResult } from '../../src/echo-home/wizard/wire.js';
@@ -13,6 +15,17 @@ let tmpRoot: string;
 let echoHome: string;
 let originalEchoHome: string | undefined;
 let originalPort: string | undefined;
+
+interface LaunchctlCall {
+  command: string;
+  args: string[];
+}
+
+interface DaemonFixture {
+  calls: LaunchctlCall[];
+  daemonOptions: NonNullable<InitOpts['daemonOptions']>;
+  plistPath: string;
+}
 
 async function loadInit(): Promise<typeof import('../../src/cli/commands/init.js')> {
   return import('../../src/cli/commands/init.js');
@@ -87,6 +100,126 @@ function detected(kind: AgentKind, confidence: DetectedAgent['confidence']): Det
   };
 }
 
+function spawnResult(
+  status: number,
+  stdout = '',
+  stderr = '',
+): SpawnSyncReturns<string> {
+  return {
+    pid: 0,
+    output: [null, stdout, stderr],
+    stdout,
+    stderr,
+    status,
+    signal: null,
+  };
+}
+
+function writeDaemonRuntimePackage(packageRoot: string): string {
+  const daemonPath = join(packageRoot, 'dist/daemon/index.js');
+  mkdirSync(join(packageRoot, 'dist/daemon'), { recursive: true });
+  writeFileSync(daemonPath, 'console.log("daemon");\n');
+  const migrationsDir = join(packageRoot, 'dist/storage/migrations');
+  mkdirSync(migrationsDir, { recursive: true });
+  writeFileSync(join(migrationsDir, '001-init.sql'), 'select 1;\n');
+  mkdirSync(join(packageRoot, 'tools/review-queue/schemas'), { recursive: true });
+  writeFileSync(join(packageRoot, 'tools/review-queue/coord-roles.json'), '{}\n');
+  writeFileSync(join(packageRoot, 'tools/review-queue/reviewers.json'), '{}\n');
+  writeFileSync(join(packageRoot, 'tools/review-queue/schemas/coord-roles.schema.json'), '{}\n');
+  return daemonPath;
+}
+
+function daemonFixture(opts: {
+  launchdRegistered: boolean;
+  health?: boolean;
+  nodeOk?: boolean;
+  plutilOk?: boolean;
+  writePlist?: boolean;
+}): DaemonFixture {
+  const calls: LaunchctlCall[] = [];
+  const packageRoot = join(tmpRoot, `daemon-pkg-${calls.length}-${Math.random()}`);
+  const daemonPath = writeDaemonRuntimePackage(packageRoot);
+  const plistPath = join(tmpRoot, `launchd/${Math.random()}.plist`);
+  const logDir = join(tmpRoot, 'daemon-logs');
+  const dataDir = join(tmpRoot, 'daemon-data');
+  const dbPath = join(dataDir, 'echo.db');
+  if (opts.writePlist === true) {
+    mkdirSync(join(tmpRoot, 'launchd'), { recursive: true });
+    writeFileSync(
+      plistPath,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/node/v22/bin/node</string>
+    <string>${daemonPath}</string>
+  </array>
+  <key>StandardOutPath</key>
+  <string>${join(logDir, 'echo-daemon.out.log')}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ECHO_HOME</key>
+    <string>${echoHome}</string>
+    <key>ECHO_MCP_PORT</key>
+    <string>39999</string>
+    <key>ECHO_DATA_DIR</key>
+    <string>${dataDir}</string>
+    <key>ECHO_DB_PATH</key>
+    <string>${dbPath}</string>
+  </dict>
+</dict>
+</plist>
+`,
+    );
+  }
+  const spawnSync: NonNullable<NonNullable<InitOpts['daemonOptions']>['spawnSync']> = ((
+    command: string,
+    args: readonly string[],
+  ) => {
+    const argv = [...args];
+    calls.push({ command, args: argv });
+    if (command === '/node/v22/bin/node') {
+      return opts.nodeOk === false
+        ? spawnResult(1, '', 'node exploded\n')
+        : spawnResult(0, 'v22.1.0\n');
+    }
+    if (command === 'plutil') {
+      return opts.plutilOk === false
+        ? spawnResult(1, '', 'bad plist\n')
+        : spawnResult(0, `${argv[1]}: OK\n`);
+    }
+    if (command === 'launchctl' && argv[0] === 'print') {
+      return opts.launchdRegistered
+        ? spawnResult(0, 'pid = 12345\nstate = running\n')
+        : spawnResult(3, '', 'not loaded\n');
+    }
+    if (command === 'launchctl') return spawnResult(0);
+    return spawnResult(0);
+  }) as NonNullable<NonNullable<InitOpts['daemonOptions']>['spawnSync']>;
+  return {
+    calls,
+    plistPath,
+    daemonOptions: {
+      plistPath,
+      logDir,
+      dataDir,
+      dbPath,
+      spawnSync,
+      healthProbe: async () => opts.health ?? true,
+      sleep: async () => {},
+      getuid: () => 501,
+      processExecPath: '/node/v22/bin/node',
+      daemonPath,
+      probeDeadlineMs: 0,
+    },
+  };
+}
+
+function daemonAlreadyRunning(): Pick<InitOpts, 'daemonOptions'> {
+  return { daemonOptions: daemonFixture({ launchdRegistered: true }).daemonOptions };
+}
+
 async function makeCodexSyncWizardFactory(opts: {
   clientHome: string;
   codexConfig: string;
@@ -126,6 +259,46 @@ async function makeCodexSyncWizardFactory(opts: {
           ),
       },
     });
+}
+
+function successfulWizardFactory(home = echoHome): (wizardOpts: CreateWizardOpts) => Wizard {
+  return (() => {
+    let selected: AgentKind[] = [];
+    return {
+      async detectAgents() {
+        return [detected('codex', 'high')];
+      },
+      async detectProjects() {
+        return [];
+      },
+      async wire(opts) {
+        selected = opts.selectedAgents;
+        return successWire(selected, home);
+      },
+      async probe() {
+        return selected.map((agent) => ({ agent, probed: true as const, latencyMs: 1 }));
+      },
+      async summary() {
+        return {
+          detected: null,
+          projects: null,
+          wired: null,
+          probed: null,
+          onboardingStateSnapshot: null,
+        };
+      },
+      async markCompleted() {
+        const state = JSON.parse(readFileSync(join(home, 'state/onboarding.json'), 'utf8')) as {
+          completed: boolean;
+        };
+        state.completed = true;
+        writeFileSync(
+          join(home, 'state/onboarding.json'),
+          `${JSON.stringify(state, null, 2)}\n`,
+        );
+      },
+    } satisfies Wizard;
+  }) as never;
 }
 
 describe('runInit', () => {
@@ -258,6 +431,7 @@ describe('runInit', () => {
       label: 'com.echo.daemon.walkthrough',
       quiet: true,
       now: () => new Date('2026-05-26T00:00:00.000Z'),
+      ...daemonAlreadyRunning(),
     });
 
     const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
@@ -286,6 +460,122 @@ describe('runInit', () => {
     expect(existsSync(join(isolatedHome, 'skills', 'merge-and-cleanup.md'))).toBe(false);
     expect(existsSync(join(isolatedHome, 'skills', 'process-backlog.md'))).toBe(false);
     expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
+  });
+
+  it('installs and starts the daemon when init finds no installed launchd job', async () => {
+    const isolatedHome = join(tmpRoot, 'bringup-install-home');
+    const answerFile = writeAnswerFile('daemon-install-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const daemon = daemonFixture({ launchdRegistered: false });
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: successfulWizardFactory(isolatedHome) as never,
+      home: isolatedHome,
+      port: '41234',
+      label: 'com.echo.daemon.test-init',
+      daemonOptions: daemon.daemonOptions,
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      stderr: { write: (s) => (stderr.push(String(s)), true) },
+    });
+
+    expect(code, stderr.join('')).toBe(0);
+    expect(stderr.join('')).toBe('');
+    const calls = daemon.calls.map((call) => `${call.command} ${call.args.join(' ')}`);
+    const plist = readFileSync(daemon.plistPath, 'utf8');
+    expect(stdout.join('')).toContain('Daemon installed and started on port 41234.');
+    expect(calls).toContain(`launchctl bootstrap gui/501 ${daemon.plistPath}`);
+    expect(calls.some((call) => call.startsWith('plutil -lint'))).toBe(true);
+    expect(plist).toContain('<string>com.echo.daemon.test-init</string>');
+    expect(plist).toContain(`<string>${isolatedHome}</string>`);
+    expect(plist).toContain('<string>41234</string>');
+  });
+
+  it('starts the daemon when the plist exists but launchd is not running it', async () => {
+    const answerFile = writeAnswerFile('daemon-start-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const daemon = daemonFixture({ launchdRegistered: false, writePlist: true });
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: successfulWizardFactory() as never,
+      daemonOptions: daemon.daemonOptions,
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+    });
+
+    const calls = daemon.calls.map((call) => `${call.command} ${call.args.join(' ')}`);
+    expect(code).toBe(0);
+    expect(stdout.join('')).toContain('Daemon started on port 39999.');
+    expect(calls).toContain(`launchctl bootstrap gui/501 ${daemon.plistPath}`);
+    expect(calls.some((call) => call.startsWith('plutil -lint'))).toBe(false);
+  });
+
+  it('does nothing when the daemon is already running', async () => {
+    const answerFile = writeAnswerFile('daemon-running-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const daemon = daemonFixture({ launchdRegistered: true });
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: successfulWizardFactory() as never,
+      daemonOptions: daemon.daemonOptions,
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+    });
+
+    expect(code).toBe(0);
+    expect(stdout.join('')).toContain('Daemon already running on port 39999.');
+    expect(daemon.calls.some((call) => call.args[0] === 'bootstrap')).toBe(false);
+    expect(daemon.calls.some((call) => call.command === 'plutil')).toBe(false);
+  });
+
+  it('fails init with remediation when daemon install fails', async () => {
+    const answerFile = writeAnswerFile('daemon-install-fails-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const daemon = daemonFixture({ launchdRegistered: false, nodeOk: false });
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: successfulWizardFactory() as never,
+      daemonOptions: daemon.daemonOptions,
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      stderr: { write: (s) => (stderr.push(String(s)), true) },
+    });
+
+    const state = JSON.parse(readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8')) as {
+      completed: boolean;
+    };
+    expect(code).toBe(1);
+    expect(stderr.join('')).toContain('daemon install failed:');
+    expect(stderr.join('')).toContain('node version check failed');
+    expect(stderr.join('')).toContain('Run `echoctl daemon install` manually');
+    expect(stdout.join('')).not.toContain("You're ready.");
+    expect(state.completed).toBe(false);
   });
 
   it('force-replaces a prior ECHO marker block and records a successful wire', async () => {
@@ -320,6 +610,7 @@ describe('runInit', () => {
       force: true,
       quiet: true,
       now: () => new Date('2026-05-26T00:00:00.000Z'),
+      ...daemonAlreadyRunning(),
     });
 
     const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
@@ -369,6 +660,7 @@ describe('runInit', () => {
       force: true,
       quiet: true,
       now: () => new Date('2026-05-26T00:00:00.000Z'),
+      ...daemonAlreadyRunning(),
     });
 
     const content = readFileSync(codexInstructions, 'utf8');
@@ -409,6 +701,7 @@ describe('runInit', () => {
       force: true,
       quiet: true,
       now: () => new Date('2026-05-26T00:00:00.000Z'),
+      ...daemonAlreadyRunning(),
     });
 
     const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
@@ -623,6 +916,7 @@ describe('runInit', () => {
         'Pick default project': '',
       }),
       quiet: true,
+      ...daemonAlreadyRunning(),
     });
 
     expect(code).toBe(0);
@@ -689,6 +983,7 @@ describe('runInit', () => {
         'Pick default project': '1',
       }),
       quiet: true,
+      ...daemonAlreadyRunning(),
     });
 
     const state = JSON.parse(readFileSync(join(echoHome, 'state/onboarding.json'), 'utf8')) as {

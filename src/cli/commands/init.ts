@@ -27,6 +27,12 @@ import {
 } from '../io/render.js';
 import { makeTtyPrompt, type PromptImpl } from '../io/prompt.js';
 import { ensureEchoHome } from '../../echo-home/scaffold.js';
+import {
+  DaemonCommandError,
+  ensureDaemonRunning,
+  type DaemonBringupResult,
+  type DaemonControlOptions,
+} from './daemon.js';
 
 export const AGENT_CAPABILITIES_BY_KIND: Readonly<Record<AgentKind, readonly Capability[]>> =
   Object.freeze({
@@ -69,6 +75,7 @@ export interface InitOpts {
   prompt?: PromptImpl;
   now?: () => Date;
   packageJsonPath?: string;
+  daemonOptions?: DaemonControlOptions;
 }
 
 export type RemediationCopy = Record<
@@ -92,8 +99,8 @@ export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>]
 
 Options:
   --home <path>          ECHO_HOME for this init run
-  --port <n>             MCP server port written to adapter configs
-  --label <id>           accepted for daemon-isolation parity; init does not manage launchd
+  --port <n>             MCP server port written to adapter configs and launchd
+  --label <id>           launchd label used when ensuring the daemon is running
   --answer-file <path>   non-interactive JSON answers
   --force                Replace existing ECHO marker blocks in adapter configs.
                          Outside-marker content is preserved. Use for upgrade
@@ -353,6 +360,21 @@ function topLevelFailure(result: WireResult): string | null {
   return null;
 }
 
+function renderDaemonBringup(result: DaemonBringupResult): string {
+  switch (result.action) {
+    case 'installed-and-started':
+      return `Daemon installed and started on port ${result.port}.`;
+    case 'started':
+      return `Daemon started on port ${result.port}.`;
+    case 'already-running':
+      return `Daemon already running on port ${result.port}.`;
+  }
+}
+
+function daemonFailureCopy(err: DaemonCommandError): string {
+  return `daemon ${err.verb} failed: ${err.message}. Run \`echoctl daemon ${err.verb}\` manually with the same --home/--port/--label flags after addressing.`;
+}
+
 export async function runInit(opts: InitOpts = {}): Promise<number> {
   const stderr = opts.stderr ?? process.stderr;
   let answerFile: LoadedAnswerFile | null = null;
@@ -472,6 +494,24 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
         renderProbeOutcomes(probes, { color, remediation: buildRemediationCopy(mcpServerUrl) }),
       );
     }
+    let daemonResult: DaemonBringupResult;
+    try {
+      daemonResult = await ensureDaemonRunning({
+        ...opts.daemonOptions,
+        label: opts.label ?? opts.daemonOptions?.label,
+        home: ECHO_HOME_PATHS.root,
+        port: String(mcpPort),
+        probeDeadlineMs: opts.daemonOptions?.probeDeadlineMs ?? 30_000,
+      });
+    } catch (err) {
+      if (err instanceof DaemonCommandError) {
+        writeLine(stderr, daemonFailureCopy(err));
+        return 1;
+      }
+      throw err;
+    }
+    if (opts.json) emitJson(opts, { event: 'init.daemon', result: daemonResult });
+    else emitText(opts, renderDaemonBringup(daemonResult));
     await wizard.markCompleted();
     if (opts.json)
       emitJson(
