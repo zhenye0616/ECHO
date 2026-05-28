@@ -113,7 +113,23 @@ Worked examples (from 057a):
 
 The check is a forcing function against [recently-added mechanism becoming the new bug surface]. It does NOT apply when findings target the original AC text or load-bearing mechanism — those need real patches. Distinguish: "this mechanism didn't exist a round ago" (likely-removable) vs. "this mechanism is in the original spec contract" (must-patch).
 
-If you choose removal, the dispatch helper invocation is still `--patches-applied=true` because the spec changed; the change just happens to be a deletion. The disposition column should explicitly say "accepted — mechanism dropped" rather than "accepted — patched" so the convergence trail records the design discipline.
+Removal proof matrix: when the signal above fires and the proposed disposition uses removal language (`remove`, `drop`, `cut`, or `mechanism dropped`), before committing any disposition that claims removal, fill a compact matrix in the `combined.md` disposition text or adjacent rationale:
+
+- `state_removed`: what persisted state/config/schema/enum/frontmatter field is deleted or made unreachable.
+- `behavior_removed`: what runtime/user-visible behavior no longer exists.
+- `owners_removed`: which source/UI/tooling owners are removed from `files_to_modify` or no longer responsible.
+- `tests_removed_or_changed`: which tests are deleted, narrowed, or changed to assert absence instead of replacement behavior.
+- `remaining_invariants`: what contract still remains after removal.
+
+Failure-mode check: if `remaining_invariants` contains a new compensating contract, or any of `state_removed`, `behavior_removed`, or `owners_removed` is false/empty, the patch is not removal. It is relabeling/deeper patching and must be dispositioned as such, or replaced with a true structural cut.
+
+Detection logic: this rule fires when a finding targets a recent-round patch per the signal above and the proposed disposition uses removal language. Keep `files_to_modify` cardinality as a smell only: if cardinality grows or stays flat, assume relabeling until the matrix proves otherwise; if it shrinks, still require the matrix because a bad patch can reduce file count while preserving behavior under a new name. The richer catch is: does any replacement behavior/state/owner/test remain? Example: "disable Cmd-R on Recap sessions" fails because behavior remains and shifts ownership to `SessionsList.tsx`/`SessionDetail.tsx`; "drop persistence entirely" passes if state, behavior, owners, and tests disappear or become absence checks.
+
+Backward compatibility: this has no effect on old `combined.md` files or completed runs. This is watcher prose for future disposition commits only; historical review artifacts are immutable evidence, not revalidated.
+
+Test/audit: enforce by prose now. `combine.py` cannot know intended behavioral removal. A later lint could grep new `combined.md` disposition rows containing removal verbs and require the five matrix labels, but that is worth a separate spec only after this misses again.
+
+If you choose removal, the dispatch helper invocation is still `--patches-applied=true` because the spec changed; the change just happens to be a deletion. Removal is only valid after the matrix passes; then the disposition column should say `accepted — mechanism dropped` plus the matrix summary.
 
 #### (a) Zero patches applied → convergence
 
