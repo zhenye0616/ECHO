@@ -32,6 +32,7 @@ Pairs with [[mcp-find-clusters|`find_clusters`]]: the discovery primitive return
                                 //   (always-on: id, source, timestamp, truncations)
   format?:   'minimal',         // V1.6 only ships 'minimal' (WIRE_SHAPE_CAPS applied)
   prefer?:   'as_requested' | 'newest_first',  // item 032 — atom-order policy (default: 'as_requested')
+  view?:     'compact' | 'rich',               // item 064 — field-hygiene projection; default 'rich'
 }
 ```
 
@@ -79,6 +80,22 @@ The two-layer disambiguation matters: AC1's cluster-rank predicate (the normaliz
   - `prefer='as_requested'` (default) — preserves the **existing** `getByIds` contract: duplicates return duplicates (request `[A, B, A]` returns three atoms, A appears twice).
   - `prefer='newest_first'` — **NEW opt-in behavior**: duplicates collapse to first occurrence (request `[A, B, A]` returns two atoms, A appears once, sorted by timestamp). The asymmetry is documented in the tool description.
 
+## Compact view projection (item 064)
+
+`view: "compact"` opts the response into the daemon-side field-hygiene projection at `src/mcp/wire-shape/compact.ts`. Compact **composes with** the existing per-content + per-key cap projector at `src/mcp/wire-shape/match.ts` — atoms run through caps first (size hygiene), then through compact's field filter (noise hygiene). The full KEEP/DROP rules and motivation live on [[mcp-compact-view-projection]]; the atom-level summary:
+
+- **KEEP (universal):** `id`, `source`, `timestamp`, `content`, `truncations`.
+- **KEEP (universal metadata when present):** `metadata.session_id`, `metadata.repo_root`, `metadata.tool_call_total` (> 0), `metadata.had_tool_use`, `metadata.tool_calls_by_name`, `metadata.files_referenced`.
+- **KEEP (per-source promoted):** claude_code `metadata.model` / `permission_mode` (non-default) / `branch`; cursor `metadata.is_continuation` (true) / `context.{attached_files, referenced_files, deleted_files}` / `thinking` (non-prefix); codex `metadata.codex.model` / `reasoning_effort` and `metadata.git.branch`.
+- **DROP:** universal debug (`mtime`, `byte_offset`, `tool_calls` redundant with `tool_calls_by_name`, `tool_calls_truncated`, `bytes_elided`, `metadata_bytes_elided`, `metadata_keys_projected`, `metadata_keys_elided`); per-source plumbing (claude_code `cli_version` / `project` / `git_state`; cursor `composer_id` / `*_bubble_id` / `bubble_text_sources` / `continuation_*`; codex `codex.{cli_version, model_provider, personality, approval_policy, sandbox_*, permission_*, file_system_*, source}`, `git.{sha, origin_url}`, `git_state`, `cwd`).
+- **Envelope:** keep `schema_version`, `tool`, `atoms[]`, `atoms_dropped`, `atoms_dropped_ids`, `warnings[]`. The registered `getAtomsOutputSchema` was widened where required.
+
+`view` is independent of `fields`: the always-on `id` / `source` / `timestamp` / `truncations` are preserved regardless. `fields=[...]` further restricts the OPTIONAL payload fields after compact projection — so `view=compact + fields=["content"]` returns atoms with `{id, source, timestamp, truncations, content}` (no metadata at all). Default is `view: "rich"` so existing agent callers observe byte-identical output.
+
+The 25 kB envelope-overflow prefix-drop loop sizes its budget on the **post-compact** atom bytes — a 50-tool-call codex atom drops from ~207 kB `metadata_bytes_elided` to under 2 kB in compact mode, so envelope drops that previously fired on rich-mode metadata are eliminated.
+
+The Raycast client at `tools/raycast-echo/src/lib/mcp.ts` opts in to compact for both `get_atoms` and [[mcp-find-clusters|`find_clusters`]].
+
 ## Cost Contract
 
 - **Medium.** Each returned atom passes through wire-shape projection.
@@ -113,3 +130,4 @@ For full verbatim atom recovery (when `truncations` reports content was clipped)
 - [[mcp-search-memories]] — sibling substring search
 - [[storage]] — the substrate `getByIds` queries
 - [[normalized-context-event]] — the atom shape
+- [[mcp-compact-view-projection]] — the `view: "compact"` projection's KEEP/DROP rules + motivation

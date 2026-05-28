@@ -39,6 +39,7 @@ V1.5's `get_recent_work_context` ([[mcp-recent-work-context|deprecated since 030
   format?:       'skeleton',    // only 'skeleton' shipped in V1.6 — no atom bodies
   repo_path?:    string,        // item 037 — absolute repo root; AND-filters atoms by metadata.repo_root === normalize(repo_path)
                                 //   uniformly across all source_apps (see [[work-artifact-first-class]])
+  view?:         'compact' | 'rich',  // item 064 — field-hygiene projection; default 'rich' (byte-identical to pre-064)
 }
 ```
 
@@ -91,6 +92,18 @@ After auto-expand, the rank chain previously sorted single-source-recent cluster
 
 This makes the demo bar a **structural guarantee**: after `[AUTO_EXPAND] single-source-recent` fires, `clusters[0]` is prior multi-source work, not the calling session's noise.
 
+## Compact view projection (item 064)
+
+`view: "compact"` opts the response into the daemon-side field-hygiene projection at `src/mcp/wire-shape/compact.ts`. The full KEEP/DROP rules and motivation live on [[mcp-compact-view-projection]]; the cluster-level summary:
+
+- **KEEP per cluster:** `cluster_id`, `atom_ids`, `source_breakdown`, `time_range.from` / `.to`, `label` (UUID-fallback emitted as `null`), `open_loop_hints` + `open_loop_hints_omitted` when the existing 30-hint cap fired, `atom_ids_truncated`, `atom_ids_total`.
+- **DROP per cluster:** `rank` (sort order conveys it), and `rank_reason` values other than `"has_open_loop"` (drop `"recent_activity"`, `"dense"`, `"matches_artifact_hint"`).
+- **Envelope:** keep `schema_version`, `tool`, `clusters[]`, `warnings[]`; drop `query` (echoed args) and `result_caps`. The registered `findClustersOutputSchema` was widened so schema-aware MCP clients pass validation.
+
+`view` is independent of `format` (`view` controls field hygiene; `format` controls atom-body inclusion). Default is `view: "rich"` so existing agent callers observe byte-identical output. The 25 kB envelope-overflow prefix-drop loop sizes its budget on the post-compact bytes, so the live ~207 kB codex case stops triggering `atoms_dropped > 0` purely on metadata that compact would have removed.
+
+The Raycast client at `tools/raycast-echo/src/lib/mcp.ts` opts in to compact for `find_clusters` (and [[mcp-get-atoms|`get_atoms`]]).
+
 ## Cost Contract
 
 - **Cheap.** Typical response < 10 kB even on full-day windows.
@@ -126,4 +139,5 @@ Documented in the `find_clusters` tool description verbatim (V1.6.1). See [[mcp-
 - [[work-trace]] — the clustering algorithm
 - [[work-artifact-first-class]] — the principle behind `repo_path` (item 037)
 - [[atomic-primitives-compose]] — the principle behind discovery / body-fetch / resolver separation
+- [[mcp-compact-view-projection]] — the `view: "compact"` projection's KEEP/DROP rules + motivation
 - [[group-session]] — cross-tool review pattern that uses this tool

@@ -2,9 +2,9 @@
   "$schema": "./.manifest-schema.json",
   "_meta": {
     "project": "ECHO",
-    "version": "v1.6.1-shipped",
-    "generated": "2026-05-10",
-    "notes": "V1.6.1 closes the V1.6 atomic MCP toolkit with item 033 (mcp-get-atom — verbatim escape hatch + Magic Moment M1-3 closure end-to-end in-MCP). Eight-tool toolkit shipped: search_memories + tail_session + find_clusters + get_atoms + get_atom + wait_for_new_turns + echo_ping (plus deprecated get_recent_work_context pending item 031 removal). 030+032 promoted earlier 2026-05-10: find_clusters (cheap discovery), get_atoms (targeted body-fetch), wait_for_new_turns (group-session subscription), group-session (cross-tool coordination). 032's first-call reliability gate (auto-expand + strict-partition demotion + prefer='newest_first') made resume-after-gap a structural guarantee. cross-tool-spec-review.md promoted to operating-model after 6 confirmation cycles; updated with 033's R1 divergent-verdict + R2 Gate 4 self-failure + recovery-primitive cost reduction. V1.5 substrate items 016-028 + V1.5.6/V1.5.6.1/V1.5.7 patches were promoted 2026-05-09. V1 form-factor surfaces still planned: hotkey-overlay, audit-page."
+    "version": "v1.7-shipped",
+    "generated": "2026-05-27",
+    "notes": "V1.7 promotes 16 items (060-076) covering three concurrent fronts. (A) Raycast hotkey-overlay v0 dogfood: 060 (search-context), 062 (ask-echo Q&A with vendor-agnostic agent profiles + MCP audit sidebar), 063 (sessions-as-objects), 065 (cluster resume via singleflight), 069 (cold-start continuity hero). Documented as a single consolidated page hotkey-overlay-raycast.md; the V1-canonical hotkey-overlay.md stays planned with a v0 cross-link. (B) ECHO Pro coordinate-layer + customer install boundary: 070 (~/.echo global home), 071 (role TOML format + 3 defaults), 072 (adapter sync engine — markers in CLAUDE.md/AGENTS.md, key-only mutation in config.toml/mcp.json, ownership classes), 073 (onboarding wizard library), 074 (echoctl CLI binary), 075 (first demo workflow change-review), 076 (packaged install boundary — daemon survives source-repo deletion via launchd plist rewrite, prepack script ships SQL migrations + skills + assets, npm-installable tarball). First customer-facing artifact in the project; design framed as the paid coordinate tier on top of the free substrate, but shipped code contains zero billing/licensing — any tarball-holder can install. (C) Substrate primitives + protocol clarification: 064 (mcp compact view projection, field-hygiene KEEP/DROP rules on find_clusters + get_atoms, principles clarification that compose-not-capture governs inputs not outputs), 066 (P1 atomic state transition primitive, process-backlog handoff atomicity), 067 (mcp request-log shutdown flush, killed_during_shutdown forensic JSONL — P2 non-graceful death still deferred). 061 doc-leanout (journal monthly shards, HTML twins gitignored, stub-and-archive backlog pattern) is operating-model hygiene only — no wiki page per its own After-Completion note. V1 form-factor surfaces still planned: hotkey-overlay (V1 canonical, distinct from v0 Raycast), audit-page."
   },
   "architecture/artifact-identity.md": {
     "status": "shipped",
@@ -148,6 +148,19 @@
     ],
     "topic": "Architecture",
     "subtopic": "Observability"
+  },
+  "architecture/mcp-compact-view-projection.md": {
+    "status": "shipped",
+    "title": "MCP Compact View Projection",
+    "link": "mcp-compact-view-projection",
+    "summary": "Daemon-side field-hygiene projection (view: 'compact') for find_clusters + get_atoms — KEEP/DROP rules, composes with wire-shape caps, default 'rich' preserves byte-identical legacy output (item 064).",
+    "aliases": [
+      "MCP Compact View Projection",
+      "view=compact",
+      "Compact View"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Retrieval Composition"
   },
   "architecture/normalization.md": {
     "status": "shipped",
@@ -388,6 +401,31 @@
     "topic": "Process",
     "subtopic": "Merge Protocol"
   },
+  "operating-model/mcp-request-log-shutdown.md": {
+    "status": "shipped",
+    "title": "MCP Request Log Shutdown Flush",
+    "link": "mcp-request-log-shutdown",
+    "summary": "Daemon graceful-shutdown flush of in-flight MCP request rows on SIGTERM with killed_during_shutdown status to mcp-shutdown.jsonl; P2 partial closure — non-graceful death deferred (item 067).",
+    "aliases": [
+      "MCP Request Log Shutdown Flush",
+      "Graceful Shutdown Flush"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Observability"
+  },
+  "operating-model/p1-atomic-state-transition.md": {
+    "status": "shipped",
+    "title": "P1 — Atomic State Transition",
+    "link": "p1-atomic-state-transition",
+    "summary": "Harness primitive that makes multi-step state moves crash-safe — single fsync'd index hop is the only legal observable transition. Worked example: process-backlog work-item stage move (item 066). Future consumer: merge-and-cleanup.",
+    "aliases": [
+      "P1",
+      "P1 Atomic State Transition",
+      "Atomic State Transition"
+    ],
+    "topic": "Process",
+    "subtopic": "Drift Audit"
+  },
   "operating-model/review-queue-protocol.md": {
     "status": "shipped",
     "title": "Review Queue Protocol",
@@ -557,6 +595,20 @@
     "topic": "V1 Scope",
     "subtopic": "Bundle Decision"
   },
+  "product/echo-pro-coordinate-layer.md": {
+    "status": "shipped",
+    "title": "ECHO Pro — Coordinate Layer",
+    "link": "echo-pro-coordinate-layer",
+    "summary": "Customer-facing install boundary above the substrate — ~/.echo global home, role TOMLs, adapter sync, onboarding wizard, echoctl binary, packaged daemon. Design intent paid; shipped code has no billing (items 070-076).",
+    "aliases": [
+      "ECHO Pro",
+      "Coordinate Layer",
+      "ECHO Pro Tier",
+      "Customer Install Boundary"
+    ],
+    "topic": "V1 Scope",
+    "subtopic": "Bundle Decision"
+  },
   "product/form-factor-decision.md": {
     "status": "shipped",
     "title": "Form Factor Decision",
@@ -695,6 +747,19 @@
     "topic": "Form Factor",
     "subtopic": "Browser Extension"
   },
+  "surfaces/echoctl-cli.md": {
+    "status": "shipped",
+    "title": "echoctl CLI",
+    "link": "echoctl-cli",
+    "summary": "Customer-facing CLI binary at tools/raycast-echo+dist/cli — subcommands init, doctor, run, daemon (install/start/stop/status/logs/uninstall), project (add/list/remove). Wraps launchd, drives onboarding wizard, dispatches workflows (items 074, 076).",
+    "aliases": [
+      "echoctl",
+      "ECHO CLI",
+      "echo cli"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "MCP Server"
+  },
   "surfaces/hotkey-overlay.md": {
     "status": "planned",
     "title": "Hotkey Overlay",
@@ -703,6 +768,20 @@
     "aliases": [
       "Hotkey Overlay",
       "Hotkey Composer"
+    ],
+    "topic": "Form Factor",
+    "subtopic": "Hotkey Overlay"
+  },
+  "surfaces/hotkey-overlay-raycast.md": {
+    "status": "shipped",
+    "title": "Hotkey Overlay (Raycast v0)",
+    "link": "hotkey-overlay-raycast",
+    "summary": "Shipped v0 of the hotkey overlay as a Raycast extension at tools/raycast-echo/ — search-context (060), ask-echo Q&A (062), sessions-as-objects (063), cluster resume singleflight (065), cold-start continuity hero (069). Dogfood surface; V1 canonical overlay still planned.",
+    "aliases": [
+      "Hotkey Overlay (Raycast v0)",
+      "Raycast Extension",
+      "ask-echo",
+      "search-context"
     ],
     "topic": "Form Factor",
     "subtopic": "Hotkey Overlay"

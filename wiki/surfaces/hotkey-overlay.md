@@ -9,6 +9,8 @@ aliases:
 
 # Hotkey Overlay
 
+> Shipped v0 dogfood: see [[hotkey-overlay-raycast]]. This page describes the V1 vision (still `planned`); the v0 ships as the Raycast extension at `tools/raycast-echo/`.
+
 ## Definition
 
 The system-wide summoned composer. Pressing a global hotkey (default ⌘⇧E) opens a small floating composer anywhere on the OS. The user types intent + target, ECHO assembles context, composer shows the bundle for review, user confirms, target app opens with context on the clipboard.

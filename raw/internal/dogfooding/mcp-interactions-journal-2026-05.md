@@ -1480,6 +1480,16 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** 🟡 partial — find_clusters did its job (named the right threads); get_atoms hit envelope truncation that mattered (codex couldn't hydrate every sampled body it wanted). Cursor MCP disconnect is a separate observation.
 - **Note:** Codex flagged `source_breakdown` sums vs `atom_ids.length` looking inconsistent on skeleton clusters during eyeball check — worth a separate backlog probe if reviewers care about interpretation of breakdown as membership vs window aggregate.
 
+### 2026-05-27 22:10 PDT — coord_invoke ENOENT against packaged daemon (077 r1 dispatch attempt)
+
+- **Trigger:** After committing + pushing `backlog/reviews/2026-05-27-077.../r1/request.md`, strategist called `coord_invoke` once per headless reviewer (codex, codex-ops) to actively spawn the review queue.
+- **Query inputs:** Two `coord_invoke` calls, both with `role={codex, codex-ops}` + `request_path=backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r1/request.md` + `correlation_id=ac4d6377-0f30-46b3-9a9a-bb54345d4c05`.
+- **Returned:** BOTH calls failed with `ENOENT: no such file or directory, stat '/Users/zhenye/.npm-global/lib/node_modules/echoctl/tools/review-queue/run-{codex,codex-ops}-reviewer.sh'`. The daemon's path resolver is anchored at the **packaged install** (`echoctl-0.1.0` installed via npm-global), which intentionally ships only `dist/` per item 076. Reviewer wrappers live in the dev repo, not the packaged install.
+- **Sources:** Error path = `/Users/zhenye/.npm-global/lib/node_modules/echoctl/...`. Dev wrappers exist at `tools/review-queue/run-codex-reviewer.sh` + `run-codex-ops-reviewer.sh` in the source repo.
+- **Verdict:** ❌ wrong — coord_invoke against the packaged daemon cannot dispatch reviewers when the source repo is the artifact of review. This is the install-boundary bug 076 spec addresses for `daemon` lifecycle but NOT for review-queue reviewer wrappers.
+- **Note:** Fell back to manual env-pinned wrapper invocation: `env ECHO_REVIEW_QUEUE_REPO_ROOT=$(pwd) ECHO_COORD_REQUEST_PATH=... ECHO_COORD_CORRELATION_ID=... tools/review-queue/run-codex-reviewer.sh &` — same pinned-request env-var contract 057b's wrapper reads, just bypassing the daemon's spawn. This works because the dev repo IS where the wrapper lives. Worth a follow-up backlog item: the packaged install needs to ship the review-queue wrappers if customers will ever drive review-queue locally, OR coord_invoke needs to resolve against a configurable REPO_ROOT distinct from the daemon's install dir.
+- **Conjecture:** (observation only) The fix is probably "coord_invoke resolves request_path's repo root, then looks for wrappers under that repo's tools/review-queue/, NOT under the daemon binary's install dir." That decouples reviewer spawn from install layout. New backlog item candidate.
+
 ### 2026-05-27 22:14 PDT - codex-ops r1 review tick on 077 cognitive recap via Raycast
 
 - **Trigger:** Codex-ops review queue tick was pinned to `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r1/request.md` and reviewed the pinned r1 077 cognitive-recap spec through the operational/runtime lens.

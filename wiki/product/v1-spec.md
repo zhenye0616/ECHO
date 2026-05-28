@@ -33,6 +33,8 @@ Three thin presences. See [[ambient-form-factor]] and [[felt-not-seen]].
 
 Plus minimal **audit page** for trust. See [[audit-page]].
 
+Customer install boundary: the [[echo-pro-coordinate-layer|coordinate layer]] (`~/.echo/` global home + role TOMLs + adapter sync + onboarding wizard + packaged daemon) is wrapped by the [[echoctl-cli|`echoctl` CLI binary]] — `echoctl init` runs the wizard, `echoctl daemon install` registers the launchd job, `echoctl run <workflow>` dispatches multi-agent workflows. The CLI is infrastructure under the felt-not-seen principle; it is not a destination surface.
+
 Architectural commitment: [[compose-not-capture]].
 
 ## V1 Bundle — 5 Tools

@@ -10,18 +10,19 @@ task_state_ref: 2026-05-27-077-cognitive-recap-via-raycast
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - tools/raycast-echo/package.json  # AC1 — add second top-level command "recap" alongside existing "echo"; add `preferences` entry for `defaultSinceWindow` (optional override of the resolver default). Bump extension version.
-  - tools/raycast-echo/src/recap-context.tsx  # AC2 — new command entry point. Form (optional `since` window text + dropdown {"since last session" (default), "last 24h", "last 4h", "custom ISO"}) → Detail (streaming markdown answer, same shape as ask-context.tsx). Cancellation via tree-kill on view dismount, identical to ask-context's pattern.
+  - tools/raycast-echo/src/recap.tsx  # AC2 — new command entry point. Raycast's manifest convention maps command `name: "recap"` to source file `src/recap.tsx` (mirroring the shipped `name: "echo"` → `src/echo.tsx` mapping from item 063's unification). Form (optional `since` window text + dropdown {"since last session" (default), "last 24h", "last 4h", "custom ISO"}) → Detail (streaming markdown answer, structurally identical to echo.tsx's Detail rendering). Cancellation via tree-kill on view dismount, mirroring echo.tsx's pattern.
+  - tools/raycast-echo/src/echo.tsx  # AC2.6 — minimal additive change ONLY: in the existing fork-action path, detect when the source session carries `recapWindow` and route the fork through the Recap prompt + new Recap session (instead of the Ask follow-up prompt). Recap forks must NOT call the Ask system prompt. See AC2 #5 + AC5 (recap-context.test.tsx) for the test requirement. NO other echo.tsx changes are permitted (system prompt, empty-state hero, sessions list rendering — all unchanged).
   - tools/raycast-echo/src/lib/recap-system-prompt.ts  # AC3 — pinned single-shot system prompt teaching the agent to read combined.md + task-state + agent-runs + git log + recent dogfooding journal entries + MCP find_clusters/get_atoms, then render A/B/D-organized narrative. Snapshot-tested to prevent accidental edits.
   - tools/raycast-echo/src/lib/since-resolver.ts  # AC4 — pure function `resolveSinceWindow(prefs, sessions, nowMs): { sinceIso: string, source: "user" | "last_session" | "fallback_24h" }`. Precedence: (a) explicit user input, (b) most recent Session row with status ∈ {done, cancelled, errored} → use its `completedAt ?? startedAt`, (c) 24h fallback if no qualifying session exists.
   - tools/raycast-echo/src/lib/sessions.ts  # AC2.5 — additive ONLY: add `recapWindow?: { sinceIso: string; source: "user" | "last_session" | "fallback_24h" }` to the Session interface. `normalizeSession` round-trips the optional field through every write path. NO other Session-shape changes are permitted per OoS #9.
   - tools/raycast-echo/test/recap-system-prompt.test.ts  # AC5 — vitest snapshot test on the system prompt body string; intentionally fragile so any edit forces an explicit snapshot refresh (same defense as system-prompt.test.ts).
   - tools/raycast-echo/test/since-resolver.test.ts  # AC5 — vitest cases pinning all three precedence branches: user-input wins, last-session wins when no user input, 24h fallback when no qualifying session, and the status-filter (a `running` session is NOT a qualifying "last session" — only terminal-state sessions count).
-  - tools/raycast-echo/test/recap-context.test.tsx  # AC5 — vitest cases covering the Form → spawn → Detail wiring (mock agent-runner). At minimum: prompt-construction includes the resolved since, agent-profile selection is honored, cancellation kills subprocess tree.
+  - tools/raycast-echo/test/recap.test.tsx  # AC5 — vitest cases covering the Form → spawn → Detail wiring (mock agent-runner). At minimum: prompt-construction includes the resolved since, agent-profile selection is honored, cancellation kills subprocess tree, AND a recap-session fork constructs a NEW Recap session (NOT an Ask follow-up) — see AC2 #5.
   - tools/raycast-echo/README.md  # AC6 — new "Recap" section: install assumptions (same agent CLIs as Ask ECHO — codex/claude/custom on PATH), preferences walkthrough (defaultSinceWindow), the A/B/D output shape, dogfooding template (7-field with `**Surface:** Recap` marker line for gate-checkable journal entries).
 
 spec_refs:
   - backlog/complete/2026-05-18-062-ask-echo-raycast-llm-qa.md  # Ask ECHO architectural precedent this spec mirrors: subprocess agent, pinned prompt, audit endpoint, single-shot by design. Recap inherits ALL of Ask ECHO's "what it does not do" defenses (no threading, no follow-ups, no daemon-side LLM).
-  - tools/raycast-echo/src/ask-context.tsx  # sibling command structure — Form → Detail → tree-kill cancellation. Recap-context.tsx mirrors this file's shape; do NOT modify ask-context.tsx.
+  - tools/raycast-echo/src/echo.tsx  # current single unified Raycast command (per item 063's unification, which removed the earlier `ask-context.tsx`). Structurally the model for recap.tsx (Form → Detail → tree-kill cancellation). Recap reads echo.tsx as a pattern reference AND adds the minimal AC2.6 fork-routing branch; no other modifications permitted.
   - tools/raycast-echo/src/lib/agent-profiles.ts  # agent-invocation contract (reused unchanged). The recap command uses the SAME profile-selection logic; vendor-agnosticism stays at the agent-profile registry, not at an LLM SDK layer.
   - tools/raycast-echo/src/lib/agent-runner.ts  # subprocess spawn + stream contract (reused unchanged).
   - tools/raycast-echo/src/lib/system-prompt.ts  # the existing Ask ECHO system prompt — referenced as a style/length model for recap-system-prompt.ts; do NOT modify.
@@ -87,35 +88,37 @@ The net feature is ≤3 new files + 1 README section + a pinned prompt — sitti
   - `name: "defaultSinceWindow"`, `type: "dropdown"`, `title: "Default Recap Window"`, `default: "last_session"`, `data: [{title: "Since last session", value: "last_session"}, {title: "Last 24 hours", value: "24h"}, {title: "Last 4 hours", value: "4h"}]`.
 - Extension version bumped (semver minor).
 
-Existing `echo` command preferences (`agentKind`, `customCommand`, `repoPath`) are UNCHANGED and REUSED by the recap command at runtime. Adding the `recap` command MUST NOT cause Raycast to lose existing user-set `agentKind` / `customCommand` preferences (verified by reviewer: any preference-namespace change is rejected).
+**Preference scoping (r1 codex F2 / codex-ops F2 patch):** in Raycast, preferences declared under a command are command-scoped — they are NOT visible to a sibling command. Since the existing `echo` command owns `agentKind`, `customCommand`, `repoPath`, and `claudeOauthToken` at command-scope, the new `recap` command MUST **duplicate** these four preference entries under its own command block in `package.json` (NOT migrate them to extension-level — migration would reset existing user-set values for ECHO). The duplicate entries MUST use identical `name` / `type` / `title` / `description` / `data` shapes so the Recap command's `getPreferenceValues()` returns the same TypeScript-typed object as Ask ECHO's. Test requirement (AC5 / recap.test.tsx): a vitest case loading the package.json and asserting that the `recap` command's `preferences` array contains entries for all four duplicated names plus the new `defaultSinceWindow`. Existing user-set ECHO preferences MUST survive the upgrade — verified by a dogfooding step in the README install walkthrough (manual reviewer check: `agentKind` value present in Raycast preferences before+after extension reload).
 
 ### AC2 — Recap command entry point + UI flow
 
-`tools/raycast-echo/src/recap-context.tsx` is the new command's entry point. It mirrors `ask-context.tsx`'s structure exactly:
+`tools/raycast-echo/src/recap.tsx` is the new command's entry point. The filename matches the manifest convention (`name: "recap"` → `src/recap.tsx`, mirroring `name: "echo"` → `src/echo.tsx`). It mirrors `echo.tsx`'s shape:
 
 1. **Form view** (initial): one optional `Form.TextField` "Since (ISO timestamp or empty for default)", one `Form.Dropdown` "Window" pre-populated from preferences, and one `Form.SubmitFormAction` "Recap".
 2. **Resolve `since`** via `resolveSinceWindow()` (AC4) on submit. The resolved ISO timestamp + source label (`user | last_session | fallback_24h`) are passed forward.
 3. **Detail view** (post-submit): identical to Ask ECHO's Detail rendering — streaming markdown answer (throttled `setMarkdown` per 80ms or on subprocess exit), `Detail.Metadata` sidebar populated from `GET /mcp/recent-calls` (reusing `lib/audit.ts` verbatim), header label includes the resolved since + source.
 4. **Cancellation**: dismounting the Detail view triggers `tree-kill` on the subprocess, identical to Ask ECHO.
-5. **Persistence**: the Recap session is written to LocalStorage as a regular `Session` row (see 063's sessions-as-objects model), with a NEW field `recapWindow: { sinceIso: string, source: "user" | "last_session" | "fallback_24h" }` added to the Session interface. Recap sessions appear in the existing `SessionsList` view; ⌘R "Ask again from this" forks a NEW recap session (does not thread).
+5. **Persistence**: the Recap session is written to LocalStorage as a regular `Session` row (see 063's sessions-as-objects model), with a NEW field `recapWindow: { sinceIso: string, source: "user" | "last_session" | "fallback_24h" }` added to the Session interface. Recap sessions appear in the existing `SessionsList` view.
 
-Single-shot is the structural defense against drift-prevention Pattern 5. The Recap command MUST NOT support follow-up turns, in-session continuation, or re-prompting. Re-asking = a new Recap invocation.
+6. **Cmd-R routing for Recap sessions (r1 codex F4 / codex-ops F4 patch):** the existing ⌘R "Ask again from this" action in `echo.tsx` currently builds an Ask follow-up prompt from the source session's question. For Recap sessions (identified by `session.recapWindow !== undefined`), ⌘R MUST instead construct a NEW Recap session — same `recapWindow` (or a fresh one derived from the current resolver call), same Recap system prompt, same agent profile. ⌘R on a Recap session MUST NOT route through the Ask follow-up path; doing so would silently violate single-shot via Ask-vs-Recap prompt mismatch. The branch lives in echo.tsx's fork-action handler (AC2.6 files_to_modify entry); test pinned in `recap.test.tsx` (AC5).
+
+Single-shot is the structural defense against drift-prevention Pattern 5. The Recap command MUST NOT support follow-up turns, in-session continuation, or re-prompting. Re-asking = a NEW Recap session (either ⌘R on a prior recap, or a fresh Raycast → "Recap" invocation).
 
 ### AC3 — Pinned recap system prompt
 
 `tools/raycast-echo/src/lib/recap-system-prompt.ts` exports a single constant string `RECAP_SYSTEM_PROMPT` that:
 
 1. Tells the agent it is a **single-shot recap renderer** for the founder of ECHO, who has been out of the loop since `${SINCE_ISO}`. The agent must compose a strategist-grade narrative organized by three drift axes.
-2. Instructs the agent to read these SIX input sources (in order):
-   - `backlog/reviews/**/r*/combined.md` files with `mtime > since` (decision artifacts; each `combined.md` carries verdicts, severity-tagged findings, and dispositions — the canonical B-axis evidence).
-   - `backlog/task-state/<task-id>/*.md` files with `mtime > since` (current_thesis + open_questions + dont_touch — canonical D-axis evidence).
-   - `raw/internal/agent-runs/*.md` files with `mtime > since` (builder's "Decisions Made During Implementation" sections — B-axis evidence for non-spec-round work).
-   - `git log --oneline --stat ${SINCE_ISO}..HEAD` + selective `git diff` on the highest-impact commits (A-axis evidence).
-   - `raw/internal/dogfooding/mcp-interactions-journal-*.md` entries with timestamp `> since` (cross-tool MCP activity; verifies what ECHO knew when).
+2. Instructs the agent to read these SIX input sources (in order), filtering by **stable embedded timestamps** rather than filesystem `mtime` (r1 codex-ops F3 patch — mtime reflects checkout/touch time, not artifact authorship; a fresh clone or rebase would over-include old files):
+   - `backlog/reviews/**/r*/combined.md` and `r*/codex.md` / `r*/codex-ops.md` / `r*/claude.md` / `r*/cursor.md` files where the frontmatter `completed_at` (response files) or `requested_at` (request files) parses as ISO and is `> ${SINCE_ISO}`. Decision artifacts; each `combined.md` carries verdicts, severity-tagged findings, and dispositions — the canonical B-axis evidence.
+   - `backlog/task-state/<task-id>/*.md` files enumerated via `git log --since="${SINCE_ISO}" --name-only --pretty=format: -- 'backlog/task-state/**'` (touched-since-window via git, NOT mtime). Read current_thesis + open_questions + dont_touch — canonical D-axis evidence.
+   - `raw/internal/agent-runs/*.md` files enumerated via `git log --since="${SINCE_ISO}" --name-only --pretty=format: -- 'raw/internal/agent-runs/**'`. Read each file's "Decisions Made During Implementation" section (and adjacent sections) — B-axis evidence for non-spec-round work.
+   - `git log --since="${SINCE_ISO}" --oneline --stat HEAD` (NOT `${SINCE_ISO}..HEAD` — Git treats the ISO timestamp as a revision name and fails with `fatal: invalid object name`; r1 codex F3 / codex-ops F1 patch). Followed by selective `git diff <sha>~..<sha>` on the highest-impact commits the log surfaces. A-axis evidence.
+   - `raw/internal/dogfooding/mcp-interactions-journal-*.md` — parse `### YYYY-MM-DD HH:MM PDT` headers and include entries whose timestamp is `> ${SINCE_ISO}` (header-embedded timestamp, NOT mtime). Cross-tool MCP activity; verifies what ECHO knew when.
    - MCP `find_clusters({since: ${SINCE_ISO}, repo_path: "${REPO_ROOT}"})` followed by `get_atoms({atom_ids: <top cluster>, prefer: "newest_first"})` ONLY if the four file-based sources above leave gaps (raw cross-tool conversation context).
 3. Pins the output format to three markdown sections, in this order: `## A — Code changed`, `## B — Decisions`, `## D — Direction`. Each section ≤200 words. A final `## Sources` line lists which inputs were used.
 4. Forbids: producing the recap without reading the actual artifacts; inventing decisions not present in `combined.md` or run logs; recommending changes the founder didn't ask for; following up or asking clarifying questions (single-shot).
-5. Total prompt body MUST be < 4096 characters (vendor-portable upper bound) and snapshot-tested.
+5. Total prompt body MUST be < 4096 characters (vendor-portable upper bound) and snapshot-tested. The snapshot test (AC5 / recap-system-prompt.test.ts) additionally asserts the verbatim presence of: (a) the corrected `git log --since="${SINCE_ISO}" ... HEAD` command form (not `${SINCE_ISO}..HEAD`), (b) the `git log --since ... --name-only` enumeration pattern for task-state and agent-runs, (c) the no-mtime constraint, (d) the journal-entry header parser for timestamp filtering. These four assertions structurally prevent regression back to the r1-broken forms.
 
 ### AC4 — `since-resolver.ts`
 
@@ -160,10 +163,12 @@ Three vitest test files added under `tools/raycast-echo/test/`:
   8. windowPref=`4h` → `now - 4h` regardless of sessions
   All ISO outputs end with `Z` (UTC canonical).
 
-- **`recap-context.test.tsx`** — three cases minimum:
+- **`recap.test.tsx`** — five cases minimum:
   1. Form-submit constructs the prompt with the resolved since interpolated into `${SINCE_ISO}`.
   2. Agent profile selection honors `preferences.agentKind` (mocked profile registry).
   3. Detail view unmount calls `tree-kill` on the subprocess PID (mocked agent-runner).
+  4. **(r1 F2 patch)** `package.json`'s `recap` command preferences include `agentKind`, `customCommand`, `repoPath`, `claudeOauthToken`, and `defaultSinceWindow` — duplicated under the recap command, not migrated to extension-level.
+  5. **(r1 F4 patch)** A Recap session (where `session.recapWindow !== undefined`) passed to the fork action constructs a NEW Recap session (asserted via the resulting prompt-construction call using the Recap system prompt, NOT the Ask system prompt).
 
 All tests must pass under root `npm test` AND `tools/raycast-echo/` `npm test`. Typecheck (`tsc --noEmit`) must pass in both roots.
 
@@ -202,8 +207,8 @@ The existing landing-state (empty input → `find_clusters` list → Continue he
 ### #6 — No threading, no follow-ups
 Single-shot is the structural defense against drift-prevention Pattern 5 ("chat with ECHO"). Re-asking is a NEW recap session. The Detail view does NOT render an input field for follow-up turns. If a builder is tempted to add "ask follow-up" to the Detail view — STOP.
 
-### #7 — No modification to existing `ask-context.tsx`, `system-prompt.ts`, or the Continue hero
-The recap is ADDITIVE. The shipped Ask ECHO command and the Continue hero are preserved byte-identically. Reviewers should reject any diff that touches `ask-context.tsx`, `src/components/EmptyState.tsx`, or `src/lib/system-prompt.ts`.
+### #7 — No modification to existing `echo.tsx` (beyond AC2.6), `system-prompt.ts`, or the Continue hero
+The recap is mostly ADDITIVE. The shipped Ask ECHO command and the Continue hero are preserved byte-identically EXCEPT for the single AC2.6 fork-routing branch in `echo.tsx`'s fork-action handler — that branch dispatches to the Recap prompt when the source session carries `recapWindow`. Reviewers should reject any diff that touches `src/components/EmptyState.tsx` or `src/lib/system-prompt.ts`, and any `echo.tsx` change beyond the AC2.6 fork-routing branch. (Note: prior `ask-context.tsx` was unified into `echo.tsx` per item 063; this OoS reflects the current shipped layout.)
 
 ### #8 — Strategist-only files
 `docs/BACKLOG.md`, `wiki/**`, `docs/STATUS.md`, `docs/NORTH_STAR.md` are out of scope per `docs/AGENT_INSTRUCTIONS.md` — builders MUST NOT write to them. The strategist will add the Ready-table row separately at spec commit; the strategist will update `wiki/surfaces/hotkey-overlay-raycast.md` post-shipment with the recap command documentation.

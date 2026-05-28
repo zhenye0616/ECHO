@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 64 pages · 62 shipped · 2 planned
+**Status:** 70 pages · 68 shipped · 2 planned
 
 ---
 
@@ -28,6 +28,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### V1 Scope
 
 - [[bundle-decision|Bundle Decision]] — V1 bundle: Cursor + Claude Code + GitHub + Slack + web AI extension. Why these 5; why not Zoom/email.
+- [[echo-pro-coordinate-layer|ECHO Pro — Coordinate Layer]] — Customer-facing install boundary above the substrate — ~/.echo global home, role TOMLs, adapter sync, onboarding wizard, echoctl binary, packaged daemon. Design intent paid; shipped code has no billing (items 070-076).
 - [[narrowest-v1-scope|Narrowest V1 Scope]] — L1 (passive ingestion) + L3 (summoned, Q&A + assembly) + minimal L5. Cut L2 and L4.
 - [[tier-vs-vertical-slice|Tier-by-Tier vs Vertical Slice]] — Why building tier-by-tier (universal categories first) is wrong. Ship vertical slice across tiers instead.
 - [[v1-spec|V1 Spec (Locked)]] — Final V1 scope: cohort, bundle, form factor, pricing, sequencing, non-goals, definition of done
@@ -75,6 +76,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
 - [[local-daemon|Local Daemon]] — Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.
 - [[logger|Logger]] — Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.
+- [[mcp-compact-view-projection|MCP Compact View Projection]] — Daemon-side field-hygiene projection (view: 'compact') for find_clusters + get_atoms — KEEP/DROP rules, composes with wire-shape caps, default 'rich' preserves byte-identical legacy output (item 064).
 - [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
 - [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
 - [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.
@@ -116,6 +118,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 - [[browser-extension|Browser Extension]] — Already shipped. Captures web AI surfaces and web SaaS. Freemium. Funnel + thesis validator for V1.
 - [[hotkey-overlay|Hotkey Overlay]] *(planned)* — System-wide summon. The Wispr Flow analog. Composer appears anywhere, returns context, disappears.
+- [[hotkey-overlay-raycast|Hotkey Overlay (Raycast v0)]] — Shipped v0 of the hotkey overlay as a Raycast extension at tools/raycast-echo/ — search-context (060), ask-echo Q&A (062), sessions-as-objects (063), cluster resume singleflight (065), cold-start continuity hero (069). Dogfood surface; V1 canonical overlay still planned.
 - [[mcp-server|MCP Server]] — Local MCP server on 127.0.0.1:38478 exposing four tools (search_memories, get_recent_work_context, tail_session, echo_ping) to MCP-compliant AI clients over stateless StreamableHTTP; outputSchema + structuredContent + readOnlyHint on every tool.
 - [[mcp-echo-resolve-mru|MCP echo_resolve_mru Tool]] — V1.6 RC2 MRU resolver — returns search_memories-ready descriptors {source, filter, phase?}; Cursor two-phase fallback (Phase 1 metadata.repo_root, Phase 2 legacy composer↔workspace registry); replaces tail_session compound modes. Item 038.
 - [[mcp-find-clusters|MCP find_clusters Tool]] — V1.6 MCP discovery primitive — coherent work clusters as skeletons (atom_ids[], source_breakdown, ranks, open_loop_hints); cluster-gap controlled by window_hours; lookback by since/until. Item 032 adds no-args auto-expand (empty + single-source-recent triggers) and strict-partition demotion making prior-work clusters[0] a structural guarantee on resume-after-gap. Hard envelope ceiling 25kB; cheap.
@@ -124,6 +127,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[mcp-recent-work-context|MCP get_recent_work_context Tool]] — DEPRECATED V1.5 MCP tool; survives in item 038 as a thin re-export shim. Cluster engine canonical home moved to src/mcp/internal/cluster-engine.ts; MCP-tool registration removal scheduled in the 2026-05-17 follow-up.
 - [[mcp-search-memories|MCP search_memories Tool]] — V1 MCP retrieval tool — case-insensitive substring + filters; source_app enum + post-038 source (exact) + metadata_match (whitelisted keys workspace_id/composer_id/session_id/repo_root); post-037 repo_path; composite-cursor pagination; wire-shape projection.
 - [[mcp-wait-for-new-turns|MCP wait_for_new_turns Tool]] — V1.6 MCP group-session subscription primitive — stateless long-poll on watched sources; post-038 IDs-only contract (returns turn_ids: string[], callers compose get_atoms/get_atom); post-037 repo_path; max 60s timeout; implements Goal A of group-session.
+- [[echoctl-cli|echoctl CLI]] — Customer-facing CLI binary at tools/raycast-echo+dist/cli — subcommands init, doctor, run, daemon (install/start/stop/status/logs/uninstall), project (add/list/remove). Wraps launchd, drives onboarding wizard, dispatches workflows (items 074, 076).
 
 ---
 
@@ -139,11 +143,16 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ## Operating Model — Process Meta
 
+### Architecture
+
+- [[mcp-request-log-shutdown|MCP Request Log Shutdown Flush]] — Daemon graceful-shutdown flush of in-flight MCP request rows on SIGTERM with killed_during_shutdown status to mcp-shutdown.jsonl; P2 partial closure — non-graceful death deferred (item 067).
+
 ### Process
 
 - [[automation-worktree-isolation|Automation worktree isolation (050)]] — Each automated role (reviewer, watcher, merger) runs in its own ephemeral $TMPDIR/echo-<role>-<uuid> worktree pinned to origin/main, eliminating the shared .git/index race surface. Replaces the prior sentinel-file lock convention which depended on every binding reading it. Unified ERR/EXIT cleanup; live checkout's .git/index is never written to by an automated tick.
 - [[builder-bindings|Builder bindings]] — Three documented builder bindings — Claude Code (in-session via process-backlog skill), codex (headless via run-codex-builder.sh launchd wrapper), Cursor's Claude (IDE-mode via paste-trigger ritual). 055 closed the third-binding matrix. Add-a-binding recipe + cross-binding race semantics + operator-facing trigger differences.
 - [[cross-tool-spec-review|Cross-Tool Spec Review]] — Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.
 - [[merge-protocol|Merge protocol]] — Founder-in-the-loop merge protocol for backlog/pending_review items. Pre-flight clean-tree check, ephemeral merger worktree (050 AC3), per-item C1-C11 loop with founder checkpoints at conflicts (C3), optional cross-vendor C3.5 consult (054), verify (C5), explicit founder live-checkout bringup at end of Step D. Thin pointer; canonical lives in skills/merge-and-cleanup.md.
+- [[p1-atomic-state-transition|P1 — Atomic State Transition]] — Harness primitive that makes multi-step state moves crash-safe — single fsync'd index hop is the only legal observable transition. Worked example: process-backlog work-item stage move (item 066). Future consumer: merge-and-cleanup.
 - [[review-queue-protocol|Review Queue Protocol]] — File-backed wire protocol for strategist↔reviewer handoffs — three artifacts (request.md, <reviewer>.md, combined.md), three loop exits, fresh-eyes-at-SHA invariant
 - [[wave-1-2-3-retrospective|Wave 1-2-3 Retrospective]] — Process retrospective on items 001-015: where small items, atomic claim, and drift discipline paid off — and where they didn't.
