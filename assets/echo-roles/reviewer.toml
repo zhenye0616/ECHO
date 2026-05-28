@@ -1,7 +1,7 @@
 [role]
-description = "Fresh-eyes-at-SHA code review. Reads the diff against acceptance criteria, surfaces correctness/scope/style findings. Read-only sandbox; never merges. Per-vendor adapters (codex, codex-ops, claude) share this role shape."
+description = "Read-only change review role for customer workflows. Reviews the current repository diff, uses ECHO context when useful, and reports actionable findings."
 sandbox = "read-only"
-skills = ["review-queue-codex", "review-queue-codex-ops", "review-queue-claude"]
+skills = ["using-echo-mcp"]
 
 [role.requires]
 mcp_servers = ["echo"]

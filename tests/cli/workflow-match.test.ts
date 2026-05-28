@@ -105,7 +105,7 @@ describe('matchRolesToAgents', () => {
   it('matches shipped change-review workflow to the default reviewer role and codex profile', () => {
     const workflow = loadWorkflow(join(repoRoot, 'assets/echo-workflows/change-review.toml'));
     const roles = loadRolesFromDir(join(repoRoot, 'assets/echo-roles'), {
-      skillsRoot: join(repoRoot, 'skills'),
+      skillsRoot: join(repoRoot, 'assets/echo-skills'),
     });
 
     const matches = matchRolesToAgents({
@@ -129,7 +129,7 @@ describe('matchRolesToAgents', () => {
   it('uses wired_at ordering for shipped change-review when codex and claude-code both match', () => {
     const workflow = loadWorkflow(join(repoRoot, 'assets/echo-workflows/change-review.toml'));
     const roles = loadRolesFromDir(join(repoRoot, 'assets/echo-roles'), {
-      skillsRoot: join(repoRoot, 'skills'),
+      skillsRoot: join(repoRoot, 'assets/echo-skills'),
     });
 
     const codexFirst = matchRolesToAgents({

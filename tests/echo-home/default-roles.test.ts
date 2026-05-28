@@ -1,6 +1,6 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   CAPABILITIES,
@@ -11,19 +11,9 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 const DEFAULT_ROLES_DIR = join(REPO_ROOT, 'assets', 'echo-roles');
-const SKILLS_DIR = join(REPO_ROOT, 'skills');
+const CUSTOMER_SKILLS_DIR = join(REPO_ROOT, 'assets', 'echo-skills');
 
-const DEFAULT_SKILL_NAMES = [
-  'merge-and-cleanup',
-  'process-backlog',
-  'process-backlog-batch',
-  'review-pending',
-  'review-queue-claude',
-  'review-queue-codex',
-  'review-queue-codex-ops',
-  'review-queue-watch',
-  'role-typed-task-state',
-] as const;
+const DEFAULT_SKILL_NAMES = ['using-echo-mcp'] as const;
 
 let tmpRoot: string | undefined;
 
@@ -31,7 +21,7 @@ function makeTempDefaultRoles(filenames: readonly string[]): string {
   tmpRoot = mkdtempSync(join(tmpdir(), 'echo-default-roles-'));
   const repoRoot = join(tmpRoot, 'repo');
   const rolesDir = join(repoRoot, 'assets', 'echo-roles');
-  const skillsDir = join(repoRoot, 'skills');
+  const skillsDir = join(repoRoot, 'assets', 'echo-skills');
   mkdirSync(rolesDir, { recursive: true });
   mkdirSync(skillsDir, { recursive: true });
   writeFileSync(join(repoRoot, 'package.json'), '{}\n');
@@ -64,7 +54,10 @@ afterEach(() => {
 
 describe('default ECHO role assets', () => {
   it('loads exactly the three default roles in deterministic order', () => {
-    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, { assertDefaults: true });
+    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, {
+      assertDefaults: true,
+      skillsRoot: CUSTOMER_SKILLS_DIR,
+    });
 
     expect(roles.map((role) => role.name)).toEqual(['builder', 'reviewer', 'strategist']);
   });
@@ -77,10 +70,11 @@ describe('default ECHO role assets', () => {
     expect(DEFAULT_ROLE_FILENAMES).toEqual(filenames);
   });
 
-  it('points every default skill reference at an existing canonical skill file', () => {
-    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, { skillsRoot: SKILLS_DIR });
+  it('points every default skill reference at an existing customer-shipped skill file', () => {
+    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, { skillsRoot: CUSTOMER_SKILLS_DIR });
 
     for (const role of roles) {
+      expect(role.skills).toEqual(['using-echo-mcp']);
       for (const skill of role.skills) {
         expect(role.sourcePath).toContain(join('assets', 'echo-roles', `${role.name}.toml`));
         expect(DEFAULT_SKILL_NAMES).toContain(skill as (typeof DEFAULT_SKILL_NAMES)[number]);
@@ -90,7 +84,7 @@ describe('default ECHO role assets', () => {
 
   it('uses only the public capability vocabulary in default role assets', () => {
     const allowed = new Set<string>(CAPABILITIES);
-    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR);
+    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, { skillsRoot: CUSTOMER_SKILLS_DIR });
 
     for (const role of roles) {
       expect(role.requires.capabilities.length).toBeGreaterThan(0);
@@ -101,31 +95,42 @@ describe('default ECHO role assets', () => {
   });
 
   it('defines the reviewer role as read-only with review output fields', () => {
-    const reviewer = loadRolesFromDir(DEFAULT_ROLES_DIR).find((role) => role.name === 'reviewer');
+    const reviewer = loadRolesFromDir(DEFAULT_ROLES_DIR, {
+      skillsRoot: CUSTOMER_SKILLS_DIR,
+    }).find((role) => role.name === 'reviewer');
 
     expect(reviewer).toBeDefined();
     expect(reviewer?.sandbox).toBe('read-only');
+    expect(reviewer?.skills).toEqual(['using-echo-mcp']);
     expect(reviewer?.requires.capabilities).toEqual(['fs.read', 'git.read', 'mcp.echo.read']);
     expect(reviewer?.output.requiredFields).toEqual(['verdict', 'reviewer', 'findings']);
   });
 
-  it('defines builder and strategist as workspace-write coordination roles', () => {
-    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR);
+  it('keeps customer default roles minimal and backed by the shipped ECHO MCP skill', () => {
+    const roles = loadRolesFromDir(DEFAULT_ROLES_DIR, { skillsRoot: CUSTOMER_SKILLS_DIR });
     const builder = roles.find((role) => role.name === 'builder');
     const strategist = roles.find((role) => role.name === 'strategist');
 
     expect(builder?.sandbox).toBe('workspace-write');
-    expect(builder?.skills).toContain('process-backlog');
-    expect(builder?.skills).toContain('process-backlog-batch');
-    expect(strategist?.sandbox).toBe('workspace-write');
-    expect(strategist?.skills).toContain('review-queue-watch');
-    expect(strategist?.skills).toContain('merge-and-cleanup');
+    expect(builder?.skills).toEqual(['using-echo-mcp']);
+    expect(builder?.requires.capabilities).toEqual([
+      'fs.read',
+      'fs.write',
+      'git.read',
+      'git.write',
+      'mcp.echo.read',
+    ]);
+    expect(strategist?.sandbox).toBe('read-only');
+    expect(strategist?.skills).toEqual(['using-echo-mcp']);
+    expect(strategist?.requires.capabilities).toEqual(['fs.read', 'git.read', 'mcp.echo.read']);
   });
 
   it('loads partial role directories when assertDefaults is not requested', () => {
     const partialRolesDir = makeTempDefaultRoles(['builder.toml']);
 
-    const roles = loadRolesFromDir(partialRolesDir);
+    const roles = loadRolesFromDir(partialRolesDir, {
+      skillsRoot: join(dirname(partialRolesDir), 'echo-skills'),
+    });
 
     expect(roles.map((role) => role.name)).toEqual(['builder']);
   });
@@ -133,7 +138,10 @@ describe('default ECHO role assets', () => {
   it('accepts a complete installation when assertDefaults is requested', () => {
     const rolesDir = makeTempDefaultRoles(DEFAULT_ROLE_FILENAMES);
 
-    const roles = loadRolesFromDir(rolesDir, { assertDefaults: true });
+    const roles = loadRolesFromDir(rolesDir, {
+      assertDefaults: true,
+      skillsRoot: join(dirname(rolesDir), 'echo-skills'),
+    });
 
     expect(roles.map((role) => role.name)).toEqual(['builder', 'reviewer', 'strategist']);
   });

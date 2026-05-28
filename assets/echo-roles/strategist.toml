@@ -1,12 +1,12 @@
 [role]
-description = "Long-context planner. Drafts backlog specs from founder conversations, synthesizes reviewer findings across rounds, decides when a spec is ready to merge. Reads the full corpus on cold-start via task-state pointers."
-sandbox = "workspace-write"
-skills = ["review-queue-watch", "review-pending", "merge-and-cleanup", "role-typed-task-state"]
+description = "Planning role for customer workflows. Recovers relevant ECHO context, frames the decision or plan, and identifies concrete next steps."
+sandbox = "read-only"
+skills = ["using-echo-mcp"]
 
 [role.requires]
 mcp_servers = ["echo"]
-capabilities = ["fs.read", "fs.write", "git.read", "git.write", "mcp.echo.read", "mcp.echo.write"]
+capabilities = ["fs.read", "git.read", "mcp.echo.read"]
 
 [role.output]
 format = "markdown"
-required_fields = ["spec-body", "acceptance-criteria"]
+required_fields = ["decision", "next_steps"]
