@@ -281,6 +281,7 @@ describe('runInit', () => {
     );
     expect(cursor.mcpServers.echo.url).toBe('http://127.0.0.1:41234/mcp');
     expect(codexCache.mcpServerConfig.url).toBe('http://127.0.0.1:41234/mcp');
+    expect(existsSync(join(isolatedHome, 'skills', 'using-echo-coord.md'))).toBe(true);
     expect(existsSync(join(isolatedHome, 'skills', 'using-echo-mcp.md'))).toBe(true);
     expect(existsSync(join(isolatedHome, 'skills', 'merge-and-cleanup.md'))).toBe(false);
     expect(existsSync(join(isolatedHome, 'skills', 'process-backlog.md'))).toBe(false);

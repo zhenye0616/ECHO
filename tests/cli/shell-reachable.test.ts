@@ -48,6 +48,7 @@ describe('echoctl shell reachability', () => {
           'package/dist/cli/index.js',
           'package/dist/daemon/index.js',
           'package/dist/storage/migrations/0001_initial.sql',
+          'package/assets/echo-skills/using-echo-coord.md',
           'package/assets/echo-skills/using-echo-mcp.md',
           'package/assets/echo-roles/reviewer.toml',
           'package/assets/echo-workflows/change-review.toml',
