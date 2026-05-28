@@ -193,6 +193,71 @@ function launchdLoaded(config: Pick<DaemonConfig, 'label'>, deps: DaemonDeps): C
   return launchctl(deps, ['print', jobTarget(config, deps)]);
 }
 
+function parseNonNegativeInt(value: string): number | null {
+  if (!/^\d+$/.test(value)) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function parsePsElapsedTimeSeconds(raw: string): number | null {
+  const value = raw.trim();
+  if (value.length === 0) return null;
+
+  const dayParts = value.split('-');
+  if (dayParts.length > 2) return null;
+
+  let days = 0;
+  let time = value;
+  const hasDays = dayParts.length === 2;
+  if (hasDays) {
+    const parsedDays = parseNonNegativeInt(dayParts[0]!);
+    if (parsedDays === null) return null;
+    days = parsedDays;
+    time = dayParts[1]!;
+  }
+
+  const pieces = time.split(':');
+  if (hasDays ? pieces.length !== 3 : pieces.length < 2 || pieces.length > 3) return null;
+
+  const [hoursRaw, minutesRaw, secondsRaw] =
+    pieces.length === 3 ? pieces : ['0', pieces[0]!, pieces[1]!];
+  const hours = parseNonNegativeInt(hoursRaw);
+  const minutes = parseNonNegativeInt(minutesRaw);
+  const seconds = parseNonNegativeInt(secondsRaw);
+  if (hours === null || minutes === null || seconds === null) return null;
+  if (minutes >= 60 || seconds >= 60) return null;
+  if (hasDays && hours >= 24) return null;
+
+  return days * 86_400 + hours * 3_600 + minutes * 60 + seconds;
+}
+
+export async function getDaemonUptimeSeconds(
+  pid: number,
+  deps: DaemonDeps = {},
+): Promise<number | null> {
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const result = run(deps, 'ps', ['-o', 'etime=', '-p', String(pid)]);
+  if (result.status !== 0 || commandMissing(result)) return null;
+  const line = result.stdout
+    .split(/\r?\n/)
+    .map((part) => part.trim())
+    .find((part) => part.length > 0);
+  return line === undefined ? null : parsePsElapsedTimeSeconds(line);
+}
+
+export function formatUptime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(total / 86_400);
+  const hours = Math.floor((total % 86_400) / 3_600);
+  const minutes = Math.floor((total % 3_600) / 60);
+  const remainingSeconds = total % 60;
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
+  return `${remainingSeconds}s`;
+}
+
 function packageRootFromDaemonPath(daemonPath: string): string {
   return dirname(dirname(dirname(daemonPath)));
 }
@@ -541,30 +606,66 @@ function stop(config: DaemonConfig, deps: DaemonDeps, stdout: Writable, stderr: 
   return 0;
 }
 
-async function status(config: DaemonConfig, deps: DaemonDeps, stdout: Writable, stderr: Writable): Promise<number> {
+async function status(config: DaemonConfig, deps: DaemonOpts, stdout: Writable, stderr: Writable): Promise<number> {
   const loaded = launchdLoaded(config, deps);
   if (commandMissing(loaded)) {
     writeLine(stderr, 'launchctl not found; daemon lifecycle requires macOS launchd');
     return 2;
   }
   if (loaded.status !== 0) {
-    writeLine(stdout, `ECHO daemon: not running\n  plist:       ${config.plistPath}`);
+    if (deps.json === true) {
+      writeLine(
+        stdout,
+        JSON.stringify({
+          daemon: 'not running',
+          plist: config.plistPath,
+          uptime: 'unknown',
+          uptime_seconds: null,
+        }),
+      );
+    } else {
+      writeLine(stdout, `ECHO daemon: not running\n  plist:       ${config.plistPath}`);
+    }
     return 2;
   }
   const runtime = existsSync(config.plistPath) ? readPlistConfig(config) : config;
   const healthy = await probeOnce(runtime.port, deps);
-  const pid = /pid\s*=\s*(\d+)/i.exec(loaded.stdout)?.[1] ?? 'unknown';
+  const pidMatch = /pid\s*=\s*(\d+)/i.exec(loaded.stdout);
+  const pid = pidMatch === null ? null : Number.parseInt(pidMatch[1]!, 10);
+  const uptimeSeconds = pid === null ? null : await getDaemonUptimeSeconds(pid, deps);
+  const uptime = uptimeSeconds === null ? 'unknown' : formatUptime(uptimeSeconds);
+
+  if (deps.json === true) {
+    writeLine(
+      stdout,
+      JSON.stringify({
+        daemon: 'running',
+        plist: runtime.plistPath,
+        binary: runtime.daemonPath,
+        pid,
+        port: runtime.port,
+        home: runtime.home,
+        data_dir: runtime.dataDir,
+        db_path: runtime.dbPath,
+        uptime,
+        uptime_seconds: uptimeSeconds,
+        health: healthy ? 'healthy' : 'broken',
+      }),
+    );
+    return healthy ? 0 : 2;
+  }
+
   writeLine(
     stdout,
     `ECHO daemon: running
   plist:       ${runtime.plistPath}
   binary:      ${runtime.daemonPath}
-  pid:         ${pid}
+  pid:         ${pid === null ? 'unknown' : pid}
   port:        ${runtime.port}
   home:        ${runtime.home}
   data-dir:    ${runtime.dataDir}
   db-path:     ${runtime.dbPath}
-  uptime:      unknown
+  uptime:      ${uptime}
   health:      ${healthy ? 'healthy' : 'broken'}`,
   );
   return healthy ? 0 : 2;
@@ -682,7 +783,7 @@ export async function runDaemon(opts: DaemonOpts = {}): Promise<number> {
 async function runVerb(
   verb: string,
   config: DaemonConfig,
-  deps: DaemonDeps,
+  deps: DaemonOpts,
   stdout: Writable,
   stderr: Writable,
   tail: number,

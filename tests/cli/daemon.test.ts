@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { renderLaunchdPlist, runDaemon, type DaemonConfig } from '../../src/cli/commands/daemon.js';
+import {
+  formatUptime,
+  getDaemonUptimeSeconds,
+  renderLaunchdPlist,
+  runDaemon,
+  type DaemonConfig,
+} from '../../src/cli/commands/daemon.js';
 
 let tmpRoot: string;
 let packageRoot: string;
@@ -52,7 +58,10 @@ function writePlist(overrides: Partial<DaemonConfig> = {}): void {
   writeFileSync(plistPath, renderLaunchdPlist(config(overrides)));
 }
 
-function makeSpawnSync(calls: Call[], opts: { loaded?: boolean } = {}) {
+function makeSpawnSync(
+  calls: Call[],
+  opts: { loaded?: boolean; etime?: string; psStatus?: number } = {},
+) {
   return ((command: string, args: readonly string[]) => {
     const argv = [...args];
     calls.push({ command, args: argv });
@@ -70,6 +79,11 @@ function makeSpawnSync(calls: Call[], opts: { loaded?: boolean } = {}) {
     if (command === 'launchctl') {
       return { status: 0, stdout: '', stderr: '' };
     }
+    if (command === 'ps') {
+      return opts.psStatus === undefined || opts.psStatus === 0
+        ? { status: 0, stdout: `${opts.etime ?? '1:02:03'}\n`, stderr: '' }
+        : { status: opts.psStatus, stdout: '', stderr: 'no such process\n' };
+    }
     if (command === 'tail') {
       return { status: 0, stdout: argv.join('\n'), stderr: '' };
     }
@@ -79,14 +93,26 @@ function makeSpawnSync(calls: Call[], opts: { loaded?: boolean } = {}) {
 
 async function runWith(
   argv: string[],
-  opts: { loaded?: boolean; health?: boolean; daemonPathOverride?: string } = {},
+  opts: {
+    loaded?: boolean;
+    health?: boolean;
+    daemonPathOverride?: string;
+    etime?: string;
+    psStatus?: number;
+    json?: boolean;
+  } = {},
 ): Promise<{ code: number; calls: Call[]; stdout: string; stderr: string }> {
   const calls: Call[] = [];
   const code = await runDaemon({
     argv,
+    json: opts.json,
     stdout: { write: (s) => (out.push(String(s)), true) },
     stderr: { write: (s) => (err.push(String(s)), true) },
-    spawnSync: makeSpawnSync(calls, { loaded: opts.loaded }),
+    spawnSync: makeSpawnSync(calls, {
+      loaded: opts.loaded,
+      etime: opts.etime,
+      psStatus: opts.psStatus,
+    }),
     healthProbe: async () => opts.health ?? true,
     sleep: async () => {},
     getuid: () => 501,
@@ -96,6 +122,54 @@ async function runWith(
   });
   return { code, calls, stdout: out.join(''), stderr: err.join('') };
 }
+
+describe('daemon uptime helpers', () => {
+  it('formats uptime using compact day, hour, minute, and second units', () => {
+    expect(formatUptime(0)).toBe('0s');
+    expect(formatUptime(47)).toBe('47s');
+    expect(formatUptime(7 * 60 + 5)).toBe('7m 5s');
+    expect(formatUptime(2 * 3_600 + 14 * 60 + 33)).toBe('2h 14m 33s');
+    expect(formatUptime(3 * 86_400 + 5 * 3_600 + 22 * 60 + 9)).toBe('3d 5h 22m');
+  });
+
+  it('reads daemon uptime from ps etime output', async () => {
+    const calls: Call[] = [];
+    await expect(
+      getDaemonUptimeSeconds(12345, {
+        spawnSync: makeSpawnSync(calls, { etime: '3-05:22:09' }),
+      }),
+    ).resolves.toBe(3 * 86_400 + 5 * 3_600 + 22 * 60 + 9);
+
+    expect(calls).toContainEqual({
+      command: 'ps',
+      args: ['-o', 'etime=', '-p', '12345'],
+    });
+    await expect(
+      getDaemonUptimeSeconds(12345, {
+        spawnSync: makeSpawnSync([], { etime: '2:14:33' }),
+      }),
+    ).resolves.toBe(2 * 3_600 + 14 * 60 + 33);
+    await expect(
+      getDaemonUptimeSeconds(12345, {
+        spawnSync: makeSpawnSync([], { etime: '00:47' }),
+      }),
+    ).resolves.toBe(47);
+  });
+
+  it('returns null when ps fails or etime is malformed', async () => {
+    await expect(
+      getDaemonUptimeSeconds(12345, {
+        spawnSync: makeSpawnSync([], { psStatus: 1 }),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      getDaemonUptimeSeconds(12345, {
+        spawnSync: makeSpawnSync([], { etime: 'not-time' }),
+      }),
+    ).resolves.toBeNull();
+    await expect(getDaemonUptimeSeconds(0)).resolves.toBeNull();
+  });
+});
 
 describe('echoctl daemon', () => {
   beforeEach(() => {
@@ -229,6 +303,25 @@ describe('echoctl daemon', () => {
     expect(stdout).toContain('health:      broken');
     expect(stdout).toContain(`data-dir:    ${dataDir}`);
     expect(stdout).toContain(`db-path:     ${dbPath}`);
+    expect(stdout).toContain('uptime:      1h 2m 3s');
+    expect(stdout).not.toContain('uptime:      unknown');
+  });
+
+  it('status json keeps formatted uptime and exposes raw uptime seconds', async () => {
+    writePlist();
+    const { code, stdout } = await runWith(
+      ['status', '--label', 'com.echo.daemon.test-unit', '--plist-path', plistPath],
+      { loaded: true, health: true, etime: '00:47', json: true },
+    );
+
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({
+      daemon: 'running',
+      pid: 12345,
+      uptime: '47s',
+      uptime_seconds: 47,
+      health: 'healthy',
+    });
   });
 
   it('logs uses the overridden log directory', async () => {
