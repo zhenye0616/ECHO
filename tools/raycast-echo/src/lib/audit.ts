@@ -26,6 +26,7 @@ export interface FetchAuditOptions {
   since: number;
   until?: number;
   status?: AuditStatus;
+  signal?: AbortSignal;
 }
 
 export class AuditUnavailableError extends Error {
@@ -45,7 +46,7 @@ export async function fetchRecentCalls(options: FetchAuditOptions): Promise<Audi
 
   let response: Response;
   try {
-    response = await fetch(url);
+    response = await fetch(url, { signal: options.signal });
   } catch (err) {
     throw new AuditUnavailableError((err as Error).message);
   }

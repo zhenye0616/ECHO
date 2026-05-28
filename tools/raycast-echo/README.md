@@ -44,6 +44,42 @@ ECHO dogfooding journal template:
 **Conjecture:**
 ```
 
+## Recap
+
+`Recap` is a second command in the same extension. It produces one ephemeral A/B/D project recap by spawning the selected local agent over existing artifacts: review `combined.md`, task-state pointers, agent-run logs, git history, the dogfooding journal, and best-effort MCP clusters. It does not write a session row, does not add follow-up turns, and does not change the ECHO command.
+
+Install assumptions match ECHO: `codex`, `claude`, or your custom agent command must already be on `PATH`, and that agent must already be configured to use the local ECHO MCP server when it chooses the MCP fallback.
+
+Recap preferences are command-scoped. Raycast does not copy the ECHO command's saved values into Recap, so configure Recap explicitly on first run:
+
+1. Search Raycast for `Recap`, then open the command preferences.
+2. Set **Agent**, **Custom Command** if Agent is custom, **Repository Path**, and **Claude OAuth Token** if Agent is Claude.
+3. Set **Default Recap Window** to `Since last session`, `Last 24 hours`, or `Last 4 hours`.
+4. Run `Recap` after the Recap preference panel shows the intended values.
+
+Output shape:
+
+- `## A - Code changed`
+- `## B - Decisions`
+- `## D - Direction`
+- `## Sources`
+
+The answer is capped to a compact recap, roughly 500 words. If the daemon is down, Recap still runs from file and git evidence; verify this path by stopping the daemon and confirming A/B/D still renders. The audit sidebar may show `Audit unavailable` in that mode.
+
+Recap dogfooding journal template:
+
+```markdown
+**Surface:** Recap
+**Trigger:**
+**Repo:** <absolute repo path>
+**Tool and query inputs:** agent=<codex|claude|custom>; since=<ISO>; source=<user|last_session|window_24h|window_4h|fallback_24h>; daemon=<up|down|unknown>
+**Returned shape:** status=<done|cancelled|errored|empty>; sections=<A/B/D/Sources present?>; words=<approx>
+**Sources:** <copy the Recap Sources section and any audit rows>
+**Verdict:** <right|partial|wrong>
+**Note:**
+**Conjecture:**
+```
+
 ## Dogfooding (v0 contract)
 
 > Every invocation of ⌘⇧E should be logged to `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `mcp-interactions-journal-2026-05.md`) using the template above. This session model is "done" when the journal contains ≥10 entries across ≥3 calendar days, covers the four original pains, and includes explicit notes on audit-window contamination and overlapping-session durability.

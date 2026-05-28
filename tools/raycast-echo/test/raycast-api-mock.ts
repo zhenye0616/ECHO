@@ -28,6 +28,7 @@ export const Icon = {
   MagnifyingGlass: "magnifying-glass",
   Plus: "plus",
   RotateClockwise: "rotate-clockwise",
+  Sidebar: "sidebar",
   Stars: "stars",
   Terminal: "terminal",
   Text: "text",
@@ -40,6 +41,7 @@ export const Action = Object.assign(component("Action"), {
   Open: component("Action.Open"),
   Paste: component("Action.Paste"),
   Push: component("Action.Push"),
+  SubmitForm: component("Action.SubmitForm"),
   Style: { Destructive: "destructive" },
 });
 
@@ -67,6 +69,13 @@ export const List = Object.assign(component("List"), {
   EmptyView: component("List.EmptyView"),
   Dropdown: Object.assign(component("List.Dropdown"), {
     Item: component("List.Dropdown.Item"),
+  }),
+});
+
+export const Form = Object.assign(component("Form"), {
+  TextField: component("Form.TextField"),
+  Dropdown: Object.assign(component("Form.Dropdown"), {
+    Item: component("Form.Dropdown.Item"),
   }),
 });
 
