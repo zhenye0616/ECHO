@@ -2,12 +2,19 @@
 task_id: 2026-05-27-077-cognitive-recap-via-raycast
 role: builder
 writer: codex-builder
-last_updated: 2026-05-28T07:21:00Z
+last_updated: 2026-05-28T07:41:11Z
+handoff_branch: agent/cognitive-recap-via-raycast
+handoff_head_sha: ac8969fdd272a844d908dfdf7280fbddbc004a1f
+handoff_run_log: raw/internal/agent-runs/2026-05-28-2026-05-27-077-cognitive-recap-via-raycast.md
 ---
 
 ## current_thesis
 
 Claimed 077 as Codex builder. Implement the Raycast Recap command as an explicit, ephemeral, single-shot project recap surface over existing artifacts, reusing Ask ECHO's agent profile and subprocess patterns while keeping Ask ECHO's shipped command/components byte-identical.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at ac8969fdd272a844d908dfdf7280fbddbc004a1f.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -33,5 +40,5 @@ Claimed 077 as Codex builder. Implement the Raycast Recap command as an explicit
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-27-077-cognitive-recap-via-raycast.md
+- spec: backlog/pending_review/2026-05-27-077-cognitive-recap-via-raycast.md
 - reviews: backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/
