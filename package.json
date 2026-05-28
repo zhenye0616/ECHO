@@ -19,8 +19,11 @@
     "tools/review-queue/coord-roles.json",
     "tools/review-queue/reviewers.json",
     "tools/review-queue/schemas/**",
-    "package.json",
-    "README.md"
+    "docs/echoctl-install.md",
+    "./CHANGELOG.md",
+    "./LICENSE",
+    "./package.json",
+    "./README.md"
   ],
   "scripts": {
     "test": "vitest run",

@@ -45,11 +45,15 @@ describe('echoctl shell reachability', () => {
       const tarEntries = tarList.stdout.split(/\r?\n/);
       expect(tarEntries).toEqual(
         expect.arrayContaining([
+          'package/README.md',
+          'package/LICENSE',
+          'package/CHANGELOG.md',
           'package/dist/cli/index.js',
           'package/dist/cli/commands/project.js',
           'package/dist/cli/commands/project.d.ts',
           'package/dist/daemon/index.js',
           'package/dist/storage/migrations/0001_initial.sql',
+          'package/docs/echoctl-install.md',
           'package/assets/echo-skills/using-echo-coord.md',
           'package/assets/echo-skills/using-echo-mcp.md',
           'package/assets/echo-roles/reviewer.toml',
@@ -60,6 +64,9 @@ describe('echoctl shell reachability', () => {
         ]),
       );
       expect(tarEntries.some((entry) => entry.startsWith('package/backlog/'))).toBe(false);
+      expect(tarEntries.filter((entry) => entry.startsWith('package/docs/'))).toEqual([
+        'package/docs/echoctl-install.md',
+      ]);
       expect(tarEntries.some((entry) => entry.startsWith('package/raw/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/wiki/'))).toBe(false);
       expect(tarEntries.some((entry) => entry.startsWith('package/skills/'))).toBe(false);
