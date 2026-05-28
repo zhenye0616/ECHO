@@ -43,10 +43,10 @@ spec_refs:
   - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # journaling sink — AC7 ≥3 founder-flagged entries / ≥2 calendar days with `**Surface:** Recap` marker; mechanically checkable via `grep -c`.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-28T07:19:37Z"
+branch: "agent/cognitive-recap-via-raycast"
+worktree: "/Users/zhenye/Desktop/Project_echo--cognitive-recap-via-raycast"
 head_sha: ""
 pr_url: ""
 review_notes: ""
