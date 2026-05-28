@@ -49,7 +49,28 @@ branch: "agent/cognitive-recap-via-raycast"
 worktree: "/Users/zhenye/Desktop/Project_echo--cognitive-recap-via-raycast"
 head_sha: "ac8969fdd272a844d908dfdf7280fbddbc004a1f"
 pr_url: ""
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-28 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean fast-forward — merge-base was tip of origin/main, single feature commit ahead)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict was "merge as-is"; pre-merge punch list was empty)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 1464/1464 root tests pass (21 skipped, 1 file skipped); raycast-echo 140/140 confirmed during /review-pending; lint and typecheck clean post-merge; tools/sync-skills.sh --check OK.
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - Document the additive-only extension pattern (audit.ts r9 F1, agent-runner.ts here) so future agents recognize the idiom and don't trip the drift heuristic. Use 077's agent-runner.ts change as the worked example.
+  - Cosmetic recap.tsx polish: (a) when status === "empty", replace markdown body's "Waiting for agent output..." placeholder with "_Agent exited with no output._"; (b) split repoPath into its own visible Form.TextField or move error display to a top-level failure toast (currently piggybacks on the Window dropdown's error slot).
+  - Founder-side AC7 dogfooding-gate tracking: count "**Surface:** Recap" entries in raw/internal/dogfooding/mcp-interactions-journal-2026-05.md; gate flips to "validated" at ≥3 entries / ≥2 calendar days / ≥1 ✅ + ≥1 🟡 or ❌.
+
+  Drift observation (non-blocking): tools/raycast-echo/src/lib/agent-runner.ts was modified outside files_to_modify (listed only in spec_refs as "reused unchanged"). Change is strictly additive — opt-out sessionLogEnabled flag + formatDuration() helper. Same additive-only pattern explicitly authorized for audit.ts r9 F1. Judged acceptable necessary drift.
 agent_notes: |
   Implemented Raycast Recap on branch `agent/cognitive-recap-via-raycast` at `ac8969fdd272a844d908dfdf7280fbddbc004a1f`.
 
