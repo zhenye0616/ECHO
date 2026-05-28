@@ -200,6 +200,21 @@ describe("agent runner", () => {
     expect(SESSION_LOG_DIR).toContain(".config/raycast/extensions/echo-context/sessions");
   });
 
+  it("can disable per-session log creation for ephemeral surfaces", async () => {
+    const run = startAgent(
+      {
+        binary: process.execPath,
+        args: ["-e", "process.stdout.write('ephemeral\\n');"],
+        stdin: "",
+      },
+      { idleTimeoutMs: 5_000, maxRuntimeMs: 5_000, sessionLogDir, sessionLogEnabled: false },
+    );
+
+    expect(run.sessionLogPath).toBeNull();
+    await collect(run.events);
+    expect(readdirSync(sessionLogDir)).toHaveLength(0);
+  });
+
   it("returns distinct immutable session log paths for overlapping runs", async () => {
     const first = startAgent(
       {

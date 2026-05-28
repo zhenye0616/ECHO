@@ -21,6 +21,7 @@ export interface AgentRun {
 export interface AgentRunnerOptions {
   idleTimeoutMs?: number;
   maxRuntimeMs?: number;
+  sessionLogEnabled?: boolean;
   sessionLogDir?: string;
   sessionLogPath?: string;
 }
@@ -140,11 +141,13 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   const stderrTail = new BoundedTextBuffer(STDERR_TAIL_LIMIT);
   const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
   const maxRuntimeMs = options.maxRuntimeMs ?? DEFAULT_MAX_RUNTIME_MS;
-  const sessionLog = createSessionLog(
-    invocation,
-    options.sessionLogDir ?? SESSION_LOG_DIR,
-    options.sessionLogPath ?? null,
-  );
+  const sessionLog = options.sessionLogEnabled === false
+    ? null
+    : createSessionLog(
+      invocation,
+      options.sessionLogDir ?? SESSION_LOG_DIR,
+      options.sessionLogPath ?? null,
+    );
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let maxTimer: ReturnType<typeof setTimeout> | null = null;
@@ -188,7 +191,7 @@ export function startAgent(invocation: AgentInvocation, options: AgentRunnerOpti
   armIdleTimer();
   maxTimer = setTimeout(() => {
     exceededMaxRuntime = true;
-    queue.push({ type: "footer", markdown: "**Exceeded 5-minute ceiling.**" });
+    queue.push({ type: "footer", markdown: `**Exceeded ${formatDuration(maxRuntimeMs)} ceiling.**` });
     if (child.pid !== undefined) void killProcessTree(child.pid);
   }, maxRuntimeMs);
 
@@ -407,6 +410,17 @@ class WriteStreamSessionLog implements SessionLog {
 function warnSessionLogFailure(action: string, err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
   console.warn(`ECHO session log tee failed to ${action}: ${message}`);
+}
+
+function formatDuration(ms: number): string {
+  if (ms % 60_000 === 0) {
+    const minutes = ms / 60_000;
+    return `${minutes}-minute`;
+  }
+  if (ms % 1_000 === 0) {
+    return `${ms / 1_000}-second`;
+  }
+  return `${ms}ms`;
 }
 
 export function stripTerminalControl(input: string): string {

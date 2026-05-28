@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { AuditUnavailableError, parseAuditResponse } from "../src/lib/audit";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuditUnavailableError, fetchRecentCalls, parseAuditResponse } from "../src/lib/audit";
 
 describe("audit response parsing", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("parses pending, ok, and error calls", () => {
     const parsed = parseAuditResponse({
       calls: [
@@ -26,5 +30,17 @@ describe("audit response parsing", () => {
     expect(() => parseAuditResponse({ calls: [{ ts: 1, tool: "x", args_shape: {}, result_shape: {}, status: "ok" }] })).toThrow(
       AuditUnavailableError,
     );
+  });
+
+  it("passes AbortSignal through to fetchRecentCalls", async () => {
+    const controller = new AbortController();
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ calls: [] }),
+    } as Response);
+
+    await expect(fetchRecentCalls({ since: 1, signal: controller.signal })).resolves.toEqual({ calls: [] });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ signal: controller.signal });
   });
 });
