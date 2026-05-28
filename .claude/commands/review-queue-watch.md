@@ -84,11 +84,11 @@ Read the just-written `combined.md`'s frontmatter:
 
 - **`escalated_to_founder: true`** — verdict is `divergent` (verdicts crossed `{proceed*, pushback}` boundary) OR `partial_responses` with multi-missing OR any-pushback-with-missing (043 AC6 rename; legacy `single_reviewer_timeout` still appears on pre-043 rounds in `complete/`) OR `no_responses`. Append a journal entry citing the queue path; **exit**. The founder will see and act on next session. You do NOT attempt to adjudicate divergence — that is the §"Out of Scope" #7 boundary. For N-reviewer rounds (043 AC6 generalized roll-up), `partial_responses` body enumerates which reviewers landed and which are missing; the founder uses that to decide whether to wait, escalate, or accept the partial set.
 
-- **`escalated_to_founder: false`** — verdict is within `{proceed, proceed_after_patches, pushback}` (no boundary cross) OR `partial_responses` with exactly one required reviewer missing AND every present reviewer in `{proceed, proceed_after_patches}` (044 AC4 single-reviewer auto-disposition). You autonomously disposition findings. For the 044 AC4 auto-disposition sub-case, the missing reviewer appears as a divergent row with `where: "did not respond; per 044 AC4 single-reviewer auto-disposition"` and `finding: "did not respond; per 044 AC4 single-reviewer auto-disposition"` (the prose and the emitter literal at `tools/review-queue/combine.py:684` are kept aligned per 045 AC4); fill its `Disposition` column the same way you'd fill any other divergent row (typically `accepted as missing per 044 AC4 — no patch`), then follow the standard path-(a)/(b)/(c) selection on the rest of the table.
+- **`escalated_to_founder: false`** — verdict is within `{proceed, proceed_after_patches, pushback}` (no boundary cross) OR `partial_responses` with exactly one required reviewer missing AND every present reviewer in `{proceed, proceed_after_patches}` (044 AC4 single-reviewer auto-disposition). You autonomously disposition findings after the Step 3 reframe gate. For the 044 AC4 auto-disposition sub-case, the missing reviewer appears as a divergent row with `where: "did not respond; per 044 AC4 single-reviewer auto-disposition"` and `finding: "did not respond; per 044 AC4 single-reviewer auto-disposition"` (the prose and the emitter literal at `tools/review-queue/combine.py:684` are kept aligned per 045 AC4); after the reframe gate, fill its `Disposition` column the same way you'd fill any other divergent row (typically `accepted as missing per 044 AC4 — no patch`), then follow the standard path-(a)/(b)/(c) selection on the rest of the table.
 
 ### Step 3 — Disposition (only on the not-escalated branch)
 
-For each row in the convergent and divergent tables in the just-written `combined.md`, fill the `Disposition` column with your judgment of the spec direction. Then commit the disposition update via `push-with-retry.sh`:
+Before filling any `Disposition` column, apply the disposition discipline below, starting with the reframe gate. Once the reframe gate is bypassed, completed, or recorded, fill each row in the convergent and divergent tables in the just-written `combined.md` with your judgment of the spec direction. Then commit the disposition update via `push-with-retry.sh`:
 
 ```bash
 git add backlog/reviews/<item_id>/r<N>/combined.md
@@ -96,9 +96,48 @@ git commit -m "review-r<N>: disposition on <item_id>"
 tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 ```
 
-After dispositioning, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
+After the gate-aware disposition pass, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
 #### Disposition discipline — prefer removal over deeper patching when findings target a recent-round patch
+
+Reframe gate: after `combine.py` writes `combined.md` and `escalated_to_founder: false` is confirmed, but before any `Disposition` column is filled, classify actionable findings in the convergent and divergent tables using the same "recent-patch-introduced" primitive defined below: a finding targets a prior-round patch when its `where:` lines fall inside a recent `spec-r<N-1>-patches` diff, or reviewers converge on bugs in a mechanism that did not exist before that patch. Exclude missing-reviewer placeholder rows and pure non-actionable deferrals.
+
+If count >= 2, the strategist MUST run a fresh-context investigator before disposition:
+
+```bash
+codex exec --sandbox read-only <<'PROMPT'
+You are a fresh-context ECHO review-queue root-cause investigator.
+
+Context:
+- Item: <item_id>, round r<N>
+- Current combined review artifact: backlog/reviews/<item_id>/r<N>/combined.md
+- Current request: backlog/reviews/<item_id>/r<N>/request.md
+- Current spec path and pinned SHA: <spec_path> @ <spec_sha>
+- Recent patch commits under review: <last 1-2 spec-r*-patches commits>
+- Founder context, if any: <paste last 1-2 founder messages relevant to disposition>
+
+Question:
+At least two current findings appear to target prior-round patches. Determine whether the next move should be a local text patch, a structural cut/removal, or propagation completion.
+
+Return exactly:
+kind: text_patch | structural_cut | propagation_completion
+justification: <why this is root-cause, not patch-on-patch drift>
+diagnostic_check: <falsifiable check the strategist must apply before patching>
+recommended_disposition: <row-level disposition guidance>
+patch_shape: <minimal spec change shape, or "none">
+risk: <main way this recommendation could be wrong>
+PROMPT
+```
+
+The strategist consumes this as validate-and-apply, not rubber-stamp: check it against the spec contract, founder instructions, and current file facts. If overriding the recommendation, record why in `combined.md`. In all trigger cases, add a compact `Reframe gate:` note to `combined.md` before row dispositions so the audit trail exists.
+
+Bypass is allowed only when every prior-patch-targeting finding is a purely mechanical typo/lint/format correction with no state, behavior, owner, test, schema, enum, frontmatter, or AC-semantics effect. If findings are mixed, do not bypass. Fewer than two such findings must not trigger this mandatory investigator; the added cost, roughly money plus about 5 minutes wallclock, is founder-approved only when >=2 patch-on-patch findings would otherwise risk 1-3 wasted review rounds.
+
+Composition with Friction A: this reframe gate fires first, before any disposition including removal. If the chosen disposition uses removal language, the removal proof matrix still fires before committing that disposition.
+
+Backward compatibility: future watcher ticks only; do not revalidate historical `combined.md`.
+
+Test/audit: prose-enforced now. Later, a `tools/review-queue/check-reframe-gate.py` could read just-combined `combined.md`, count recent-patch-introduced findings, and refuse disposition unless a `Reframe gate:` artifact exists.
 
 Before committing to a patch, check whether the finding is targeting **mechanism a prior round's patch added** vs. mechanism the original spec had. If it's the former — i.e. r<N>'s findings are bugs in r<N-1>'s patch — strongly prefer **removing the r<N-1> mechanism** over patching deeper.
 
