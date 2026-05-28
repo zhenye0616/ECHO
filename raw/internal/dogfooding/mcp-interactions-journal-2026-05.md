@@ -1443,3 +1443,39 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Note:** The Codex failure is a hard trust-gate preflight. The Claude failure is a permission-gate response rendered as normal stdout, which the existing strict `pong` parser correctly rejects.
 - **Follow-up probe:** From `/tmp`, `claude --allowedTools mcp__echo__echo_ping ...` returned `{"pong":true,"ts":"2026-05-28T01:50:51.324Z"}` and `codex exec --skip-git-repo-check --sandbox read-only ...` returned `{"pong":true,"ts":"2026-05-28T01:50:52.615Z"}`. These exact flags remove the cwd/trust coupling without loosening the response parser.
 - **Verification:** After patch/build, `node dist/cli/index.js doctor --json` from `/tmp` returned `overall:"healthy"` with `claude-code` and `codex` probed true; the same command from `/private/tmp/echo-fix-doctor-cwd` also returned `overall:"healthy"` with both probed true. `cursor` remained `manual-only`, as designed.
+
+### 2026-05-27 21:55 PDT — claude strategist session resume after /clear
+
+- **Trigger:** Founder cleared context mid-session and asked "use echo to understand where we left off last session." Strategist invoked `using-echo-mcp` skill, then trigger pattern for "where did I leave off" → `find_clusters` no-args.
+- **Query inputs:** `find_clusters({repo_path: "/Users/zhenye/Desktop/Project_echo"})` — no `since`/`until` (relied on default 4h→24h auto-expand).
+- **Returned:** 2 clusters, 44 atoms in window. Top cluster `ctx_f6f9df04`: `rank_reasons=[recent_activity, has_open_loop, has_unresolved_open_loop, code_session_anchor, dense]`; `source_breakdown={claude_code: 31, git: 8}`; 12 open_loop_hints. Second cluster `ctx_cac90714`: codex-only (5 atoms), labeled "discussion about ECHO".
+- **Sources:** `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/85dfa894-1b33-4c34-9560-da57e12d71da.jsonl` (the prior session's transcript); `git:/Users/zhenye/Desktop/Project_echo`; `fs:/Users/zhenye/.codex/sessions/...` (cluster 2).
+- **Verdict:** ✅ right — top cluster's atoms covered the exact thread we needed (cross-vendor demo + cognitive-debt brainstorm); the demoted single-source-recent expand fired correctly.
+- **Note:** Repo-scoped query was the right disposition (founder asked about THIS project specifically). Auto-expand 4h→24h worked without me having to pass explicit `since`.
+
+### 2026-05-27 21:56 PDT — claude strategist hydrate top cluster bodies
+
+- **Trigger:** After `find_clusters`, needed atom bodies to read the open-loop content of the recent session for an accurate "where we left off" summary. Selected 10 atom IDs with unresolved-true hints + most-recent timestamps.
+- **Query inputs:** `get_atoms({atom_ids: [<10 ids from ctx_f6f9df04>], prefer: "newest_first", format: "minimal"})`.
+- **Returned:** 8 atoms returned, 2 dropped (envelope budget; ids `26cc1008-bca3-4a29-9b84-e547c48d445e`, `62d28ed6-0221-4b9f-a599-f07705c958f9`). Each atom had `truncations: ["content"]` (content > wire-shape cap, projector clipped). Most-recent atom dated 2026-05-28T03:46:26Z (PDT 20:46) — the cross-vendor "shared memory vs subprocess" pushback I was about to resume.
+- **Sources:** All 8 returned atoms from `fs:/Users/zhenye/.claude/projects/.../85dfa894-1b33-4c34-9560-da57e12d71da.jsonl`. Both dropped atoms were also expected to be from same source (didn't verify since they were dropped).
+- **Verdict:** ✅ right — atoms gave enough body to reconstruct the resume summary; the content truncations didn't impair the resume (each turn had a useful opening paragraph that survived).
+- **Note:** `prefer: newest_first` + 8/10 returned was a good cost shape. Dropped-atoms-at-end-of-iteration semantics worked as designed (resume calls don't need the oldest atoms).
+
+### 2026-05-27 22:30 PDT — codex consult #3 (reuse audit) — journal-by-proxy
+
+- **Source agent:** codex strategist (read-only consultee; orchestrator-journaled by claude). Codex invoked via `codex exec --skip-git-repo-check --color never - < /tmp/codex-audit-reuse.md` to audit existing shipped pieces against the proposed cognitive-recap feature scope. Read-only.
+- **Query inputs (reported by codex):** TWO `search_memories` calls. (1) `search_memories({query: "cognitive understanding decision receipt recap interrupt severity", repo_path: "/Users/zhenye/Desktop/Project_echo", limit: 10})`. (2) `search_memories({query: "cognitive debt loop-close recap", repo_path: same, limit: 10})`.
+- **Returned:** Both calls returned 0 matches.
+- **Sources:** None (zero matches in both).
+- **Verdict:** 🟡 partial — feature vocabulary not present in memory (expected — this feature is genuinely net-new); codex correctly fell back to repo-doc audit as the authoritative source (CLAUDE.md, wiki/architecture/coord-substrate-and-observability.md, tools/raycast-echo/, schemas).
+- **Note:** Confirms `search_memories` is literal-substring (not semantic). A semantic query like "founder cognitive debt" finds nothing when the corpus only contains the phrase "loss of continuity and inspectability." Useful as a vocabulary-novelty signal.
+
+### 2026-05-27 22:50 PDT — codex consult #4 (deep-dive on 5 gaps) — journal-by-proxy
+
+- **Source agent:** codex strategist (read-only consultee; orchestrator-journaled by claude). Codex invoked to deep-dive on five gaps (057b emission, principle compliance, prior raw decisions, agent_notes pattern, get_recent_work_context). Read-only.
+- **Query inputs (reported by codex tail):** `find_clusters` with a time window for cross-tool work, followed by `get_atoms` to hydrate some atom IDs. (Per the tail output at line 519: cluster ids and atom samples were inspected for Project_echo activity over a recent window; exact `since`/`until` and full IDs not captured in my orchestrator view.)
+- **Returned:** Codex reported (line 520): "find_clusters answered 'where the cross-tool work landed' (Project_echo operating-model + codex-heavy ECHO thread) but retrieval was budget-truncated (3 clusters missing; get_atoms dropped most sampled IDs)." Cursor's `user-echo` MCP was disconnected for codex's binding; HTTP fallback used directly because `npm run daemon` was already up on port 38478.
+- **Sources:** Mix of `fs:/Users/zhenye/.claude/projects/...` Claude jsonls and `fs:/Users/zhenye/.codex/sessions/...` codex rollouts, plus `git:/Users/zhenye/Desktop/Project_echo`. Project_echo + Statellite_Detection both surfaced (cross-project — correct ECHO machine-scoped signal per memory entry).
+- **Verdict:** 🟡 partial — find_clusters did its job (named the right threads); get_atoms hit envelope truncation that mattered (codex couldn't hydrate every sampled body it wanted). Cursor MCP disconnect is a separate observation.
+- **Note:** Codex flagged `source_breakdown` sums vs `atom_ids.length` looking inconsistent on skeleton clusters during eyeball check — worth a separate backlog probe if reviewers care about interpretation of breakdown as membership vs window aggregate.
