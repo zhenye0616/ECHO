@@ -35,7 +35,7 @@ spec_refs:
   - wiki/principles/context-as-moat.md  # "never ship a chat UI" — explicit. Recap is single-shot Q&A, NOT chat. Re-asking is a NEW recap session (fork-style, mirroring 063's "ask again from this" pattern).
   - wiki/principles/felt-not-seen.md  # L3 summoned overlay is explicitly allowed daily-use; "few minutes a month" applies to L5 (audit page) only.
   - wiki/principles/compose-not-capture.md  # 064 scope clarification: consumer-side projection of substrate data is allowed. Recap is projection, not capture.
-  - wiki/surfaces/hotkey-overlay-raycast.md  # V0 surface this extends. Recap adds a SECOND command (parallel to `echo`); does NOT replace or override the existing landing-state behavior.
+  - wiki/surfaces/hotkey-overlay.md  # V1 planned hotkey overlay surface (tracked at the pinned SHA). Recap adds a SECOND command (parallel to `echo`); does NOT replace or override the existing landing-state behavior. The Raycast v0 adapter documentation (`hotkey-overlay-raycast.md`) is currently untracked strategist post-shipment work for items 060/062/063/065/069; this spec references the tracked V1 page to preserve builder-readability (r3 codex F1 patch).
   - raw/internal/decisions/2026-05-06-v15-trace-layer-design.md  # rejected "LLM natural-language brief on the daemon read path due trust/hallucination risk." Recap is consumer-side agent composition, NOT daemon-side rendering. This decision is load-bearing for the architecture choice.
   - backlog/complete/2026-05-22-069-raycast-cold-start-continuity-hero.md  # Continue hero — read-only reference. Recap does NOT modify the hero or the empty-state. The empty-Enter contract (find_clusters list + Continue hero) is preserved verbatim.
   - backlog/complete/2026-05-21-067-mcp-request-log-shutdown-flush.md  # /mcp/recent-calls audit endpoint reliability — recap inherits the same audit-availability semantics ("audit unavailable" sidebar message on error, does NOT block the answer pane).
@@ -98,6 +98,8 @@ The net feature is ≤3 new files + 1 README section + a pinned prompt — sitti
 1. **Form view** (initial): one optional `Form.TextField` "Since (ISO timestamp or empty for default)", one `Form.Dropdown` "Window" pre-populated from preferences, and one `Action.SubmitForm` "Recap" (r2 codex F2 patch — verified against `@raycast/api@1.104.17` exports; the API surface ships `Action.SubmitForm`, NOT a `Form.SubmitFormAction` export). Reviewers should reject any diff that references `Form.SubmitFormAction`.
 2. **Resolve `since`** via `resolveSinceWindow()` (AC4) on submit. The resolved ISO timestamp + source label (`user | last_session | fallback_24h`) are passed forward.
 3. **Detail view** (post-submit): identical to Ask ECHO's Detail rendering — streaming markdown answer (throttled `setMarkdown` per 80ms or on subprocess exit), `Detail.Metadata` sidebar populated from `GET /mcp/recent-calls` (reusing `lib/audit.ts` verbatim), header label includes the resolved since + source.
+
+3a. **Daemon-down non-blocking contract (r3 codex-ops F2 patch):** Recap's evidence sources are filesystem-first (combined.md / task-state / agent-runs / git log / journal); MCP is only the optional final fallback. Therefore the existing Ask ECHO `probeEchoDaemon()` hard-fail preflight MUST NOT gate Recap. Recap-context.tsx EITHER (a) skips the daemon probe entirely, OR (b) calls it non-blockingly (timeout + ignore failure). The agent subprocess spawns regardless of daemon state; the `Detail.Metadata` sidebar shows "audit unavailable" when `/mcp/recent-calls` fails, but the streaming markdown answer is not blocked. Test pinned in `recap.test.tsx` (AC5 case 7 below): daemon-mocked-down → recap still spawns and streams; sidebar reports unavailable.
 4. **Cancellation**: dismounting the Detail view triggers `tree-kill` on the subprocess, identical to Ask ECHO.
 5. **Persistence**: the Recap session is written to LocalStorage as a regular `Session` row (see 063's sessions-as-objects model), with a NEW field `recapWindow: { sinceIso: string, source: "user" | "last_session" | "fallback_24h" }` added to the Session interface. Recap sessions appear in the existing `SessionsList` view.
 
@@ -142,7 +144,7 @@ export function resolveSinceWindow(
 Precedence (deterministic, easy to test):
 
 1. **`userInput`** parses as a valid ISO timestamp (with `Z` or `+HH:MM`) → `source: "user"`.
-2. **`windowPref === "last_session"`** → find the most recent `Session` with `status ∈ {"done", "cancelled", "errored"}`; use `completedAt ?? startedAt`. **`status: "running"` sessions are NOT qualifying** (the founder isn't trying to recap their currently-open session). If no qualifying session exists → fall through to (3).
+2. **`windowPref === "last_session"`** → find the most recent `Session` with **`status === "done"`** AND (if the session carries `recapWindow`, additionally requiring a non-empty `answer` field — i.e., the recap actually produced output). Use `completedAt ?? startedAt`. **`status ∈ {"running", "cancelled", "errored"}` sessions are NOT qualifying** (r3 codex-ops F1 patch): `running` because the founder isn't trying to recap their currently-open session; `cancelled`/`errored` because a failed/aborted attempt would poison the next default window — the next Recap would start AFTER the failed timestamp, silently excluding the artifacts the founder was trying to recover. A cancelled/errored prior Recap MUST behave as if it never ran for resolver purposes. If no qualifying session exists → fall through to (3).
 3. **Fallback** → `now - 24h`, `source: "fallback_24h"`.
 
 `windowPref === "24h"` → `now - 24h`. `windowPref === "4h"` → `now - 4h`. Both bypass the session lookup.
@@ -155,24 +157,27 @@ Three vitest test files added under `tools/raycast-echo/test/`:
 
 - **`recap-system-prompt.test.ts`** — snapshot test on the full prompt body string. Intentionally fragile — any edit to the prompt content fails this test until the snapshot is explicitly refreshed (`vitest --update`). Same defense pattern as `system-prompt.test.ts`. Additionally asserts: prompt body < 4096 chars; mentions all six input sources; mentions all three drift axes by name.
 
-- **`since-resolver.test.ts`** — eight cases minimum:
+- **`since-resolver.test.ts`** — ten cases minimum:
   1. user-input ISO wins over windowPref
   2. user-input invalid → falls through to windowPref
-  3. windowPref=`last_session` + qualifying session present → uses `completedAt`
-  4. windowPref=`last_session` + qualifying session has null `completedAt` → uses `startedAt`
+  3. windowPref=`last_session` + qualifying `done` session present → uses `completedAt`
+  4. windowPref=`last_session` + qualifying `done` session has null `completedAt` → uses `startedAt`
   5. windowPref=`last_session` + only `running` sessions present → falls through to 24h
   6. windowPref=`last_session` + zero sessions → 24h
   7. windowPref=`24h` → `now - 24h` regardless of sessions
   8. windowPref=`4h` → `now - 4h` regardless of sessions
+  9. **(r3 codex-ops F1 patch)** windowPref=`last_session` + most recent session is `cancelled` Recap → resolver SKIPS it, uses the next older `done` session OR falls through to 24h.
+  10. **(r3 codex-ops F1 patch)** windowPref=`last_session` + most recent session is `errored` Recap → same: resolver SKIPS, picks next older `done` or falls through to 24h.
   All ISO outputs end with `Z` (UTC canonical).
 
-- **`recap.test.tsx`** — six cases minimum:
+- **`recap.test.tsx`** — seven cases minimum:
   1. Form-submit constructs the prompt with the resolved since interpolated into `${SINCE_ISO}`.
   2. Agent profile selection honors `preferences.agentKind` (mocked profile registry).
   3. Detail view unmount calls `tree-kill` on the subprocess PID (mocked agent-runner).
   4. **(r1 F2 patch)** `package.json`'s `recap` command preferences include `agentKind`, `customCommand`, `repoPath`, `claudeOauthToken`, and `defaultSinceWindow` — duplicated under the recap command, not migrated to extension-level.
   5. **(r1 F4 patch)** A Recap session (where `session.recapWindow !== undefined`) passed to the fork action constructs a NEW Recap session (asserted via the resulting prompt-construction call using the Recap system prompt, NOT the Ask system prompt).
   6. **(r2 codex-ops F1 patch)** A custom-agent recap spawn (mocked `agentKind: "custom"` with a stdin-template `customCommand`) passes through the recap prompt via stdin AND the resulting `child_process.spawn` options include `cwd: <mocked repoPath>`. Asserts the cwd contract for custom commands so relative-path reads in the recap prompt resolve against the project repo.
+  7. **(r3 codex-ops F2 patch)** Daemon-down non-blocking contract: with `probeEchoDaemon()` mocked to fail, the recap subprocess still spawns and streams its markdown answer. The `Detail.Metadata` sidebar reports "audit unavailable" but does NOT prevent the answer from rendering.
 
 All tests must pass under root `npm test` AND `tools/raycast-echo/` `npm test`. Typecheck (`tsc --noEmit`) must pass in both roots.
 
@@ -215,7 +220,7 @@ Single-shot is the structural defense against drift-prevention Pattern 5 ("chat 
 The recap is mostly ADDITIVE. The shipped Ask ECHO command and the Continue hero are preserved byte-identically EXCEPT for the single AC2.6 fork-routing branch in `echo.tsx`'s fork-action handler — that branch dispatches to the Recap prompt when the source session carries `recapWindow`. Reviewers should reject any diff that touches `src/components/EmptyState.tsx` or `src/lib/system-prompt.ts`, and any `echo.tsx` change beyond the AC2.6 fork-routing branch. (Note: prior `ask-context.tsx` was unified into `echo.tsx` per item 063; this OoS reflects the current shipped layout.)
 
 ### #8 — Strategist-only files
-`docs/BACKLOG.md`, `wiki/**`, `docs/STATUS.md`, `docs/NORTH_STAR.md` are out of scope per `docs/AGENT_INSTRUCTIONS.md` — builders MUST NOT write to them. The strategist will add the Ready-table row separately at spec commit; the strategist will update `wiki/surfaces/hotkey-overlay-raycast.md` post-shipment with the recap command documentation.
+`docs/BACKLOG.md`, `wiki/**`, `docs/STATUS.md`, `docs/NORTH_STAR.md` are out of scope per `docs/AGENT_INSTRUCTIONS.md` — builders MUST NOT write to them. The strategist will add the Ready-table row separately at spec commit; the strategist will update the relevant hotkey-overlay wiki page (today `wiki/surfaces/hotkey-overlay.md`; will be `hotkey-overlay-raycast.md` once that page is committed as part of the in-flight Raycast v0 post-shipment wiki work) post-shipment with the recap command documentation.
 
 ### #9 — No widening of the `Session` interface beyond `recapWindow`
 The one additive Session field documented in AC2 (`recapWindow?: { sinceIso, source }`) is the ONLY allowed Session-shape change. Adding `recapHistory`, `recapVersion`, `recapAggregations`, etc. is drift. Builders feeling the urge — STOP.
@@ -227,9 +232,9 @@ Following Ask ECHO's "single-user dogfooding, zero phone-home" stance per 062's 
 
 When this item lands in `backlog/complete/`, the strategist updates:
 
-1. **`wiki/surfaces/hotkey-overlay-raycast.md`** — add a new section "Recap (077)" documenting the command, the system prompt sources, and the dogfooding contract gate. Cross-link to this item from the "Commands Shipped" subsection.
+1. **`wiki/surfaces/hotkey-overlay-raycast.md`** (if then-committed as part of Raycast v0 post-shipment work) **OR `wiki/surfaces/hotkey-overlay.md`** — add a new section "Recap (077)" documenting the command, the system prompt sources, and the dogfooding contract gate. Cross-link to this item from the "Commands Shipped" subsection.
 2. **`wiki/principles/drift-prevention.md`** — add a worked-example callout: "Recap (077) is the explicit-action complement to Continue hero, NOT a chat companion." This reinforces Pattern 5's structural defense across future surfaces.
-3. **No new wiki page is created for the recap as a separate surface** — it is one feature inside the existing `hotkey-overlay-raycast` v0 surface.
+3. **No new wiki page is created for the recap as a separate surface** — it is one feature inside the existing hotkey-overlay surface.
 4. **`.manifest.json`** updated only if a new wiki page is created (none expected per (3)); regenerate `wiki/index.md` via `tools/wiki_index.py`.
 
 ## Expected merge conflicts
