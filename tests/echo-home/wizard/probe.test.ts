@@ -93,6 +93,31 @@ describe('probeAgents', () => {
     expect(timeouts).toEqual([30_000]);
   });
 
+  it('passes the codex trust-bypass flag so probes work outside git repos', async () => {
+    const calls: Array<{ cmd: string; args: string[] }> = [];
+    const out = await probeAgents(['codex'], {
+      spawn: async (cmd, args) => {
+        calls.push({ cmd, args });
+        return ok('{"pong":true,"ts":"2026-05-25T10:00:00.000Z"}');
+      },
+    });
+
+    expect(out[0]!.probed).toBe(true);
+    expect(calls).toEqual([
+      {
+        cmd: 'codex',
+        args: [
+          'exec',
+          '--skip-git-repo-check',
+          '--sandbox',
+          'read-only',
+          '--',
+          'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.',
+        ],
+      },
+    ]);
+  });
+
   it('lets an explicit timeout override the 30s default', async () => {
     const timeouts: number[] = [];
     const out = await probeAgents(['codex'], {
@@ -115,6 +140,8 @@ describe('probeAgents', () => {
           '--print',
           '--output-format',
           'text',
+          '--allowedTools',
+          'mcp__echo__echo_ping',
           '--',
           'Invoke the mcp tool mcp__echo__echo_ping with no arguments and return its result verbatim as JSON only — no commentary.',
         ]);

@@ -117,8 +117,16 @@ async function probeOne(
   const cmd = agent === 'codex' ? 'codex' : 'claude';
   const args =
     agent === 'codex'
-      ? ['exec', '--sandbox', 'read-only', '--', PROMPT]
-      : ['--print', '--output-format', 'text', '--', PROMPT];
+      ? ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--', PROMPT]
+      : [
+          '--print',
+          '--output-format',
+          'text',
+          '--allowedTools',
+          'mcp__echo__echo_ping',
+          '--',
+          PROMPT,
+        ];
 
   let result: SpawnResult;
   try {
