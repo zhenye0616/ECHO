@@ -1661,6 +1661,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** partial - r10 resolves the r9 audit and no-persistence blockers, but two narrow builder-facing contradictions remain in the spec text. Both are easy patches, but leaving them in `ready/` gives the builder two plausible implementation targets for the same files.
 - **Note:** The response commit completed before this observation-only journal entry. Per reviewer-command ordering, coord `tick_end` is emitted after this sibling journal commit. Current `CLAUDE.md`/`AGENTS.md` policy makes the May monthly Markdown shard canonical and treats generated HTML twins as local-only, so this tick writes only this shard.
 
+### 2026-05-28 00:10 PDT - codex r11 review tick on 077 cognitive recap via Raycast
+
+- **Trigger:** Codex review queue tick was pinned to `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r11/request.md` and reviewed the pinned r11 077 cognitive-recap spec through the implementability/code-grounded lens.
+- **Query inputs:** ECHO coord call already emitted: `coord_emit(event_type=tick_start, reviewer=codex, correlation_id=fb7da8ba-cc23-48c2-847b-3e54f0c5bdb8)`. Queue/file reads used the r11 request, reviewer schema, pinned artifact `backlog/ready/2026-05-27-077-cognitive-recap-via-raycast.md` at `7f313fc374731fc3cafeb1c2467a70bf01f99f4b`, same-SHA Raycast package/lockfile anchors, and the May-shard journal policy.
+- **Returned:** Wrote, pre-link validated, upstream-duplicate checked, committed, and pushed `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r11/codex.md` at review commit `749c4c78`, verdict `proceed_after_patches`, with one MEDIUM finding: AC1 requires a semver bump in `tools/raycast-echo/package.json`, but `tools/raycast-echo/package-lock.json` also embeds that package version and is absent from `files_to_modify`.
+- **Sources:** Review response file above; request correlation `fb7da8ba-cc23-48c2-847b-3e54f0c5bdb8`; artifact commit `7f313fc374731fc3cafeb1c2467a70bf01f99f4b`; spec anchors `backlog/ready/2026-05-27-077-cognitive-recap-via-raycast.md:12` and `:85-90`; supporting package anchors `tools/raycast-echo/package.json:2` and `tools/raycast-echo/package-lock.json:2,7`.
+- **Verdict:** partial - the r11 spec is otherwise implementable, but the version-bump acceptance criterion still needs the nested lockfile in scope so the builder can avoid package metadata drift without violating the file boundary.
+- **Note:** The response commit completed before this observation-only journal entry. Per reviewer-command ordering, coord `tick_end` is emitted after this sibling journal commit. Current `CLAUDE.md`/`AGENTS.md` policy makes the May monthly Markdown shard canonical and treats generated HTML twins as local-only, so this tick writes only this shard.
+
 ### 2026-05-28 00:09 PDT - codex-ops r11 review tick on 077 cognitive recap via Raycast
 
 - **Trigger:** Codex-ops review queue tick was pinned to `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r11/request.md` and reviewed the r11 patched 077 cognitive-recap spec through the operational/runtime lens.
