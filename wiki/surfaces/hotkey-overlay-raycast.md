@@ -132,12 +132,37 @@ The landing view's `Open loops · Today` section was over-approximating: its und
 
 **Architectural invariant:** the hero **never** promotes a cluster ECHO cannot anchor. There is no "best guess" fallback. Trust is preserved by making the hero's appearance itself the confidence signal — it appears iff ECHO is confident.
 
+## Recap (077)
+
+ECHO's multi-agent loop closed mid-May 2026: cross-vendor review queues (codex / codex-ops / claude / cursor) ran autonomously, builder agents claimed items, reviewers iterated r1→rN, items merged to `main` — all without founder intervention between brainstorm and sign-off. Speed went up; founder's mental model of the codebase, decisions, and direction drifted away. The founder's own framing in the May dogfooding journal: *"loss of continuity and inspectability, not absence of chat."*
+
+[[2026-05-27-077-cognitive-recap-via-raycast|077]] added a second Raycast command, `recap`, that closes the cognitive-debt gap without inventing new substrate. The command's job is to compress N hours of cross-vendor agent activity into ~5 minutes of strategist-grade reading on demand, organized by three drift axes:
+
+- **A — Code changed** (from `git log --since=<ISO> --oneline --stat HEAD` + selective diffs)
+- **B — Decisions** (from `backlog/reviews/**/r*/combined.md`, `backlog/task-state/<task-id>/*.md`, `raw/internal/agent-runs/*.md` enumerated via `git log --since --name-only`)
+- **D — Direction** (from current_thesis + open_questions in task-state pointers, plus open-loop clusters)
+
+**Architectural posture (inherits from 062):** ECHO does NOT host the LLM loop. The Recap command spawns the user's configured CLI agent (codex / claude / custom — same agent-profiles as Ask ECHO) with a pinned recap system prompt. The agent reads file-based evidence first, with `find_clusters` + `get_atoms` as an optional best-effort MCP fallback. Daemon-down at the agent layer must NOT block — the prompt verbatim instructs the agent to continue from file + git sources if MCP fails or times out.
+
+**Ephemeral by design (r8 option-F resolution).** Recap is single-shot and never persisted to LocalStorage. The Detail view streams the markdown answer; on dismiss it's gone. No SessionsList integration, no Cmd-R contract, no Session-shape changes. The dogfooding journal is the durable audit trail; the founder copies relevant lines from the streamed Detail into the next journal entry in-the-moment. This cut replaced an earlier "option D" relabeling that surfaced as the worked example for the new disposition-discipline rule in [[review-queue-watch]] (see § Disposition discipline — prefer removal over deeper patching; the removal proof matrix added at commit `e7927ba2` catches exactly this failure mode).
+
+**Command-scoped preference duplication (r1 codex F2 / codex-ops F2 patch).** Raycast preferences are command-scoped, not extension-scoped. The `recap` command duplicates the `echo` command's `agentKind` / `customCommand` / `repoPath` / `claudeOauthToken` entries under its own command block, plus a new `defaultSinceWindow` dropdown. Operators upgrading must configure the Recap command's own preference panel — the values do NOT inherit from the Ask command.
+
+**Lookback resolution (`since-resolver.ts`).** A pure function `resolveSinceWindow(userInput, windowPref, sessions, nowMs)` returns `{sinceIso, source}` where `source ∈ {"user", "last_session", "window_24h", "window_4h", "fallback_24h"}`. Precedence: explicit user ISO (throws `InvalidSinceInputError` on non-empty invalid — silent fallback rejected) → most recent Ask ECHO Session with `status === "done"` (running/cancelled/errored skipped — failed-attempt poisoning rejected) → explicit window selection (24h / 4h) → 24h fallback when last-session lookup yields nothing. The resolver is pure; `recap.tsx` (not the resolver) owns LocalStorage IO.
+
+**Prompt construction.** `buildRecapPrompt({sinceIso, repoPath})` substitutes `<SINCE_ISO>` and `<REPO_PATH>` placeholders in `RECAP_SYSTEM_PROMPT_TEMPLATE`. Pre-condition: `repoPath` MUST be absolute (Raycast pref default `~/Desktop/Project_echo` home-expanded before the call). Post-condition: no placeholder/legacy-form literals remain. Snapshot-tested with ten assertions pinning the template's load-bearing clauses (no-mtime constraint, per-file-kind canonical timestamp field, the `combined.md`-is-authoritative rule, MCP best-effort wording, 50-cap atom_ids sample).
+
+**Audit fetch bounded (r3 + r8 codex-ops F2 patches).** Recap's Detail.Metadata sidebar makes ONE best-effort `GET /mcp/recent-calls` fetch at mount with an `AbortController` + 5s timeout (NOT the inherited Ask 600ms repeating poll). The `lib/audit.ts` `fetchRecentCalls()` was extended additively with an optional `signal?: AbortSignal` parameter so Ask callers stay byte-identical and Recap can pass the controller's signal.
+
+**11-round review history preserved.** 077 is the canonical worked example of the strategist-drift-discipline patterns now documented in [[review-queue-watch]] § Disposition discipline. The r1-r11 `combined.md` files at `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/` are the canonical decision trail; the founder's after-the-fact accept-and-ship at r11 was the empirical wedge that proved review-queue convergence-by-asymptote is preferable to convergence-by-perfection for builder-tractable findings.
+
 ## Dogfooding Contract
 
 V0 is "done as a learning instrument" only when journal evidence accumulates. The contracts live in each item's post-merge gate:
 
 - **[[2026-05-17-060-hotkey-overlay-v0-raycast-dogfood|060]] AC8:** ≥10 entries / ≥3 calendar days, with founder articulating the top-3 retrieval-quality issues. **Adds a `Repo` field** to the standard 6-field cross-tool template at `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md` — the 7-field shape is Raycast-scoped only; the cross-tool template per `CLAUDE.md` remains 6-field everywhere else.
 - **[[2026-05-18-062-ask-echo-raycast-llm-qa|062]] AC9:** ≥5 entries containing the marker line `**Surface:** Ask ECHO` across ≥2 calendar days, ≥1 ✅ and ≥1 🟡/❌. Mechanically checkable via `grep -c`.
+- **[[2026-05-27-077-cognitive-recap-via-raycast|077]] AC7:** ≥3 entries containing the marker line `**Surface:** Recap` across ≥2 calendar days, ≥1 ✅ and ≥1 🟡/❌. Mechanically checkable via `grep -Fc '**Surface:** Recap' raw/internal/dogfooding/mcp-interactions-journal-*.md` (fixed-string match — leading `**` is regex repetition operator, per r2 codex F3 / codex-ops F2 convergent patch).
 
 Every ⌘⇧E / ⌘⇧A invocation is logged to `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md` in the moment, NOT batched at end-of-day. The journal is the load-bearing V1 spec input — aspirational end-of-week entries are useless; lossy in-the-moment entries are gold. **The README documents this verbatim**, and the extension explicitly does NOT auto-telemeter — single-user dogfooding, zero phone-home.
 

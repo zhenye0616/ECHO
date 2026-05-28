@@ -58,6 +58,8 @@ That's Layer 4 (conversational dialogue). Also makes ECHO a destination, which i
 
 **Counter-move:** note the idea for V2. Do not build.
 
+**Worked example — Recap (077) is the explicit-action complement to Continue hero, NOT a chat companion.** Item 077 (the Raycast `recap` command) sits structurally on the Pattern 5 trap line: it summarizes recent agent activity into a streamed narrative, which could easily slide into "let me ask a follow-up about what you just said." The spec defends against this in three load-bearing ways: (a) **single-shot only** — no follow-up turns, no in-session continuation; re-asking is a fresh `Raycast → Recap` invocation; (b) **ephemeral** — not persisted to LocalStorage, no SessionsList integration, no Cmd-R cross-command fork (all cut per r8 option-F resolution); (c) **explicit action only** — invoked from the Raycast root search, NEVER hijacked from the empty-Enter cluster-list semantics that the Continue hero owns. Recap and Continue hero are siblings at L3: Continue is the cold-start "where you left off" auto-surfaced row; Recap is the on-demand "brief me on what happened" command. Neither becomes a destination. See [[hotkey-overlay-raycast]] § Recap (077) for the full structural defense.
+
 ## The Decision Test (Five Questions)
 
 Before any new build decision, answer all five. If any is "yes," it's drift:
