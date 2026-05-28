@@ -144,4 +144,3 @@ The pointer's content is **byte-identical** through either path at the same git 
 - `tools/review-queue/validate.py` — reviewer-side fresh-eyes enforcement.
 - `src/mcp/parse-anchors.ts` — canonical anchors parser.
 - `CLAUDE.md` "Dogfooding journal discipline — Journal-by-proxy" — read-only consultee protocol.
-- `skills/using-superpowers.md` — cold-start primer ("read your role's task-state pointer first").

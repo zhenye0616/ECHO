@@ -25,7 +25,7 @@ Until BOTH (e1) AND (e2) hold, every new spec must directly serve (e1) or (e2) o
 
 ## Role-typed task-state pointers (046+)
 
-ECHO ships a compact working-memory snapshot at `backlog/task-state/<task-id>/<role>.md` per role binding. Continuity roles (strategist, builder, watcher, dispatcher) write these; reviewer ticks DO NOT read or write them (fresh-eyes-at-SHA invariant). Full schema + read/write protocol in `skills/role-typed-task-state.md`. Cold-start primer in `skills/using-superpowers.md` (the ECHO-namespaced file at the repo root's skills directory; this is distinct from the superpowers-plugin skill of the same name).
+ECHO ships a compact working-memory snapshot at `backlog/task-state/<task-id>/<role>.md` per role binding. Continuity roles (strategist, builder, watcher, dispatcher) write these; reviewer ticks DO NOT read or write them (fresh-eyes-at-SHA invariant). Full schema + read/write protocol in `skills/role-typed-task-state.md`.
 
 **If you are starting a strategist or builder session and the task already has a `task_state_ref:` in its backlog item frontmatter, read your role's pointer FIRST before any broader corpus walk.** That's the load-bearing primer rule — it should cut cold-start from ~3 MCP calls + ~3-4 min down to 0-1 MCP calls + <60s.
 

@@ -1,7 +1,7 @@
 [role]
 description = "Long-context planner. Drafts backlog specs from founder conversations, synthesizes reviewer findings across rounds, decides when a spec is ready to merge. Reads the full corpus on cold-start via task-state pointers."
 sandbox = "workspace-write"
-skills = ["review-queue-watch", "review-pending", "merge-and-cleanup", "role-typed-task-state", "using-superpowers"]
+skills = ["review-queue-watch", "review-pending", "merge-and-cleanup", "role-typed-task-state"]
 
 [role.requires]
 mcp_servers = ["echo"]

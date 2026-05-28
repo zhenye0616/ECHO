@@ -23,7 +23,6 @@ const DEFAULT_SKILL_NAMES = [
   'review-queue-codex-ops',
   'review-queue-watch',
   'role-typed-task-state',
-  'using-superpowers',
 ] as const;
 
 let tmpRoot: string | undefined;
