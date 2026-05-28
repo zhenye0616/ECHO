@@ -115,22 +115,28 @@ Single-shot is the structural defense against drift-prevention Pattern 5. The Re
 
 1. Tells the agent it is a **single-shot recap renderer** for the founder of ECHO, who has been out of the loop since `${SINCE_ISO}`. The agent must compose a strategist-grade narrative organized by three drift axes.
 2. Instructs the agent to read these SIX input sources (in order), filtering by **stable embedded timestamps** rather than filesystem `mtime` (r1 codex-ops F3 patch — mtime reflects checkout/touch time, not artifact authorship; a fresh clone or rebase would over-include old files):
-   - `backlog/reviews/**/r*/combined.md` and `r*/codex.md` / `r*/codex-ops.md` / `r*/claude.md` / `r*/cursor.md` files filtered by their **canonical frontmatter timestamp field per file kind** (r2 codex F1 patch): `combined.md` uses `combined_at`, reviewer response files use `completed_at`, request files use `requested_at`. The recap prompt MUST consult the correct field per file kind — failing to read `combined_at` would silently skip every `combined.md` (the B-axis canonical artifact). Each file is included iff its canonical field parses as ISO and is `> ${SINCE_ISO}`. Decision artifacts; each `combined.md` carries verdicts, severity-tagged findings, and dispositions — the canonical B-axis evidence.
+   - `backlog/reviews/**/r*/combined.md` is the **ONLY authoritative B-axis source** (r4 codex-ops F1 patch). The recap MUST treat a round as having a final disposition ONLY if its `combined.md` exists. Reviewer response files (`r*/codex.md` / `r*/codex-ops.md` / `r*/claude.md` / `r*/cursor.md`) MAY be read for context BUT MUST be reported in the recap as "in-flight (round rN, no convergence yet)" when no sibling `combined.md` exists. Reporting reviewer findings as decisions during the race window where reviewers have landed but the watcher hasn't combined yet would create false continuity — the exact failure the feature is designed to prevent. Filtering by **canonical frontmatter timestamp field per file kind** (r2 codex F1 patch): `combined.md` uses `combined_at`, reviewer response files use `completed_at`, request files use `requested_at`. Each file is included iff its canonical field parses as ISO and is `> ${SINCE_ISO}`. Each `combined.md` carries verdicts, severity-tagged findings, and dispositions — the canonical B-axis evidence.
    - `backlog/task-state/<task-id>/*.md` files enumerated via `git log --since="${SINCE_ISO}" --name-only --pretty=format: -- 'backlog/task-state/**'` (touched-since-window via git, NOT mtime). Read current_thesis + open_questions + dont_touch — canonical D-axis evidence.
    - `raw/internal/agent-runs/*.md` files enumerated via `git log --since="${SINCE_ISO}" --name-only --pretty=format: -- 'raw/internal/agent-runs/**'`. Read each file's "Decisions Made During Implementation" section (and adjacent sections) — B-axis evidence for non-spec-round work.
    - `git log --since="${SINCE_ISO}" --oneline --stat HEAD` (NOT `${SINCE_ISO}..HEAD` — Git treats the ISO timestamp as a revision name and fails with `fatal: invalid object name`; r1 codex F3 / codex-ops F1 patch). Followed by selective `git diff <sha>~..<sha>` on the highest-impact commits the log surfaces. A-axis evidence.
    - `raw/internal/dogfooding/mcp-interactions-journal-*.md` — parse `### YYYY-MM-DD HH:MM PDT` headers and include entries whose timestamp is `> ${SINCE_ISO}` (header-embedded timestamp, NOT mtime). Cross-tool MCP activity; verifies what ECHO knew when.
-   - MCP `find_clusters({since: ${SINCE_ISO}, repo_path: "${REPO_ROOT}"})` followed by `get_atoms({atom_ids: <top cluster>, prefer: "newest_first"})` ONLY if the four file-based sources above leave gaps (raw cross-tool conversation context).
+   - MCP `find_clusters({since: <SINCE_ISO>, repo_path: <REPO_PATH>})` followed by `get_atoms({atom_ids: <top cluster>, prefer: "newest_first"})` ONLY if the four file-based sources above leave gaps (raw cross-tool conversation context). **Both `<SINCE_ISO>` and `<REPO_PATH>` are template placeholders substituted at prompt construction time** (r4 codex F1 patch). The `repo_path` MUST be an absolute filesystem path (the MCP validator at `src/mcp/util/repo-path.ts:35-38` rejects non-absolute strings). The substitution is performed by `buildRecapPrompt({ sinceIso, repoPath })` — see AC4a below.
 3. Pins the output format to three markdown sections, in this order: `## A — Code changed`, `## B — Decisions`, `## D — Direction`. Each section ≤200 words. A final `## Sources` line lists which inputs were used.
 4. Forbids: producing the recap without reading the actual artifacts; inventing decisions not present in `combined.md` or run logs; recommending changes the founder didn't ask for; following up or asking clarifying questions (single-shot).
-5. Total prompt body MUST be < 4096 characters (vendor-portable upper bound) and snapshot-tested. The snapshot test (AC5 / recap-system-prompt.test.ts) additionally asserts the verbatim presence of: (a) the corrected `git log --since="${SINCE_ISO}" ... HEAD` command form (not `${SINCE_ISO}..HEAD`), (b) the `git log --since ... --name-only` enumeration pattern for task-state and agent-runs, (c) the no-mtime constraint, (d) the journal-entry header parser for timestamp filtering, and (e) **the per-file-kind canonical timestamp field**: `combined_at` for `combined.md`, `completed_at` for reviewer response files, `requested_at` for request files (r2 codex F1 patch). These five assertions structurally prevent regression back to the r1/r2-broken forms.
+5. Total prompt body MUST be < 4096 characters (vendor-portable upper bound) and snapshot-tested. The snapshot test runs against the TEMPLATE constant `RECAP_SYSTEM_PROMPT_TEMPLATE` (with placeholders), NOT against `buildRecapPrompt()` output (which would be path-dependent and break in CI). The snapshot test (AC5 / recap-system-prompt.test.ts) additionally asserts the verbatim presence of: (a) the corrected `git log --since="<SINCE_ISO>" ... HEAD` command form (not `<SINCE_ISO>..HEAD`), (b) the `git log --since ... --name-only` enumeration pattern for task-state and agent-runs, (c) the no-mtime constraint, (d) the journal-entry header parser for timestamp filtering, (e) **the per-file-kind canonical timestamp field**: `combined_at` for `combined.md`, `completed_at` for reviewer response files, `requested_at` for request files (r2 codex F1 patch), (f) **the in-flight labeling rule** (r4 codex-ops F1 patch): the prompt verbatim states `combined.md` is the ONLY authoritative B-axis source and reviewer-only rounds without combined.md MUST be reported as "in-flight," and (g) **the placeholder tokens** `<SINCE_ISO>` and `<REPO_PATH>` are present in the TEMPLATE constant (r4 codex F1 patch). These seven assertions structurally prevent regression back to the r1/r2/r3/r4-broken forms.
 
-### AC4 — `since-resolver.ts`
+### AC4 — `since-resolver.ts` + `buildRecapPrompt`
 
 `tools/raycast-echo/src/lib/since-resolver.ts` exports a pure function:
 
 ```ts
-export type SinceSource = "user" | "last_session" | "fallback_24h";
+export type SinceSource =
+  | "user"           // explicit valid ISO input from the Form TextField
+  | "last_session"   // dropdown=last_session, qualifying session found
+  | "window_24h"     // dropdown=24h, explicit operator choice (r4 codex-ops F2 patch)
+  | "window_4h"      // dropdown=4h, explicit operator choice (r4 codex-ops F2 patch)
+  | "fallback_24h";  // dropdown=last_session but no qualifying session existed
+
 export interface ResolvedSince { sinceIso: string; source: SinceSource; }
 
 export function resolveSinceWindow(
@@ -139,13 +145,35 @@ export function resolveSinceWindow(
   sessions: readonly Session[],     // LocalStorage-loaded sessions
   nowMs: number = Date.now(),
 ): ResolvedSince;
+
+export class InvalidSinceInputError extends Error {
+  constructor(public readonly rawInput: string) { super(`Invalid since input: "${rawInput}" — expected ISO 8601 timestamp with explicit timezone (Z or ±HH:MM).`); }
+}
 ```
 
 Precedence (deterministic, easy to test):
 
-1. **`userInput`** parses as a valid ISO timestamp (with `Z` or `+HH:MM`) → `source: "user"`.
-2. **`windowPref === "last_session"`** → find the most recent `Session` with **`status === "done"`** AND (if the session carries `recapWindow`, additionally requiring a non-empty `answer` field — i.e., the recap actually produced output). Use `completedAt ?? startedAt`. **`status ∈ {"running", "cancelled", "errored"}` sessions are NOT qualifying** (r3 codex-ops F1 patch): `running` because the founder isn't trying to recap their currently-open session; `cancelled`/`errored` because a failed/aborted attempt would poison the next default window — the next Recap would start AFTER the failed timestamp, silently excluding the artifacts the founder was trying to recover. A cancelled/errored prior Recap MUST behave as if it never ran for resolver purposes. If no qualifying session exists → fall through to (3).
-3. **Fallback** → `now - 24h`, `source: "fallback_24h"`.
+1. **`userInput` non-empty AND valid** (parses as ISO 8601 with explicit `Z` or `+HH:MM` timezone) → `source: "user"`.
+2. **`userInput` non-empty AND invalid** → **throw `InvalidSinceInputError`** (r4 codex-ops F2 patch). The Form caller in recap.tsx MUST catch this and render a visible Form error (`Form.TextField.error` or `showToast({style: Failure})`); the recap MUST NOT silently fall through to a different window when the user explicitly typed something. Silent-fallback would produce a recap over a window the user did not intend, with no operator-visible signal that the input was wrong.
+3. **`userInput` empty AND `windowPref === "last_session"`** → find the most recent `Session` with **`status === "done"`** AND (if the session carries `recapWindow`, additionally requiring a non-empty `answer` field — i.e., the recap actually produced output). Use `completedAt ?? startedAt`. **`status ∈ {"running", "cancelled", "errored"}` sessions are NOT qualifying** (r3 codex-ops F1 patch): `running` because the founder isn't trying to recap their currently-open session; `cancelled`/`errored` because a failed/aborted attempt would poison the next default window — the next Recap would start AFTER the failed timestamp, silently excluding the artifacts the founder was trying to recover. If no qualifying session exists → fall through to (6) with `source: "fallback_24h"`.
+4. **`userInput` empty AND `windowPref === "24h"`** → `now - 24h`, `source: "window_24h"` (NOT `fallback_24h` — operator explicitly chose this; r4 codex-ops F2 patch).
+5. **`userInput` empty AND `windowPref === "4h"`** → `now - 4h`, `source: "window_4h"`.
+6. **`windowPref === "last_session"` + no qualifying session** → `now - 24h`, `source: "fallback_24h"` (default window when last-session lookup found nothing).
+
+Returns ISO-8601 with explicit `Z` suffix (UTC canonical), matching `src/capture/pipeline.ts:17-44`'s timestamp canonicalization.
+
+### AC4a — `buildRecapPrompt({ sinceIso, repoPath })` (r4 codex F1 patch)
+
+`tools/raycast-echo/src/lib/recap-system-prompt.ts` exports BOTH the pinned template constant `RECAP_SYSTEM_PROMPT_TEMPLATE` (which contains `<SINCE_ISO>` and `<REPO_PATH>` placeholder tokens) AND a pure function:
+
+```ts
+export function buildRecapPrompt(args: {
+  sinceIso: string;     // result of resolveSinceWindow().sinceIso
+  repoPath: string;     // absolute filesystem path (REJECT non-absolute → throw)
+}): string;
+```
+
+`buildRecapPrompt` performs string substitution of `<SINCE_ISO>` → `args.sinceIso` and `<REPO_PATH>` → `args.repoPath`. Pre-condition: `args.repoPath` MUST be an absolute path (matches the MCP `find_clusters` `repo_path` validator at `src/mcp/util/repo-path.ts:35-38`); non-absolute → throw. Post-condition: the returned string MUST NOT contain any of `<SINCE_ISO>`, `<REPO_PATH>`, `${SINCE_ISO}`, `${REPO_ROOT}` literals — fully-substituted prompt only. Recap.tsx is the SOLE call site; it MUST call `buildRecapPrompt({sinceIso: resolved.sinceIso, repoPath: prefs.repoPath})` and pass the result to `agentRunner`.
 
 `windowPref === "24h"` → `now - 24h`. `windowPref === "4h"` → `now - 4h`. Both bypass the session lookup.
 
@@ -157,20 +185,22 @@ Three vitest test files added under `tools/raycast-echo/test/`:
 
 - **`recap-system-prompt.test.ts`** — snapshot test on the full prompt body string. Intentionally fragile — any edit to the prompt content fails this test until the snapshot is explicitly refreshed (`vitest --update`). Same defense pattern as `system-prompt.test.ts`. Additionally asserts: prompt body < 4096 chars; mentions all six input sources; mentions all three drift axes by name.
 
-- **`since-resolver.test.ts`** — ten cases minimum:
-  1. user-input ISO wins over windowPref
-  2. user-input invalid → falls through to windowPref
-  3. windowPref=`last_session` + qualifying `done` session present → uses `completedAt`
-  4. windowPref=`last_session` + qualifying `done` session has null `completedAt` → uses `startedAt`
-  5. windowPref=`last_session` + only `running` sessions present → falls through to 24h
-  6. windowPref=`last_session` + zero sessions → 24h
-  7. windowPref=`24h` → `now - 24h` regardless of sessions
-  8. windowPref=`4h` → `now - 4h` regardless of sessions
-  9. **(r3 codex-ops F1 patch)** windowPref=`last_session` + most recent session is `cancelled` Recap → resolver SKIPS it, uses the next older `done` session OR falls through to 24h.
+- **`since-resolver.test.ts`** — twelve cases minimum:
+  1. user-input valid ISO → `source: "user"`
+  2. **(r4 codex-ops F2 patch)** user-input non-empty AND invalid → **throws `InvalidSinceInputError`** (NOT silent fall-through)
+  3. windowPref=`last_session` + qualifying `done` session present → uses `completedAt`, `source: "last_session"`
+  4. windowPref=`last_session` + qualifying `done` session has null `completedAt` → uses `startedAt`, `source: "last_session"`
+  5. windowPref=`last_session` + only `running` sessions present → falls through to 24h, `source: "fallback_24h"`
+  6. windowPref=`last_session` + zero sessions → 24h, `source: "fallback_24h"`
+  7. **(r4 codex-ops F2 patch)** windowPref=`24h` → `now - 24h`, `source: "window_24h"` (NOT `"fallback_24h"`)
+  8. **(r4 codex-ops F2 patch)** windowPref=`4h` → `now - 4h`, `source: "window_4h"`
+  9. **(r3 codex-ops F1 patch)** windowPref=`last_session` + most recent session is `cancelled` Recap → resolver SKIPS it, uses the next older `done` session OR falls through to 24h (`source: "fallback_24h"`).
   10. **(r3 codex-ops F1 patch)** windowPref=`last_session` + most recent session is `errored` Recap → same: resolver SKIPS, picks next older `done` or falls through to 24h.
+  11. **(r4 codex F1 patch — buildRecapPrompt absolute-path validator)** `buildRecapPrompt({sinceIso, repoPath: "relative/path"})` THROWS (non-absolute rejected).
+  12. **(r4 codex F1 patch — buildRecapPrompt full substitution)** `buildRecapPrompt({sinceIso, repoPath: "/Users/test/repo"})` returns a string where neither `<SINCE_ISO>`, `<REPO_PATH>`, `${SINCE_ISO}`, nor `${REPO_ROOT}` appears as a literal substring.
   All ISO outputs end with `Z` (UTC canonical).
 
-- **`recap.test.tsx`** — seven cases minimum:
+- **`recap.test.tsx`** — eight cases minimum:
   1. Form-submit constructs the prompt with the resolved since interpolated into `${SINCE_ISO}`.
   2. Agent profile selection honors `preferences.agentKind` (mocked profile registry).
   3. Detail view unmount calls `tree-kill` on the subprocess PID (mocked agent-runner).
@@ -178,6 +208,7 @@ Three vitest test files added under `tools/raycast-echo/test/`:
   5. **(r1 F4 patch)** A Recap session (where `session.recapWindow !== undefined`) passed to the fork action constructs a NEW Recap session (asserted via the resulting prompt-construction call using the Recap system prompt, NOT the Ask system prompt).
   6. **(r2 codex-ops F1 patch)** A custom-agent recap spawn (mocked `agentKind: "custom"` with a stdin-template `customCommand`) passes through the recap prompt via stdin AND the resulting `child_process.spawn` options include `cwd: <mocked repoPath>`. Asserts the cwd contract for custom commands so relative-path reads in the recap prompt resolve against the project repo.
   7. **(r3 codex-ops F2 patch)** Daemon-down non-blocking contract: with `probeEchoDaemon()` mocked to fail, the recap subprocess still spawns and streams its markdown answer. The `Detail.Metadata` sidebar reports "audit unavailable" but does NOT prevent the answer from rendering.
+  8. **(r4 codex-ops F2 patch)** Form-level validation on invalid `userInput`: a non-empty TextField value that doesn't parse as ISO with explicit timezone causes the resolver to throw `InvalidSinceInputError`; recap.tsx catches it and renders a visible Form error or failure toast. The subprocess MUST NOT spawn in this case (silent-fallback rejected). Asserted via mocked Form submit + assertion the agent-runner was NOT invoked.
 
 All tests must pass under root `npm test` AND `tools/raycast-echo/` `npm test`. Typecheck (`tsc --noEmit`) must pass in both roots.
 
