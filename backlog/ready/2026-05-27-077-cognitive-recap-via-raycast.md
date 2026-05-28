@@ -262,6 +262,18 @@ Per r8 option-F resolution, Recap session persistence is DROPPED ENTIRELY for V1
 ### #10 — No telemetry / phone-home
 Following Ask ECHO's "single-user dogfooding, zero phone-home" stance per 062's contract. The recap command logs locally via the dogfooding journal discipline; no remote telemetry endpoint is added.
 
+## Builder Pre-Claim Fixups (from r11 — accept-and-ship per founder direction 2026-05-28 PDT)
+
+The spec converged after 11 review rounds (codex + codex-ops). Codex-ops landed `proceed` cleanly at r7 and r9; codex remained at `proceed_after_patches` with asymptotically narrowing findings (r1=5 → r11=3). After r11, founder dispositioned **accept-and-ship**: the remaining 3 MEDs are concrete, builder-tractable, and would be discovered in the first hour of implementation. Builder applies these inline during build:
+
+| # | Source | Fixup | Files | Est. LOC |
+|---|---|---|---|---|
+| 1 | r11 codex F1 | Add `tools/raycast-echo/package-lock.json` to files_to_modify. Bump root + `packages[""]` version to match the new package.json version. | `package-lock.json` | 1 |
+| 2 | r11 codex-ops F1 | Add subprocess-level timeout for the agent's MCP fallback (30s subprocess timeout OR Raycast-side AbortController-bounded prefetch-then-spawn). The "wait 5s then continue" prompt instruction is not a runtime gate against a wedged daemon. Builder picks the cleaner path. | `recap.tsx` + maybe `agent-runner.ts` | 10-20 |
+| 3 | r11 codex-ops F2 | recap.tsx preflight: `fs.existsSync(repoPath)` + verify directory + verify `.git` (or run `git rev-parse --show-toplevel`). On failure, render visible Form error, do NOT spawn. Add 2 vitest cases (nonexistent + non-git paths). | `recap.tsx` + `test/recap.test.tsx` (cases 9-10) | 5-10 + tests |
+
+Full r11 review responses + combined.md preserved at `backlog/reviews/2026-05-27-077-cognitive-recap-via-raycast/r11/`. All earlier rounds (r1-r10) likewise preserved as the canonical decision trail. The 11-round review history is the **B-axis evidence** (decision drift) the Recap feature itself is designed to render — meta-recursive but real.
+
 ## V1.5+ Followup — deferred from this spec
 
 The following capabilities were considered and **explicitly deferred** to V1.5+ as part of the r8 option-F resolution. If V1 dogfooding shows demand, the strategist files these as new backlog items:
