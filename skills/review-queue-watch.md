@@ -98,9 +98,9 @@ tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 
 After the gate-aware disposition pass, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
-#### Disposition discipline — prefer removal over deeper patching when findings target a recent-round patch
+#### Disposition discipline — prefer removal over deeper patching when findings target any prior-round patch
 
-Reframe gate: after `combine.py` writes `combined.md` and `escalated_to_founder: false` is confirmed, but before any `Disposition` column is filled, classify actionable findings in the convergent and divergent tables using the same "recent-patch-introduced" primitive defined below: a finding targets a prior-round patch when its `where:` lines fall inside a recent `spec-r<N-1>-patches` diff, or reviewers converge on bugs in a mechanism that did not exist before that patch. Exclude missing-reviewer placeholder rows and pure non-actionable deferrals.
+Reframe gate: after `combine.py` writes `combined.md` and `escalated_to_founder: false` is confirmed, but before any `Disposition` column is filled, classify actionable findings in the convergent and divergent tables using the same "prior-patch-introduced" primitive defined below: a finding targets a prior-round patch when its `where:` lines fall inside any prior-round `spec-r*-patches` commit for this item, or reviewers converge on bugs in a mechanism that did not exist before that round. The lookback window is any patch commit between the spec's first-ready commit and this round's `spec_commit_sha`, excluding this round's commits. This broader rule still does not fire for findings targeting original spec text or original load-bearing mechanisms; only patch-introduced mechanisms count. Exclude missing-reviewer placeholder rows and pure non-actionable deferrals.
 
 If count >= 2, the strategist MUST run a fresh-context investigator before disposition:
 
@@ -113,7 +113,7 @@ Context:
 - Current combined review artifact: backlog/reviews/<item_id>/r<N>/combined.md
 - Current request: backlog/reviews/<item_id>/r<N>/request.md
 - Current spec path and pinned SHA: <spec_path> @ <spec_sha>
-- Recent patch commits under review: <last 1-2 spec-r*-patches commits>
+- Prior patch commits under review: <all prior-round spec-r*-patches commits for this item in the broad lookback window>
 - Founder context, if any: <paste last 1-2 founder messages relevant to disposition>
 
 Question:
@@ -139,9 +139,9 @@ Backward compatibility: future watcher ticks only; do not revalidate historical 
 
 Test/audit: prose-enforced now. Later, a `tools/review-queue/check-reframe-gate.py` could read just-combined `combined.md`, count recent-patch-introduced findings, and refuse disposition unless a `Reframe gate:` artifact exists.
 
-Before committing to a patch, check whether the finding is targeting **mechanism a prior round's patch added** vs. mechanism the original spec had. If it's the former — i.e. r<N>'s findings are bugs in r<N-1>'s patch — strongly prefer **removing the r<N-1> mechanism** over patching deeper.
+Before committing to a patch, check whether the finding is targeting **mechanism a prior round's patch added** vs. mechanism the original spec had. If it's the former — i.e. this round's findings are bugs in any prior-round patch — strongly prefer **removing the prior-round mechanism** over patching deeper.
 
-The signal: a finding is most likely "recent-patch-introduced" when (a) its `where:` lines all fall inside the diff range of a recent `spec-r<N-1>-patches` commit, OR (b) multiple reviewers converge on bugs in one mechanism that didn't exist before that commit. In that case, ask whether the prior round's reviewer actually required the mechanism, or whether it was your interpretation of a softer ask (e.g. "perf fixture OR runtime warning" → you added both → the warning has bugs).
+The signal: a finding is most likely "prior-patch-introduced" when (a) its `where:` lines all fall inside the diff range of any prior-round `spec-r*-patches` commit, OR (b) multiple reviewers converge on bugs in one mechanism that didn't exist before the prior-round patch that introduced it. 077 r10 is the canonical broad-window case: three findings targeted stale text accumulated across r4-r9 patch commits, so the gate fires under the broad reading even though only one finding targets r9 alone. In that case, ask whether the prior round's reviewer actually required the mechanism, or whether it was your interpretation of a softer ask (e.g. "perf fixture OR runtime warning" → you added both → the warning has bugs).
 
 Concrete win condition: a removal-only `spec-r<N>-patches` commit typically converges in r<N+1>. A patch-deeper commit typically introduces r<N+1>'s findings.
 
