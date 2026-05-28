@@ -16,6 +16,7 @@ export interface EchoHomePaths {
   state: string;
   stateOnboarding: string;
   stateProjects: string;
+  stateCaptureSources: string;
 }
 
 function resolveRoot(homeOverride?: string): string {
@@ -39,6 +40,7 @@ export function resolveEchoHomePaths(homeOverride?: string): EchoHomePaths {
     state: join(resolvedRoot, 'state'),
     stateOnboarding: join(resolvedRoot, 'state', 'onboarding.json'),
     stateProjects: join(resolvedRoot, 'state', 'projects.json'),
+    stateCaptureSources: join(resolvedRoot, 'state', 'capture-sources.json'),
   });
 }
 

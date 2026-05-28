@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isNonEmptyString } from '../guards.js';
+import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
+
+export const DEFAULT_GIT_REPOS = ['~/Desktop/Project_echo/'] as const;
 
 export const CAPTURED_SOURCES = {
   apps: {},
@@ -11,8 +15,22 @@ export const CAPTURED_SOURCES = {
     '~/.codex/sessions/',
   ],
   apis: [],
-  git_repos: ['~/Desktop/Project_echo/'],
+  git_repos: [...DEFAULT_GIT_REPOS],
 } as const;
+
+// ~/.echo/state/capture-sources.json schema:
+// {
+//   "schema_version": 1,
+//   "updated_at": "2026-05-28T00:00:00.000Z",
+//   "git_repos": ["/absolute/path/to/git/repo"]
+// }
+// The file stores user-managed capture repos. The daemon merges them with
+// DEFAULT_GIT_REPOS at boot for backward compatibility.
+export interface CaptureSourcesConfig {
+  schema_version: 1;
+  updated_at: string;
+  git_repos: string[];
+}
 
 export type Source =
   | { kind: 'app'; bundleId: keyof typeof CAPTURED_SOURCES.apps }
@@ -22,6 +40,18 @@ export type Source =
   | { kind: 'git'; repo: string };
 
 const HOME = homedir();
+
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && 'code' in err;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function invalidCaptureConfig(filePath: string, message: string): never {
+  throw new Error(`${filePath}: invalid capture-sources config: ${message}`);
+}
 
 export function expandTilde(p: string): string {
   if (p === '~') return HOME;
@@ -62,6 +92,84 @@ function stripTrailingSlash(p: string): string {
 
 export function normalizeRepoPath(p: string): string {
   return stripTrailingSlash(expandTilde(p));
+}
+
+export function mergeGitRepos(
+  defaults: ReadonlyArray<string>,
+  configured: ReadonlyArray<string>,
+): string[] {
+  const repos: string[] = [];
+  const seen = new Set<string>();
+  for (const repo of [...defaults, ...configured]) {
+    const normalized = normalizeRepoPath(repo);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    repos.push(repo);
+  }
+  return repos;
+}
+
+export function readCaptureSourcesConfig(
+  filePath = ECHO_HOME_PATHS.stateCaptureSources,
+): CaptureSourcesConfig | null {
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (isErrnoException(err) && err.code === 'ENOENT') return null;
+    throw err;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    invalidCaptureConfig(filePath, `invalid JSON: ${(err as Error).message}`);
+  }
+
+  if (!isPlainObject(parsed)) invalidCaptureConfig(filePath, 'expected object');
+  const allowedKeys = new Set(['schema_version', 'updated_at', 'git_repos']);
+  for (const key of Object.keys(parsed)) {
+    if (!allowedKeys.has(key)) invalidCaptureConfig(filePath, `unknown field: ${key}`);
+  }
+  if (parsed['schema_version'] !== 1) {
+    invalidCaptureConfig(filePath, 'schema_version must be 1');
+  }
+  const updatedAt = parsed['updated_at'];
+  const gitRepos = parsed['git_repos'];
+  if (!isNonEmptyString(updatedAt)) {
+    invalidCaptureConfig(filePath, 'updated_at must be a non-empty string');
+  }
+  if (!Array.isArray(gitRepos)) {
+    invalidCaptureConfig(filePath, 'git_repos must be an array');
+  }
+  for (let i = 0; i < gitRepos.length; i++) {
+    if (!isNonEmptyString(gitRepos[i])) {
+      invalidCaptureConfig(filePath, `git_repos[${i}] must be a non-empty string`);
+    }
+  }
+
+  return {
+    schema_version: 1,
+    updated_at: updatedAt,
+    git_repos: [...gitRepos],
+  };
+}
+
+export function loadGitReposFromCaptureConfig(
+  filePath = ECHO_HOME_PATHS.stateCaptureSources,
+): string[] {
+  const config = readCaptureSourcesConfig(filePath);
+  return mergeGitRepos(DEFAULT_GIT_REPOS, config?.git_repos ?? []);
+}
+
+export function applyGitReposFromCaptureConfig(
+  filePath = ECHO_HOME_PATHS.stateCaptureSources,
+): string[] {
+  const repos = loadGitReposFromCaptureConfig(filePath);
+  const target = CAPTURED_SOURCES.git_repos as unknown as string[];
+  target.splice(0, target.length, ...repos);
+  return repos;
 }
 
 export function _isAllowedRepoIn(

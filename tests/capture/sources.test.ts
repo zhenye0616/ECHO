@@ -1,15 +1,19 @@
-import { homedir } from 'node:os';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   CAPTURED_SOURCES,
+  DEFAULT_GIT_REPOS,
   _isAllowedAppIn,
+  _isAllowedApiIn,
   _isAllowedDomainIn,
   _isAllowedPathIn,
-  _isAllowedApiIn,
+  loadGitReposFromCaptureConfig,
   isAllowedApp,
+  isAllowedApi,
   isAllowedDomain,
   isAllowedPath,
-  isAllowedApi,
 } from '../../src/capture/sources.js';
 
 const malformed: unknown[] = [null, undefined, 42, '', {}, [], true, false];
@@ -28,6 +32,43 @@ describe('CAPTURED_SOURCES', () => {
       '~/.claude/projects/',
       '~/.codex/sessions/',
     ]);
+  });
+
+  it('falls back to the built-in git repo when capture config is absent', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'echo-capture-sources-'));
+    try {
+      expect(loadGitReposFromCaptureConfig(join(dir, 'missing.json'))).toEqual([
+        ...DEFAULT_GIT_REPOS,
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads persisted git repos merged with the built-in default', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'echo-capture-sources-'));
+    const configPath = join(dir, 'capture-sources.json');
+    try {
+      writeFileSync(
+        configPath,
+        `${JSON.stringify(
+          {
+            schema_version: 1,
+            updated_at: '2026-05-28T00:00:00.000Z',
+            git_repos: ['/tmp/customer-repo', '/tmp/customer-repo/'],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      expect(loadGitReposFromCaptureConfig(configPath)).toEqual([
+        ...DEFAULT_GIT_REPOS,
+        '/tmp/customer-repo',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

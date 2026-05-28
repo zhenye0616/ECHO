@@ -48,6 +48,9 @@ describe('ECHO home paths', () => {
     expect(ECHO_HOME_PATHS.stateProjects).toBe(
       join(ECHO_HOME_PATHS.root, 'state', 'projects.json'),
     );
+    expect(ECHO_HOME_PATHS.stateCaptureSources).toBe(
+      join(ECHO_HOME_PATHS.root, 'state', 'capture-sources.json'),
+    );
   });
 
   it('honors ECHO_HOME at module load', async () => {

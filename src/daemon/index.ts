@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { startClaudeCodeExtractor } from '../capture/extractors/claude-code.js';
 import { startCodexExtractor } from '../capture/extractors/codex.js';
 import { startCursorExtractor } from '../capture/extractors/cursor.js';
-import { CAPTURED_SOURCES } from '../capture/sources.js';
+import { applyGitReposFromCaptureConfig, CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { ensureEchoHome } from '../echo-home/scaffold.js';
@@ -53,11 +53,12 @@ try {
 }
 
 const { storage, backend, dispose } = createStorage();
+const gitRepos = applyGitReposFromCaptureConfig();
 
 const [fsWatcher, gitWatcher, claudeCodeExtractor, codexExtractor, cursorExtractor, mcp] =
   await Promise.all([
     startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
-    startGitWatcher(CAPTURED_SOURCES.git_repos, storage),
+    startGitWatcher(gitRepos, storage),
     startClaudeCodeExtractor(storage),
     startCodexExtractor(storage),
     startCursorExtractor(storage),

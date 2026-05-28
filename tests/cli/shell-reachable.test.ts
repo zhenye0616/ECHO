@@ -46,6 +46,8 @@ describe('echoctl shell reachability', () => {
       expect(tarEntries).toEqual(
         expect.arrayContaining([
           'package/dist/cli/index.js',
+          'package/dist/cli/commands/project.js',
+          'package/dist/cli/commands/project.d.ts',
           'package/dist/daemon/index.js',
           'package/dist/storage/migrations/0001_initial.sql',
           'package/assets/echo-skills/using-echo-coord.md',
