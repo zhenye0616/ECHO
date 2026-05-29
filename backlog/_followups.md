@@ -1155,3 +1155,9 @@ The structural framing — **roles MUST be conflict-free by construction across 
   **Meta:** this is the empirical closing of the loop on the 077 friction-fix work. The fresh-eyes investigator pattern (entry 3 in the prior followup cluster) produced not just the fix directives but also the regression evidence — same codex role family applied at different points in the workflow (root-cause analysis → implementation → regression verification). Cycle time per iteration ~5-6min; total ~30min wallclock across A + B + B-tighten + 2 regression evaluations. The pattern works for skill-prose changes; would extend cleanly to code changes once the implementer's sandbox is extended past `workspace-write` for repo-relative tests.
 
   No further action required on frictions A + B. Operational hygiene (entry 4) and the deeper "typed cross-vendor orchestration" theme from codex's root-cause re-analysis remain as separate backlog candidates. (surfaced during 077 post-close regression cycle)
+
+## From 078 merge (2026-05-29) — decision-card-board
+
+- **NIT (non-blocking):** `src/mcp/tools/pending-decisions.ts` sets `GIT_ASKPASS`/`SSH_ASKPASS=echo` rather than unsetting them. Functionally equivalent under `BatchMode` (echo → empty cred → fast fail); cosmetic.
+- **NIT (non-blocking):** `runaway_churn` detail string is generated in two places with the same template — cosmetic dedup.
+- **Post-shipment strategist (per spec After-Completion):** (1) amend `wiki/principles/felt-not-seen.md` with the manager-altitude "felt by default, visible on demand" exception; (2) create `wiki/surfaces/decisions-board.md` (status: shipped); (3) write `raw/internal/decisions/2026-05-28-decision-card-surface-and-sequencing.md` (DecisionCard primitive, ① now / ② on signal, overlay as V1.5 channel, recap-fold); (4) recap-command-entry fold to the 2-command beta ceiling, gated on 077's dogfooding gate. Update `.manifest.json` + regen `wiki/index.md` for pages created.
