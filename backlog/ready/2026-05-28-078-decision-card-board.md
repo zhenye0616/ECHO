@@ -76,29 +76,43 @@ type DecisionCard = {
   blocking?: string[];   // what's stalled waiting on this
   agents: string[];      // which agents are involved/waiting
   sources: { label: string; href: string }[];  // SEE+JUMP targets
-  signals: Signal[];     // alarms-as-attributes (A1 / A2), NOT a feed
+  signals: Signal[];     // alarms-as-attributes, NOT a feed. v0 populates A1 only (A2 deferred — see AC3 / r1 codex F2)
 };
-type Signal = { kind: "runaway_churn" | "non_converging_patch"; detail: string };
+type Signal = { kind: "runaway_churn"; detail: string };  // v0: A1 only. "non_converging_patch" (A2) is reserved but NOT emitted in v0 (V1.5 — needs a cross-round finding-fingerprint algorithm the queue doesn't yet encode)
+
+// The tool result carries freshness so the board can never silently show a stale "no decisions" (r1 codex-ops F4):
+type PendingDecisionsResult = {
+  decisions: DecisionCard[];
+  source_state: {           // freshness contract — the board renders a warning, never lies by omission
+    local_head: string;     // HEAD sha of the read repo_path
+    upstream_head: string | null;  // origin/main sha known to the daemon (null if unknown/offline)
+    behind: number;         // commits local is behind upstream (0 = fresh; >0 → board shows "N behind origin")
+    dirty: boolean;         // working tree has uncommitted changes under backlog/ (review state may be mid-write)
+    scanned_items: number;  // in-flight items scanned (bounds the scan — see AC2)
+    partial: boolean;       // true if the scan hit its budget and results may be incomplete (board shows a partial warning)
+  };
+  result_caps?: unknown;    // J5: only if the payload needs the 064 compact/rich machinery; default omitted
+};
 ```
 
 ## Acceptance Criteria
 
-1. **AC1 — daemon `pending_decisions` tool.** New `src/mcp/tools/pending-decisions.ts` exporting `registerPendingDecisions`, registered in `server.ts`, mirroring find-clusters' shape. Param `repo_path` (required v0). Returns `PendingDecisionsResult`. Deterministic; zero LLM; no agent subprocess.
-2. **AC2 — v0 playbook source adapter.** `decision-source-playbook.ts` projects `backlog/reviews/**/combined.md` + backlog state → `DecisionCard[]` for decisions awaiting the founder (escalated/at-boundary and not-yet-dispositioned). Pure, unit-tested, tolerant of older rounds missing fields. Filesystem-read logic isolated here (J1).
-3. **AC3 — alarms as card attributes.** A1 runaway-churn (≥ threshold consecutive rounds since last founder touch; resets on touch) and A2 non-converging-patch (≥MED finding recurring across ≥2 rounds; escalated when its spec line moved) are computed and attached to each card's `signals[]` — NOT rendered as a standalone feed.
-4. **AC4 — Raycast `decisions` board.** `decisions.tsx` renders the cards (current repo), read-only SEE+JUMP (every action opens where to act; zero writes anywhere under `backlog/`), live re-read while open with teardown on dismount. `mcp.ts` gains an additive `pendingDecisions(repoPath)` client method.
+1. **AC1 — daemon `pending_decisions` tool.** New `src/mcp/tools/pending-decisions.ts` exporting `registerPendingDecisions`, registered in `server.ts`, mirroring find-clusters' shape. Param `repo_path` (required v0). Returns `PendingDecisionsResult` **including the `source_state` freshness block** (local_head, upstream_head, behind, dirty, scanned_items, partial — r1 codex-ops F4). The daemon computes `behind`/`upstream_head` from its known origin/main ref (a `git rev-parse`/`git rev-list --count` against the repo, NOT a network fetch in v0 — see AC2 budget). Deterministic; zero LLM; no agent subprocess.
+2. **AC2 — v0 playbook source adapter + exact predicates (r1 codex F1 / codex-ops F2+F6).** `decision-source-playbook.ts` projects → `DecisionCard[]`. **Card-open predicate (durable, machine-readable — no inferred/invented state):** a card exists for an item's latest round `rN` IFF (a) `rN/combined.md` frontmatter has `escalated_to_founder: true`, AND (b) no newer `r<N+1>/request.md` exists, AND (c) the item still resides in a review-active backlog dir (`ready/`|`claimed/`|`pending_review/`). **Founder-touch / dispositioned (closes the card, resets A1):** a newer `r<N+1>/request.md` exists (founder dispositioned → next round) OR the item has moved to `complete/` OR `rN/combined.md` carries a non-empty convergence call / disposition (the watcher's own write). These three frontmatter/dir facts are the ONLY signals used — no journal-prose parsing, no body-placeholder inference. **Scan is bounded to in-flight items** (items in `ready/`|`claimed/`|`pending_review/` — NOT the full ~1000-commit `backlog/reviews/` history), so cost scales with open work, not total review volume. Pure, unit-tested, tolerant of older rounds missing fields. Filesystem-read logic isolated here (J1).
+3. **AC3 — alarms as card attributes (v0 = A1 ONLY; A2 deferred per r1 codex F2).** A1 runaway-churn — `signals[]` gets a `runaway_churn` entry when consecutive rounds since the last founder touch (per AC2's touch predicate) ≥ `staleTouchThreshold` (default 4); the count resets the moment a touch is recorded. Computed deterministically from round-dir counting + the AC2 predicates. **A2 (non-converging-patch) is NOT implemented in v0** — matching a recurring ≥MED finding across rounds needs a cross-round finding-fingerprint + line-move algorithm the queue does not encode (free-text, line-based `where`; `cross_ref` is same-round only). A2 is reserved in the `Signal` type and deferred to a V1.5 follow-up. Alarms are card attributes, NOT a standalone feed.
+4. **AC4 — Raycast `decisions` board.** `decisions.tsx` renders the cards (current repo), read-only SEE+JUMP (every action opens where to act; zero writes anywhere under `backlog/`). **Freshness:** when `source_state.behind > 0` or `dirty` or `partial`, the board shows a visible banner ("source N commits behind origin — may be stale" / "scan partial") — it never silently renders "no decisions" over a stale read (r1 codex-ops F4). **Polling budget (r1 codex-ops F6):** a fixed re-read interval (default 5s) with **single-flight** (no overlapping fetches) + backoff on daemon-unreachable; because AC2 bounds the scan to in-flight items the per-call cost is small. **Cleanup:** on dismount, clear the interval AND suppress late/stale results via a `cancelled` flag (the inherited `mcp.ts` `callTool` owns its own internal `AbortController` and exposes no caller signal — so AC4 requires interval-cleanup + stale-result suppression, NOT a caller-provided abort; r1 codex F3). `mcp.ts` gains an additive `pendingDecisions(repoPath)` client method.
 5. **AC5 — boundary holds.** `DecisionCard`/`PendingDecisionsResult` types contain NO knowledge of combined.md/backlog/reviewers; the only playbook-aware module is `decision-source-playbook.ts`. Swapping playbooks = new adapter, same type, same board.
 6. **AC6 — command discipline.** Add ONLY the `decisions` command; do NOT add `monitor`; `echo` unchanged. README "Decisions" section added. Extension stays ≤3 commands now, targeted to 2 by beta (recap folds — After Completion).
-7. **AC7 — tests + checks green.** Daemon unit tests for the tool + adapter (incl. the A1/A2 boundaries reconstructed from the real 072 round sequence, and missing-field tolerance); Raycast tests per the `files_to_modify` notes. `npm run typecheck` + `npm test` green in `tools/raycast-echo`; daemon test + lint + typecheck green.
+7. **AC7 — tests + checks green.** Daemon unit tests for the tool + adapter: (a) the **card-open / founder-touch / A1-reset predicates** via fixtures — an escalated `combined.md` before vs after a disposition (card appears then disappears), a multi-round sequence where A1 fires at the threshold and resets when a newer request.md appears, an item that moved to `complete/` (card gone); (b) **freshness** — `source_state.behind`/`dirty` populated correctly for a behind/dirty repo fixture; (c) **scan-bound** — a fixture with many completed review dirs + few in-flight asserts only in-flight items are scanned (`scanned_items` small); missing-field tolerance for older rounds. (A2 is deferred, so no A2 tests.) Raycast tests per the `files_to_modify` notes incl. the stale/partial banner + single-flight interval + dismount suppression. `npm run typecheck` + `npm test` green in `tools/raycast-echo`; daemon test + lint + typecheck green.
 8. **AC8 — founder dogfooding gate** (merged → validated): ≥3 `decisions` sessions across ≥2 calendar days, ≥1 where an alarm signal fired on a real awaiting-you decision, with a founder note on whether seeing decisions-as-cards kept them in command. (This validates the CARD MODEL — the adapter is acknowledged playbook-specific.)
 
 ## Design judgment calls (flagged for r1 reviewer pushback)
 
 - **J1 — daemon reads working-tree files (new pattern).** The v0 source is repo files (combined.md/backlog), not the atom store. Existing tools never read the working tree. Isolated in `decision-source-playbook.ts`. Reviewers: is daemon-side fs-read acceptable, or should the adapter run elsewhere and feed the tool? (Founder chose daemon-owned for durability; this is the cost.)
 - **J2 — read-only SEE+JUMP for v0.** SEE+ACT (approve/override from the card, writing into the pipeline) is deferred — zero write-path risk, fastest dogfood. Reviewers may argue act-from-card is the real magic; default stays SEE+JUMP.
-- **J3 — alarm thresholds are provisional content.** Starting values (runaway ≥4 rounds; non-converging ≥2 rounds) iterate post-merge. Invariants only: A1 counts consecutive un-escalated rounds since a founder touch and resets on touch; A2 keys on a recurring ≥MED finding and escalates on a moved spec line.
-- **J4 — "awaiting the founder" predicate.** v0 = a round at the {proceed*, pushback} boundary / escalated and not-yet-dispositioned. Reviewers refine what counts as a card vs. noise (the "useful feed vs. noise you ignore" line).
-- **J5 — wire-shape.** Does `pending_decisions` need the compact/rich projection (064) machinery, or is its payload small enough to skip it? Default: small, skip; reviewers confirm.
+- **J3 — A1 threshold is provisional content; A2 deferred.** `staleTouchThreshold` default 4 iterates post-merge. Invariant: A1 counts consecutive rounds since a founder touch (AC2 predicate) and resets on touch. A2 is OUT of v0 (r1 codex F2 — no cross-round fingerprint algorithm yet); reserved in the type, deferred to V1.5.
+- **J4 — RESOLVED at r1 (codex F1 / codex-ops F2):** the card-open / founder-touch / dispositioned predicates are now exact and durable (AC2) — built only from `combined.md` frontmatter (`escalated_to_founder`, convergence call), the presence of `r<N+1>/request.md`, and the backlog dir. No inferred state.
+- **J5 — wire-shape.** Does `pending_decisions` need the compact/rich projection (064) machinery, or is its payload small enough to skip it? Default: small, skip (`result_caps` omitted); reviewers confirm. (Card count is bounded by in-flight items — typically single digits — so the payload is small.)
 
 ## Out of Scope (Don't Drift)
 
@@ -111,6 +125,7 @@ type Signal = { kind: "runaway_churn" | "non_converging_patch"; detail: string }
 7. **No recap deletion in this item.** Recap's command-entry fold is a separate pre-beta follow-up (After Completion); recap code stays untouched here.
 8. **No multi-repo/multi-machine aggregation.** Single configured repo. Cross-machine portfolio = V2+.
 9. **Do not rewrite the inherited Raycast infra** (`mcp.ts`, `agent-runner.ts`, etc.) — it's green and tested; build additively.
+10. **No A2 (non-converging-patch) alarm in v0** (r1 codex F2). Only A1 (runaway-churn) ships. No caller-provided `AbortSignal` added to `mcp.ts`/`callTool` (r1 codex F3) — cleanup is interval + stale-result suppression. No network `git fetch` inside the tool (r1 codex-ops F4 freshness is computed from the daemon's known refs, not a live fetch).
 
 ## After Completion (Strategist Notes — post-shipment, NOT build-time)
 
@@ -120,3 +135,4 @@ When this lands in `complete/`, the strategist (not the builder):
 3. **Creates `wiki/surfaces/decisions-board.md`** (status: shipped) documenting the DecisionCard primitive, the `pending_decisions` tool, the playbook-adapter boundary, and alarms-as-attributes.
 4. **Records the surface + positioning decision** in `raw/internal/decisions/2026-05-28-decision-card-surface-and-sequencing.md`: the DecisionCard primitive, ① now / ② on signal, the overlay as the card's V1.5 channel, recap-fold, and the defined ② flip signal. Updates `.manifest.json` + regenerates `wiki/index.md` for pages actually created.
 5. **Does NOT** change the public brand promise — V1.5+ call gated on the beta ② signal.
+6. **Files the A2 (non-converging-patch alarm) V1.5 follow-up** (deferred r1): needs a cross-round finding-fingerprint + spec-line-move algorithm over the combined.md findings tables. Sibling V1.5 successors already named: the in-AI card channel and the whole-computer ambient overlay (both read the same `pending_decisions` tool). Optionally, a live `git fetch`-backed freshness mode if the daemon's known-ref staleness proves insufficient in dogfooding.
