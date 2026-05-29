@@ -1687,3 +1687,93 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `ctx_ca688027` source_breakdown=`{"claude_code":124,"git":94}`, time_range=`2026-05-27T07:00:39.000Z` to `2026-05-28T07:16:15.753Z`, rank_reasons=`["has_open_loop","has_unresolved_open_loop","code_session_anchor"]`; `ctx_5014a96e` source_breakdown=`{"codex":23}`, time_range=`2026-05-27T08:54:24.867Z` to `2026-05-28T05:01:49.030Z`, rank_reasons=`["code_session_anchor"]`.
 - **Verdict:** right - MCP connectivity was healthy and recent context showed the immediately preceding review churn around item 077.
 - **Note:** The call was useful as a smoke test and high-level recent-work scan, but the top cluster was too broad for implementation detail; the builder path still needs to rely on the claimed item's `spec_refs` and task-state pointer.
+
+### 2026-05-28 01:20 PDT — cold-start recovery after /clear
+- **Trigger:** founder said "use echo to understand where we left off last session. then i want to live test 077"
+- **Query inputs:** `find_clusters({})` (no args → 4h window auto)
+- **Returned:** 3 clusters / 245 atoms. Top cluster `ctx_8dc7737d` (rank_reasons=`["recent_activity","has_open_loop","code_session_anchor","dense"]`), label="work on Project_echo", source_breakdown=`{"claude_code":66,"git":98}`, time_range=`2026-05-28T04:21:33Z` to `08:14:31Z`. 10 open_loop_hints, all resolved.
+- **Sources:** cluster 1 mixes Claude Code jsonl tail + git events; cluster 2 (`ctx_2f6bdcb7`) cross-project NavyPowerTwin noise; cluster 3 (`ctx_7ac2a79c`) codex-only, label="discussion about ECHO".
+- **Verdict:** ✅ right
+- **Note:** Returned the full session arc cleanly — 077 ship → wiki backfill → friction A+B regression evaluator → wiki promote. Confirmed clean tree on main.
+- **Conjecture:** none — exactly the resume-style answer find_clusters is designed for.
+
+### 2026-05-28 01:20 PDT — hydrate 20 newest atoms from top cluster
+- **Trigger:** following the find_clusters above, needed bodies for the open-loop hints + most-recent assistant turns to summarize.
+- **Query inputs:** `get_atoms({atom_ids: [20 ids from ctx_8dc7737d], prefer: "newest_first", format: "minimal"})`
+- **Returned:** 8 atoms hydrated, 12 dropped under wire budget (`atoms_dropped: 12`). Newest atom = `a9588e96` (2026-05-28T08:02Z assistant turn re friction A+B regression evidence at r10).
+- **Sources:** 4× fs:/.claude/projects/.../jsonl (claude_code session), 4× git commits (`c1a639c` wiki backfill, `911cf88` 077 builder init, `ac8969f` 077 builder ship, etc).
+- **Verdict:** 🟡 partial
+- **Note:** Got the most-recent context but 12 of 20 requested IDs got dropped. `prefer: "newest_first"` did its job — what survived was the resume-relevant tail, missing IDs were older mid-session atoms I didn't need. Working as designed.
+- **Conjecture:** none.
+
+### 2026-05-28 01:50 PDT — codex consult, no MCP calls made by consultee
+- **Trigger:** founder asked "consult codex on replacing raycast with localhost html overlay"
+- **Query inputs:** `codex exec --sandbox read-only` with architectural-consult prompt (~4.3KB). Prompt explicitly invited codex to use `mcp__echo__find_clusters` / `search_memories` if helpful and to report any call so I could journal-by-proxy.
+- **Returned:** Codex reported `No ECHO MCP calls made; file-only review.` It read 4 wiki pages (felt-not-seen, audit-page, hotkey-overlay, ambient-form-factor) via Read tool and answered from file evidence + first principles. ~64K tokens. Verdict: localhost HTML viable as view layer, default browser is the wrong shell; recommended path C = native shell + daemon-served webview.
+- **Sources:** N/A for ECHO MCP (none invoked); codex's evidence path was `wiki/principles/*.md` + `wiki/architecture/*.md` only.
+- **Verdict:** N/A (no MCP call to evaluate)
+- **Note:** Worth journaling because the *expectation* was an MCP call (the consult prompt invited it) and codex chose not to. Suggests file-based wiki has high enough signal density for architecture-shape questions that ECHO retrieval added no marginal value. For implementation-detail consults (e.g., "what was the r9 disposition reasoning"), MCP retrieval would have been needed.
+- **Conjecture:** consult-prompt template could include a "MCP optional, file-first" hint to set expectation. But that's design-in-journal — out of scope here.
+
+### 2026-05-28 12:42 PDT — next-session cold-start resume ("use echo to understand where we left of last night")
+- **Trigger:** founder reopened after compaction: "use echo to understand where we left of last night and resume from there."
+- **Query inputs:** `find_clusters({since: 2026-05-27T00:00:00Z, until: 2026-05-28T23:59:59Z})` (explicit 2-day window vs the default 4h, to span the prior night).
+- **Returned:** 4 clusters / 325 atoms shown (881 in window; truncated). Top cluster `ctx_bbe854f0` (rank_reasons=`["has_open_loop","has_unresolved_open_loop","code_session_anchor","dense"]`), label="discussion about Project_echo", 375 atoms total, source_breakdown=`{claude_code:206, git:169}`, time_range `2026-05-27T02:15Z`→`2026-05-28T19:41Z`. Warning: limit dropped 4 entire clusters.
+- **Sources:** cluster 1 claude_code+git (Project_echo); cluster 2 `ctx_82d383dc` claude_code+git (NavyPowerTwin, cross-project); cluster 3 `ctx_8d467685` codex-only (NavyPowerTwin); cluster 4 `ctx_a1b2a7bd` codex-only (ECHO, 459 atoms).
+- **Verdict:** ✅ right — recovered the prior-night arc; correctly carried the 077 friction + surface-decision open loop.
+- **Note:** 2-day window surfaced NavyPowerTwin clusters (machine-scoped corpus working as intended — that's the founder's other active repo). Open-loop hints mostly resolved; the live ones pointed at the surface-decision thread.
+- **Conjecture:** none.
+
+### 2026-05-28 12:42 PDT — hydrate 5 unresolved open-loop atoms
+- **Trigger:** following find_clusters, needed bodies of the unresolved open-loop hints to reconstruct the exact decision point.
+- **Query inputs:** `get_atoms({atom_ids: [e3afc1c0, 05ecfb29, df388d73, b2d9d24a, 373df3a5]})`
+- **Returned:** 5/5 atoms hydrated, 0 dropped. Content confirmed: 077 install-time-onboarding origin (df388d73), NavyPowerTwin runtime-readiness + pseudo-transient threads (b2d9d24a, 373df3a5, cross-project), "same experience out of the box" customer-friction framing (05ecfb29).
+- **Sources:** 3× fs:/.claude/projects/...jsonl (2× Project_echo, 1× NavyPowerTwin claude_code), 1× fs:/.codex/sessions (NavyPowerTwin codex), 1× autonomous-loop tick (Project_echo).
+- **Verdict:** ✅ right — full hydration, no wire-budget drops (5 atoms well under cap).
+- **Note:** Two of the five open loops were NavyPowerTwin, not ECHO — the unresolved-loop ranker pulled cross-project threads. Correct signal (machine-scoped), but for an ECHO-only resume I'd filter `repo_path` next time.
+- **Conjecture:** none.
+
+### 2026-05-28 12:55 PDT — debug "the other session" (cross-session error triage)
+- **Trigger:** founder in a fresh claude session: "use echo and help me debug the errors in the other session."
+- **Query inputs:** (1) `find_clusters({repo_path: Project_echo})` no-args window; (2) `get_atoms({15 newest cluster-1 ids, prefer: newest_first})`; (3) `get_atoms({10 cluster-2/codex ids, prefer: newest_first})` + (4) `search_memories({query: "Error", repo_path: Project_echo, since: 2026-05-28T12:00:00Z, limit: 12})` in parallel.
+- **Returned:** find_clusters → 2 clusters (ctx_cf20bac1 claude_code:135/git:107; ctx_be716a1e codex:28), AUTO_EXPAND single-source-recent warning. get_atoms #1 → mostly 077 spec/wiki commits (right repo, but not the error). get_atoms #2 → codex consult/builder sessions. search_memories "Error" → 2 matches, the decisive one: atom `5ed2a898` = compaction summary of session `581f7bdb` naming "the unfixed 30s Recap ceiling bug" + 2 uncommitted changes; also surfaced this very session's turn (`1c269df1`).
+- **Sources:** find_clusters source_breakdown shown above; get_atoms = fs:/.claude/projects/...581f7bdb + 790a3658 jsonl + git commits + fs:/.codex/sessions; search_memories = 2× fs:/.claude/projects (sessions f643b287 self + 581f7bdb other).
+- **Verdict:** 🟡 partial → ✅ after clarification. ECHO correctly located the other session + named the 30s ceiling bug, but the founder then clarified the *actual* blocker was a Claude API 400 (`thinking blocks in the latest assistant message cannot be modified`) wedging every Bash call — that error is in the live transcript, not yet an ECHO atom (the wedged turn never persisted a clean assistant message).
+- **Note:** Literal `query:"Error"` was the unlock — `find_clusters` ranked the 077 spec churn as cluster-1 and buried the broken session; the exact-token search jumped straight to the compaction summary. Reinforces skill guidance: typed-token search beats cluster discovery when you know the string. The API-400 root cause was NOT retrievable via ECHO (capture happens on clean turn boundaries; a turn that 400s mid-resend leaves no atom) — had to read the live JSONL + repo git state.
+- **Conjecture:** none (observation only).
+
+### 2026-05-28 12:57 PDT — resume "where we left off last night" (fresh session)
+- **Trigger:** founder in a new claude session: "use echo and help me resume from where we left off last night."
+- **Query inputs:** (1) `find_clusters({})` no-args (4h window, returned only this session's own activity); (2) `find_clusters({since: 2026-05-27T22:00:00-07:00, until: 2026-05-28T13:00:00-07:00})` 15h lookback to span last night; (3) `get_atoms({7 newest cluster ids, prefer: newest_first})`; (4) `get_atoms({6 codex-cluster ids, prefer: newest_first})`.
+- **Returned:** find_clusters #1 → 2 clusters, both this-session-only (claude_code). find_clusters #2 → 3 clusters / 248 atoms (not truncated): `ctx_49de6609` "work on Project_echo" (claude_code:69, git:98, 22:08→02:12 PDT, has_open_loop, all hints resolved); `ctx_2f6bdcb7` NavyPowerTwin (claude_code:4, cross-project); `ctx_1912e9ec` "discussion about ECHO" (codex:77). get_atoms #1 → strategic thread recovered via compaction-summary atom `5ed2a898` (session 581f7bdb): 077 Raycast live-test → surface step-back → localhost-HTML overlay idea + codex consult directed; named the 30s Recap ceiling bug + 2 uncommitted changes. get_atoms #2 → codex cluster was background review-queue ticks (all `bind_failed`/`request_not_found` on stale pinned `2026-05-16-057b/r1/request.md`) + 1 Recap render — NOT the overlay consult.
+- **Sources:** find_clusters source_breakdown as above; get_atoms = fs:/.claude/projects (581f7bdb, f643b287, 37b9ea76 this-session) + git; codex = 6× fs:/.codex/sessions/2026/05/28 rollout jsonl (launchd review-queue temp worktrees + 1 Recap exec). Git working tree confirmed the 2 uncommitted changes (`tools/raycast-echo/package.json` +1, this journal +45).
+- **Verdict:** ✅ right — recovered the prior-night arc and the live surface-decision open loop.
+- **Note:** No-arg 4h returned only the calling session's own turns (the AUTO_EXPAND didn't fire to 24h because the 4h pass was non-empty with this session's activity); the explicit 15h `since` was the unlock for last night. The directed codex overlay-consult had no committed artifact in the hydrated clusters — if it produced output it's in an un-hydrated session; flagged to founder rather than asserted.
+- **Conjecture:** none (observation only).
+
+### 2026-05-28 13:30 PDT — cross-session understanding ("use echo to understand what we've been discussing")
+- **Trigger:** founder, in a fresh claude session discussing the philosophy of executor→validator→manager, asked ECHO to recover the parallel thread running in another live claude session.
+- **Query inputs:** (1) `find_clusters({since: 2026-05-27T00:00:00})`; (2–4) `search_memories({query: "decision loop" | "execution loop" | "validator" | "up the ladder", since: 2026-05-26..Z, limit: 10–15})`; (5) `get_atom({e54db4e7})` for the full reframe turn.
+- **Returned:** find_clusters → rank-1 `ctx_e673800c` "discussion about Project_echo" (claude_code:176, git:111, 287 atoms total). `search_memories "decision loop"` → 0 matches (literal substring miss — the discussion says "decision/escalation queue", not "decision loop"). `"execution loop"` → 1 (this very session). `"validator"` → 10: the decisive ones were `e54db4e7` (other session 37b9ea76, founder's executor→validator→manager reframe + the assistant's "pick the altitude, surface the escalation queue first" answer), `558cea3d` (codex read-only survey placing founder "still mostly validator-manager, not fully out of the loop"), `2e91a830` (codex map → friction/recovery stream + blind-spot honesty fork). `"up the ladder"` → 1 (this session).
+- **Sources:** find_clusters source_breakdown `{claude_code:176, git:111}`; search/get_atom = fs:/.claude/projects (37b9ea76 = the other live session; 733c1e0d = this session) + fs:/.codex/sessions/2026/05/28 (read-only survey) + git commits.
+- **Verdict:** ✅ right — pinpointed the parallel session and its current decision fork from a paraphrased query, across two concurrently-live claude sessions on the same repo.
+- **Note:** literal-substring search punished the paraphrase ("decision loop" → 0) but the conceptual token "validator" recovered the whole thread including the cross-tool codex survey. Strong demonstration of the machine-scoped, cross-session value prop: founder is running two claude sessions on one topic and ECHO stitched them. The two threads are in latent tension (product session designs to remove the executor surface; this session argues you can't fully leave it) — surfaced to founder.
+- **Conjecture:** none (observation only).
+
+### 2026-05-28 14:44 PDT — strategist brainstorm: ECHO's own product-surface decision (this session)
+- **Trigger:** founder, fresh claude session: "biggest product decision for echo — what should the product surface be like; not another app; meet users where they already work; brainstorm + be innovative." Dogfooded ECHO to sweep for any cross-tool surface reasoning not already in files, before brainstorming.
+- **Query inputs:** `find_clusters({since: 2026-05-27T00:00:00-07:00, until: 2026-05-28T23:59:59-07:00})` (explicit 2-day lookback, no hydrate).
+- **Returned:** 4/8 clusters (result_caps.truncated; limit dropped 4). rank-1 `ctx_4bc0522d` "discussion about Project_echo" (claude_code:192, git:111, 303 atoms total, atom_ids_truncated, many open-loop hints); rank-4 `ctx_afbe66e4` "discussion about ECHO" (codex:376, no open loops); 2× NavyPowerTwin (cross-project, claude_code + codex).
+- **Sources:** source_breakdown per cluster — claude_code+git = the Project_echo strategist/build thread; codex-only = heavy reviewer-tick thread; NavyPowerTwin cross-project present (machine-scoped, expected, not discarded).
+- **Verdict:** 🟡 partial — discovery confirmed the recent shape (077/078 sprint + codex reviewer ticks) and that no *separate* surface-strategy thread exists beyond what files capture; deliberately did NOT hydrate (skill: don't hydrate a large generic cluster). Authoritative surface reasoning already lived in files (today's project memory + 078 spec + this journal's 12:57 / 13:30 entries).
+- **Note:** find_clusters used as an "anything I'm missing?" sweep before a big decision — its value was negative-space confirmation, not new content. This journal's own prior entries (12:57 overlay step-back, 13:30 executor→validator→manager tension) were higher-signal than the cluster discovery — the in-the-moment journal is itself a first-class recall surface.
+- **Conjecture:** none (observation only).
+
+### 2026-05-28 15:36 PDT — cross-session reconciliation ("use echo and get context on the parallel claude")
+- **Trigger:** founder, mid-brainstorm in session 733c1e0d (whole-computer overlay + "remove Raycast"), asked ECHO to pull the parallel session where they're "close to a conclusion" on product surface shape.
+- **Query inputs:** (1) `search_memories({query:"overlay", since:2026-05-28T18:00:00Z, limit:12})`; (2) `search_memories({query:"surface", since:2026-05-28T19:30:00Z, limit:12})`; (3) `find_clusters({since:2026-05-28T18:00:00Z})`.
+- **Returned:** find_clusters → 3 clusters (rank-1 `ctx_84de7ec5` claude_code:44 "Project_echo"; rank-2 NavyPowerTwin cross-project; rank-3 codex:2 "ECHO" = the codex surface consult). search "surface" → the full f6ac333b arc: A/B/C/D up-surface options, codex consult ("ECHO manages delegated authority, surfaced through least-intrusive channel"; flagged the ②-pivot trap), the ①-vs-② fork, the locked Option 3 (decision-card primitive, board-first/in-AI-next), the SEE+JUMP read-only call, and the card-model-agnostic / playbook-as-adapter boundary.
+- **Sources:** fs:/.claude/projects 2 sessions (f6ac333b = parallel surface brainstorm; 733c1e0d = this session) + 1 NavyPowerTwin (cross-project, correct machine-scope) + fs:/.codex/sessions (the read-only surface consult) + workflow subagent atoms (the 078 diagnosis).
+- **Verdict:** ✅ right — recovered the parallel session's full locked conclusion + the saved positioning decision, and surfaced the live divergence between the two sessions (this one: remove-Raycast+overlay; parallel: keep-Raycast-board+card primitive, ① now).
+- **Note:** highest-value cross-session stitch yet — two concurrent claude sessions reached *different* surface conclusions on the same day; ECHO is what lets the founder reconcile rather than ship contradictions. The ②-pivot drift (overlay excitement silently flipping the ① positioning the other session saved to memory) is exactly the failure the 05-17 memory warned about.
+- **Conjecture:** none (observation only).
