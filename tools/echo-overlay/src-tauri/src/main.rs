@@ -5,7 +5,7 @@ use std::process::Command;
 use std::str::FromStr;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const WINDOW_LABEL: &str = "main";
@@ -244,11 +244,17 @@ fn show_overlay(app: &AppHandle) -> Result<(), String> {
     window
         .set_always_on_top(true)
         .map_err(|err| format!("restore always-on-top failed: {err}"))?;
+    window
+        .emit("overlay:shown", ())
+        .map_err(|err| format!("emit overlay shown failed: {err}"))?;
     Ok(())
 }
 
 fn hide_overlay(app: &AppHandle) -> Result<(), String> {
     let window = overlay_window(app)?;
+    window
+        .emit("overlay:hidden", ())
+        .map_err(|err| format!("emit overlay hidden failed: {err}"))?;
     window
         .hide()
         .map_err(|err| format!("hide overlay failed: {err}"))

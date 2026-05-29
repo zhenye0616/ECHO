@@ -7,7 +7,7 @@ export default [
     ignores: ["node_modules/**", "dist/**", "src-tauri/target/**"],
   },
   {
-    files: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+    files: ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
