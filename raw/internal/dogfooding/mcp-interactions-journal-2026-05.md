@@ -1975,3 +1975,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - the r3 codex findings are closed: AC2 now makes `kind=push` return exactly `ECHO_EFFECT_NONLIVE_RC=97` under both dry-run and test, with non-push kinds returning exactly 0, and AC3 now requires validator-side coercion of PyYAML-parsed `reviewed_at` datetimes from the current unquoted producer template.
 - **Note:** The response commit completed before this observation-only journal entry. The stale reviewer command still mentions the old unsharded journal and generated HTML twin; current repo policy makes the May monthly Markdown shard canonical and treats generated HTML twins as local-only, so this tick writes only this shard.
 - **Conjecture:** none.
+
+### 2026-05-29 00:35 PDT — strategist recalls parallel-session design discussion
+- **Trigger:** Founder asked "use echo to see what I am discussing with other claude agent about design."
+- **Query inputs:** `find_clusters(since=2026-05-28T00:00:00-07:00, until=2026-05-29T23:59:59-07:00)`; then `get_atoms(atom_ids=[10 ids from clusters[0]], prefer=newest_first, format=minimal)`.
+- **Returned:** 3 clusters (caps.truncated=true, 409/472 atoms). clusters[0] "discussion about Project_echo" source_breakdown={claude_code:146, git:117}, 263 atoms (atom_ids_truncated). get_atoms returned 8 (2 dropped: e5d5576a, f3e0378d under budget). Key atoms: eee6cfd6 (reconciliation of parallel session f6ac333b's DecisionCard lock), f9af56d2 (founder's "humane surface" framing), 0306de19 (subagent surface-inventory mining).
+- **Sources:** clusters[0] = claude_code session 733c1e0d JSONL + git:/Users/zhenye/Desktop/Project_echo commits (078/079 spec rounds); parallel design session referenced as `f6ac333b`. clusters[1] NavyPowerTwin, clusters[2] codex/ECHO both off-topic.
+- **Verdict:** ✅ right — the design conversation surfaced as clusters[0] on first call; newest_first get_atoms reconstructed the surface-design arc (pain → humane-surface POV → DecisionCard lock → Option3/①/SEE-JUMP reconciliation → 2 open sub-choices).
+- **Note:** atom_ids_truncated at 263 of cluster total; the 8-atom newest_first sample was sufficient to answer without hydrating more. The two open loops (daemon-vs-extension `pending_decisions`, overlay-as-V1.5) were both legible from a single high-signal atom (eee6cfd6).
+- **Conjecture:** none.
