@@ -35,10 +35,19 @@
 
 set -e
 CONTEXT="${1:-unknown}"
+TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$TOOL_DIR/_effect-runner.sh"
 
 for attempt in 1 2; do
-  if git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin HEAD:main; then
+  set +e
+  echo_effect push -- bash -c 'git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin HEAD:main'
+  rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
     exit 0
+  fi
+  if [ "$rc" -eq "$ECHO_EFFECT_NONLIVE_RC" ]; then
+    exit "$rc"
   fi
 done
 

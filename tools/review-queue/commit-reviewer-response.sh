@@ -42,6 +42,7 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 VALIDATOR="$REPO_ROOT/tools/review-queue/validate.py"
 PUSH_HELPER="$REPO_ROOT/tools/review-queue/push-with-retry.sh"
+EFFECT_RUNNER="$REPO_ROOT/tools/review-queue/_effect-runner.sh"
 
 if [ ! -f "$VALIDATOR" ]; then
   echo "error: validator not found at $VALIDATOR" >&2
@@ -86,6 +87,26 @@ if [ "$VALIDATE_RC" -ne 0 ]; then
 fi
 
 CONTEXT="review-r${ROUND}: ${REVIEWER_NAME} on ${ITEM_ID}"
+
+if [ "${ECHO_EFFECT_MODE:-live}" != "live" ]; then
+  if [ ! -f "$EFFECT_RUNNER" ]; then
+    echo "error: effect runner not found at $EFFECT_RUNNER" >&2
+    exit 2
+  fi
+  # Non-live push is a sentinel, not success. Refuse before creating a
+  # local-only reviewer-response commit that cleanup could discard.
+  source "$EFFECT_RUNNER"
+  set +e
+  echo_effect push -- true
+  PUSH_RC=$?
+  set -e
+  if [ "$PUSH_RC" -eq "$ECHO_EFFECT_NONLIVE_RC" ]; then
+    echo "commit-reviewer-response: ECHO_EFFECT_MODE=${ECHO_EFFECT_MODE:-live}; refusing to commit because push would be non-live" >&2
+    exit "$PUSH_RC"
+  fi
+  echo "commit-reviewer-response: unexpected non-live push status $PUSH_RC" >&2
+  exit "$PUSH_RC"
+fi
 
 git add "$REVIEWER_PATH"
 git commit -m "$CONTEXT"
