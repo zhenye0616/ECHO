@@ -96,7 +96,9 @@ Separate **harness correctness** from **retrieval quality**:
 - **Harness correctness gate (builder handoff):** schema validation passes, fixture refs all resolve, the runner executes deterministically, reports every metric, exits with the documented code, emits the expected JSON/Markdown, and never hides loss/budget/warning failures.
 - **Retrieval quality gate (baseline output):** the thresholds above define what "good retrieval" means. The first committed run may fail this gate because several seed cases intentionally encode current retrieval gaps. That is acceptable for this item if the failures are reported as baseline failures, captured in `agent_notes`, and do not require production retrieval changes.
 
-Suite reporting rule: all P0 cases must have an explicit baseline status (`pass`, `expected_fail_current_behavior`, or `unexpected_fail`). `expected_fail_current_behavior` is allowed only when the case's `provenance` names the current limitation and the follow-on retrieval-fix candidate. No hard budget violation, warning gap, schema error, fixture-ref miss, or silent-loss case may be marked expected-fail; those are harness failures.
+Suite reporting rule: all P0 query variants must have an explicit input `baseline_status` (`pass` or `expected_fail_current_behavior`). Runner output may additionally classify a variant as `expected_fail_matched`, `expected_fail_mismatched`, or `unexpected_fail`; those are result statuses, not legal case-input values. `expected_fail_current_behavior` is allowed only when the variant includes a structured `expected_failure` object and the case's `provenance` names the current limitation plus the follow-on retrieval-fix candidate. Schema errors, fixture-ref misses, nondeterminism, runtime exceptions, hard budget violations, and silent-loss cases are harness failures and may never be masked by an expected-fail label.
+
+Warning and loss-legibility scope: the runner records both production tool warnings (`origin: "tool"`) and eval-derived warnings (`origin: "eval"`) such as `eval_source_gap`, `eval_stale_source`, and `eval_truncated_hydration` when scored evidence proves a required lane/source/artifact was missing, stale, or capped. A case's `must_warn[]` must declare the acceptable origin for each warning. The stale/degraded-source seed may therefore be measured without changing production retrieval: absence of a production warning is either a named expected retrieval-quality failure, or an eval-derived source-gap warning in the report, depending on the variant's `expected_failure` contract.
 
 ### AC2 — Add a typed case schema for journal/JSONL-grounded evals
 
@@ -105,11 +107,12 @@ Add `eval/retrieval/schema.ts` exporting the case types and validation helpers u
 Each case must carry:
 
 - `id`, `priority` (`P0`/`P1`/`P2`), `intent`, `repo_path`, `time_window`, and `reference_now`.
-- `query_variants[]`, including the founder's natural wording when known and at least one exact-token/control variant when available. Each variant carries `id`, `query`, and `baseline_status` (`pass` or `expected_fail_current_behavior`).
+- `query_variants[]`, including the founder's natural wording when known and at least one exact-token/control variant when available. Each variant carries `id`, `query`, and `baseline_status` (`pass` or `expected_fail_current_behavior`). Variants marked `expected_fail_current_behavior` must also carry `expected_failure`.
+- `expected_failure`, only legal on expected-fail variants, with `reason`, `followup_candidate`, `allowed_failed_metrics[]`, `allowed_missing_refs[]`, `allowed_forbidden_noise_refs[]`, `allowed_warning_gaps[]`, and optional `required_observed_warnings[]`. The runner classifies the expected failure as matched only when the observed failures are a subset of the allowed metrics/refs/warnings and any required warning is present.
 - `tool_recipe[]`, with explicit `step_id`, tool name, params, and whether the step is discovery, hydration, or scoring input.
 - `required_sources[]`, naming lanes/artifacts that must appear or be explicitly warned missing.
 - Labeled fixture refs: `required_primary[]`, `required_context[]`, `acceptable_context[]`, `noise[]`, `forbidden_noise[]`.
-- `must_warn[]` for expected warnings such as truncation, stale source, storage cap, local-offset ambiguity, degraded source, or oversized atom.
+- `must_warn[]` for expected warnings such as truncation, stale source, storage cap, local-offset ambiguity, degraded source, or oversized atom. Each entry names a warning code and allowed origins (`tool`, `eval`, or both).
 - `canonical_answer_facts[]`, used only to document why the primary refs are primary; the V0 scorer does not judge prose answers.
 - `budgets`, with per-call bytes, total bytes, and max calls.
 - `provenance`, pointing to dogfooding journal entries, raw JSONL session paths, committed artifacts, or notes that justify labels.
@@ -121,8 +124,9 @@ Recipe binding language is part of the V0 contract:
 - The runner executes each `query_variants[]` entry as a separate scored run with `$query` bound to that variant's query text.
 - Tool params may use placeholders: `$query`, `$case.repo_path`, `$case.time_window.since`, `$case.time_window.until`, `$case.reference_now`, `$steps.<step_id>.matches[*].id`, `$steps.<step_id>.clusters[0].atom_ids`, and `$labels.<label_name>`.
 - Hydration steps use prior discovery output placeholders, not static atom IDs. Example: a `get_atoms` step may set `atom_ids: "$steps.discovery.matches[*].id"` or `atom_ids: "$steps.discovery.clusters[0].atom_ids"`.
+- Hydration collection binding must be explicit about the `get_atoms` 50-id ceiling. A hydration step that binds a collection must declare either `ids_limit <= 50` with deterministic ordering (`discovery_order` or `newest_first`) or `paginate: true` with 50-id chunks, where every chunk counts against `budgets.max_calls`. If a placeholder resolves to more than 50 IDs without one of those controls, schema validation fails before scoring.
 - Exactly one discovery step per recipe must be marked `primary_discovery: true`; `top_rank_success` is computed against that step's ordered matches/clusters.
-- Per-case output reports metrics per query variant plus an aggregate. Aggregate status is `pass` only when every variant with `baseline_status: pass` meets the threshold and every expected-fail variant fails for the named current-behavior reason, not for schema/fixture/budget/silent-loss reasons.
+- Per-case output reports metrics per query variant plus an aggregate. Aggregate status is `pass` only when every variant with `baseline_status: pass` meets the threshold and every expected-fail variant is `expected_fail_matched`. Expected-fail variants that fail for an unallowed metric/ref/warning become `expected_fail_mismatched`; pass-baseline variants that miss a threshold become `unexpected_fail`.
 
 ### AC3 — Build deterministic sanitized fixtures from real provenance
 
@@ -143,13 +147,14 @@ Raw JSONL handling is intentionally modest: parse enough Claude/Codex JSONL to e
 
 Add `tools/retrieval-eval/run.ts` that:
 
-- Loads case JSON and sanitized fixture JSONL.
+- Loads case JSON and sanitized fixture JSONL. In default all-case mode and focused `--case <id>` mode, the runner loads the same committed fixture universe into `MemoryStorage`; `--case` filters scoring and output only. V0 must not add an isolated focused mode because signal/noise, forbidden refs, source coverage, and rank must reproduce the same evidence set seen in the full suite.
 - Rewrites `$EVAL_HOME` and `$EVAL_REPO`, validates deterministic timestamp ordering, and appends fixture events into `MemoryStorage`.
 - Runs the existing handlers directly (`searchMemories`, `findClusters`, `getAtoms`) according to the case's `tool_recipe` and placeholder binding rules.
 - Passes each case's `reference_now` into direct `findClusters` calls. For committed CI cases, every recipe must use absolute `since`/`until` values or `reference_now`; ambient `new Date()` is forbidden.
 - Captures every tool response, warning, result cap, serialized byte size, and assigned atom ID.
+- Emits eval-derived source/loss warnings when scored results prove required sources, fresh evidence, or hydrated atoms were missing, stale, truncated, or capped. These warnings are separate from production tool warnings and must be labeled with `origin: "eval"`.
 - Normalizes returned atom IDs back to fixture refs before scoring.
-- Hydrates candidate atoms when the recipe says hydration is required, then scores the hydrated evidence set.
+- Hydrates candidate atoms when the recipe says hydration is required, applying the case's explicit `ids_limit` or `paginate` semantics before calling `getAtoms`, then scores the hydrated evidence set.
 - Emits deterministic JSON and Markdown summaries with per-case metric values, threshold pass/fail, missing primary refs, forbidden noise refs, budget totals, warnings expected vs observed, and top evidence refs.
 
 No live daemon, MCP network call, browser/Raycast/overlay surface, embedding service, or LLM judge is allowed in CI mode. A future live-daemon dogfood mode may be a separate flag, but the default must be deterministic and isolated.
@@ -163,7 +168,7 @@ Create at least six cases and fixtures:
 3. **`what-shipped-today-needs-artifacts` (P0):** "what shipped today" must include git/backlog/task artifacts, not only chat summaries.
 4. **`resume-after-clear-newest-first` (P0):** resume after context clear should prefer the newest meaningful cluster and hydrate newest-first atoms rather than old dense history.
 5. **`generated-label-circular-retrieval` (P1):** generated Ask-ECHO/cluster labels are noise when the intent is the underlying primary work; they are acceptable only when the user explicitly asks for prior ECHO summaries.
-6. **`stale-source-degraded-warning` (P0):** stale Cursor/source-prefix cases must either return fresh evidence or explicitly warn degraded/missing source coverage.
+6. **`stale-source-degraded-warning` (P0):** stale Cursor/source-prefix cases must either return fresh evidence or explicitly warn degraded/missing source coverage. Its `must_warn[]` entry may allow `origin: "eval"` so the harness can report source coverage loss without requiring a production tool warning in this measurement-only item.
 
 Each case must include at least two query variants: the natural wording and one control/exact-token variant. At least two cases must include cross-tool source requirements (for example Claude Code + Codex + git/artifact). At least two cases must include a `must_warn` assertion. Every committed case must include `reference_now` and either absolute `time_window.since`/`until` or a recipe that explicitly uses `reference_now`.
 
@@ -175,13 +180,15 @@ Add `npm run eval:retrieval` if and only if it runs the deterministic in-process
 - `--format json|md` for machine or human output.
 - `--update-fixtures` only in local provenance mode, never as part of tests.
 
+Focused run semantics: `npm run eval:retrieval -- --case <id>` must use the same loaded fixture universe and same deterministic `reference_now` behavior as the default all-case command; only scoring/output is narrowed to the selected case. The Markdown and JSON output must state that corpus mode so a failing full-suite case can be reproduced with the focused command.
+
 Exit codes:
 
 - `0`: all gates pass.
 - `1`: cases ran but one or more gates failed.
 - `2`: schema/fixture/provenance validation failed before scoring.
 
-The Markdown output must be useful for backlog/review discussion: top failing metric first, then missing primary evidence, forbidden noise, warning gaps, budget/call counts, query variant baseline statuses, and the exact tool recipe that produced the result. If `npm run eval:retrieval` exits `1` only because expected current-behavior retrieval-quality gates failed, the builder may still hand off the item if `npm test -- tests/retrieval-eval` passes and `agent_notes` lists those baseline failures.
+The Markdown output must be useful for backlog/review discussion: top failing metric first, then missing primary evidence, forbidden noise, warning gaps, budget/call counts, query variant baseline statuses, expected-fail matched/mismatched classification, corpus mode, and the exact tool recipe that produced the result. If `npm run eval:retrieval` exits `1` only because expected current-behavior retrieval-quality gates failed and every such variant is `expected_fail_matched`, the builder may still hand off the item if `npm test -- tests/retrieval-eval` passes and `agent_notes` lists those baseline failures.
 
 ### AC7 — Keep production retrieval behavior unchanged
 
@@ -209,9 +216,9 @@ This item is measurement infrastructure only. The builder must not change rankin
 
 ## Tests
 
-- `tests/retrieval-eval/schema.test.ts` validates required fields, fixture-ref label integrity, budgets, priority values, `reference_now`, placeholder syntax, baseline-status values, and rejection of labels that reference missing fixture refs.
-- `tests/retrieval-eval/scorer.test.ts` covers primary recall, top-rank success, weighted precision, signal/noise ratio, forbidden-noise failures, source coverage, warning gaps, byte budgets, expected-fail classification, and exit-code classification.
-- `tests/retrieval-eval/run.test.ts` loads at least two real seed fixtures through `MemoryStorage`, calls the existing MCP handlers directly, rewrites `$EVAL_HOME`/`$EVAL_REPO`, injects `reference_now`, normalizes atom IDs back to fixture refs, and snapshots the JSON summary shape without depending on random UUIDs.
+- `tests/retrieval-eval/schema.test.ts` validates required fields, fixture-ref label integrity, budgets, priority values, `reference_now`, placeholder syntax, baseline-status values, structured `expected_failure`, `must_warn` origins, hydration `ids_limit`/pagination controls, and rejection of labels that reference missing fixture refs.
+- `tests/retrieval-eval/scorer.test.ts` covers primary recall, top-rank success, weighted precision, signal/noise ratio, forbidden-noise failures, source coverage, warning gaps, byte budgets, eval-derived warnings, expected-fail matched vs mismatched classification, and exit-code classification.
+- `tests/retrieval-eval/run.test.ts` loads at least two real seed fixtures through `MemoryStorage`, calls the existing MCP handlers directly, rewrites `$EVAL_HOME`/`$EVAL_REPO`, injects `reference_now`, normalizes atom IDs back to fixture refs, proves focused `--case` uses the same fixture universe as the full suite, tests over-50 hydration collection handling, and snapshots the JSON summary shape without depending on random UUIDs.
 - `tests/retrieval-eval/cases.test.ts` asserts all six seed cases load, each has at least two query variants, P0 cases declare required primary refs, and warning cases fail if the expected warning is absent.
 - `tests/retrieval-eval/determinism.test.ts` proves committed cases do not depend on ambient wall-clock time, host-specific home/repo paths, or random UUID tie ordering; include a duplicate-raw-timestamp fixture that is rejected or deterministically disambiguated.
 - Verification command for the builder: `npm test -- tests/retrieval-eval`, `npm run typecheck`, `npm run lint`, `tools/sync-skills.sh --check`, `git diff --check`.

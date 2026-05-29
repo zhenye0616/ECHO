@@ -2,7 +2,7 @@
 task_id: 2026-05-29-082-retrieval-quality-eval-harness
 role: strategist
 writer: codex-strategist
-last_updated: 2026-05-29T15:45:00-07:00
+last_updated: 2026-05-29T16:10:00-07:00
 ---
 
 ## current_thesis
@@ -22,6 +22,11 @@ Spec drafted; awaiting claim. The item creates the missing standard/eval layer f
 - Reviewer roster for the full-auto spec review is `["codex", "codex-ops"]` per founder direction, overriding the post-047 default `["codex", "cursor"]`.
 - R1 reviewer findings patched the spec to separate harness-correctness from retrieval-quality pass/fail; baseline expected-fail cases are legal only for current retrieval limitations, never schema/fixture/budget/silent-loss failures.
 - R1 also locked deterministic-runner semantics: query variant placeholder binding, prior-step hydration selectors, fixed `reference_now`, `$EVAL_HOME`/`$EVAL_REPO` fixture rewriting, and no random-UUID tie ordering in scored results.
+- R2 reviewer findings patched the spec to make expected failures machine-checkable: case-input `baseline_status` is only `pass` or `expected_fail_current_behavior`; runner output may classify `expected_fail_matched`, `expected_fail_mismatched`, or `unexpected_fail`.
+- Every expected-fail query variant must include structured `expected_failure` fields (`reason`, `followup_candidate`, allowed failed metrics/refs/warning gaps, optional required observed warnings). An expected failure is accepted only when observed failures are a subset of the allowed contract.
+- Loss legibility distinguishes production tool warnings from eval-derived warnings. The harness may emit `origin: "eval"` source/loss warnings for missing stale/degraded/capped evidence; this measures the gap without changing production retrieval.
+- Hydration placeholders that resolve more than 50 atom IDs must declare `ids_limit <= 50` with deterministic ordering or `paginate: true`; every paginated chunk counts against max calls.
+- Focused `--case` runs load the same committed fixture universe as the full suite and filter only scoring/output, so noise/rank/source failures reproduce during triage.
 
 ## open_questions
 
