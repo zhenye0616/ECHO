@@ -1,0 +1,151 @@
+---
+id: 2026-05-29-080-decisions-desktop-overlay
+title: "Decisions — desktop overlay (the operator surface): summon + ambient menubar dot, two altitudes (fleet-glance + decision-dive), thin consumer of the daemon pending_decisions/coord_status tools"
+status: ready
+priority: HIGH
+estimate: 3-4d
+created: 2026-05-29
+blocked_by: []
+task_state_ref: 2026-05-29-080-decisions-desktop-overlay
+requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  # --- The new overlay surface (chosen stack TBD per J1 — TAURI recommended; the dir/file layout below assumes Tauri+web-UI but MUST be reconciled to the chosen stack at build time) ---
+  - tools/echo-overlay/  # AC2 — NEW surface dir for the desktop overlay (a sibling of tools/raycast-echo/, NOT inside it). The overlay shell in the chosen stack (J1): a transparent, always-on-top, menubar-resident macOS overlay that summons on a global hotkey and is invisible/idle otherwise. "Not an app you open" — no dock icon, no window chrome that reads as an app, Wispr-Flow interaction parity. The exact intra-dir layout (e.g. Tauri `src-tauri/` Rust shell + `src/` web UI, or a Swift target, or an Electron main/renderer split) is fixed by the J1 stack decision; whichever stack is chosen, keep the surface self-contained under this one dir.
+  - tools/echo-overlay/README.md  # AC2/AC6 — what the overlay is (the operator surface; summon + ambient dot; two altitudes), the chosen stack + WHY (the J1 decision recorded here, not silently), the daemon-read model (reads the SAME http://127.0.0.1:38478/mcp the Raycast extension uses), the repoPath/config it needs, the felt-not-seen contract (idle = nothing on screen, dot dark), and the dogfooding template with a `**Surface:** Overlay` marker (mirrors the raycast-echo README's dogfooding section).
+  # --- The MCP-over-http client the overlay uses (mirror the proven Raycast client pattern; do NOT import Raycast code) ---
+  - tools/echo-overlay/  # AC1 — an MCP-over-http client module INSIDE the overlay dir (path per chosen stack, e.g. tools/echo-overlay/src/lib/mcp.ts for a web UI). It mirrors tools/raycast-echo/src/lib/mcp.ts's callTool/SSE-parse/AbortController/2s-timeout/EchoDaemonError pattern, exposing thin typed methods: pendingDecisions(repoPath) → PendingDecisionsResult, coordStatus() → CoordStatusResult, and (composed in the overlay, NOT the daemon — see AC4) the in-flight backlog-dir read for fleet-glance. REUSE the wire shape; do NOT fork the daemon types — share/copy the DecisionCard + PendingDecisionsSourceState + CoordStatusResult shapes (J3: how types are shared is a flagged call). This is the ONE place the overlay talks to the daemon; the durable primitive stays daemon-owned (one source for every channel).
+  # --- Tests for the overlay (framework per chosen stack — vitest if web UI, XCTest if Swift, etc.) ---
+  - tools/echo-overlay/  # AC7 — overlay tests (path/framework per chosen stack): (a) the MCP client (arg shape, result typing, daemon-unreachable path mirrors mcp.ts error handling); (b) the ambient-dot predicate (lit IFF pending_decisions returns ≥1 awaiting-founder card; dark otherwise; dark on stale/unreachable is NOT silently "nothing" — see AC6); (c) fleet-glance composition (pending_decisions + coord_status + in-flight backlog dirs → the glance model); (d) decision-dive renders an existing DecisionCard with SEE+JUMP links and issues ZERO writes; (e) summon/teardown lifecycle (single-flight poll while open, interval + stale-result suppression torn down on dismiss — mirror decisions.tsx's startDecisionPolling/stop discipline).
+  # --- ONLY IF AC4 proves fleet-glance needs a composed read not yet exposed: a thin ADDITIVE daemon read-projection (justify in agent_notes; do NOT duplicate pending_decisions) ---
+  - src/mcp/tools/  # AC4 (CONDITIONAL — see J2): if and only if client-side composition of pending_decisions + coord_status + the in-flight backlog dirs cannot honestly produce the fleet-glance without scraping, add a thin ADDITIVE daemon read-projection tool (e.g. fleet_status) mirroring pending-decisions.ts's shape (zod params, register* export, source_state freshness block, result_caps discipline, zero LLM, read-only). Register it in src/mcp/server.ts alongside registerPendingDecisions/registerCoordStatus. Prefer NOT adding this — default is client-side composition of the existing two tools + a bounded in-flight backlog-dir read. If added, it MUST NOT duplicate pending_decisions' card projection; it composes health/state only. Builder MUST justify the addition in agent_notes if taken.
+  - src/mcp/server.ts  # AC4 (CONDITIONAL) — register the fleet-glance read-projection tool ONLY if AC4 takes the additive-daemon-read path. Single additive registration; no change to existing tools. If fleet-glance is composed client-side (the default), this file is NOT touched.
+  # (Daemon tests for the conditional fleet read: add alongside the existing MCP-tool test layout — mirror pending-decisions' test location/naming. AC7. Only if the additive tool is added.)
+
+spec_refs:
+  - backlog/complete/2026-05-28-078-decision-card-board.md  # PARENT. 078 shipped the daemon-owned pending_decisions tool, the playbook-agnostic DecisionCard type, and the Raycast `decisions` board as the v0 channel. 080 CONSUMES all of that; it does NOT rebuild the primitive, the adapter, or the alarm logic. Read 078's Locked decisions + AC1/AC5 (boundary) + After-Completion (the overlay was named there as "the V1.5 channel for the same card").
+  - src/mcp/tools/pending-decisions.ts  # AC1 — the daemon-owned tool the overlay reads for "needs you" cards + their source_state freshness. The overlay is a THIN CONSUMER over the same MCP-over-http transport. READ-ONLY: 080 consumes this tool's wire shape; it does not modify the tool or the adapter behind it.
+  - src/mcp/tools/internal/decision-card-types.ts  # AC5 — the playbook-agnostic DecisionCard { id,title,decision,whyNow,options,default,deadline?,blocking?,agents,sources,signals } + PendingDecisionsResult/PendingDecisionsSourceState wire shapes. decision-dive renders THIS card unchanged. The overlay copies/shares these types (J3); it must NOT redefine the card model or add playbook knowledge.
+  - src/mcp/tools/coord-status.ts  # AC4 — the health/deadline manager-tier signal fleet-glance composes (open_deadlines, recent_missed, per_role_last_tick). READ-ONLY: fleet-glance projects coord_status output; it does not change the coord ledger or emit any coord event.
+  - tools/raycast-echo/src/decisions.tsx  # AC4/AC5 — the v0 CHANNEL precedent the overlay mirrors at the new altitude. READ for: the read-only SEE+JUMP card-render model, the source-warning/freshness banner logic (sourceWarnings), the single-flight poller (startDecisionPolling) + teardown (stop/cancelled), and the "never silently render no-decisions over a stale read" discipline. The overlay reproduces this BEHAVIOR in the new stack; it does not import Raycast code.
+  - tools/raycast-echo/src/lib/mcp.ts  # AC1 — the MCP-over-http client pattern the overlay's client mirrors: ECHO_MCP_URL (http://127.0.0.1:38478/mcp), callTool with SSE-or-JSON parse, AbortController + 2s timeout, EchoDaemonError, structuredContent-first unwrap. Copy the PATTERN; do not import this file across surfaces.
+  - tools/raycast-echo/src/lib/launch.ts  # AC5 — the deep-link/open pattern SEE+JUMP uses to send the founder to where they act (the review round dir / backlog item / linked artifact). The overlay's decision-dive uses the chosen stack's open-URL/path equivalent; behavior parity with this.
+  - wiki/principles/felt-not-seen.md  # LOAD-BEARING for AC2/AC3. The overlay is the literal "summoned for explicit moments, disappears" hotkey-overlay form. Idle = nothing on screen + menubar dot dark; visible-on-demand only. ONE calm ambient nudge (the dot lit iff a decision waits); NO auto-pop, NO feed, NO OS notification. Relies on the AMENDED reading ("felt by default, visible on demand at manager altitude") agreed 2026-05-28; wiki amendment is post-shipment (After Completion).
+  - wiki/principles/compose-not-capture.md  # 064 scope clarification: consumer-side projection of substrate/pipeline OUTPUT is explicitly allowed. fleet-glance is a READ-ONLY projection of pending_decisions + coord_status + in-flight backlog state — projection, not capture. SEE+JUMP (not act-from-card) keeps decision-dive from becoming a capture/collaboration tool ("ECHO doesn't send messages").
+  - wiki/principles/drift-prevention.md  # Pattern 5 (chat-UI trap / destination) + Pattern 4 (proactive-surfacing trap). The overlay must NOT become a feed, a chat companion, or an auto-popping interrupt. Summoned read-only view + one calm dot only. Strategist "remove-don't-patch-deeper" discipline applies to overlay scope.
+  - wiki/architecture/coord-substrate-and-observability.md  # 057a: the coord ledger stays health/deadline-only; pending_decisions is a SEPARATE read-projection (not the ledger). fleet-glance READS coord_status; it adds NO coord event and changes NOTHING in the ledger/combine.py/watcher. This distinction is load-bearing — do not route fleet-glance or decision content through the coord ledger.
+  - docs/AGENT_INSTRUCTIONS.md  # builder contract — update task-state at handoff; do NOT write strategist-only files (wiki/**, docs/BACKLOG.md, docs/STATUS.md, docs/NORTH_STAR.md). Those are spec_refs (read-only) here, never files_to_modify.
+  - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # journaling sink. AC8 gate: ≥3 Overlay sessions across ≥2 calendar days with `**Surface:** Overlay`, ≥1 where the ambient dot lit on a real awaiting-you decision AND the founder dove in. The overlay DOES call ECHO MCP tools (pending_decisions, coord_status), so overlay usage IS journal-worthy.
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+---
+
+# 080 — Decisions: the desktop overlay (the operator surface)
+
+## Why (the friction this closes)
+
+078 shipped the DecisionCard primitive (daemon-owned `pending_decisions`) and a v0 channel — a summoned **Raycast** `decisions` board. Raycast was deliberate scaffolding: it let the durable primitive ship and get exercised without committing to a surface stack first. But Raycast is a launcher palette, not an operator cockpit — it cannot sit ambiently on top of the work, it cannot light a calm nudge only when a decision waits, and it has no second altitude for "watch the fleet at a glance, then dive into the one node that needs me."
+
+The founder's loop is: **stay in the decision/validation loop, out of execution, with a trapdoor down to execution by choice** (the manager rung). The missing piece is a surface that lives *where the work happens* — felt, not opened — and gives both altitudes in one place: the fleet at a glance, and the one decision to make right now.
+
+The decision (founder, 2026-05-29): **the v0 operator surface is a desktop overlay** with the Wispr-Flow interaction model — summon-on-demand, "not an app you open," idle-invisible. This item ships that overlay as a **thin consumer of the daemon primitives 078 and 057a already shipped**. It does NOT rebuild the primitive, and it does NOT remove Raycast — Raycast removal is a separate, later, dogfooding-gated step (item 081).
+
+## What this is (and what it deliberately is NOT)
+
+The overlay is **one surface with two altitudes**, reading **one source** (the daemon over the same MCP-over-http transport the Raycast extension uses):
+
+- **FLEET-GLANCE** — modeled on Claude Code's live multi-agent workflow/progress-tree view: the in-flight items and their state (running / reviewing / blocked / needs-you / merged) at a glance. A **read-only projection** (compose-not-capture) of what already exists: `pending_decisions` (the "needs you" rows + their signals), `coord_status` (health/deadline), and the in-flight backlog dirs (`ready/`|`claimed/`|`pending_review/`). Zero new coord event; no change to combine.py / the watcher / the coord ledger.
+- **DECISION-DIVE** — drill into a "needs you" node → render the **existing** `DecisionCard` { decision, whyNow, options, default, deadline, blocking, agents, sources, signals }. Read-only **SEE+JUMP** (open where you act via the source links; writes NOTHING under `backlog/`). SEE+ACT is deferred — the same boundary 078 set.
+
+It is NOT: another Raycast command; a feed; an auto-popping interrupt; an OS notification stream; a destination app; a write path into the pipeline; a multi-repo/multi-machine portfolio; a new coord event.
+
+### Locked decisions (founder, 2026-05-29)
+- **FORM = a desktop overlay** that sits on top of everything, summon-on-demand, "not an app you open." macOS first (founder's machine; Wispr-Flow parity).
+- **TRIGGER MODEL = summon (global hotkey)** for the view + dive-in, PLUS **ONE calm ambient nudge**: a menubar dot that lights ONLY when a decision is waiting. Idle = nothing on screen, dot dark. NO auto-popping interrupt, NO feed, NO OS notification (felt-not-seen / drift-prevention Pattern 5).
+- **TWO ALTITUDES IN ONE SURFACE** = fleet-glance (Claude-Code-style progress-tree of in-flight work) + decision-dive (the existing DecisionCard).
+- **DATA SOURCE = the existing daemon-owned MCP tools** read over `http://127.0.0.1:38478/mcp`. The overlay is a thin consumer; the durable primitive stays in the daemon so every channel reads ONE source. A thin additive daemon read-projection is allowed ONLY if fleet-glance genuinely needs a composed read not yet exposed (AC4 / J2) — never duplicate `pending_decisions`, never scrape.
+- **ACTION MODEL = read-only SEE+JUMP** for v0 (the card links you to where you act; writes nothing). SEE+ACT is a deliberate later phase.
+- **POSITIONING = ① hold the line** (personal context layer). This authority/manager surface ships as dogfooding that graduates later; building the overlay must NOT silently flip ① → ② (command-layer-for-delegated-agency stays deferred to a defined beta signal).
+
+## The DecisionCard (unchanged) + the fleet-glance model
+
+The card is exactly 078's type — 080 renders it, it does not redefine it:
+
+```ts
+// FROM src/mcp/tools/internal/decision-card-types.ts — 080 consumes this verbatim.
+type DecisionCard = {
+  id: string; title: string; decision: string; whyNow: string;
+  options: string[]; default: string; deadline?: string; blocking?: string[];
+  agents: string[]; sources: { label: string; href: string }[];
+  signals: { kind: "runaway_churn"; detail: string }[];  // A1 only in v0 (078)
+};
+```
+
+The fleet-glance model is a NEW projection composed in the overlay (default) or by a thin additive daemon read (only if needed — J2). It carries NO new durable primitive — it is a glance over existing reads:
+
+```ts
+// 080 fleet-glance projection — composed READ-ONLY from existing sources. Illustrative shape (builder finalizes).
+type FleetNode = {
+  itemId: string;                 // e.g. "2026-05-28-079-loop-reliability-pack"
+  title: string;                  // human label
+  state: "running" | "reviewing" | "blocked" | "needs_you" | "merged";  // derived from backlog dir + coord_status + pending_decisions
+  needsYou: boolean;              // true iff this item has a DecisionCard in pending_decisions (the dive-in target)
+  signals: { kind: string; detail: string }[];  // surfaced from the card's signals[] (A1) when needs_you
+  health?: { open_deadlines: number; recent_misses: number };  // from coord_status, when applicable
+};
+type FleetGlance = {
+  nodes: FleetNode[];
+  source_state: /* the SAME freshness contract pending_decisions carries — never render a glance over a stale/unreachable read without warning */;
+};
+```
+
+State derivation (read-only, deterministic, zero LLM): `needs_you` ⟸ the item has a card in `pending_decisions`; `reviewing` ⟸ in-flight backlog dir + active review rounds; `running` ⟸ `claimed/` with no awaiting card; `blocked` ⟸ surfaced from `coord_status` open/missed deadlines; `merged` ⟸ left the in-flight dirs (transient, fades). The dot is lit IFF ≥1 `needs_you` node exists.
+
+## Acceptance Criteria
+
+1. **AC1 — daemon-read contract (thin consumer; one source).** The overlay reads the daemon over `http://127.0.0.1:38478/mcp` using an MCP-over-http client that mirrors `tools/raycast-echo/src/lib/mcp.ts` (callTool, SSE-or-JSON parse, AbortController + ~2s timeout, `EchoDaemonError`, structuredContent-first unwrap). It calls the EXISTING tools `pending_decisions(repo_path)` and `coord_status()`. It does NOT modify those tools, the playbook adapter, combine.py, the watcher, or the coord ledger. A thin ADDITIVE daemon read-projection (AC4 / J2) is permitted ONLY if fleet-glance cannot be composed honestly client-side; if added it mirrors `pending-decisions.ts`'s shape (zod params, `register*` export, `source_state` freshness, `result_caps` discipline, zero LLM, read-only), is registered additively in `server.ts`, and MUST NOT duplicate `pending_decisions`' card projection. Default (preferred): client-side composition, no new daemon tool.
+2. **AC2 — overlay shell + summon.** A transparent, always-on-top, menubar-resident macOS overlay in the chosen stack (J1), summoned by a configurable global hotkey, dismissed by hotkey/Esc/blur. "Not an app you open": no dock presence that reads as an app, no persistent window when idle. While summoned it shows the two altitudes (AC4, AC5). The chosen stack + the WHY is recorded in `tools/echo-overlay/README.md` (J1 must not be decided silently).
+3. **AC3 — menubar ambient dot (the one calm nudge).** A menubar item whose indicator is **lit IFF `pending_decisions` returns ≥1 awaiting-founder card**, and dark otherwise. Idle (no awaiting card) = dot dark, nothing on screen. NO auto-pop of the overlay, NO OS notification, NO badge count feed. The dot polls on the same bounded single-flight cadence as the overlay (AC6) so it reflects current truth without a hot loop. **Stale/unreachable is not silently "dark":** if the read is stale or the daemon is unreachable, the dot enters a distinct neutral/unknown state (NOT the confident "all clear" dark) so a silent stale read can never read as "no decisions" (mirrors 078's freshness discipline).
+4. **AC4 — fleet-glance.** The summoned overlay renders the Claude-Code-style progress-tree of in-flight items with their state (`running`/`reviewing`/`blocked`/`needs_you`/`merged`), composed READ-ONLY from `pending_decisions` + `coord_status` + the in-flight backlog dirs (`ready/`|`claimed/`|`pending_review/` — NOT the ~1000-commit reviews history). `needs_you` nodes are the dive-in targets and carry their card's `signals[]` (A1). Deterministic, zero LLM, zero writes. Composition is client-side by default; the additive daemon read (AC1/J2) is taken ONLY if client-side composition cannot be done without scraping, and justified in `agent_notes`.
+5. **AC5 — decision-dive (SEE+JUMP).** Drilling into a `needs_you` node renders the EXISTING `DecisionCard` (decision / whyNow / options / default / deadline / blocking / agents / sources / signals) and offers **SEE+JUMP only**: every action opens where the founder acts (the review round dir / backlog item / linked artifact) via the stack's open-path equivalent of `launch.ts`. It WRITES NOTHING anywhere under `backlog/`. The card model is consumed unchanged from 078 — the overlay adds NO playbook knowledge and does NOT redefine the card (AC5-boundary: swapping playbooks is still a daemon-adapter concern, never an overlay concern).
+6. **AC6 — freshness + cleanup.** The overlay inherits `pending_decisions`' `source_state` freshness: when `behind > 0` OR `upstream_stale` OR `dirty` OR `partial`, it shows a visible banner ("source N commits behind origin", "remote last seen Xm ago — may be stale", "scan partial") and NEVER silently renders "no decisions" / a blank glance over a stale read. Polling is a fixed bounded interval (default 5s) with **single-flight** (no overlapping fetches) + backoff on daemon-unreachable (mirror `startDecisionPolling`). On dismiss/teardown: clear the interval AND suppress late/stale results (a `cancelled` flag), so a result arriving after dismiss can't repaint. The ambient-dot poller follows the same single-flight + backoff discipline.
+7. **AC7 — tests + checks green.** Overlay tests (framework per chosen stack): (a) MCP client arg shape / result typing / daemon-unreachable path; (b) the ambient-dot predicate (lit iff ≥1 awaiting card; dark when zero; **neutral/unknown — not confident-dark — on stale/unreachable**); (c) fleet-glance composition over fixtures (pending_decisions + coord_status + in-flight backlog dirs → the FleetGlance nodes/states; scan bounded to in-flight items); (d) decision-dive renders a DecisionCard with the right SEE+JUMP targets and issues ZERO writes; (e) summon/teardown lifecycle (single-flight poll while open; interval + stale-result suppression torn down on dismiss). If the additive daemon read is taken (AC4), add daemon unit tests mirroring pending-decisions' layout incl. its `source_state` freshness. Typecheck/lint/test green for the overlay; if `src/` is touched, root `npm run typecheck`/`npm run lint`/`npm test` green too.
+8. **AC8 — founder dogfooding gate** (merged → validated): ≥3 Overlay sessions across ≥2 calendar days (logged with `**Surface:** Overlay`), ≥1 where the ambient dot lit on a real awaiting-you decision AND the founder summoned + dove in, with a founder note on (i) whether the overlay's felt-not-seen behavior held (idle-invisible, one calm dot, no interrupt), and (ii) whether the two altitudes (glance → dive) kept them in command better than the Raycast board did. This is the gate that unlocks item 081 (Raycast removal). (Validates the SURFACE; the card model + adapter are inherited from 078.)
+
+## Design judgment calls (flagged for r1 reviewer pushback)
+
+- **J1 — the overlay TECH STACK (LOAD-BEARING; escalation-worthy if reviewers split).** This is the most expensive-to-reverse decision in the item. **Strategist recommendation: TAURI** (Rust shell + web UI) — native overlay feel + menubar + transparent always-on-top window at a small footprint that honors felt-not-seen, with a web UI that can reuse the repo's TS/React patterns and potentially share types with the daemon. **Alternatives to weigh:** native **Swift/SwiftUI** (most felt-not-seen, truest Wispr-Flow parity, but a new language in a TS repo — higher long-term maintenance / no type sharing) vs **Electron** (matches repo language but heavy — contradicts felt-not-seen). The builder MUST NOT pick silently: the chosen stack + the reasoning is recorded in `tools/echo-overlay/README.md`. Reviewers: pressure-test Tauri vs Swift specifically against (a) felt-not-seen footprint, (b) menubar + transparent-always-on-top reliability on macOS, (c) type-sharing with the daemon, (d) maintenance cost of a new language in a TS repo. If reviewers split on this, escalate to the founder.
+- **J2 — fleet-glance: client-side composition vs a thin additive daemon read.** Default is client-side composition of `pending_decisions` + `coord_status` + a bounded in-flight backlog-dir read (no new daemon tool). The additive daemon read (e.g. `fleet_status`) is taken ONLY if client-side composition cannot be done honestly without scraping repo internals. Reviewers: is the in-flight backlog-dir read better done in the daemon (durable, one source, but a second fs-read tool — 078's J1 cost again) or in the overlay client (thinner daemon, but the overlay learns a little playbook shape)? Default leans client-side to keep the daemon thin; reviewers confirm or push for the additive tool.
+- **J3 — how the daemon types are shared with the overlay.** The overlay needs `DecisionCard` / `PendingDecisionsSourceState` / `CoordStatusResult`. Options: copy the type definitions (simple, can drift), a shared types package (clean, more setup), or generate from the daemon. Default for v0: copy with a clear "source of truth is `src/mcp/tools/internal/decision-card-types.ts`" comment. Reviewers weigh drift risk vs setup cost.
+- **J4 — the fleet-glance state taxonomy.** The illustrative states (`running`/`reviewing`/`blocked`/`needs_you`/`merged`) and their derivation rules are provisional content, iterable post-merge. The INVARIANT: states derive deterministically from durable facts (backlog dir + coord_status + pending_decisions), zero LLM, zero writes. Reviewers: is this taxonomy the right minimum, or does it over/under-model the glance?
+- **J5 — ambient-dot stale/unknown visual.** AC3 requires a distinct neutral/unknown dot state for stale/unreachable so a silent stale read can't read as "all clear." The exact visual treatment (e.g. hollow vs dim vs amber) is a content call; the INVARIANT is that confident-dark ("no decisions") is reserved for a fresh successful read of zero awaiting cards. Reviewers confirm the three-state model (lit / dark / unknown) is right.
+
+## Out of Scope (Don't Drift)
+
+1. **No Raycast removal in this item.** Removing `tools/raycast-echo/` (echo + recap + decisions) is **item 081**, gated on 080's dogfooding gate (AC8) confirming the overlay carries the decision/monitor job in daily use. 080's Definition of Done is the overlay working + the founder dogfooding gate — NOT Raycast removal. The Raycast `decisions` board keeps running in parallel during 080's dogfooding.
+2. **No folding of echo/recap retrieval into the overlay.** The overlay ships fleet-glance + decision-dive only. The retrieval surfaces (echo's ask/Continue, recap's narrative) are NOT brought into the overlay here — that is a later item if it happens at all.
+3. **No SEE+ACT / no writes under `backlog/`.** Read-only SEE+JUMP for v0; the overlay observes the pipeline, never acts on it. Same boundary 078 set.
+4. **No auto-pop / no feed / no OS notification.** Summoned read-only view + ONE calm menubar dot only. No interrupt, no badge-count stream, no notification center entries (Pattern 5 / felt-not-seen).
+5. **No new coord event and no change to the coord ledger / combine.py / the watcher / the playbook adapter.** fleet-glance READS `coord_status` and `pending_decisions`; it adds nothing to the ledger. (057a: receipt-shape rejected; the ledger stays health/deadline-only.)
+6. **No duplication of `pending_decisions`.** If an additive daemon read is added (AC4/J2), it composes health/state only and never re-emits the card projection. Default is no new daemon tool at all.
+7. **No A2 (non-converging-patch) alarm.** v0 surfaces only A1 (runaway-churn) as inherited from the card's `signals[]`. A2 stays deferred (078 After-Completion / V1.5).
+8. **No multi-repo / multi-machine portfolio.** Single configured repo (the founder's `~/Desktop/Project_echo`). Cross-machine/cross-repo aggregation = V2+.
+9. **No public brand/positioning change.** ① holds. Building the overlay must NOT flip ① → ② (command-layer-for-delegated-agency) — that pivot stays gated on a defined external beta signal. `wiki/product/` brand pages untouched.
+10. **No LLM / no agent subprocess in the overlay or any fleet read.** Deterministic projection + the existing tools only.
+
+## After Completion (Strategist Notes — post-shipment, NOT build-time)
+
+When this lands in `complete/`, the strategist (not the builder):
+1. **Files item 081 — Raycast removal** (the landing bar): remove the whole `tools/raycast-echo/` extension (echo + recap + decisions commands), gated on 080's AC8 dogfooding gate confirming the overlay carries the decision/monitor job in daily use. 081 is the step that retires the scaffolding; 080 only proves the replacement.
+2. **Amends `wiki/principles/felt-not-seen.md`** to record the overlay as the realized "hotkey overlay → summoned for explicit moments, disappears" form, with the one-calm-ambient-dot nudge, citing this item + the 2026-05-29 founder decision.
+3. **Creates `wiki/surfaces/decisions-overlay.md`** (status: shipped) documenting the overlay surface: the two altitudes (fleet-glance + decision-dive), the summon + ambient-dot trigger model, the thin-consumer-of-daemon-tools data contract, and the chosen stack (J1). Cross-links `wiki/surfaces/decisions-board.md` (078) as the v0 channel the overlay supersedes.
+4. **Records the surface decision** in `raw/internal/decisions/2026-05-29-decisions-desktop-overlay.md`: overlay-over-Raycast, the J1 stack choice + reasoning, summon + one-calm-dot, two altitudes, ① now / ② on signal, and the 081 Raycast-removal sequencing. Updates `.manifest.json` + regenerates `wiki/index.md` via `tools/wiki_index.py` for pages actually created.
+5. **Files the echo/recap-fold-or-retire question** as a later item once the overlay is the daily surface and Raycast is removed (081): decide whether the retrieval surfaces (echo ask/Continue, recap) get a home in the overlay or are retired with Raycast.
+6. **Does NOT** change the public brand promise — V1.5+ ② call gated on the defined beta signal.
