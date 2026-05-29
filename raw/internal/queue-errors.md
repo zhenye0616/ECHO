@@ -34,3 +34,5 @@
 2026-05-28T06:07:31Z PUSH-RACE-FALLBACK: journal: codex r4 review tick on 2026-05-27-077-cognitive-recap-via-raycast sha=92031b120a9b45b37e5bef0b0a87d787454b3be3
 2026-05-28T06:54:13Z PUSH-RACE-FALLBACK: journal: codex r9 review tick on 2026-05-27-077-cognitive-recap-via-raycast sha=ead20e25828247d29f43ec71e8eed66a1687d334
 2026-05-29T03:09:29Z PUSH-RACE-FALLBACK: journal: codex r1 review tick on 2026-05-28-078-decision-card-board sha=db78dac2cfa5adb8a3fa1930e646b91d783a75b2
+2026-05-29T03:33:51Z PUSH-RACE-FALLBACK: journal: codex-ops r3 review tick on 2026-05-28-078-decision-card-board sha=7889421db08033c06f2186611f61f6a644bff9e8
+2026-05-29T03:35:09Z PUSH-RACE-FALLBACK: journal: codex-ops r3 review tick on 2026-05-28-078-decision-card-board sha=5cd02f30eb0ec0cf27c4d090e62d8f1e61a5936a
