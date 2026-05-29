@@ -2,17 +2,18 @@ use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::str::FromStr;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
-use tauri_plugin_global_shortcut::{
-    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
-};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "ambient-dot";
 const TOGGLE_MENU_ID: &str = "toggle-overlay";
 const QUIT_MENU_ID: &str = "quit";
+const DEFAULT_HOTKEY: &str = "CommandOrControl+Shift+D";
+const HOTKEY_ENV: &str = "ECHO_OVERLAY_HOTKEY";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DotState {
@@ -161,7 +162,7 @@ fn configure_overlay_window(window: &WebviewWindow) -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 fn configure_macos_window(window: &WebviewWindow) -> Result<(), String> {
-    use objc2_app_kit::{NSColor, NSWindow};
+    use objc2_app_kit::{NSColor, NSFloatingWindowLevel, NSWindow};
 
     let ns_window_ptr = window
         .ns_window()
@@ -171,6 +172,7 @@ fn configure_macos_window(window: &WebviewWindow) -> Result<(), String> {
     ns_window.setOpaque(false);
     ns_window.setBackgroundColor(Some(&clear));
     ns_window.setHasShadow(true);
+    ns_window.setLevel(NSFloatingWindowLevel);
     Ok(())
 }
 
@@ -211,7 +213,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
 }
 
 fn register_hotkey(app: &AppHandle) -> Result<(), String> {
-    let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyD);
+    let hotkey = std::env::var(HOTKEY_ENV).unwrap_or_else(|_| DEFAULT_HOTKEY.to_string());
+    let shortcut = Shortcut::from_str(&hotkey)
+        .map_err(|err| format!("{HOTKEY_ENV}={hotkey:?} is not a valid shortcut: {err}"))?;
     app.global_shortcut()
         .register(shortcut)
         .map_err(|err| format!("global hotkey registration failed: {err}"))
