@@ -16,6 +16,7 @@ import { registerGetAtom } from './tools/get-atom.js';
 import { registerGetAtoms } from './tools/get-atoms.js';
 import { registerGetRoleState } from './tools/get-role-state.js';
 import { registerListTaskStates } from './tools/list-task-states.js';
+import { registerPendingDecisions } from './tools/pending-decisions.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 import { registerWaitForNewTurns } from './tools/wait-for-new-turns.js';
@@ -246,6 +247,7 @@ export async function startMcpServer(
     registerRecentWorkContext(mcp, storage);
     // V1.6 (item 030) — atomic decomposition + group-session subscription.
     registerFindClusters(mcp, storage);
+    registerPendingDecisions(mcp);
     registerGetAtoms(mcp, storage);
     registerWaitForNewTurns(mcp, storage);
     // V1.6 (item 033) — full-atom recovery escape hatch.
