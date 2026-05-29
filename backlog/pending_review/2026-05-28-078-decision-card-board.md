@@ -45,6 +45,23 @@ spec_refs:
 claimed_by: "codex-builder"
 claimed_at: "2026-05-29T03:50:05Z"
 branch: "agent/decision-card-board"
+worktree: "/Users/zhenye/Desktop/Project_echo--decision-card-board"
+head_sha: "1ea38793100aabc720cc802805987074e6f3dc8c"
+pr_url: ""
+agent_notes: |
+  Implemented DecisionCard board on branch `agent/decision-card-board` at `1ea38793100aabc720cc802805987074e6f3dc8c`.
+
+  Summary:
+  - Added daemon `pending_decisions` MCP tool with playbook-agnostic DecisionCard types, isolated ECHO review-playbook adapter, source freshness state, bounded non-interactive origin refresh, and registration/test coverage.
+  - Added Raycast `decisions` command with read-only SEE+JUMP card rows, stale/dirty/partial warnings, single-flight polling/backoff, teardown suppression, README docs, and client/board tests.
+  - Kept out-of-scope boundaries: no A2, no monitor command, no SEE+ACT/backlog writes, no LLM/agent subprocess, no combine.py/watcher/coord-ledger changes, and no echo/recap rewrites.
+
+  Verification:
+  - Root: `npm run typecheck`, `npm run lint`, `npm test` (1476 passed, 21 skipped, 1 file skipped), focused pending-decision MCP tests, `git diff --check`.
+  - Raycast: `npm run typecheck`, `npm test` (149 passed), `npm ci --ignore-scripts --dry-run` (passes with existing @raycast/api Node engine warning on v22.22.1).
+
+  Drift note:
+  - Updated existing MCP registration/audit contract tests so the full daemon suite recognizes the newly registered `pending_decisions` tool.
 ---
 
 # 078 — Decisions: the DecisionCard board

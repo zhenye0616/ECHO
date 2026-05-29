@@ -2,12 +2,19 @@
 task_id: 2026-05-28-078-decision-card-board
 role: builder
 writer: codex-builder
-last_updated: 2026-05-29T03:50:05Z
+last_updated: 2026-05-29T04:18:11Z
+handoff_branch: agent/decision-card-board
+handoff_head_sha: 1ea38793100aabc720cc802805987074e6f3dc8c
+handoff_run_log: raw/internal/agent-runs/2026-05-28-2026-05-28-078-decision-card-board.md
 ---
 
 ## current_thesis
 
 Claimed 078 as Codex builder. Implement a daemon-owned `pending_decisions` projection and a Raycast `decisions` board that renders playbook-derived DecisionCards as read-only SEE+JUMP cards, with freshness warnings and A1-only alarm attributes.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 1ea38793100aabc720cc802805987074e6f3dc8c.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -36,5 +43,5 @@ Claimed 078 as Codex builder. Implement a daemon-owned `pending_decisions` proje
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-28-078-decision-card-board.md
+- spec: backlog/pending_review/2026-05-28-078-decision-card-board.md
 - reviews: backlog/reviews/2026-05-28-078-decision-card-board/
