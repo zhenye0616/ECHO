@@ -1955,3 +1955,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** ✅ right — both headless reviewers actively triggered; launchd-fallback remains the redundant path.
 - **Note:** Daemon was up; no 406 negotiation failure (the r9-codex-F1 Accept-header fix held). Clean active-trigger, no fallback needed.
 - **Conjecture:** none.
+
+### 2026-05-28 23:26 PDT - codex-ops r4 review tick on 079 Loop Reliability Pack
+
+- **Trigger:** Codex-ops review queue tick selected `backlog/reviews/2026-05-28-079-loop-reliability-pack/r4/request.md` and reviewed the r4-patched Loop Reliability Pack spec through the operational/runtime lens.
+- **Query inputs:** ECHO coord call already emitted: `coord_emit(event_type=tick_start, reviewer=codex-ops, correlation_id=f53d7dfe-ee75-4209-b6d7-e798e816e8d6)`. Queue/file reads used the r4 request focus hints, reviewer schema, pinned artifact `backlog/ready/2026-05-28-079-loop-reliability-pack.md` at `e14cae77f228b56f77098106ef61874cc74ae449`, r3 combined context, r3 codex response, r3 codex-ops response, and current May-shard journal policy. Per command ordering, `tick_end` will be emitted after this sibling journal commit.
+- **Returned:** Wrote, pre-link validated, upstream-duplicate checked, committed, and pushed `backlog/reviews/2026-05-28-079-loop-reliability-pack/r4/codex-ops.md` at review commit `0bb7c56f`, verdict `proceed`, findings empty.
+- **Sources:** Review response file above; request correlation `f53d7dfe-ee75-4209-b6d7-e798e816e8d6`; artifact commit `e14cae77f228b56f77098106ef61874cc74ae449`; spec anchors `backlog/ready/2026-05-28-079-loop-reliability-pack.md:17-19`, `:33-34`, `:91-95`, and `:103`.
+- **Verdict:** right - r4 closes the requested runtime checks: `kind=push` returns exactly `ECHO_EFFECT_NONLIVE_RC=97` under both dry-run and test while non-push kinds return exactly 0, and `validate-sidecar.py` must normalize PyYAML-parsed `reviewed_at` datetimes from the current unquoted producer template before jsonschema validation.
+- **Note:** The response commit completed before this observation-only journal entry. The stale reviewer command still mentions the old unsharded journal and generated HTML twin; current `CLAUDE.md`/`AGENTS.md` policy makes the May monthly Markdown shard canonical and treats generated HTML twins as local-only, so this tick writes only this shard.
+- **Conjecture:** none.
