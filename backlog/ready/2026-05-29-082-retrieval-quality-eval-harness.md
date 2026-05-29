@@ -7,7 +7,7 @@ estimate: 1.5-2d
 created: 2026-05-29
 blocked_by: []
 task_state_ref: 2026-05-29-082-retrieval-quality-eval-harness
-requested_reviewers: ["codex", "cursor"]
+requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   # AC1/AC2 -- human-readable standard + case schema. This is builder-owned docs, not docs/BACKLOG.md.
   - docs/retrieval-eval.md

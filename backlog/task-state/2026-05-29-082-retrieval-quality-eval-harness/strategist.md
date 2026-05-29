@@ -19,6 +19,7 @@ Spec drafted; awaiting claim. The item creates the missing standard/eval layer f
 - Seed pack locks six cases: signal-vs-noise alias miss, neutrality-axis alias, what-shipped-today needs artifacts, resume-after-clear newest-first, generated-label circular retrieval, and stale/degraded source warnings.
 - No production retrieval behavior changes are allowed in this item. Failing evals are an acceptable deliverable and should be surfaced in `agent_notes`.
 - 081 stays reserved for Raycast removal after 080's overlay dogfooding gate; this retrieval-quality spec uses 082.
+- Reviewer roster for the full-auto spec review is `["codex", "codex-ops"]` per founder direction, overriding the post-047 default `["codex", "cursor"]`.
 
 ## open_questions
 
