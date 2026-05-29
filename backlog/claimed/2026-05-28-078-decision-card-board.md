@@ -40,6 +40,11 @@ spec_refs:
   - backlog/complete/2026-05-27-077-cognitive-recap-via-raycast.md  # recap precedent (command-add mechanics, single-shot discipline, dogfooding-gate shape). Recap's command entry folds before beta (After Completion); its CODE is kept and reused.
   - docs/AGENT_INSTRUCTIONS.md  # builder contract — update task-state at handoff; do not write strategist-only files (wiki/**, docs/BACKLOG.md).
   - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # journaling sink. AC8 gate: ≥3 entries with `**Surface:** Decisions` across ≥2 days, ≥1 where an alarm signal fired on a real awaiting-you decision. The `decisions` board itself DOES call an ECHO MCP tool (pending_decisions), so board usage IS journal-worthy (unlike the old file-only monitor design).
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: "codex-builder"
+claimed_at: "2026-05-29T03:50:05Z"
+branch: "agent/decision-card-board"
 ---
 
 # 078 — Decisions: the DecisionCard board
