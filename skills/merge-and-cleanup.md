@@ -35,15 +35,32 @@ for ID in "$@"; do
   SIDECAR="${ITEM%.md}.review.md"
   [ -z "$ITEM" ]    && { echo "ERROR: $ID not in pending_review/"; exit 1; }
   [ ! -f "$SIDECAR" ] && { echo "ERROR: no $SIDECAR — run /review-pending $ID first"; exit 1; }
-  # also reject items whose verdict is not mergeable
-  VERDICT=$(awk '/^verdict:/ { sub(/verdict:[ ]*/,""); print; exit }' "$SIDECAR")
+  tools/review-queue/validate-sidecar.py "$SIDECAR" || exit 1
+  # also reject items whose validated verdict is not mergeable
+  VERDICT=$(python3 - "$SIDECAR" <<'PY'
+import sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f:
+    print(yaml.safe_load(f.read().split("---")[1])["verdict"])
+PY
+  )
   case "$VERDICT" in
     "merge as-is"|"merge with founder fixups") ;;
     *) echo "ERROR: $ID verdict is '$VERDICT' — not mergeable"; exit 1 ;;
   esac
 
   # 4. Warn if main moved significantly since the sidecar was written
-  REVIEWED_AT=$(awk '/^reviewed_at:/ { sub(/reviewed_at:[ ]*/,""); print; exit }' "$SIDECAR")
+  REVIEWED_AT=$(python3 - "$SIDECAR" <<'PY'
+import datetime as dt, sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f:
+    value = yaml.safe_load(f.read().split("---")[1])["reviewed_at"]
+if isinstance(value, dt.datetime):
+    if value.tzinfo is not None:
+        value = value.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    print(value.strftime("%Y-%m-%dT%H:%M:%SZ"))
+else:
+    print(value)
+PY
+  )
   if [ -n "$REVIEWED_AT" ]; then
     AGE_HOURS=$(( ( $(date -u +%s) - $(date -u -d "$REVIEWED_AT" +%s 2>/dev/null || gdate -u -d "$REVIEWED_AT" +%s) ) / 3600 ))
     if [ "$AGE_HOURS" -gt 6 ]; then
@@ -232,6 +249,7 @@ npm install                 # in case dependencies changed (especially MCP SDK, 
 npm test
 npm run lint
 npm run typecheck
+tools/review-queue/check-coupled-invariants.sh
 tools/sync-skills.sh --check
 ```
 

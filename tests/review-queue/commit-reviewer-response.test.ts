@@ -51,6 +51,7 @@ function setupRepo(): { root: string; origin: string } {
     'tools/review-queue/validate.py',
     'tools/review-queue/_lib.py',
     'tools/review-queue/push-with-retry.sh',
+    'tools/review-queue/_effect-runner.sh',
     'tools/review-queue/schemas/reviewer.schema.json',
   ]) {
     const data = readFileSync(join(REPO, rel));

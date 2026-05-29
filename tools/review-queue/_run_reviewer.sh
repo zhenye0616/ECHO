@@ -41,6 +41,7 @@ fi
 
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
+source "$TOOL_DIR/_effect-runner.sh"
 
 # PATH augmentation — launchd's environment is stripped down; codex (and
 # common dependencies it shells out to, including the python3 with
@@ -86,69 +87,18 @@ fi
   REVIEWER_NAME="$REVIEWER_NAME" "$TOOL_DIR/coord-emit.sh" scheduler_health \
     --tick-run-id="$TICK_RUN_ID" || true
 
-  # ── 050 AC1 step 0: pre-flight worktree hygiene (order matters) ────────
-  # 1) Prune admin entries for worktrees whose dirs are already gone (e.g.
-  #    cleanly-removed prior ticks). Admin-only — does not touch live dirs.
-  git worktree prune || true
-  # 2) Enumerate registered worktrees. Any path in this set is skipped no
-  #    matter its age — registered worktrees include active merger
-  #    conflict-pauses AND crashed registered survivors. 050 does not
-  #    distinguish (followup-F is the operator script for crashed cleanup).
-  REGISTERED_WT=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
-  # 3) GC unregistered $TMPDIR/echo-* orphans older than 60 minutes.
-  if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
-    while IFS= read -r -d '' orphan; do
-      if printf '%s\n' "$REGISTERED_WT" | grep -Fxq "$orphan"; then
-        continue   # registered → skip regardless of mtime
-      fi
-      rm -rf -- "$orphan" || true
-    done < <(find "$TMPDIR" -maxdepth 1 -type d -name 'echo-*' -mmin +60 -print0 2>/dev/null)
-  fi
+  # ── 050 AC1: enter a clean detached-HEAD snapshot. The shared helper
+  # preserves the observable invariants from the former inline block:
+  # pre-flight hygiene, origin/main fetch, $TMPDIR/echo-<reviewer>-<uuid>
+  # worktree, WT + ECHO_REVIEW_QUEUE_REPO_ROOT exports, and unified cleanup.
+  source "$TOOL_DIR/_clean-snapshot.sh"
+  echo_enter_clean_snapshot "$REVIEWER_NAME"
 
-  # ── 050 AC1 step 1: read-only fetch (does NOT check out, does NOT touch
-  # live index). The reviewer will run in a fresh detached-HEAD worktree at
-  # origin/main below.
-  git fetch origin main
-
-  # ── 050 AC1 step 2: compute worktree path. Hard-fail if $TMPDIR is unset
-  # or empty (don't silently fall back to /tmp — surfacing the unset-env
-  # case is more useful than silently writing somewhere unexpected).
-  if [ -z "${TMPDIR:-}" ]; then
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: TMPDIR unset; cannot place ephemeral worktree" >&2
-    exit 1
-  fi
-  WT="$TMPDIR/echo-${REVIEWER_NAME}-$(uuidgen)"
-
-  # ── 050 AC1 step 3: create the detached worktree pinned to origin/main.
-  if ! git worktree add --detach "$WT" origin/main; then
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: git worktree add failed at $WT" >&2
-    exit 1
-  fi
-
-  # ── 050 AC1 step 6: unified cleanup trap (success + failure paths).
-  # No push-failure-specific preservation logic — any failure mode discards
-  # the worktree and its uncommitted/unpushed work. Crashed-tick safety is
-  # guaranteed by re-fireability (next tick re-reads r<N>/request.md).
-  cleanup() {
-    local rc=$?
-    cd "$REPO_ROOT" 2>/dev/null || true
-    if [ -n "${WT:-}" ] && [ -d "$WT" ]; then
-      git worktree remove --force "$WT" 2>/dev/null || true
-    fi
-    git worktree prune 2>/dev/null || true
-    return $rc
-  }
-  trap cleanup EXIT
-  trap 'cleanup; exit 1' ERR INT TERM
-
-  # ── 050 AC1 step 4: route the child Codex into $WT via ALL FOUR handoffs.
+  # Route the child CLI into $WT via ALL FOUR handoffs.
   # CWD, env (so the prompt body's `cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-...}"`
   # lands in the worktree), prompt-path (so the reviewer reads prompt bytes
   # from the worktree copy — picks up R3-disposition fixes that landed in
   # origin/main), and `-C` to codex itself.
-  cd "$WT"
-  export ECHO_REVIEW_QUEUE_REPO_ROOT="$WT"
-
   PROMPT="$WT/.claude/commands/${SLASH_COMMAND}.md"
   if [ ! -f "$PROMPT" ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: prompt missing at $PROMPT" >&2
@@ -192,7 +142,7 @@ fi
   # "command not found" inside the subshell + leave the founder hunting
   # through launchd logs.
   EXE_NAME=$(printf '%s\n' "$INVOKE_CMD" | awk '{print $1}')
-  if ! command -v "$EXE_NAME" >/dev/null 2>&1; then
+  if [ "${ECHO_EFFECT_MODE:-live}" = "live" ] && ! command -v "$EXE_NAME" >/dev/null 2>&1; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick abort: executable not on PATH: $EXE_NAME" >&2
     REVIEWER_NAME="$REVIEWER_NAME" "$TOOL_DIR/queue_error.sh" \
       "executable_not_found" "$EXE_NAME not on PATH" \
@@ -215,7 +165,7 @@ fi
 
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] dispatching: $INVOKE_CMD"
   set +e
-  bash -c "$INVOKE_CMD"
+  echo_effect codex-exec -- bash -c "$INVOKE_CMD"
   rc=$?
   set -e
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick end rc=$rc"

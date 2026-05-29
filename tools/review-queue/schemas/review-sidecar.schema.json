@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://echo.local/review-queue/review-sidecar.schema.json",
+  "title": "review-pending committed sidecar frontmatter",
+  "description": "Schema for backlog/pending_review/<item_id>.review.md, the committed review sidecar produced by /review-pending and consumed by /merge-and-cleanup.",
+  "type": "object",
+  "required": ["item_id", "verdict", "reviewed_at", "test_counts", "producer"],
+  "additionalProperties": false,
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}-\\d{3}[a-z]?-[a-z][a-z0-9-]*$"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["merge as-is", "merge with founder fixups", "redo before merge", "block"]
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "test_counts": {
+      "type": "object",
+      "required": ["passed", "failed"],
+      "additionalProperties": false,
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "producer": {
+      "type": "string",
+      "enum": ["claude-code-subagent", "codex-child", "review-pending-orchestrator"]
+    }
+  }
+}

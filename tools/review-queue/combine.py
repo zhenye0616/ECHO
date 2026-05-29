@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import os
 import re
 import sys
 import time
@@ -748,6 +749,81 @@ def write_combined(round_dir: Path, fm: dict[str, Any], body: str) -> str:
     return _lib.atomic_link_write(final, content)
 
 
+def _git_toplevel(path: Path) -> Path:
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return Path(out.stdout.strip()).resolve()
+
+
+def _registered_worktrees(repo_root: Path) -> set[Path]:
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "-C", str(repo_root), "worktree", "list", "--porcelain"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    paths: set[Path] = set()
+    for line in out.stdout.splitlines():
+        if line.startswith("worktree "):
+            paths.add(Path(line.removeprefix("worktree ")).resolve())
+    return paths
+
+
+def _is_valid_clean_snapshot(repo_root: Path) -> bool:
+    tmpdir = os.environ.get("TMPDIR")
+    routed = os.environ.get("ECHO_REVIEW_QUEUE_REPO_ROOT")
+    if not tmpdir or not routed:
+        return False
+    try:
+        top = _git_toplevel(repo_root)
+    except Exception:
+        return False
+    if Path(routed).resolve() != top:
+        return False
+    if top.parent.resolve() != Path(tmpdir).resolve():
+        return False
+    if not re.match(r"^echo-[A-Za-z0-9._-]+-[0-9A-Fa-f-]{36}$", top.name):
+        return False
+    try:
+        return top in _registered_worktrees(top)
+    except Exception:
+        return False
+
+
+def _founder_live_checkout() -> Path:
+    return (Path.home() / "Desktop" / "Project_echo").resolve()
+
+
+def assert_git_mutation_target_safe(repo_root: Path, allow_live: bool) -> None:
+    """Refuse git-mutating combine.py paths on the founder live checkout.
+
+    Clean snapshots are accepted only when the physical git toplevel matches
+    ECHO_REVIEW_QUEUE_REPO_ROOT and is a registered $TMPDIR/echo-<role>-<uuid>
+    worktree. Throwaway temp clones are allowed for tests and ad-hoc isolated
+    exercises; the guarded footgun is the founder's live checkout.
+    """
+    if allow_live:
+        return
+    try:
+        top = _git_toplevel(repo_root)
+    except Exception as exc:
+        raise SystemExit(f"combine.py: cannot resolve git toplevel for {repo_root}: {exc}") from exc
+
+    if top == _founder_live_checkout() and not _is_valid_clean_snapshot(repo_root):
+        raise SystemExit(
+            "combine.py: refusing to mutate the founder live checkout. "
+            "Run via the watcher clean-snapshot tick or pass --allow-live for an explicit operator override."
+        )
+
+
 # ---------------- entry ----------------
 
 
@@ -767,6 +843,7 @@ def main(argv: list[str]) -> int:
     )
     ap.add_argument("--all", dest="all_rounds", action="store_true")
     ap.add_argument("--no-git", action="store_true", help="skip git pull/push (test hook)")
+    ap.add_argument("--allow-live", action="store_true", help="allow git mutations in the founder live checkout")
     ap.add_argument("--now", default=None, help="override 'now' (ISO-8601 UTC; test hook)")
     args = ap.parse_args(argv[1:])
 
@@ -785,6 +862,7 @@ def main(argv: list[str]) -> int:
     if not args.no_git:
         import subprocess
 
+        assert_git_mutation_target_safe(repo_root, args.allow_live)
         subprocess.run(
             ["git", "-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
             cwd=repo_root,

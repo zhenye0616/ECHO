@@ -66,6 +66,11 @@ function setupFixture(): Fixture {
   );
   const helper = 'tools/review-queue/push-with-retry.sh';
   writeFileSync(join(repo, helper), helperSrc, { mode: 0o755 });
+  writeFileSync(
+    join(repo, 'tools/review-queue/_effect-runner.sh'),
+    readFileSync(join(process.cwd(), 'tools/review-queue/_effect-runner.sh'), 'utf-8'),
+    { mode: 0o755 },
+  );
   writeFileSync(join(repo, 'README.md'), '# bootstrap\n');
   execSync('git add -A', { cwd: repo });
   execSync('git commit -q -m bootstrap', { cwd: repo });

@@ -174,6 +174,7 @@ item_id: 2026-04-30-012-git-capture
 verdict: merge with founder fixups   # merge as-is | merge with founder fixups | redo before merge | block
 reviewed_at: 2026-04-30T22:30:00Z
 test_counts: { passed: 132, failed: 0 }
+producer: review-pending-orchestrator
 ---
 
 ## Verdict
@@ -205,6 +206,7 @@ After ALL sidecars are written, commit + push each one atomically. The sidecar I
 # SIDECARS is the list of paths written above (one per item).
 for SIDECAR in "${SIDECARS[@]}"; do
   SIDECAR_BASE=$(basename "$SIDECAR" .review.md)
+  tools/review-queue/validate-sidecar.py "$SIDECAR"
   git add "$SIDECAR"
   git commit -m "review: $SIDECAR_BASE" "$SIDECAR"
   tools/review-queue/push-with-retry.sh "review: $SIDECAR_BASE"
