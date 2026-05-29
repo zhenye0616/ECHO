@@ -8,7 +8,7 @@
 
 ## Hotkey Binding
 
-The extension is a local dogfooding tool, not a Raycast Store package. It registers a single command, `ECHO`, and relies on Raycast for the hotkey and window chrome.
+The extension is a local dogfooding tool, not a Raycast Store package. It registers a small command set and relies on Raycast for the hotkey and window chrome.
 
 ## ECHO (sessions as objects)
 
@@ -75,6 +75,28 @@ Recap dogfooding journal template:
 **Tool and query inputs:** agent=<codex|claude|custom>; since=<ISO>; source=<user|last_session|window_24h|window_4h|fallback_24h>; daemon=<up|down|unknown>
 **Returned shape:** status=<done|cancelled|errored|empty>; sections=<A/B/D/Sources present?>; words=<approx>
 **Sources:** <copy the Recap Sources section and any audit rows>
+**Verdict:** <right|partial|wrong>
+**Note:**
+**Conjecture:**
+```
+
+## Decisions
+
+`Decisions` is a read-only board of DecisionCards for the configured repo. A DecisionCard is a current delegated-work decision that needs the founder's attention, projected from the daemon `pending_decisions` MCP tool. The first source adapter reads ECHO's own review queue artifacts (`combined.md` plus active backlog stage), while the card type stays playbook-agnostic.
+
+The command uses SEE+JUMP only. Rows show the decision, why it is pending now, source freshness warnings, and A1 runaway-churn signals when a review has churned several rounds without a founder touch. Actions only open the underlying review round, combined review, or backlog item; the board does not write under `backlog/`.
+
+Decisions preferences are command-scoped. Set **Repository Path** to the repo whose active backlog should feed cards; the default is `~/Desktop/Project_echo`.
+
+Decisions dogfooding journal template:
+
+```markdown
+**Surface:** Decisions
+**Trigger:**
+**Repo:** <absolute repo path>
+**Tool and query inputs:** pending_decisions(repo_path=<path>)
+**Returned shape:** cards=<count>; signals=<count>; source_state.behind=<n>; upstream_stale=<true|false>; dirty=<true|false>; partial=<true|false>
+**Sources:** <source_breakdown and card source labels/paths>
 **Verdict:** <right|partial|wrong>
 **Note:**
 **Conjecture:**

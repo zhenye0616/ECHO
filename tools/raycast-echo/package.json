@@ -1,6 +1,6 @@
 {
   "name": "echo-context",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "title": "ECHO Context",
   "description": "Search and paste ECHO context from the local daemon.",
   "icon": "icon.png",
@@ -112,6 +112,23 @@
             { "title": "Last 24 hours", "value": "24h" },
             { "title": "Last 4 hours", "value": "4h" }
           ]
+        }
+      ]
+    },
+    {
+      "name": "decisions",
+      "title": "Decisions",
+      "subtitle": "ECHO Context",
+      "description": "Review pending DecisionCards from the current repo.",
+      "mode": "view",
+      "preferences": [
+        {
+          "name": "repoPath",
+          "type": "textfield",
+          "required": true,
+          "title": "Repository Path",
+          "description": "Repo whose active backlog and review rounds feed DecisionCards.",
+          "default": "~/Desktop/Project_echo"
         }
       ]
     }

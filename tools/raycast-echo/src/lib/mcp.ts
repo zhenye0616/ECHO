@@ -58,6 +58,43 @@ export interface FindClustersResult {
   warnings: string[];
 }
 
+export interface DecisionSignal {
+  kind: "runaway_churn";
+  detail: string;
+}
+
+export interface DecisionCard {
+  id: string;
+  title: string;
+  decision: string;
+  whyNow: string;
+  options: string[];
+  default: string;
+  deadline?: string;
+  blocking?: string[];
+  agents: string[];
+  sources: { label: string; href: string }[];
+  signals: DecisionSignal[];
+}
+
+export interface PendingDecisionsSourceState {
+  local_head: string;
+  upstream_head: string | null;
+  behind: number;
+  upstream_checked_at: string | null;
+  upstream_stale: boolean;
+  dirty: boolean;
+  scanned_items: number;
+  partial: boolean;
+}
+
+export interface PendingDecisionsResult {
+  decisions: DecisionCard[];
+  source_breakdown: Record<string, number>;
+  source_state: PendingDecisionsSourceState;
+  result_caps?: unknown;
+}
+
 export interface GetAtomSuccessResult {
   atom: EchoAtom;
   atom_size_bytes: number;
@@ -114,6 +151,10 @@ export async function getAtoms(
   };
   if (options.prefer !== undefined) args.prefer = options.prefer;
   return callTool<GetAtomsResult>("get_atoms", args);
+}
+
+export async function pendingDecisions(repoPath: string): Promise<PendingDecisionsResult> {
+  return callTool<PendingDecisionsResult>("pending_decisions", { repo_path: repoPath });
 }
 
 async function callTool<T>(name: string, args: Record<string, unknown>, timeoutMs = 2_000): Promise<T> {

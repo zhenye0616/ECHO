@@ -75,6 +75,8 @@ function minimalArgs(tool: string): Record<string, unknown> {
       return { task_id: 'missing', role: 'builder' };
     case 'list_task_states':
       return {};
+    case 'pending_decisions':
+      return { repo_path: '/tmp' };
     case 'coord_emit':
       return {
         event_type: 'tick_start',
