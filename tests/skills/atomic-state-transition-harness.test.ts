@@ -36,6 +36,10 @@ const PUSH_HELPER_SRC = readFileSync(
   join(PROJECT_ROOT, 'tools/review-queue/push-with-retry.sh'),
   'utf-8',
 );
+const EFFECT_RUNNER_SRC = readFileSync(
+  join(PROJECT_ROOT, 'tools/review-queue/_effect-runner.sh'),
+  'utf-8',
+);
 const PATCHER_SRC = readFileSync(
   join(PROJECT_ROOT, 'tools/task-state/patch-builder-state.py'),
   'utf-8',
@@ -1026,6 +1030,9 @@ function makeConsumerEnv(opts: { withPointer?: boolean } = {}): ConsumerEnv {
     mode: 0o755,
   });
   chmodSync(join(env.repo, 'tools/review-queue/push-with-retry.sh'), 0o755);
+  writeFileSync(join(env.repo, 'tools/review-queue/_effect-runner.sh'), EFFECT_RUNNER_SRC, {
+    mode: 0o755,
+  });
   mkdirSync(join(env.repo, 'tools/task-state'), { recursive: true });
   writeFileSync(join(env.repo, 'tools/task-state/patch-builder-state.py'), PATCHER_SRC);
   writeFileSync(join(env.repo, 'tools/task-state/lint.py'), LINT_SRC);

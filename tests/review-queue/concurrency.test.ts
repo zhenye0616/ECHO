@@ -157,6 +157,11 @@ except FileExistsError:
     );
     mkdirSync(join(repo, 'tools/review-queue'), { recursive: true });
     writeFileSync(join(repo, 'tools/review-queue/push-with-retry.sh'), helperSrc, { mode: 0o755 });
+    writeFileSync(
+      join(repo, 'tools/review-queue/_effect-runner.sh'),
+      readFileSync(join(process.cwd(), 'tools/review-queue/_effect-runner.sh'), 'utf-8'),
+      { mode: 0o755 },
+    );
     const r = spawnSync(
       'bash',
       ['tools/review-queue/push-with-retry.sh', 'review-r1: codex on test'],

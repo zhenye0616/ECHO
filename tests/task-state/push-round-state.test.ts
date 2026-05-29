@@ -50,7 +50,7 @@ function writePointerFile(repoRoot: string, body: string): void {
 function copyHelperScripts(targetRoot: string): void {
   // The scripts live in production REPO; copy them to the clone roots so
   // bash invocations resolve $REPO_ROOT/tools/task-state/... correctly.
-  for (const rel of [PUSH_SCRIPT_REL, PUSH_HELPER_REL]) {
+  for (const rel of [PUSH_SCRIPT_REL, PUSH_HELPER_REL, 'tools/review-queue/_effect-runner.sh']) {
     const src = join(REPO, rel);
     const dst = join(targetRoot, rel);
     mkdirSync(join(dst, '..'), { recursive: true });

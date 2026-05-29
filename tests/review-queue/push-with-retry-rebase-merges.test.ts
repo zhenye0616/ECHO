@@ -63,6 +63,10 @@ function setupFixture(): { origin: string; local: string; sibling: string } {
     join(repoRoot, 'tools/review-queue/push-with-retry.sh'),
     join(helperDir, 'push-with-retry.sh'),
   );
+  cpSync(
+    join(repoRoot, 'tools/review-queue/_effect-runner.sh'),
+    join(helperDir, '_effect-runner.sh'),
+  );
   mkdirSync(join(local, 'raw/internal'), { recursive: true });
 
   // Initial commit on main.

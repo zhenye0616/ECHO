@@ -68,6 +68,10 @@ function setupFixture(): Fixture {
   const helperRel = 'tools/review-queue/push-with-retry.sh';
   const helperSrc = readFileSync(join(process.cwd(), helperRel), 'utf-8');
   writeFileSync(join(repo, helperRel), helperSrc, { mode: 0o755 });
+  const effectRel = 'tools/review-queue/_effect-runner.sh';
+  writeFileSync(join(repo, effectRel), readFileSync(join(process.cwd(), effectRel), 'utf-8'), {
+    mode: 0o755,
+  });
   writeFileSync(join(repo, 'README.md'), '# bootstrap\n');
   execSync('git add -A && git commit -q -m bootstrap', { cwd: repo });
   execSync('git push -q -u origin main', { cwd: repo });
@@ -101,6 +105,13 @@ function addRoleWorktree(fx: Fixture, role: string, uuid: string): string {
     mkdirSync(join(wt, 'tools/review-queue'), { recursive: true });
     const helperSrc = readFileSync(join(fx.repo, fx.helperRel), 'utf-8');
     writeFileSync(join(wt, fx.helperRel), helperSrc, { mode: 0o755 });
+  }
+  const effectRel = 'tools/review-queue/_effect-runner.sh';
+  if (!existsSync(join(wt, effectRel))) {
+    mkdirSync(join(wt, 'tools/review-queue'), { recursive: true });
+    writeFileSync(join(wt, effectRel), readFileSync(join(fx.repo, effectRel), 'utf-8'), {
+      mode: 0o755,
+    });
   }
   return wt;
 }
