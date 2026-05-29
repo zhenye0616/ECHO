@@ -20,6 +20,7 @@
     "vitest.config.ts"
   ],
   "exclude": [
-    "tools/raycast-echo/**/*"
+    "tools/raycast-echo/**/*",
+    "tools/echo-overlay/**/*"
   ]
 }
