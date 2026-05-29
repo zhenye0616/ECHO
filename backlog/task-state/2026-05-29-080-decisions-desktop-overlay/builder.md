@@ -3,11 +3,18 @@ task_id: 2026-05-29-080-decisions-desktop-overlay
 role: builder
 agent_id: codex-builder-080
 branch: agent/decisions-desktop-overlay
-last_updated: 2026-05-29T09:01:44Z
+last_updated: 2026-05-29T20:55:21Z
+handoff_branch: agent/decisions-desktop-overlay
+handoff_head_sha: 23c5ab5d57c375558c7c8430c53a7050c1d31198
+handoff_run_log: raw/internal/agent-runs/2026-05-29-2026-05-29-080-decisions-desktop-overlay.md
 ---
 
 ## current_thesis
 Claimed item 080 for implementation as the desktop decisions overlay. Build must happen in the isolated `agent/decisions-desktop-overlay` worktree and stay scoped to a thin, read-only overlay consumer of `pending_decisions`, `coord_status`, and bounded in-flight backlog reads.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 23c5ab5d57c375558c7c8430c53a7050c1d31198.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - Implement one self-contained `tools/echo-overlay/` package with its own manifest, tsconfig, lint, typecheck, and test scripts.
@@ -31,4 +38,5 @@ Claimed item 080 for implementation as the desktop decisions overlay. Build must
 - Do not edit `wiki/**`, `docs/BACKLOG.md`, `docs/STATUS.md`, `docs/NORTH_STAR.md`, or backlog item body text.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-05-29-080-decisions-desktop-overlay.md
+
+- spec: backlog/pending_review/2026-05-29-080-decisions-desktop-overlay.md

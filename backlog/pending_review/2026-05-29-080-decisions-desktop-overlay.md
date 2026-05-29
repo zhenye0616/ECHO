@@ -40,10 +40,23 @@ spec_refs:
 claimed_by: "codex-builder-080"
 claimed_at: "2026-05-29T09:01:44Z"
 branch: "agent/decisions-desktop-overlay"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--decisions-desktop-overlay"
+head_sha: "23c5ab5d57c375558c7c8430c53a7050c1d31198"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the decisions desktop overlay on branch `agent/decisions-desktop-overlay` at `23c5ab5d57c375558c7c8430c53a7050c1d31198`.
+
+  Pass summary:
+  - Prior passes built the self-contained Tauri overlay package: Rust shell, transparent always-on-top accessory window, global-hotkey summon/dismiss, menubar 3-state ambient dot, React fleet-glance + decision-dive UI, MCP client, bounded in-flight snapshot command, tests, README, and static smoke.
+  - Pass 4 adopted the pushed branch, audited AC1-AC7, confirmed no daemon-side `src/mcp/**` changes and no additive daemon tool, and added the missing AC7(e) poller lifecycle test coverage.
+  - Fleet-glance uses the default client-side composition path from `pending_decisions` + `coord_status` + bounded in-flight backlog/review-request reads; coord rows with unmatched correlation IDs are dropped.
+  - Decision-dive renders the existing DecisionCard shape with SEE+JUMP only and no backlog write path. J1 is recorded as Tauri, with AC7(vii) transparent + always-on-top config facts and the manual packaged-app smoke checklist in `tools/echo-overlay/README.md`.
+
+  Verification:
+  - `npm run typecheck` green.
+  - `npm run lint` green.
+  - `npm run test` green: 5 test files, 17 tests passed.
+  - `npm run smoke:static` green.
 review_notes: ""
 ---
 
