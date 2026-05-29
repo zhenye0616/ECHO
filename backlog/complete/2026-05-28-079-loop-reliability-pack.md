@@ -138,7 +138,29 @@ agent_notes: |
     (reviewer-prompt, watcher-prompt, dispatch-next-round): all PASS.
   - git diff --check: clean (no whitespace errors in new shell helpers).
   - tools/raycast-echo NOT touched (079 does not touch it; no suite run needed).
-review_notes: ""
+review_notes: |
+  Merged 2026-05-29 via founder green-light + recovered full-auto loop. ORIGIN: the 079 implementation was first produced by an autonomous full-loop Workflow (spec->4-round review convergence->claim->build) that errored at the build agent's StructuredOutput serialization, leaving a partial, untested impl in the MAIN checkout (the exact dirty-checkout failure mode AC1 fixes). Recovered via shelve-and-finish: partial moved to the worktree branch + double-shelved; a fresh builder completed it (wrote the 4 AC7 shell tests the auto-build skipped, fixed a real 079-caused regression in 7 vitest fixtures that copy push-with-retry.sh without the new _effect-runner.sh dep), verified green, handed off.
+
+  Conflicts resolved:
+  - none (clean merge --no-ff; git merge-tree zero conflicts)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Independent code review: ECHO code-reviewer subagent (independent of the builder). Verdict APPROVE-TO-MERGE (sidecar d30e2e15). Re-ran suites itself: 1476 pass/21 skip, lint+typecheck clean, sync-skills OK, 4 new shell tests pass. AC1-4 verified in code; AC5 deferred (stretch).
+
+  J5 adjudication (load-bearing): J5-DECISION-CORRECT. Only _run_reviewer.sh needed conversion to the shared clean-snapshot helper; the watcher (review-queue-watch.md:28-32) and merger (merge-and-cleanup.md:91-95) ALREADY isolate via existing 050 ephemeral worktrees, so AC1 is satisfied for them. No files_to_modify amendment needed.
+
+  Fixups applied: 0
+  Fixups deferred to follow-up items: 0
+
+  Verify (merger worktree, merged tree): root npm test 1476 pass/21 skip, lint+typecheck clean, sync-skills --check OK; 4 new tools/review-queue/test-*.sh all pass; check-coupled-invariants exit 0.
+
+  Follow-up items (non-blocking):
+  - NIT: test-effect-runner.sh:36 redundant second assertion clause (cosmetic).
+  - AC5 (stretch) wiring: executable patch-drift classification (original_contract|prior_patch_introduced|propagation_gap).
+  - Optional cosmetic de-dup: route watcher/merge-and-cleanup inline worktree preambles through the shared clean-snapshot helper (needs files_to_modify amendment; behavior-neutral).
+  - Deferred siblings: ECHO semantic/field-scoped recall (fix 6); process-ancestry-before-incident-framing (fix 7).
+  - Post-shipment strategist: promote 079 to wiki + decision record; same for 078.
 ---
 
 # 079 — Loop Reliability Pack
