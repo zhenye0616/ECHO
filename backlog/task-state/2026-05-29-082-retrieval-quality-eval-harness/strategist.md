@@ -20,10 +20,12 @@ Spec drafted; awaiting claim. The item creates the missing standard/eval layer f
 - No production retrieval behavior changes are allowed in this item. Failing evals are an acceptable deliverable and should be surfaced in `agent_notes`.
 - 081 stays reserved for Raycast removal after 080's overlay dogfooding gate; this retrieval-quality spec uses 082.
 - Reviewer roster for the full-auto spec review is `["codex", "codex-ops"]` per founder direction, overriding the post-047 default `["codex", "cursor"]`.
+- R1 reviewer findings patched the spec to separate harness-correctness from retrieval-quality pass/fail; baseline expected-fail cases are legal only for current retrieval limitations, never schema/fixture/budget/silent-loss failures.
+- R1 also locked deterministic-runner semantics: query variant placeholder binding, prior-step hydration selectors, fixed `reference_now`, `$EVAL_HOME`/`$EVAL_REPO` fixture rewriting, and no random-UUID tie ordering in scored results.
 
 ## open_questions
 
-- None blocking. Builder judgment remains on fixture redaction depth and exact event snippets, but the invariants are fixed: sanitized, deterministic, provenance-cited, and small.
+- None blocking after r1 patch. Builder judgment remains on fixture redaction depth and exact event snippets, but the invariants are fixed: sanitized, deterministic, provenance-cited, host-independent, clock-pinned, and small.
 - After the first harness run, strategist should decide whether the next spec is semantic/alias expansion, field-scoped fallback, or degraded-source warning improvements based on measured failures.
 
 ## dont_touch
