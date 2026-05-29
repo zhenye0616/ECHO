@@ -37,9 +37,9 @@ spec_refs:
   - raw/internal/dogfooding/mcp-interactions-journal-2026-05.md  # journaling sink. AC8 gate: ≥3 Overlay sessions across ≥2 calendar days with `**Surface:** Overlay`, ≥1 where the ambient dot lit on a real awaiting-you decision AND the founder dove in. The overlay DOES call ECHO MCP tools (pending_decisions, coord_status), so overlay usage IS journal-worthy.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "codex-builder-080"
+claimed_at: "2026-05-29T09:01:44Z"
+branch: "agent/decisions-desktop-overlay"
 worktree: ""
 head_sha: ""
 pr_url: ""
