@@ -68,6 +68,7 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Trigger:** Founder asked Ask ECHO "tell me about y git history"
 - **Query inputs:** `find_clusters(since=2026-05-01, until=2026-05-19, window_hours=24)`; `search_memories(query="git history", source_app=git, limit=10)`
 - **Returned:** find_clusters → 1 cluster returned (47 total; budget limit hit), 200 atoms shown of 4215; source_breakdown={claude_code:1623, git:1445, codex:2}. search_memories → 10 git commits returned (948853b, 1d0b884, 77376fe, a929a73, a5e93c2, 8848501, 7a94459, 018e26a, c398307, a01244cb).
+
 - **Sources:** git:/Users/zhenye/Desktop/Project_echo — 10 commit diffs returned spanning 2026-05-14 to 2026-05-19.
 - **Verdict:** ✅ right — search_memories on source_app=git returned concrete recent commits; answer grounded in actual commit messages + diffs.
 - **Note:** The find_clusters call returned only 1 cluster due to budget ceiling (47 total clusters but only 1 shown). The search_memories git query was more useful for this specific question — literal "git history" matched commit metadata well. The "y" in the question was a typo for "your"; interpreted as "the repo's git history."
@@ -1925,3 +1926,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** ✅ right — both active-triggers accepted by the daemon; r3 reviewer ticks will fire without waiting for the launchd 10-min cadence.
 - **Note:** r2 was divergent (codex=proceed_after_patches, codex-ops=pushback) but both reviewers agreed on substance — same AC2 non-live-push-contract HIGH and same AC3 heading MEDIUM. FULL-AUTO dispositioned (no core-premise rejection): named sentinel 97 for kind=push, commit-reviewer-response.sh promoted to files_to_modify, AC3 headings pinned verbatim, AC1 byte-identity dropped for per-caller invariants. Patch SHA 4b47e337; r3 pins it.
 - **Conjecture:** none (observation only).
+
+### 2026-05-28 23:09 PDT - codex-ops r3 review tick on 079 Loop Reliability Pack
+
+- **Trigger:** Codex-ops review queue tick selected `backlog/reviews/2026-05-28-079-loop-reliability-pack/r3/request.md` and reviewed the r3-patched Loop Reliability Pack spec through the operational/runtime lens.
+- **Query inputs:** ECHO coord call already emitted: `coord_emit(event_type=tick_start, reviewer=codex-ops, correlation_id=9a1a7a5e-dee8-46a1-bc01-8ad69d2b388c)`. Queue/file reads used the r3 request focus hints, reviewer schema, pinned artifact `backlog/ready/2026-05-28-079-loop-reliability-pack.md` at `4b47e33732e8cdf5c14d534abadc43ac47e97c58`, r2 combined context, r2 codex-ops response, r1 combined context, and current May-shard journal policy. Per command ordering, `tick_end` will be emitted after this sibling journal commit.
+- **Returned:** Wrote, pre-link validated, upstream-duplicate checked, committed, and pushed `backlog/reviews/2026-05-28-079-loop-reliability-pack/r3/codex-ops.md` at review commit `e0ae2027`, verdict `proceed`, findings empty.
+- **Sources:** Review response file above; request correlation `9a1a7a5e-dee8-46a1-bc01-8ad69d2b388c`; artifact commit `4b47e33732e8cdf5c14d534abadc43ac47e97c58`; spec anchors `backlog/ready/2026-05-28-079-loop-reliability-pack.md:17-19`, `:91-95`, and `:13,32,89,115`.
+- **Verdict:** right - r3 resolves the prior unattended-runtime blockers: push non-live status is now exactly `ECHO_EFFECT_NONLIVE_RC=97`, the commit helper owns the non-completed path, the committed-sidecar heading matches the live producer text, and AC1 fixtures target observable invariants instead of byte identity.
+- **Note:** The response commit completed before this observation-only journal entry. The stale reviewer command still mentions the old unsharded journal and generated HTML twin; current `CLAUDE.md`/`AGENTS.md` policy makes the May monthly Markdown shard canonical and treats generated HTML twins as local-only, so this tick writes only this shard.
+- **Conjecture:** none.
