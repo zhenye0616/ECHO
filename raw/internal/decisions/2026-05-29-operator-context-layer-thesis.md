@@ -20,6 +20,12 @@ A **user-owned, cross-vendor context substrate**, in three layers — only one o
 
 The brand line is the product spec: *"we don't make AI smarter, we make every AI smarter about **you**."* The load-bearing word is **every** — context travels with the *person*, orthogonal to the vendors. Vendor memory travels with the *vendor*.
 
+The ultimate buyer question is sharper:
+
+> **Do you own your context across everything, or is it trapped in one vendor and scattered across the rest?**
+
+That is the main goal: **give users their context back.** Once the user's context is owned by the user and served neutrally to every tool, the tools and agents become commodities — replaceable execution surfaces reading from and writing to the user's durable substrate.
+
 ## The 8 first-principles axioms
 
 1. **Work is increasingly performed by agents, across many tools.** "Human across multiple tools" is the weak version; the substance is "agents you didn't watch."
@@ -44,7 +50,7 @@ Four jobs, none of them "a window": **Reassemble** (the substrate), **Route** (s
 - **Agents are producers AND consumers → a self-compounding flywheel.** Each agent action writes context the next reads. Data gravity is deposited by usage, not curated by hand.
 - **Coordination without communication — ECHO is the blackboard.** Robust multi-agent coordination isn't agent-to-agent messaging (fragile, synchronous); it's stigmergy — agents leave traces in a shared environment and others read them. **Already dogfooded:** the review loop coordinates through `combined.md` + task-state + the journal; Codex and Claude never message each other.
 - **The loop closes — this is how one human commands a fleet.** Your judgment is itself context → lands back in the substrate → the whole fleet inherits one decision. Without the substrate, your decision dies in your head or one tool and must be re-issued N times. With it, **you decide once and N agents inherit it.** One unit of human judgment, amplified across the fleet. Leverage is the product. A fleet, not a swarm of amnesiacs.
-- **Commoditize the complement.** If every agent (Claude, GPT, Cursor, Codex) reads from one neutral substrate *you* own, you're loyal to the substrate, not the vendor — swap the model, keep the context. The agents become interchangeable muscle; ECHO becomes the durable layer and the **system of record for AI-era work** (the stickiest software category).
+- **Commoditize the complement.** If every tool and agent (Claude, GPT, Cursor, Codex, GitHub, browser AI) reads from one neutral substrate *you* own, you're loyal to the substrate, not the vendor — swap the model, IDE, or agent runner; keep the context. The tools become replaceable work surfaces, the agents become interchangeable muscle, and ECHO becomes the durable layer and the **system of record for AI-era work** (the stickiest software category).
 
 ## Defensibility (the honest version)
 
@@ -58,7 +64,7 @@ Four jobs, none of them "a window": **Reassemble** (the substrate), **Route** (s
 
 ## One-sentence
 
-ECHO isn't a tool that helps you work — it's the **judgment infrastructure for when the work has left your hands**: the bus between blind agents, the blackboard they coordinate through, and the channel that propagates one human's judgment across the whole fleet — which is exactly what commoditizes the agents and leaves the integrated context as the only thing anyone's loyal to.
+ECHO gives users their context back: it is the **judgment infrastructure for when the work has left your hands** — the bus between blind agents, the blackboard they coordinate through, and the channel that propagates one human's judgment across the whole fleet — which is exactly what commoditizes the tools/agents and leaves the integrated user-owned context as the thing anyone's loyal to.
 
 ## Routing of this thesis (per operating model)
 

@@ -13,6 +13,12 @@ aliases:
 
 > *We don't make AI smarter. We make every AI smarter about you.*
 
+## The Ultimate Question
+
+> **Do you own your context across everything, or is it trapped in one vendor and scattered across the rest?**
+
+ECHO's main goal is to give the user their context back. Once context belongs to the user and can be served neutrally to every AI surface, the tools and agents become commodities: useful, swappable execution surfaces over the user's durable context layer.
+
 ## The Strategic Bet
 
 Foundation models compete on *capability* (smarter, faster, cheaper, more accurate). ECHO competes on *context* (better inputs, persistent memory, cross-source synthesis). These are orthogonal axes. A "dumb" model with great context can outperform a "smart" model with no context. As foundation models commoditize, context becomes the differentiator.
@@ -56,6 +62,7 @@ The fourth-down formulation is the most user-recognizable in 5 seconds.
 - **Never ship a chat UI.** That makes us the destination, not the layer.
 - **Always be model-agnostic.** Context flows to whichever model the user picks.
 - **Always favor cross-source composition** over single-source depth.
+- **Always give the user their context back.** ECHO should weaken tool/agent lock-in, not create a new one.
 
 ## Related
 
