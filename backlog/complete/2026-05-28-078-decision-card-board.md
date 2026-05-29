@@ -62,6 +62,25 @@ agent_notes: |
 
   Drift note:
   - Updated existing MCP registration/audit contract tests so the full daemon suite recognizes the newly registered `pending_decisions` tool.
+review_notes: |
+  Merged 2026-05-29 via founder green-light ("merge it") + fully-autonomous pipeline (diagnosis workflow -> spec -> 4-round cross-tool convergence -> Codex builder -> independent review).
+
+  Conflicts resolved:
+  - none (clean merge --no-ff; git merge-tree against origin/main produced zero conflict markers — main advanced only with backlog state, no overlap with the 13 changed files)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Independent code review: ECHO code-reviewer subagent (Claude) reviewing Codex-built code (reviewer-independence satisfied). Verdict APPROVE-TO-MERGE. Verified in code (not just claimed): AC3 A1 runaway-churn counts consecutive escalated_to_founder:false rounds and resets on escalated:true (NOT next_round — the r3 bug); AC1 freshness fetch hard-bounded 1.2s < Raycast 2s abort, SIGKILL on timeout, non-interactive (GIT_TERMINAL_PROMPT=0/BatchMode), timeout==offline.
+
+  Fixups applied: 0
+  Fixups deferred to follow-up items: 0
+
+  Verify (merger worktree, merged tree): root npm test 1476 pass / 21 skip, lint clean, typecheck clean, sync-skills --check clean; raycast npm test 149 pass, typecheck clean.
+
+  Follow-up items (non-blocking):
+  - NIT: pending-decisions.ts sets GIT_ASKPASS/SSH_ASKPASS=echo rather than unsetting (functionally equivalent under BatchMode)
+  - NIT: runaway_churn detail string generated in two places with the same template (cosmetic dedup)
+  - Post-shipment strategist (per spec After-Completion): felt-not-seen amendment, wiki/surfaces/decisions-board.md, 2026-05-28-decision-card-surface-and-sequencing decision record, recap-command-fold pre-beta follow-up
 ---
 
 # 078 — Decisions: the DecisionCard board
