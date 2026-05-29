@@ -58,10 +58,86 @@ spec_refs:
 claimed_by: "codex-builder-079"
 claimed_at: "2026-05-29T06:33:14Z"
 branch: "agent/loop-reliability-pack"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--loop-reliability-pack"
+head_sha: "cd67c6e2b01235864e7afb1d1709d0f073842079"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Completed a half-finished auto-build. Branch agent/loop-reliability-pack
+  at cd67c6e2b01235864e7afb1d1709d0f073842079.
+
+  WHAT THE PARTIAL ALREADY HAD (uncommitted, untested, audited + kept):
+  - AC1: _clean-snapshot.sh (echo_enter_clean_snapshot <role>); _run_reviewer.sh
+    converted to source it (inline 050 preamble removed, no leftover REGISTERED_WT/
+    cleanup refs); combine.py live-checkout guard (assert_git_mutation_target_safe +
+    _is_valid_clean_snapshot) — physical-toplevel + parent==$TMPDIR + registered-
+    worktree + ECHO_REVIEW_QUEUE_REPO_ROOT physical-path equality, refuses founder
+    live checkout unless --allow-live; stale-env bypass rejected. Test-compat rule:
+    refuse ONLY when toplevel == ~/Desktop/Project_echo, so the 044 temp-clone live
+    path stays green WITHOUT a test edit (rule applied consistently; no 044 change
+    needed).
+  - AC2: _effect-runner.sh (echo_effect <kind> -- argv; modes live|dry-run|test;
+    ECHO_EFFECT_NONLIVE_RC=97). push-with-retry.sh routes the ENTIRE pull+push cycle
+    through echo_effect push (not just terminal push), propagates 97. commit-reviewer-
+    response.sh refuses BEFORE git add/commit on non-live push sentinel (no orphan
+    commit, no false completed tick). _run_reviewer.sh dispatch wrapped in
+    echo_effect codex-exec; the command-v PATH guard is now live-only.
+  - AC3: schemas/review-sidecar.schema.json + validate-sidecar.py (datetime->ISO
+    coercion for the unquoted reviewed_at the live Step-C template emits; verbatim
+    heading match incl. parenthetical; producer enum additive). review-pending.md
+    Step C stamps producer + validates pre-push; merge-and-cleanup.md Step A replaces
+    awk scrapes with validate-sidecar.py then reads verdict/reviewed_at.
+  - AC4: check-coupled-invariants.sh — (i) package.json<->lock deps/name/version
+    coherence (node, non-network); (ii) tools/sync-skills.sh --check; (iii) every
+    register* import in src/mcp/server.ts has a tool file + the registration test
+    recognizes the registerTool('<name>') literal. merge-and-cleanup.md Step C5
+    runs it (pause-don't-auto-fix).
+
+  WHAT I COMPLETED (the partial had NONE of this):
+  - All four AC7 shell tests, written + passing: test-clean-snapshot.sh (observable
+    invariants per-caller + trap discard + the four combine.py guard cases incl.
+    stale-env refusal + 044 temp-clone-green), test-effect-runner.sh (mode-symmetric
+    contract: non-push=0, push=97 under BOTH dry-run AND test; push-with-retry no
+    real git; commit-reviewer-response no orphan commit — driven through the real
+    scripts), test-validate-sidecar.sh (all producers, unquoted-ts coercion,
+    parenthetical heading, malformed rejection, producer<->consumer round-trip),
+    test-check-coupled-invariants.sh (catches i/ii/iii drift; coherent tree passes).
+  - chmod +x on the four new shell helpers; re-ran tools/sync-skills.sh so the two
+    .claude/commands adapters match canonical skills/ (--check clean).
+  - Fixed 7 EXISTING vitest fixtures that copy push-with-retry.sh /
+    commit-reviewer-response.sh into throwaway repos but did NOT copy the new
+    _effect-runner.sh dependency (regression: "_effect-runner.sh: No such file").
+    Confirmed via baseline check on claim commit 5b80dd38 that these were 079-caused,
+    not pre-existing. Files: push-with-retry-cwd-agnostic, push-with-retry-rebase-
+    merges, concurrency, worktree-isolation, commit-reviewer-response (review-queue);
+    atomic-state-transition-harness (skills); push-round-state (task-state). Each now
+    copies _effect-runner.sh alongside the helper.
+
+  AC5 (STRETCH) DEFERRED WHOLE per the spec budget rule (AC5 ships only if AC1-AC4
+  land with budget remaining; classify-finding-provenance.py + its test were never
+  in the partial and are explicitly defer-able to the After-Completion sibling list).
+
+  SCOPE DECISION FLAGGED FOR REVIEWER/FOUNDER (J5): AC1's prose says "_run_reviewer.sh
+  (and, in prose, the watcher + merger skills) source it". I converted ONLY
+  _run_reviewer.sh (the file explicitly in files_to_modify for AC1, with an existing
+  smoke). I did NOT rewrite the inline worktree preamble in skills/review-queue-watch.md
+  (Step 0) or skills/merge-and-cleanup.md (Step B) because: review-queue-watch.md is a
+  READ-ONLY spec_ref NOT in files_to_modify (writing it would break the atomic-claim
+  files_to_modify contract), and merge-and-cleanup.md's files_to_modify entries are
+  scoped to AC3 (sidecar) + AC4 (checker), not the AC1 preamble. The shared helper
+  ships and _run_reviewer.sh proves it; converting the two skills' bash-in-markdown is
+  the J5 follow-on alternative. The skills' prose preambles remain as documentation of
+  the same 050 invariant. If the reviewer wants all three converted in this item, it
+  needs a files_to_modify amendment for review-queue-watch.md.
+
+  VERIFY RESULTS (worktree, clean tree at head SHA, deps installed):
+  - npm test: 1476 passed | 21 skipped | 0 failed (138 files).
+  - npm run typecheck: clean.
+  - npm run lint: clean (eslint --max-warnings 0 + python task-state lint).
+  - tools/sync-skills.sh --check: OK (adapters match).
+  - 4 new AC7 shell tests: all PASS. 3 existing review-queue shell smokes
+    (reviewer-prompt, watcher-prompt, dispatch-next-round): all PASS.
+  - git diff --check: clean (no whitespace errors in new shell helpers).
+  - tools/raycast-echo NOT touched (079 does not touch it; no suite run needed).
 review_notes: ""
 ---
 
