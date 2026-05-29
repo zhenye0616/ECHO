@@ -13,8 +13,8 @@ describe("DecisionDive", () => {
     expect(screen.getByRole("heading", { name: card.title })).toBeInTheDocument();
     expect(screen.getByText(card.decision)).toBeInTheDocument();
     expect(screen.getByText(card.whyNow)).toBeInTheDocument();
-    expect(screen.getByText(card.default)).toBeInTheDocument();
-    expect(screen.getByText(card.options[0]!)).toBeInTheDocument();
+    expect(screen.getAllByText(card.default)).toHaveLength(2);
+    expect(screen.getByText(card.options[1]!)).toBeInTheDocument();
     expect(screen.getByText(card.blocking![0]!)).toBeInTheDocument();
     expect(screen.getByText("runaway_churn: churned 5 rounds without pulling you in")).toBeInTheDocument();
 

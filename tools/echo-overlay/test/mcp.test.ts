@@ -9,7 +9,9 @@ describe("MCP client", () => {
 
   it("calls pending_decisions with the absolute repo_path argument and unwraps structuredContent", async () => {
     const result = pendingResult([decisionCard()]);
-    const fetchMock = vi.fn(async () => jsonResponse({ jsonrpc: "2.0", id: 1, result: { structuredContent: result } }));
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: { structuredContent: result } }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(pendingDecisions("/Users/zhenye/Desktop/Project_echo")).resolves.toEqual(result);

@@ -82,10 +82,9 @@ describe("fleet glance composition", () => {
       state: "blocked",
       health: { open_deadlines: 1, recent_misses: 1 },
     });
-    expect(glance.nodes.find((node) => node.itemId === "2026-05-29-082-ready-item")).toMatchObject({
-      state: "reviewing",
-      health: undefined,
-    });
+    const readyNode = glance.nodes.find((node) => node.itemId === "2026-05-29-082-ready-item");
+    expect(readyNode).toMatchObject({ state: "reviewing" });
+    expect(readyNode).not.toHaveProperty("health");
   });
 
   it("drops coord_status rows whose correlation_id is not mapped by an in-flight review request", () => {
