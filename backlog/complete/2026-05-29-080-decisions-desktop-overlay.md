@@ -57,7 +57,26 @@ agent_notes: |
   - `npm run lint` green.
   - `npm run test` green: 5 test files, 17 tests passed.
   - `npm run smoke:static` green.
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-29 via founder-authorized autonomous merge.
+
+  Conflicts resolved:
+  - none — clean additive merge (git merge-tree showed zero conflict markers; branch is confined to tools/echo-overlay/ plus the single AC2-mandated one-line root tsconfig.json exclude).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict was "merge as-is"; no pre-merge fixups listed).
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: root 1475/1476 tests pass (1 flake — see below), overlay 17/17 tests pass; lint and typecheck clean post-merge at both root and tools/echo-overlay/; tools/sync-skills.sh --check clean; overlay smoke:static green.
+
+  Follow-up items (non-blocking):
+  - Flaky test: tests/mcp/recent-calls-endpoint.test.ts timed out at 15000ms under full-suite parallel load (638s total test time). Re-ran isolated: PASSES in 7.07s (2/2). Unrelated to this branch (touches zero src/ or tests/mcp/ files). Filed to backlog/_followups.md — consider raising testTimeout or de-contending this test.
+  - AC7 packaged-.app macOS smoke (build via Tauri/Rust toolchain + drive live menu-bar UI incl. AC7(vii) transparency + always-on-top) is the documented manual fallback in tools/echo-overlay/README.md; not automatable in sandbox.
+  - AC8 dogfooding gate (≥3 Overlay sessions across ≥2 days, ≥1 with ambient dot lit on a real awaiting-you decision + founder dove in) is an explicit post-merge founder gate.
 ---
 
 # 080 — Decisions: the desktop overlay (the operator surface)

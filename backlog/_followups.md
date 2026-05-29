@@ -1161,3 +1161,10 @@ The structural framing — **roles MUST be conflict-free by construction across 
 - **NIT (non-blocking):** `src/mcp/tools/pending-decisions.ts` sets `GIT_ASKPASS`/`SSH_ASKPASS=echo` rather than unsetting them. Functionally equivalent under `BatchMode` (echo → empty cred → fast fail); cosmetic.
 - **NIT (non-blocking):** `runaway_churn` detail string is generated in two places with the same template — cosmetic dedup.
 - **Post-shipment strategist (per spec After-Completion):** (1) amend `wiki/principles/felt-not-seen.md` with the manager-altitude "felt by default, visible on demand" exception; (2) create `wiki/surfaces/decisions-board.md` (status: shipped); (3) write `raw/internal/decisions/2026-05-28-decision-card-surface-and-sequencing.md` (DecisionCard primitive, ① now / ② on signal, overlay as V1.5 channel, recap-fold); (4) recap-command-entry fold to the 2-command beta ceiling, gated on 077's dogfooding gate. Update `.manifest.json` + regen `wiki/index.md` for pages created.
+
+## From 080 merge (2026-05-29) — decisions-desktop-overlay
+
+- **Flaky test (non-blocking):** `tests/mcp/recent-calls-endpoint.test.ts` timed out at 15000ms under full-suite parallel load (638s total test time) during the 080 verify. Re-ran isolated: PASSES in 7.07s (2/2). Unrelated to the 080 branch (touches zero `src/` or `tests/mcp/` files). Consider raising `testTimeout` for this test or de-contending it from the parallel pool.
+- **AC7 manual gate (post-merge founder):** packaged-`.app` macOS smoke (Tauri/Rust build + drive live menu-bar UI incl. AC7(vii) transparency + always-on-top) is the documented manual fallback in `tools/echo-overlay/README.md`; not automatable in sandbox.
+- **AC8 dogfooding gate (post-merge founder):** ≥3 Overlay sessions across ≥2 calendar days with `**Surface:** Overlay`, ≥1 where the ambient dot lit on a real awaiting-you decision AND the founder dove in.
+- **Post-shipment strategist (per spec After-Completion):** promote 080's After-Completion decisions to `wiki/` (overlay surface page / felt-not-seen manager-altitude amendment as applicable); update `.manifest.json` + regen `wiki/index.md`.
