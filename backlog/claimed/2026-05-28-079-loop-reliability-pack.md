@@ -55,9 +55,9 @@ spec_refs:
   - wiki/operating-model/wave-1-2-3-retrospective.md  # READ-ONLY context for how operating-model hardening has historically been documented post-shipment (After-Completion notes the strategist promotes here, NOT a builder write).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "codex-builder-079"
+claimed_at: "2026-05-29T06:33:14Z"
+branch: "agent/loop-reliability-pack"
 worktree: ""
 head_sha: ""
 pr_url: ""
