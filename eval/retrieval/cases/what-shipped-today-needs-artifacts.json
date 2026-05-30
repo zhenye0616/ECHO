@@ -1,0 +1,72 @@
+{
+  "id": "what-shipped-today-needs-artifacts",
+  "priority": "P0",
+  "intent": "A 'what shipped today' query must include git and backlog/review artifacts, not only chat summaries.",
+  "repo_path": "$EVAL_REPO",
+  "time_window": {
+    "since": "2026-05-29T00:00:00.000Z",
+    "until": "2026-05-30T00:00:00.000Z"
+  },
+  "reference_now": "2026-05-30T00:00:00.000Z",
+  "fixture_files": ["eval/retrieval/fixtures/core.jsonl"],
+  "query_variants": [
+    {
+      "id": "natural",
+      "query": "what shipped today",
+      "baseline_status": "pass"
+    },
+    {
+      "id": "artifact-control",
+      "query": "claim-ready after R3",
+      "baseline_status": "pass"
+    }
+  ],
+  "tool_recipe": [
+    {
+      "step_id": "discovery",
+      "tool": "search_memories",
+      "kind": "discovery",
+      "primary_discovery": true,
+      "params": {
+        "query": "$query",
+        "since": "$case.time_window.since",
+        "until": "$case.time_window.until",
+        "repo_path": "$case.repo_path",
+        "limit": 10
+      }
+    },
+    {
+      "step_id": "hydrate",
+      "tool": "get_atoms",
+      "kind": "hydration",
+      "params": {
+        "atom_ids": "$steps.discovery.matches[*].id",
+        "prefer": "as_requested"
+      },
+      "ids_limit": 10,
+      "deterministic_order": "discovery_order"
+    }
+  ],
+  "required_sources": ["git", "claude_code"],
+  "required_primary": ["shipped-git-primary", "shipped-claude-context"],
+  "required_context": ["shipped-codex-context"],
+  "acceptable_context": [],
+  "noise": [],
+  "forbidden_noise": [],
+  "must_warn": [],
+  "canonical_answer_facts": [
+    "The durable answer is the R3 combined review artifact and git commit, not only a chat summary.",
+    "Codex and Claude context are useful supporting evidence."
+  ],
+  "budgets": {
+    "per_call_bytes": 25000,
+    "total_bytes": 50000,
+    "max_calls": 3
+  },
+  "provenance": [
+    {
+      "kind": "artifact",
+      "ref": "backlog/reviews/2026-05-29-082-retrieval-quality-eval-harness/r3/combined.md"
+    }
+  ]
+}

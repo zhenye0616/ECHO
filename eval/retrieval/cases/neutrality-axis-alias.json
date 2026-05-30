@@ -1,0 +1,86 @@
+{
+  "id": "neutrality-axis-alias",
+  "priority": "P1",
+  "intent": "The phrase 'competition axis' should recover the neutrality-axis decision thread rather than generic competitor notes.",
+  "repo_path": "$EVAL_REPO",
+  "time_window": {
+    "since": "2026-05-20T00:00:00.000Z",
+    "until": "2026-05-30T00:00:00.000Z"
+  },
+  "reference_now": "2026-05-30T00:00:00.000Z",
+  "fixture_files": ["eval/retrieval/fixtures/core.jsonl"],
+  "query_variants": [
+    {
+      "id": "natural",
+      "query": "competition axis",
+      "baseline_status": "expected_fail_current_behavior",
+      "expected_failure": {
+        "reason": "Current literal search retrieves generic competitor wording and misses the neutrality-axis synonym.",
+        "followup_candidate": "semantic-alias-expansion-for-strategy-vocabulary",
+        "allowed_failed_metrics": [
+          "primary_recall",
+          "top_rank_success",
+          "weighted_precision_at_5",
+          "weighted_precision_overall",
+          "signal_noise_ratio_at_10"
+        ],
+        "allowed_missing_refs": ["neutrality-primary-claude", "neutrality-primary-codex"],
+        "allowed_forbidden_noise_refs": [],
+        "allowed_warning_gaps": []
+      }
+    },
+    {
+      "id": "exact-token-control",
+      "query": "neutrality axis",
+      "baseline_status": "pass"
+    }
+  ],
+  "tool_recipe": [
+    {
+      "step_id": "discovery",
+      "tool": "search_memories",
+      "kind": "discovery",
+      "primary_discovery": true,
+      "params": {
+        "query": "$query",
+        "since": "$case.time_window.since",
+        "until": "$case.time_window.until",
+        "repo_path": "$case.repo_path",
+        "limit": 10
+      }
+    },
+    {
+      "step_id": "hydrate",
+      "tool": "get_atoms",
+      "kind": "hydration",
+      "params": {
+        "atom_ids": "$steps.discovery.matches[*].id",
+        "prefer": "as_requested"
+      },
+      "ids_limit": 10,
+      "deterministic_order": "discovery_order"
+    }
+  ],
+  "required_sources": ["claude_code", "codex"],
+  "required_primary": ["neutrality-primary-claude", "neutrality-primary-codex"],
+  "required_context": [],
+  "acceptable_context": [],
+  "noise": ["neutrality-noise-competitor"],
+  "forbidden_noise": [],
+  "must_warn": [],
+  "canonical_answer_facts": [
+    "The surviving strategic frame is the neutrality axis, not generic competitor tracking.",
+    "The neutral substrate matters if agent fleets become heterogeneous."
+  ],
+  "budgets": {
+    "per_call_bytes": 25000,
+    "total_bytes": 50000,
+    "max_calls": 3
+  },
+  "provenance": [
+    {
+      "kind": "decision",
+      "ref": "raw/internal/decisions/2026-05-29-office-hours-commoditize-agents-endgame.md"
+    }
+  ]
+}
