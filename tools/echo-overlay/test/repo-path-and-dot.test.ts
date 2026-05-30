@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ambientDotState } from "../src/lib/fleet";
-import { classifyOverlayError, loadAmbientDot } from "../src/lib/model";
+import { classifyOverlayError, loadAmbientDot, resolveRepoPath } from "../src/lib/model";
 import { InvalidRepoPathError, normalizeRepoPath, requireRepoPath } from "../src/lib/repo-path";
 import { decisionCard, freshSourceState, pendingResult } from "./fixtures";
 
@@ -14,6 +14,15 @@ describe("repoPath resolution", () => {
 
   it("passes through an absolute configured path", () => {
     expect(normalizeRepoPath("/tmp/Project_echo", "/Users/zhenye")).toEqual({ ok: true, path: "/tmp/Project_echo" });
+  });
+
+  it("does not require the Tauri home directory when the configured path is already absolute", async () => {
+    const homeDir = vi.fn(async () => {
+      throw new Error("homeDir should not be called");
+    });
+
+    await expect(resolveRepoPath({ repoPath: "/tmp/Project_echo" }, { homeDir })).resolves.toBe("/tmp/Project_echo");
+    expect(homeDir).not.toHaveBeenCalled();
   });
 
   it("rejects relative configured paths before calling pending_decisions", () => {

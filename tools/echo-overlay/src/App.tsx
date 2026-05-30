@@ -12,7 +12,7 @@ import {
 } from "./lib/model";
 import { startSingleFlightPoller, type PollerHandle } from "./lib/poller";
 import type { DecisionSourceLink } from "./lib/types";
-import { tauriBridge, type OverlayBridge } from "./lib/bridge";
+import { hasTauriRuntime, tauriBridge, type OverlayBridge } from "./lib/bridge";
 
 interface AppProps {
   bridge?: OverlayBridge;
@@ -91,7 +91,7 @@ export function App({ bridge = tauriBridge }: AppProps) {
       hidden = unlisten;
     });
 
-    if (!("__TAURI_INTERNALS__" in window)) startOverlayPolling();
+    if (!hasTauriRuntime()) startOverlayPolling();
 
     return () => {
       cancelled = true;
@@ -100,6 +100,22 @@ export function App({ bridge = tauriBridge }: AppProps) {
       stopOverlayPolling();
     };
   }, [bridge, startOverlayPolling, stopOverlayPolling]);
+
+  useEffect(() => {
+    if (hasTauriRuntime()) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || (key !== "d" && key !== "e")) return;
+      event.preventDefault();
+      if (isOpen) {
+        stopOverlayPolling();
+      } else {
+        startOverlayPolling();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, startOverlayPolling, stopOverlayPolling]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

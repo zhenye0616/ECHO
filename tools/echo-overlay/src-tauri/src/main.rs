@@ -12,8 +12,9 @@ const WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "ambient-dot";
 const TOGGLE_MENU_ID: &str = "toggle-overlay";
 const QUIT_MENU_ID: &str = "quit";
-const DEFAULT_HOTKEY: &str = "CommandOrControl+Shift+D";
+const DEFAULT_HOTKEYS: &[&str] = &["CommandOrControl+Shift+D", "CommandOrControl+Shift+E"];
 const HOTKEY_ENV: &str = "ECHO_OVERLAY_HOTKEY";
+const HOTKEYS_ENV: &str = "ECHO_OVERLAY_HOTKEYS";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DotState {
@@ -103,6 +104,7 @@ fn main() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
+                        eprintln!("ECHO overlay hotkey pressed: {_shortcut:?}");
                         if let Err(err) = toggle_overlay(app) {
                             eprintln!("failed to toggle ECHO overlay: {err}");
                         }
@@ -213,12 +215,53 @@ fn build_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
 }
 
 fn register_hotkey(app: &AppHandle) -> Result<(), String> {
-    let hotkey = std::env::var(HOTKEY_ENV).unwrap_or_else(|_| DEFAULT_HOTKEY.to_string());
-    let shortcut = Shortcut::from_str(&hotkey)
-        .map_err(|err| format!("{HOTKEY_ENV}={hotkey:?} is not a valid shortcut: {err}"))?;
-    app.global_shortcut()
-        .register(shortcut)
-        .map_err(|err| format!("global hotkey registration failed: {err}"))
+    let hotkeys = configured_hotkeys();
+    let mut registered = Vec::new();
+    let mut failures = Vec::new();
+
+    for hotkey in hotkeys {
+        match Shortcut::from_str(&hotkey) {
+            Ok(shortcut) => match app.global_shortcut().register(shortcut) {
+                Ok(()) => {
+                    eprintln!("registered ECHO overlay hotkey: {hotkey}");
+                    registered.push(hotkey);
+                }
+                Err(err) => failures.push(format!("{hotkey}: {err}")),
+            },
+            Err(err) => failures.push(format!("{hotkey}: invalid shortcut: {err}")),
+        }
+    }
+
+    if registered.is_empty() {
+        return Err(format!("no ECHO overlay hotkeys registered: {}", failures.join("; ")));
+    }
+    if !failures.is_empty() {
+        eprintln!("some ECHO overlay hotkeys were not registered: {}", failures.join("; "));
+    }
+    Ok(())
+}
+
+fn configured_hotkeys() -> Vec<String> {
+    let raw = std::env::var(HOTKEYS_ENV)
+        .ok()
+        .or_else(|| std::env::var(HOTKEY_ENV).ok());
+    let values: Vec<String> = raw
+        .map(|value| {
+            value
+                .split([',', ';'])
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_else(|| DEFAULT_HOTKEYS.iter().map(|value| value.to_string()).collect());
+
+    values.into_iter().fold(Vec::new(), |mut unique, value| {
+        if !unique.contains(&value) {
+            unique.push(value);
+        }
+        unique
+    })
 }
 
 fn toggle_overlay(app: &AppHandle) -> Result<(), String> {
@@ -235,9 +278,15 @@ fn toggle_overlay(app: &AppHandle) -> Result<(), String> {
 
 fn show_overlay(app: &AppHandle) -> Result<(), String> {
     let window = overlay_window(app)?;
+    #[cfg(target_os = "macos")]
+    app.show()
+        .map_err(|err| format!("show app failed: {err}"))?;
     window
         .show()
         .map_err(|err| format!("show overlay failed: {err}"))?;
+    window
+        .set_focusable(true)
+        .map_err(|err| format!("make overlay focusable failed: {err}"))?;
     window
         .set_focus()
         .map_err(|err| format!("focus overlay failed: {err}"))?;
@@ -247,6 +296,7 @@ fn show_overlay(app: &AppHandle) -> Result<(), String> {
     window
         .emit("overlay:shown", ())
         .map_err(|err| format!("emit overlay shown failed: {err}"))?;
+    eprintln!("ECHO overlay shown");
     Ok(())
 }
 
@@ -257,7 +307,9 @@ fn hide_overlay(app: &AppHandle) -> Result<(), String> {
         .map_err(|err| format!("emit overlay hidden failed: {err}"))?;
     window
         .hide()
-        .map_err(|err| format!("hide overlay failed: {err}"))
+        .map_err(|err| format!("hide overlay failed: {err}"))?;
+    eprintln!("ECHO overlay hidden");
+    Ok(())
 }
 
 fn overlay_window(app: &AppHandle) -> Result<WebviewWindow, String> {
