@@ -2,12 +2,19 @@
 task_id: 2026-05-29-082-retrieval-quality-eval-harness
 role: builder
 writer: codex-builder
-last_updated: 2026-05-30T03:38:41Z
+last_updated: 2026-05-30T04:05:24Z
+handoff_branch: agent/retrieval-quality-eval-harness
+handoff_head_sha: 599903bf1d4a7aefd023dd8e612142dea99bbec2
+handoff_run_log: raw/internal/agent-runs/2026-05-29-2026-05-29-082-retrieval-quality-eval-harness.md
 ---
 
 ## current_thesis
 
 Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement a deterministic retrieval-quality eval harness that measures evidence quality and loss legibility against sanitized journal/JSONL-grounded fixtures, without changing production retrieval behavior.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 599903bf1d4a7aefd023dd8e612142dea99bbec2.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -35,5 +42,5 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement a det
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-05-29-082-retrieval-quality-eval-harness.md
+- spec: backlog/pending_review/2026-05-29-082-retrieval-quality-eval-harness.md
 - reviews: backlog/reviews/2026-05-29-082-retrieval-quality-eval-harness/
