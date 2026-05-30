@@ -1,0 +1,77 @@
+{
+  "id": "stale-source-degraded-warning",
+  "priority": "P0",
+  "intent": "A stale Cursor/source-prefix case must either return fresh evidence or explicitly warn that the lane is missing/degraded.",
+  "repo_path": "$EVAL_REPO",
+  "time_window": {
+    "since": "2026-05-29T00:00:00.000Z",
+    "until": "2026-05-30T00:00:00.000Z"
+  },
+  "reference_now": "2026-05-30T00:00:00.000Z",
+  "fixture_files": ["eval/retrieval/fixtures/core.jsonl"],
+  "query_variants": [
+    {
+      "id": "natural",
+      "query": "stale Cursor source coverage",
+      "baseline_status": "pass"
+    },
+    {
+      "id": "case-token-control",
+      "query": "stale-source-degraded-warning",
+      "baseline_status": "pass"
+    }
+  ],
+  "tool_recipe": [
+    {
+      "step_id": "discovery",
+      "tool": "search_memories",
+      "kind": "discovery",
+      "primary_discovery": true,
+      "params": {
+        "query": "$query",
+        "since": "$case.time_window.since",
+        "until": "$case.time_window.until",
+        "repo_path": "$case.repo_path",
+        "limit": 10
+      }
+    },
+    {
+      "step_id": "hydrate",
+      "tool": "get_atoms",
+      "kind": "hydration",
+      "params": {
+        "atom_ids": "$steps.discovery.matches[*].id",
+        "prefer": "as_requested"
+      },
+      "ids_limit": 10,
+      "deterministic_order": "discovery_order"
+    }
+  ],
+  "required_sources": ["cursor"],
+  "required_primary": ["stale-degraded-journal"],
+  "required_context": [],
+  "acceptable_context": [],
+  "noise": [],
+  "forbidden_noise": ["stale-cursor-old-forbidden"],
+  "must_warn": [
+    {
+      "code": "eval_source_gap",
+      "origins": ["eval"]
+    }
+  ],
+  "canonical_answer_facts": [
+    "The case is acceptable only if missing Cursor coverage is explicit.",
+    "Old Cursor rows cannot stand in for fresh evidence."
+  ],
+  "budgets": {
+    "per_call_bytes": 25000,
+    "total_bytes": 50000,
+    "max_calls": 3
+  },
+  "provenance": [
+    {
+      "kind": "journal",
+      "ref": "raw/internal/dogfooding/2026-05-08-v1-5-livetest-gaps.md#Gap-8"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "id": "signal-vs-noise-alias",
+  "priority": "P0",
+  "intent": "Founder wording should recover the May 29 signal-to-noise / right-slice product thread instead of an older warning-quality atom.",
+  "repo_path": "$EVAL_REPO",
+  "time_window": {
+    "since": "2026-05-18T00:00:00.000Z",
+    "until": "2026-05-30T00:00:00.000Z"
+  },
+  "reference_now": "2026-05-30T00:00:00.000Z",
+  "fixture_files": ["eval/retrieval/fixtures/core.jsonl"],
+  "query_variants": [
+    {
+      "id": "natural",
+      "query": "signal vs noise",
+      "baseline_status": "expected_fail_current_behavior",
+      "expected_failure": {
+        "reason": "Current search is literal substring matching and does not bridge 'signal vs noise' to 'signal-to-noise'.",
+        "followup_candidate": "semantic-alias-expansion-for-product-vocabulary",
+        "allowed_failed_metrics": [
+          "primary_recall",
+          "top_rank_success",
+          "weighted_precision_at_5",
+          "weighted_precision_overall",
+          "signal_noise_ratio_at_10",
+          "forbidden_noise",
+          "source_coverage"
+        ],
+        "allowed_missing_refs": ["sig-primary-claude", "sig-primary-codex", "sig-decision-git"],
+        "allowed_forbidden_noise_refs": ["sig-forbidden-cursor-warning"],
+        "allowed_warning_gaps": []
+      }
+    },
+    {
+      "id": "exact-token-control",
+      "query": "signal-to-noise",
+      "baseline_status": "pass"
+    }
+  ],
+  "tool_recipe": [
+    {
+      "step_id": "discovery",
+      "tool": "search_memories",
+      "kind": "discovery",
+      "primary_discovery": true,
+      "params": {
+        "query": "$query",
+        "since": "$case.time_window.since",
+        "until": "$case.time_window.until",
+        "repo_path": "$case.repo_path",
+        "limit": 10
+      }
+    },
+    {
+      "step_id": "hydrate",
+      "tool": "get_atoms",
+      "kind": "hydration",
+      "params": {
+        "atom_ids": "$steps.discovery.matches[*].id",
+        "prefer": "as_requested"
+      },
+      "ids_limit": 10,
+      "deterministic_order": "discovery_order"
+    }
+  ],
+  "required_sources": ["claude_code", "codex", "git"],
+  "required_primary": ["sig-primary-claude", "sig-primary-codex", "sig-decision-git"],
+  "required_context": [],
+  "acceptable_context": [],
+  "noise": [],
+  "forbidden_noise": ["sig-forbidden-cursor-warning"],
+  "must_warn": [],
+  "canonical_answer_facts": [
+    "The May 29 thread defines retrieval quality as serving the right slice with primary evidence and low forbidden noise.",
+    "The older Cursor warning-quality note uses similar natural wording but is not the product thesis."
+  ],
+  "budgets": {
+    "per_call_bytes": 25000,
+    "total_bytes": 50000,
+    "max_calls": 3
+  },
+  "provenance": [
+    {
+      "kind": "decision",
+      "ref": "raw/internal/decisions/2026-05-29-operator-context-layer-thesis.md"
+    },
+    {
+      "kind": "journal",
+      "ref": "raw/internal/dogfooding/mcp-interactions-journal-2026-05.md#2026-05-29-13-43"
+    }
+  ]
+}

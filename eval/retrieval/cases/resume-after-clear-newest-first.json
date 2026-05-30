@@ -1,0 +1,77 @@
+{
+  "id": "resume-after-clear-newest-first",
+  "priority": "P0",
+  "intent": "Resume after context clear should surface the newest meaningful retrieval-eval handoff and hydrate newest-first within a bounded atom set.",
+  "repo_path": "$EVAL_REPO",
+  "time_window": {
+    "since": "2026-05-29T17:00:00.000Z",
+    "until": "2026-05-30T00:00:00.000Z"
+  },
+  "reference_now": "2026-05-30T00:00:00.000Z",
+  "fixture_files": ["eval/retrieval/fixtures/core.jsonl"],
+  "query_variants": [
+    {
+      "id": "natural",
+      "query": "resume after clear",
+      "baseline_status": "pass"
+    },
+    {
+      "id": "control",
+      "query": "newest meaningful work",
+      "baseline_status": "pass"
+    }
+  ],
+  "tool_recipe": [
+    {
+      "step_id": "discovery",
+      "tool": "find_clusters",
+      "kind": "discovery",
+      "primary_discovery": true,
+      "params": {
+        "since": "$case.time_window.since",
+        "until": "$case.time_window.until",
+        "repo_path": "$case.repo_path",
+        "window_hours": 8,
+        "format": "skeleton"
+      }
+    },
+    {
+      "step_id": "hydrate",
+      "tool": "get_atoms",
+      "kind": "hydration",
+      "params": {
+        "atom_ids": "$steps.discovery.clusters[0].atom_ids",
+        "prefer": "newest_first"
+      },
+      "ids_limit": 3,
+      "deterministic_order": "newest_first"
+    }
+  ],
+  "required_sources": ["claude_code", "codex", "git"],
+  "required_primary": ["resume-newest-primary", "resume-context-codex", "resume-context-git"],
+  "required_context": [],
+  "acceptable_context": ["resume-old-history-1", "resume-old-history-2"],
+  "noise": [],
+  "forbidden_noise": [],
+  "must_warn": [
+    {
+      "code": "eval_truncated_hydration",
+      "origins": ["eval"]
+    }
+  ],
+  "canonical_answer_facts": [
+    "The newest meaningful work is the retrieval-eval handoff.",
+    "Focused resume should preserve newest atoms before old dense history."
+  ],
+  "budgets": {
+    "per_call_bytes": 25000,
+    "total_bytes": 75000,
+    "max_calls": 3
+  },
+  "provenance": [
+    {
+      "kind": "note",
+      "ref": "backlog/ready/2026-05-29-082-retrieval-quality-eval-harness.md#AC5"
+    }
+  ]
+}
