@@ -4,6 +4,10 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ---
 
+## From 081 r1 review (2026-05-29) — review-queue can't reach parked specs
+
+- **Decouple reviewability from claimability — teach the review queue to scan `backlog/inbox/`.** `tools/review-queue/request.py` `find_artifact()` (and `combine.py` / `dispatch-next-round.py`) only scan `ready|claimed|pending_review|complete`, identical to `tools/blocked.py`'s claim-selector set. So a spec is reviewable **iff** it's claimable — there is no "reviewed/reviewable but not yet buildable" state. Parked-in-`inbox/` specs (externally-gated, e.g. 081 gated on 080 AC8) are therefore un-reviewable without a temp-promote to `ready/`, which (a) makes them prematurely claimable and (b) can break `blocked.py` globally (observed 2026-05-29: 081's `blocked_by` inline comment aborted every selector run while temp-promoted). **Fix:** add `inbox/` to the review tools' artifact-lookup set while keeping `blocked.py` excluding it → `inbox/` becomes "reviewable, not claimable." Both codex and codex-ops independently recommended exactly this at 081 r1. ~1 line per tool; the change itself should be queue-reviewed. This is the prerequisite for the canonical in-place review of 081 at promotion time.
+
 ## ⚠️ Known V1 degraded surfaces
 
 ### Cursor capture — `agentKv:` migration (gated, not scheduled)

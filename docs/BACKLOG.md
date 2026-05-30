@@ -12,7 +12,7 @@
 
 | ID (reserved) | Title | Depends on | Source |
 |---|---|---|---|
-| 081 | Raycast removal after overlay dogfooding gate | 080 AC8 | `backlog/complete/2026-05-29-080-decisions-desktop-overlay.md` After Completion |
+| 081 | Raycast command disposition + removal (parity-gated, per-command) | 080 AC8 (post-merge dogfooding gate; not yet fired) | **Spec parked:** `backlog/inbox/2026-05-29-081-raycast-command-disposition-and-removal.md` — content-reviewed at r1 (2026-05-29, both reviewers: direction sound; see `backlog/reviews/2026-05-29-081-…/r1/combined.md`). Promote `inbox/`→`ready/` when AC8 fires; run the canonical fresh-eyes review in place then. |
 
 *Next free id is 083.*
 
