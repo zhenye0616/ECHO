@@ -48,8 +48,8 @@ npm run smoke:static
 
 Summon is handled by the Tauri shell:
 
-- Default hotkey: `CommandOrControl+Shift+D`
-- Override: `ECHO_OVERLAY_HOTKEY`
+- Default hotkeys: `CommandOrControl+Shift+D` and `CommandOrControl+Shift+E`
+- Override: `ECHO_OVERLAY_HOTKEYS` as a comma-separated list, or legacy single-value `ECHO_OVERLAY_HOTKEY`
 - Dismissal: hotkey toggle, Esc, or blur
 - Menubar dot states: `●` lit when at least one pending decision exists, `○` dark when a fresh read returns zero decisions, `◌` unknown on stale/unreachable reads
 

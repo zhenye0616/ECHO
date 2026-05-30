@@ -41,10 +41,15 @@ export function servicesFromBridge(bridge: OverlayBridge): OverlayServices {
 }
 
 export async function resolveRepoPath(config: OverlayConfig, services: Pick<OverlayServices, "homeDir">): Promise<string> {
-  const home = await services.homeDir();
+  const home = repoPathNeedsHome(config.repoPath) ? await services.homeDir() : "/";
   const result = normalizeRepoPath(config.repoPath, home);
   if (!result.ok) throw new InvalidRepoPathError(result.code, result.message);
   return result.path;
+}
+
+function repoPathNeedsHome(repoPath: string | undefined): boolean {
+  const raw = repoPath?.trim();
+  return raw === undefined || raw === "" || raw === "~" || raw.startsWith("~/");
 }
 
 export async function loadOverlayData(config: OverlayConfig, services: OverlayServices): Promise<OverlayData> {

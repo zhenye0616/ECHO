@@ -17,12 +17,51 @@ export interface OverlayBridge {
   onOverlayHidden: (handler: () => void) => Promise<UnlistenFn>;
 }
 
+interface TauriInternals {
+  invoke?: unknown;
+  transformCallback?: unknown;
+}
+
+export function hasTauriRuntime(): boolean {
+  const internals = tauriInternals();
+  return typeof internals?.invoke === "function" && typeof internals.transformCallback === "function";
+}
+
+function tauriInternals(): TauriInternals | null {
+  if (typeof window === "undefined") return null;
+  const candidate = (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  return candidate !== null && typeof candidate === "object" ? candidate : null;
+}
+
+const emptyInFlightSnapshot = (): InFlightSnapshot => ({
+  items: [],
+  reviewRequests: [],
+  scannedReviewRoots: [],
+});
+
+const noopUnlisten: UnlistenFn = () => undefined;
+
+export const browserBridge: OverlayBridge = {
+  readInFlightSnapshot: async () => emptyInFlightSnapshot(),
+  setAmbientDot: async () => undefined,
+  openTarget: async () => undefined,
+  dismissOverlay: async () => undefined,
+  homeDir: async () => {
+    const configuredHomeDir = import.meta.env.VITE_ECHO_HOME_DIR as string | undefined;
+    if (configuredHomeDir !== undefined && configuredHomeDir.trim() !== "") return configuredHomeDir;
+    throw new Error("Tauri homeDir is unavailable outside the desktop shell; configure an absolute repo path for web dev.");
+  },
+  onOverlayShown: async () => noopUnlisten,
+  onOverlayHidden: async () => noopUnlisten,
+};
+
 export const tauriBridge: OverlayBridge = {
-  readInFlightSnapshot: (repoPath) => invoke<InFlightSnapshot>("read_in_flight_snapshot", { repoPath }),
-  setAmbientDot: (state) => invoke<void>("set_ambient_dot", { state }),
-  openTarget: (target) => invoke<void>("open_target", { target }),
-  dismissOverlay: () => invoke<void>("dismiss_overlay"),
-  homeDir: () => tauriHomeDir(),
-  onOverlayShown: (handler) => listen(OVERLAY_SHOWN_EVENT, handler),
-  onOverlayHidden: (handler) => listen(OVERLAY_HIDDEN_EVENT, handler),
+  readInFlightSnapshot: (repoPath) =>
+    hasTauriRuntime() ? invoke<InFlightSnapshot>("read_in_flight_snapshot", { repoPath }) : browserBridge.readInFlightSnapshot(repoPath),
+  setAmbientDot: (state) => (hasTauriRuntime() ? invoke<void>("set_ambient_dot", { state }) : browserBridge.setAmbientDot(state)),
+  openTarget: (target) => (hasTauriRuntime() ? invoke<void>("open_target", { target }) : browserBridge.openTarget(target)),
+  dismissOverlay: () => (hasTauriRuntime() ? invoke<void>("dismiss_overlay") : browserBridge.dismissOverlay()),
+  homeDir: () => (hasTauriRuntime() ? tauriHomeDir() : browserBridge.homeDir()),
+  onOverlayShown: (handler) => (hasTauriRuntime() ? listen(OVERLAY_SHOWN_EVENT, handler) : browserBridge.onOverlayShown(handler)),
+  onOverlayHidden: (handler) => (hasTauriRuntime() ? listen(OVERLAY_HIDDEN_EVENT, handler) : browserBridge.onOverlayHidden(handler)),
 };
