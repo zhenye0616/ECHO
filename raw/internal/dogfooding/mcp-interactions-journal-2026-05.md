@@ -2182,3 +2182,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right.
 - **Note:** The `mcp__echo__` surface was initially absent from the active tool list but became available after Codex tool discovery; no retrieval calls were needed before claim.
 - **Conjecture:** The codex builder wrapper/preflight should make the MCP discovery/smoke-test state explicit so a missing configured tool surface is not mistaken for an empty ECHO context.
+
+### 2026-05-29 20:41 PDT - codex builder context retrieval for 082
+
+- **Trigger:** Codex builder claimed `2026-05-29-082-retrieval-quality-eval-harness` and needed prior cross-tool context before implementation.
+- **Query inputs:** `search_memories(query="2026-05-29-082-retrieval-quality-eval-harness", repo_path="/Users/zhenye/Desktop/Project_echo", limit=10)`.
+- **Returned:** 10 matches, `next_cursor` present, warnings `[]`. Top two were fresh git atoms for this builder's claim and builder-state commits; useful prior context appeared in the same page: Codex session `019e75bb...` confirming R3 convergence, git commit `93261d91` with `combined_verdict: proceed`, and R3 codex/codex-ops review/journal commits.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo` and `fs:/Users/zhenye/.codex/sessions/2026/05/29/rollout-2026-05-29T14-54-53-019e75bb-a9e7-77e1-b085-e6990edd5154.jsonl`.
+- **Verdict:** partial.
+- **Note:** Retrieval found the claim-ready evidence and reviewer notes, but recency meant the current builder's own just-pushed claim artifacts occupied the top slots. That is expected for literal recency search but mildly noisy for "pre-implementation prior context."
+- **Conjecture:** A future builder-preflight recipe might filter out commits authored in the current claim window or query `backlog/reviews/<task>/r3/combined.md` directly when the task id is known.
