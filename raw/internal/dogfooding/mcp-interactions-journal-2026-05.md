@@ -2173,3 +2173,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** 🟡 partial
 - **Note:** coord_status confirmed the reviewer SESSIONS are live+healthy but it's health/deadline only — it cannot confirm a review VERDICT. Convergence (r3 combined_verdict: proceed, next_round: null) was confirmable only from git (backlog/reviews/.../r3/combined.md), not from any MCP tool. So "use echo to check codex session" half-worked: liveness yes, convergence no.
 - **Conjecture:** the relative-`since` foot-gun bit me on the two highest-value tools (recent-context + clusters) while the lower-value coord/ping worked — schemas accept only absolute ISO timestamps. Relative-window sugar (or a clearer error pointing at the exact accepted form) would have saved the round-trip; and there's no MCP surface that answers "did review round N converge?" — that lives only in git.
+
+### 2026-05-29 20:37 PDT - codex builder pre-claim MCP smoke test
+
+- **Trigger:** Codex builder `/process-backlog` run needed to confirm ECHO MCP exposure before atomic claim.
+- **Query inputs:** `echo_ping(message="codex builder pre-claim smoke test for /Users/zhenye/Desktop/Project_echo")`.
+- **Returned:** `pong=true`, timestamp `2026-05-30T03:37:16.566Z`, received message echoed.
+- **Verdict:** right.
+- **Note:** The `mcp__echo__` surface was initially absent from the active tool list but became available after Codex tool discovery; no retrieval calls were needed before claim.
+- **Conjecture:** The codex builder wrapper/preflight should make the MCP discovery/smoke-test state explicit so a missing configured tool surface is not mistaken for an empty ECHO context.
