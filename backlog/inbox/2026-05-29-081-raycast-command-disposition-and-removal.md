@@ -5,7 +5,16 @@ status: inbox            # PARKED — `inbox` is NOT a kanban stage and is NOT s
 priority: MED
 estimate: 0.5-1d
 created: 2026-05-29
-blocked_by: []           # Intentionally empty. The AC8 gate is NOT machine-enforceable via blocked_by: tools/blocked.py rejects non-item-id refs (so `080-AC8` would fail --validate), and `080` alone is already in complete/ so it would auto-satisfy and make this claimable immediately. The real gate is the manual promotion gate in AC1 — do not fake a no-code gate item (codex consult 2026-05-29).
+# blocked_by intentionally empty (codex consult 2026-05-29; codex r1 review finding):
+#   The AC8 gate is NOT machine-enforceable via blocked_by — tools/blocked.py rejects non-item-id
+#   refs (so `080-AC8` would fail --validate), and `080` alone is already in complete/ so it would
+#   auto-satisfy and make this claimable immediately. The real gate is the manual promotion gate in
+#   AC1 — do not fake a no-code gate item.
+#   NOTE: this rationale MUST stay on full `#` comment lines, never inline after the scalar:
+#   tools/blocked.py's minimal parser only recognizes an empty list when the value is exactly `[]`;
+#   an inline comment makes it parse as a string and `tools/blocked.py` aborts EVERY selector run
+#   with "blocked_by must be a list, got str" (codex r1 HIGH).
+blocked_by: []
 task_state_ref: ""
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:         # MAXIMAL (all-REMOVE) set, BUILDER-REMOVABLE ONLY. The strategist NARROWS this at promotion to match the LOCKED disposition table (a partial trim touches far fewer files). NEVER add wiki/** or docs/BACKLOG.md here — those are strategist-only and the atomic claim escalates if a builder lists them (see AC5).
