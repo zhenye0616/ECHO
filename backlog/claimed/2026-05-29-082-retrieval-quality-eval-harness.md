@@ -40,10 +40,10 @@ spec_refs:
   - raw/internal/decisions/2026-05-29-office-hours-commoditize-agents-endgame.md  # Product/endgame thread used as one seed case for retrieval quality.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by:
-claimed_at:
-branch:
-worktree:
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-05-30T03:38:41Z"
+branch: "agent/retrieval-quality-eval-harness"
+worktree: "/Users/zhenye/Desktop/Project_echo--retrieval-quality-eval-harness"
 head_sha:
 pr_url:
 agent_notes:
