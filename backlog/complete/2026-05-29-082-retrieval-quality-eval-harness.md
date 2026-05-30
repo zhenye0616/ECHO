@@ -48,7 +48,30 @@ head_sha: "599903bf1d4a7aefd023dd8e612142dea99bbec2"
 pr_url:
 agent_notes: |
   Implemented the deterministic retrieval-quality eval harness on `agent/retrieval-quality-eval-harness`. Verification passed: `npm run typecheck`, `npm test -- tests/retrieval-eval`, `npx vite-node --script tools/retrieval-eval/build-fixture.ts`, `npm run lint`, `tools/sync-skills.sh --check`, and `git diff --check`. The baseline all-case eval exits `1` with 3 `expected_fail_matched` current-behavior retrieval-quality variants and 0 unexpected failures: generated-label circular retrieval, neutrality-axis natural-language aliasing, and signal-vs-noise natural-language aliasing.
-review_notes:
+review_notes: |
+  Merged on 2026-05-30 (UTC) via founder-gated merge-and-cleanup.
+
+  Review source: review-queue (not /review-pending sidecar). Rounds r1-r3 at
+  spec c68895dd93fb5bdf7c805b9bc0929d0dbf3eb40d. r3 combined_verdict: proceed;
+  both requested reviewers (codex, codex-ops) returned proceed with zero
+  findings; escalated_to_founder: false. No outstanding fixups.
+
+  Conflicts resolved:
+  - none (clean --no-ff merge of agent/retrieval-quality-eval-harness @ 599903bf)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 1490/1490 tests pass (21 skipped); lint, typecheck, and
+  sync-skills --check all clean post-merge.
+
+  Follow-up items (non-blocking):
+  - none
 ---
 
 # 082 -- Retrieval quality eval harness
