@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'coverage/**', 'tools/raycast-echo/raycast-env.d.ts'],
+    ignores: ['node_modules/**', 'dist/**', 'coverage/**'],
   },
   {
     files: ['**/*.ts'],

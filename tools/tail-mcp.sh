@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # tail-mcp.sh — live tail of ECHO daemon MCP calls.
-# Companion to the per-session agent stdout/stderr log at
-# ~/.config/raycast/extensions/echo-context/sessions/latest.log
+# Polls the daemon's /mcp/recent-calls endpoint (see URL below).
 #
 # Usage: tools/tail-mcp.sh   (Ctrl-C to stop)
 
