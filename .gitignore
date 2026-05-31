@@ -44,3 +44,7 @@ coverage/
 # Python (tools/blocked.py et al)
 __pycache__/
 *.pyc
+
+# Workflow scratch scripts (Workflow tool persists run scripts here) + packed tarballs
+.workflow-*.js
+echoctl-*.tgz
