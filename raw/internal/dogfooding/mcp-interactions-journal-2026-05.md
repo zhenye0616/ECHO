@@ -2230,3 +2230,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** ✅ right — thin-but-accurate; the empty multi-source window IS the signal (pipeline drained, overlay debug paused).
 - **Note:** find_clusters correctly did NOT auto-expand here (the in-window result was non-empty, just single-source-recent). Cross-checked against repo ground-truth rather than trusting the 1-atom window alone.
 - **Conjecture:** (none.)
+
+### 2026-05-31 12:42 PDT - codex r2 review tick on 081 Raycast removal implementation
+
+- **Trigger:** Codex-side review queue tick selected `backlog/reviews/2026-05-29-081-raycast-command-disposition-and-removal/r2/request.md` and reviewed the all-REMOVE implementation branch through the implementability/code-grounded lens.
+- **Query inputs:** ECHO coord call already emitted: `coord_emit(event_type=tick_start, reviewer=codex, correlation_id=c145e6a5-0421-4f43-b0b9-b78e4500ae32)`. Queue/file reads used the r2 request focus hints, reviewer schema, pinned artifact `backlog/pending_review/2026-05-29-081-raycast-command-disposition-and-removal.md` at `b0de716c696441f75142f6db4a54f8e5cdfe8324`, and branch diff checks against `origin/agent/081-raycast-removal`. Per command ordering, `tick_end` will be emitted after this sibling journal commit.
+- **Returned:** Wrote, pre-link validated, upstream-duplicate checked, committed, and pushed `backlog/reviews/2026-05-29-081-raycast-command-disposition-and-removal/r2/codex.md` at review commit `f8c7e4c7`, verdict `proceed`, findings empty.
+- **Sources:** Review response file above; request correlation `c145e6a5-0421-4f43-b0b9-b78e4500ae32`; artifact commit `b0de716c696441f75142f6db4a54f8e5cdfe8324`; implementation branch commits `9bf44cea` and `b2f7a26b`; verification anchors `.gitignore`, `eslint.config.js`, `tsconfig.json`, `tools/tail-mcp.sh`, and the deleted `tools/raycast-echo/**` tree.
+- **Verdict:** right - the implementation matches the founder-locked all-REMOVE path: the Raycast extension tree is deleted, active code/config references are clean, `tools/echo-overlay/**/*` remains excluded, `tools/tail-mcp.sh` is retained with the daemon endpoint comment, and forbidden scope areas are untouched.
+- **Note:** The stale reviewer command still mentions the old unsharded journal and generated HTML twin; current `CLAUDE.md`/`AGENTS.md` policy and prior shard entries make the May monthly Markdown shard canonical and treat generated HTML twins as local-only, so this tick writes only this shard.
+- **Conjecture:** The remaining reconciliation work belongs to the strategist post-merge path: wiki/docs/backlog cleanup and any active follow-up retirement for Raycast-only test debt.
