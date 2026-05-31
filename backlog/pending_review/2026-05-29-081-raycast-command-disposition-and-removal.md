@@ -1,7 +1,7 @@
 ---
 id: 2026-05-29-081-raycast-command-disposition-and-removal
 title: "Raycast command disposition + removal (parity-gated, per-command)"
-status: inbox            # PARKED — `inbox` is NOT a kanban stage and is NOT scanned by tools/blocked.py (STAGES = ready|claimed|pending_review|complete). This file lives in backlog/inbox/ so no agent can claim it. Promote backlog/inbox/ -> backlog/ready/ ONLY after the Claim Gate (AC1) fires AND the disposition table is locked (AC2).
+status: pending_review   # BUILT (strategist-executed), awaiting independent cross-tool review. Founder unblocked the item (2026-05-31) and OVERRODE the per-command disposition to ALL-REMOVE after confirming the Raycast code is Raycast-specific and the overlay reuses none of it (see agent_notes). Moved straight from backlog/inbox/ -> backlog/pending_review/; AC1 manual claim-gate + AC2 per-command table are superseded by the founder's all-REMOVE directive.
 priority: MED
 estimate: 0.5-1d
 created: 2026-05-29
@@ -36,13 +36,49 @@ spec_refs:
   - docs/BACKLOG.md  # STRATEGIST-ONLY (read-only for builder): Inbox row now + Ready/Done bookkeeping at promotion/merge (AC5).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "claude-strategist"
+claimed_at: "2026-05-31"
+branch: "agent/081-raycast-removal"
 worktree: ""
-head_sha: ""
+head_sha: "b2f7a26b6d90554bcc7ce8675f86e7263ee1f973"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  DISPOSITION (founder override, 2026-05-31): ALL-REMOVE. The founder unblocked 081
+  and directed "remove all raycast overlay setup," conditioned on "keep the logic that
+  can be used in the new overlay setup — or if it's Raycast-specific, remove everything."
+
+  Reusability check (the founder's gate) — done before any deletion:
+    - tools/echo-overlay/ (Tauri/Rust overlay) imports NOTHING from tools/raycast-echo/.
+    - NOTHING anywhere in the repo imports from tools/raycast-echo/.
+    - The overlay has its own independent src/lib/mcp.ts and no @raycast/api dependency.
+    - The Raycast lib/ helpers are coupled to @raycast/api (LocalStorage, List/Detail UI)
+      — not portable business logic the overlay would consume.
+    => No reusable logic is lost. echo/recap *capabilities* are future feature decisions,
+       not code to port. Founder's condition met => all-REMOVE.
+
+  This SUPERSEDES the per-command AC2 table (decisions REMOVE-by-parity / echo KEEP-BLOCKED
+  / recap REMOVE-by-disuse) and the AC1 080-AC8 claim gate. Locked decision #4 (echo
+  KEEP-BLOCKED) is explicitly overridden by founder directive. No replacement built (OoS #1
+  honored) — if echo/recap jobs are missed later, file separate replacement items.
+
+  What was removed (branch agent/081-raycast-removal, impl head b2f7a26b):
+    - commit 9bf44cea: delete tools/raycast-echo/ (echo+recap+decisions + lib + tests, 44 files);
+      tsconfig.json drop raycast exclude; eslint.config.js drop raycast-env.d.ts ignore;
+      .gitignore drop raycast-env.d.ts line; tools/tail-mcp.sh fix stale Raycast log-path comment
+      (file kept — it tails the daemon /mcp/recent-calls).
+    - commit b2f7a26b (chore, separable): gitignore + eslint-ignore .workflow-*.js + echoctl-*.tgz
+      (pre-existing untracked scratch leftovers from 080 workflow build that were failing eslint .).
+
+  Verification: typecheck GREEN; lint GREEN; review-queue+task-state suites 169/169 in isolation;
+  full suite shows only an intermittent shellout TIMEOUT under parallel load (not a regression —
+  nothing imports the deleted dir). AC6 journal: zero mcp__echo__* calls this run => skip-rule
+  applies, disposition recorded here instead.
+
+  Wiki/BACKLOG/manifest reconciliation is HELD for post-merge (operating model: wiki edits only
+  after complete/). Broken tools/raycast-echo/... path pointers to fix then:
+  wiki/surfaces/hotkey-overlay.md, hotkey-overlay-raycast.md (retire), mcp-get-atoms.md,
+  mcp-find-clusters.md, architecture/mcp-compact-view-projection.md. Historical narrative in
+  principles/{compose-not-capture,drift-prevention}.md stays immutable (OoS #2).
 review_notes: ""
 ---
 
