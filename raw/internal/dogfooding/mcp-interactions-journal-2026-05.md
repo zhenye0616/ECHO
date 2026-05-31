@@ -2212,3 +2212,21 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - the per-command disposition framework may be directionally sound, but the submitted artifact is operationally unsafe for the backlog queue because it either halts all builder selection now or becomes claimable before the evidence/attestation gate has fired.
 - **Note:** The stale reviewer command still mentions the old unsharded journal and generated HTML twin; current `CLAUDE.md`/`AGENTS.md` policy and prior shard entries make the May monthly Markdown shard canonical and treat generated HTML twins as local-only, so this tick writes only this shard.
 - **Conjecture:** Review-before-promotion needs a path that does not make the artifact claimable, or `tools/blocked.py` needs a real machine-readable pre-promotion gate instead of relying on prose plus folder placement.
+
+### 2026-05-30 22:25 PDT — claude strategist "where did I leave off" resume recall
+- **Trigger:** Founder asked "use echo help me understand where i left off" at the start of a session (machine-scoped resume).
+- **Query inputs:** `find_clusters(since=2026-05-29T00:00:00-07:00, until=2026-05-30T23:59:59-07:00)` → then `get_atoms(atom_ids=[7 unresolved open-loop atoms across clusters 1/2/3], prefer=newest_first, format=minimal)`.
+- **Returned:** 4 clusters, 367/379 atoms in window (result_caps.truncated=true). c1 "discussion about Project_echo" (rank 1, 212 atoms, atom_ids_truncated); c2 "discussion about ECHO"; c3 "discussion about HDLEO_AILEO_OD_Fusion_ONE_CLICK"; c4 "Desktop". get_atoms returned 7 atoms, 0 dropped.
+- **Sources:** source_breakdown — c1={git:102, claude_code:110}; c2={codex:147}; c3={claude_code:18}; c4={claude_code:2}. Atom source paths: `fs:.../Project-echo/*.jsonl` (082 merge, 081 review, burned-insurance research), `fs:.../HDLEO-AILEO-OD-Fusion-ONE-CLICK/*.jsonl` (cloud-suppression bridge), `fs:.../.codex/sessions/2026/05/29/rollout-*.jsonl` (081 design consult).
+- **Verdict:** ✅ right — three distinct open threads surfaced cleanly (ECHO build pipeline, ECHO strategy/validation, HDLEO verification) with accurate per-source attribution.
+- **Note:** newest_first on a hand-picked unresolved-open-loop set was the right move — the `open_loop_hints` `resolved:false` flags pointed straight at still-open work without hydrating all 212 c1 atoms. Cross-project HDLEO cluster correctly surfaced (machine-scoped, not noise).
+- **Conjecture:** (none — retrieval behaved as intended.)
+
+### 2026-05-31 PDT — claude strategist "detailed recap" status pull
+- **Trigger:** Founder asked for a detailed recap on Project ECHO status.
+- **Query inputs:** `find_clusters(since=2026-05-30T00:00:00-07:00, until=2026-05-31T23:59:59-07:00)` (paired with repo ground-truth: git log, backlog dir state, blocked.py).
+- **Returned:** 1 cluster, 1 atom (not truncated). c1 {claude_code:1} @ 2026-05-31T05:25Z, unresolved open loop — this is the prior session's own resume-recall turn, not new project activity.
+- **Sources:** source_breakdown={claude_code:1}; the single atom is `fs:.../Project-echo/*.jsonl` (this session). No git/codex/cursor contribution in-window → confirms the build pipeline has been idle since the 2026-05-30 recall.
+- **Verdict:** ✅ right — thin-but-accurate; the empty multi-source window IS the signal (pipeline drained, overlay debug paused).
+- **Note:** find_clusters correctly did NOT auto-expand here (the in-window result was non-empty, just single-source-recent). Cross-checked against repo ground-truth rather than trusting the 1-atom window alone.
+- **Conjecture:** (none.)
