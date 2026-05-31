@@ -12,7 +12,9 @@ const WINDOW_LABEL: &str = "main";
 const TRAY_ID: &str = "ambient-dot";
 const TOGGLE_MENU_ID: &str = "toggle-overlay";
 const QUIT_MENU_ID: &str = "quit";
-const DEFAULT_HOTKEYS: &[&str] = &["CommandOrControl+Shift+D", "CommandOrControl+Shift+E"];
+// Only Shift+Cmd+E is bound by default. Shift+Cmd+D was released back to Ghostty
+// (2026-05-31) — the overlay no longer claims it. Override via ECHO_OVERLAY_HOTKEYS.
+const DEFAULT_HOTKEYS: &[&str] = &["CommandOrControl+Shift+E"];
 const HOTKEY_ENV: &str = "ECHO_OVERLAY_HOTKEY";
 const HOTKEYS_ENV: &str = "ECHO_OVERLAY_HOTKEYS";
 
