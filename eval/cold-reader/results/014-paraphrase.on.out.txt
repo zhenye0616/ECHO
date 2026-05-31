@@ -1,0 +1,91 @@
+OpenAI Codex v0.135.0
+--------
+workdir: /var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/tmp.L3R0FLsWPU
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019e7fd0-f8ab-7a41-a8ab-1cc32b704a33
+--------
+user
+You are a fresh agent with NO prior knowledge of this project. You have access to one set of tools only: the `echo` MCP tools (e.g. find_clusters, search_memories, get_atoms, get_recent_work_context).
+
+HARD RULES:
+- Use ONLY the `echo` MCP tools to gather information.
+- Do NOT run any shell commands. Do NOT read any files on disk. Do NOT use web search.
+- If the echo tools do not give you enough to answer a part, write "INSUFFICIENT FROM ECHO" for that part rather than guessing or using outside knowledge.
+
+CONTEXT — I will NOT give you the name of the item or the tool. You must find it from this description:
+Early in this project there was a design decision about how the system's stored-memory search would work — i.e. the basic approach for matching a user's query against captured content when retrieving memories.
+
+TASK — find that decision in ECHO and answer:
+1. What was decided (including the specific matching approach that was chosen)?
+2. Why — what was the core reasoning?
+3. Did any reviewer push back, and on what specifically?
+4. What was the final disposition — did it ship/merge?
+
+State the item/tool NAME once you've identified it. For each answer, cite which echo tool call(s) and which returned cluster/atom IDs the answer rests on. End with a one-line list of every echo tool you called, in order.
+
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/get_atoms started
+mcp: echo/get_atoms (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/get_atom started
+mcp: echo/get_atom (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+mcp: echo/find_clusters started
+mcp: echo/find_clusters (completed)
+mcp: echo/get_atom started
+mcp: echo/get_atom (completed)
+mcp: echo/get_atoms started
+mcp: echo/get_atoms (completed)
+mcp: echo/search_memories started
+mcp: echo/search_memories (completed)
+codex
+Item/tool identified: `2026-04-30-014-mcp-search-memories` / MCP tool `search_memories`.
+
+1. Decided: ship `search_memories` as the first real MCP retrieval tool over captured events. Matching was **case-insensitive literal substring search** over captured content, with filters like `source_prefix`, `since`, `until`, and `limit`; results sorted newest-first. Semantic/embedding search was deferred.  
+Cites: `get_atoms` atoms `4097ca04-f6fd-421c-a938-b27e74925daa`, `c3a37d81-485e-4885-8cca-f2608aad76a4`, `ba6849b4-005d-45dd-8dee-f1042889982d`; `find_clusters` cluster `ctx_48ed2a75`.
+
+2. Why: the core reasoning was to close the V1 demo loop: captured Cursor/Claude Code/git work needed to be queryable by AI clients through MCP. The deliberately simple raw-substring + source/time filter path was enough for V1; richer clustering/semantic retrieval came later.  
+Cites: `get_atoms` atoms `e9321eba-d5dd-4cc4-b0cc-85ad98fa7565`, `35a81f51-a37a-49f8-9c98-8eebacc30515`, `d9bf0099-11e4-4f6b-ab21-33350a919322`.
+
+3. Reviewer pushback: yes, but not against the core search approach. The review verdict was `merge with founder fixups`; pushback was on implementation correctness/details: SQLite `LIKE` needed escaping for `%`, `_`, and `\`; `MemoryStorage.query` limit semantics needed clarification/fix; storage-side limit/order/content pushdown was follow-up scale work.  
+Cites: `get_atom` atom `f80e642f-0bac-426f-b328-2be07477a194`; `get_atoms` atoms `3d8ab04a-d6c5-42a1-b027-0830159a1d43`, `d238a716-ef2c-47bc-8ecd-f6711361ce30`; `find_clusters` cluster `ctx_48ed2a75`.
+
+4. Final disposition: it shipped/merged. The merge happened on 2026-05-01 with zero conflicts, two founder fixups applied, no deferred fixups, branch/worktree cleanup done, and origin synced at `27cc58b`.  
+Cites: `get_atoms` atoms `674c160e-1cb2-4497-b4e7-e2d9bb21200d`, `f6853ec0-9043-4698-9477-8b7ab6b1ec5c`, `c3a37d81-485e-4885-8cca-f2608aad76a4`.
+
+Echo tools called, in order: `search_memories`, `search_memories`, `search_memories`, `get_atoms`, `search_memories`, `search_memories`, `search_memories`, `search_memories`, `get_atom`, `search_memories`, `find_clusters`, `get_atom`, `get_atoms`, `search_memories`.
+tokens used
+128,473
+Item/tool identified: `2026-04-30-014-mcp-search-memories` / MCP tool `search_memories`.
+
+1. Decided: ship `search_memories` as the first real MCP retrieval tool over captured events. Matching was **case-insensitive literal substring search** over captured content, with filters like `source_prefix`, `since`, `until`, and `limit`; results sorted newest-first. Semantic/embedding search was deferred.  
+Cites: `get_atoms` atoms `4097ca04-f6fd-421c-a938-b27e74925daa`, `c3a37d81-485e-4885-8cca-f2608aad76a4`, `ba6849b4-005d-45dd-8dee-f1042889982d`; `find_clusters` cluster `ctx_48ed2a75`.
+
+2. Why: the core reasoning was to close the V1 demo loop: captured Cursor/Claude Code/git work needed to be queryable by AI clients through MCP. The deliberately simple raw-substring + source/time filter path was enough for V1; richer clustering/semantic retrieval came later.  
+Cites: `get_atoms` atoms `e9321eba-d5dd-4cc4-b0cc-85ad98fa7565`, `35a81f51-a37a-49f8-9c98-8eebacc30515`, `d9bf0099-11e4-4f6b-ab21-33350a919322`.
+
+3. Reviewer pushback: yes, but not against the core search approach. The review verdict was `merge with founder fixups`; pushback was on implementation correctness/details: SQLite `LIKE` needed escaping for `%`, `_`, and `\`; `MemoryStorage.query` limit semantics needed clarification/fix; storage-side limit/order/content pushdown was follow-up scale work.  
+Cites: `get_atom` atom `f80e642f-0bac-426f-b328-2be07477a194`; `get_atoms` atoms `3d8ab04a-d6c5-42a1-b027-0830159a1d43`, `d238a716-ef2c-47bc-8ecd-f6711361ce30`; `find_clusters` cluster `ctx_48ed2a75`.
+
+4. Final disposition: it shipped/merged. The merge happened on 2026-05-01 with zero conflicts, two founder fixups applied, no deferred fixups, branch/worktree cleanup done, and origin synced at `27cc58b`.  
+Cites: `get_atoms` atoms `674c160e-1cb2-4497-b4e7-e2d9bb21200d`, `f6853ec0-9043-4698-9477-8b7ab6b1ec5c`, `c3a37d81-485e-4885-8cca-f2608aad76a4`.
+
+Echo tools called, in order: `search_memories`, `search_memories`, `search_memories`, `get_atoms`, `search_memories`, `search_memories`, `search_memories`, `search_memories`, `get_atom`, `search_memories`, `find_clusters`, `get_atom`, `get_atoms`, `search_memories`.
