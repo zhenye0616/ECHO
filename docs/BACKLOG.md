@@ -12,7 +12,7 @@
 
 | ID (reserved) | Title | Depends on | Source |
 |---|---|---|---|
-| 081 | Raycast command disposition + removal (parity-gated, per-command) | 080 AC8 (post-merge dogfooding gate; not yet fired) | **Spec parked:** `backlog/inbox/2026-05-29-081-raycast-command-disposition-and-removal.md` — content-reviewed at r1 (2026-05-29, both reviewers: direction sound; see `backlog/reviews/2026-05-29-081-…/r1/combined.md`). Promote `inbox/`→`ready/` when AC8 fires; run the canonical fresh-eyes review in place then. |
+| _(empty)_ | — | — | 081 shipped 2026-05-31 (see Complete); inbox clear. |
 
 *Next free id is 083.*
 
@@ -140,6 +140,12 @@
 | [2026-05-08-026](../backlog/complete/2026-05-08-026-tail-session-tool.md) | `tail_session` MCP tool | Cheap exact-fetch primitive; `source` or `source_app`; default count=5, max 20 |
 | [2026-05-08-027](../backlog/complete/2026-05-08-027-mcp-stateless-transport.md) | MCP stateless transport | `sessionIdGenerator: undefined` + JSON response mode; eliminates stale-session failures after daemon restart |
 | [2026-05-08-028](../backlog/complete/2026-05-08-028-rwc-envelope-skeleton-format.md) | `format:'skeleton'` envelope mode | Strips uncapped sub-collections; realistic-density acceptance test; default minimal unchanged |
+
+**Surface consolidation — Raycast retirement.** Item 081 retires the v0 hotkey-overlay scaffolding now that the Tauri desktop overlay is the shipped operator surface. (Items 029–080 are not individually listed above — pre-existing BACKLOG/Complete lag, not part of this item.)
+
+| ID | Title | Shipped |
+|---|---|---|
+| [2026-05-29-081](../backlog/complete/2026-05-29-081-raycast-command-disposition-and-removal.md) | Raycast command disposition + removal | **all-REMOVE** (founder override of per-command disposition, 2026-05-31). Deleted `tools/raycast-echo/` in full — `echo` + `recap` + `decisions` commands, lib, tests; cleaned tsconfig/eslint/.gitignore/tail-mcp refs. Overlay (`tools/echo-overlay/`) reuses none of it; `echo`/`recap` jobs retired without replacement. Cross-tool review queue r2: codex + codex-ops both `proceed`, zero findings. Merged `3d5e3d9e`. |
 
 ---
 

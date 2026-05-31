@@ -66,7 +66,7 @@ The `view` parameter is independent of the existing `format?: "skeleton"` (find_
 
 ## Applies to find_clusters + get_atoms
 
-Both tools accept `view?: "compact" | "rich"` with default `"rich"`. The Raycast client at `tools/raycast-echo/src/lib/mcp.ts` opts in to compact for both. See [[mcp-find-clusters]] and [[mcp-get-atoms]] for the per-tool documentation of how compact composes with that tool's other parameters.
+Both tools accept `view?: "compact" | "rich"` with default `"rich"`. The first consumer to opt into compact was the Raycast v0 client (`tools/raycast-echo/src/lib/mcp.ts`, retired 2026-05-31 per [[hotkey-overlay-raycast|item 081]]); `view` remains a substrate-level contract for any consumer. See [[mcp-find-clusters]] and [[mcp-get-atoms]] for the per-tool documentation of how compact composes with that tool's other parameters.
 
 `search_memories` and `get_atom` are explicitly **deferred** — Raycast does not use them on the resume path. If a future consumer needs compact for those tools, that is a separate item, not a proactive expansion of 064.
 

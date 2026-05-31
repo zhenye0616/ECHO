@@ -94,7 +94,7 @@ The two-layer disambiguation matters: AC1's cluster-rank predicate (the normaliz
 
 The 25 kB envelope-overflow prefix-drop loop sizes its budget on the **post-compact** atom bytes — a 50-tool-call codex atom drops from ~207 kB `metadata_bytes_elided` to under 2 kB in compact mode, so envelope drops that previously fired on rich-mode metadata are eliminated.
 
-The Raycast client at `tools/raycast-echo/src/lib/mcp.ts` opts in to compact for both `get_atoms` and [[mcp-find-clusters|`find_clusters`]].
+The first consumer to opt into compact was the Raycast v0 client (`tools/raycast-echo/src/lib/mcp.ts`), which requested compact for both `get_atoms` and [[mcp-find-clusters|`find_clusters`]]. That extension was retired on 2026-05-31 ([[hotkey-overlay-raycast|item 081]]); the `view` knob remains a substrate-level contract for any consumer (default `rich`).
 
 ## Cost Contract
 

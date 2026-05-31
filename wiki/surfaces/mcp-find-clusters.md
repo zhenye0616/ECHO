@@ -102,7 +102,7 @@ This makes the demo bar a **structural guarantee**: after `[AUTO_EXPAND] single-
 
 `view` is independent of `format` (`view` controls field hygiene; `format` controls atom-body inclusion). Default is `view: "rich"` so existing agent callers observe byte-identical output. The 25 kB envelope-overflow prefix-drop loop sizes its budget on the post-compact bytes, so the live ~207 kB codex case stops triggering `atoms_dropped > 0` purely on metadata that compact would have removed.
 
-The Raycast client at `tools/raycast-echo/src/lib/mcp.ts` opts in to compact for `find_clusters` (and [[mcp-get-atoms|`get_atoms`]]).
+The first consumer to opt into compact was the Raycast v0 client (`tools/raycast-echo/src/lib/mcp.ts`), which requested compact for `find_clusters` (and [[mcp-get-atoms|`get_atoms`]]). That extension was retired on 2026-05-31 ([[hotkey-overlay-raycast|item 081]]); the `view` knob remains a substrate-level contract for any consumer (default `rich`).
 
 ## Cost Contract
 

@@ -11,9 +11,11 @@ aliases:
 
 # Hotkey Overlay — Raycast v0
 
+> **RETIRED 2026-05-31 (item 081).** This surface no longer exists. The Raycast extension at `tools/raycast-echo/` was removed in full once the Tauri desktop overlay ([[hotkey-overlay]] / `tools/echo-overlay/`) became the shipped operator surface. The `decisions` job (the DecisionCard board) migrated to that overlay; the Raycast-only `echo` (Ask Q&A / sessions / cluster-resume / Continue hero) and `recap` jobs were retired **without a replacement** — if those jobs return, they are new feature items, not a Raycast revival. This page is kept as the **historical record** of the v0 dogfooding phase (items 060→078); the code paths it references (`tools/raycast-echo/...`) are gone. The founder's call: *"I have an overlay with rust and I like it more than raycast."*
+
 ## Definition
 
-The shipped v0 of the [[hotkey-overlay|V1 hotkey overlay]] — a Raycast extension at `tools/raycast-echo/` that gives the founder a single global hotkey to summon ECHO's retrieval, ask LLM-mediated questions against it, and resume prior sessions without leaving the keyboard. The extension borrows Raycast as the host shell (window chrome, hotkey binding, command palette) and consumes the daemon's existing MCP surface at `http://127.0.0.1:38478/mcp`.
+The (now-retired) v0 of the [[hotkey-overlay|V1 hotkey overlay]] — a Raycast extension at `tools/raycast-echo/` that gave the founder a single global hotkey to summon ECHO's retrieval, ask LLM-mediated questions against it, and resume prior sessions without leaving the keyboard. The extension borrowed Raycast as the host shell (window chrome, hotkey binding, command palette) and consumed the daemon's existing MCP surface at `http://127.0.0.1:38478/mcp`.
 
 V0 is deliberately a **learning instrument**, not the V1 surface. Its purpose is to put ECHO retrieval in the founder's daily flow so [[hotkey-overlay|V1]] gets specced from empirical dogfooding data, not from theory. The [[hotkey-overlay|V1 quality bar]] (<100ms summon, <500ms retrieval, native chrome) does **not** apply here — Raycast's chrome is whatever Raycast renders, and v0 inherits its perf envelope verbatim.
 

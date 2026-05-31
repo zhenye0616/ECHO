@@ -9,7 +9,7 @@ aliases:
 
 # Hotkey Overlay
 
-> Shipped v0 dogfood: see [[hotkey-overlay-raycast]]. This page describes the V1 vision (still `planned`); the v0 ships as the Raycast extension at `tools/raycast-echo/`.
+> Shipped v0 dogfood (retired): see [[hotkey-overlay-raycast]]. This page describes the V1 vision (still `planned`). The v0 shipped as a Raycast extension at `tools/raycast-echo/` but was **removed on 2026-05-31 (item 081)** once the Tauri desktop overlay (`tools/echo-overlay/`) became the shipped operator surface; the `decisions` job moved to that overlay, and the Raycast-only `echo`/`recap` jobs were retired without a replacement.
 
 ## Definition
 
