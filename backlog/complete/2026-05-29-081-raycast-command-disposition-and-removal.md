@@ -79,7 +79,51 @@ agent_notes: |
   wiki/surfaces/hotkey-overlay.md, hotkey-overlay-raycast.md (retire), mcp-get-atoms.md,
   mcp-find-clusters.md, architecture/mcp-compact-view-projection.md. Historical narrative in
   principles/{compose-not-capture,drift-prevention}.md stays immutable (OoS #2).
-review_notes: ""
+review_notes: |
+  Merged on 2026-05-31 via founder reconciliation (strategist-built, founder-overridden
+  all-REMOVE; founder pushes the final commit).
+
+  Review of record: cross-tool review queue r2 (CODE review of the deletion diff), NOT a
+  /review-pending sidecar. Both required reviewers returned `proceed` with zero findings;
+  combine.py combined_verdict=proceed, escalated_to_founder=false, next_round=null.
+  - codex @ proceed: deletion complete; `git grep` finds no @raycast/raycast-echo/
+    tools/raycast-echo refs in active code/scripts/configs; tsconfig keeps the echo-overlay
+    exclude; tail-mcp.sh retained + comment fixed; no touch to src/mcp/**, echo-overlay/**,
+    wiki/**, docs/BACKLOG.md, or historical artifacts.
+  - codex-ops @ proceed: did a real --no-commit merge from origin/main (CLEAN); npm ci +
+    typecheck + lint + git diff --check all GREEN on the merge result; confirmed the lone
+    red test (tests/coord/no-pre-push-spawn.test.ts) is pre-existing baseline noise the
+    branch does not touch.
+
+  Conflicts resolved: none (clean --no-ff merge).
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied: none.
+  Fixups deferred to follow-up items: none.
+
+  Verify (post-merge, live checkout): typecheck clean; lint (eslint + task-state) clean;
+  tools/sync-skills.sh --check OK. Full vitest suite previously green in isolation for the
+  affected suites (review-queue + task-state 169/169) and green on codex-ops's merge tree;
+  intermittent shellout TIMEOUT under full-suite parallel load is environmental, not a
+  regression (nothing imports the deleted dir).
+
+  Disposition: ALL-REMOVE (founder override of the per-command AC2 table + AC1 080-AC8 gate
+  + locked-decision-#4 echo-KEEP-BLOCKED). No replacement built (OoS #1). See agent_notes
+  for the founder's reusability check.
+
+  Note: b0de716c committed only the inbox->pending_review rename; the dropped frontmatter
+  (status + agent_notes) was re-committed at 10e1d000 (git-add pathspec-atomicity footgun).
+
+  Follow-up items (non-blocking):
+  - Strategist post-merge wiki/BACKLOG/manifest reconciliation: retire/redirect
+    wiki/surfaces/hotkey-overlay-raycast.md; fix broken tools/raycast-echo/... path pointers
+    in wiki/surfaces/{hotkey-overlay,mcp-get-atoms,mcp-find-clusters}.md +
+    wiki/architecture/mcp-compact-view-projection.md (historical narrative in
+    principles/{compose-not-capture,drift-prevention}.md stays immutable per OoS #2); move the
+    081 row in docs/BACKLOG.md to Done; regenerate .manifest.json + wiki/index.md.
+  - If echo/recap jobs are missed later, file separate replacement/retirement items (the
+    overlay covers neither today).
 ---
 
 # 081 — Raycast command disposition + removal (parity-gated, per-command)
