@@ -79,6 +79,24 @@ Do **not** build a flop AI / Unreal extractor (expansion trap, sample of one). f
 
 Run the n=1 concierge install. Coworker installs **CC + Codex + git + MCP** on his own machine, founder watching. Score three binary facts: (1) did the substrate **form** on his tools; (2) did retrieval return **signal on his corpus**; (3) unprompted "when can I pay?" reaction (caveated — friendly sample). Log the flop AI coverage gap as observation: graceful-degrade vs confabulate. **What kills the move:** substrate won't form without founder hand-staging → next build item is "make it form unattended," NOT the alpha program, NOT the actionability harness, NOT expansion.
 
+## Empirical pre-flight — sandbox foreign-install (2026-06-01)
+
+Ran the full install end-to-end in an isolated sandbox simulating a foreign machine (fake `$HOME` with seeded `~/.claude/CLAUDE.md` + `~/.codex/config.toml`, test launchd label `com.echo.daemon.sboxtest`, test port 41789, isolated ECHO_HOME/data-dir/db-path/log-dir). **Production daemon on 38478 verified untouched after the run.** Reusable script saved at `tools/foreign-install-smoke.sh`.
+
+**Passed (de-risked for Tuesday):**
+- `npm install -g echoctl-0.1.0.tgz` → `echoctl --version` 0.1.0. Clean.
+- `echoctl daemon install` → plist written, packaged daemon binary resolved, daemon started. **The MCP server actually serves on the isolated port** — real JSON-RPC `initialize` response (`serverInfo: echo-daemon`, tools advertised). *The formation/serving floor — n=0's biggest unknown — passed off a non-founder config.*
+- `echoctl init` with **`repo_root` omitted** → **exit 0, NO "could not locate source tree" prompt.** The packaged install locates its `assets/echo-skills` source fine on a repo-less machine. The source-tree worry does not materialize.
+- **Codex MCP wired functionally:** wire wrote `[mcp_servers.echo] url=http://127.0.0.1:<port>/mcp` into `config.toml` (wire result `ok (append, add)`).
+- **Skills boundary confirmed:** `~/.echo/skills` got exactly `using-echo-coord.md` + `using-echo-mcp.md`. Tarball listing confirms `package.json` `files` ships `assets/echo-skills/**` (2 curated), NOT `skills/**` (the dev protocol). No `backlog/`, `src/`, `review-queue/*.{sh,py}`, `process-backlog`/`merge-and-cleanup`/`review-queue-*`, `wiki/`, `raw/`. `using-echo-coord` is itself honest that `coord_invoke` wrappers aren't shipped. **Founder's coordination-skills worry is correct and already structurally handled.**
+- Aside: git-watcher backfilled 2 recent cwd commits into a cold store — git capture + backfill works on a fresh DB.
+
+**The ONE gap surfaced — Claude Code MCP registration:** wire results differ by agent — Codex got `ok (append, add)` (the `add` = real server registration); Claude Code got `ok (append, copied, copied)` — it **appended a `<!-- BEGIN ECHO -->` instructions block to `CLAUDE.md` and copied skills, but did NOT register an MCP server.** A `CLAUDE.md` block tells Claude *to use* ECHO; it is not a server registration (Claude Code registers via `claude mcp add` / `.mcp.json`). Couldn't fully confirm because the sandbox's fake HOME meant `claude` wasn't logged in (probe hit `Not logged in · Please run /login` before MCP could be tested). **Tuesday's #1 likely live fix: `claude mcp add echo http://127.0.0.1:38478/mcp` then re-`doctor`** (exactly what init's own remediation text says).
+
+**Fresh tarball:** rebuilt 2026-06-01 13:17, 263 KB, 253 files, clean. Since `dist/` is gitignored, the tarball is only as fresh as the last `npm pack` — repack if any `src/` changes before Tuesday.
+
+**Remaining real-machine unknowns (the actual experiment):** (1) Claude Code MCP reachability/registration; (2) his Node + launchd runtime (Codex's "own the runtime" issue — pinned `process.execPath` vs nvm/asdf); (3) capture backfill of *his real* Claude Code + Codex history (untestable under an empty fake HOME); (4) retrieval quality on a corpus the founder didn't generate.
+
 ## What I noticed about how you think
 
 The expansion-under-validation-pressure pattern showed up **and you caught it yourself this time** — "i know that i have been expanding without validation." That's new; the prior two docs had to name it *for* you. Credit where due.
