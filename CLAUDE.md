@@ -154,7 +154,7 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 ### Dogfooding journal discipline (every AI client)
 
-**Every ECHO MCP call must be logged to the current month's shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` in the moment** — currently `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md`. Do not append to the frozen historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; monthly shards are the canonical log. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+**Every ECHO MCP call must be logged to the current month's shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` in the moment** — currently `raw/internal/dogfooding/mcp-interactions-journal-2026-06.md`. Do not append to the frozen historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; monthly shards are the canonical log. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
 
 **What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
 
