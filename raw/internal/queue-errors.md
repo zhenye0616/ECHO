@@ -39,3 +39,4 @@
 2026-05-29T05:56:23Z PUSH-RACE-FALLBACK: journal: codex-ops r2 review tick on 2026-05-28-079-loop-reliability-pack sha=43ac1d5aad1fb55695737e2e10743cc00bf81de5
 2026-05-29T23:05:49Z PUSH-RACE-FALLBACK: journal: codex r2 review tick on 2026-05-29-082-retrieval-quality-eval-harness sha=4762d03d3ce7c8a80860b7a2a085f15a26e0774d
 2026-05-29T23:15:40Z PUSH-RACE-FALLBACK: journal: codex-ops r3 review tick on 2026-05-29-082-retrieval-quality-eval-harness sha=ae429d3a2d97aee3b96a45f81e9f28689cd97164
+2026-06-02T06:53:09Z PUSH-RACE-FALLBACK: journal: codex r1 review tick on 2026-06-01-083-init-registers-claude-code-mcp sha=25595e8e87a13b66a9d3fbe14aa8e67f6fbd2f9d
