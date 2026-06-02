@@ -47,7 +47,46 @@ pr_url: ""
 agent_notes: |
   Implemented `echoctl init` install profiles on `agent/install-profile-split` at `f144bb4c0a8e15371c61ea8b410da77e32ed8f4a`: CLI/answer-file/recorded/default profile resolution, onboarding persistence + profile-less warning, customer skill filtering, customer role/workflow no-op skips, dogfood full-surface preservation, doctor profile output, and smoke-script assertions.
   Verification: focused profile vitest (4 files / 70 tests), `npm run typecheck`, `npm run lint`, full `npm test` (142 files passed / 1 skipped; 1505 tests passed / 21 skipped), `npm run build:cli`, `bash -n tools/foreign-install-smoke.sh`, and `git diff --check` passed. Full foreign-install smoke was not executed because the script hardcodes `$HOME/Desktop/Project_echo`, which would exercise main rather than the sibling feature worktree.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-02 via founder reconciliation.
+
+  Conflicts resolved:
+  - None. Clean --no-ff merge of agent/install-profile-split (f144bb4c) onto
+    main (66bc6036); ort strategy, 15 files, no conflict markers. Sidecar
+    predicted zero conflicts (main-only changes were backlog/review artifacts,
+    not the code files this branch touched).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - None applied to the tree. The sidecar's single pre-merge fixup was a
+    founder verification decision, not a code change.
+
+  Fixups deferred to follow-up items:
+  - Bump testTimeout (or isolate) tests/mcp/recent-calls-endpoint.test.ts —
+    deferred per founder. Not modified in this merge (unrelated file; would be
+    scope drift into an install-profile-split merge).
+
+  Verify: 1504/1505 tests pass on full `npm test` (1 skipped suite, 21 skipped
+  tests). The lone failure — tests/mcp/recent-calls-endpoint.test.ts timing out
+  at 15s under full-suite load — passed 2/2 in 8s on isolated rerun; founder
+  waived it as a load-sensitive flake. lint, typecheck, and
+  tools/sync-skills.sh --check all clean post-merge.
+
+  Follow-up items (non-blocking):
+  - Bump/raise testTimeout or isolate tests/mcp/recent-calls-endpoint.test.ts
+    so full-suite load no longer trips its 15s gate.
+  - Codex adapter friction (review-pending on this item): sandboxed Codex CLI
+    child failed app-server init with "Operation not permitted"; escalated child
+    verified but hung after status/diff and never wrote --output-last-message,
+    forcing a stale parse-fail sidecar before the successful rerun. `ps`
+    inspection required sandbox escalation.
+  - Skill portability: /review-pending Codex adapter is CLI-specific
+    (--output-last-message temp-file semantics); the retry used the Codex
+    subagent primitive (agent-output) instead.
+  - Skill artifact-scope: parse-fail handling wants durable queue-error evidence
+    committed, but the skill says only sidecars should be committed — clarify
+    whether queue-error evidence may be committed.
 ---
 
 ## Why (the friction this closes)

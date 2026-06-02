@@ -1176,3 +1176,9 @@ The structural framing — **roles MUST be conflict-free by construction across 
 ## From 083 merge (2026-06-02)
 - 083: Add SIGKILL escalation for the Claude Code MCP registration spawn if it ignores SIGTERM (currently bounded-timeout + SIGTERM only). (from /review-pending sidecar)
 - 083: Narrow Claude MCP duplicate detection from broad `already exists` text-match to the `echo`-server-specific duplicate shape. (from /review-pending sidecar)
+
+## From 084-install-profile-split (merged 2026-06-02)
+- [ ] Bump/raise `testTimeout` or isolate `tests/mcp/recent-calls-endpoint.test.ts` so full-suite load no longer trips its 15s gate (deferred per founder at 084 merge).
+- [ ] Codex /review-pending adapter friction: sandboxed Codex CLI child fails app-server init with "Operation not permitted"; escalated child hangs after status/diff and never writes `--output-last-message`, forcing a stale parse-fail sidecar. `ps` inspection needs sandbox escalation.
+- [ ] Skill portability: /review-pending Codex adapter is CLI-specific (`--output-last-message` temp-file semantics); successful retry used the Codex subagent primitive (agent-output) instead.
+- [ ] Skill artifact-scope: parse-fail handling wants durable queue-error evidence committed, but the skill says only sidecars should be committed — clarify whether queue-error evidence may be committed.
