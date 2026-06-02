@@ -241,3 +241,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** ECHO MCP daemon at `http://127.0.0.1:38478/mcp`; no memory atoms, clusters, or captured-source rows were requested.
 - **Verdict:** right - connectivity check returned the expected pong envelope.
 - **Note:** Tool discovery exposed the `mcp__echo` namespace in this Codex session; the builder can use MCP directly rather than falling back silently to filesystem-only context.
+
+### 2026-06-02 01:32 PDT - codex builder task-state discovery for 084
+
+- **Trigger:** Codex builder claimed `2026-06-02-084-install-profile-split`; checked whether ECHO MCP could discover the role-typed task-state pointer before broader implementation context loading.
+- **Query inputs:** `list_task_states(stage="claimed", role="strategist", ref="HEAD")`; retry `list_task_states(stage="claimed", role="strategist", ref="origin/main")`.
+- **Returned:** Both calls returned text errors: unable to resolve the requested ref to a commit.
+- **Sources:** ECHO MCP task-state transport only; local filesystem separately showed no `backlog/task-state/2026-06-02-084-install-profile-split/` directory.
+- **Verdict:** partial - the MCP namespace is reachable, but task-state ref resolution did not work for local git refs in this session.
+- **Note:** The builder will proceed from committed filesystem/backlog context and write the missing `builder.md` pointer as the single builder owner.
