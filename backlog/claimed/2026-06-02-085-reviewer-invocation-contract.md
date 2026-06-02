@@ -1,7 +1,7 @@
 ---
 id: 2026-06-02-085-reviewer-invocation-contract
 title: "Reviewer-invocation contract (MVP) — one argv-based `reviewer-bindings.json` + agent_sandbox/commit_policy split; kill the shell-string `bash -c` path + the danger-full-access review-child blessing"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-06-02
@@ -29,10 +29,10 @@ spec_refs:
   - backlog/complete/2026-06-02-084-install-profile-split.md  # frontmatter-shape + section-structure template this spec mirrors; also the live source of the review-child friction (agent_notes: sandboxed Codex child failed app-server init w/ "Operation not permitted"; escalated child wrote a stale/fabricated sidecar) that motivates the agent_sandbox/commit_policy split.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-02T21:43:20Z"
+branch: "agent/reviewer-invocation-contract"
+worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-invocation-contract"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
