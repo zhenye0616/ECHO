@@ -3,11 +3,18 @@ task_id: 2026-06-02-084-install-profile-split
 role: builder
 binding: codex
 claim_branch: agent/install-profile-split
-last_updated: 2026-06-02T08:34:00Z
+last_updated: 2026-06-02T15:06:17Z
+handoff_branch: agent/install-profile-split
+handoff_head_sha: f144bb4c0a8e15371c61ea8b410da77e32ed8f4a
+handoff_run_log: raw/internal/agent-runs/2026-06-02-2026-06-02-084-install-profile-split.md
 ---
 
 ## current_thesis
 Claimed 084 as codex builder. Implement the install-profile split for `echoctl init`: default customer installs get retrieval/substrate skills only, explicit dogfood installs keep the full coord surface, and recorded profiles are persisted/respected without adding auto-detection or cleanup machinery.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at f144bb4c0a8e15371c61ea8b410da77e32ed8f4a.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: `echoctl init` resolves profile by CLI flag > answer-file `profile` > recorded onboarding profile > unconditional `customer`, persists it, and no-flag reruns respect a recorded profile.
@@ -32,5 +39,5 @@ Claimed 084 as codex builder. Implement the install-profile split for `echoctl i
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-02-084-install-profile-split.md
+- spec: backlog/pending_review/2026-06-02-084-install-profile-split.md
 - reviews: backlog/reviews/2026-06-02-084-install-profile-split/

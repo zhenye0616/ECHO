@@ -42,9 +42,11 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-02T08:31:53Z"
 branch: "agent/install-profile-split"
 worktree: "/Users/zhenye/Desktop/Project_echo--install-profile-split"
-head_sha: ""
+head_sha: "f144bb4c0a8e15371c61ea8b410da77e32ed8f4a"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented `echoctl init` install profiles on `agent/install-profile-split` at `f144bb4c0a8e15371c61ea8b410da77e32ed8f4a`: CLI/answer-file/recorded/default profile resolution, onboarding persistence + profile-less warning, customer skill filtering, customer role/workflow no-op skips, dogfood full-surface preservation, doctor profile output, and smoke-script assertions.
+  Verification: focused profile vitest (4 files / 70 tests), `npm run typecheck`, `npm run lint`, full `npm test` (142 files passed / 1 skipped; 1505 tests passed / 21 skipped), `npm run build:cli`, `bash -n tools/foreign-install-smoke.sh`, and `git diff --check` passed. Full foreign-install smoke was not executed because the script hardcodes `$HOME/Desktop/Project_echo`, which would exercise main rather than the sibling feature worktree.
 review_notes: ""
 ---
 
