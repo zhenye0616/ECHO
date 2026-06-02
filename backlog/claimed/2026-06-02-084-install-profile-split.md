@@ -38,10 +38,10 @@ spec_refs:
   - backlog/{ready,pending_review,complete}/2026-05-26-076-packaged-echoctl-install-boundary.md  # 076 set the tarball `files` allowlist (ships BOTH audiences). 084 does NOT change what ships — it filters at INSTALL time (see Locked #1).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-02T08:31:53Z"
+branch: "agent/install-profile-split"
+worktree: "/Users/zhenye/Desktop/Project_echo--install-profile-split"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
