@@ -250,3 +250,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** ECHO MCP task-state transport only; local filesystem separately showed no `backlog/task-state/2026-06-02-084-install-profile-split/` directory.
 - **Verdict:** partial - the MCP namespace is reachable, but task-state ref resolution did not work for local git refs in this session.
 - **Note:** The builder will proceed from committed filesystem/backlog context and write the missing `builder.md` pointer as the single builder owner.
+
+### 2026-06-02 10:55 PDT — claude strategist: recall Codex's 084-review friction via ECHO
+
+- **Trigger:** Founder asked "use echo and identify the friction point codex identified during its review session" (the /review-pending 084 Codex session, post-merge).
+- **Query inputs:** `find_clusters(since=2026-06-02T16:00:00Z, until=2026-06-02T18:30:00Z)`; then `get_atoms(atom_ids=[23 of the codex cluster's ids], prefer=newest_first, format=minimal, fields=[id,timestamp,content,source])`.
+- **Returned:** 2 clusters. ctx_0097e153 = pure Codex (source_breakdown={codex:47}, 16:55–17:48Z) — the review session. get_atoms returned 10, dropped 13 under budget. Top/answer atom: `7a2ef6a8` @17:48:40Z = Codex's verbatim self-summary in reply to "summarize the friction you encounter during review" (7 enumerated friction points).
+- **Sources:** source_breakdown across the two clusters = {codex:47, claude_code:9, git:6}. The answer atom source = `fs:/Users/zhenye/.codex/sessions/2026/06/02/rollout-2026-06-02T09-44-38-…0d1b…jsonl`. Most other codex atoms in the cluster were UNRELATED review-queue-codex ticks (pinned-request `bind_failed`/`request_not_found` for 2026-05-16-057b), not the 084 review.
+- **Verdict:** ✅ right — ECHO surfaced Codex's own friction self-report directly; richer + more first-person than the sidecar's distilled follow-up list.
+- **Note:** Strong dogfood signal: the highest-value atom was a model's self-narrated friction summary captured cross-tool, retrievable by another tool minutes later with zero hand-staging. Interpretation discipline mattered — the codex cluster was ~80% noise from concurrent 057b reviewer ticks; the single 084 atom is the answer. 13-atom budget drop didn't hurt (the newest_first answer atom survived, by design).
