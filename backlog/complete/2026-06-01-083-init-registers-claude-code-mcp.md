@@ -40,7 +40,26 @@ head_sha: "2d64e40e2c242fd794f5eca0594eb4f234ff1c2f"
 pr_url: ""
 agent_notes: |
   Implemented Claude Code MCP registration during echoctl init via the wire path, with exact init/doctor remediation and smoke-test argv assertion. Feature branch agent/init-registers-claude-code-mcp is pushed at 2d64e40e2c242fd794f5eca0594eb4f234ff1c2f; verification passed: focused init/doctor/wire tests, typecheck, lint, build:cli, bash -n for foreign-install-smoke.sh, git diff --check, and a second full npm test run (1496 passed, 21 skipped).
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-02 via founder reconciliation.
+
+  Spec converged via cross-tool review-queue (codex + codex-ops, 3 rounds: r1 5 findings → patch; r2 1 finding → reconcile mechanism removed; r3 both proceed/0) before claim. Implementation reviewed via /review-pending sidecar (verdict: merge with founder fixups; 1496/0 tests, AC1-AC6 covered, HEAD 2d64e40e).
+
+  Conflicts resolved:
+  - None. Branch forked post-convergence; its src/tests/docs/tools changes were disjoint from main's backlog/review traffic → clean --no-ff merge.
+
+  C3.5 cross-vendor consult: none invoked (clean merge, no judgment-loaded resolution).
+
+  Fixups applied:
+  - Founder accepted the file-scope exception: the branch touched src/echo-home/adapter-sync.ts (not in files_to_modify). This is the J1 placement realized correctly — the in-scope new src/echo-home/adapters/claude-code-mcp.ts is wired into syncAll's per-agent dispatch (adapter-sync.ts), parallel to the existing codex/cursor MCP registration. Coherent, tested, within J1's open placement question; spec under-specified the wire→syncAll seam. Not drift.
+
+  Fixups deferred to follow-up items: none.
+
+  Verify: 1496/1496 tests pass (21 skipped); lint, typecheck, and tools/sync-skills.sh --check all clean post-merge.
+
+  Follow-up items (non-blocking, filed to _followups.md):
+  - Add SIGKILL escalation for the Claude Code MCP registration spawn if the process ignores SIGTERM.
+  - Narrow duplicate detection from broad `already exists` text to the Claude MCP `echo` server duplicate shape.
 ---
 
 ## Why (the friction this closes)

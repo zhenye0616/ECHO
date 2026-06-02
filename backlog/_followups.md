@@ -1172,3 +1172,7 @@ The structural framing — **roles MUST be conflict-free by construction across 
 - **AC7 manual gate (post-merge founder):** packaged-`.app` macOS smoke (Tauri/Rust build + drive live menu-bar UI incl. AC7(vii) transparency + always-on-top) is the documented manual fallback in `tools/echo-overlay/README.md`; not automatable in sandbox.
 - **AC8 dogfooding gate (post-merge founder):** ≥3 Overlay sessions across ≥2 calendar days with `**Surface:** Overlay`, ≥1 where the ambient dot lit on a real awaiting-you decision AND the founder dove in.
 - **Post-shipment strategist (per spec After-Completion):** promote 080's After-Completion decisions to `wiki/` (overlay surface page / felt-not-seen manager-altitude amendment as applicable); update `.manifest.json` + regen `wiki/index.md`.
+
+## From 083 merge (2026-06-02)
+- 083: Add SIGKILL escalation for the Claude Code MCP registration spawn if it ignores SIGTERM (currently bounded-timeout + SIGTERM only). (from /review-pending sidecar)
+- 083: Narrow Claude MCP duplicate detection from broad `already exists` text-match to the `echo`-server-specific duplicate shape. (from /review-pending sidecar)
