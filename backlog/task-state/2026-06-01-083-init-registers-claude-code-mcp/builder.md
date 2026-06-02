@@ -3,11 +3,18 @@ task_id: 2026-06-01-083-init-registers-claude-code-mcp
 role: builder
 binding: codex
 claim_branch: agent/init-registers-claude-code-mcp
-last_updated: 2026-06-02T07:31:36Z
+last_updated: 2026-06-02T07:57:37Z
+handoff_branch: agent/init-registers-claude-code-mcp
+handoff_head_sha: 2d64e40e2c242fd794f5eca0594eb4f234ff1c2f
+handoff_run_log: raw/internal/agent-runs/2026-06-02-2026-06-01-083-init-registers-claude-code-mcp.md
 ---
 
 ## current_thesis
 Claimed 083 as codex builder. Implement the narrow install-friction fix: `echoctl init` must register Claude Code's user-scope ECHO MCP server through the `claude` CLI, and `doctor`/install docs/tests must surface the exact remediation and local-shadow escape hatch without adding broader MCP-client machinery.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 2d64e40e2c242fd794f5eca0594eb4f234ff1c2f.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: Claude Code registration uses `claude mcp add --transport http --scope user echo <resolved mcpServerUrl>` when claude-code is selected; Codex/Cursor wiring remains unchanged.
@@ -29,4 +36,5 @@ Claimed 083 as codex builder. Implement the narrow install-friction fix: `echoct
 - Do not edit `wiki/`, docs outside `docs/echoctl-install.md`, item body text, or founder-owned backlog/status docs.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-01-083-init-registers-claude-code-mcp.md
+
+- spec: backlog/pending_review/2026-06-01-083-init-registers-claude-code-mcp.md

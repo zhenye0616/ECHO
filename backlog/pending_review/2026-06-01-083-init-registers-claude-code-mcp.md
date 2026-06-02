@@ -1,7 +1,7 @@
 ---
 id: 2026-06-01-083-init-registers-claude-code-mcp
 title: "`echoctl init` registers Claude Code's MCP server (close the half-wire gap) + exact doctor remediation copy"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.5d
 created: 2026-06-01
@@ -36,9 +36,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-02T07:31:36Z"
 branch: "agent/init-registers-claude-code-mcp"
 worktree: "/Users/zhenye/Desktop/Project_echo--init-registers-claude-code-mcp"
-head_sha: ""
+head_sha: "2d64e40e2c242fd794f5eca0594eb4f234ff1c2f"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented Claude Code MCP registration during echoctl init via the wire path, with exact init/doctor remediation and smoke-test argv assertion. Feature branch agent/init-registers-claude-code-mcp is pushed at 2d64e40e2c242fd794f5eca0594eb4f234ff1c2f; verification passed: focused init/doctor/wire tests, typecheck, lint, build:cli, bash -n for foreign-install-smoke.sh, git diff --check, and a second full npm test run (1496 passed, 21 skipped).
 review_notes: ""
 ---
 
