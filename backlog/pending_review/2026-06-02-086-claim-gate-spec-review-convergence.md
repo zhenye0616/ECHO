@@ -30,10 +30,11 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-02T22:34:19Z"
 branch: "agent/claim-gate-spec-review-convergence"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--claim-gate-spec-review-convergence"
+head_sha: "09ad3ac45fc7d4c96ab4c06645b927e33c637436"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the spec-review claim gate in `tools/blocked.py`, including inline-list `requested_reviewers` parsing/preservation, watcher/founder-owned marker validation, normalized-content digest staleness checks, and blocked-list reasons. Updated watcher terminal-path instructions, regenerated the Claude adapter, documented the builder/backlog contract, and extended `tools/test_blocked.py` to 29 passing cases. Verification passed: `python3 tools/test_blocked.py`, `python3 tools/blocked.py --validate`, `tools/sync-skills.sh --check`, `git diff --check`, and `npm test`.
 review_notes: ""
 ---
 

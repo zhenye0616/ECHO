@@ -3,11 +3,18 @@ task_id: 2026-06-02-086-claim-gate-spec-review-convergence
 role: builder
 binding: codex
 claim_branch: agent/claim-gate-spec-review-convergence
-last_updated: 2026-06-02T22:35:14Z
+last_updated: 2026-06-02T22:48:34Z
+handoff_branch: agent/claim-gate-spec-review-convergence
+handoff_head_sha: 09ad3ac45fc7d4c96ab4c06645b927e33c637436
+handoff_run_log: raw/internal/agent-runs/2026-06-02-2026-06-02-086-claim-gate-spec-review-convergence.md
 ---
 
 ## current_thesis
 Claimed 086 as codex builder. Implement the claim gate so a `ready/` item with non-empty `requested_reviewers` is claimable only after watcher/founder-owned spec-review convergence is present and fresh, while unreviewed-by-design items keep today's selector behavior.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 09ad3ac45fc7d4c96ab4c06645b927e33c637436.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: update `skills/review-queue-watch.md` so both terminal paths write `spec_review: converged` and a normalized-content digest in `spec_review_sha`, then regenerate `.claude/commands/review-queue-watch.md`.
@@ -29,5 +36,6 @@ Claimed 086 as codex builder. Implement the claim gate so a `ready/` item with n
 - Do not edit `wiki/`, backlog item bodies, docs/status/backlog founder-owned files, or files outside the spec's `files_to_modify`.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-02-086-claim-gate-spec-review-convergence.md
+
+- spec: backlog/pending_review/2026-06-02-086-claim-gate-spec-review-convergence.md
 - reviews: backlog/reviews/2026-06-02-086-claim-gate-spec-review-convergence/
