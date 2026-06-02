@@ -24,13 +24,13 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | backlog/ready/2026-06-02-084-install-profile-split.md:19,81,84; src/cli/io/render.ts:77-101 at a8f4b72 | _strategist fills_ | _strategist fills_ |
-| 2 | MEDIUM | codex | backlog/ready/2026-06-02-084-install-profile-split.md:77,80,83; src/echo-home/scaffold.ts:29-51 at a8f4b72 | _strategist fills_ | _strategist fills_ |
-| 3 | MEDIUM | codex-ops | backlog/ready/2026-06-02-084-install-profile-split.md:80,83; src/echo-home/scaffold.ts:29-62 at a8f4b72 | _strategist fills_ | _strategist fills_ |
-| 4 | MEDIUM | codex-ops | backlog/ready/2026-06-02-084-install-profile-split.md:19,81,84; src/cli/io/render.ts:76-98 at a8f4b72 | _strategist fills_ | _strategist fills_ |
-| 5 | MEDIUM | codex-ops | backlog/ready/2026-06-02-084-install-profile-split.md:77,82-83; tools/foreign-install-smoke.sh:71-76 at a8f4b72 | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex | spec AC5; src/cli/io/render.ts | accepted — patched (CONVERGENT w/ #4) | Real scope gap: doctor TEXT output renders in `render.ts` (`renderDoctorReport()`), not in files_to_modify, so AC5+AC8 conflicted — builder couldn't print the profile in text mode without violating scope. Added `src/cli/io/render.ts` to files_to_modify; AC5 now requires text+JSON; AC7 asserts the text path. |
+| 2 | MEDIUM | codex | spec AC4/AC7; scaffold.ts | accepted — patched (CONVERGENT w/ #3) | The r2 atomic-ordering fix NARROWED but didn't CLOSE the crash window: `ensureEchoHome()` writes a valid profile-less file before init persists, so an interrupted fresh scaffold == legacy install on "valid file, no profile." Fixed AC4 with a **durable discriminator over existing fields**: no-file OR (`completed:false` + empty agents) ⇒ customer; (`completed:true` OR agents) without profile ⇒ dogfood. Independent of persistence timing → closes the collapse. AC7 tests the on-disk shape. |
+| 3 | MEDIUM | codex-ops | spec AC4/AC7; scaffold.ts | accepted — patched (CONVERGENT w/ #2) | Same partial-scaffold collapse from the ops lens (unattended retry flips fresh→dogfood after a crash). Resolved by the same AC4 discriminator (`completed`/agents) — exactly codex-ops's suggested "define the persisted discriminator." |
+| 4 | MEDIUM | codex-ops | spec AC5; src/cli/io/render.ts | accepted — patched (CONVERGENT w/ #1) | Same doctor text-output scope gap; render.ts added + text assertion required. |
+| 5 | MEDIUM | codex-ops | spec AC1/AC7; smoke | accepted — patched | Answer-file `profile` was schema-accepted but absent from resolution order/tests → a scripted `profile: dogfood` could silently come up customer. AC1 now pins explicit precedence: CLI `--profile` > answer-file `profile` > recorded > inferred (AC4); AC7 adds the no-TTY answer-file test. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**needs R4** — 5 findings, all NEW spec-completeness gaps (NOT bugs in the r2 removal — the prune removal converged clean), 3 convergent pairs + 1: (#1/#4) doctor text-render scope → render.ts added; (#2/#3) AC4 partial-scaffold crash-window → durable `completed`/agents discriminator (closes it independent of timing); (#5) answer-file precedence → explicit chain + test. All patches, no removals. R4 verifies. focus_hints: (1) AC4 inference keys on `completed`/`agents` (no-file or completed:false+empty-agents ⇒ customer; completed:true/agents-without-profile ⇒ dogfood) — NOT file-presence; AC7 asserts all three on-disk shapes. (2) AC1 precedence CLI > answer-file > recorded > inferred, with the no-TTY answer-file test. (3) AC5 requires doctor profile in BOTH text (render.ts, now in files_to_modify) and JSON. Confirm AC8 scope now matches the expanded files_to_modify.
 
