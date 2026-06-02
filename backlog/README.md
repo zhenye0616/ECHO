@@ -47,7 +47,7 @@ This makes spec/build divergence structurally impossible — the wiki cannot cla
 ```
 backlog/
 ├── README.md            (this file)
-├── ready/               # specced, agent can claim
+├── ready/               # specced; claimable only when blocked.py says so
 ├── claimed/             # agent has atomically claimed; in-progress
 ├── pending_review/      # agent done; awaits founder review + merge
 └── complete/            # founder approved + merged; wiki update pending
@@ -60,6 +60,8 @@ backlog/
      │
      ▼
 ready/      ← agents poll this folder; oldest HIGH-priority item wins
+              (if requested_reviewers is non-empty, spec-review convergence
+               or founder waiver is required before blocked.py will select it)
      │
      ▼ (atomic claim: see below)
 claimed/    ← agent owns it; works in its own worktree on agent/<slug> branch
@@ -267,6 +269,10 @@ task_state_ref: ""                # optional (046+). When set, names the task-st
                                   # under backlog/task-state/<task-id>/ — the role-typed working-memory
                                   # snapshot strategist/builder/watcher/dispatcher actors read on cold
                                   # start. Reviewer ticks MUST NOT read this; see skills/role-typed-task-state.md.
+requested_reviewers: []           # optional. Non-empty means the item is under/awaiting spec-review
+                                  # and is not claimable until blocked.py sees spec_review convergence.
+# spec_review: converged          # optional, watcher/founder-owned: converged | waived | pending.
+# spec_review_sha: <sha256>       # watcher-owned normalized-content digest required for converged.
 acceptance:                       # specific, testable criteria
   - All capture data flows through one chokepoint function
   - Non-allowlisted sources rejected; rejections are logged
@@ -324,7 +330,7 @@ When an agent runs, it must:
    - Exit 0: stdout has the path of the next unblocked, highest-priority, oldest item
    - Exit 1: no unblocked work; stop cleanly
    - Exit 2: validation failed (dangling `blocked_by`, cycle, malformed frontmatter, duplicate id, bad priority, id/filename mismatch); stop and surface the error
-   - **Do NOT filter manually.** The script is the deterministic enforcement of `blocked_by`; the agent's job is to call it, not to re-implement the rule. See `tools/blocked.py` for the selection logic and `tools/test_blocked.py` for the test surface (17 cases including dangling refs, cycles, partial dependency satisfaction, priority/date ordering)
+   - **Do NOT filter manually.** The script is the deterministic enforcement of dependency and spec-review claim gates; the agent's job is to call it, not to re-implement the rule. A `ready/` item with non-empty `requested_reviewers` is claimable only after `spec_review: converged` plus a fresh `spec_review_sha`, or founder-owned `spec_review: waived`. See `tools/blocked.py` for the selection logic and `tools/test_blocked.py` for the regression surface.
 4. **Create-or-reuse the worktree** on `agent/<slug>` (idempotent — see Idempotency Guarantees)
 5. **Read all `spec_refs`** in the item before writing any code
 6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)
@@ -361,6 +367,8 @@ The agent is more dangerous than the founder for drift, because it doesn't have 
 3. **Sandbox is enforced in code, not policy** (capture gate pattern; see the first sandbox item)
 
 If the agent finds itself wanting to do something not in acceptance criteria: STOP, log the temptation in `raw/internal/decisions/` as a `drift-event`, leave the item in `claimed/` with a question in `agent_notes` and move it to `pending_review/`.
+
+The `spec_review` and `spec_review_sha` frontmatter fields are not builder-managed. The watcher writes `converged` plus the normalized-content digest when review terminates successfully; the founder may set `waived` as an explicit manual fast-track. Builders must not self-certify review convergence.
 
 ## Item Priority Conventions
 
