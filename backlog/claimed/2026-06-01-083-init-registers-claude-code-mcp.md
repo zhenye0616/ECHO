@@ -1,7 +1,7 @@
 ---
 id: 2026-06-01-083-init-registers-claude-code-mcp
 title: "`echoctl init` registers Claude Code's MCP server (close the half-wire gap) + exact doctor remediation copy"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.5d
 created: 2026-06-01
@@ -32,10 +32,10 @@ spec_refs:
   - backlog/{ready,pending_review,complete}/2026-05-26-076-packaged-echoctl-install-boundary.md  # 076 is the install boundary this rides on; daemon plist already bakes process.execPath + validates node>=22 (so the old "bare node" runtime worry is largely closed). Shipped.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-02T07:31:36Z"
+branch: "agent/init-registers-claude-code-mcp"
+worktree: "/Users/zhenye/Desktop/Project_echo--init-registers-claude-code-mcp"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
