@@ -27,9 +27,9 @@ spec_refs:
   - CLAUDE.md  # operating model: review queue / cross-tool spec review is the protocol; reviewer-independence rule. 086 makes "spec was reviewed before it is built" a code-enforced invariant rather than founder-serialization discipline.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-02T22:34:19Z"
+branch: "agent/claim-gate-spec-review-convergence"
 worktree: ""
 head_sha: ""
 pr_url: ""
