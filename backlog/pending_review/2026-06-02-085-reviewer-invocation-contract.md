@@ -1,7 +1,7 @@
 ---
 id: 2026-06-02-085-reviewer-invocation-contract
 title: "Reviewer-invocation contract (MVP) — one argv-based `reviewer-bindings.json` + agent_sandbox/commit_policy split; kill the shell-string `bash -c` path + the danger-full-access review-child blessing"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-06-02
@@ -33,9 +33,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-02T21:43:20Z"
 branch: "agent/reviewer-invocation-contract"
 worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-invocation-contract"
-head_sha: ""
+head_sha: "40756238ab84a7a7be4c2be103e3d969b6224873"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC3 requires review AI children to run `agent_sandbox: read-only` and "NEVER commit", but the current reviewer prompts still write and commit `<reviewer>.md` from inside the child via `tools/review-queue/commit-reviewer-response.sh`, while OoS#1 explicitly defers the orchestrator-owned sidecar/ownership migration.
+  Tried: Read the mandatory builder context plus every spec_ref, including `tools/review-queue/_run_reviewer.sh`, `_reviewer_gate.py`, `reviewers.json`, `coord-roles.json`, `src/mcp/tools/coord-invoke.ts`, `docs/review-queue-setup.md`, `backlog/_followups.md`, and 084's completed item. Confirmed the existing `.claude/commands/review-queue-codex.md` prompt performs the write/commit/push inside the child process, and those prompt files are not in `files_to_modify`.
+  Best-guess answer: Either narrow 085 to "data-model + argv exec only, do not enforce read-only until the ownership migration ships" or widen 085 to include the orchestrator-owned capture/sidecar migration plus reviewer-prompt changes; confidence high that the current AC/OoS set cannot satisfy both "child read-only/never commits" and "reviewer self-commit stays AS-IS".
+  Why I escalated rather than guessing: Stopping conditions triggered: unresolved spec ambiguity, and satisfying the stronger AC3 interpretation would require files/scope explicitly outside `files_to_modify` and OoS#1.
 review_notes: ""
 ---
 
