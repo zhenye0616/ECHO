@@ -8,6 +8,10 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - **Decouple reviewability from claimability — teach the review queue to scan `backlog/inbox/`.** `tools/review-queue/request.py` `find_artifact()` (and `combine.py` / `dispatch-next-round.py`) only scan `ready|claimed|pending_review|complete`, identical to `tools/blocked.py`'s claim-selector set. So a spec is reviewable **iff** it's claimable — there is no "reviewed/reviewable but not yet buildable" state. Parked-in-`inbox/` specs (externally-gated, e.g. 081 gated on 080 AC8) are therefore un-reviewable without a temp-promote to `ready/`, which (a) makes them prematurely claimable and (b) can break `blocked.py` globally (observed 2026-05-29: 081's `blocked_by` inline comment aborted every selector run while temp-promoted). **Fix:** add `inbox/` to the review tools' artifact-lookup set while keeping `blocked.py` excluding it → `inbox/` becomes "reviewable, not claimable." Both codex and codex-ops independently recommended exactly this at 081 r1. ~1 line per tool; the change itself should be queue-reviewed. This is the prerequisite for the canonical in-place review of 081 at promotion time.
 
+## Test infra
+
+- [ ] **Chokidar teardown race — un-skip the quarantined suites.** Quarantined via `describe.skip` in 3 suites (`tests/capture/surfaces/fs-watcher.test.ts:49`, `tests/capture/extractors/cursor.test.ts:543`, `tests/daemon/lifecycle.test.ts:130`) per item 023. The underlying `watcher.close()` teardown race is still OPEN; quarantine is a holding pattern, not a fix. Real fix (deterministic sync via `probeFreshness` or sentinel-event subscription) restores coverage on 3 core capture/daemon suites. Medium effort, ~2-3d.
+
 ## ⚠️ Known V1 degraded surfaces
 
 ### Cursor capture — `agentKv:` migration (gated, not scheduled)
@@ -71,45 +75,8 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ---
 
-## ✅ Resolved (V1.6 wave — items 030 + 032 + 033)
-
-### MCP retrieval — long-turn elision + envelope caps (RESOLVED end-to-end by 030 + 032 + 033)
-
-**Status:** RESOLVED 2026-05-10 via three shipped items.
-
-- **Trust-bug part — closed by item 030** (merge SHAs `6011d62` / `a6352a4`, 2026-05-10): `truncations: string[]` field now lands on every atom-bearing response (`search_memories`, `tail_session`, `get_atoms`, `wait_for_new_turns`). `[]` ⟺ everything verbatim; `["content"]` ⟺ content was clipped to wire-shape cap; `["metadata.<key>"]` ⟺ per-key cap fired; `["metadata.<key>:projected"]` ⟺ projector reshaped (REFORMATTED not clipped). Consumers can KNOW their response was clipped instead of silently treating it as authoritative. See [[mcp-find-clusters]] / [[mcp-get-atoms]] in the wiki for the contract.
-- **First-call reliability part — closed by item 032** (same merge wave): no-args `find_clusters()` auto-expands from 4h to 24h on either empty OR single-source-recent triggers; strict-partition demotion makes `clusters[0]` STRUCTURALLY prior multi-source work, not calling-session noise; `get_atoms(prefer='newest_first')` guarantees the newest atom of the picked cluster lands in the response even when prefix-drop fires.
-- **Recovery half — closed by item 033** (merged 2026-05-10 PDT, ~19:48 PDT / 2026-05-11T02:48Z, head `a713cac`): new `get_atom(id)` MCP tool returns content verbatim through MCP — no shell, no JSONL fallback, no composer-id context. Contract: content verbatim + metadata projected (via reused `projectMatch` — `tool_calls` reshape + per-key caps still apply) + embedding excluded. Three exit shapes: success / `atom_too_large_for_wire` (with `source` populated for JSONL fallback) / `atom_not_found` (distinct error class). R2 Finding 1 load-bearing fix: `"content"` is filtered out of `truncations` after the verbatim override, so the trust signal that 030 added doesn't lie on the very tool meant to recover from it. The full elision-recovery loop now closes in-MCP; JSONL fallback is last-resort instead of routine.
-
-**Originating surface evidence:** 2026-05-09 Claude Code strategist thread `71b36548-cf1d-4fe5-9370-b0317f9c4ac0` — `tail_session` returned a load-bearing assistant turn with thousands of middle chars replaced by `bytes_elided` marker, recoverable only from source JSONL on disk. Closes the entry the founder kept open pending 030 verification.
-
-**What still bites (non-blocking):** the per-cluster sourcing concern (legacy concern in this entry) is independent of the trust-bug and recovery surfaces; it's tracked separately under the item 029 source_breakdown fix.
-
----
-
-## ❌ Killed (won't ship)
-
-### Item 017 — "Wire normalizer into MCP `search_memories` response shape"
-
-**Status:** killed 2026-05-09. Never specced into `backlog/ready/`. Originally deferred from item 016 ("MCP wiring is the next item"); re-deferred by item 018 ("V1.6, informed by trace-layer learnings"); kept Out of Scope by item 022.
-
-**Original 016 proposal:** add `format: 'raw' | 'normalized' | 'both'` to `search_memories`, returning `match.normalized: NormalizedContextEvent` alongside `match.content`.
-
-**Why killed:**
-
-1. **The need has been unbundled.** When 016 wrote the proposal, `search_memories` was the only retrieval tool. V1.5 added `get_recent_work_context` (clustered + normalized atoms in `atoms[id]`) and `tail_session` (sequential, same wire shape). A consumer who hits `search_memories` and wants the normalized shape can chain `tail_session(source=match.source)` — one extra call, but the three retrieval tools stay separable: substring vs. clustered vs. exact-tail.
-2. **Reintroduces V1.5 envelope risk.** Normalized atoms add `actors`, `artifacts[]`, `provenance`, `context`, `open_loop_hints[]` per match. The V1.5.6 wire-shape projector (`src/mcp/wire-shape/match.ts`) caps `content` and per-key metadata; it has no slots for the normalized sub-fields. Adding format dispatch either expands the projector (more cap surface to maintain) or lets the budget creep back, undoing V1.5.5/V1.5.6/V1.5.7's three rounds of envelope-overflow closures.
-3. **No surfaced consumer demand.** The V1.5 dogfooding journal entries (16:22 / 22:40 / 00:30 / 02:05 PDT through 17:01 PDT) flag substring-tool pain as envelope overflow, fs-watcher noise, TZ-naive parsing, and substring-vs-semantic confusion — all closed. None ask for normalized-from-substring. The 016-era promise predates the trace layer; the substrate it was solving for now exists.
-
-**Reopen criteria:** a concrete consumer (not an abstract API improvement) asks for substring + normalized in one call AND the chained `search_memories` → `tail_session` path is observably insufficient for that use case. Reopen as a narrow `format: 'normalized'` opt-in (no `'both'` — that's the schema-bifurcation trap), single non-default mode, projector-capped, default stays `'raw'`. ~0.5d. Until that surfaces, save the spec slot for the V1.6 priority the journals actually flagged: `get_atom(id, fields?)` deep-dive primitive (the wire-shape elision pattern is implicitly waiting for it). The cursor `agentKv:` extractor rewrite was previously also in this V1.6 list but has been demoted to a gated known-degraded surface — see "Cursor capture — `agentKv:` migration" above.
-
-**Stale references** (historical, do not edit):
-- `backlog/complete/2026-05-06-016-read-time-normalizer.md:30, 116, 421, 444` — original deferral
-- `backlog/complete/2026-05-06-018-recent-work-context-tool.md:429, 452` — V1.6 punt
-- `backlog/complete/2026-05-08-022-v15-2-trace-retrieval-reliability.md:297` — out-of-scope confirmation
-- `raw/internal/decisions/2026-05-06-v15-trace-layer-design.md:153` — design-doc note
-
-`wiki/architecture/work-trace.md:258` updated in this kill commit to remove the forward-pointing reference.
+## ❌ Killed — item 017 (read-time normalizer wiring)
+Killed 2026-05-09; need unbundled by get_recent_work_context + tail_session. Reopen only if a concrete consumer needs substring+normalized in one call. Full rationale in git history.
 
 ---
 
@@ -133,13 +100,7 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ## 2026-05-01 — from merge of 014-mcp-search-memories
 
-- Wire `limit: MAX_OVERFETCH` into `storage.query` once storage guarantees timestamp-DESC ordering. Today `searchMemories` loads the entire matching set into memory before sorting/slicing — fine for V1 dataset sizes, becomes O(N) memory at scale. (MCP search-memories tool; cross-cuts Storage interface.)
-
-  > Re-verified 2026-05-08 post-025: `MAX_OVERFETCH = 200` is still exported at `src/mcp/tools/search-memories.ts:11` and still NOT wired into the production storage call after 025's path-aware `limit+1` overfetch refactor. The constant is now genuinely dead code — subsumed by the 025 follow-up bullet ("`MAX_OVERFETCH = 200` dead constant") which proposes the same fix shape (wire it as a defensive cap on the substring path, or delete). Track from there; don't double-count.
-
 - Add `order` / `order_by` to `QueryFilter` once a second consumer needs DESC. Until then the in-tool sort is fine. Worth a Spec Authoring Lesson once the second use case appears. (Storage interface.)
-
-- **Investigate chokidar lifecycle flake** — `cursor.test.ts`, `claude-code.test.ts`, `fs-watcher.test.ts` intermittently time out at 5000ms under parallel load. Different tests fail each run (race, not deterministic regression). Surface area was reduced in chore commit `912ebab` (fs-watcher now ignores Cursor's SQLite triplet; cursor-extractor debounces) but the deeper `watcher.close()` race in chokidar teardown remains. Workaround: `--pool=forks --poolOptions.forks.singleFork=true` masks rather than fixes. (Test-infra item; high priority since the flake will block future merges.)
 
 ## From merge of 2026-04-30-015-mcp-integration-test (2026-05-01)
 
@@ -148,8 +109,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - [ ] Strategist amends item-spec template: phrase STATUS.md updates as founder-post-merge, not as agent acceptance. Otherwise this conflict recurs every "milestone" item.
 
 ---
-
-## 2026-05-02 — surfaced while writing `wiki/capture/per-app/claude-code-collected-data.md`
 
 ## 2026-05-04 — surfaced during metadata-normalization branch
 
@@ -167,17 +126,11 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
   > Re-verified 2026-05-08 post-025: still open. `src/normalize/types.ts:73-75` unchanged.
 
-- [ ] **Pre-existing chokidar timing flakes** in `tests/capture/extractors/cursor.test.ts` (3 failures intermittent) and `tests/daemon/lifecycle.test.ts` (1 failure intermittent). Reproduces on `main` with no inbound branch — count varies (3-9 failures across runs depending on box load). Either bump per-test timeout on the chokidar suites or switch them from `waitFor(predicate, ms)` to deterministic synchronization via the extractor's `probeFreshness` handle. Already partially flagged in the 014-mcp-search-memories follow-up section above; this run confirms the issue is still live and now blocks the verify step's signal-to-noise on every merge. (Test infra; high priority — flakes will keep noise-pollution merge verifies until fixed.)
-
 ## 2026-05-07 — from merge of 018-recent-work-context-tool
 
 - [ ] **Tighten MCP `limit` zod schema** in `src/mcp/tools/recent-work-context.ts:90`. Change `z.number().optional()` → `z.number().int().min(1).max(500).optional()` so a malformed value surfaces as a structured tool-error at the boundary rather than silently being clamped by `clampLimit`. Founder-facing validation is looser than typical MCP tools today. (MCP tool; cosmetic boundary tightening.)
 
   > Re-verified 2026-05-08 post-025: still open. `src/mcp/tools/recent-work-context.ts:254` is still `limit: z.number().optional()`. Note: 025 made an explicit choice for `search_memories.ts` to add `.int().min(1)` (no max) and let the handler clamp >MAX_LIMIT, so the precedent is set for this tool too.
-
-- [ ] **Switch `computeTimeRange` to `Date.parse()`** in `src/trace/index.ts:202`. Uses string comparison on `occurred_at` today — works for Z-suffixed UTC (which storage emits) but breaks ordering for offset-bearing timestamps (e.g. `+02:00` vs equal-moment `Z`). Change before any timezone-bearing extractor lands. (Trace module; dormant correctness.)
-
-  > Re-verified 2026-05-08 post-025: `computeTimeRange` at `src/trace/index.ts:274-285` still uses string comparison on `a.time.occurred_at`. **Status downgraded from "dormant correctness" to "structurally unreachable"** — item 022 closed Bug A by canonicalizing all stored timestamps to Z-suffixed UTC at storage append-time, so any offset-bearing input is converted before it can reach the trace layer. The lex-sort ≡ chronological invariant now holds by construction. Code unchanged but bug is no longer a live exposure. Defer until something actually wants to bypass the storage normalizer.
 
 - [ ] **Broaden hint regexes during V1.5 dogfooding** in `src/trace/hints.ts:5-6`. `FOLLOWUP_RE` matches three exact phrases ("follow up", "come back to", "will do later"); `TODO_RE` requires `:` or whitespace after `TODO`. Per spec these are intentionally scoped — refine if dogfooding shows them too tight. (Trace module; product tuning.)
 
@@ -186,8 +139,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - [ ] **Pick a convention for agent-run-log filenames** and document in `backlog/README.md`. Spec acceptance referenced `raw/internal/agent-runs/<spec-date>-<item-id>.md`; agent wrote `<run-date>-<item-id>.md` per the `$(date +%Y-%m-%d)` pattern in the slash command. Trivial, but the divergence will keep recurring on every cross-day item until the convention is locked. (Process meta.)
 
 - [ ] **Track "shared-repo artifact coalesces multi-file work threads" as V1.5 dogfooding signal.** When events from different files in the same repo land within the 4h window, the repo-level artifact alone joins them into one cluster. This is correct per the spec's algorithm (any shared artifact = edge), but whether it matches the founder's intuition for "coherent work thread" boundaries is exactly what `raw/internal/decisions/2026-05-06-v15-trace-layer-design.md` "What V1.5 will teach us" expected the dogfooding loop to surface. If clusters feel too coarse, candidate refinement: weight non-repo artifacts higher, or downgrade repo-only edges to a separate `same_repo` edge kind. (Trace algorithm tuning; dogfooding-driven.)
-
-- [ ] **Pre-existing chokidar lifecycle flake** carry-over from item 014 — still live as of 018's merge verify (3/391 flaky on default pool, 1/391 on `--pool=forks --poolOptions.forks.singleFork=true`). Same `waitFor` 5s timeout signature, different test names per run. Already flagged in the 014 and 016 follow-ups; the duplicate notice here just confirms it remains the noisiest item on the test-infra punch list. (Test infra; high priority — keeps polluting merge verifies.)
 
 ---
 
@@ -203,7 +154,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 - [ ] **Strategist: promote 019 to wiki.** Update `wiki/architecture/work-trace.md` (edges[] is signal-bearing post-019; role taxonomy; `unknown: keep` generalizability default) and `wiki/surfaces/mcp-recent-work-context.md` (input schema with `format`; signal-bearing edges callout; consumer notice that `edges.length === C(N, 2)` is no longer guaranteed). Reference `raw/internal/decisions/2026-05-07-trace-edge-filter-design.md`. ~15 min.
 - [ ] **Operating-model reconciliation: wiki-edit policy for builder agents.** The 019 spec listed wiki paths in `files_to_modify` per "After Completion §4" delegation; the runtime hook + `docs/AGENT_INSTRUCTIONS.md:348` denied the edit ("only the strategist edits the wiki, post-shipment"). Pick one: (a) keep strategist-owns-wiki rule; update spec-item template to stop listing wiki paths in `files_to_modify`; OR (b) update `CLAUDE.md` + `AGENT_INSTRUCTIONS.md` + the policy hook to delegate wiki edits to implementation agents for items 016+. Drift event at `raw/internal/decisions/2026-05-07-DRIFT-019-wiki-edit-conflict.md`.
-- [ ] **Pre-existing test flake: capture + daemon-lifecycle.** `tests/daemon/lifecycle.test.ts` (`waitFor` predicate timeout) and `tests/capture/extractors/cursor.test.ts` (4 timeouts at 5000ms — `omits metadata.files_referenced when no bubble carried any file references`, `end-to-end: chronological appends produce ordered, non-duplicate turns`, `backfills lastSeenMap from prior storage events on boot`, `stop() resolves cleanly and prevents further events`). Independent of 019 (branch did not touch those test files). Bump `testTimeout` for capture-extractor tests or fix the underlying filesystem-watcher race.
 
 - [ ] **Optional: rename 019 run log.** `raw/internal/agent-runs/2026-05-07-2026-05-07-019-trace-edge-filter-and-format.md` has a doubled date prefix per the agent's run. Prevailing convention in `raw/internal/agent-runs/` is mixed (e.g., `2026-04-30-2026-04-30-001-...md`). Cosmetic; left as-is unless project standardizes the convention.
 
@@ -219,7 +169,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - **Strategist post-merge spec amendment:** spec line 42 prose says "matching by `context.conversation` artifact id" but the actual `NormalizedContextEvent.context` schema has only `visible/selected/ambient` strings. Agent correctly inferred conversation-typed `ArtifactRef` matching by `provider:type:id`. Update spec wording for future readers.
 - **R1.TODO snapshot-resolver expansion (decision pending dogfooding):** R1.TODO matches only `state.delta.artifact_id`. Git-commit atoms use `state.snapshot.artifact_id` and won't close TODOs in the current rule. Per spec ("`state.delta.artifact_id`") this is faithful; revisit after dogfooding evidence.
 - **R1.AQ user-with-empty-input edge case (validate during dogfooding):** `hasNonEmptyContent` falls back from `input` to `output` for user-role atoms. For sources where the user atom legitimately has empty `input` but non-empty `output` (rare; some cursor extractor cases), this still resolves. Verify in the founder hand-score pass.
-- **Quarantine the pre-existing capture/daemon flake** as a separate item: 3 failures intermittent in `tests/capture/extractors/cursor.test.ts` (workspace_id matching, lastSeenMap backfill, stop() timeout) + 1 in `tests/daemon/lifecycle.test.ts` (waitFor timeout). Already flagged from item 019's verification; re-confirmed at 020's merge. Flake fluctuates 3–14 failures across runs.
 
 - **Founder hand-scores the 111 rows** in `raw/internal/dogfooding/020-resolution-validation.md` as TP / FP / TN / FN. If overall precision (TP / (TP + FP)) ≥ 80%, R1 is sufficient for V1 hotkey overlay. Otherwise calibration becomes the next backlog item before the overlay UI is specced.
 
@@ -227,8 +176,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ---
 
 ## 2026-05-08 — from merge of 021-trace-cross-gap-where-left-off
-
-- **Quarantine the recurring fs-watcher / cursor / daemon-lifecycle flake.** Same files since item 018 (`tests/capture/extractors/cursor.test.ts`, `tests/daemon/lifecycle.test.ts`); failure count fluctuates 3–14 across runs. Fixture races on FSEvents under load. File its own backlog item — bump test timeout, fix the underlying race, or quarantine via `.skip` with a tracking comment.
 
 - **Spec template improvement: explicit "test fallout permitted in:" convention.** 021 hit this on `tests/capture/*` (six test files needed `order: 'asc'` after Bug A's DESC flip). Both items 020 and 021 had small test-only diffs outside `files_to_modify` that needed agent-notes call-outs. Convention would be: spec author lists test files where collateral edits are expected, removing the agent-side ambiguity.
 - **`search_memories` KNN determinism investigation.** Flagged as out-of-scope inside 021's spec body but is an independent reliability issue the dogfooding journal also surfaced (same query returning different match counts on consecutive calls; e.g., "hotkey overlay" returned 1 match earlier today and 0 matches later in the same session). File its own item if it persists across V1.5+ retrieval work.
@@ -241,7 +188,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ### Per-merge cleanup (small, mechanical)
 
-
 - [ ] **Add explanatory comment at `src/storage/migrate.ts:71`** documenting the `TZ_MARKER_RE` else-branch (defensive for naive rows that bypass the SQL `WHERE timestamp NOT LIKE '%Z'` filter). Logic is correct but non-obvious.
 
   > Re-verified 2026-05-08 post-025: 🟡 partial — `canonicalizeTimestamps` at `src/storage/migrate.ts:55-60` now carries a 6-line function-level comment explaining the Node-not-SQL choice and the idempotency guarantee, but the inline `TZ_MARKER_RE.test(...) ? ... : ... + 'Z'` ternary at line 71 still has no per-line note explaining why the defense is needed when the WHERE clause already filters. One small inline comment short of done.
@@ -249,7 +195,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 - [ ] **Lift cap-hit equality to `>=` storageCap** at `src/mcp/tools/recent-work-context.ts:170` once a `count(filter)` storage method exists. V1.5.3 territory; spec already flagged in Out of Scope.
 
   > Re-verified 2026-05-08 post-025: still open. `src/mcp/tools/recent-work-context.ts:191` reads `if (events.length === storageCap)`. Strict equality preserved.
-
 
 ### Strategist post-merge
 
@@ -263,14 +208,9 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 > **Verification convergence:** Codex's 02:05 PDT direct daemon+log inspection and Claude Code's 02:10 PDT MCP retrieval landed on the same gap classification on the same window — two reasoning processes from different starting points (one inspecting daemon stdout + SQLite directly; one calling the public MCP surface) converging is structural-correctness signal, similar to the 15:39 PDT day-1 V1-atom-design observation.
 > **Status legend:** ✅ closed by 022/023 · 🟡 partial / narrowed (capture fixed; UX or ranking gap remains) · ❌ still open · 🚨 newly surfaced during verification.
 
-
-
-
 - [ ] ❌ **Default 4h window wrong for "where did I leave off" — UNCHANGED.** Codex 02:05: *"Still open by code. Default no-arg window is still now minus 4h."* 022 didn't touch this. Founder/strategist call: change the default, or document the "active-now vs morning-orientation" framing more loudly in the tool description. (Source: dogfooding entry 22:40 PDT.)
 
-
 - [ ] ❌ **Atom envelope payload floor — UNCHANGED, NOW HIGHEST-LEVERAGE PAYLOAD MOVE.** Codex 02:05: *"Still open. Minimal responses are still large: about 242KB for day `limit=100`, 405KB for round-4 `limit=100`."* Claude Code 02:10 retrieved 105K (trace, limit 50) + 98K (search, limit 10) — both over CC's tool-result budget with `format: "minimal"` already on. Bug C reduced atom *count* but didn't shrink the per-atom envelope (~3-4KB of structural metadata). **Skeleton-only mode is now the candidate spec** — return `id`+`time`+`source`+`artifacts` + `cluster_anchor_summary`; consumer fetches full atom content via `search_memories(id=...)` on demand. Highest-leverage payload move post-022. (Source: dogfooding entry 16:16 PDT round 2, 02:05 PDT, 02:10 PDT.)
-
 
 - [ ] ❌ **Founder hand-score pass on 020 R1 fixture** at `raw/internal/dogfooding/020-resolution-validation.md`. Unchanged — verdict column still empty across all 111 rows. Half-day founder task; converts inferred precision into measured precision. (Source: existing 020 follow-up, unchanged by 022/023.)
 
@@ -280,7 +220,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ### Newly-surfaced gaps from 02:05/02:10 verification
 
-
 - [ ] 🟡 **Daemon health flap at port level — USER-FACING SYMPTOM CLOSED BY 027, root mechanism still open.** The practical failure mode (Codex calls failing after daemon restart) is closed: stateless transport means there's no per-process session state to lose. But 027 does not address the *underlying* launchd / PID-file race Codex flagged at 02:05 PDT (PID file `7319` vs actual `7333`, port alternating between 'Bad Request' and 'connection refused'). If that race ever produces a window where the new daemon hasn't bound the port yet, calls still fail — just transiently rather than persistently. Investigate-first item still has merit but is no longer P0; demote to V1.5+ reliability cleanup. (Source: dogfooding entry 02:05 PDT.)
 
 - [ ] 🚨 **Trace-ranking gap surfaced as separate item.** From the verified-partial cross-source representation gap above: at `limit=50` Codex appears as a dropped lower-rank cluster even though it's the only representative of its source. Promote to its own spec because the fix is in trace ranking heuristic (`src/trace/cluster.ts` + `src/trace/index.ts`), not in storage or capture. Candidate signals: (a) source-diversity boost — small rank bonus when a cluster is the only contributor of a source not represented in higher-rank clusters; (b) cross-source artifact-join bias — increase edge weight when an artifact connects atoms across distinct source-prefixes; (c) surface dropped clusters' `source_breakdown` in `truncation.dropped_clusters` so the consumer can decide to retry with higher `limit`. Next-spec territory; the `_followups.md` 022 section's "cross-source representation balance" entry was the placeholder. (Source: dogfooding entries 02:05 PDT, 02:10 PDT.)
@@ -289,22 +228,11 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 
 ## 2026-05-08 — from merge of 023-chokidar-flake-quarantine
 
-- [ ] **fs-watcher.test.ts Path C successor (~15 min).** The 023 carve-out: agent stayed strictly inside `files_to_modify` and did not quarantine `tests/capture/surfaces/fs-watcher.test.ts > startFsWatcher` despite ~33% solo flake rate. Apply the same Path C `describe.skip` with a `2026-05-08-023`-anchored tracking comment. ~30 LOC, same shape as the 023 changes to cursor.test.ts and lifecycle.test.ts. The 014 section's annotation already pre-lays the breadcrumb. (Test infra; small.)
-
-- [ ] **Chokidar real-fix item (post-V1.5; 2-3d).** Tracking comments at `tests/capture/extractors/cursor.test.ts` and `tests/daemon/lifecycle.test.ts` cite item 023; once 023 lands in `complete/` those references become tombstones unless a successor item exists. Investigate deterministic synchronization via the extractor's `probeFreshness` handle (already flagged in 016 followup) or sentinel-event subscription. The deeper `watcher.close()` race in chokidar teardown is the underlying root cause — quarantine is a holding pattern, not a fix. (Test infra; high priority post-V1.5.)
-
 - [ ] **Optional: grep-anchored CI ship-blocker for V1 cut.** CI fails if `describe.skip` paired with the literal `2026-05-08-023` tracking-comment string is still present in the tree after a target date. Insurance against the quarantine outliving memory and shipping skipped tests in V1. (CI / V1 cut hygiene.)
 
 ---
 
 ## 2026-05-08 — from merge of 025-mcp-best-practices
-
-### Per-merge cleanup (small, mechanical)
-
-
-
-### Code-correctness follow-up (own item)
-
 
 ### V1.6 territory (already specced as out-of-scope by 025)
 
@@ -324,12 +252,6 @@ Deferred fixups and follow-up items surfaced during `/merge-and-cleanup`. Founde
 ### Dogfooding (founder + AI clients)
 
 - [ ] **Capture AI-client uptake on the new affordances:** does Claude Code spontaneously use `source_app: 'claude_code'` for app-scoped queries instead of guessing FS prefixes? Does pagination via `next_cursor` get used at all, or do consumers default to wider `until` filters? Two more dogfooding entries' worth of signal needed before deciding whether the affordances are working as intended.
-
-### From 028 dogfooding context (2026-05-08 15:54 PDT post-026+027 round)
-
-
-### From 16:14 PDT post-Bugs-A+B-merge live verification (third round)
-
 
 ### V1.6 candidates (surfaced post-V1.5 cap-stone, 2026-05-08 17:05 PDT)
 
@@ -394,8 +316,6 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 - [ ] **Profile `get_atoms` deterministic-drop loop O(n²) `JSON.stringify(tentative)` cost on a 50-id large-body fixture.** Loop at `src/mcp/tools/get-atoms.ts:188-241` rebuilds the full tentative envelope per accepted atom; bounded but obviously O(n²) on the cumulative byte count. Bound is small (cap=50, ~25k stringify per iter) and run log line 144-146 acknowledges the trade-off. If profiling shows it dominates wall time on real call traces, switch to a running-sum byte approximation. Source: 030 round-2 reviewer judgment.
 - [ ] **File item 031 (remove `get_recent_work_context`) after ≥1 week of dogfooding.** Spec'd in 030's "After Completion" §5. Conditional gate: the new toolkit must cover all real founder resume patterns AND consumers must be observed exercising the judgment-between-calls step (not blind `clusters[0]`). The judgment-step gate is added per the AC10c synthesized-entry conjecture in `raw/internal/dogfooding/mcp-interactions-journal.md` — if the judgment step is skipped in practice, the decomposition's load-bearing claim degrades to "compound but with worse ergonomics" and item 031 should not land yet. Estimate: 0.5d.
-- [x] **Strategist wiki promotion for 030 (post-merge action).** ✅ DONE 2026-05-10 ~16:40 PDT (consolidated with 032 promotion in one pass). Four new pages landed: `wiki/surfaces/mcp-find-clusters.md`, `wiki/surfaces/mcp-get-atoms.md`, `wiki/surfaces/mcp-wait-for-new-turns.md`, `wiki/architecture/group-session.md`. Updated: `wiki/surfaces/mcp-server.md` (7-tool table, V1.6 atomic toolkit framing), `wiki/surfaces/mcp-recent-work-context.md` (top-of-page deprecation banner + migration recipe), `wiki/architecture/system-architecture.md` (ASCII tool list + V1.5→V1.6 toolkit shift paragraph). Moved "MCP retrieval — long-turn elision + envelope caps" from "Known V1 degraded surfaces" to the "✅ Resolved" subsection above.
-- [x] **Promote `wiki/operating-model/cross-tool-spec-review.md` from candidate to definite-after-030-ships.** ✅ DONE 2026-05-10 ~15:55 PDT — page landed at `wiki/operating-model/cross-tool-spec-review.md` covering the pattern + 4-role allocation + findings classes + strategist self-review checklist + verdict-convergence signal + cost/value + evidence base (~10 cycles across items 030 and 032). Trigger evidence expanded by end of day to SIX independent confirmation cycles (R1 spec review 030 ×3, R1 code review 030, R1 spec review 032, R2 spec review 032, R3 spec review 032). Manifest + wiki/index.md regenerated.
 - [ ] **Operating-model note for future builders: pre-list wrapper-Storage adapters in `files_to_modify` when the spec adds a `Storage` interface method.** Item 030 added `Storage.getByIds` (in scope per spec) but the three wrapper-Storage adapters (`tools/render-trace.ts`, `tools/serve-trace.ts`, `tools/stream-watch.ts`) and the smoke-script tool-count assertion (`tools/mcp-integration-smoke.sh`) needed mechanical updates that weren't in `files_to_modify` — the agent had to flag them in `agent_notes` as drift-rule edge cases for founder review. Drift-rule fix: when a spec adds an interface method, the claiming agent runs `grep -lr "implements Storage" tools/` (or equivalent for the affected interface) and adds those files to `files_to_modify` at claim time. Either patch `docs/AGENT_INSTRUCTIONS.md` with this rule or document it in the standard claim-time checklist. Source: 030 round-1 reviewer judgment.
 - [ ] **Real-call before/after dogfooding entry for 030 (post-merge action).** AC10c was closed during `/merge-and-cleanup` with a `[SYNTHESIZED]` journal entry (run log lines 274-294 reformatted into the 6-field template, clearly tagged as fixture data not real call). Per "lossy in-the-moment honesty" discipline, a real before/after entry should land in `raw/internal/dogfooding/mcp-interactions-journal.md` the next time founder runs the new toolkit on a real morning resume. The synthesized entry is design proof; the real entry will be field evidence. Founder action when next dogfooding session lands.
 
@@ -403,14 +323,12 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 - [ ] **Dogfooding verification for 032 (post-merge action, After Completion §1).** Founder or strategist reruns the 2026-05-10 13:06 PDT chain — no-args `find_clusters()` after a multi-hour gap — and logs to `raw/internal/dogfooding/mcp-interactions-journal.md` whether: (a) `[AUTO_EXPAND] single-source-recent` warning fires, (b) `clusters[0]` is prior multi-source work (not the calling session's noise), (c) `get_atoms(picked.atom_ids, prefer='newest_first')` returns the newest atom of the prior work session (not dropped). Daemon was kickstarted at merge time so vite-node loaded the patched code. This closes the empirical loop on the M2-1 + M2-2 friction that motivated the item.
 - [ ] **Stricter contract on `rank.ts` `demote=true` + `nowMs=undefined`** — currently silently no-ops at `src/trace/rank.ts:139-140`. The only in-tree caller (`recent-work-context.ts:502`) always passes `nowMs`, but the silent degeneration is a latent footgun for future callers that flip the flag without reading the doc. Consider `throw` for stricter contract. Non-blocker. Source: 032 round-1 reviewer judgment.
-- [x] **Strategist wiki promotion for 032 (After Completion §2-§5).** ✅ DONE 2026-05-10 ~16:40 PDT (folded into 030 promotion pass, single pass per the predecessor-dependency note below). New `wiki/surfaces/mcp-find-clusters.md` includes the "Auto-expand triggers" + "Strict-Partition Demotion" sections covering 032's M2-1/M2-2 friction fixes. New `wiki/surfaces/mcp-get-atoms.md` includes the "Resume-Call Usage" section covering `prefer='newest_first'` + missing-ID position + duplicate-collapse asymmetry. New `wiki/architecture/group-session.md` includes a "First-Call Reliability Gate (item 032)" section noting the gate is now closed for resume-after-gap. The M2-1/M2-2 friction entries were folded into the "✅ Resolved" subsection above as part of the long-turn-elision Resolved block; the friction's empirical closure entry will land in `mcp-interactions-journal.md` when founder runs the post-merge dogfooding verification (still owed — see entry above).
 - [ ] **Re-evaluate item 031 (`get_recent_work_context` removal) readiness after ≥1 week of post-merge dogfooding entries.** Both gates now have shipped fixes: 030's judgment-step gate AND 032's first-call-reliability gate. The 031 strategist conversation should evaluate both gates together against the dogfooding log.
 - [ ] **Extend `wiki/operating-model/cross-tool-spec-review.md` with an "AC3 ⇒ multi-tool implementation review required" rule.** The page already landed today (see the `[x]` entry above), but currently covers the spec-review pattern. The 032 round-1 → Codex round-2 sequence is the **second** implementation-review cycle where Codex caught AC-class issues single-tool Claude reviewer missed (first was 030 round-1 + envelope-ceiling bugs). Add a section codifying: when an item's acceptance criteria include AC3-class user-facing documentation requirements (description strings, tools/list metadata, migration recipes), require a multi-tool implementation review before merge. 7th confirmation cycle of the broader pattern; 2nd at the implementation-review level.
 - [ ] **Optional Cursor third pass on 032 implementation.** Codex caught the 2 AC3 description-drift issues. The Cursor angle remains untested at the implementation level. Specific questions: (a) does the strict-partition primary key in `rank.ts:139-156` interact correctly with the existing `cluster_id` tiebreaker when both partitions have identical 5-key signals; (b) does the `as_requested` early-return in `get-atoms.ts:170-172` actually preserve dup-returns-dup semantics when input has duplicates straddling missing IDs; (c) any AC1/AC2 implementation drift Codex didn't probe. Defer until founder has Cursor session time; non-blocker.
 
 ### From 033 merge (2026-05-10-033-full-atom-recovery)
 
-- [x] **Strategist wiki promotion for 033 (After Completion §1-§5).** ✅ DONE 2026-05-10 ~19:55 PDT. New `wiki/surfaces/mcp-get-atom.md` landed covering content-verbatim + metadata-projected + embedding-excluded contract, three exit shapes (success / `atom_too_large_for_wire` / `atom_not_found`), R2 truncations-correctness fix, canonical recovery pattern. `wiki/surfaces/mcp-server.md` 7→8 tools (new row + framing paragraph updated). `wiki/architecture/system-architecture.md` ASCII tool list + V1.6→V1.6.1 paragraph updated. `wiki/operating-model/cross-tool-spec-review.md` "Findings classes" gained a "Recovery primitive for elided reviewer responses" sub-block referencing `get_atom`; "Cost / value" gained a "Cost reduction from V1.6.1 recovery primitive" paragraph; "Evidence base" gained 033 R1 + R2 entries (divergent-verdict + Gate 4 self-failure findings). M1-3 already in "Resolved" subsection from merge — confirmed in place.
 - [ ] **Dogfooding verification for 033 (post-merge action, After Completion §1).** Next time a Codex (or other long-turn) MCP response comes back with `truncations: ["content"]`, the strategist (or any AI client) should call `get_atom({id: <elided-atom-id>})` instead of `jq` against the JSONL. Log to `raw/internal/dogfooding/mcp-interactions-journal.md` documenting whether the response returned verbatim or hit `atom_too_large_for_wire` — both outcomes are useful data.
 - [ ] **Re-evaluate item 031 (`get_recent_work_context` deprecation) readiness.** 033 closes the M1-3 dependency that implicitly blocked comfortable deprecation. After 033 ships and ≥1 dogfooding verification entry lands, the strategist 031 conversation should re-evaluate the deprecation gate alongside 030's judgment-step gate + 032's first-call-reliability gate.
 - [ ] **Dead-code manual `id` validation at `src/mcp/tools/get-atom.ts:103-107`** (redundant with zod `min(1)`). Could be removed if direct (non-MCP) callers of `getAtom` rely on the caller for validation. Non-blocker; defer pending decision on direct-caller contract. Source: 033 code-reviewer.
@@ -426,35 +344,6 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 - [ ] **Cosmetic log-field-name divergence.** Implementation uses `reason` on the `handleGlobalChange` entry log; R1 finding's text said `tick_reason`. Spec body was generic. If any downstream log-grep parses this field, rename; otherwise leave. Source: 034 code-reviewer.
 - [ ] **`safeMtimeMs` vs `maxGlobalDbFamilyMtime` stat-failure asymmetry** (`src/capture/extractors/cursor.ts:480` vs `:491-503`). Legacy `safeMtimeMs` returns `Date.now()` on stat failure; the new `maxGlobalDbFamilyMtime` returns 0. Both behaviors are correct as scoped, but the divergence is worth noting if a future refactor unifies them. Non-blocking. Source: 034 code-reviewer.
 - [ ] **Re-evaluate `agentKv:` migration follow-up gating.** The "Cursor capture — `agentKv:` migration (gated, not scheduled)" entry at the top of this file (under "Known V1 degraded surfaces") was originally diagnosed pre-2026-05-09 (later corrected). 034 ships the capture-cadence + bubble-shape fixes for the EXISTING `bubbleId:` / `composerData:` schema; it does NOT address the future `agentKv:` migration. Reactivation gate (founder upgraded to Cursor Pro 2026-05-09) is still triggered; 034's AC4 dogfooding evidence may help re-prioritize the `agentKv:` work for V1.6.2+.
-
-- [x] ✅ **CLOSED 2026-05-15 by 036** (HIGH) — **Cursor multi-cluster agent runs: follow-on bubbles silently dropped.** Item 036 shipped Option A (continuation atom emission). Verified live in `src/capture/extractors/cursor.ts`: `is_continuation?: true` field declaration at lines 115-121, continuation-atom emission with `continuation_of_assistant_bubble_id: checkpoint` at lines 956-968, metadata projection at lines 1334-1338. Spec at `backlog/complete/2026-05-11-036-cursor-multicluster-continuation.md`. Original analysis preserved below for historical context.
-
-- [ ] **🔴 KNOWN GAP (HISTORICAL, CLOSED) — Cursor multi-cluster agent runs: follow-on bubbles silently dropped (item 036 candidate; surfaced by 034 AC4 dogfooding, 2026-05-10 23:17 PDT).** **Discovered during the AC4 dogfooding run on fresh composer `4f02b335-4b1d-4bd1-a9fa-2e0d76ae5e56`.** The composer had 1 user message + 26 consecutive assistant bubbles (a typical Cursor agent-mode run with ~10 tool calls). 034's periodic re-poll fired at 15s and captured the first 11 bubbles as ONE atom (40,601 chars). Cursor continued writing 15 more assistant bubbles (still answering the same user question). The next cadence tick found `lastSeenMap[4f02b335] = 70975526` (an assistant bubble); the V1.5.7 streaming-continuation fast-forward at `cursor.ts` `extractCursorTurns` lines 402-409 (explicitly preserved in 034's Out-of-Scope) silently skipped all 15 follow-on assistant bubbles as "streaming continuations." Lost content from this single test conversation: Cursor's analysis paragraph ("There are two overlapping threads..."), action narration ("I'm appending a short dogfooding journal entry..."), and the **verdict turn** ("ECHO says the latest real state is: `034` landed and was merged as `7362d88`...").
-
-  **Why it happens:** Cursor's agent-mode runs typically take 20-60s to write all bubbles for one user question. 034's cadence is 15s. So agent-mode runs basically always cross at least one tick boundary, and the second-half bubbles arrive after a checkpoint that lands on an assistant. V1.5.7's fast-forward then drops them as orphans. The bug isn't 034's two fixes (those work correctly for the first cluster); it's that V1.5.7's silent-skip is being asked to handle a class of cases it wasn't designed for (legitimately-new content arriving after a partial-cluster capture).
-
-  **Reproduction:** any Cursor agent-mode conversation longer than ~15s end-to-end exhibits this. Single-turn agent runs split into "first N bubbles captured, rest dropped." Multi-turn agent runs (user + agent + user + agent) capture each turn's first cluster but drop follow-ons.
-
-  **Empirical scope:** the AC4 capture rate on this composer was 10/21 = 47.6% (P1 territory per the formula). But the math is misleading — the 10/11 hit rate on the **first cluster** is structurally correct; the missing bubbles all come from V1.5.7's silent-skip, which is a separate gap. For *non-agent-mode* Cursor (regular chat, one assistant bubble per user message), 034 alone hits ≥90% cleanly.
-
-  **Why not fixed in 034:** 034's Out-of-Scope explicitly preserved V1.5.7's streaming-continuation fast-forward ("Do NOT reduce `orphan_assistant_bubble` warning frequency further... That fix stays"). The intent was to avoid scope creep. Empirically, the V1.5.7 logic is now actively defeating 034's intent on the most common Cursor usage pattern (agent mode).
-
-  **Item 036 candidate spec shape — three options for the strategist conversation:**
-  - **Option A — Continuation atom emission.** When the post-checkpoint walk finds consecutive assistants without an intervening user, emit a follow-on atom (with `metadata.continuation_of: <prior_atom_id>` or similar). Append-only-friendly; multiple atoms per logical turn require consumer-side join logic.
-  - **Option B — Hold-the-pairing-open.** Don't emit the atom on first tick; wait for the next user bubble OR a configurable timeout. One merged atom per logical turn. Latency cost: ECHO doesn't see the turn until Cursor is done streaming OR the timeout fires.
-  - **Option C — Update-in-place re-emission.** Re-emit the same atom with the growing `assistant_bubble_ids[]` list. Cleanest semantics but **breaks ECHO's append-only substrate model** — not viable without a major architectural change.
-
-  **Strategist lean: Option A.** Append-only compatible, low latency, and the join key (`composer_id + overlapping assistant_bubble_ids[]`) is already present in metadata. Confirm during the 036 strategist conversation.
-
-  **References:**
-  - `raw/internal/dogfooding/mcp-interactions-journal.md` 2026-05-10 23:30 PDT entry — empirical walkthrough with bubble-by-bubble breakdown of composer `4f02b335`.
-  - `src/capture/extractors/cursor.ts` `extractCursorTurns` lines 402-409 (V1.5.7 streaming-continuation fast-forward) — the function to revise.
-  - `backlog/complete/2026-05-10-034-cursor-capture-coverage.md` Out-of-Scope section — the explicit preservation that this gap surfaces.
-
-  **Workaround until 036 ships:** for AC4-style dogfooding verification, use a non-agent-mode Cursor composer (simple chat without tool calls — single assistant bubble per user message). Single-cluster turns avoid the V1.5.7 path entirely; 034's two fixes work cleanly there. For real cross-tool spec review (which is agent-mode by nature), the SQLite-probe recovery chain (R1+R2 of 034+035) remains the workaround.
-
-  **Strategic priority:** HIGH — without 036, the M1-1 capture-coverage demo bar (≥90% on agent-mode composers) is structurally unreachable, which means the V1.6.x "ECHO captures Cursor review content" narrative is incomplete. Spec next, parallel with item 031 deprecation conversation, or as the immediate-next-item after the 034+035 wiki promotion lands.
-
 
 ---
 
@@ -509,10 +398,7 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 ## From 039 merge (2026-05-12, RC5 at cd02160 + reconciliation 94b6fc5)
 
 - **Watcher-state executable test (V1.6+)** — convert the prose-level (b)-branch assertion in `.claude/commands/review-queue-watch.md:50-73` into an integration test that drives the slash-command body (or extracted helper) and asserts `r{N+1}/request.md` exists + `next_round: <N+1>` in the prior round's `combined.md`. Today the (a)/(b)/(c) fixtures in `combine.test.ts:288-342` cover what `combine.py` outputs, but the load-bearing watcher-state transition (Codex R3 M1's load-bearing case) is verified only by reading the slash-command prose, not by an executable assertion. **Closes Codex R4 LOW #1 with full falsifiability.**
-
 - **e2e.test.ts fresh-tmp comment (polish)** — `tests/review-queue/e2e.test.ts:139-147` explicitly leaves the fresh `cursor.md.*.tmp` in `r1Dir` and only asserts `r2Dir` cleanliness. The behavior is consistent with combine.py's "cleanup-only-stale" rule, but the test deserves an explicit in-test comment naming the convention so future readers don't read it as an AC6a coverage gap. **Closes Codex implementation-monitor finding #3 (partial-confirm).** Polish-only; not load-bearing.
-
-- ~~**AC6b post-merge dogfooding (founder, immediate)** — per spec §After Completion §5...~~ ✅ **CLOSED 2026-05-15** — empirically met across 042/043/044/045/046/047/048/049/050/051/052/053/054 (13 specs, all reviewer dispatch via launchd autopolling + occasional manual fallback when the documented exit-126 silent-failure mode fires). Loop-close gate criterion was "next qualifying spec requires zero manual reviewer-dispatch messages"; that's been the steady state for ~2 weeks. Memory `project_loop_close_gate.md` reflects this.
 
 - **Wiki promotion (strategist, post-039)** — promote 039's "After Completion" notes:
   - New page `wiki/surfaces/review-queue.md` — file-backed protocol overview, the three slash-commands (`review-queue-codex.md` / `review-queue-cursor.md` / `review-queue-watch.md`), AC3.5 (a)/(b)/(c) state machine, the JOURNAL-AS-QUEUE PROHIBITION invariant, the reviewer-harness-agnostic property.
@@ -521,11 +407,7 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 - **Cross-tool review cycle decay-curve heuristic candidate** — 039's 4-round cycle (R1: 18 findings → R2: 14 → R3: 8 → R4: 2 LOW; zero residual HIGH/MED at convergence) is the third structural-reform data point (after 037 and 038). The earlier observation that structural reforms need 3 rounds while narrow features settle in 1-2 holds; 039's 4-round bump came from being its own bootstrap dogfooding subject. Two more confirming cases (040, 041) would lock the heuristic into `backlog/README.md` or `docs/AGENT_INSTRUCTIONS.md`.
 
-- ~~**🔴 AC0 Codex recipe fails verification on macOS — `--sandbox workspace-write` blocks `.git/FETCH_HEAD` writes...~~ ✅ **CLOSED 2026-05-15** — fix candidate (a) shipped: both `tools/review-queue/_run_reviewer.sh:140` (the production reviewer wrapper) and `docs/review-queue-setup.md:43,47` use `--sandbox danger-full-access` with an explicit note that the prior `workspace-write` setting denied `.git/FETCH_HEAD` writes on macOS. The known cost (no scoped sandbox for Codex reviewers on founder's dev machine) is documented and accepted.
-
 - **AC6b live-test verdict (in flight, 040 R1) — Codex reviewer blocked at Step 1.** As of 2026-05-12 02:16 PDT, the 040 live test scoreboard is: spec draft (no dispatch msg), R1 dispatch (no dispatch msg), watcher cron fired by strategist (no dispatch msg), R1 reviewer-tick attempt = Codex blocked by sandbox (above), Cursor not yet observed. **AC6b status:** the AC0 sandbox issue is a session-bootstrap defect, NOT a per-round founder-to-reviewer dispatch message — under the 039 reading ("session bootstrap is out of scope for the dispatch-message count"), AC6b is still passing. Re-evaluate after Codex re-fires under the workaround sandbox and `r1/codex.md` lands.
-
-- ~~**🔴 AC3 reviewer-emission validation gap — Cursor R1 cursor.md had unparseable YAML...~~ ✅ **CLOSED 2026-05-15** — fix candidate (c) "both" shipped across three specs: **042** (`reviewer-emission-yaml-validation`, merged 2026-05-13 at `4fb517d`) hardened `_lib.parse_frontmatter` to raise typed `ValueError` and added combine.py defensive parse path; **045** (`queue-reliability-friction-cluster`, merged 2026-05-13 at `ad5ba68`) added `tools/review-queue/validate_response_yaml.py` as a pre-link gate the reviewer skill prompts now invoke before `commit-reviewer-response.sh`; **053** (`reviewer-completed-at-coercion`, merged 2026-05-15 at `e59d7bf`) closed the specific datetime-auto-coercion subclass that was the modal recurring failure. The "this will recur the moment any reviewer cites text containing literal quote characters" prediction has not fired since 042 shipped.
 
 - **AC6b reading on the inline-patch intervention.** Strict reading: the strategist editing a reviewer's pushed response is a queue-contract violation — combine.py's deterministic-one-round-per-tick property assumes immutable reviewer artifacts. Lenient reading: it was a one-character fix that preserved semantics, the act was logged to queue-errors.md (the exact failure-path the 039 spec carved out for emergencies), and no founder-to-reviewer dispatch message was needed. **Calling it: AC6b still passing for round 1, with an explicit caveat.** The AC3 emission-validation fix above must land before this pattern can be claimed reliable; until then, the queue is "self-driving with strategist hand-patches on YAML defects" — better than pre-039, not yet the fully-automated steady state 039 promised.
 
@@ -542,58 +424,13 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 ## From 040 merge (2026-05-12)
 
-- **🟡 MED — `tests/review-queue/concurrency.test.ts:133` orphan-cleanup test clock-frame mismatch.** ✅ **CLOSED 2026-05-15** — live-verified: `npx vitest run tests/review-queue/concurrency.test.ts` shows all 7 tests passing, including `orphan .tmp.* older than 30 min is cleaned up by combine.py` (315ms). Fix landed in the test file at some point after 040 merge. Original analysis preserved below for historical context.
-
-#### Historical entry (closed)
-
-  **Original Claude/strategist classification (now superseded):** "HIGH — combine.py orphan-cleanup is a real production bug; cleanup path isn't actually firing." Wrong.
-
-  **Codex investigation (journal entry 2026-05-12 13:39 PDT) + strategist empirical verification (2026-05-12 14:00 PDT, post-merge):** the test sets the orphan file's `mtime` to `real_wall_clock_now() - 31 min` using `touch -t $(date -r ${Math.floor(past)})`, but passes `--now=2026-05-12T11:00:00Z` (a fixed past timestamp) to `combine.py`. Since real wall-clock is many hours after the fake `--now`, the file's mtime ends up **in the future** relative to combine.py's notion of "now"; cleanup correctly identifies it as "not 30 min old yet" and skips. Production `combine.py cleanup_orphans()` at `tools/review-queue/combine.py:109-126` is correct: a controlled fixture with `touch -t 202605120329.00` (= 10:29 UTC, exactly 31 min before fake-now in UTC frame) **does** delete the orphan as expected. Verified by strategist 2026-05-12 14:00 PDT against current main HEAD.
-
-  **What to actually fix (test, not production):**
-  - Option A (preferred — simpler): drop the `--now=2026-05-12T11:00:00Z` override; let combine.py use real wall-clock `_dt.datetime.now(_dt.timezone.utc)`; the existing `touch -t $(date -r real_now-31min)` then aligns correctly.
-  - Option B: compute the `touch -t` argument relative to the fake `--now` (e.g., convert `2026-05-12T11:00:00Z` to local time, subtract 31 min, format).
-  - Option A is cleaner because it removes the fake-clock from this test entirely (other concurrency tests in the file don't need it; this one drifted in by copy-paste).
-
-  **Why this matters less than originally framed:** no production bug. The "silently red since 039 merged" framing is accurate (the test has been red since 039) but the consequence is "1 test file in CI shows red," not "queue's orphan-cleanup is broken in steady-state." File a small follow-up to fix the test (suggested ID: `2026-05-XX-NNN-concurrency-test-clock-frame-fix`). MED, not HIGH.
-
-  **Process note:** the strategist's original synthesis classified this as a production bug based on the sidecar reviewer's word ("real bug in `tools/review-queue/combine.py`'s orphan-cleanup path"). Codex's independent local investigation (running `combine.py` directly on controlled fixtures) caught the misclassification within ~30 min of seeing the strategist synthesis. **Two-tool cross-check on diagnostic claims is operationally valuable** — the same convergent-on-direction divergent-on-prescription pattern that holds in cross-tool spec review also surfaces classification errors in post-merge gap synthesis. Worth recording as evidence for the cross-tool-spec-review wiki page.
-
 - **MED — Watcher slash-command body integration test (V1.6+).** 040 ships executable test coverage of the `dispatch-next-round.py` helper's (a)/(b)/(c) terminal transitions, closing 039 R4 LOW #1. But the `.claude/commands/review-queue-watch.md` Step 3 prose that *invokes* the helper is still human-audited — there's no executable test that the slash-command body correctly translates strategist disposition into the right helper invocation. Consider a higher-level integration test that exercises the slash-command body end-to-end for V1.6+. Not load-bearing — the helper itself is tested; only the prose-to-invocation translation is unverified. (Sidecar reviewer flagged this as Follow-up #3.)
 
-- **✅ Cross-out: 039 R4 LOW #1 closed by 040.** The 039 followup line 505 ("Watcher-state executable test") is now resolved by 040's merge. Test fixture at `tests/review-queue/watcher-state.test.ts` constructs a real r1 dir, runs the real `combine.py`, then runs the real `dispatch-next-round.py` (spawning the real `request.py` as a subprocess, NOT mocked), and asserts the load-bearing AC3.5 (b) post-conditions executably. Strategist promoting 039 to wiki should reference this as the canonical evidence the (b)-branch transition is no longer prose-only.
-
-- **✅ Cross-out: AC6b loop-close gate empirically closed by 040.** The 039 followup "AC6b post-merge dogfooding" entry is now resolved. 040 was the FIRST qualifying spec to traverse the new file-backed queue end-to-end with **zero founder→reviewer dispatch messages**. Three rounds of cross-tool review converged in 53 min wall-clock; full ready→pending_review in ~4 hours. Two friction cases surfaced (Codex sandbox + Cursor YAML emission) but both are session-bootstrap / emission-validation defects, not per-round dispatch messages. The strategist (Claude Code) interacted with the founder exactly twice in this entire cycle: (a) the post-039 reconciliation push acknowledgement, and (b) when the founder invoked `/review-pending`. AC6b empirical criterion met. The next operational gap (`reviewer-background-execution`) is filed as 041 candidate above — that's the difference between "AC6b passes on the strict reading" and "founder never touches reviewer agents."
-
 ## From 041 merge (2026-05-12)
-
-- **✅ AC3 founder smoke verification CLOSED 2026-05-12 ~23:05 PDT.** Founder ran `tools/review-queue/install-codex-reviewer-launchd.sh --smoke` which executed both: (1) `launchctl kickstart -k` → wrapper-fired tick against production repo (rc=0, 46s, "no codex reviews to write"); (2) `smoke-test-codex-runner.sh` against isolated tmpdir + local bare origin → **`smoke OK: codex.md produced, validated, committed; hard isolation assertions all passed`**.
-
-  Took **3 post-merge fixups** to get clean (all operational test/helper bugs surfaced by AC5; none changed production semantics):
-  1. `50c2e81` — drop `HOME=$SMOKE_HOME` override in smoke (was preventing `codex` from finding `~/.codex/auth.json` → 401);
-  2. `aec75fd` — make `cd` in 3 queue slash-commands respect `ECHO_REVIEW_QUEUE_REPO_ROOT` (was hardcoded `~/Desktop/Project_echo`; smoke ran against PROD not tmpdir);
-  3. `c63dad9` — `PYTHONDONTWRITEBYTECODE=1` in `commit-reviewer-response.sh` + smoke copies `.gitignore` + removes `__pycache__/` (was tracking .pyc files; validate.py regenerated them mid-pipeline → push-with-retry's `git pull --rebase` failed with "unstaged changes"; Codex's LLM judgment recovered the first time; the fix removes the need for recovery).
-
-  **The launchd job is now installed, verified, and ticking every 10 min unattended.** Founder-side Codex activations: 0 going forward.
-
-  Operational observation: `launchctl list | grep com.echo.review-queue-codex` shows last exit `126` from an earlier failed install attempt; subsequent kickstart-fired ticks succeed (rc=0). The `126` appears stale — launchctl seems to preserve the worst-recent exit even after subsequent successes. Not a runtime issue; the wrapper's own log (`~/Library/Logs/echo-review-queue-codex.log`) is authoritative for tick state.
 
 - **AC7 wiki residue (strategist, post-merge wiki promotion)** — `wiki/operating-model/cross-tool-spec-review.md:140` has `get_atom(<elided_atom_id>)` placeholder. Builder honored AGENT_INSTRUCTIONS rule 6 (no wiki edits from builders); fix at strategist's next wiki promotion pass. Search-replace `<elided_atom_id>` → `<id>` or restructure the example to match the `get_atom({id: ...})` schema.
 
 - **AC8 empirical measurement (strategist, next qualifying spec)** — count founder activations during the next post-041 spec's review cycle. Pre-041 baseline measured: ~5 per 3-round cycle during 040 (initial Codex terminal command + Codex re-fires after sandbox correction + Cursor chat pastes). Target post-041: 0–1. Record measurement in the next item's `review_notes` at merge time. If count >1, file 042 with the specific friction observed.
-
-- **combine.py reviewer-finding-enumeration audit** — ✅ **CLOSED 2026-05-15 by 043** (MED). Stricter convergence match-key shipped: `tools/review-queue/combine.py:75-101` `cross_refs_match` now requires round/reviewer/`finding_index` triple to match (043 AC6 R6 MED #2 — finding_index discriminator). Union-find over anchors at lines 510-554 with `consumed_findings` set guards against double-listing the same finding across convergent + divergent rows. Live regression: `npx vitest run tests/review-queue/combine.test.ts` — 21/21 tests pass. Original observation preserved below for historical context.
-
-  **Historical observation (closed):** empirically observed twice during 041's review rounds:
-  - R1: combine.py folded Codex M4 + Cursor M2 into one "convergent" row even though they were different findings at the same anchor (variable-name normativity vs synthetic item_id whitelist).
-  - R2: combine.py dropped Cursor L1 (AC2 Label vs kickstart target) entirely from both tables, AND double-listed Cursor L2 (AC1 invalid env var) across convergent + divergent.
-  Strategist's manual read of `<reviewer>.md` files was the safety net both times. Needs a backlog item to fix the finding-enumeration logic (suggested: stricter convergence match-key + a "missing findings" audit pass that compares input findings to output rows). Priority: MED (queue still works correctly; this is friction on the hands-off pattern that 041+ depends on).
-
-- **✅ Cross-out: 040 follow-up "🔴 NEXT GAP — Reviewer background execution" closed by 041 merge.** Strict-reading AC6b kept passing; the activation-friction half is now structurally addressed (pending AC8 empirical confirmation).
-
-- **✅ Cross-out: AC0 Codex recipe failure on macOS** — 041 AC3 pins the corrected invocation (`--sandbox danger-full-access`, no `--ask-for-approval`, `<` redirection) in the wrapper script.
-
-- **✅ Cross-out: AC3 reviewer-emission validation gap** — 041 AC4 ships `tools/review-queue/commit-reviewer-response.sh` with mechanical validate-before-commit + invalid-file MV-aside on failure; both reviewer slash-commands rewired.
 
 ## From 042 dogfooding cycle (2026-05-12)
 
@@ -610,65 +447,6 @@ The four MCP envelope-overflow bugs from this dogfooding window are CLOSED for t
 
 **Fix candidates:** (a) move the pre-redirect work inside the `{...}` block; (b) plist `StandardErrorPath` → log file path instead of `/dev/null`; (c) emit a `[bootstrap]` marker line at the very top of `{...}` so silent failures are detectable downstream.
 
-### 🔴 #2 — `git pull --rebase origin main` wedges on dirty tree in every prompt's Step 1 (HIGH) — ✅ **CLOSED 2026-05-15 by 044 + 050**
-
-**Status:** Closed two ways. (1) **044 autostash fix shipped** — `skills/review-queue-watch.md:60` uses `git -c rebase.autoStash=true pull --rebase origin main`; `tools/review-queue/push-with-retry.sh:40` and `tools/review-queue/combine.py:789` also use autostash at every watcher-transaction site. Live test: `tests/review-queue/044-autostash-dirty-tree.test.ts` passes (`dirty journal + remote-advanced origin: full transaction succeeds, dirty file preserved, no PUSH-RACE-FALLBACK rows`). (2) **050 worktree-isolation structurally obsoletes the reviewer-side concern** — `tools/review-queue/_run_reviewer.sh` runs every headless reviewer tick in a fresh `$TMPDIR/echo-<reviewer>-<uuid>` ephemeral worktree pinned to `origin/main`; there is no shared dirty-tree surface for the codex/codex-ops reviewer prompts to wedge against. Original analysis preserved below for historical context.
-
-#### Historical entry (closed)
-
-**Observed:** Both `review-queue-watch.md` and `review-queue-codex.md` (and presumably `review-queue-cursor.md`) start Step 1 with bare `git pull --rebase origin main`. If the worktree is dirty, the rebase aborts non-zero and the tick exits without doing anything. This fired 4+ times during 042: once at the first watcher tick (workaround: manual stash/pop), and once at Codex r2's first attempt (Codex correctly aborted to avoid reviewing stale artifacts, leaving r2/codex.md never written; resolved only after strategist stashed the dirty tree).
-
-**Cost:** Roughly half the strategist intervention time this cycle. The dirty state is unavoidable in steady state — Codex's own post-review journal write always leaves the tree dirty for several seconds; concurrent agents add to it; the strategist's WIP wiki edits sit dirty across sessions.
-
-**Fix:** One-line change to all three slash-commands' Step 1:
-
-```bash
-# Before:
-git pull --rebase origin main
-# After:
-git -c rebase.autoStash=true pull --rebase origin main
-```
-
-Codex itself adopted this pattern organically in one of the 042 r1 ticks; this should be the documented convention.
-
-### 🔴 #3 — `MISSING_REVIEWER_TIMEOUT_HOURS=2` is too slow for iterative work (HIGH) — ✅ **CLOSED 2026-05-15 by 043**
-
-**Status:** Closed by 043 (`2026-05-13-043-per-round-reviewer-roster`, merged at `d846c35`). Per-reviewer timeout config replaced the single global `MISSING_REVIEWER_TIMEOUT_HOURS`. `tools/review-queue/reviewers.json` now declares per-reviewer `mode` + `timeout_hours`: headless reviewers (codex, codex-ops) have `mode: "headless"` + `timeout_hours: null` (no wait at all); only IDE-mode reviewers (cursor) carry `timeout_hours: 2`. Validated at `tools/review-queue/_reviewers.py:92-106` (mode↔timeout_hours contract). Result: codex-only or codex+codex-ops rounds never wait on Cursor; combine.py auto-dispositions immediately. Original analysis preserved below for historical context.
-
-#### Historical entry (closed)
-
-**Observed:** With Cursor closed (the accept-degradation case from 041), combine.py refuses to write `combined.md` until 2h elapse from `requested_at`. For 042 that meant a per-round wait of ~2h just to start dispositioning. Strategist worked around by invoking `combine.py --timeout-hours=0` three times across the cycle.
-
-**Cost:** 042 cycle would have taken 6+ hours under default 2h timeout. With `--timeout-hours=0`, the cycle took ~50 min.
-
-**Fix:** Drop the default to a small value (5-15 min) OR — better — replace the timeout-based "accept-degradation" with a config-driven optional reviewer list. If Cursor is in `optional_reviewers` for the current session, combine.py treats absent-Cursor as a clean single-reviewer round, no waiting. Per the 041 followup's "replace Cursor as a reviewer" candidate (line 531), this also opens the door to a second headless reviewer (second Codex with different prompt, or Claude API cron) that doesn't have the "is the IDE open?" question.
-
-### 🟠 #4 — Watcher's `single_reviewer_timeout → escalate_to_founder` default contradicts AC8 goal (MEDIUM) — ✅ **CLOSED 2026-05-15 by 043 + 044**
-
-**Status:** Closed by 043's `partial_responses` rename + 044 AC4 auto-disposition. `tools/review-queue/combine.py:122-156` (`compute_combined_verdict`): when exactly one required reviewer is missing AND every present reviewer's verdict is in `PROCEED_STAR` (`{proceed, proceed_after_patches}`), the watcher returns `("partial_responses", escalated=False)` — the strategist auto-dispositions through the normal path-(a)/(b)/(c) flow, no founder escalation. Multi-missing or any-pushback-with-missing still escalates. Skill prose at `skills/review-queue-watch.md:85` reflects the new boundary. Live regression test: `tests/review-queue/concurrency.test.ts` includes `missing-reviewer timeout: partial_responses + auto-disposition (044 AC4 — single-missing-proceed)` which passes. Original analysis preserved below for historical context.
-
-#### Historical entry (closed)
-
-**Observed:** When combine.py writes `combined_verdict: single_reviewer_timeout`, it sets `escalated_to_founder: true`. The watcher slash-command's Step 3 then says "Append a journal entry; **exit**. The founder will see and act on next session." That's exactly the founder-activation 041/AC8 is trying to eliminate. Strategist overrode this 3× during 042 by ignoring the escalation flag and dispositioning the single-reviewer (Codex-only) findings as if it were a normal `proceed_after_patches` round.
-
-**Cost:** None this cycle (off-protocol override was clean), but the default behavior is the wrong default — every non-Cursor session would hit it.
-
-**Fix:** Watcher Step 3 should treat `single_reviewer_timeout` differently from `divergent`/`no_responses`: when one named reviewer (codex) succeeded and only the accept-degradation reviewer (cursor) is absent, the strategist disposition path fires normally with `escalated_to_founder: false` (or a new `escalated: false, mode: single_reviewer_strategist_drive` flag). Divergent + no_responses still escalate.
-
-### 🟡 #5 — Reviewer schema accepts unquoted-YAML timestamps; reviewers emit them ~half the time (MEDIUM) — ✅ **CLOSED 2026-05-15 by 053**
-
-**Status:** Closed by 2026-05-14-053-reviewer-completed-at-coercion (merged at `e59d7bf`). Two-prong fix shipped: fix-variant **(a)** (quoted-example prompts added to all three reviewer skills + adapters) AND fix-variant **(c)** (`_coerce_completed_at` helper at module scope in `tools/review-queue/validate.py:53`, reviewer-schema-gated hook between `parse_frontmatter` and `validate_frontmatter`, in-memory-only, no on-disk rewrites). Fix-variant **(b)** explicitly skipped per the spec's "schema stays narrow; emission gets concrete; reception is forgiving" invariant — `reviewer.schema.json` was not widened.
-
-**Convergence record:** 6 review rounds (4→4→3→2→1→0 findings, AC3.2-heavy). Asymmetric reviewer decay observed (codex-ops converged at R3; codex polished narrow code-mechanics through R6). The recursive-risk note in the spec body did NOT fire — no reviewer emitted unquoted `completed_at` during 053's own review cycle.
-
-**Original analysis preserved below (lines 633-644 of pre-2026-05-15 version) for historical context:**
-
-> **Observed:** `reviewer.schema.json` declares `completed_at: { type: string }`. YAML parses `2026-05-12T23:56:42Z` (unquoted) as `datetime.datetime`, not `str`. jsonschema then rejects: `is not of type 'string'`. 042 r1/r2 happened to emit single-quoted strings (passing); r3 first-attempt emitted unquoted (failing → 041 AC4 quarantine fired). The variance is non-deterministic across Codex ticks.
->
-> **Cost:** One extra ~3-min round-trip in r3 to regenerate. AC4 absorbed it without founder activation, but the wasted compute is real.
->
-> **Fix candidates:** (a) tighten reviewer prompts to specify `completed_at: '2026-05-XXTHH:MM:SSZ'` (quoted) verbatim, with example. (b) Relax `reviewer.schema.json` to accept `oneOf` shapes. (c) Pre-normalize in `validate.py`: if value is `datetime.datetime`, coerce to ISO 8601 string before validation. Option (a) is the lowest-friction fix; (c) is the most resilient.
-
 ### 🟡 #6 — Watcher cron is session-only; cross-session autonomy gap (MEDIUM) — ❌ **STILL OPEN (revalidated 2026-05-15)**
 
 **Revalidation 2026-05-15:** `ls ~/Library/LaunchAgents/ | grep -i echo` shows `com.echo.daemon.plist`, `com.echo.review-queue-codex.plist`, `com.echo.review-queue-codex-ops.plist` — no `com.echo.review-queue-watch.plist`. Watcher remains session-only via `/loop 10m /review-queue-watch` in a strategist Claude Code session. No watcher headless wrapper has been built. Cross-session autonomy gap unchanged.
@@ -680,19 +458,6 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 
 **Fix:** Launchd-ify the watcher too. Similar plist + wrapper shape as 041's Codex one. Trade-off: watcher's slash-command body does require a Claude session to invoke (it's not just a shell script). Real fix is the slash-command body extracted into a standalone Python/bash helper that doesn't need Claude, or a Claude Code headless invocation similar to `codex exec`.
 
-### Summary recommendation
-
-**File 043 as a single spec** named `2026-05-XX-043-reviewer-loop-speed-and-resilience` covering #1-#6. Estimated 1-2d. Order of leverage (per cost-saved-this-cycle):
-
-1. #2 — `git -c rebase.autoStash=true`, 4× wedge hits avoided
-2. #3 — drop timeout default OR config-driven optional-reviewer list, ~10× speed boost
-3. #4 — watcher single-reviewer-strategist-drive path, 3× off-protocol overrides avoided
-4. #1 — launchd kickstart logging fix, debugging gain
-5. #5 — reviewer prompt quoted-timestamp + validate.py coercion, ~50% emission-fail avoidance
-6. #6 — watcher on launchd, cross-session autonomy
-
-043 itself becomes the next AC8 measurement vehicle, this time also measuring round-trip latency (target: ≤30 min for 3-round convergence end-to-end, no overrides needed).
-
 ## From 042 merge (2026-05-13)
 
 - **Pre-existing orphan-cleanup test failure** (`tests/review-queue/concurrency.test.ts:133`) — fails on main HEAD; also failed before 042's changes. Out of scope per 042 spec §Out of Scope. Root cause was investigated post-040 (see _followups.md "From 041 merge" → the `--now=` fixed-timestamp vs real-mtime mismatch under `touch -t $(date -r ...)`). Two prescribed Option-A/Option-B fixes were named there but never landed. Suggested ID: `2026-05-XX-044-orphan-cleanup-test-fix`. Tiny scope (5-10 lines in the test).
@@ -700,8 +465,6 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 - **Path-resolution caveat in `combine.py:207`** — `Path.resolve().relative_to(repo_root.resolve())` assumes `repo_root` is realpath-resolved by the caller. Tests pre-resolve with `realpathSync` for macOS `/private/var/folders/...`. Not a current bug; document for next builder. Could add an internal-style `_resolve_repo_root(path)` helper that always realpath-resolves.
 
 ## From 043 merge (2026-05-13)
-
-- ~~**2026-05-XX-044-add-3rd-reviewer-end-to-end-falsification** (LARGE, HIGH) — AC6h N=3 end-to-end test...~~ ✅ **CLOSED 2026-05-15** — N=3 reviewer protocol is empirically proven: codex + codex-ops + cursor (three reviewers, two vendors) have run through `request.py` → `validate.py reviewer` → `commit-reviewer-response.sh` → `combine.py` → `validate.py combined` across 12+ cycles (042 through 054). Per-round reviewer roster from spec 043 (merged at `d846c35`) generalized the hardcoded `(codex, cursor)` assumption to N reviewers; codex-ops fulfills the originally-hypothesized "3rd reviewer with different prompt" role (operational/runtime lens). The "codex-arch architectural-perspective reviewer" specific deployment didn't happen, but the protocol itself is proven against real cycles. Open sub-items (R5 MED #2 list-shape preservation, R6 MED #2 finding_index cross_refs_match, R6 MED #3 bucket collapse, R8 HIGH #1 TOOL_DIR/TARGET_REPO split) are individually small and have not surfaced empirically — file as narrow follow-ups if/when they fire.
 
 - **AC1a — cursor exits no-op when not in requested_reviewers** — needs a shell-extractable harness for the reviewer-prompt Step 2 gate. The behavior is correct (verified in code review); test coverage is the gap.
 
@@ -729,8 +492,6 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 
 - **`_install_reviewer_launchd.sh --smoke` fails-open when smoke runner is absent** (r2 codex-ops MED #2). **→ ABSORBED into `2026-05-13-045-queue-reliability-friction-cluster` as AC2.** Original observation preserved here: `tools/review-queue/_install_reviewer_launchd.sh:97-103` prints a warning and exits 0 when `--smoke` is passed but `smoke-test-<reviewer>-runner.sh` doesn't exist. AC2 of 045 fixes this fail-closed.
 
-- ~~**Reviewer prompts' Step 1 pull also lacks autostash** (r2 codex-ops HIGH adjacent observation)...~~ ✅ **CLOSED 2026-05-15 by 050** — obsoleted structurally. 050 worktree-isolation means each reviewer tick runs in a fresh ephemeral `$TMPDIR/echo-<role>-<uuid>` worktree created from `origin/main`; there is no "dirty tree at start-of-tick" surface because the tree IS the tick. The shared-live-checkout race that motivated the autostash question no longer exists.
-
 ## From 044 merge (2026-05-13)
 
 - **Cosmetic prose mismatch in watcher slash command** (code-reviewer subagent finding, non-blocking). `.claude/commands/review-queue-watch.md:38` documents the AC4 missing-reviewer divergent-row example as `where: "—"`, but the actual emitter at `tools/review-queue/combine.py:684` writes `where: "did not respond; per 044 AC4 single-reviewer auto-disposition"`. Pure prose-vs-emitter literal divergence, no behavior change. Pick one canonical form and align both. Trivial scope. Could bundle into 045 or stand alone.
@@ -738,8 +499,6 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 - **/review-pending → /merge-and-cleanup sidecar handoff has a tracked-file gap.** `/review-pending` writes `backlog/pending_review/<id>.review.md` but explicitly does not `git add` or commit (Step E: "Do not run git operations beyond `git diff` and `git fetch`"). `/merge-and-cleanup`'s pre-flight aborts on any dirty tree, AND its C7 runs `git rm` on the sidecar (which requires the sidecar to be tracked). The two skills don't compose cleanly — the strategist driving them must commit the sidecar manually between skills. Hit during 044 merge; resolved by adding a `review: <id>` commit before invoking /merge-and-cleanup. Either skill could close the gap: /review-pending stages or commits, OR /merge-and-cleanup tolerates an untracked sidecar at the named path. Strategist preference: have /review-pending commit the sidecar (matches the rest of the queue's "writes are committed atomically" pattern). Filed as skill-edit candidate; not a backlog item per the friction-first directive (skill edits aren't specs).
 
 ## From 045 merge (2026-05-13)
-
-- ~~**`/merge-and-cleanup` C5 verify should include `tools/sync-skills.sh --check`** (045 code-reviewer subagent meta-finding)...~~ ✅ **CLOSED 2026-05-15 by 052** — AC1 adds `tools/sync-skills.sh --check` to C5 verify in `skills/merge-and-cleanup.md:169` with operator-manual remediation paragraph at line 172; AC4 shape test guards regression; AC3 ships `tools/install-pre-commit-hook.sh` as the optional pre-commit half. Both halves of the bundled recommendation landed.
 
 - **Code-style nit: `tools/review-queue/validate_response_yaml.py:91`** uses `__import__("os").environ` instead of a top-level `import os` + `os.environ`. Functionally fine; stylistic only. Non-blocking; trivial 2-line edit.
 
@@ -772,27 +531,9 @@ Codex itself adopted this pattern organically in one of the 042 r1 ticks; this s
 
 - 048 follow-up (non-blocking): Tighten E2.5 `HAS_TASK_STATE_REF` awk detection in skills/process-backlog.md to filter empty-string `task_state_ref:` values (spec wording says "non-empty"). Currently any key presence triggers the helper; the missing-pointer no-op covers it benignly. Cosmetic.
 - 048 follow-up (non-blocking): The 048 agent_notes claim that builder.md is staged in branch tip f8869ed is off — dogfood pointer first appeared in c0ea432 (main's review move). Cosmetic / historical only.
-- ~~048 process-debt: Merge lock at .git/echo-merge-in-progress is Claude-Code-only; codex-side and cursor-side reviewer queues bypass it...~~ ✅ **CLOSED 2026-05-15** by 051 (interim cross-vendor lock extension via `_run_reviewer.sh` reading the sentinel) + 050 (long-term: sentinel-lock convention deleted entirely; reviewers/watcher/merger now run in ephemeral `$TMPDIR/echo-*` worktrees). Lock convention no longer exists.
-
-- ~~049 follow-up (non-blocking, cosmetic): `tools/install-codex-adapters.sh:201` — `age_ok=${age_ok}` diagnostic is always 1 by the time it's printed (early-return on the ≤600s branch).~~ ✅ **CLOSED 2026-05-17** by deleting the obsolete repo-side Codex adapter/symlink path; canonical Codex install is now `tools/install-echo-codex-skills.sh`.
-- ~~049 follow-up (non-blocking, cosmetic): `tools/install-codex-adapters.sh:342` — `cp -R "$adapter/." "$stage/"` runs after writing the sentinel; safe per V1 scope (adapters only contain SKILL.md) but worth a comment.~~ ✅ **CLOSED 2026-05-17** by deleting the obsolete repo-side Codex adapter/symlink path.
-- ~~049 follow-up (docs): Document in `tools/sync-skills.sh` header that `--check` reads `$HOME/.codex/skills/*/` for stale-`--copy` warnings, so CI environments aren't surprised.~~ ✅ **CLOSED 2026-05-17** by narrowing `tools/sync-skills.sh` back to Claude command copies only.
-- 049 strategist queue (After-Completion): extend vendor-neutralization to `merge-and-cleanup`, `review-queue-*`, `process-backlog-batch`; ~~generate `agents/openai.yaml` for each codex adapter~~ superseded by direct `ECHO:*` Codex skill install; ~~pre-commit hook for `sync-skills.sh --check`~~ ✅ **CLOSED 2026-05-15 by 052** (`tools/install-pre-commit-hook.sh` shipped, idempotent, 6-scenario test coverage); ~~verify codex auto-discovery honors symlinks (R2 mitigation)~~ ✅ **CLOSED 2026-05-17** by using real directory installs under `~/.codex/skills/ECHO:<name>/`.
 - 049 follow-up: re-file deferred `parse-failure-evidence-preservation` test against a future codex-fan-out-orchestrator spec.
-- ~~049 owed: human smoke test — run `tools/install-codex-adapters.sh` in a real codex CLI session and verify `/review-pending` discovers in codex's slash-command surface.~~ ✅ **CLOSED 2026-05-17** by real Codex session discovery/use of `ECHO:process-backlog`, `ECHO:review-pending`, and `ECHO:merge-and-cleanup` from `~/.codex/skills/ECHO:*`.
-- ~~**CROSS-CUT (post-merge adapter drift)**: ...~~ ✅ **CLOSED 2026-05-15 by 052** — option (a) shipped: `tools/sync-skills.sh --check` added to `/merge-and-cleanup` C5 verify with operator-manual remediation (no auto-fix), AC4 shape test guards regression. Option (b) also shipped: `tools/install-pre-commit-hook.sh` for optional pre-commit `--check`.
-- ~~**CROSS-CUT (merge-lock cross-vendor gap, SECOND occurrence today)**: ...~~ ✅ **CLOSED 2026-05-15 by 051 + 050** — interim (051): `_run_reviewer.sh` reads `.git/echo-merge-in-progress` and exits 0 when present + `push-with-retry.sh` uses `pull --rebase=merges` (equals form, preserves in-flight merge commits). Long-term (050): sentinel-lock convention deleted entirely; reviewers/watcher/merger run in ephemeral `$TMPDIR/echo-*` worktrees so the live-checkout race surface no longer exists.
 
 ## From 051 R4 — deferred findings (out of scope; outside the 1-day friction-fix budget)
-
-Surfaced during 051's R4 review cycle 2026-05-15 00:37 PDT. Both are real operational concerns but expand 051's scope beyond the original 2-prong friction-fix charter (lock check + `--rebase=merges` flag). Filed here per the friction-first directive instead of inflating 051's AC text. Reviewable when the queue-reliability cluster gets a deeper second pass post-050.
-
-- ~~**051-followup-A (R4 codex-ops F1, MED) — `push-with-retry.sh` rebase-failure recovery.**...~~ ✅ **CLOSED 2026-05-15 by 050** — the entry's own text predicted this ("Cross-cut: 050 worktree-isolation eliminates the shared live-checkout race surface entirely, so the practical exposure window for this is 'between 051 ship and 050 ship'"). 051 and 050 both shipped in this morning's batch; reviewers/watcher/merger now run in ephemeral `$TMPDIR/echo-*` worktrees that the cleanup trap removes on every exit path. A wedged-rebase in an ephemeral worktree gets reaped on the next tick. Live-checkout race surface no longer exists. Could still file as low-priority residual hardening of `push-with-retry.sh` for defense-in-depth, but the practical exposure window is closed.
-- ~~**051-followup-B (R4 codex-ops F2, LOW) — lock-release race in AC2 lock-present holder read.**...~~ ✅ **CLOSED 2026-05-15 by 050** — the lock-check codepath this race was inside was deleted entirely by 050 AC3 (sentinel-lock convention removed). The test exercising it (`tests/review-queue/run-reviewer-honors-merge-lock.test.ts`) was deleted during 050's merge (commit `5ad67e0`). Race surface no longer exists.
-- ~~**052-followup-A (sidecar §3, MED) — strategist task: note pre-commit hook landed.** ...~~ ✅ **CLOSED 2026-05-15** — `raw/internal/decisions/2026-05-13-echo-skills-are-the-cross-tool-protocol.md` "Next steps" section now annotates the pre-commit-hook line with `✅ SHIPPED 2026-05-15 by 052` + commit-time/merge-time gate summary.
-- ~~**052-followup-B (BLOCKING on 050 merge) — re-insert `tools/sync-skills.sh --check` line + remediation paragraph into 050's restructured C5.**...~~ ✅ **CLOSED 2026-05-15** — 050's merge (commit `5ad67e0`) auto-merged `skills/merge-and-cleanup.md` cleanly. Verified post-merge: the C5 gate survives at line 169 + remediation paragraph at line 172 inside 050's restructured Step B. AC4 shape test (`tests/skills/merge-and-cleanup-shape.test.ts`) passes; `tools/sync-skills.sh --check` exits 0. Mutual reinforcement worked as designed — no manual re-insertion needed thanks to context-offset auto-merge.
-- ~~**050-followup-H (sidecar §"Suggested fixups", founder-only) — remove literal `echo-merge-in-progress` from docs/BACKLOG.md:23-24.**...~~ ✅ **CLOSED 2026-05-15** — strategist (not builder; CLAUDE.md grants strategist BACKLOG.md edit rights) reworded both row prose entries to drop the literal string. Line 23 (051 row): `reads the merge-and-cleanup sentinel-file lock`. Line 24 (050 row): `honors the sentinel-file lock convention`. AC7 grep over the 050-spec'd scope (`skills/ tools/ docs/ tests/ wiki/`) now returns exactly 4 hits — the legitimate AC6.5 negative-assertions in `tests/review-queue/worktree-isolation.test.ts:360-363`. Observation (out of followup-H scope): rows 23-26 in `docs/BACKLOG.md` still have stale `../backlog/ready/` link paths + no `✅ MERGED` annotation despite 048/049/050/051 having shipped — separate BACKLOG.md hygiene task, not part of -H.
-- ~~**050-cross-merge-note — Codex consulted mid-merge.**...~~ ✅ **CLOSED 2026-05-15 by 054** — the C3.5 codification shipped: `skills/merge-and-cleanup.md` now contains §C3.5 (optional, trigger-driven cross-vendor consult), §C3 surfaces `c3.5`/`continue`/`abort` as a three-branch pause prompt, §C6 review_notes template + §C8 commit-body signpost capture the audit trail, and `tests/skills/merge-and-cleanup-shape.test.ts` adds 17 mechanical-detection test cases. Review trajectory: 5 rounds (6→4→2→4→0 findings) via codex + codex-ops; both reviewers terminal proceed at R5. Implementation in fused strategist+builder mode directly on main per founder authorization. See `backlog/complete/2026-05-15-054-merge-cleanup-cross-vendor-conflict-review.md`.
 
 - **056-claude-required-flag-gate** — Before flipping `claude` reviewer's `required: true` flag in `tools/review-queue/reviewers.json` (currently `false`), the operator MUST either (a) configure `~/.claude/settings.json` permission rules so unattended `claude -p` runs cleanly without interactive prompts, OR (b) add `--dangerously-skip-permissions` to the `invoke_command` template. 056's builder spec-deviated from the literal flag because the harness denied writing the permission-bypass flag as an "unsafe agent" creation; the spec body's "MAY refine the canonical flags during build" clause authorized the deviation, but production headless execution depends on resolving this before activation. AC8 install is also deferred pending this decision.
 
@@ -884,10 +625,6 @@ The goal is a cross-tool multi-agent harness where any AI tool with the right ca
 Each primitive is a contract every flow consumer must satisfy. Mechanisms are not prescribed. Specific tool vendors, role names, and cardinalities are configuration, not protocol.
 
 ### Reliability primitives
-
-**P1 — Atomic state transition.** Any state change touching more than one file or one field MUST be observable as a single durable commit OR be fully self-resumable from on-disk state alone. No human-driven recovery procedure. *Current consumer: work-item stage moves.* ✅ **CLOSED by 066 merge `bc8042f` (2026-05-21).** Mechanism: `skills/process-backlog.md:250-292` `recover_p1_stage_move` (rollback-only, prefix-guarded, per-surface dispatch) runs BEFORE pull/rebase; bounded publish block + `p1_boundary_published_remotely` idempotency check means the boundary is either fully observed on origin/main or fully rolled back. Exit codes 2/4/5/6 cover each failure mode without human triage. 1484-line test harness (`tests/skills/atomic-state-transition-harness.test.ts`) covers the matrix. Invariant holds under any future flow that adopts the same harness contract.
-
-**P2 — In-flight observability across restart.** Any operation in `pending` / `in-flight` state at process shutdown MUST surface on the next boot. The mechanism is open; the property is not. *Current consumer: in-process tool-call log.* ✅ **CLOSED by 067 merge `d7bf3b9` (2026-05-21).** Mechanism: `src/mcp/request-log.ts:137-165` `flushRecentMcpCallLog(path, now?)` walks the ring buffer, flips every `pending` entry to `killed_during_shutdown` with `duration_ms` measured against shutdown timestamp, then atomically writes the snapshot via tmp-then-rename (POSIX `rename(2)` atomicity guarantees readers see prior-complete OR new-complete, never a torn write). Wired in `src/daemon/index.ts:63` between `mcp.stop()` and watcher teardown, isolated by try/catch so flush failures don't poison the rest of teardown. New `RecentMcpCallStatus` variant `killed_during_shutdown` (`src/mcp/request-log.ts:21`) is parseable by future tail-mcp consumers. **Deferred fixup:** real long-running MCP call test for AC4 Test (i) waived per founder; documented at line 982 below.
 
 **P3 — Partial-write tolerance.** Any artifact readable by another actor while it is being written MUST be guarded so the reader sees either the prior complete version or recognizes the in-progress write and waits — never a torn intermediate. *Current consumer: typed handoff artifacts between actors.*
 
