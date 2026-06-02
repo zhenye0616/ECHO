@@ -118,6 +118,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** partial - the r1 patches address the requested stale duplicate, bounded spawn, hard smoke, doctor escape-hatch, and probe-order items, but the duplicate reconciliation command still has an API mismatch because `get echo` returns the effective entry rather than a scoped user entry.
 - **Note:** The mandatory `git pull --rebase origin main` failed with `Cannot rebase onto multiple branches`; `git fetch origin main` plus `git rebase origin/main` completed the sync. The live checkout already had two unrelated untracked files, left untouched. The queue prompt still references the old monolithic journal plus HTML twin; current `CLAUDE.md` makes this June Markdown shard canonical and says not to commit regenerated HTML twins.
 
+### 2026-06-02 00:21 PDT - codex r3 review tick on 083 Claude Code MCP registration
+
+- **Trigger:** Codex-side reviewer queue tick selected r3 for `2026-06-01-083-init-registers-claude-code-mcp` and reviewed the r2 removal patch through the implementability/code-grounded lens.
+- **Query inputs:** ECHO coord call already emitted: `coord_emit(event_type=tick_start, reviewer=codex, correlation_id=0cfc065a-e75a-468b-a18a-a953f3249b1c)`. Queue/file reads used the r3 request focus hints, reviewer schema, pinned artifact `backlog/ready/2026-06-01-083-init-registers-claude-code-mcp.md` at `93c9b6ef11db1d05d5ac5946f7359651f6ae6be0`, r2 combined context, and source anchors in `wire.ts`/`init.ts`/`doctor.ts`/`render.ts`/`adapter-sync.ts`/`probe.ts`. Per command ordering, `tick_end` will be emitted after this sibling journal commit.
+- **Returned:** Wrote, pre-link validated, upstream-duplicate checked, committed, and pushed `backlog/reviews/2026-06-01-083-init-registers-claude-code-mcp/r3/codex.md` at review commit `0cbe3a8b`. Review verdict `proceed` with no findings.
+- **Sources:** `backlog/reviews/2026-06-01-083-init-registers-claude-code-mcp/r3/request.md`; pinned spec at `93c9b6e`; r2 `combined.md`, `codex.md`, and `codex-ops.md`; code anchors at current main matching the same install surfaces; response file `backlog/reviews/2026-06-01-083-init-registers-claude-code-mcp/r3/codex.md`.
+- **Verdict:** right - the r2 patch removed the brittle `claude mcp get`/output-parse/auto-reconcile mechanism, surfaces duplicate adds as `already-exists (unverified)`, and leaves probe/doctor as the reachability authority.
+- **Note:** This tick followed the current June-shard policy and did not regenerate or commit an HTML twin, despite the stale queue prompt language. The live checkout still has unrelated untracked files, left untouched.
+
 ### 2026-06-02 00:20 PDT - codex-ops r3 review tick on 083 Claude Code MCP registration
 
 - **Trigger:** Reviewer queue tick for `MY_REVIEWER=codex-ops`; selected r3 for `2026-06-01-083-init-registers-claude-code-mcp` and reviewed the r2-patched spec through the unattended-runtime lens.
