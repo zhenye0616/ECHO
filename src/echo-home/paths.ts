@@ -52,11 +52,14 @@ export function setEchoHomeRoot(homeOverride: string): EchoHomePaths {
   return ECHO_HOME_PATHS;
 }
 
+export type InstallProfile = 'customer' | 'dogfood';
+
 export interface OnboardingState {
   schema_version: 1;
   created_at: string;
   last_updated_at: string;
   completed: boolean;
+  profile?: InstallProfile;
   agents: OnboardedAgentProfile[];
 }
 
@@ -91,6 +94,7 @@ const onboardingStateSchema: AnySchema = {
     created_at: { type: 'string' },
     last_updated_at: { type: 'string' },
     completed: { type: 'boolean' },
+    profile: { enum: ['customer', 'dogfood'] },
     agents: {
       type: 'array',
       items: {

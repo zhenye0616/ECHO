@@ -59,6 +59,20 @@ fail() {
   exit 1
 }
 
+assert_exists() {
+  [ -e "$1" ] || fail "expected path to exist: $1"
+}
+
+assert_absent() {
+  [ ! -e "$1" ] || fail "expected path to be absent: $1"
+}
+
+assert_profile() {
+  local expected="$1"
+  node -e 'const fs=require("fs"); const p=process.argv[1]; const expected=process.argv[2]; const state=JSON.parse(fs.readFileSync(p,"utf8")); if (state.profile !== expected) { console.error(`[assert] expected profile ${expected}, got ${state.profile}`); process.exit(1); }' "$ECHO_HOME/state/onboarding.json" "$expected" \
+    || fail "onboarding profile mismatch"
+}
+
 cd "$REPO"
 echo "=================== STEP 0: build fresh tarball ==================="
 npm pack 2>&1 | tail -2
@@ -114,6 +128,15 @@ echo "[assert] claude-code MCP registration argv OK"
 
 echo ""; echo "=== what skills landed in the user's ~/.echo/skills? ==="
 ls -1 "$ECHO_HOME/skills" 2>&1 || echo "(no skills dir created)"
+assert_profile customer
+assert_exists "$ECHO_HOME/skills/using-echo-mcp.md"
+assert_absent "$ECHO_HOME/skills/using-echo-coord.md"
+assert_absent "$SBOX/fakehome/.claude/commands/using-echo-coord.md"
+assert_absent "$ECHO_HOME/roles/builder.toml"
+assert_absent "$ECHO_HOME/roles/reviewer.toml"
+assert_absent "$ECHO_HOME/roles/strategist.toml"
+assert_absent "$ECHO_HOME/workflows/change-review.toml"
+echo "[assert] default customer surface OK"
 
 echo ""; echo "=== did wire inject an ECHO block into his codex config.toml? ==="
 grep -nE "ECHO|echo|mcp|38478|$PORT" "$SBOX/fakehome/.codex/config.toml" 2>/dev/null | head || echo "(no ECHO content in codex config)"
@@ -122,3 +145,31 @@ grep -nE "BEGIN ECHO|END ECHO|ECHO" "$SBOX/fakehome/.claude/CLAUDE.md" 2>/dev/nu
 
 echo ""; echo "=================== STEP 4: doctor AFTER install ==================="
 "$BIN" doctor 2>&1 | head -50 || true
+
+echo ""; echo "=================== STEP 5: no-flag rerun stays customer ==================="
+"$BIN" init --home "$ECHO_HOME" --port "$PORT" --label "$LABEL" --answer-file "$SBOX/answers.json" > "$SBOX/init-rerun.out" 2>&1
+RERUN_RC=$?
+sed -n '1,40p' "$SBOX/init-rerun.out"
+[ "$RERUN_RC" -eq 0 ] || fail "echoctl init rerun exited $RERUN_RC"
+assert_profile customer
+assert_absent "$ECHO_HOME/skills/using-echo-coord.md"
+assert_absent "$SBOX/fakehome/.claude/commands/using-echo-coord.md"
+echo "[assert] no-flag customer rerun stayed customer"
+
+echo ""; echo "=================== STEP 6: explicit dogfood install gets full coord surface ==================="
+cat > "$SBOX/answers-dogfood.json" <<'JSON'
+{ "confirm_setup": true, "selected_agents": ["codex","claude-code"], "default_project_repo_root": null }
+JSON
+"$BIN" init --home "$ECHO_HOME" --port "$PORT" --profile dogfood --label "$LABEL" --answer-file "$SBOX/answers-dogfood.json" > "$SBOX/init-dogfood.out" 2>&1
+DOGFOOD_RC=$?
+sed -n '1,50p' "$SBOX/init-dogfood.out"
+[ "$DOGFOOD_RC" -eq 0 ] || fail "echoctl init --profile dogfood exited $DOGFOOD_RC"
+assert_profile dogfood
+assert_exists "$ECHO_HOME/skills/using-echo-mcp.md"
+assert_exists "$ECHO_HOME/skills/using-echo-coord.md"
+assert_exists "$SBOX/fakehome/.claude/commands/using-echo-coord.md"
+assert_exists "$ECHO_HOME/roles/builder.toml"
+assert_exists "$ECHO_HOME/roles/reviewer.toml"
+assert_exists "$ECHO_HOME/roles/strategist.toml"
+assert_exists "$ECHO_HOME/workflows/change-review.toml"
+echo "[assert] explicit dogfood surface OK"

@@ -38,7 +38,10 @@ export interface Wizard {
   detectAgents(): Promise<DetectedAgent[]>;
   detectProjects(): Promise<DetectedProject[]>;
   wire(
-    opts: Pick<WireOpts, 'selectedAgents' | 'defaultProjectRepoRoot' | 'repoRoot' | 'force'>,
+    opts: Pick<
+      WireOpts,
+      'selectedAgents' | 'defaultProjectRepoRoot' | 'profile' | 'repoRoot' | 'force'
+    >,
   ): Promise<WireResult>;
   probe(agents: AgentKind[]): Promise<ProbeOutcome[]>;
   summary(): Promise<WizardSummary>;
@@ -64,7 +67,10 @@ export function createWizard(opts: CreateWizardOpts): Wizard {
     },
 
     async wire(
-      wireOpts: Pick<WireOpts, 'selectedAgents' | 'defaultProjectRepoRoot' | 'repoRoot' | 'force'>,
+      wireOpts: Pick<
+        WireOpts,
+        'selectedAgents' | 'defaultProjectRepoRoot' | 'profile' | 'repoRoot' | 'force'
+      >,
     ): Promise<WireResult> {
       wired = await wireAgents({
         ...(opts.wireDepsOverride ?? {}),

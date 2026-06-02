@@ -30,6 +30,7 @@ import {
 import { syncDefaultRoles, type RoleSyncResult } from './adapters/role-sync.js';
 import { syncDefaultWorkflows, type WorkflowSyncResult } from './adapters/workflow-sync.js';
 import { AtomicWriteError } from './adapters/atomic-write.js';
+import type { InstallProfile } from './paths.js';
 
 // =============================================================================
 // Public types
@@ -61,6 +62,7 @@ export interface SyncAllOpts {
   workflowsSourceDir?: string;
   defaultWorkflows?: readonly string[];
   allowUserModifiedRoles?: boolean;
+  profile?: InstallProfile;
 }
 
 export type AdapterErrorCode =
@@ -190,6 +192,20 @@ function lockUnavailablePopulateResult(): PopulateEchoSkillsResult {
 }
 
 const DEFAULT_WORKFLOW_FILENAMES = ['change-review.toml'] as const;
+
+function skippedRoles(defaultRoles: readonly string[]): RoleSyncResult {
+  return {
+    results: defaultRoles.map((role) => ({ role, action: 'noop' as const })),
+    rolesErrors: [],
+  };
+}
+
+function skippedWorkflows(defaultWorkflows: readonly string[]): WorkflowSyncResult {
+  return {
+    results: defaultWorkflows.map((workflow) => ({ workflow, action: 'noop' as const })),
+    workflowsErrors: [],
+  };
+}
 
 // -----------------------------------------------------------------------------
 // Repo-root resolution
@@ -445,13 +461,18 @@ export async function syncAll(
   profiles: AdapterSyncProfile[],
   opts: SyncAllOpts = {},
 ): Promise<SyncResult> {
+  const installProfile = opts.profile ?? 'dogfood';
   // Step 1: directory-symlink guard.
   const dirChecks: Array<{ path: string; boundary: string }> = [
     { path: ECHO_HOME_PATHS.skills, boundary: ECHO_HOME_PATHS.root },
-    { path: ECHO_HOME_PATHS.roles, boundary: ECHO_HOME_PATHS.root },
-    { path: ECHO_HOME_PATHS.workflows, boundary: ECHO_HOME_PATHS.root },
     { path: ECHO_HOME_PATHS.state, boundary: ECHO_HOME_PATHS.root },
   ];
+  if (installProfile === 'dogfood') {
+    dirChecks.push(
+      { path: ECHO_HOME_PATHS.roles, boundary: ECHO_HOME_PATHS.root },
+      { path: ECHO_HOME_PATHS.workflows, boundary: ECHO_HOME_PATHS.root },
+    );
+  }
   for (const profile of profiles) {
     const commandsDir = profile.paths?.commandsDir ?? defaultCommandsDir(profile.kind);
     if (isString(commandsDir)) {
@@ -536,6 +557,7 @@ export async function syncAll(
     skillsPopulated = populateEchoSkills({
       sourceDir: repoSkillsDir,
       targetDir: ECHO_HOME_PATHS.skills,
+      profile: installProfile,
     });
 
     // Step 5: per-agent dispatch.
@@ -543,19 +565,24 @@ export async function syncAll(
       agents.push(await dispatchAgent(profile, skillsPopulated.ok === true));
     }
 
-    // Step 6: roles once.
-    roles = syncDefaultRoles({
-      sourceDir: rolesSourceDir,
-      targetDir: ECHO_HOME_PATHS.roles,
-      defaults: defaultRoles,
-    });
+    if (installProfile === 'dogfood') {
+      // Step 6: roles once.
+      roles = syncDefaultRoles({
+        sourceDir: rolesSourceDir,
+        targetDir: ECHO_HOME_PATHS.roles,
+        defaults: defaultRoles,
+      });
 
-    // Step 7: workflows once.
-    workflowsResult = syncDefaultWorkflows({
-      sourceDir: workflowsSourceDir,
-      targetDir: ECHO_HOME_PATHS.workflows,
-      defaults: defaultWorkflows,
-    });
+      // Step 7: workflows once.
+      workflowsResult = syncDefaultWorkflows({
+        sourceDir: workflowsSourceDir,
+        targetDir: ECHO_HOME_PATHS.workflows,
+        defaults: defaultWorkflows,
+      });
+    } else {
+      roles = skippedRoles(defaultRoles);
+      workflowsResult = skippedWorkflows(defaultWorkflows);
+    }
   } finally {
     releaseLock(lockHandle);
   }

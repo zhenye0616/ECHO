@@ -103,11 +103,7 @@ function detected(kind: AgentKind, confidence: DetectedAgent['confidence']): Det
   };
 }
 
-function spawnResult(
-  status: number,
-  stdout = '',
-  stderr = '',
-): SpawnSyncReturns<string> {
+function spawnResult(status: number, stdout = '', stderr = ''): SpawnSyncReturns<string> {
   return {
     pid: 0,
     output: [null, stdout, stderr],
@@ -345,10 +341,7 @@ function successfulWizardFactory(home = echoHome): (wizardOpts: CreateWizardOpts
           completed: boolean;
         };
         state.completed = true;
-        writeFileSync(
-          join(home, 'state/onboarding.json'),
-          `${JSON.stringify(state, null, 2)}\n`,
-        );
+        writeFileSync(join(home, 'state/onboarding.json'), `${JSON.stringify(state, null, 2)}\n`);
       },
     } satisfies Wizard;
   }) as never;
@@ -401,30 +394,39 @@ describe('runInit', () => {
   it('documents and parses init isolation flags', async () => {
     const { INIT_HELP, parseInitArgs } = await loadInit();
 
-    expect(parseInitArgs([
-      '--home',
-      '/tmp/echo-home',
-      '--port',
-      '41234',
-      '--label',
-      'com.echo.daemon.walkthrough',
-      '--answer-file',
-      '/tmp/answers.json',
-      '--force',
-    ])).toEqual({
+    expect(
+      parseInitArgs([
+        '--home',
+        '/tmp/echo-home',
+        '--port',
+        '41234',
+        '--profile',
+        'dogfood',
+        '--label',
+        'com.echo.daemon.walkthrough',
+        '--answer-file',
+        '/tmp/answers.json',
+        '--force',
+      ]),
+    ).toEqual({
       home: '/tmp/echo-home',
       port: '41234',
+      profile: 'dogfood',
       label: 'com.echo.daemon.walkthrough',
       answerFile: '/tmp/answers.json',
       force: true,
     });
     expect(INIT_HELP).toContain('--home <path>');
     expect(INIT_HELP).toContain('--port <n>');
+    expect(INIT_HELP).toContain('--profile <name>');
     expect(INIT_HELP).toContain('--label <id>');
     expect(INIT_HELP).toContain('--answer-file <path>');
     expect(INIT_HELP).toContain('--force');
     expect(() => parseInitArgs(['--port', '0'])).toThrow('invalid --port: 0');
     expect(() => parseInitArgs(['--port', '12abc'])).toThrow('invalid --port: 12abc');
+    expect(() => parseInitArgs(['--profile', 'orchestrator'])).toThrow(
+      'invalid --profile: expected customer or dogfood',
+    );
   });
 
   it('honors --home, --port, and --label in non-interactive answer-file mode', async () => {
@@ -489,6 +491,7 @@ describe('runInit', () => {
 
     const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
       completed: boolean;
+      profile: string;
       agents: Array<{ id: AgentKind }>;
     };
     const cursor = JSON.parse(readFileSync(cursorConfig, 'utf8')) as {
@@ -502,16 +505,17 @@ describe('runInit', () => {
 
     expect(code).toBe(0);
     expect(state.completed).toBe(true);
+    expect(state.profile).toBe('customer');
     expect(state.agents.map((agent) => agent.id).sort()).toEqual(['codex', 'cursor']);
-    expect(readFileSync(codexConfig, 'utf8')).toContain(
-      'url = "http://127.0.0.1:41234/mcp"',
-    );
+    expect(readFileSync(codexConfig, 'utf8')).toContain('url = "http://127.0.0.1:41234/mcp"');
     expect(cursor.mcpServers.echo.url).toBe('http://127.0.0.1:41234/mcp');
     expect(codexCache.mcpServerConfig.url).toBe('http://127.0.0.1:41234/mcp');
-    expect(existsSync(join(isolatedHome, 'skills', 'using-echo-coord.md'))).toBe(true);
+    expect(existsSync(join(isolatedHome, 'skills', 'using-echo-coord.md'))).toBe(false);
     expect(existsSync(join(isolatedHome, 'skills', 'using-echo-mcp.md'))).toBe(true);
     expect(existsSync(join(isolatedHome, 'skills', 'merge-and-cleanup.md'))).toBe(false);
     expect(existsSync(join(isolatedHome, 'skills', 'process-backlog.md'))).toBe(false);
+    expect(existsSync(join(isolatedHome, 'roles', 'builder.toml'))).toBe(false);
+    expect(existsSync(join(isolatedHome, 'workflows', 'change-review.toml'))).toBe(false);
     expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
   });
 
@@ -525,6 +529,7 @@ describe('runInit', () => {
     const answerFile = writeAnswerFile('claude-register-answers.json', {
       confirm_setup: true,
       selected_agents: ['claude-code'],
+      profile: 'dogfood',
       default_project_repo_root: null,
     });
     const calls: Array<{ cmd: string; args: string[]; timeoutMs: number }> = [];
@@ -553,6 +558,10 @@ describe('runInit', () => {
     });
 
     expect(code).toBe(0);
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      profile: string;
+    };
+    expect(state.profile).toBe('dogfood');
     expect(calls).toEqual([
       {
         cmd: 'claude',
@@ -570,6 +579,146 @@ describe('runInit', () => {
       },
     ]);
     expect(stdout.join('')).toContain('mcp-add');
+  });
+
+  it('CLI profile overrides answer-file and recorded profile', async () => {
+    const isolatedHome = join(tmpRoot, 'profile-precedence-home');
+    mkdirSync(join(isolatedHome, 'state'), { recursive: true });
+    writeFileSync(
+      join(isolatedHome, 'state/onboarding.json'),
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          created_at: '2026-05-26T00:00:00.000Z',
+          last_updated_at: '2026-05-26T00:00:00.000Z',
+          completed: true,
+          profile: 'dogfood',
+          agents: [],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const answerFile = writeAnswerFile('profile-precedence-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      profile: 'dogfood',
+      default_project_repo_root: null,
+    });
+    const seenProfiles: unknown[] = [];
+    const wizardFactory = (() =>
+      ({
+        async detectAgents() {
+          return [detected('codex', 'high')];
+        },
+        async detectProjects() {
+          return [];
+        },
+        async wire(opts) {
+          seenProfiles.push(opts.profile);
+          return successWire(opts.selectedAgents, isolatedHome);
+        },
+        async probe() {
+          return [{ agent: 'codex', probed: true as const, latencyMs: 1 }];
+        },
+        async summary() {
+          return {
+            detected: null,
+            projects: null,
+            wired: null,
+            probed: null,
+            onboardingStateSnapshot: null,
+          };
+        },
+        async markCompleted() {},
+      }) satisfies Wizard) as never;
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      profile: 'customer',
+      wizardFactory,
+      home: isolatedHome,
+      quiet: true,
+      ...daemonAlreadyRunning(),
+    });
+
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      profile: string;
+    };
+    expect(code).toBe(0);
+    expect(seenProfiles).toEqual(['customer']);
+    expect(state.profile).toBe('customer');
+  });
+
+  it('recorded dogfood profile is respected on no-flag rerun', async () => {
+    const isolatedHome = join(tmpRoot, 'recorded-dogfood-home');
+    mkdirSync(join(isolatedHome, 'state'), { recursive: true });
+    writeFileSync(
+      join(isolatedHome, 'state/onboarding.json'),
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          created_at: '2026-05-26T00:00:00.000Z',
+          last_updated_at: '2026-05-26T00:00:00.000Z',
+          completed: true,
+          profile: 'dogfood',
+          agents: [],
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const answerFile = writeAnswerFile('recorded-dogfood-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+    });
+    const seenProfiles: unknown[] = [];
+    const wizardFactory = (() =>
+      ({
+        async detectAgents() {
+          return [detected('codex', 'high')];
+        },
+        async detectProjects() {
+          return [];
+        },
+        async wire(opts) {
+          seenProfiles.push(opts.profile);
+          return successWire(opts.selectedAgents, isolatedHome);
+        },
+        async probe() {
+          return [{ agent: 'codex', probed: true as const, latencyMs: 1 }];
+        },
+        async summary() {
+          return {
+            detected: null,
+            projects: null,
+            wired: null,
+            probed: null,
+            onboardingStateSnapshot: null,
+          };
+        },
+        async markCompleted() {},
+      }) satisfies Wizard) as never;
+    const { runInit } = await loadInit();
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory,
+      home: isolatedHome,
+      quiet: true,
+      ...daemonAlreadyRunning(),
+    });
+
+    const state = JSON.parse(readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8')) as {
+      profile: string;
+    };
+    expect(code).toBe(0);
+    expect(seenProfiles).toEqual(['dogfood']);
+    expect(state.profile).toBe('dogfood');
   });
 
   it('surfaces duplicate claude-code MCP registration without masking probe failure', async () => {
@@ -866,9 +1015,7 @@ describe('runInit', () => {
     expect(code).toBe(0);
     expect(codex?.wired_at).toBe('2026-05-26T00:00:00.000Z');
     expect(codex?.wire_error).toBeNull();
-    expect(readFileSync(codexInstructions, 'utf8')).toContain(
-      'http://127.0.0.1:41236/mcp',
-    );
+    expect(readFileSync(codexInstructions, 'utf8')).toContain('http://127.0.0.1:41236/mcp');
     expect(readFileSync(codexInstructions, 'utf8')).not.toContain('user hand-edited');
   });
 
@@ -1044,6 +1191,30 @@ describe('runInit', () => {
     expect(errors.join('')).toContain('extra: unknown field');
   });
 
+  it('fails loudly when the answer file has an invalid profile', async () => {
+    const { runInit } = await loadInit();
+    const answerFile = writeAnswerFile('invalid-profile.json', {
+      confirm_setup: true,
+      selected_agents: ['codex'],
+      default_project_repo_root: null,
+      profile: 'orchestrator',
+    });
+    const wizardFactory = vi.fn();
+    const errors: string[] = [];
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      answerFile,
+      wizardFactory: wizardFactory as never,
+      stderr: { write: (s) => (errors.push(String(s)), true) },
+    });
+
+    expect(code).toBe(2);
+    expect(wizardFactory).not.toHaveBeenCalled();
+    expect(errors.join('')).toContain(answerFile);
+    expect(errors.join('')).toContain('profile: expected customer or dogfood');
+  });
+
   it('fails loudly when repo_root is required but absent in answer-file mode', async () => {
     const { runInit } = await loadInit();
     const answerFile = writeAnswerFile('missing-repo-root.json', {
@@ -1105,6 +1276,88 @@ describe('runInit', () => {
     expect(errors.join('')).toContain(answerFile);
     expect(errors.join('')).toContain('repo_root: required');
   });
+
+  it.each([
+    ['bare scaffold', { completed: false, agents: [] }],
+    [
+      'completed with agents',
+      {
+        completed: true,
+        agents: [
+          {
+            id: 'codex',
+            detected_at: '2026-05-26T00:00:00.000Z',
+            wired_at: '2026-05-26T00:00:00.000Z',
+            probed_at: null,
+            capabilities: [],
+            wire_error: null,
+          },
+        ],
+      },
+    ],
+    [
+      'mid-wire with agents',
+      {
+        completed: false,
+        agents: [
+          {
+            id: 'claude-code',
+            detected_at: '2026-05-26T00:00:00.000Z',
+            wired_at: '2026-05-26T00:00:00.000Z',
+            probed_at: null,
+            capabilities: [],
+            wire_error: null,
+          },
+        ],
+      },
+    ],
+  ])(
+    'defaults profile-less onboarding state to customer with warning: %s',
+    async (_label, partial) => {
+      const isolatedHome = join(tmpRoot, `profileless-${String(_label).replace(/\s+/g, '-')}`);
+      mkdirSync(join(isolatedHome, 'state'), { recursive: true });
+      writeFileSync(
+        join(isolatedHome, 'state/onboarding.json'),
+        `${JSON.stringify(
+          {
+            schema_version: 1,
+            created_at: '2026-05-26T00:00:00.000Z',
+            last_updated_at: '2026-05-26T00:00:00.000Z',
+            ...partial,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      const answerFile = writeAnswerFile(`${String(_label).replace(/\s+/g, '-')}.json`, {
+        confirm_setup: true,
+        selected_agents: ['codex'],
+        default_project_repo_root: null,
+      });
+      const errors: string[] = [];
+      const { runInit } = await loadInit();
+
+      const code = await runInit({
+        stdin: { isTTY: false },
+        answerFile,
+        wizardFactory: successfulWizardFactory(isolatedHome) as never,
+        home: isolatedHome,
+        stderr: { write: (s) => (errors.push(String(s)), true) },
+        quiet: true,
+        ...daemonAlreadyRunning(),
+      });
+
+      const state = JSON.parse(
+        readFileSync(join(isolatedHome, 'state/onboarding.json'), 'utf8'),
+      ) as {
+        profile: string;
+      };
+      expect(code).toBe(0);
+      expect(state.profile).toBe('customer');
+      expect(errors.join('')).toContain('defaulted to `customer`');
+      expect(errors.join('')).toContain('echoctl init --profile dogfood');
+    },
+  );
 
   it('bootstraps echo home before the interactive wizard touches state', async () => {
     const created: boolean[] = [];

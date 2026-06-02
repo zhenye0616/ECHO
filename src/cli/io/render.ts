@@ -82,7 +82,7 @@ export function renderDoctorReport(
     `daemon: reachable=${report.daemon.mcpReachable ? 'yes' : 'no'} pid-lock=${report.daemon.pidLockHeld ? 'yes' : 'no'} port=${report.daemon.port}`,
   );
   lines.push(
-    `echo-home: exists=${report.echoHome.exists ? 'yes' : 'no'} onboarding=${report.echoHome.onboardingValid ? 'valid' : 'invalid'} projects=${report.echoHome.projectsValid ? 'valid' : 'invalid'} schema=${report.echoHome.schemaVersion}`,
+    `echo-home: exists=${report.echoHome.exists ? 'yes' : 'no'} onboarding=${report.echoHome.onboardingValid ? 'valid' : 'invalid'} projects=${report.echoHome.projectsValid ? 'valid' : 'invalid'} schema=${report.echoHome.schemaVersion} profile=${report.echoHome.profile}`,
   );
   lines.push(`sync-lock: ${report.syncLock.present ? report.syncLock.cleanupCommand : 'absent'}`);
   for (const agent of report.agents) {

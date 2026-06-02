@@ -157,6 +157,32 @@ describe('syncAll (orchestrator)', () => {
     expect(existsSync(join(stubHome, '.claude', 'commands', 'process-backlog.md'))).toBe(false);
   });
 
+  it('customer profile filters dogfood skills and skips roles/workflows as successful no-ops', async () => {
+    const { repoRoot, skillsDir } = setupRepoMirror();
+    writeFileSync(join(skillsDir, 'dogfood.md'), '---\naudience: dogfood\n---\n# dogfood\n');
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], {
+      repoRoot,
+      profile: 'customer',
+    });
+
+    expect(result.overallOk).toBe(true);
+    expect(result.skillsPopulated.ok).toBe(true);
+    if (result.skillsPopulated.ok) {
+      expect(result.skillsPopulated.copied.sort()).toEqual(['alpha.md', 'beta.md']);
+      expect(result.skillsPopulated.skipped).toContain('dogfood.md');
+    }
+    expect(existsSync(join(echoHome, 'skills', 'dogfood.md'))).toBe(false);
+    expect(existsSync(join(stubHome, '.claude', 'commands', 'dogfood.md'))).toBe(false);
+    expect(result.roles.results.map((entry) => entry.action)).toEqual(['noop', 'noop', 'noop']);
+    expect(existsSync(join(echoHome, 'roles', 'builder.toml'))).toBe(false);
+    expect(result.workflowsResult?.results).toEqual([
+      { workflow: 'change-review.toml', action: 'noop' },
+    ]);
+    expect(existsSync(join(echoHome, 'workflows', 'change-review.toml'))).toBe(false);
+  });
+
   it('populate-skills failure (missing repoSkillsDir) skips claude-code fan-out and flips overallOk', async () => {
     const { repoRoot } = setupRepoMirror();
     const { syncAll } = await loadAdapterSync();

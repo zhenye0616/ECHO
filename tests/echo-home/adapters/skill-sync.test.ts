@@ -48,54 +48,88 @@ function runFn(
   return { copied: r.copied, skipped: r.skipped };
 }
 
-describe.each([
-  { label: 'populateEchoSkills' as const },
-  { label: 'syncClaudeSkills' as const },
-])('$label (shared overwrite-posture contract)', ({ label }) => {
-  it(`${label}: target dir does not exist → created; all source skills copied`, () => {
-    const { source, names } = setupSource();
-    const target = join(tmpRoot, 'tgt');
-    expect(existsSync(target)).toBe(false);
-    const r = runFn(label, { sourceDir: source, targetDir: target });
-    expect(existsSync(target)).toBe(true);
-    expect(r.copied.sort()).toEqual(names);
-    for (const n of names) {
-      expect(readFileSync(join(target, n), 'utf8')).toBe(`# ${n}\n`);
-    }
-  });
+describe.each([{ label: 'populateEchoSkills' as const }, { label: 'syncClaudeSkills' as const }])(
+  '$label (shared overwrite-posture contract)',
+  ({ label }) => {
+    it(`${label}: target dir does not exist → created; all source skills copied`, () => {
+      const { source, names } = setupSource();
+      const target = join(tmpRoot, 'tgt');
+      expect(existsSync(target)).toBe(false);
+      const r = runFn(label, { sourceDir: source, targetDir: target });
+      expect(existsSync(target)).toBe(true);
+      expect(r.copied.sort()).toEqual(names);
+      for (const n of names) {
+        expect(readFileSync(join(target, n), 'utf8')).toBe(`# ${n}\n`);
+      }
+    });
 
-  it(`${label}: re-run produces byte-identical files (idempotency-by-overwrite)`, () => {
-    const { source, names } = setupSource();
-    const target = join(tmpRoot, 'tgt');
-    runFn(label, { sourceDir: source, targetDir: target });
-    const first: Record<string, Buffer> = {};
-    for (const n of names) first[n] = readFileSync(join(target, n));
-    runFn(label, { sourceDir: source, targetDir: target });
-    for (const n of names) {
-      expect(readFileSync(join(target, n)).equals(first[n])).toBe(true);
-    }
-  });
+    it(`${label}: re-run produces byte-identical files (idempotency-by-overwrite)`, () => {
+      const { source, names } = setupSource();
+      const target = join(tmpRoot, 'tgt');
+      runFn(label, { sourceDir: source, targetDir: target });
+      const first: Record<string, Buffer> = {};
+      for (const n of names) first[n] = readFileSync(join(target, n));
+      runFn(label, { sourceDir: source, targetDir: target });
+      for (const n of names) {
+        expect(readFileSync(join(target, n)).equals(first[n])).toBe(true);
+      }
+    });
 
-  it(`${label}: stale skill file in target (not in source) is LEFT IN PLACE`, () => {
-    const { source } = setupSource();
-    const target = join(tmpRoot, 'tgt');
-    mkdirSync(target);
-    writeFileSync(join(target, 'stale.md'), 'stale\n');
-    runFn(label, { sourceDir: source, targetDir: target });
-    expect(readFileSync(join(target, 'stale.md'), 'utf8')).toBe('stale\n');
-  });
+    it(`${label}: stale skill file in target (not in source) is LEFT IN PLACE`, () => {
+      const { source } = setupSource();
+      const target = join(tmpRoot, 'tgt');
+      mkdirSync(target);
+      writeFileSync(join(target, 'stale.md'), 'stale\n');
+      runFn(label, { sourceDir: source, targetDir: target });
+      expect(readFileSync(join(target, 'stale.md'), 'utf8')).toBe('stale\n');
+    });
 
-  it(`${label}: user-hand-edited target skill file matching a source filename is OVERWRITTEN`, () => {
-    const { source } = setupSource();
-    const target = join(tmpRoot, 'tgt');
-    mkdirSync(target);
-    writeFileSync(join(target, 'alpha.md'), 'user-edit\n');
-    runFn(label, { sourceDir: source, targetDir: target });
-    expect(readFileSync(join(target, 'alpha.md'), 'utf8')).toBe('# alpha.md\n');
-  });
-});
+    it(`${label}: user-hand-edited target skill file matching a source filename is OVERWRITTEN`, () => {
+      const { source } = setupSource();
+      const target = join(tmpRoot, 'tgt');
+      mkdirSync(target);
+      writeFileSync(join(target, 'alpha.md'), 'user-edit\n');
+      runFn(label, { sourceDir: source, targetDir: target });
+      expect(readFileSync(join(target, 'alpha.md'), 'utf8')).toBe('# alpha.md\n');
+    });
+  },
+);
 
 describe('populateEchoSkills — symlink guards', () => {
+  it('customer profile copies customer and untagged skills but skips dogfood-only skills', () => {
+    const source = join(tmpRoot, 'audience-src');
+    const target = join(tmpRoot, 'audience-target');
+    mkdirSync(source);
+    writeFileSync(join(source, 'customer.md'), '---\naudience: customer\n---\n# customer\n');
+    writeFileSync(join(source, 'dogfood.md'), '---\naudience: dogfood\n---\n# dogfood\n');
+    writeFileSync(join(source, 'untagged.md'), '# untagged\n');
+
+    const result = populateEchoSkills({
+      sourceDir: source,
+      targetDir: target,
+      profile: 'customer',
+    });
+
+    if (!result.ok) throw new Error('expected ok:true');
+    expect(result.copied.sort()).toEqual(['customer.md', 'untagged.md']);
+    expect(result.skipped).toContain('dogfood.md');
+    expect(existsSync(join(target, 'dogfood.md'))).toBe(false);
+  });
+
+  it('dogfood profile copies all skill audiences', () => {
+    const source = join(tmpRoot, 'dogfood-audience-src');
+    const target = join(tmpRoot, 'dogfood-audience-target');
+    mkdirSync(source);
+    writeFileSync(join(source, 'customer.md'), '---\naudience: customer\n---\n# customer\n');
+    writeFileSync(join(source, 'dogfood.md'), '---\naudience: dogfood\n---\n# dogfood\n');
+
+    const result = populateEchoSkills({ sourceDir: source, targetDir: target, profile: 'dogfood' });
+
+    if (!result.ok) throw new Error('expected ok:true');
+    expect(result.copied.sort()).toEqual(['customer.md', 'dogfood.md']);
+    expect(result.skipped).toEqual([]);
+  });
+
   it('symlink in sourceDir is NEVER followed (skipped[])', () => {
     const { source } = setupSource();
     // Add a symlink in source pointing outside the dir.

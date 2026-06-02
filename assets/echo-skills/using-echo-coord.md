@@ -2,6 +2,7 @@
 name: using-echo-coord
 description: Use ECHO coord tools to log multi-agent work, track deadlines, inspect the shared coord ledger, and understand the current coord_invoke packaging boundary.
 type: skill
+audience: dogfood
 ---
 
 # Using ECHO Coord

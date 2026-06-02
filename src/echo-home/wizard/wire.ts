@@ -9,7 +9,12 @@ import {
 } from '../adapter-sync.js';
 import type { ClaudeCodeMcpRegisterDeps } from '../adapters/claude-code-mcp.js';
 import { atomicWrite } from '../adapters/atomic-write.js';
-import { ECHO_HOME_PATHS, validateOnboardingState, type OnboardingState } from '../paths.js';
+import {
+  ECHO_HOME_PATHS,
+  validateOnboardingState,
+  type InstallProfile,
+  type OnboardingState,
+} from '../paths.js';
 import { readAdapterCache, writeAdapterCache, type AdapterCacheRecord } from './adapter-cache.js';
 import type { AgentKind } from './detect-agents.js';
 import { renderEchoSection } from './render-echo-section.js';
@@ -19,6 +24,7 @@ export interface WireOpts {
   defaultProjectRepoRoot: string | null;
   mcpServerUrl: string;
   echoVersion: string;
+  profile?: InstallProfile;
   repoRoot?: string;
   force?: boolean;
   syncAll?: typeof realSyncAll;
@@ -225,12 +231,15 @@ export async function wire(opts: WireOpts): Promise<WireResult> {
   const cache = opts.cache ?? { read: readAdapterCache, write: writeAdapterCache };
   const { profiles, rendered } = buildProfiles(opts, nowIso, cache);
   const runSyncAll = opts.syncAll ?? realSyncAll;
+  const installProfile = opts.profile ?? 'dogfood';
 
   let syncResult: SyncResult;
   try {
     syncResult = await runSyncAll(
       profiles,
-      opts.repoRoot === undefined ? undefined : { repoRoot: opts.repoRoot },
+      opts.repoRoot === undefined
+        ? { profile: installProfile }
+        : { repoRoot: opts.repoRoot, profile: installProfile },
     );
   } catch (err) {
     return {
