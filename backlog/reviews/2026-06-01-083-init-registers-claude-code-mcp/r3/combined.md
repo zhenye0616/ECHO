@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R3.** Both reviewers `proceed`, zero findings, no boundary cross. Convergence trail: r1 (5 findings, both `proceed_after_patches`) → patched → r2 (codex-ops `proceed`/0; codex 1 finding on the r1-added reconcile mechanism) → mechanism **removed** (not patched deeper, per disposition discipline + the ambient-output-as-API anti-pattern) → r3 (both `proceed`/0). The removal converged in one round, as predicted. Spec is claimable by any builder at `93c9b6ef`.
 
