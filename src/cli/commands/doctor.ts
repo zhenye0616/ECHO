@@ -13,7 +13,7 @@ import {
 import { type AgentKind } from '../../echo-home/wizard/detect-agents.js';
 import { probeAgents as realProbeAgents, type ProbeOutcome } from '../../echo-home/wizard/probe.js';
 import { renderDoctorReport } from '../io/render.js';
-import { parsePort, readPackageVersion, resolveMcpPort } from './init.js';
+import { buildRemediationCopy, parsePort, readPackageVersion, resolveMcpPort } from './init.js';
 
 export interface DoctorReport {
   daemon: {
@@ -272,7 +272,10 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<number> {
       else
         writeLine(
           opts.stdout ?? process.stdout,
-          renderDoctorReport(report, { color: opts.color ?? false }),
+          renderDoctorReport(report, {
+            color: opts.color ?? false,
+            remediation: buildRemediationCopy(`http://127.0.0.1:${port}/mcp`),
+          }),
         );
     }
     return report.overall === 'healthy' ? 0 : 1;

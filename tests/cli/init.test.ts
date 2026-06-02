@@ -27,6 +27,9 @@ interface DaemonFixture {
   plistPath: string;
 }
 
+type WireDepsOverride = NonNullable<CreateWizardOpts['wireDepsOverride']>;
+type ClaudeRegistrationDeps = NonNullable<WireDepsOverride['claudeCodeMcpRegistration']>;
+
 async function loadInit(): Promise<typeof import('../../src/cli/commands/init.js')> {
   return import('../../src/cli/commands/init.js');
 }
@@ -261,6 +264,56 @@ async function makeCodexSyncWizardFactory(opts: {
     });
 }
 
+async function makeClaudeSyncWizardFactory(opts: {
+  clientHome: string;
+  claudeInstructions: string;
+  claudeCommands: string;
+  registerSpawn: NonNullable<ClaudeRegistrationDeps['spawn']>;
+  registerTimeoutMs?: number;
+  probeSpawn?: NonNullable<NonNullable<CreateWizardOpts['probeDeps']>['spawn']>;
+}): Promise<(wizardOpts: CreateWizardOpts) => Wizard> {
+  const { createWizard } = await import('../../src/echo-home/wizard/run-wizard.js');
+  const { syncAll } = await import('../../src/echo-home/adapter-sync.js');
+  return (wizardOpts: CreateWizardOpts): Wizard =>
+    createWizard({
+      ...wizardOpts,
+      detectAgentsDeps: { homedir: opts.clientHome, atomStore: null },
+      detectProjectsDeps: { atomStore: null },
+      probeDeps: {
+        spawn:
+          opts.probeSpawn ??
+          (async () => ({
+            exitCode: 0,
+            stdout: '{"pong":true,"ts":"2026-05-26T00:00:00.000Z"}\n',
+            stderr: '',
+            timedOut: false,
+          })),
+      },
+      wireDepsOverride: {
+        claudeCodeMcpRegistration: {
+          spawn: opts.registerSpawn,
+          ...(opts.registerTimeoutMs === undefined ? {} : { timeoutMs: opts.registerTimeoutMs }),
+        },
+        syncAll: async (profiles, syncOpts) =>
+          syncAll(
+            profiles.map((profile): AdapterSyncProfile => {
+              if (profile.kind === 'claude-code') {
+                return {
+                  ...profile,
+                  paths: {
+                    instructionsFile: opts.claudeInstructions,
+                    commandsDir: opts.claudeCommands,
+                  },
+                };
+              }
+              return profile;
+            }),
+            syncOpts,
+          ),
+      },
+    });
+}
+
 function successfulWizardFactory(home = echoHome): (wizardOpts: CreateWizardOpts) => Wizard {
   return (() => {
     let selected: AgentKind[] = [];
@@ -460,6 +513,199 @@ describe('runInit', () => {
     expect(existsSync(join(isolatedHome, 'skills', 'merge-and-cleanup.md'))).toBe(false);
     expect(existsSync(join(isolatedHome, 'skills', 'process-backlog.md'))).toBe(false);
     expect(existsSync(join(echoHome, 'state/onboarding.json'))).toBe(false);
+  });
+
+  it('registers claude-code MCP when selected in answer-file mode', async () => {
+    const isolatedHome = join(tmpRoot, 'claude-register-home');
+    const clientHome = join(tmpRoot, 'claude-register-client');
+    const claudeInstructions = join(clientHome, '.claude/CLAUDE.md');
+    const claudeCommands = join(clientHome, '.claude/commands');
+    mkdirSync(join(clientHome, '.claude'), { recursive: true });
+    writeFileSync(claudeInstructions, '# Claude user file\n');
+    const answerFile = writeAnswerFile('claude-register-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['claude-code'],
+      default_project_repo_root: null,
+    });
+    const calls: Array<{ cmd: string; args: string[]; timeoutMs: number }> = [];
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeClaudeSyncWizardFactory({
+      clientHome,
+      claudeInstructions,
+      claudeCommands,
+      registerSpawn: async (cmd, args, opts) => {
+        calls.push({ cmd, args, timeoutMs: opts.timeoutMs });
+        return { exitCode: 0, stdout: '', stderr: '', timedOut: false };
+      },
+    });
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41234',
+      label: 'com.echo.daemon.walkthrough',
+      now: () => new Date('2026-05-26T00:00:00.000Z'),
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      ...daemonAlreadyRunning(),
+    });
+
+    expect(code).toBe(0);
+    expect(calls).toEqual([
+      {
+        cmd: 'claude',
+        args: [
+          'mcp',
+          'add',
+          '--transport',
+          'http',
+          '--scope',
+          'user',
+          'echo',
+          'http://127.0.0.1:41234/mcp',
+        ],
+        timeoutMs: 30_000,
+      },
+    ]);
+    expect(stdout.join('')).toContain('mcp-add');
+  });
+
+  it('surfaces duplicate claude-code MCP registration without masking probe failure', async () => {
+    const isolatedHome = join(tmpRoot, 'claude-duplicate-home');
+    const clientHome = join(tmpRoot, 'claude-duplicate-client');
+    const claudeInstructions = join(clientHome, '.claude/CLAUDE.md');
+    const claudeCommands = join(clientHome, '.claude/commands');
+    mkdirSync(join(clientHome, '.claude'), { recursive: true });
+    writeFileSync(claudeInstructions, '# Claude user file\n');
+    const answerFile = writeAnswerFile('claude-duplicate-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['claude-code'],
+      default_project_repo_root: null,
+    });
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeClaudeSyncWizardFactory({
+      clientHome,
+      claudeInstructions,
+      claudeCommands,
+      registerSpawn: async () => ({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'MCP server echo already exists in user config\n',
+        timedOut: false,
+      }),
+      probeSpawn: async () => ({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'No such tool mcp__echo__echo_ping\n',
+        timedOut: false,
+      }),
+    });
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41234',
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      ...daemonAlreadyRunning(),
+    });
+
+    const text = stdout.join('');
+    expect(code).toBe(0);
+    expect(text).toContain('already-exists (unverified)');
+    expect(text).toContain('claude-code: WARN mcp-not-configured');
+    expect(text).toContain(
+      'claude mcp add --transport http --scope user echo http://127.0.0.1:41234/mcp',
+    );
+    expect(text).toContain('claude mcp remove echo -s local');
+  });
+
+  it('continues init when claude-code MCP registration times out', async () => {
+    const isolatedHome = join(tmpRoot, 'claude-timeout-home');
+    const clientHome = join(tmpRoot, 'claude-timeout-client');
+    const claudeInstructions = join(clientHome, '.claude/CLAUDE.md');
+    const claudeCommands = join(clientHome, '.claude/commands');
+    mkdirSync(join(clientHome, '.claude'), { recursive: true });
+    writeFileSync(claudeInstructions, '# Claude user file\n');
+    const answerFile = writeAnswerFile('claude-timeout-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['claude-code'],
+      default_project_repo_root: null,
+    });
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeClaudeSyncWizardFactory({
+      clientHome,
+      claudeInstructions,
+      claudeCommands,
+      registerTimeoutMs: 5,
+      registerSpawn: async () => ({
+        exitCode: -1,
+        stdout: '',
+        stderr: '',
+        timedOut: true,
+      }),
+    });
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41234',
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      ...daemonAlreadyRunning(),
+    });
+
+    expect(code).toBe(0);
+    expect(stdout.join('')).toContain('timeout');
+  });
+
+  it('continues init when claude is missing and prints remediation through probe', async () => {
+    const isolatedHome = join(tmpRoot, 'claude-missing-home');
+    const clientHome = join(tmpRoot, 'claude-missing-client');
+    const claudeInstructions = join(clientHome, '.claude/CLAUDE.md');
+    const claudeCommands = join(clientHome, '.claude/commands');
+    mkdirSync(join(clientHome, '.claude'), { recursive: true });
+    writeFileSync(claudeInstructions, '# Claude user file\n');
+    const answerFile = writeAnswerFile('claude-missing-answers.json', {
+      confirm_setup: true,
+      selected_agents: ['claude-code'],
+      default_project_repo_root: null,
+    });
+    const enoent = Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+    const stdout: string[] = [];
+    const { runInit } = await loadInit();
+    const wizardFactory = await makeClaudeSyncWizardFactory({
+      clientHome,
+      claudeInstructions,
+      claudeCommands,
+      registerSpawn: async () => {
+        throw enoent;
+      },
+      probeSpawn: async () => {
+        throw enoent;
+      },
+    });
+
+    const code = await runInit({
+      stdin: { isTTY: false },
+      wizardFactory,
+      answerFile,
+      home: isolatedHome,
+      port: '41234',
+      stdout: { write: (s) => (stdout.push(String(s)), true) },
+      ...daemonAlreadyRunning(),
+    });
+
+    const text = stdout.join('');
+    expect(code).toBe(0);
+    expect(text).toContain('cli-unavailable');
+    expect(text).toContain('claude-code not found on PATH');
   });
 
   it('installs and starts the daemon when init finds no installed launchd job', async () => {

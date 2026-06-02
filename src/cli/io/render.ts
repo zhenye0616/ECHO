@@ -73,8 +73,10 @@ export function renderProbeOutcomes(
     .join('\n');
 }
 
-export function renderDoctorReport(report: DoctorReport, opts: { color: boolean }): string {
-  void opts;
+export function renderDoctorReport(
+  report: DoctorReport,
+  opts: { color: boolean; remediation: ReturnType<typeof buildRemediationCopy> },
+): string {
   const lines = [`ECHO doctor: ${report.overall}`];
   lines.push(
     `daemon: reachable=${report.daemon.mcpReachable ? 'yes' : 'no'} pid-lock=${report.daemon.pidLockHeld ? 'yes' : 'no'} port=${report.daemon.port}`,
@@ -90,6 +92,7 @@ export function renderDoctorReport(report: DoctorReport, opts: { color: boolean 
       lines.push(`agent ${agent.kind}: ok`);
     } else {
       lines.push(`agent ${agent.kind}: ${agent.probeOutcome.reason}`);
+      lines.push(opts.remediation[agent.probeOutcome.reason](agent.probeOutcome));
     }
   }
   if (report.overall !== 'healthy') {

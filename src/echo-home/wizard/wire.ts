@@ -7,6 +7,7 @@ import {
   type SyncConflict,
   type SyncResult,
 } from '../adapter-sync.js';
+import type { ClaudeCodeMcpRegisterDeps } from '../adapters/claude-code-mcp.js';
 import { atomicWrite } from '../adapters/atomic-write.js';
 import { ECHO_HOME_PATHS, validateOnboardingState, type OnboardingState } from '../paths.js';
 import { readAdapterCache, writeAdapterCache, type AdapterCacheRecord } from './adapter-cache.js';
@@ -21,6 +22,7 @@ export interface WireOpts {
   repoRoot?: string;
   force?: boolean;
   syncAll?: typeof realSyncAll;
+  claudeCodeMcpRegistration?: ClaudeCodeMcpRegisterDeps;
   cache?: {
     read: (kind: AgentKind) => AdapterCacheRecord | null;
     write: (rec: AdapterCacheRecord) => void;
@@ -95,13 +97,17 @@ function buildProfiles(
       : undefined;
     rendered.set(kind, echoSection ?? null);
     const mcpServerConfig =
-      kind === 'codex' || kind === 'cursor' ? { url: opts.mcpServerUrl } : undefined;
+      kind === 'codex' || kind === 'cursor' || kind === 'claude-code'
+        ? { url: opts.mcpServerUrl }
+        : undefined;
     profiles.push({
       kind,
       echoSection,
       previousEchoSection: prior?.echoSection ?? undefined,
       mcpServerConfig,
       previousMcpServerConfig: prior?.mcpServerConfig ?? undefined,
+      claudeCodeMcpRegistration:
+        kind === 'claude-code' ? opts.claudeCodeMcpRegistration : undefined,
       force: opts.force === true,
     });
   }
@@ -243,7 +249,9 @@ export async function wire(opts: WireOpts): Promise<WireResult> {
     const result = agentResult(syncResult, kind);
     if (!isSuccessfulAgent(result)) continue;
     const mcpServerConfig =
-      kind === 'codex' || kind === 'cursor' ? { url: opts.mcpServerUrl } : null;
+      kind === 'codex' || kind === 'cursor' || kind === 'claude-code'
+        ? { url: opts.mcpServerUrl }
+        : null;
     cache.write({
       schema_version: 1,
       agent: kind,
