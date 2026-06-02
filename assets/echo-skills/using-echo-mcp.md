@@ -2,6 +2,7 @@
 name: using-echo-mcp
 description: Use ECHO MCP to recover prior work, decisions, source context, and live cross-tool activity with disciplined trigger, fallback, and interpretation patterns.
 type: skill
+audience: customer
 ---
 
 # Using ECHO MCP

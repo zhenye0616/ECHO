@@ -28,6 +28,7 @@ function writeState(
         created_at: now,
         last_updated_at: now,
         completed: true,
+        profile: 'customer',
         agents: [
           {
             id:
@@ -102,9 +103,13 @@ describe('runDoctor', () => {
       probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
     });
 
-    const report = JSON.parse(out.join('')) as { overall: string };
+    const report = JSON.parse(out.join('')) as {
+      echoHome: { profile: string };
+      overall: string;
+    };
     expect(code).toBe(0);
     expect(report.overall).toBe('healthy');
+    expect(report.echoHome.profile).toBe('customer');
     expect(calls[0]!.init.headers).toMatchObject({
       Accept: 'application/json, text/event-stream',
       'Content-Type': 'application/json',
@@ -124,14 +129,16 @@ describe('runDoctor', () => {
     const { DOCTOR_HELP, parseDoctorArgs, runDoctor } = await loadDoctor();
     const out: string[] = [];
 
-    expect(parseDoctorArgs([
-      '--home',
-      isolatedHome,
-      '--port',
-      '41235',
-      '--label',
-      'com.echo.daemon.walkthrough',
-    ])).toEqual({
+    expect(
+      parseDoctorArgs([
+        '--home',
+        isolatedHome,
+        '--port',
+        '41235',
+        '--label',
+        'com.echo.daemon.walkthrough',
+      ]),
+    ).toEqual({
       home: isolatedHome,
       port: '41235',
       label: 'com.echo.daemon.walkthrough',
@@ -213,6 +220,7 @@ describe('runDoctor', () => {
     const text = out.join('');
     expect(code).toBe(1);
     expect(text).toContain('agent claude-code: mcp-not-configured');
+    expect(text).toContain('profile=customer');
     expect(text).toContain(
       'claude mcp add --transport http --scope user echo http://127.0.0.1:41234/mcp',
     );

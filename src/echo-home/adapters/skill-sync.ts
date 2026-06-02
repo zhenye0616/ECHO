@@ -1,6 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { atomicWrite, AtomicWriteError } from './atomic-write.js';
+import type { InstallProfile } from '../paths.js';
 
 export type PopulateEchoSkillsResult =
   | { ok: true; copied: string[]; skipped: string[]; targetDir: string }
@@ -15,6 +16,23 @@ export interface SyncClaudeSkillsResult {
 export interface SkillSyncOpts {
   sourceDir: string;
   targetDir: string;
+  profile?: InstallProfile;
+}
+
+function audienceFor(content: string): InstallProfile {
+  if (!content.startsWith('---\n')) return 'customer';
+  const end = content.indexOf('\n---', 4);
+  if (end === -1) return 'customer';
+  const frontmatter = content.slice(4, end).split(/\r?\n/);
+  for (const line of frontmatter) {
+    const match = /^audience:\s*["']?(customer|dogfood)["']?\s*$/.exec(line.trim());
+    if (match !== null) return match[1] as InstallProfile;
+  }
+  return 'customer';
+}
+
+function includedForProfile(content: string, profile: InstallProfile): boolean {
+  return profile === 'dogfood' || audienceFor(content) === 'customer';
 }
 
 function listMdFiles(dir: string): string[] {
@@ -31,6 +49,7 @@ function listMdFiles(dir: string): string[] {
  */
 export function populateEchoSkills(opts: SkillSyncOpts): PopulateEchoSkillsResult {
   const { sourceDir, targetDir } = opts;
+  const profile = opts.profile ?? 'dogfood';
   const copied: string[] = [];
   const skipped: string[] = [];
 
@@ -73,6 +92,10 @@ export function populateEchoSkills(opts: SkillSyncOpts): PopulateEchoSkillsResul
     try {
       content = readFileSync(srcPath, 'utf8');
     } catch {
+      skipped.push(name);
+      continue;
+    }
+    if (!includedForProfile(content, profile)) {
       skipped.push(name);
       continue;
     }

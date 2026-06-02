@@ -7,6 +7,7 @@ import {
   setEchoHomeRoot,
   validateOnboardingState,
   validateProjectsState,
+  type InstallProfile,
   type OnboardedAgentProfile,
   type OnboardingState,
 } from '../../echo-home/paths.js';
@@ -29,6 +30,7 @@ export interface DoctorReport {
     onboardingValid: boolean;
     projectsValid: boolean;
     schemaVersion: 1 | 'mismatch' | 'missing';
+    profile: InstallProfile | 'unknown';
   };
   syncLock: { present: boolean; path: string; mtimeIso?: string; cleanupCommand?: string };
   agents: {
@@ -78,7 +80,9 @@ function parseNonEmptyOption(value: string | undefined, flag: string): string | 
   return value;
 }
 
-export function parseDoctorArgs(args: readonly string[]): Pick<DoctorOpts, 'home' | 'label' | 'port'> {
+export function parseDoctorArgs(
+  args: readonly string[],
+): Pick<DoctorOpts, 'home' | 'label' | 'port'> {
   const parsed = parseArgs({
     args: [...args],
     strict: true,
@@ -117,6 +121,7 @@ function stateVersion(): {
   onboardingValid: boolean;
   projectsValid: boolean;
   schemaVersion: 1 | 'mismatch' | 'missing';
+  profile: InstallProfile | 'unknown';
   onboarding: OnboardingState | null;
 } {
   let onboardingValid = false;
@@ -140,6 +145,7 @@ function stateVersion(): {
     onboardingValid,
     projectsValid,
     schemaVersion: missing ? 'missing' : onboardingValid && projectsValid ? 1 : 'mismatch',
+    profile: onboardingValid ? (onboarding?.profile ?? 'customer') : 'unknown',
     onboarding,
   };
 }
@@ -206,6 +212,7 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
         onboardingValid: false,
         projectsValid: false,
         schemaVersion: 'missing' as const,
+        profile: 'unknown' as const,
         onboarding: null,
       };
 
@@ -244,6 +251,7 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
       onboardingValid: state.onboardingValid,
       projectsValid: state.projectsValid,
       schemaVersion: state.schemaVersion,
+      profile: state.profile,
     },
     syncLock,
     agents,

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -7,6 +7,7 @@ import {
   ECHO_HOME_PATHS,
   setEchoHomeRoot,
   validateOnboardingState,
+  type InstallProfile,
   type OnboardedAgentProfile,
   type OnboardingState,
 } from '../../echo-home/paths.js';
@@ -66,6 +67,7 @@ export interface InitOpts {
   color?: boolean;
   home?: string;
   port?: string;
+  profile?: InstallProfile;
   label?: string;
   answerFile?: string;
   force?: boolean;
@@ -88,6 +90,7 @@ export interface InitAnswerFile {
   confirm_setup: boolean;
   selected_agents: AgentKind[];
   default_project_repo_root: string | null;
+  profile?: InstallProfile;
   repo_root?: string;
 }
 
@@ -96,11 +99,12 @@ interface LoadedAnswerFile {
   answers: InitAnswerFile;
 }
 
-export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>] [--answer-file <path>] [--force]
+export const INIT_HELP = `Usage: echoctl init [--json] [--quiet] [--home <path>] [--port <n>] [--profile customer|dogfood] [--label <id>] [--answer-file <path>] [--force]
 
 Options:
   --home <path>          ECHO_HOME for this init run
   --port <n>             MCP server port written to adapter configs and launchd
+  --profile <name>       Install profile: customer (default) or dogfood
   --label <id>           launchd label used when ensuring the daemon is running
   --answer-file <path>   non-interactive JSON answers
   --force                Replace existing ECHO marker blocks in adapter configs.
@@ -111,19 +115,20 @@ Answer-file JSON schema:
   {
     "confirm_setup": true,
     "selected_agents": ["codex", "claude-code", "cursor"],
+    "profile": "customer",
     "default_project_repo_root": null,
     "repo_root": "/Users/me/Desktop/Project_echo"
   }
 
 Required fields: confirm_setup, selected_agents, default_project_repo_root.
-Optional field: repo_root, only needed if init cannot locate ECHO's source tree.`;
+Optional fields: profile, repo_root. repo_root is only needed if init cannot locate ECHO's source tree.`;
 
 const ANSWER_REQUIRED_FIELDS = [
   'confirm_setup',
   'selected_agents',
   'default_project_repo_root',
 ] as const;
-const ANSWER_OPTIONAL_FIELDS = ['repo_root'] as const;
+const ANSWER_OPTIONAL_FIELDS = ['profile', 'repo_root'] as const;
 const ANSWER_FIELDS = new Set<string>([...ANSWER_REQUIRED_FIELDS, ...ANSWER_OPTIONAL_FIELDS]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -163,10 +168,15 @@ function parseNonEmptyOption(value: string | undefined, flag: string): string | 
   return value;
 }
 
-export function parseInitArgs(args: readonly string[]): Pick<
-  InitOpts,
-  'answerFile' | 'force' | 'home' | 'label' | 'port'
-> {
+function parseProfile(value: string | undefined, flag = '--profile'): InstallProfile | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'customer' || value === 'dogfood') return value;
+  throw new Error(`invalid ${flag}: expected customer or dogfood`);
+}
+
+export function parseInitArgs(
+  args: readonly string[],
+): Pick<InitOpts, 'answerFile' | 'force' | 'home' | 'label' | 'port' | 'profile'> {
   const parsed = parseArgs({
     args: [...args],
     strict: true,
@@ -174,6 +184,7 @@ export function parseInitArgs(args: readonly string[]): Pick<
     options: {
       home: { type: 'string' },
       port: { type: 'string' },
+      profile: { type: 'string' },
       label: { type: 'string' },
       'answer-file': { type: 'string' },
       force: { type: 'boolean', default: false },
@@ -184,6 +195,7 @@ export function parseInitArgs(args: readonly string[]): Pick<
   return {
     home: parseNonEmptyOption(parsed.values.home, '--home'),
     port,
+    profile: parseProfile(parseNonEmptyOption(parsed.values.profile, '--profile')),
     label: parseNonEmptyOption(parsed.values.label, '--label'),
     answerFile: parseNonEmptyOption(parsed.values['answer-file'], '--answer-file'),
     force: parsed.values.force === true,
@@ -221,6 +233,10 @@ function validateAnswerFile(filePath: string, value: unknown): InitAnswerFile {
   if (typeof defaultProject === 'string' && defaultProject.trim().length === 0) {
     failAnswerFile(filePath, 'default_project_repo_root', 'expected non-empty string or null');
   }
+  const profile = value['profile'];
+  if (profile !== undefined && profile !== 'customer' && profile !== 'dogfood') {
+    failAnswerFile(filePath, 'profile', 'expected customer or dogfood');
+  }
   const repoRoot = value['repo_root'];
   if (repoRoot !== undefined && (typeof repoRoot !== 'string' || repoRoot.trim().length === 0)) {
     failAnswerFile(filePath, 'repo_root', 'expected non-empty string');
@@ -229,6 +245,7 @@ function validateAnswerFile(filePath: string, value: unknown): InitAnswerFile {
     confirm_setup: value['confirm_setup'],
     selected_agents: selectedAgents,
     default_project_repo_root: defaultProject,
+    ...(profile === undefined ? {} : { profile: profile as InstallProfile }),
     ...(repoRoot === undefined ? {} : { repo_root: repoRoot }),
   };
 }
@@ -327,6 +344,40 @@ function writeOnboardingState(state: OnboardingState): void {
   });
 }
 
+function readRecordedProfile(): {
+  exists: boolean;
+  profile: InstallProfile | null;
+  validShape: boolean;
+} {
+  if (!existsSync(ECHO_HOME_PATHS.stateOnboarding)) {
+    return { exists: false, profile: null, validShape: true };
+  }
+  try {
+    const raw = JSON.parse(readFileSync(ECHO_HOME_PATHS.stateOnboarding, 'utf8')) as unknown;
+    if (!validateOnboardingState(raw)) {
+      return { exists: true, profile: null, validShape: false };
+    }
+    return { exists: true, profile: raw.profile ?? null, validShape: true };
+  } catch {
+    return { exists: true, profile: null, validShape: false };
+  }
+}
+
+function resolveInstallProfile(input: {
+  cliProfile?: InstallProfile;
+  answerProfile?: InstallProfile;
+  recordedProfile: InstallProfile | null;
+}): InstallProfile {
+  return input.cliProfile ?? input.answerProfile ?? input.recordedProfile ?? 'customer';
+}
+
+function persistInstallProfile(profile: InstallProfile, now: Date): void {
+  const state = readOnboardingState();
+  state.profile = profile;
+  state.last_updated_at = now.toISOString();
+  writeOnboardingState(state);
+}
+
 function successfulAgents(result: WireResult, selected: readonly AgentKind[]): AgentKind[] {
   const ok = new Set(
     result.syncResult.agents.filter((agent) => agent.ok).map((agent) => agent.agent),
@@ -380,10 +431,24 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
   const stderr = opts.stderr ?? process.stderr;
   let answerFile: LoadedAnswerFile | null = null;
   let mcpPort: number;
+  let installProfile: InstallProfile = 'customer';
+  let warnProfileDefault = false;
   try {
     if (opts.home !== undefined) setEchoHomeRoot(opts.home);
     mcpPort = opts.port === undefined ? resolveMcpPort() : parsePort(opts.port);
     if (opts.answerFile !== undefined) answerFile = loadAnswerFile(opts.answerFile);
+    const recorded = readRecordedProfile();
+    installProfile = resolveInstallProfile({
+      cliProfile: opts.profile,
+      answerProfile: answerFile?.answers.profile,
+      recordedProfile: recorded.profile,
+    });
+    warnProfileDefault =
+      opts.profile === undefined &&
+      answerFile?.answers.profile === undefined &&
+      recorded.exists &&
+      recorded.validShape &&
+      recorded.profile === null;
   } catch (err) {
     writeLine(stderr, (err as Error).message);
     return 2;
@@ -397,6 +462,13 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     return 2;
   }
   ensureEchoHome();
+  persistInstallProfile(installProfile, opts.now?.() ?? new Date());
+  if (warnProfileDefault) {
+    writeLine(
+      stderr,
+      'echoctl init: onboarding profile was missing; defaulted to `customer`. Re-run `echoctl init --profile dogfood` to restore the full coordination surface.',
+    );
+  }
 
   try {
     const mcpServerUrl = `http://127.0.0.1:${mcpPort}/mcp`;
@@ -449,6 +521,7 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
     let wire = await wizard.wire({
       selectedAgents,
       defaultProjectRepoRoot,
+      profile: installProfile,
       force: opts.force === true,
     });
     if (wire.syncResult.repoRoot !== undefined) {
@@ -470,6 +543,7 @@ export async function runInit(opts: InitOpts = {}): Promise<number> {
       wire = await wizard.wire({
         selectedAgents,
         defaultProjectRepoRoot,
+        profile: installProfile,
         repoRoot,
         force: opts.force === true,
       });
