@@ -15,7 +15,7 @@ async function loadDoctor(): Promise<typeof import('../../src/cli/commands/docto
 }
 
 function writeState(
-  agentReason: 'ok' | 'manual-only' | 'auth-required' = 'ok',
+  agentReason: 'ok' | 'manual-only' | 'auth-required' | 'mcp-not-configured' = 'ok',
   home = echoHome,
 ): void {
   mkdirSync(join(home, 'state'), { recursive: true });
@@ -30,7 +30,12 @@ function writeState(
         completed: true,
         agents: [
           {
-            id: agentReason === 'manual-only' ? 'cursor' : 'codex',
+            id:
+              agentReason === 'manual-only'
+                ? 'cursor'
+                : agentReason === 'mcp-not-configured'
+                  ? 'claude-code'
+                  : 'codex',
             detected_at: now,
             wired_at: now,
             probed_at: null,
@@ -182,5 +187,36 @@ describe('runDoctor', () => {
 
     expect(broken.overall).toBe('broken');
     expect(degraded.overall).toBe('degraded');
+  });
+
+  it('prints exact claude-code MCP remediation and local-shadow escape hatch', async () => {
+    writeState('mcp-not-configured');
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, 'daemon.pid'), '123');
+    const { runDoctor } = await loadDoctor();
+    const out: string[] = [];
+
+    const code = await runDoctor({
+      port: '41234',
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+      probeAgents: async () => [
+        {
+          agent: 'claude-code',
+          probed: false,
+          reason: 'mcp-not-configured',
+          detail: 'No such tool mcp__echo__echo_ping',
+        },
+      ],
+    });
+
+    const text = out.join('');
+    expect(code).toBe(1);
+    expect(text).toContain('agent claude-code: mcp-not-configured');
+    expect(text).toContain(
+      'claude mcp add --transport http --scope user echo http://127.0.0.1:41234/mcp',
+    );
+    expect(text).toContain('claude mcp remove echo -s local');
+    expect(text).toContain('echoctl doctor');
   });
 });

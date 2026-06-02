@@ -33,6 +33,7 @@ import {
   type DaemonBringupResult,
   type DaemonControlOptions,
 } from './daemon.js';
+import { claudeCodeMcpAddCommand } from '../../echo-home/adapters/claude-code-mcp.js';
 
 export const AGENT_CAPABILITIES_BY_KIND: Readonly<Record<AgentKind, readonly Capability[]>> =
   Object.freeze({
@@ -270,7 +271,7 @@ export function buildRemediationCopy(mcpServerUrl: string): RemediationCopy {
     'manual-only': () =>
       'Cursor has no headless CLI. Open Cursor and run any prompt to confirm ECHO MCP is reachable.',
     'mcp-not-configured': () =>
-      `Claude Code does not have ECHO MCP configured. Run \`claude mcp add echo ${mcpServerUrl}\` and then \`echoctl doctor\`.`,
+      `Claude Code does not have ECHO MCP configured. Run \`${claudeCodeMcpAddCommand(mcpServerUrl)}\` and then \`echoctl doctor\`.\nIf still degraded, remove a shadowing local entry with \`claude mcp remove echo -s local\` and then run \`echoctl doctor\`.`,
     timeout: (outcome) =>
       `${outcome.agent} took longer than 30s to respond. Re-run \`echoctl doctor\` once if this persists.`,
     'unexpected-output': (outcome) =>

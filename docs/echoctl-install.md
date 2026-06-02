@@ -15,6 +15,7 @@ echoctl doctor
 ```
 
 `npm pack` runs `npm run build:cli` first, which builds `dist/` and copies SQL migrations into `dist/storage/migrations/`.
+`echoctl init` wires selected agents and registers Claude Code's ECHO MCP server at user scope with `claude mcp add --transport http --scope user echo http://127.0.0.1:<port>/mcp`.
 
 ## Daily Use
 
@@ -26,6 +27,22 @@ echoctl run change-review
 ```
 
 The daemon is managed by launchd and serves MCP on `127.0.0.1:38478` unless installed with `--port`.
+
+## Claude Code MCP Troubleshooting
+
+Claude Code registration is best-effort because it uses the vendor CLI. If `echoctl doctor` reports `claude-code: mcp-not-configured`, run:
+
+```bash
+claude mcp add --transport http --scope user echo http://127.0.0.1:38478/mcp
+echoctl doctor
+```
+
+If it is still degraded, remove any old local-scope entry that may shadow the user-scope server, then re-check:
+
+```bash
+claude mcp remove echo -s local
+echoctl doctor
+```
 
 ## Upgrade
 

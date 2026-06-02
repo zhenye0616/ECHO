@@ -17,6 +17,10 @@ import { ECHO_HOME_PATHS } from './paths.js';
 import { DEFAULT_ROLE_FILENAMES } from './roles.js';
 import { mergeWithMarkers, type MarkerResult } from './adapters/markers.js';
 import { syncCodexMcpBlock, RenderError, TomlParseError } from './adapters/codex-config.js';
+import {
+  registerClaudeCodeMcpServer,
+  type ClaudeCodeMcpRegisterDeps,
+} from './adapters/claude-code-mcp.js';
 import { syncCursorMcpEntry, CursorJsonParseError } from './adapters/cursor-config.js';
 import {
   populateEchoSkills,
@@ -44,6 +48,7 @@ export interface AdapterSyncProfile {
   previousEchoSection?: string;
   mcpServerConfig?: { url: string; [k: string]: unknown };
   previousMcpServerConfig?: Record<string, unknown>;
+  claudeCodeMcpRegistration?: ClaudeCodeMcpRegisterDeps;
   force?: boolean;
 }
 
@@ -535,7 +540,7 @@ export async function syncAll(
 
     // Step 5: per-agent dispatch.
     for (const profile of profiles) {
-      agents.push(dispatchAgent(profile, skillsPopulated.ok === true));
+      agents.push(await dispatchAgent(profile, skillsPopulated.ok === true));
     }
 
     // Step 6: roles once.
@@ -600,7 +605,10 @@ function computeOverallOk(
 // Per-agent dispatch
 // -----------------------------------------------------------------------------
 
-function dispatchAgent(profile: AdapterSyncProfile, skillsAvailable: boolean): AgentResult {
+async function dispatchAgent(
+  profile: AdapterSyncProfile,
+  skillsAvailable: boolean,
+): Promise<AgentResult> {
   const filesWritten: string[] = [];
   const actions: Array<{ file: string; action: string }> = [];
   const conflicts: SyncConflict[] = [];
@@ -637,6 +645,7 @@ function dispatchAgent(profile: AdapterSyncProfile, skillsAvailable: boolean): A
     } else {
       skipped.push('syncClaudeSkills');
     }
+    await handleClaudeCodeMcpRegistration(profile, actions, skipped);
   } else if (profile.kind === 'cursor') {
     handleCursorConfig(profile, configFile, filesWritten, actions, conflicts, errors);
   }
@@ -658,6 +667,27 @@ function dispatchAgent(profile: AdapterSyncProfile, skillsAvailable: boolean): A
     actions,
     skipped: skipped.length > 0 ? skipped : undefined,
   };
+}
+
+async function handleClaudeCodeMcpRegistration(
+  profile: AdapterSyncProfile,
+  actions: Array<{ file: string; action: string }>,
+  skipped: string[],
+): Promise<void> {
+  const url = profile.mcpServerConfig?.url;
+  if (!isString(url)) {
+    skipped.push('claudeCodeMcpRegistration');
+    return;
+  }
+  const result = await registerClaudeCodeMcpServer(url, profile.claudeCodeMcpRegistration);
+  let action: string = result.action;
+  if (result.action === 'error' && result.exitCode !== undefined) {
+    action = `error exit-${result.exitCode}`;
+  }
+  if (result.detail !== undefined && result.detail.length > 0) {
+    action = `${action}: ${result.detail.replace(/\s+/g, ' ')}`;
+  }
+  actions.push({ file: 'claude:mcp:echo', action });
 }
 
 function handleMarkersForAgent(

@@ -132,6 +132,67 @@ describe('wire', () => {
     expect(cache.writes.map((rec) => rec.agent)).toEqual(['codex', 'claude-code']);
     expect(seen[0]![0]!.previousEchoSection).toBeUndefined();
     expect(seen[0]![0]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+    expect(seen[0]![1]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+    expect(cache.writes[1]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:38478' });
+  });
+
+  it('registers claude-code MCP through the wire sync profile', async () => {
+    await writeInitialState();
+    const calls: Array<{ cmd: string; args: string[]; timeoutMs: number }> = [];
+    const cache = makeCache();
+    const claudeInstructions = join(tmpRoot, 'client-home/.claude/CLAUDE.md');
+    const claudeCommands = join(tmpRoot, 'client-home/.claude/commands');
+    const { wire } = await loadWire();
+    const { syncAll } = await import('../../../src/echo-home/adapter-sync.js');
+
+    const result = await wire({
+      selectedAgents: ['claude-code'],
+      defaultProjectRepoRoot: null,
+      mcpServerUrl: 'http://127.0.0.1:41234/mcp',
+      echoVersion: '0.0.0',
+      cache: cache.cache,
+      claudeCodeMcpRegistration: {
+        timeoutMs: 5,
+        spawn: async (cmd, args, opts) => {
+          calls.push({ cmd, args, timeoutMs: opts.timeoutMs });
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false };
+        },
+      },
+      syncAll: async (profiles, syncOpts) =>
+        syncAll(
+          profiles.map((profile): AdapterSyncProfile => {
+            if (profile.kind !== 'claude-code') return profile;
+            return {
+              ...profile,
+              paths: { instructionsFile: claudeInstructions, commandsDir: claudeCommands },
+            };
+          }),
+          syncOpts,
+        ),
+    });
+
+    const claude = result.syncResult.agents[0]!;
+    expect(calls).toEqual([
+      {
+        cmd: 'claude',
+        args: [
+          'mcp',
+          'add',
+          '--transport',
+          'http',
+          '--scope',
+          'user',
+          'echo',
+          'http://127.0.0.1:41234/mcp',
+        ],
+        timeoutMs: 5,
+      },
+    ]);
+    expect(claude.ok).toBe(true);
+    if (claude.ok) {
+      expect(claude.actions.some((action) => action.action === 'mcp-add')).toBe(true);
+    }
+    expect(cache.writes[0]!.mcpServerConfig).toEqual({ url: 'http://127.0.0.1:41234/mcp' });
   });
 
   it('does not update cache for a conflicting agent but updates successful siblings', async () => {

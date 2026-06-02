@@ -14,14 +14,32 @@ LABEL=com.echo.daemon.sboxtest
 PORT=41789
 BIN="$SBOX/npm/bin/echoctl"
 PLIST="$SBOX/$LABEL.plist"
+SHIMS="$SBOX/shims"
+CLAUDE_ARGS="$SBOX/claude-argv.log"
 
 rm -rf "$SBOX"
-mkdir -p "$SBOX"/{npm,data,logs,fakehome/.claude,fakehome/.codex}
+mkdir -p "$SBOX"/{npm,data,logs,shims,fakehome/.claude,fakehome/.codex}
 
 # Seed fake foreign-coworker agent configs so detect-agents finds them
 # WITHOUT ever reading/writing the real ~/.claude or ~/.codex.
 printf '# CLAUDE.md (fake foreign coworker machine)\n\nSome of his own instructions here.\n' > "$SBOX/fakehome/.claude/CLAUDE.md"
 printf '# codex config.toml (fake foreign coworker machine)\nmodel = "gpt-5.5"\n' > "$SBOX/fakehome/.codex/config.toml"
+cat > "$SHIMS/claude" <<'SH'
+#!/usr/bin/env bash
+set -u
+if [ "${1:-}" = "mcp" ]; then
+  printf '%s\n' "$*" >> "${ECHO_FAKE_CLAUDE_ARGS:?}"
+  exit 0
+fi
+if [ "${1:-}" = "--print" ]; then
+  printf '{"pong":true,"ts":"2026-06-01T00:00:00.000Z"}\n'
+  exit 0
+fi
+printf 'unexpected fake claude argv: %s\n' "$*" >&2
+exit 2
+SH
+chmod +x "$SHIMS/claude"
+: > "$CLAUDE_ARGS"
 
 cleanup() {
   echo ""; echo "=================== CLEANUP ==================="
@@ -36,6 +54,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+fail() {
+  echo "[assert] ERROR: $*" >&2
+  exit 1
+}
+
 cd "$REPO"
 echo "=================== STEP 0: build fresh tarball ==================="
 npm pack 2>&1 | tail -2
@@ -47,11 +70,12 @@ npm install -g "$TGZ" --prefix "$SBOX/npm" 2>&1 | tail -4
 
 # From here on, become the "foreign machine": fake HOME.
 export HOME="$SBOX/fakehome"
-export PATH="$SBOX/npm/bin:$PATH"
+export PATH="$SHIMS:$SBOX/npm/bin:$PATH"
 export ECHO_HOME="$SBOX/fakehome/.echo"
 export ECHO_MCP_PORT="$PORT"
 export ECHO_DATA_DIR="$SBOX/data"
 export ECHO_DB_PATH="$SBOX/data/echo.db"
+export ECHO_FAKE_CLAUDE_ARGS="$CLAUDE_ARGS"
 
 echo ""; echo "=== echoctl --version (from packaged global install) ==="
 "$BIN" --version 2>&1 || echo "VERSION FAILED"
@@ -73,8 +97,20 @@ echo "(This tests your worry: can a packaged install LOCATE its skills/source on
 cat > "$SBOX/answers.json" <<'JSON'
 { "confirm_setup": true, "selected_agents": ["codex","claude-code"], "default_project_repo_root": null }
 JSON
-"$BIN" init --home "$ECHO_HOME" --port "$PORT" --label "$LABEL" --answer-file "$SBOX/answers.json" 2>&1 | head -70
-echo "(init exit code: $?)"
+INIT_LOG="$SBOX/init.out"
+"$BIN" init --home "$ECHO_HOME" --port "$PORT" --label "$LABEL" --answer-file "$SBOX/answers.json" > "$INIT_LOG" 2>&1
+INIT_RC=$?
+sed -n '1,70p' "$INIT_LOG"
+echo "(init exit code: $INIT_RC)"
+[ "$INIT_RC" -eq 0 ] || fail "echoctl init exited $INIT_RC"
+
+EXPECTED_CLAUDE_ARGV="mcp add --transport http --scope user echo http://127.0.0.1:$PORT/mcp"
+if ! grep -Fxq "$EXPECTED_CLAUDE_ARGV" "$CLAUDE_ARGS"; then
+  echo "[assert] recorded fake claude argv:" >&2
+  sed 's/^/[assert]   /' "$CLAUDE_ARGS" >&2
+  fail "claude-code MCP registration argv missing or mismatched; expected: $EXPECTED_CLAUDE_ARGV"
+fi
+echo "[assert] claude-code MCP registration argv OK"
 
 echo ""; echo "=== what skills landed in the user's ~/.echo/skills? ==="
 ls -1 "$ECHO_HOME/skills" 2>&1 || echo "(no skills dir created)"
