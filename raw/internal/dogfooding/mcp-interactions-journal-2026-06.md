@@ -232,3 +232,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `backlog/reviews/2026-06-02-084-install-profile-split/r5/request.md`; pinned spec at `cd90ba3`; response file `backlog/reviews/2026-06-02-084-install-profile-split/r5/codex.md`; source anchors at the requested SHA including `src/echo-home/wizard/run-wizard.ts:40-42,66-75`, `src/echo-home/scaffold.ts:49-62`, and `src/echo-home/adapter-sync.ts:531-567,570-597`.
 - **Verdict:** right - the r4 patch resolves the remaining implementability blockers: missing profile defaults to customer without state inference, dogfood is reachable only through explicit flag/answer-file/recorded profile, the pre-084 warning path is specified, and `run-wizard.ts` is in scope for the public `Wizard.wire()` profile handoff.
 - **Note:** The mandatory `git pull --rebase origin main` fetched `main` but failed with `Cannot rebase onto multiple branches`; `git fetch origin main` plus `git rebase origin/main` completed the sync and confirmed `main` was up to date. The live checkout still has unrelated untracked files, left untouched. The queue prompt still references the old monolithic journal plus committed HTML twin; current `CLAUDE.md` makes this June monthly Markdown shard canonical and says not to commit regenerated HTML twins, so this tick writes only this shard.
+
+### 2026-06-02 01:26 PDT - codex builder process-backlog preflight
+
+- **Trigger:** Codex builder invocation via `$ECHO:process-backlog`; checked whether the ECHO MCP server was reachable before atomic claim.
+- **Query inputs:** `echo_ping(message="codex builder process-backlog preflight")`.
+- **Returned:** `pong=true`; timestamp `2026-06-02T08:26:51.360Z`; received message echoed.
+- **Sources:** ECHO MCP daemon at `http://127.0.0.1:38478/mcp`; no memory atoms, clusters, or captured-source rows were requested.
+- **Verdict:** right - connectivity check returned the expected pong envelope.
+- **Note:** Tool discovery exposed the `mcp__echo` namespace in this Codex session; the builder can use MCP directly rather than falling back silently to filesystem-only context.
