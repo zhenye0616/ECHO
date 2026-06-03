@@ -25,6 +25,7 @@ files_to_modify:
   - .claude/commands/review-queue-claude.md                         # AC1 — regenerated adapter (prose-cleanup only, mirrors skill).
   - docs/review-queue-setup.md                                      # AC4 — update to the read-only-child + writer-owned-commit model; remove the `danger-full-access` review-child blessing; the "Why these flags" rationale now states the AI child reads+reasons only, commit/push lives in the wrapper. Remove 087's forward-pointer (now landed).
   - tests/review-queue/reviewer-readonly.test.* (path per repo convention)  # AC5 — assert: codex/codex-ops bindings resolve `read-only`; the child has no commit capability (no `git commit`/`commit-reviewer-response.sh` invoked from inside the child path); the wrapper publishes a valid `<reviewer>.md` from captured content; a child write attempt under read-only is denied/no-ops without losing the review.
+  - tests/review-queue/reviewer-bindings.test.ts                            # AC5 (escalation-resolved 2026-06-03, founder-authorized) — UPDATE 087's existing binding-contract assertions that the read-only flip necessarily invalidates: the `agent_sandbox: danger-full-access` / `commit_policy: child` assertions for codex+codex-ops become `read-only` / `wrapper`. The builder correctly escalated because `npm test` cannot pass after the AC3 flip while these old 087 assertions stand, and this file was not in the original allow-list. SCOPE: update ONLY the assertions the flip changes; do NOT expand 087's coverage or alter unrelated assertions (claude/cursor entries unchanged).
 
 spec_refs:
   - backlog/complete/2026-06-02-087-reviewer-invocation-argv-contract.md  # PARENT (impl-time dep). LIFECYCLE-MOBILE PATH (r1 codex F4): 087 is in pending_review/ as of 2026-06-02; `blocked_by` guarantees it is in complete/ before 087b is claimable, so the builder will read it at THIS complete/ path. (If consulting before merge, it is at backlog/pending_review/2026-06-02-087-reviewer-invocation-argv-contract.md.) 087 ships the argv binding file + `agent_sandbox`/`commit_policy` as DESCRIPTIVE fields recording current reality + the `capture.kind` enum (incl. the `stdout_json` kind 087b wires); 087b flips those values + moves the commit so the descriptions become enforced.
@@ -35,17 +36,19 @@ spec_refs:
   - backlog/complete/2026-06-02-086-claim-gate-spec-review-convergence.md  # if merged: the spec-review claim gate. 087b is itself a reviewed spec; once 086 ships, 087b must reach review convergence before it is claimable.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-06-03T17:49:29Z"
-branch: "agent/reviewer-child-readonly-migration"
-worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-child-readonly-migration"
-head_sha: "388b8cf0e96020bed185e0759b44f87ef45b59ca"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
 pr_url: ""
 agent_notes: |
-  BLOCKED: AC3/AC5 require flipping codex/codex-ops reviewer bindings to `read-only`, but the existing `tests/review-queue/reviewer-bindings.test.ts` asserts the old `danger-full-access`/`commit_policy: child` behavior and is not listed in `files_to_modify` (the listed test path is `tests/review-queue/reviewer-readonly.test.*`).
-  Tried: Claimed the item, created the initial builder task-state pointer, loaded mandatory context and every spec_ref (with 085 read from `backlog/complete/` after lifecycle move), inspected `_run_reviewer.sh`, `_reviewer_gate.py`, `reviewer-bindings.json`, docs, prompts, and tests, and confirmed the blocking assertions with `rg -n "danger-full-access|commit_policy|records current sandbox|preserves current reviewer" tests/review-queue/reviewer-bindings.test.ts tools/review-queue/reviewer-bindings.json`.
-  Best-guess answer: Add `tests/review-queue/reviewer-bindings.test.ts` to `files_to_modify` or explicitly allow updating the existing 087 binding-contract tests alongside the new `reviewer-readonly.test.*`; confidence high because full `npm test` cannot pass after the required config flip while those old assertions remain.
-  Why I escalated rather than guessing: Stopping condition triggered: satisfying acceptance requires modifying a file not listed in `files_to_modify`.
+  Escalation resolved 2026-06-03 (founder-authorized). The prior claim produced NO implementation
+  (empty branch, claim commit only) — the builder correctly STOPPED because AC3/AC5 require editing
+  tests/review-queue/reviewer-bindings.test.ts (087-created, asserts the old danger-full-access /
+  commit_policy:child), which was absent from files_to_modify. That file is now authorized (see its
+  AC5 entry). Item returned to ready/ for a fresh claim. Full escalation record: "## Escalation
+  history (resolved 2026-06-03)" below.
 review_notes: ""
 ---
 
@@ -84,3 +87,23 @@ The fix is a **two-actor split**: the AI child reads + reasons + produces review
 
 - This closes the R1/R2 reviewer-child friction from the 2026-06-02 friction audit (danger-full-access child + child self-commit + rc=143 hang).
 - Wiki: update `wiki/surfaces/review-queue.md` "reviewer-binding contract" — the `agent_sandbox`/`commit_policy` fields are now ENFORCED (read-only child, wrapper-owned commit). Update `.manifest.json` + regen index.
+
+## Escalation history (resolved 2026-06-03)
+
+**First claim (2026-06-03, builder `78D5AB0F…`):** claimed but produced NO implementation — a
+clean, justified escalation. AC3/AC5 require flipping codex/codex-ops bindings to `read-only` +
+`commit_policy: wrapper`, but the existing `tests/review-queue/reviewer-bindings.test.ts` (created
+by 087) asserts the old `danger-full-access` / `commit_policy: child` values and was NOT in
+`files_to_modify`. Per drift-prevention the builder STOPPED rather than touch an unlisted file and
+escalated with a high-confidence best-guess answer.
+
+**Code review of that claim (codex child, verdict `block`):** confirmed the branch had no impl diff
+(`388b8cf0` = claim commit, already an ancestor of `main`) — merging would be a no-op leaving
+AC1–AC5 unbuilt. Open question to founder: authorize `reviewer-bindings.test.ts` in the allow-list?
+
+**Resolution (founder, 2026-06-03):** authorized — `tests/review-queue/reviewer-bindings.test.ts`
+added to `files_to_modify` (scoped to the assertions the flip necessarily changes). Item returned to
+`ready/`; claim fields cleared; the empty prior branch/worktree cleaned up. NOTE: this spec edit
+invalidates the prior `spec_review_sha` (086 staleness), so spec-review re-converges (or is founder-
+waived) before re-claim. (Aside — that `block` sidecar was *also* a Codex-child sidecar missing the
+`producer` field: a second live instance of the bug item 088 fixes.)
