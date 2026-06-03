@@ -35,10 +35,10 @@ spec_refs:
   - backlog/complete/2026-06-02-086-claim-gate-spec-review-convergence.md  # if merged: the spec-review claim gate. 087b is itself a reviewed spec; once 086 ships, 087b must reach review convergence before it is claimable.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-03T22:34:50Z"
+branch: "agent/reviewer-child-readonly-migration"
+worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-child-readonly-migration"
 head_sha: ""
 pr_url: ""
 agent_notes: |

@@ -2,19 +2,19 @@
 task_id: 2026-06-02-087b-reviewer-child-readonly-migration
 role: builder
 binding: codex
-last_updated: 2026-06-03T17:54:45Z
+last_updated: 2026-06-03T22:34:50Z
 branch: agent/reviewer-child-readonly-migration
 claim_sha: ""
-handoff_branch: agent/reviewer-child-readonly-migration
-handoff_head_sha: 388b8cf0e96020bed185e0759b44f87ef45b59ca
-handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md
+handoff_branch: ""
+handoff_head_sha: ""
+handoff_run_log: ""
 ---
 
 ## current_thesis
-Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement only the reviewer-child read-only migration: move codex/codex-ops reviewer artifact publication, coord lifecycle, selection, git sync, and capture parsing into the wrapper; make the child content-only and read-only.
+Reclaimed by Codex builder on `agent/reviewer-child-readonly-migration` after the founder-authorized allow-list fix for `tests/review-queue/reviewer-bindings.test.ts`. Implement only the reviewer-child read-only migration: move codex/codex-ops reviewer artifact publication, coord lifecycle, selection, git sync, and capture parsing into the wrapper; make the child content-only and read-only.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md for blocker.
+- Lifecycle: IN_PROGRESS — claimed at 2026-06-03T22:34:50Z; implementation pending in `agent/reviewer-child-readonly-migration`.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -27,11 +27,7 @@ Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement
 - AC6: no new capture kind, no claude/cursor migration, no coord-roles SLA changes, no combine.py/watcher native capture-failed classification.
 
 ## open_questions
-- None blocking at claim time.
-
-<!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
-<!-- builder-state-handoff-open-questions:end -->
+- None blocking.
 
 ## dont_touch
 - Do not edit `combine.py` or watcher native marker classification; selector-only marker consumption is in scope.
@@ -42,5 +38,5 @@ Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement
 
 ## canonical_anchors
 
-- spec: backlog/pending_review/2026-06-02-087b-reviewer-child-readonly-migration.md
+- spec: backlog/claimed/2026-06-02-087b-reviewer-child-readonly-migration.md
 - reviews: backlog/reviews/2026-06-02-087b-reviewer-child-readonly-migration/
