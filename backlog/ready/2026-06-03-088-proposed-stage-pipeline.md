@@ -12,17 +12,17 @@ files_to_modify:
   - backlog/proposed/.gitkeep                       # AC1 — NEW stage directory. proposed/ holds a spec draft from first commit through spec-review convergence; presence == "in spec-review".
   - tools/blocked.py                                # AC2 — the claim-selector contract. Add "proposed" to STAGES; candidates() stays STRICTLY ready/ (proposed items are never candidates). Claimable iff: stage==ready AND every blocked_by dep in complete/ AND ready_content_sha present+matching. REMOVE the 086 spec_review field gate (transitional dual-read first — see AC6/migration). blocked_by validation: proposed items count as KNOWN ids but only complete/ SATISFIES a dep. Stale-ready: ready_content_sha mismatch ⇒ fail closed (item is invalid-in-ready, not a candidate) and is surfaced for bounce to proposed/.
   - tools/review-queue/request.py                   # AC3 — find_artifact() must scan proposed/ FIRST (today: ready|claimed|pending_review|complete). Without this, proposed specs are unreviewable. Order: proposed → ready → claimed → pending_review → complete.
-  - skills/review-queue-watch.md                     # AC4 — watcher terminal step: on convergence, stamp ready_content_sha on the CURRENT proposed/ file, then idempotently move proposed→ready, fold into the terminal commit with combined.md, push via retry. ADD a pre-step that scans for "combined-but-not-promoted/terminalized" rounds before running combine.py (recompute promotion from review artifacts — pitfall #1) so a crash after combined.md but before promotion is recovered on the next tick, never stranding a converged spec outside ready/.
-  - tools/review-queue/promote.py                    # AC4 — NEW idempotent promotion + bounce helper (P1 mindset, mirrors the claimed→pending move in 079): upsert proposed→ready (stamp+move+commit+push, remote-boundary check, safe re-run) and the reverse ready→proposed bounce on ready_content_sha mismatch. The watcher + a manual repair path both call it. (J1 — placement: standalone helper vs folding into combine.py/an existing script; default standalone for testability.)
-  - tools/backlog_index.py                           # AC5 — NEW generator that renders docs/BACKLOG.md from folder state + frontmatter (mirrors tools/wiki_index.py → wiki/index.md). Sections by stage incl. a Proposed table and a Ready table; derives BLOCKED/READY status from the blocked.py contract. docs/BACKLOG.md becomes GENERATED, not hand-maintained (it is a strategist-only file: the builder ships the GENERATOR + a --check mode, NOT a hand-edit of BACKLOG.md; regeneration is a strategist/post-merge step like wiki regen).
+  - skills/review-queue-watch.md                     # AC4 — watcher terminal step: on convergence, stamp ready_content_sha on the CURRENT proposed/ file, then idempotently move proposed→ready, fold into the terminal commit with combined.md, push via retry. ADD a pre-step that scans for combined-but-not-promoted rounds before running combine.py and recovers them — but ONLY if the round satisfies the TERMINAL-PROMOTABLE predicate (see AC4); a merely-combined round (combine.py just wrote combined.md with unfilled `_strategist fills_` rows, next_round null pre-disposition) must NOT be promoted (r1 codex/codex-ops HIGH). ALSO add a stale-ready bounce pre-step: scan ready/ for ready_content_sha mismatches (the unattended owner per r1 codex-ops MED) and call promote.py's bounce, writing a queue-errors.md entry when it fires or fails.
+  - tools/review-queue/promote.py                    # AC4 — NEW idempotent promotion + bounce helper (P1 mindset, mirrors the claimed→pending move in 079): upsert proposed→ready (stamp+move+commit+push, remote-boundary check, safe re-run) and the reverse ready→proposed bounce on ready_content_sha mismatch. Promotion fires ONLY when the round is TERMINAL-PROMOTABLE (AC4 predicate), never on combined.md existence alone. The bounce has a concrete scheduled owner: the watcher stale-ready pre-step (above) calls it; on fire-or-fail it writes a queue-errors.md entry (operator-visible). The watcher + a manual repair path both call it. (J1 — placement: standalone helper vs folding into combine.py/an existing script; default standalone for testability.)
+  - tools/backlog_index.py                           # AC5 — NEW generator that renders docs/BACKLOG.md from folder state + frontmatter (mirrors tools/wiki_index.py → wiki/index.md). Sections by stage incl. a Proposed table and a Ready table; derives BLOCKED/READY status from the blocked.py contract. docs/BACKLOG.md becomes GENERATED, not hand-maintained. OWNERSHIP (r1 codex MED): the builder ships the GENERATOR ONLY — it does NOT write the tracked docs/BACKLOG.md (that file stays off files_to_modify; it remains a forbidden builder write per AGENT_INSTRUCTIONS, like wiki/index.md). `--check` is FIXTURE-ONLY: it validates the generator against test fixtures, NOT the live tracked docs/BACKLOG.md, so the merge gate never fails on a not-yet-regenerated live file. Regenerating the live docs/BACKLOG.md is the strategist/post-merge step (After Completion), exactly like the wiki/index.md regen.
   - skills/process-backlog.md                        # AC7 — stage-reference + claim-contract prose: claim target stays ready→claimed, but document the proposed→ready→claimed lifecycle, the ready_content_sha contract, and that new specs are authored into proposed/.
   - skills/process-backlog-batch.md                  # AC7 — same stage/lifecycle prose updates as process-backlog.
   - skills/merge-and-cleanup.md                      # AC7 — stage-list/diagram references (operates on pending_review→complete; verify no assumption that a spec was ever in ready-as-draft).
   - backlog/README.md                                # AC7 — the canonical pipeline doc: proposed → ready → claimed → pending_review → complete; raw ideas = ECHO context (no inbox); the ready_content_sha integrity model; the two-axis reviewable(in proposed)⟂claimable(in ready) split.
   - docs/AGENT_INSTRUCTIONS.md                       # AC7 — claim contract (claim from ready/ only; ready means claimable, no field read), the forbidden-strategist-files list (docs/BACKLOG.md now GENERATED — never hand- or builder-edited), task-state pointer default path = backlog/proposed/.
   - CLAUDE.md                                        # AC7 (J2) — operating-model pipeline diagram + the proposed/ stage description. (J2 flagged: operating-model docs ship ON the builder branch so they stay coherent with enforcement code at merge, rather than strategist-immediate — for a pipeline-topology change the doc describes code behavior, so atomic coherence wins.)
-  - tests/backlog/blocked.test.* (path per repo convention)        # AC8 — rework 086's blocked.py tests for the stage model: candidates only ready/; proposed never a candidate; ready_content_sha match→claimable, mismatch→fail-closed-not-candidate; blocked_by proposed=known-but-unsatisfied, complete=satisfied; legacy spec_review absence is fine; the transitional dual-read window (AC6).
-  - tests/review-queue/promote.test.* (path per repo convention)   # AC8 — promotion idempotency + recovery: stamp+move+push; crash-after-combined-before-promote recomputes on re-run; double-run is a no-op; ready→proposed bounce on sha mismatch; remote-boundary check.
+  - tools/test_blocked.py                                          # AC8 — rework 086's SHIPPED selector harness (NOT a new tests/backlog/blocked.test.* placeholder — r1 codex MED: the real harness is tools/test_blocked.py and still holds the spec_review assertions this item must rework). Rework for the stage model: candidates only ready/; proposed never a candidate; ready_content_sha match→claimable, mismatch→fail-closed-not-candidate; blocked_by proposed=known-but-unsatisfied, complete=satisfied; legacy spec_review absence is fine; the transitional dual-read window (AC6). AC8 requires `python3 tools/test_blocked.py` green.
+  - tests/review-queue/promote.test.* (path per repo convention)   # AC8 — promotion idempotency + recovery: stamp+move+push; crash-after-terminal-disposition-before-promote recomputes + promotes on re-run; double-run is a no-op; ready→proposed bounce on sha mismatch; remote-boundary check. NEGATIVE case (r1 codex/codex-ops HIGH): crash-after-combine-BEFORE-disposition (combined.md present, `_strategist fills_` rows unfilled, next_round null, no terminal marker) must NOT promote — review artifacts alone cannot trigger promotion.
   - tests/review-queue/request.test.* (path per repo convention)   # AC8 — find_artifact() resolves a proposed/ spec; resolution order proposed-first.
   - tests/backlog/backlog-index.test.* (path per repo convention)  # AC8 — generator renders Proposed + Ready tables from folder state; --check fails on drift; matches the blocked.py status derivation.
 
@@ -73,10 +73,11 @@ reasoning, decisions, pitfalls, and migration order: the design doc in `spec_ref
   they stay coherent with the enforcement code at merge, rather than strategist-immediate. For a
   pipeline-topology change the docs describe code behavior, so atomic coherence beats the usual
   "operating-model files update immediately" rule. (BACKLOG.md stays excluded — generated.)
-- **J3 — bounce surfacing:** when `ready_content_sha` mismatches, does `blocked.py` just exclude it
-  (report-only) and let the watcher/repair path move it, or does it move it? Default: blocked.py
-  reports invalid + the explicit `promote.py` repair path performs the bounce (no selector side
-  effects).
+- **J3 — bounce surfacing (RESOLVED r1 codex-ops MED):** `blocked.py` is report-only (excludes the
+  mismatched item from candidates, no selector side effects). The bounce's concrete *scheduled* owner
+  is the watcher stale-ready pre-step, which calls `promote.py`'s `ready→proposed` bounce and logs a
+  `queue-errors.md` entry on fire-or-fail. No fail-closed item can sit in `ready/` waiting on manual
+  discovery.
 
 ## Acceptance criteria
 
@@ -91,13 +92,31 @@ reasoning, decisions, pitfalls, and migration order: the design doc in `spec_ref
   pending_review → complete). A proposed spec is reviewable.
 - **AC4 — automated, idempotent promotion.** The watcher, at convergence, stamps `ready_content_sha`
   on the current `proposed/` file and moves it to `ready/` (terminal commit + push-with-retry).
-  `promote.py` makes the move idempotent + crash-recoverable: a crash after `combined.md` but before
-  promotion is recovered on the next tick (recompute from review artifacts); re-run is a no-op; it
-  also performs the `ready→proposed` bounce on sha mismatch.
+  `promote.py` makes the move idempotent + crash-recoverable: a crash after the terminal disposition
+  but before promotion is recovered on the next tick; re-run is a no-op; it also performs the
+  `ready→proposed` bounce on sha mismatch.
+  - **TERMINAL-PROMOTABLE predicate (r1 codex/codex-ops HIGH).** `combine.py` writes `combined.md`
+    *before* the strategist dispositions, so `combined.md` existence is NOT a terminal signal.
+    Promotion recovery fires ONLY when ALL hold: (a) no unresolved `_strategist fills_` disposition
+    rows in `combined.md`; (b) `escalated_to_founder: false`; (c) `next_round: null` (a dispatch
+    branch sets `next_round: N+1` → not terminal); (d) a terminal convergence marker is present (the
+    "Convergence call" reads `claim-ready after R<N>`); (e) no `r<N+1>/request.md` exists. A
+    merely-combined round (rows unfilled, no marker) must NOT promote, even after an unattended crash.
+    AC8 covers the crash-after-combine-before-disposition negative case.
+  - **Stale-ready bounce owner (r1 codex-ops MED).** `blocked.py` only *reports* a `ready_content_sha`
+    mismatch (it fails closed, excluding the item from candidates — J3 report-only). The concrete
+    *scheduled* owner of the repair is a **watcher pre-step**: each tick scans `ready/` for mismatches
+    and calls `promote.py`'s bounce (`ready→proposed`), writing an operator-visible `queue-errors.md`
+    entry when it fires or fails. This closes the "fail-closed item silently stuck in ready/ until
+    manual discovery" hole — the exact hidden-non-claimable state this spec removes.
 - **AC5 — generated `BACKLOG.md`.** `tools/backlog_index.py` renders `docs/BACKLOG.md` (Proposed +
-  Ready + downstream tables) from folder state + the blocked.py status derivation, with a `--check`
-  mode for drift. `docs/BACKLOG.md` is no longer hand-edited (builder ships the generator, not a
-  hand-edit of the file).
+  Ready + downstream tables) from folder state + the blocked.py status derivation. `docs/BACKLOG.md`
+  is no longer hand-edited. **Ownership (r1 codex MED):** the builder ships the GENERATOR ONLY and
+  never writes the tracked `docs/BACKLOG.md` — that file stays off `files_to_modify` and remains a
+  forbidden builder write (like `wiki/index.md`). `--check` is **fixture-only**: it asserts the
+  generator's output against test fixtures, NOT the live tracked `docs/BACKLOG.md`, so the merge gate
+  never fails on a not-yet-regenerated live file. The live `docs/BACKLOG.md` is regenerated as the
+  strategist/post-merge step (After Completion), mirroring the `wiki/index.md` regen.
 - **AC6 — never-half-broken migration.** Land in this order: (1) add `proposed/` + docs; (2)
   blocked.py loads proposed for validation, candidates still ready; (3) **transitional dual-read** —
   086's field gate still works for existing ready/ items while `ready_content_sha` is introduced; (4)
@@ -109,10 +128,12 @@ reasoning, decisions, pitfalls, and migration order: the design doc in `spec_ref
   process-backlog(+batch), merge-and-cleanup, review-queue-watch reflect the new stages + contract;
   `.claude/` adapters regenerated via `tools/sync-skills.sh` (`--check` green). Forbidden-files list
   notes BACKLOG.md is generated.
-- **AC8 — tests green.** blocked.py (stage model, ready_content_sha match/mismatch, blocked_by
-  proposed-vs-complete, candidates-only-ready, dual-read window), promote.py (idempotency + recovery
-  + bounce), request.py (proposed-first resolution), backlog_index (render + --check). Full
-  `npm test` + lint + typecheck + `tools/sync-skills.sh --check` + `python3` test runner green.
+- **AC8 — tests green.** `tools/test_blocked.py` (the SHIPPED 086 harness, reworked — r1 codex MED):
+  stage model, ready_content_sha match/mismatch, blocked_by proposed-vs-complete, candidates-only-ready,
+  dual-read window; `python3 tools/test_blocked.py` must pass. promote.py (idempotency + recovery +
+  bounce; the crash-after-combine-before-disposition NEGATIVE case must NOT promote), request.py
+  (proposed-first resolution), backlog_index (render + fixture-only --check). Full `npm test` + lint +
+  typecheck + `tools/sync-skills.sh --check` + `python3` test runner green.
 - **AC9 — no scope drift.** Only stage TOPOLOGY + the claim/promotion mechanism change. Spec-review
   CONTENT (rounds, reviewers, convergence computation) is unchanged. `docs/BACKLOG.md` is not
   hand-edited; `wiki/**` untouched (post-shipment). The demoted `_followups.md` root-cause fixes
