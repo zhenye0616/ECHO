@@ -9,6 +9,8 @@ blocked_by:
   - 2026-06-02-087-reviewer-invocation-argv-contract
 task_state_ref: 2026-06-02-087b-reviewer-child-readonly-migration
 requested_reviewers: ["codex", "codex-ops"]
+spec_review: converged
+spec_review_sha: 7e4f9e0f3941d761d32f52debcd688b59cfd50a6922aa9e9a4feb62222484e46
 files_to_modify:
   - tools/review-queue/reviewer-bindings.json                       # AC3 — flip codex + codex-ops `agent_sandbox: danger-full-access` → `read-only` and `commit_policy: child` → `wrapper`. (087 created these fields as descriptive; 087b makes them enforced reality.)
   - tools/review-queue/_run_reviewer.sh                             # AC1+AC2 — the wrapper, NOT the child, writes+commits+pushes the canonical `<reviewer>.md`. The child runs at the binding's `agent_sandbox` (now read-only), produces its review CONTENT via the capture mechanism (per 087's `capture.kind`), and the wrapper validates + writes the file + commits via push-with-retry. The child no longer self-commits.
