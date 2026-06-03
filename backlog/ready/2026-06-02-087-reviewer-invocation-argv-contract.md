@@ -8,6 +8,8 @@ created: 2026-06-02
 blocked_by: []
 task_state_ref: 2026-06-02-087-reviewer-invocation-argv-contract
 requested_reviewers: ["codex", "codex-ops"]
+spec_review: converged
+spec_review_sha: 933530df643208c4fa558a7497eaae59155714880847f1af0155850709b78cf6
 files_to_modify:
   - tools/review-queue/reviewer-bindings.json                       # AC1 — NEW canonical argv-based binding file (kind: reviewer), one entry per current reviewer (codex, codex-ops, cursor, claude); reconciles today's reviewers.json + the reviewer-relevant coord-roles.json invocation argv. Each entry: reviewer, mode (headless-cli|host-subagent|ide-manual), argv[], stdin_from, cwd, agent_sandbox, commit_policy, timeout_sec, capture.kind + capture paths, expected_artifact. **CRITICAL (resolves 085's AC3 contradiction): agent_sandbox + commit_policy record CURRENT reality — codex/codex-ops `agent_sandbox: danger-full-access`, `commit_policy: child` (the child self-commits today). These are descriptive forward-stable fields, NOT enforced behavior. Do NOT set read-only and do NOT move the commit. The flip is 087b.**
   - tools/review-queue/schemas/reviewer-bindings.schema.json        # AC1 — NEW schema for reviewer-bindings.json: argv array (NOT shell string), mode enum, capture.kind enum, agent_sandbox enum (values include read-only|workspace-write|danger-full-access; NO default-to-read-only — the field is descriptive), commit_policy enum (child|wrapper), expected_artifact shape. Mirrors coord-roles.schema.json's argv discipline (057a r4 codex F2 HIGH — argv not shell string, injection defense).
