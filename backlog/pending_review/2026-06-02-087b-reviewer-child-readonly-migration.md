@@ -1,7 +1,7 @@
 ---
 id: 2026-06-02-087b-reviewer-child-readonly-migration
 title: "Reviewer-child read-only migration — move `<reviewer>.md` write+commit from inside the AI child to the wrapper/orchestrator, then flip codex/codex-ops `agent_sandbox` → read-only (the R1 fabrication-surface fix; consumes 087's binding fields)"
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-06-02
@@ -39,15 +39,26 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-03T22:34:50Z"
 branch: "agent/reviewer-child-readonly-migration"
 worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-child-readonly-migration"
-head_sha: ""
+head_sha: "05a7ef3ad712f3456bb3294362c25db62ea52068"
 pr_url: ""
 agent_notes: |
-  Escalation resolved 2026-06-03 (founder-authorized). The prior claim produced NO implementation
-  (empty branch, claim commit only) — the builder correctly STOPPED because AC3/AC5 require editing
-  tests/review-queue/reviewer-bindings.test.ts (087-created, asserts the old danger-full-access /
-  commit_policy:child), which was absent from files_to_modify. That file is now authorized (see its
-  AC5 entry). Item returned to ready/ for a fresh claim. Full escalation record: "## Escalation
-  history (resolved 2026-06-03)" below.
+  Implemented on branch `agent/reviewer-child-readonly-migration` at
+  `05a7ef3ad712f3456bb3294362c25db62ea52068`: codex/codex-ops reviewer
+  bindings now run read-only with `stdout_json` capture and wrapper-owned
+  publication; `_run_reviewer.sh` owns request selection, packet prep, final
+  assistant-message extraction, schema validation, canonical sidecar commit,
+  terminal capture-failure marker/queue-error publication, coord lifecycle, and
+  post-response journal append. Updated codex/codex-ops prompts to content-only,
+  regenerated adapters, refreshed docs, and added focused readonly regression
+  coverage. Also updated the stale `tests/review-queue/056-claude-reviewer-onboarding.test.ts`
+  argv snapshot after explicit founder authorization during this run. Verification:
+  focused reviewer tests, lint, typecheck, sync-skills, shell syntax, prettier,
+  and diff hygiene passed. Full default `npm test` did not finish green because
+  `tests/mcp/recent-calls-endpoint.test.ts` times out only under full-suite
+  parallel load; that test passed when rerun focused. A retry with a CLI timeout
+  flag still used the test's 15s timeout and additionally showed a load-sensitive
+  daemon health failure in `tests/cli/shell-reachable.test.ts`, which had passed
+  in the default full-suite runs.
 review_notes: ""
 ---
 

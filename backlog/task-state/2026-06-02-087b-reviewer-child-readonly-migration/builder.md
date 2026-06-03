@@ -2,19 +2,19 @@
 task_id: 2026-06-02-087b-reviewer-child-readonly-migration
 role: builder
 binding: codex
-last_updated: 2026-06-03T22:34:50Z
+last_updated: 2026-06-03T23:24:02Z
 branch: agent/reviewer-child-readonly-migration
 claim_sha: ""
-handoff_branch: ""
-handoff_head_sha: ""
-handoff_run_log: ""
+handoff_branch: agent/reviewer-child-readonly-migration
+handoff_head_sha: 05a7ef3ad712f3456bb3294362c25db62ea52068
+handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md
 ---
 
 ## current_thesis
 Reclaimed by Codex builder on `agent/reviewer-child-readonly-migration` after the founder-authorized allow-list fix for `tests/review-queue/reviewer-bindings.test.ts`. Implement only the reviewer-child read-only migration: move codex/codex-ops reviewer artifact publication, coord lifecycle, selection, git sync, and capture parsing into the wrapper; make the child content-only and read-only.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: IN_PROGRESS — claimed at 2026-06-03T22:34:50Z; implementation pending in `agent/reviewer-child-readonly-migration`.
+- Lifecycle: COMPLETE — ready for review at 05a7ef3ad712f3456bb3294362c25db62ea52068.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -38,5 +38,5 @@ Reclaimed by Codex builder on `agent/reviewer-child-readonly-migration` after th
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-02-087b-reviewer-child-readonly-migration.md
+- spec: backlog/pending_review/2026-06-02-087b-reviewer-child-readonly-migration.md
 - reviews: backlog/reviews/2026-06-02-087b-reviewer-child-readonly-migration/
