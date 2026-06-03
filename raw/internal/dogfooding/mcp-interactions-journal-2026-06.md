@@ -838,3 +838,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `mcp__echo.echo_ping` against the local ECHO MCP server; no capture-source atoms were read or returned.
 - **Verdict:** right - the MCP surface is reachable from this Codex session.
 - **Note:** Proceeding with the builder claim flow after the smoke test. No context retrieval was needed yet beyond the mandatory repo files.
+
+### 2026-06-03 15:39 PDT — strategist monitors the codex builder (087b) for friction/failure-retry
+- **Trigger:** founder asked Claude (strategist/watcher) to monitor the live Codex builder run on 087b, paying extra attention to friction points and failure/retry.
+- **Query inputs:** `wait_for_new_turns({sources:["codex"], since:"2026-06-03T22:34:50Z", timeout:60, repo_path:"/Users/zhenye/Desktop/Project_echo"})`; then retry `wait_for_new_turns({sources:["codex"], since:"2026-06-03T22:34:50Z", timeout:25})` (no repo_path).
+- **Returned:** call #1 → **transport ERROR ("operation timed out")** before the server's 60s hold elapsed — the client MCP transport limit is < 60s. call #2 (timeout=25) → normal empty shape `{turn_ids:[], timed_out:true, next_since:"2026-06-03T22:39:30.637Z"}`.
+- **Sources:** `mcp__echo.wait_for_new_turns` against local daemon; codex source, no atoms returned (no builder turns captured since claim 22:34:50Z → 22:39:30Z). Builder worktree exists + clean tree (verified via git, not MCP): builder is in read-spec_refs phase, no code/commits yet.
+- **Verdict:** 🟡 partial — the wait primitive works at ≤25s but the builder's long read/plan turn hasn't flushed to capture, so live-turn monitoring is blind until the first codex turn completes; git-polling the worktree is the better progress signal meanwhile.
+- **Note:** **Friction:** `wait_for_new_turns(timeout=60)` exceeds the MCP client transport timeout and surfaces as an error rather than the documented empty-return — a monitoring footgun. Keep timeout ≤ ~25–30s. (The tool's own max is 60, but the client can't hold that long here.)
+- **Conjecture:** (obs only) either clamp the advertised max to the client transport budget, or have the wrapper chunk a long wait into ≤25s server holds — so callers don't have to know the transport limit.
