@@ -829,3 +829,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `backlog/reviews/2026-06-03-088-proposed-stage-pipeline/r7/request.md`; pinned spec at `b87e6f6`; response file `backlog/reviews/2026-06-03-088-proposed-stage-pipeline/r7/codex.md`; artifact anchors `backlog/ready/2026-06-03-088-proposed-stage-pipeline.md:17,159-164,192-198`; `tools/review-queue/dispatch-next-round.py`; `tests/review-queue/watcher-state.test.ts`; `tools/review-queue/test-dispatch-next-round.sh`; `CLAUDE.md:157-191`.
 - **Verdict:** right - the r7 patch closes the deterministic-dispatch and test-home gaps from the code-grounded lens; no remaining implementability finding.
 - **Note:** This tick ran in the live repo after a clean `git pull --rebase origin main`; no detached wrapper worktree was involved. The response commit and first journal commit pushed before terminal `tick_end`; this correction records the terminal coord call. A first response-body write expanded shell backticks in prose, but the file was inspected and repaired before validation/commit; the pre-link YAML gate and canonical commit helper succeeded. A direct `python3 tools/review-queue/validate.py reviewer ...` probe hit the known macOS Python architecture mismatch for `jsonschema`/`rpds`, but the queue wrappers used the Apple Silicon fallback. The checked-in reviewer prompt still references the old unsharded journal plus committed HTML twin, but current `CLAUDE.md` makes this June Markdown shard canonical and says not to commit regenerated HTML twins.
+
+### 2026-06-03 15:33 PDT - codex builder preflight MCP smoke test
+
+- **Trigger:** Codex builder invocation for `$ECHO:process-backlog` checked whether the ECHO MCP surface was available before claiming a backlog item.
+- **Query inputs:** `echo_ping(message="codex process-backlog preflight 2026-06-03")`.
+- **Returned:** Connectivity response only: `pong=true`, daemon timestamp `2026-06-03T22:32:57.955Z`, received message echoed back. No clusters, atoms, or rank reasons returned because this was a health check.
+- **Sources:** `mcp__echo.echo_ping` against the local ECHO MCP server; no capture-source atoms were read or returned.
+- **Verdict:** right - the MCP surface is reachable from this Codex session.
+- **Note:** Proceeding with the builder claim flow after the smoke test. No context retrieval was needed yet beyond the mandatory repo files.
