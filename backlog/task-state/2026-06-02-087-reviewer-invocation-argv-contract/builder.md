@@ -1,14 +1,21 @@
 ---
 role: builder
 task_id: 2026-06-02-087-reviewer-invocation-argv-contract
-last_updated: 2026-06-03T04:21:01Z
+last_updated: 2026-06-03T04:53:33Z
 lifecycle: claimed
 branch: agent/reviewer-invocation-argv-contract
 claim_commit: 181eec8d
+handoff_branch: agent/reviewer-invocation-argv-contract
+handoff_head_sha: 5083f9d5cee2621170881b62ccba542dccf54432
+handoff_run_log: raw/internal/agent-runs/2026-06-02-2026-06-02-087-reviewer-invocation-argv-contract.md
 ---
 
 ## current_thesis
 Claimed 087 for implementation. The build is the narrow argv-invocation contract only: add reviewer-bindings.json + schema, route reviewer wrapper/installer/gate runtime invocation through argv + stdin_from, document current behavior, and prove behavior preservation with tests.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 5083f9d5cee2621170881b62ccba542dccf54432.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: create tools/review-queue/reviewer-bindings.json and tools/review-queue/schemas/reviewer-bindings.schema.json; include codex, codex-ops, cursor, and claude entries.
@@ -33,5 +40,6 @@ Claimed 087 for implementation. The build is the narrow argv-invocation contract
 - Do not retire or relax reviewers.json invoke_command or its schema; leave legacy data validated but runtime-unused for invocation.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-02-087-reviewer-invocation-argv-contract.md
+
+- spec: backlog/pending_review/2026-06-02-087-reviewer-invocation-argv-contract.md
 - reviews: backlog/reviews/2026-06-02-087-reviewer-invocation-argv-contract/

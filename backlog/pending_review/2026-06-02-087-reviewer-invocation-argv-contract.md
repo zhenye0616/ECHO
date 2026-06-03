@@ -1,7 +1,7 @@
 ---
 id: 2026-06-02-087-reviewer-invocation-argv-contract
 title: "Reviewer-invocation argv contract (narrow) — one argv-based `reviewer-bindings.json` + kill the shell-string `bash -c` path. Behavior-preserving: `agent_sandbox`/`commit_policy` are forward-stable DATA fields recording CURRENT reality, NOT enforced (read-only-child migration = 087b)."
-status: ready
+status: pending_review
 priority: HIGH
 estimate: 1d
 created: 2026-06-02
@@ -36,9 +36,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-03T04:21:01Z"
 branch: "agent/reviewer-invocation-argv-contract"
 worktree: "~/Desktop/Project_echo--reviewer-invocation-argv-contract"
-head_sha: ""
+head_sha: "5083f9d5cee2621170881b62ccba542dccf54432"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the narrow argv-based reviewer invocation contract on branch `agent/reviewer-invocation-argv-contract` at `5083f9d5cee2621170881b62ccba542dccf54432`: added `reviewer-bindings.json` + schema, moved wrapper/installer runtime dispatch to NUL-delimited argv + `stdin_from` without `bash -c`, documented current danger-full-access/child-self-commit behavior, and added binding contract tests. Verification passed: `npm test`, `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check`, `bash -n` for both shell scripts, and `git diff --check`.
 review_notes: ""
 ---
 
