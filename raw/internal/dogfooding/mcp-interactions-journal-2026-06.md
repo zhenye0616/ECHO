@@ -662,3 +662,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `backlog/reviews/2026-06-02-087b-reviewer-child-readonly-migration/r8/request.md`; pinned spec at `f6ae3727`; response file `backlog/reviews/2026-06-02-087b-reviewer-child-readonly-migration/r8/codex-ops.md`; artifact anchors `backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md:64-75`; `CLAUDE.md:157-191`.
 - **Verdict:** right - the r8 scope boundary is operationally acceptable for V1: selector-only terminal-marker consumption prevents re-poll starvation, and native combine/watcher `capture-failed` classification can stay successor work because existing `partial_responses`, durable `queue-errors.md` diagnostics, and explicit terminal-failure `tick_end` still produce a visible, non-looping failure path.
 - **Note:** This tick ran in the live repo after a clean `git pull --rebase origin main`; no detached wrapper worktree was involved. The live checkout had two unrelated untracked files, left untouched. The checked-in reviewer prompt still references the old unsharded journal plus committed HTML twin, but current `CLAUDE.md` makes this June Markdown shard canonical and says not to commit regenerated HTML twins.
+
+### 2026-06-03 10:20 PDT - codex builder preflight for /process-backlog
+
+- **Trigger:** Founder invoked `$ECHO:process-backlog`; before claiming work, Codex verified ECHO MCP exposure and pulled light repo-scoped recent context.
+- **Query inputs:** `echo_ping({message:"codex process-backlog preflight 2026-06-03"})`; `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", format:"skeleton", view:"compact"})`.
+- **Returned:** `echo_ping` returned pong at `2026-06-03T17:20:54.224Z`. `find_clusters` returned 2 clusters after AUTO_EXPAND 4h→24h: c1 `work on Project_echo` with 227 total atoms (atom_ids truncated), rank reasons `[has_open_loop, has_unresolved_open_loop, code_session_anchor]`; c2 `discussion about ECHO` with 56 Codex atoms.
+- **Sources:** c1 source_breakdown={claude_code:67, git:160}; c2 source_breakdown={codex:56}. Cursor absent. Echo ping sourced from daemon connectivity only.
+- **Verdict:** 🟡 partial — MCP is reachable and the repo context shape matches the visible review-queue activity, but c1 is too broad for implementation detail without a narrower follow-up.
+- **Note:** Useful as a pre-claim exposure check. No body hydration was needed because the backlog item and `spec_refs` remain the authoritative builder context.
