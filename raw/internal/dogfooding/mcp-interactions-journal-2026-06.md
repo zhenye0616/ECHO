@@ -509,3 +509,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** 🟡 partial — confirmed no builder *claim* is captured (corroborating the gate-block) but the literal-substring query missed the generic builder-preflight session; the 21:05 PDT codex-self-journaled entry is what actually closes the loop.
 - **Note:** Root cause (independently confirmed via `tools/blocked.py --list-blocked` → `BLOCKED 087: awaiting-spec-review`): the watcher prose loaded at loop start lacked 086 AC1's terminal marker-write, so convergence (r4 `proceed`) shipped WITHOUT `spec_review: converged` + `spec_review_sha` in the spec frontmatter — the 086 claim gate held the builder out. Corrected by writing the marker (digest `933530df…`, commit `76651a4`); 087 now returns as the sole `blocked.py` candidate. Also: the 8 reviewer sessions' start times (20:06/20:11/20:21/20:27/20:35/20:41/20:49/20:54) make the same-vendor codex⇄codex-ops serialization visible — never overlapping.
 - **Conjecture:** (obs only) literal-substring `search_memories` is the wrong instrument for "find the builder session" — a builder preflight rarely contains the item-id literal. `find_clusters` (which the builder itself used) or a `coord:`-prefix scan would have surfaced it directly.
+
+### 2026-06-02 21:19 PDT - codex builder preflight context pull after marker fix
+
+- **Trigger:** Founder re-invoked `$ECHO:process-backlog` after the spec-review marker fix for 087; Codex builder checked ECHO MCP connectivity and recent repo-scoped context before attempting the deterministic claim.
+- **Query inputs:** `echo_ping({message:"codex process-backlog preflight 2"})`; `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-06-02T21:05:00-07:00", format:"skeleton", view:"compact"})`.
+- **Returned:** ping ok at `2026-06-03T04:19:40.700Z`; `find_clusters` returned 2 clusters, no warnings. c1 `ctx_4d433093` label "work on Project_echo", 5 atoms, rank_reason `[code_session_anchor]`; c2 `ctx_bb980e8f`, 1 atom, rank_reason `[code_session_anchor]`.
+- **Sources:** c1 source_breakdown `{claude_code:1, git:4}`; c2 source_breakdown `{codex:1}`. Cursor absent in this short repo-scoped window.
+- **Verdict:** partial - connectivity and short-window activity were right, but the useful claimability signal is still `tools/blocked.py`, not the broad cluster shape.
+- **Note:** The prior 21:08 strategist journal entry is the load-bearing context: 087 should now be claimable because the spec-review marker was written after the previous builder attempt.
