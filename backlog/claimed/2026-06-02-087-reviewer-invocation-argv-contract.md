@@ -32,10 +32,10 @@ spec_refs:
   - src/coord/paths.ts  # resolveReviewerWrapperPath → tools/review-queue/run-<role>-reviewer.sh (5-step gate). The wrapper basename contract is unchanged by 087; only what the wrapper resolves internally (argv vs shell string) changes.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-03T04:21:01Z"
+branch: "agent/reviewer-invocation-argv-contract"
+worktree: "~/Desktop/Project_echo--reviewer-invocation-argv-contract"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
