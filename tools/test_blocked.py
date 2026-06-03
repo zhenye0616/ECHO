@@ -27,6 +27,7 @@ def write_item(
     created: str = "2026-04-30",
     blocked_by: list[str] | None = None,
     extra_frontmatter: str = "",
+    body_extra: str = "",
 ) -> Path:
     """Write a minimal but valid item file under repo/backlog/<stage>/."""
     blocked_by = blocked_by or []
@@ -47,6 +48,7 @@ def write_item(
         f"---\n"
         f"\n"
         f"# body for {item_id}\n"
+        f"{body_extra}"
     )
     f = repo / "backlog" / stage / f"{item_id}.md"
     f.parent.mkdir(parents=True, exist_ok=True)
@@ -81,6 +83,11 @@ class BlockedScriptTests(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.repo, ignore_errors=True)
 
+    def spec_review_sha(self, path: Path) -> str:
+        rc, out, err = run_script(self.repo, "--spec-review-sha", str(path))
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        return out.strip()
+
     # ── Default selection mode ──────────────────────────────────────────────
 
     def test_empty_queue_exits_1(self) -> None:
@@ -90,6 +97,141 @@ class BlockedScriptTests(unittest.TestCase):
 
     def test_single_unblocked_item_is_picked(self) -> None:
         write_item(self.repo, "ready", "2026-04-30-001-foo")
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_empty_requested_reviewers_does_not_gate(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter="requested_reviewers: []\n",
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_absent_requested_reviewers_does_not_gate(self) -> None:
+        write_item(self.repo, "ready", "2026-04-30-001-foo")
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_inline_requested_reviewers_without_review_is_blocked(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo", out)
+        self.assertIn("awaiting-spec-review", out)
+
+    def test_malformed_requested_reviewers_fails_closed(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter='requested_reviewers: "codex,codex-ops"\n',
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertIn("malformed-requested-reviewers", out)
+
+    def test_converged_matching_digest_is_claimable(self) -> None:
+        path = write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+        )
+        digest = self.spec_review_sha(path)
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                'requested_reviewers: ["codex","codex-ops"]\n'
+                "spec_review: converged\n"
+                f"spec_review_sha: {digest}\n"
+            ),
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_marker_only_delta_stays_fresh(self) -> None:
+        path = write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+        )
+        digest = self.spec_review_sha(path)
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                'requested_reviewers: ["codex","codex-ops"]\n'
+                "spec_review: converged\n"
+                f"spec_review_sha: {digest}\n"
+                'agent_notes: "marker-only lifecycle note"\n'
+            ),
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_body_delta_after_convergence_is_stale(self) -> None:
+        path = write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+            body_extra="## Acceptance Criteria\n- original\n",
+        )
+        digest = self.spec_review_sha(path)
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                'requested_reviewers: ["codex","codex-ops"]\n'
+                "spec_review: converged\n"
+                f"spec_review_sha: {digest}\n"
+            ),
+            body_extra="## Acceptance Criteria\n- changed\n",
+        )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertIn("spec-edited-after-review", out)
+
+    def test_waived_spec_review_is_claimable_without_digest(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                'requested_reviewers: ["codex","codex-ops"]\n'
+                "spec_review: waived\n"
+            ),
+        )
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 0)
         self.assertIn("2026-04-30-001-foo.md", out.strip())
@@ -259,6 +401,45 @@ class BlockedScriptTests(unittest.TestCase):
         rc, _, err = run_script(self.repo, "--validate")
         self.assertEqual(rc, 2)
         self.assertIn("priority", err)
+
+    def test_bad_spec_review_value_exits_2(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter="spec_review: done\n",
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("spec_review must be one of", err)
+
+    def test_converged_without_digest_exits_2(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                'requested_reviewers: ["codex","codex-ops"]\n'
+                "spec_review: converged\n"
+            ),
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("spec_review: converged requires a valid spec_review_sha", err)
+
+    def test_malformed_spec_review_sha_exits_2(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            extra_frontmatter=(
+                "spec_review: pending\n"
+                "spec_review_sha: abc123\n"
+            ),
+        )
+        rc, _, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 2)
+        self.assertIn("spec_review_sha must be a 64-character", err)
 
     def test_status_field_is_NOT_validated(self) -> None:
         # status field is informational; folder is truth. Items can have a stale

@@ -98,6 +98,29 @@ tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 
 After the gate-aware disposition pass, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
+#### Terminal spec-review marker for claim gating (paths a and c)
+
+For BOTH terminal paths below, the watcher is the actor that certifies the reviewed spec content for builder claimability. Immediately before the terminal commit, write the convergence marker into the reviewed item's frontmatter and fold that spec edit into the same terminal commit:
+
+1. Resolve `<spec_path>` from the current round's `request.md` `artifact_path` field.
+2. Compute the digest with the selector's shared normalization helper:
+
+   ```bash
+   SPEC_REVIEW_SHA=$(python3 tools/blocked.py --spec-review-sha "<spec_path>")
+   ```
+
+3. Edit `<spec_path>` frontmatter to set:
+
+   ```yaml
+   spec_review: converged
+   spec_review_sha: <SPEC_REVIEW_SHA>
+   ```
+
+4. Re-run `python3 tools/blocked.py --spec-review-sha "<spec_path>"` after the marker write and confirm it prints the SAME digest. This proves the marker fields are excluded from the normalized content and the marker is not self-stale.
+5. Stage `<spec_path>` together with the terminal `combined.md` in the branch-specific `git add` below. Do NOT create a separate marker commit.
+
+Path-specific content rule: in path (a), the digest certifies the reviewed content with no spec changes. In path (c), compute the digest AFTER the mechanical/comment/link patch is applied, so the waived-verification terminal certifies the post-patch content and remains staleness-checked. The watcher never writes `spec_review: waived`; `waived` is founder-only bypass.
+
 #### Disposition discipline — prefer removal over deeper patching when findings target any prior-round patch
 
 Reframe gate: after `combine.py` writes `combined.md` and `escalated_to_founder: false` is confirmed, but before any `Disposition` column is filled, classify actionable findings in the convergent and divergent tables using the same "prior-patch-introduced" primitive defined below: a finding targets a prior-round patch when its `where:` lines fall inside any prior-round `spec-r*-patches` commit for this item, or reviewers converge on bugs in a mechanism that did not exist before that round. The lookback window is any patch commit between the spec's first-ready commit and this round's `spec_commit_sha`, excluding this round's commits. This broader rule still does not fire for findings targeting original spec text or original load-bearing mechanisms; only patch-introduced mechanisms count. Exclude missing-reviewer placeholder rows and pure non-actionable deferrals.
@@ -178,7 +201,7 @@ Verdict was `proceed` with no actionable findings, OR a `pushback` where all fin
 tools/review-queue/dispatch-next-round.py <item_id> <N> \
   --verdict={proceed,pushback} --patches-applied=false \
   --class=<request.class> --focus-hints=""
-git add backlog/reviews/<item_id>/r<N>/combined.md
+git add <spec_path> backlog/reviews/<item_id>/r<N>/combined.md
 git commit -m "review-r<N>: terminal on <item_id>"
 tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
 ```
@@ -274,7 +297,7 @@ Strategist's-call when patches are mechanical (typo fixes, comment-only changes,
 tools/review-queue/dispatch-next-round.py <item_id> <N> \
   --verdict=proceed_after_patches --patches-applied=false \
   --class=<request.class> --focus-hints="<one-line rationale for waiving verification>"
-git add backlog/reviews/<item_id>/r<N>/combined.md
+git add <spec_path> backlog/reviews/<item_id>/r<N>/combined.md
 git commit -m "review-r<N>: terminal on <item_id>"
 tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
 ```
