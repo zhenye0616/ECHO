@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://echo.local/review-queue/reviewer-bindings.schema.json",
+  "title": "review-queue reviewer-bindings.json config",
+  "description": "Canonical reviewer invocation bindings. Headless reviewers use argv vectors plus stdin_from prompt routing; ide-manual reviewers are present for roster completeness but have no argv.",
+  "type": "object",
+  "required": ["kind", "bindings"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "reviewer" },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "reviewer",
+          "mode",
+          "agent_sandbox",
+          "commit_policy",
+          "timeout_sec",
+          "capture",
+          "expected_artifact"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "reviewer": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["headless-cli", "host-subagent", "ide-manual"]
+          },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Argv vector, not a shell string. Templated values such as {{WT}} are substituted as full argv elements."
+          },
+          "stdin_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Prompt file path redirected onto stdin. Relative paths resolve under WT."
+          },
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "agent_sandbox": {
+            "type": "string",
+            "enum": ["read-only", "workspace-write", "danger-full-access"],
+            "description": "Descriptive current sandbox value; not enforced by 087."
+          },
+          "commit_policy": {
+            "type": "string",
+            "enum": ["child", "wrapper"],
+            "description": "Descriptive current commit ownership; not enforced by 087."
+          },
+          "timeout_sec": {
+            "anyOf": [{ "type": "integer", "exclusiveMinimum": 0 }, { "type": "null" }]
+          },
+          "capture": {
+            "type": "object",
+            "required": ["kind", "final_message_path", "stdout_path", "stderr_path", "rc_path"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["committed_file", "stdout_json", "stdout_text", "stderr_text", "none"]
+              },
+              "final_message_path": { "type": "string", "minLength": 1 },
+              "stdout_path": { "type": "string", "minLength": 1 },
+              "stderr_path": { "type": "string", "minLength": 1 },
+              "rc_path": { "type": "string", "minLength": 1 }
+            }
+          },
+          "expected_artifact": {
+            "type": "object",
+            "required": ["path", "schema_ref"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "schema_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": { "enum": ["headless-cli", "host-subagent"] }
+              },
+              "required": ["mode"]
+            },
+            "then": {
+              "required": ["argv", "stdin_from", "cwd"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": { "const": "ide-manual" }
+              },
+              "required": ["mode"]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  { "required": ["argv"] },
+                  { "required": ["stdin_from"] },
+                  { "required": ["cwd"] }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

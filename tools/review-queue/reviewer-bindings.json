@@ -1,0 +1,87 @@
+{
+  "$schema": "./schemas/reviewer-bindings.schema.json",
+  "kind": "reviewer",
+  "bindings": [
+    {
+      "reviewer": "codex",
+      "mode": "headless-cli",
+      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-"],
+      "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
+      "cwd": "{{WT}}",
+      "agent_sandbox": "danger-full-access",
+      "commit_policy": "child",
+      "timeout_sec": null,
+      "capture": {
+        "kind": "committed_file",
+        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
+        "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
+        "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
+      },
+      "expected_artifact": {
+        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
+      }
+    },
+    {
+      "reviewer": "cursor",
+      "mode": "ide-manual",
+      "agent_sandbox": "workspace-write",
+      "commit_policy": "child",
+      "timeout_sec": 7200,
+      "capture": {
+        "kind": "committed_file",
+        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
+        "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
+        "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
+      },
+      "expected_artifact": {
+        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
+      }
+    },
+    {
+      "reviewer": "codex-ops",
+      "mode": "headless-cli",
+      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-"],
+      "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
+      "cwd": "{{WT}}",
+      "agent_sandbox": "danger-full-access",
+      "commit_policy": "child",
+      "timeout_sec": null,
+      "capture": {
+        "kind": "committed_file",
+        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
+        "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
+        "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
+      },
+      "expected_artifact": {
+        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
+      }
+    },
+    {
+      "reviewer": "claude",
+      "mode": "headless-cli",
+      "argv": ["claude", "--dangerously-skip-permissions", "-p"],
+      "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
+      "cwd": "{{WT}}",
+      "agent_sandbox": "danger-full-access",
+      "commit_policy": "child",
+      "timeout_sec": null,
+      "capture": {
+        "kind": "committed_file",
+        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
+        "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
+        "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
+      },
+      "expected_artifact": {
+        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
+      }
+    }
+  ]
+}

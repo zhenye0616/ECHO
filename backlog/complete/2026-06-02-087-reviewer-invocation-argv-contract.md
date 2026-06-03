@@ -40,7 +40,46 @@ head_sha: "5083f9d5cee2621170881b62ccba542dccf54432"
 pr_url: ""
 agent_notes: |
   Implemented the narrow argv-based reviewer invocation contract on branch `agent/reviewer-invocation-argv-contract` at `5083f9d5cee2621170881b62ccba542dccf54432`: added `reviewer-bindings.json` + schema, moved wrapper/installer runtime dispatch to NUL-delimited argv + `stdin_from` without `bash -c`, documented current danger-full-access/child-self-commit behavior, and added binding contract tests. Verification passed: `npm test`, `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check`, `bash -n` for both shell scripts, and `git diff --check`.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-03 via founder reconciliation (merge-and-cleanup).
+
+  Conflicts resolved:
+  - None. Clean no-ff merge of agent/reviewer-invocation-argv-contract @ 5083f9d5
+    onto origin/main; 9 files changed (all in-scope code/config), zero backlog/
+    collisions — matched the sidecar's "no conflicts expected" prediction.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts to adjudicate).
+
+  Fixups applied:
+  - None (sidecar Pre-merge fixups = None).
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 1513/1513 tests pass (21 skipped); lint, typecheck, coupled-invariants,
+  and sync-skills --check all clean post-merge. Test count matches sidecar exactly.
+
+  Sidecar provenance correction (process note):
+  - The review sidecar was committed (d83869f2) WITHOUT the schema-required
+    `producer` field, blocking merge-and-cleanup validation. Backfilled during
+    this merge. Root-cause investigation (ECHO session trace, atom bb7c93b4 /
+    codex session 019e8bd8, git_state.head_sha == d83869f2) proved the sidecar
+    was produced by a CODEX CLI /review-pending session, so the truthful producer
+    value is `codex-child` (NOT `claude-code-subagent`, which an earlier blind
+    backfill in commit 4820e325 wrote and this merge corrects to codex-child).
+  - Underlying defect: `producer` was added to canonical skills/ + schema in
+    05cce802 (May 28) but the Codex skill adapter (~/.codex/skills/
+    ECHO:review-pending/SKILL.md, rendered May 17) is installed by
+    tools/install-echo-codex-skills.sh, which is NOT under the sync-skills.sh
+    --check drift gate — so the producer template never reached Codex, and the
+    field is emitted only by hand-copied prose, never programmatically.
+
+  Follow-up items (non-blocking):
+  - Migrate old 056 fixture overrides to ECHO_REVIEWER_BINDINGS_CONFIG, then
+    remove the legacy `--print invoke_command` compatibility path (from sidecar).
+  - Bring the Codex skill adapter under the sync-skills --check gate (or emit
+    `producer` programmatically + add a pre-commit validate-sidecar.py gate) so a
+    non-conformant sidecar can't be committed again (see backlog/_followups.md).
 ---
 
 # 087 — Reviewer-invocation argv contract (the buildable narrow half of 085)

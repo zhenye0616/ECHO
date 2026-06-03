@@ -14,7 +14,8 @@
 //   4. Spawns the wrapper as a fire-and-forget detached child with
 //      `shell: false`, `stdio: 'ignore'`, `cwd: REPO_ROOT`, and three
 //      env vars: ECHO_REVIEW_QUEUE_REPO_ROOT (per 050 worktree-isolation),
-//      ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID.
+//      ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID. The wrapper
+//      resolves the vendor child argv from reviewer-bindings.json.
 //   5. Installs a `child.on('error', ...)` listener BEFORE `child.unref()`
 //      so an async spawn failure (EMFILE, EAGAIN, bad shebang, wrapper
 //      removed between stat and exec) does not crash the daemon
@@ -50,7 +51,7 @@ const UUID4_RE =
 const REQUEST_PATH_RE = /^backlog\/reviews\/[a-z0-9-]+\/r[0-9]+\/request\.md$/;
 
 export const COORD_INVOKE_DESCRIPTION =
-  'INTERNAL: strategist-side active-trigger seam. Spawns the reviewer wrapper for `role` to review the request file at `request_path`, after synchronously appending `coord:reviewer_invoked` so the daemon-side deadline tracker opens the pre-spawn deadline BEFORE the child can emit `tick_start`. Inputs: `role` (canonical reviewer slug — lowercase, `[a-z][a-z0-9-]*`, must be present in coord-roles.json with headless:true); `request_path` (must match `backlog/reviews/<slug>/r<N>/request.md`); `correlation_id` (canonical uuid4 — version-4 nibble + variant byte enforced). The wrapper is spawned fire-and-forget (detached, stdio ignored, cwd=REPO_ROOT) with env vars ECHO_REVIEW_QUEUE_REPO_ROOT, ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID — the wrapper reads these to bind to the exact request rather than scan-picking. Async spawn failures (EMFILE, missing executable, bad shebang) are logged structured and DO NOT crash the daemon; the pre-spawn deadline still fires `coord:deadline_missed` naturally if the child never emits `tick_start`.';
+  'INTERNAL: strategist-side active-trigger seam. Spawns the reviewer wrapper for `role` to review the request file at `request_path`, after synchronously appending `coord:reviewer_invoked` so the daemon-side deadline tracker opens the pre-spawn deadline BEFORE the child can emit `tick_start`. Inputs: `role` (canonical reviewer slug — lowercase, `[a-z][a-z0-9-]*`, must be present in coord-roles.json with headless:true); `request_path` (must match `backlog/reviews/<slug>/r<N>/request.md`); `correlation_id` (canonical uuid4 — version-4 nibble + variant byte enforced). The wrapper is spawned fire-and-forget (detached, stdio ignored, cwd=REPO_ROOT) with env vars ECHO_REVIEW_QUEUE_REPO_ROOT, ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID — the wrapper reads these to bind to the exact request rather than scan-picking, then resolves the vendor child argv from tools/review-queue/reviewer-bindings.json. Async spawn failures (EMFILE, missing executable, bad shebang) are logged structured and DO NOT crash the daemon; the pre-spawn deadline still fires `coord:deadline_missed` naturally if the child never emits `tick_start`.';
 
 export interface CoordInvokeResult {
   schema_version: 1;

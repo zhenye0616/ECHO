@@ -5,16 +5,17 @@
 # per-reviewer wrapper script. Idempotent: re-running overwrites the plist
 # + re-bootstraps.
 #
-# Validates that <slug> exists in reviewers.json with mode:headless before
-# writing anything; refuses to install for IDE-mode reviewers (those have no
-# launchd presence — they run inside the IDE on user invocation).
+# Validates that <slug> exists in reviewers.json with mode:headless and has a
+# reviewer-bindings.json argv binding before writing anything; refuses to
+# install for IDE-mode reviewers (those have no launchd presence — they run
+# inside the IDE on user invocation).
 #
 # 056 AC7b — install-context fail-closed preflight. The installer ALWAYS
 # treats itself as install-context: BEFORE writing the plist or invoking
-# launchctl, parse the reviewer's `invoke_command` template, extract the
-# first token (the executable name — `codex`, `claude`, etc.), and run
-# `command -v <exe>`. If the executable is not on PATH, exit non-zero with
-# a clear diagnostic and DO NOT write the plist. This prevents the scenario
+# launchctl, resolve the reviewer's argv from reviewer-bindings.json, read
+# argv[0] (the executable name — `codex`, `claude`, etc.), and run
+# `command -v <exe>`. If the executable is not on PATH, exit non-zero with a
+# clear diagnostic and DO NOT write the plist. This prevents the scenario
 # where a misconfigured CLI install leaves `com.echo.review-queue-<slug>`
 # firing every 10 minutes with `command-not-found` (which burns the silent
 # launchd-fail surface).
@@ -74,32 +75,44 @@ if [ ! -x "$WRAPPER" ]; then
   exit 1
 fi
 
-# 056 AC7b — install-context preflight. Resolve the invoke_command template
-# from reviewers.json, extract the first token (executable name), and gate
-# on `command -v`. Refuse to write the plist if the CLI is not installed.
-# We do NOT need real $WT / $PROMPT values here — we only want the resolved
-# template's first whitespace-delimited token. The gate-script
-# substitution is shell-safe; placeholder values flow through shlex.quote
-# unchanged, and we only look at argv[0].
+# 056 AC7b / 087 — install-context preflight. Resolve the argv vector from
+# reviewer-bindings.json, read argv[0] (executable name), and gate on
+# `command -v`. Refuse to write the plist if the CLI is not installed. We do
+# NOT need a real $WT here — the placeholder preflight path is only used to
+# complete deterministic binding substitution before reading argv[0].
+argv_file="$(mktemp "${TMPDIR:-/tmp}/echo-rq-install-argv.XXXXXX")"
+argv_err_file="$(mktemp "${TMPDIR:-/tmp}/echo-rq-install-argv-err.XXXXXX")"
 set +e
-INVOKE_RESOLVED=$(
-  REVIEWER_NAME="$REVIEWER" \
-  WT="/preflight/wt" \
-  PROMPT="/preflight/prompt.md" \
-  python3 "$TOOL_DIR/_reviewer_gate.py" --print invoke_command 2>&1
-)
+REVIEWER_NAME="$REVIEWER" WT="/preflight/wt" \
+  python3 "$TOOL_DIR/_reviewer_gate.py" --print argv_nul > "$argv_file" 2>"$argv_err_file"
 INVOKE_RC=$?
+INVOKE_ERR=$(cat "$argv_err_file" 2>/dev/null || true)
 set -e
-if [ "$INVOKE_RC" -ne 0 ] || [ -z "$INVOKE_RESOLVED" ]; then
-  echo "error: could not resolve invoke_command for $REVIEWER: $INVOKE_RESOLVED" >&2
-  echo "  fix: ensure tools/review-queue/reviewers.json has a valid invoke_command for $REVIEWER" >&2
+if [ "$INVOKE_RC" -ne 0 ] || [ ! -s "$argv_file" ]; then
+  rm -f "$argv_file" "$argv_err_file"
+  echo "error: could not resolve reviewer argv for $REVIEWER: ${INVOKE_ERR:-no diagnostic from gate}" >&2
+  echo "  fix: ensure tools/review-queue/reviewer-bindings.json has a valid argv binding for $REVIEWER" >&2
   exit 1
 fi
-INVOKE_EXE=$(printf '%s\n' "$INVOKE_RESOLVED" | awk '{print $1}')
+INVOKE_ARGV=()
+while IFS= read -r -d '' arg; do
+  INVOKE_ARGV+=("$arg")
+done < "$argv_file"
+rm -f "$argv_file" "$argv_err_file"
+if [ "${#INVOKE_ARGV[@]}" -eq 0 ]; then
+  echo "error: reviewer argv for $REVIEWER resolved to an empty vector" >&2
+  echo "  fix: ensure tools/review-queue/reviewer-bindings.json has a valid argv binding for $REVIEWER" >&2
+  exit 1
+fi
+INVOKE_EXE="${INVOKE_ARGV[0]}"
 if ! command -v "$INVOKE_EXE" >/dev/null 2>&1; then
   echo "error: $INVOKE_EXE not found on PATH; cannot install $LABEL" >&2
-  echo "  Resolved invoke_command: $INVOKE_RESOLVED" >&2
-  echo "  Either install the $INVOKE_EXE CLI first, or edit tools/review-queue/reviewers.json to use a different binding." >&2
+  {
+    printf '  Resolved argv:'
+    printf ' %q' "${INVOKE_ARGV[@]}"
+    printf '\n'
+  } >&2
+  echo "  Either install the $INVOKE_EXE CLI first, or edit tools/review-queue/reviewer-bindings.json to use a different binding." >&2
   exit 1
 fi
 
