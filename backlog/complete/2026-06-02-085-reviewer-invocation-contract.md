@@ -1,7 +1,7 @@
 ---
 id: 2026-06-02-085-reviewer-invocation-contract
-title: "Reviewer-invocation contract (MVP) — one argv-based `reviewer-bindings.json` + agent_sandbox/commit_policy split; kill the shell-string `bash -c` path + the danger-full-access review-child blessing"
-status: pending_review
+title: "[SUPERSEDED by 087 + 087b] Reviewer-invocation contract (MVP) — one argv-based `reviewer-bindings.json` + agent_sandbox/commit_policy split; kill the shell-string `bash -c` path + the danger-full-access review-child blessing"
+status: superseded
 priority: HIGH
 estimate: 1-1.5d
 created: 2026-06-02
@@ -40,7 +40,12 @@ agent_notes: |
   Tried: Read the mandatory builder context plus every spec_ref, including `tools/review-queue/_run_reviewer.sh`, `_reviewer_gate.py`, `reviewers.json`, `coord-roles.json`, `src/mcp/tools/coord-invoke.ts`, `docs/review-queue-setup.md`, `backlog/_followups.md`, and 084's completed item. Confirmed the existing `.claude/commands/review-queue-codex.md` prompt performs the write/commit/push inside the child process, and those prompt files are not in `files_to_modify`.
   Best-guess answer: Either narrow 085 to "data-model + argv exec only, do not enforce read-only until the ownership migration ships" or widen 085 to include the orchestrator-owned capture/sidecar migration plus reviewer-prompt changes; confidence high that the current AC/OoS set cannot satisfy both "child read-only/never commits" and "reviewer self-commit stays AS-IS".
   Why I escalated rather than guessing: Stopping conditions triggered: unresolved spec ambiguity, and satisfying the stronger AC3 interpretation would require files/scope explicitly outside `files_to_modify` and OoS#1.
-review_notes: ""
+review_notes: |
+  SUPERSEDED — zero implementation; not shipped. Closed 2026-06-02 by founder decision (no wiki page; nothing shipped). Root cause: 085 AC3 ("review AI child read-only + NEVER commit") directly contradicted its own Locked-Decision-3 ("reviewer self-commit stays AS-IS") — the child self-commits `<reviewer>.md` via commit-reviewer-response.sh and the ownership migration was OoS. Builder correctly escalated (empty diff). review-pending verdict: block.
+  Re-scoped via the honest-narrow split (strategist eval + read-only Codex consult, both converged; chosen over respec-in-place as less work + less destructive to pipeline/recall legibility — no dependents, empty-diff husk):
+    - 087 (reviewer-invocation-argv-contract) — the buildable argv half: one reviewer-bindings.json + kill the bash -c shell-string path; agent_sandbox/commit_policy are DESCRIPTIVE forward-stable fields recording current reality (NOT enforced). Behavior-preserving.
+    - 087b (reviewer-child-readonly-migration, blocked_by:[087]) — the dropped half: move <reviewer>.md commit to the wrapper, THEN flip codex/codex-ops agent_sandbox→read-only. The R1 fabrication-surface fix.
+  Disposition: complete/ tombstone (annotated, unshipped). The 3-round-consult design provenance is preserved in this file and inherited by 087.
 ---
 
 ## Problem / Why (the friction this closes)

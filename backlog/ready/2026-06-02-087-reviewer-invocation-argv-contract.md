@@ -1,0 +1,101 @@
+---
+id: 2026-06-02-087-reviewer-invocation-argv-contract
+title: "Reviewer-invocation argv contract (narrow) — one argv-based `reviewer-bindings.json` + kill the shell-string `bash -c` path. Behavior-preserving: `agent_sandbox`/`commit_policy` are forward-stable DATA fields recording CURRENT reality, NOT enforced (read-only-child migration = 087b)."
+status: ready
+priority: HIGH
+estimate: 1d
+created: 2026-06-02
+blocked_by: []
+task_state_ref: 2026-06-02-087-reviewer-invocation-argv-contract
+requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  - tools/review-queue/reviewer-bindings.json                       # AC1 — NEW canonical argv-based binding file (kind: reviewer), one entry per current reviewer (codex, codex-ops, cursor, claude); reconciles today's reviewers.json + the reviewer-relevant coord-roles.json invocation argv. Each entry: reviewer, mode (headless-cli|host-subagent|ide-manual), argv[], stdin_from, cwd, agent_sandbox, commit_policy, timeout_sec, capture.kind + capture paths, expected_artifact. **CRITICAL (resolves 085's AC3 contradiction): agent_sandbox + commit_policy record CURRENT reality — codex/codex-ops `agent_sandbox: danger-full-access`, `commit_policy: child` (the child self-commits today). These are descriptive forward-stable fields, NOT enforced behavior. Do NOT set read-only and do NOT move the commit. The flip is 087b.**
+  - tools/review-queue/schemas/reviewer-bindings.schema.json        # AC1 — NEW schema for reviewer-bindings.json: argv array (NOT shell string), mode enum, capture.kind enum, agent_sandbox enum (values include read-only|workspace-write|danger-full-access; NO default-to-read-only — the field is descriptive), commit_policy enum (child|wrapper), expected_artifact shape. Mirrors coord-roles.schema.json's argv discipline (057a r4 codex F2 HIGH — argv not shell string, injection defense).
+  - tools/review-queue/_run_reviewer.sh                             # AC2 — exec the resolved argv array with stdin redirected from stdin_from; REMOVE the `bash -c "$INVOKE_CMD"` shell-string path (line ~168) and the `_reviewer_gate.py --print invoke_command` shlex round-trip (lines ~124-137). The executable-on-PATH preflight (lines ~144-151) reads argv[0] instead of awk-over-a-shell-string. **No sandbox change: pass through whatever agent_sandbox the binding records (today: danger-full-access for codex). Behavior-preserving.**
+  - tools/review-queue/_reviewer_gate.py                            # AC2 — replace `--print invoke_command` (shlex-quoted shell string) with an argv-vector resolver reading reviewer-bindings.json; the gate still validates reviewer-name ∈ roster + headless-mode, still emits durable queue-error diagnostics on miss; it now returns/validates argv + agent_sandbox (as recorded), not a bash string.
+  - src/mcp/tools/coord-invoke.ts                                   # AC2 — reconcile the wrapper-spawn path so there is ONE invocation source of truth. coord_invoke SPAWNS run-<role>-reviewer.sh (it does NOT exec coord-roles.json argv); the wrapper it spawns now resolves the child argv from reviewer-bindings.json. No behavior change to coord_invoke's spawn contract (env handoff, shell:false, fire-and-forget, reviewer_invoked emission) beyond the binding-file being the single source the spawned wrapper reads.
+  - docs/review-queue-setup.md                                      # AC3 — document reviewer-bindings.json as the single invocation source of truth + the argv model. **Describe the CURRENT child sandbox + child self-commit behavior EXPLICITLY and accurately (codex review child runs danger-full-access and self-commits its <reviewer>.md today). Do NOT claim read-only children or writer-owned commit — those are 087b. Add a forward-pointer: "the read-only-child + writer-owned-commit migration is tracked in 087b."**
+  - tests/review-queue/reviewer-bindings.test.* (path per repo convention)  # AC4 — binding-file parse + schema validation; argv-exec (asserts NO `bash -c` shell-string path remains); per-reviewer behavior-preservation vs current reviewers.json resolution (same executable + flags + worktree routing + prompt-stdin + sandbox value); coord_invoke wrapper-spawn reads the same binding file.
+
+spec_refs:
+  - backlog/pending_review/2026-06-02-085-reviewer-invocation-contract.md  # SUPERSEDED-BY-087. The full design + 3-round-consult provenance lives here. 087 = the "honest narrow" half: it KEEPS 085's AC1 (binding file + argv schema) + AC2 (argv exec, one source of truth) + AC5 (tests), and DROPS 085's AC3 (read-only enforcement / sandbox flip / writer-owned commit) which contradicted 085's own Locked-Decision-3 ("reviewer self-commit stays AS-IS"). That contradiction is what blocked 085 at build time (085 agent_notes). 087b carries the dropped half.
+  - tools/review-queue/reviewers.json  # THE shell-string `invoke_command` to replace (codex/codex-ops/claude carry `codex exec ... --sandbox danger-full-access - < {{PROMPT}}` / `claude ... -p < {{PROMPT}}` strings; cursor is mode:ide, no invoke_command). reviewer-bindings.json subsumes the reviewer-relevant parts. The argv MUST be behavior-equivalent to today's resolution (AC4 proves it), INCLUDING the current danger-full-access sandbox value.
+  - tools/review-queue/coord-roles.json  # ALREADY argv arrays (`["codex","exec","-C","{{WT}}","--sandbox","danger-full-access"]`) — the model to converge on. This file ALSO carries per-event SLA deadlines consumed by src/coord/roles.ts at daemon boot; 087 does NOT move the SLA/event config — only the reviewer-INVOCATION argv is unified into reviewer-bindings.json.
+  - tools/review-queue/_run_reviewer.sh  # the `bash -c "$INVOKE_CMD"` execution (line ~168) + the `_reviewer_gate.py --print invoke_command` shlex resolution (lines ~124-137) + the executable-on-PATH preflight (lines ~144-151) are the exact seams 087 replaces with argv-exec.
+  - tools/review-queue/schemas/reviewers-config.schema.json  # the shell-string `invoke_command` schema (mandatory {{PROMPT}}, shlex.quote → bash -c per 056 AC5) being superseded for reviewers; reconcile.
+  - tools/review-queue/schemas/coord-roles.schema.json  # the argv-vector `invoke_command` schema (minItems 1, string items, "argv vector not a shell string") = the precedent reviewer-bindings.schema.json follows.
+  - src/mcp/tools/coord-invoke.ts  # CONFIRMS the wrapper-spawn path: coord_invoke resolves run-<role>-reviewer.sh via resolveReviewerWrapperPath (src/coord/paths.ts) and `spawn(wrapperPath, [], { shell:false, ... })` passing ECHO_REVIEW_QUEUE_REPO_ROOT / ECHO_COORD_REQUEST_PATH / ECHO_COORD_CORRELATION_ID env. It does NOT exec coord-roles.json argv — the spawned wrapper is where the child argv is built, so the binding file is what the wrapper must read.
+  - src/coord/paths.ts  # resolveReviewerWrapperPath → tools/review-queue/run-<role>-reviewer.sh (5-step gate). The wrapper basename contract is unchanged by 087; only what the wrapper resolves internally (argv vs shell string) changes.
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+---
+
+# 087 — Reviewer-invocation argv contract (the buildable narrow half of 085)
+
+## Why this exists (and why it's 087, not 085)
+
+085 (`reviewer-invocation-contract`) tried to do TWO things at once: (1) unify reviewer invocation onto one argv binding file + kill the shell-string `bash -c` path, and (2) flip the review AI child to `read-only` with writer-owned commit. The builder escalated 085 because its **AC3 ("child read-only + NEVER commit") directly contradicted its own Locked-Decision-3 ("reviewer self-commit stays AS-IS")** — the reviewer prompts commit `<reviewer>.md` from *inside* the child (`commit-reviewer-response.sh`), and the ownership migration that would resolve it was explicitly out-of-scope. You cannot have the child both read-only and self-committing.
+
+**087 is the honest narrow:** ship the invocation-hygiene half — one argv `reviewer-bindings.json`, kill the shell-string path, one invocation source of truth — and record the sandbox/commit reality as **forward-stable DATA fields without enforcing them.** This is genuinely behavior-preserving (not "behavior-preserving except a sandbox flip"). The read-only-child + writer-owned-commit migration is **087b** (`blocked_by: [087]`), which consumes these fields by flipping their values + moving the commit. R1-class fabrication risk stays visible as 087b, not buried.
+
+085 is superseded by this item (closed as a tombstone in `complete/`, zero implementation).
+
+## What this is — and is NOT
+
+A **reliability + protocol-hygiene fix**: collapse reviewer invocation to ONE argv binding file (vendor differences in DATA, not shell-string templates), kill the injection-prone `bash -c` round-trip, and make the launchd-tick path + the `coord_invoke` wrapper-spawn path read the SAME source. It is **behavior-preserving**: no sandbox flip, no commit-ownership change, the committed boundary stays the canonical `backlog/reviews/<item>/r<N>/<reviewer>.md`. It is NOT a new surface, NOT the read-only migration (087b), NOT a headless-watcher change.
+
+## Locked decisions
+
+1. **One canonical argv binding file, `tools/review-queue/reviewer-bindings.json` (`kind: reviewer`)** subsumes the reviewer-relevant parts of `reviewers.json` + the invocation argv of `coord-roles.json`. The entire shell-string path (reviewers.json strings → `_reviewer_gate.py` shlex → `_run_reviewer.sh` `bash -c`) is replaced by argv execution.
+2. **`agent_sandbox` + `commit_policy` are DESCRIPTIVE, forward-stable fields — NOT enforced behavior in 087.** They record current reality (codex/codex-ops: `agent_sandbox: danger-full-access`, `commit_policy: child`). The schema defines the full enums so 087b can flip the values without a shape change. **This is the exact decision that removes 085's contradiction.**
+3. **Behavior-preserving, full stop.** Each reviewer's resolved argv (incl. the current `--sandbox danger-full-access`) is byte-equivalent to today's resolution. No reviewer's ability to produce its artifact regresses.
+4. **The wrapper-spawn path is reconciled, not rewritten.** `coord_invoke`'s spawn contract is unchanged; only the spawned wrapper's internal argv resolution moves to the binding file → exactly ONE invocation source of truth.
+
+## Judgment calls (flagged for r1 reviewers)
+
+- **J1 — keep coord-roles.json's SLA config in place.** `reviewer-bindings.json` owns INVOCATION (argv, sandbox-as-recorded, capture, expected_artifact); `coord-roles.json` keeps per-event SLA deadlines (consumed by `src/coord/roles.ts` at daemon boot — OoS). Split by concern, not vendor.
+- **J2 — `capture.kind` enum: define all, wire today's only.** Define the enum field in the schema for forward-stability; wire only each reviewer's current capture (codex/codex-ops/claude `committed_file` — the child writes `<reviewer>.md` itself, as today). Implementing a new capture kind is 087b/successor.
+- **J3 — `agent_sandbox` records current value, does NOT default to read-only.** Unlike 085, the schema field is descriptive; codex/codex-ops record `danger-full-access` (today's reality). 087b changes them to `read-only`. claude records its current argv/sandbox; the `056-claude-required-flag-gate` is untouched.
+- **J4 — argv preflight reads argv[0]** (keep the existing executable-on-PATH check, source the name from argv[0] not an awk-split shell string). Per-binding smoke is a successor.
+- **J5 — cursor (mode:ide-manual) entry, no argv.** Mirrors today's reviewers.json omission of invoke_command for mode:ide; the argv-exec path is never taken for cursor.
+
+## Acceptance criteria
+
+- **AC1 — `reviewer-bindings.json` + schema.** A new `tools/review-queue/reviewer-bindings.json` (`kind: reviewer`) carries one entry per current reviewer (`codex`, `codex-ops`, `cursor`, `claude`). Each entry: `reviewer`, `mode` ∈ {`headless-cli`,`host-subagent`,`ide-manual`}, `argv[]` (vector with `{{WT}}`/`{{PROMPT}}` as array elements — NOT a shell string), `stdin_from`, `cwd`, `agent_sandbox` (recorded value, e.g. `danger-full-access` for codex — see J3), `commit_policy` (`child` today — see J2/Locked-2), `timeout_sec`, `capture.kind` (enum) + `capture.{final_message_path,stdout_path,stderr_path,rc_path}`, `expected_artifact` (canonical `backlog/reviews/<item>/r<N>/<reviewer>.md` template + schema ref). A new `tools/review-queue/schemas/reviewer-bindings.schema.json` validates: `argv` is a non-empty string array (minItems 1) for headless modes, MAY be omitted for `ide-manual`; `agent_sandbox` and `commit_policy` are constrained enums (full value sets, no enforced default). Per-reviewer argv MUST be behavior-equivalent to today's resolved invocation (AC4 proves it).
+- **AC2 — argv execution; ONE invocation source of truth.** `_run_reviewer.sh` execs the resolved `argv` array with stdin redirected from `stdin_from`. The `bash -c "$INVOKE_CMD"` execution (line ~168) and the `_reviewer_gate.py --print invoke_command` shlex round-trip (lines ~124-137) are REMOVED. `_reviewer_gate.py` resolves + validates argv (+ the recorded `agent_sandbox`) from `reviewer-bindings.json`, still validates reviewer ∈ roster + headless-mode, still emits durable queue-error diagnostics on miss. The PATH preflight reads `argv[0]` (J4). `coord_invoke`'s spawned wrapper resolves its child argv from the SAME binding file — one invocation source of truth across the launchd-tick path and the `coord_invoke` wrapper-spawn path. `coord_invoke`'s spawn contract is unchanged.
+- **AC3 — docs describe the binding model + CURRENT behavior accurately (no read-only claim).** `docs/review-queue-setup.md` documents `reviewer-bindings.json` as the single invocation source + the argv model, and describes the CURRENT child sandbox (`danger-full-access` for codex) + child self-commit behavior explicitly and truthfully. It MUST NOT claim read-only children or writer-owned commit. It adds a forward-pointer to 087b for the read-only-child + writer-owned-commit migration.
+- **AC4 — tests green (behavior-preservation is the contract).** New/updated tests prove: (i) `reviewer-bindings.json` parses + validates; (ii) the argv-exec path runs the vector with NO `bash -c` shell-string path (assert the removed seam is gone); (iii) per-reviewer behavior-preservation — each binding's resolved argv == today's `reviewers.json` resolution (same executable + flags + worktree routing + prompt-stdin + recorded sandbox value, INCLUDING `danger-full-access` where it is used today); (iv) `coord_invoke`'s wrapper-spawn reads the same binding file. Full `npm test` + typecheck + lint + `tools/sync-skills.sh --check` green; `bash -n tools/review-queue/_run_reviewer.sh` clean.
+- **AC5 — no scope drift.** No file outside `files_to_modify` is touched; the Out-of-Scope list is honored; no sandbox value is changed from today's; no commit is moved off the child; coord-roles.json's SLA config is NOT moved (J1).
+
+## Out of Scope (Don't Drift) — successors
+
+1. **Read-only-child + writer-owned-commit migration = 087b** (`blocked_by: [087]`): flip codex/codex-ops `agent_sandbox` → `read-only`, move `<reviewer>.md` write+commit+push from inside the child to the wrapper/orchestrator (off `commit-reviewer-response.sh`), set `commit_policy: wrapper`, update docs to the read-only model. This is the R1 fabrication-surface fix; it CONSUMES 087's `agent_sandbox`/`commit_policy`/`expected_artifact` fields. HIGH priority, separate item.
+2. `/review-pending` output normalization + orchestrator-owned canonical sidecar — folds into 087b or a sibling.
+3. 5th capture-kind implementation / forcing `claude -p --output-format json` beyond DEFINING the enum (J2).
+4. `NormalizedReviewIntermediate` (internal normalized JSON between capture and the committed markdown).
+5. Evidence-dir byte-cap + redaction.
+6. Schema reviewer-enum-sync codegen across request/reviewer/combined schemas.
+7. Per-binding preflight/smoke + adding `install-claude-reviewer-launchd.sh`.
+8. Headless watcher / strategist — explicitly OUT.
+9. `requested_reviewers` claim-gate (separate review-lifecycle item; note 086 shipped the spec-review convergence gate).
+10. Moving coord-roles.json's per-event SLA config (J1).
+11. The `056-claude-required-flag-gate` decision — OUT (J3).
+
+## After Completion (Strategist Notes)
+
+- **Close 085** if not already closed: it is superseded by 087 (argv half) + 087b (read-only half).
+- **File 087b** (`blocked_by: [087]`, HIGH) for the read-only-child + writer-owned-commit migration if not already filed.
+- Update `backlog/_followups.md`: mark the "SPEC CANDIDATE — codex review-pending fan-out" (~527) as PARTIALLY-LANDED (argv/source-of-truth half ships in 087; sandbox-flip + orchestrator-owned-sidecar = 087b).
+- **Wiki (post-shipment only):** `wiki/surfaces/review-queue.md` "reviewer-binding contract" section — the argv binding file + the single-invocation-source-of-truth rule. Note the sandbox/commit fields are descriptive in 087 and become enforced in 087b. Cross-reference `[[mcp-server]]`. Update `.manifest.json` + regen `wiki/index.md`.
+
+## Provenance
+
+Design + 3-round cross-vendor Codex consult (2026-06-02, R3 "YES, spec it") live in 085. The narrow/split decision is the 2026-06-02 post-build founder + Codex consult: 085's builder escalated on the AC3-vs-Locked-3 contradiction; both the strategist eval and a read-only Codex consult recommended the honest-narrow split (087 argv-only buildable now, 087b read-only migration). Splitting (vs respec-085-in-place) was chosen as less work + less destructive to pipeline/recall legibility (no dependents, empty-diff husk).
