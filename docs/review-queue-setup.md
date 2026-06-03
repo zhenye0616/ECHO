@@ -37,18 +37,20 @@ tools/review-queue/uninstall-codex-reviewer-launchd.sh
 
 The install script shipped in item 041 writes the plist with `StartInterval=600` (10 minutes), `RunAtLoad=false`, and `KeepAlive=false` (one-shot per tick), uses `launchctl bootstrap gui/<uid>` on macOS Sonoma+ and falls back to `launchctl load -w` on older macOS, and routes the launchd stream captures to `/dev/null` (the wrapper writes a unified log to `~/Library/Logs/echo-review-queue-codex.log` with its own timestamped preamble per tick).
 
-The driver (`tools/review-queue/run-codex-reviewer.sh`) delegates to `tools/review-queue/_run_reviewer.sh`, which reads `${ECHO_REVIEW_QUEUE_REPO_ROOT}` (default `~/Desktop/Project_echo`) so launchd-driven ticks operate against the production repo while the smoke test isolates by setting the env var to a tmpdir. Since item 050, the wrapper does **not** run Codex in the founder's live checkout and does not use any sentinel-file lock. Each tick performs `git fetch origin main`, creates a detached ephemeral worktree at `$TMPDIR/echo-codex-<uuid>` pinned to `origin/main`, routes Codex into that worktree via CWD + `ECHO_REVIEW_QUEUE_REPO_ROOT` + prompt path + `codex -C`, and removes the worktree on exit. The live checkout's `.git/index` is not a reviewer write surface.
+The driver (`tools/review-queue/run-codex-reviewer.sh`) delegates to `tools/review-queue/_run_reviewer.sh`, which reads `${ECHO_REVIEW_QUEUE_REPO_ROOT}` (default `~/Desktop/Project_echo`) so launchd-driven ticks operate against the production repo while the smoke test isolates by setting the env var to a tmpdir. Since item 050, the wrapper does **not** run Codex in the founder's live checkout and does not use any sentinel-file lock. Each tick performs `git fetch origin main`, creates a detached ephemeral worktree at `$TMPDIR/echo-codex-<uuid>` pinned to `origin/main`, resolves the reviewer child argv and prompt stdin path from `tools/review-queue/reviewer-bindings.json`, routes Codex into that worktree via CWD + `ECHO_REVIEW_QUEUE_REPO_ROOT` + stdin prompt path + `codex -C`, and removes the worktree on exit. The live checkout's `.git/index` is not a reviewer write surface.
 
-The canonical raw Codex invocation shape is:
+`tools/review-queue/reviewer-bindings.json` is the canonical invocation source for headless reviewer children. The prompt path is not an argv element; the binding's `stdin_from` path is redirected onto the child's stdin. The canonical raw Codex invocation shape is:
 
 ```bash
-codex exec -C ~/Desktop/Project_echo --sandbox danger-full-access - < ~/Desktop/Project_echo/.claude/commands/review-queue-codex.md
+argv=(codex exec -C "$WT" --sandbox danger-full-access -)
+stdin_from="$WT/.claude/commands/review-queue-codex.md"
+"${argv[@]}" < "$stdin_from"
 ```
 
-Inside the launchd wrapper, the same shape is evaluated against the ephemeral worktree (`-C "$WT"` and `< "$WT/.claude/commands/review-queue-codex.md"`), not the live checkout.
+Inside the launchd wrapper, `$WT` is the ephemeral worktree, not the live checkout.
 
 Why these flags:
-- `--sandbox danger-full-access` — the prior `workspace-write` setting denied `.git/FETCH_HEAD` writes on macOS and broke every tick. `danger-full-access` is correct for this background reviewer process; the wrapper creates/removes worktrees, fetches/pushes, and runs the prompt as a single non-interactive tick under launchd.
+- `--sandbox danger-full-access` — this records the current Codex/Codex-Ops child behavior. The child still self-commits its `<reviewer>.md` through `tools/review-queue/commit-reviewer-response.sh`, so the read-only-child + wrapper-owned-commit migration is tracked separately in 087b.
 - `--ask-for-approval` is **not** passed — the flag does not exist on Codex CLI v0.130.0, and the runtime preamble already defaults headless `codex exec` to `never`.
 - `<` redirection rather than `cat | codex exec` — survives shell-paste edge cases the pipe variant does not. See memory note `reference_codex_review_queue_invocation.md`.
 
@@ -112,17 +114,18 @@ After install, verify each recipe by running it once before relying on the queue
 
 If any recipe fails verification, raise as a follow-up; the verified recipes are blocking for any post-merge dogfooding cycle that relies on the queue.
 
-## Adding a 3rd reviewer (043 AC2 + AC3)
+## Adding a 3rd reviewer (043 AC2 + AC3 + 087)
 
-The reviewer roster is sourced from `tools/review-queue/reviewers.json` plus the explicit `reviewer` enums in the JSON schemas. Adding a new reviewer (e.g., a second Codex variant with an architectural-review prompt called `codex-arch`) is **5 file edits + 1 install invocation** for headless reviewers, **5 file edits** for IDE reviewers:
+The reviewer roster is sourced from `tools/review-queue/reviewers.json`; child invocation argv is sourced from `tools/review-queue/reviewer-bindings.json`; the explicit `reviewer` enums in the JSON schemas remain intentionally enumerated. Adding a new reviewer (e.g., a second Codex variant with an architectural-review prompt called `codex-arch`) is **6 file edits + 1 install invocation** for headless reviewers, **6 file edits** for IDE reviewers:
 
 | # | File | Edit |
 |---|---|---|
 | 1 | `tools/review-queue/reviewers.json` | Append one row: `{"name": "X", "mode": "headless"\|"ide", "required": true\|false, "timeout_hours": null\|<positive number>, "slash_command": "review-queue-X"}` |
-| 2 | `tools/review-queue/schemas/request.schema.json` | Append `"X"` to `requested_reviewers.items.enum` |
-| 3 | `tools/review-queue/schemas/reviewer.schema.json` | Append `"X"` to BOTH enums: top-level `reviewer` enum AND `findings[].cross_ref.reviewer` enum |
-| 4 | `tools/review-queue/schemas/combined.schema.json` | Add `"X_response": { "type": ["string", "null"] }` under `properties`. Schema's `additionalProperties: false` is preserved. |
-| 5 | `.claude/commands/review-queue-X.md` | New file; mirror `review-queue-codex.md`'s structure with the reviewer-perspective-specific prompt body. |
+| 2 | `tools/review-queue/reviewer-bindings.json` | Append one invocation binding. Headless reviewers use `mode: "headless-cli"`, an argv array, `stdin_from`, `cwd`, current `agent_sandbox`, current `commit_policy`, and committed-file capture metadata. IDE reviewers use `mode: "ide-manual"` and no argv/stdin/cwd. |
+| 3 | `tools/review-queue/schemas/request.schema.json` | Append `"X"` to `requested_reviewers.items.enum` |
+| 4 | `tools/review-queue/schemas/reviewer.schema.json` | Append `"X"` to BOTH enums: top-level `reviewer` enum AND `findings[].cross_ref.reviewer` enum |
+| 5 | `tools/review-queue/schemas/combined.schema.json` | Add `"X_response": { "type": ["string", "null"] }` under `properties`. Schema's `additionalProperties: false` is preserved. |
+| 6 | `.claude/commands/review-queue-X.md` | New file; mirror `review-queue-codex.md`'s structure with the reviewer-perspective-specific prompt body. |
 
 For **`mode: headless`** reviewers, then run:
 

@@ -17,6 +17,7 @@
     "assets/echo-roles/**",
     "assets/echo-workflows/**",
     "tools/review-queue/coord-roles.json",
+    "tools/review-queue/reviewer-bindings.json",
     "tools/review-queue/reviewers.json",
     "tools/review-queue/schemas/**",
     "docs/echoctl-install.md",
