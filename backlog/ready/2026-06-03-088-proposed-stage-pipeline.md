@@ -8,6 +8,8 @@ created: 2026-06-03
 blocked_by: []
 task_state_ref: 2026-06-03-088-proposed-stage-pipeline
 requested_reviewers: ["codex", "codex-ops"]
+spec_review: converged
+spec_review_sha: d650f5a1db109f199e84920fe2054983ff9ba95197be36bb174c535780d84a0f
 files_to_modify:
   - backlog/proposed/.gitkeep                       # AC1 — NEW stage directory. proposed/ holds a spec draft from first commit through spec-review convergence; presence == "in spec-review".
   - tools/blocked.py                                # AC2 — the claim-selector contract. Add "proposed" to STAGES; candidates() stays STRICTLY ready/ (proposed items are never candidates). Claimable iff: stage==ready AND every blocked_by dep in complete/ AND ready_content_sha present+matching. REMOVE the 086 spec_review field gate (transitional dual-read first — see AC6/migration). blocked_by validation: proposed items count as KNOWN ids but only complete/ SATISFIES a dep. Stale-ready: ready_content_sha mismatch ⇒ fail closed (item is invalid-in-ready, not a candidate) and is surfaced for bounce to proposed/.
