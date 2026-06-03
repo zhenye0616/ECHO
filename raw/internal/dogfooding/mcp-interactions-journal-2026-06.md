@@ -671,3 +671,11 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** c1 source_breakdown={claude_code:67, git:160}; c2 source_breakdown={codex:56}. Cursor absent. Echo ping sourced from daemon connectivity only.
 - **Verdict:** 🟡 partial — MCP is reachable and the repo context shape matches the visible review-queue activity, but c1 is too broad for implementation detail without a narrower follow-up.
 - **Note:** Useful as a pre-claim exposure check. No body hydration was needed because the backlog item and `spec_refs` remain the authoritative builder context.
+
+### 2026-06-03 10:28 PDT — session resume: "where did we leave off on 087"
+- **Trigger:** founder asked Claude (strategist) to use ECHO + check 087 review-pending status and last-session state at session start.
+- **Query inputs:** `find_clusters({since:"2026-06-02T00:00:00"})` (24h+ lookback; no repo_path).
+- **Returned:** 2 of 3 clusters (1 dropped by limit). c1 `work on Project_echo` 319 atoms (truncated), rank_reason=[recent_activity, has_open_loop, has_unresolved_open_loop, code_session_anchor, dense]; c2 `discussion about ECHO` 252 codex atoms. 2 unresolved open-loops in c1 (bf820ef4, c01c6a3c).
+- **Sources:** c1 source_breakdown={claude_code:78, git:241}; c2 source_breakdown={codex:252}. Cursor absent again.
+- **Verdict:** 🟡 partial — confirmed cross-tool activity is concentrated on the 087/087b review thread, but cluster too broad to resolve the specific merge-state question; answered it from backlog files (.review.md sidecar + task-state + r4 combined) not atom hydration.
+- **Note:** TZ warning fired (naive `since` parsed as local). The authoritative "where we left off" signal lived in committed backlog artifacts, not the cluster — ECHO confirmed the WHAT (087 thread is hot) but the precise merge-readiness came from git/files.
