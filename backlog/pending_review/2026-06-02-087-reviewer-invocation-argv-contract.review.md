@@ -3,6 +3,7 @@ item_id: 2026-06-02-087-reviewer-invocation-argv-contract
 verdict: merge as-is
 reviewed_at: 2026-06-03T06:15:07Z
 test_counts: { passed: 1513, failed: 0 }
+producer: claude-code-subagent
 ---
 
 ## Verdict
