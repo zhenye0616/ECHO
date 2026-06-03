@@ -9,7 +9,7 @@ blocked_by:
   - 2026-06-02-087-reviewer-invocation-argv-contract
 task_state_ref: 2026-06-02-087b-reviewer-child-readonly-migration
 requested_reviewers: ["codex", "codex-ops"]
-spec_review: waived  # founder-waived 2026-06-03 — the post-review edit was a one-line, scoped allow-list authorization (tests/review-queue/reviewer-bindings.test.ts) already endorsed by both the builder escalation and the code-review verdict; no design change, so a full re-review round would be ceremony. (Prior converged sha 7e4f9e0f… intentionally dropped; waived does not gate on it.)
+spec_review: waived
 files_to_modify:
   - tools/review-queue/reviewer-bindings.json                       # AC3 — flip codex + codex-ops `agent_sandbox: danger-full-access` → `read-only` and `commit_policy: child` → `wrapper`. (087 created these fields as descriptive; 087b makes them enforced reality.)
   - tools/review-queue/_run_reviewer.sh                             # AC1+AC2 — the wrapper, NOT the child, writes+commits+pushes the canonical `<reviewer>.md`. The child runs at the binding's `agent_sandbox` (now read-only), produces its review CONTENT via the capture mechanism (per 087's `capture.kind`), and the wrapper validates + writes the file + commits via push-with-retry. The child no longer self-commits.
@@ -102,7 +102,10 @@ AC1–AC5 unbuilt. Open question to founder: authorize `reviewer-bindings.test.t
 
 **Resolution (founder, 2026-06-03):** authorized — `tests/review-queue/reviewer-bindings.test.ts`
 added to `files_to_modify` (scoped to the assertions the flip necessarily changes). Item returned to
-`ready/`; claim fields cleared; the empty prior branch/worktree cleaned up. NOTE: this spec edit
-invalidates the prior `spec_review_sha` (086 staleness), so spec-review re-converges (or is founder-
-waived) before re-claim. (Aside — that `block` sidecar was *also* a Codex-child sidecar missing the
-`producer` field: a second live instance of the bug item 088 fixes.)
+`ready/`; claim fields cleared; the empty prior branch/worktree cleaned up. This spec edit
+invalidated the prior `spec_review_sha` (086 staleness), and the founder **waived** spec-review
+(`spec_review: waived`) on 2026-06-03 — the edit was a one-line, scoped allow-list authorization
+already endorsed by both the builder escalation and the code-review verdict, so a full re-review
+round would be ceremony. The prior converged sha `7e4f9e0f…` is intentionally dropped (waived does
+not gate on it). 087b is now claimable. (Aside — that `block` sidecar was *also* a Codex-child
+sidecar missing the `producer` field: a second live instance of the bug item 088 fixes.)
