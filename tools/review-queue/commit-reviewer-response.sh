@@ -5,7 +5,7 @@
 # commit path.
 #
 # Usage:
-#   commit-reviewer-response.sh <reviewer.md path> <codex|cursor> <round N> <item_id>
+#   commit-reviewer-response.sh <reviewer.md path> <reviewer> <round N> <item_id>
 #
 # Behavior:
 #   1. Run `python3 tools/review-queue/validate.py reviewer <path>`.
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 4 ]; then
-  echo "usage: commit-reviewer-response.sh <reviewer.md path> <codex|cursor> <round N> <item_id>" >&2
+  echo "usage: commit-reviewer-response.sh <reviewer.md path> <reviewer> <round N> <item_id>" >&2
   exit 2
 fi
 

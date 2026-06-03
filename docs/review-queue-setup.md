@@ -6,6 +6,8 @@ The polling primitive in each client wakes the canonical reviewer-loop or watche
 
 Reviewer responses are commit-gated through the canonical validation helper `tools/review-queue/commit-reviewer-response.sh`, which runs `tools/review-queue/validate.py reviewer` against the response file before any `git add`. Malformed responses are quarantined to `<path>.invalid.<ISO-ts>` and a one-line `VALIDATION-FAIL:` entry is appended to `raw/internal/queue-errors.md`; the canonical poll then regenerates the response on the next tick. The validation gate is mechanically unbypassable for any reviewer that uses the canonical commit path — this is the AC4 contract from item 041 and the reason a new reviewer voice (a third Claude API persona, a fresh Codex instance, etc.) just plugs into the same helper and inherits the contract.
 
+For codex and codex-ops, the helper is now invoked by the wrapper, not the AI child. The child runs read-only, reasons over a wrapper-prepared packet, and emits review markdown through structured stdout. `_run_reviewer.sh` validates that captured content, writes the canonical `<reviewer>.md`, calls `commit-reviewer-response.sh`, pushes the response, emits the coord lifecycle, and journals the completed tick. Claude and Cursor remain on their existing publication model until the successor migration.
+
 ## Claude Code (strategist watcher)
 
 `/loop` is a Claude Code CLI built-in. Verified absent as a plugin skill at `.claude/skills/loop` — invoke it via the `Skill` tool inside a Claude Code session.
@@ -39,20 +41,22 @@ The install script shipped in item 041 writes the plist with `StartInterval=600`
 
 The driver (`tools/review-queue/run-codex-reviewer.sh`) delegates to `tools/review-queue/_run_reviewer.sh`, which reads `${ECHO_REVIEW_QUEUE_REPO_ROOT}` (default `~/Desktop/Project_echo`) so launchd-driven ticks operate against the production repo while the smoke test isolates by setting the env var to a tmpdir. Since item 050, the wrapper does **not** run Codex in the founder's live checkout and does not use any sentinel-file lock. Each tick performs `git fetch origin main`, creates a detached ephemeral worktree at `$TMPDIR/echo-codex-<uuid>` pinned to `origin/main`, resolves the reviewer child argv and prompt stdin path from `tools/review-queue/reviewer-bindings.json`, routes Codex into that worktree via CWD + `ECHO_REVIEW_QUEUE_REPO_ROOT` + stdin prompt path + `codex -C`, and removes the worktree on exit. The live checkout's `.git/index` is not a reviewer write surface.
 
-`tools/review-queue/reviewer-bindings.json` is the canonical invocation source for headless reviewer children. The prompt path is not an argv element; the binding's `stdin_from` path is redirected onto the child's stdin. The canonical raw Codex invocation shape is:
+`tools/review-queue/reviewer-bindings.json` is the canonical invocation source for headless reviewer children. The prompt path is not an argv element; the binding's `stdin_from` path is redirected onto the child's stdin. The canonical raw Codex invocation shape for codex and codex-ops is:
 
 ```bash
-argv=(codex exec -C "$WT" --sandbox danger-full-access -)
+argv=(codex exec -C "$WT" --sandbox read-only --json -)
 stdin_from="$WT/.claude/commands/review-queue-codex.md"
-"${argv[@]}" < "$stdin_from"
+"${argv[@]}" < "$stdin_from" > "$capture_stdout" 2> "$capture_stderr"
 ```
 
 Inside the launchd wrapper, `$WT` is the ephemeral worktree, not the live checkout.
 
 Why these flags:
-- `--sandbox danger-full-access` — this records the current Codex/Codex-Ops child behavior. The child still self-commits its `<reviewer>.md` through `tools/review-queue/commit-reviewer-response.sh`, so the read-only-child + wrapper-owned-commit migration is tracked separately in 087b.
+- `--sandbox read-only` — the AI child reads and reasons only. It cannot write the canonical review artifact or commit/push even if prompt prose regresses.
+- `--json` — stdout is a structured event stream. The wrapper parses the final assistant-message event as the review payload; raw stdout/stderr remain diagnostics only.
 - `--ask-for-approval` is **not** passed — the flag does not exist on Codex CLI v0.130.0, and the runtime preamble already defaults headless `codex exec` to `never`.
 - `<` redirection rather than `cat | codex exec` — survives shell-paste edge cases the pipe variant does not. See memory note `reference_codex_review_queue_invocation.md`.
+- commit/push capability lives in `_run_reviewer.sh` and `commit-reviewer-response.sh`, not in the child. Terminal capture failures write a durable `<reviewer>.capture-failed` marker plus a bounded `queue-errors.md` diagnostic before the ephemeral worktree is cleaned up.
 
 ### Manual force-fire — direct-invoke the wrapper driver
 

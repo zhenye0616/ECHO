@@ -13,6 +13,13 @@ interface ReviewerBinding {
   stdin_from?: string;
   agent_sandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
   commit_policy: 'child' | 'wrapper';
+  capture: {
+    kind: 'committed_file' | 'stdout_json' | 'stdout_text' | 'stderr_text' | 'none';
+    final_message_path: string;
+    stdout_path: string;
+    stderr_path: string;
+    rc_path: string;
+  };
 }
 
 interface ReviewerBindingsConfig {
@@ -90,18 +97,23 @@ describe('087 reviewer-bindings.json contract', () => {
     expect(cfg.bindings.map((b) => b.reviewer)).toEqual(['codex', 'cursor', 'codex-ops', 'claude']);
   });
 
-  it('records current sandbox and child commit reality without flipping behavior', () => {
+  it('records codex and codex-ops as read-only children with wrapper-owned commit', () => {
     for (const slug of ['codex', 'codex-ops']) {
       const b = binding(slug);
-      expect(b.agent_sandbox).toBe('danger-full-access');
-      expect(b.commit_policy).toBe('child');
+      expect(b.agent_sandbox).toBe('read-only');
+      expect(b.commit_policy).toBe('wrapper');
+      expect(b.capture.kind).toBe('stdout_json');
+      expect(b.capture.final_message_path).toBe(
+        'raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md',
+      );
       expect(b.argv).toEqual([
         'codex',
         'exec',
         '-C',
         '{{WT}}',
         '--sandbox',
-        'danger-full-access',
+        'read-only',
+        '--json',
         '-',
       ]);
     }
@@ -121,7 +133,7 @@ describe('087 reviewer-bindings.json contract', () => {
     expect(binding('claude').argv).toEqual(['claude', '--dangerously-skip-permissions', '-p']);
   });
 
-  it('preserves current reviewer executable, flags, worktree routing, and sandbox values', () => {
+  it('resolves codex and codex-ops to read-only argv while leaving claude on its current argv', () => {
     expect(legacyReviewer('codex').invoke_command).toBe(
       'codex exec -C {{WT}} --sandbox danger-full-access - < {{PROMPT}}',
     );
@@ -133,13 +145,15 @@ describe('087 reviewer-bindings.json contract', () => {
     );
 
     const wt = '/tmp/echo wt';
-    const codexArgv = ['codex', 'exec', '-C', wt, '--sandbox', 'danger-full-access', '-'];
+    const codexArgv = ['codex', 'exec', '-C', wt, '--sandbox', 'read-only', '--json', '-'];
     for (const slug of ['codex', 'codex-ops']) {
       const r = gateBuffer(['--print', 'argv_nul'], { REVIEWER_NAME: slug, WT: wt });
       expect(r.status, r.stderr.toString()).toBe(0);
       expect(parseNulDelimited(r.stdout as Buffer)).toEqual(codexArgv);
       const sandbox = gateText(['--print', 'agent_sandbox'], { REVIEWER_NAME: slug, WT: wt });
-      expect(sandbox.stdout.trim()).toBe('danger-full-access');
+      expect(sandbox.stdout.trim()).toBe('read-only');
+      const policy = gateText(['--print', 'commit_policy'], { REVIEWER_NAME: slug, WT: wt });
+      expect(policy.stdout.trim()).toBe('wrapper');
     }
 
     const claude = gateBuffer(['--print', 'argv_nul'], { REVIEWER_NAME: 'claude', WT: wt });
@@ -245,8 +259,12 @@ describe('087 reviewer-bindings.json contract', () => {
     const installer = readFileSync(installerPath, 'utf-8');
 
     expect(runner).toContain('--print argv_nul');
+    expect(runner).toContain('--print commit_policy');
     expect(runner).toContain('gate_rc=$?');
     expect(runner).toContain('[ ! -s "$argv_file" ]');
+    expect(runner).toContain('commit_policy=wrapper');
+    expect(runner).toContain('capture.kind=stdout_json');
+    expect(runner).toContain('commit-reviewer-response.sh');
     expect(runner).toContain('echo_effect codex-exec -- "${INVOKE_ARGV[@]}" < "$STDIN_FROM"');
     expect(runner).not.toContain('--print invoke_command');
     expect(runner).not.toContain('bash -c "$INVOKE_CMD"');

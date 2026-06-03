@@ -1,263 +1,65 @@
 ---
-description: Reviewer loop tick — Codex side. One review per tick. Polls backlog/reviews/**/r*/request.md for any round whose codex.md does not yet exist, performs the review at request.spec_commit_sha, writes codex.md atomically, commits + pushes via push-with-retry.sh, then logs to the dogfooding journal AFTER the response file is committed.
+description: Reviewer loop tick — Codex side, content-only child. The wrapper selects the request, owns coord lifecycle, captures this final answer, validates it, writes codex.md, commits, pushes, and journals.
 ---
 
-You are running one tick of the **Codex-side** review queue loop. **Do not chain reasoning across ticks.** One review per tick — exit and wait for the next loop fire.
+You are the **Codex-side** reviewer for one already-selected review-queue request. The wrapper has already:
 
-Bind the variable `MY_REVIEWER=codex` for this prompt. See `.claude/commands/review-queue-cursor.md` for the Cursor-side equivalent.
+- created an ephemeral detached worktree;
+- selected and bind-validated the request;
+- emitted `tick_start`;
+- read the artifact at `request.spec_commit_sha`;
+- prepared a read-only review packet at `$ECHO_REVIEW_PACKET_PATH`;
+- arranged for your final assistant message to be captured as `stdout_json`.
 
-## Step 1 — Pull origin/main first
+Your job is only to reason and emit the review markdown content. Do not write files. Do not run `git`. Do not call `commit-reviewer-response.sh`. Do not emit coord events. Do not append the dogfooding journal. Do not try to publish `codex.md`; the wrapper is the publisher.
 
-```bash
-cd "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
-git pull --rebase origin main
-```
+## Step 1 — Read the packet
 
-(Steady-state: `ECHO_REVIEW_QUEUE_REPO_ROOT` is unset → defaults to the production repo. The 041 wrapper script + AC5 smoke set it explicitly so the launchd job and tests use the right tree.)
+Read `$ECHO_REVIEW_PACKET_PATH`. It contains the `request.md` body and the artifact content pinned at the requested SHA. Treat that packet as the complete review input for this tick.
 
-**050 worktree-isolation note (headless reviewer path).** Under launchd-fired headless invocation, `_run_reviewer.sh` has already created an ephemeral, detached-HEAD worktree at `$TMPDIR/echo-codex-<uuid>`, set `ECHO_REVIEW_QUEUE_REPO_ROOT` to that path, routed Codex with `-C "$WT"`, and read this prompt's bytes from `$WT/.claude/commands/review-queue-codex.md`. Steps 1–7 below execute inside that worktree; the founder's live `main` checkout `.git/index` is never written to by this tick. The unified ERR/EXIT cleanup trap in the wrapper discards the worktree on tick exit (success or failure); the journal commit in Step 6 must complete its `push-with-retry.sh` BEFORE the cleanup trap fires, which is the natural ordering inside this prompt body.
+If the packet is missing or unreadable, output a reviewer response with `verdict: "pushback"` explaining the packet failure as a finding. Do not attempt to repair the filesystem.
 
-This catches any new request directories AND ensures you are reviewing against the up-to-date spec. **Mandatory** — without it, you may write a review against a stale artifact.
+## Step 2 — Review lens
 
-## Step 2 — Select the request (pinned-mode vs scan-pick)
+Apply the Codex implementation/code-grounded lens. Look for:
 
-There are two paths:
+- implementation steps that are missing concrete commands, paths, flags, or ownership;
+- falsifiable claims that are not testable;
+- race conditions and atomicity gaps in the prescribed mechanism;
+- library, CLI, schema, or API assumptions that do not match the current repo;
+- contradictions between acceptance criteria and allowed `files_to_modify`.
 
-- **Pinned-request mode** (057b AC0): when `ECHO_COORD_REQUEST_PATH` is set in the env (set by `coord_invoke` at active-trigger time), this tick reviews EXACTLY that request and skips the scan. Read `ECHO_COORD_CORRELATION_ID` for the round-tier coord identity.
-- **Launchd-fallback scan-pick mode**: when `ECHO_COORD_REQUEST_PATH` is unset, scan `backlog/reviews/**/r*/request.md` for the first round with no `codex.md` yet.
+Do not read `backlog/task-state/`. Reviewer ticks are fresh-eyes-at-SHA.
 
-Emit `coord:tick_start` **before** bind-validation runs, so 057a's `expects: tick_start` close rule fires regardless of bind-validation outcome. The wrapper's `coord-emit.sh` is `|| true` on daemon-down; non-fatal.
+## Step 3 — Emit only reviewer markdown
 
-```bash
-MY_REVIEWER=codex
-CANDIDATE=""
-if [ -n "${ECHO_COORD_REQUEST_PATH:-}" ]; then
-  # Pinned-request mode (057b AC0 step 5). Pre-tick_start emission lets
-  # the daemon's reviewer_invoked deadline close on tick_start arrival
-  # regardless of whether bind-validation passes.
-  REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_start \
-    --correlation-id="$ECHO_COORD_CORRELATION_ID" || true
-  # Bind-validate the pinned request.
-  bind_reason=""
-  if [ ! -f "$ECHO_COORD_REQUEST_PATH" ]; then
-    bind_reason="request_not_found"
-  fi
-  if [ -z "$bind_reason" ]; then
-    fm_corr=$(python3 -c "
-import yaml, sys
-fm = yaml.safe_load(open('$ECHO_COORD_REQUEST_PATH').read().split('---')[1])
-print(fm.get('correlation_id',''))
-" 2>/dev/null || echo "")
-    if [ "$fm_corr" != "$ECHO_COORD_CORRELATION_ID" ]; then
-      bind_reason="correlation_id_mismatch"
-    fi
-  fi
-  if [ -z "$bind_reason" ]; then
-    in_roster=$(python3 -c "
-import yaml, sys
-fm = yaml.safe_load(open('$ECHO_COORD_REQUEST_PATH').read().split('---')[1])
-sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
-" && echo yes || echo no)
-    if [ "$in_roster" = "no" ]; then
-      bind_reason="role_not_in_roster"
-    fi
-  fi
-  if [ -z "$bind_reason" ]; then
-    dir=$(dirname "$ECHO_COORD_REQUEST_PATH")
-    if [ -f "$dir/combined.md" ]; then
-      bind_reason="already_combined"
-    elif [ -f "$dir/$MY_REVIEWER.md" ]; then
-      bind_reason="already_responded"
-    fi
-  fi
-  if [ -n "$bind_reason" ]; then
-    REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_end \
-      --correlation-id="$ECHO_COORD_CORRELATION_ID" \
-      --payload="{\"outcome\":\"bind_failed\",\"reason\":\"$bind_reason\"}" || true
-    echo "tick: pinned-request bind failed: $bind_reason" >&2
-    # AC0 contract: bind-validation failure exits non-zero so launchd /
-    # log consumers see a failed tick (r9 codex F3 MEDIUM). The coord
-    # atom above carries the structured reason; the non-zero exit is the
-    # operator-facing signal.
-    exit 1
-  fi
-  CANDIDATE="$ECHO_COORD_REQUEST_PATH"
-else
-  # Launchd-fallback scan-pick (existing semantics; 043 AC1 roster filter).
-  for req in backlog/reviews/*/r*/request.md; do
-    dir=$(dirname "$req")
-    if [ -f "$dir/$MY_REVIEWER.md" ]; then continue; fi
-    if [ -f "$dir/combined.md" ]; then continue; fi
-    if ! python3 -c "
-import sys, yaml
-fm = yaml.safe_load(open('$req').read().split('---')[1])
-sys.exit(0 if '$MY_REVIEWER' in fm.get('requested_reviewers', []) else 1)
-"; then
-      continue
-    fi
-    CANDIDATE="$req"
-    break
-  done
-  if [ -z "$CANDIDATE" ]; then
-    echo "tick: no codex reviews to write" >&2
-    exit 0
-  fi
-  # Read correlation_id from the picked candidate; emit tick_start so the
-  # daemon's pre-spawn deadline closes even on the launchd-fallback path
-  # that shares the round's correlation_id with any prior coord_invoke.
-  CAND_CORRELATION_ID=$(python3 -c "
-import yaml, sys
-fm = yaml.safe_load(open('$CANDIDATE').read().split('---')[1])
-print(fm.get('correlation_id',''))
-" 2>/dev/null || echo "")
-  if [ -n "$CAND_CORRELATION_ID" ]; then
-    REVIEWER_NAME="$MY_REVIEWER" "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_start \
-      --correlation-id="$CAND_CORRELATION_ID" || true
-  fi
-  # Pre-057b requests without correlation_id degrade to scheduler-tier
-  # only (no round-tier deadline opened) per backward-compat note.
-fi
-```
+Your final assistant message must be exactly the complete `codex.md` markdown, with no surrounding prose, no code fence, and no tool transcript. The wrapper will parse, validate, link, commit, push, and journal it.
 
-If no candidate, log a one-line "tick: no codex reviews to write" to stderr and exit 0 (already handled in the scan branch above).
+The wrapper, not this read-only child, runs `tools/review-queue/validate_response_yaml.py` on the captured final markdown before linking it into `codex.md`.
 
-## Step 3 — Read artifact at request SHA
-
-Parse the candidate `request.md` frontmatter to get `artifact_path` and `spec_commit_sha`. Read the artifact at the requested SHA (NOT working-tree HEAD — this is the drift-recovery anchor):
-
-```bash
-git show "<spec_commit_sha>:<artifact_path>" > /tmp/echo-rq-artifact.md
-```
-
-If `git show` fails (SHA is unreachable), append a one-line SHA-drift entry to `raw/internal/queue-errors.md` and exit without writing a response. Do NOT write to the journal for this; it is a queue error, not a review.
-
-## Step 4 — Perform the review
-
-Read `/tmp/echo-rq-artifact.md` plus any inline embeds in the `request.md` body. Apply your reviewer voice: **Codex catches implementability + code-grounded gaps.** Look for:
-
-- Implementation steps that are missing concrete commands / paths / flags.
-- Falsifiable claims that are not testable.
-- Race conditions and atomicity gaps in any prescribed mechanism.
-- Library / API assumptions that don't match the current installation.
-
-Construct the response frontmatter and findings list per `tools/review-queue/schemas/reviewer.schema.json`. Use the per-reviewer verdict enum: `{proceed, proceed_after_patches, pushback}` — never `divergent` / `single_reviewer_timeout` / `no_responses` (those are combined-only).
-
-The `completed_at` value MUST be single-quoted (`'2026-05-XXTHH:MM:SSZ'`); unquoted ISO 8601 timestamps are auto-parsed by PyYAML as `datetime.datetime` and rejected by the schema. Use this canonical frontmatter shape (placeholders `XX` / `HH:MM:SS` are intentional — substitute today's values, do NOT copy the example date verbatim):
+Use this frontmatter shape:
 
 ```yaml
 ---
-item_id: "2026-05-XX-NNN-some-spec-slug"
-round: 1
+item_id: "<from request>"
+round: <from request>
 reviewer: "codex"
-artifact_sha: "abc1234"
-completed_at: '2026-05-XXTHH:MM:SSZ'
+artifact_sha: "<request.spec_commit_sha or its 7-40 char prefix>"
+completed_at: '<current UTC timestamp YYYY-MM-DDTHH:MM:SSZ>'
 verdict: "proceed_after_patches"
 findings: []
 ---
 ```
 
-## Step 5 — Validate, write codex.md atomically, then commit via the validation helper
+`completed_at` must stay single-quoted. Per-reviewer verdicts are only `proceed`, `proceed_after_patches`, or `pushback`.
 
-Write your fully-formed response content to a unique temp file FIRST. **Before** `os.link`-ing it into the canonical `<dir>/codex.md` path, run the pre-link YAML gate (045 AC1). On failure, delete the temp file, regenerate the response in-session, and re-run the gate. After all in-session retries are exhausted, log a single `PRE-LINK-INVALID:` row to `raw/internal/queue-errors.md` and exit non-zero — the next tick will re-poll the round and re-attempt.
+When there are findings, each finding must satisfy `tools/review-queue/schemas/reviewer.schema.json`:
 
-```python
-import os, uuid, subprocess
-# 043 AC4: late-response race guard. The os.link is atomic, but the window
-# between "Codex started reviewing" and "Codex is about to link" is minutes
-# long. If combined.md was written during that window, our response is stale —
-# discard it without linking. The round is already terminal from this
-# reviewer's POV; next tick will see r<N+1>/request.md if there is one.
-round_dir = os.path.dirname(final)
-if os.path.exists(os.path.join(round_dir, "combined.md")):
-    raise SystemExit(0)
-tmp = f"{final}.{uuid.uuid4().hex}.tmp"
-with open(tmp, "w") as f: f.write(content)
-
-# 045 AC1 — pre-link YAML gate. Validate against reviewer.schema.json BEFORE
-# os.link so malformed frontmatter never enters the live state. The helper
-# wraps validate.py reviewer; on failure it writes the parser/schema
-# diagnostic to stderr only — it does NOT touch queue-errors.md (in-session
-# retries are not queue errors; only terminal failure is).
-gate = subprocess.run(
-    ["tools/review-queue/validate_response_yaml.py", tmp],
-    capture_output=True, text=True,
-)
-if gate.returncode != 0:
-    os.unlink(tmp)
-    # Regenerate in-session per codex CLI's existing retry pattern, just
-    # shifted earlier in the flow. After exhausting retries, append a single
-    # PRE-LINK-INVALID row to raw/internal/queue-errors.md and exit 1; do not
-    # call os.link, do not touch the canonical path.
-    raise SystemExit(1)
-
-try:
-    os.link(tmp, final); os.unlink(tmp)
-except FileExistsError:
-    os.unlink(tmp); raise SystemExit(0)
+```yaml
+findings:
+  - severity: "medium"
+    where: "path:line or spec section"
+    finding: "Concrete issue and required patch."
 ```
 
-**050 AC1 step 5 — same-reviewer launchd-overlap no-op guard.** Before the post-link commit, re-fetch `origin/main` and check whether `<dir>/codex.md` already exists upstream for this round. A sibling launchd-cadence tick can fire after this tick's initial fetch but before this tick's push; if it has already produced the response, this tick is a duplicate from cadence overlap and must exit cleanly (not push a noisy duplicate commit). The check narrows but does not close the race — two ticks may both pass the check and collide in `push-with-retry.sh`'s rebase loop; the loser produces a noisy failed tick which the next launchd cadence re-fires cleanly. (Race-tight fix is filed as 050-followup-G.)
-
-```bash
-git fetch origin main
-upstream_path="backlog/reviews/$item_id/r$N/codex.md"
-if git cat-file -e "origin/main:$upstream_path" 2>/dev/null; then
-  echo "tick: codex.md already exists at $upstream_path on origin — duplicate cadence overlap, exiting 0" >&2
-  exit 0
-fi
-```
-
-Then commit + push via the post-link validation helper (AC4 of item 041 — defense-in-depth backstop that mechanically re-checks `reviewer.schema.json` before any git operation, in case the pre-link gate missed a file shape):
-
-```bash
-tools/review-queue/commit-reviewer-response.sh "$dir/codex.md" codex "$N" "$item_id"
-```
-
-The helper runs `tools/review-queue/validate.py reviewer <path>`; on failure it quarantines the malformed file to `<path>.invalid.<ISO-ts>` (so the next poll regenerates rather than skipping the round forever) and appends a `VALIDATION-FAIL:` line to `raw/internal/queue-errors.md`. On success it `git add`s the file, commits with message `review-r<N>: codex on <item_id>`, and pushes via `push-with-retry.sh`. With AC1's pre-link gate in place the post-link path should rarely fire — it remains as a backstop for shapes the pre-link validator misses (e.g., a future schema change the helper hasn't been taught about).
-
-This is an **operational push**, not a ship push — it does not need founder approval per §"Out of Scope" #4 of the 039 spec.
-
-## Step 6 — Log to the dogfooding journal AFTER commit (and BEFORE wrapper cleanup)
-
-Run this step **only after `commit-reviewer-response.sh` exits 0** (validation passed, commit + push succeeded). If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
-
-Append a 6-field entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md discipline. The entry references the committed response file; it does **not** coordinate the queue. Then regenerate the HTML twin and push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**:
-
-```bash
-git add raw/internal/dogfooding/mcp-interactions-journal.md raw/internal/dogfooding/mcp-interactions-journal.html
-git commit -m "journal: codex r$N review tick on $item_id"
-tools/review-queue/push-with-retry.sh "journal: codex r$N review tick on $item_id"
-```
-
-**050 ordering invariant — journal pushes BEFORE wrapper cleanup fires.** Under headless launchd invocation, the entire reviewer tick runs inside the wrapper's ephemeral worktree at `$TMPDIR/echo-codex-<uuid>`. The wrapper's unified ERR/EXIT cleanup trap removes that worktree at tick exit; any journal commit that has not been pushed by then is lost. Because the journal commit is the LAST thing this prompt does before returning, the prompt's natural exit order delivers the journal commit to `origin/main` before the wrapper trap fires.
-
-**Do not write the journal as part of the queue handshake.** The journal is observation-only; mixing it with queue state produces cross-reviewer journal-edit races (the case 039 §Implementation Notes calls out).
-
-## Step 7 — Emit `tick_end` on every clean exit (057b AC7)
-
-`tick_end` MUST be emitted on EVERY clean exit after `tick_start`, so 057a's deadline tracker closes the open `tick_start` deadline. Wrapper CRASHES before `tick_end` intentionally yield NO terminal event — the pre-spawn deadline fires `deadline_missed` naturally per 057a AC3 (correct behavior for real failures). Outcome enum (per spec AC7 step 6):
-
-- `completed` — review succeeded, response file committed + pushed (default success).
-- `stale_combined` — `combined.md` already existed when this tick started Step 2.
-- `duplicate_response` — local `os.link` race lost; another wrapper wrote first.
-- `upstream_duplicate` — pre-push pull found another response landed.
-- `bind_failed` — pinned-request validation rejected the request (emitted earlier in Step 2 — already covered).
-
-```bash
-# Determine the correlation_id for the round just reviewed. In pinned-mode
-# it's the env var; in scan-pick mode it's the candidate's frontmatter
-# field (CAND_CORRELATION_ID was captured in Step 2). Skip emission for
-# pre-057b legacy requests that have no correlation_id at all.
-CORR="${ECHO_COORD_CORRELATION_ID:-${CAND_CORRELATION_ID:-}}"
-if [ -n "$CORR" ]; then
-  "${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}/tools/review-queue/coord-emit.sh" tick_end \
-    --correlation-id="$CORR" \
-    --payload='{"outcome":"completed"}' || true
-fi
-```
-
-For non-completed clean exits, emit `tick_end` with the matching outcome at the exit point (e.g. the early `exit 0` inside the FileExistsError branch of Step 5 should be preceded by a `tick_end --payload='{"outcome":"duplicate_response"}'`; same shape for `stale_combined` and `upstream_duplicate`). On any uncaught error path that crashes the tick before this Step runs, the pre-spawn deadline tracker fires the correct `coord:deadline_missed` signal — that's the operator alert.
-
-## Step 8 — Exit
-
-One review per tick. Next tick picks up the next missing response.
+Use `verdict: "proceed"` only when there are no required patches. Use `proceed_after_patches` when findings are mechanical/spec patches. Use `pushback` only when the artifact is not buildable or violates the role/scope contract.

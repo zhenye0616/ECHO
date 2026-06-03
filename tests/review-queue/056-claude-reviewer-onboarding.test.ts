@@ -152,10 +152,14 @@ print('ok')`,
   });
 
   it('--print invoke_command for cursor (IDE-mode) exits non-zero with documented diagnostic', () => {
-    const r = spawnSync('python3', [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'], {
-      env: { ...process.env, REVIEWER_NAME: 'cursor' },
-      encoding: 'utf-8',
-    });
+    const r = spawnSync(
+      'python3',
+      [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'],
+      {
+        env: { ...process.env, REVIEWER_NAME: 'cursor' },
+        encoding: 'utf-8',
+      },
+    );
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/IDE-mode reviewer cursor has no invoke_command/);
   });
@@ -180,10 +184,10 @@ print('ok')`,
     }
   });
 
-  it('argv-snapshot equivalence: codex/codex-ops resolved template matches pre-AC5 argv', () => {
-    // Pre-AC5 line: codex exec -C "$WT" --sandbox danger-full-access - < "$PROMPT"
+  it('argv-snapshot equivalence: codex/codex-ops resolved template matches read-only binding argv', () => {
+    // 087b moves codex/codex-ops publication to the wrapper and flips the AI child to read-only.
     // With shlex.quote on simple paths (no spaces/special), the quoting is a no-op.
-    const expectedCodex = 'codex exec -C /tmp/wt --sandbox danger-full-access - < /tmp/prompt.md';
+    const expectedCodex = 'codex exec -C /tmp/wt --sandbox read-only --json - < /tmp/prompt.md';
     const r = spawnSync(
       'python3',
       [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'],
@@ -198,7 +202,12 @@ print('ok')`,
       'python3',
       [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'],
       {
-        env: { ...process.env, REVIEWER_NAME: 'codex-ops', WT: '/tmp/wt', PROMPT: '/tmp/prompt.md' },
+        env: {
+          ...process.env,
+          REVIEWER_NAME: 'codex-ops',
+          WT: '/tmp/wt',
+          PROMPT: '/tmp/prompt.md',
+        },
         encoding: 'utf-8',
       },
     );
@@ -260,11 +269,7 @@ describe('056 AC2 — combined.schema.json 4-reviewer surface', () => {
         '',
       ].join('\n'),
     );
-    const r = runPython([
-      join(REPO, 'tools/review-queue/validate.py'),
-      'combined',
-      fixture,
-    ]);
+    const r = runPython([join(REPO, 'tools/review-queue/validate.py'), 'combined', fixture]);
     expect(r.code, r.stderr).toBe(0);
   });
 
@@ -287,11 +292,7 @@ describe('056 AC2 — combined.schema.json 4-reviewer surface', () => {
         '',
       ].join('\n'),
     );
-    const r = runPython([
-      join(REPO, 'tools/review-queue/validate.py'),
-      'reviewer',
-      fixture,
-    ]);
+    const r = runPython([join(REPO, 'tools/review-queue/validate.py'), 'reviewer', fixture]);
     expect(r.code, r.stderr).toBe(0);
   });
 
@@ -318,11 +319,7 @@ describe('056 AC2 — combined.schema.json 4-reviewer surface', () => {
         '',
       ].join('\n'),
     );
-    const r = runPython([
-      join(REPO, 'tools/review-queue/validate.py'),
-      'request',
-      fixture,
-    ]);
+    const r = runPython([join(REPO, 'tools/review-queue/validate.py'), 'request', fixture]);
     expect(r.code, r.stderr).toBe(0);
   });
 });
@@ -344,11 +341,10 @@ describe('056 AC5 part 4 — queue_error.sh row shapes', () => {
     // Resolve from the bare repo by cloning a peek; simpler — fetch on the
     // working repo, then read from origin/main.
     execSync('git fetch -q origin main', { cwd: fx.repo });
-    const r = spawnSync(
-      'git',
-      ['show', 'origin/main:raw/internal/queue-errors.md'],
-      { cwd: fx.repo, encoding: 'utf-8' },
-    );
+    const r = spawnSync('git', ['show', 'origin/main:raw/internal/queue-errors.md'], {
+      cwd: fx.repo,
+      encoding: 'utf-8',
+    });
     return r.stdout || '';
   }
 
@@ -361,7 +357,9 @@ describe('056 AC5 part 4 — queue_error.sh row shapes', () => {
     });
     expect(r.status, r.stderr).toBe(0);
     const txt = readUpstreamQueueErrors();
-    expect(txt).toMatch(/QUEUE-ERROR: reviewer=claude failure=invoke_command_unresolved diagnostic=missing executable/);
+    expect(txt).toMatch(
+      /QUEUE-ERROR: reviewer=claude failure=invoke_command_unresolved diagnostic=missing executable/,
+    );
     // Confirm pre-spawn shape lacks the spec= field.
     expect(txt).not.toMatch(/reviewer=claude failure=invoke_command_unresolved.*spec=/);
   });
@@ -370,13 +368,7 @@ describe('056 AC5 part 4 — queue_error.sh row shapes', () => {
     const helper = join(fx.repo, 'tools/review-queue/queue_error.sh');
     const r = spawnSync(
       'bash',
-      [
-        helper,
-        'spec_sha_unreachable',
-        'git show failed',
-        'backlog/ready/foo.md',
-        FAKE_SHA,
-      ],
+      [helper, 'spec_sha_unreachable', 'git show failed', 'backlog/ready/foo.md', FAKE_SHA],
       {
         cwd: fx.repo,
         env: { ...process.env, REVIEWER_NAME: 'claude' },
@@ -446,7 +438,9 @@ describe('056 AC7b/AC8 — _install_reviewer_launchd.sh', () => {
     // If PATH stripping didn't remove claude, the test is inconclusive.
     if (r.stderr.includes('not found on PATH')) {
       expect(r.status).not.toBe(0);
-      expect(r.stderr).toMatch(/claude not found on PATH; cannot install com\.echo\.review-queue-claude/);
+      expect(r.stderr).toMatch(
+        /claude not found on PATH; cannot install com\.echo\.review-queue-claude/,
+      );
       // The plist must NOT have been written. Use $HOME to be safe — but
       // we can't safely assert on the operator's actual LaunchAgents dir,
       // so we only check the stderr+rc contract.
@@ -477,10 +471,7 @@ describe('056 AC9 — wrapper end-to-end with mock-claude', () => {
     const mockBinDir = join(fx.base, 'mock-bin');
     mkdirSync(mockBinDir, { recursive: true });
     mockClaudePath = join(mockBinDir, 'claude');
-    cpSync(
-      join(REPO, 'tests/review-queue/fixtures/mock-claude.sh'),
-      mockClaudePath,
-    );
+    cpSync(join(REPO, 'tests/review-queue/fixtures/mock-claude.sh'), mockClaudePath);
     chmodSync(mockClaudePath, 0o755);
 
     // Rewrite reviewers.json in the smoke repo so claude's invoke_command
@@ -504,133 +495,132 @@ describe('056 AC9 — wrapper end-to-end with mock-claude', () => {
     teardown(fx);
   });
 
-  it('produces claude.md + commits via mock-claude (produce_response mode)', { timeout: E2E_TIMEOUT_MS }, () => {
-    // Defensive precondition: resolve invoke_command via the gate against
-    // the smoke roster and assert it points at the mock. If this fails,
-    // ECHO_REVIEWERS_CONFIG isn't being honored and we'd otherwise invoke
-    // the founder's REAL `claude` CLI (which has happened — 50min hangs +
-    // potential token spend).
-    const probeRosterPath = join(fx.repo, 'tools/review-queue/reviewers.json');
-    const probe = spawnSync(
-      'python3',
-      [
-        join(REPO, 'tools/review-queue/_reviewer_gate.py'),
-        '--print',
-        'invoke_command',
-      ],
-      {
+  it(
+    'produces claude.md + commits via mock-claude (produce_response mode)',
+    { timeout: E2E_TIMEOUT_MS },
+    () => {
+      // Defensive precondition: resolve invoke_command via the gate against
+      // the smoke roster and assert it points at the mock. If this fails,
+      // ECHO_REVIEWERS_CONFIG isn't being honored and we'd otherwise invoke
+      // the founder's REAL `claude` CLI (which has happened — 50min hangs +
+      // potential token spend).
+      const probeRosterPath = join(fx.repo, 'tools/review-queue/reviewers.json');
+      const probe = spawnSync(
+        'python3',
+        [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'],
+        {
+          env: {
+            ...process.env,
+            REVIEWER_NAME: 'claude',
+            WT: '/tmp/wt',
+            PROMPT: '/tmp/p.md',
+            ECHO_REVIEWERS_CONFIG: probeRosterPath,
+          },
+          encoding: 'utf-8',
+        },
+      );
+      expect(probe.status, probe.stderr).toBe(0);
+      expect(
+        probe.stdout,
+        `precondition failed: invoke_command not routed to mock — would have invoked real claude CLI. probe stdout: ${probe.stdout}`,
+      ).toContain(mockClaudePath);
+
+      // Use a SHA that actually exists in the smoke repo so step-3 git-show
+      // succeeds.
+      const sha = execSync('git rev-parse HEAD', { cwd: fx.repo, encoding: 'utf-8' }).trim();
+      writeRequestAtSha(fx.repo, 1, sha);
+      const wrapper = join(REPO, 'tools/review-queue/run-claude-reviewer.sh');
+      const recordDir = join(fx.base, 'mock-record');
+      const r = spawnSync('bash', [wrapper], {
         env: {
           ...process.env,
-          REVIEWER_NAME: 'claude',
-          WT: '/tmp/wt',
-          PROMPT: '/tmp/p.md',
-          ECHO_REVIEWERS_CONFIG: probeRosterPath,
+          ECHO_REVIEW_QUEUE_REPO_ROOT: fx.repo,
+          // The wrapper runs _reviewer_gate.py from the founder's
+          // TOOL_DIR, but `_lib.REVIEWERS_CONFIG` is env-var-routable.
+          // Point it at the smoke fixture's roster so the absolute mock
+          // path in invoke_command is what gets resolved.
+          ECHO_REVIEWERS_CONFIG: join(fx.repo, 'tools/review-queue/reviewers.json'),
+          MOCK_CLAUDE_MODE: 'produce_response',
+          MOCK_CLAUDE_RECORD_DIR: recordDir,
         },
         encoding: 'utf-8',
-      },
-    );
-    expect(probe.status, probe.stderr).toBe(0);
-    expect(
-      probe.stdout,
-      `precondition failed: invoke_command not routed to mock — would have invoked real claude CLI. probe stdout: ${probe.stdout}`,
-    ).toContain(mockClaudePath);
+        timeout: 25_000,
+        killSignal: 'SIGKILL',
+      });
+      // The wrapper may exit non-zero because the synthetic round's
+      // commit-reviewer-response.sh push lands on origin/main from inside
+      // the ephemeral worktree — that's expected to succeed in the smoke,
+      // but if it fails the smoke logs surface why.
+      // Either rc=0 with claude.md present, or rc!=0 with a wrapper-log
+      // diagnostic — pass on rc=0 + presence.
+      expect(r.status, `wrapper rc=${r.status} stderr=${r.stderr}`).toBe(0);
+      execSync('git fetch -q origin main', { cwd: fx.repo });
+      const showRc = spawnSync(
+        'git',
+        ['show', `origin/main:backlog/reviews/${ITEM_ID}/r1/claude.md`],
+        { cwd: fx.repo, encoding: 'utf-8' },
+      );
+      expect(showRc.status, `claude.md not on origin/main: ${showRc.stderr}`).toBe(0);
+      expect(showRc.stdout).toMatch(/reviewer: "claude"/);
+      // The mock recorded the prompt body (skill content) it received via stdin.
+      expect(existsSync(join(recordDir, 'stdin'))).toBe(true);
+      const recordedStdin = readFileSync(join(recordDir, 'stdin'), 'utf-8');
+      expect(recordedStdin).toMatch(/MY_REVIEWER=claude/);
+    },
+  );
 
-    // Use a SHA that actually exists in the smoke repo so step-3 git-show
-    // succeeds.
-    const sha = execSync('git rev-parse HEAD', { cwd: fx.repo, encoding: 'utf-8' }).trim();
-    writeRequestAtSha(fx.repo, 1, sha);
-    const wrapper = join(REPO, 'tools/review-queue/run-claude-reviewer.sh');
-    const recordDir = join(fx.base, 'mock-record');
-    const r = spawnSync('bash', [wrapper], {
-      env: {
-        ...process.env,
-        ECHO_REVIEW_QUEUE_REPO_ROOT: fx.repo,
-        // The wrapper runs _reviewer_gate.py from the founder's
-        // TOOL_DIR, but `_lib.REVIEWERS_CONFIG` is env-var-routable.
-        // Point it at the smoke fixture's roster so the absolute mock
-        // path in invoke_command is what gets resolved.
-        ECHO_REVIEWERS_CONFIG: join(fx.repo, 'tools/review-queue/reviewers.json'),
-        MOCK_CLAUDE_MODE: 'produce_response',
-        MOCK_CLAUDE_RECORD_DIR: recordDir,
-      },
-      encoding: 'utf-8',
-      timeout: 25_000,
-      killSignal: 'SIGKILL',
-    });
-    // The wrapper may exit non-zero because the synthetic round's
-    // commit-reviewer-response.sh push lands on origin/main from inside
-    // the ephemeral worktree — that's expected to succeed in the smoke,
-    // but if it fails the smoke logs surface why.
-    // Either rc=0 with claude.md present, or rc!=0 with a wrapper-log
-    // diagnostic — pass on rc=0 + presence.
-    expect(r.status, `wrapper rc=${r.status} stderr=${r.stderr}`).toBe(0);
-    execSync('git fetch -q origin main', { cwd: fx.repo });
-    const showRc = spawnSync(
-      'git',
-      ['show', `origin/main:backlog/reviews/${ITEM_ID}/r1/claude.md`],
-      { cwd: fx.repo, encoding: 'utf-8' },
-    );
-    expect(showRc.status, `claude.md not on origin/main: ${showRc.stderr}`).toBe(0);
-    expect(showRc.stdout).toMatch(/reviewer: "claude"/);
-    // The mock recorded the prompt body (skill content) it received via stdin.
-    expect(existsSync(join(recordDir, 'stdin'))).toBe(true);
-    const recordedStdin = readFileSync(join(recordDir, 'stdin'), 'utf-8');
-    expect(recordedStdin).toMatch(/MY_REVIEWER=claude/);
-  });
+  it(
+    'sha_drift mode → wrapper exits non-zero + per-round queue-error row on origin/main',
+    { timeout: E2E_TIMEOUT_MS },
+    () => {
+      // Same defensive precondition as the produce_response test — guard
+      // against accidentally hitting the founder's real claude CLI.
+      const probeRosterPath = join(fx.repo, 'tools/review-queue/reviewers.json');
+      const probe = spawnSync(
+        'python3',
+        [join(REPO, 'tools/review-queue/_reviewer_gate.py'), '--print', 'invoke_command'],
+        {
+          env: {
+            ...process.env,
+            REVIEWER_NAME: 'claude',
+            WT: '/tmp/wt',
+            PROMPT: '/tmp/p.md',
+            ECHO_REVIEWERS_CONFIG: probeRosterPath,
+          },
+          encoding: 'utf-8',
+        },
+      );
+      expect(probe.status, probe.stderr).toBe(0);
+      expect(
+        probe.stdout,
+        `precondition: invoke_command not routed to mock; probe stdout: ${probe.stdout}`,
+      ).toContain(mockClaudePath);
 
-  it('sha_drift mode → wrapper exits non-zero + per-round queue-error row on origin/main', { timeout: E2E_TIMEOUT_MS }, () => {
-    // Same defensive precondition as the produce_response test — guard
-    // against accidentally hitting the founder's real claude CLI.
-    const probeRosterPath = join(fx.repo, 'tools/review-queue/reviewers.json');
-    const probe = spawnSync(
-      'python3',
-      [
-        join(REPO, 'tools/review-queue/_reviewer_gate.py'),
-        '--print',
-        'invoke_command',
-      ],
-      {
+      writeRequestAtSha(fx.repo, 2, FAKE_SHA);
+      const wrapper = join(REPO, 'tools/review-queue/run-claude-reviewer.sh');
+      const r = spawnSync('bash', [wrapper], {
         env: {
           ...process.env,
-          REVIEWER_NAME: 'claude',
-          WT: '/tmp/wt',
-          PROMPT: '/tmp/p.md',
-          ECHO_REVIEWERS_CONFIG: probeRosterPath,
+          ECHO_REVIEW_QUEUE_REPO_ROOT: fx.repo,
+          ECHO_REVIEWERS_CONFIG: join(fx.repo, 'tools/review-queue/reviewers.json'),
+          MOCK_CLAUDE_MODE: 'sha_drift',
         },
         encoding: 'utf-8',
-      },
-    );
-    expect(probe.status, probe.stderr).toBe(0);
-    expect(
-      probe.stdout,
-      `precondition: invoke_command not routed to mock; probe stdout: ${probe.stdout}`,
-    ).toContain(mockClaudePath);
-
-    writeRequestAtSha(fx.repo, 2, FAKE_SHA);
-    const wrapper = join(REPO, 'tools/review-queue/run-claude-reviewer.sh');
-    const r = spawnSync('bash', [wrapper], {
-      env: {
-        ...process.env,
-        ECHO_REVIEW_QUEUE_REPO_ROOT: fx.repo,
-        ECHO_REVIEWERS_CONFIG: join(fx.repo, 'tools/review-queue/reviewers.json'),
-        MOCK_CLAUDE_MODE: 'sha_drift',
-      },
-      encoding: 'utf-8',
-      timeout: 25_000,
-      killSignal: 'SIGKILL',
-    });
-    expect(r.status).not.toBe(0);
-    execSync('git fetch -q origin main', { cwd: fx.repo });
-    const queueErrors = spawnSync(
-      'git',
-      ['show', 'origin/main:raw/internal/queue-errors.md'],
-      { cwd: fx.repo, encoding: 'utf-8' },
-    );
-    expect(queueErrors.status).toBe(0);
-    expect(queueErrors.stdout).toMatch(
-      new RegExp(
-        `QUEUE-ERROR: reviewer=claude failure=spec_sha_unreachable spec=backlog/ready/${ITEM_ID}\\.md@${FAKE_SHA}`,
-      ),
-    );
-  });
+        timeout: 25_000,
+        killSignal: 'SIGKILL',
+      });
+      expect(r.status).not.toBe(0);
+      execSync('git fetch -q origin main', { cwd: fx.repo });
+      const queueErrors = spawnSync('git', ['show', 'origin/main:raw/internal/queue-errors.md'], {
+        cwd: fx.repo,
+        encoding: 'utf-8',
+      });
+      expect(queueErrors.status).toBe(0);
+      expect(queueErrors.stdout).toMatch(
+        new RegExp(
+          `QUEUE-ERROR: reviewer=claude failure=spec_sha_unreachable spec=backlog/ready/${ITEM_ID}\\.md@${FAKE_SHA}`,
+        ),
+      );
+    },
+  );
 });

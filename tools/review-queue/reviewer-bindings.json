@@ -5,15 +5,15 @@
     {
       "reviewer": "codex",
       "mode": "headless-cli",
-      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-"],
+      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "read-only", "--json", "-"],
       "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
       "cwd": "{{WT}}",
-      "agent_sandbox": "danger-full-access",
-      "commit_policy": "child",
+      "agent_sandbox": "read-only",
+      "commit_policy": "wrapper",
       "timeout_sec": null,
       "capture": {
-        "kind": "committed_file",
-        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "kind": "stdout_json",
+        "final_message_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md",
         "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
         "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
@@ -44,15 +44,15 @@
     {
       "reviewer": "codex-ops",
       "mode": "headless-cli",
-      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "danger-full-access", "-"],
+      "argv": ["codex", "exec", "-C", "{{WT}}", "--sandbox", "read-only", "--json", "-"],
       "stdin_from": ".claude/commands/review-queue-{{REVIEWER}}.md",
       "cwd": "{{WT}}",
-      "agent_sandbox": "danger-full-access",
-      "commit_policy": "child",
+      "agent_sandbox": "read-only",
+      "commit_policy": "wrapper",
       "timeout_sec": null,
       "capture": {
-        "kind": "committed_file",
-        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "kind": "stdout_json",
+        "final_message_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md",
         "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
         "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
