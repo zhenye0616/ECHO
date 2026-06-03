@@ -35,7 +35,22 @@ head_sha: "09ad3ac45fc7d4c96ab4c06645b927e33c637436"
 pr_url: ""
 agent_notes: |
   Implemented the spec-review claim gate in `tools/blocked.py`, including inline-list `requested_reviewers` parsing/preservation, watcher/founder-owned marker validation, normalized-content digest staleness checks, and blocked-list reasons. Updated watcher terminal-path instructions, regenerated the Claude adapter, documented the builder/backlog contract, and extended `tools/test_blocked.py` to 29 passing cases. Verification passed: `python3 tools/test_blocked.py`, `python3 tools/blocked.py --validate`, `tools/sync-skills.sh --check`, `git diff --check`, and `npm test`.
-review_notes: ""
+review_notes: |
+  Merged 2026-06-02 via founder reconciliation (independent reviewer: not the Codex builder 78D5AB0F).
+
+  Conflicts resolved: none (clean --no-ff merge; ort strategy; 6 files, +426/-20).
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied: none (review-pending verdict: merge as-is, 0 pre-merge fixups).
+  Fixups deferred to follow-up items: none.
+
+  Verify (merger worktree at origin/main + branch): `python3 tools/test_blocked.py` 29/29 OK; `python3 tools/blocked.py --validate` OK (87 items); `tools/sync-skills.sh --check` OK; `git diff --check` clean. npm test NOT re-run in the merger worktree — the merge diff contains ZERO .ts/.js source (only tools/blocked.py [py], tools/test_blocked.py [py], skills/+.claude adapter, docs, backlog/README), so the TS suite is provably unaffected; the builder's full `npm test` (1505 passed) at head_sha 09ad3ac4 + the review-pending sidecar (8/8) stand.
+
+  Spec-review provenance: 086 converged through the cross-tool review queue r1→r4 (4→1→3→0 findings; r3 reframe gate fired → unified content-anchored marker). Once live, the gate it installs forces ready/ specs with requested_reviewers through review-to-convergence before claim.
+
+  Follow-up items (non-blocking):
+  - Once watcher terminal paths are easier to fixture, add an executable test around the marker write path rather than relying on skill prose (from review sidecar).
 ---
 
 # 086 — Claim gate: spec-review convergence required before a reviewed spec is claimable
