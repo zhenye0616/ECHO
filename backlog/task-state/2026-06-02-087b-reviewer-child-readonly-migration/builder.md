@@ -2,13 +2,20 @@
 task_id: 2026-06-02-087b-reviewer-child-readonly-migration
 role: builder
 binding: codex
-last_updated: 2026-06-03T17:49:29Z
+last_updated: 2026-06-03T17:54:45Z
 branch: agent/reviewer-child-readonly-migration
 claim_sha: ""
+handoff_branch: agent/reviewer-child-readonly-migration
+handoff_head_sha: 388b8cf0e96020bed185e0759b44f87ef45b59ca
+handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md
 ---
 
 ## current_thesis
 Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement only the reviewer-child read-only migration: move codex/codex-ops reviewer artifact publication, coord lifecycle, selection, git sync, and capture parsing into the wrapper; make the child content-only and read-only.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: wrapper owns codex/codex-ops request selection, bind validation, git sync, immutable packet prep, coord lifecycle, schema validation, response write, commit, push, and post-response journaling; child only reasons and emits content.
@@ -22,6 +29,10 @@ Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement
 ## open_questions
 - None blocking at claim time.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not edit `combine.py` or watcher native marker classification; selector-only marker consumption is in scope.
 - Do not migrate claude or cursor publication semantics; only monthly-journal/no-HTML prose cleanup applies there.
@@ -30,5 +41,6 @@ Claimed by Codex builder on `agent/reviewer-child-readonly-migration`. Implement
 - Do not modify wiki, docs outside `docs/review-queue-setup.md`, or backlog item bodies.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-02-087b-reviewer-child-readonly-migration.md
+
+- spec: backlog/pending_review/2026-06-02-087b-reviewer-child-readonly-migration.md
 - reviews: backlog/reviews/2026-06-02-087b-reviewer-child-readonly-migration/

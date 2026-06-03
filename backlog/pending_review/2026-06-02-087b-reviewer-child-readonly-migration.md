@@ -39,9 +39,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-03T17:49:29Z"
 branch: "agent/reviewer-child-readonly-migration"
 worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-child-readonly-migration"
-head_sha: ""
+head_sha: "388b8cf0e96020bed185e0759b44f87ef45b59ca"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC3/AC5 require flipping codex/codex-ops reviewer bindings to `read-only`, but the existing `tests/review-queue/reviewer-bindings.test.ts` asserts the old `danger-full-access`/`commit_policy: child` behavior and is not listed in `files_to_modify` (the listed test path is `tests/review-queue/reviewer-readonly.test.*`).
+  Tried: Claimed the item, created the initial builder task-state pointer, loaded mandatory context and every spec_ref (with 085 read from `backlog/complete/` after lifecycle move), inspected `_run_reviewer.sh`, `_reviewer_gate.py`, `reviewer-bindings.json`, docs, prompts, and tests, and confirmed the blocking assertions with `rg -n "danger-full-access|commit_policy|records current sandbox|preserves current reviewer" tests/review-queue/reviewer-bindings.test.ts tools/review-queue/reviewer-bindings.json`.
+  Best-guess answer: Add `tests/review-queue/reviewer-bindings.test.ts` to `files_to_modify` or explicitly allow updating the existing 087 binding-contract tests alongside the new `reviewer-readonly.test.*`; confidence high because full `npm test` cannot pass after the required config flip while those old assertions remain.
+  Why I escalated rather than guessing: Stopping condition triggered: satisfying acceptance requires modifying a file not listed in `files_to_modify`.
 review_notes: ""
 ---
 
