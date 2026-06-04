@@ -44,6 +44,138 @@ const reviewersPath = join(REPO, 'tools/review-queue/reviewers.json');
 const gatePath = join(REPO, 'tools/review-queue/_reviewer_gate.py');
 const runReviewerPath = join(REPO, 'tools/review-queue/_run_reviewer.sh');
 const installerPath = join(REPO, 'tools/review-queue/_install_reviewer_launchd.sh');
+const canonicalProtectedArgv = [
+  'codex',
+  'exec',
+  '-C',
+  '{{WT}}',
+  '--sandbox',
+  'read-only',
+  '--json',
+  '-',
+];
+const nonCanonicalProtectedArgvCases: Array<[string, string[]]> = [
+  [
+    'dangerous sandbox bypass flag',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    '-c sandbox override',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '-c',
+      'sandbox=danger-full-access',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    '--config sandbox override',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--config',
+      'sandbox=danger-full-access',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    '--config=sandbox override',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--config=sandbox=danger-full-access',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    '--profile override',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--profile',
+      'unsafe',
+      '--json',
+      '-',
+    ],
+  ],
+  ['-s sandbox alias', ['codex', 'exec', '-C', '{{WT}}', '-s', 'read-only', '--json', '-']],
+  [
+    'duplicate read-only --sandbox',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--sandbox',
+      'read-only',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    'duplicate non-read-only --sandbox',
+    [
+      'codex',
+      'exec',
+      '-C',
+      '{{WT}}',
+      '--sandbox',
+      'read-only',
+      '--sandbox',
+      'workspace-write',
+      '--json',
+      '-',
+    ],
+  ],
+  [
+    'separated non-read-only --sandbox',
+    ['codex', 'exec', '-C', '{{WT}}', '--sandbox', 'workspace-write', '--json', '-'],
+  ],
+  [
+    'glued non-read-only --sandbox',
+    ['codex', 'exec', '-C', '{{WT}}', '--sandbox=workspace-write', '--json', '-'],
+  ],
+  [
+    'extra unknown trailing flag',
+    ['codex', 'exec', '-C', '{{WT}}', '--sandbox', 'read-only', '--json', '-', '--unexpected'],
+  ],
+  [
+    'reordered otherwise-read-only flags',
+    ['codex', 'exec', '--json', '-C', '{{WT}}', '--sandbox', 'read-only', '-'],
+  ],
+];
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
@@ -112,6 +244,19 @@ function protectedReviewerBindingConfig(reviewer: 'codex' | 'codex-ops', argv: s
       },
     ],
   };
+}
+
+function gateWithProtectedBinding(reviewer: 'codex' | 'codex-ops', argv: string[]) {
+  const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-protected-argv-'));
+  const bindings = join(dir, `${reviewer}.json`);
+  writeFileSync(bindings, JSON.stringify(protectedReviewerBindingConfig(reviewer, argv), null, 2));
+  const result = gateBuffer(['--print', 'argv_nul'], {
+    REVIEWER_NAME: reviewer,
+    WT: '/tmp/wt',
+    ECHO_REVIEWER_BINDINGS_CONFIG: bindings,
+  });
+  rmSync(dir, { recursive: true, force: true });
+  return result;
 }
 
 describe('087 reviewer-bindings.json contract', () => {
@@ -283,100 +428,35 @@ describe('087 reviewer-bindings.json contract', () => {
     }
   });
 
-  it('rejects codex argv sandbox drift before emitting argv', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-sandbox-drift-'));
-    try {
-      const driftBindings = join(dir, 'reviewer-bindings.json');
-      writeFileSync(
-        driftBindings,
-        JSON.stringify(
-          {
-            kind: 'reviewer',
-            bindings: [
-              {
-                reviewer: 'codex',
-                mode: 'headless-cli',
-                argv: ['codex', 'exec', '-C', '{{WT}}', '--sandbox', 'danger-full-access', '-'],
-                stdin_from: '.claude/commands/review-queue-codex.md',
-                cwd: '{{WT}}',
-                agent_sandbox: 'read-only',
-                commit_policy: 'wrapper',
-                timeout_sec: null,
-                capture: {
-                  kind: 'stdout_json',
-                  final_message_path: 'raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md',
-                  stdout_path: 'stdout',
-                  stderr_path: 'stderr',
-                  rc_path: 'rc',
-                },
-                expected_artifact: {
-                  path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
-                  schema_ref: 'tools/review-queue/schemas/reviewer.schema.json',
-                },
-              },
-            ],
-          },
-          null,
-          2,
-        ),
-      );
-      const r = gateBuffer(['--print', 'argv_nul'], {
-        REVIEWER_NAME: 'codex',
-        WT: '/tmp/wt',
-        ECHO_REVIEWER_BINDINGS_CONFIG: driftBindings,
-      });
-      expect(r.status).not.toBe(0);
-      expect(r.stderr.toString()).toMatch(/argv --sandbox 'danger-full-access' disagrees/);
-      expect((r.stdout as Buffer).length).toBe(0);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
+  it.each(['codex', 'codex-ops'] as const)(
+    'allows the exact canonical protected argv for %s',
+    (reviewer) => {
+      const r = gateWithProtectedBinding(reviewer, canonicalProtectedArgv);
+      expect(r.status, r.stderr.toString()).toBe(0);
+      expect(parseNulDelimited(r.stdout as Buffer)).toEqual([
+        'codex',
+        'exec',
+        '-C',
+        '/tmp/wt',
+        '--sandbox',
+        'read-only',
+        '--json',
+        '-',
+      ]);
+    },
+  );
 
-  it.each([
-    [
-      'duplicate separated+glued vector resolves full-access last',
-      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox=danger-full-access', '-'],
-    ],
-    ['single glued full-access form', ['codex', 'exec', '--sandbox=danger-full-access', '-']],
-    [
-      'duplicate separated form resolves workspace-write last',
-      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox', 'workspace-write', '-'],
-    ],
-    [
-      'duplicate glued form resolves workspace-write last',
-      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox=workspace-write', '-'],
-    ],
-    [
-      'separated non-read-only before effective read-only',
-      ['codex', 'exec', '--sandbox', 'workspace-write', '--sandbox', 'read-only', '-'],
-    ],
-    [
-      'glued non-read-only before effective read-only',
-      ['codex', 'exec', '--sandbox=danger-full-access', '--sandbox', 'read-only', '-'],
-    ],
-  ])('rejects protected reviewer argv sandbox drift: %s', (_label, argv) => {
-    const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-sandbox-all-tokens-'));
-    try {
+  it.each(nonCanonicalProtectedArgvCases)(
+    'rejects protected reviewer non-canonical argv: %s',
+    (_label, argv) => {
       for (const reviewer of ['codex', 'codex-ops'] as const) {
-        const driftBindings = join(dir, `${reviewer}.json`);
-        writeFileSync(
-          driftBindings,
-          JSON.stringify(protectedReviewerBindingConfig(reviewer, argv), null, 2),
-        );
-        const r = gateBuffer(['--print', 'argv_nul'], {
-          REVIEWER_NAME: reviewer,
-          WT: '/tmp/wt',
-          ECHO_REVIEWER_BINDINGS_CONFIG: driftBindings,
-        });
+        const r = gateWithProtectedBinding(reviewer, argv);
         expect(r.status).not.toBe(0);
-        expect(r.stderr.toString()).toMatch(/sandbox|agent_sandbox|read-only/);
+        expect(r.stderr.toString()).toMatch(/canonical read-only argv exactly/);
         expect((r.stdout as Buffer).length).toBe(0);
       }
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
+    },
+  );
 
   it('runtime scripts use argv_nul and no removed shell-string dispatch seam', () => {
     const runner = readFileSync(runReviewerPath, 'utf-8');

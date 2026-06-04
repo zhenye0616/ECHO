@@ -76,44 +76,40 @@ def _argv_sandbox_values(argv: list[str], reviewer: str) -> list[str]:
     return values
 
 
-def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
-    argv_raw = binding.get("argv")
-    argv = [str(arg) for arg in argv_raw] if isinstance(argv_raw, list) else []
-    sandbox_values = _argv_sandbox_values(argv, reviewer) if argv else []
-    effective_sandbox = sandbox_values[-1] if sandbox_values else None
+def _enforce_protected_metadata(binding: dict[str, Any], reviewer: str, *, source: str) -> None:
     agent_sandbox = binding.get("agent_sandbox")
     commit_policy = binding.get("commit_policy")
 
+    if agent_sandbox != "read-only":
+        raise GateError(f"{source}: {reviewer!r} must use agent_sandbox='read-only'")
+    if commit_policy != "wrapper":
+        raise GateError(f"{source}: {reviewer!r} must use commit_policy='wrapper'")
+
+
+def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
+    argv_raw = binding.get("argv")
+    argv = [str(arg) for arg in argv_raw] if isinstance(argv_raw, list) else []
+    agent_sandbox = binding.get("agent_sandbox")
+
+    if reviewer in PROTECTED_WRAPPER_REVIEWERS:
+        _enforce_protected_metadata(binding, reviewer, source="reviewer-bindings.json")
+        return
+
+    sandbox_values = _argv_sandbox_values(argv, reviewer) if argv else []
+    effective_sandbox = sandbox_values[-1] if sandbox_values else None
     if effective_sandbox is not None and effective_sandbox != agent_sandbox:
         raise GateError(
             f"reviewer-bindings.json: {reviewer!r} effective argv --sandbox {effective_sandbox!r} "
             f"disagrees with agent_sandbox {agent_sandbox!r}"
         )
 
-    if reviewer not in PROTECTED_WRAPPER_REVIEWERS:
-        return
 
-    if agent_sandbox != "read-only":
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} must use agent_sandbox='read-only'"
-        )
-    if commit_policy != "wrapper":
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} must use commit_policy='wrapper'"
-        )
-    if effective_sandbox != "read-only":
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} must resolve argv --sandbox read-only"
-        )
-    non_read_only = [value for value in sandbox_values if value != "read-only"]
-    if non_read_only:
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} argv --sandbox values must all be "
-            f"'read-only' (resolved {sandbox_values!r})"
-        )
-
-
-def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
+def _validate_binding(
+    raw: dict[str, Any],
+    reviewer: str,
+    *,
+    enforce_runtime: bool = True,
+) -> dict[str, Any]:
     if raw.get("kind") != "reviewer":
         raise GateError("reviewer-bindings.json: kind must be 'reviewer'")
     bindings = raw.get("bindings")
@@ -163,8 +159,24 @@ def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
             if key in found:
                 raise GateError(f"reviewer-bindings.json: {reviewer!r} ide-manual entry must not set {key}")
 
-    _enforce_runtime_contract(found, reviewer)
+    if enforce_runtime:
+        _enforce_runtime_contract(found, reviewer)
     return found
+
+
+def _canonical_binding(reviewer: str) -> dict[str, Any]:
+    binding = _validate_binding(
+        _load_json(DEFAULT_BINDINGS_CONFIG),
+        reviewer,
+        enforce_runtime=False,
+    )
+    if reviewer in PROTECTED_WRAPPER_REVIEWERS:
+        _enforce_protected_metadata(
+            binding,
+            reviewer,
+            source="canonical reviewer-bindings.json",
+        )
+    return binding
 
 
 def _legacy_binding_from_reviewer(reviewer: Reviewer) -> dict[str, Any]:
@@ -238,6 +250,52 @@ def _resolve_stdin_from(binding: dict[str, Any], reviewer: str, wt: str | None) 
     return resolved
 
 
+def _format_argv(argv: list[str]) -> str:
+    return shlex.join(argv)
+
+
+def _assert_read_only_sandbox_shape(argv: list[str], reviewer: str) -> None:
+    separated_positions = [i for i, arg in enumerate(argv) if arg == "--sandbox"]
+    glued = [arg for arg in argv if arg.startswith("--sandbox=")]
+    if len(separated_positions) != 1 or glued:
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} canonical read-only argv must contain "
+            "exactly one separated --sandbox read-only token pair"
+        )
+    idx = separated_positions[0]
+    if idx + 1 >= len(argv) or argv[idx + 1] != "read-only":
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} canonical read-only argv must contain "
+            "exactly one separated --sandbox read-only token pair"
+        )
+
+
+def _enforce_protected_argv_allowlist(
+    *,
+    reviewer: str,
+    wt: str | None,
+    resolved_argv: list[str],
+) -> None:
+    if reviewer not in PROTECTED_WRAPPER_REVIEWERS:
+        return
+
+    canonical = _canonical_binding(reviewer)
+    canonical_raw = canonical.get("argv")
+    if not isinstance(canonical_raw, list) or not canonical_raw:
+        raise GateError(
+            f"canonical reviewer-bindings.json: {reviewer!r} argv must be a non-empty string array"
+        )
+    canonical_argv = [_substitute(str(arg), reviewer=reviewer, wt=wt) for arg in canonical_raw]
+
+    if resolved_argv != canonical_argv:
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} resolved argv must match canonical read-only argv exactly; "
+            f"expected {_format_argv(canonical_argv)}, got {_format_argv(resolved_argv)}"
+        )
+
+    _assert_read_only_sandbox_shape(resolved_argv, reviewer)
+
+
 def _resolve_argv(binding: dict[str, Any], reviewer: str, wt: str | None) -> list[str]:
     raw = binding.get("argv")
     if not isinstance(raw, list) or not raw:
@@ -245,6 +303,11 @@ def _resolve_argv(binding: dict[str, Any], reviewer: str, wt: str | None) -> lis
     argv = [_substitute(str(arg), reviewer=reviewer, wt=wt) for arg in raw]
     if not argv[0]:
         raise GateError(f"reviewer-bindings.json: {reviewer!r} argv[0] is empty")
+    _enforce_protected_argv_allowlist(
+        reviewer=reviewer,
+        wt=wt,
+        resolved_argv=argv,
+    )
     return argv
 
 
