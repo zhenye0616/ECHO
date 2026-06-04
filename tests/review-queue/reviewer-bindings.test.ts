@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Ajv } from 'ajv';
@@ -176,6 +176,14 @@ const nonCanonicalProtectedArgvCases: Array<[string, string[]]> = [
     ['codex', 'exec', '--json', '-C', '{{WT}}', '--sandbox', 'read-only', '-'],
   ],
 ];
+const poisonedDefaultProtectedArgvCases = nonCanonicalProtectedArgvCases.filter(([label]) =>
+  [
+    'dangerous sandbox bypass flag',
+    '-c sandbox override',
+    '--config sandbox override',
+    '--profile override',
+  ].includes(label),
+);
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
@@ -254,6 +262,30 @@ function gateWithProtectedBinding(reviewer: 'codex' | 'codex-ops', argv: string[
     REVIEWER_NAME: reviewer,
     WT: '/tmp/wt',
     ECHO_REVIEWER_BINDINGS_CONFIG: bindings,
+  });
+  rmSync(dir, { recursive: true, force: true });
+  return result;
+}
+
+function gateWithMutatedDefaultProtectedBinding(reviewer: 'codex' | 'codex-ops', argv: string[]) {
+  const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-default-bindings-'));
+  const toolDir = join(dir, 'review-queue');
+  cpSync(join(REPO, 'tools/review-queue'), toolDir, { recursive: true });
+  rmSync(join(toolDir, '__pycache__'), { recursive: true, force: true });
+
+  const tempBindingsPath = join(toolDir, 'reviewer-bindings.json');
+  const cfg = readJson<ReviewerBindingsConfig>(tempBindingsPath);
+  const entry = cfg.bindings.find((b) => b.reviewer === reviewer);
+  if (!entry) throw new Error(`binding not found for ${reviewer}`);
+  entry.argv = argv;
+  writeFileSync(tempBindingsPath, `${JSON.stringify(cfg, null, 2)}\n`);
+
+  const env: NodeJS.ProcessEnv = { ...process.env, REVIEWER_NAME: reviewer, WT: '/tmp/wt' };
+  delete env.ECHO_REVIEWER_BINDINGS_CONFIG;
+  delete env.ECHO_REVIEWERS_CONFIG;
+  const result = spawnSync('python3', [join(toolDir, '_reviewer_gate.py'), '--print', 'argv_nul'], {
+    cwd: REPO,
+    env,
   });
   rmSync(dir, { recursive: true, force: true });
   return result;
@@ -452,7 +484,21 @@ describe('087 reviewer-bindings.json contract', () => {
       for (const reviewer of ['codex', 'codex-ops'] as const) {
         const r = gateWithProtectedBinding(reviewer, argv);
         expect(r.status).not.toBe(0);
-        expect(r.stderr.toString()).toMatch(/canonical read-only argv exactly/);
+        expect(r.stderr.toString()).toMatch(/gate-owned read-only template/);
+        expect((r.stdout as Buffer).length).toBe(0);
+      }
+    },
+  );
+
+  it.each(poisonedDefaultProtectedArgvCases)(
+    'rejects poisoned default reviewer-bindings.json for protected reviewers: %s',
+    (_label, argv) => {
+      for (const reviewer of ['codex', 'codex-ops'] as const) {
+        const r = gateWithMutatedDefaultProtectedBinding(reviewer, argv);
+        expect(r.status).not.toBe(0);
+        expect(r.stderr.toString()).toMatch(
+          /canonical reviewer-bindings\.json: 'codex(?:-ops)?' protected argv must match gate-owned read-only template/,
+        );
         expect((r.stdout as Buffer).length).toBe(0);
       }
     },

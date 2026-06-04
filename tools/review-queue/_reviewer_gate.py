@@ -25,6 +25,16 @@ TOOL_DIR = Path(__file__).resolve().parent
 DEFAULT_BINDINGS_CONFIG = TOOL_DIR / "reviewer-bindings.json"
 HEADLESS_BINDING_MODES = {"headless-cli", "host-subagent"}
 PROTECTED_WRAPPER_REVIEWERS = {"codex", "codex-ops"}
+PROTECTED_CODEX_ARGV_TEMPLATE = (
+    "codex",
+    "exec",
+    "-C",
+    "<WT>",
+    "--sandbox",
+    "read-only",
+    "--json",
+    "-",
+)
 VALID_PRINT_FIELDS = (
     "slash_command",
     "invoke_command",
@@ -254,20 +264,44 @@ def _format_argv(argv: list[str]) -> str:
     return shlex.join(argv)
 
 
-def _assert_read_only_sandbox_shape(argv: list[str], reviewer: str) -> None:
-    separated_positions = [i for i, arg in enumerate(argv) if arg == "--sandbox"]
-    glued = [arg for arg in argv if arg.startswith("--sandbox=")]
-    if len(separated_positions) != 1 or glued:
+def _is_codex_executable_token(value: str) -> bool:
+    return Path(value).name == "codex"
+
+
+def _assert_protected_codex_argv_template(
+    argv: list[str],
+    reviewer: str,
+    *,
+    source: str,
+    wt: str | None,
+) -> None:
+    template = _format_argv(list(PROTECTED_CODEX_ARGV_TEMPLATE))
+
+    def fail(reason: str) -> None:
         raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} canonical read-only argv must contain "
-            "exactly one separated --sandbox read-only token pair"
+            f"{source}: {reviewer!r} protected argv must match gate-owned read-only template "
+            f"{template}: {reason}; got {_format_argv(argv)}"
         )
-    idx = separated_positions[0]
-    if idx + 1 >= len(argv) or argv[idx + 1] != "read-only":
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} canonical read-only argv must contain "
-            "exactly one separated --sandbox read-only token pair"
-        )
+
+    if wt is None:
+        fail("$WT is required for the -C <WT> slot")
+    if len(argv) != len(PROTECTED_CODEX_ARGV_TEMPLATE):
+        fail(f"expected {len(PROTECTED_CODEX_ARGV_TEMPLATE)} tokens")
+    if not _is_codex_executable_token(argv[0]):
+        fail("argv[0] must be the codex executable")
+
+    expected_by_position = {
+        1: "exec",
+        2: "-C",
+        3: wt,
+        4: "--sandbox",
+        5: "read-only",
+        6: "--json",
+        7: "-",
+    }
+    for index, expected in expected_by_position.items():
+        if argv[index] != expected:
+            fail(f"argv[{index}] must be {expected!r}")
 
 
 def _enforce_protected_argv_allowlist(
@@ -286,14 +320,18 @@ def _enforce_protected_argv_allowlist(
             f"canonical reviewer-bindings.json: {reviewer!r} argv must be a non-empty string array"
         )
     canonical_argv = [_substitute(str(arg), reviewer=reviewer, wt=wt) for arg in canonical_raw]
-
-    if resolved_argv != canonical_argv:
-        raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} resolved argv must match canonical read-only argv exactly; "
-            f"expected {_format_argv(canonical_argv)}, got {_format_argv(resolved_argv)}"
-        )
-
-    _assert_read_only_sandbox_shape(resolved_argv, reviewer)
+    _assert_protected_codex_argv_template(
+        canonical_argv,
+        reviewer,
+        source="canonical reviewer-bindings.json",
+        wt=wt,
+    )
+    _assert_protected_codex_argv_template(
+        resolved_argv,
+        reviewer,
+        source="resolved reviewer-bindings.json",
+        wt=wt,
+    )
 
 
 def _resolve_argv(binding: dict[str, Any], reviewer: str, wt: str | None) -> list[str]:
