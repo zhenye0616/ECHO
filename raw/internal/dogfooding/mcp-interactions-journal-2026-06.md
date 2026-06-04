@@ -26,6 +26,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 
 ## Interactions
 
+### 2026-06-03 23:25 PDT - codex builder preflight on 088 proposed-stage pipeline
+
+- **Trigger:** Founder invoked `$ECHO:process-backlog 088`; Codex builder preflight checked MCP reachability and pulled repo-scoped recent context before atomic claim.
+- **Query inputs:** `echo_ping({message:"codex builder process-backlog 088 preflight"})`; `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", since:"2026-06-03T00:00:00-07:00", format:"skeleton", view:"compact"})`.
+- **Returned:** `echo_ping` returned `pong:true` at `2026-06-04T06:25:52.192Z`. `find_clusters` returned 2 clusters / 204 atom ids; top cluster `ctx_b9f388ba` label `"work on Project_echo"`, rank_reasons `[has_open_loop, has_unresolved_open_loop, code_session_anchor]`; secondary cluster `ctx_0b0197fc` label `"discussion about ECHO"`.
+- **Sources:** top source_breakdown `{claude_code:50, git:119}`; secondary source_breakdown `{codex:35}`. Cursor absent from this repo-scoped window.
+- **Verdict:** partial - MCP is reachable and recovered the live repo activity spine, but the skeleton cluster is broad rather than specifically about item 088.
+- **Note:** The repo-scoped call is useful as a smoke/context check; item-specific grounding still comes from the backlog item and `spec_refs` before implementation.
+
 ### 2026-06-03 15:08 PDT - codex r5 review tick on 088 proposed-stage pipeline
 
 - **Trigger:** Codex-side reviewer queue tick selected `backlog/reviews/2026-06-03-088-proposed-stage-pipeline/r5/request.md` and reviewed the r4-patched proposed-stage pipeline spec through the implementability/code-grounded lens.
