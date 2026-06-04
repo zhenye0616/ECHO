@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-088-proposed-stage-pipeline
 title: "Add a `proposed/` backlog stage — make folder-location the single source of claimability; delete 086's spec_review state field for a renamed `ready_content_sha` integrity seal; generate docs/BACKLOG.md"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 2-3d
 created: 2026-06-03
@@ -50,9 +50,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-04T06:28:06Z"
 branch: "agent/proposed-stage-pipeline"
 worktree: "/Users/zhenye/Desktop/Project_echo--proposed-stage-pipeline"
-head_sha: ""
+head_sha: "371210fa70d00819eaa5f6e744794f2bc8175f77"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC6/AC8 and the final `spec_refs`/`files_to_modify` entry require migrating `backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md`, but that file no longer exists in `ready/`; current `main` has 087b at `backlog/pending_review/2026-06-02-087b-reviewer-child-readonly-migration.md`, which is outside 088's allow-list and already carries builder handoff state. Tried: claimed 088, pushed `agent/proposed-stage-pipeline` at `371210fa70d00819eaa5f6e744794f2bc8175f77`, read the mandatory context plus available spec_refs, verified the listed 087b path is absent and the pending_review path is present. Best guess: the strategist should patch 088 to either drop/replace the 087b ready-stage migration assertion because 087b has already left `ready/`, or explicitly authorize the pending_review-path migration semantics if that is still intended. Why escalated: the spec_ref is missing and satisfying AC6/AC8 would require either editing an unlisted `pending_review/` item or changing the backlog item body/test contract, both forbidden to a builder.
 ---
 
 # 088 — Add a `proposed/` backlog stage (folder-location = claimability)

@@ -4,12 +4,19 @@ role: builder
 writer: codex-builder
 binding: codex
 claim_branch: agent/proposed-stage-pipeline
-last_updated: 2026-06-04T06:28:06Z
+last_updated: 2026-06-04T06:32:28Z
+handoff_branch: agent/proposed-stage-pipeline
+handoff_head_sha: 371210fa70d00819eaa5f6e744794f2bc8175f77
+handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md
 ---
 
 ## current_thesis
 
 Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the proposed-stage pipeline: make folder location the source of claimability, replace 086's `spec_review` state gate with `ready_content_sha`, automate promotion/bounce, generate BACKLOG output through a tool only, and keep spec-review content mechanics unchanged.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -28,6 +35,10 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 - None blocking at claim time.
 - Non-blocking observation: `task_state_ref` is set, but no strategist pointer directory existed at claim; builder proceeds from the spec body and mandatory refs.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 
 - Do not change spec-review convergence computation, reviewer rosters, or round mechanics except the proposed-stage path-(c) dispatch guard required by AC4/AC8.
@@ -38,5 +49,5 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-03-088-proposed-stage-pipeline.md
+- spec: backlog/pending_review/2026-06-03-088-proposed-stage-pipeline.md
 - reviews: backlog/reviews/2026-06-03-088-proposed-stage-pipeline/
