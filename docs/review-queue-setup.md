@@ -51,6 +51,8 @@ stdin_from="$WT/.claude/commands/review-queue-codex.md"
 
 Inside the launchd wrapper, `$WT` is the ephemeral worktree, not the live checkout.
 
+The gate validates invocation shape only (sandbox flags and argv structure); `codex` binary provenance/authenticity via PATH resolution or signing is out of 087b scope and belongs to host trust.
+
 Why these flags:
 - `--sandbox read-only` — the AI child reads and reasons only. It cannot write the canonical review artifact or commit/push even if prompt prose regresses.
 - `--json` — stdout is a structured event stream. The wrapper parses the final assistant-message event as the review payload; raw stdout/stderr remain diagnostics only.

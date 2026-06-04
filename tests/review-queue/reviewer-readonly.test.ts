@@ -200,14 +200,6 @@ function setupFixture(opts: { reviewer?: Reviewer; requestState?: RequestState }
 
   const mockCodex = join(mockBin, 'codex');
   writeMockCodex(mockCodex);
-  const bindingsPath = join(repo, 'tools/review-queue/reviewer-bindings.json');
-  const bindings = JSON.parse(readFileSync(bindingsPath, 'utf-8'));
-  for (const entry of bindings.bindings as Array<{ reviewer: string; argv?: string[] }>) {
-    if ((entry.reviewer === 'codex' || entry.reviewer === 'codex-ops') && entry.argv) {
-      entry.argv[0] = mockCodex;
-    }
-  }
-  writeFileSync(bindingsPath, JSON.stringify(bindings, null, 2) + '\n');
 
   writeExecutable(
     join(repo, 'tools/review-queue/coord-emit.sh'),
@@ -276,6 +268,8 @@ function runWrapper(fx: Fixture, mode: MockMode, extraEnv: Record<string, string
       ECHO_MCP_URL: 'http://127.0.0.1:1/mcp',
       TMPDIR: fx.tmp,
       PATH: `${fx.mockBin}:${process.env.PATH}`,
+      MOCK_CODEX_BIN: join(fx.mockBin, 'codex'),
+      'BASH_FUNC_codex%%': '() { "$MOCK_CODEX_BIN" "$@"; }',
       MOCK_CODEX_MODE: mode,
       MOCK_CODEX_RECORD_DIR: fx.recordDir,
       MOCK_CODEX_REVIEWER: fx.reviewer,

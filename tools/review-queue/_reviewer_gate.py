@@ -265,7 +265,7 @@ def _format_argv(argv: list[str]) -> str:
 
 
 def _is_codex_executable_token(value: str) -> bool:
-    return Path(value).name == "codex"
+    return value == "codex"
 
 
 def _assert_protected_codex_argv_template(
@@ -287,8 +287,9 @@ def _assert_protected_codex_argv_template(
         fail("$WT is required for the -C <WT> slot")
     if len(argv) != len(PROTECTED_CODEX_ARGV_TEMPLATE):
         fail(f"expected {len(PROTECTED_CODEX_ARGV_TEMPLATE)} tokens")
+    # Shape guard only: PATH resolution and binary authenticity are host-trust concerns.
     if not _is_codex_executable_token(argv[0]):
-        fail("argv[0] must be the codex executable")
+        fail("argv[0] must be exactly 'codex'")
 
     expected_by_position = {
         1: "exec",

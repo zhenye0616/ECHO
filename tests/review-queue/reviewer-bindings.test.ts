@@ -56,6 +56,14 @@ const canonicalProtectedArgv = [
 ];
 const nonCanonicalProtectedArgvCases: Array<[string, string[]]> = [
   [
+    'path-qualified codex argv0',
+    ['/tmp/evil/codex', 'exec', '-C', '{{WT}}', '--sandbox', 'read-only', '--json', '-'],
+  ],
+  [
+    'bare differently-named shim argv0',
+    ['codex-shim', 'exec', '-C', '{{WT}}', '--sandbox', 'read-only', '--json', '-'],
+  ],
+  [
     'dangerous sandbox bypass flag',
     [
       'codex',
