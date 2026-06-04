@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-088-proposed-stage-pipeline
 title: "Add a `proposed/` backlog stage — make folder-location the single source of claimability; delete 086's spec_review state field for a renamed `ready_content_sha` integrity seal; generate docs/BACKLOG.md"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 2-3d
 created: 2026-06-03
@@ -44,6 +44,15 @@ spec_refs:
   - tools/wiki_index.py  # the precedent for a generated index (wiki/index.md) that tools/backlog_index.py mirrors for docs/BACKLOG.md.
   - backlog/complete/2026-05-28-079-loop-reliability-pack.md  # AC3's clean-snapshot + P1 idempotent stage-move pattern (the claimed→pending move) that promote.py mirrors for proposed→ready.
   - backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md  # the live migration case: currently in ready/ with spec_review: waived — AC6 migrates it to a ready_content_sha (it stays claimable in ready/).
+
+# --- agent-managed fields (filled in during run) ---
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-04T06:28:06Z"
+branch: "agent/proposed-stage-pipeline"
+worktree: "/Users/zhenye/Desktop/Project_echo--proposed-stage-pipeline"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 # 088 — Add a `proposed/` backlog stage (folder-location = claimability)
