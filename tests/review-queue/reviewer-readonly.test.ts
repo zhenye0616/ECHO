@@ -384,13 +384,20 @@ describe('087b reviewer read-only wrapper publisher', () => {
     expect(originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`)).toBe(false);
   });
 
-  it('closes the coord lifecycle even when capture-failure marker push fails', () => {
+  it('closes the coord lifecycle and does not reselect after capture-failure marker push fails', () => {
     const fx = setupFixture();
     fixtures.push(fx);
 
     const r = runWrapper(fx, 'invalid_final', { MOCK_PUSH_FAIL_ON_CAPTURE: '1' });
     expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).toBe(42);
     expect(originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.capture-failed`)).toBe(false);
+    const before = readRecord(fx, 'invocations');
+
+    const second = runWrapper(fx, 'valid');
+    expect(second.status, `stdout=${second.stdout}\nstderr=${second.stderr}`).toBe(0);
+    expect(readRecord(fx, 'invocations')).toBe(before);
+    expect(originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`)).toBe(false);
+
     const events = readRecord(fx, 'coord-events');
     expect(events).toContain('tick_start');
     expect(events).toContain('--payload={"outcome":"terminal_capture_failure"}');

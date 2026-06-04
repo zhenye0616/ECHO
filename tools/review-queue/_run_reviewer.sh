@@ -295,6 +295,88 @@ print(text[:500])
 PY
   }
 
+  # Detached tick worktrees are deleted on EXIT. Keep the terminal skip
+  # signal in the anchoring repo's git dir so selection can suppress a failed
+  # round even when the committed marker push never reaches origin/main.
+  capture_failure_state_file() {
+    if [ -n "${ECHO_CAPTURE_FAILURE_STATE_FILE:-}" ]; then
+      printf '%s\n' "$ECHO_CAPTURE_FAILURE_STATE_FILE"
+      return 0
+    fi
+
+    local anchor="${ECHO_CLEAN_SNAPSHOT_REPO_ROOT:-$REPO_ROOT}"
+    local git_dir
+    git_dir="$(git -C "$anchor" rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$git_dir" ]; then
+      case "$git_dir" in
+        /*) ;;
+        *) git_dir="$anchor/$git_dir" ;;
+      esac
+      printf '%s\n' "$git_dir/echo-review-queue/capture-failures.jsonl"
+      return 0
+    fi
+
+    printf '%s\n' "$HOME/.echo/review-queue/capture-failures.jsonl"
+  }
+
+  CAPTURE_FAILURE_STATE_FILE="$(capture_failure_state_file)"
+  export CAPTURE_FAILURE_STATE_FILE
+
+  record_local_capture_failure() {
+    local failure_class="$1"
+    local diagnostic="$2"
+    local iso_ts="$3"
+    mkdir -p "$(dirname "$CAPTURE_FAILURE_STATE_FILE")"
+    python3 - "$CAPTURE_FAILURE_STATE_FILE" "$REVIEWER_NAME" "$ITEM_ID" "$ROUND_NUM" "$SPEC_COMMIT_SHA" "$ARTIFACT_PATH" "$failure_class" "$CHILD_RC" "$iso_ts" "$diagnostic" <<'PY'
+from __future__ import annotations
+
+from pathlib import Path
+import json
+import sys
+
+(
+    state_path_raw,
+    reviewer,
+    item_id,
+    round_num,
+    spec_commit_sha,
+    artifact_path,
+    failure_class,
+    child_rc,
+    failed_at,
+    diagnostic,
+) = sys.argv[1:11]
+
+state_path = Path(state_path_raw)
+key = {
+    "reviewer": reviewer,
+    "item_id": item_id,
+    "round": str(round_num),
+    "spec_commit_sha": spec_commit_sha,
+    "artifact_path": artifact_path,
+}
+record = {
+    **key,
+    "failed_at": failed_at,
+    "failure_class": failure_class,
+    "rc": child_rc,
+    "diagnostic": diagnostic,
+}
+
+if state_path.exists():
+    for line in state_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            existing = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if all(str(existing.get(k, "")) == v for k, v in key.items()):
+            raise SystemExit(0)
+
+with state_path.open("a", encoding="utf-8") as f:
+    f.write(json.dumps(record, sort_keys=True) + "\n")
+PY
+  }
+
   record_capture_failure() {
     local failure_class="$1"
     local diagnostic="$2"
@@ -319,6 +401,7 @@ EOF
     printf '%s CAPTURE-FAIL: reviewer=%s failure=%s rc=%s spec=%s@%s marker=%s diagnostic=%s\n' \
       "$iso_ts" "$REVIEWER_NAME" "$failure_class" "$CHILD_RC" "$ARTIFACT_PATH" "$SPEC_COMMIT_SHA" "$marker_path" "$diagnostic" \
       >> "$errors_file"
+    record_local_capture_failure "$failure_class" "$diagnostic" "$iso_ts" || return $?
     echo "[$iso_ts] recording capture failure reviewer=$REVIEWER_NAME failure=$failure_class marker=$marker_path"
     git add "$marker_path" "$errors_file" || return $?
     if ! git diff --cached --quiet; then
@@ -443,6 +526,7 @@ EOF
   env REVIEWER_NAME="$REVIEWER_NAME" \
     ECHO_COORD_REQUEST_PATH="${ECHO_COORD_REQUEST_PATH:-}" \
     ECHO_COORD_CORRELATION_ID="${ECHO_COORD_CORRELATION_ID:-}" \
+    CAPTURE_FAILURE_STATE_FILE="$CAPTURE_FAILURE_STATE_FILE" \
     python3 - "$WRAPPER_STATE_FILE" <<'PY'
 from pathlib import Path
 import glob
@@ -455,6 +539,7 @@ out_path = Path(sys.argv[1])
 reviewer = os.environ["REVIEWER_NAME"]
 pinned = os.environ.get("ECHO_COORD_REQUEST_PATH") or ""
 env_corr = os.environ.get("ECHO_COORD_CORRELATION_ID") or ""
+capture_failure_state_file = os.environ.get("CAPTURE_FAILURE_STATE_FILE") or ""
 
 
 def read_fm(path: Path):
@@ -492,6 +577,33 @@ def selected(req: Path, fm: dict):
     )
 
 
+def local_capture_failure_recorded(fm: dict) -> bool:
+    if not capture_failure_state_file:
+        return False
+    state_path = Path(capture_failure_state_file)
+    if not state_path.is_file():
+        return False
+    key = {
+        "reviewer": reviewer,
+        "item_id": str(fm.get("item_id", "")),
+        "round": str(fm.get("round", "")),
+        "spec_commit_sha": str(fm.get("spec_commit_sha", "")),
+        "artifact_path": str(fm.get("artifact_path", "")),
+    }
+    try:
+        lines = state_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if all(str(record.get(k, "")) == v for k, v in key.items()):
+            return True
+    return False
+
+
 def validate_req(req: Path, *, pinned_mode: bool):
     if not req.is_file():
         write("bind_failed", reason="request_not_found", correlation_id=env_corr)
@@ -512,7 +624,7 @@ def validate_req(req: Path, *, pinned_mode: bool):
     if (round_dir / f"{reviewer}.md").exists():
         write("duplicate_response", correlation_id=corr)
         return
-    if (round_dir / f"{reviewer}.capture-failed").exists():
+    if (round_dir / f"{reviewer}.capture-failed").exists() or local_capture_failure_recorded(fm):
         write("capture_failed", correlation_id=corr)
         return
     selected(req, fm)
@@ -535,7 +647,7 @@ else:
             continue
         if (round_dir / "combined.md").exists():
             continue
-        if (round_dir / f"{reviewer}.capture-failed").exists():
+        if (round_dir / f"{reviewer}.capture-failed").exists() or local_capture_failure_recorded(fm):
             continue
         selected(req, fm)
         break

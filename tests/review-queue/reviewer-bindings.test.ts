@@ -85,6 +85,35 @@ function parseNulDelimited(stdout: Buffer): string[] {
   return stdout.toString('utf-8').split('\0').filter(Boolean);
 }
 
+function protectedReviewerBindingConfig(reviewer: 'codex' | 'codex-ops', argv: string[]) {
+  return {
+    kind: 'reviewer',
+    bindings: [
+      {
+        reviewer,
+        mode: 'headless-cli',
+        argv,
+        stdin_from: `.claude/commands/review-queue-${reviewer}.md`,
+        cwd: '{{WT}}',
+        agent_sandbox: 'read-only',
+        commit_policy: 'wrapper',
+        timeout_sec: null,
+        capture: {
+          kind: 'stdout_json',
+          final_message_path: 'raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md',
+          stdout_path: 'stdout',
+          stderr_path: 'stderr',
+          rc_path: 'rc',
+        },
+        expected_artifact: {
+          path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
+          schema_ref: 'tools/review-queue/schemas/reviewer.schema.json',
+        },
+      },
+    ],
+  };
+}
+
 describe('087 reviewer-bindings.json contract', () => {
   it('parses and validates against the reviewer-bindings schema', () => {
     const schema = readJson<Record<string, unknown>>(bindingsSchemaPath);
@@ -299,6 +328,51 @@ describe('087 reviewer-bindings.json contract', () => {
       expect(r.status).not.toBe(0);
       expect(r.stderr.toString()).toMatch(/argv --sandbox 'danger-full-access' disagrees/);
       expect((r.stdout as Buffer).length).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'duplicate separated+glued vector resolves full-access last',
+      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox=danger-full-access', '-'],
+    ],
+    ['single glued full-access form', ['codex', 'exec', '--sandbox=danger-full-access', '-']],
+    [
+      'duplicate separated form resolves workspace-write last',
+      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox', 'workspace-write', '-'],
+    ],
+    [
+      'duplicate glued form resolves workspace-write last',
+      ['codex', 'exec', '--sandbox', 'read-only', '--sandbox=workspace-write', '-'],
+    ],
+    [
+      'separated non-read-only before effective read-only',
+      ['codex', 'exec', '--sandbox', 'workspace-write', '--sandbox', 'read-only', '-'],
+    ],
+    [
+      'glued non-read-only before effective read-only',
+      ['codex', 'exec', '--sandbox=danger-full-access', '--sandbox', 'read-only', '-'],
+    ],
+  ])('rejects protected reviewer argv sandbox drift: %s', (_label, argv) => {
+    const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-sandbox-all-tokens-'));
+    try {
+      for (const reviewer of ['codex', 'codex-ops'] as const) {
+        const driftBindings = join(dir, `${reviewer}.json`);
+        writeFileSync(
+          driftBindings,
+          JSON.stringify(protectedReviewerBindingConfig(reviewer, argv), null, 2),
+        );
+        const r = gateBuffer(['--print', 'argv_nul'], {
+          REVIEWER_NAME: reviewer,
+          WT: '/tmp/wt',
+          ECHO_REVIEWER_BINDINGS_CONFIG: driftBindings,
+        });
+        expect(r.status).not.toBe(0);
+        expect(r.stderr.toString()).toMatch(/sandbox|agent_sandbox|read-only/);
+        expect((r.stdout as Buffer).length).toBe(0);
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

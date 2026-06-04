@@ -56,27 +56,37 @@ def _load_json(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _argv_sandbox(argv: list[str], reviewer: str) -> str | None:
-    for idx, arg in enumerate(argv):
+def _argv_sandbox_values(argv: list[str], reviewer: str) -> list[str]:
+    values: list[str] = []
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
         if arg == "--sandbox":
             if idx + 1 >= len(argv):
                 raise GateError(f"reviewer-bindings.json: {reviewer!r} argv has --sandbox without a value")
-            return argv[idx + 1]
+            values.append(argv[idx + 1])
+            idx += 2
+            continue
         if arg.startswith("--sandbox="):
-            return arg.split("=", 1)[1]
-    return None
+            value = arg.split("=", 1)[1]
+            if not value:
+                raise GateError(f"reviewer-bindings.json: {reviewer!r} argv has --sandbox= without a value")
+            values.append(value)
+        idx += 1
+    return values
 
 
 def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
     argv_raw = binding.get("argv")
     argv = [str(arg) for arg in argv_raw] if isinstance(argv_raw, list) else []
-    sandbox = _argv_sandbox(argv, reviewer) if argv else None
+    sandbox_values = _argv_sandbox_values(argv, reviewer) if argv else []
+    effective_sandbox = sandbox_values[-1] if sandbox_values else None
     agent_sandbox = binding.get("agent_sandbox")
     commit_policy = binding.get("commit_policy")
 
-    if sandbox is not None and sandbox != agent_sandbox:
+    if effective_sandbox is not None and effective_sandbox != agent_sandbox:
         raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} argv --sandbox {sandbox!r} "
+            f"reviewer-bindings.json: {reviewer!r} effective argv --sandbox {effective_sandbox!r} "
             f"disagrees with agent_sandbox {agent_sandbox!r}"
         )
 
@@ -91,13 +101,15 @@ def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
         raise GateError(
             f"reviewer-bindings.json: {reviewer!r} must use commit_policy='wrapper'"
         )
-    if sandbox != "read-only":
+    if effective_sandbox != "read-only":
         raise GateError(
             f"reviewer-bindings.json: {reviewer!r} must resolve argv --sandbox read-only"
         )
-    if "danger-full-access" in argv:
+    non_read_only = [value for value in sandbox_values if value != "read-only"]
+    if non_read_only:
         raise GateError(
-            f"reviewer-bindings.json: {reviewer!r} argv contains forbidden danger-full-access"
+            f"reviewer-bindings.json: {reviewer!r} argv --sandbox values must all be "
+            f"'read-only' (resolved {sandbox_values!r})"
         )
 
 
