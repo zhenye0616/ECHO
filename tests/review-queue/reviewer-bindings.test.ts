@@ -198,15 +198,15 @@ describe('087 reviewer-bindings.json contract', () => {
               {
                 reviewer: 'codex',
                 mode: 'headless-cli',
-                argv: ['codex', '-'],
+                argv: ['codex', 'exec', '-C', '{{WT}}', '--sandbox', 'read-only', '--json', '-'],
                 stdin_from: 'binding-owned/prompt.md',
                 cwd: '{{WT}}',
-                agent_sandbox: 'danger-full-access',
-                commit_policy: 'child',
+                agent_sandbox: 'read-only',
+                commit_policy: 'wrapper',
                 timeout_sec: null,
                 capture: {
-                  kind: 'committed_file',
-                  final_message_path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
+                  kind: 'stdout_json',
+                  final_message_path: 'raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md',
                   stdout_path: 'stdout',
                   stderr_path: 'stderr',
                   rc_path: 'rc',
@@ -248,6 +248,56 @@ describe('087 reviewer-bindings.json contract', () => {
       });
       expect(r.status).not.toBe(0);
       expect(r.stderr.toString()).toMatch(/codex not found in reviewer-bindings\.json/);
+      expect((r.stdout as Buffer).length).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects codex argv sandbox drift before emitting argv', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'echo-rq-087b-sandbox-drift-'));
+    try {
+      const driftBindings = join(dir, 'reviewer-bindings.json');
+      writeFileSync(
+        driftBindings,
+        JSON.stringify(
+          {
+            kind: 'reviewer',
+            bindings: [
+              {
+                reviewer: 'codex',
+                mode: 'headless-cli',
+                argv: ['codex', 'exec', '-C', '{{WT}}', '--sandbox', 'danger-full-access', '-'],
+                stdin_from: '.claude/commands/review-queue-codex.md',
+                cwd: '{{WT}}',
+                agent_sandbox: 'read-only',
+                commit_policy: 'wrapper',
+                timeout_sec: null,
+                capture: {
+                  kind: 'stdout_json',
+                  final_message_path: 'raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.final.md',
+                  stdout_path: 'stdout',
+                  stderr_path: 'stderr',
+                  rc_path: 'rc',
+                },
+                expected_artifact: {
+                  path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
+                  schema_ref: 'tools/review-queue/schemas/reviewer.schema.json',
+                },
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+      const r = gateBuffer(['--print', 'argv_nul'], {
+        REVIEWER_NAME: 'codex',
+        WT: '/tmp/wt',
+        ECHO_REVIEWER_BINDINGS_CONFIG: driftBindings,
+      });
+      expect(r.status).not.toBe(0);
+      expect(r.stderr.toString()).toMatch(/argv --sandbox 'danger-full-access' disagrees/);
       expect((r.stdout as Buffer).length).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });

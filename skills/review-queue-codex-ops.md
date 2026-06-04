@@ -46,7 +46,7 @@ Use this frontmatter shape:
 item_id: "<from request>"
 round: <from request>
 reviewer: "codex-ops"
-artifact_sha: "<request.spec_commit_sha or its 7-40 char prefix>"
+artifact_sha: "<request.spec_commit_sha exactly>"
 completed_at: '<current UTC timestamp YYYY-MM-DDTHH:MM:SSZ>'
 verdict: "proceed_after_patches"
 findings: []

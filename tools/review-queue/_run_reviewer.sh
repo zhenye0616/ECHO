@@ -320,11 +320,72 @@ EOF
       "$iso_ts" "$REVIEWER_NAME" "$failure_class" "$CHILD_RC" "$ARTIFACT_PATH" "$SPEC_COMMIT_SHA" "$marker_path" "$diagnostic" \
       >> "$errors_file"
     echo "[$iso_ts] recording capture failure reviewer=$REVIEWER_NAME failure=$failure_class marker=$marker_path"
-    git add "$marker_path" "$errors_file"
+    git add "$marker_path" "$errors_file" || return $?
     if ! git diff --cached --quiet; then
-      git commit -m "capture-failed: $REVIEWER_NAME r$ROUND_NUM on $ITEM_ID"
-      "$TOOL_DIR/push-with-retry.sh" "capture-failed: $REVIEWER_NAME r$ROUND_NUM on $ITEM_ID"
+      git commit -m "capture-failed: $REVIEWER_NAME r$ROUND_NUM on $ITEM_ID" || return $?
+      "$TOOL_DIR/push-with-retry.sh" "capture-failed: $REVIEWER_NAME r$ROUND_NUM on $ITEM_ID" || return $?
     fi
+  }
+
+  finish_capture_failure() {
+    local exit_rc="$1"
+    local failure_class="$2"
+    local diagnostic="$3"
+    local record_rc
+    set +e
+    record_capture_failure "$failure_class" "$diagnostic"
+    record_rc=$?
+    set -e
+    if [ "$record_rc" -ne 0 ]; then
+      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] capture failure record/push failed rc=$record_rc; closing coord lifecycle anyway" >&2
+    fi
+    emit_tick_end "$CORRELATION_ID" "terminal_capture_failure"
+    if [ "$record_rc" -ne 0 ]; then
+      exit "$record_rc"
+    fi
+    exit "$exit_rc"
+  }
+
+  validate_request_binding() {
+    local response_path="$1"
+    PYTHONDONTWRITEBYTECODE=1 python3 - "$response_path" "$REVIEWER_NAME" "$ITEM_ID" "$ROUND_NUM" "$SPEC_COMMIT_SHA" <<'PY'
+from pathlib import Path
+import sys
+import yaml
+
+path = Path(sys.argv[1])
+expected_reviewer = sys.argv[2]
+expected_item = sys.argv[3]
+expected_round = sys.argv[4]
+expected_sha = sys.argv[5]
+
+text = path.read_text(encoding="utf-8")
+parts = text.split("---", 2)
+if len(parts) < 3:
+    print("request binding mismatch: missing YAML frontmatter", file=sys.stderr)
+    raise SystemExit(1)
+fm = yaml.safe_load(parts[1]) or {}
+if not isinstance(fm, dict):
+    print("request binding mismatch: frontmatter is not a mapping", file=sys.stderr)
+    raise SystemExit(1)
+
+checks = {
+    "reviewer": expected_reviewer,
+    "item_id": expected_item,
+    "round": expected_round,
+    "artifact_sha": expected_sha,
+}
+mismatches = []
+for key, expected in checks.items():
+    actual = fm.get(key)
+    actual_s = "" if actual is None else str(actual)
+    if actual_s != expected:
+        mismatches.append(f"{key}={actual_s!r} expected {expected!r}")
+
+if mismatches:
+    print("request binding mismatch: " + "; ".join(mismatches), file=sys.stderr)
+    raise SystemExit(1)
+PY
   }
 
   append_wrapper_journal() {
@@ -622,15 +683,11 @@ PY
 
   if [ "$CHILD_RC" -ne 0 ]; then
     diag="$(bounded_snippet "$CAPTURE_STDERR")"
-    record_capture_failure "rc_nonzero" "${diag:-child exited non-zero}"
-    emit_tick_end "$CORRELATION_ID" "terminal_capture_failure"
-    exit "$CHILD_RC"
+    finish_capture_failure "$CHILD_RC" "rc_nonzero" "${diag:-child exited non-zero}"
   fi
   if [ ! -s "$CAPTURE_STDOUT" ]; then
     diag="$(bounded_snippet "$CAPTURE_STDERR")"
-    record_capture_failure "empty_stdout" "${diag:-child stdout was empty}"
-    emit_tick_end "$CORRELATION_ID" "terminal_capture_failure"
-    exit 1
+    finish_capture_failure 1 "empty_stdout" "${diag:-child stdout was empty}"
   fi
 
   if python3 - "$CAPTURE_STDOUT" "$CAPTURE_FINAL" 2>"$PACKET_DIR/parse-final-message.stderr" <<'PY'
@@ -704,9 +761,7 @@ PY
   fi
   parse_diag="$(cat "$PACKET_DIR/parse-final-message.stderr" 2>/dev/null || true)"
   if [ "$parse_rc" -ne 0 ] || [ ! -s "$CAPTURE_FINAL" ]; then
-    record_capture_failure "schema_invalid" "${parse_diag:-no final assistant message parsed from stdout_json}"
-    emit_tick_end "$CORRELATION_ID" "terminal_capture_failure"
-    exit 1
+    finish_capture_failure 1 "schema_invalid" "${parse_diag:-no final assistant message parsed from stdout_json}"
   fi
 
   validate_err_file="$PACKET_DIR/validate-response.stderr"
@@ -720,9 +775,19 @@ PY
   if [ "$validate_rc" -ne 0 ]; then
     validation_line="$(first_line "$VALIDATE_STDERR")"
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] captured final message failed validation rc=$validate_rc diagnostic=${validation_line:-<empty>}"
-    record_capture_failure "schema_invalid" "${validation_line:-reviewer schema validation failed}"
-    emit_tick_end "$CORRELATION_ID" "terminal_capture_failure"
-    exit 1
+    finish_capture_failure 1 "schema_invalid" "${validation_line:-reviewer schema validation failed}"
+  fi
+
+  binding_err_file="$PACKET_DIR/request-binding.stderr"
+  if validate_request_binding "$CAPTURE_FINAL" 2>"$binding_err_file"; then
+    binding_rc=0
+  else
+    binding_rc=$?
+  fi
+  if [ "$binding_rc" -ne 0 ]; then
+    binding_line="$(first_line "$(cat "$binding_err_file" 2>/dev/null || true)")"
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] captured final message failed request binding rc=$binding_rc diagnostic=${binding_line:-<empty>}"
+    finish_capture_failure 1 "request_binding_mismatch" "${binding_line:-reviewer response does not match selected request}"
   fi
 
   if [ -f "$ROUND_DIR/combined.md" ]; then

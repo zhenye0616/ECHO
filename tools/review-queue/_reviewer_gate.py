@@ -24,6 +24,7 @@ from _reviewers import Reviewer, load_reviewers  # noqa: E402
 TOOL_DIR = Path(__file__).resolve().parent
 DEFAULT_BINDINGS_CONFIG = TOOL_DIR / "reviewer-bindings.json"
 HEADLESS_BINDING_MODES = {"headless-cli", "host-subagent"}
+PROTECTED_WRAPPER_REVIEWERS = {"codex", "codex-ops"}
 VALID_PRINT_FIELDS = (
     "slash_command",
     "invoke_command",
@@ -53,6 +54,51 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise GateError("reviewer-bindings.json: top-level object is required")
     return raw
+
+
+def _argv_sandbox(argv: list[str], reviewer: str) -> str | None:
+    for idx, arg in enumerate(argv):
+        if arg == "--sandbox":
+            if idx + 1 >= len(argv):
+                raise GateError(f"reviewer-bindings.json: {reviewer!r} argv has --sandbox without a value")
+            return argv[idx + 1]
+        if arg.startswith("--sandbox="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
+    argv_raw = binding.get("argv")
+    argv = [str(arg) for arg in argv_raw] if isinstance(argv_raw, list) else []
+    sandbox = _argv_sandbox(argv, reviewer) if argv else None
+    agent_sandbox = binding.get("agent_sandbox")
+    commit_policy = binding.get("commit_policy")
+
+    if sandbox is not None and sandbox != agent_sandbox:
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} argv --sandbox {sandbox!r} "
+            f"disagrees with agent_sandbox {agent_sandbox!r}"
+        )
+
+    if reviewer not in PROTECTED_WRAPPER_REVIEWERS:
+        return
+
+    if agent_sandbox != "read-only":
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} must use agent_sandbox='read-only'"
+        )
+    if commit_policy != "wrapper":
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} must use commit_policy='wrapper'"
+        )
+    if sandbox != "read-only":
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} must resolve argv --sandbox read-only"
+        )
+    if "danger-full-access" in argv:
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} argv contains forbidden danger-full-access"
+        )
 
 
 def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
@@ -105,16 +151,17 @@ def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
             if key in found:
                 raise GateError(f"reviewer-bindings.json: {reviewer!r} ide-manual entry must not set {key}")
 
+    _enforce_runtime_contract(found, reviewer)
     return found
 
 
 def _legacy_binding_from_reviewer(reviewer: Reviewer) -> dict[str, Any]:
     """Bridge old fixture overrides that still route via ECHO_REVIEWERS_CONFIG.
 
-    Production runtime uses reviewer-bindings.json. Existing smoke fixtures set
-    ECHO_REVIEWERS_CONFIG to route a temporary mock CLI; synthesizing a binding
-    from that explicit override keeps those tests from invoking a real vendor
-    CLI while the fixture migration catches up.
+    Production codex/codex-ops runtime uses reviewer-bindings.json even when a
+    legacy roster override is present. This bridge remains only for non-087b
+    reviewers and old synthetic fixtures that are not part of the read-only
+    child migration.
     """
     if reviewer.mode != "headless" or not reviewer.invoke_command:
         return {
@@ -149,7 +196,11 @@ def _legacy_binding_from_reviewer(reviewer: Reviewer) -> dict[str, Any]:
 
 
 def _load_binding(reviewer: Reviewer) -> dict[str, Any]:
-    if os.environ.get("ECHO_REVIEWERS_CONFIG") and not os.environ.get("ECHO_REVIEWER_BINDINGS_CONFIG"):
+    if (
+        os.environ.get("ECHO_REVIEWERS_CONFIG")
+        and not os.environ.get("ECHO_REVIEWER_BINDINGS_CONFIG")
+        and reviewer.name not in PROTECTED_WRAPPER_REVIEWERS
+    ):
         return _legacy_binding_from_reviewer(reviewer)
     return _validate_binding(_load_json(_binding_config_path()), reviewer.name)
 
