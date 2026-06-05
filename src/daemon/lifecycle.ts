@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
@@ -15,18 +15,45 @@ let signalsBound = false;
 let keepAlive: NodeJS.Timeout | null = null;
 let onShutdownHook: (() => void | Promise<void>) | null = null;
 
-export function resolveDataDir(): string {
-  const env = process.env['ECHO_DATA_DIR'];
-  if (isNonEmptyString(env)) return resolve(env);
-  return join(homedir(), 'Library', 'Application Support', 'ECHO');
+export interface DataDirOptions {
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  homeDir?: string;
 }
 
-export function resolveDbPath(): string {
-  const dbPath = process.env['ECHO_DB_PATH'];
-  if (isNonEmptyString(dbPath)) return resolve(dbPath);
-  const dataDir = process.env['ECHO_DATA_DIR'];
-  if (isNonEmptyString(dataDir)) return join(resolve(dataDir), 'echo.db');
-  return join(homedir(), 'Library', 'Application Support', 'ECHO', 'echo.db');
+function pathResolve(platform: NodeJS.Platform, path: string): string {
+  return platform === 'win32' ? win32.resolve(path) : resolve(path);
+}
+
+function pathJoin(platform: NodeJS.Platform, ...parts: string[]): string {
+  return platform === 'win32' ? win32.join(...parts) : join(...parts);
+}
+
+export function resolveDataDir(opts: DataDirOptions = {}): string {
+  const envSource = opts.env ?? process.env;
+  const platform = opts.platform ?? process.platform;
+  const home = opts.homeDir ?? homedir();
+  const env = envSource['ECHO_DATA_DIR'];
+  if (isNonEmptyString(env)) return pathResolve(platform, env);
+  if (platform === 'win32') {
+    const base = envSource['LOCALAPPDATA'] ?? envSource['APPDATA'];
+    return isNonEmptyString(base)
+      ? pathResolve(platform, pathJoin(platform, base, 'ECHO'))
+      : pathResolve(platform, pathJoin(platform, home, 'AppData', 'Local', 'ECHO'));
+  }
+  if (platform === 'darwin') return join(home, 'Library', 'Application Support', 'ECHO');
+  const xdgDataHome = envSource['XDG_DATA_HOME'];
+  return isNonEmptyString(xdgDataHome)
+    ? pathResolve(platform, pathJoin(platform, xdgDataHome, 'ECHO'))
+    : pathResolve(platform, pathJoin(platform, home, '.local', 'share', 'ECHO'));
+}
+
+export function resolveDbPath(opts: DataDirOptions = {}): string {
+  const env = opts.env ?? process.env;
+  const platform = opts.platform ?? process.platform;
+  const dbPath = env['ECHO_DB_PATH'];
+  if (isNonEmptyString(dbPath)) return pathResolve(platform, dbPath);
+  return pathJoin(platform, resolveDataDir(opts), 'echo.db');
 }
 
 export function acquirePidLockOrExit(dataDir: string): void {

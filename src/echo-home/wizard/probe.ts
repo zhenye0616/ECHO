@@ -1,5 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import type { AgentKind } from './detect-agents.js';
+import { resolveCommand } from '../../util/subprocess.js';
 
 export type ProbeOutcome =
   | { agent: AgentKind; probed: true; latencyMs: number }
@@ -37,7 +39,14 @@ function realSpawn(
   opts?: { timeoutMs: number },
 ): Promise<SpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    const child = nodeSpawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const resolved = resolveCommand(cmd, {
+      platform: process.platform,
+      env: process.env,
+      existsSync,
+    });
+    const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     let timedOut = false;

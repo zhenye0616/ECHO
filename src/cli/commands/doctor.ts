@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 import { parseArgs } from 'node:util';
 import { resolveDataDir } from '../../daemon/lifecycle.js';
 import {
@@ -53,6 +53,7 @@ export interface DoctorOpts {
   probeAgents?: typeof realProbeAgents;
   fetch?: typeof fetch;
   now?: () => Date;
+  platform?: NodeJS.Platform;
 }
 
 export const DOCTOR_HELP = `Usage: echoctl doctor [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>]
@@ -202,7 +203,9 @@ export function computeOverall(report: DoctorReport): 'healthy' | 'degraded' | '
 export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorReport> {
   if (opts.home !== undefined) setEchoHomeRoot(opts.home);
   const port = resolveDoctorPort(opts.port);
-  const pidLockPath = join(resolveDataDir(), 'daemon.pid');
+  const platform = opts.platform ?? process.platform;
+  const dataDir = resolveDataDir({ platform });
+  const pidLockPath = platform === 'win32' ? win32.join(dataDir, 'daemon.pid') : join(dataDir, 'daemon.pid');
   const pidLockHeld = existsSync(pidLockPath);
   const mcpReachable = await probeMcp(opts.fetch ?? fetch, port);
   const echoHomeExists = existsSync(ECHO_HOME_PATHS.root);

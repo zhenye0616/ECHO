@@ -100,6 +100,7 @@ async function runWith(
     etime?: string;
     psStatus?: number;
     json?: boolean;
+    platform?: NodeJS.Platform;
   } = {},
 ): Promise<{ code: number; calls: Call[]; stdout: string; stderr: string }> {
   const calls: Call[] = [];
@@ -116,6 +117,7 @@ async function runWith(
     healthProbe: async () => opts.health ?? true,
     sleep: async () => {},
     getuid: () => 501,
+    platform: opts.platform ?? 'darwin',
     processExecPath: '/node/v22/bin/node',
     daemonPath: opts.daemonPathOverride ?? daemonPath,
     probeDeadlineMs: 0,
@@ -291,6 +293,43 @@ describe('echoctl daemon', () => {
     expect(calls.some((c) => c.command === 'launchctl' && c.args[0] === 'bootout')).toBe(false);
     expect(calls.some((c) => c.command === 'launchctl' && c.args[0] === 'bootstrap')).toBe(false);
   });
+
+  it.each(['win32', 'linux'] as const)(
+    'status reports manual-daemon mode and never calls launchctl on %s',
+    async (platform) => {
+      const { code, calls, stdout } = await runWith(['status'], {
+        platform,
+        health: true,
+        json: true,
+      });
+
+      expect(code).toBe(0);
+      expect(calls.some((c) => c.command === 'launchctl')).toBe(false);
+      expect(JSON.parse(stdout)).toMatchObject({
+        daemon: 'manual',
+        mode: 'manual-daemon',
+        launchd: false,
+        health: 'healthy',
+      });
+    },
+  );
+
+  it.each(['win32', 'linux'] as const)(
+    'start and stop are clean manual-daemon no-ops on %s',
+    async (platform) => {
+      const started = await runWith(['start'], { platform });
+      out = [];
+      err = [];
+      const stopped = await runWith(['stop'], { platform });
+
+      expect(started.code).toBe(0);
+      expect(stopped.code).toBe(0);
+      expect(started.stdout).toContain('Manual daemon mode (no launchd)');
+      expect(stopped.stdout).toContain('Manual daemon mode (no launchd)');
+      expect(started.calls.some((c) => c.command === 'launchctl')).toBe(false);
+      expect(stopped.calls.some((c) => c.command === 'launchctl')).toBe(false);
+    },
+  );
 
   it('status reports loaded-but-unhealthy as exit 2 with health broken', async () => {
     writePlist();

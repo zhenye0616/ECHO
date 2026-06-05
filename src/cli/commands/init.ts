@@ -35,6 +35,7 @@ import {
   type DaemonControlOptions,
 } from './daemon.js';
 import { claudeCodeMcpAddCommand } from '../../echo-home/adapters/claude-code-mcp.js';
+import { parseJson, readJsonFile } from '../../util/json.js';
 
 export const AGENT_CAPABILITIES_BY_KIND: Readonly<Record<AgentKind, readonly Capability[]>> =
   Object.freeze({
@@ -262,7 +263,7 @@ function loadAnswerFile(path: string): LoadedAnswerFile {
     failAnswerFile(resolvedPath, 'file', `failed to read: ${(err as Error).message}`);
   }
   try {
-    return { path: resolvedPath, answers: validateAnswerFile(resolvedPath, JSON.parse(raw)) };
+    return { path: resolvedPath, answers: validateAnswerFile(resolvedPath, parseJson(raw)) };
   } catch (err) {
     if (err instanceof SyntaxError) {
       failAnswerFile(resolvedPath, 'root', `invalid JSON: ${err.message}`);
@@ -328,7 +329,7 @@ function parseAgentSelection(input: string, fallback: readonly AgentKind[]): Age
 }
 
 function readOnboardingState(): OnboardingState {
-  const raw = JSON.parse(readFileSync(ECHO_HOME_PATHS.stateOnboarding, 'utf8')) as unknown;
+  const raw = readJsonFile(ECHO_HOME_PATHS.stateOnboarding);
   if (!validateOnboardingState(raw)) {
     throw new Error(`${ECHO_HOME_PATHS.stateOnboarding}: invalid onboarding state`);
   }
@@ -353,7 +354,7 @@ function readRecordedProfile(): {
     return { exists: false, profile: null, validShape: true };
   }
   try {
-    const raw = JSON.parse(readFileSync(ECHO_HOME_PATHS.stateOnboarding, 'utf8')) as unknown;
+    const raw = readJsonFile(ECHO_HOME_PATHS.stateOnboarding);
     if (!validateOnboardingState(raw)) {
       return { exists: true, profile: null, validShape: false };
     }

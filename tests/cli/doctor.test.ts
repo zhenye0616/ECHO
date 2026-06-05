@@ -196,6 +196,23 @@ describe('runDoctor', () => {
     expect(degraded.overall).toBe('degraded');
   });
 
+  it.each(['win32', 'linux'] as const)(
+    'treats a reachable manual daemon as healthy on %s',
+    async (platform) => {
+      writeState();
+      const { buildDoctorReport } = await loadDoctor();
+
+      const report = await buildDoctorReport({
+        platform,
+        fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+        probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
+      });
+
+      expect(report.daemon.mcpReachable).toBe(true);
+      expect(report.overall).toBe('healthy');
+    },
+  );
+
   it('prints exact claude-code MCP remediation and local-shadow escape hatch', async () => {
     writeState('mcp-not-configured');
     mkdirSync(dataDir, { recursive: true });

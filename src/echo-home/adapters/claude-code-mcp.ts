@@ -1,4 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolveCommand } from '../../util/subprocess.js';
 
 export interface ClaudeCodeMcpSpawnResult {
   exitCode: number;
@@ -54,7 +56,14 @@ function realSpawn(
   opts: { timeoutMs: number; outputLimit: number },
 ): Promise<ClaudeCodeMcpSpawnResult> {
   return new Promise((resolvePromise, reject) => {
-    const child = nodeSpawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const resolved = resolveCommand(cmd, {
+      platform: process.platform,
+      env: process.env,
+      existsSync,
+    });
+    const child = nodeSpawn(resolved.command, [...(resolved.prependArgs ?? []), ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     let timedOut = false;

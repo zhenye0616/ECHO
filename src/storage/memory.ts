@@ -16,6 +16,58 @@ interface InternalEvent extends CaptureEvent {
   _seq: number;
 }
 
+function stripTrailingSlash(value: string): string {
+  let out = value;
+  while (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+}
+
+function pathStartIndex(value: string): number | null {
+  if (/^[A-Za-z]:[\\/]/.test(value)) return 0;
+  if (value.startsWith('/') || value.startsWith('~/') || value.startsWith('\\')) return 0;
+  const match = /^([A-Za-z_][A-Za-z0-9_+.-]*:)(.*)$/.exec(value);
+  if (match === null) return value.includes('\\') ? 0 : null;
+  const rest = match[2]!;
+  if (
+    rest.startsWith('/') ||
+    rest.startsWith('\\') ||
+    rest.startsWith('~/') ||
+    /^[A-Za-z]:[\\/]/.test(rest)
+  ) {
+    return match[1]!.length;
+  }
+  return null;
+}
+
+function normalizePathLikeSource(value: string): string | null {
+  const start = pathStartIndex(value);
+  if (start === null) return null;
+  const sourcePrefix = value.slice(0, start);
+  const pathPart = stripTrailingSlash(value.slice(start).replace(/\\/g, '/'));
+  const windowsLike = process.platform === 'win32' || /^[A-Za-z]:(?:\/|$)/.test(pathPart);
+  const normalized = `${sourcePrefix}${pathPart}`;
+  return windowsLike ? normalized.toLowerCase() : normalized;
+}
+
+function sourceEquals(left: string, right: string): boolean {
+  const normalizedLeft = normalizePathLikeSource(left);
+  const normalizedRight = normalizePathLikeSource(right);
+  if (normalizedLeft !== null && normalizedRight !== null) return normalizedLeft === normalizedRight;
+  return left === right;
+}
+
+function sourceHasPrefix(source: string, prefix: string): boolean {
+  const normalizedSource = normalizePathLikeSource(source);
+  const normalizedPrefix = normalizePathLikeSource(prefix);
+  if (normalizedSource !== null && normalizedPrefix !== null) {
+    if (normalizedSource === normalizedPrefix) return true;
+    return normalizedSource.startsWith(
+      normalizedPrefix.endsWith('/') ? normalizedPrefix : `${normalizedPrefix}/`,
+    );
+  }
+  return source.startsWith(prefix);
+}
+
 function stripSeq(e: InternalEvent): CaptureEvent {
   // Re-construct to drop `_seq` — the internal sequence counter is
   // exposed only via iterateCoordAtomsByAppendOrder's typed
@@ -90,8 +142,8 @@ export class MemoryStorage implements Storage {
     // ASC, ASC) — parallel directions, never mixed.
     const filtered: InternalEvent[] = [];
     for (const event of this.events) {
-      if (source !== undefined && event.source !== source) continue;
-      if (sourcePrefix !== undefined && !event.source.startsWith(sourcePrefix)) continue;
+      if (source !== undefined && !sourceEquals(event.source, source)) continue;
+      if (sourcePrefix !== undefined && !sourceHasPrefix(event.source, sourcePrefix)) continue;
       if (since !== undefined && event.timestamp < since) continue;
       if (until !== undefined && event.timestamp >= until) continue;
       if (before !== undefined) {
