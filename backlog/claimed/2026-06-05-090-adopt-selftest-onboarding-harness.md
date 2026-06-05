@@ -25,10 +25,10 @@ spec_refs:
   # builder reconstructs selftest from it even if that worktree is gone.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T20:39:33Z"
+branch: "agent/adopt-selftest-onboarding-harness"
+worktree: "/Users/zhenye/Desktop/Project_echo--adopt-selftest-onboarding-harness"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
