@@ -4,15 +4,19 @@ role: builder
 writer: codex-builder
 binding: codex
 claim_branch: agent/proposed-stage-pipeline
-last_updated: 2026-06-05T04:24:18Z
-handoff_branch: ""
-handoff_head_sha: ""
-handoff_run_log: ""
+last_updated: 2026-06-05T04:48:46Z
+handoff_branch: agent/proposed-stage-pipeline
+handoff_head_sha: 857924b9fd69c2af55f03db165cd761d3fd22ae7
+handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md
 ---
 
 ## current_thesis
 
 Fresh claim by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the proposed-stage pipeline: make folder location the source of claimability, replace 086's `spec_review` state gate with `ready_content_sha`, automate promotion/bounce, generate BACKLOG output through a tool only, and keep spec-review content mechanics unchanged.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 857924b9fd69c2af55f03db165cd761d3fd22ae7.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -40,5 +44,5 @@ Fresh claim by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement t
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-03-088-proposed-stage-pipeline.md
+- spec: backlog/pending_review/2026-06-03-088-proposed-stage-pipeline.md
 - reviews: backlog/reviews/2026-06-03-088-proposed-stage-pipeline/

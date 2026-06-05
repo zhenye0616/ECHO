@@ -48,9 +48,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-05T04:24:18Z"
 branch: "agent/proposed-stage-pipeline"
 worktree: ""
-head_sha: ""
+head_sha: "857924b9fd69c2af55f03db165cd761d3fd22ae7"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the proposed-stage pipeline on branch agent/proposed-stage-pipeline: added backlog/proposed, reworked claimability around ready_content_sha, added proposed-first review artifact lookup, added idempotent promote/bounce tooling, enforced proposed-stage verification-round routing, added the generated BACKLOG index tool, and updated the allowed docs/skills plus regenerated command adapters. Verification passed: python3 tools/test_blocked.py, python3 tools/backlog_index.py --check, targeted Vitest, python3 tools/blocked.py --validate, tools/sync-skills.sh --check, git diff --check, npm run lint, npm run typecheck, and full npm test.
 ---
 
 # 088 — Add a `proposed/` backlog stage (folder-location = claimability)
