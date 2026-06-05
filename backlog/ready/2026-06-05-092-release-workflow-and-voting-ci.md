@@ -8,6 +8,7 @@ created: 2026-06-05
 blocked_by: ["2026-06-05-091-upstream-windows-compat-fixes"]
 task_state_ref: 2026-06-05-092-release-workflow-and-voting-ci
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: ed54968e04cee9be4f6e4b3bb9534a8d934aeba4ce5cfe5fc733cf6e675ceadb
 files_to_modify:
   - .github/workflows/release.yml          # AC1/AC2 — NEW tag-triggered (`v*`) workflow. Build ONE artifact via `npm pack` (echoctl-<version>.tgz — NOT per-OS artifacts; ECHO is one Node package, only native dep better-sqlite3 installs via its own prebuild path and is NOT bundled in the npm tarball). Then on matrix os:[ubuntu,macos,windows]: install that SAME .tgz and run `echoctl selftest` (+ `echoctl doctor`). Publish the tarball as a private/prerelease GitHub Release tagged the same `v0.1.x-beta.N`; do NOT delete the prior release (rollback). No npm-public/Homebrew/winget here.
   - .github/workflows/ci.yml               # AC3 — flip the `onboarding` + windows-compat job(s) from 090's NON-required/quarantined state to a REQUIRED gate now that 091 made them green. main now fails if cross-platform onboarding regresses. (Un-skip is already done in 091; this makes the green job a blocking check.)

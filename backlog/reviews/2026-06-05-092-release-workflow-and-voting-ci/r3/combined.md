@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R3 — both reviewers (codex, codex-ops) returned `proceed` with zero findings at spec SHA `11d8dfaa`. The r2 refinements (Node `crypto` portable checksum verifier, pre-merge `pull_request`/`push` vs post-merge-only `workflow_dispatch` rehearsal split, builder-local-static gate with founder/manual post-merge GH-matrix carve-out) closed the operational gaps with no new mechanism introduced — no patch-on-patch regression. Convergence arc: r1 (8 findings) → r2 (2, reframe gate fired → text_patch) → r3 (0). Promoting `proposed/ → ready/`; the spec is now claimable by a builder.
 
