@@ -21,10 +21,10 @@ spec_refs:
   - package.json  # current `files` allowlist (:12) + bin/prepack (:9,:31); native dep better-sqlite3 (:60).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T22:00:46Z"
+branch: "agent/release-workflow-and-voting-ci"
+worktree: "/Users/zhenye/Desktop/Project_echo--release-workflow-and-voting-ci"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
