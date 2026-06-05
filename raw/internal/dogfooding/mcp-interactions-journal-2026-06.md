@@ -1149,3 +1149,38 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/request.md`; artifact `backlog/proposed/2026-06-05-091-upstream-windows-compat-fixes.md@c2426d101063dd1ec30eed3e21bf258c997d83e1`; response `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/codex-ops.md`; raw diagnostics `/tmp/claude-501/echo-codex-ops-0FDCD772-1DFC-4ED3-AB27-3174735E4C4A/raw/internal/review-queue/1686cb7e-2118-4559-b719-82853fffa4dd/codex-ops.stdout.log` / `/tmp/claude-501/echo-codex-ops-0FDCD772-1DFC-4ED3-AB27-3174735E4C4A/raw/internal/review-queue/1686cb7e-2118-4559-b719-82853fffa4dd/codex-ops.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+### 2026-06-05 13:33 PDT — monitor confirms 090 r3 convergence and 091 r3 dispatch
+
+- **Trigger:** Codex reran the prior wait with a valid timeout to recover the events missed by the invalid `timeout=75` call.
+- **Query inputs:** `wait_for_new_turns(sources=["claude_code","git"], source_prefix="coord:", since="2026-06-05T20:30:02.176Z", timeout=10)`; `get_atoms(11 returned ids, prefer="newest_first", format="minimal", view="compact")`; `coord_status({})`.
+- **Returned:** Wait returned 11 ids, `timed_out=false`, `next_since="2026-06-05T20:33:05.774Z"`. Hydrated atoms showed 090 r3 codex-ops and codex both returned `proceed`; git commit `46756345` combined 090 r3 with `combined_verdict: proceed`; git commit `c2426d10` patched 091 r2 (darwin-only launchd gate); git commit `91ae8374` dispatched 091 r3; coord tick_end atoms closed codex/codex-ops. `coord_status` at `20:33:05Z` returned `open_deadlines=[]`.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`; Claude session `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/d5d732c0...jsonl`; coord atoms `coord:codex` and `coord:codex-ops`. Cursor absent.
+- **Verdict:** ✅ right — ECHO captured the r3 close and the next 091 dispatch. Cross-checking origin then showed 090 promoted to `backlog/ready/2026-06-05-090-adopt-selftest-onboarding-harness.md` by terminal commit `cdfd3d7e`.
+- **Note:** Monitoring state: 090 converged/promoted; 091 is still in `backlog/proposed/` with r3 requested and must remain under watch.
+
+### 2026-06-05 13:34 PDT — monitor confirms 091 r3 reviewers are clean
+
+- **Trigger:** Continue monitoring after 090 promotion; 091 r3 had just been dispatched and needed reviewer closure.
+- **Query inputs:** `wait_for_new_turns(sources=["claude_code","git"], source_prefix="coord:", since="2026-06-05T20:33:05.774Z", timeout=60)`; `get_atoms(11 returned ids, prefer="newest_first", format="minimal", view="compact")`; `coord_status({})`.
+- **Returned:** Wait returned 11 ids, `timed_out=false`, `next_since="2026-06-05T20:34:12.926Z"`. Hydrated atoms showed terminal 090 promotion commit `cdfd3d7e`; 091 r2 patch/disposition context in Claude session `14bfc2a7...`; coord tick_start/tick_end for 091 r3 codex/codex-ops; `coord_status` at `20:34:12Z` returned `open_deadlines=[]`. Origin cross-check showed `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/codex.md` and `codex-ops.md` both exist and both verdict `proceed` with no findings.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`; Claude Code FS sessions `d5d732c0...` and `14bfc2a7...`; coord atoms `coord:codex`, `coord:codex-ops`. Cursor absent.
+- **Verdict:** ✅ right — ECHO and origin agree that 091 r3 reviewers completed cleanly.
+- **Note:** Monitoring state: 091 is not terminal yet because `r3/combined.md` and `backlog/ready/2026-06-05-091-upstream-windows-compat-fixes.md` are still absent. Keep watching for watcher combine+promotion.
+
+### 2026-06-05 13:36 PDT — monitor idle after 091 r3 reviewers clean
+
+- **Trigger:** Wait specifically for 091 r3 combine/terminal promotion after both r3 reviewers had returned `proceed`.
+- **Query inputs:** `wait_for_new_turns(sources=["claude_code","git"], source_prefix="coord:", since="2026-06-05T20:34:12.926Z", timeout=60)`; no hydration because no ids; `coord_status({})`.
+- **Returned:** Wait timed out with `turn_ids=[]`, `next_since="2026-06-05T20:36:11.758Z"`, no warnings. `coord_status` at `20:36:11Z` returned `open_deadlines=[]`; codex/codex-ops last ticks remained the 091 r3 reviewer pair (`20:33:08Z→20:33:56Z`, `20:33:27Z→20:34:08Z`); recent misses unchanged and old.
+- **Sources:** Direct loopback MCP daemon. No atom sources because the wait returned zero; `coord_status` derived from coord tracker state.
+- **Verdict:** 🟡 partial — health is clean and no deadlines are open, but no terminal watcher commit appeared in the observed window.
+- **Note:** This is not a reviewer failure; it is an idle gap between "both reviewers clean" and "watcher combines/promotes." Continue watching origin/ECHO for `r3/combined.md` and `ready/091`.
+
+### 2026-06-05 13:36 PDT — final origin cross-check after idle wait
+
+- **Trigger:** After the idle ECHO wait, Codex fetched origin to verify whether the terminal watcher commits had landed without a new wait wake-up.
+- **Query inputs:** No new MCP call; this entry closes the immediately preceding `wait_for_new_turns` observation with origin evidence.
+- **Returned:** Origin showed `52d7e16f` (`review-r3: combined on 091`) at `13:34:34 PDT`, `3a106103` (`review-r3: disposition on 091 — claim-ready`) at `13:36:11 PDT`, and `d39cbdd1` (`review-r3: terminal on 091 — promoted proposed→ready, ready_content_sha sealed`) at `13:36:29 PDT`. `backlog/ready/2026-06-05-091-upstream-windows-compat-fixes.md` exists; `backlog/proposed/2026-06-05-091-upstream-windows-compat-fixes.md` is gone from origin.
+- **Sources:** Git origin/main paths and commits: `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/combined.md`, `backlog/ready/2026-06-05-091-upstream-windows-compat-fixes.md`, commit ids above. No additional ECHO atom sources.
+- **Verdict:** ✅ right — final state reached: both 090 and 091 converged and are now claimable in `backlog/ready/`.
+- **Note:** Friction: the terminal commits landed during/just after the 60s idle window, but `wait_for_new_turns` returned no ids. The practical workaround remains origin polling after an idle ECHO wait when the expected event is a watcher git commit.
