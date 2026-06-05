@@ -26,6 +26,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 
 ## Interactions
 
+### 2026-06-05 16:34 PDT - codex builder process-backlog pre-claim context pull
+
+- **Trigger:** Founder invoked `$ECHO:process-backlog`; Codex builder checked repo-scoped recent work context before atomic claim.
+- **Query inputs:** `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo", format:"skeleton", view:"compact"})`.
+- **Returned:** 2 clusters. Top cluster `ctx_67886ddd` label `"work on Project_echo"`, 218 total atom ids with `atom_ids_truncated:true`, rank_reasons `[has_open_loop, has_unresolved_open_loop, code_session_anchor]`; secondary cluster `ctx_12efa7ea` label `"discussion about ECHO"`.
+- **Sources:** top source_breakdown `{git:137, claude_code:81}` over `2026-06-05T19:37:08Z` to `2026-06-05T23:33:02Z`; secondary source_breakdown `{codex:9}` over `2026-06-05T19:46:09Z` to `2026-06-05T22:53:02Z`. Cursor absent from this repo-scoped call.
+- **Verdict:** partial - MCP is reachable and recovered active Project_echo work, but the returned skeleton is intentionally broad and not item-specific before the backlog selector chooses the claim.
+- **Note:** Useful as a smoke/context check. Implementation grounding still comes from the selected backlog item and its `spec_refs`.
+
 ### 2026-06-03 23:25 PDT - codex builder preflight on 088 proposed-stage pipeline
 
 - **Trigger:** Founder invoked `$ECHO:process-backlog 088`; Codex builder preflight checked MCP reachability and pulled repo-scoped recent context before atomic claim.
