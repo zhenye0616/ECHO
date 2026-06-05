@@ -940,3 +940,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** partial - connectivity is present, but the smoke test fixture is stale relative to the current coord/task-state MCP surface.
 - **Note:** Useful as a pre-claim health signal despite the non-zero exit. The failure is an expectation mismatch, not daemon unreachability.
 - **Conjecture:** Update the smoke script to tolerate/add the coord and role-state tools, or split "daemon reachable" from "exact public tool-set" assertions so builder startup probes do not fail on intentional surface growth.
+
+### 2026-06-05 00:54 PDT — post-089-merge daemon health check
+
+- **Trigger:** strategist merged 089 (legacy spec_review gate teardown) to main after a separate-codex independent review; merge-and-cleanup live-checkout-bringup verification.
+- **Query inputs:** `echo_ping(message="post-089-merge health check")`.
+- **Returned:** `pong=true`, ts `2026-06-05T07:54:07Z`, message echoed. Connectivity only.
+- **Sources:** `mcp__echo.echo_ping` against local daemon; no capture-source atoms.
+- **Verdict:** right — daemon healthy through the merge (089 touched blocked.py/promote.py/test/skills/docs — all CLI/static, not daemon runtime; no package.json change → no reinstall/restart).
+- **Note:** 089 completes 088's migration: folder-location + ready_content_sha is now the SOLE claim contract (legacy spec_review fully removed). Two-codex split this turn (root-cause investigator A → _followups; independent reviewer B → merge-as-is) both clean.
