@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R2 — both codex and codex-ops returned `proceed` with zero findings on the r1-patched spec (`81d4aa5e`), explicitly endorsing the seal-stability disposition (CONTENT_MARKER_FIELDS unchanged; no runtime hash guard; AC3 caller-sweep sufficient). No patches this round; converged. Promoting proposed→ready via promote.py stage-only.
 
