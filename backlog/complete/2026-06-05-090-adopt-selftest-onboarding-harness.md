@@ -35,7 +35,27 @@ agent_notes: |
   Implemented `echoctl selftest` and the 090 CI skeleton on `agent/adopt-selftest-onboarding-harness` at `c98641f00d113ec3a3bb4f127ad09fa8f101359c`. The selftest command runs in throwaway HOME/ECHO_HOME/CODEX_HOME state, starts its daemon with `ECHO_MCP_PORT=0`, parses the resolved lifecycle port, and threads that port through MCP/CLI checks without touching 38478. Voting tests use a fake runner and cover JSON check IDs, exit codes, sentinel/concurrency isolation, and cleanup on success/failure/timeout. `tests/windows-compat.test.ts` is quarantined with skipped/todo rows; `.github/workflows/ci.yml` makes `quality` the only voting gate and keeps packed-artifact `onboarding` non-voting via `continue-on-error: true`.
 
   Verification passed: focused selftest/windows-compat vitest, `npm run typecheck`, `npm run lint`, `npm run build:cli`, full `npm test` (147 files passed / 2 skipped; 1564 tests passed / 25 skipped / 2 todo), `npm pack --pack-destination /private/tmp/echo-090-pack`, and `git diff --check --cached`.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-05 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean `--no-ff` merge; the 5 declared files touched exactly, `.github/workflows/` was empty on main so ci.yml is a pure add.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none — sidecar verdict was `merge as-is` with an empty pre-merge punch list.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 1564/1564 tests pass (25 skipped, 2 todo); lint, typecheck, check-coupled-invariants, and sync-skills --check all clean post-merge. The init.test.ts full-suite real-daemon flake the reviewer observed did NOT recur in the merger worktree (confirms environmental, not a 090 regression).
+
+  Packed-artifact onboarding job (076 boundary, first CI exercise): NOT yet observed — the `onboarding` job is continue-on-error and only runs on GitHub Actions; allowlist-gap signal will surface on the first live CI run post-merge, not at merge time. Re-check after CI runs.
+
+  Follow-up items (non-blocking):
+  - 091 should replace the fixed `await sleep(4000)` capture-settle in selftest.ts:609 with a poll-until-recall loop before flipping `onboarding` to a required gate in 092.
+  - Consider filing the tests/cli/init.test.ts full-suite real-daemon flake as a separate friction item (produced a false-red under the reviewer's full run; passes in isolation).
 ---
 
 # 090 — Adopt the onboarding self-test harness (revised, red board quarantined)
