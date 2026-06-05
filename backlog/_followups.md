@@ -965,3 +965,29 @@ The founder's "two adapters drift" theory is the *install-time* hop (canonical s
 - promote.py leaves a stale `status: proposed` field in the promoted `ready/` file (folder is authoritative so it's cosmetic + validates + claimable, but it's the exact folder-vs-field drift 088 killed; worse, the seal freezes it — `status` is a sealed/non-excluded field, so it can't be corrected to `status: ready` without invalidating ready_content_sha). Fix: set `status: ready` BEFORE stamping in promote.py, OR exclude `status` from the normalized seal. Full context: raw/internal/decisions/2026-06-04-089-pipeline-shakedown-friction.md.
 - Builder handoff commit mislabeled `review:` (observed at BOTH 088 and 089 builds): the move-to-pending_review/completion commit is prefixed `review: <id>`, colliding visually with /review-pending sidecar commits in git log. Trivial builder-prompt/skill fix (use `handoff:` or `pending-review:` prefix). Recurring.
 - `status:` frontmatter field is vestigial under folder-authoritative claiming (088) yet still sealed by promote.py, so it freezes at `status: proposed` and rides stale through claimed/ + pending_review/. Either update `status` at each stage move (claim/promote/handoff) or exclude it from the ready_content_sha seal. See raw/internal/decisions/2026-06-04-089-pipeline-shakedown-friction.md.
+
+## Root-cause analysis — 089 friction (codex investigation 2026-06-05)
+
+### 1. Stale `status:` field
+
+**Root cause:** `tools/review-queue/promote.py:210-224` computes `current_sha` from the current `proposed/` text, stamps that digest as `ready_content_sha`, and moves the file to `ready/` without ever setting `status: ready`; `tools/blocked.py:66-76` and `tools/blocked.py:194-200` exclude only marker + agent-managed fields from the seal, so `status` is sealed.
+
+**Why it happens:** 088 made folder location authoritative, and `tools/blocked.py:271-276` explicitly ignores `status`/folder mismatch, so claimability still works. But `status` stayed in the normalized digest, so the promotion freezes the pre-promotion lifecycle label and any later correction changes `normalized_content_sha`.
+
+**Minimal fix:** Recommend treating `status` as lifecycle metadata, not sealed spec content: add it to the normalized-hash exclusion set and have `promote.py` set `status: ready` during the move. This preserves the seal's meaning as "reviewed spec content + non-lifecycle frontmatter has not changed" and keeps the pre-promotion identity comparison against `request.spec_commit_sha` valid. The alternative, setting `status: ready` while keeping it sealed, needs a special compare-before/recompute-after path and still blocks legitimate later `claimed/` or `pending_review/` status updates unless every stage mover can restamp the seal.
+
+### 2. Builder handoff commit mislabeled `review:`
+
+**Root cause:** The label is in the canonical builder protocol, not a hidden helper: `docs/AGENT_INSTRUCTIONS.md:66-83` tells successful handoff to `git commit -m "review: <item-id>"`, and `skills/process-backlog.md:315-373` uses `"review: $ITEM_ID"` for both the local commit and `push-with-retry.sh`; batch repeats it at `skills/process-backlog-batch.md:130-137`.
+
+**Why it happens:** The builder handoff uses "review" to mean "ready for review", while `/review-pending` uses the same prefix for actual review sidecars at `skills/review-pending.md:209-212`. `tools/backlog/run-codex-builder.sh:79-107` only feeds `skills/process-backlog.md` into Codex, so the observed 088/089 commits follow that prose exactly.
+
+**Minimal fix:** Rename only the successful builder handoff label in `skills/process-backlog.md`, `skills/process-backlog-batch.md`, and `docs/AGENT_INSTRUCTIONS.md` to a distinct prefix such as `handoff: $ITEM_ID` or `pending-review: $ITEM_ID`, including the finish-path `push-with-retry.sh` message. Leave `/review-pending` sidecar commits as `review:` and leave blocked/escalation handoff as `escalate:`.
+
+### 3. Same-vendor reviewer serialization
+
+**Root cause:** ECHO can spawn separate reviewer wrappers, but both `codex` and `codex-ops` resolve to the same protected Codex CLI binding: `tools/review-queue/reviewer-bindings.json:5-24` and `tools/review-queue/reviewer-bindings.json:44-64` both use `codex exec ... --json -`, and `_reviewer_gate.py:27-37` plus `_reviewer_gate.py:317-335` enforce that exact protected template.
+
+**Why it happens:** `src/mcp/tools/coord-invoke.ts:132-170` fire-and-forget spawns one wrapper per requested headless role, and `_run_reviewer.sh:633-655` can bind each wrapper to its own requested response, so there is no ECHO-side cross-reviewer lock. The serialization is below that layer: `_run_reviewer.sh:783-794` synchronously waits for each child `codex exec` process, and both children share one local Codex account/session substrate. The existing 087/089 timing pattern is therefore consistent with a Codex-side single-active-session/account cap, not a queue bug.
+
+**Minimal fix:** Accept/document unless wall-clock is more important than keeping the two Codex-family lenses together. The repo-configurable lever is reviewer roster selection (`requested_reviewers`) or a different binding in `reviewer-bindings.json`; within today's protected config, `codex` + `codex-ops` intentionally share `codex exec`, so real parallelism should come from mixed vendors (`codex` + `claude`/`cursor`) or a separately authenticated Codex binding if Codex CLI/backend supports that outside ECHO.
