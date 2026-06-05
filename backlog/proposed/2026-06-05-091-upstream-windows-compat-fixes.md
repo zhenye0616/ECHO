@@ -13,13 +13,17 @@ files_to_modify:
   - src/cli/commands/init.ts               # AC1 (F4) — route answer-file parse (init.ts:265 `JSON.parse(raw)`) and onboarding-state reads (:331, :356 `JSON.parse(readFileSync(...))`) through the BOM-tolerant reader. A UTF-8-BOM answer file currently throws — this is the root of the answer-file/init cascade.
   - src/capture/sources.ts                 # AC1 (F4) + AC2 (R1) — F4: capture-sources parse (sources.ts:125 `JSON.parse(raw)`) through the BOM reader. R1: path-membership checks compare raw slash styles (`expanded.startsWith(expandTilde(entry))` :81, `expandTilde` :58) — normalize separators before compare so a Windows path matches its config entry.
   - src/storage/memory.ts                  # AC2 (R1) — `event.source.startsWith(sourcePrefix)` (:94) compares source strings that embed filesystem paths (e.g. `fs:/…`). VERIFY which compares are genuinely path-style vs logical-prefix (`coord:` at :166/:180 are logical — leave those); normalize only the path-bearing ones.
-  - src/util/subprocess.ts                 # AC3 (R2) — NEW cross-platform command resolver: resolve `claude`/`codex` on Windows (PATHEXT, .cmd/.exe shims), correct arg handling, NO shell-injection. (Path per repo util convention.)
+  - src/util/subprocess.ts                 # AC3 (R2) — NEW cross-platform command resolver: resolve `claude`/`codex` on Windows (PATHEXT, .cmd/.exe shims), correct arg handling, NO shell-injection. (Path per repo util convention.) SEAM (r1 codex F3): export a PURE resolver `resolveCommand(cmd, deps: { platform: NodeJS.Platform; env: NodeJS.ProcessEnv; existsSync: (p: string) => boolean })` returning `{ command: string; prependArgs?: string[] }`. The resolver reads platform/PATH/PATHEXT/fs ONLY from `deps` — never `process.platform`/`process.env`/host PATH directly — so a Windows `.cmd` lookup is testable on a POSIX host by injecting `{ platform: 'win32', env: { PATH, PATHEXT }, existsSync: <fake> }`. `realSpawn` calls it with the real `{ platform: process.platform, env: process.env, existsSync }`.
   - src/echo-home/wizard/probe.ts          # AC3 (R2) — the default `realSpawn` (:167, used at :133 `spawn(cmd, ...)`) routes through src/util/subprocess.ts. The `deps.spawn` injection seam is preserved (tests still inject).
   - src/echo-home/adapters/claude-code-mcp.ts  # AC3 (R2) — default `realSpawn` (:99, used at :105 `spawn('claude', args, ...)`) routes through src/util/subprocess.ts. Preserve the `deps.spawn` seam.
   - src/daemon/lifecycle.ts                # AC4 — `resolveDataDir()` (:18) returns `~/Library/Application Support/ECHO` on EVERY OS. Make it OS-appropriate: Windows → %LOCALAPPDATA% (fallback %APPDATA%), macOS → ~/Library/Application Support/ECHO, Linux → $XDG_DATA_HOME or ~/.local/share/ECHO. PRESERVE the ECHO_DATA_DIR override (highest precedence). NOTE migration risk: existing macOS installs must keep resolving the same path (no data move) — macOS branch is unchanged.
+  - src/cli/commands/daemon.ts             # AC4 (r1 codex F1 / codex-ops F5) — the launchctl caller. EVERY launchd op (launchctl print/bootstrap/bootout at :231/:514/:518, and the "launchctl not found …" false-fail messages) is currently unconditional. Add `platform?: NodeJS.Platform` to `DaemonDeps` (:34; the existing DI seam, default `process.platform`); on `win32`, the daemon lifecycle MUST NOT invoke `launchctl` — start/stop/status return a clean "manual daemon (no launchd on Windows)" result instead of a launchctl-not-found error. POSIX/darwin path unchanged.
+  - src/cli/commands/doctor.ts             # AC4 (r1 codex F1 / codex-ops F5) — the doctor reporting path. Reads daemon health via `report.daemon.pidLockHeld`/`mcpReachable` (:191-192) over `resolveDataDir()` (:205). On Windows, absent launchd MUST report a clean manual-daemon state (NOT `broken`/`degraded` false-fail); the unattended Windows selftest must not red-board on a manually-run daemon.
   - tests/windows-compat.test.ts           # AC6 — UN-QUARANTINE the F4/R1/R2/data-dir assertions 090 marked `it.todo`/`skip`; they now PASS. Keep Codex-skill + Scheduled-Task assertions `it.todo` (Ring-2 successors — src/util/codex-skill.ts is NOT created here).
   - tests/util/json.test.ts               # AC1 — BOM-prefixed input parses; non-BOM unchanged; malformed still throws. (Path per repo convention.)
-  - tests/util/subprocess.test.ts         # AC3 — resolver finds a `.cmd` shim under a simulated Windows PATHEXT; POSIX path unchanged; no shell-injection. (Path per repo convention.)
+  - tests/util/subprocess.test.ts         # AC3 — via the injected `{ platform, env, existsSync }` deps (no process.platform monkey-patch, no host-PATH dependency): resolver finds a `.cmd` shim under a simulated Windows PATHEXT; POSIX path unchanged; no shell-injection. (Path per repo convention.)
+  - tests/cli/daemon.test.ts               # AC4 — with `platform: 'win32'` injected into DaemonDeps, daemon start/stop/status make ZERO `launchctl` calls (assert the spawnSync/spawn mock is never invoked with 'launchctl') and return the manual-daemon result; darwin path still calls launchctl as today.
+  - tests/cli/doctor.test.ts               # AC4 — with `platform: 'win32'`, doctor reports a non-broken manual-daemon state for a reachable-but-not-launchd daemon (no false-fail); darwin reporting unchanged.
 spec_refs:
   - backlog/proposed/2026-06-05-090-adopt-selftest-onboarding-harness.md  # parent. 090 ships the harness + quarantined red board; 091 makes F4/R1/R2/data-dir green and un-quarantines them. Read 090's AC4 (quarantine mechanism) before un-skipping.
   - src/cli/commands/init.ts          # F4 parse sites (:265 answer-file, :331/:356 onboarding-state)
@@ -77,19 +81,37 @@ land, the beta tester's Windows box cannot receive a correct artifact.
   (`init.ts:265`), onboarding-state reads (`init.ts:331,:356`), and capture-sources parse (`sources.ts:125`).
   A UTF-8-BOM answer file and a BOM'd capture-sources file parse cleanly; non-BOM input is unchanged; malformed
   input still throws. The 090-quarantined F4 windows-compat assertion now passes.
-- **AC2 — R1 (separators).** Path-membership/prefix compares normalize separators before comparing, so a
-  Windows-style path matches its config entry (`sources.ts:58/:81`; the path-bearing compare in `memory.ts:94`).
-  Logical prefixes (`coord:` in `memory.ts`) are left alone. The R1 assertion passes.
+- **AC2 — R1 (separators).** Path-membership/prefix compares use **path-component-aware** normalization
+  (r1 codex-ops F4), not bare slash-swapping: (a) normalize separators, (b) case-fold on Windows (filesystem
+  paths are case-insensitive there), and (c) enforce a **path-boundary** so a prefix matches only at a segment
+  boundary — `C:\foo` MUST NOT match `C:\foobar`, while `C:\foo\bar` DOES match entry `C:\foo`. Applied to the
+  path-bearing compares (`sources.ts:58/:81`; `memory.ts:94`); logical prefixes (`coord:` in `memory.ts:166/:180`)
+  stay plain string-prefix, untouched. The R1 assertion passes, plus an added sibling-prefix non-match case
+  (`C:\foo` vs `C:\foobar`) and a Windows case-fold match case.
 - **AC3 — R2 (spawn).** `src/util/subprocess.ts` resolves `claude`/`codex` cross-platform (PATHEXT/.cmd/.exe,
-  correct arg handling, no shell-injection); `realSpawn` in `probe.ts` and `claude-code-mcp.ts` routes through
-  it; the `deps.spawn` seam is preserved. A test proves resolution of a `.cmd` shim on a simulated Windows
-  PATHEXT. The R2 assertion passes.
-- **AC4 — no-launchctl false-fail + Windows data dir.** `resolveDataDir()` returns an OS-appropriate directory
-  (Windows %LOCALAPPDATA%/%APPDATA%, macOS unchanged, Linux XDG) with `ECHO_DATA_DIR` overriding; daemon
-  autostart/doctor do not call `launchctl` on Windows and do not false-fail (doctor reports a clean
-  manual-daemon state on Windows). Tests cover the Windows data-dir resolution and a no-launchctl doctor path.
-- **AC5 — patcher retired from the release path.** No normal build/release step applies `echo-fix`; the fixes
-  are in `src/`. (`echo-fix/` is not referenced by CI or the release workflow.)
+  correct arg handling, no shell-injection) via a PURE `resolveCommand(cmd, { platform, env, existsSync })`
+  resolver that reads platform/PATH/PATHEXT/fs ONLY from injected deps (r1 codex F3); `realSpawn` in `probe.ts`
+  and `claude-code-mcp.ts` routes through it; the `deps.spawn` seam is preserved. A test injects
+  `{ platform: 'win32', env: { PATH, PATHEXT }, existsSync }` and proves resolution of a `.cmd` shim on a
+  simulated Windows PATHEXT **without** monkey-patching `process.platform` or depending on host PATH. The R2
+  assertion passes.
+- **AC4 — no-launchctl false-fail + Windows data dir.** `resolveDataDir()` (`lifecycle.ts:18`) returns an
+  OS-appropriate directory (Windows %LOCALAPPDATA%/%APPDATA%, macOS unchanged, Linux XDG) with `ECHO_DATA_DIR`
+  overriding. The launchd lifecycle in `src/cli/commands/daemon.ts` (the `launchctl` caller) is gated on a new
+  `DaemonDeps.platform` field (default `process.platform`): on `win32` it makes **zero** `launchctl` calls and
+  returns a manual-daemon result; `src/cli/commands/doctor.ts` reports a clean (non-`broken`/`degraded`)
+  manual-daemon state on Windows rather than false-failing. macOS/Linux behavior unchanged. Tests cover the
+  Windows data-dir resolution (`tests/windows-compat.test.ts`), the no-launchctl daemon path
+  (`tests/cli/daemon.test.ts` — `platform:'win32'` → no `launchctl` spawn), and the no-false-fail doctor path
+  (`tests/cli/doctor.test.ts`).
+- **AC5 — patcher retired from the release path (VERIFICATION-ONLY; r1 codex F2).** No normal build/release step
+  references `echo-fix`. Falsifiable check (must return no matches):
+  `grep -rIn 'echo-fix\|echo-windows-fix' package.json scripts/ .github/workflows/ tsconfig*.json`. At spec time
+  this is already clean (`build:cli`/`prepack` in `package.json` invoke no patcher; the only `echo-fix*` strings
+  in-repo are unrelated `echo-fixture` test data under `tools/review-queue/`). **No `src/` change is required for
+  this AC.** `echo-fix/` may remain on disk as a local emergency hotfix tool but MUST NOT be invoked by
+  `npm run build:cli`, `prepack`, or 090's CI workflow (the same grep over `.github/workflows/` must be clean once
+  090's CI is present).
 - **AC6 — Ring-1 board green; tests pass.** `npm test`, `npm run lint`, `npm run typecheck` green; the
   un-quarantined F4/R1/R2/data-dir windows-compat assertions pass; `echoctl selftest` passes on the
   os:[ubuntu,macos,windows] matrix from 090's CI (still non-required until 092). Codex-skill + Scheduled-Task
