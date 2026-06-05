@@ -8,6 +8,7 @@ created: 2026-06-05
 blocked_by: []
 task_state_ref: 2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: b4e6343cf9202c635fe215646a8c8006bff77c9af03f1b6a01b3bd1642d3081f
 files_to_modify:
   - src/echo-home/adapters/skill-sync.ts      # AC1 — second-hop Codex skills: render `<codexHome>/skills/<name>/SKILL.md` (directory + `name:` frontmatter format) from the shipped `assets/echo-skills/*.md`. Today this file has ZERO codex/SKILL.md references — the packaged install populates ~/.echo/skills/ and stops. (A new sibling adapter file under src/echo-home/adapters/ is acceptable if cleaner; wire it in adapter-sync.)
   - src/echo-home/adapter-sync.ts             # AC1 — invoke the second-hop for the codex agent profile during wiring, with the same atomic-write + marker discipline the other adapters use.

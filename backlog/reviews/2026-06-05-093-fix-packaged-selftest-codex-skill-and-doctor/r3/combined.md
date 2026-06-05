@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R3 — both reviewers (codex, codex-ops) returned `proceed` with zero findings at spec SHA `205cd4fe`. Convergence arc: r1 (4 findings: AC4 isolation + binary identity, AC2 escalation-handoff clarity) → r2 (2: AC4 concretization, AC1 missing-source contract) → r3 (0). All patches were spec-text tightening with zero new mechanism — no patch-on-patch regression; the reframe gate was evaluated at both disposition points (bypassed r1 by construction; considered-and-rejected r2 with rationale). Promoting `proposed/ → ready/`; the spec is claimable by a builder.
 
