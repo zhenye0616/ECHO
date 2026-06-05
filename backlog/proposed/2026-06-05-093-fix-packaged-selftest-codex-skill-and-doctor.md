@@ -76,6 +76,12 @@ Diagnosis carried in from the 092 escalation (verified at spec time):
   `WIR-06` and `SKILL-02` pass. The hop renders from the shipped `assets/echo-skills/using-echo-mcp.md`,
   is idempotent (re-run produces no spurious diff), uses the adapter layer's atomic-write + marker pattern,
   and is covered by unit tests (path, frontmatter, idempotency, missing-source behavior).
+  **Missing-source contract** *(r2 codex F2)*: if the shipped source `assets/echo-skills/using-echo-mcp.md`
+  is absent at wiring time, the second-hop is a **hard failure** with a diagnostic naming the missing path —
+  NOT a silent/diagnostic skip (a packaged install without its shipped skill source is a broken artifact and
+  must not wire "successfully"). Atomic-write discipline applies: on failure, NO partial SKILL.md and NO
+  marker write (the target is either fully written or untouched). The unit test asserts the error surface
+  AND the absence of partial target/marker writes.
 - **AC2 — DOC-02 diagnosed and green.** Builder diagnoses WHY `doctor --json` fails reachability under the
   packaged install (candidates: port/home plumbing in the doctor invocation, daemon startup race in the
   sandbox, packaged-path resolution) and fixes the actual root cause. If diagnosis reveals a defect outside
@@ -91,16 +97,29 @@ Diagnosis carried in from the 092 escalation (verified at spec time):
   HEAD: `npm pack`, install the produced `.tgz` into a clean temp prefix, run the INSTALLED
   `echoctl selftest --json` → exit 0, `failedIds: []` (skips allowed as today). Record the JSON output in
   the run log. Two hardening contracts:
-  - **Isolated runtime state** *(r1 codex F1 + codex-ops F1, convergent)*: the rehearsal runs with fresh
-    temp runtime homes (HOME / codex home / echo home, or equivalent env isolation) and isolated daemon
-    state, cleaned up afterwards, so preexisting developer-machine state (an existing `~/.codex/skills`,
-    a running daemon, a populated `~/.echo`) cannot satisfy WIR-06/SKILL-02/DOC-02. (`selftest` already
-    sandboxes its own homes internally; the rehearsal-level isolation additionally guards daemon state and
-    anything resolved from the real environment.) Record the isolation env settings in the run log
-    alongside the JSON output.
+  - **Isolated runtime state** *(r1 codex F1 + codex-ops F1, convergent; concretized r2 codex F1)*: the
+    rehearsal sets the four env vars the product actually honors (`selftest.ts:390-394`) — `HOME`,
+    `USERPROFILE`, `ECHO_HOME`, `CODEX_HOME` — to fresh `mktemp -d` paths, cleaned up afterwards, so
+    preexisting developer-machine state (an existing `~/.codex/skills`, a populated `~/.echo`) cannot
+    satisfy WIR-06/SKILL-02. Daemon isolation: `selftest` spawns its own throwaway daemon with
+    `ECHO_MCP_PORT=0` (random port; `selftest.ts:142-143`) — the rehearsal env must NOT override
+    `ECHO_MCP_PORT` to the live daemon's port, so DOC-02 cannot false-pass by contacting a preexisting
+    daemon. Normative command skeleton (exact paths/layout may vary; the recorded values are the contract):
+
+    ```bash
+    RUNTIME=$(mktemp -d) && PREFIX=$(mktemp -d)
+    npm pack                                            # → echoctl-<version>.tgz
+    npm install -g --prefix "$PREFIX" ./echoctl-<version>.tgz
+    HOME="$RUNTIME/home" USERPROFILE="$RUNTIME/home" \
+    ECHO_HOME="$RUNTIME/echo" CODEX_HOME="$RUNTIME/codex" \
+      "$PREFIX/bin/echoctl" selftest --json             # absolute clean-prefix bin path
+    ```
   - **Binary identity** *(r1 codex-ops F2)*: invoke the installed CLI by the clean prefix's absolute bin
     path (NOT bare `echoctl` / `npx` PATH resolution, which can silently exercise the repo/dev CLI) and
     record the resolved executable path in the run log.
+  **Run-log record (required fields)** *(r2 codex F1)*: the resolved absolute bin path actually executed;
+  the four env-var values (`HOME`, `USERPROFILE`, `ECHO_HOME`, `CODEX_HOME`); confirmation `ECHO_MCP_PORT`
+  was NOT set/overridden; the tarball filename + its SHA-256; and the full `selftest --json` output.
   This is the builder-executable proof; it must be in the run log before handoff.
 - **AC5 — repo suite green.** `npm test`, `npm run lint`, `npm run typecheck` green. New unit tests from AC1
   included. No existing test deleted or weakened.
