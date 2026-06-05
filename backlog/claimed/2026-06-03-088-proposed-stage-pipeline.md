@@ -44,9 +44,9 @@ spec_refs:
   - backlog/complete/2026-05-28-079-loop-reliability-pack.md  # AC3's clean-snapshot + P1 idempotent stage-move pattern (the claimed→pending move) that promote.py mirrors for proposed→ready.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T04:24:18Z"
+branch: "agent/proposed-stage-pipeline"
 worktree: ""
 head_sha: ""
 pr_url: ""
