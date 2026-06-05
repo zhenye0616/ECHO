@@ -4,19 +4,15 @@ role: builder
 writer: codex-builder
 binding: codex
 claim_branch: agent/proposed-stage-pipeline
-last_updated: 2026-06-05T04:20:00Z
+last_updated: 2026-06-05T04:24:18Z
 handoff_branch: ""
 handoff_head_sha: ""
-handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md
+handoff_run_log: ""
 ---
 
 ## current_thesis
 
-Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the proposed-stage pipeline: make folder location the source of claimability, replace 086's `spec_review` state gate with `ready_content_sha`, automate promotion/bounce, generate BACKLOG output through a tool only, and keep spec-review content mechanics unchanged.
-
-<!-- builder-state-handoff:start -->
-- Lifecycle: RESET — escalation resolved by strategist. 088 spec patched (obsolete 087b ready-stage migration removed; 087b shipped to complete/ and ready/ is empty, so the live-item migration step is a documented no-op + fixture test). Returned to ready/ at a recomputed spec_review_sha for a fresh codex builder claim.
-<!-- builder-state-handoff:end -->
+Fresh claim by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the proposed-stage pipeline: make folder location the source of claimability, replace 086's `spec_review` state gate with `ready_content_sha`, automate promotion/bounce, generate BACKLOG output through a tool only, and keep spec-review content mechanics unchanged.
 
 ## locked_decisions
 
@@ -25,7 +21,7 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 - AC3: update `tools/review-queue/request.py` artifact lookup to scan proposed before ready, claimed, pending_review, and complete.
 - AC4: add `tools/review-queue/promote.py` plus watcher integration for stage-only terminal promotion, recovery/bounce commit+push mode, terminal-promotable predicate, reviewed-content identity check, ready mismatch bounce, and proposed-stage path-(c) cut via `dispatch-next-round.py`.
 - AC5: add `tools/backlog_index.py` as a generated BACKLOG renderer with fixture-only `--check`; do not modify tracked `docs/BACKLOG.md`.
-- AC6: land migration in the never-half-broken order, including migrating live 087b from `spec_review: waived` to current `ready_content_sha`.
+- AC6: land migration in the never-half-broken order; live ready/ legacy migration is a documented no-op at claim time, but fixture coverage must prove a legacy ready item can be sealed with `ready_content_sha`.
 - AC7: update coherent operating-model docs and canonical skills, then regenerate listed `.claude/commands/*` adapters through `tools/sync-skills.sh`.
 - AC8: rework selector tests and add promotion, request, watcher-dispatch, and backlog-index tests; full test/lint/typecheck/sync/diff hygiene must pass or be escalated.
 - AC9: constrain scope to stage topology plus claim/promotion mechanism only.
@@ -33,11 +29,6 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 ## open_questions
 
 - None blocking at claim time.
-- Non-blocking observation: `task_state_ref` is set, but no strategist pointer directory existed at claim; builder proceeds from the spec body and mandatory refs.
-
-<!-- builder-state-handoff-open-questions:start -->
-- None — escalation resolved by strategist spec patch (087b migration was the only blocker).
-<!-- builder-state-handoff-open-questions:end -->
 
 ## dont_touch
 
@@ -49,5 +40,5 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 
 ## canonical_anchors
 
-- spec: backlog/pending_review/2026-06-03-088-proposed-stage-pipeline.md
+- spec: backlog/claimed/2026-06-03-088-proposed-stage-pipeline.md
 - reviews: backlog/reviews/2026-06-03-088-proposed-stage-pipeline/
