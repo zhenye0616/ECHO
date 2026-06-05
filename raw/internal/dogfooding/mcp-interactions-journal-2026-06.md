@@ -1229,3 +1229,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `fs:…/.codex/sessions/2026/06/05/rollout-…019e9968…jsonl` (codex monitor).
 - **Verdict:** ✅ right — `echo_resolve_mru(codex)` + `wait_for_new_turns` cleanly returned the live monitor session's newest turn.
 - **Note:** Codex's fresh reviewer-scoped list aligns with the followup on every overlapping item (journal #1; timeout/wait/search under #2). Adds ONE not in the followup: the **stale `claude` reviewer lane** (latent — would bite if a spec rosters `claude`). Omits followup #3 (codex search-rank gap) — out of scope for "auto reviewer" execution. Journal-concurrency headline now corroborated 4× (Codex monitor ×2 framings + 091 + 090).
+
+### 2026-06-05 13:55 PDT — 092 r1 active-trigger: coord_invoke wrapper-path ENOENT (both headless reviewers)
+
+- **Trigger:** dispatched 092 r1 spec-review request (`883cca7a`), then fired the 057b active-trigger `coord_invoke` for both rostered headless reviewers.
+- **Query inputs:** `coord_invoke(role=codex, request_path=backlog/reviews/2026-06-05-092-release-workflow-and-voting-ci/r1/request.md, correlation_id=a5876ad7-…)`; same for `role=codex-ops`.
+- **Returned:** BOTH errored — `ENOENT: reviewer wrapper not found at /Users/zhenye/.npm-global/lib/node_modules/echoctl/tools/review-queue/run-codex[-ops]-reviewer.sh`.
+- **Sources:** daemon-side spawn seam. The daemon resolves the wrapper against its own REPO_ROOT = the **global npm install** (`~/.npm-global/lib/node_modules/echoctl/`), NOT the dev repo (`~/Desktop/Project_echo`). The launchd fallback jobs (`com.echo.review-queue-codex/-ops`) point at the CORRECT repo path and their wrappers exist + are executable.
+- **Verdict:** 🟡 partial — active-trigger seam can't locate the reviewer wrappers when the daemon runs from the global install; NON-BLOCKING because the launchd fallback (correct path, drove 090/091 today) still fires on its ~10-min cadence.
+- **Note:** Two reviewer-invocation paths, only one healthy here. The active-trigger optimizes latency (pre-spawn before cadence); its failure just means r1 reviewers wait for the next launchd tick instead of starting immediately. Same daemon-runs-from-global-install root cause likely explains any `coord_invoke` head-start miss in this dev env.
+- **Conjecture:** (optional) daemon REPO_ROOT/cwd is pinned to the installed echoctl package; wrapper path = REPO_ROOT + `tools/review-queue/run-*.sh`. A daemon launched (or env-overridden) against the dev worktree would resolve correctly — worth a friction-followup, not a fix here.
