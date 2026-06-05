@@ -25,6 +25,7 @@ files_to_modify:
   - docs/review-queue-setup.md                                      # AC4 — update to the read-only-child + writer-owned-commit model; remove the `danger-full-access` review-child blessing; the "Why these flags" rationale now states the AI child reads+reasons only, commit/push lives in the wrapper. Remove 087's forward-pointer (now landed).
   - tests/review-queue/reviewer-readonly.test.* (path per repo convention)  # AC5 — assert: codex/codex-ops bindings resolve `read-only`; the child has no commit capability (no `git commit`/`commit-reviewer-response.sh` invoked from inside the child path); the wrapper publishes a valid `<reviewer>.md` from captured content; a child write attempt under read-only is denied/no-ops without losing the review.
   - tests/review-queue/reviewer-bindings.test.ts                            # AC5 (escalation-resolved 2026-06-03, founder-authorized) — UPDATE 087's existing binding-contract assertions that the read-only flip necessarily invalidates: the `agent_sandbox: danger-full-access` / `commit_policy: child` assertions for codex+codex-ops become `read-only` / `wrapper`. The builder correctly escalated because `npm test` cannot pass after the AC3 flip while these old 087 assertions stand, and this file was not in the original allow-list. SCOPE: update ONLY the assertions the flip changes; do NOT expand 087's coverage or alter unrelated assertions (claude/cursor entries unchanged).
+  - tests/review-queue/056-claude-reviewer-onboarding.test.ts               # AC5 (founder-authorized in the codex builder session, 2026-06-04) — UPDATE only the codex/codex-ops argv-snapshot assertion the read-only flip necessarily invalidates (`--sandbox danger-full-access` → `--sandbox read-only --json`). SCOPE: only the flip-changed assertions; claude/cursor coverage unchanged. Independently confirmed MINIMAL-AND-NECESSARY by a focused reviewer. Same class as the reviewer-bindings.test.ts authorization above.
 
 spec_refs:
   - backlog/complete/2026-06-02-087-reviewer-invocation-argv-contract.md  # PARENT (impl-time dep). LIFECYCLE-MOBILE PATH (r1 codex F4): 087 is in pending_review/ as of 2026-06-02; `blocked_by` guarantees it is in complete/ before 087b is claimable, so the builder will read it at THIS complete/ path. (If consulting before merge, it is at backlog/pending_review/2026-06-02-087-reviewer-invocation-argv-contract.md.) 087 ships the argv binding file + `agent_sandbox`/`commit_policy` as DESCRIPTIVE fields recording current reality + the `capture.kind` enum (incl. the `stdout_json` kind 087b wires); 087b flips those values + moves the commit so the descriptions become enforced.
@@ -39,7 +40,7 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-03T22:34:50Z"
 branch: "agent/reviewer-child-readonly-migration"
 worktree: "/Users/zhenye/Desktop/Project_echo--reviewer-child-readonly-migration"
-head_sha: "05a7ef3ad712f3456bb3294362c25db62ea52068"
+head_sha: "6c95b171218bf946889662f8db5ffc71c866ec5f"
 pr_url: ""
 agent_notes: |
   Implemented on branch `agent/reviewer-child-readonly-migration` at
@@ -59,6 +60,23 @@ agent_notes: |
   flag still used the test's 15s timeout and additionally showed a load-sensitive
   daemon health failure in `tests/cli/shell-reachable.test.ts`, which had passed
   in the default full-suite runs.
+
+  POST-REVIEW FIX HISTORY (independent review + 5 root-cause fixer passes, 2026-06-04/05).
+  After handoff at 05a7ef3a, a fresh independent codex reviewer found 4 findings (2 HIGH, 2 MED):
+  (1) ECHO_REVIEWERS_CONFIG/argv could still resolve danger-full-access for codex/codex-ops;
+  (2) capture-failure marker push could skip tick_end and vanish on $WT cleanup -> re-poll/starvation;
+  (3) the wrapper published on schema-validity alone (no request-binding check); (4) incomplete AC5
+  coverage. Five fixer passes, each re-confirmed by a separate read-only reviewer, drove these to
+  root-cause: 765d5e17 (initial 4) -> c9f88ea0 (two-mode commit boundary + content-identity gate +
+  all-form sandbox parse) -> 9b94d42f (allowlist sandbox gate) -> b7e3104e (gate-owned canonical
+  shape) -> 6c95b171 (pin argv[0]; document binary provenance/PATH as out of 087b scope). Final
+  state: request-binding validation before publish (3); capture-failure non-reselection via an
+  anchor-dir terminal registry written pre-push and consulted by the selector (2); a GATE-OWNED
+  exact-argv allowlist for codex/codex-ops replacing the whack-a-mole denylist (1). Final confirm
+  reviewer verdict: CONFIRM (root-cause across 087b scope, merge-ready) at 6c95b171. Full `npm test`
+  GREEN at the fix passes (1540 passed / 21 skipped) -- supersedes the original-build load-flake note
+  above. Isolated trial merge of 6c95b171 into origin/main is clean (no conflicts). HEAD bumped from
+  05a7ef3a to 6c95b171 above.
 review_notes: ""
 ---
 

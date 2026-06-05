@@ -2,11 +2,11 @@
 task_id: 2026-06-02-087b-reviewer-child-readonly-migration
 role: builder
 binding: codex
-last_updated: 2026-06-03T23:24:02Z
+last_updated: 2026-06-05T03:37:43Z
 branch: agent/reviewer-child-readonly-migration
 claim_sha: ""
 handoff_branch: agent/reviewer-child-readonly-migration
-handoff_head_sha: 05a7ef3ad712f3456bb3294362c25db62ea52068
+handoff_head_sha: 6c95b171218bf946889662f8db5ffc71c866ec5f
 handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-child-readonly-migration.md
 ---
 
@@ -14,7 +14,7 @@ handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-02-087b-reviewer-chi
 Reclaimed by Codex builder on `agent/reviewer-child-readonly-migration` after the founder-authorized allow-list fix for `tests/review-queue/reviewer-bindings.test.ts`. Implement only the reviewer-child read-only migration: move codex/codex-ops reviewer artifact publication, coord lifecycle, selection, git sync, and capture parsing into the wrapper; make the child content-only and read-only.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 05a7ef3ad712f3456bb3294362c25db62ea52068.
+- Lifecycle: COMPLETE + REVIEWED — CONFIRM (merge-ready) at 6c95b171218bf946889662f8db5ffc71c866ec5f. Independent review found 4 findings (2 HIGH, 2 MED); 5 root-cause fixer passes (05a7ef3a→765d5e17→c9f88ea0→9b94d42f→b7e3104e→6c95b171), each re-confirmed by a fresh read-only reviewer; final confirm CONFIRM. Full npm test green (1540 passed/21 skipped); isolated trial merge into origin/main clean.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
