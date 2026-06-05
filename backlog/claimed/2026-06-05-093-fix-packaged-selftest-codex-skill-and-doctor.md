@@ -22,10 +22,10 @@ spec_refs:
   - backlog/_followups.md  # 092-merge section — sleep(4000) history (filed at 090, did not land in 091, urgency now "before the gate becomes real").
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T23:36:10Z"
+branch: "agent/fix-packaged-selftest-codex-skill-and-doctor"
+worktree: "/Users/zhenye/Desktop/Project_echo--fix-packaged-selftest-codex-skill-and-doctor"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
