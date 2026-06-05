@@ -1,0 +1,170 @@
+name: release
+
+on:
+  push:
+    branches:
+      - 'agent/**'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build package
+    runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.package.outputs.version }}
+      tarball_name: ${{ steps.pack.outputs.tarball_name }}
+      checksum_name: ${{ steps.pack.outputs.checksum_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Read package version
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - name: Pack once
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifact
+          pack_output="$(npm pack --pack-destination release-artifact --silent)"
+          tarball_name="$(printf '%s\n' "$pack_output" | tail -n 1)"
+          tarball="release-artifact/${tarball_name}"
+          count="$(find release-artifact -maxdepth 1 -type f -name '*.tgz' | wc -l | tr -d ' ')"
+          if [ "$count" != "1" ]; then
+            echo "expected exactly one .tgz in release-artifact, found ${count}" >&2
+            exit 1
+          fi
+          node -e 'const { createHash } = require("node:crypto"); const { readFileSync, writeFileSync } = require("node:fs"); const { basename } = require("node:path"); const tarball = process.argv[1]; const hash = createHash("sha256").update(readFileSync(tarball)).digest("hex"); writeFileSync(`${tarball}.sha256`, `${hash}  ${basename(tarball)}\n`);' "$tarball"
+          printf 'tarball_name=%s\n' "$tarball_name" >> "$GITHUB_OUTPUT"
+          printf 'checksum_name=%s.sha256\n' "$tarball_name" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: echoctl-release-package
+          path: |
+            release-artifact/*.tgz
+            release-artifact/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  validate:
+    name: validate package · ${{ matrix.os }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: echoctl-release-package
+          path: release-artifact
+      - name: Verify checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const { createHash } = require("node:crypto"); const { readdirSync, readFileSync } = require("node:fs"); const { join } = require("node:path"); const dir = process.argv[1]; const tgzs = readdirSync(dir).filter((name) => name.endsWith(".tgz")); const sums = readdirSync(dir).filter((name) => name.endsWith(".sha256")); if (tgzs.length !== 1 || sums.length !== 1) { console.error(`expected one tarball and one checksum, got ${tgzs.length} tarballs and ${sums.length} checksums`); process.exit(1); } const tarball = join(dir, tgzs[0]); const checksum = join(dir, sums[0]); const expected = readFileSync(checksum, "utf8").trim().split(/\s+/)[0]; const actual = createHash("sha256").update(readFileSync(tarball)).digest("hex"); if (actual !== expected) { console.error(`checksum mismatch: expected ${expected}, got ${actual}`); process.exit(1); } console.log(`${tgzs[0]} ${actual}`);' release-artifact
+      - name: Install packed echoctl
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$(find release-artifact -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          npm install -g "$tarball"
+          test "$(echoctl --version)" = "${{ needs.build.outputs.package_version }}"
+      - name: Run onboarding self-test
+        shell: bash
+        run: echoctl selftest --json
+      - name: Run doctor against installed daemon
+        shell: bash
+        env:
+          ECHO_HOME: ${{ runner.temp }}/echo-doctor-home
+          ECHO_DATA_DIR: ${{ runner.temp }}/echo-doctor-data
+          ECHO_DB_PATH: ${{ runner.temp }}/echo-doctor-data/echo.db
+          ECHO_MCP_PORT: '39878'
+        run: |
+          set -euo pipefail
+          node -e 'const fs = require("node:fs"); const path = require("node:path"); const now = new Date().toISOString(); fs.mkdirSync(path.join(process.env.ECHO_HOME, "state"), { recursive: true }); fs.mkdirSync(process.env.ECHO_DATA_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.ECHO_HOME, "state", "onboarding.json"), `${JSON.stringify({ schema_version: 1, created_at: now, last_updated_at: now, completed: true, profile: "customer", agents: [] })}\n`); fs.writeFileSync(path.join(process.env.ECHO_HOME, "state", "projects.json"), `${JSON.stringify({ schema_version: 1, last_refreshed_at: now, default_project: null, projects: [] })}\n`);'
+          daemon_path="$(node -e 'const cp = require("node:child_process"); const path = require("node:path"); const root = cp.execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim(); console.log(path.join(root, "echoctl", "dist", "daemon", "index.js"));')"
+          node "$daemon_path" > "$RUNNER_TEMP/echo-doctor-daemon.out" 2> "$RUNNER_TEMP/echo-doctor-daemon.err" &
+          daemon_pid=$!
+          cleanup() {
+            kill "$daemon_pid" 2>/dev/null || true
+            wait "$daemon_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for _ in $(seq 1 30); do
+            if echoctl doctor --json --home "$ECHO_HOME" --port "$ECHO_MCP_PORT"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/echo-doctor-daemon.err" >&2 || true
+          exit 1
+
+  publish:
+    name: publish private beta
+    needs: [build, validate]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: echoctl-release-package
+          path: release-artifact
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match package version ${package_version}" >&2
+            exit 1
+          fi
+          if [ "${{ needs.build.outputs.package_version }}" != "$package_version" ]; then
+            echo "build output version ${{ needs.build.outputs.package_version }} does not match package version ${package_version}" >&2
+            exit 1
+          fi
+      - name: Verify checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const { createHash } = require("node:crypto"); const { readdirSync, readFileSync } = require("node:fs"); const { join } = require("node:path"); const dir = process.argv[1]; const tgzs = readdirSync(dir).filter((name) => name.endsWith(".tgz")); const sums = readdirSync(dir).filter((name) => name.endsWith(".sha256")); if (tgzs.length !== 1 || sums.length !== 1) { console.error(`expected one tarball and one checksum, got ${tgzs.length} tarballs and ${sums.length} checksums`); process.exit(1); } const tarball = join(dir, tgzs[0]); const checksum = join(dir, sums[0]); const expected = readFileSync(checksum, "utf8").trim().split(/\s+/)[0]; const actual = createHash("sha256").update(readFileSync(tarball)).digest("hex"); if (actual !== expected) { console.error(`checksum mismatch: expected ${expected}, got ${actual}`); process.exit(1); } console.log(`${tgzs[0]} ${actual}`);' release-artifact
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            release-artifact/*.tgz \
+            release-artifact/*.sha256 \
+            --verify-tag \
+            --prerelease \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Private beta release ${GITHUB_REF_NAME}. The attached tarball is the build-once artifact validated by this workflow on ubuntu, macOS, and Windows."
