@@ -69,17 +69,29 @@ harness themselves.
   validation jobs DOWNLOAD the uploaded artifact, verify its SHA-256 matches AC1's checksum, install that exact
   `.tgz`, and run `echoctl selftest` (+ `echoctl doctor`). A `publish` job runs ONLY after every validation job
   passes, consumes the SAME downloaded artifact (never a rebuild), publishes it to a private/prerelease GitHub
-  Release tagged `v0.1.x-beta.N`, and retains the prior release for rollback. Three publish-safety contracts:
+  Release tagged `v0.1.x-beta.N`, and retains the prior release for rollback. Publish-safety contracts:
+  - **OS-portable checksum verifier** *(r2 codex-ops F1)*: the SHA-256 verification uses ONE cross-platform
+    verifier on every matrix OS — a Node `crypto` one-liner (e.g. `node -e "compute sha256 of the .tgz, compare
+    to the recorded checksum, exit nonzero on mismatch"`), run AFTER `actions/setup-node` and BEFORE install.
+    Do NOT use `sha256sum -c` / `shasum` / `certutil` — they are absent or shell-divergent on the default
+    Windows runner shell and would fail only at runtime. (Node is guaranteed present: validation installs and
+    runs the Node CLI, so `setup-node` precedes the verifier.)
   - **Version-identity gate** *(r1 codex F2)*: before publishing, the workflow asserts `${GITHUB_REF_NAME#v}`
     equals `package.json` `version`; a mismatch fails the job (prevents tag / version / tarball-name drift).
   - **Least-privilege token** *(r1 codex-ops F2)*: the workflow declares explicit `permissions:` — validation
     jobs are `contents: read`; only the `publish` job is granted `contents: write`, so a read-only default
     `GITHUB_TOKEN` cannot silently fail publish and validation jobs cannot mutate repo state.
   - **Channel:** private/prerelease only; no npm-public/Homebrew/winget.
-- **AC2b — runnable rehearsal (no production release state)** *(r1 codex-ops F3)*. `release.yml` exposes a
-  `workflow_dispatch` path that runs the SAME build-once + OS-matrix download/verify/install/selftest/doctor
-  steps but SKIPS the `publish` job (no tag, no GitHub Release created). Only a real `v*` tag publishes. This is
-  the dry-run that satisfies AC5's rehearsal without creating a real tag/release.
+- **AC2b — runnable rehearsal (no production release state)** *(r1 codex-ops F3; trigger refined r2 codex F1)*.
+  The rehearsal runs the SAME build-once + OS-matrix download/verify(portable checksum)/install/selftest/doctor
+  steps but SKIPS the `publish` job (no tag, no GitHub Release created); `publish` is conditioned on a real `v*`
+  tag only. The rehearsal is reachable WITHOUT a tag by two triggers, because each covers a different window:
+  - a `pull_request` (and/or `push`-to-feature-branch) trigger so branch CI can run the rehearsal **pre-merge
+    where available**;
+  - `workflow_dispatch` for the **post-merge** manual dry-run — note GitHub only dispatches a workflow once it is
+    present on the default branch, so `workflow_dispatch` CANNOT rehearse a brand-new `release.yml` before it
+    merges. The pre-merge window is owned by the `pull_request`/`push` trigger (or, if branch CI is unavailable
+    for this repo, by AC5's post-merge founder/manual carve-out) — NOT by `workflow_dispatch`.
 - **AC3 — onboarding CI is a blocking gate (in-file mechanism + founder-verifiable protection)** *(r1 codex F3
   + codex-ops F1, convergent)*. Within `ci.yml`, the `onboarding`/windows-compat job(s) (green after 091) are
   made blocking by having the workflow's existing required/aggregate status job `needs:` them, so the
@@ -95,9 +107,17 @@ harness themselves.
   it against an INLINE snapshot held in the test file itself (no external snapshot artifact — keeps
   `files_to_modify` unchanged). Adding/removing a shipped path fails the test until the inline snapshot is
   updated. It does not alter the `files` allowlist.
-- **AC5 — tests green + rehearsal passes.** `npm test`, `npm run lint`, `npm run typecheck` green; the AC2b
-  `workflow_dispatch` rehearsal completes (build-once + OS-matrix validate, no publish). A real Windows GH run
-  is the truth but not a unit-test gate.
+- **AC5 — tests green + builder-local rehearsal; full GH-matrix run is post-merge** *(r2 codex F1)*. `npm test`,
+  `npm run lint`, `npm run typecheck` green. The BUILDER-executable rehearsal gate is LOCAL/static, because a
+  brand-new workflow file cannot be GitHub-run before it lands on the default branch: `npm pack` succeeds, the
+  `release.yml`/`ci.yml` YAML passes a static check (`actionlint` if available, else a YAML parse asserting the
+  `build → validate(matrix) → publish` `needs:` wiring and the `publish`-gated-on-`v*`-tag condition), and the
+  Node `crypto` checksum verifier + validation steps are demonstrably runnable as local commands on the
+  builder's own OS. The full GitHub Actions OS-matrix rehearsal is validated **post-merge** — the
+  `pull_request`/branch-CI run if the integration flow opens one, otherwise the real `v*`-tag / `workflow_dispatch`
+  run — as a **founder/manual** check, NOT a pre-review builder gate. (Consistent with the original contract: a
+  real Windows GH run is the truth but not a unit-test gate; the spec does not require the builder to do the
+  pre-merge-impossible.)
 - **AC6 — no drift (impl/product scope only; lifecycle metadata carved out)** *(r1 codex F5)*. ONLY the release
   workflow, the CI-voting flip, and the manifest pin. NO `src/` changes, NO `files`-allowlist edits, NO
   public-distribution channels (Homebrew/winget/npm-public), NO thin acceptance repo, NO telemetry. Do not touch
