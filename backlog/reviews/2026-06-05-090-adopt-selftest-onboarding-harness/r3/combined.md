@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R3` — both reviewers `proceed` with zero findings at `adf4893e` (the r2 structural cut). The r1 underspecification (6 findings) and r2 patch-on-patch surface (5 findings, reframe-gated to a structural cut) are fully resolved; the spec is self-contained (no orphaned-worktree dependency), the port mechanism reuses existing daemon `:0` support, onboarding is wholly non-voting, and nothing that executes the real selftest votes. Promote `proposed/ → ready/`.
 

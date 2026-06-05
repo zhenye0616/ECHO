@@ -8,6 +8,7 @@ created: 2026-06-05
 blocked_by: []
 task_state_ref: 2026-06-05-090-adopt-selftest-onboarding-harness
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 4fddfd292ea8203ba83b4ce889298a0f14ee9e283b978e07ea98e14b0ac17ded
 files_to_modify:
   - src/cli/commands/selftest.ts          # AC1/AC2 — RE-IMPLEMENT the selftest command on current main to the AC1 check-id contract. The orphaned worktree (~/Desktop/Project_echo--onboarding-ci) is an ADVISORY starting point only — its line numbers are NOT authoritative and the build must not depend on it. KEEP its shape: isolated throwaway HOME/ECHO_HOME/CODEX_HOME, native-sqlite-load check, daemon/MCP/init/wiring/capture/doctor checks, exit-code contract, JSON + human reporters. AC2 port: set ECHO_MCP_PORT=0 for the throwaway daemon (atomic :0 bind — existing support) and read the resolved port from the daemon's mcp_port/mcp_url payload; never read or bind 38478. selftest must never touch the founder's real daemon or real ~/.echo/~/.claude/~/.codex.
   - src/cli/index.ts                       # AC1 — wire the `selftest` subcommand (import, command-list help, COMMAND_HELP entry, dispatch branch). +~6 lines, mirror the orphaned diff.
