@@ -885,3 +885,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** `git:/Users/zhenye/Desktop/Project_echo` commit atoms (e71341a, ef75c0d, 4e94405, 3f8213a, 6c95b17, b7e3104, 9b94d42, c9f88ea, 765d5e1) + the 088 review sidecar commit e689d1f. Cross-checked against working-tree fact (087b file physically in backlog/complete/). No non-git sources contributed to the merge-confirmation.
 - **Verdict:** right — ECHO's git-source atoms independently confirm 087b merged to complete/ at e71341a; the merge commit body (conflicts/tests/verdict) was fully recoverable from capture without opening the repo log by hand.
 - **Note:** Two merge commits exist for 087b (4e94405 then e71341a, doubled "…migration-reviewer-child-readonly-migration" name) — messy reconciliation, but the terminal e71341a is the clean pending_review→complete move. The completed item's frontmatter still reads `status: pending_review` (stale field; folder is truth) — a live specimen of exactly the drift 088 is designed to kill.
+
+### 2026-06-04 22:05 PDT — post-088-merge daemon health check
+
+- **Trigger:** strategist finished merging item 088 (proposed-stage pipeline) to main; merge-and-cleanup live-checkout-bringup verification step.
+- **Query inputs:** `echo_ping(message="post-088-merge health check")`.
+- **Returned:** `pong=true`, ts `2026-06-05T05:05:36Z`, message echoed. Connectivity only (no clusters/atoms — health check).
+- **Sources:** `mcp__echo.echo_ping` against the local daemon; no capture-source atoms read.
+- **Verdict:** right — daemon survived the merge (088 changed CLI tools/blocked.py/promote.py + skills/docs/tests, none of the daemon's runtime serving path; no package.json change, so no reinstall/restart needed). MCP surface reachable.
+- **Note:** Confirms the bringup assumption that this merge needed no daemon restart. 088 landed at main 355cd20c; the new proposed/ stage + ready_content_sha gate are now the live claim contract.
