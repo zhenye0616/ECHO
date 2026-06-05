@@ -79,15 +79,29 @@ Diagnosis carried in from the 092 escalation (verified at spec time):
 - **AC2 — DOC-02 diagnosed and green.** Builder diagnoses WHY `doctor --json` fails reachability under the
   packaged install (candidates: port/home plumbing in the doctor invocation, daemon startup race in the
   sandbox, packaged-path resolution) and fixes the actual root cause. If diagnosis reveals a defect outside
-  `files_to_modify` or larger than this item's estimate: STOP, write the diagnosis into `agent_notes`, move
-  to `pending_review/` — partial credit for a pinned root cause beats a drifted fix.
+  `files_to_modify` or larger than this item's estimate: STOP, write the diagnosis into `agent_notes`
+  prefixed `BLOCKED:`, move to `pending_review/` — and that handoff is an **ESCALATION, not an
+  acceptance-complete item** *(r1 codex F2)*: AC2/AC4 are explicitly NOT met, the reviewer must treat it as
+  an escalation (disposition: re-scope, expand `files_to_modify` in a revised spec, or spin a successor)
+  and must NOT review it as a merge candidate. Partial credit for a pinned root cause beats a drifted fix.
 - **AC3 — poll-until-recall.** `selftest.ts:609`'s fixed `sleep(4000)` is replaced by a bounded poll loop
   (e.g. poll every 250–500ms up to a ceiling ≥ the old 4s; configurable ceiling acceptable). On timeout,
   CAP-02 fails with a diagnostic that says how long it waited. No other check's semantics change.
-- **AC4 — packaged rehearsal is the gate.** From the repo at the builder's HEAD: `npm pack`, install the
-  produced `.tgz` into a clean temp prefix, run the INSTALLED `echoctl selftest --json` → exit 0,
-  `failedIds: []` (skips allowed as today). Record the JSON output in the run log. This is the
-  builder-executable proof; it must be in the run log before handoff.
+- **AC4 — packaged rehearsal is the gate (env-isolated, identity-checked).** From the repo at the builder's
+  HEAD: `npm pack`, install the produced `.tgz` into a clean temp prefix, run the INSTALLED
+  `echoctl selftest --json` → exit 0, `failedIds: []` (skips allowed as today). Record the JSON output in
+  the run log. Two hardening contracts:
+  - **Isolated runtime state** *(r1 codex F1 + codex-ops F1, convergent)*: the rehearsal runs with fresh
+    temp runtime homes (HOME / codex home / echo home, or equivalent env isolation) and isolated daemon
+    state, cleaned up afterwards, so preexisting developer-machine state (an existing `~/.codex/skills`,
+    a running daemon, a populated `~/.echo`) cannot satisfy WIR-06/SKILL-02/DOC-02. (`selftest` already
+    sandboxes its own homes internally; the rehearsal-level isolation additionally guards daemon state and
+    anything resolved from the real environment.) Record the isolation env settings in the run log
+    alongside the JSON output.
+  - **Binary identity** *(r1 codex-ops F2)*: invoke the installed CLI by the clean prefix's absolute bin
+    path (NOT bare `echoctl` / `npx` PATH resolution, which can silently exercise the repo/dev CLI) and
+    record the resolved executable path in the run log.
+  This is the builder-executable proof; it must be in the run log before handoff.
 - **AC5 — repo suite green.** `npm test`, `npm run lint`, `npm run typecheck` green. New unit tests from AC1
   included. No existing test deleted or weakened.
 - **AC6 — no drift (lifecycle carve-out as in 092).** ONLY the second-hop adapter work, the DOC-02 root-cause
