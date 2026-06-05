@@ -32,6 +32,26 @@ head_sha: "c4150c62a98c2f73c17308a2c4690e334d3cb9f4"
 pr_url: ""
 agent_notes: |
   Implemented the legacy spec_review gate teardown on branch agent/legacy-spec-review-gate-teardown. The selector now requires a valid ready_content_sha seal with no spec_review fallback, legacy fields are inert and no longer validated, CONTENT_MARKER_FIELDS remains unchanged for seal stability, the --spec-review-sha alias was removed after a live caller sweep found no users, promote.py's dead spec_review_sha insertion branch is gone, and watcher/builder docs plus the generated Claude adapter are coherent. Verification passed: python3 tools/test_blocked.py (35 tests), python3 tools/blocked.py --validate, python3 tools/backlog_index.py --check, tools/sync-skills.sh --check, git diff --check, npm run lint, npm run typecheck, targeted promote tests, and full npm test (1555 passed / 21 skipped).
+review_notes: |
+  Merged 2026-06-05 via founder authorization ("merge after codex's review"). Strategist (Claude) as merger; builder was codex; reviewer was a SEPARATE codex process — reviewer-independence satisfied. This item also closes 088's migration sequence (AC6 step 8): folder-location + ready_content_sha is now the SOLE claim contract.
+
+  Conflicts resolved: none — clean --no-ff merge (ort). Branch forked at the 089 claim commit; current main advanced only on pending-review metadata, task-state/run logs, _followups.md, and friction notes — none of the six implementation/doc files this branch touched. `git merge-tree` (codex review) and the actual merge both reported zero conflicts.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied: none (verdict: merge as-is).
+
+  Fixups deferred to follow-up items: the optional malformed-ready_content_sha fixture (non-blocking; missing+mismatch paths covered, malformed already fails closed in code).
+
+  Verify (post-merge, ephemeral merger worktree @ 66699733): npm test 1555 passed / 21 skipped / 0 failed (147 files); npm run lint + typecheck clean; tools/test_blocked.py 35 passed; blocked.py --validate clean (89 items); backlog_index.py --check fixture-pass; check-coupled-invariants OK; sync-skills.sh --check matched; git diff --check clean.
+
+  Independent review: separate codex reviewer, verdict `merge as-is` — all 6 ACs Met with file:line evidence, zero drift, zero blocking bugs. Confirmed legacy_spec_review_satisfied + the --spec-review-sha alias are GONE, CONTENT_MARKER_FIELDS correctly unchanged (r1 disposition), seals stay stable. Sidecar at backlog/pending_review/2026-06-04-089-…review.md (consumed at merge).
+
+  Pipeline-shakedown note: 089 was the first item to traverse the full post-088 pipeline (proposed→ready→claimed→pending_review→complete). Friction log: raw/internal/decisions/2026-06-04-089-pipeline-shakedown-friction.md; codex root-cause analysis of the 3 friction points in backlog/_followups.md. All friction was cosmetic/operational (🟡), zero 🔴.
+
+  Follow-up items (non-blocking):
+  - Optional malformed-ready_content_sha fixture in tools/test_blocked.py.
+  - (already filed) promote.py status-field seal fix; builder `review:` handoff-commit relabel; reviewer-vendor-diversity for parallelism.
 ---
 
 # 089 — Tear down the legacy `spec_review` dual-read claim path (088 migration step 8)
