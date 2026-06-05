@@ -8,6 +8,7 @@ import { runDaemon } from './commands/daemon.js';
 import { INIT_HELP, parseInitArgs, readPackageVersion, runInit } from './commands/init.js';
 import { PROJECT_HELP, runProject } from './commands/project.js';
 import { runRun } from './commands/run.js';
+import { parseSelfTestArgs, runSelftest, SELFTEST_HELP } from './commands/selftest.js';
 import { runUninstall } from './commands/uninstall.js';
 
 interface GlobalOpts {
@@ -25,6 +26,7 @@ Commands:
   project     Manage git repositories captured by the daemon
   uninstall   Remove ECHO adapter writes
   run         Run a workflow from ~/.echo/workflows
+  selftest    Run the cross-platform onboarding smoke
 `;
 
 const COMMAND_HELP: Record<string, string> = {
@@ -34,6 +36,7 @@ const COMMAND_HELP: Record<string, string> = {
   project: PROJECT_HELP,
   uninstall: 'Usage: echoctl uninstall [--yes] [--purge-state] [--force-purge] [--json] [--quiet]',
   run: 'Usage: echoctl run <workflow> [--project <path>] [--agent <role>=<agent>] [--timeout <seconds>] [--json] [--quiet]',
+  selftest: SELFTEST_HELP,
 };
 
 function peelGlobal(argv: readonly string[]): { globals: GlobalOpts; rest: string[] } {
@@ -123,6 +126,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     if (command === 'project') {
       return await runProject({ ...globals, argv: args });
     }
+    if (command === 'selftest') {
+      return await runSelftest({ ...globals, ...parseSelfTestArgs(args) });
+    }
     if (command === 'uninstall') {
       const parsed = parseArgs({
         args,
@@ -159,7 +165,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       }
       const timeoutSeconds = parseTimeoutSeconds(parsed.values.timeout);
       if (timeoutSeconds === null) {
-        print(process.stderr, `${COMMAND_HELP.run}\ninvalid --timeout: expected a positive integer`);
+        print(
+          process.stderr,
+          `${COMMAND_HELP.run}\ninvalid --timeout: expected a positive integer`,
+        );
         return 2;
       }
       const overrides = new Map<string, AgentKind>();

@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: quality · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build CLI
+        run: npm run build:cli
+      - name: Unit tests
+        run: npm test
+
+  onboarding:
+    name: onboarding · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Preconditions
+        shell: bash
+        run: |
+          node -e "if(+process.versions.node.split('.')[0]<22)process.exit(1);console.log('node',process.version)"
+          node -p "({platform:process.platform,arch:process.arch})"
+          git --version
+      - run: npm ci
+      - name: Pack artifact
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p packed
+          tarball="$(npm pack --pack-destination packed --silent)"
+          printf 'tarball=%s\n' "packed/${tarball}" >> "$GITHUB_OUTPUT"
+      - name: Install packed echoctl
+        shell: bash
+        run: npm install -g "${{ steps.pack.outputs.tarball }}"
+      - name: Onboarding self-test
+        run: echoctl selftest --json
