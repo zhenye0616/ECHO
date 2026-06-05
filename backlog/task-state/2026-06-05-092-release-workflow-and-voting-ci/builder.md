@@ -1,15 +1,22 @@
 ---
 role: builder
 task_id: 2026-06-05-092-release-workflow-and-voting-ci
-last_updated: 2026-06-05T22:00:46Z
+last_updated: 2026-06-05T22:24:51Z
 lifecycle: claimed
 branch: agent/release-workflow-and-voting-ci
 head_sha: ""
 run_log: ""
+handoff_branch: agent/release-workflow-and-voting-ci
+handoff_head_sha: 0f392a3263b1109803b00190f5932b1e894aa903
+handoff_run_log: raw/internal/agent-runs/2026-06-05-2026-06-05-092-release-workflow-and-voting-ci.md
 ---
 
 ## current_thesis
 Claimed 092 as codex builder. Implement only the tag-triggered release workflow, CI onboarding voting flip, and packed-manifest snapshot, then hand off for review on `agent/release-workflow-and-voting-ci`.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-05-2026-06-05-092-release-workflow-and-voting-ci.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add a `v*`-tag release workflow that builds exactly one `npm pack` tarball from clean source, computes a SHA-256 checksum, and uploads both as the build artifact.
@@ -23,6 +30,10 @@ Claimed 092 as codex builder. Implement only the tag-triggered release workflow,
 ## open_questions
 - None blocking at claim time. The item's first two `spec_refs` point to `backlog/proposed/`, but both parent specs now live in `backlog/complete/`; builder will read those current item paths by id and note the stale anchors in the run log.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not add public distribution channels: no `npm publish`, Homebrew tap, winget, or scoop.
 - Do not create the thin acceptance/distribution repo.
@@ -31,5 +42,6 @@ Claimed 092 as codex builder. Implement only the tag-triggered release workflow,
 - Do not edit `wiki/`, `docs/BACKLOG.md`, or backlog item body content.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-05-092-release-workflow-and-voting-ci.md
+
+- spec: backlog/pending_review/2026-06-05-092-release-workflow-and-voting-ci.md
 - reviews: backlog/reviews/2026-06-05-092-release-workflow-and-voting-ci/

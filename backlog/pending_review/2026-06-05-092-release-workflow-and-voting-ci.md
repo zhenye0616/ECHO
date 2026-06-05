@@ -25,9 +25,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-05T22:00:46Z"
 branch: "agent/release-workflow-and-voting-ci"
 worktree: "/Users/zhenye/Desktop/Project_echo--release-workflow-and-voting-ci"
-head_sha: ""
+head_sha: "0f392a3263b1109803b00190f5932b1e894aa903"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: The implemented release workflow would correctly run the installed tarball's `echoctl selftest --json`, but that prerequisite currently fails from a locally packed/installed `echoctl-0.1.0-beta.1.tgz` with failedIds `WIR-06`, `SKILL-02`, and `DOC-02`. Tried: implemented and pushed `agent/release-workflow-and-voting-ci` at `0f392a3263b1109803b00190f5932b1e894aa903`; ran static workflow assertions, focused packed-manifest test, `npm ci --dry-run`, `npm run typecheck`, `npm run lint`, full `npm test`, and a local build-once/install/selftest/doctor rehearsal. Best-guess answer: 090/091 left the packaged selftest path not actually green for Codex skill installation and internal doctor reachability, so a prerequisite follow-up should fix selftest before 092 can safely make onboarding/release validation required (confidence high for WIR-06/SKILL-02 because `src/echo-home/adapter-sync.ts` does not second-hop Codex skills today; medium for DOC-02). Why I escalated rather than guessing: fixing the failing prerequisite requires `src/cli/commands/selftest.ts` and/or adapter-sync changes outside `files_to_modify`, and AC6 explicitly forbids `src/` drift.
 review_notes: ""
 ---
 
