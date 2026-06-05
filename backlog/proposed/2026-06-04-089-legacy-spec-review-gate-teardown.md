@@ -9,7 +9,7 @@ blocked_by: []
 task_state_ref: 2026-06-04-089-legacy-spec-review-gate-teardown
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  - tools/blocked.py                       # AC1/AC2/AC3 — remove the legacy claim path + validation + helpers. Delete legacy_spec_review_satisfied(); ready_content_satisfied() no longer falls back to it (missing/mismatched ready_content_sha ALWAYS fails closed). Remove the spec_review/spec_review_sha validation block + VALID_SPEC_REVIEW. CONTENT_MARKER_FIELDS → {"ready_content_sha"} only. Remove the spec_review_content_sha() alias. Drop the `--spec-review-sha` CLI alias (keep `--ready-content-sha`). Update the module docstring (lines ~32/45/16) to drop the transitional-fallback language.
+  - tools/blocked.py                       # AC1/AC2/AC3 — remove the legacy claim path + validation + helpers. Delete legacy_spec_review_satisfied(); ready_content_satisfied() no longer falls back to it (missing/mismatched ready_content_sha ALWAYS fails closed). Remove the spec_review/spec_review_sha validation block + VALID_SPEC_REVIEW. KEEP CONTENT_MARKER_FIELDS unchanged (legacy fields stay excluded from the hash — decision 3 / AC3, the r1 seal-stability disposition). Remove the spec_review_content_sha() alias. Drop the `--spec-review-sha` CLI alias (keep `--ready-content-sha`) ONLY after the AC3 caller sweep. Update the module docstring (lines ~32/45/16) to drop the transitional-fallback language.
   - tools/test_blocked.py                  # AC5 — rework the legacy-path tests. The six legacy tests (transitionally-claimable, second matching-digest case, body-delta-after-legacy-convergence-is-stale, waived-without-digest, bad-spec_review-value-exits-2, malformed-spec_review-sha + converged-requires-sha) become assertions that (a) a spec_review-only item with NO ready_content_sha is BLOCKED (no seal → fail closed), and (b) spec_review is no longer a validated field (a value like `done` no longer exits 2). Keep/strengthen the ready_content_sha match/mismatch/missing coverage. `python3 tools/test_blocked.py` green.
   - tools/review-queue/promote.py          # AC3 — line-80 regex cleanup: the strip pattern `^(spec_review_sha|requested_reviewers):` drops the dead `spec_review_sha` alternation (no item carries it post-teardown), leaving the requested_reviewers handling intact. promote.py keeps using blocked.normalized_content_sha (shared; stays consistent through the CONTENT_MARKER_FIELDS change — verify no independent spec_review read remains).
   - skills/review-queue-watch.md           # AC4 — remove the legacy-marker branch (the "If it does not start with backlog/proposed/, do not write legacy spec_review markers" prose ~line 125). Post-088 every spec is authored into proposed/ and promoted via promote.py's ready_content_sha stamp; the watcher never writes a spec_review marker. Tighten the terminal/promotion prose accordingly.
@@ -64,15 +64,19 @@ end-to-end shakedown of the pipeline 088 built (author in proposed/ → spec-rev
    loud rejection would be a new error path guarding against a field that no live item carries; lenient
    ignore is the smaller, safer teardown and the seal already provides the real gate. (Reviewers: push
    back here if you think a one-line "stray legacy field" WARN in `--validate` is worth the surface.)
-3. **Clean the marker set + helpers + CLI.** `CONTENT_MARKER_FIELDS` → `{"ready_content_sha"}` (the
-   seal field self-excludes from its own hash; the now-absent `spec_review`/`spec_review_sha` no longer
-   need exclusion). Delete the `spec_review_content_sha()` alias (callers use `normalized_content_sha`).
-   Drop the `--spec-review-sha` CLI alias; keep `--ready-content-sha`. Clean `promote.py`'s line-80
-   strip regex (`spec_review_sha` alternation). **Never-half-broken guard:** this MUST land while no
-   `ready/` item carries `spec_review` (true now) — otherwise removing `spec_review` from
-   `CONTENT_MARKER_FIELDS` would change that item's normalized hash and break its seal. A pre-flight
-   assertion (no live `ready/`+`claimed/`+`pending_review/` item carries `spec_review`) belongs in the
-   test/validate path.
+3. **Clean the helpers + CLI, but KEEP the marker-set exclusions conservative (r1 codex + codex-ops
+   MED).** `CONTENT_MARKER_FIELDS` is **unchanged** — it retains `{"ready_content_sha", "spec_review",
+   "spec_review_sha"}`, so the legacy fields stay EXCLUDED from the normalized hash even though they're
+   no longer read. **Why keep them:** removing them from the exclusion set is the *only* thing that
+   could change a live item's seal hash — an item carrying a stray `spec_review`/`spec_review_sha` line
+   would suddenly hash differently, so its `ready_content_sha` seal would mismatch and the item would
+   become unclaimable. Keeping them excluded makes the teardown **seal-stable by construction**, so NO
+   never-half-broken hash guard is needed and decision 2's lenient-ignore stands unconflicted. This is
+   the root-cause disposition of the r1 guard contradiction: *remove the risky change, not add a guard.*
+   Delete the `spec_review_content_sha()` alias (callers use `normalized_content_sha`). Clean
+   `promote.py`'s line-80 strip regex (`spec_review_sha` alternation). Drop the `--spec-review-sha` CLI
+   alias and keep `--ready-content-sha`, but ONLY after the AC3 caller sweep confirms no live caller
+   passes the old flag.
 4. **Docs + skills coherent.** Remove the transitional dual-read prose from `docs/AGENT_INSTRUCTIONS.md`
    and the legacy-marker branch from `skills/review-queue-watch.md`; regenerate the `.claude/` adapter
    via `tools/sync-skills.sh` (`--check` green).
@@ -87,20 +91,27 @@ end-to-end shakedown of the pipeline 088 built (author in proposed/ → spec-rev
   `VALID_SPEC_REVIEW` are removed. `tools/blocked.py --validate` passes on the live backlog. A test
   proves an item with `spec_review: <anything>` no longer exits 2 (the field is inert), and that such an
   item is not claimable absent a valid seal.
-- **AC3 — marker set + helpers + CLI cleaned.** `CONTENT_MARKER_FIELDS == {"ready_content_sha"}`;
-  `spec_review_content_sha()` removed; `--spec-review-sha` removed and `--ready-content-sha` retained
-  (a test or `--help` assertion pins the canonical flag); `promote.py`'s strip regex no longer
-  references `spec_review_sha`. Seal compute for a real proposed→ready promotion is unchanged
-  (round-trip: stamp then `--validate` claimable).
+- **AC3 — helpers + CLI cleaned; marker set UNCHANGED; CLI removal gated on a caller sweep (r1
+  codex-ops MED).** `CONTENT_MARKER_FIELDS` is unchanged (`{"ready_content_sha", "spec_review",
+  "spec_review_sha"}` — legacy fields stay excluded from the hash; decision 3), so every existing seal
+  stays valid. `spec_review_content_sha()` removed; `promote.py`'s line-80 strip regex no longer
+  references `spec_review_sha`. **CLI alias removal is gated:** grep the live surfaces (`tools/`,
+  `skills/`, `.claude/commands/`, any launchd/`*.sh` script — EXCLUDING historical `backlog/complete/**`,
+  `backlog/reviews/**`, `raw/internal/agent-runs/**`, dogfooding) for `--spec-review-sha`; drop the alias
+  only if zero live callers remain (update any found), else keep the alias and file the sweep as a
+  follow-up. A test or `--help` assertion pins `--ready-content-sha` as canonical. Seal compute for a
+  real proposed→ready promotion is unchanged (round-trip: stamp then `--validate` claimable).
 - **AC4 — docs + skills coherent.** `docs/AGENT_INSTRUCTIONS.md` no longer caveats legacy `spec_review`;
   `skills/review-queue-watch.md` has no legacy-marker branch; `.claude/commands/review-queue-watch.md`
   regenerated; `tools/sync-skills.sh --check` green.
-- **AC5 — never-half-broken + tests green.** A guard (test or `--validate` check) asserts no live
-  `ready/`/`claimed/`/`pending_review/` item carries `spec_review` before the marker-set change is
-  trusted. The six legacy `test_blocked.py` tests are reworked to the new behavior (spec_review-only →
-  blocked; spec_review value not validated). `python3 tools/test_blocked.py`, full `npm test`,
-  `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh --check`, `python3 tools/blocked.py
-  --validate`, and `python3 tools/backlog_index.py --check` all green.
+- **AC5 — tests green (no hash guard needed — r1 codex + codex-ops MED).** Because the marker set is
+  unchanged (decision 3 / AC3), seals are stable by construction, so **no never-half-broken hash guard
+  is required** — the earlier guard wording is removed precisely to avoid a `--validate` failure that
+  would contradict AC2's lenient-ignore. The six legacy `test_blocked.py` tests are reworked to the new
+  behavior: a `spec_review`-only item with no `ready_content_sha` is **blocked** (no seal → fail closed),
+  and a `spec_review: <anything>` value is no longer validated (no exit-2). `python3
+  tools/test_blocked.py`, full `npm test`, `npm run lint`, `npm run typecheck`, `tools/sync-skills.sh
+  --check`, `python3 tools/blocked.py --validate`, and `python3 tools/backlog_index.py --check` all green.
 - **AC6 — no scope drift.** ONLY the legacy-`spec_review` teardown. The `proposed/` stage, the
   `ready_content_sha` seal semantics, `promote.py`'s promotion/bounce/identity-gate logic, `request.py`,
   `dispatch-next-round.py`, and `backlog_index.py` are unchanged (beyond the promote.py one-line regex).
