@@ -8,6 +8,7 @@ created: 2026-06-05
 blocked_by: ["2026-06-05-090-adopt-selftest-onboarding-harness"]
 task_state_ref: 2026-06-05-091-upstream-windows-compat-fixes
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: a261929911beea21cfc30315a3dec3a0e4457184539dad49f2a2f28ea76cb9b8
 files_to_modify:
   - src/util/json.ts                       # AC1 (F4) — NEW BOM-tolerant JSON reader (strip a leading U+FEFF before JSON.parse). Single helper reused at every onboarding-critical parse site. (Path per repo util convention.)
   - src/cli/commands/init.ts               # AC1 (F4) — route answer-file parse (init.ts:265 `JSON.parse(raw)`) and onboarding-state reads (:331, :356 `JSON.parse(readFileSync(...))`) through the BOM-tolerant reader. A UTF-8-BOM answer file currently throws — this is the root of the answer-file/init cascade.
