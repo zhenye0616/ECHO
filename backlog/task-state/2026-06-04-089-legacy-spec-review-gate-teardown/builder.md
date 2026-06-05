@@ -1,14 +1,21 @@
 ---
 role: builder
 task_id: 2026-06-04-089-legacy-spec-review-gate-teardown
-last_updated: 2026-06-05T06:04:08Z
+last_updated: 2026-06-05T06:18:45Z
 lifecycle: claimed
 branch: agent/legacy-spec-review-gate-teardown
 claim_commit: 929a6448fcd88af23a6e25f603ebd7fbf44d7635
+handoff_branch: agent/legacy-spec-review-gate-teardown
+handoff_head_sha: c4150c62a98c2f73c17308a2c4690e334d3cb9f4
+handoff_run_log: raw/internal/agent-runs/2026-06-04-2026-06-04-089-legacy-spec-review-gate-teardown.md
 ---
 
 ## current_thesis
 Claimed 089 as Codex builder. Implement the narrow 088 migration teardown: remove the legacy `spec_review` dual-read claim path so folder location plus matching `ready_content_sha` is the sole live claim contract, while preserving seal normalization and avoiding new validation drift.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at c4150c62a98c2f73c17308a2c4690e334d3cb9f4.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: delete `legacy_spec_review_satisfied()` and remove the fallback from `ready_content_satisfied()`; missing, malformed, or mismatched `ready_content_sha` must fail closed.
@@ -31,5 +38,6 @@ Claimed 089 as Codex builder. Implement the narrow 088 migration teardown: remov
 - Do not modify files outside the spec's `files_to_modify` list except protocol-owned run log/backlog/task-state handoff files.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-04-089-legacy-spec-review-gate-teardown.md
+
+- spec: backlog/pending_review/2026-06-04-089-legacy-spec-review-gate-teardown.md
 - reviews: backlog/reviews/2026-06-04-089-legacy-spec-review-gate-teardown/

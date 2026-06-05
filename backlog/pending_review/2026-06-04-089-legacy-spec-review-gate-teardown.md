@@ -28,9 +28,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-05T06:04:08Z"
 branch: "agent/legacy-spec-review-gate-teardown"
 worktree: "/Users/zhenye/Desktop/Project_echo--legacy-spec-review-gate-teardown"
-head_sha: ""
+head_sha: "c4150c62a98c2f73c17308a2c4690e334d3cb9f4"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the legacy spec_review gate teardown on branch agent/legacy-spec-review-gate-teardown. The selector now requires a valid ready_content_sha seal with no spec_review fallback, legacy fields are inert and no longer validated, CONTENT_MARKER_FIELDS remains unchanged for seal stability, the --spec-review-sha alias was removed after a live caller sweep found no users, promote.py's dead spec_review_sha insertion branch is gone, and watcher/builder docs plus the generated Claude adapter are coherent. Verification passed: python3 tools/test_blocked.py (35 tests), python3 tools/blocked.py --validate, python3 tools/backlog_index.py --check, tools/sync-skills.sh --check, git diff --check, npm run lint, npm run typecheck, targeted promote tests, and full npm test (1555 passed / 21 skipped).
 ---
 
 # 089 — Tear down the legacy `spec_review` dual-read claim path (088 migration step 8)
