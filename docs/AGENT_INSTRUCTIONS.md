@@ -40,10 +40,10 @@ The **entire `wiki/` folder is your global context** — read-only, but readable
        — exit 0 + path on stdout: that's your candidate
        — exit 1: no unblocked work; STOP cleanly
        — exit 2: validation failure (dangling ref, cycle, malformed); STOP and surface the error
-       — Do NOT filter manually. The script is the enforcement, not your judgment.
-       — A ready/ item with non-empty `requested_reviewers` is claimable only
-         after spec-review convergence; `blocked.py` enforces the
-         `spec_review` / `spec_review_sha` gate before printing candidates.
+      — Do NOT filter manually. The script is the enforcement, not your judgment.
+      — Only `ready/` is claimable. `proposed/` is reviewable spec-draft
+        state, never a builder candidate. `blocked.py` enforces
+        `ready_content_sha` freshness before printing candidates.
  5. Atomic claim:
        (in main repo on main)
        git mv backlog/ready/X.md backlog/claimed/X.md
@@ -247,7 +247,7 @@ These rules override anything you might infer from context. If any rule conflict
 
 5. **Tests are mandatory, not optional.** If acceptance says "tests pass," tests must exist and pass. If no test framework exists yet, escalate — don't invent one.
 
-6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. The review-gate fields `spec_review` and `spec_review_sha` are watcher/founder-owned, NOT builder-writable; a builder cannot self-certify spec-review convergence. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
+6. **No spec changes.** You do not edit `wiki/`, and you do not edit anything in the body of a backlog item. The only fields in a backlog item file you may edit are the agent-managed frontmatter fields: `claimed_by`, `claimed_at`, `branch`, `worktree`, `head_sha`, `pr_url`, `agent_notes`. The ready-stage integrity field `ready_content_sha` is watcher/founder-owned, NOT builder-writable; a builder cannot self-certify claimability. Legacy `spec_review` / `spec_review_sha` fields are transitional and still non-builder-managed. If a spec is wrong, write a note in `raw/internal/decisions/` and escalate.
 
 7. **No merging your own branch.** You push `agent/<slug>`. Someone else merges — by preference the strategist, otherwise a second builder agent that did not build this item, otherwise the founder. **You never run `git merge` on `main` for an item you built.** If the user asks you to review and merge a *different* builder's pending item, you may operate in reviewer mode: read the diff, prep `review_notes` and any reconciliation diff, but the actual `git merge` and `git push origin main` still wait for founder green-light per the Reviewer Independence Rule in `claude.md` / `backlog/README.md`.
 
@@ -278,6 +278,7 @@ The standing test: *"Is this in the acceptance criteria?"* If no, don't do it. L
 
 | From | To | When | Where |
 |---|---|---|---|
+| `backlog/proposed/` | `backlog/ready/` | Watcher promotes after spec-review convergence; never builder-owned | main repo, on `main` |
 | `backlog/ready/` | `backlog/claimed/` | Atomic claim at run start | main repo, on `main` |
 | `backlog/claimed/` | `backlog/pending_review/` | Done OR stuck | main repo, on `main` |
 | (anywhere) | `backlog/complete/` | **Founder only** — never you |  |
@@ -336,7 +337,7 @@ When you can't proceed without founder input:
 6. STOP. Do not pick up another item.
 
 Founder will respond by either:
-- Updating the item with clarification → moving back to `ready/`
+- Updating the item with clarification → moving back to `proposed/` if it needs spec-review again, or `ready/` only if it is immediately claimable with a fresh `ready_content_sha`
 - Marking it cancelled → moving to `complete/` with note
 - Splitting into smaller items → adjusting backlog
 
@@ -359,13 +360,13 @@ Founder will respond by either:
 - Agent-managed frontmatter fields of the item you're working on
 - File moves between `backlog/ready/`, `backlog/claimed/`, `backlog/pending_review/`
 
-The review-gate frontmatter fields `spec_review` and `spec_review_sha` are NOT agent-managed. The watcher writes `converged` plus a digest when review terminates successfully; the founder may set `waived` as an explicit manual fast-track. Builders only consume the gate through `tools/blocked.py`.
+The ready-stage integrity field `ready_content_sha` is NOT agent-managed. The watcher stamps it when promoting `proposed/` to `ready/`, and stale ready items are bounced back to `proposed/`. Builders only consume claimability through `tools/blocked.py`; they do not read readiness fields manually. New task-state anchors for unclaimed specs should point at `backlog/proposed/<id>.md` until promotion moves the item.
 
 ## What You Must Not Write
 
 - Anything in `wiki/` (only the strategist edits, and only post-shipment)
 - Item bodies in `backlog/` (only agent-managed frontmatter fields)
-- `docs/BACKLOG.md` (founder regenerates manually after approval)
+- `docs/BACKLOG.md` (generated by `tools/backlog_index.py`; strategist/post-merge only)
 - `docs/STATUS.md` (founder updates Friday)
 - `docs/NORTH_STAR.md` (founder owns this)
 - Anything in `backlog/complete/` (founder-only)

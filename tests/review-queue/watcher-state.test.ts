@@ -38,7 +38,7 @@ function setupRepo(): string {
   return root;
 }
 
-function writeRequest(root: string, round: number, sha: string = R1_SHA): string {
+function writeRequest(root: string, round: number, sha: string = R1_SHA, stage = 'ready'): string {
   const dir = join(root, 'backlog/reviews', ITEM_ID, `r${round}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -48,7 +48,7 @@ function writeRequest(root: string, round: number, sha: string = R1_SHA): string
       `item_id: "${ITEM_ID}"`,
       `round: ${round}`,
       `spec_commit_sha: "${sha}"`,
-      `artifact_path: "backlog/ready/${ITEM_ID}.md"`,
+      `artifact_path: "backlog/${stage}/${ITEM_ID}.md"`,
       'class: "narrow"',
       'requested_at: "2026-05-12T08:00:00Z"',
       'requested_reviewers:',
@@ -281,5 +281,37 @@ describe('dispatch-next-round.py (AC3.5 watcher post-combine state machine)', ()
     const bodyAfter = readBody(combinedPath);
     const occurrences = bodyAfter.match(/verification waived; rationale:/g) || [];
     expect(occurrences.length).toBe(1);
+  });
+
+  it('proposed-stage proceed_after_patches + patches_applied=false routes to verification round', () => {
+    mkdirSync(join(root, 'backlog/proposed'), { recursive: true });
+    writeFileSync(
+      join(root, 'backlog/proposed', `${ITEM_ID}.md`),
+      `---\nid: ${ITEM_ID}\n---\nproposed body\n`,
+    );
+    const r1 = writeRequest(root, 1, R1_SHA, 'proposed');
+    writeReviewer(r1, 'codex', 1, 'proceed_after_patches', [
+      { severity: 'low', where: '§AC4 wording', finding: 'mechanical typo' },
+    ]);
+    writeReviewer(r1, 'cursor', 1, 'proceed', []);
+    expect(runCombine(root).code).toBe(0);
+
+    const r = runDispatch(root, [
+      '1',
+      '--verdict=proceed_after_patches',
+      '--patches-applied=false',
+      '--class=narrow',
+      '--focus-hints=Verify proposed-stage patch before promotion',
+      `--spec-sha=${R1_SHA}`,
+    ]);
+    expect(r.code, r.stderr).toBe(0);
+
+    const r2Request = join(root, 'backlog/reviews', ITEM_ID, 'r2/request.md');
+    expect(existsSync(r2Request)).toBe(true);
+    const r2Body = readFileSync(r2Request, 'utf-8');
+    expect(r2Body).toMatch(new RegExp(`artifact_path: backlog/proposed/${ITEM_ID}\\.md`));
+    const r1Fm = readFrontmatter(join(r1, 'combined.md'));
+    expect(r1Fm.next_round).toBe(2);
+    expect(readBody(join(r1, 'combined.md'))).not.toMatch(/verification waived; rationale:/);
   });
 });

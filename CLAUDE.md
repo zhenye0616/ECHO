@@ -10,14 +10,14 @@ ECHO is the cross-platform context layer for AI-era knowledge work. The product 
 
 This is both a **decision archive** (the wiki) and a **build coordination system** (the backlog + agent runs). Two important rules govern how the two halves stay honest:
 
-- **The product wiki (`wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its `backlog/ready/<id>.md` item.
+- **The product wiki (`wiki/`) is lagging documentation of shipped reality, not aspirational spec.** A page exists for X only after X has been built, reviewed, and merged. Until then, X's spec lives inside its backlog item: `backlog/proposed/<id>.md` while under spec-review, then `backlog/ready/<id>.md` once claimable.
 - **Operating-model files** (this file, `docs/AGENT_INSTRUCTIONS.md`, `backlog/README.md`, `.claude/commands/process-backlog.md`) update *immediately* when the operating model changes. They have no shipping milestone and are not product decisions.
 
 ### When making strategic decisions
 
 1. **Search existing wiki + backlog first.** A shipped wiki page (`wiki/product/`, `wiki/principles/`, `wiki/architecture/`, `wiki/capture/`, `wiki/surfaces/`, etc.) or an in-flight backlog item often already captures the principle. Reuse before creating.
 2. **Cite cross-project wisdom.** The `yc-wiki` (`~/Desktop/yc/yc-wiki/`) is the authoritative source for startup strategy frameworks. Reference its concept pages by `[[link]]` when applying them.
-3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — lives inside `backlog/ready/<id>.md`. The strategist does **not** write to `wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
+3. **Capture new decisions as backlog items, not wiki pages.** The full spec — reasoning, alternatives considered, final call, acceptance criteria — starts inside `backlog/proposed/<id>.md`. The strategist does **not** write to `wiki/` at decision time. Wiki pages are written *after* the item lands in `backlog/complete/`, and only then.
 4. **Background reasoning** that doesn't correspond to an actionable build item lands in `raw/internal/decisions/`.
 5. **The manifest** is updated only when (and only when) a wiki page is actually created post-shipment.
 
@@ -94,7 +94,7 @@ Working name: **ECHO**. Hard rename deadline: before public Show HN launch (week
 
 This repo coordinates three roles. **Multiple builder agents may run in parallel** — each works inside its own git worktree on its own feature branch.
 
-1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/ready/<id>.md` items; does **not** write to `wiki/` until items ship; **may also review and prep merges** for items in `pending_review/` (see "Reviewer independence rule" below)
+1. **Strategist (Claude in conversation with founder)** — produces design decisions; specs them as `backlog/proposed/<id>.md` items; does **not** write to `wiki/` until items ship; **may also review and prep merges** for items in `pending_review/` (see "Reviewer independence rule" below)
 2. **Builder agents (autonomous, parallelizable)** — claim items from `backlog/ready/`, work in isolated worktrees, move items through the pipeline; **never review or merge their own work**
 3. **Founder** — gives final approval at the two irreversible moments: (a) signing off on substantive conflict resolutions surfaced by reviewer, (b) `git push origin main`. Also handles review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
 
@@ -121,18 +121,18 @@ Self-review is the bad version. The agent that drifted into wrong scope can't se
 ### Pipeline
 
 ```
-backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlog/complete/
-                                                                         │
-                                                                         ▼
-                                                            strategist updates wiki/
+backlog/proposed/  →  backlog/ready/  →  backlog/claimed/  →  backlog/pending_review/  →  backlog/complete/
+   spec review          claimable          builder owns          founder reviews              │
+                                                                                              ▼
+                                                                                 strategist updates wiki/
 ```
 
 ### Strategist Responsibilities (this Claude conversation)
 
 After any strategic conversation that lands an actionable decision:
 
-1. **Create a `backlog/ready/<id>.md` item** — full spec lives here (this is the authoritative spec until the item ships). Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
-2. **Add a row to `docs/BACKLOG.md`'s Ready table.**
+1. **Create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`. Include an "After Completion (Strategist Notes)" section noting which wiki pages should be created/updated post-shipment.
+2. **Do not hand-edit `docs/BACKLOG.md`.** It is generated from folder state by `tools/backlog_index.py`; regenerate it after merge when acting in strategist/post-shipment mode.
 3. **Do NOT touch `wiki/`.** Wiki edits happen only after items land in `complete/`.
 
 When the founder reports items have moved to `complete/`, the strategist's *next* job is to read those items' "After Completion" sections and promote the now-shipped decisions to `wiki/` — landing each page in the appropriate folder (product/, principles/, architecture/, capture/, capture/per-app/, surfaces/, research/, or operating-model/), then updating `.manifest.json` and regenerating `wiki/index.md` via `tools/wiki_index.py`.

@@ -14,6 +14,9 @@ Executes one of the three AC3.5 branches documented in
     (c) verdict=proceed_after_patches AND --patches-applied=false (explicit waiver)
         Appends `verification waived; rationale: <--focus-hints>` line into
         r<N>/combined.md body; leaves next_round=null.
+        Proposed-stage artifacts are excluded from this branch: a proposed spec
+        with this tuple is routed to (b) so any content patch receives a
+        verification round before proposed/ can be promoted to ready/.
 
 File mutations only — does NOT run git add/commit/push. The watcher
 slash-command owns the single per-branch git block that follows.
@@ -103,6 +106,20 @@ def _resolve_request_py() -> list[str]:
     return [sys.executable, str(here / "request.py")]
 
 
+def _current_artifact_is_proposed(combined_path: Path) -> bool:
+    request_path = combined_path.parent / "request.md"
+    if not request_path.is_file():
+        return False
+    try:
+        fm, _ = _lib.parse_frontmatter(request_path)
+    except (ValueError, KeyError):
+        return False
+    artifact_path = fm.get("artifact_path")
+    if not isinstance(artifact_path, str):
+        return False
+    return Path(artifact_path).parts[:2] == ("backlog", "proposed")
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("item_id")
@@ -135,6 +152,8 @@ def main(argv: list[str]) -> int:
     if args.patches_applied:
         return _branch_b(args, repo_root, combined_path, n)
     if args.verdict == "proceed_after_patches":
+        if _current_artifact_is_proposed(combined_path):
+            return _branch_b(args, repo_root, combined_path, n)
         return _branch_c(args, combined_path)
     # verdict ∈ {proceed, pushback} AND patches_applied=false → (a)
     return _branch_a(combined_path)

@@ -4,7 +4,7 @@ Kanban-style work coordination across strategic conversations, one or more auton
 
 ## The Three Roles
 
-1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/ready/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
+1. **Strategist (chat conversations)** — produces design decisions, captures specs as `backlog/proposed/` items. Does **not** write to `wiki/` until an item is shipped. **May also review and prep merges** for items in `pending_review/` — see the Reviewer Independence Rule below.
 2. **Builder agent (autonomous, parallelizable)** — claims items from `backlog/ready/`, works in an isolated git worktree, moves items through the pipeline. Multiple agents may run in parallel. **Never reviews or merges its own work** (and never merges any work — see `docs/AGENT_INSTRUCTIONS.md`).
 3. **Founder** — gives final approval at the two irreversible moments: (a) substantive conflict-resolution sign-off, (b) `git push origin main`. Also handles end-to-end review + merge directly when no strategist or independent reviewer is available, and asks the strategist to update the wiki post-shipment.
 
@@ -47,7 +47,8 @@ This makes spec/build divergence structurally impossible — the wiki cannot cla
 ```
 backlog/
 ├── README.md            (this file)
-├── ready/               # specced; claimable only when blocked.py says so
+├── proposed/            # spec draft in spec-review; reviewable, never claimable
+├── ready/               # claimable; sealed by ready_content_sha
 ├── claimed/             # agent has atomically claimed; in-progress
 ├── pending_review/      # agent done; awaits founder review + merge
 └── complete/            # founder approved + merged; wiki update pending
@@ -56,21 +57,22 @@ backlog/
 ## Item Lifecycle
 
 ```
-[strategist]
+raw idea     ← ECHO session context only; no backlog artifact
      │
      ▼
-ready/      ← agents poll this folder; oldest HIGH-priority item wins
-              (if requested_reviewers is non-empty, spec-review convergence
-               or founder waiver is required before blocked.py will select it)
+proposed/    ← written spec draft; review queue can open rounds here
+     │          watcher promotes on convergence by stamping ready_content_sha
+     ▼
+ready/       ← claimable only; agents poll this folder
      │
      ▼ (atomic claim: see below)
-claimed/    ← agent owns it; works in its own worktree on agent/<slug> branch
+claimed/     ← agent owns it; works in its own worktree on agent/<slug> branch
      │
      ▼
 pending_review/  ← agent done; founder reviews diff/tests/notes; merges PR
      │
      ├── approved → complete/  ← strategist promotes decisions to wiki/ in next conversation
-     └── rejected → back to ready/ with review_notes
+     └── rejected → proposed/ if the spec needs review again, or ready/ only with a fresh ready_content_sha
 ```
 
 ## Atomic Claim (Multi-Agent Safe)
@@ -136,7 +138,7 @@ The system is designed so a crashed run, a re-run, or a network glitch mid-push 
 ### What we guarantee strongly
 
 - **At-most-one claim per item.** The atomic claim commit + push-rejection-on-race makes it impossible for two agents to both end up owning the same item.
-- **Single source of truth for an item's stage.** Git enforces that the file lives in exactly one of `ready/`, `claimed/`, `pending_review/`, `complete/` at any time.
+- **Single source of truth for an item's stage.** Git enforces that the file lives in exactly one of `proposed/`, `ready/`, `claimed/`, `pending_review/`, `complete/` at any time.
 
 ### What the agent loop must do to make the rest safe
 
@@ -258,7 +260,7 @@ Each item is one markdown file with frontmatter that's both human-readable and m
 ---
 id: 2026-04-30-001-capture-gate
 title: Capture gate (sandbox chokepoint)
-status: ready                     # ready | claimed | pending_review | complete
+status: ready                     # informational only; folder location is authoritative
 priority: HIGH                    # HIGH | MED | LOW
 estimate: 0.5d
 created: 2026-04-30
@@ -269,10 +271,10 @@ task_state_ref: ""                # optional (046+). When set, names the task-st
                                   # under backlog/task-state/<task-id>/ — the role-typed working-memory
                                   # snapshot strategist/builder/watcher/dispatcher actors read on cold
                                   # start. Reviewer ticks MUST NOT read this; see skills/role-typed-task-state.md.
-requested_reviewers: []           # optional. Non-empty means the item is under/awaiting spec-review
-                                  # and is not claimable until blocked.py sees spec_review convergence.
-# spec_review: converged          # optional, watcher/founder-owned: converged | waived | pending.
-# spec_review_sha: <sha256>       # watcher-owned normalized-content digest required for converged.
+requested_reviewers: []           # optional reviewer roster for spec-review rounds
+ready_content_sha: <sha256>       # watcher/founder-owned seal required in ready/; proves the
+                                  # file still matches the content promoted into claimable state.
+                                  # Omit in proposed/; watcher stamps it during promotion.
 acceptance:                       # specific, testable criteria
   - All capture data flows through one chokepoint function
   - Non-allowlisted sources rejected; rejections are logged
@@ -330,7 +332,7 @@ When an agent runs, it must:
    - Exit 0: stdout has the path of the next unblocked, highest-priority, oldest item
    - Exit 1: no unblocked work; stop cleanly
    - Exit 2: validation failed (dangling `blocked_by`, cycle, malformed frontmatter, duplicate id, bad priority, id/filename mismatch); stop and surface the error
-   - **Do NOT filter manually.** The script is the deterministic enforcement of dependency and spec-review claim gates; the agent's job is to call it, not to re-implement the rule. A `ready/` item with non-empty `requested_reviewers` is claimable only after `spec_review: converged` plus a fresh `spec_review_sha`, or founder-owned `spec_review: waived`. See `tools/blocked.py` for the selection logic and `tools/test_blocked.py` for the regression surface.
+   - **Do NOT filter manually.** The script is the deterministic enforcement of dependency and ready-stage integrity gates; the agent's job is to call it, not to re-implement the rule. `proposed/` items are reviewable but never claimable. A `ready/` item is claimable only when every `blocked_by` dependency is in `complete/` and `ready_content_sha` is present and fresh. See `tools/blocked.py` for the selection logic and `tools/test_blocked.py` for the regression surface.
 4. **Create-or-reuse the worktree** on `agent/<slug>` (idempotent — see Idempotency Guarantees)
 5. **Read all `spec_refs`** in the item before writing any code
 6. **Implement to acceptance criteria only** — no scope expansion (per drift rules)
@@ -349,7 +351,7 @@ For each item in `pending_review/`:
 2. Read the item file (acceptance + `agent_notes`), the agent run log, the feature-branch diff, and run tests locally.
 3. Decide:
    - **Approve** → fill `review_notes`, merge `agent/<slug>` to `main`, move item to `complete/`, remove worktree, delete branch.
-   - **Rework** → fill `review_notes` with what's wrong, move back to `ready/` (worktree + branch can stay or be torn down).
+   - **Rework** → fill `review_notes` with what's wrong, move back to `proposed/` if spec-review must run again, or to `ready/` only if it remains immediately claimable with a fresh `ready_content_sha` (worktree + branch can stay or be torn down).
    - **Cancel** → move to `complete/` with `review_notes: "cancelled — <reason>"`.
 4. **Founder checkpoints (never skipped, regardless of reviewer):**
    - Any **substantive conflict** in step 3's merge must be surfaced to the founder before resolution. Mechanical conflicts (e.g., two items adding adjacent fields to the same interface) the reviewer prepares as a composed diff for founder rubber-stamp.
@@ -368,7 +370,7 @@ The agent is more dangerous than the founder for drift, because it doesn't have 
 
 If the agent finds itself wanting to do something not in acceptance criteria: STOP, log the temptation in `raw/internal/decisions/` as a `drift-event`, leave the item in `claimed/` with a question in `agent_notes` and move it to `pending_review/`.
 
-The `spec_review` and `spec_review_sha` frontmatter fields are not builder-managed. The watcher writes `converged` plus the normalized-content digest when review terminates successfully; the founder may set `waived` as an explicit manual fast-track. Builders must not self-certify review convergence.
+The `ready_content_sha` frontmatter field is not builder-managed. The watcher stamps it when spec-review promotes `proposed/` to `ready/`; the founder may also explicitly stamp current content when manually promoting. Builders must not self-certify claimability.
 
 ## Item Priority Conventions
 
@@ -388,8 +390,8 @@ Filename: `YYYY-MM-DD-NNN-short-slug.md`
 
 After any strategic conversation that lands an actionable decision:
 
-1. **Create a `backlog/ready/<id>.md` item** — full spec lives here (this is the authoritative spec until the item ships)
-2. **Add a row to `docs/BACKLOG.md`'s Ready table**
+1. **Create a `backlog/proposed/<id>.md` item** — full spec lives here until spec-review promotes it to `ready/`
+2. **Do not hand-edit `docs/BACKLOG.md`** — it is generated by `tools/backlog_index.py` after merge
 3. **Do NOT touch `wiki/`** — wiki updates happen only after the item lands in `complete/`
 
 The wiki is for *what is shipped*. The backlog is for *what is in flight*. They connect via the item's "After Completion (Strategist Notes)" section once the item completes.
@@ -413,6 +415,6 @@ When the spec depends on the layout of an external app's data files (Cursor's SQ
 - **Pre-merge fixups deferred during merge** — when the founder reviews a fixup and chooses `defer-as-followup` rather than applying it inline. The fixup's description goes here so it's not forgotten.
 - **Non-blocking follow-up items from the review sidecar** — things the code-reviewer subagent flagged but didn't consider merge-blocking (e.g., "consider adding a comment explaining the chokidar polling fallback rationale").
 
-The queue is consumed during the next strategist conversation: each entry is either turned into a proper `backlog/ready/` item (with full spec, blocked_by, etc.), rolled into an existing item's scope, or dropped with a one-line rationale.
+The queue is consumed during the next strategist conversation: each entry is either turned into a proper `backlog/proposed/` item (with full spec, blocked_by, etc.), rolled into an existing item's scope, or dropped with a one-line rationale.
 
 The underscore prefix (`_followups.md`) sorts it first alphabetically inside `backlog/` so the founder sees it on every `ls`. It is not a backlog item — it does not have an id, does not pass through the kanban stages, and is not validated by `tools/blocked.py`. It's a working-memory queue, processed and emptied by the strategist as items are promoted.

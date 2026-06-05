@@ -4,6 +4,8 @@ description: Atomically claim or resume a backlog item, work it in an isolated w
 
 You are an ECHO builder agent. Pick up the next ready backlog item — or resume a previously crashed run — and execute it through the full implementation loop. Multiple agents may run in parallel; the atomic-claim mechanic handles collisions; the reconciliation step handles crash recovery.
 
+Backlog lifecycle is `proposed/ → ready/ → claimed/ → pending_review/ → complete/`. Builders only claim from `ready/`: that folder means the spec is claimable and carries a fresh `ready_content_sha` seal. `proposed/` is spec-draft/review state and is reviewable by the review queue, but it is never a builder candidate. New specs are authored into `backlog/proposed/`; the watcher promotes them to `ready/` after spec-review convergence.
+
 ## Mandatory First Steps
 
 Before doing anything, read these four files in order — they are your global context for every run:
@@ -54,11 +56,12 @@ if [ -n "$EXISTING" ]; then
 else
   RESUMING=0
   # Fresh claim: pick highest priority + oldest creation date from ready/
-  # (use your own logic to pick the right file; it must be from backlog/ready/)
+  # (the path printed by tools/blocked.py must be from backlog/ready/)
   # Selection is enforced by tools/blocked.py (deterministic, validated, tested).
   # Do NOT filter manually — the agent's job is to call the script, not to interpret
-  # blocked_by status by reading frontmatter. The script checks dangling refs and
-  # cycles before returning a candidate; if validation fails, the loop aborts.
+  # blocked_by or ready_content_sha status by reading frontmatter. The script
+  # checks dangling refs/cycles and ready-stage freshness before returning a
+  # candidate; if validation fails, the loop aborts.
   NEXT_ITEM=$(python3 tools/blocked.py)
   RC=$?
   case "$RC" in
@@ -512,7 +515,7 @@ The codex-builder writes a `builder.md` pointer for every claim, per the `skills
 
 | Moment | What | Body content |
 |---|---|---|
-| Atomic claim (the `ready/` → `claimed/` op) | Initial write — same commit as the claim, OR as the very next commit | `current_thesis: "claim of <id>"`; AC list locked; `open_questions:` populated from anything that will be deferred; `canonical_anchors:` to the spec path |
+| Atomic claim (the `ready/` → `claimed/` op) | Initial write — same commit as the claim, OR as the very next commit | `current_thesis: "claim of <id>"`; AC list locked; `open_questions:` populated from anything that will be deferred; `canonical_anchors:` to the claimed spec path. Strategist pointers for unclaimed specs start at `backlog/proposed/<id>.md` and move to `ready/` on watcher promotion. |
 | Milestone commits (per "Step D" run-log writes) | Update `open_questions` + `locked_decisions` if anything shifts | Same five blocks; updated bullets |
 | Move to `pending_review/` (completion or escalation) | **Final refresh runs via the protocol-wide E2.5 step (`tools/task-state/patch-builder-state.py`), not via codex-specific logic.** That step is the only canonical implementation site. It updates frontmatter `last_updated` + `handoff_*` metadata, refreshes the lifecycle marker block in `## current_thesis`, and rewrites `## canonical_anchors` to point at `backlog/pending_review/<item>.md` (schema-compliant `spec` + preserved `reviews`). `## locked_decisions` and `## dont_touch` are preserved byte-for-byte. | Patcher-managed marker block in `## current_thesis`; existing builder-authored `## locked_decisions` and `## dont_touch` content untouched. |
 
