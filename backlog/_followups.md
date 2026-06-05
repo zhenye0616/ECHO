@@ -994,3 +994,32 @@ The founder's "two adapters drift" theory is the *install-time* hop (canonical s
 
 ## From 089 merge (2026-06-05)
 - Optional: add a direct malformed-`ready_content_sha` fixture to tools/test_blocked.py (missing + mismatch paths are covered; malformed is handled in code at blocked.py:326-327 but not directly fixtured). Non-blocking — implementation already fails closed. (089 codex review non-blocking note.)
+
+## From parallel 090/091 review run (2026-06-05) — friction harvest
+
+Context: founder drove 090 and 091 spec-review to convergence in **two concurrent Claude Code sessions**, with a **third Codex session monitoring** the run. Each item below notes which independent actors corroborated it — the cross-tool agreement (not any single session's report) is the signal these are real. The review *work* itself stayed clean throughout (isolated ephemeral watcher worktrees + coord-lock-serialized response publish); the friction is in the shared-state and monitoring surfaces around it.
+
+### 1. ⭐ HEADLINE — the shared dogfooding journal has no concurrency story (corroborated 3×: Codex monitor + 091 session + 090 session)
+
+**Symptom:** with ≥2 actors active, appends to the single `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` on the shared `~/Desktop/Project_echo` checkout collide repeatedly. The 091 session hand-resolved the stash-pop/ff conflict **5×**; the 090 session hit it several times; the Codex monitor logged "journal append collisions during concurrent reviewers." All three resolved keep-both by hand.
+
+**Root cause:** every reviewer wrapper (`tools/review-queue/_run_reviewer.sh`), every strategist watcher tick, and every monitor session does `git stash` / `pull --rebase` / append / `commit` / `push` around the *same one file*. The coord layer serializes the reviewer **publish** (per-round response files) but NOT the **journal-append stash race**. Contention scales with parallelism — exactly the regime the parallel-review experiment is meant to exercise.
+
+**Candidate fixes (pick one):**
+- **(a) Per-actor journal shards** — `mcp-interactions-journal-YYYY-MM.<role-or-session>.md`, union-merged at read time. No two actors write the same file → no stash race. Read tooling concatenates by timestamp.
+- **(b) Append-only journal writer that never stashes** — a tiny helper that `O_APPEND`-writes the entry directly and decouples the git commit from the working-tree append (or commits via a lock-free path), so reviewer wrappers / watcher / monitors all route journal writes through it instead of the stash dance.
+
+This is the strongest follow-up from the run because it's the one friction independently surfaced by all three actors and the only one that *scales with* the parallelism the feature is selling.
+
+### 2. Monitoring ergonomics — `wait_for_new_turns` + connect-to-session papercuts (Codex monitor; some corroborated by both Claude sessions)
+
+- **`wait_for_new_turns` source union must include `git`.** Watching only `["claude_code"]` + `coord:` looks idle while the queue advances primarily as git review/disposition commits; the monitor widened to `["claude_code","git"]` + `coord:` mid-run. Document/default this for queue monitoring.
+- **`wait_for_new_turns` misses terminal watcher git commits even with `git` in the union.** A 60s wait timed out with `turn_ids=[]` while the 091 terminal commits (`52d7e16f`/`3a106103`/`d39cbdd1`) landed *in that window*. Workaround is poll origin after an idle wait when the expected event is a watcher commit — but it suggests git-commit atoms aren't surfaced as wake-events within wait latency. Worth a capture/wake-latency check.
+- **`wait_for_new_turns` timeout hard-caps at `<=60s`** (MCP error `-32602` on `timeout=75`), but the tool description / user memory imply timeout is a free knob. Fix: either raise the cap or put the `<=60` limit in the schema description so callers don't trip it.
+- **Connecting to a concurrent same-repo session: literal/MRU is brittle, cluster discovery works.** Literal `search_memories` by item-id returned 0 for both 090 and 091; `echo_resolve_mru` returns *self* when the asker is the most-recent writer. Reliable recipe: `find_clusters → get_atoms` for an unknown session; `search_memories(source_prefix=<session-id>)` when the id is known. Document this "connect to a live sibling session" recipe.
+- **Coord correlation-id forensic search returns 0; `coord_status` is the live-health surface.** `search_memories(source_prefix="coord:")` by correlation-id didn't recover coord atoms; `coord_status` had the derived tick/deadline state. Either index correlation-ids for search or canonicalize `coord_status` as the health surface in the monitor recipe.
+- **Codex sandbox blocks loopback MCP until escalated** (`Operation not permitted` before reaching the daemon). Sandbox friction, not a daemon failure — document the escalation requirement for `codex exec` monitors.
+
+### 3. Codex-ingestion / search-over-codex gap (dogfooding — 3 consecutive threads today)
+
+Three consecutive cross-tool retrievals today ([12:22], [13:05], [13:43] journal entries) showed **codex (and cursor) silently absent from the rank-1 `find_clusters` cluster**, even though Codex did the heaviest technical reasoning in the release/compat + monitoring threads. Independently flagged by BOTH Claude sessions. **Important nuance:** when codex was the explicit retrieval *target* (the "connect to the codex monitor" read), `get_atoms` on the codex cluster surfaced it fine — so the gap is most likely in **cluster-ranking / literal-search over codex atoms**, not raw ingestion. Candidate check: is codex capture ingested + indexed at parity with `claude_code` for clustering and literal search? If clustering systematically under-ranks codex atoms, cross-tool recall silently loses the tool that often does the most reasoning. Reproduction is the three dated journal entries.
