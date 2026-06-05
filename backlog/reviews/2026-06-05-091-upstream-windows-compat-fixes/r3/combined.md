@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R3` — both codex and codex-ops returned `proceed` with zero findings at the r2-patch SHA (`c2426d10`). All r1 findings (5) and the r2 darwin-gate finding (1) were dispositioned accepted+patched; the verification round confirmed the patches. No open strategist placeholders, no escalation. 091 is claimable.
 
