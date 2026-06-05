@@ -4,9 +4,9 @@ role: builder
 writer: codex-builder
 binding: codex
 claim_branch: agent/proposed-stage-pipeline
-last_updated: 2026-06-04T06:32:28Z
-handoff_branch: agent/proposed-stage-pipeline
-handoff_head_sha: 371210fa70d00819eaa5f6e744794f2bc8175f77
+last_updated: 2026-06-05T04:20:00Z
+handoff_branch: ""
+handoff_head_sha: ""
 handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md
 ---
 
@@ -15,7 +15,7 @@ handoff_run_log: raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stag
 Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the proposed-stage pipeline: make folder location the source of claimability, replace 086's `spec_review` state gate with `ready_content_sha`, automate promotion/bounce, generate BACKLOG output through a tool only, and keep spec-review content mechanics unchanged.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-03-2026-06-03-088-proposed-stage-pipeline.md for blocker.
+- Lifecycle: RESET — escalation resolved by strategist. 088 spec patched (obsolete 087b ready-stage migration removed; 087b shipped to complete/ and ready/ is empty, so the live-item migration step is a documented no-op + fixture test). Returned to ready/ at a recomputed spec_review_sha for a fresh codex builder claim.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -36,7 +36,7 @@ Claimed by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement the p
 - Non-blocking observation: `task_state_ref` is set, but no strategist pointer directory existed at claim; builder proceeds from the spec body and mandatory refs.
 
 <!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
+- None — escalation resolved by strategist spec patch (087b migration was the only blocker).
 <!-- builder-state-handoff-open-questions:end -->
 
 ## dont_touch

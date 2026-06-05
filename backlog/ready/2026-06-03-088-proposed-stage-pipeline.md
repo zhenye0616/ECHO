@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-088-proposed-stage-pipeline
 title: "Add a `proposed/` backlog stage — make folder-location the single source of claimability; delete 086's spec_review state field for a renamed `ready_content_sha` integrity seal; generate docs/BACKLOG.md"
-status: pending_review
+status: ready
 priority: HIGH
 estimate: 2-3d
 created: 2026-06-03
@@ -9,7 +9,7 @@ blocked_by: []
 task_state_ref: 2026-06-03-088-proposed-stage-pipeline
 requested_reviewers: ["codex", "codex-ops"]
 spec_review: converged
-spec_review_sha: d650f5a1db109f199e84920fe2054983ff9ba95197be36bb174c535780d84a0f
+spec_review_sha: 822eba73fb70b6757b3a92d40f5d64e1c8152f449b8e129bb036978937aca63e
 files_to_modify:
   - backlog/proposed/.gitkeep                       # AC1 — NEW stage directory. proposed/ holds a spec draft from first commit through spec-review convergence; presence == "in spec-review".
   - tools/blocked.py                                # AC2 — the claim-selector contract. Add "proposed" to STAGES; candidates() stays STRICTLY ready/ (proposed items are never candidates). Claimable iff: stage==ready AND every blocked_by dep in complete/ AND ready_content_sha present+matching. REMOVE the 086 spec_review field gate (transitional dual-read first — see AC6/migration). blocked_by validation: proposed items count as KNOWN ids but only complete/ SATISFIES a dep. Stale-ready: ready_content_sha mismatch ⇒ fail closed (item is invalid-in-ready, not a candidate) and is surfaced for bounce to proposed/.
@@ -33,7 +33,6 @@ files_to_modify:
   - tests/review-queue/request.test.* (path per repo convention)   # AC8 — find_artifact() resolves a proposed/ spec; resolution order proposed-first.
   - tests/review-queue/watcher-state.test.ts                       # AC8 (r6 codex LOW) — the npm-run home of branch-(c) dispatch coverage. Add the proposed-stage guard assertions here: proposed artifact + proceed_after_patches + --patches-applied=false routes to branch (b) with a successful next-round dispatch (exit 0, r<N+1>/request.md written, next_round:N+1); non-proposed artifact still takes branch (c). (`tools/review-queue/test-dispatch-next-round.sh` is ad-hoc, NOT the gate.)
   - tests/backlog/backlog-index.test.* (path per repo convention)  # AC8 — generator renders Proposed + Ready tables from folder state; --check fails on drift; matches the blocked.py status derivation.
-  - backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md  # AC6 (r4 codex MED) — MIGRATION-ONLY: replace this live item's `spec_review: waived` with a current `ready_content_sha` so it stays claimable in ready/ under the new gate. The ONLY permitted edit is the spec_review→ready_content_sha frontmatter migration (no body/scope changes). Authorizes the migration that AC6 step (7) requires; without this listing a strict builder cannot perform it. AC8 adds an assertion that 087b's ready_content_sha keeps it claimable.
 
 spec_refs:
   - raw/internal/decisions/2026-06-03-proposed-stage-pipeline.md  # THE design (model, decisions 1-3, blocked.py contract, Codex adversarial pitfalls, the never-half-broken migration order, 086 supersession). Authoritative; this spec implements it.
@@ -43,17 +42,15 @@ spec_refs:
   - skills/review-queue-watch.md  # current terminal/convergence step that writes the 086 marker — becomes the promotion step.
   - tools/wiki_index.py  # the precedent for a generated index (wiki/index.md) that tools/backlog_index.py mirrors for docs/BACKLOG.md.
   - backlog/complete/2026-05-28-079-loop-reliability-pack.md  # AC3's clean-snapshot + P1 idempotent stage-move pattern (the claimed→pending move) that promote.py mirrors for proposed→ready.
-  - backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md  # the live migration case: currently in ready/ with spec_review: waived — AC6 migrates it to a ready_content_sha (it stays claimable in ready/).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-06-04T06:28:06Z"
-branch: "agent/proposed-stage-pipeline"
-worktree: "/Users/zhenye/Desktop/Project_echo--proposed-stage-pipeline"
-head_sha: "371210fa70d00819eaa5f6e744794f2bc8175f77"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+worktree: ""
+head_sha: ""
 pr_url: ""
-agent_notes: |
-  BLOCKED: AC6/AC8 and the final `spec_refs`/`files_to_modify` entry require migrating `backlog/ready/2026-06-02-087b-reviewer-child-readonly-migration.md`, but that file no longer exists in `ready/`; current `main` has 087b at `backlog/pending_review/2026-06-02-087b-reviewer-child-readonly-migration.md`, which is outside 088's allow-list and already carries builder handoff state. Tried: claimed 088, pushed `agent/proposed-stage-pipeline` at `371210fa70d00819eaa5f6e744794f2bc8175f77`, read the mandatory context plus available spec_refs, verified the listed 087b path is absent and the pending_review path is present. Best guess: the strategist should patch 088 to either drop/replace the 087b ready-stage migration assertion because 087b has already left `ready/`, or explicitly authorize the pending_review-path migration semantics if that is still intended. Why escalated: the spec_ref is missing and satisfying AC6/AC8 would require either editing an unlisted `pending_review/` item or changing the backlog item body/test contract, both forbidden to a builder.
+agent_notes: ""
 ---
 
 # 088 — Add a `proposed/` backlog stage (folder-location = claimability)
@@ -186,8 +183,11 @@ reasoning, decisions, pitfalls, and migration order: the design doc in `spec_ref
   blocked.py loads proposed for validation, candidates still ready; (3) **transitional dual-read** —
   086's field gate still works for existing ready/ items while `ready_content_sha` is introduced; (4)
   request.py scans proposed; (5) watcher promotion via promote.py; (6) stale-ready bounce; (7)
-  migrate existing items (087b: replace `spec_review: waived` with a current `ready_content_sha`,
-  stays in ready/); (8) remove legacy `spec_review` once no live item depends on it; (9) skills/
+  migrate any live `ready/` item still carrying legacy `spec_review` to a current `ready_content_sha`
+  (it stays in ready/) — at spec time NO such live item exists (087b shipped to `complete/`; `ready/`
+  is empty), so step (7) is a no-op unless a legacy item is in `ready/` at migration time; the
+  migration mechanism + its fixture test (AC8) are still required; (8) remove legacy `spec_review`
+  once no live item depends on it; (9) skills/
   adapters/docs/tests. The pipeline is claimable-correct at every step.
 - **AC7 — docs + skills coherent.** README, AGENT_INSTRUCTIONS, CLAUDE.md pipeline diagrams,
   process-backlog(+batch), merge-and-cleanup, review-queue-watch reflect the new stages + contract;
@@ -195,8 +195,9 @@ reasoning, decisions, pitfalls, and migration order: the design doc in `spec_ref
   notes BACKLOG.md is generated.
 - **AC8 — tests green.** `tools/test_blocked.py` (the SHIPPED 086 harness, reworked — r1 codex MED):
   stage model, ready_content_sha match/mismatch, blocked_by proposed-vs-complete, candidates-only-ready,
-  dual-read window; `python3 tools/test_blocked.py` must pass — incl. an assertion that migrated 087b
-  (now carrying a `ready_content_sha`, no `spec_review`) stays claimable in ready/ (r4 codex MED).
+  dual-read window; `python3 tools/test_blocked.py` must pass — incl. a FIXTURE assertion that a
+  legacy item migrated from `spec_review` to a `ready_content_sha` (no `spec_review`) stays claimable
+  in ready/ (r4 codex MED — fixture-based, since `ready/` has no live legacy item at spec time).
   promote.py (idempotency + recovery + bounce; the crash-after-combine-before-disposition NEGATIVE
   case must NOT promote; the edited-after-request content-identity mismatch must REFUSE; and a
   waiver-after-content-patch is NOT a valid proposed-promotion terminal — it forces a verification
