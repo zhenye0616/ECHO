@@ -1393,3 +1393,11 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor/r2/request.md`; artifact `backlog/proposed/2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor.md@507b252ceb3372ccb3caac70fee0847dcdcb4f79`; response `backlog/reviews/2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor/r2/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-E62C6093-F638-4D93-AB6B-2FF818B81617/raw/internal/review-queue/00cdfa9b-431a-49d7-a22e-f28e8a9a053d/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-E62C6093-F638-4D93-AB6B-2FF818B81617/raw/internal/review-queue/00cdfa9b-431a-49d7-a22e-f28e8a9a053d/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-05 16:30 PDT — coord_invoke for 093 r3 (same ENOENT, recurrence within the same run)
+
+- **Trigger:** watcher tick on 093 r2 → r3 dispatched at `b7575d85`; 057b post-push hook fired for [codex, codex-ops].
+- **Query inputs:** `coord_invoke(role={codex,codex-ops}, request_path=backlog/reviews/2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor/r3/request.md, correlation_id=<r3>)`.
+- **Returned:** identical ENOENT against `/Users/zhenye/.npm-global/lib/node_modules/echoctl/tools/review-queue/run-*-reviewer.sh` (both roles).
+- **Sources:** daemon coord layer only; no atom retrieval.
+- **Verdict:** ❌ wrong — same root cause as the 16:25 entry (this run's r2) and 077/092. Logged compactly as same-run recurrence; see the 16:25 entry for the full diagnosis. Manual-wrapper fallback fired both roles in the same turn.
