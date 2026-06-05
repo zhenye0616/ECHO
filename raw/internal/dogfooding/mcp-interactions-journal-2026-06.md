@@ -1131,3 +1131,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** Direct loopback MCP daemon. No atom sources from the failed wait call; `coord_status` derived from coord tracker state.
 - **Verdict:** 🟡 partial — operator error on the wait contract, but the status fallback showed the r3 reviewer deadlines closed cleanly.
 - **Note:** Friction: tool description/user memory says timeout is a live wait knob, but the hard cap is 60s. Workaround: rerun wait with `timeout<=60` and/or use `coord_status` as the deadline-close fallback.
+
+### 2026-06-05 13:33 PDT - codex r3 review tick on 2026-06-05-091-upstream-windows-compat-fixes
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/request.md` and published `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/codex.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=91e046bf-0d04-467a-94b7-2dccf6ba04e4)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/tmp/claude-501/echo-codex-10BFB2AC-B498-434F-A1A9-E046F5244C08/raw/internal/review-queue/b1778b91-7ff9-42d1-9930-0e50ef117088/codex.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/codex.md` at `01966394df0b766302161a11308bd2b0e4b8bf77`.
+- **Sources:** request `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/request.md`; artifact `backlog/proposed/2026-06-05-091-upstream-windows-compat-fixes.md@c2426d101063dd1ec30eed3e21bf258c997d83e1`; response `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-10BFB2AC-B498-434F-A1A9-E046F5244C08/raw/internal/review-queue/b1778b91-7ff9-42d1-9930-0e50ef117088/codex.stdout.log` / `/tmp/claude-501/echo-codex-10BFB2AC-B498-434F-A1A9-E046F5244C08/raw/internal/review-queue/b1778b91-7ff9-42d1-9930-0e50ef117088/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
