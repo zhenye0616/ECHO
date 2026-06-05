@@ -1184,3 +1184,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** Git origin/main paths and commits: `backlog/reviews/2026-06-05-091-upstream-windows-compat-fixes/r3/combined.md`, `backlog/ready/2026-06-05-091-upstream-windows-compat-fixes.md`, commit ids above. No additional ECHO atom sources.
 - **Verdict:** ✅ right — final state reached: both 090 and 091 converged and are now claimable in `backlog/ready/`.
 - **Note:** Friction: the terminal commits landed during/just after the 60s idle window, but `wait_for_new_turns` returned no ids. The practical workaround remains origin polling after an idle ECHO wait when the expected event is a watcher git commit.
+
+### 2026-06-05 13:48 PDT — connect to the Codex friction-monitor session (cross-tool, claude reading codex)
+
+- **Trigger:** founder (091-watcher Claude session) asked to "connect to the codex session that was monitoring both 090 and 091" and surface the frictions Codex was tasked to log.
+- **Query inputs:** (1) `echo_resolve_mru(sources=["codex"], repo_path=Project_echo)`; (2) `find_clusters(since="2026-06-05T19:50:00Z", until="2026-06-05T21:30:00Z")`; (3) `get_atoms(15 ids from the pure-codex cluster ctx_57bd732e, prefer=newest_first, format=minimal)`.
+- **Returned:** (1) MRU codex = `fs:…/.codex/sessions/2026/06/05/rollout-…019e9968…jsonl` (the 13:10 monitor session). (2) 3 clusters; rank-3 `ctx_57bd732e` "discussion about ECHO" was **pure codex (15 atoms)**, 20:04→20:38Z. (3) hydrated Codex's full monitor arc incl. its 20:38 summary ("Both converged … monitored ~9 min") + consolidated friction list.
+- **Sources:** `fs:…/.codex/sessions/2026/06/05/rollout-019e9968…jsonl` (monitor) + sibling `rollout-*` reviewer-tick child sessions; claude_code+git absent from the codex-only rank-3 cluster (expected — it isolated the codex source).
+- **Verdict:** ✅ right — `echo_resolve_mru(codex)`→`find_clusters`→`get_atoms` recovered a *foreign-tool* (Codex) session's content + friction log from this Claude session with no session id supplied. Cross-tool read path working end-to-end.
+- **Note:** Codex's friction log independently corroborates the journal-append-collision finding and adds MCP-surface frictions (sandbox loopback block, `wait_for_new_turns` timeout cap, idle-wait-misses-git-commit). Codex also observed my 091 watcher commits live via ECHO — cross-tool observability confirmed in both directions.
