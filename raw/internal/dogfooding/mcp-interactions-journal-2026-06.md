@@ -930,3 +930,13 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-04-089-legacy-spec-review-gate-teardown/r2/request.md`; artifact `backlog/proposed/2026-06-04-089-legacy-spec-review-gate-teardown.md@81d4aa5e8b46ffebb591992c20094a5f206e68ca`; response `backlog/reviews/2026-06-04-089-legacy-spec-review-gate-teardown/r2/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-B5A5721C-2113-4E64-A62A-A6DF99C34E72/raw/internal/review-queue/084c9d74-4fc8-4f93-a592-b6906900451b/codex.stdout.log` / `/tmp/claude-501/echo-codex-B5A5721C-2113-4E64-A62A-A6DF99C34E72/raw/internal/review-queue/084c9d74-4fc8-4f93-a592-b6906900451b/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-04 23:02 PDT - codex builder MCP smoke before backlog claim
+
+- **Trigger:** Codex builder run startup for `/process-backlog`; after the mandatory global context reads, the builder checked whether the local ECHO MCP daemon was reachable before claiming the next ready item.
+- **Query inputs:** `./tools/mcp-integration-smoke.sh` against `http://127.0.0.1:38478/mcp`; the failing step was the smoke script's `tools/list` advertisement check.
+- **Returned:** Daemon responded, but the smoke script exited 1 with `WRONG_TOOL_SET`: live tools were `coord_emit`, `coord_invoke`, `coord_status`, `echo_ping`, `echo_resolve_mru`, `find_clusters`, `get_atom`, `get_atoms`, `get_recent_work_context`, `get_role_state`, `list_task_states`, `pending_decisions`, `search_memories`, `wait_for_new_turns`; the script expected only the older eight-tool set.
+- **Sources:** Local daemon `/mcp` response plus repo smoke script; no memory atoms/clusters were read.
+- **Verdict:** partial - connectivity is present, but the smoke test fixture is stale relative to the current coord/task-state MCP surface.
+- **Note:** Useful as a pre-claim health signal despite the non-zero exit. The failure is an expectation mismatch, not daemon unreachability.
+- **Conjecture:** Update the smoke script to tolerate/add the coord and role-state tools, or split "daemon reachable" from "exact public tool-set" assertions so builder startup probes do not fail on intentional surface growth.
