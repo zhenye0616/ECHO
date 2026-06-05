@@ -77,7 +77,24 @@ agent_notes: |
   GREEN at the fix passes (1540 passed / 21 skipped) -- supersedes the original-build load-flake note
   above. Isolated trial merge of 6c95b171 into origin/main is clean (no conflicts). HEAD bumped from
   05a7ef3a to 6c95b171 above.
-review_notes: ""
+review_notes: |
+  Merged 2026-06-05 via founder reconciliation (Claude strategist as merger; builder was codex — independence satisfied).
+
+  Conflicts resolved: none — clean `--no-ff` merge; isolated trial merge into origin/main was pre-verified conflict-free (branch touches tools/review-queue + tests + skills/docs; zero overlap with main's backlog/journal/088 changes).
+
+  C3.5 cross-vendor consult: none invoked (no conflicts). A pre-merge codex consult converged on the reconciliation edits (head_sha 05a7ef3a->6c95b171, sidecar, 056 authorization, builder.md handoff_head_sha).
+
+  Fixups applied: none (verdict `merge as-is`). All 4 independent-review findings (2 HIGH, 2 MED) were root-cause-fixed on-branch across 5 fixer passes (765d5e17 -> c9f88ea0 -> 9b94d42f -> b7e3104e -> 6c95b171), each re-confirmed by a separate read-only reviewer; final confirm verdict CONFIRM at 6c95b171.
+
+  Fixups deferred to follow-up items: none.
+
+  Verify (post-merge, in merger worktree): 1546 tests pass / 21 skipped; lint, typecheck, coupled-invariants, and sync-skills --check all clean.
+
+  Follow-up items (non-blocking, filed to backlog/_followups.md):
+  - Binary provenance / PATH hardening — gate validates invocation shape, not codex-binary provenance; documented out of 087b scope.
+  - combine.py / watcher native `capture-failed` classification — 087b OoS successor.
+  - claude / cursor read-only migration — gated on the 056-claude-required-flag-gate decision.
+  - Ops: stale ECHO_COORD_REQUEST_PATH (-> deleted 2026-05-16-057b/r1) misfired ~24 reviewer ticks; reviewer-loop env cleanup.
 ---
 
 # 087b — Reviewer-child read-only migration (the R1 fix; consumes 087's binding fields)
