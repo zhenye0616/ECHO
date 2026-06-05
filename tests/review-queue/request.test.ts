@@ -59,6 +59,19 @@ describe('request.py', () => {
     expect(body).toMatch(/class: structural-reform/);
   });
 
+  it('find_artifact resolves proposed/ before ready/', () => {
+    mkdirSync(join(root, 'backlog/proposed'), { recursive: true });
+    writeFileSync(
+      join(root, 'backlog/proposed', `${ITEM_ID}.md`),
+      '---\nid: ' + ITEM_ID + '\n---\nproposed body\n',
+    );
+
+    const r = runRequest(root);
+    expect(r.code, r.stderr).toBe(0);
+    const body = readFileSync(join(root, 'backlog/reviews', ITEM_ID, 'r1/request.md'), 'utf-8');
+    expect(body).toMatch(new RegExp(`artifact_path: backlog/proposed/${ITEM_ID}\\.md`));
+  });
+
   it('item not found: clear error', () => {
     const r = runPython([
       requestScript(),

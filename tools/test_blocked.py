@@ -18,6 +18,17 @@ THIS_DIR = Path(__file__).resolve().parent
 SCRIPT = THIS_DIR / "blocked.py"
 
 
+def compute_content_sha(path: Path) -> str:
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--ready-content-sha", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise AssertionError(f"sha failed for {path}: {proc.stderr}")
+    return proc.stdout.strip()
+
+
 def write_item(
     repo: Path,
     stage: str,
@@ -28,6 +39,7 @@ def write_item(
     blocked_by: list[str] | None = None,
     extra_frontmatter: str = "",
     body_extra: str = "",
+    seal_ready: bool = True,
 ) -> Path:
     """Write a minimal but valid item file under repo/backlog/<stage>/."""
     blocked_by = blocked_by or []
@@ -53,14 +65,21 @@ def write_item(
     f = repo / "backlog" / stage / f"{item_id}.md"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(body, encoding="utf-8")
+    if stage == "ready" and seal_ready and "ready_content_sha:" not in extra_frontmatter:
+        digest = compute_content_sha(f)
+        text = f.read_text(encoding="utf-8")
+        f.write_text(
+            text.replace("---\n\n# body", f"ready_content_sha: {digest}\n---\n\n# body", 1),
+            encoding="utf-8",
+        )
     return f
 
 
 def make_repo() -> Path:
-    """Create a temp repo skeleton with the four backlog stages and a fake .git."""
+    """Create a temp repo skeleton with the backlog stages and a fake .git."""
     repo = Path(tempfile.mkdtemp(prefix="blocked-test-"))
     (repo / ".git").mkdir()
-    for stage in ("ready", "claimed", "pending_review", "complete"):
+    for stage in ("proposed", "ready", "claimed", "pending_review", "complete"):
         (repo / "backlog" / stage).mkdir(parents=True)
     return repo
 
@@ -83,8 +102,8 @@ class BlockedScriptTests(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.repo, ignore_errors=True)
 
-    def spec_review_sha(self, path: Path) -> str:
-        rc, out, err = run_script(self.repo, "--spec-review-sha", str(path))
+    def ready_content_sha(self, path: Path) -> str:
+        rc, out, err = run_script(self.repo, "--ready-content-sha", str(path))
         self.assertEqual(rc, 0, f"stderr: {err}")
         return out.strip()
 
@@ -118,7 +137,7 @@ class BlockedScriptTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("2026-04-30-001-foo.md", out.strip())
 
-    def test_inline_requested_reviewers_without_review_is_blocked(self) -> None:
+    def test_inline_requested_reviewers_does_not_gate_when_ready_sealed(self) -> None:
         write_item(
             self.repo,
             "ready",
@@ -126,15 +145,10 @@ class BlockedScriptTests(unittest.TestCase):
             extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
         )
         rc, out, _ = run_script(self.repo)
-        self.assertEqual(rc, 1)
-        self.assertEqual(out.strip(), "")
-
-        rc, out, _ = run_script(self.repo, "--list-blocked")
         self.assertEqual(rc, 0)
-        self.assertIn("2026-04-30-001-foo", out)
-        self.assertIn("awaiting-spec-review", out)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
 
-    def test_malformed_requested_reviewers_fails_closed(self) -> None:
+    def test_malformed_requested_reviewers_does_not_affect_claimability(self) -> None:
         write_item(
             self.repo,
             "ready",
@@ -142,21 +156,53 @@ class BlockedScriptTests(unittest.TestCase):
             extra_frontmatter='requested_reviewers: "codex,codex-ops"\n',
         )
         rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo.md", out.strip())
+
+    def test_missing_ready_content_sha_is_blocked(self) -> None:
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            seal_ready=False,
+        )
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo", out)
+        self.assertIn("missing-ready-content-sha", out)
+
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+    def test_ready_content_sha_mismatch_is_blocked(self) -> None:
+        path = write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-001-foo",
+            body_extra="## Acceptance Criteria\n- original\n",
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("- original", "- changed"),
+            encoding="utf-8",
+        )
+        rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 1)
         self.assertEqual(out.strip(), "")
 
         rc, out, _ = run_script(self.repo, "--list-blocked")
         self.assertEqual(rc, 0)
-        self.assertIn("malformed-requested-reviewers", out)
+        self.assertIn("ready-content-sha-mismatch", out)
 
-    def test_converged_matching_digest_is_claimable(self) -> None:
+    def test_legacy_converged_matching_digest_is_transitionally_claimable(self) -> None:
         path = write_item(
             self.repo,
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+            seal_ready=False,
         )
-        digest = self.spec_review_sha(path)
+        digest = self.ready_content_sha(path)
         write_item(
             self.repo,
             "ready",
@@ -166,6 +212,7 @@ class BlockedScriptTests(unittest.TestCase):
                 "spec_review: converged\n"
                 f"spec_review_sha: {digest}\n"
             ),
+            seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 0)
@@ -177,8 +224,9 @@ class BlockedScriptTests(unittest.TestCase):
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
+            seal_ready=False,
         )
-        digest = self.spec_review_sha(path)
+        digest = self.ready_content_sha(path)
         write_item(
             self.repo,
             "ready",
@@ -189,20 +237,22 @@ class BlockedScriptTests(unittest.TestCase):
                 f"spec_review_sha: {digest}\n"
                 'agent_notes: "marker-only lifecycle note"\n'
             ),
+            seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 0)
         self.assertIn("2026-04-30-001-foo.md", out.strip())
 
-    def test_body_delta_after_convergence_is_stale(self) -> None:
+    def test_body_delta_after_legacy_convergence_is_stale(self) -> None:
         path = write_item(
             self.repo,
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
             body_extra="## Acceptance Criteria\n- original\n",
+            seal_ready=False,
         )
-        digest = self.spec_review_sha(path)
+        digest = self.ready_content_sha(path)
         write_item(
             self.repo,
             "ready",
@@ -213,6 +263,7 @@ class BlockedScriptTests(unittest.TestCase):
                 f"spec_review_sha: {digest}\n"
             ),
             body_extra="## Acceptance Criteria\n- changed\n",
+            seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 1)
@@ -220,7 +271,7 @@ class BlockedScriptTests(unittest.TestCase):
 
         rc, out, _ = run_script(self.repo, "--list-blocked")
         self.assertEqual(rc, 0)
-        self.assertIn("spec-edited-after-review", out)
+        self.assertIn("legacy-spec-edited-after-review", out)
 
     def test_waived_spec_review_is_claimable_without_digest(self) -> None:
         write_item(
@@ -231,6 +282,7 @@ class BlockedScriptTests(unittest.TestCase):
                 'requested_reviewers: ["codex","codex-ops"]\n'
                 "spec_review: waived\n"
             ),
+            seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 0)
@@ -244,6 +296,12 @@ class BlockedScriptTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("2026-05-16-057a-coord-substrate.md", out.strip())
 
+    def test_proposed_item_is_never_a_candidate(self) -> None:
+        write_item(self.repo, "proposed", "2026-04-30-001-foo")
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
     def test_blocker_in_pending_review_does_NOT_unblock(self) -> None:
         # Critical safety property: only complete/ satisfies a dependency
         write_item(self.repo, "pending_review", "2026-04-30-001-foo")
@@ -253,6 +311,21 @@ class BlockedScriptTests(unittest.TestCase):
             "2026-04-30-002-bar",
             blocked_by=["2026-04-30-001-foo"],
         )
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1, f"expected no candidates, got: {out}")
+        self.assertEqual(out.strip(), "")
+
+    def test_blocker_in_proposed_is_known_but_does_NOT_unblock(self) -> None:
+        write_item(self.repo, "proposed", "2026-04-30-001-foo")
+        write_item(
+            self.repo,
+            "ready",
+            "2026-04-30-002-bar",
+            blocked_by=["2026-04-30-001-foo"],
+        )
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
         rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 1, f"expected no candidates, got: {out}")
         self.assertEqual(out.strip(), "")

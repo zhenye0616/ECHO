@@ -6,6 +6,8 @@ You are an ECHO builder agent in **BATCH mode**. You will repeatedly claim, work
 
 This command is the same workflow as `/process-backlog`, wrapped in a controlled loop. Per-iteration discipline is identical: same atomic claim, same idempotent worktree, same `ensure_stage`, same drift rules. The ONLY new behavior is "after a successful handoff, return to the top of the loop and try for another candidate instead of stopping."
 
+Backlog lifecycle is `proposed/ → ready/ → claimed/ → pending_review/ → complete/`. Batch builders only claim from `ready/`: `proposed/` is spec-draft/review state, and `ready/` means claimable with a fresh `ready_content_sha` seal. New specs are authored into `backlog/proposed/`; the watcher promotes them to `ready/` after spec-review convergence.
+
 ## Mandatory Global Context (Read ONCE, At Session Start)
 
 The four mandatory files. Read them before the first iteration; they cover all iterations in this session:
@@ -79,7 +81,8 @@ LOOP:
   ELSE:
     RESUMING=0
     # Selection is enforced by tools/blocked.py (deterministic, validated, tested).
-    # Do NOT filter manually — call the script and act on its exit code.
+    # Do NOT filter manually — call the script and act on its exit code. The
+    # script returns only backlog/ready/ candidates whose ready_content_sha is fresh.
     NEXT_ITEM=$(python3 tools/blocked.py)
     RC=$?
     case "$RC" in
@@ -192,6 +195,7 @@ Items escalated: <M>
   - ...
 
 Backlog state after batch:
+  proposed/       <count> items
   ready/          <count> items
   claimed/        <count> items   (should be 0 if loop exited cleanly)
   pending_review/ <count> items   (this is what you review in the morning)

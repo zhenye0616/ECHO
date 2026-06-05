@@ -66,6 +66,17 @@ tail -n 5 raw/internal/queue-errors.md 2>/dev/null || true
 
 The tail surfaces any push-race fallbacks since the last tick so you can flag them in this turn's narration if action is needed. The file itself is repo-tracked, append-only, and uses the `.md` extension to avoid `*.log` gitignore.
 
+## Step 1.5 — Recover terminal promotions + stale ready bounces
+
+Before combining a new round, converge any already-terminal proposed-stage state from disk:
+
+```bash
+tools/review-queue/promote.py recover --mode=commit-push
+tools/review-queue/promote.py bounce-stale-ready --mode=commit-push
+```
+
+If either command prints `promoted:` or `bounced:`, exit this tick after confirming the push. The helper owns its commit+push and remote-boundary check in `commit-push` mode, so the next watcher tick resumes from the now-durable `origin/main` state. This pre-step is intentionally stricter than "combined.md exists": `promote.py` promotes only TERMINAL-PROMOTABLE rounds (no unresolved `_strategist fills_`, `escalated_to_founder: false`, `next_round: null`, a `claim-ready after R<N>` convergence call, and no `r<N+1>/request.md`). A merely combined but undispositioned round must not promote.
+
 ## Step 2 — Run combine.py for one eligible round
 
 ```bash
@@ -98,28 +109,22 @@ tools/review-queue/push-with-retry.sh "disposition: r<N> on <item_id>"
 
 After the gate-aware disposition pass, decide which branch fires. The file mutations for all three branches are a single helper invocation; the watcher then runs one branch-specific git block.
 
-#### Terminal spec-review marker for claim gating (paths a and c)
+#### Terminal proposed-stage promotion for claim gating (paths a and c)
 
-For BOTH terminal paths below, the watcher is the actor that certifies the reviewed spec content for builder claimability. Immediately before the terminal commit, write the convergence marker into the reviewed item's frontmatter and fold that spec edit into the same terminal commit:
+For terminal paths, the watcher is the actor that makes a reviewed proposed spec claimable. Immediately before the terminal commit, inspect the current round's `request.md` `artifact_path`:
 
-1. Resolve `<spec_path>` from the current round's `request.md` `artifact_path` field.
-2. Compute the digest with the selector's shared normalization helper:
+- If it starts with `backlog/proposed/`, run:
 
-   ```bash
-   SPEC_REVIEW_SHA=$(python3 tools/blocked.py --spec-review-sha "<spec_path>")
-   ```
+  ```bash
+  tools/review-queue/promote.py promote <item_id> --round <N> --mode=stage-only
+  TERMINAL_SPEC_PATH="backlog/ready/<item_id>.md"
+  ```
 
-3. Edit `<spec_path>` frontmatter to set:
+  `promote.py` verifies the TERMINAL-PROMOTABLE predicate, compares normalized current proposed content with the file at `request.spec_commit_sha`, stamps `ready_content_sha`, and performs `git mv proposed→ready` without committing. Fold `TERMINAL_SPEC_PATH` into the same terminal commit as `combined.md`; do not create a separate promote-only commit on the convergence path.
 
-   ```yaml
-   spec_review: converged
-   spec_review_sha: <SPEC_REVIEW_SHA>
-   ```
+- If it does not start with `backlog/proposed/`, do not write legacy `spec_review` markers. Set `TERMINAL_SPEC_PATH` to the current artifact path and proceed with the terminal commit.
 
-4. Re-run `python3 tools/blocked.py --spec-review-sha "<spec_path>"` after the marker write and confirm it prints the SAME digest. This proves the marker fields are excluded from the normalized content and the marker is not self-stale.
-5. Stage `<spec_path>` together with the terminal `combined.md` in the branch-specific `git add` below. Do NOT create a separate marker commit.
-
-Path-specific content rule: in path (a), the digest certifies the reviewed content with no spec changes. In path (c), compute the digest AFTER the mechanical/comment/link patch is applied, so the waived-verification terminal certifies the post-patch content and remains staleness-checked. The watcher never writes `spec_review: waived`; `waived` is founder-only bypass.
+Proposed-stage path (c) is structurally cut: `dispatch-next-round.py` routes `verdict=proceed_after_patches` + `--patches-applied=false` to branch (b) for proposed artifacts, so a content-patched proposed spec always gets a verification round before promotion. Branch (c) remains available only for non-proposed legacy artifacts.
 
 #### Disposition discipline — prefer removal over deeper patching when findings target any prior-round patch
 
@@ -201,7 +206,7 @@ Verdict was `proceed` with no actionable findings, OR a `pushback` where all fin
 tools/review-queue/dispatch-next-round.py <item_id> <N> \
   --verdict={proceed,pushback} --patches-applied=false \
   --class=<request.class> --focus-hints=""
-git add <spec_path> backlog/reviews/<item_id>/r<N>/combined.md
+git add "$TERMINAL_SPEC_PATH" backlog/reviews/<item_id>/r<N>/combined.md
 git commit -m "review-r<N>: terminal on <item_id>"
 tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
 ```
@@ -297,7 +302,7 @@ Strategist's-call when patches are mechanical (typo fixes, comment-only changes,
 tools/review-queue/dispatch-next-round.py <item_id> <N> \
   --verdict=proceed_after_patches --patches-applied=false \
   --class=<request.class> --focus-hints="<one-line rationale for waiving verification>"
-git add <spec_path> backlog/reviews/<item_id>/r<N>/combined.md
+git add "$TERMINAL_SPEC_PATH" backlog/reviews/<item_id>/r<N>/combined.md
 git commit -m "review-r<N>: terminal on <item_id>"
 tools/review-queue/push-with-retry.sh "terminal: r<N> on <item_id>"
 ```

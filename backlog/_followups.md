@@ -954,3 +954,9 @@ The founder's "two adapters drift" theory is the *install-time* hop (canonical s
 - combine.py / watcher NATIVE `capture-failed` classification (087b OoS, r7 codex-ops): terminal capture-failures degrade through the generic `partial_responses`->founder path; teach the orchestration layer to render an explicit `capture-failed` row/verdict.
 - claude / cursor reviewer read-only migration: gated on the 056-claude-required-flag-gate decision; 087b was codex/codex-ops only.
 - OPS: stale `ECHO_COORD_REQUEST_PATH` pinned to deleted `backlog/reviews/2026-05-16-057b/r1/request.md` misfired ~24 reviewer ticks on 2026-06-03 (`bind_failed`/`request_not_found`), spawning throwaway codex worktrees. Find + fix the launchd/env source.
+
+## From 088 merge (2026-06-05)
+- After-Completion (strategist): regenerate live docs/BACKLOG.md via `tools/backlog_index.py` (mirrors the wiki/index.md regen step; the generator shipped, the tracked file is not builder-written).
+- After-Completion (strategist): promote shipped 088 decisions to wiki/ per the item's After Completion notes; update .manifest.json + regen wiki/index.md.
+- AC6 step 8 (once no live item carries legacy `spec_review`): remove `legacy_spec_review_satisfied` in tools/blocked.py + the inert transitional `waived`-without-sha allowance (flagged by the 088 reviewer; inert at merge time since ready/ had no legacy item).
+- Author 089+ specs into backlog/proposed/ per the new proposed→ready lifecycle.

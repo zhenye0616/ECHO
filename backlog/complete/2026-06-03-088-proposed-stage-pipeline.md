@@ -52,6 +52,26 @@ head_sha: "857924b9fd69c2af55f03db165cd761d3fd22ae7"
 pr_url: ""
 agent_notes: |
   Implemented the proposed-stage pipeline on branch agent/proposed-stage-pipeline: added backlog/proposed, reworked claimability around ready_content_sha, added proposed-first review artifact lookup, added idempotent promote/bounce tooling, enforced proposed-stage verification-round routing, added the generated BACKLOG index tool, and updated the allowed docs/skills plus regenerated command adapters. Verification passed: python3 tools/test_blocked.py, python3 tools/backlog_index.py --check, targeted Vitest, python3 tools/blocked.py --validate, tools/sync-skills.sh --check, git diff --check, npm run lint, npm run typecheck, and full npm test.
+review_notes: |
+  Merged 2026-06-05 via founder authorization ("merge if there is no escalation"). Strategist (Claude) as merger; builder was codex — reviewer-independence satisfied. Builder run followed a strategist spec-patch that resolved the prior escalation (obsolete 087b ready-stage migration removed; 087b had shipped to complete/ and ready/ was empty).
+
+  Conflicts resolved: none — clean --no-ff merge. Branch forked at the 088 backlog-state commits; main HEAD changed only the 088 item file, its task-state/builder.md, and the agent-run log, none touched by the implementation branch (empty file intersection).
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied: none (verdict: merge as-is).
+
+  Fixups deferred to follow-up items: none.
+
+  Verify (post-merge, in ephemeral merger worktree at d35fed4a): npm test 1555 passed / 21 skipped / 0 failed (147 files); npm run lint + npm run typecheck clean; python3 tools/test_blocked.py 33 passed; tools/blocked.py --validate clean (88 items); tools/backlog_index.py --check fixture-pass; tools/review-queue/check-coupled-invariants.sh OK; tools/sync-skills.sh --check matched; git diff --check clean. docs/BACKLOG.md + wiki/ correctly absent from the merge diff (generator-only).
+
+  Independent review: code-reviewer subagent (Claude, cross-vendor vs the codex builder) returned verdict `merge as-is` — all 9 ACs Met, zero drift, dual-read precedence has no spoof hole, sha mismatch fails closed, promote.py content-identity normalization has parity with 086, promotion is idempotent. Sidecar at backlog/pending_review/2026-06-03-088-proposed-stage-pipeline.review.md (consumed at merge).
+
+  Follow-up items (non-blocking, filed to backlog/_followups.md):
+  - After-Completion (strategist): regenerate live docs/BACKLOG.md via tools/backlog_index.py (mirrors wiki/index.md regen).
+  - After-Completion (strategist): promote shipped 088 decisions to wiki/ per the item's After Completion notes; update .manifest.json + regen wiki/index.md.
+  - AC6 step 8 (once no live item carries legacy spec_review): remove legacy_spec_review_satisfied + the inert transitional `waived`-without-sha allowance.
+  - Author 089+ specs into backlog/proposed/ per the new lifecycle.
 ---
 
 # 088 — Add a `proposed/` backlog stage (folder-location = claimability)

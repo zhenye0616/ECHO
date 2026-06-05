@@ -11,6 +11,8 @@ This command is destructive in the sense that it pushes to origin and deletes br
 - One or more positional arguments: item ids in **merge order**, e.g., `/merge-and-cleanup 012 013`. Order matters: items whose branches were claimed earlier should generally merge first, because later branches typically forked from earlier claim points and will conflict with them.
 - Optional flag `--skip-fixups`: merge raw without applying pre-merge fixups. The fixups still get listed in `review_notes` as TODOs, and follow-up items are filed. Use sparingly — usually fixups are pre-merge gates for a reason.
 
+Backlog lifecycle is `proposed/ → ready/ → claimed/ → pending_review/ → complete/`. This skill starts only after a builder has moved an item into `pending_review/`; it never assumes the spec was authored directly in `ready/`, and it never performs the watcher-owned `proposed/ → ready/` promotion.
+
 For each id, locate the matching `.md` file in `backlog/pending_review/` and its sidecar `.review.md` (written by `/review-pending`). If the sidecar is missing, abort with a clear error — the human must run `/review-pending` first.
 
 ## Step A — Pre-flight (once, before any item)
@@ -452,7 +454,7 @@ If the daemon isn't launchd-managed in this environment (e.g., during a manual `
 - Do not auto-resolve conflicts.
 - Do not skip the verify step.
 - Do not commit during a verify pause.
-- Do not edit `wiki/`, `docs/BACKLOG.md`, or items not in the argument list.
+- Do not edit `wiki/`, generated `docs/BACKLOG.md`, or items not in the argument list.
 - Do not amend the merge commit after pushing (history is shared).
 - Do not force-push to main.
 - Do not `--force` worktree removal or branch deletion.

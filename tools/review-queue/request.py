@@ -36,7 +36,7 @@ def _valid_reviewers() -> tuple[str, ...]:
 
 
 def find_artifact(item_id: str, repo_root: Path) -> Path:
-    for stage in ("ready", "claimed", "pending_review", "complete"):
+    for stage in ("proposed", "ready", "claimed", "pending_review", "complete"):
         candidate = repo_root / "backlog" / stage / f"{item_id}.md"
         if candidate.is_file():
             return candidate
