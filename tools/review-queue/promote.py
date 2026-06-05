@@ -77,7 +77,7 @@ def set_frontmatter_scalar(text: str, key: str, value: str) -> str:
     else:
         insert_at = len(lines)
         for idx, line in enumerate(lines):
-            if re.match(r"^(spec_review_sha|requested_reviewers):\s*", line):
+            if re.match(r"^requested_reviewers:\s*", line):
                 insert_at = idx + 1
         lines.insert(insert_at, replacement)
     return "---\n" + "\n".join(lines).rstrip() + "\n---\n" + body

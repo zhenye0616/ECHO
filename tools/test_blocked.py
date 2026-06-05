@@ -194,7 +194,7 @@ class BlockedScriptTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("ready-content-sha-mismatch", out)
 
-    def test_legacy_converged_matching_digest_is_transitionally_claimable(self) -> None:
+    def test_spec_review_only_matching_digest_is_blocked_without_ready_seal(self) -> None:
         path = write_item(
             self.repo,
             "ready",
@@ -215,35 +215,62 @@ class BlockedScriptTests(unittest.TestCase):
             seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+        rc, out, _ = run_script(self.repo, "--list-blocked")
+        self.assertEqual(rc, 0)
+        self.assertIn("2026-04-30-001-foo", out)
+        self.assertIn("missing-ready-content-sha", out)
+
+    def test_legacy_marker_fields_are_excluded_from_ready_seal(self) -> None:
+        path = write_item(self.repo, "ready", "2026-04-30-001-foo")
+        text = path.read_text(encoding="utf-8")
+        path.write_text(
+            text.replace(
+                "---\n\n# body",
+                (
+                    "spec_review: done\n"
+                    "spec_review_sha: not-a-digest\n"
+                    "---\n\n# body"
+                ),
+                1,
+            ),
+            encoding="utf-8",
+        )
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+        rc, out, _ = run_script(self.repo)
         self.assertEqual(rc, 0)
         self.assertIn("2026-04-30-001-foo.md", out.strip())
 
-    def test_marker_only_delta_stays_fresh(self) -> None:
-        path = write_item(
+    def test_spec_review_any_value_is_inert_without_ready_seal(self) -> None:
+        write_item(
             self.repo,
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter='requested_reviewers: ["codex","codex-ops"]\n',
             seal_ready=False,
         )
-        digest = self.ready_content_sha(path)
         write_item(
             self.repo,
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter=(
                 'requested_reviewers: ["codex","codex-ops"]\n'
-                "spec_review: converged\n"
-                f"spec_review_sha: {digest}\n"
-                'agent_notes: "marker-only lifecycle note"\n'
+                "spec_review: done\n"
             ),
             seal_ready=False,
         )
-        rc, out, _ = run_script(self.repo)
-        self.assertEqual(rc, 0)
-        self.assertIn("2026-04-30-001-foo.md", out.strip())
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
 
-    def test_body_delta_after_legacy_convergence_is_stale(self) -> None:
+        rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+    def test_body_delta_after_legacy_convergence_is_missing_seal(self) -> None:
         path = write_item(
             self.repo,
             "ready",
@@ -271,9 +298,9 @@ class BlockedScriptTests(unittest.TestCase):
 
         rc, out, _ = run_script(self.repo, "--list-blocked")
         self.assertEqual(rc, 0)
-        self.assertIn("legacy-spec-edited-after-review", out)
+        self.assertIn("missing-ready-content-sha", out)
 
-    def test_waived_spec_review_is_claimable_without_digest(self) -> None:
+    def test_waived_spec_review_is_blocked_without_ready_seal(self) -> None:
         write_item(
             self.repo,
             "ready",
@@ -285,8 +312,12 @@ class BlockedScriptTests(unittest.TestCase):
             seal_ready=False,
         )
         rc, out, _ = run_script(self.repo)
+        self.assertEqual(rc, 1)
+        self.assertEqual(out.strip(), "")
+
+        rc, out, _ = run_script(self.repo, "--list-blocked")
         self.assertEqual(rc, 0)
-        self.assertIn("2026-04-30-001-foo.md", out.strip())
+        self.assertIn("missing-ready-content-sha", out)
 
     def test_alpha_suffixed_id_is_accepted(self) -> None:
         # Decomposed parent/sibling specs use a single-letter suffix on the
@@ -475,18 +506,18 @@ class BlockedScriptTests(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertIn("priority", err)
 
-    def test_bad_spec_review_value_exits_2(self) -> None:
+    def test_bad_spec_review_value_is_ignored_by_validate(self) -> None:
         write_item(
             self.repo,
             "ready",
             "2026-04-30-001-foo",
             extra_frontmatter="spec_review: done\n",
         )
-        rc, _, err = run_script(self.repo, "--validate")
-        self.assertEqual(rc, 2)
-        self.assertIn("spec_review must be one of", err)
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("OK", out)
 
-    def test_converged_without_digest_exits_2(self) -> None:
+    def test_converged_without_digest_is_ignored_by_validate(self) -> None:
         write_item(
             self.repo,
             "ready",
@@ -496,11 +527,11 @@ class BlockedScriptTests(unittest.TestCase):
                 "spec_review: converged\n"
             ),
         )
-        rc, _, err = run_script(self.repo, "--validate")
-        self.assertEqual(rc, 2)
-        self.assertIn("spec_review: converged requires a valid spec_review_sha", err)
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("OK", out)
 
-    def test_malformed_spec_review_sha_exits_2(self) -> None:
+    def test_malformed_spec_review_sha_is_ignored_by_validate(self) -> None:
         write_item(
             self.repo,
             "ready",
@@ -510,9 +541,9 @@ class BlockedScriptTests(unittest.TestCase):
                 "spec_review_sha: abc123\n"
             ),
         )
-        rc, _, err = run_script(self.repo, "--validate")
-        self.assertEqual(rc, 2)
-        self.assertIn("spec_review_sha must be a 64-character", err)
+        rc, out, err = run_script(self.repo, "--validate")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("OK", out)
 
     def test_status_field_is_NOT_validated(self) -> None:
         # status field is informational; folder is truth. Items can have a stale
@@ -569,6 +600,17 @@ class BlockedScriptTests(unittest.TestCase):
 
     def test_unknown_flag_exits_2(self) -> None:
         rc, _, err = run_script(self.repo, "--no-such-flag")
+        self.assertEqual(rc, 2)
+        self.assertIn("unknown flag", err)
+
+    def test_ready_content_sha_is_only_advertised_digest_flag(self) -> None:
+        rc, out, err = run_script(self.repo, "--help")
+        self.assertEqual(rc, 0, f"stderr: {err}")
+        self.assertIn("--ready-content-sha", out)
+        self.assertNotIn("--spec-review-sha", out)
+
+        path = write_item(self.repo, "ready", "2026-04-30-001-foo")
+        rc, _, err = run_script(self.repo, "--spec-review-sha", str(path))
         self.assertEqual(rc, 2)
         self.assertIn("unknown flag", err)
 

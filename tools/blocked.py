@@ -13,8 +13,6 @@ Usage:
     tools/blocked.py --validate      # check whole backlog for cycles, dangling refs, malformed; exit 0 or 2
     tools/blocked.py --ready-content-sha <item.md>
                                       # print the normalized-content digest used by the ready/ seal
-    tools/blocked.py --spec-review-sha <item.md>
-                                      # legacy alias for --ready-content-sha during 086→088 migration
 
 Exit codes:
     0  success — printed a candidate path (or validation passed in --validate mode)
@@ -29,7 +27,6 @@ Input shape (parsed from each item's YAML frontmatter):
     blocked_by:  list of item IDs (may be empty list `[]` or omitted)
     requested_reviewers: list of reviewer slugs (optional; used by the spec-review queue)
     ready_content_sha: 64-char sha-256 digest of normalized spec content (required for ready/)
-    spec_review/spec_review_sha: legacy 086 fields accepted only as a transitional fallback
 
 Selection rule:
     UNBLOCKED candidates are items in backlog/ready/ where every entry of
@@ -41,9 +38,8 @@ Selection rule:
     A ready/ item is also gated on ready_content_sha: the seal must be present
     and match the normalized content. Mismatch/missing/malformed seals fail
     closed and the item is omitted from candidates; the watcher bounce path
-    repairs stale ready/ files by moving them back to proposed/. During the
-    086→088 migration only, a legacy spec_review marker can satisfy the seal
-    when ready_content_sha is absent.
+    repairs stale ready/ files by moving them back to proposed/. There is no
+    legacy fallback: stray spec_review/spec_review_sha fields are inert.
 
     Among UNBLOCKED candidates: HIGH > MED > LOW priority; ties broken by
     oldest creation date; further ties broken by lexicographic id.
@@ -61,7 +57,6 @@ from typing import Any, Optional
 
 PRIORITY_ORDER = {"HIGH": 0, "MED": 1, "LOW": 2}
 STAGES = ("proposed", "ready", "claimed", "pending_review", "complete")
-VALID_SPEC_REVIEW = {"converged", "waived", "pending"}
 CONTENT_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 CONTENT_MARKER_FIELDS = {"ready_content_sha", "spec_review", "spec_review_sha"}
 AGENT_MANAGED_FIELDS = {
@@ -185,9 +180,11 @@ def parse_frontmatter(text: str) -> dict[str, Any]:
 def normalized_content_sha(text: str) -> str:
     """Digest normalized spec content for ready-stage integrity checks.
 
-    The ready seal, legacy 086 marker fields, and agent-managed lifecycle fields
-    are excluded so promotion/handoff metadata cannot make the seal self-stale,
-    while substantive frontmatter/body edits still change the digest.
+    The ready seal, former 086 marker fields, and agent-managed lifecycle
+    fields are excluded so promotion/handoff metadata cannot make the seal
+    self-stale, while substantive frontmatter/body edits still change the
+    digest. Former marker fields stay excluded for seal stability but are not
+    read for claimability.
     """
     fm = parse_frontmatter(text)
     _, body = split_frontmatter(text)
@@ -209,17 +206,8 @@ def normalized_content_sha(text: str) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def spec_review_content_sha(text: str) -> str:
-    """Legacy alias retained for 086-era callers during the 088 migration."""
-    return normalized_content_sha(text)
-
-
 def has_valid_content_sha(value: Any) -> bool:
     return isinstance(value, str) and bool(CONTENT_SHA_RE.match(value))
-
-
-def has_valid_spec_review_sha(value: Any) -> bool:
-    return has_valid_content_sha(value)
 
 
 def load_items(repo_root: Path) -> dict[str, dict[str, Any]]:
@@ -284,8 +272,6 @@ def load_items(repo_root: Path) -> dict[str, dict[str, Any]]:
                 "blocked_by": blocked_by,
                 "requested_reviewers": fm.get("requested_reviewers", []),
                 "ready_content_sha": fm.get("ready_content_sha"),
-                "spec_review": fm.get("spec_review"),
-                "spec_review_sha": fm.get("spec_review_sha"),
                 "normalized_content_sha": normalized_content_sha(text),
             }
     return items
@@ -306,33 +292,6 @@ def validate(items: dict[str, dict[str, Any]]) -> list[str]:
                 errors.append(
                     f"{it['path']}: blocked_by '{dep}' is not a known item id"
                 )
-
-    # Spec-review marker validation. Missing spec_review is valid: it means
-    # "not reviewed yet". A converged marker without a usable digest must never
-    # unblock, so validation rejects it before selection.
-    for _, it in items.items():
-        spec_review = it.get("spec_review")
-        spec_review_sha = it.get("spec_review_sha")
-
-        if spec_review is not None and (
-            not isinstance(spec_review, str) or spec_review not in VALID_SPEC_REVIEW
-        ):
-            errors.append(
-                f"{it['path']}: spec_review must be one of "
-                f"{', '.join(sorted(VALID_SPEC_REVIEW))}, got {spec_review!r}"
-            )
-
-        if spec_review_sha is not None and not has_valid_spec_review_sha(spec_review_sha):
-            errors.append(
-                f"{it['path']}: spec_review_sha must be a 64-character "
-                "lowercase sha-256 hex digest"
-            )
-
-        if spec_review == "converged" and not has_valid_spec_review_sha(spec_review_sha):
-            errors.append(
-                f"{it['path']}: spec_review: converged requires a valid "
-                "spec_review_sha"
-            )
 
     # Cycle detection (only over non-complete items; complete items can't cycle)
     UNVISITED, VISITING, DONE = 0, 1, 2
@@ -359,27 +318,11 @@ def validate(items: dict[str, dict[str, Any]]) -> list[str]:
     return errors
 
 
-def legacy_spec_review_satisfied(item: dict[str, Any]) -> tuple[bool, Optional[str]]:
-    """086 fallback while live ready/ items migrate to ready_content_sha."""
-    spec_review = item.get("spec_review")
-    if spec_review == "waived":
-        return True, None
-    if spec_review != "converged":
-        return False, "missing-ready-content-sha"
-
-    spec_review_sha = item.get("spec_review_sha")
-    if not has_valid_spec_review_sha(spec_review_sha):
-        return False, "missing-ready-content-sha"
-    if spec_review_sha != item.get("normalized_content_sha"):
-        return False, "legacy-spec-edited-after-review"
-    return True, None
-
-
 def ready_content_satisfied(item: dict[str, Any]) -> tuple[bool, Optional[str]]:
     """Return whether the ready/ integrity seal passes, plus a block reason."""
     ready_sha = item.get("ready_content_sha")
     if ready_sha is None:
-        return legacy_spec_review_satisfied(item)
+        return False, "missing-ready-content-sha"
     if not has_valid_content_sha(ready_sha):
         return False, "malformed-ready-content-sha"
     if ready_sha != item.get("normalized_content_sha"):
@@ -440,7 +383,7 @@ def find_repo_root(start: Path) -> Path:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) == 3 and argv[1] in ("--ready-content-sha", "--spec-review-sha"):
+    if len(argv) == 3 and argv[1] == "--ready-content-sha":
         try:
             path = Path(argv[2])
             print(normalized_content_sha(path.read_text(encoding="utf-8")))

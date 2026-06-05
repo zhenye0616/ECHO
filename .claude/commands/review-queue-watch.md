@@ -122,9 +122,9 @@ For terminal paths, the watcher is the actor that makes a reviewed proposed spec
 
   `promote.py` verifies the TERMINAL-PROMOTABLE predicate, compares normalized current proposed content with the file at `request.spec_commit_sha`, stamps `ready_content_sha`, and performs `git mv proposed→ready` without committing. Fold `TERMINAL_SPEC_PATH` into the same terminal commit as `combined.md`; do not create a separate promote-only commit on the convergence path.
 
-- If it does not start with `backlog/proposed/`, do not write legacy `spec_review` markers. Set `TERMINAL_SPEC_PATH` to the current artifact path and proceed with the terminal commit.
+- If it does not start with `backlog/proposed/`, set `TERMINAL_SPEC_PATH` to the current artifact path and proceed with the terminal commit. There is no alternate review-marker write path; post-088 claimability is represented by folder location plus a `ready_content_sha` seal.
 
-Proposed-stage path (c) is structurally cut: `dispatch-next-round.py` routes `verdict=proceed_after_patches` + `--patches-applied=false` to branch (b) for proposed artifacts, so a content-patched proposed spec always gets a verification round before promotion. Branch (c) remains available only for non-proposed legacy artifacts.
+Proposed-stage path (c) is structurally cut: `dispatch-next-round.py` routes `verdict=proceed_after_patches` + `--patches-applied=false` to branch (b) for proposed artifacts, so a content-patched proposed spec always gets a verification round before promotion. Branch (c) remains available only for non-proposed artifacts.
 
 #### Disposition discipline — prefer removal over deeper patching when findings target any prior-round patch
 
