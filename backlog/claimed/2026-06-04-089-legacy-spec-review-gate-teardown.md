@@ -24,10 +24,10 @@ spec_refs:
   - tools/blocked.py  # current gate: legacy_spec_review_satisfied(), ready_content_satisfied() fallback (line ~382), the spec_review validation block (~310-334), VALID_SPEC_REVIEW, CONTENT_MARKER_FIELDS, spec_review_content_sha() alias, and the dual `--ready-content-sha`/`--spec-review-sha` CLI (line ~443).
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T06:04:08Z"
+branch: "agent/legacy-spec-review-gate-teardown"
+worktree: "/Users/zhenye/Desktop/Project_echo--legacy-spec-review-gate-teardown"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
