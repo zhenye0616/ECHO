@@ -61,23 +61,50 @@ harness themselves.
 
 ## Acceptance criteria
 
-- **AC1 — tag-triggered release build.** A `v*` tag triggers `release.yml`, which builds exactly one
-  `echoctl-<version>.tgz` via `npm pack` from clean source (no `echo-fix` patcher).
-- **AC2 — per-OS tarball validation + publish.** On os:[ubuntu,macos,windows] the workflow installs the SAME
-  `.tgz` and runs `echoctl selftest` (+ `doctor`); all green is required to publish. It publishes the tarball
-  to a private/prerelease GitHub Release tagged `v0.1.x-beta.N` and retains the prior release for rollback.
-  (Validated by inspection + a dry-run / `workflow_dispatch` rehearsal; a real Windows GH run is the truth but
-  not a unit-test gate.)
-- **AC3 — onboarding CI is a required gate.** The `onboarding`/windows-compat job (green after 091) is flipped
-  from non-required to a blocking check on `ci.yml`; a deliberately reintroduced compat regression fails it.
-- **AC4 — packed-manifest pinned.** `tests/packaging/packed-manifest.test.ts` snapshots `npm pack --dry-run`
-  output; adding/removing a shipped path fails the test until the snapshot is updated. It does not alter the
-  `files` allowlist.
-- **AC5 — tests green.** `npm test`, `npm run lint`, `npm run typecheck` green; the release workflow passes a
-  dry-run/rehearsal.
-- **AC6 — no drift.** ONLY the release workflow, the CI-voting flip, and the manifest pin. NO `src/` changes,
-  NO `files`-allowlist edits, NO public-distribution channels (Homebrew/winget/npm-public), NO thin acceptance
-  repo, NO telemetry. Do not touch `backlog/`, `wiki/`, `docs/BACKLOG.md`.
+- **AC1 — tag-triggered build-once.** A `v*` tag triggers `release.yml`. A SINGLE `build` job builds exactly one
+  `echoctl-<version>.tgz` via `npm pack` from clean source (no `echo-fix` patcher), computes its SHA-256
+  checksum, and uploads BOTH the tarball and the checksum as a workflow artifact. No downstream job re-runs
+  `npm pack` — the build-once artifact is the seam every consumer receives. *(r1 codex F1.)*
+- **AC2 — validate-the-exact-artifact, then gated publish.** On os:[ubuntu,macos,windows], independent
+  validation jobs DOWNLOAD the uploaded artifact, verify its SHA-256 matches AC1's checksum, install that exact
+  `.tgz`, and run `echoctl selftest` (+ `echoctl doctor`). A `publish` job runs ONLY after every validation job
+  passes, consumes the SAME downloaded artifact (never a rebuild), publishes it to a private/prerelease GitHub
+  Release tagged `v0.1.x-beta.N`, and retains the prior release for rollback. Three publish-safety contracts:
+  - **Version-identity gate** *(r1 codex F2)*: before publishing, the workflow asserts `${GITHUB_REF_NAME#v}`
+    equals `package.json` `version`; a mismatch fails the job (prevents tag / version / tarball-name drift).
+  - **Least-privilege token** *(r1 codex-ops F2)*: the workflow declares explicit `permissions:` — validation
+    jobs are `contents: read`; only the `publish` job is granted `contents: write`, so a read-only default
+    `GITHUB_TOKEN` cannot silently fail publish and validation jobs cannot mutate repo state.
+  - **Channel:** private/prerelease only; no npm-public/Homebrew/winget.
+- **AC2b — runnable rehearsal (no production release state)** *(r1 codex-ops F3)*. `release.yml` exposes a
+  `workflow_dispatch` path that runs the SAME build-once + OS-matrix download/verify/install/selftest/doctor
+  steps but SKIPS the `publish` job (no tag, no GitHub Release created). Only a real `v*` tag publishes. This is
+  the dry-run that satisfies AC5's rehearsal without creating a real tag/release.
+- **AC3 — onboarding CI is a blocking gate (in-file mechanism + founder-verifiable protection)** *(r1 codex F3
+  + codex-ops F1, convergent)*. Within `ci.yml`, the `onboarding`/windows-compat job(s) (green after 091) are
+  made blocking by having the workflow's existing required/aggregate status job `needs:` them, so the
+  already-required check transitively fails when onboarding regresses; a deliberately reintroduced compat
+  regression fails that aggregate. **Branch-protection / ruleset config is NOT settable from workflow YAML** —
+  if `main`'s required checks are managed by GitHub branch protection rather than an aggregate job, that toggle
+  is an explicit founder/manual follow-up OUTSIDE this file list, verified with
+  `gh api repos/{owner}/{repo}/branches/main/protection`. The spec ships whichever mechanism the repo already
+  uses; it does not invent a new required-checks surface.
+- **AC4 — packed-manifest pinned (self-contained snapshot)** *(r1 codex F4)*.
+  `tests/packaging/packed-manifest.test.ts` runs `npm pack --dry-run --json`, extracts a SORTED list of
+  `files[].path` with stable normalization (path-only; no sizes/integrity/version-bearing fields), and asserts
+  it against an INLINE snapshot held in the test file itself (no external snapshot artifact — keeps
+  `files_to_modify` unchanged). Adding/removing a shipped path fails the test until the inline snapshot is
+  updated. It does not alter the `files` allowlist.
+- **AC5 — tests green + rehearsal passes.** `npm test`, `npm run lint`, `npm run typecheck` green; the AC2b
+  `workflow_dispatch` rehearsal completes (build-once + OS-matrix validate, no publish). A real Windows GH run
+  is the truth but not a unit-test gate.
+- **AC6 — no drift (impl/product scope only; lifecycle metadata carved out)** *(r1 codex F5)*. ONLY the release
+  workflow, the CI-voting flip, and the manifest pin. NO `src/` changes, NO `files`-allowlist edits, NO
+  public-distribution channels (Homebrew/winget/npm-public), NO thin acceptance repo, NO telemetry. Do not touch
+  `wiki/`, `docs/BACKLOG.md`, or product/spec content under `backlog/`. **Carve-out:** the REQUIRED
+  builder-protocol lifecycle edits are explicitly allowed — atomically claiming the item (`ready/`→`claimed/`),
+  moving it to `pending_review/`, writing `agent_notes`/`head_sha`, and the run-log under
+  `raw/internal/agent-runs/`. Those are protocol metadata, not the product-content edits AC6 forbids.
 
 ## Out of Scope (Don't Drift) — successors
 
