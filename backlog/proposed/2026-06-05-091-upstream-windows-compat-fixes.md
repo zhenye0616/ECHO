@@ -17,13 +17,13 @@ files_to_modify:
   - src/echo-home/wizard/probe.ts          # AC3 (R2) — the default `realSpawn` (:167, used at :133 `spawn(cmd, ...)`) routes through src/util/subprocess.ts. The `deps.spawn` injection seam is preserved (tests still inject).
   - src/echo-home/adapters/claude-code-mcp.ts  # AC3 (R2) — default `realSpawn` (:99, used at :105 `spawn('claude', args, ...)`) routes through src/util/subprocess.ts. Preserve the `deps.spawn` seam.
   - src/daemon/lifecycle.ts                # AC4 — `resolveDataDir()` (:18) returns `~/Library/Application Support/ECHO` on EVERY OS. Make it OS-appropriate: Windows → %LOCALAPPDATA% (fallback %APPDATA%), macOS → ~/Library/Application Support/ECHO, Linux → $XDG_DATA_HOME or ~/.local/share/ECHO. PRESERVE the ECHO_DATA_DIR override (highest precedence). NOTE migration risk: existing macOS installs must keep resolving the same path (no data move) — macOS branch is unchanged.
-  - src/cli/commands/daemon.ts             # AC4 (r1 codex F1 / codex-ops F5) — the launchctl caller. EVERY launchd op (launchctl print/bootstrap/bootout at :231/:514/:518, and the "launchctl not found …" false-fail messages) is currently unconditional. Add `platform?: NodeJS.Platform` to `DaemonDeps` (:34; the existing DI seam, default `process.platform`); on `win32`, the daemon lifecycle MUST NOT invoke `launchctl` — start/stop/status return a clean "manual daemon (no launchd on Windows)" result instead of a launchctl-not-found error. POSIX/darwin path unchanged.
-  - src/cli/commands/doctor.ts             # AC4 (r1 codex F1 / codex-ops F5) — the doctor reporting path. Reads daemon health via `report.daemon.pidLockHeld`/`mcpReachable` (:191-192) over `resolveDataDir()` (:205). On Windows, absent launchd MUST report a clean manual-daemon state (NOT `broken`/`degraded` false-fail); the unattended Windows selftest must not red-board on a manually-run daemon.
+  - src/cli/commands/daemon.ts             # AC4 (r1 codex F1 / codex-ops F5; r2 codex-ops F1) — the launchctl caller. EVERY launchd op (launchctl print/bootstrap/bootout at :231/:514/:518, and the "launchctl not found …" false-fail messages) is currently unconditional. Add `platform?: NodeJS.Platform` to `DaemonDeps` (:34; the existing DI seam, default `process.platform`); gate launchd on `platform === 'darwin'` — on EVERY non-darwin platform (`win32` AND `linux`), the daemon lifecycle MUST NOT invoke `launchctl`: start/stop/status return a clean "manual daemon (no launchd)" result instead of a launchctl-not-found error. Only the macOS/darwin path calls launchctl (unchanged).
+  - src/cli/commands/doctor.ts             # AC4 (r1 codex F1 / codex-ops F5; r2 codex-ops F1) — the doctor reporting path. Reads daemon health via `report.daemon.pidLockHeld`/`mcpReachable` (:191-192) over `resolveDataDir()` (:205). On every non-darwin platform (Windows AND Linux), absent launchd MUST report a clean manual-daemon state (NOT `broken`/`degraded` false-fail); the unattended ubuntu/Windows selftest must not red-board on a manually-run daemon.
   - tests/windows-compat.test.ts           # AC6 — UN-QUARANTINE the F4/R1/R2/data-dir assertions 090 marked `it.todo`/`skip`; they now PASS. Keep Codex-skill + Scheduled-Task assertions `it.todo` (Ring-2 successors — src/util/codex-skill.ts is NOT created here).
   - tests/util/json.test.ts               # AC1 — BOM-prefixed input parses; non-BOM unchanged; malformed still throws. (Path per repo convention.)
   - tests/util/subprocess.test.ts         # AC3 — via the injected `{ platform, env, existsSync }` deps (no process.platform monkey-patch, no host-PATH dependency): resolver finds a `.cmd` shim under a simulated Windows PATHEXT; POSIX path unchanged; no shell-injection. (Path per repo convention.)
-  - tests/cli/daemon.test.ts               # AC4 — with `platform: 'win32'` injected into DaemonDeps, daemon start/stop/status make ZERO `launchctl` calls (assert the spawnSync/spawn mock is never invoked with 'launchctl') and return the manual-daemon result; darwin path still calls launchctl as today.
-  - tests/cli/doctor.test.ts               # AC4 — with `platform: 'win32'`, doctor reports a non-broken manual-daemon state for a reachable-but-not-launchd daemon (no false-fail); darwin reporting unchanged.
+  - tests/cli/daemon.test.ts               # AC4 — with a non-darwin platform injected into DaemonDeps (cover BOTH `'win32'` and `'linux'`), daemon start/stop/status make ZERO `launchctl` calls (assert the spawnSync/spawn mock is never invoked with 'launchctl') and return the manual-daemon result; `'darwin'` path still calls launchctl as today.
+  - tests/cli/doctor.test.ts               # AC4 — with a non-darwin platform (`'win32'` and `'linux'`), doctor reports a non-broken manual-daemon state for a reachable-but-not-launchd daemon (no false-fail); `'darwin'` reporting unchanged.
 spec_refs:
   - backlog/proposed/2026-06-05-090-adopt-selftest-onboarding-harness.md  # parent. 090 ships the harness + quarantined red board; 091 makes F4/R1/R2/data-dir green and un-quarantines them. Read 090's AC4 (quarantine mechanism) before un-skipping.
   - src/cli/commands/init.ts          # F4 parse sites (:265 answer-file, :331/:356 onboarding-state)
@@ -98,12 +98,14 @@ land, the beta tester's Windows box cannot receive a correct artifact.
 - **AC4 — no-launchctl false-fail + Windows data dir.** `resolveDataDir()` (`lifecycle.ts:18`) returns an
   OS-appropriate directory (Windows %LOCALAPPDATA%/%APPDATA%, macOS unchanged, Linux XDG) with `ECHO_DATA_DIR`
   overriding. The launchd lifecycle in `src/cli/commands/daemon.ts` (the `launchctl` caller) is gated on a new
-  `DaemonDeps.platform` field (default `process.platform`): on `win32` it makes **zero** `launchctl` calls and
-  returns a manual-daemon result; `src/cli/commands/doctor.ts` reports a clean (non-`broken`/`degraded`)
-  manual-daemon state on Windows rather than false-failing. macOS/Linux behavior unchanged. Tests cover the
-  Windows data-dir resolution (`tests/windows-compat.test.ts`), the no-launchctl daemon path
-  (`tests/cli/daemon.test.ts` — `platform:'win32'` → no `launchctl` spawn), and the no-false-fail doctor path
-  (`tests/cli/doctor.test.ts`).
+  `DaemonDeps.platform` field (default `process.platform`) **on `darwin` only** (r2 codex-ops F1): launchd ops
+  run iff `platform === 'darwin'`; on **every non-darwin platform (win32 AND linux)** the lifecycle makes **zero**
+  `launchctl` calls and returns a manual-daemon result — so the ubuntu selftest in AC6's matrix cannot
+  launchctl-not-found false-fail either. `src/cli/commands/doctor.ts` reports a clean (non-`broken`/`degraded`)
+  manual-daemon state on all non-darwin platforms rather than false-failing. macOS behavior unchanged. Tests cover
+  the Windows data-dir resolution (`tests/windows-compat.test.ts`), the no-launchctl daemon path
+  (`tests/cli/daemon.test.ts` — `platform:'win32'` AND `platform:'linux'` → no `launchctl` spawn), and the
+  no-false-fail doctor path (`tests/cli/doctor.test.ts`, non-darwin).
 - **AC5 — patcher retired from the release path (VERIFICATION-ONLY; r1 codex F2).** No normal build/release step
   references `echo-fix`. Falsifiable check (must return no matches):
   `grep -rIn 'echo-fix\|echo-windows-fix' package.json scripts/ .github/workflows/ tsconfig*.json`. At spec time
