@@ -34,7 +34,6 @@ jobs:
   onboarding:
     name: onboarding · ${{ matrix.os }} · node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +58,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p packed
-          tarball="$(npm pack --pack-destination packed --silent)"
+          pack_output="$(npm pack --pack-destination packed --silent)"
+          tarball="$(printf '%s\n' "$pack_output" | tail -n 1)"
           printf 'tarball=%s\n' "packed/${tarball}" >> "$GITHUB_OUTPUT"
       - name: Install packed echoctl
         shell: bash
