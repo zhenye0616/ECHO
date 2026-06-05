@@ -9,17 +9,19 @@ blocked_by: []
 task_state_ref: 2026-06-05-090-adopt-selftest-onboarding-harness
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
-  - src/cli/commands/selftest.ts          # AC1/AC2 — PORT from the orphaned worktree onto CURRENT main (the agent/onboarding-ci branch is 49 commits BEHIND main; do NOT commit that stale branch — re-apply the file onto main). KEEP: isolated throwaway HOME/ECHO_HOME/CODEX_HOME (selftest.ts:223), native-sqlite-load check (:264), daemon/MCP/init/wiring/capture/doctor checks, exit-code contract (:445), JSON + human reporters. FIX (AC2): the default port is hardcoded 38478 (:198) so it can ping the REAL daemon — change to an ephemeral/free port by default, or fail-fast if the chosen port is already serving a live daemon. selftest must never touch the founder's real daemon or real ~/.echo/~/.claude/~/.codex.
+  - src/cli/commands/selftest.ts          # AC1/AC2 — RE-IMPLEMENT the selftest command on current main to the AC1 check-id contract. The orphaned worktree (~/Desktop/Project_echo--onboarding-ci) is an ADVISORY starting point only — its line numbers are NOT authoritative and the build must not depend on it. KEEP its shape: isolated throwaway HOME/ECHO_HOME/CODEX_HOME, native-sqlite-load check, daemon/MCP/init/wiring/capture/doctor checks, exit-code contract, JSON + human reporters. AC2 port: set ECHO_MCP_PORT=0 for the throwaway daemon (atomic :0 bind — existing support) and read the resolved port from the daemon's mcp_port/mcp_url payload; never read or bind 38478. selftest must never touch the founder's real daemon or real ~/.echo/~/.claude/~/.codex.
   - src/cli/index.ts                       # AC1 — wire the `selftest` subcommand (import, command-list help, COMMAND_HELP entry, dispatch branch). +~6 lines, mirror the orphaned diff.
   - tests/windows-compat.test.ts           # AC4 — PORT, but QUARANTINE. The F4/R1 assertions reference live code; the R2 + Codex-skill assertions reference src/util/subprocess.ts + src/util/codex-skill.ts that DO NOT EXIST yet (they are 091/Ring-2 targets). To keep main green: mark every not-yet-satisfiable assertion `it.todo`/`describe.skip` with a comment pointing at the spec that will un-skip it (091 for F4/R1/R2; a Ring-2 successor for Codex-skill). NO red test may enter the voting suite here.
-  - tests/cli/selftest.test.ts             # AC1 — NEW smoke test for the command: runs `echoctl selftest --json` against an isolated/ephemeral sandbox, asserts the JSON shape + exit contract. (Path per repo test convention.)
-  - .github/workflows/ci.yml               # AC3 — PORT the skeleton, REVISED. `quality` job (typecheck/lint/build/test) on matrix os:[ubuntu,macos,windows] × node:[22,24], fail-fast:false — this job is the only voting gate in 090. `onboarding` job validates the PACKED artifact, NOT `npm install -g .` (which skips the `files` allowlist): `npm pack` → install the produced `.tgz` globally → `echoctl selftest`. REMOVE the dead `echo-fix/FIXES.md` comment reference (no echo-fix/ exists in this repo). `format:check` stays omitted (main is Prettier-dirty tree-wide). The cross-platform compat tests are NOT a required gate yet (091 makes them green, 092 flips them to voting).
+  - tests/cli/selftest.test.ts             # AC1 — NEW VOTING unit test: drive the command with a FAKE runner / mocked daemon+MCP; assert the JSON shape (check-id set + per-check pass/fail) + exit-code contract. It MUST NOT spawn the real daemon or shell out to the full `echoctl selftest` (the real end-to-end run lives in the NON-voting onboarding job), so it is green on every OS pre-091. Anti-drift: assert it exercises the same check-id inventory + command entrypoint as the real path. (Path per repo test convention.)
+  - .github/workflows/ci.yml               # AC3 — PORT the skeleton, REVISED. `quality` job (typecheck/lint/build/test) on matrix os:[ubuntu,macos,windows] × node:[22,24], fail-fast:false — the ONLY voting gate in 090 (windows-compat + selftest unit tests are skip/fake per AC1/AC4, so `npm test` is green on every leg). `onboarding` job validates the PACKED artifact (`npm pack` → install the `.tgz` → real `echoctl selftest`), NOT `npm install -g .` (which skips the `files` allowlist); the ENTIRE `onboarding` matrix carries `continue-on-error: true` in 090 (non-voting on every OS — visible as the real-packaged-path signal, cannot fail `main`). REMOVE the dead `echo-fix/FIXES.md` comment reference. `format:check` stays omitted (main is Prettier-dirty tree-wide). 091 makes the onboarding legs green; 092 removes continue-on-error + makes onboarding a required gate.
 spec_refs:
   - backlog/complete/2026-05-26-076-packaged-echoctl-install-boundary.md  # the `files` allowlist / packaging boundary the `npm pack` validation exercises. selftest's INS-* checks ride on this boundary.
   - backlog/complete/2026-05-25-074-echo-cli-binary.md                    # the echoctl binary + doctor surface selftest invokes.
   - backlog/complete/2026-06-01-083-init-registers-claude-code-mcp.md     # the WIR-* adapter-registration checks selftest exercises.
   - backlog/complete/2026-06-02-084-install-profile-split.md              # init --answer-file + customer profile selftest drives.
-  - src/cli/commands/selftest.ts  # current orphaned impl in the worktree ~/Desktop/Project_echo--onboarding-ci/ (read it there; it is NOT on main). Port the INTENT onto current main, applying the AC2 port fix.
+  # NOTE (not a spec_ref): the orphaned worktree ~/Desktop/Project_echo--onboarding-ci holds an advisory
+  # reference impl of selftest. It is NOT load-bearing — AC1's check-id contract is authoritative and the
+  # builder reconstructs selftest from it even if that worktree is gone.
 
 # --- agent-managed fields (filled in during run) ---
 claimed_by: ""
@@ -65,46 +67,44 @@ fixes, the Ring-1 blocker) → 092 (release workflow + flip CI to voting).
 
 ## Acceptance criteria
 
-- **AC1 — `echoctl selftest` exists and is wired; the ACs are the authoritative, reproducible contract
-  (finding 1, codex).** The command is ported onto current main and dispatched from `src/cli/index.ts`;
-  `echoctl selftest` and `echoctl selftest --json` run, produce the human + JSON reporters, and honor the
-  documented exit-code contract. The check set below is authoritative — the orphaned worktree
-  (`~/Desktop/Project_echo--onboarding-ci`) is an advisory starting point only; if it is gone the builder
-  reconstructs selftest from THIS contract, so the spec does not depend on an uncommitted external tree.
-  selftest MUST cover, each as a stable check-id row in the JSON: install sanity (`INS-*`), daemon
-  spawn/stop (`DAE-*`), MCP-over-HTTP bring-up (`MCP-*`), `init` via answer-file (`INIT-*`), adapter wiring
-  for Claude + Codex (`WIR-*`), git capture→recall across a daemon restart (`CAP-*`, `REC-*`), and `doctor`
-  (`DOC-*`). A smoke test (`tests/cli/selftest.test.ts`) asserts the JSON shape (the check-id set + per-check
-  pass/fail) + exit code against an isolated sandbox.
+- **AC1 — `echoctl selftest` exists and is wired; the ACs are the authoritative, reproducible contract.**
+  The command is ported onto current main and dispatched from `src/cli/index.ts`; `echoctl selftest` and
+  `echoctl selftest --json` run, produce the human + JSON reporters, and honor the documented exit-code
+  contract. The check set below is authoritative and self-contained — the orphaned worktree is advisory only
+  (its line numbers are NOT authoritative); the spec does not depend on an uncommitted external tree. selftest
+  MUST cover, each as a stable check-id row in the JSON: install sanity (`INS-*`), daemon spawn/stop
+  (`DAE-*`), MCP-over-HTTP bring-up (`MCP-*`), `init` via answer-file (`INIT-*`), adapter wiring for Claude +
+  Codex (`WIR-*`), git capture→recall across a daemon restart (`CAP-*`, `REC-*`), and `doctor` (`DOC-*`). The
+  VOTING test (`tests/cli/selftest.test.ts`) is a UNIT/fake-runner test of the JSON shape (check-id set +
+  per-check pass/fail) + exit code — it does NOT spawn the real daemon (the real end-to-end run lives in the
+  non-voting onboarding job per AC3), so it is green on every OS pre-091.
 - **AC2 — selftest is hermetic, atomically port-isolated, and cleans up on every exit path.** It uses an
-  isolated throwaway HOME/ECHO_HOME/CODEX_HOME (preserved from the orphaned impl). **Port allocation
-  (findings 2+6, codex/codex-ops):** ATOMIC, not check-then-bind — selftest binds an OS-assigned free port
-  (bind `:0`, or otherwise reserve the port until the daemon owns it) and threads that resolved port to the
-  spawned daemon's config AND to every MCP/HTTP-client check; it never reads or binds the hardcoded 38478.
-  Two tests: (i) a SENTINEL test occupies 38478 with a stub listener and asserts selftest still succeeds and
-  never contacts that listener; (ii) two concurrent selftest runs neither collide on a port nor touch 38478.
-  **Cleanup (finding 5, codex-ops):** on success, failure, AND timeout, selftest terminates its child daemon
-  process (platform-aware kill) and removes the throwaway HOME/ECHO_HOME/CODEX_HOME temp state; a test
-  asserts no selftest-spawned daemon remains listening after a forced failure/timeout.
-- **AC3 — CI skeleton, packed-artifact validated, non-voting via YAML not branch protection (findings 3+4,
-  codex/codex-ops).** `.github/workflows/ci.yml` runs a `quality` job (typecheck/lint/build/test) across
-  os:[ubuntu,macos,windows] × node:[22,24], `fail-fast:false` — `quality` votes on all legs (the
-  windows-compat unit assertions are `it.todo`/`skip` per AC4, so `npm test` is green everywhere). It also
-  runs an `onboarding` job (`npm pack` → install the `.tgz` → `echoctl selftest`). Because 091 has not yet
-  landed the Windows fixes, every `onboarding` matrix leg that is red on clean source carries
-  `continue-on-error: true` (non-voting) with a comment naming 091 — at minimum the Windows legs, plus any
-  other leg the builder confirms red on clean source (e.g. Linux if no-launchctl/data-dir affects it). Legs
-  green on clean source today (at minimum macOS) vote. The non-voting behavior is encoded IN THE WORKFLOW
-  YAML (`continue-on-error`), never via repo branch-protection settings (which live outside `files_to_modify`).
-  The dead `echo-fix/FIXES.md` reference is removed. (CI authoring is validated by inspection + `act`/dry-run
-  where feasible; live GH execution is not a merge gate.)
-- **AC4 — red board quarantined two ways; main stays green.** (i) Every windows-compat UNIT assertion that
-  depends on a not-yet-landed `src/` fix is `it.todo`/`describe.skip` with a comment naming the un-skipping
-  spec (091 for F4/R1/R2), so `npm test` is green on every OS. (ii) The `onboarding` selftest LEGS that are
-  red on clean source are non-voting via `continue-on-error: true` per AC3 — not via branch protection. Net:
-  no `ci.yml` leg can fail `main` in 090. `npm test`, `npm run lint`, `npm run typecheck` are green on
-  current main; 091 removes the `continue-on-error` from each leg as it goes green; 092 makes the full
-  onboarding matrix a required gate.
+  isolated throwaway HOME/ECHO_HOME/CODEX_HOME. **Port — existing daemon support, no daemon change:** selftest
+  sets `ECHO_MCP_PORT=0` for its throwaway daemon; the daemon binds `:0` atomically (`src/mcp/server.ts`
+  listen → `boundPort`) and already exposes the resolved port via its `mcp_port`/`mcp_url` payload
+  (`src/daemon/index.ts:71`); selftest parses that resolved port and threads it to every MCP/client check. It
+  never reads or binds 38478. Two tests: (i) a SENTINEL test occupies 38478 with a stub listener and asserts
+  selftest still succeeds and never contacts it; (ii) two concurrent selftest runs neither collide nor touch
+  38478. **Cleanup:** on success, failure, AND timeout, selftest terminates its child daemon (platform-aware
+  kill) and removes the throwaway HOME/ECHO_HOME/CODEX_HOME; a test asserts BOTH temp-state removal on all
+  three exit paths AND no selftest-spawned daemon left listening after a forced failure/timeout.
+- **AC3 — `quality` is the ONLY voting gate; the `onboarding` job is wholly non-voting in 090.**
+  `.github/workflows/ci.yml` runs a `quality` job (typecheck/lint/build/test) across os:[ubuntu,macos,windows]
+  × node:[22,24], `fail-fast:false` — the windows-compat unit assertions and the selftest unit test are
+  skip/fake per AC1/AC4, so `npm test` is green on every leg and `quality` is the sole voting gate. The
+  `onboarding` job (`npm pack` → install the `.tgz` → real `echoctl selftest`) carries `continue-on-error:
+  true` on EVERY matrix leg in 090 — it runs and reports as the real-packaged-path signal but cannot fail
+  `main` on any OS. Non-voting is encoded in the workflow YAML (`continue-on-error`), never via repo
+  branch-protection (which lives outside `files_to_modify`). The dead `echo-fix/FIXES.md` reference is
+  removed. (CI authoring validated by inspection + `act`/dry-run; live GH execution is not a merge gate.)
+- **AC4 — red board quarantined; nothing that executes the real selftest votes; main stays green.** (i) Every
+  windows-compat UNIT assertion depending on a not-yet-landed `src/` fix is `it.todo`/`describe.skip` with a
+  091 comment. (ii) `tests/cli/selftest.test.ts` is a fake-runner unit test (AC1) — it never runs the real
+  daemon, so it is green on every OS. (iii) The real end-to-end selftest runs ONLY in the `onboarding` job,
+  which is `continue-on-error` on all legs (AC3). Net: no `ci.yml` leg and no voting test can fail `main` in
+  090. `npm test`, `npm run lint`, `npm run typecheck` green on current main; 091 un-skips the compat
+  assertions + makes the onboarding legs green; 092 removes `continue-on-error` and makes onboarding a
+  required gate.
 - **AC5 — no drift.** ONLY harness adoption + CI skeleton. NO `src/` compat fixes (those are 091), NO release
   workflow (092), NO `echo-fix` changes, NO new `src/util/*` modules. Do not touch `backlog/`, `wiki/`,
   `docs/BACKLOG.md`, or `docs/STATUS.md`.
