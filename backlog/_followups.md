@@ -960,3 +960,6 @@ The founder's "two adapters drift" theory is the *install-time* hop (canonical s
 - After-Completion (strategist): promote shipped 088 decisions to wiki/ per the item's After Completion notes; update .manifest.json + regen wiki/index.md.
 - AC6 step 8 (once no live item carries legacy `spec_review`): remove `legacy_spec_review_satisfied` in tools/blocked.py + the inert transitional `waived`-without-sha allowance (flagged by the 088 reviewer; inert at merge time since ready/ had no legacy item).
 - Author 089+ specs into backlog/proposed/ per the new proposed→ready lifecycle.
+
+## From 089 pipeline shakedown (2026-06-04)
+- promote.py leaves a stale `status: proposed` field in the promoted `ready/` file (folder is authoritative so it's cosmetic + validates + claimable, but it's the exact folder-vs-field drift 088 killed; worse, the seal freezes it — `status` is a sealed/non-excluded field, so it can't be corrected to `status: ready` without invalidating ready_content_sha). Fix: set `status: ready` BEFORE stamping in promote.py, OR exclude `status` from the normalized seal. Full context: raw/internal/decisions/2026-06-04-089-pipeline-shakedown-friction.md.
