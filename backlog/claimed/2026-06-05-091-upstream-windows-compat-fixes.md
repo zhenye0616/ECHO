@@ -34,10 +34,10 @@ spec_refs:
   - src/daemon/lifecycle.ts           # data-dir default (:18 resolveDataDir)
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-05T21:18:19Z"
+branch: "agent/upstream-windows-compat-fixes"
+worktree: "/Users/zhenye/Desktop/Project_echo--upstream-windows-compat-fixes"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
