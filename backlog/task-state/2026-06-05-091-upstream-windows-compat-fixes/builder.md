@@ -1,15 +1,22 @@
 ---
 role: builder
 task_id: 2026-06-05-091-upstream-windows-compat-fixes
-last_updated: 2026-06-05T21:18:19Z
+last_updated: 2026-06-05T21:41:28Z
 lifecycle: claimed
 branch: agent/upstream-windows-compat-fixes
 head_sha: ""
 run_log: ""
+handoff_branch: agent/upstream-windows-compat-fixes
+handoff_head_sha: a25d62e25abe3fa4dbacead1aa852419d7a32947
+handoff_run_log: raw/internal/agent-runs/2026-06-05-2026-06-05-091-upstream-windows-compat-fixes.md
 ---
 
 ## current_thesis
 Claimed 091 as codex builder. Implement only the Ring-1 Windows compatibility fixes in the listed files, then hand off for review on `agent/upstream-windows-compat-fixes`.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-05-2026-06-05-091-upstream-windows-compat-fixes.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add one BOM-tolerant JSON helper in `src/util/json.ts` and route the answer-file, onboarding-state, and capture-sources parse sites through it.
@@ -23,6 +30,10 @@ Claimed 091 as codex builder. Implement only the Ring-1 Windows compatibility fi
 ## open_questions
 - None blocking at claim time.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not implement Windows Scheduled-Task autostart.
 - Do not create `src/util/codex-skill.ts` or un-todo its successor assertion.
@@ -32,4 +43,5 @@ Claimed 091 as codex builder. Implement only the Ring-1 Windows compatibility fi
 - Do not edit `wiki/`, `docs/BACKLOG.md`, or backlog item body content.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-05-091-upstream-windows-compat-fixes.md
+
+- spec: backlog/pending_review/2026-06-05-091-upstream-windows-compat-fixes.md
