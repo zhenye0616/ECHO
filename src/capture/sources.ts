@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isNonEmptyString } from '../guards.js';
 import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
+import { parseJson } from '../util/json.js';
 
 export const DEFAULT_GIT_REPOS = ['~/Desktop/Project_echo/'] as const;
 
@@ -77,8 +78,7 @@ export function _isAllowedDomainIn(
 
 export function _isAllowedPathIn(path: unknown, fsPaths: ReadonlyArray<string>): boolean {
   if (!isNonEmptyString(path)) return false;
-  const expanded = expandTilde(path);
-  return fsPaths.some((entry) => expanded.startsWith(expandTilde(entry)));
+  return fsPaths.some((entry) => pathContainsOrEquals(path, entry));
 }
 
 export function _isAllowedApiIn(name: unknown, apis: ReadonlyArray<string>): boolean {
@@ -87,11 +87,33 @@ export function _isAllowedApiIn(name: unknown, apis: ReadonlyArray<string>): boo
 }
 
 function stripTrailingSlash(p: string): string {
-  return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
+  let out = p;
+  while (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+}
+
+function isWindowsPathLike(p: string): boolean {
+  return /^[A-Za-z]:(?:\/|$)/.test(p) || p.startsWith('//');
+}
+
+function normalizePathForCompare(p: string): string {
+  const normalized = stripTrailingSlash(expandTilde(p).replace(/\\/g, '/'));
+  return process.platform === 'win32' || isWindowsPathLike(normalized)
+    ? normalized.toLowerCase()
+    : normalized;
+}
+
+function pathContainsOrEquals(path: string, prefix: string): boolean {
+  const normalizedPath = normalizePathForCompare(path);
+  const normalizedPrefix = normalizePathForCompare(prefix);
+  if (normalizedPath === normalizedPrefix) return true;
+  return normalizedPath.startsWith(
+    normalizedPrefix.endsWith('/') ? normalizedPrefix : `${normalizedPrefix}/`,
+  );
 }
 
 export function normalizeRepoPath(p: string): string {
-  return stripTrailingSlash(expandTilde(p));
+  return normalizePathForCompare(p);
 }
 
 export function mergeGitRepos(
@@ -122,7 +144,7 @@ export function readCaptureSourcesConfig(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseJson(raw);
   } catch (err) {
     invalidCaptureConfig(filePath, `invalid JSON: ${(err as Error).message}`);
   }

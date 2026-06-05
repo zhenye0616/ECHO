@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { resolveDataDir, resolveDbPath } from '../../daemon/lifecycle.js';
@@ -39,6 +39,7 @@ export interface DaemonDeps {
   healthProbe?: (port: number) => Promise<boolean>;
   getuid?: () => number;
   now?: () => Date;
+  platform?: NodeJS.Platform;
   processExecPath?: string;
   daemonPath?: string;
   probeDeadlineMs?: number;
@@ -145,14 +146,30 @@ function writeLine(stream: Writable, line: string): void {
   stream.write(line.endsWith('\n') ? line : `${line}\n`);
 }
 
-function expandHome(path: string): string {
+function runtimePlatform(deps: DaemonDeps): NodeJS.Platform {
+  return deps.platform ?? process.platform;
+}
+
+function isLaunchdPlatform(deps: DaemonDeps): boolean {
+  return runtimePlatform(deps) === 'darwin';
+}
+
+function pathJoinFor(deps: DaemonDeps, ...parts: string[]): string {
+  return runtimePlatform(deps) === 'win32' ? win32.join(...parts) : join(...parts);
+}
+
+function pathResolveFor(deps: DaemonDeps, path: string): string {
+  return runtimePlatform(deps) === 'win32' ? win32.resolve(path) : resolve(path);
+}
+
+function expandHome(path: string, deps: DaemonDeps): string {
   if (path === '~') return homedir();
-  if (path.startsWith('~/')) return join(homedir(), path.slice(2));
+  if (path.startsWith('~/')) return pathJoinFor(deps, homedir(), path.slice(2));
   return path;
 }
 
-function abs(path: string): string {
-  return resolve(expandHome(path));
+function abs(path: string, deps: DaemonDeps): string {
+  return pathResolveFor(deps, expandHome(path, deps));
 }
 
 function defaultPlistPath(label: string): string {
@@ -181,18 +198,21 @@ function parseTail(value: string | undefined): number {
 
 function resolveConfig(values: Record<string, unknown>, deps: DaemonDeps): DaemonConfig {
   const label = String(values['label'] ?? DEFAULT_LABEL);
-  const dataDir = abs(String(values['data-dir'] ?? resolveDataDir()));
+  const dataDir = abs(
+    String(values['data-dir'] ?? resolveDataDir({ platform: deps.platform })),
+    deps,
+  );
   const dbPath =
     values['db-path'] !== undefined
-      ? abs(String(values['db-path']))
+      ? abs(String(values['db-path']), deps)
       : values['data-dir'] !== undefined
-        ? join(dataDir, 'echo.db')
-        : abs(resolveDbPath());
+        ? pathJoinFor(deps, dataDir, 'echo.db')
+        : abs(resolveDbPath({ platform: deps.platform }), deps);
   return {
     label,
-    plistPath: abs(String(values['plist-path'] ?? defaultPlistPath(label))),
-    logDir: abs(String(values['log-dir'] ?? DEFAULT_LOG_DIR)),
-    home: abs(String(values['home'] ?? ECHO_HOME_PATHS.root)),
+    plistPath: abs(String(values['plist-path'] ?? defaultPlistPath(label)), deps),
+    logDir: abs(String(values['log-dir'] ?? DEFAULT_LOG_DIR), deps),
+    home: abs(String(values['home'] ?? ECHO_HOME_PATHS.root), deps),
     port: parsePort(values['port'] as string | undefined),
     dataDir,
     dbPath,
@@ -546,11 +566,49 @@ function capturedOutput(stdout: readonly string[], stderr: readonly string[]): s
   return `${stdout.join('')}${stderr.join('')}`.trim();
 }
 
+async function manualDaemonStatus(
+  config: DaemonConfig,
+  deps: DaemonOpts,
+  stdout: Writable,
+): Promise<number> {
+  const healthy = await probeOnce(config.port, deps);
+  if (deps.json === true) {
+    writeLine(
+      stdout,
+      JSON.stringify({
+        daemon: 'manual',
+        mode: 'manual-daemon',
+        launchd: false,
+        port: config.port,
+        data_dir: config.dataDir,
+        db_path: config.dbPath,
+        health: healthy ? 'healthy' : 'unreachable',
+      }),
+    );
+  } else {
+    writeLine(
+      stdout,
+      `ECHO daemon: manual daemon (no launchd)
+  port:        ${config.port}
+  data-dir:    ${config.dataDir}
+  db-path:     ${config.dbPath}
+  health:      ${healthy ? 'healthy' : 'unreachable'}`,
+    );
+  }
+  return 0;
+}
+
+function manualDaemonNoop(verb: string, deps: DaemonDeps, stdout: Writable): number {
+  writeLine(stdout, `Manual daemon mode (no launchd) on ${runtimePlatform(deps)}; ${verb} is a no-op.`);
+  return 0;
+}
+
 async function runDaemonControlVerb(
   verb: Exclude<DaemonControlVerb, 'status'>,
   config: DaemonConfig,
   deps: DaemonDeps,
 ): Promise<void> {
+  if (!isLaunchdPlatform(deps)) return;
   const stdout: string[] = [];
   const stderr: string[] = [];
   const out = captureStream(stdout);
@@ -569,6 +627,18 @@ export async function getDaemonStatus(
   opts: DaemonControlOptions = {},
 ): Promise<DaemonServiceStatus> {
   const config = resolveDaemonControlConfig(opts);
+  if (!isLaunchdPlatform(opts)) {
+    const healthy = await probeOnce(config.port, opts);
+    return {
+      installed: true,
+      running: healthy,
+      healthy,
+      launchdRegistered: false,
+      label: config.label,
+      plistPath: config.plistPath,
+      port: config.port,
+    };
+  }
   const loaded = launchdLoaded(config, opts);
   if (commandMissing(loaded)) {
     throw new DaemonCommandError(
@@ -942,6 +1012,11 @@ async function runVerb(
   follow: boolean,
   explicitLogDir: boolean,
 ): Promise<number> {
+  if (!isLaunchdPlatform(deps) && verb !== 'logs') {
+    if (verb === 'status') return manualDaemonStatus(config, deps, stdout);
+    return manualDaemonNoop(verb, deps, stdout);
+  }
+
   switch (verb) {
     case 'install':
       return install(config, deps, stdout, stderr);

@@ -7,20 +7,25 @@ import {
   _isAllowedRepoIn,
   readCaptureSourcesConfig,
 } from '../src/capture/sources.js';
+import { resolveDataDir, resolveDbPath } from '../src/daemon/lifecycle.js';
 import { MemoryStorage } from '../src/storage/memory.js';
+import { resolveCommand } from '../src/util/subprocess.js';
 
-// 090 quarantine: this is the cross-platform red board, not a voting gate yet.
-// 091 un-skips the F4/R1/R2 rows when the actual src/ compat fixes land.
-
-describe.skip('R1 — path/source separator normalization (unskip in 091)', () => {
+describe('R1 — path/source separator normalization', () => {
   it('_isAllowedPathIn matches a backslash path against a forward-slash allowlist', () => {
     const fsPaths = ['C:/Users/me/.codex/sessions/'];
     const windowsPath = 'C:\\Users\\me\\.codex\\sessions\\rollout.jsonl';
     expect(_isAllowedPathIn(windowsPath, fsPaths)).toBe(true);
   });
 
+  it('_isAllowedPathIn enforces a path boundary and case-folds Windows paths', () => {
+    expect(_isAllowedPathIn('C:\\FOO\\bar\\baz.jsonl', ['c:/foo'])).toBe(true);
+    expect(_isAllowedPathIn('C:\\foobar\\baz.jsonl', ['C:/foo'])).toBe(false);
+  });
+
   it('_isAllowedRepoIn matches a backslash repo path against a forward-slash entry', () => {
     expect(_isAllowedRepoIn('C:\\dev\\Project_echo', ['C:/dev/Project_echo'])).toBe(true);
+    expect(_isAllowedRepoIn('C:\\DEV\\Project_echo', ['c:/dev/project_echo'])).toBe(true);
   });
 
   it('MemoryStorage.query matches a backslash-stored source via a forward-slash prefix', async () => {
@@ -37,7 +42,7 @@ describe.skip('R1 — path/source separator normalization (unskip in 091)', () =
   });
 });
 
-describe.skip('F4 — UTF-8 BOM tolerance (unskip in 091)', () => {
+describe('F4 — UTF-8 BOM tolerance', () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'echo-bom-'));
@@ -60,7 +65,63 @@ describe.skip('F4 — UTF-8 BOM tolerance (unskip in 091)', () => {
 });
 
 describe('R2 — cross-platform subprocess resolution', () => {
-  it.todo('src/util/subprocess exports resolveCommandForSpawn (unskip in 091)');
+  it('resolves a Windows .cmd shim through cmd.exe without shell string joining', () => {
+    const found = 'C:\\Tools\\codex.CMD';
+    const result = resolveCommand('codex', {
+      platform: 'win32',
+      env: {
+        PATH: 'C:\\Tools',
+        PATHEXT: '.EXE;.CMD',
+        ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+      },
+      existsSync: (path) => path === found,
+    });
+    expect(result).toEqual({
+      command: 'C:\\Windows\\System32\\cmd.exe',
+      prependArgs: ['/d', '/s', '/c', found],
+    });
+  });
+});
+
+describe('data dir defaults', () => {
+  it('keeps the macOS data dir unchanged', () => {
+    expect(resolveDataDir({ platform: 'darwin', env: {}, homeDir: '/Users/me' })).toBe(
+      '/Users/me/Library/Application Support/ECHO',
+    );
+  });
+
+  it('uses LOCALAPPDATA then APPDATA on Windows and keeps ECHO_DATA_DIR highest precedence', () => {
+    expect(
+      resolveDataDir({
+        platform: 'win32',
+        env: { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
+        homeDir: 'C:\\Users\\me',
+      }),
+    ).toBe('C:\\Users\\me\\AppData\\Local\\ECHO');
+    expect(
+      resolveDataDir({
+        platform: 'win32',
+        env: { APPDATA: 'C:\\Users\\me\\AppData\\Roaming' },
+        homeDir: 'C:\\Users\\me',
+      }),
+    ).toBe('C:\\Users\\me\\AppData\\Roaming\\ECHO');
+    expect(
+      resolveDbPath({
+        platform: 'win32',
+        env: { ECHO_DATA_DIR: 'D:\\EchoData', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
+        homeDir: 'C:\\Users\\me',
+      }),
+    ).toBe('D:\\EchoData\\echo.db');
+  });
+
+  it('uses XDG_DATA_HOME or ~/.local/share on Linux', () => {
+    expect(
+      resolveDataDir({ platform: 'linux', env: { XDG_DATA_HOME: '/var/data' }, homeDir: '/home/me' }),
+    ).toBe('/var/data/ECHO');
+    expect(resolveDataDir({ platform: 'linux', env: {}, homeDir: '/home/me' })).toBe(
+      '/home/me/.local/share/ECHO',
+    );
+  });
 });
 
 describe('Codex skill — companion skill install', () => {
