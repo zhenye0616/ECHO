@@ -183,10 +183,10 @@ Operational push; no founder approval needed per §"Out of Scope" #4.
 
 Run this step **only after `commit-reviewer-response.sh` exits 0**. If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
-Append a 6-field journal entry to `raw/internal/dogfooding/mcp-interactions-journal.md` per CLAUDE.md, referencing the committed response file. Regenerate the HTML twin and push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**:
+Append a 6-field journal entry to the current monthly shard (`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md`) per CLAUDE.md, referencing the committed response file. Push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**. Do not generate or commit HTML output.
 
 ```bash
-git add raw/internal/dogfooding/mcp-interactions-journal.md raw/internal/dogfooding/mcp-interactions-journal.html
+git add "raw/internal/dogfooding/mcp-interactions-journal-$(date +%Y-%m).md"
 git commit -m "journal: cursor r$N review tick on $item_id"
 tools/review-queue/push-with-retry.sh "journal: cursor r$N review tick on $item_id"
 ```

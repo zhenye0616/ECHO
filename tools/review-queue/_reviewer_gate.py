@@ -24,6 +24,17 @@ from _reviewers import Reviewer, load_reviewers  # noqa: E402
 TOOL_DIR = Path(__file__).resolve().parent
 DEFAULT_BINDINGS_CONFIG = TOOL_DIR / "reviewer-bindings.json"
 HEADLESS_BINDING_MODES = {"headless-cli", "host-subagent"}
+PROTECTED_WRAPPER_REVIEWERS = {"codex", "codex-ops"}
+PROTECTED_CODEX_ARGV_TEMPLATE = (
+    "codex",
+    "exec",
+    "-C",
+    "<WT>",
+    "--sandbox",
+    "read-only",
+    "--json",
+    "-",
+)
 VALID_PRINT_FIELDS = (
     "slash_command",
     "invoke_command",
@@ -55,7 +66,60 @@ def _load_json(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
+def _argv_sandbox_values(argv: list[str], reviewer: str) -> list[str]:
+    values: list[str] = []
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == "--sandbox":
+            if idx + 1 >= len(argv):
+                raise GateError(f"reviewer-bindings.json: {reviewer!r} argv has --sandbox without a value")
+            values.append(argv[idx + 1])
+            idx += 2
+            continue
+        if arg.startswith("--sandbox="):
+            value = arg.split("=", 1)[1]
+            if not value:
+                raise GateError(f"reviewer-bindings.json: {reviewer!r} argv has --sandbox= without a value")
+            values.append(value)
+        idx += 1
+    return values
+
+
+def _enforce_protected_metadata(binding: dict[str, Any], reviewer: str, *, source: str) -> None:
+    agent_sandbox = binding.get("agent_sandbox")
+    commit_policy = binding.get("commit_policy")
+
+    if agent_sandbox != "read-only":
+        raise GateError(f"{source}: {reviewer!r} must use agent_sandbox='read-only'")
+    if commit_policy != "wrapper":
+        raise GateError(f"{source}: {reviewer!r} must use commit_policy='wrapper'")
+
+
+def _enforce_runtime_contract(binding: dict[str, Any], reviewer: str) -> None:
+    argv_raw = binding.get("argv")
+    argv = [str(arg) for arg in argv_raw] if isinstance(argv_raw, list) else []
+    agent_sandbox = binding.get("agent_sandbox")
+
+    if reviewer in PROTECTED_WRAPPER_REVIEWERS:
+        _enforce_protected_metadata(binding, reviewer, source="reviewer-bindings.json")
+        return
+
+    sandbox_values = _argv_sandbox_values(argv, reviewer) if argv else []
+    effective_sandbox = sandbox_values[-1] if sandbox_values else None
+    if effective_sandbox is not None and effective_sandbox != agent_sandbox:
+        raise GateError(
+            f"reviewer-bindings.json: {reviewer!r} effective argv --sandbox {effective_sandbox!r} "
+            f"disagrees with agent_sandbox {agent_sandbox!r}"
+        )
+
+
+def _validate_binding(
+    raw: dict[str, Any],
+    reviewer: str,
+    *,
+    enforce_runtime: bool = True,
+) -> dict[str, Any]:
     if raw.get("kind") != "reviewer":
         raise GateError("reviewer-bindings.json: kind must be 'reviewer'")
     bindings = raw.get("bindings")
@@ -105,16 +169,33 @@ def _validate_binding(raw: dict[str, Any], reviewer: str) -> dict[str, Any]:
             if key in found:
                 raise GateError(f"reviewer-bindings.json: {reviewer!r} ide-manual entry must not set {key}")
 
+    if enforce_runtime:
+        _enforce_runtime_contract(found, reviewer)
     return found
+
+
+def _canonical_binding(reviewer: str) -> dict[str, Any]:
+    binding = _validate_binding(
+        _load_json(DEFAULT_BINDINGS_CONFIG),
+        reviewer,
+        enforce_runtime=False,
+    )
+    if reviewer in PROTECTED_WRAPPER_REVIEWERS:
+        _enforce_protected_metadata(
+            binding,
+            reviewer,
+            source="canonical reviewer-bindings.json",
+        )
+    return binding
 
 
 def _legacy_binding_from_reviewer(reviewer: Reviewer) -> dict[str, Any]:
     """Bridge old fixture overrides that still route via ECHO_REVIEWERS_CONFIG.
 
-    Production runtime uses reviewer-bindings.json. Existing smoke fixtures set
-    ECHO_REVIEWERS_CONFIG to route a temporary mock CLI; synthesizing a binding
-    from that explicit override keeps those tests from invoking a real vendor
-    CLI while the fixture migration catches up.
+    Production codex/codex-ops runtime uses reviewer-bindings.json even when a
+    legacy roster override is present. This bridge remains only for non-087b
+    reviewers and old synthetic fixtures that are not part of the read-only
+    child migration.
     """
     if reviewer.mode != "headless" or not reviewer.invoke_command:
         return {
@@ -149,7 +230,11 @@ def _legacy_binding_from_reviewer(reviewer: Reviewer) -> dict[str, Any]:
 
 
 def _load_binding(reviewer: Reviewer) -> dict[str, Any]:
-    if os.environ.get("ECHO_REVIEWERS_CONFIG") and not os.environ.get("ECHO_REVIEWER_BINDINGS_CONFIG"):
+    if (
+        os.environ.get("ECHO_REVIEWERS_CONFIG")
+        and not os.environ.get("ECHO_REVIEWER_BINDINGS_CONFIG")
+        and reviewer.name not in PROTECTED_WRAPPER_REVIEWERS
+    ):
         return _legacy_binding_from_reviewer(reviewer)
     return _validate_binding(_load_json(_binding_config_path()), reviewer.name)
 
@@ -175,6 +260,81 @@ def _resolve_stdin_from(binding: dict[str, Any], reviewer: str, wt: str | None) 
     return resolved
 
 
+def _format_argv(argv: list[str]) -> str:
+    return shlex.join(argv)
+
+
+def _is_codex_executable_token(value: str) -> bool:
+    return value == "codex"
+
+
+def _assert_protected_codex_argv_template(
+    argv: list[str],
+    reviewer: str,
+    *,
+    source: str,
+    wt: str | None,
+) -> None:
+    template = _format_argv(list(PROTECTED_CODEX_ARGV_TEMPLATE))
+
+    def fail(reason: str) -> None:
+        raise GateError(
+            f"{source}: {reviewer!r} protected argv must match gate-owned read-only template "
+            f"{template}: {reason}; got {_format_argv(argv)}"
+        )
+
+    if wt is None:
+        fail("$WT is required for the -C <WT> slot")
+    if len(argv) != len(PROTECTED_CODEX_ARGV_TEMPLATE):
+        fail(f"expected {len(PROTECTED_CODEX_ARGV_TEMPLATE)} tokens")
+    # Shape guard only: PATH resolution and binary authenticity are host-trust concerns.
+    if not _is_codex_executable_token(argv[0]):
+        fail("argv[0] must be exactly 'codex'")
+
+    expected_by_position = {
+        1: "exec",
+        2: "-C",
+        3: wt,
+        4: "--sandbox",
+        5: "read-only",
+        6: "--json",
+        7: "-",
+    }
+    for index, expected in expected_by_position.items():
+        if argv[index] != expected:
+            fail(f"argv[{index}] must be {expected!r}")
+
+
+def _enforce_protected_argv_allowlist(
+    *,
+    reviewer: str,
+    wt: str | None,
+    resolved_argv: list[str],
+) -> None:
+    if reviewer not in PROTECTED_WRAPPER_REVIEWERS:
+        return
+
+    canonical = _canonical_binding(reviewer)
+    canonical_raw = canonical.get("argv")
+    if not isinstance(canonical_raw, list) or not canonical_raw:
+        raise GateError(
+            f"canonical reviewer-bindings.json: {reviewer!r} argv must be a non-empty string array"
+        )
+    canonical_argv = [_substitute(str(arg), reviewer=reviewer, wt=wt) for arg in canonical_raw]
+    _assert_protected_codex_argv_template(
+        canonical_argv,
+        reviewer,
+        source="canonical reviewer-bindings.json",
+        wt=wt,
+    )
+    _assert_protected_codex_argv_template(
+        resolved_argv,
+        reviewer,
+        source="resolved reviewer-bindings.json",
+        wt=wt,
+    )
+
+
 def _resolve_argv(binding: dict[str, Any], reviewer: str, wt: str | None) -> list[str]:
     raw = binding.get("argv")
     if not isinstance(raw, list) or not raw:
@@ -182,6 +342,11 @@ def _resolve_argv(binding: dict[str, Any], reviewer: str, wt: str | None) -> lis
     argv = [_substitute(str(arg), reviewer=reviewer, wt=wt) for arg in raw]
     if not argv[0]:
         raise GateError(f"reviewer-bindings.json: {reviewer!r} argv[0] is empty")
+    _enforce_protected_argv_allowlist(
+        reviewer=reviewer,
+        wt=wt,
+        resolved_argv=argv,
+    )
     return argv
 
 
