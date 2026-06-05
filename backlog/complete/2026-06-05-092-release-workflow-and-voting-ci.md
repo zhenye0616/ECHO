@@ -29,7 +29,29 @@ head_sha: "0f392a3263b1109803b00190f5932b1e894aa903"
 pr_url: ""
 agent_notes: |
   BLOCKED: The implemented release workflow would correctly run the installed tarball's `echoctl selftest --json`, but that prerequisite currently fails from a locally packed/installed `echoctl-0.1.0-beta.1.tgz` with failedIds `WIR-06`, `SKILL-02`, and `DOC-02`. Tried: implemented and pushed `agent/release-workflow-and-voting-ci` at `0f392a3263b1109803b00190f5932b1e894aa903`; ran static workflow assertions, focused packed-manifest test, `npm ci --dry-run`, `npm run typecheck`, `npm run lint`, full `npm test`, and a local build-once/install/selftest/doctor rehearsal. Best-guess answer: 090/091 left the packaged selftest path not actually green for Codex skill installation and internal doctor reachability, so a prerequisite follow-up should fix selftest before 092 can safely make onboarding/release validation required (confidence high for WIR-06/SKILL-02 because `src/echo-home/adapter-sync.ts` does not second-hop Codex skills today; medium for DOC-02). Why I escalated rather than guessing: fixing the failing prerequisite requires `src/cli/commands/selftest.ts` and/or adapter-sync changes outside `files_to_modify`, and AC6 explicitly forbids `src/` drift.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-05 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean merge (sidecar's zero-conflict prediction held; `package.json` version bump 0.1.0 → 0.1.0-beta.1 was sole-editor, ci.yml/release.yml/packed-manifest.test.ts uncontested).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none in-tree — both sidecar "fixups" were founder decisions, not code edits.
+
+  Fixups deferred to follow-up items:
+  - DECISION (resolved): AC3 efficacy — founder chose (a): merge now with AC3 recorded as a DOCUMENTED PARTIAL. Removing `continue-on-error` from the `onboarding` job changes displayed status only; there is no aggregate `all-green` job in ci.yml and branch protection is inaccessible (403, free-tier private repo), so no merge-blocking gate exists yet. Real enforcement deferred until public repo / paid plan + an aggregate job.
+  - DECISION (resolved): packaged selftest red (WIR-06 / SKILL-02 / DOC-02) — founder chose to file 093 (src/-touching successor: fix packaged `echoctl selftest --json` from the installed tarball; bundle the selftest.ts:609 sleep(4000) → poll-until-recall fix). 093 must be green before any v* release tag validates and before AC3 is ever made truly enforcing.
+
+  Verify: 1587/1587 tests pass (21 skipped, 1 todo); lint, typecheck, coupled-invariants, sync-skills --check all clean post-merge. The 3 parallelism flakes from the builder's full-suite run did not reproduce.
+
+  Follow-up items (non-blocking):
+  - 093: packaged selftest WIR-06/SKILL-02/DOC-02 + sleep(4000) poll fix (real Ring-1 blocker).
+  - Test-suite split: scope CI voting gate to product/context-layer tests; keep tests/review-queue/** out; investigate tests/cli/init.test.ts CI failures (possibly real cross-platform bug).
+  - Post-merge: real Windows GH-matrix run of release.yml (doctor daemon background-spawn :106-107, bare `echoctl --version` equality :92 untested on real Windows runner).
+  - Strategist: 090+091+092 wiki page; flagged founder decision on stripping assets/echo-roles|workflows/** + review-queue config from the tarball.
+  - Flake friction item: run-codex-builder lockfile-race timeout, recent-calls-endpoint timeout, 056-claude-reviewer-onboarding (all pass in isolation).
 ---
 
 # 092 — Release workflow + flip CI to voting + pin the packed manifest
