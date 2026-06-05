@@ -948,3 +948,9 @@ The founder's "two adapters drift" theory is the *install-time* hop (canonical s
 - [ ] **(endgame, defer) `echo_skill()` render-at-use-time** — retire rendered per-client adapter bodies in favor of thin loaders that read canonical `skills/<name>.md` at execution time (per CLAUDE.md's planned `echo_skill(name)` MCP tool). The right long-term freshness fix; big new mechanism; does NOT solve LLM mis-transcription, so it's the arc, not the immediate fix. Deferred per friction-first/no-new-architecture.
 
 (Supersedes/extends the earlier "STALE CODEX SKILL ADAPTER omits producer" entry above with the converged ranking. Full draft-088 spec text was at /tmp/echo-088-draft.md during the 2026-06-03 session.)
+
+## From 087b merge (2026-06-05)
+- Binary provenance / PATH hardening: the reviewer-bindings gate validates invocation SHAPE (sandbox flags + exact argv), not the `codex` binary's provenance/authenticity (PATH resolution, signing). Documented out of 087b scope; host-trust hardening successor.
+- combine.py / watcher NATIVE `capture-failed` classification (087b OoS, r7 codex-ops): terminal capture-failures degrade through the generic `partial_responses`->founder path; teach the orchestration layer to render an explicit `capture-failed` row/verdict.
+- claude / cursor reviewer read-only migration: gated on the 056-claude-required-flag-gate decision; 087b was codex/codex-ops only.
+- OPS: stale `ECHO_COORD_REQUEST_PATH` pinned to deleted `backlog/reviews/2026-05-16-057b/r1/request.md` misfired ~24 reviewer ticks on 2026-06-03 (`bind_failed`/`request_not_found`), spawning throwaway codex worktrees. Find + fix the launchd/env source.
