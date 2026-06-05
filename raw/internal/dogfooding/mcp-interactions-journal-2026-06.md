@@ -1294,6 +1294,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
 
+### 2026-06-05 14:19 PDT - codex builder lookup before implementing 091
+
+- **Trigger:** Codex `/process-backlog` builder claimed `2026-06-05-091-upstream-windows-compat-fixes` and needed prior cross-tool context before editing the Ring-1 Windows compat fixes.
+- **Query inputs:** `search_memories(repo_path="/Users/zhenye/Desktop/Project_echo", query="2026-06-05-091-upstream-windows-compat-fixes", since="2026-06-05T00:00:00-07:00", limit=5)`.
+- **Returned:** 5 matches: fresh git claim commit `3096994a` with truncated diff; prior Codex batch session that shipped 090 and halted because 091 was blocked; earlier convergence-monitor Codex session; two git journal/convergence commits around 091 readiness.
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo`; `fs:/Users/zhenye/.codex/sessions/2026/06/05/rollout-*.jsonl`. No atom hydration was needed because the item spec and 090 shipped spec already carry the implementation contract.
+- **Verdict:** right, but mostly confirmation - the lookup confirmed 090 had shipped and 091 was now claimable; it did not surface additional implementation decisions beyond the spec.
+- **Note:** Useful as a quick sanity check that this builder run is following the prior batch/convergence path. The top result being the current claim is expected recency noise after an in-session claim commit.
+
 ### 2026-06-05 14:20 PDT — coord_status read while diagnosing whether 092 r1 reviewers would fire
 
 - **Trigger:** after dispatching 092 r1 the active-trigger `coord_invoke` failed (ENOENT, already journaled); called `coord_status` to judge whether the launchd-fallback reviewers would still pick up the round.
