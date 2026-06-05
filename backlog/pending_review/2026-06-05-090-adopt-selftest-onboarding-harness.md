@@ -29,9 +29,12 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-05T20:39:33Z"
 branch: "agent/adopt-selftest-onboarding-harness"
 worktree: "/Users/zhenye/Desktop/Project_echo--adopt-selftest-onboarding-harness"
-head_sha: ""
+head_sha: "c98641f00d113ec3a3bb4f127ad09fa8f101359c"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented `echoctl selftest` and the 090 CI skeleton on `agent/adopt-selftest-onboarding-harness` at `c98641f00d113ec3a3bb4f127ad09fa8f101359c`. The selftest command runs in throwaway HOME/ECHO_HOME/CODEX_HOME state, starts its daemon with `ECHO_MCP_PORT=0`, parses the resolved lifecycle port, and threads that port through MCP/CLI checks without touching 38478. Voting tests use a fake runner and cover JSON check IDs, exit codes, sentinel/concurrency isolation, and cleanup on success/failure/timeout. `tests/windows-compat.test.ts` is quarantined with skipped/todo rows; `.github/workflows/ci.yml` makes `quality` the only voting gate and keeps packed-artifact `onboarding` non-voting via `continue-on-error: true`.
+
+  Verification passed: focused selftest/windows-compat vitest, `npm run typecheck`, `npm run lint`, `npm run build:cli`, full `npm test` (147 files passed / 2 skipped; 1564 tests passed / 25 skipped / 2 todo), `npm pack --pack-destination /private/tmp/echo-090-pack`, and `git diff --check --cached`.
 review_notes: ""
 ---
 
