@@ -42,7 +42,28 @@ head_sha: "a25d62e25abe3fa4dbacead1aa852419d7a32947"
 pr_url: ""
 agent_notes: |
   BLOCKED: Full `npm test` timed out twice in `tests/mcp/recent-calls-endpoint.test.ts` (`GET /mcp/recent-calls > logs every runtime-registered tool through the wrapper`, 15000ms timeout) even though the same file passes in isolation; Tried: implemented and pushed the 091 Ring-1 fixes on `agent/upstream-windows-compat-fixes` at `a25d62e25abe3fa4dbacead1aa852419d7a32947`, ran focused compat/daemon/doctor tests (pass), `npm run typecheck` (pass), `npm run lint` (pass), AC5 grep (clean), full `npm test` twice (same timeout), isolated `npx vitest run tests/mcp/recent-calls-endpoint.test.ts` (pass); Best guess: the timeout is an existing load-sensitive/full-suite concurrency flake unrelated to the 091 touched files, but confidence is medium because AC6 requires full `npm test` green; Why escalated: repeated test failure after two reasonable attempts plus fixing the timeout would require modifying a file outside `files_to_modify`.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-05 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean `--no-ff` merge; exactly the 15 declared files, main untouched on all of them since the branch merge-base. `tests/windows-compat.test.ts` coherently un-skipped 090's merged quarantine rows.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none — sidecar verdict was `merge as-is` with an empty pre-merge punch list.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 1585 pass / 21 skipped / 1 todo; lint, typecheck, check-coupled-invariants, and sync-skills --check all clean post-merge. ONE full-suite failure — `tests/mcp/recent-calls-endpoint.test.ts` (15s timeout) — confirmed pre-existing environmental flake: untouched by 091 (no diff in the file or src/mcp/) and passes 2/2 in isolation (10.4s). Founder accepted as environmental and authorized merge. NOT a 091 regression; same class as the init.test.ts flake observed at 090's merge.
+
+  Windows-compat coverage now green on src/: F4 BOM reader (strip-leading-U+FEFF-then-JSON.parse), R1 path-component-aware compares (separator-normalize + case-fold + segment boundary; coord: logical prefixes untouched), R2 pure deps-only spawn resolver (cmd.exe /d /s /c, shell:false — injection-safe), OS-appropriate data dir (macOS branch byte-identical, no migration), launchctl gated on darwin (win32 AND linux make zero launchctl calls → clean manual-daemon state). echo-fix patcher retired from the release path.
+
+  Follow-up items (non-blocking):
+  - Track the `tests/mcp/recent-calls-endpoint.test.ts` full-suite timeout flake as a friction item (sits alongside the tests/cli/init.test.ts flake filed at 090; both are real-daemon/concurrency full-suite flakes that false-red).
+  - Optional cleanup (non-AC): inject platform/env into src/capture/sources.ts:90 normalizePathForCompare (mirroring the AC3 subprocess resolver seam) so the win32 case-fold branch is directly unit-testable on a POSIX host. AC2 did not require it.
+  - Unblocks 092 (release workflow + flip onboarding CI to required + pin packed manifest). Merge 092 after this.
 ---
 
 # 091 — Upstream the Windows compat fixes; retire the patcher from the release path
