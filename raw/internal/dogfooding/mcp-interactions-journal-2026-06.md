@@ -1446,3 +1446,11 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r1/request.md`; artifact `backlog/proposed/2026-06-05-094-ci-burn-reduction-paths-ignore.md@f0ad7483e1fdf9fe6b8837f981adcf16845800c1`; response `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r1/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-1BD2FD86-DEC9-4F17-AEB7-92BA317D3B10/raw/internal/review-queue/81f7817a-047b-418b-aa9d-2abc0fe6d423/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-1BD2FD86-DEC9-4F17-AEB7-92BA317D3B10/raw/internal/review-queue/81f7817a-047b-418b-aa9d-2abc0fe6d423/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-05 17:05 PDT — coord_invoke for 094 r2 (same ENOENT)
+
+- **Trigger:** watcher tick on 094 r1 → r2 dispatched at `1e5c10af`; 057b post-push hook for [codex, codex-ops].
+- **Query inputs:** `coord_invoke(role={codex,codex-ops}, request_path=backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/request.md)`.
+- **Returned:** identical wrapper-not-found ENOENT (both roles) against the global npm install path.
+- **Sources:** daemon coord layer only.
+- **Verdict:** ❌ wrong — same root cause; see 16:25 entry for diagnosis. Manual-wrapper fallback fired in the same turn. Running tally this session: 6 failed coord_invoke calls across 3 dispatches (093 r2, 093 r3, 094 r2).
