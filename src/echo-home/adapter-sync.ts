@@ -24,7 +24,9 @@ import {
 import { syncCursorMcpEntry, CursorJsonParseError } from './adapters/cursor-config.js';
 import {
   populateEchoSkills,
+  syncCodexSkills,
   syncClaudeSkills,
+  SkillSyncError,
   type PopulateEchoSkillsResult,
 } from './adapters/skill-sync.js';
 import { syncDefaultRoles, type RoleSyncResult } from './adapters/role-sync.js';
@@ -44,6 +46,7 @@ export interface AdapterSyncProfile {
     configFile?: string;
     instructionsFile?: string;
     commandsDir?: string;
+    skillsDir?: string;
   };
   echoSection?: string;
   previousEchoSection?: string;
@@ -433,13 +436,13 @@ function releaseLock(handle: LockHandle): void {
 // -----------------------------------------------------------------------------
 
 function defaultConfigFile(kind: AgentKind): string | undefined {
-  if (kind === 'codex') return resolve(homedir(), '.codex/config.toml');
+  if (kind === 'codex') return resolve(defaultCodexHome(), 'config.toml');
   if (kind === 'cursor') return resolve(homedir(), '.cursor/mcp.json');
   return undefined;
 }
 
 function defaultInstructionsFile(kind: AgentKind): string | undefined {
-  if (kind === 'codex') return resolve(homedir(), '.codex/AGENTS.md');
+  if (kind === 'codex') return resolve(defaultCodexHome(), 'AGENTS.md');
   if (kind === 'claude-code') return resolve(homedir(), '.claude/CLAUDE.md');
   return undefined;
 }
@@ -447,6 +450,16 @@ function defaultInstructionsFile(kind: AgentKind): string | undefined {
 function defaultCommandsDir(kind: AgentKind): string | undefined {
   if (kind === 'claude-code') return resolve(homedir(), '.claude/commands');
   return undefined;
+}
+
+function defaultCodexHome(): string {
+  const configured = process.env['CODEX_HOME'];
+  if (isString(configured) && configured.trim().length > 0) return resolve(configured);
+  return resolve(homedir(), '.codex');
+}
+
+function defaultCodexSkillsDir(): string {
+  return resolve(defaultCodexHome(), 'skills');
 }
 
 function isString(v: unknown): v is string {
@@ -488,6 +501,10 @@ export async function syncAll(
     if (isString(configFile)) {
       const d = dirname(configFile);
       dirChecks.push({ path: d, boundary: dirname(d) });
+    }
+    if (profile.kind === 'codex') {
+      const skillsDir = profile.paths?.skillsDir ?? defaultCodexSkillsDir();
+      dirChecks.push({ path: skillsDir, boundary: dirname(skillsDir) });
     }
   }
   for (const check of dirChecks) {
@@ -562,7 +579,13 @@ export async function syncAll(
 
     // Step 5: per-agent dispatch.
     for (const profile of profiles) {
-      agents.push(await dispatchAgent(profile, skillsPopulated.ok === true));
+      agents.push(
+        await dispatchAgent(profile, {
+          available: skillsPopulated.ok === true,
+          sourceDir: repoSkillsDir,
+          profile: installProfile,
+        }),
+      );
     }
 
     if (installProfile === 'dogfood') {
@@ -634,7 +657,7 @@ function computeOverallOk(
 
 async function dispatchAgent(
   profile: AdapterSyncProfile,
-  skillsAvailable: boolean,
+  skills: { available: boolean; sourceDir: string; profile: InstallProfile },
 ): Promise<AgentResult> {
   const filesWritten: string[] = [];
   const actions: Array<{ file: string; action: string }> = [];
@@ -645,8 +668,37 @@ async function dispatchAgent(
   const configFile = profile.paths?.configFile ?? defaultConfigFile(profile.kind);
   const instructionsFile = profile.paths?.instructionsFile ?? defaultInstructionsFile(profile.kind);
   const commandsDir = profile.paths?.commandsDir ?? defaultCommandsDir(profile.kind);
+  const codexSkillsDir = profile.paths?.skillsDir ?? defaultCodexSkillsDir();
 
   if (profile.kind === 'codex') {
+    if (skills.available) {
+      handleCodexSkills(
+        skills.sourceDir,
+        codexSkillsDir,
+        skills.profile,
+        filesWritten,
+        actions,
+        errors,
+        skipped,
+      );
+    } else {
+      errors.push({
+        code: 'ENOENT',
+        file: skills.sourceDir,
+        operation: 'read',
+        message: `syncCodexSkills skipped: packaged skills unavailable at ${skills.sourceDir}`,
+      });
+    }
+    if (errors.length > 0) {
+      return {
+        agent: profile.kind,
+        ok: false,
+        conflicts,
+        errors,
+        files_written: filesWritten,
+        skipped: skipped.length > 0 ? skipped : undefined,
+      };
+    }
     handleMarkersForAgent(
       'codex',
       profile,
@@ -667,7 +719,7 @@ async function dispatchAgent(
       conflicts,
       errors,
     );
-    if (skillsAvailable) {
+    if (skills.available) {
       handleClaudeSkills(commandsDir, filesWritten, actions, errors, skipped);
     } else {
       skipped.push('syncClaudeSkills');
@@ -864,6 +916,54 @@ function handleCursorConfig(
   }
 }
 
+function handleCodexSkills(
+  sourceDir: string,
+  targetDir: string | undefined,
+  profile: InstallProfile,
+  filesWritten: string[],
+  actions: Array<{ file: string; action: string }>,
+  errors: AdapterError[],
+  skipped: string[],
+): void {
+  if (!isString(targetDir)) {
+    errors.push({
+      code: 'MISSING_REQUIRED_INPUT',
+      file: '',
+      operation: 'parse',
+      message: 'skillsDir required for kind=codex',
+      field: 'skillsDir',
+    });
+    return;
+  }
+  try {
+    const r = syncCodexSkills({
+      sourceDir,
+      targetDir,
+      profile,
+    });
+    for (const name of r.copied) {
+      filesWritten.push(`${targetDir}${sep}${name}`);
+      actions.push({ file: `${targetDir}${sep}${name}`, action: 'copied' });
+    }
+    for (const name of r.skipped) {
+      skipped.push(name);
+    }
+    if (r.copied.length === 0) {
+      errors.push({
+        code: 'EEXIST',
+        file: targetDir,
+        operation: 'write',
+        message:
+          r.skipped.length > 0
+            ? `syncCodexSkills copied 0 files; ${r.skipped.length} skipped (profile, symlink targets, or non-regular source entries)`
+            : `syncCodexSkills copied 0 files; source dir empty`,
+      });
+    }
+  } catch (err) {
+    errors.push(toAdapterError(err, targetDir, 'write'));
+  }
+}
+
 function handleClaudeSkills(
   commandsDir: string | undefined,
   filesWritten: string[],
@@ -919,6 +1019,14 @@ function toAdapterError(
       code: err.code,
       file: err.file,
       operation,
+      message: err.message,
+    };
+  }
+  if (err instanceof SkillSyncError) {
+    return {
+      code: err.code,
+      file: err.file,
+      operation: err.operation,
       message: err.message,
     };
   }
