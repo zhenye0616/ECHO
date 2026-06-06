@@ -3,11 +3,18 @@ task_id: 2026-06-05-094-ci-burn-reduction-paths-ignore
 role: builder
 binding: codex
 claim_branch: agent/ci-burn-reduction-paths-ignore
-last_updated: 2026-06-06T00:56:52Z
+last_updated: 2026-06-06T01:07:48Z
+handoff_branch: agent/ci-burn-reduction-paths-ignore
+handoff_head_sha: 0ee083c36e0a608cf14c76c9be61b64e30212604
+handoff_run_log: raw/internal/agent-runs/2026-06-05-2026-06-05-094-ci-burn-reduction-paths-ignore.md
 ---
 
 ## current_thesis
 Claimed 094 as codex builder. Implement only trigger-level path filters that stop bookkeeping-only pushes from firing CI/release rehearsal matrices while preserving all non-bookkeeping CI and the unfiltered `v*` release-tag path.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-05-2026-06-05-094-ci-burn-reduction-paths-ignore.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: `.github/workflows/ci.yml` `on.push` for `main` and `on.pull_request` gain `paths-ignore` for `backlog/**`, `raw/**`, `docs/**`, and `wiki/**`; `workflow_dispatch` remains unchanged.
@@ -20,6 +27,10 @@ Claimed 094 as codex builder. Implement only trigger-level path filters that sto
 ## open_questions
 - None blocking at claim. Escalate if implementation needs non-trigger workflow changes beyond AC3's explicit exception, a new dependency, files outside `files_to_modify`, or branch-protection/account-billing verification.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not implement the aggregate `all-green` required-status job.
 - Do not split test suites or alter job/matrix/step bodies beyond AC3's sanctioned minimal exception if needed.
@@ -28,4 +39,5 @@ Claimed 094 as codex builder. Implement only trigger-level path filters that sto
 - Do not edit `wiki/**`, founder-owned status/backlog docs, backlog item bodies, or files outside the spec's `files_to_modify`.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-05-094-ci-burn-reduction-paths-ignore.md
+
+- spec: backlog/pending_review/2026-06-05-094-ci-burn-reduction-paths-ignore.md
