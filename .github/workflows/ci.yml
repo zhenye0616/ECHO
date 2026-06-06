@@ -39,7 +39,7 @@ jobs:
       - name: Build CLI
         run: npm run build:cli
       - name: Unit tests
-        run: npm test
+        run: npm run test:product
 
   onboarding:
     name: onboarding · ${{ matrix.os }} · node ${{ matrix.node }}
@@ -73,6 +73,6 @@ jobs:
           printf 'tarball=%s\n' "packed/${tarball}" >> "$GITHUB_OUTPUT"
       - name: Install packed echoctl
         shell: bash
-        run: npm install -g "${{ steps.pack.outputs.tarball }}"
+        run: npm install -g "./${{ steps.pack.outputs.tarball }}"
       - name: Onboarding self-test
         run: echoctl selftest --json

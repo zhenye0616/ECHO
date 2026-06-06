@@ -26,6 +26,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 
 ## Interactions
 
+### 2026-06-05 23:38 PDT — codex CI product-gate split MCP smoke
+
+- **Trigger:** Founder asked Codex to split ECHO's CI product gate from non-portable orchestration tests; Codex performed a narrow MCP connectivity/prior-context probe before implementation.
+- **Query inputs:** `curl GET http://127.0.0.1:38478/mcp`; then JSON-RPC `initialize({protocolVersion:"2024-11-05", clientInfo:{name:"codex-ci-product-gate-split"}})` via POST.
+- **Returned:** GET returned HTTP 405 `Method Not Allowed: GET (POST only)`. POST initialize returned protocol `2024-11-05`, tools capability `{listChanged:true}`, serverInfo `{name:"echo-daemon", version:"0.0.0"}`. No clusters/atoms requested.
+- **Sources:** daemon endpoint `http://127.0.0.1:38478/mcp`; no source-backed memory retrieval, so no source_breakdown.
+- **Verdict:** 🟡 partial — daemon reachability confirmed, but this was only a smoke/protocol probe and did not retrieve prior work.
+- **Note:** The task is already tightly specified by the founder; implementation grounding comes from repo files and local test output.
+
 ### 2026-06-05 16:34 PDT - codex builder process-backlog pre-claim context pull
 
 - **Trigger:** Founder invoked `$ECHO:process-backlog`; Codex builder checked repo-scoped recent work context before atomic claim.

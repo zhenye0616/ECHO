@@ -17,7 +17,7 @@
     "src/**/*",
     "tests/**/*",
     "tools/**/*",
-    "vitest.config.ts"
+    "vitest*.config.ts"
   ],
   "exclude": [
     "tools/echo-overlay/**/*"
