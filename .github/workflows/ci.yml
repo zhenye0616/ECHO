@@ -3,7 +3,17 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'backlog/**'
+      - 'raw/**'
+      - 'docs/**'
+      - 'wiki/**'
   pull_request:
+    paths-ignore:
+      - 'backlog/**'
+      - 'raw/**'
+      - 'docs/**'
+      - 'wiki/**'
   workflow_dispatch:
 
 jobs:
