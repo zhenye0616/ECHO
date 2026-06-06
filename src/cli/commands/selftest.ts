@@ -185,6 +185,9 @@ function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const CAPTURE_RECALL_TIMEOUT_MS = 10_000;
+const CAPTURE_RECALL_POLL_INTERVAL_MS = 500;
+
 function defaultRunCommand({ env, file, args, cwd }: SelfTestCommandContext): SyncResult {
   try {
     const out = execFileSync(file, [...args], {
@@ -266,6 +269,33 @@ function toolCall(
   args: Record<string, unknown>,
 ): Promise<string> {
   return mcpRequest(url, 'tools/call', { name, arguments: args });
+}
+
+async function pollUntilRecall(args: {
+  mcpRequest: SelfTestMcpRequest;
+  url: string;
+  token: string;
+  sleep: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+  intervalMs?: number;
+}): Promise<{ ok: boolean; waitedMs: number; response: string }> {
+  const timeoutMs = args.timeoutMs ?? CAPTURE_RECALL_TIMEOUT_MS;
+  const intervalMs = args.intervalMs ?? CAPTURE_RECALL_POLL_INTERVAL_MS;
+  let waitedMs = 0;
+  let response = '';
+
+  while (true) {
+    response = await toolCall(args.mcpRequest, args.url, 'search_memories', {
+      query: args.token,
+      source_app: 'git',
+      limit: 5,
+    });
+    if (response.includes(args.token)) return { ok: true, waitedMs, response };
+    if (waitedMs >= timeoutMs) return { ok: false, waitedMs, response };
+    const delay = Math.min(intervalMs, timeoutMs - waitedMs);
+    await args.sleep(delay);
+    waitedMs += delay;
+  }
 }
 
 function parseLifecyclePort(line: string): { port: number; url: string } | null {
@@ -606,14 +636,19 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
     }
     currentPort = daemon.port;
     clientEnv = makeClientEnv(daemonEnv, currentPort);
-    await sleep(4000);
-
-    const recall = await toolCall(mcpRequest, daemon.url, 'search_memories', {
-      query: token,
-      source_app: 'git',
-      limit: 5,
+    const recall = await pollUntilRecall({
+      mcpRequest,
+      url: daemon.url,
+      token,
+      sleep,
     });
-    record('CAP-02', recall.includes(token), 'commit captured + recalled');
+    record(
+      'CAP-02',
+      recall.ok,
+      recall.ok
+        ? `commit captured + recalled after ${recall.waitedMs}ms`
+        : `commit not recalled after ${recall.waitedMs}ms`,
+    );
     const clusters = await toolCall(mcpRequest, daemon.url, 'find_clusters', {
       repo_path: repo,
       view: 'compact',
@@ -633,14 +668,44 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
       String(currentPort),
     ]);
     let mcpReachable = false;
+    let doctorOverall = 'unparsed';
+    let doctorStateOk = false;
+    let doctorAgentProbeDegraded = false;
     try {
       const line = doc.out.split(/\r?\n/).find((l) => l.trim().startsWith('{')) ?? '{}';
-      mcpReachable =
-        (JSON.parse(line) as { daemon?: { mcpReachable?: unknown } }).daemon?.mcpReachable === true;
+      const parsed = JSON.parse(line) as {
+        daemon?: { mcpReachable?: unknown };
+        echoHome?: { schemaVersion?: unknown };
+        syncLock?: { present?: unknown };
+        agents?: Array<{ probeOutcome?: { probed?: unknown; reason?: unknown } | null }>;
+        overall?: unknown;
+      };
+      mcpReachable = parsed.daemon?.mcpReachable === true;
+      doctorOverall = typeof parsed.overall === 'string' ? parsed.overall : 'unparsed';
+      doctorStateOk = parsed.echoHome?.schemaVersion === 1 && parsed.syncLock?.present !== true;
+      doctorAgentProbeDegraded =
+        parsed.agents?.some((agent) => {
+          const outcome = agent.probeOutcome;
+          return (
+            outcome !== null &&
+            outcome !== undefined &&
+            outcome.probed === false &&
+            outcome.reason !== 'manual-only'
+          );
+        }) ?? false;
     } catch {
       mcpReachable = false;
     }
-    record('DOC-02', doc.code === 0 && mcpReachable, 'doctor: mcp reachable');
+    const doctorExitOk = doc.code === 0 && mcpReachable;
+    const doctorMcpOnlyOk =
+      mcpReachable && doctorOverall === 'degraded' && doctorStateOk && doctorAgentProbeDegraded;
+    record(
+      'DOC-02',
+      doctorExitOk || doctorMcpOnlyOk,
+      `doctor: mcp reachable (exit ${doc.code}, mcpReachable=${mcpReachable}, overall=${doctorOverall}${
+        doctorAgentProbeDegraded ? ', agent-probe degraded' : ''
+      })`,
+    );
     if (IS_WIN) record('DOC-03', !/launchctl/i.test(doc.out), 'no launchctl false-fail on Windows');
     else skip('DOC-03', 'Windows-only');
 

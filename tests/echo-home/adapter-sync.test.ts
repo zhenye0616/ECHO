@@ -20,6 +20,7 @@ let stubHome: string;
 let echoHome: string;
 let originalHome: string | undefined;
 let originalEchoHome: string | undefined;
+let originalCodexHome: string | undefined;
 
 const ROLES = ['builder.toml', 'reviewer.toml', 'strategist.toml'];
 
@@ -50,6 +51,10 @@ function setupRepoMirror(): {
   // Customer skill fixtures.
   writeFileSync(join(skillsDir, 'alpha.md'), '# alpha\n');
   writeFileSync(join(skillsDir, 'beta.md'), '# beta\n');
+  writeFileSync(
+    join(skillsDir, 'using-echo-mcp.md'),
+    '---\nname: using-echo-mcp\n---\n# using echo mcp\n',
+  );
   // Role fixtures (matching DEFAULT_ROLE_FILENAMES).
   for (const r of ROLES) writeFileSync(join(rolesDir, r), `# ${r}\nbody\n`);
   writeFileSync(
@@ -62,10 +67,12 @@ function setupRepoMirror(): {
 beforeEach(() => {
   originalHome = process.env.HOME;
   originalEchoHome = process.env.ECHO_HOME;
+  originalCodexHome = process.env.CODEX_HOME;
   tmpRoot = mkdtempSync(join(tmpdir(), 'echo-072-adapter-'));
   stubHome = join(tmpRoot, 'home');
   mkdirSync(stubHome, { recursive: true });
   process.env.HOME = stubHome;
+  delete process.env.CODEX_HOME;
   echoHome = join(stubHome, '.echo');
   process.env.ECHO_HOME = echoHome;
   vi.resetModules();
@@ -76,6 +83,8 @@ afterEach(() => {
   else process.env.HOME = originalHome;
   if (originalEchoHome === undefined) delete process.env.ECHO_HOME;
   else process.env.ECHO_HOME = originalEchoHome;
+  if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = originalCodexHome;
   rmSync(tmpRoot, { recursive: true, force: true });
   vi.resetModules();
 });
@@ -170,7 +179,11 @@ describe('syncAll (orchestrator)', () => {
     expect(result.overallOk).toBe(true);
     expect(result.skillsPopulated.ok).toBe(true);
     if (result.skillsPopulated.ok) {
-      expect(result.skillsPopulated.copied.sort()).toEqual(['alpha.md', 'beta.md']);
+      expect(result.skillsPopulated.copied.sort()).toEqual([
+        'alpha.md',
+        'beta.md',
+        'using-echo-mcp.md',
+      ]);
       expect(result.skillsPopulated.skipped).toContain('dogfood.md');
     }
     expect(existsSync(join(echoHome, 'skills', 'dogfood.md'))).toBe(false);
@@ -440,8 +453,41 @@ describe('syncAll (orchestrator)', () => {
       { repoRoot },
     );
     expect(existsSync(join(stubHome, '.codex', 'config.toml'))).toBe(true);
+    expect(existsSync(join(stubHome, '.codex', 'skills', 'using-echo-mcp', 'SKILL.md'))).toBe(true);
+    expect(
+      readFileSync(join(stubHome, '.codex', 'skills', 'using-echo-mcp', 'SKILL.md'), 'utf8'),
+    ).toMatch(/^name: using-echo-mcp/m);
     expect(existsSync(join(stubHome, '.cursor', 'mcp.json'))).toBe(true);
     expect(result.overallOk).toBe(true);
+  });
+
+  it('codex missing required packaged skill fails before marker/config writes', async () => {
+    const { repoRoot, skillsDir } = setupRepoMirror();
+    rmSync(join(skillsDir, 'using-echo-mcp.md'));
+    const { syncAll } = await loadAdapterSync();
+
+    const result = await syncAll(
+      [
+        {
+          kind: 'codex',
+          echoSection: '## E\nx',
+          mcpServerConfig: { url: 'http://localhost:7117/mcp' },
+        },
+      ],
+      { repoRoot },
+    );
+
+    expect(result.overallOk).toBe(false);
+    const codex = result.agents.find((a) => a.agent === 'codex')!;
+    expect(codex.ok).toBe(false);
+    if (codex.ok === false) {
+      expect(codex.errors[0]?.message).toContain('missing required Codex skill source');
+    }
+    expect(existsSync(join(stubHome, '.codex', 'skills', 'using-echo-mcp', 'SKILL.md'))).toBe(
+      false,
+    );
+    expect(existsSync(join(stubHome, '.codex', 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(stubHome, '.codex', 'config.toml'))).toBe(false);
   });
 
   it('symlink in repo assets/echo-skills/ is not propagated to ~/.echo/skills/', async () => {
@@ -576,10 +622,13 @@ describe('syncAll (orchestrator)', () => {
     mkdirSync(cmdDir, { recursive: true });
     const externA = join(tmpRoot, 'extern-alpha.md');
     const externB = join(tmpRoot, 'extern-beta.md');
+    const externC = join(tmpRoot, 'extern-using-echo-mcp.md');
     writeFileSync(externA, 'pristine-alpha\n');
     writeFileSync(externB, 'pristine-beta\n');
+    writeFileSync(externC, 'pristine-mcp\n');
     symlinkSync(externA, join(cmdDir, 'alpha.md'));
     symlinkSync(externB, join(cmdDir, 'beta.md'));
+    symlinkSync(externC, join(cmdDir, 'using-echo-mcp.md'));
     const { syncAll } = await loadAdapterSync();
     const result = await syncAll([{ kind: 'claude-code', echoSection: '## E\nx' }], {
       repoRoot,

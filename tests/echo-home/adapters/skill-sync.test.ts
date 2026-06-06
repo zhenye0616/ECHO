@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   populateEchoSkills,
+  syncCodexSkills,
   syncClaudeSkills,
 } from '../../../src/echo-home/adapters/skill-sync.js';
 
@@ -165,5 +166,78 @@ describe('syncClaudeSkills — symlink target skipped', () => {
     const r = syncClaudeSkills({ sourceDir: source, targetDir: target });
     expect(r.skipped).toContain('alpha.md');
     expect(readFileSync(externalFile, 'utf8')).toBe('pristine\n');
+  });
+});
+
+describe('syncCodexSkills — Codex SKILL.md second-hop', () => {
+  it('renders packaged skills into <codexHome>/skills/<name>/SKILL.md with name frontmatter', () => {
+    const source = join(tmpRoot, 'codex-source');
+    const target = join(tmpRoot, 'codex-target');
+    mkdirSync(source);
+    writeFileSync(join(source, 'using-echo-mcp.md'), '# Using ECHO MCP\n');
+
+    const result = syncCodexSkills({ sourceDir: source, targetDir: target, profile: 'customer' });
+    const skillPath = join(target, 'using-echo-mcp', 'SKILL.md');
+
+    expect(result.copied).toEqual(['using-echo-mcp/SKILL.md']);
+    expect(readFileSync(skillPath, 'utf8')).toBe(
+      '---\nname: using-echo-mcp\n---\n# Using ECHO MCP\n',
+    );
+  });
+
+  it('re-run is byte-identical and preserves existing frontmatter shape with corrected name', () => {
+    const source = join(tmpRoot, 'codex-idempotent-source');
+    const target = join(tmpRoot, 'codex-idempotent-target');
+    mkdirSync(source);
+    writeFileSync(
+      join(source, 'using-echo-mcp.md'),
+      '---\nname: stale-name\ndescription: Uses ECHO\n---\n# Body\n',
+    );
+
+    syncCodexSkills({ sourceDir: source, targetDir: target, profile: 'customer' });
+    const skillPath = join(target, 'using-echo-mcp', 'SKILL.md');
+    const first = readFileSync(skillPath);
+    syncCodexSkills({ sourceDir: source, targetDir: target, profile: 'customer' });
+
+    expect(readFileSync(skillPath).equals(first)).toBe(true);
+    expect(readFileSync(skillPath, 'utf8')).toContain('name: using-echo-mcp\n');
+    expect(readFileSync(skillPath, 'utf8')).toContain('description: Uses ECHO\n');
+  });
+
+  it('dogfood profile includes dogfood-only skills while customer profile skips them', () => {
+    const source = join(tmpRoot, 'codex-profile-source');
+    const customerTarget = join(tmpRoot, 'codex-customer-target');
+    const dogfoodTarget = join(tmpRoot, 'codex-dogfood-target');
+    mkdirSync(source);
+    writeFileSync(join(source, 'using-echo-mcp.md'), '---\naudience: customer\n---\n# mcp\n');
+    writeFileSync(join(source, 'using-echo-coord.md'), '---\naudience: dogfood\n---\n# coord\n');
+
+    const customer = syncCodexSkills({
+      sourceDir: source,
+      targetDir: customerTarget,
+      profile: 'customer',
+    });
+    const dogfood = syncCodexSkills({
+      sourceDir: source,
+      targetDir: dogfoodTarget,
+      profile: 'dogfood',
+    });
+
+    expect(customer.copied).toEqual(['using-echo-mcp/SKILL.md']);
+    expect(customer.skipped).toContain('using-echo-coord.md');
+    expect(existsSync(join(customerTarget, 'using-echo-coord', 'SKILL.md'))).toBe(false);
+    expect(dogfood.copied.sort()).toEqual(['using-echo-coord/SKILL.md', 'using-echo-mcp/SKILL.md']);
+  });
+
+  it('missing required using-echo-mcp source fails before target writes', () => {
+    const source = join(tmpRoot, 'codex-missing-source');
+    const target = join(tmpRoot, 'codex-missing-target');
+    mkdirSync(source);
+    writeFileSync(join(source, 'using-echo-coord.md'), '# coord\n');
+
+    expect(() => syncCodexSkills({ sourceDir: source, targetDir: target })).toThrow(
+      /missing required Codex skill source: .*using-echo-mcp\.md/,
+    );
+    expect(existsSync(target)).toBe(false);
   });
 });
