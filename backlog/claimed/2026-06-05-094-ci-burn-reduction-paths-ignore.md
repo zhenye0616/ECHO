@@ -19,10 +19,10 @@ spec_refs:
   - .github/workflows/release.yml # current triggers: push branches agent/** + tags v* + pull_request + workflow_dispatch, no path filtering; build + 3-OS validate matrix.
 
 # --- agent-managed fields (filled in during run) ---
-claimed_by: ""
-claimed_at: ""
-branch: ""
-worktree: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-06T00:56:52Z"
+branch: "agent/ci-burn-reduction-paths-ignore"
+worktree: "/Users/zhenye/Desktop/Project_echo--ci-burn-reduction-paths-ignore"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
