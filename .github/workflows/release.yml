@@ -98,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           tarball="$(find release-artifact -maxdepth 1 -type f -name '*.tgz' -print -quit)"
-          npm install -g "$tarball"
+          npm install -g "./$tarball"
           test "$(echoctl --version)" = "${{ needs.build.outputs.package_version }}"
       - name: Run onboarding self-test
         shell: bash
@@ -113,7 +113,8 @@ jobs:
         run: |
           set -euo pipefail
           node -e 'const fs = require("node:fs"); const path = require("node:path"); const now = new Date().toISOString(); fs.mkdirSync(path.join(process.env.ECHO_HOME, "state"), { recursive: true }); fs.mkdirSync(process.env.ECHO_DATA_DIR, { recursive: true }); fs.writeFileSync(path.join(process.env.ECHO_HOME, "state", "onboarding.json"), `${JSON.stringify({ schema_version: 1, created_at: now, last_updated_at: now, completed: true, profile: "customer", agents: [] })}\n`); fs.writeFileSync(path.join(process.env.ECHO_HOME, "state", "projects.json"), `${JSON.stringify({ schema_version: 1, last_refreshed_at: now, default_project: null, projects: [] })}\n`);'
-          daemon_path="$(node -e 'const cp = require("node:child_process"); const path = require("node:path"); const root = cp.execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim(); console.log(path.join(root, "echoctl", "dist", "daemon", "index.js"));')"
+          npm_global_root="$(npm root -g | tr -d '\r')"
+          daemon_path="${npm_global_root}/echoctl/dist/daemon/index.js"
           node "$daemon_path" > "$RUNNER_TEMP/echo-doctor-daemon.out" 2> "$RUNNER_TEMP/echo-doctor-daemon.err" &
           daemon_pid=$!
           cleanup() {
