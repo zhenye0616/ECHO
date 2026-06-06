@@ -1,7 +1,7 @@
 ---
 id: 2026-06-05-093-fix-packaged-selftest-codex-skill-and-doctor
 title: "Make the packaged `echoctl selftest --json` green from the installed tarball — second-hop Codex skills (WIR-06/SKILL-02), fix doctor mcp-reachability (DOC-02), replace the fixed capture-settle sleep with poll-until-recall"
-status: proposed
+status: pending_review
 priority: HIGH
 estimate: 0.5d
 created: 2026-06-05
@@ -26,9 +26,9 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-05T23:36:10Z"
 branch: "agent/fix-packaged-selftest-codex-skill-and-doctor"
 worktree: "/Users/zhenye/Desktop/Project_echo--fix-packaged-selftest-codex-skill-and-doctor"
-head_sha: ""
+head_sha: "0ce61a001beb8e45a224c34008ea6ed7ce9d1919"
 pr_url: ""
-agent_notes: ""
+agent_notes: "Implemented AC1-AC4 on branch agent/fix-packaged-selftest-codex-skill-and-doctor at 0ce61a001beb8e45a224c34008ea6ed7ce9d1919. Packaged installed-tarball rehearsal passed with failedIds: [] and WIR-06/SKILL-02/DOC-02 green. npm run typecheck, npm run lint, focused 093 tests, isolated tests/mcp/recent-calls-endpoint.test.ts, and git diff --check passed. Exact npm test was attempted twice and timed out/hung in out-of-scope tests/mcp/recent-calls-endpoint.test.ts under full-suite load; see run log for details and founder/reviewer disposition questions."
 review_notes: ""
 ---
 
