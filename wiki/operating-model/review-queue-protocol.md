@@ -173,7 +173,7 @@ Post-056, the headless wrapper (`_run_reviewer.sh`) is vendor-agnostic. Each hea
 {
   "name": "claude", "mode": "headless", "required": false, "timeout_hours": null,
   "slash_command": "review-queue-claude",
-  "invoke_command": "claude -p < {{PROMPT}}"
+  "invoke_command": "claude --dangerously-skip-permissions -p < {{PROMPT}}"
 }
 ```
 
@@ -199,10 +199,10 @@ The reviewer role above has three peers (codex, codex-ops, cursor); the builder 
 | Binding | Trigger mode | Wrapper | Documented by |
 |---|---|---|---|
 | Claude Code in-session | conversational (founder asks Claude Code to claim) | none — implicit default | implicit since project start |
-| `codex` | headless (launchd / on-demand `codex exec`) | `tools/run-codex-builder.sh` | item 047 |
+| `codex` | headless (launchd / on-demand `codex exec`) | `tools/backlog/run-codex-builder.sh` | item 047 |
 | Cursor's Claude (IDE-mode) | founder paste-driven inside Cursor IDE chat | none — paste skill prose | item 055 |
 
-Per-binding notes live at the bottom of `skills/process-backlog.md` under "Binding-specific notes — codex" (047) and "Binding-specific notes — Cursor's Claude (IDE-mode)" (055); the protocol body itself is unchanged for every binding. Operator-facing trigger recipes: `docs/cursor-builder-trigger.md` (Cursor) and `docs/codex-builder-setup.md` (codex).
+Per-binding notes live at the bottom of `skills/process-backlog.md` under "Binding-specific notes — codex" (047) and "Binding-specific notes — Cursor's Claude (IDE-mode)" (055); the protocol body itself is unchanged for every binding. Operator-facing trigger recipe: `docs/cursor-builder-trigger.md` (Cursor); the codex operator recipe lives in `skills/process-backlog.md` under 'Binding-specific notes — codex'.
 
 The atomic-claim git op (single commit moving `ready/<id>.md → claimed/<id>.md` with `claimed_by` populated, push-or-lose) is the sole cross-binding synchronization primitive. Same-machine concurrency under the shared default `~/.echo/agent-id` UUID is operator-serialized (one builder per `ECHO_AGENT_ID` at a time); cross-machine concurrency is naturally serialized by git.
 
@@ -226,7 +226,7 @@ Builder / merger / watcher lifecycle event types are deferred to a follow-on obs
 
 - **Skills (canonical, vendor-neutral):** `skills/review-queue-codex.md`, `skills/review-queue-codex-ops.md`, `skills/review-queue-cursor.md`, `skills/review-queue-claude.md`, `skills/review-queue-watch.md`, `skills/process-backlog.md`. Synced into `.claude/commands/` via `tools/sync-skills.sh`.
 - **Python helpers:** `tools/review-queue/request.py` (creates `request.md`, including the `correlation_id` uuid4 added by 057b), `tools/review-queue/combine.py` (writes `combined.md`), `tools/review-queue/dispatch-next-round.py` (creates `r<N+1>/request.md`), `tools/review-queue/validate.py` (schema-validates any reviewer/combined/request artifact), `tools/review-queue/_reviewers.py` (loader; enforces conditional-required `invoke_command` per 056), `tools/review-queue/_reviewer_gate.py` (per-tick gate; supports `--print invoke_command` post-056).
-- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body — vendor-agnostic post-056, hosts two-phase coord emission), `tools/review-queue/run-{codex,codex-ops,claude}-reviewer.sh` (5-line drivers), `tools/review-queue/coord-emit.sh` (057b curl helper callable from wrappers + reviewer skill steps), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/queue_error.sh` (durable queue-error commit before cleanup, per 056 AC5 part 4), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/run-codex-builder.sh` (047 codex-builder driver).
+- **Shell wrappers:** `tools/review-queue/_run_reviewer.sh` (generic headless tick body — vendor-agnostic post-056, hosts two-phase coord emission), `tools/review-queue/run-{codex,codex-ops,claude}-reviewer.sh` (5-line drivers), `tools/review-queue/coord-emit.sh` (057b curl helper callable from wrappers + reviewer skill steps), `tools/review-queue/commit-reviewer-response.sh` (validate-before-commit gate), `tools/review-queue/queue_error.sh` (durable queue-error commit before cleanup, per 056 AC5 part 4), `tools/review-queue/push-with-retry.sh` (autostash + rebase=merges), `tools/backlog/run-codex-builder.sh` (047 codex-builder driver).
 - **Coord MCP tools:** `src/mcp/tools/coord-emit.ts`, `src/mcp/tools/coord-status.ts`, `src/mcp/tools/coord-invoke.ts`; `src/coord/{paths,roles,deadlines,internal-emitter,identity,validate}.ts`; `tools/review-queue/coord-roles.json`.
 - **Installer:** `tools/review-queue/_install_reviewer_launchd.sh` (roster-driven launchd plist installer; preflights `invoke_command` executable via `command -v` post-056).
 - **Operator docs:** `docs/cursor-builder-trigger.md` (055), `docs/review-queue-setup.md` (reviewer triggers).

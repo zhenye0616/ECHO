@@ -773,7 +773,7 @@
     "subtopic": "Hotkey Overlay"
   },
   "surfaces/hotkey-overlay-raycast.md": {
-    "status": "shipped",
+    "status": "retired",
     "title": "Hotkey Overlay (Raycast v0, retired)",
     "link": "hotkey-overlay-raycast",
     "summary": "RETIRED 2026-05-31 (item 081). Historical record of the v0 hotkey overlay shipped as a Raycast extension at tools/raycast-echo/ — search-context (060), ask-echo Q&A (062), sessions-as-objects (063), cluster resume singleflight (065), cold-start continuity hero (069). Removed in full once the Tauri desktop overlay became the operator surface; decisions migrated there, echo/recap retired without replacement.",

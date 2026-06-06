@@ -55,8 +55,12 @@ The first-call gate was the structural blocker for the "where did the strategist
 ```ts
 // Participant joins a group session
 // (a) discover the other participants' MRU sessions
-const myTail   = await tail_session({ source_app: 'claude_code' });   // strategist's MRU
-const peerTail = await tail_session({ source_app: 'codex' });          // codex reviewer's MRU
+const myMru   = await echo_resolve_mru({ source_app: 'claude_code' });  // strategist's MRU
+const peerMru = await echo_resolve_mru({ source_app: 'codex' });        // codex reviewer's MRU
+
+// grab the peer's latest turn(s) using the resolved descriptor
+const peerLatest = await search_memories({ source: peerMru.source,
+                                           ...peerMru.filter, limit: 1 });
 
 // (b) hydrate the prior cross-tool context
 const c = await find_clusters();                                       // no-args auto-expand handles gaps
@@ -67,8 +71,8 @@ const a = await get_atoms({ atom_ids: c.clusters[0].atom_ids,
 
 // (d) wait for next participant's turn
 const reply = await wait_for_new_turns({
-  sources: [myTail.source_resolved, peerTail.source_resolved],
-  since:   peerTail.turns[0].timestamp,
+  sources: [myMru.source, peerMru.source],
+  since:   peerLatest[0].timestamp,
   timeout: 30,
 });
 

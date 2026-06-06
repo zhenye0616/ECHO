@@ -1,5 +1,5 @@
 ---
-status: shipped
+status: retired
 topic: Form Factor
 subtopic: Hotkey Overlay
 aliases:

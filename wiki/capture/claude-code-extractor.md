@@ -19,6 +19,7 @@ The Claude Code extractor (`src/capture/extractors/claude-code.ts`) tails Claude
 ```ts
 interface ClaudeCodeExtractorHandle {
   stop: () => Promise<void>;
+  probeFreshness: () => Promise<FreshnessProbe>;
 }
 
 function startClaudeCodeExtractor(
@@ -95,7 +96,25 @@ FS events can fire mid-write. If the buffer ends with an incomplete JSON line (n
     turn_index: number,
     mtime: number,
     byte_offset: number,
-    had_tool_use?: true,  // omitted when false
+    // The fields below are written conditionally — omitted when undefined.
+    had_tool_use?: true,       // omitted when false
+    repo_root?: string,
+    files_referenced?: string[],
+    tool_calls?: ToolCall[],   // each: name, truncated args/output, is_error, call_id
+    tool_call_total?: number,
+    tool_calls_truncated?: true,
+    thinking?: string,
+    permission_mode?: string,
+    cli_version?: string,
+    model?: string,
+    branch?: string,
+    git_state?: {
+      head_sha?: string,
+      branch?: string,
+      dirty_count?: number,
+      captured_at: string,
+      fresh: boolean,
+    },
   },
 }
 ```
@@ -105,7 +124,7 @@ The content shape and `fs:` source prefix match [[cursor-extractor]] by design �
 ## What it does NOT do
 
 - **Does not extract diffs.** Code change capture is [[git-capture]]'s job.
-- **Does not extract tool inputs/outputs into content.** Tool blocks only flip `metadata.had_tool_use`; their payloads are not stored.
+- **Captures tool blocks (bounded), not just a flag.** In addition to setting `metadata.had_tool_use`, tool_use/tool_result blocks are matched and stored under `metadata.tool_calls` (each with name, truncated `args` and `output`, is_error, call_id), plus `tool_call_total` and `tool_calls_truncated` (overflow past the per-turn cap). It does NOT inline tool payloads into `content` — `content` stays the `USER: …\n\nASSISTANT: …` text pair.
 - **Does not group multi-turn dialogues.** One `(user, assistant)` pair = one event. No conversation aggregation.
 - **Does not dedup across sessions.** Each session is tracked independently.
 - **Does not capture other Claude Code data** (settings, project metadata, tool-results subdirectory).

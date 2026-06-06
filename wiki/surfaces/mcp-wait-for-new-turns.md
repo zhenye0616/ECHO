@@ -75,11 +75,11 @@ Envelope shrinks dramatically vs pre-038 (no body projection in the wait respons
 
 ## How It Works
 
-The handler runs a short polling loop server-side at ~250 ms cadence:
+The handler runs a short polling loop server-side at ~1 s cadence:
 1. Query storage for atoms from `sources[]` with `timestamp > since`.
-2. If any rows, return them immediately (wire-shape projected through `projectMatch` — same caps as `tail_session`).
-3. If no rows AND elapsed < `timeout`, sleep 250 ms and re-query.
-4. If elapsed ≥ `timeout`, return `turns: []` + echoed `next_since`.
+2. If any rows, return their atom IDs immediately as `turn_ids[]` (merged across sources by timestamp DESC, deduped by id, capped at `WAIT_MAX_RETURNED_TURNS`) — no body projection; bodies are composed via a follow-up `get_atoms` / `get_atom` call.
+3. If no rows AND elapsed < `timeout`, sleep ~1 s and re-query.
+4. If elapsed >= `timeout`, return `turn_ids: []` with `timed_out: true` and `next_since` echoing the server's current timestamp.
 
 This is **stateless from the MCP transport's perspective** — no `Mcp-Session-Id`, no subscription registry, no fan-out. The server-side polling is hidden behind one MCP request/response cycle. Per-client timeout is independent.
 
@@ -96,8 +96,8 @@ Post-038, `wait_for_new_turns` returns IDs only — no wire-shape projection hap
 ## Cost Contract
 
 - **Stateless on the wire, polling under the hood.** One MCP request blocks for up to `timeout` seconds.
-- **Default timeout 30s; max 120s.** Higher timeouts mean fewer round-trips but block the calling client's MCP slot longer. 30s matches typical human-typing-pause cadence in group sessions.
-- **`turns: []` is a legitimate empty response** when the timeout elapses with no activity. Consumers should NOT treat it as an error.
+- **Default timeout 30s; max 60s.** Higher timeouts mean fewer round-trips but block the calling client's MCP slot longer. 30s matches typical human-typing-pause cadence in group sessions.
+- **`turn_ids: []` is a legitimate empty response** when the timeout elapses with no activity. Consumers should NOT treat it as an error.
 
 ## What `wait_for_new_turns` Does NOT Do
 

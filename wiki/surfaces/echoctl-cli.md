@@ -25,6 +25,7 @@ echoctl init                            # run the onboarding wizard
 echoctl doctor                          # health check (read-only)
 echoctl uninstall                       # remove ECHO blocks from agent configs
 echoctl run <workflow> [--project P]    # dispatch a workflow
+echoctl selftest [--json] [--quiet] [--keep-sandbox]   # cross-platform onboarding smoke (isolated HOME/ECHO_HOME sandbox)
 
 echoctl daemon install                  # write launchd plist + bootstrap
 echoctl daemon start                    # bootstrap the daemon if not loaded
@@ -124,17 +125,21 @@ The packed tarball contents are pinned by `package.json`'s `files` allowlist:
 dist/**/*.js
 dist/**/*.d.ts
 dist/**/*.sql
-skills/**
+assets/echo-skills/**
 assets/echo-roles/**
 assets/echo-workflows/**
 tools/review-queue/coord-roles.json
+tools/review-queue/reviewer-bindings.json
 tools/review-queue/reviewers.json
 tools/review-queue/schemas/**
-package.json
-README.md
+docs/echoctl-install.md
+./CHANGELOG.md
+./LICENSE
+./package.json
+./README.md
 ```
 
-Each line carries the load — `dist/**/*.sql` ships SQLite migrations (the daemon resolves them via `import.meta.url`, so the lookup works against `dist/storage/migrations/` post-pack and `src/storage/migrations/` in dev); `tools/review-queue/coord-roles.json` + schemas ship because the daemon's `src/coord/roles.ts` validates against them at startup; `skills/**` ships because 072 copies into `~/.echo/skills/`. Removing any entry produces a daemon-crash or wizard-failure regression that the shell-reachability smoke test (`tests/cli/shell-reachable.test.ts`) catches.
+Each line carries the load — `dist/**/*.sql` ships SQLite migrations (the daemon resolves them via `import.meta.url`, so the lookup works against `dist/storage/migrations/` post-pack and `src/storage/migrations/` in dev); `tools/review-queue/coord-roles.json` + schemas ship because the daemon's `src/coord/roles.ts` validates against them at startup; `assets/echo-skills/**` ships because 072 copies the curated customer skill set into `~/.echo/skills/` — per commit 8bf323b1, only customer-facing skills (e.g. using-echo-mcp) ship; the dev-process skills under `skills/**` are deliberately excluded. Removing any entry produces a daemon-crash or wizard-failure regression that the shell-reachability smoke test (`tests/cli/shell-reachable.test.ts`) catches.
 
 Negative assertions also enforced: the tarball does NOT contain `backlog/`, `raw/`, `wiki/`, `tests/`, `src/`, `node_modules/`, `coverage/`, `tools/review-queue/*.sh`, `tools/review-queue/*.py`, or `dist/**/*.test.{js,d.ts}`. The dev-only review-queue wrappers are excluded; `coord_invoke` cleanly rejects with a `CoordPathError`-shaped response in a packaged install rather than crashing the daemon (the de-scope is implicit in the absence of the wrappers, not a code path).
 

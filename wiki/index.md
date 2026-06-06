@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 70 pages · 68 shipped · 2 planned
+**Status:** 70 pages · 67 shipped · 2 planned
 
 ---
 

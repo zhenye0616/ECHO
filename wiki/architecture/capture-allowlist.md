@@ -29,16 +29,17 @@ Each category is paired with a typed predicate (`isAllowedApp`, `isAllowedDomain
 
 `CAPTURED_SOURCES` shipped with all categories empty at item 003. The commitment was: **entries land alongside the capture surface that consumes them, in the same per-source PR, never speculatively in advance.** That commitment has held through items 009–012.
 
-There is no remote config, no feature flag, no runtime mutation path. A change to the allowlist requires a commit, which is reviewable. Neither agents nor the founder can sneak sources in via a config edit.
+There is no remote config and no feature flag. Four categories (apps, domains, fs_paths, apis) are commit-only — a change requires a reviewable commit. The one runtime-extensible category is git_repos: the daemon merges the default git repos with the user-managed local file `~/.echo/state/capture-sources.json` (schema_version 1) at boot via `applyGitReposFromCaptureConfig()`, written by the `echoctl project add|list|remove` CLI. The config is local-only — no remote source, and only git_repos accepts file entries.
 
 ## What's in the Allowlist Today
 
 As of items 009–012:
 
-- **`fs_paths`** — three entries:
+- **`fs_paths`** — four entries:
   - `~/Library/Application Support/Cursor/User/workspaceStorage/` (per-workspace state, used for inferring the workspace_id of a composer)
   - `~/Library/Application Support/Cursor/User/globalStorage/` (where Cursor composer chat content actually lives)
   - `~/.claude/projects/` (Claude Code's append-only JSONL transcripts)
+  - `~/.codex/sessions/` (OpenAI Codex CLI append-only session JSONLs). See [[codex-extractor]].
 - **`git_repos`** — one entry:
   - `~/Desktop/Project_echo/` — the founder's dogfooding repo
 - **`apps`, `domains`, `apis`** — still empty. Native-app capture (macOS Accessibility) and API connectors (GitHub, Slack) are V1.5+; the browser extension uses its own `host_permissions` manifest, not this list.
@@ -54,6 +55,7 @@ Every entry in the allowlist traces back to a backlog item. The "why this path" 
 | `~/Library/Application Support/Cursor/User/workspaceStorage/` | `2026-04-30-009` (FS watcher), refined by `2026-04-30-010` | Workspace state — used to infer composer→workspace mapping. See [[cursor-extractor]]. |
 | `~/Library/Application Support/Cursor/User/globalStorage/` | `2026-04-30-010` (Cursor extractor) | Where chat *content* lives. Drift-note 2026-04-30 corrected the original assumption that workspace storage held content. See [[cursor-extractor]]. |
 | `~/.claude/projects/` | `2026-04-30-009` (FS watcher), refined by `2026-04-30-011` | Claude Code transcripts (`*.jsonl`, append-only). See [[claude-code-extractor]]. |
+| `~/.codex/sessions/` | `2026-05-01` (codex-extractor) | OpenAI Codex CLI session JSONLs (`rollout-*.jsonl`, append-only). Third turn-shaped capture surface; nothing else under `~/.codex/` is in scope. See [[codex-extractor]]. |
 | `git_repos` category itself | `2026-04-30-012` (git capture) | Fifth category. Repos are not directories of files — commits are first-class events. Exact-match after `~` expansion and trailing-slash normalization. See [[git-capture]]. |
 | `~/Desktop/Project_echo/` | `2026-04-30-012` | The dogfooding repo. Each additional repo is its own per-repo PR. |
 
@@ -68,7 +70,7 @@ Three properties matter:
 ## What the Allowlist Is Not
 
 - **Not a permissions UI.** The audit page surfaces the contents read-only; per-source consent toggles ("user disables Slack temporarily") are a separate later item.
-- **Not user-configurable at runtime.** No JSON load, no env-var override. The constant is the contract.
+- **Mostly commit-only.** Four categories are fixed in the constant; only git_repos is user-configurable at runtime via the local `~/.echo/state/capture-sources.json` file (no env-var override, no remote config). The constant is the contract for everything except the git_repos allowlist.
 - **Not pattern-based.** No subdomain wildcarding, no globs, no regex. Exact / prefix only for V1. Adds clarity at the cost of verbosity — a reasonable trade in a security-critical chokepoint.
 - **Not per-user.** Single allowlist for all users in V1. Persona / per-user allowlists are V1.5+.
 

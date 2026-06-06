@@ -109,7 +109,7 @@ Same-tool review by the spec author defeats the structural check.
 
 ## Evidence base
 
-Documented cycles in `raw/internal/dogfooding/mcp-interactions-journal.md`:
+Documented cycles in `raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`:
 
 - **Item 030 R1 spec review** (2026-05-08 → 2026-05-09): 3 rounds, 25 findings, eventually claimable. Cursor + Codex caught 14 complementary findings the strategist had drafted past.
 - **Item 030 R1 code review** (2026-05-10 ~00:30 PDT): Cursor's Claude + Codex independently caught the same TWO P1 envelope-ceiling bugs (Class A) that the initial Claude code-reviewer subagent missed entirely. Fixed in commit `c12617b`.
@@ -141,8 +141,7 @@ The pattern's value scales positively with patch-cycle depth. Each cycle catches
 
 ## Related
 
-- [[multi-agent-dev-template-and-product-thesis]] — the broader pattern this is one component of (the 4-role multi-agent dev template)
 - [[drift-prevention]] — sibling discipline (catches scope drift; cross-tool review catches correctness drift)
 - [[wave-1-2-3-retrospective]] — operating-model retrospective on the substrate waves (sets up the post-substrate review cadence)
-- `raw/internal/decisions/2026-05-10-multi-agent-dev-template-and-product-thesis.md` — original archival decision note where the 4-role pattern was first named
-- `raw/internal/dogfooding/mcp-interactions-journal.md` — primary evidence base; entries dated 2026-05-08 through 2026-05-10 PDT document the cycles cited here
+- `raw/internal/decisions/2026-05-10-multi-agent-dev-template-and-product-thesis.md` — original archival decision note where the 4-role pattern was first named; the broader pattern this is one component of (the 4-role multi-agent dev template)
+- `raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md` — primary evidence base; entries dated 2026-05-08 through 2026-05-10 PDT document the cycles cited here

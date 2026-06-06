@@ -19,16 +19,16 @@ The matrix matters because vendor-agnosticism at the builder role is one of the 
 | Binding | Trigger mode | Wrapper | Spec-of-record | Operator doc |
 |---|---|---|---|---|
 | **Claude Code** in-session | conversational — founder asks Claude Code (this session) to claim | none — implicit default | implicit since project start | `skills/process-backlog.md` (used directly via `/process-backlog`) |
-| **codex** | headless (launchd / on-demand `codex exec`) | `tools/run-codex-builder.sh` | item 047 | `docs/codex-builder-setup.md` |
+| **codex** | headless (launchd / on-demand `codex exec`) | `tools/backlog/run-codex-builder.sh` | item 047 | `skills/process-backlog.md` ("Binding-specific notes — codex" section) |
 | **Cursor's Claude** (IDE-mode) | founder paste-driven inside Cursor IDE chat | none — paste skill prose | item 055 | `docs/cursor-builder-trigger.md` |
 
 All three bindings:
 
-- Read the canonical protocol from `skills/process-backlog.md` (Cursor reads it directly from the open repo; Claude Code reads its synced `.claude/commands/` copy; codex reads its synced `adapters/codex/skills/process-backlog/SKILL.md` adapter — all three kept in sync by `tools/sync-skills.sh`).
+- Read the canonical protocol from `skills/process-backlog.md` (Cursor reads it directly from the open repo; Claude Code reads its synced `.claude/commands/` copy; codex reads `~/.codex/skills/ECHO:process-backlog/SKILL.md`, rendered by `tools/install-echo-codex-skills.sh` (not sync-skills.sh); sync-skills.sh keeps only the `.claude/commands/` adapter in lockstep).
 - Perform the atomic-claim commit (`ready/<id>.md → claimed/<id>.md` with `claimed_by`, `claimed_at`, `branch` populated in frontmatter) on `main`, push, and lose-or-win.
 - Create the worktree at `~/Desktop/Project_echo--<slug>/` on a fresh `agent/<slug>` branch.
 - Write `backlog/task-state/<id>/builder.md` via direct commit (single-owner invariant; no CAS) per item 046 AC1's writer-responsibilities table.
-- Journal every `mcp__echo__*` call in-the-moment to `raw/internal/dogfooding/mcp-interactions-journal.md` with the 6-field template.
+- Journal every `mcp__echo__*` call in-the-moment to the current month's shard `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `-2026-06.md`) with the 6-field template.
 - Move the item to `pending_review/` with `agent_notes`, `head_sha`, and (where applicable) `pr_url` when acceptance criteria pass.
 
 What differs is **only** the trigger mode and the wrapper plumbing; the protocol body itself is unchanged.
@@ -38,7 +38,7 @@ What differs is **only** the trigger mode and the wrapper plumbing; the protocol
 A natural-but-wrong instinct is to wrap every binding behind an identical shell driver. ECHO deliberately doesn't:
 
 - **Claude Code** runs the protocol in-session as part of an ongoing strategist conversation — wrapping it would force a separate process and discard the contextual benefits of the live session.
-- **codex** is headless-capable (`codex exec --sandbox workspace-write`) so a 5-line wrapper (`tools/run-codex-builder.sh`) is enough to fire it from launchd or on demand.
+- **codex** is headless-capable (`codex exec --sandbox workspace-write`) so a 5-line wrapper (`tools/backlog/run-codex-builder.sh`) is enough to fire it from launchd or on demand.
 - **Cursor's Claude** has no headless mode today; Cursor IDE is interactive. The trigger is therefore a paste-into-chat ritual mirroring the existing reviewer binding (`skills/review-queue-cursor.md`). No wrapper is necessary or useful.
 
 If Cursor (or any future vendor) ships a headless builder mode, the matrix grows with a new wrapper; the protocol body stays untouched. Adding a fourth binding is a small spec — one new "Binding-specific notes" section in `skills/process-backlog.md`, one operator doc, and (if headless) a 5-line driver.
@@ -61,9 +61,9 @@ Per CLAUDE.md's reviewer-independence rule, the builder of an item is never its 
 If a future AI client (e.g., Gemini CLI, a Replit Agent, a different self-hosted Llama harness) earns a builder binding, the change set is small:
 
 1. Append a "Binding-specific notes — `<name>`" section at the bottom of `skills/process-backlog.md`, mirroring the shape of the codex and Cursor sections.
-2. Re-run `tools/sync-skills.sh` to propagate to `.claude/commands/process-backlog.md` and `adapters/codex/skills/process-backlog/SKILL.md`.
+2. Re-run `tools/sync-skills.sh` to propagate to `.claude/commands/`, and re-run `tools/install-echo-codex-skills.sh` to render the Codex SKILL.md at `~/.codex/skills/ECHO:process-backlog/SKILL.md`.
 3. Add an operator doc under `docs/<binding>-builder-trigger.md` (paste-driven) or `docs/<binding>-builder-setup.md` (headless wrapper).
-4. If headless, add a 5-line wrapper under `tools/run-<binding>-builder.sh` mirroring `tools/run-codex-builder.sh`.
+4. If headless, add a 5-line wrapper under `tools/run-<binding>-builder.sh` mirroring `tools/backlog/run-codex-builder.sh`.
 5. Update this page's matrix.
 
 No protocol body changes, no schema changes, no `reviewers.json`-style roster file for builders (the builder role is identified by which binding executes `skills/process-backlog.md`, not by config).

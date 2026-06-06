@@ -37,10 +37,11 @@ After the wave-3 simplification (commit `238c530`), all subsystems start concurr
 - [[fs-watcher]] — generic filesystem signal source
 - [[git-capture|git-watcher]] — commit + diff capture across allowlisted repos
 - [[claude-code-extractor]] — tails Claude Code session JSONL into turn pairs
+- [[codex-extractor]] — tails OpenAI Codex CLI session JSONL into turn pairs
 - [[cursor-extractor]] — parses Cursor's SQLite globalStorage/workspaceStorage into turn pairs
 - [[mcp-server]] — HTTP/SSE retrieval interface
 
-The shutdown hook stops them in the inverse order (`mcp → cursor → claude-code → git → fs`) and then disposes the storage handle.
+The shutdown hook stops them in the inverse order (`mcp → cursor → codex → claude-code → git → fs`) and then disposes the storage handle.
 
 ## Storage Backend
 

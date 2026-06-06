@@ -17,7 +17,7 @@ A field-by-field record of what ECHO reads from Cursor's local data, where it li
 
 ## TL;DR
 
-ECHO captures the **plain text of every Composer/Agent chat turn**, plus three structured context lists when populated: **files the user attached**, **files the assistant referenced**, **files the assistant deleted**. Stable IDs let you group by chat (`composer_id`) or workspace (`workspace_id`). All other Cursor signals — inline Tab autocomplete, terminal output, editor state, lint state, suggested diff content, web/doc references, tool-result payloads — are deliberately not collected today.
+ECHO captures the **plain text of every Composer/Agent chat turn**, plus three structured context lists when populated: **files the user attached**, **files the assistant referenced**, **files the assistant deleted**. Since item 034 (commit `c00a7e7a`) the bubble text is no longer limited to the primary `'text'` field — when `text` is empty the extractor derives content from a **fallback chain** (`toolFormerData` → `fileDiff` → `codeBlocks` body → `thinkingContent`), and records which source each assistant bubble used in **`metadata.bubble_text_sources[]`**. Tool-using turns now also surface **`metadata.tool_calls[]`** (derived from `toolFormerData` frames) and **`metadata.had_tool_use`**, and thinking-bubble content is mirrored into **`metadata.thinking`**. Stable IDs let you group by chat (`composer_id`) or workspace (`workspace_id`). The signals still deliberately not collected today: inline Tab autocomplete, terminal output, editor state, lint state, generated-diff content, and web/doc references.
 
 ## The two watched paths
 
@@ -60,14 +60,16 @@ Used to identify the chat thread, anchor timestamps, and order bubbles within it
 
 Cursor also stores: `richText`, `conversation`, `status`, `context`, `gitGraphFileSuggestions`, `userResponsesToSuggestedCodeBlocks`, `generatingBubbleIds`, `isReadingLongFile`, `codeBlockData`, `originalModelLines`, `newlyCreatedFiles`, `newlyCreatedFolders`, `tabs`, `selectedTabIndex`, `hasChangedContext`, `capabilities`, `forceMode`, `codebaseSearchSettings`, `isFileListExpanded`, `hasLoaded`. **None of these are read.** Most are scrubbed-empty in real Cursor data anyway (probed empirically; see below).
 
-## Per-`bubbleId:*` row — 5 fields read
+## Per-`bubbleId:*` row — fields read
 
-This is where chat content lives.
+This is where chat content lives. Since item 034 (commit `c00a7e7a`) the text-derivation is a **fallback chain**, not a single `text` field, and several derived metadata fields are surfaced from tool/thinking frames.
 
 | Cursor field | Used for | ECHO output |
 |---|---|---|
 | `type` (number) | Role: `1` = user, `2` = assistant. Anything else triggers `unrecognized_bubble_shape: unknown_type` and the bubble is dropped. | `metadata.user_bubble_id` / `metadata.assistant_bubble_ids[]` |
-| `text` (string) | The plain message text | `content: "USER: <text>\n\nASSISTANT: <joined cluster>"` |
+| `text` (string), then fallbacks | The plain message text. Primary `v.text` wins when non-empty (the 99% case); otherwise the chain `toolFormerData` → `fileDiff` (`attachedHumanChanges.fileDiff`) → `codeBlocks` body → `thinkingContent` fires in precedence order, first non-empty derivation wins | `content: "USER: <text>\n\nASSISTANT: <joined cluster>"`; the per-bubble source is recorded in `metadata.bubble_text_sources[]` whenever any bubble used a fallback |
+| `toolFormerData` | Tool-call frames (Agent/Composer modes): best-effort `name`, `rawArgs`/`params` → `args`, `result`/`text` → `output`, `isError` → `is_error` | `metadata.tool_calls[]` + `metadata.had_tool_use: true` |
+| `thinkingContent` / `thinking` | Assistant reasoning bubbles | concatenated into `metadata.thinking` (also kept in `assistant_message`) |
 | `attachedFileCodeChunksUris[].path` | Files the user dragged into the chat (user bubbles) | `metadata.context.attached_files[]` |
 | `codeBlocks[].uri.path` + `codeBlocks[].languageId` | Files the assistant referenced or wrote code for (assistant bubbles) | `metadata.context.referenced_files[]` |
 | `deletedFiles[].uri.path` | Files the assistant deleted in the turn | `metadata.context.deleted_files[]` |
@@ -75,7 +77,7 @@ This is where chat content lives.
 Cursor also stores ~60 other fields per bubble. Notable ones explicitly **not** read:
 
 - `richText` — markdown / formatting structure (we keep only plain `text`)
-- `toolResults`, `interpreterResults`, `consoleLogs` — tool-call outputs the agent saw
+- `interpreterResults`, `consoleLogs` — interpreter / console outputs the agent saw (tool-call outputs themselves are now surfaced via `metadata.tool_calls`, derived from `toolFormerData` — see above)
 - `gitDiffs`, `assistantSuggestedDiffs`, `suggestedCodeBlocks`, `fileDiffTrajectories`, `diffsForCompressingFiles`, `diffsSinceLastApply` — generated diff content
 - `lints`, `approximateLintErrors`, `multiFileLinterErrors` — editor diagnostic state
 - `recentlyViewedFiles`, `recentLocationsHistory` — what the user was browsing
@@ -201,7 +203,7 @@ If a future Cursor version starts populating one of the currently-empty fields w
 | **What the user looked at without typing** | OS-level signal, not in any file | macOS Accessibility API (deferred Swift shim) |
 | **LSP signals (hover, goto, references)** | Editor-runtime only | Editor extension |
 | **Run/debug/test session output** | Editor-runtime; not persisted | Editor extension or stdout interception |
-| **Tool-call full payloads** | In bubble's `toolResults` / `interpreterResults`, but always empty in real data so far | If/when populated: parser-only extension |
+| **Tool-call payloads** | Now extracted via the `toolFormerData` fallback (item 034, commit `c00a7e7a`) → `metadata.tool_calls[]` with best-effort `name` / `args` / `output` / `is_error`. The legacy `toolResults` / `interpreterResults` bubble fields remain empty in real data and are not read; `toolFormerData` is the populated shape | Collected today (via `toolFormerData`); `interpreterResults` parser-only extension if it ever populates |
 | **Generated diff content** | In bubble's `gitDiffs` / `assistantSuggestedDiffs`, always empty in real data; the *resulting* commits are fully captured by [[git-capture]] anyway | git-watcher already covers shipped diffs |
 | **Editor state (open tabs, breakpoints)** | Stored elsewhere in workspaceStorage; mostly not useful as memory | Could be added later if a use case appears |
 
@@ -214,6 +216,7 @@ Even if a future code change tried to read from a different path under Cursor, t
   '~/Library/Application Support/Cursor/User/workspaceStorage/',
   '~/Library/Application Support/Cursor/User/globalStorage/',
   '~/.claude/projects/',
+  '~/.codex/sessions/',
 ]
 ```
 

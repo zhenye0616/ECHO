@@ -14,7 +14,9 @@ A field-by-field record of what ECHO reads from Claude Code's local session tran
 
 ## TL;DR
 
-ECHO captures the **plain user and assistant text from every Claude Code main-session turn**, plus the project slug, session UUID, monotonic turn index, and a `had_tool_use` boolean per turn. Stable IDs let you group by chat (`session_id`) or by project (`project`). All Claude Code signals outside `~/.claude/projects/<project>/<session>.jsonl` are deliberately not collected today: tool-call payloads, hidden thinking blocks, file-history snapshots, attachments, system caveats, the slash-command stream, and every other directory under `~/.claude/`.
+ECHO captures the **plain user and assistant text from every Claude Code main-session turn**, plus the project slug, session UUID, monotonic turn index, and a `had_tool_use` boolean per turn. Beyond that text core, each turn now also persists a layer of **Tier-A per-turn metadata** (shipped, analogous to what landed for Cursor): bounded **`tool_calls`** (each with `name` / `args` / `output` / `is_error` / `call_id`, plus a `tool_call_total` count and a `tool_calls_truncated` flag when more than `MAX_TOOL_CALLS_PER_TURN` = 50 fired), a bounded **`thinking`** summary (truncated via `truncateThinking` at 8 000 chars), **`files_referenced`**, **`repo_root`**, a per-turn **`git_state`** + **`branch`**, **`permission_mode`**, **`cli_version`**, and **`model`**. Stable IDs let you group by chat (`session_id`) or by project (`project`).
+
+The tool-call / tool-result / thinking blocks still do **not** become their own turns — the pairing rule is unchanged (one user line + the next text-bearing assistant line) — they now additionally populate the per-turn metadata above. What is *still* deliberately not collected, all outside `~/.claude/projects/<project>/<session>.jsonl`: file-history snapshots, attachments, `system` lines, `last-prompt` lines, multi-modal / image content blocks, subagent JSONLs, `history.jsonl`, and every non-allowlisted directory under `~/.claude/`.
 
 ## The watched path
 
@@ -25,9 +27,9 @@ ECHO captures the **plain user and assistant text from every Claude Code main-se
 
 `<project-slug>` is Claude Code's URL-safe encoding of the cwd the session was launched in (e.g. `/Users/zhenye/Desktop/Project_echo` → `-Users-zhenye-Desktop-Project-echo`). `<session-id>` is a v4 UUID.
 
-The extractor watches `~/.claude/projects/` recursively (`src/capture/extractors/claude-code.ts:275-279`); on every `add` or `change` whose path satisfies `path.startsWith(projectsPrefix) && path.endsWith('.jsonl')` (`src/capture/extractors/claude-code.ts:229-231`), the dispatcher schedules an incremental tail of that file. Files are opened **read-only** (`open(path, 'r')`, `src/capture/extractors/claude-code.ts:113`).
+The extractor watches `~/.claude/projects/` recursively (wired via `wireJsonlExtractor`, `src/capture/extractors/claude-code.ts:599-604`); on every `add` or `change` whose path satisfies `p.startsWith(prefix) && p.endsWith('.jsonl')` (the `isJsonl` predicate driving `dispatch`, `src/capture/extractors/_shared.ts:175-198`), the dispatcher schedules an incremental tail of that file. Files are opened **read-only** (`open(jsonlPath, 'r')` in `readJsonlTail`, `src/capture/extractors/_shared.ts:140`).
 
-`session_id` is derived from `basename(path, '.jsonl')` (`src/capture/extractors/claude-code.ts:84-87`); `project` is the parent directory name (`src/capture/extractors/claude-code.ts:89-91`).
+`session_id` is derived from `basename(path, '.jsonl')` (`deriveSessionId`, `src/capture/extractors/claude-code.ts:261-264`); `project` is the parent directory name (`deriveProject`, `src/capture/extractors/claude-code.ts:266-268`).
 
 ## Claude Code's JSONL line shape
 
@@ -37,22 +39,22 @@ Each line is one event. Real lines (probed against the live session `4e273691-�
 |---|---:|---|---|
 | `user`                     | many | A user-role message line. `message.role === "user"`, `message.content` is string-or-array | ✅ when `text` non-empty after extraction |
 | `assistant`                | many | An assistant-role message line | ✅ when `text` non-empty after extraction |
-| `system`                   | a few | Synthetic injected blurbs (e.g. local-command stdout) | ❌ — `parseLine` returns null because there is no `.message` field (`src/capture/extractors/claude-code.ts:69-70`) |
+| `system`                   | a few | Synthetic injected blurbs (e.g. local-command stdout) | ❌ — `parseLine` returns null because there is no `.message` field (`src/capture/extractors/claude-code.ts:230-231`) |
 | `attachment`               | a few | Hook-additional-context, task-reminder, mcp_instructions_delta, skill_listing, etc. | ❌ — same reason |
 | `file-history-snapshot`    | a few | Claude Code's per-message file-backup checkpoints (under `~/.claude/file-history/`) | ❌ — same reason |
 | `last-prompt`              | a few | A short trailing line carrying the user's last prompt verbatim and `sessionId` only | ❌ — same reason |
 
-Only `user` and `assistant` lines have a `message: {role, content}` substructure, and `parseLine` (`src/capture/extractors/claude-code.ts:60-82`) ignores everything else.
+Only `user` and `assistant` lines have a `message: {role, content}` substructure, and `parseLine` (`src/capture/extractors/claude-code.ts:217-259`) ignores everything else.
 
 For each `message`, `role` is one of:
 
 | `message.role` | What it is | Read by ECHO? |
 |---|---|---|
-| `user`         | What you typed, OR a synthetic tool_result block, OR a meta-caveat | ✅ — but tool_result-only and empty-text user lines are skipped (`text === ''` filter, `src/capture/extractors/claude-code.ts:149-152`) |
+| `user`         | What you typed, OR a synthetic tool_result block, OR a meta-caveat | ✅ — but tool_result-only and empty-text user lines are skipped for *text* purposes (`text === ''` filter, `src/capture/extractors/claude-code.ts:361-380`); their tool_use/tool_result/thinking side-effects still fold into the open or next cluster's metadata |
 | `assistant`   | What Claude replied | ✅ — same empty-text filter applies |
-| (anything else) | not produced by Claude Code today | ❌ — `parseLine` rejects (`src/capture/extractors/claude-code.ts:73`) |
+| (anything else) | not produced by Claude Code today | ❌ — `parseLine` rejects (`src/capture/extractors/claude-code.ts:234`) |
 
-For `message.content`, the value is **either a string OR an array of content blocks** (handled in `extractContent`, `src/capture/extractors/claude-code.ts:38-58`):
+For `message.content`, the value is **either a string OR an array of content blocks** (handled in `extractContent`, `src/capture/extractors/claude-code.ts:162-215`):
 
 | `content` shape | What it is | Read by ECHO? |
 |---|---|---|
@@ -64,30 +66,30 @@ For each content block:
 | `block.type`     | What it is | Read by ECHO? |
 |---|---|---|
 | `text`           | The visible text the user/agent emits | ✅ — concatenated into `text` |
-| `tool_use`       | The agent invoked a tool | ❌ payload, ✅ `had_tool_use` flag |
-| `tool_result`    | A tool returned output | ❌ payload, ✅ `had_tool_use` flag |
-| `thinking`       | Hidden reasoning block | ❌ — silently dropped by `extractContent` (no branch matches) |
-| (other, e.g. images) | Multi-modal content | ❌ — silently dropped by `extractContent` |
+| `tool_use`       | The agent invoked a tool | ✅ — flips `had_tool_use`; **also** the `id` / `name` / `input` land in `turn.tool_calls` (with `tool_call_total` + `tool_calls_truncated`), and file-path inputs feed `files_referenced` (`extractContent`, `src/capture/extractors/claude-code.ts:187-201`) |
+| `tool_result`    | A tool returned output | ✅ — flips `had_tool_use`; **also** the `tool_use_id` / `content` / `is_error` land in `turn.tool_calls` (matched to its `tool_use` by id, `matchToolCalls`, `src/capture/extractors/claude-code.ts:455-483`) |
+| `thinking`       | Hidden reasoning block | ✅ — non-empty `thinking` blocks are concatenated and truncated via `truncateThinking` into `turn.thinking` (`src/capture/extractors/claude-code.ts:181-186`, `_turn_meta.ts:61-63`) |
+| (other, e.g. images) | Multi-modal content | ❌ — silently dropped by `extractContent` (no branch matches) |
 
-Lines whose extracted `text` is empty (e.g. a user-role line whose only content block is a `tool_result`) are dropped before pairing (`src/capture/extractors/claude-code.ts:149-152`); `had_tool_use` carries forward via `hadToolBetween` so the next emitted turn still records that tools fired during it.
+Lines whose extracted `text` is empty (e.g. a user-role line whose only content block is a `tool_result`) are dropped before pairing for *text* purposes (`src/capture/extractors/claude-code.ts:361-380`); their `had_tool_use`, `tool_calls`, `files_referenced`, and `thinking` side-effects still fold into the open cluster (or via the "between" buffers into the next cluster), so the emitted turn records what fired during it.
 
-Top-level fields **on every user/assistant line** but not read by ECHO: `parentUuid`, `isSidechain`, `promptId`, `uuid`, `userType`, `entrypoint`, `cwd`, `sessionId`, `version`, `gitBranch`, `isMeta`, sometimes `permissionMode`, `requestId`, `sourceToolAssistantUUID`, `toolUseResult`. All ignored — `parseLine` only reaches in for `message`, `message.role`, `message.content`, and the top-level `timestamp` (`src/capture/extractors/claude-code.ts:69-80`).
+Top-level fields **on every user/assistant line**: `parentUuid`, `isSidechain`, `promptId`, `uuid`, `userType`, `entrypoint`, `sessionId`, `isMeta`, `requestId`, `sourceToolAssistantUUID`, `toolUseResult` are still ignored. But `parseLine` now *also* reaches in for `cwd` → `repo_root`, `gitBranch` → `git_state` / `branch`, `permissionMode` → `permission_mode`, `version` → `cli_version`, and `message.model` → `model`, in addition to `message`, `message.role`, `message.content`, and the top-level `timestamp` (`src/capture/extractors/claude-code.ts:235-258`).
 
 ## User/assistant pairing rule
 
-The extractor walks lines in file order and groups them into turns (`src/capture/extractors/claude-code.ts:143-186`):
+The extractor walks lines in file order and groups them into turns (the main loop, `src/capture/extractors/claude-code.ts:352-446`):
 
-1. A `user` line with non-empty `text` becomes `pendingUser`.
-2. A `user` line that arrives while another is pending logs `user_replaced_without_assistant` and overwrites (`src/capture/extractors/claude-code.ts:155-157`).
-3. An `assistant` line with non-empty `text` and a `pendingUser` set emits one turn, advances `turn_index`, clears the pending state.
-4. An `assistant` line with no pending user logs `orphan_assistant` and is dropped (its `had_tool_use` still carries forward via `hadToolBetween`, `src/capture/extractors/claude-code.ts:164-167`).
-5. A trailing user with no assistant yet emits zero turns and stays pending — the next FS event picks it up.
+1. A `user` line with non-empty `text` opens a `pending` cluster.
+2. A `user` line that arrives while a cluster is still open closes it: if assistants accumulated, the cluster is emitted; otherwise the prior user is recorded as a `DroppedUserLine` (logged once per byte_offset as `user_prompt_dropped_without_assistant_reply` / `user_inject_dropped`, `src/capture/extractors/claude-code.ts:382-396`, `526-544`), then the new user opens a fresh cluster.
+3. An `assistant` line with non-empty `text` appends to the open cluster; an assistant with `stop_reason: end_turn` closes and emits the cluster immediately (`src/capture/extractors/claude-code.ts:438-442`).
+4. An `assistant` line with no open cluster logs `orphan_assistant` and is dropped (its tool/thinking side-effects still carry forward via the "between" buffers, `src/capture/extractors/claude-code.ts:420-421`, `371-377`).
+5. A trailing user/assistant with no closing next-user emits zero turns and stays pending — it is intentionally *not* emitted at EOF (`src/capture/extractors/claude-code.ts:448-452`); the next FS event re-reads from `confirmedThroughOffset` and rebuilds it.
 
-So one stored turn is **one user line paired with the next text-bearing assistant line**, regardless of how many tool_use / tool_result / thinking blocks sat between them. Tool blocks are not themselves turns; they only flip `had_tool_use`.
+So one stored turn is **one user line paired with the following text-bearing assistant line(s)**, regardless of how many tool_use / tool_result / thinking blocks sat between them. Tool blocks are not themselves turns; they flip `had_tool_use` and now also populate the per-turn `tool_calls` / `thinking` / `files_referenced` metadata (assembled in `emitPendingIfComplete`, `src/capture/extractors/claude-code.ts:317-350`).
 
 ## What lands in `echo.db` per turn
 
-Built in `handleJsonlChange` (`src/capture/extractors/claude-code.ts:233-261`):
+Built in `handleJsonlChange` (`src/capture/extractors/claude-code.ts:522-597`); the per-turn shape itself is assembled in `emitPendingIfComplete` (`src/capture/extractors/claude-code.ts:317-350`):
 
 ```ts
 {
@@ -96,19 +98,33 @@ Built in `handleJsonlChange` (`src/capture/extractors/claude-code.ts:233-261`):
               falling back to file mtime when absent>,
   content:   "USER: <user_message>\n\nASSISTANT: <assistant_message>",
   metadata: {
-    project:       "<project-slug>",     // parent dir name, e.g. "-Users-zhenye-Desktop-Project-echo"
-    session_id:    "<UUID>",             // basename minus .jsonl
-    turn_index:    <0-based, monotonically increasing per session>,
-    mtime:         <ms epoch — the file's mtimeMs at extraction time>,
-    byte_offset:   <file offset just past the last line consumed for this turn>,
-    had_tool_use?: true                  // omitted when false (line 245)
+    project:        "<project-slug>",    // parent dir name, e.g. "-Users-zhenye-Desktop-Project-echo"
+    session_id:     "<UUID>",            // basename minus .jsonl
+    turn_index:     <0-based, monotonically increasing per session>,
+    mtime:          <ms epoch — the file's mtimeMs at extraction time>,
+    byte_offset:    <file offset just past the last line consumed for this turn>,
+    // — all of the following are OMITTED when empty/absent (no-bloat on plain turns) —
+    had_tool_use?:  true,                       // omitted when false (line 554)
+    repo_root?:     "<cwd from any line in the turn>",
+    files_referenced?: ["<path>", ...],         // from tool_use.input file-path keys
+    tool_calls?:    [{ name, args?, output?, is_error?, call_id? }, ...],  // bounded; see below
+    tool_call_total?: <raw tool_use count before truncation>,
+    tool_calls_truncated?: true,                // only when total > 50
+    thinking?:      "<concatenated thinking, truncated at 8 000 chars>",
+    git_state?:     { captured_at, fresh, branch?, head_sha?, dirty_count? },
+    branch?:        "<branch name>",
+    permission_mode?: "<e.g. 'auto' | 'default'>",
+    cli_version?:   "<Claude Code CLI version, e.g. '2.1.119'>",
+    model?:         "<assistant model id, e.g. 'claude-opus-4-7'>"
   }
 }
 ```
 
-`byte_offset` is the **resume checkpoint**: on daemon boot, `backfillOffsetMap` (`src/capture/extractors/claude-code.ts:191-209`) reconstructs per-session offsets from this field, so capture continues exactly where the previous run left off. No separate state file.
+`tool_calls` are **structured summaries with overflow caps**, not raw full payloads: `args` and `output` are truncated (2 000 / 4 000 chars) with per-field `*_truncated` flags, the array is capped at `MAX_TOOL_CALLS_PER_TURN` = 50, and `thinking` is truncated at 8 000 chars (`src/capture/extractors/_turn_meta.ts:40-65`). `git_state` is sampled via `probeGitState`; on stale (boot-scanned) turns where the probe refuses, a partial `{ captured_at, fresh: false, branch }` is emitted from the JSONL's own `gitBranch` (`src/capture/extractors/claude-code.ts:564-581`).
 
-The content prefix `USER: ... \n\nASSISTANT: ...` (`src/capture/extractors/claude-code.ts:249`) matches [[cursor-extractor]] and [[codex-extractor]] by design — the MCP retrieval tool sees one consistent envelope across all three coding-agent surfaces.
+`byte_offset` is the **resume checkpoint**: on daemon boot, `backfillOffsetMap` (`src/capture/extractors/claude-code.ts:485-502`) reconstructs per-session offsets from this field, so capture continues exactly where the previous run left off. No separate state file.
+
+The content prefix `USER: ... \n\nASSISTANT: ...` (`src/capture/extractors/claude-code.ts:585`) matches [[cursor-extractor]] and [[codex-extractor]] by design — the MCP retrieval tool sees one consistent envelope across all three coding-agent surfaces.
 
 ## Empirical coverage on the live install
 
@@ -150,15 +166,16 @@ SQL
 
 ## What's deliberately not collected (and where it would have to come from)
 
+> **Note:** tool-call payloads and thinking blocks used to live in this table; both now ship as bounded per-turn metadata (`tool_calls` / `tool_call_total` / `tool_calls_truncated` and `thinking`). See "What lands in `echo.db` per turn" above. The rows below are what *still* genuinely never reaches metadata.
+
 | Signal | Why not collected today | Where it would come from |
 |---|---|---|
-| **Tool-call payloads** (which tool, what arguments, what output) | Tier-A-style extraction not yet implemented; would inflate row size meaningfully | Parser-only follow-up: read `block.type === 'tool_use'` (`name`, `input`) and `block.type === 'tool_result'` (`output`) from the same JSONL. The `had_tool_use` flag already proves the data is in arm's reach. |
-| **Thinking blocks** (`block.type === 'thinking'`) | Out of scope for V1 retrieval — clutters search; doubles storage; many turns are >50% thinking by token count | Parser-only addition. Should ship behind a config flag. Same shape as Codex's reasoning blocks ([[codex-collected-data]]). |
 | **`system`-type lines** (synthetic local-command stdout, etc.) | Not chat — it's the harness's own output | Could be promoted to a per-session `metadata.system_messages` summary if useful. |
 | **`attachment`-type lines** (task_reminder, hook_additional_context, mcp_instructions_delta, skill_listing, deferred_tools_delta, hook_success, auto_mode) | Harness-level metadata about what Claude Code injected into the prompt; not user/agent content | Could be aggregated as session-level summary metadata; mostly debugging signal. |
 | **`file-history-snapshot` lines** | Claude Code's own file-backup tracking, mirrored in `~/.claude/file-history/` | Out of scope; could be its own surface if a file-restore use case appears. |
 | **`last-prompt` lines** | Redundant with the corresponding `user` line earlier in the same JSONL | None needed. |
-| **Per-line top-level fields** (`parentUuid`, `gitBranch`, `cwd`, `version`, `entrypoint`, `userType`, `permissionMode`, `requestId`, `sourceToolAssistantUUID`, `toolUseResult`) | None reach `metadata` today; the extractor only pulls `message.role`, `message.content`, and top-level `timestamp` | Pure parser additions if a use case appears. `cwd` and `gitBranch` are likely the highest-value next picks. |
+| **Per-line top-level fields that now DO reach metadata** (`cwd` → `repo_root`, `gitBranch` → `git_state` / `branch`, `permissionMode` → `permission_mode`, `version` → `cli_version`, `message.model` → `model`) | Shipped (Tier A) — extractor pulls these in addition to `message.role`, `message.content`, and top-level `timestamp` | n/a — collected today |
+| **Per-line top-level fields that still DON'T** (`parentUuid`, `isSidechain`, `promptId`, `uuid`, `entrypoint`, `userType`, `isMeta`, `requestId`, `sourceToolAssistantUUID`, `toolUseResult`) | Tracking / linkage fields with no clear retrieval value | Pure parser additions if a use case appears. |
 | **Subagent JSONLs** (`<session>/subagents/agent-<id>.jsonl`) | Empirically 0 parsed turns despite path-filter match — open investigation | Likely a chokidar lifecycle / addDir-watching nuance, not a content issue. |
 | **Subagent metadata** (`<session>/subagents/agent-<id>.meta.json`) | Not JSONL — extractor's `endsWith('.jsonl')` filter rejects | Parser-only follow-up if subagent-run summaries become useful. |
 | **Tool-results subdirectory** (`<session>/tool-results/*.txt`) | Not JSONL; large tool outputs spill here when too big to inline | Out of scope; arguably duplicative of what `had_tool_use` already signals. |
@@ -167,25 +184,15 @@ SQL
 | **`~/.claude/plugins/`, `shell-snapshots/`, `file-history/`, `image-cache/`, `paste-cache/`, `cache/`, `downloads/`, `plans/`, `sessions/`, `session-env/`, `ide/`, `debug/`, `backups/`, `statsig`, `stats-cache.json`** | Out of allowlist; mostly Claude Code internal state | Most have no clear retrieval value; if any do, parser-only additions after allowlist expansion. |
 | **Multi-modal content** (images, file attachments inlined as content blocks) | Only `block.type === 'text'` reaches `text`; image/document blocks fall through `extractContent`'s switch | Parser extension; bigger lift if attachment payloads need to be persisted. |
 
-## Future extensions (Tier A and beyond)
+## Tier-A per-turn metadata (shipped)
 
-A natural Tier-A follow-up (analogous to what shipped for Cursor) would surface a structured `metadata.context` block per turn:
+The Tier-A follow-up anticipated here (analogous to what shipped for Cursor) has now landed. Instead of a nested `metadata.context` block, the enrichment lives as flat per-turn metadata keys — `tool_calls` (each with `name` / `args` / `output` / `is_error` / `call_id`), `tool_call_total`, `tool_calls_truncated`, `thinking`, `files_referenced`, `repo_root`, `git_state`, `branch`, `permission_mode`, `cli_version`, `model` (see "What lands in `echo.db` per turn"). All are derived from the same JSONL `extractContent` already iterates over (`src/capture/extractors/claude-code.ts:162-215`) plus the per-line top-level fields `parseLine` reads (`src/capture/extractors/claude-code.ts:235-258`) — pure parser additions, no new surfaces. The shared truncation / `ToolCall` shape lives in `src/capture/extractors/_turn_meta.ts`, matching the Codex/Cursor extractors.
 
-```ts
-metadata.context = {
-  tool_calls?:    [{ name: "Bash", summary: "git status" }, ...],
-  tool_outputs?:  [{ name: "Bash", exit_code: 0, snippet: "..." }, ...],
-  thinking_count?: 3,        // how many reasoning blocks, without their content
-  cwd?:            "/Users/<you>/Desktop/Project_echo",   // from any line in the turn
-  gitBranch?:      "main",
-}
-```
-
-All five live in the same JSONL `extractContent` already iterates over (`src/capture/extractors/claude-code.ts:38-58`) — pure parser additions, no new surfaces.
+Remaining un-built parser extensions: promoting `system` / `attachment` lines to session-level summaries, persisting multi-modal / image blocks, and parsing subagent JSONLs (see the not-collected table above and "Empirical coverage").
 
 ## The gate also enforces this
 
-`CAPTURED_SOURCES.fs_paths` (`src/capture/sources.ts:7-12`) declares only the four prefixes the extractors are allowed to touch:
+`CAPTURED_SOURCES.fs_paths` (`src/capture/sources.ts:12-17`) declares only the four prefixes the extractors are allowed to touch:
 
 ```ts
 [

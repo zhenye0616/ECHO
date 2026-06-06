@@ -41,7 +41,7 @@ Three reasons:
 
 ## Tools Currently Registered
 
-Eight tools are registered per request (stateless transport — no session ties). The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (item 030: `find_clusters` + `get_atoms`), then to V1.6 RC2's full atomicity refactor (item 038: kill `tail_session`'s compound modes, add `echo_resolve_mru` resolver primitive, unbundle `wait_for_new_turns` bodies, DRY `exclude_metadata_surface`). `get_recent_work_context` survives as a thin re-export shim until the 2026-05-17 follow-up removes its MCP-tool registration.
+12 tools register on every request (stateless transport — no session ties), with 2 more (`coord_status`, `coord_invoke`) added only when the deadline tracker is enabled (`deadlines !== null`), for a max of 14. The toolkit migrated from V1.5's compound `get_recent_work_context` to V1.6's atomic decomposition (item 030: `find_clusters` + `get_atoms`), then to V1.6 RC2's full atomicity refactor (item 038: kill `tail_session`'s compound modes, add `echo_resolve_mru` resolver primitive, unbundle `wait_for_new_turns` bodies, DRY `exclude_metadata_surface`). `get_recent_work_context` survives as a thin re-export shim until the 2026-05-17 follow-up removes its MCP-tool registration.
 
 | Tool | Purpose | Cost class |
 |---|---|---|
@@ -53,8 +53,14 @@ Eight tools are registered per request (stateless transport — no session ties)
 | [[mcp-wait-for-new-turns\|`wait_for_new_turns`]] | V1.6 group-session subscription — stateless long-poll on watched sources (max 60s default; max 120s ceiling). **Item 038 changed contract: returns `turn_ids: string[]` only (no bodies). Callers compose `get_atoms(turn_ids)` or `get_atom(turn_ids[i])` for body fetch.** Item 037 added `repo_path`. Implements Goal A of the [[group-session]] pattern. | blocks |
 | [[mcp-recent-work-context\|`get_recent_work_context`]] | V1.5 compound clustered context. **DEPRECATED by item 030; survives in 038 as a thin re-export shim** (cluster engine canonical home moved to `src/mcp/internal/cluster-engine.ts`; MCP-tool registration stays until the 2026-05-17 follow-up). Removal pending dogfooding-evidence-based founder consent receipt. | medium |
 | `echo_ping` | Connectivity check; returns `{ pong: true, received, ts }`. | trivial |
+| `pending_decisions` | Read surface for items awaiting founder decision. | cheap |
+| `get_role_state` | Item 046 — role-typed task-state read; `repo_root`-pinned at server-start (never re-reads `process.cwd()`). | cheap |
+| `list_task_states` | Item 046 — lists role-typed task-state pointers (`repo_root`-pinned). | cheap |
+| `coord_emit` | Item 057a — coord-substrate append seam; emitter identity server-derived from the `X-Echo-Role` header; calls `storage.append`. | append |
+| `coord_status` | Item 057a — coord-substrate read surface; **only registered when the deadline tracker is enabled** (its `currentSnapshot()` feeds `open_deadlines`). | cheap |
+| `coord_invoke` | Item 057b — strategist-side active-trigger seam; spawns the reviewer wrapper; **deadline-gated** (registered together with `coord_status`). | active-trigger |
 
-**The post-038 atomic toolkit** is 8 tools, each with one purpose, composing cleanly per the [[atomic-primitives-compose]] principle. The canonical compose patterns:
+**The post-038 atomic retrieval toolkit** composes cleanly per the [[atomic-primitives-compose]] principle. The canonical compose patterns:
 
 - **Tail (cheap recency-only fetch):** `echo_resolve_mru({sources:['cursor'], repo_path:X})` → `search_memories({source: desc.source, ...desc.filter, limit:N})`.
 - **Live-watch:** `echo_resolve_mru({sources:['claude_code'], repo_path:X})` → `wait_for_new_turns({sources:[desc.source], repo_path:desc.filter.repo_path, since:now})` (note: `wait_for_new_turns` ignores `metadata_match` — wait is for new turns, legacy Cursor atoms are out of scope).
@@ -92,7 +98,7 @@ The `content` text field stays for compat with clients that only read text conte
 
 **Schema scoping decision (item 025).** Small response shapes (`echo_ping`, `search_memories`) are mirrored exactly. The deeply nested cluster/atom/edge bodies inside `get_recent_work_context` use permissive `z.record(z.string(), z.unknown())` / `z.array(z.unknown())` because their internal contract is still moving (items 016–022 reshape them on most weeks); top-level keys (`schema_version: z.literal(1)`, `tool: z.literal('get_recent_work_context')`, `query`, `clusters`, `atoms`, `truncation`, `warnings`) are exact. An exact-everywhere schema would reject every real response at validation time the next week trace internals shift.
 
-**`readOnlyHint: true` on all four.** All current tools are pure-read (no `storage.append` calls). The hint lets MCP clients render and route them as safe-by-default. Codex's 2026-05-08 13:25 PDT review settled the question of whether `echo_ping` should instead be reclassified as an MCP resource: stay a tool. Resources are application-controlled; tools are model-controlled. A model-invoked health check is a tool.
+**`readOnlyHint` split.** The retrieval/query tools — `echo_ping`, `search_memories`, `find_clusters`, `get_atoms`, `get_atom`, `get_recent_work_context`, `echo_resolve_mru`, `get_role_state`, `pending_decisions`, `list_task_states`, `wait_for_new_turns`, `coord_status` — carry `readOnlyHint: true` and are pure-read (no `storage.append` calls). The coord write surfaces are the exception: `coord_emit` and `coord_invoke` set `readOnlyHint: false`, and `coord_emit` calls `storage.append`. The hint lets MCP clients render and route the read tools as safe-by-default. Codex's 2026-05-08 13:25 PDT review settled the question of whether `echo_ping` should instead be reclassified as an MCP resource: stay a tool. Resources are application-controlled; tools are model-controlled. A model-invoked health check is a tool.
 
 The [[storage|`Storage`]] instance is passed into the tool's `register*` function at session-creation time, so handlers can `await storage.query(...)` without a global. This is the dependency-injection seam that lets tests run with `MemoryStorage` and production runs with `SqliteStorage`.
 
@@ -101,7 +107,7 @@ The [[storage|`Storage`]] instance is passed into the tool's `register*` functio
 Every tool invocation is a self-contained HTTP request. The server creates a fresh `(McpServer, StreamableHTTPServerTransport)` pair, dispatches the request, and tears the pair down at end-of-request. There is no `Map<sessionId, Session>`, no `Mcp-Session-Id` header generation, no `onsessionclosed` handler — the SDK transport runs in JSON-response mode (`enableJsonResponse: true`) and per-request mode (`sessionIdGenerator: undefined`). A stale `Mcp-Session-Id` header from a client that survived a daemon restart is silently ignored.
 
 Why this shape:
-- ECHO's tools are all pure-read (`readOnlyHint: true`); no per-session state to retain across calls.
+- ECHO's retrieval tools are pure-read (`readOnlyHint: true`) and the coord write surfaces (`coord_emit`, `coord_invoke`, `readOnlyHint: false`) append durably without retaining per-session state; nothing relies on session state across calls.
 - The pre-027 stateful transport caused a known failure: a Codex CLI session that called ECHO at 20:12 UTC, then encountered a daemon restart at 20:22 UTC, retained its `Mcp-Session-Id` and got `400 Bad Request: no active session` from the next call. Stateless dispatch eliminates the failure mode without loss of capability.
 - Bodies are pre-parsed in the HTTP listener with a 4 MB cap (413 on overflow).
 - DNS-rebinding protection still applies per request.
