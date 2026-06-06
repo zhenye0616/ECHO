@@ -204,6 +204,7 @@ function daemonFixture(opts: {
       logDir,
       dataDir,
       dbPath,
+      platform: 'darwin',
       spawnSync,
       healthProbe: async () => opts.health ?? true,
       sleep: async () => {},
