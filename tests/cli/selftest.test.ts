@@ -49,6 +49,7 @@ function writeInitArtifacts(sandbox: SelfTestSandbox): void {
 
 function makeDeps(
   opts: {
+    captureRepoPath?: (repo: string) => string;
     failCapture?: boolean;
     hangAfterStart?: boolean;
     onCommand?: (args: readonly string[], env: NodeJS.ProcessEnv) => void;
@@ -122,10 +123,16 @@ function makeDeps(
         return { code: 0, out: JSON.stringify({ event: 'init.done' }) };
       }
       if (args[1] === 'project') {
+        const repo = typeof args[3] === 'string' ? args[3] : (cwd ?? join(sandbox.sandbox, 'repo'));
+        const persistedRepo = opts.captureRepoPath?.(repo) ?? repo;
         mkdirSync(join(sandbox.echoHome, 'state'), { recursive: true });
         writeFileSync(
           join(sandbox.echoHome, 'state', 'capture-sources.json'),
-          `${JSON.stringify({ schema_version: 1, git_repos: [cwd ?? join(sandbox.sandbox, 'repo')] })}\n`,
+          `${JSON.stringify({
+            schema_version: 1,
+            updated_at: '2026-05-28T00:00:00.000Z',
+            git_repos: [persistedRepo],
+          })}\n`,
         );
         return { code: 0, out: '' };
       }
@@ -190,6 +197,23 @@ describe('echoctl selftest command', () => {
     expect(starts.map((start) => start.env.ECHO_MCP_PORT)).toEqual(['0', '0']);
     expect(starts.map((start) => start.port)).toHaveLength(2);
     expect(stops).toEqual(starts.map((start) => start.port));
+  });
+
+  it('normalizes capture-sources repo paths before evaluating INIT-06', async () => {
+    const { deps } = makeDeps({
+      captureRepoPath: (repo) => repo.replace(/\//g, '\\'),
+    });
+    const out: string[] = [];
+    const code = await runSelftest({
+      json: true,
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      deps,
+    });
+    const report = parseReport(out);
+
+    expect(code).toBe(0);
+    expect(report.failedIds).not.toContain('INIT-06');
+    expect(report.checks.find((check) => check.id === 'INIT-06')?.ok).toBe(true);
   });
 
   it('exits 1 and reports failedIds when a fake check fails', async () => {

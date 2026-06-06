@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { normalizeRepoPath, readCaptureSourcesConfig } from '../../capture/sources.js';
 
 type Writable = Pick<NodeJS.WritableStream, 'write'>;
 
@@ -207,6 +208,17 @@ function safeRead(path: string): string {
     return readFileSync(path, 'utf8');
   } catch {
     return '';
+  }
+}
+
+function captureSourcesIncludesRepo(filePath: string, repo: string): boolean {
+  try {
+    const config = readCaptureSourcesConfig(filePath);
+    if (config === null) return false;
+    const normalizedRepo = normalizeRepoPath(repo);
+    return config.git_repos.some((entry) => normalizeRepoPath(entry) === normalizedRepo);
+  } catch {
+    return false;
   }
 }
 
@@ -606,10 +618,10 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
     );
 
     echoctl(['project', 'add', repo, '--home', sandbox.echoHome]);
-    const captureSources = safeRead(join(sandbox.echoHome, 'state', 'capture-sources.json'));
+    const captureSourcesPath = join(sandbox.echoHome, 'state', 'capture-sources.json');
     record(
       'INIT-06',
-      captureSources.includes('git_repos') && captureSources.includes(repo),
+      captureSourcesIncludesRepo(captureSourcesPath, repo),
       'repo in capture-sources.json',
     );
 
