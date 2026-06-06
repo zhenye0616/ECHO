@@ -6,7 +6,17 @@ on:
       - 'agent/**'
     tags:
       - 'v*'
+    paths-ignore:
+      - 'backlog/**'
+      - 'raw/**'
+      - 'docs/**'
+      - 'wiki/**'
   pull_request:
+    paths-ignore:
+      - 'backlog/**'
+      - 'raw/**'
+      - 'docs/**'
+      - 'wiki/**'
   workflow_dispatch:
 
 permissions:
