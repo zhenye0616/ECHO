@@ -29,7 +29,39 @@ worktree: "/Users/zhenye/Desktop/Project_echo--fix-packaged-selftest-codex-skill
 head_sha: "0ce61a001beb8e45a224c34008ea6ed7ce9d1919"
 pr_url: ""
 agent_notes: "Implemented AC1-AC4 on branch agent/fix-packaged-selftest-codex-skill-and-doctor at 0ce61a001beb8e45a224c34008ea6ed7ce9d1919. Packaged installed-tarball rehearsal passed with failedIds: [] and WIR-06/SKILL-02/DOC-02 green. npm run typecheck, npm run lint, focused 093 tests, isolated tests/mcp/recent-calls-endpoint.test.ts, and git diff --check passed. Exact npm test was attempted twice and timed out/hung in out-of-scope tests/mcp/recent-calls-endpoint.test.ts under full-suite load; see run log for details and founder/reviewer disposition questions."
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-06 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean --no-ff merge; main 26 commits ahead but none touched the 4 modified files)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (both pre-merge fixups were founder dispositions, not code changes)
+
+  Founder dispositions:
+  - DOC-02 narrowing (src/cli/commands/selftest.ts:700-710) ACCEPTED as the DOC-02 contract.
+    The relaxed doctorMcpOnlyOk still hard-requires mcpReachable===true and tolerates only
+    agent-probe-driven 'degraded'. Per locked-decision #1 this was a founder call; accepted,
+    not escalated.
+
+  Fixups deferred to follow-up items:
+  - AC4 clean-host packaged rehearsal + run-log (raw/internal/agent-runs/2026-06-05-093-*.md)
+    owed before cutting v0.1.0-beta.1. Reviewer rehearsal confirmed WIR-06/SKILL-02 green but
+    DOC-02/CAP-02 were unreachable on the review host (live-daemon OS-data-dir pid-lock collision).
+
+  Verify: 1591/1591 substantive tests pass; typecheck + lint clean post-merge. One known
+  out-of-scope flake — tests/mcp/recent-calls-endpoint.test.ts timed out under full-suite
+  concurrency load but PASSES in isolation (7.8s). 093 touches neither the endpoint nor its
+  test; already tracked as the successor flake item (real-daemon/concurrency class). Founder
+  dispositioned 'continue'.
+
+  Follow-up items (non-blocking):
+  - Clean-host AC4 packaged rehearsal + run-log before v0.1.0-beta.1 tag.
+  - Document AC4 rehearsal must run on a host with no live ECHO daemon (pid-lock keyed on OS data-dir).
+  - Consider sandbox pid-lock honoring sandbox dataDir (selftest robustness on dev machines).
+  - doctorStateOk schemaVersion===1 brittleness (selftest.ts:692), low priority.
 ---
 
 # 093 — Fix the packaged selftest: Codex skill second-hop + doctor reachability + poll-until-recall
