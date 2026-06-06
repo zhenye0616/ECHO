@@ -20,8 +20,10 @@ raw/internal/**/*.html
 # Claude Code agent runtime logs
 .claude/logs/
 
-# Sensitive interview data (uncomment if needed)
-# raw/internal/interviews/
+# Sensitive interview + outreach data — third-party handles/lead lists must never
+# be committed to the (public) repo. Aggregate signals go to wiki/research/ after 5+
+# interviews per CLAUDE.md; raw per-person notes stay local-only.
+raw/internal/interviews/
 
 # Per-user Claude Code settings — never check in
 .claude/settings.local.json
