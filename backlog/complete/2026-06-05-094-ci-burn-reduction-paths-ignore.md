@@ -30,7 +30,36 @@ agent_notes: |
   Tried: Installed dependencies with `npm ci`; verified workflow YAML/trigger shape locally with `js-yaml`; verified AC3 against GitHub workflow syntax docs that path filters are not evaluated for tag pushes; ran full `npm test` twice, and ran `npx vitest run tests/mcp/recent-calls-endpoint.test.ts` once between them. The focused retry passed in 9.04s, but both full-suite attempts failed with the same timeout.
   Best-guess answer: The implementation is likely correct and the failing test is an existing full-suite timing flake rather than a regression from this trigger-only workflow diff (confidence medium-high), but AC4 requires full `npm test` green.
   Why I escalated rather than guessing: The builder stopping condition says to stop after a test fails after 2 reasonable attempts, and fixing the timeout would require touching files outside `files_to_modify`.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-06 via founder reconciliation.
+
+  Conflicts resolved:
+  - none (clean --no-ff merge; only main commit behind was a review sidecar, no workflow files)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (verdict was merge as-is)
+
+  AC3 (load-bearing) resolution:
+  - The same-block `paths-ignore` co-located with `tags: [v*]` in release.yml does NOT suppress
+    release-tag runs: GitHub's documented semantics are that path filters are NOT evaluated for
+    tag pushes (verified vs the workflow-syntax docs + staff-answered community discussion #165354).
+    A v* tag on a bookkeeping commit still fires build->validate->publish. The spec's structural
+    restructure fallback was correctly NOT exercised; diff stayed at 20 trigger-only insertions.
+
+  Verify: 1591/1591 substantive tests pass; typecheck + lint + coupled-invariants + sync-skills
+  clean post-merge. One known out-of-scope flake — tests/mcp/recent-calls-endpoint.test.ts timed
+  out under full-suite concurrency load but PASSES in isolation (7.8s); 094 is a trigger-only YAML
+  diff and categorically cannot regress a TS test. Founder dispositioned 'continue'.
+
+  Follow-up items (non-blocking):
+  - Strategist forward obligation: the successor aggregate all-green required-check item (092 AC3)
+    MUST handle path-skipped runs (skipped-as-success aggregate, or a no-op status job) or a
+    bookkeeping push leaves a required check pending forever. 094's filters are an input to it.
+  - Documented residual (accepted): a code change in a >300-file bookkeeping push can evade the
+    bounded-diff path eval and silently skip CI; operators trigger workflow_dispatch manually then.
+  - Operational: 094 cuts FUTURE burn; it does not unblock the current GitHub-Actions billing gate.
 ---
 
 # 094 — CI burn reduction: paths-ignore for bookkeeping pushes
