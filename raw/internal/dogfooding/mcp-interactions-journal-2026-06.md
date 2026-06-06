@@ -1454,3 +1454,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Returned:** identical wrapper-not-found ENOENT (both roles) against the global npm install path.
 - **Sources:** daemon coord layer only.
 - **Verdict:** ❌ wrong — same root cause; see 16:25 entry for diagnosis. Manual-wrapper fallback fired in the same turn. Running tally this session: 6 failed coord_invoke calls across 3 dispatches (093 r2, 093 r3, 094 r2).
+
+### 2026-06-05 17:06 PDT - codex r2 review tick on 2026-06-05-094-ci-burn-reduction-paths-ignore
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/request.md` and published `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/codex.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=f1c4c70a-d254-4414-9068-016647a10132)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-B1642F6B-4903-4084-B945-32101F352234/raw/internal/review-queue/02f7975a-a866-4a72-b4b3-3b859354dbb2/codex.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/codex.md` at `8747ec54404a75f07cfea16c0bd9432043b033ad`.
+- **Sources:** request `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/request.md`; artifact `backlog/proposed/2026-06-05-094-ci-burn-reduction-paths-ignore.md@99f56455533ee164aaf156b11adba971bc288603`; response `backlog/reviews/2026-06-05-094-ci-burn-reduction-paths-ignore/r2/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-B1642F6B-4903-4084-B945-32101F352234/raw/internal/review-queue/02f7975a-a866-4a72-b4b3-3b859354dbb2/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-B1642F6B-4903-4084-B945-32101F352234/raw/internal/review-queue/02f7975a-a866-4a72-b4b3-3b859354dbb2/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
