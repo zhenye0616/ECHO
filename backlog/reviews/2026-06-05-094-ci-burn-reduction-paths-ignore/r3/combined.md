@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R3 — both reviewers (codex, codex-ops) returned `proceed` with zero findings at spec SHA `476d3f1f`. Convergence arc: r1 (3 findings) → r2 (4, reframe gate FIRED on the AC2b cluster) → r3 (0). The r2 round is the protocol's textbook case: the gate caught strategist patch-inflation, the fresh-context investigator prescribed `structural_cut`, the diagnostic check (plan-shaped 403 on protection + rulesets) validated it, and the removal-only patch converged in one round — exactly the predicted win condition (removal converges; patch-deeper breeds next-round findings). Promoting `proposed/ → ready/`; claimable by a builder.
 

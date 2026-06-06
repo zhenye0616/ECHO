@@ -8,6 +8,7 @@ created: 2026-06-05
 blocked_by: []
 task_state_ref: 2026-06-05-094-ci-burn-reduction-paths-ignore
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 232801842b6996bc6c239b39d8e97ae64bba83ea9e966724e1aed37e262dfce8
 files_to_modify:
   - .github/workflows/ci.yml       # AC1 — paths-ignore on push + pull_request triggers. Trigger block ONLY; no job/step content changes.
   - .github/workflows/release.yml  # AC2 — paths-ignore on the agent/** push + pull_request REHEARSAL triggers; the v* tag trigger must remain unfiltered (AC3).
