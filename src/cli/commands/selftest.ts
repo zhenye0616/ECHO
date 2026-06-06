@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { normalizeRepoPath, readCaptureSourcesConfig } from '../../capture/sources.js';
 
 type Writable = Pick<NodeJS.WritableStream, 'write'>;
 
@@ -187,6 +188,10 @@ function defaultSleep(ms: number): Promise<void> {
 
 const CAPTURE_RECALL_TIMEOUT_MS = 10_000;
 const CAPTURE_RECALL_POLL_INTERVAL_MS = 500;
+const DAEMON_RESTART_TIMEOUT_MS = 15_000;
+const DAEMON_RESTART_POLL_INTERVAL_MS = 250;
+const DAEMON_READY_MCP_TIMEOUT_MS = 1_000;
+const REQUIRED_ECHO_TOOLS = ['echo_ping', 'search_memories', 'find_clusters', 'get_atoms'] as const;
 
 function defaultRunCommand({ env, file, args, cwd }: SelfTestCommandContext): SyncResult {
   try {
@@ -207,6 +212,35 @@ function safeRead(path: string): string {
     return readFileSync(path, 'utf8');
   } catch {
     return '';
+  }
+}
+
+function readPidLockPid(sandbox: SelfTestSandbox): number | null {
+  try {
+    const pid = Number.parseInt(readFileSync(join(sandbox.dataDir, 'daemon.pid'), 'utf8'), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+function captureSourcesIncludesRepo(filePath: string, repo: string): boolean {
+  try {
+    const config = readCaptureSourcesConfig(filePath);
+    if (config === null) return false;
+    const normalizedRepo = normalizeRepoPath(repo);
+    return config.git_repos.some((entry) => normalizeRepoPath(entry) === normalizedRepo);
+  } catch {
+    return false;
   }
 }
 
@@ -292,6 +326,150 @@ async function pollUntilRecall(args: {
     });
     if (response.includes(args.token)) return { ok: true, waitedMs, response };
     if (waitedMs >= timeoutMs) return { ok: false, waitedMs, response };
+    const delay = Math.min(intervalMs, timeoutMs - waitedMs);
+    await args.sleep(delay);
+    waitedMs += delay;
+  }
+}
+
+function priorDaemonReleaseStatus(args: {
+  sandbox: SelfTestSandbox;
+  priorPid: number | null;
+  priorPort: number;
+}): { ok: boolean; detail: string } {
+  const lockPid = readPidLockPid(args.sandbox);
+  if (lockPid === null) return { ok: true, detail: 'pid-lock released' };
+  if (!isProcessAlive(lockPid)) {
+    return { ok: true, detail: `pid-lock stale for exited pid ${lockPid}` };
+  }
+  const owner =
+    args.priorPid !== null && lockPid === args.priorPid ? 'prior daemon' : 'daemon process';
+  return {
+    ok: false,
+    detail: `pid-lock still held by live ${owner} ${lockPid} on old port ${args.priorPort}`,
+  };
+}
+
+async function pollUntilPriorDaemonReleased(args: {
+  sandbox: SelfTestSandbox;
+  priorPid: number | null;
+  priorPort: number;
+  sleep: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+  intervalMs?: number;
+}): Promise<{ ok: boolean; waitedMs: number; detail: string }> {
+  const timeoutMs = args.timeoutMs ?? DAEMON_RESTART_TIMEOUT_MS;
+  const intervalMs = args.intervalMs ?? DAEMON_RESTART_POLL_INTERVAL_MS;
+  let waitedMs = 0;
+  let status = priorDaemonReleaseStatus(args);
+
+  while (true) {
+    if (status.ok) return { ok: true, waitedMs, detail: status.detail };
+    if (waitedMs >= timeoutMs) return { ok: false, waitedMs, detail: status.detail };
+    const delay = Math.min(intervalMs, timeoutMs - waitedMs);
+    await args.sleep(delay);
+    waitedMs += delay;
+    status = priorDaemonReleaseStatus(args);
+  }
+}
+
+async function withTimeout<T>(label: string, timeoutMs: number, work: Promise<T>): Promise<T> {
+  let timer: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
+}
+
+async function daemonReadyStatus(args: {
+  sandbox: SelfTestSandbox;
+  handle: SelfTestDaemonHandle;
+  mcpRequest: SelfTestMcpRequest;
+}): Promise<{ ok: boolean; detail: string }> {
+  if (readPidLockPid(args.sandbox) === null) {
+    return { ok: false, detail: 'pid-lock not present after daemon lifecycle start' };
+  }
+  let tools: string;
+  try {
+    tools = await withTimeout(
+      `MCP tools/list on port ${args.handle.port}`,
+      DAEMON_READY_MCP_TIMEOUT_MS,
+      args.mcpRequest(args.handle.url, 'tools/list', {}),
+    );
+  } catch (err) {
+    return { ok: false, detail: (err as Error).message };
+  }
+  const missing = REQUIRED_ECHO_TOOLS.filter((tool) => !tools.includes(tool));
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      detail: `MCP tools/list on port ${args.handle.port} missing ${missing.join(', ')}`,
+    };
+  }
+  return {
+    ok: true,
+    detail: `pid-lock present and MCP tools/list reachable on port ${args.handle.port}`,
+  };
+}
+
+async function startDaemonUntilReady(args: {
+  env: NodeJS.ProcessEnv;
+  sandbox: SelfTestSandbox;
+  paths: SelfTestRuntimePaths;
+  startupTimeoutMs: number;
+  mcpRequest: SelfTestMcpRequest;
+  sleep: (ms: number) => Promise<void>;
+  startDaemon: (ctx: SelfTestDaemonContext) => Promise<SelfTestDaemonHandle | null>;
+  timeoutMs?: number;
+  intervalMs?: number;
+}): Promise<{ ok: boolean; waitedMs: number; detail: string; handle: SelfTestDaemonHandle | null }> {
+  const timeoutMs = args.timeoutMs ?? DAEMON_RESTART_TIMEOUT_MS;
+  const intervalMs = args.intervalMs ?? DAEMON_RESTART_POLL_INTERVAL_MS;
+  let waitedMs = 0;
+  let handle: SelfTestDaemonHandle | null = null;
+  let detail = 'daemon restart not attempted';
+
+  while (true) {
+    if (waitedMs >= timeoutMs) return { ok: false, waitedMs, detail, handle };
+
+    if (handle === null) {
+      const remainingMs = Math.max(1, timeoutMs - waitedMs);
+      const attemptTimeoutMs = Math.min(args.startupTimeoutMs, remainingMs);
+      const startedAt = Date.now();
+      handle = await args.startDaemon({
+        env: args.env,
+        sandbox: args.sandbox,
+        paths: args.paths,
+        startupTimeoutMs: attemptTimeoutMs,
+        mcpRequest: args.mcpRequest,
+        sleep: args.sleep,
+      });
+      waitedMs += Math.max(0, Date.now() - startedAt);
+      if (handle === null) {
+        detail = `daemon did not report lifecycle started within ${attemptTimeoutMs}ms`;
+      }
+    }
+
+    if (handle !== null) {
+      const ready = await daemonReadyStatus({
+        sandbox: args.sandbox,
+        handle,
+        mcpRequest: args.mcpRequest,
+      });
+      if (ready.ok) return { ok: true, waitedMs, detail: ready.detail, handle };
+      detail = ready.detail;
+    }
+
+    if (waitedMs >= timeoutMs) return { ok: false, waitedMs, detail, handle };
     const delay = Math.min(intervalMs, timeoutMs - waitedMs);
     await args.sleep(delay);
     waitedMs += delay;
@@ -518,9 +696,7 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
     const tools = await mcpRequest(daemon.url, 'tools/list', {});
     record(
       'MCP-02',
-      ['echo_ping', 'search_memories', 'find_clusters', 'get_atoms'].every((t) =>
-        tools.includes(t),
-      ),
+      REQUIRED_ECHO_TOOLS.every((t) => tools.includes(t)),
       'ECHO tools advertised',
     );
 
@@ -606,10 +782,10 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
     );
 
     echoctl(['project', 'add', repo, '--home', sandbox.echoHome]);
-    const captureSources = safeRead(join(sandbox.echoHome, 'state', 'capture-sources.json'));
+    const captureSourcesPath = join(sandbox.echoHome, 'state', 'capture-sources.json');
     record(
       'INIT-06',
-      captureSources.includes('git_repos') && captureSources.includes(repo),
+      captureSourcesIncludesRepo(captureSourcesPath, repo),
       'repo in capture-sources.json',
     );
 
@@ -618,20 +794,45 @@ export async function runSelftest(opts: SelfTestOpts = {}): Promise<number> {
     git(['add', '-A'], repo);
     git(['commit', '-q', '-m', token], repo);
 
+    const priorPid = readPidLockPid(sandbox);
+    const priorPort = daemon.port;
     await stopDaemon({ handle: daemon, sandbox });
     daemon = null;
-    await sleep(250);
+    const release = await pollUntilPriorDaemonReleased({
+      sandbox,
+      priorPid,
+      priorPort,
+      sleep,
+      timeoutMs: DAEMON_RESTART_TIMEOUT_MS,
+      intervalMs: DAEMON_RESTART_POLL_INTERVAL_MS,
+    });
+    if (!release.ok) {
+      record(
+        'CAP-02',
+        false,
+        `daemon restart timed out after ${release.waitedMs}ms; prior daemon release unmet: ${release.detail}`,
+      );
+      return;
+    }
     daemonEnv = makeDaemonEnv(sandbox);
-    daemon = await startDaemon({
+    const restart = await startDaemonUntilReady({
       env: daemonEnv,
       sandbox,
       paths,
       startupTimeoutMs,
       mcpRequest,
       sleep,
+      startDaemon,
+      timeoutMs: DAEMON_RESTART_TIMEOUT_MS - release.waitedMs,
+      intervalMs: DAEMON_RESTART_POLL_INTERVAL_MS,
     });
-    if (daemon === null) {
-      record('CAP-02', false, 'daemon failed to restart');
+    daemon = restart.handle;
+    if (!restart.ok || daemon === null) {
+      record(
+        'CAP-02',
+        false,
+        `daemon restart timed out after ${release.waitedMs + restart.waitedMs}ms; readiness unmet: ${restart.detail}`,
+      );
       return;
     }
     currentPort = daemon.port;

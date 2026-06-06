@@ -49,18 +49,23 @@ function writeInitArtifacts(sandbox: SelfTestSandbox): void {
 
 function makeDeps(
   opts: {
+    captureRepoPath?: (repo: string) => string;
     failCapture?: boolean;
     hangAfterStart?: boolean;
+    restartStartFailures?: number;
     onCommand?: (args: readonly string[], env: NodeJS.ProcessEnv) => void;
     onMcpUrl?: (url: string) => void;
   } = {},
 ): {
   deps: SelfTestDeps;
+  startAttempts: { count: number };
   starts: { env: NodeJS.ProcessEnv; port: number }[];
   stops: number[];
   sandboxes: SelfTestSandbox[];
 } {
   let nextPort = 41000;
+  let restartStartFailures = opts.restartStartFailures ?? 0;
+  const startAttempts = { count: 0 };
   const starts: { env: NodeJS.ProcessEnv; port: number }[] = [];
   const stops: number[] = [];
   const sandboxes: SelfTestSandbox[] = [];
@@ -77,6 +82,11 @@ function makeDeps(
     hasEventsTable: () => true,
     sleep: async () => {},
     startDaemon: async ({ env, sandbox }) => {
+      startAttempts.count += 1;
+      if (starts.length > 0 && restartStartFailures > 0) {
+        restartStartFailures -= 1;
+        return null;
+      }
       const port = ++nextPort;
       starts.push({ env: { ...env }, port });
       mkdirSync(sandbox.dataDir, { recursive: true });
@@ -122,10 +132,16 @@ function makeDeps(
         return { code: 0, out: JSON.stringify({ event: 'init.done' }) };
       }
       if (args[1] === 'project') {
+        const repo = typeof args[3] === 'string' ? args[3] : (cwd ?? join(sandbox.sandbox, 'repo'));
+        const persistedRepo = opts.captureRepoPath?.(repo) ?? repo;
         mkdirSync(join(sandbox.echoHome, 'state'), { recursive: true });
         writeFileSync(
           join(sandbox.echoHome, 'state', 'capture-sources.json'),
-          `${JSON.stringify({ schema_version: 1, git_repos: [cwd ?? join(sandbox.sandbox, 'repo')] })}\n`,
+          `${JSON.stringify({
+            schema_version: 1,
+            updated_at: '2026-05-28T00:00:00.000Z',
+            git_repos: [persistedRepo],
+          })}\n`,
         );
         return { code: 0, out: '' };
       }
@@ -135,7 +151,7 @@ function makeDeps(
       return { code: 0, out: '' };
     },
   };
-  return { deps, starts, stops, sandboxes };
+  return { deps, startAttempts, starts, stops, sandboxes };
 }
 
 function parseReport(stdout: string[]): SelfTestReport {
@@ -190,6 +206,59 @@ describe('echoctl selftest command', () => {
     expect(starts.map((start) => start.env.ECHO_MCP_PORT)).toEqual(['0', '0']);
     expect(starts.map((start) => start.port)).toHaveLength(2);
     expect(stops).toEqual(starts.map((start) => start.port));
+  });
+
+  it('polls CAP-02 daemon restart until a transient start failure clears', async () => {
+    const { deps, startAttempts, starts } = makeDeps({ restartStartFailures: 2 });
+    const out: string[] = [];
+    const code = await runSelftest({
+      json: true,
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      deps,
+    });
+    const report = parseReport(out);
+
+    expect(code).toBe(0);
+    expect(report.failedIds).toEqual([]);
+    expect(report.checks.find((check) => check.id === 'CAP-02')?.ok).toBe(true);
+    expect(starts).toHaveLength(2);
+    expect(startAttempts.count).toBe(4);
+  });
+
+  it('reports a bounded CAP-02 restart diagnostic when the daemon never restarts', async () => {
+    const { deps } = makeDeps({ restartStartFailures: Number.POSITIVE_INFINITY });
+    const out: string[] = [];
+    const code = await runSelftest({
+      json: true,
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      deps,
+    });
+    const report = parseReport(out);
+    const cap02 = report.checks.find((check) => check.id === 'CAP-02');
+
+    expect(code).toBe(1);
+    expect(report.failedIds).toContain('CAP-02');
+    expect(cap02?.ok).toBe(false);
+    expect(cap02?.detail).toContain('daemon restart timed out after 15000ms');
+    expect(cap02?.detail).toContain('readiness unmet');
+    expect(cap02?.detail).not.toBe('daemon failed to restart');
+  });
+
+  it('normalizes capture-sources repo paths before evaluating INIT-06', async () => {
+    const { deps } = makeDeps({
+      captureRepoPath: (repo) => repo.replace(/\//g, '\\'),
+    });
+    const out: string[] = [];
+    const code = await runSelftest({
+      json: true,
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      deps,
+    });
+    const report = parseReport(out);
+
+    expect(code).toBe(0);
+    expect(report.failedIds).not.toContain('INIT-06');
+    expect(report.checks.find((check) => check.id === 'INIT-06')?.ok).toBe(true);
   });
 
   it('exits 1 and reports failedIds when a fake check fails', async () => {
