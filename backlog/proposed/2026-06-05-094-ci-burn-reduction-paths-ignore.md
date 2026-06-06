@@ -52,8 +52,12 @@ half.
    fire. An allowlist (`paths:`) would silently skip CI when someone adds a new code directory.
 2. **`skills/`, `.claude/`, `tools/`, `tests/` are NOT ignored.** CI's verify surface includes
    skill-adapter sync and coupled-invariant checks; protocol-file changes must keep firing CI.
-3. **Trigger blocks only.** No job, step, matrix, or permission changes in either workflow. This item must
-   be diff-reviewable in seconds.
+3. **Trigger blocks only — with ONE sanctioned exception** *(r1 codex F1)*. No job, step, matrix, or
+   permission changes in either workflow, EXCEPT: if AC3's semantics verification shows a single filtered
+   `on.push` block can suppress tag-triggered runs, the builder MAY add the minimal job-level `if:` guard
+   (or equivalent minimal restructure) needed to keep the `v*` tag path unconditionally live. That exception
+   is part of AC3's contract, not drift; anything beyond it stays forbidden. The item must remain
+   diff-reviewable in seconds.
 4. **The `v*` tag path must remain unfiltered** — a release tag must ALWAYS trigger release.yml regardless
    of what files the tagged commit touched (a tag often points at a bookkeeping-adjacent commit). See AC3.
 
@@ -66,6 +70,16 @@ half.
 - **AC2 — release.yml rehearsal filter.** The `agent/**` push trigger and `pull_request` trigger gain the
   same `paths-ignore` list, so builder-branch bookkeeping commits stop firing build + 3-OS validate.
   `workflow_dispatch` unchanged.
+- **AC2b — required-checks ground truth recorded** *(r1 codex F2 + codex-ops F1, convergent)*. Workflow-level
+  `paths-ignore` on `pull_request` makes a path-skipped workflow report NO status — if a branch-protection
+  required check expected it, the PR would hang pending forever. Ground truth at spec time: branch
+  protection on this free-tier private repo is inaccessible (403, verified during the 092 review) — **no
+  required checks exist, so a path-skipped workflow cannot strand any PR today.** The spec REQUIRES: (a) the
+  builder re-verify this fact at build time (`gh api repos/{owner}/{repo}/branches/main/protection` → expect
+  403/404) and record it in the run log; (b) a standing note for the future aggregate-gate item (092 AC3's
+  successor): when a required check is introduced, THAT spec must handle path-skipped runs (e.g.
+  skipped-counts-as-success aggregate pattern or a no-op status job) — 094's filters are an explicit input
+  to that design.
 - **AC3 — tag path provably unfiltered.** `v*` tag pushes trigger release.yml unconditionally. The builder
   MUST verify GitHub's actual semantics for `paths-ignore` interaction with tag refs in a single `on.push`
   block (the documented behavior is ambiguous): if `paths-ignore` can suppress a tag-triggered run, the
@@ -77,9 +91,11 @@ half.
   check; `npm test`, `npm run lint`, `npm run typecheck` green (no product code touched — this is a
   regression guard). Note: a live CI run cannot be a builder gate while account billing is still failing;
   AC3's semantics verification is documentation-or-local, per 092 AC5's precedent.
-- **AC5 — no drift (lifecycle carve-out as in 092/093).** ONLY the two trigger blocks. NO job/matrix/step
-  changes, NO aggregate gate job, NO test-suite split, NO repo-visibility changes. Builder-protocol
-  lifecycle edits (claim, pending_review move, agent_notes/head_sha, run log) are explicitly allowed.
+- **AC5 — no drift (lifecycle carve-out as in 092/093).** ONLY the two trigger blocks, plus AC3's sanctioned
+  tag-safety exception (Locked decision 3) if and only if its trigger-only precondition fails. NO other
+  job/matrix/step changes, NO aggregate gate job, NO test-suite split, NO repo-visibility changes.
+  Builder-protocol lifecycle edits (claim, pending_review move, agent_notes/head_sha, run log) are
+  explicitly allowed.
 
 ## Out of Scope (Don't Drift) — successors
 
