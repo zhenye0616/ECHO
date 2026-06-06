@@ -50,6 +50,14 @@ half.
    roots: `backlog/**`, `raw/**`, `docs/**`, `wiki/**`. Ignore-list semantics are the safe direction: a push
    runs CI unless **every** changed file matches the ignore list, so mixed pushes (code + bookkeeping) still
    fire. An allowlist (`paths:`) would silently skip CI when someone adds a new code directory.
+   **Known operational limit** *(r2 codex-ops F2)*: GitHub evaluates push path filters against a bounded
+   changed-file diff (documented limit: 300 files; pushes with >1,000 commits or an unavailable diff always
+   run). In the pathological case — a single push where the first 300 evaluated files are all ignored paths
+   and a code file sits beyond the bound — CI could silently skip. Accepted as a documented residual risk,
+   not mechanism: this repo's push profile is many small single-purpose commits (bookkeeping commits are
+   1-2 files; code lands via reviewed merges), so the >300-mixed-file push shape does not occur in normal
+   operation. Operators bundling a code change into a mass bookkeeping push (>300 files) must trigger
+   `workflow_dispatch` manually — noted in After Completion.
 2. **`skills/`, `.claude/`, `tools/`, `tests/` are NOT ignored.** CI's verify surface includes
    skill-adapter sync and coupled-invariant checks; protocol-file changes must keep firing CI.
 3. **Trigger blocks only — with ONE sanctioned exception** *(r1 codex F1)*. No job, step, matrix, or
@@ -70,16 +78,16 @@ half.
 - **AC2 — release.yml rehearsal filter.** The `agent/**` push trigger and `pull_request` trigger gain the
   same `paths-ignore` list, so builder-branch bookkeeping commits stop firing build + 3-OS validate.
   `workflow_dispatch` unchanged.
-- **AC2b — required-checks ground truth recorded** *(r1 codex F2 + codex-ops F1, convergent)*. Workflow-level
-  `paths-ignore` on `pull_request` makes a path-skipped workflow report NO status — if a branch-protection
-  required check expected it, the PR would hang pending forever. Ground truth at spec time: branch
-  protection on this free-tier private repo is inaccessible (403, verified during the 092 review) — **no
-  required checks exist, so a path-skipped workflow cannot strand any PR today.** The spec REQUIRES: (a) the
-  builder re-verify this fact at build time (`gh api repos/{owner}/{repo}/branches/main/protection` → expect
-  403/404) and record it in the run log; (b) a standing note for the future aggregate-gate item (092 AC3's
-  successor): when a required check is introduced, THAT spec must handle path-skipped runs (e.g.
-  skipped-counts-as-success aggregate pattern or a no-op status job) — 094's filters are an explicit input
-  to that design.
+- **AC2b — required-checks decision recorded** *(r1 codex F2 + codex-ops F1 convergent; cut to
+  spec-time-recorded form per r2 reframe gate — see r2/combined.md)*. Workflow-level `paths-ignore` on
+  `pull_request` makes a path-skipped workflow report NO status — if a branch-protection required check
+  expected it, the PR would hang pending forever. **Decision, recorded at spec time (2026-06-05):** PR-level
+  `paths-ignore` is safe in this repo because no required checks exist and none CAN exist on the current
+  plan — both `gh api repos/zhenye0616/ECHO/branches/main/protection` and `.../rulesets` return a
+  plan-shaped 403 whose body reads "Upgrade to GitHub Pro or make this repository public to enable this
+  feature" (NOT an auth/scope failure; captured 2026-06-05, strategist session). No builder-side
+  verification is required — this is a spec-level fact, not a build-time gate. The forward obligation on
+  the future aggregate-gate item lives in After Completion (strategist notes), not as a builder AC.
 - **AC3 — tag path provably unfiltered.** `v*` tag pushes trigger release.yml unconditionally. The builder
   MUST verify GitHub's actual semantics for `paths-ignore` interaction with tag refs in a single `on.push`
   block (the documented behavior is ambiguous): if `paths-ignore` can suppress a tag-triggered run, the
@@ -113,3 +121,8 @@ half.
   adjacent paths, or the test-suite split.
 - No wiki page for this item alone — fold one line into the 090–093 onboarding/CI/release page when it's
   written.
+- **Forward obligation (strategist-owned):** when the aggregate `all-green` required-check item (092 AC3's
+  successor) is specced, it MUST handle path-skipped runs (skipped-counts-as-success aggregate pattern or a
+  no-op status job) — 094's filters are an explicit input to that design. Carry this line into that spec.
+- **Operator note:** a code change bundled into a mass bookkeeping push (>300 changed files) can evade the
+  path filter's bounded-diff evaluation — trigger `workflow_dispatch` manually in that (abnormal) case.
