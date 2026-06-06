@@ -913,6 +913,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
 
+### 2026-06-05 17:52 PDT - codex builder process-backlog preflight
+
+- **Trigger:** Codex builder session invoked `$ECHO:process-backlog` and checked ECHO MCP availability before atomic claim.
+- **Query inputs:** `echo_ping(message="codex builder process-backlog connectivity check before atomic claim")`; `find_clusters(format="skeleton", view="compact", repo_path="/Users/zhenye/Desktop/Project_echo")`.
+- **Returned:** `echo_ping` returned pong at `2026-06-06T00:52:20.889Z`; `find_clusters` returned 2 clusters. Top cluster `ctx_c6e1df92` label `work on Project_echo`, 178 atom ids, time range `2026-06-05T20:53:31.000Z` to `2026-06-06T00:50:57.941Z`, rank reasons `has_open_loop`, `has_unresolved_open_loop`, `code_session_anchor`. Second cluster `ctx_675caf5a` label `discussion about ECHO`, 6 atom ids.
+- **Sources:** `find_clusters.source_breakdown`: top cluster `{git: 110, claude_code: 68}`; second cluster `{codex: 6}`. `echo_ping` source is the local ECHO MCP daemon.
+- **Verdict:** partial - MCP connectivity is healthy, but the compact cluster is broad and useful mainly as a confirmation that recent repo work exists.
+- **Note:** No atom bodies were needed for the builder claim path; follow-up context will come from the claimed item's `spec_refs`.
+
 ### 2026-06-04 22:45 PDT - codex-ops r1 review tick on 2026-06-04-089-legacy-spec-review-gate-teardown
 
 - **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-04-089-legacy-spec-review-gate-teardown/r1/request.md` and published `backlog/reviews/2026-06-04-089-legacy-spec-review-gate-teardown/r1/codex-ops.md`.
