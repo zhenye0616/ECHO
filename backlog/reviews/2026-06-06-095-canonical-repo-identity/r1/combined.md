@@ -24,12 +24,14 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | backlog/proposed/2026-06-06-095-canonical-repo-identity.md:files_to_modify / Acceptance criteria | _strategist fills_ | _strategist fills_ |
-| 2 | MEDIUM | codex | backlog/proposed/2026-06-06-095-canonical-repo-identity.md:AC3 | _strategist fills_ | _strategist fills_ |
-| 3 | MEDIUM | codex-ops | backlog/proposed/2026-06-06-095-canonical-repo-identity.md:55 | _strategist fills_ | _strategist fills_ |
-| 4 | MEDIUM | codex-ops | backlog/proposed/2026-06-06-095-canonical-repo-identity.md:64 | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex | …:files_to_modify / Acceptance criteria | accepted — added AC8 (builder-authored tests) + 2 test files (`tests/capture/`, `tests/normalize/`) to files_to_modify, covering AC1–AC6 plus the F1–F4 hardening cases | spec-r1-patches |
+| 2 | MEDIUM | codex | …:AC3 | accepted — AC3 + LD8 now require repo-root-scoped `git -C <repo_root> remote get-url origin` (not process-cwd) + a per-repo cache; probeGitState (AC1) is already cwd-scoped via `gitOne(cwd,…)`, noted inline | spec-r1-patches |
+| 3 | MEDIUM | codex-ops | …:55 | accepted — AC7 + LD7 require credential (userinfo) stripping **at capture** in BOTH probe + watcher before stamping metadata; credential-bearing-remote regression in AC8 | spec-r1-patches |
+| 4 | MEDIUM | codex-ops | …:64 | accepted — AC3 + LD8 require a bounded/invalidatable per-repo cache that retries an absent/failed origin (no permanent local-fallback / stale pin until restart) | spec-r1-patches |
+
+**Reframe gate:** N/A — r1, no prior-round `spec-r*-patches` commits exist, so no finding can target a prior patch. All four findings target the original spec text and are accepted as forward hardening (no removal; `files_to_modify` grows by 2 test files, 0 production files beyond the original 4). → branch (b): apply patches, verify in r2.
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`needs R2` — all four r1 findings accepted and patched into the spec; r2 verifies the patches (repo-root-scoped + cached origin resolution, capture-time credential scrub, builder test coverage) against the patched spec SHA.
 
