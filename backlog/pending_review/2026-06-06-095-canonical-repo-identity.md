@@ -11,6 +11,10 @@ requested_reviewers: ["codex", "codex-ops"]
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-07T05:02:58Z"
 branch: "agent/canonical-repo-identity"
+head_sha: "9c75323600aaf379ba1a2d425298de099383d157"
+pr_url: ""
+agent_notes: |
+  BLOCKED: default `npm test` times out in `tests/mcp/recent-calls-endpoint.test.ts` under full-suite load even though the implementation's focused tests, lint, typecheck, formatting check, and the timed-out test's isolated rerun pass. Tried: ran focused origin/convergence tests, `npm run typecheck`, `npm run lint`, `npx prettier --check`, `git diff --check`, full `npm test` twice, and isolated `npm test -- tests/mcp/recent-calls-endpoint.test.ts`. Best guess: full-suite load/timing flake unrelated to this origin-url change, but confidence is not high enough to mark AC6 green while the default full-suite command exits non-zero. Why escalated: stopping rule for a test failure after two reasonable attempts.
 ready_content_sha: ad97666b9edb61c1a3959f1d7287b4901fd6a4361313884967c111f9b6948365
 files_to_modify:
   - src/capture/extractors/_turn_meta.ts        # AC1 — add optional origin_url field to GitState interface
