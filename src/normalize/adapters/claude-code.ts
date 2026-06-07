@@ -1,11 +1,11 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import { conversationArtifact, fileArtifact } from '../artifacts.js';
-import type {
-  Adapter,
-  ArtifactRef,
-  ContextRef,
-  NormalizedContextEvent,
-} from '../types.js';
+import {
+  conversationArtifact,
+  fileArtifact,
+  normalizeRemoteUrl,
+  workspaceArtifact,
+} from '../artifacts.js';
+import type { Adapter, ArtifactRef, ContextRef, NormalizedContextEvent } from '../types.js';
 import {
   buildAssistant,
   buildConversation,
@@ -29,9 +29,7 @@ export function matchesClaudeCode(source: string): boolean {
   return CLAUDE_CODE_SOURCE_RE.test(source);
 }
 
-export const adaptClaudeCode: Adapter = (
-  event: CaptureEvent,
-): NormalizedContextEvent | null => {
+export const adaptClaudeCode: Adapter = (event: CaptureEvent): NormalizedContextEvent | null => {
   // The source-prefix dispatch is intentionally coarse: a `fs:.../.claude/projects/.../*.jsonl`
   // event might be a turn-pair from the claude-code-extractor OR a generic stat-change event
   // from the fs-watcher (same path observed by two surfaces). Only the former is ours.
@@ -50,16 +48,21 @@ export const adaptClaudeCode: Adapter = (
   const filesReferenced = getStringArray(meta, 'files_referenced');
   const model = getString(meta, 'model');
   const branch = getString(meta, 'branch');
+  const canonicalRoot = getString(meta, 'canonical_root');
 
   const gitState = getRecord(meta, 'git_state');
   const originUrl = gitState !== undefined ? getString(gitState, 'origin_url') : undefined;
-  const repo = buildRepoArtifact(repo_root, originUrl);
+  const workspace = canonicalRoot !== undefined ? workspaceArtifact(canonicalRoot) : null;
+  const repo = workspace === null ? buildRepoArtifact(repo_root, originUrl) : null;
+  const scopeId = workspace !== null ? `workspace:${workspace.id}` : (repo?.id ?? null);
+  const fileRoot = workspace !== null ? canonicalRoot : repo_root;
   const artifacts: ArtifactRef[] = [conversationArtifact('claude_code', session_id)];
-  if (repo !== null) artifacts.push(repo.artifact);
+  if (workspace !== null) artifacts.push(workspace);
+  else if (repo !== null) artifacts.push(repo.artifact);
 
   if (filesReferenced !== undefined) {
     for (const path of filesReferenced) {
-      artifacts.push(fileArtifact(repo?.id ?? null, path, repo_root));
+      artifacts.push(fileArtifact(scopeId, path, fileRoot));
     }
   }
 
@@ -70,9 +73,9 @@ export const adaptClaudeCode: Adapter = (
   if (cli_version !== undefined) ambient.cli_version = cli_version;
   const permission_mode = getString(meta, 'permission_mode');
   if (permission_mode !== undefined) ambient.permission_mode = permission_mode;
+  if (originUrl !== undefined) ambient.git_alias = normalizeRemoteUrl(originUrl);
 
-  const context: ContextRef | undefined =
-    Object.keys(ambient).length > 0 ? { ambient } : undefined;
+  const context: ContextRef | undefined = Object.keys(ambient).length > 0 ? { ambient } : undefined;
 
   const out: NormalizedContextEvent = {
     schema_version: 1,
@@ -83,10 +86,7 @@ export const adaptClaudeCode: Adapter = (
       surface: 'jsonl',
       raw_pointer: event.source,
     },
-    actors: [
-      { role: 'user' },
-      buildAssistant(model, 'anthropic'),
-    ],
+    actors: [{ role: 'user' }, buildAssistant(model, 'anthropic')],
     action: {
       kind: 'message',
       input: pair.user,
@@ -103,4 +103,3 @@ export const adaptClaudeCode: Adapter = (
 
   return out;
 };
-

@@ -5,6 +5,7 @@ import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState, readBranch } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
+import { resolveCanonicalRoot } from '../workspace-root.js';
 import {
   dedupStrings,
   readJsonlTail,
@@ -161,7 +162,14 @@ function stringifyToolResultContent(content: unknown): string {
 
 function extractContent(content: unknown): ExtractedContent {
   if (typeof content === 'string') {
-    return { text: content, hasTool: false, files: [], toolUses: [], toolResults: [], thinking: [] };
+    return {
+      text: content,
+      hasTool: false,
+      files: [],
+      toolUses: [],
+      toolResults: [],
+      thinking: [],
+    };
   }
   if (!Array.isArray(content)) {
     return { text: '', hasTool: false, files: [], toolUses: [], toolResults: [], thinking: [] };
@@ -482,7 +490,9 @@ function matchToolCalls(
   return { calls, total, truncated };
 }
 
-async function backfillOffsetMap(storage: Storage): Promise<Map<string, { offset: number; turn_index: number }>> {
+async function backfillOffsetMap(
+  storage: Storage,
+): Promise<Map<string, { offset: number; turn_index: number }>> {
   const map = new Map<string, { offset: number; turn_index: number }>();
   const events = await storage.query({ source_prefix: 'fs:' });
   for (const evt of events) {
@@ -553,6 +563,9 @@ export async function startClaudeCodeExtractor(
       };
       if (turn.had_tool_use) metadata['had_tool_use'] = true;
       if (turn.repo_root !== undefined) metadata['repo_root'] = turn.repo_root;
+      if (turn.repo_root !== undefined) {
+        metadata['canonical_root'] = await resolveCanonicalRoot(turn.repo_root);
+      }
       if (turn.files_referenced !== undefined) metadata['files_referenced'] = turn.files_referenced;
       if (turn.tool_calls !== undefined) metadata['tool_calls'] = turn.tool_calls;
       if (turn.tool_call_total !== undefined) metadata['tool_call_total'] = turn.tool_call_total;

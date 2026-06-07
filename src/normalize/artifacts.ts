@@ -1,3 +1,4 @@
+import { basename as pathBasename, isAbsolute, normalize, relative, sep } from 'node:path';
 import type { ArtifactRef } from './types.js';
 
 const GIT_SSH_RE = /^git@([^:]+):(.+?)(?:\.git)?\/?$/i;
@@ -30,10 +31,7 @@ export function normalizeRemoteUrl(remote: string): string {
   return url;
 }
 
-export function repoArtifact(
-  remoteUrl: string | null,
-  localRoot: string,
-): ArtifactRef {
+export function repoArtifact(remoteUrl: string | null, localRoot: string): ArtifactRef {
   if (remoteUrl !== null && remoteUrl.length > 0) {
     const id = normalizeRemoteUrl(remoteUrl);
     return {
@@ -50,6 +48,16 @@ export function repoArtifact(
     id: `local:${localRoot}`,
     label: deriveLocalRepoLabel(localRoot),
     locator: localRoot,
+  };
+}
+
+export function workspaceArtifact(canonicalRoot: string): ArtifactRef {
+  return {
+    type: 'workspace',
+    provider: 'local',
+    id: canonicalRoot,
+    label: deriveLocalRepoLabel(canonicalRoot),
+    locator: canonicalRoot,
   };
 }
 
@@ -82,42 +90,39 @@ export function fileArtifact(
   absPath: string,
   repoRoot?: string,
 ): ArtifactRef {
-  if (repoId !== null && repoRoot !== undefined && isInsideRoot(absPath, repoRoot)) {
-    const rel = stripRoot(absPath, repoRoot);
-    return {
-      type: 'file',
-      provider: 'local_fs',
-      id: `${repoId}::${rel}`,
-      label: rel,
-      locator: absPath,
-    };
+  const normalizedAbsPath = normalize(absPath);
+  if (repoId !== null && repoRoot !== undefined) {
+    const rel = relativeInsideRoot(normalizedAbsPath, repoRoot);
+    if (rel !== null) {
+      return {
+        type: 'file',
+        provider: 'local_fs',
+        id: `${repoId}::${rel}`,
+        label: rel,
+        locator: absPath,
+      };
+    }
   }
   return {
     type: 'file',
     provider: 'local_fs',
-    id: `abs:${absPath}`,
-    label: basename(absPath),
+    id: `abs:${normalizedAbsPath}`,
+    label: basename(normalizedAbsPath),
     locator: absPath,
   };
 }
 
-function isInsideRoot(absPath: string, root: string): boolean {
-  const normalizedRoot = root.replace(/\/+$/, '');
-  return (
-    absPath === normalizedRoot ||
-    absPath.startsWith(`${normalizedRoot}/`)
-  );
-}
-
-function stripRoot(absPath: string, root: string): string {
-  const normalizedRoot = root.replace(/\/+$/, '');
-  if (absPath === normalizedRoot) return '';
-  return absPath.slice(normalizedRoot.length + 1);
+function relativeInsideRoot(absPath: string, root: string): string | null {
+  const normalizedRoot = normalize(root);
+  const rel = relative(normalizedRoot, absPath);
+  if (rel === '') return '';
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return rel;
 }
 
 function basename(p: string): string {
-  const m = /\/([^/]+)\/?$/.exec(p);
-  return m === null ? p : (m[1] as string);
+  const base = pathBasename(p);
+  return base.length > 0 ? base : p;
 }
 
 export function branchArtifact(repoId: string, branch: string): ArtifactRef {
@@ -139,10 +144,7 @@ export function commitArtifact(repoId: string, sha: string): ArtifactRef {
   };
 }
 
-export function conversationArtifact(
-  provider: string,
-  sessionId: string,
-): ArtifactRef {
+export function conversationArtifact(provider: string, sessionId: string): ArtifactRef {
   return {
     type: 'conversation',
     provider,
