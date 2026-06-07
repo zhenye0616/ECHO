@@ -10,9 +10,11 @@ task_state_ref: 2026-06-06-095-canonical-repo-identity
 requested_reviewers: ["codex", "codex-ops"]
 files_to_modify:
   - src/capture/extractors/_turn_meta.ts        # AC1 — add optional origin_url field to GitState interface
-  - src/capture/git-state.ts                     # AC1 — probeGitState captures `git remote get-url origin` (normalized at read), stamps GitState.origin_url; cache it like the other fields
-  - src/capture/surfaces/git-watcher.ts          # AC3 — capture origin_url once per repo and stamp metadata.origin_url on each commit candidate
+  - src/capture/git-state.ts                     # AC1 — probeGitState runs the cwd-scoped `git remote get-url origin`, strips embedded credentials, stamps GitState.origin_url; cached like the other fields under the existing TTL
+  - src/capture/surfaces/git-watcher.ts          # AC3 — resolve repo-root-scoped `git -C <repo_root> remote get-url origin`, strip credentials, stamp metadata.origin_url per commit candidate; bounded/invalidatable per-repo cache that retries absent values
   - src/normalize/adapters/git.ts                # AC3 — read metadata.origin_url and pass it to repoArtifact instead of hardcoded null
+  - tests/capture/origin-url-capture.test.ts     # AC8 — builder unit tests: origin capture (probe + watcher), repo-root scoping, credential scrubbing, cache retry/invalidation, remote-less silence
+  - tests/normalize/repo-identity-convergence.test.ts  # AC8 — builder tests: cross-adapter repo-id convergence, derived file-id prefix convergence, machine-independence (POSIX vs C:\), remote-less local fallback
 spec_refs:
   - raw/internal/decisions/2026-06-06-r1-cross-adapter-repo-identity-gap-brief.md  # the converged root-cause brief (READ FIRST)
   - src/normalize/artifacts.ts                    # repoArtifact + normalizeRemoteUrl — NO change; normalizer already handles ssh/https/.git
@@ -48,12 +50,15 @@ The repo identity that codex already uses — the normalized remote URL — is t
 4. **Repos without a remote keep the `local:<root>` fallback.** `repoArtifact(null, root)` and `buildRepoArtifact(root, undefined)` behavior is unchanged. Remote-less repos join only same-machine; that is acceptable and out of scope to fix.
 5. **Do NOT retro-migrate historical atoms.** Atoms already stored with `local:` ids will not retroactively converge from a capture-time change. Read-time aliasing for legacy data is a separate, deferrable item.
 6. **No change to `artifacts.ts` or `_shared.ts`.** The normalizer and `buildRepoArtifact` already accept and correctly handle an `origin_url`; the only missing wiring is on the capture side (and the git adapter's hardcoded `null`).
+7. **Credentials are stripped at capture, never persisted (r1 codex-ops F1).** Scrubbing happens in the capture code (`probeGitState` + git watcher) before stamping metadata — NOT by mutating `normalizeRemoteUrl`/`artifacts.ts` (LD6 holds). This keeps `metadata.*origin_url` and every derived id credential-free at the source, so even raw stored metadata never holds a secret.
+8. **The git-watcher origin cache is bounded + invalidatable (r1 codex-ops F2).** It must not permanently stamp an absent / failed / stale remote; absent values are retried for later commit candidates. `probeGitState`'s per-cwd TTL cache is the precedent. The git-watcher resolution is repo-root-scoped (`git -C <repo_root>`), never process-cwd (r1 codex F2).
 
 ## Acceptance criteria
 
 1. **GitState carries the remote, and `probeGitState` captures it.**
    - `GitState` (src/capture/extractors/_turn_meta.ts) gains an optional `origin_url?: string` field, documented as the repo's remote (origin) URL as captured at probe time.
-   - `probeGitState` (src/capture/git-state.ts) additionally runs `git remote get-url origin` (alongside the existing rev-parse/status probes, via the same `gitOne` helper and Promise.all fan-out), and when it returns a non-empty value, stamps it onto `GitState.origin_url`. The value is cached in the per-cwd cache entry exactly like the other fields (so a burst of turns in one repo does not re-fan-out). Absence of a remote (non-zero exit / empty output) leaves `origin_url` undefined — no error, no log noise; this matches the existing silent-failure convention.
+   - `probeGitState` (src/capture/git-state.ts) additionally runs `git remote get-url origin` (alongside the existing rev-parse/status probes, via the same `gitOne` helper and Promise.all fan-out), and when it returns a non-empty value, stamps it onto `GitState.origin_url`. Because `gitOne(cwd, …)` already runs git scoped to the probe's `cwd` argument, this origin probe is correctly per-repo for free (the repo-scoping hazard in r1 codex F2 applies to the long-lived watcher path, AC3 — not here). The value is cached in the per-cwd cache entry exactly like the other fields (so a burst of turns in one repo does not re-fan-out). Absence of a remote (non-zero exit / empty output) leaves `origin_url` undefined — no error, no log noise; this matches the existing silent-failure convention.
+   - **Credential scrub (r1 codex-ops F1):** any embedded URL userinfo (e.g. `https://user:token@host/…`) is stripped from the captured value before it is stamped onto `GitState.origin_url`, so no secret is ever persisted to `metadata.git_state.origin_url`. See AC7.
    - The existing freshness/stale-skip and not-a-git-repo negative-cache behavior is unchanged.
 
 2. **claude_code atoms for a remote-backed checkout get the normalized-remote repo id.**
@@ -61,7 +66,8 @@ The repo identity that codex already uses — the normalized remote URL — is t
    - Observable outcome: a claude_code turn captured in a remote-backed checkout produces a repo artifact whose `provider`/`id` equal what codex produces for the same remote (e.g. provider `github`, id `https://github.com/<owner>/<repo>`) rather than `local:<path>`.
 
 3. **git commit atoms get the normalized-remote repo id.**
-   - The git watcher (src/capture/surfaces/git-watcher.ts) resolves the repo's origin URL (e.g. once per repo, `git remote get-url origin`) and, when present, stamps it onto each commit candidate's metadata under `origin_url` alongside the existing `repo_root`.
+   - The git watcher (src/capture/surfaces/git-watcher.ts) resolves each watched repo's origin URL with a **repo-root-scoped** command — `git -C <repo_root> remote get-url origin` — NOT a bare process-cwd `git remote get-url origin`, which would mis-stamp under multiple watched repos, git worktrees, or `.git`-file checkouts (r1 codex F2). Embedded credentials are stripped (AC7); when a non-empty remote is present, it stamps the scrubbed URL onto each commit candidate's metadata under `origin_url` alongside the existing `repo_root`.
+   - **The per-repo origin resolution is cached in a bounded, invalidatable cache that does NOT permanently pin an absent/failed result** (r1 codex-ops F2). An initial miss, a transient `git`/config-read failure, or a remote added or changed later must be re-resolved for future commit candidates rather than stuck on local fallback or a stale URL until daemon restart. Mirror the TTL-bounded approach `probeGitState` already uses for its per-cwd cache.
    - The git adapter (src/normalize/adapters/git.ts) reads `metadata.origin_url` and passes it to `repoArtifact(originUrl ?? null, repoRoot)` instead of the current hardcoded `repoArtifact(null, repoRoot)`. When `origin_url` is absent, behavior is identical to today (local fallback).
    - Observable outcome: a git commit atom in a remote-backed checkout produces the same repo `provider`/`id` as codex/claude_code for that remote.
 
@@ -73,6 +79,10 @@ The repo identity that codex already uses — the normalized remote URL — is t
    - The canonical repo id is derived purely from the normalized remote URL, independent of the local checkout path. The same remote checked out at a different local path (and/or a different OS path style — `/Users/...` vs `C:\...`) resolves to the same repo id and therefore joins the same cluster. (`locator` may still differ per machine; identity does not.)
 
 6. **Regression guard.** The existing test suite, typecheck, and lint all stay green. Remote-less repos and not-a-git-repo cwds behave exactly as before (local fallback / undefined). The `probeGitState` cache, freshness window, and stale-turn partial-GitState path are unchanged except for the additive `origin_url` field.
+
+7. **No persisted credentials (security; r1 codex-ops F1).** Any embedded URL userinfo (`https://user:token@host/…`) is stripped from the origin URL **at capture time**, in BOTH `probeGitState` (AC1) and the git watcher (AC3), before it is written to `metadata.git_state.origin_url` / `metadata.origin_url`. No atom, cluster, or derived artifact id ever contains a credential. A credential-bearing remote resolves to the same clean canonical id as its credential-free form. (Scrubbing is done in the capture code, not by mutating `normalizeRemoteUrl`/`artifacts.ts` — see Locked decision 6/7.)
+
+8. **Tests (builder-authored; r1 codex F1).** The builder writes unit + integration tests covering: probe + watcher origin capture; repo-root scoping (AC3); credential scrubbing (AC7), **including a credential-bearing-remote regression case**; cache retry/invalidation on an absent-then-present remote (AC3); cross-adapter repo-id convergence + derived file-id prefix convergence (AC4); machine-independence across POSIX and `C:\` local roots (AC5); and remote-less local fallback (AC6). Tests live under `tests/capture/` and `tests/normalize/` per the files_to_modify entries. (These are the builder's own tests; behavior is the contract, not a specific assertion shape.)
 
 ## Out of Scope (Don't Drift)
 
