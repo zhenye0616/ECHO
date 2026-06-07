@@ -1789,3 +1789,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
 
+
+### 2026-06-06 21:51 PDT - codex r2 review tick on 2026-06-06-095-canonical-repo-identity
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/request.md` and published `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/codex.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=9b9168bb-8314-4340-a051-a27a2988e0bf)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/tmp/claude-501/echo-codex-0C2033D6-2A10-4156-B731-3A6B9D1CB9C7/raw/internal/review-queue/3dfa40f7-e490-4c47-87d1-87ec79ef15e4/codex.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/codex.md` at `9ad0d163e40d138815079cdadc2df44c4d96a33a`.
+- **Sources:** request `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/request.md`; artifact `backlog/proposed/2026-06-06-095-canonical-repo-identity.md@a3a95e04cc1c60ede37b9813c37d6a45253707db`; response `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-0C2033D6-2A10-4156-B731-3A6B9D1CB9C7/raw/internal/review-queue/3dfa40f7-e490-4c47-87d1-87ec79ef15e4/codex.stdout.log` / `/tmp/claude-501/echo-codex-0C2033D6-2A10-4156-B731-3A6B9D1CB9C7/raw/internal/review-queue/3dfa40f7-e490-4c47-87d1-87ec79ef15e4/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
