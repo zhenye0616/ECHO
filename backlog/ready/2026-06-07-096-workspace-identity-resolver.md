@@ -8,6 +8,7 @@ created: 2026-06-07
 blocked_by: []
 task_state_ref: 2026-06-07-096-workspace-identity-resolver
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: c025faed9cbd80a6d83e9bd30f53fb861fbfc9ef036fdee2c7d44e806c218038
 claimed_by: ""
 claimed_at: ""
 branch: ""
