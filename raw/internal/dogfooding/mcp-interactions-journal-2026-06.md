@@ -1807,3 +1807,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/request.md`; artifact `backlog/proposed/2026-06-06-095-canonical-repo-identity.md@a3a95e04cc1c60ede37b9813c37d6a45253707db`; response `backlog/reviews/2026-06-06-095-canonical-repo-identity/r2/codex-ops.md`; raw diagnostics `/tmp/claude-501/echo-codex-ops-FD363286-9F96-442B-8697-512662B325A7/raw/internal/review-queue/54157ec1-05e4-4d14-b987-a4c1e4a6b6ec/codex-ops.stdout.log` / `/tmp/claude-501/echo-codex-ops-FD363286-9F96-442B-8697-512662B325A7/raw/internal/review-queue/54157ec1-05e4-4d14-b987-a4c1e4a6b6ec/codex-ops.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-06 22:01 PDT - codex builder ECHO daemon probe failed before claim
+
+- **Trigger:** Builder invocation for `/process-backlog`; AGENTS.md instructed Codex to use ECHO MCP for prior cross-tool context before backlog work.
+- **Query inputs:** `tool_search("ECHO MCP find_clusters search_memories get_atom echo_ping")` exposed no ECHO MCP namespace; local adapter showed daemon URL `http://127.0.0.1:38478/mcp`; raw HTTP MCP `initialize` POST attempted against that URL from this Codex shell.
+- **Returned:** `curl: (7) Failed to connect to 127.0.0.1 port 38478 after 0 ms: Couldn't connect to server`. No clusters, atoms, or memories returned.
+- **Sources:** `~/.echo/adapters/codex.json`; `~/.echo/state/onboarding.json`; raw HTTP endpoint probe.
+- **Verdict:** wrong / unavailable - this Codex session cannot currently reach the ECHO daemon even though onboarding says Codex is wired for `mcp.echo.read` and `mcp.echo.write`.
+- **Note:** Proceeding with filesystem/git backlog protocol only. This is a retrieval-path availability failure, not evidence about project state.
