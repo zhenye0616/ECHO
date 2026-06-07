@@ -1,10 +1,12 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import { execFile } from 'node:child_process';
+import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { isNonEmptyString } from '../../guards.js';
 import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
+import { scrubOriginUrlCredentials } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { normalizeRepoPath } from '../sources.js';
 
@@ -15,6 +17,8 @@ const DIFF_TRUNCATE_BYTES = 100 * 1024;
 const DEFAULT_POLL_MS = 30_000;
 const DEFAULT_BACKFILL = 50;
 const FORMAT = '%H%x1f%P%x1f%aI%x1f%an%x1f%s%x1f%b%x1e';
+const ORIGIN_CACHE_TTL_MS = 5_000;
+const ORIGIN_CACHE_MAX_ENTRIES = 256;
 
 function getBackfillCount(): number {
   const env = process.env['ECHO_GIT_BACKFILL_COMMITS'];
@@ -51,6 +55,66 @@ async function git(args: string[], cwd: string): Promise<string | null> {
   }
 }
 
+interface OriginCacheEntry {
+  originUrl: string;
+  expiresAt: number;
+  configMtimeMs: number | null;
+}
+
+const originCache = new Map<string, OriginCacheEntry>();
+
+function lruSet<K, V>(map: Map<K, V>, key: K, value: V, maxEntries: number): void {
+  if (map.size >= maxEntries && !map.has(key)) {
+    const oldest = map.keys().next().value;
+    if (oldest !== undefined) map.delete(oldest);
+  }
+  map.set(key, value);
+}
+
+async function repoConfigMtime(repo: string): Promise<number | null> {
+  try {
+    const st = await stat(join(repo, '.git', 'config'));
+    return st.mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+async function getOriginUrl(repo: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileP('git', ['-C', repo, 'remote', 'get-url', 'origin'], {
+      timeout: 1_500,
+      maxBuffer: 1_024 * 1_024,
+    });
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+async function resolveOriginUrl(repo: string): Promise<string | undefined> {
+  const now = Date.now();
+  const configMtimeMs = await repoConfigMtime(repo);
+  const cached = originCache.get(repo);
+  if (cached !== undefined && cached.expiresAt > now && cached.configMtimeMs === configMtimeMs) {
+    return cached.originUrl;
+  }
+
+  const originUrl = scrubOriginUrlCredentials(await getOriginUrl(repo));
+  if (originUrl === undefined) {
+    originCache.delete(repo);
+    return undefined;
+  }
+
+  lruSet(
+    originCache,
+    repo,
+    { originUrl, expiresAt: now + ORIGIN_CACHE_TTL_MS, configMtimeMs },
+    ORIGIN_CACHE_MAX_ENTRIES,
+  );
+  return originUrl;
+}
+
 async function getHead(repo: string): Promise<string | null> {
   const out = await git(['rev-parse', 'HEAD'], repo);
   return out === null ? null : out.trim();
@@ -82,8 +146,7 @@ function parseCommitRecords(out: string): CommitInfo[] {
     const trimmedSha = sha.replace(/^\n+/, '').trim();
     if (trimmedSha.length === 0) continue;
     const parentList = parents.trim();
-    const parent_sha =
-      parentList.length === 0 ? undefined : parentList.split(' ')[0];
+    const parent_sha = parentList.length === 0 ? undefined : parentList.split(' ')[0];
     commits.push({
       sha: trimmedSha,
       parent_sha,
@@ -121,10 +184,7 @@ interface CommitStats {
 }
 
 async function getCommitStats(repo: string, sha: string): Promise<CommitStats> {
-  const out = await git(
-    ['show', sha, '--no-color', '--format=', '--shortstat'],
-    repo,
-  );
+  const out = await git(['show', sha, '--no-color', '--format=', '--shortstat'], repo);
   if (out === null) return { files_changed: 0, additions: 0, deletions: 0 };
   const line = out.trim();
   let files_changed = 0;
@@ -158,11 +218,7 @@ async function getChangedFiles(
   return files;
 }
 
-async function getDiff(
-  repo: string,
-  sha: string,
-  parent: string | undefined,
-): Promise<string> {
+async function getDiff(repo: string, sha: string, parent: string | undefined): Promise<string> {
   const raw =
     parent !== undefined
       ? await git(['diff', `${parent}..${sha}`, '--no-color'], repo)
@@ -181,15 +237,12 @@ function shortSha(sha: string): string {
   return sha.slice(0, 7);
 }
 
-async function buildAndEmit(
-  repo: string,
-  commit: CommitInfo,
-  storage: Storage,
-): Promise<boolean> {
-  const [stats, diff, changedFiles] = await Promise.all([
+async function buildAndEmit(repo: string, commit: CommitInfo, storage: Storage): Promise<boolean> {
+  const [stats, diff, changedFiles, originUrl] = await Promise.all([
     getCommitStats(repo, commit.sha),
     getDiff(repo, commit.sha, commit.parent_sha),
     getChangedFiles(repo, commit.sha, commit.parent_sha),
+    resolveOriginUrl(repo),
   ]);
 
   const bodyBlock = commit.body.length > 0 ? `${commit.body}\n\n` : '';
@@ -205,6 +258,7 @@ async function buildAndEmit(
   };
   if (commit.parent_sha !== undefined) metadata['parent_sha'] = commit.parent_sha;
   if (changedFiles.length > 0) metadata['files_referenced'] = changedFiles;
+  if (originUrl !== undefined) metadata['origin_url'] = originUrl;
 
   const candidate = {
     source: `git:${repo}`,
@@ -222,10 +276,12 @@ async function buildAndEmit(
   return true;
 }
 
-async function discoverLastSeen(
-  repo: string,
-  storage: Storage,
-): Promise<string | undefined> {
+/** For tests: clear the per-repo origin cache. */
+export function _resetGitWatcherOriginCache(): void {
+  originCache.clear();
+}
+
+async function discoverLastSeen(repo: string, storage: Storage): Promise<string | undefined> {
   // Walk git log from HEAD backwards, return the first SHA that's already in
   // storage. This is deterministic regardless of storage's timestamp tie-break:
   // event ids are uuids and don't reflect git chronology on same-second commits,
@@ -304,12 +360,7 @@ export async function startGitWatcher(
       }
       if (state.lastSeen === head) return;
 
-      const commits = await enumerateNewCommits(
-        state.repo,
-        head,
-        state.lastSeen,
-        backfillLimit,
-      );
+      const commits = await enumerateNewCommits(state.repo, head, state.lastSeen, backfillLimit);
       if (stopped) return;
 
       for (const commit of commits) {

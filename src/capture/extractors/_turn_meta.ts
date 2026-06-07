@@ -27,6 +27,8 @@ export interface GitState {
   head_sha?: string;
   /** Branch ref name (`HEAD` if detached). */
   branch?: string;
+  /** Repo remote (origin) URL captured at probe time, with URL userinfo stripped. */
+  origin_url?: string;
   /** Number of files with uncommitted changes (porcelain count). */
   dirty_count?: number;
   /** When ECHO sampled `git`. May be later than the turn timestamp for

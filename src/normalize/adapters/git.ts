@@ -1,23 +1,7 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import {
-  branchArtifact,
-  commitArtifact,
-  fileArtifact,
-  repoArtifact,
-} from '../artifacts.js';
-import type {
-  Adapter,
-  ArtifactRef,
-  ContextRef,
-  NormalizedContextEvent,
-} from '../types.js';
-import {
-  buildProvenance,
-  fail,
-  getNumber,
-  getString,
-  getStringArray,
-} from './_shared.js';
+import { branchArtifact, commitArtifact, fileArtifact, repoArtifact } from '../artifacts.js';
+import type { Adapter, ArtifactRef, ContextRef, NormalizedContextEvent } from '../types.js';
+import { buildProvenance, fail, getNumber, getString, getStringArray } from './_shared.js';
 
 export const GIT_VERSION = 'git@1';
 
@@ -29,9 +13,7 @@ export function matchesGit(source: string): boolean {
 
 const COMMIT_RE = /^COMMIT [^:]+: (.*?)\n\n([\s\S]*?)--- DIFF ---\n([\s\S]*)$/;
 
-export const adaptGit: Adapter = (
-  event: CaptureEvent,
-): NormalizedContextEvent => {
+export const adaptGit: Adapter = (event: CaptureEvent): NormalizedContextEvent => {
   const meta = event.metadata;
   const sha = getString(meta, 'sha');
   if (sha === undefined) {
@@ -48,8 +30,9 @@ export const adaptGit: Adapter = (
   const filesChanged = getNumber(meta, 'files_changed');
   const branch = getString(meta, 'branch');
   const parentSha = getString(meta, 'parent_sha');
+  const originUrl = getString(meta, 'origin_url');
 
-  const repo = repoArtifact(null, repoRoot);
+  const repo = repoArtifact(originUrl ?? null, repoRoot);
   const artifacts: ArtifactRef[] = [repo, commitArtifact(repo.id, sha)];
   if (branch !== undefined) artifacts.push(branchArtifact(repo.id, branch));
   for (const path of filesReferenced) {
@@ -68,8 +51,7 @@ export const adaptGit: Adapter = (
   if (additions !== undefined) ambient.additions = String(additions);
   if (deletions !== undefined) ambient.deletions = String(deletions);
 
-  const context: ContextRef | undefined =
-    Object.keys(ambient).length > 0 ? { ambient } : undefined;
+  const context: ContextRef | undefined = Object.keys(ambient).length > 0 ? { ambient } : undefined;
 
   const summaryParts: string[] = [];
   if (filesChanged !== undefined) summaryParts.push(`${filesChanged} files changed`);
