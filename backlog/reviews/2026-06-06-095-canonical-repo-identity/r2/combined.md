@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — clean `proceed` with zero findings from both reviewers. All four r1 findings (repo-root-scoped + invalidatable origin cache, capture-time credential scrub, builder test coverage) were patched into the spec and verified at `a3a95e04`; no new hazards surfaced. Spec converged in 2 rounds; promoting proposed → ready.
 

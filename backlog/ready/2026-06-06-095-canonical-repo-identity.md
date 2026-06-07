@@ -8,6 +8,7 @@ created: 2026-06-06
 blocked_by: []
 task_state_ref: 2026-06-06-095-canonical-repo-identity
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: ad97666b9edb61c1a3959f1d7287b4901fd6a4361313884967c111f9b6948365
 files_to_modify:
   - src/capture/extractors/_turn_meta.ts        # AC1 — add optional origin_url field to GitState interface
   - src/capture/git-state.ts                     # AC1 — probeGitState runs the cwd-scoped `git remote get-url origin`, strips embedded credentials, stamps GitState.origin_url; cached like the other fields under the existing TTL
