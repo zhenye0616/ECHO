@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R6` — both reviewers (codex, codex-ops) returned `proceed` with **zero findings** against the holistically-rewritten spec (`3bc9042d`). The r5 fresh-context consolidation pass closed the last contradictions (git-state.ts frontmatter, AC8 verification commands, git_alias/key consistency) and r6 verified them clean. Spec converged over 6 rounds (finding arc 5→2→5→1→3→0); the local-minimum break at r5 (separate fresh codex per founder direction) was decisive. Promoting `proposed/ → ready/`.
 
