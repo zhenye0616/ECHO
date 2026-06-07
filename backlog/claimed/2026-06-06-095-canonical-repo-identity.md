@@ -8,6 +8,9 @@ created: 2026-06-06
 blocked_by: []
 task_state_ref: 2026-06-06-095-canonical-repo-identity
 requested_reviewers: ["codex", "codex-ops"]
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-07T05:02:58Z"
+branch: "agent/canonical-repo-identity"
 ready_content_sha: ad97666b9edb61c1a3959f1d7287b4901fd6a4361313884967c111f9b6948365
 files_to_modify:
   - src/capture/extractors/_turn_meta.ts        # AC1 — add optional origin_url field to GitState interface
