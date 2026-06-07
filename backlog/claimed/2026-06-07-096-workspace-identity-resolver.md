@@ -9,9 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-07-096-workspace-identity-resolver
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: c025faed9cbd80a6d83e9bd30f53fb861fbfc9ef036fdee2c7d44e806c218038
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "codex-builder-F5CFFC27-E8BD-486A-94FA-8CFF1CBC6D3C"
+claimed_at: "2026-06-07T19:58:59Z"
+branch: "agent/096-workspace-identity-resolver"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
