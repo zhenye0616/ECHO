@@ -22,7 +22,50 @@ agent_notes: |
   - Builder-run broader suites: tests/trace 105/105, tests/normalize 73/73, tests/capture 235 passed/17 skipped.
   - Known flake (NON-blocking, same as 095/followups): `tests/trace/build.test.ts` perf threshold (<500ms) trips only under combined tests/normalize+trace+capture load (~628ms); passes standalone at ~241ms. Categorically a load-timing flake, not a regression from this capture/normalize change.
   head_sha = cb54f8def2b0e91c67199d356b7e8c907733dc0e (branch agent/096-workspace-identity-resolver, pushed to origin).
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-07 via founder reconciliation (codex-builder → subagent-review → merge).
+
+  Review path: the founder directed a Codex builder to build, then an INDEPENDENT Claude
+  code-reviewer subagent to review (in lieu of /review-pending). The subagent is cross-vendor
+  to the Codex builder, satisfying reviewer-independence. No .review.md sidecar was produced;
+  this note is the review-of-record.
+
+  Conflicts resolved:
+  - none (clean --no-ff; main only carried backlog state-transition commits since the claim
+    point 56cad6db; the 12 code/test files were untouched on main → git reported zero conflicts).
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied: none (subagent verdict was MERGE AS-IS).
+
+  Independent review (Claude code-reviewer subagent, cross-vendor to the Codex builder):
+  verdict MERGE AS-IS. All 8 ACs Met with file:line evidence and non-trivial test coverage.
+  Critical point verified: AC2 — probeGitState.repo_root uses the git-only gitToplevel
+  primitive (NOT resolveCanonicalRoot), so 095's git_state semantics are preserved (no
+  regression). AC7 normalize tests assert the exact `local:workspace:<root>` key AND that no
+  `type:"repo"` / `github:repo:` edge exists (proves LD2's single-join-key invariant, not a
+  union tautology). Zero drift: src/trace/cluster.ts, src/trace/index.ts,
+  src/normalize/adapters/cursor.ts, _shared.ts unmodified; normalizeRemoteUrl body byte-unchanged.
+  No bugs found.
+
+  Verify (orchestrator-reproduced from the merger worktree, post-merge):
+  typecheck clean; lint clean; coupled-invariants OK; sync-skills --check OK; touched suites
+  (tests/capture + tests/normalize + tests/trace) 413 passed / 17 skipped across 28 files —
+  including tests/trace/build.test.ts (green here). Focused 22/22 confirmed pre-merge.
+
+  Known flake (NON-blocking, documented 094/095 + followups R5): tests/trace/build.test.ts
+  perf threshold (<500ms) trips only under maximal full-suite combined load (~628ms); passes
+  standalone and in the capture+normalize+trace combined run here. Not a regression from this
+  capture/normalize change.
+
+  Follow-up items (non-blocking):
+  - Strategist: promote the After-Completion wiki page (workspace identity = canonical-root
+    same-machine join key, git as enrichment alias) and update backlog/_followups.md R1
+    (mark git-init-transition / non-git same-machine split closed; keep cross-machine-non-git,
+    identity-at-rest #2, Cursor, residuals d/e open).
+  - Post-deploy dogfood check: confirm the claude_code+codex halves of one session stop
+    fragmenting into sibling clusters (the live R1 failure observed during this spec's design).
+  - NOT yet deployed: live in capture only after the daemon rebuild+reinstall (same as 095).
 files_to_modify:
   - src/capture/workspace-root.ts                 # NEW — resolveCanonicalRoot plus shared gitToplevel/canonicalization helpers; git toplevel -> anchor walk -> reported dir; no-throw capture-time resolver.
   - src/capture/git-state.ts                      # AC1/AC2 — share git-only gitToplevel (and optional GIT_PROBE_TIMEOUT_MS); repo_root stays null on git failure; origin_url capture unchanged. Do not use resolveCanonicalRoot here.

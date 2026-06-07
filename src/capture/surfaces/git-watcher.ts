@@ -9,6 +9,7 @@ import type { Storage } from '../../storage/interface.js';
 import { scrubOriginUrlCredentials } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
 import { normalizeRepoPath } from '../sources.js';
+import { canonicalizePath, GIT_PROBE_TIMEOUT_MS, gitToplevel } from '../workspace-root.js';
 
 const log = createLogger('capture.surfaces.git');
 const execFileP = promisify(execFile);
@@ -83,7 +84,7 @@ async function repoConfigMtime(repo: string): Promise<number | null> {
 async function getOriginUrl(repo: string): Promise<string | null> {
   try {
     const { stdout } = await execFileP('git', ['-C', repo, 'remote', 'get-url', 'origin'], {
-      timeout: 1_500,
+      timeout: GIT_PROBE_TIMEOUT_MS,
       maxBuffer: 1_024 * 1_024,
     });
     return stdout.trim();
@@ -113,6 +114,12 @@ async function resolveOriginUrl(repo: string): Promise<string | undefined> {
     ORIGIN_CACHE_MAX_ENTRIES,
   );
   return originUrl;
+}
+
+async function resolveGitCanonicalRoot(repo: string): Promise<string | undefined> {
+  const toplevel = await gitToplevel(repo);
+  if (toplevel === null) return undefined;
+  return canonicalizePath(toplevel);
 }
 
 async function getHead(repo: string): Promise<string | null> {
@@ -238,11 +245,12 @@ function shortSha(sha: string): string {
 }
 
 async function buildAndEmit(repo: string, commit: CommitInfo, storage: Storage): Promise<boolean> {
-  const [stats, diff, changedFiles, originUrl] = await Promise.all([
+  const [stats, diff, changedFiles, originUrl, canonicalRoot] = await Promise.all([
     getCommitStats(repo, commit.sha),
     getDiff(repo, commit.sha, commit.parent_sha),
     getChangedFiles(repo, commit.sha, commit.parent_sha),
     resolveOriginUrl(repo),
+    resolveGitCanonicalRoot(repo),
   ]);
 
   const bodyBlock = commit.body.length > 0 ? `${commit.body}\n\n` : '';
@@ -259,6 +267,7 @@ async function buildAndEmit(repo: string, commit: CommitInfo, storage: Storage):
   if (commit.parent_sha !== undefined) metadata['parent_sha'] = commit.parent_sha;
   if (changedFiles.length > 0) metadata['files_referenced'] = changedFiles;
   if (originUrl !== undefined) metadata['origin_url'] = originUrl;
+  if (canonicalRoot !== undefined) metadata['canonical_root'] = canonicalRoot;
 
   const candidate = {
     source: `git:${repo}`,

@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { GitState } from './extractors/_turn_meta.js';
+import { GIT_PROBE_TIMEOUT_MS, gitToplevel } from './workspace-root.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -41,7 +42,7 @@ async function gitOne(cwd: string, args: string[]): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync('git', args, {
       cwd,
-      timeout: 1_500,
+      timeout: GIT_PROBE_TIMEOUT_MS,
       maxBuffer: 1_024 * 1_024,
     });
     return stdout.trim();
@@ -83,11 +84,21 @@ export async function probeGitState(
     return { ...cached.state, fresh };
   }
 
+  const repoRoot = await gitToplevel(cwd);
+  if (repoRoot === null) {
+    // Not a git repo, or git not available — cache the negative briefly.
+    lruSet(cache, cwd, {
+      state: { captured_at: new Date(now).toISOString() },
+      expiresAt: now + CACHE_TTL_MS,
+    });
+    return undefined;
+  }
+
   const [headSha, branch, dirty, originUrl] = await Promise.all([
-    gitOne(cwd, ['rev-parse', 'HEAD']),
-    gitOne(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']),
-    gitOne(cwd, ['status', '--porcelain']),
-    gitOne(cwd, ['remote', 'get-url', 'origin']),
+    gitOne(repoRoot, ['rev-parse', 'HEAD']),
+    gitOne(repoRoot, ['rev-parse', '--abbrev-ref', 'HEAD']),
+    gitOne(repoRoot, ['status', '--porcelain']),
+    gitOne(repoRoot, ['remote', 'get-url', 'origin']),
   ]);
 
   if (headSha === null) {

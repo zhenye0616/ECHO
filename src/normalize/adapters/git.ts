@@ -1,5 +1,12 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import { branchArtifact, commitArtifact, fileArtifact, repoArtifact } from '../artifacts.js';
+import {
+  branchArtifact,
+  commitArtifact,
+  fileArtifact,
+  normalizeRemoteUrl,
+  repoArtifact,
+  workspaceArtifact,
+} from '../artifacts.js';
 import type { Adapter, ArtifactRef, ContextRef, NormalizedContextEvent } from '../types.js';
 import { buildProvenance, fail, getNumber, getString, getStringArray } from './_shared.js';
 
@@ -31,12 +38,16 @@ export const adaptGit: Adapter = (event: CaptureEvent): NormalizedContextEvent =
   const branch = getString(meta, 'branch');
   const parentSha = getString(meta, 'parent_sha');
   const originUrl = getString(meta, 'origin_url');
+  const canonicalRoot = getString(meta, 'canonical_root');
 
+  const workspace = canonicalRoot !== undefined ? workspaceArtifact(canonicalRoot) : null;
   const repo = repoArtifact(originUrl ?? null, repoRoot);
-  const artifacts: ArtifactRef[] = [repo, commitArtifact(repo.id, sha)];
-  if (branch !== undefined) artifacts.push(branchArtifact(repo.id, branch));
+  const scopeId = workspace !== null ? `workspace:${workspace.id}` : repo.id;
+  const fileRoot = workspace !== null ? canonicalRoot : repoRoot;
+  const artifacts: ArtifactRef[] = [workspace ?? repo, commitArtifact(scopeId, sha)];
+  if (branch !== undefined) artifacts.push(branchArtifact(scopeId, branch));
   for (const path of filesReferenced) {
-    artifacts.push(fileArtifact(repo.id, path, repoRoot));
+    artifacts.push(fileArtifact(scopeId, path, fileRoot));
   }
 
   const parsed = parseCommitContent(event.content);
@@ -50,6 +61,7 @@ export const adaptGit: Adapter = (event: CaptureEvent): NormalizedContextEvent =
   if (filesChanged !== undefined) ambient.files_changed = String(filesChanged);
   if (additions !== undefined) ambient.additions = String(additions);
   if (deletions !== undefined) ambient.deletions = String(deletions);
+  if (originUrl !== undefined) ambient.git_alias = normalizeRemoteUrl(originUrl);
 
   const context: ContextRef | undefined = Object.keys(ambient).length > 0 ? { ambient } : undefined;
 
@@ -78,7 +90,7 @@ export const adaptGit: Adapter = (event: CaptureEvent): NormalizedContextEvent =
     artifacts,
     state: {
       delta: {
-        artifact_id: `${repo.id}::${sha}`,
+        artifact_id: `${scopeId}::${sha}`,
         kind: 'commit',
         ...(summary.length > 0 ? { detail: summary } : {}),
       },

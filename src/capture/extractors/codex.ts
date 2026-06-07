@@ -5,6 +5,7 @@ import { createLogger } from '../../logging/index.js';
 import type { Storage } from '../../storage/interface.js';
 import { probeGitState } from '../git-state.js';
 import { processCandidate } from '../pipeline.js';
+import { resolveCanonicalRoot } from '../workspace-root.js';
 import {
   dedupStrings,
   readJsonlTail,
@@ -293,7 +294,10 @@ function parseLine(line: string): ParsedLine | null {
         if (typeof ec === 'number' && ec !== 0) out.tool_is_error = true;
       }
     }
-    if (out.tool_output !== undefined && /Process exited with code (?!0\b)\d+/.test(out.tool_output)) {
+    if (
+      out.tool_output !== undefined &&
+      /Process exited with code (?!0\b)\d+/.test(out.tool_output)
+    ) {
       out.tool_is_error = true;
     }
     return out;
@@ -422,7 +426,10 @@ function mergeCodexMeta(
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function gitStateFromCodexGit(git: CodexGitMeta | undefined, timestamp: string): GitState | undefined {
+function gitStateFromCodexGit(
+  git: CodexGitMeta | undefined,
+  timestamp: string,
+): GitState | undefined {
   if (git === undefined) return undefined;
   const state: GitState = { captured_at: timestamp, fresh: false };
   if (isNonEmptyString(git.sha)) state.head_sha = git.sha;
@@ -477,16 +484,15 @@ export async function extractCodexTurns(
     if (pending.git !== undefined) turn.git = pending.git;
     if (pending.codex !== undefined) turn.codex = pending.codex;
     if (pending.toolCalls.length > 0) {
-      turn.tool_calls = pending.toolCalls
-        .map((p) =>
-          buildToolCall({
-            name: p.name,
-            call_id: p.call_id,
-            argsRaw: p.args,
-            outputRaw: p.output,
-            is_error: p.is_error,
-          }),
-        );
+      turn.tool_calls = pending.toolCalls.map((p) =>
+        buildToolCall({
+          name: p.name,
+          call_id: p.call_id,
+          argsRaw: p.args,
+          outputRaw: p.output,
+          is_error: p.is_error,
+        }),
+      );
     }
     if (pending.toolCallTotal > 0) {
       turn.tool_call_total = pending.toolCallTotal;
@@ -770,8 +776,13 @@ export async function startCodexExtractor(
     if (cur.cwd !== undefined) extractInput.lastKnownCwd = cur.cwd;
     if (cur.git !== undefined) extractInput.lastKnownGit = cur.git;
     if (cur.codex !== undefined) extractInput.lastKnownCodex = cur.codex;
-    const { turns, newOffset, cwd: passCwd, git: passGit, codex: passCodex } =
-      await extractCodexTurns(path, cur.offset, extractInput);
+    const {
+      turns,
+      newOffset,
+      cwd: passCwd,
+      git: passGit,
+      codex: passCodex,
+    } = await extractCodexTurns(path, cur.offset, extractInput);
     let nextTurnIndex = cur.turn_index + 1;
     for (const turn of turns) {
       const metadata: Record<string, unknown> = {
@@ -784,6 +795,7 @@ export async function startCodexExtractor(
       if (turn.cwd !== undefined) {
         metadata['cwd'] = turn.cwd;
         metadata['repo_root'] = turn.cwd;
+        metadata['canonical_root'] = await resolveCanonicalRoot(turn.cwd);
       }
       if (turn.git !== undefined) metadata['git'] = turn.git;
       if (turn.codex !== undefined) metadata['codex'] = turn.codex;

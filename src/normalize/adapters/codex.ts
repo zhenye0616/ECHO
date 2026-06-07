@@ -1,11 +1,11 @@
 import type { CaptureEvent } from '../../storage/interface.js';
-import { conversationArtifact, fileArtifact } from '../artifacts.js';
-import type {
-  Adapter,
-  ArtifactRef,
-  ContextRef,
-  NormalizedContextEvent,
-} from '../types.js';
+import {
+  conversationArtifact,
+  fileArtifact,
+  normalizeRemoteUrl,
+  workspaceArtifact,
+} from '../artifacts.js';
+import type { Adapter, ArtifactRef, ContextRef, NormalizedContextEvent } from '../types.js';
 import {
   buildAssistant,
   buildConversation,
@@ -29,9 +29,7 @@ export function matchesCodex(source: string): boolean {
   return CODEX_SOURCE_RE.test(source);
 }
 
-export const adaptCodex: Adapter = (
-  event: CaptureEvent,
-): NormalizedContextEvent | null => {
+export const adaptCodex: Adapter = (event: CaptureEvent): NormalizedContextEvent | null => {
   // Source-prefix dispatch is coarse — see claude-code adapter for context.
   const pair = tryParseTurnPair(event.content);
   if (pair === null) return null;
@@ -45,19 +43,24 @@ export const adaptCodex: Adapter = (
   const turn_index = getNumber(meta, 'turn_index');
   const had_tool_use = getBoolean(meta, 'had_tool_use') === true;
   const repo_root = getString(meta, 'repo_root') ?? getString(meta, 'cwd');
+  const canonicalRoot = getString(meta, 'canonical_root');
   const filesReferenced = getStringArray(meta, 'files_referenced');
   const codex = getRecord(meta, 'codex');
   const git = getRecord(meta, 'git');
   const model = codex !== undefined ? getString(codex, 'model') : undefined;
 
   const originUrl = git !== undefined ? getString(git, 'origin_url') : undefined;
-  const repo = buildRepoArtifact(repo_root, originUrl);
+  const workspace = canonicalRoot !== undefined ? workspaceArtifact(canonicalRoot) : null;
+  const repo = workspace === null ? buildRepoArtifact(repo_root, originUrl) : null;
+  const scopeId = workspace !== null ? `workspace:${workspace.id}` : (repo?.id ?? null);
+  const fileRoot = workspace !== null ? canonicalRoot : repo_root;
   const artifacts: ArtifactRef[] = [conversationArtifact('codex', session_id)];
-  if (repo !== null) artifacts.push(repo.artifact);
+  if (workspace !== null) artifacts.push(workspace);
+  else if (repo !== null) artifacts.push(repo.artifact);
 
   if (filesReferenced !== undefined) {
     for (const path of filesReferenced) {
-      artifacts.push(fileArtifact(repo?.id ?? null, path, repo_root));
+      artifacts.push(fileArtifact(scopeId, path, fileRoot));
     }
   }
 
@@ -79,11 +82,12 @@ export const adaptCodex: Adapter = (
     const branch = getString(git, 'branch');
     if (branch !== undefined) ambient.branch = branch;
   }
+  if (originUrl !== undefined) ambient.git_alias = normalizeRemoteUrl(originUrl);
 
-  const context: ContextRef | undefined =
-    Object.keys(ambient).length > 0 ? { ambient } : undefined;
+  const context: ContextRef | undefined = Object.keys(ambient).length > 0 ? { ambient } : undefined;
 
-  const provider = codex !== undefined ? getString(codex, 'model_provider') ?? 'openai' : 'openai';
+  const provider =
+    codex !== undefined ? (getString(codex, 'model_provider') ?? 'openai') : 'openai';
   const out: NormalizedContextEvent = {
     schema_version: 1,
     id: event.id,
@@ -93,10 +97,7 @@ export const adaptCodex: Adapter = (
       surface: 'jsonl',
       raw_pointer: event.source,
     },
-    actors: [
-      { role: 'user' },
-      buildAssistant(model, provider),
-    ],
+    actors: [{ role: 'user' }, buildAssistant(model, provider)],
     action: {
       kind: 'message',
       input: pair.user,
@@ -113,4 +114,3 @@ export const adaptCodex: Adapter = (
 
   return out;
 };
-
