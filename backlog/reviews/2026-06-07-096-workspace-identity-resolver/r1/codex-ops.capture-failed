@@ -1,0 +1,10 @@
+---
+item_id: "2026-06-07-096-workspace-identity-resolver"
+round: 1
+reviewer: "codex-ops"
+failed_at: "2026-06-07T19:02:52Z"
+failure_class: "schema_invalid"
+rc: 0
+---
+
+/tmp/claude-501/echo-codex-ops-368A2798-3F75-4699-87D9-BB26C9A3D0CF/raw/internal/review-queue/becc7809-78bd-48f2-95ae-6d52bfb95320/codex-ops.final.md: schema violation at artifact_sha: 'eba1c60375384c9b0ad0c18f5a928e7605a928e7605a0fef4' does not match '^[0-9a-f]{7,40}$'
