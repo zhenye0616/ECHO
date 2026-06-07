@@ -15,6 +15,27 @@ head_sha: "9c75323600aaf379ba1a2d425298de099383d157"
 pr_url: ""
 agent_notes: |
   BLOCKED: default `npm test` times out in `tests/mcp/recent-calls-endpoint.test.ts` under full-suite load even though the implementation's focused tests, lint, typecheck, formatting check, and the timed-out test's isolated rerun pass. Tried: ran focused origin/convergence tests, `npm run typecheck`, `npm run lint`, `npx prettier --check`, `git diff --check`, full `npm test` twice, and isolated `npm test -- tests/mcp/recent-calls-endpoint.test.ts`. Best guess: full-suite load/timing flake unrelated to this origin-url change, but confidence is not high enough to mark AC6 green while the default full-suite command exits non-zero. Why escalated: stopping rule for a test failure after two reasonable attempts.
+review_notes: |
+  Merged on 2026-06-07 via founder reconciliation (full-auto pipeline run).
+
+  Conflicts resolved:
+  - none (clean --no-ff merge; main's 1 intervening commit did not touch the 4 production files; git merge-tree reported zero conflicts)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (verdict was merge as-is)
+
+  Independent review: code-reviewer subagent (Claude, cross-vendor to the Codex builder) — verdict "merge as-is", all 8 ACs Met with file:line evidence, zero drift. Sidecar archived in the merge diff.
+
+  Held-out verification (blind oracle): the independently-authored holdout/r1-repo-identity suite (4 tests, authored blind from the converged gap brief, never seen by the spec author or the builder) was red 4/4 on pre-fix main and is GREEN 4/4 against this fix. Decisive non-overfit signal.
+
+  AC6 / known-flake disposition: the builder's BLOCKED escalation was the documented tests/mcp/recent-calls-endpoint.test.ts full-suite concurrency flake (passes in isolation; 094 ruled it categorically non-regressable; a capture-side origin-url change cannot touch an MCP endpoint test). Dispositioned "continue", consistent with the 094 merge.
+
+  Verify (post-merge, live checkout): typecheck clean; lint clean; focused tests 7/7 (tests/capture + tests/normalize); coupled-invariants OK; sync-skills adapters match. Full suite per reviewer: 1601 passed, 1 known flake.
+
+  Follow-up items (non-blocking):
+  - Linked-worktree/.git-file checkouts: resolveOriginUrl cache-invalidation uses stat(.git/config) mtime which is null when .git is a file (worktree); a cached origin can survive the full 5s TTL there. Bounded; the repo-mis-stamp hazard is fully handled by `git -C`. Optionally hash .git HEAD/packed-refs for worktrees.
 ready_content_sha: ad97666b9edb61c1a3959f1d7287b4901fd6a4361313884967c111f9b6948365
 files_to_modify:
   - src/capture/extractors/_turn_meta.ts        # AC1 — add optional origin_url field to GitState interface

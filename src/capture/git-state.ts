@@ -1,7 +1,6 @@
 // Live git-state probe for Layer 2 ("cheap world state").
 //
-// Runs `git rev-parse HEAD`, `git rev-parse --abbrev-ref HEAD`, and
-// `git status --porcelain` in a target cwd, returns a GitState snapshot.
+// Runs cheap git probes in a target cwd and returns a GitState snapshot.
 // Caches per-cwd for FRESH_TTL_MS so a burst of turn emissions in the same
 // repo doesn't fan out into N subprocesses. Failures are silent (returns
 // undefined) — non-git-repo cwds are common and not interesting.
@@ -51,6 +50,20 @@ async function gitOne(cwd: string, args: string[]): Promise<string | null> {
   }
 }
 
+export function scrubOriginUrlCredentials(raw: string | null | undefined): string | undefined {
+  const trimmed = raw?.trim();
+  if (trimmed === undefined || trimmed.length === 0) return undefined;
+  const schemeIdx = trimmed.indexOf('://');
+  if (schemeIdx === -1) return trimmed;
+  const prefix = trimmed.slice(0, schemeIdx + 3);
+  const rest = trimmed.slice(schemeIdx + 3);
+  const atIdx = rest.indexOf('@');
+  if (atIdx === -1) return trimmed;
+  const firstPathIdx = rest.search(/[/?#]/);
+  if (firstPathIdx !== -1 && atIdx > firstPathIdx) return trimmed;
+  return `${prefix}${rest.slice(atIdx + 1)}`;
+}
+
 export async function probeGitState(
   cwd: string | undefined,
   turnTimestampIso: string,
@@ -70,15 +83,19 @@ export async function probeGitState(
     return { ...cached.state, fresh };
   }
 
-  const [headSha, branch, dirty] = await Promise.all([
+  const [headSha, branch, dirty, originUrl] = await Promise.all([
     gitOne(cwd, ['rev-parse', 'HEAD']),
     gitOne(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']),
     gitOne(cwd, ['status', '--porcelain']),
+    gitOne(cwd, ['remote', 'get-url', 'origin']),
   ]);
 
   if (headSha === null) {
     // Not a git repo, or git not available — cache the negative briefly.
-    lruSet(cache, cwd, { state: { captured_at: new Date(now).toISOString() }, expiresAt: now + CACHE_TTL_MS });
+    lruSet(cache, cwd, {
+      state: { captured_at: new Date(now).toISOString() },
+      expiresAt: now + CACHE_TTL_MS,
+    });
     return undefined;
   }
 
@@ -87,6 +104,8 @@ export async function probeGitState(
     captured_at: new Date(now).toISOString(),
   };
   if (branch !== null && branch.length > 0) state.branch = branch;
+  const scrubbedOriginUrl = scrubOriginUrlCredentials(originUrl);
+  if (scrubbedOriginUrl !== undefined) state.origin_url = scrubbedOriginUrl;
   if (dirty !== null) {
     state.dirty_count = dirty.length === 0 ? 0 : dirty.split('\n').length;
   }
