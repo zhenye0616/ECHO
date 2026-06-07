@@ -12,9 +12,16 @@ ready_content_sha: c025faed9cbd80a6d83e9bd30f53fb861fbfc9ef036fdee2c7d44e806c218
 claimed_by: "codex-builder-F5CFFC27-E8BD-486A-94FA-8CFF1CBC6D3C"
 claimed_at: "2026-06-07T19:58:59Z"
 branch: "agent/096-workspace-identity-resolver"
-head_sha: ""
+head_sha: "cb54f8def2b0e91c67199d356b7e8c907733dc0e"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Built blind by a Codex builder (codex exec, danger-full-access, worktree agent/096-workspace-identity-resolver). All 12 files within the spec's files_to_modify allowlist; zero out-of-scope edits (cluster.ts / cursor.ts / normalizeRemoteUrl untouched). All 8 ACs reported satisfied.
+  Verification (orchestrator-reproduced from git ground-truth, not builder self-report):
+  - Focused suite GREEN: `npm run test -- tests/capture/workspace-root.test.ts tests/capture/canonical-root-capture.test.ts tests/normalize/workspace-identity.test.ts` → 3 files, 22/22 passed.
+  - `npm run typecheck` clean; `npm run lint` clean.
+  - Builder-run broader suites: tests/trace 105/105, tests/normalize 73/73, tests/capture 235 passed/17 skipped.
+  - Known flake (NON-blocking, same as 095/followups): `tests/trace/build.test.ts` perf threshold (<500ms) trips only under combined tests/normalize+trace+capture load (~628ms); passes standalone at ~241ms. Categorically a load-timing flake, not a regression from this capture/normalize change.
+  head_sha = cb54f8def2b0e91c67199d356b7e8c907733dc0e (branch agent/096-workspace-identity-resolver, pushed to origin).
 review_notes: ""
 files_to_modify:
   - src/capture/workspace-root.ts                 # NEW — resolveCanonicalRoot plus shared gitToplevel/canonicalization helpers; git toplevel -> anchor walk -> reported dir; no-throw capture-time resolver.
