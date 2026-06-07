@@ -26,7 +26,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 **Test cases:**
 
 ### Cross-adapter identity fragmentation
-- **Cross-adapter repo identity split** — Claude normalizes the same checkout as `local:/Users/.../Project_echo`; Codex as `https://github.com/zhenye0616/ECHO`; `repo_path` scopes candidates but is not the shared join key, so the same checkout splits into separate clusters. `open` — *fix:* canonical repo identity + alias rules across all adapters.
+- **Cross-adapter repo identity split** — ✅ **shipped (095 / `2d4238fc`)**: claude_code + git now capture the canonical normalized remote URL at capture time (matching codex's reference behavior); derived `file`/`branch`/`commit` ids converge too; regression-guarded by `tests/trace/repo-identity-cross-adapter.test.ts` on main. See Archive. **Residual (still open) — `partial`:** (a) remote-less repos keep machine-specific `local:<root>` identity → still split cross-machine (by design); (b) historical pre-fix atoms not migrated (read-time aliasing deferred); (c) the new git-watcher origin cache skips mtime-invalidation on linked-worktree `.git`-file checkouts — `resolveOriginUrl` stats `<repo>/.git/config` (null for worktrees) so a cached origin can survive the full 5s TTL there (`git -C` handles the mis-stamp hazard; bound is 5s). *fix:* hash `.git` HEAD/packed-refs for worktrees; spec read-time aliasing only if legacy data matters.
 - **No `joined_by`/`membership_artifacts` debug field** — cluster cohesion is opaque; join-key bugs are invisible because you cannot see which artifact produced a cluster edge. `open` (also R2) — *fix:* expose membership artifacts in cluster response output.
 
 ### Cursor workspace identity
@@ -39,7 +39,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Loose `hostOf` suffix match** (016) — `host.endsWith('github.com')` also matches `github.com.evil.com`; tighten before any user-controlled URL flows through. `open` — *fix:* `host === 'github.com' || host.endsWith('.github.com')`. `src/normalize/artifacts.ts:56-63`
 
 ### Granularity & attribution
-- **Shared-repo artifact coalesces multi-file work** (018) — repo-level artifact alone joins everything in-window; whether this matches "coherent work thread" intuition is dogfooding-driven signal not yet resolved. `open` (also R2) — *fix:* weight non-repo artifacts higher, or downgrade repo-only edges to a `same_repo` edge kind.
+- **Shared-repo artifact coalesces multi-file work** (018) — repo-level artifact alone joins everything in-window; whether this matches "coherent work thread" intuition is dogfooding-driven signal not yet resolved. **095 widened the blast radius:** now that codex also resolves to the canonical repo id, repo-level coalescing spans all three beta-bundle sources (claude_code + codex + git), not just claude+git — same unresolved calibration, more atoms affected. `open` (also R2) — *fix:* weight non-repo artifacts higher, or downgrade repo-only edges to a `same_repo` edge kind.
 - **Cursor Phase-2 multi-install hardening** (038) — Cursor MRU resolver picks the global-newest source with no composer-id scoping; single-install assumption holds for V1 but breaks under multiple Cursor installs. `open` — *fix:* scope Cursor source lookup to composer-id at V2 multi-install.
 - **`cluster.source_breakdown` doesn't reflect Cursor even when capture is healthy** (022) — the remaining 029 bug: Cursor is present in storage but absent from source-attribution, making cross-source attribution wrong at the response surface. `open` (also R2 — identity feeds attribution, ranking is R2) — *fix:* correct `cluster.source_breakdown` Cursor attribution at cluster-build time.
 
@@ -240,7 +240,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **`/merge-and-cleanup` Step-B orphan-detection `/var` vs `/private/var` symlink** — defeats skip-if-registered; nuked a registered watcher worktree during 076. `open` — *fix:* canonicalize both sides via `realpath`/`pwd -P` before compare.
 
 ### Shared-file concurrency (journal) · `R6.shared_file_concurrency`
-- **HEADLINE: shared dogfooding journal has no concurrency story (corroborated 3× — 090/091/Codex monitor)** — every reviewer wrapper, watcher tick, and monitor does stash/pull/append/commit/push on one file; 091 hand-resolved 5×; contention scales exactly with the parallelism the product sells. `open` HIGH — *fix:* per-actor journal shards (`...-<role>.md`) OR an `O_APPEND` writer that never stashes.
+- **HEADLINE: shared dogfooding journal has no concurrency story (corroborated 4× — 090/091/Codex monitor/095 full-auto run)** — every reviewer wrapper, watcher tick, and monitor does stash/pull/append/commit/push on one file; 091 hand-resolved 5×; the 095 full-auto pipeline run hit it twice more (autostash conflicts when the strategist's journal edit collided with the reviewer wrappers' appends during the review loop — hand-resolved by chronological union both times). Contention scales exactly with the parallelism the product sells. `open` HIGH — *fix:* per-actor journal shards (`...-<role>.md`) OR an `O_APPEND` writer that never stashes.
 
 ### Merge mechanics · `R6.merge_mechanics`
 - **`git pull --rebase` discards conflict resolution on retry** — 065 ran 61 codex tool-calls vs ~12 normal; O(re-resolve). `open` — *fix:* `git pull --rebase=merges` in `skills/merge-and-cleanup.md` (P7 one-line).
@@ -355,6 +355,10 @@ Carried as open but already merged before the rewrite; archived with commit evid
 - **review-pending Codex fanout** — `skills/review-pending.md` now has Codex invocation + sidecar validation + commit/push.
 - **proposed→ready lifecycle docs** — repo docs (`backlog/README.md`, `AGENT_INSTRUCTIONS.md`, `CLAUDE.md`) describe `proposed/ → ready/` (note: pasted AGENTS preamble may still be stale — regenerate separately).
 - **`/review-pending` → `/merge-and-cleanup` sidecar handoff** — `skills/review-pending.md` commits and pushes the sidecar.
+
+### Shipped after the rewrite (2026-06-06→)
+Closed via the full spec→review→build→merge pipeline; recorded with commit evidence.
+- **Cross-adapter repo identity split (the dominant R1 join-key gap)** — 095 / `2d4238fc`, regression guard `6d34cd30`. Capture-time canonical remote-URL identity across claude_code + codex + git: `origin_url` now captured by `probeGitState` + the git watcher (credential-scrubbed, repo-root-scoped, invalidatable cache); the git adapter stops hardcoding `null`. Spec converged in 2 cross-vendor review rounds; built **blind** by a Codex builder; verified by an **independently-authored blind held-out oracle** (red 4/4 on pre-fix main → green 4/4), landed on main as `tests/trace/repo-identity-cross-adapter.test.ts`. Residual sub-gaps (remote-less repos, historical-atom migration, worktree `.git`-file cache invalidation) kept in R1. **NOT yet deployed** — the daemon runs the installed echoctl package; live in capture only after rebuild+reinstall. Unblocks the R2 (ranking) + R4 (passive inference) downstream chain for the beta bundle; R6 is co-equal and untouched.
 
 ---
 
