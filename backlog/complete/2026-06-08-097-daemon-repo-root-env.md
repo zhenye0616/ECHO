@@ -23,7 +23,23 @@ agent_notes: |
   - Orchestrator-reproduced from git ground truth: npx vitest run tests/cli/daemon.test.ts -> 26/26 passed; typecheck clean; lint clean.
   head_sha = d1ee1cacf1848f0c09eb78a08b92d3147657adb0 (branch agent/097-daemon-repo-root-env, pushed to origin).
   MERGE-RECONCILIATION (939bfe3e, founder-approved): tests/cli/shell-reachable.test.ts (outside 097 files_to_modify) asserted coord_invoke returns isError in a packaged install AND the post-097 auto-derive made its install (cwd=repo) resolve the real source-repo wrapper -> coord_invoke succeeded (inverting the assertion) AND fire-and-forget spawned a live codex tick. Fix: run daemon install from a non-repo cwd (tmpRoot) so ECHO_REPO_ROOT is omitted, faithfully modelling the packaged-boundary (076); graceful-ENOENT contract restored, live spawn removed, test-only. shell-reachable green in isolation; full suite re-verified at merge.
-review_notes: ""
+review_notes: |
+  Merged 2026-06-08 via founder reconciliation (queue-reviewed path; no /review-pending sidecar — review-of-record is agent_notes, same pattern as 096).
+
+  Conflicts resolved:
+  - none (clean --no-ff; main advanced only by backlog/state-transition + the 098 spec since the branch base — zero code conflicts).
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Pre-merge reconciliation (founder-approved, on the branch at 939bfe3e):
+  - tests/cli/shell-reachable.test.ts (outside 097 files_to_modify) asserted coord_invoke returns isError in a packaged install. The full-suite green gate caught it failing ONLY on the 097 branch (passes on pristine main) — 097's auto-derive made the test's install (cwd=source repo) resolve the REAL repo reviewer wrapper, so coord_invoke succeeded (inverting the assertion) AND fire-and-forget spawned a live codex tick. Fix: run `daemon install` from a non-repo cwd (tmpRoot) so ECHO_REPO_ROOT is omitted, faithfully modelling the packaged-install boundary (item 076) the test exists to check. Graceful-ENOENT restored, live spawn removed; test-only.
+
+  Review (Claude strategist, independent of the Codex builder): MERGE AS-IS. AC1-AC5 met; harness-marker gate on both explicit (throw->exit 2, no plist) and auto (silent omit); restart/start/status preserve the var via readPlistConfig read-back. AC5 all 7 cases (a/d folded w/ special-char value; g parametrized over non-existent + no-harness).
+
+  Verify (merger worktree, post-merge): typecheck clean; lint clean; check-coupled-invariants OK; sync-skills --check OK; 097 suites (daemon + shell-reachable) 27/27 green. Full suite verified on identical code: 1647 passed; SOLE failure = tests/mcp/recent-calls-endpoint.test.ts (15s timeout under full-suite parallel load) — documented R5 flake, passes in isolation (re-confirmed today), NOT a 097 regression.
+
+  Follow-up items (non-blocking):
+  - none.
 files_to_modify:
   - src/cli/commands/daemon.ts        # add --repo-root flag + repoRoot config field (explicit flag → cwd git-toplevel → omit); harness-marker gate (<root>/tools/review-queue/ must exist) — explicit failure = exit non-zero + no plist, auto-derive failure = silent omit; emit <key>ECHO_REPO_ROOT</key> into the plist EnvironmentVariables dict only when an accepted root is resolved; update the install help text.
   - tests/cli/daemon.test.ts          # plist-content assertions: flag value present + XML-escaped + absolute; relative flag resolves absolute; cwd-in-harness-repo default; cwd-not-a-repo / git-ENOENT → key OMITTED; cwd-in-unrelated-repo (no harness) → OMITTED; explicit bad/non-harness path → exit non-zero + no plist.
