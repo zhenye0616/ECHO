@@ -216,7 +216,7 @@ This is an **operational push**, not a ship push — it does not need founder ap
 
 Run this step **only after `commit-reviewer-response.sh` exits 0** (validation passed, commit + push succeeded). If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
-Append a 6-field entry to the current monthly shard (`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md`) per CLAUDE.md discipline. The entry references the committed response file; it does **not** coordinate the queue. Push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**. Do not generate or commit HTML output.
+Append a 6-field entry to your per-actor shard (`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-claude.md`) per CLAUDE.md discipline (read the merged journal via `tools/dogfooding/journal-cat.sh <month>`). The entry references the committed response file; it does **not** coordinate the queue. Push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**. Do not generate or commit HTML output.
 
 ```bash
 git add "raw/internal/dogfooding/mcp-interactions-journal-$(date +%Y-%m).md"

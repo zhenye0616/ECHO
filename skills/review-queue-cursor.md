@@ -183,7 +183,7 @@ Operational push; no founder approval needed per §"Out of Scope" #4.
 
 Run this step **only after `commit-reviewer-response.sh` exits 0**. If the helper exited non-zero, the response was quarantined and `queue-errors.md` has the trace — do NOT also write a journal entry for that tick.
 
-Append a 6-field journal entry to the current monthly shard (`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md`) per CLAUDE.md, referencing the committed response file. Push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**. Do not generate or commit HTML output.
+Append a 6-field journal entry to your per-actor shard (`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-cursor.md`) per CLAUDE.md (read the merged journal via `tools/dogfooding/journal-cat.sh <month>`), referencing the committed response file. Push the journal commit via `push-with-retry.sh` as a **sibling commit before this prompt returns**. Do not generate or commit HTML output.
 
 ```bash
 git add "raw/internal/dogfooding/mcp-interactions-journal-$(date +%Y-%m).md"
