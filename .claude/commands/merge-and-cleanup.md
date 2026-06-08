@@ -1,5 +1,5 @@
 ---
-description: Merge one or more reviewed items from backlog/pending_review/ into main, with founder-in-the-loop checkpoints at conflicts, fixups, and final commit. Per item sequentially: pre-flight, merge --no-ff, pause for human conflict resolution, apply pre-merge fixups, verify (test/lint/typecheck), populate review_notes, move item to complete/, commit, delete worktree + branches (local + remote), push. Idempotent failure modes: refuses to start on dirty tree, refuses to skip checkpoints, never auto-resolves conflicts.
+description: Merge one or more reviewed items from backlog/pending_review/ into main, with founder-in-the-loop checkpoints at conflicts, fixups, and final commit. Per item sequentially: pre-flight, merge --no-ff, pause for human conflict resolution, apply pre-merge fixups, verify (test/lint/typecheck), populate review_notes, move item to complete/, commit, push, then delete worktree + branches (local + remote). Idempotent failure modes: refuses to start on dirty tree, refuses to skip checkpoints, never auto-resolves conflicts.
 ---
 
 You are executing the founder's morning merge after `/review-pending` has produced verdicts the founder accepts. Your job is to do the **mechanical** parts of merge + cleanup correctly, while pausing at every **judgment** point so the founder stays in the loop.
@@ -116,7 +116,7 @@ trap 'cleanup_merger; exit 1' ERR INT TERM
 cd "$MERGER_WT"
 ```
 
-**Scope of this isolation.** It removes the parallel-sessions-on-this-machine race surface (the bug class that caused the 013 + 010-rework collision AND the 2026-05-14 14:02 PDT 048/049 collision) by giving each role its own `.git/index`. It does NOT prevent inbound pushes from another machine — the C11 push step's "rejected → rebase" path handles cross-machine cases. The previous prose-as-protocol merge sentinel-file lock is DELETED in this spec; no defense-in-depth file lock is retained because retaining one would preserve the one-sided-convention failure mode for whichever future binding next ignored it.
+**Scope of this isolation.** It removes the parallel-sessions-on-this-machine race surface (the bug class that caused the 013 + 010-rework collision AND the 2026-05-14 14:02 PDT 048/049 collision) by giving each role its own `.git/index`. It does NOT prevent inbound pushes from another machine — the C9 push step's "rejected → rebase" path handles cross-machine cases. The previous prose-as-protocol merge sentinel-file lock is DELETED in this spec; no defense-in-depth file lock is retained because retaining one would preserve the one-sided-convention failure mode for whichever future binding next ignored it.
 
 **Migration note.** If a stale sentinel file from a pre-050 manually-aborted merge happens to exist on the live checkout under `.git/`, the worktree-mode merger does not read or care about it. It is simply orphaned — clean up by hand with a one-shot `rm` of the stale file.
 
@@ -342,9 +342,33 @@ EOM
 )"
 ```
 
-### C9. Cleanup worktree and branches
+### C9. Push
 
-Before `git worktree remove`, surgically delete `$WORKTREE/node_modules` (regenerable, not work — `npm install` from C5 or the code-reviewer subagent's in-worktree verify left it). The strict "do not --force" invariant on `git worktree remove` is preserved; this rm is narrowly scoped to a known-regenerable directory AND gated behind an identity check that aborts the operation if `$WORKTREE` doesn't point at the expected agent worktree on the expected branch.
+**Push BEFORE cleanup (P6).** The merge commit lives only on the merger worktree's detached HEAD until it lands on `origin/main` — so the worktree removal and branch deletes in C11 must run **only after this push succeeds**. Doing cleanup first risks an unreferenced (GC-able) merge commit and a "branch deleted, commit not on main" loss if the push then fails.
+
+```bash
+# 050 AC5 — explicit HEAD:main refspec. The merger runs inside a detached-HEAD
+# worktree ($MERGER_WT pinned to origin/main at Step B); `git push origin main`
+# would push the COMMON repository's `main` branch ref, leaving the merger
+# worktree's new commit unpushed. HEAD:main pushes the worktree's actual HEAD.
+git push origin HEAD:main
+```
+
+If push is rejected (someone else pushed during the merge):
+
+1. `git pull --rebase=merges origin main`. The merge commit may need to be replayed; `--rebase=merges` **preserves the merge commit and its second-parent** (the backlog-move/sidecar ops carried in the merge) instead of flattening them — a plain `--rebase` silently drops those extras on replay.
+2. If rebase produces conflicts: stop, surface, ask the human.
+3. Re-push (still `git push origin HEAD:main`).
+
+If still rejected after one rebase attempt: stop. Surface to the human; do not loop.
+
+### C10. File follow-up items
+
+For each fixup deferred in C4 and each item in the sidecar's "Follow-up items" section: append a one-line entry to a queue file `backlog/_followups.md` (create if missing). Founder turns these into proper backlog items in their next strategist conversation.
+
+### C11. Cleanup worktree and branches
+
+Runs **only after the C9 push has landed on `origin/main`** (see the C9 ordering note). Before `git worktree remove`, surgically delete `$WORKTREE/node_modules` (regenerable, not work — `npm install` from C5 or the code-reviewer subagent's in-worktree verify left it). The strict "do not --force" invariant on `git worktree remove` is preserved; this rm is narrowly scoped to a known-regenerable directory AND gated behind an identity check that aborts the operation if `$WORKTREE` doesn't point at the expected agent worktree on the expected branch.
 
 ```bash
 # 045 AC5a — identity guard. ALL four checks must pass or the rm does NOT
@@ -369,33 +393,11 @@ If `git worktree remove` still fails (chokidar handles, stray pyc, etc.) AFTER t
 
 If the remote delete fails because the branch was already pushed for someone else's reference (rare): surface the error and ask the human; do not force.
 
-### C9b. (deferred — see "Live checkout bringup" at end of Step D)
+### C11b. (deferred — see "Live checkout bringup" at end of Step D)
 
-**REMOVED: auto-kickstart of `com.echo.daemon`.** Earlier versions ran `launchctl kickstart -k` here, on the assumption that merger-worktree-verify implies live-checkout-runnable. That assumption is false whenever the merge bumps `package.json` (and is true for any dep change, not just one): the merger worktree's `npm install` from C5 lives only inside the ephemeral worktree, discarded at C9 cleanup. The live checkout's `node_modules` never gets reconciled. Auto-kickstart against stale `node_modules` crashes the daemon silently — observed 2026-05-16 post-057a merge with the `Ajv is not a constructor` symptom (eslint's transitive ajv@6 hoisted over the ajv@8 the new lockfile required; tests passed in the merger's fresh-install tree).
+**REMOVED: auto-kickstart of `com.echo.daemon`.** Earlier versions ran `launchctl kickstart -k` here, on the assumption that merger-worktree-verify implies live-checkout-runnable. That assumption is false whenever the merge bumps `package.json` (and is true for any dep change, not just one): the merger worktree's `npm install` from C5 lives only inside the ephemeral worktree, discarded at C11 cleanup. The live checkout's `node_modules` never gets reconciled. Auto-kickstart against stale `node_modules` crashes the daemon silently — observed 2026-05-16 post-057a merge with the `Ajv is not a constructor` symptom (eslint's transitive ajv@6 hoisted over the ajv@8 the new lockfile required; tests passed in the merger's fresh-install tree).
 
 Daemon bringup is now an explicit founder-in-the-loop step at the end of Step D, after all items in the argument list have been pushed (so the live checkout's `git pull` actually sees the new commits). See the "Live checkout bringup" subsection below.
-
-### C10. File follow-up items
-
-For each fixup deferred in C4 and each item in the sidecar's "Follow-up items" section: append a one-line entry to a queue file `backlog/_followups.md` (create if missing). Founder turns these into proper backlog items in their next strategist conversation.
-
-### C11. Push
-
-```bash
-# 050 AC5 — explicit HEAD:main refspec. The merger runs inside a detached-HEAD
-# worktree ($MERGER_WT pinned to origin/main at Step B); `git push origin main`
-# would push the COMMON repository's `main` branch ref, leaving the merger
-# worktree's new commit unpushed. HEAD:main pushes the worktree's actual HEAD.
-git push origin HEAD:main
-```
-
-If push is rejected (someone else pushed during the merge):
-
-1. `git pull --rebase origin main`. The merge commit may need to be replayed.
-2. If rebase produces conflicts: stop, surface, ask the human.
-3. Re-push (still `git push origin HEAD:main`).
-
-If still rejected after one rebase attempt: stop. Surface to the human; do not loop.
 
 ## Step D — Final summary
 
@@ -409,7 +411,7 @@ After the loop completes, output:
 
 After wiki promotion of an item lands in `wiki/`, convert its `backlog/complete/<id>.md` file to the stub schema and move the full original body to `backlog/archive/shipped/<YYYY-MM>/<id>.md`. The stub schema is documented in `backlog/archive/README.md`.
 
-### Live checkout bringup (founder-in-the-loop, replaces C9b auto-kickstart)
+### Live checkout bringup (founder-in-the-loop, replaces C11b auto-kickstart)
 
 After Step D's summary, surface this exact prompt and wait for founder `continue`:
 
@@ -432,7 +434,7 @@ The founder's `continue` is the final gate. The skill does not exit past this pa
 
 If the daemon isn't launchd-managed in this environment (e.g., during a manual `npm run daemon` session), the `launchctl kickstart` line won't apply — founder restarts by hand. The verification check via `coord-status.sh uptime` is the same.
 
-**Why this replaces the old auto-kickstart pattern.** The old C9b was codified post-018/019 to handle "founder forgets to restart daemon". That convenience worked when dep changes were rare. Post-057a (which added ajv) and going forward (coord layer + future deps), silent daemon death on stale `node_modules` is a recurring failure mode. Visible founder-driven bringup is structurally safer than invisible automation that fails when assumptions break. The verification step (`coord-status.sh uptime`) catches not just stale-dep crashes but any daemon-boot regression a merge introduces.
+**Why this replaces the old auto-kickstart pattern.** The old C11b was codified post-018/019 to handle "founder forgets to restart daemon". That convenience worked when dep changes were rare. Post-057a (which added ajv) and going forward (coord layer + future deps), silent daemon death on stale `node_modules` is a recurring failure mode. Visible founder-driven bringup is structurally safer than invisible automation that fails when assumptions break. The verification step (`coord-status.sh uptime`) catches not just stale-dep crashes but any daemon-boot regression a merge introduces.
 
 ## Failure Modes (and what the command does)
 
