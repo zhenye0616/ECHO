@@ -9,9 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-08-098-per-actor-journal-shards
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: bba31b89efe3307d9b525dd2a6f284543d008da47849c058468859297310074c
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-08T22:48:08Z"
+branch: "agent/per-actor-journal-shards"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
