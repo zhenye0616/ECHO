@@ -2016,3 +2016,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-08-097-daemon-repo-root-env/r2/request.md`; artifact `backlog/proposed/2026-06-08-097-daemon-repo-root-env.md@c80d3c582daf89e0419174b887d49da46a7261be`; response `backlog/reviews/2026-06-08-097-daemon-repo-root-env/r2/codex-ops.md`; raw diagnostics `/tmp/claude-501/echo-codex-ops-DADD036E-9E48-40B8-9D41-89CD8EC1FDC9/raw/internal/review-queue/38b82062-c66e-4997-b60d-367e2e0c654c/codex-ops.stdout.log` / `/tmp/claude-501/echo-codex-ops-DADD036E-9E48-40B8-9D41-89CD8EC1FDC9/raw/internal/review-queue/38b82062-c66e-4997-b60d-367e2e0c654c/codex-ops.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-08 14:54 PDT — strategist resume: "where did we leave off" before spec-reviewing 098
+
+- **Trigger:** New session, founder asked to use ECHO to recover context then spec-review 098 with codex until convergence.
+- **Query inputs:** `find_clusters({repo_path:"/Users/zhenye/Desktop/Project_echo"})` (no time args → 4h default window); then `get_atoms({atom_ids:[13 newest from cluster ctx_263afd31], prefer:"newest_first", format:"minimal"})`.
+- **Returned:** 1 cluster (ctx_263afd31), 39 atoms, source_breakdown={claude_code:15, git:22, codex:2}; rank_reasons=[recent_activity, has_open_loop, code_session_anchor, dense, cross_tool]; 5 open-loop hints all resolved. get_atoms hydrated 9, dropped 4 under budget. Recovered: A (merge-mechanics) shipped; C=spec 097 converged→ready (now already claimed/built/pending_review per git log); B=this item, spec 098 drafted+committed at 15ca7b7 in proposed/.
+- **Sources:** cluster atoms from git:/Users/zhenye/Desktop/Project_echo (commits 15ca7b7 spec-098, 433bad2/0c4f513/969067f review-097) + fs claude_code session jsonl 3926b152 (turns 15-20). No cursor atoms in window.
+- **Verdict:** ✅ right — single dense cluster correctly reconstructed the full "A done / C converged / B = 098 next" state; matched git log ground truth.
+- **Note:** No-arg find_clusters 4h window was sufficient because the session was continuous; the resolved open-loop hints correctly signaled 097's loop had closed, leaving 098 as the live item.
