@@ -16,7 +16,24 @@ head_sha: "daa80b41d6506079f839ad25f74f6e6a50b2c8ef"
 pr_url: ""
 agent_notes: |
   Implemented the per-actor dogfooding journal shard cutover: reviewer wrapper writes and stages only its actor shard with slug validation and shard bootstrap, `tools/dogfooding/journal-cat.sh` merges shard sets plus frozen legacy files with loud malformed-block failures, CLAUDE.md/AGENTS.md point writers and readers at the shard convention, and the June shared file received only the LD4 cutover note. Verification passed: focused vitest, typecheck, lint, shell syntax checks, `git diff --check`, and real-data `journal-cat.sh 2026-06` smoke.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-08 via codex builder + independent Claude subagent review (reviewer-independence: builder=codex, reviewer=Claude subagent — distinct roles).
+
+  Conflicts resolved:
+  - None. Clean --no-ff merge against origin/main; no conflict markers, no unmerged paths.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts; review clean, no fixups).
+
+  Fixups applied:
+  - None. Review verdict "merge as-is".
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify (post-merge, merger worktree): 098 test 3/3 pass; lint, typecheck, coupled-invariants, sync-skills --check all clean. Full suite 1649 passed; the 2 non-098 failures (tests/cli/shell-reachable.test.ts daemon-install, tests/mcp/recent-calls-endpoint.test.ts 15s timeout) PASS in isolation at the merge HEAD (9.2s / 18.7s) — load-induced contention/flakiness pre-existing on main, not introduced by 098 (which touches no daemon/MCP-endpoint code).
+
+  Follow-up items (non-blocking):
+  - Strategist post-merge (spec After-Completion): mark backlog/_followups.md R6 shared-journal-concurrency HEADLINE resolved (same-slug residual = accepted); realign skill-path references (skills/review-queue-*.md, review-pending.md, process-backlog.md, office-hours.md) to the shard convention + journal-cat.sh then tools/sync-skills.sh (cutover hygiene, not a gate); optional architecture note on shared-file-as-coordination-medium being the R6 anti-pattern.
 files_to_modify:
   - tools/review-queue/_run_reviewer.sh        # append_wrapper_journal(): write to the per-actor shard mcp-interactions-journal-<month>-<REVIEWER_NAME>.md instead of the shared monthly file; commit/push message unchanged.
   - tools/dogfooding/journal-cat.sh            # NEW — read/merge helper: concatenate all mcp-interactions-journal-<month>*.md shards for a month in chronological entry order; the canonical "read the journal" + HTML-regen + synthesis entrypoint.
