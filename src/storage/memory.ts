@@ -7,6 +7,7 @@ import {
   type QueryFilter,
   type Storage,
 } from './interface.js';
+import { canonicalizeTimestamp } from '../util/timestamp.js';
 
 // 057a AC3 — monotonic insertion counter parallel to SQLite's rowid.
 // Stored alongside the event so iterateCoordAtomsByAppendOrder + the
@@ -52,7 +53,8 @@ function normalizePathLikeSource(value: string): string | null {
 function sourceEquals(left: string, right: string): boolean {
   const normalizedLeft = normalizePathLikeSource(left);
   const normalizedRight = normalizePathLikeSource(right);
-  if (normalizedLeft !== null && normalizedRight !== null) return normalizedLeft === normalizedRight;
+  if (normalizedLeft !== null && normalizedRight !== null)
+    return normalizedLeft === normalizedRight;
   return left === right;
 }
 
@@ -106,8 +108,8 @@ export class MemoryStorage implements Storage {
         'QueryFilter.before is defined for descending queries only; pass order: "desc" or omit it',
       );
     }
-    const since = filter?.since;
-    const until = filter?.until;
+    const since = filter?.since !== undefined ? canonicalizeTimestamp(filter.since) : undefined;
+    const until = filter?.until !== undefined ? canonicalizeTimestamp(filter.until) : undefined;
     const limit = filter?.limit;
     const order = filter?.order ?? 'desc';
     const before = filter?.before;
@@ -176,9 +178,8 @@ export class MemoryStorage implements Storage {
       if (a.id > b.id) return order === 'asc' ? 1 : -1;
       return 0;
     });
-    const truncated = limit !== undefined && filtered.length > limit
-      ? filtered.slice(0, limit)
-      : filtered;
+    const truncated =
+      limit !== undefined && filtered.length > limit ? filtered.slice(0, limit) : filtered;
     return truncated.map(stripSeq);
   }
 

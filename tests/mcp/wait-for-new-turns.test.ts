@@ -57,6 +57,13 @@ describe('wait_for_new_turns — validation', () => {
     ).rejects.toThrow(/ISO 8601/);
   });
 
+  it('rejects invalid ISO calendar since', async () => {
+    const store = new MemoryStorage();
+    await expect(
+      waitForNewTurns(store, { sources: ['fs:/x'], since: '2026-05-99T00:00:00.000Z' }),
+    ).rejects.toThrow(/invalid timestamp: 2026-05-99T00:00:00.000Z/);
+  });
+
   it('accepts timeout=0 (no wait, immediate return)', async () => {
     const store = new MemoryStorage();
     const startMs = Date.now();
@@ -103,6 +110,20 @@ describe('wait_for_new_turns — happy path', () => {
     const r = await waitForNewTurns(
       store,
       { sources: ['fs:/A'], since: boundary, timeout: 5 },
+      { pollIntervalMs: 50 },
+    );
+    expect(r.turn_ids).toHaveLength(1);
+    const [atom] = await store.getByIds(r.turn_ids);
+    expect(atom!.content).toContain('after turn');
+  });
+
+  it('STRICT-after `since` with +0900 offset excludes the boundary turn', async () => {
+    const store = new MemoryStorage();
+    await store.append(ev('fs:/A', '2026-05-09T14:00:00.000Z', 'boundary turn (must be dropped)'));
+    await store.append(ev('fs:/A', '2026-05-09T14:00:01.000Z', 'after turn (must be kept)'));
+    const r = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T23:00:00.000+0900', timeout: 5 },
       { pollIntervalMs: 50 },
     );
     expect(r.turn_ids).toHaveLength(1);

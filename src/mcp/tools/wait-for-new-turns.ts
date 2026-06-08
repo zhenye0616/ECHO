@@ -21,6 +21,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { CaptureEvent, QueryFilter, Storage } from '../../storage/interface.js';
+import { canonicalizeTimestamp } from '../../util/timestamp.js';
 import { withFsExclusion } from '../util/fs-exclusion.js';
 import { isoString } from '../util/iso8601.js';
 import { assertAbsoluteRepoPath, normaliseRepoPath } from '../util/repo-path.js';
@@ -201,7 +202,7 @@ async function pollOnce(
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/;
 
 export interface WaitForNewTurnsOptions {
   /** Override the 1s default poll interval. Used by tests to keep them
@@ -237,6 +238,7 @@ export async function waitForNewTurns(
   if (params.since === undefined || !ISO_RE.test(params.since)) {
     throw new Error('wait_for_new_turns: since must be a valid ISO 8601 timestamp');
   }
+  const since = canonicalizeTimestamp(params.since);
 
   // Item 037 / AC5: validate + normalise repo_path before the poll loop
   // so a bad input fails immediately rather than after the first timeout.
@@ -285,14 +287,14 @@ export async function waitForNewTurns(
   // Initial poll first (no wait) — common case is "content is already
   // there"; the long-poll's whole point is to NOT round-trip the wait
   // when there's nothing newer than `since`.
-  let rows = await pollOnce(storage, resolved, params.since, normalisedRepoPath);
+  let rows = await pollOnce(storage, resolved, since, normalisedRepoPath);
   while (rows.length === 0 && now().getTime() < deadlineMs) {
     // Sleep then re-poll. Cap the sleep at remaining-time so we don't
     // overshoot the deadline by up to one poll interval.
     const remaining = deadlineMs - now().getTime();
     if (remaining <= 0) break;
     await sleep(Math.min(pollIntervalMs, remaining));
-    rows = await pollOnce(storage, resolved, params.since, normalisedRepoPath);
+    rows = await pollOnce(storage, resolved, since, normalisedRepoPath);
   }
 
   // next_since is the server's current clock when we return — caller
