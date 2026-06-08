@@ -140,8 +140,17 @@ describe('echoctl shell reachability', () => {
       const productionDataSnapshot = snapshotProductionDataDir(productionWasLoaded);
 
       try {
+        // Item 097: `daemon install` auto-derives ECHO_REPO_ROOT from the install
+        // cwd's git toplevel when it contains the tools/review-queue/ harness. This
+        // test models a PACKAGED install (item 076 boundary) — wrappers are NOT
+        // shipped in the tarball — so install from a non-repo cwd (tmpRoot) to keep
+        // ECHO_REPO_ROOT omitted. That preserves the packaged-boundary contract the
+        // coord_invoke assertion below checks (graceful ENOENT, no harness resolved)
+        // AND prevents resolving the real source-repo wrapper, which would
+        // fire-and-forget spawn a live codex reviewer tick during the test.
         const daemonInstall = spawnSync('bash', ['-c', `echoctl daemon install ${shellArgs(overrides)}`], {
           env,
+          cwd: tmpRoot,
           encoding: 'utf8',
         });
         expect(daemonInstall.status, daemonInstall.stderr).toBe(0);
