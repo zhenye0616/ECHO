@@ -12,9 +12,16 @@ ready_content_sha: 127f00a3e18afad70865b5d2f6681f12ce9787d698e61bbc1f0555ec03be0
 claimed_by: "codex-builder-E94AA128-0730-443D-B17B-AA0321BA6E1A"
 claimed_at: "2026-06-08T21:18:57Z"
 branch: "agent/097-daemon-repo-root-env"
-head_sha: ""
+head_sha: "d1ee1cacf1848f0c09eb78a08b92d3147657adb0"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Built by a Codex builder (codex exec, danger-full-access, worktree agent/097-daemon-repo-root-env). Only the 2 files_to_modify touched (src/cli/commands/daemon.ts, tests/cli/daemon.test.ts); zero out-of-scope edits (src/coord/paths.ts untouched). All ACs implemented.
+  Reviewed by Claude strategist (independent of the Codex builder), verdict MERGE AS-IS:
+  - AC1-AC4 met with file:line evidence; harness-marker gate (tools/review-queue/) applied to BOTH explicit (throw->exit 2, no plist) and auto-derive (silent omit) paths; ECHO_REPO_ROOT XML-escaped in plist; isLaunchdPlatform gates Windows out (omits).
+  - Critical negatives verified: explicit bad --repo-root -> return 2 + existsSync(plist)==false; restart/start/status preserve the var via readPlistConfig read-back (no upgrade-path regression).
+  - AC5 all 7 cases covered (a/d folded with real special-char value; g parametrized over non-existent + no-harness).
+  - Orchestrator-reproduced from git ground truth: npx vitest run tests/cli/daemon.test.ts -> 26/26 passed; typecheck clean; lint clean.
+  head_sha = d1ee1cacf1848f0c09eb78a08b92d3147657adb0 (branch agent/097-daemon-repo-root-env, pushed to origin).
 review_notes: ""
 files_to_modify:
   - src/cli/commands/daemon.ts        # add --repo-root flag + repoRoot config field (explicit flag → cwd git-toplevel → omit); harness-marker gate (<root>/tools/review-queue/ must exist) — explicit failure = exit non-zero + no plist, auto-derive failure = silent omit; emit <key>ECHO_REPO_ROOT</key> into the plist EnvironmentVariables dict only when an accepted root is resolved; update the install help text.
