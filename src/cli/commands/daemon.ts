@@ -43,6 +43,7 @@ export interface DaemonDeps {
   processExecPath?: string;
   daemonPath?: string;
   probeDeadlineMs?: number;
+  cwd?: string;
 }
 
 export interface DaemonOpts extends DaemonDeps {
@@ -61,6 +62,7 @@ export interface DaemonConfig {
   port: number;
   dataDir: string;
   dbPath: string;
+  repoRoot?: string;
   nodePath: string;
   daemonPath: string;
 }
@@ -73,6 +75,7 @@ export interface DaemonControlOptions extends DaemonDeps {
   port?: string;
   dataDir?: string;
   dbPath?: string;
+  repoRoot?: string;
 }
 
 export interface DaemonServiceStatus {
@@ -129,11 +132,12 @@ Options:
   --port <n>            ECHO_MCP_PORT persisted into launchd
   --data-dir <path>     ECHO_DATA_DIR persisted into launchd
   --db-path <path>      ECHO_DB_PATH persisted into launchd
+  --repo-root <path>    ECHO_REPO_ROOT persisted into launchd when tools/review-queue/ exists
   --log-dir <path>      log directory
 `;
 
 const VERB_HELP: Record<string, string> = {
-  install: `Usage: echoctl daemon install [--label <id>] [--plist-path <path>] [--home <path>] [--port <n>] [--data-dir <path>] [--db-path <path>] [--log-dir <path>]`,
+  install: `Usage: echoctl daemon install [--label <id>] [--plist-path <path>] [--home <path>] [--port <n>] [--data-dir <path>] [--db-path <path>] [--repo-root <path>] [--log-dir <path>]`,
   start: `Usage: echoctl daemon start [--label <id>] [--plist-path <path>] [--home <path>] [--port <n>] [--data-dir <path>] [--db-path <path>] [--log-dir <path>]`,
   stop: `Usage: echoctl daemon stop [--label <id>] [--plist-path <path>]`,
   restart: `Usage: echoctl daemon restart [--label <id>] [--plist-path <path>] [--home <path>] [--port <n>] [--data-dir <path>] [--db-path <path>] [--log-dir <path>]`,
@@ -172,6 +176,17 @@ function abs(path: string, deps: DaemonDeps): string {
   return pathResolveFor(deps, expandHome(path, deps));
 }
 
+function installCwd(deps: DaemonDeps): string {
+  return deps.cwd ?? process.cwd();
+}
+
+function absFromInstallCwd(path: string, deps: DaemonDeps): string {
+  const expanded = expandHome(path, deps);
+  return runtimePlatform(deps) === 'win32'
+    ? win32.resolve(installCwd(deps), expanded)
+    : resolve(installCwd(deps), expanded);
+}
+
 function defaultPlistPath(label: string): string {
   return join(homedir(), 'Library', 'LaunchAgents', `${label}.plist`);
 }
@@ -196,7 +211,59 @@ function parseTail(value: string | undefined): number {
   return n;
 }
 
-function resolveConfig(values: Record<string, unknown>, deps: DaemonDeps): DaemonConfig {
+interface ResolveConfigOptions {
+  resolveRepoRoot?: boolean;
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function hasReviewerHarness(repoRoot: string, deps: DaemonDeps): boolean {
+  return isDirectory(pathJoinFor(deps, repoRoot, 'tools', 'review-queue'));
+}
+
+function validateExplicitRepoRoot(value: string, deps: DaemonDeps): string {
+  if (value.length === 0) throw new Error('invalid --repo-root: value must not be empty');
+  const repoRoot = absFromInstallCwd(value, deps);
+  if (!isDirectory(repoRoot)) {
+    throw new Error(`invalid --repo-root: expected existing directory: ${repoRoot}`);
+  }
+  if (!hasReviewerHarness(repoRoot, deps)) {
+    throw new Error(
+      `invalid --repo-root: missing reviewer harness marker tools/review-queue/ under ${repoRoot}`,
+    );
+  }
+  return repoRoot;
+}
+
+function deriveGitRepoRoot(deps: DaemonDeps): string | undefined {
+  const result = run(deps, 'git', ['rev-parse', '--show-toplevel'], { cwd: installCwd(deps) });
+  if (commandMissing(result) || result.status !== 0) return undefined;
+  const raw = result.stdout.trim();
+  if (raw.length === 0) return undefined;
+  const repoRoot = absFromInstallCwd(raw, deps);
+  return hasReviewerHarness(repoRoot, deps) ? repoRoot : undefined;
+}
+
+function resolveRepoRoot(
+  values: Record<string, unknown>,
+  deps: DaemonDeps,
+): string | undefined {
+  const explicit = values['repo-root'];
+  if (explicit !== undefined) return validateExplicitRepoRoot(String(explicit), deps);
+  return deriveGitRepoRoot(deps);
+}
+
+function resolveConfig(
+  values: Record<string, unknown>,
+  deps: DaemonDeps,
+  options: ResolveConfigOptions = {},
+): DaemonConfig {
   const label = String(values['label'] ?? DEFAULT_LABEL);
   const dataDir = abs(
     String(values['data-dir'] ?? resolveDataDir({ platform: deps.platform })),
@@ -208,6 +275,7 @@ function resolveConfig(values: Record<string, unknown>, deps: DaemonDeps): Daemo
       : values['data-dir'] !== undefined
         ? pathJoinFor(deps, dataDir, 'echo.db')
         : abs(resolveDbPath({ platform: deps.platform }), deps);
+  const repoRoot = options.resolveRepoRoot === true ? resolveRepoRoot(values, deps) : undefined;
   return {
     label,
     plistPath: abs(String(values['plist-path'] ?? defaultPlistPath(label)), deps),
@@ -216,13 +284,22 @@ function resolveConfig(values: Record<string, unknown>, deps: DaemonDeps): Daemo
     port: parsePort(values['port'] as string | undefined),
     dataDir,
     dbPath,
+    ...(repoRoot !== undefined ? { repoRoot } : {}),
     nodePath: deps.processExecPath ?? process.execPath,
     daemonPath: deps.daemonPath ?? defaultDaemonPath(),
   };
 }
 
-function run(deps: DaemonDeps, command: string, args: readonly string[]): CommandResult {
-  const result = (deps.spawnSync ?? spawnSync)(command, [...args], { encoding: 'utf8' });
+function run(
+  deps: DaemonDeps,
+  command: string,
+  args: readonly string[],
+  options: { cwd?: string } = {},
+): CommandResult {
+  const result = (deps.spawnSync ?? spawnSync)(command, [...args], {
+    encoding: 'utf8',
+    ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+  });
   return {
     status: typeof result.status === 'number' ? result.status : result.error ? 127 : 0,
     stdout: String(result.stdout ?? ''),
@@ -385,6 +462,13 @@ function xmlEscape(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
+function renderRepoRootEnv(config: DaemonConfig): string {
+  if (config.repoRoot === undefined) return '';
+  return `    <key>ECHO_REPO_ROOT</key>
+    <string>${xmlEscape(config.repoRoot)}</string>
+`;
+}
+
 export function renderLaunchdPlist(config: DaemonConfig): string {
   const outPath = join(config.logDir, 'echo-daemon.out.log');
   const errPath = join(config.logDir, 'echo-daemon.err.log');
@@ -422,7 +506,7 @@ export function renderLaunchdPlist(config: DaemonConfig): string {
     <string>${xmlEscape(config.dataDir)}</string>
     <key>ECHO_DB_PATH</key>
     <string>${xmlEscape(config.dbPath)}</string>
-  </dict>
+${renderRepoRootEnv(config)}  </dict>
 </dict>
 </plist>
 `;
@@ -456,6 +540,7 @@ function readPlistConfig(base: DaemonConfig): DaemonConfig {
   const logDir = outPath !== null ? dirname(outPath) : base.logDir;
   const dataDir = stringAfterKey(envBlock, 'ECHO_DATA_DIR') ?? base.dataDir;
   const dbPath = stringAfterKey(envBlock, 'ECHO_DB_PATH') ?? base.dbPath;
+  const repoRoot = stringAfterKey(envBlock, 'ECHO_REPO_ROOT') ?? base.repoRoot;
   return {
     ...base,
     nodePath: args[0] ?? base.nodePath,
@@ -465,6 +550,7 @@ function readPlistConfig(base: DaemonConfig): DaemonConfig {
     port: parsePort(stringAfterKey(envBlock, 'ECHO_MCP_PORT') ?? String(base.port)),
     dataDir,
     dbPath,
+    ...(repoRoot !== undefined ? { repoRoot } : {}),
   };
 }
 
@@ -551,6 +637,7 @@ function controlValues(opts: DaemonControlOptions): Record<string, unknown> {
   if (opts.port !== undefined) values['port'] = opts.port;
   if (opts.dataDir !== undefined) values['data-dir'] = opts.dataDir;
   if (opts.dbPath !== undefined) values['db-path'] = opts.dbPath;
+  if (opts.repoRoot !== undefined) values['repo-root'] = opts.repoRoot;
   return values;
 }
 
@@ -661,7 +748,9 @@ export async function getDaemonStatus(
 }
 
 export async function installDaemon(opts: DaemonControlOptions = {}): Promise<DaemonConfig> {
-  const config = resolveDaemonControlConfig(opts);
+  const config = resolveConfig(controlValues(opts), opts, {
+    resolveRepoRoot: isLaunchdPlatform(opts),
+  });
   await runDaemonControlVerb('install', config, opts);
   return config;
 }
@@ -944,6 +1033,7 @@ export async function runDaemon(opts: DaemonOpts = {}): Promise<number> {
       port: { type: 'string' },
       'data-dir': { type: 'string' },
       'db-path': { type: 'string' },
+      'repo-root': { type: 'string' },
       'log-dir': { type: 'string' },
       tail: { type: 'string' },
       follow: { type: 'boolean', default: false },
@@ -968,7 +1058,9 @@ export async function runDaemon(opts: DaemonOpts = {}): Promise<number> {
   let config: DaemonConfig;
   let tail: number;
   try {
-    config = resolveConfig(parsed.values, opts);
+    config = resolveConfig(parsed.values, opts, {
+      resolveRepoRoot: verb === 'install' && isLaunchdPlatform(opts),
+    });
     tail = parseTail(parsed.values.tail);
   } catch (err) {
     writeLine(stderr, (err as Error).message);

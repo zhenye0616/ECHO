@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -23,6 +23,13 @@ let err: string[];
 interface Call {
   command: string;
   args: string[];
+}
+
+interface MockCommandResult {
+  status?: number | null;
+  stdout?: string;
+  stderr?: string;
+  error?: NodeJS.ErrnoException;
 }
 
 function writeRuntimePackage(): void {
@@ -58,15 +65,52 @@ function writePlist(overrides: Partial<DaemonConfig> = {}): void {
   writeFileSync(plistPath, renderLaunchdPlist(config(overrides)));
 }
 
+function installArgs(extra: string[] = []): string[] {
+  return [
+    'install',
+    '--plist-path',
+    plistPath,
+    '--home',
+    join(tmpRoot, 'home'),
+    '--port',
+    '45678',
+    '--log-dir',
+    logDir,
+    '--data-dir',
+    dataDir,
+    '--db-path',
+    dbPath,
+    ...extra,
+  ];
+}
+
+function makeHarnessRepo(path: string): string {
+  mkdirSync(join(path, 'tools', 'review-queue'), { recursive: true });
+  return path;
+}
+
+function readInstalledPlist(): string {
+  return readFileSync(plistPath, 'utf8');
+}
+
 function makeSpawnSync(
   calls: Call[],
-  opts: { loaded?: boolean; etime?: string; psStatus?: number } = {},
+  opts: { loaded?: boolean; etime?: string; psStatus?: number; git?: MockCommandResult } = {},
 ) {
   return ((command: string, args: readonly string[]) => {
     const argv = [...args];
     calls.push({ command, args: argv });
     if (command === '/node/v22/bin/node') {
       return { status: 0, stdout: 'v22.1.0\n', stderr: '' };
+    }
+    if (command === 'git' && argv.join(' ') === 'rev-parse --show-toplevel') {
+      const git = opts.git ?? { status: 1, stdout: '', stderr: 'not a git repository\n' };
+      return {
+        status: git.status ?? null,
+        stdout: git.stdout ?? '',
+        stderr: git.stderr ?? '',
+        error: git.error,
+      };
     }
     if (command === 'plutil') {
       return { status: 0, stdout: `${argv[1]}: OK\n`, stderr: '' };
@@ -101,6 +145,8 @@ async function runWith(
     psStatus?: number;
     json?: boolean;
     platform?: NodeJS.Platform;
+    cwd?: string;
+    git?: MockCommandResult;
   } = {},
 ): Promise<{ code: number; calls: Call[]; stdout: string; stderr: string }> {
   const calls: Call[] = [];
@@ -113,6 +159,7 @@ async function runWith(
       loaded: opts.loaded,
       etime: opts.etime,
       psStatus: opts.psStatus,
+      git: opts.git,
     }),
     healthProbe: async () => opts.health ?? true,
     sleep: async () => {},
@@ -121,6 +168,7 @@ async function runWith(
     processExecPath: '/node/v22/bin/node',
     daemonPath: opts.daemonPathOverride ?? daemonPath,
     probeDeadlineMs: 0,
+    cwd: opts.cwd,
   });
   return { code, calls, stdout: out.join(''), stderr: err.join('') };
 }
@@ -195,9 +243,94 @@ describe('echoctl daemon', () => {
     expect(xml).toContain('home &amp; &quot;quoted&quot;');
     expect(xml).toContain('<key>ECHO_DATA_DIR</key>');
     expect(xml).toContain('<key>ECHO_DB_PATH</key>');
+    expect(xml).not.toContain('<key>ECHO_REPO_ROOT</key>');
     expect(xml).not.toContain('WorkingDirectory');
     expect(xml).toContain('<string>/node/v22/bin/node</string>');
     expect(xml).toContain('<string>45678</string>');
+  });
+
+  it('install persists an explicit absolute repo root and XML-escapes it', async () => {
+    const repoRoot = makeHarnessRepo(join(tmpRoot, 'repo & "quoted"'));
+    const { code } = await runWith(installArgs(['--repo-root', repoRoot]));
+
+    expect(code).toBe(0);
+    const xml = readInstalledPlist();
+    expect(xml).toContain('<key>ECHO_REPO_ROOT</key>');
+    expect(xml).toContain('repo &amp; &quot;quoted&quot;');
+    expect(xml).not.toContain(`<string>${repoRoot}</string>`);
+  });
+
+  it('install derives repo root from the cwd git toplevel when the harness marker exists', async () => {
+    const repoRoot = makeHarnessRepo(join(tmpRoot, 'repo'));
+    const cwd = join(repoRoot, 'nested', 'dir');
+    mkdirSync(cwd, { recursive: true });
+    const { code } = await runWith(installArgs(), {
+      cwd,
+      git: { status: 0, stdout: `${repoRoot}\n`, stderr: '' },
+    });
+
+    expect(code).toBe(0);
+    const xml = readInstalledPlist();
+    expect(xml).toContain('<key>ECHO_REPO_ROOT</key>');
+    expect(xml).toContain(`<string>${repoRoot}</string>`);
+  });
+
+  it('install omits repo root silently when git is unavailable for cwd derivation', async () => {
+    const cwd = join(tmpRoot, 'not-git');
+    mkdirSync(cwd, { recursive: true });
+    const enoent = Object.assign(new Error('spawn git ENOENT'), { code: 'ENOENT' });
+    const { code, stderr } = await runWith(installArgs(), {
+      cwd,
+      git: { status: null, stdout: '', stderr: '', error: enoent },
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).not.toContain('repo-root');
+    expect(readInstalledPlist()).not.toContain('<key>ECHO_REPO_ROOT</key>');
+  });
+
+  it('install omits an auto-derived git toplevel that lacks the reviewer harness marker', async () => {
+    const repoRoot = join(tmpRoot, 'unrelated-repo');
+    mkdirSync(repoRoot, { recursive: true });
+    const { code, stderr } = await runWith(installArgs(), {
+      cwd: repoRoot,
+      git: { status: 0, stdout: `${repoRoot}\n`, stderr: '' },
+    });
+
+    expect(code).toBe(0);
+    expect(stderr).not.toContain('repo-root');
+    expect(readInstalledPlist()).not.toContain('<key>ECHO_REPO_ROOT</key>');
+  });
+
+  it('install resolves a relative explicit repo root against the install cwd', async () => {
+    const cwd = join(tmpRoot, 'installer-cwd');
+    const repoRoot = makeHarnessRepo(join(cwd, 'relative-harness'));
+    mkdirSync(cwd, { recursive: true });
+    const { code } = await runWith(installArgs(['--repo-root', 'relative-harness']), { cwd });
+
+    expect(code).toBe(0);
+    const xml = readInstalledPlist();
+    expect(xml).toContain('<key>ECHO_REPO_ROOT</key>');
+    expect(xml).toContain(`<string>${repoRoot}</string>`);
+  });
+
+  it.each([
+    ['non-existent directory', () => join(tmpRoot, 'missing-repo-root')],
+    [
+      'directory without reviewer harness',
+      () => {
+        const path = join(tmpRoot, 'repo-without-harness');
+        mkdirSync(path, { recursive: true });
+        return path;
+      },
+    ],
+  ])('install rejects explicit repo root pointing at a %s and writes no plist', async (_label, makeRoot) => {
+    const badRoot = makeRoot();
+    const { code, stderr } = await runWith(installArgs(['--repo-root', badRoot]));
+
+    expect(code).toBe(2);
+    expect(stderr).toContain('invalid --repo-root');
+    expect(existsSync(plistPath)).toBe(false);
   });
 
   it('install uses only the overridden launchd label and writes a linted plist before bootout', async () => {
