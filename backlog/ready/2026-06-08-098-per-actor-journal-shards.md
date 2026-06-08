@@ -8,7 +8,7 @@ created: 2026-06-08
 blocked_by: []
 task_state_ref: 2026-06-08-098-per-actor-journal-shards
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: ""
+ready_content_sha: bba31b89efe3307d9b525dd2a6f284543d008da47849c058468859297310074c
 claimed_by: ""
 claimed_at: ""
 branch: ""
