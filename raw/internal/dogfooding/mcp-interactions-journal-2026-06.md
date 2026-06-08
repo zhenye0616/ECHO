@@ -2133,3 +2133,12 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-08-098-per-actor-journal-shards/r6/request.md`; artifact `backlog/proposed/2026-06-08-098-per-actor-journal-shards.md@90bd55ffe02a35730736a68de0aa471b854c3224`; response `backlog/reviews/2026-06-08-098-per-actor-journal-shards/r6/codex-ops.md`; raw diagnostics `/tmp/claude-501/echo-codex-ops-40350EA2-8CEF-4BA5-BABA-5664BD428B08/raw/internal/review-queue/a55767d9-2505-41a9-9d22-0fde728fc1a7/codex-ops.stdout.log` / `/tmp/claude-501/echo-codex-ops-40350EA2-8CEF-4BA5-BABA-5664BD428B08/raw/internal/review-queue/a55767d9-2505-41a9-9d22-0fde728fc1a7/codex-ops.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-08 15:46 PDT - codex builder pre-claim MCP smoke/context check
+
+- **Trigger:** Codex builder run invoked `/process-backlog` semantics from `/Users/zhenye/Desktop/Project_echo`; before claiming, the run checked that ECHO MCP was exposed and pulled recent repo-scoped context.
+- **Query inputs:** `echo_ping(message="codex-builder pre-claim smoke test for Project_echo process-backlog run")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-07T00:00:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** `echo_ping` returned `pong:true` at `2026-06-08T22:46:24.357Z`. `find_clusters` returned 2 clusters: rank-1 `ctx_4751d2b4` labeled `work on project_echo` with source breakdown `git:137, claude_code:62, codex:5`, `atom_ids_truncated:true` over 204 total atoms, and rank-2 `ctx_e79b6a0c` labeled `discussion about ECHO` with `codex:22`.
+- **Verdict:** partial.
+- **Note:** MCP exposure is healthy, but the broad repo cluster is not item-specific enough to drive implementation choices; the builder still needs the deterministic backlog claim and the item's own `spec_refs`.
+- **Conjecture:** A pre-claim query scoped to the eventual `task_state_ref` or backlog ID may be more useful after claim than a whole-repo recent-work cluster.
