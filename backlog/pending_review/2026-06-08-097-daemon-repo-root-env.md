@@ -12,7 +12,7 @@ ready_content_sha: 127f00a3e18afad70865b5d2f6681f12ce9787d698e61bbc1f0555ec03be0
 claimed_by: "codex-builder-E94AA128-0730-443D-B17B-AA0321BA6E1A"
 claimed_at: "2026-06-08T21:18:57Z"
 branch: "agent/097-daemon-repo-root-env"
-head_sha: "d1ee1cacf1848f0c09eb78a08b92d3147657adb0"
+head_sha: "939bfe3ef9b461614fece76a00e832b41a7c7c8d"
 pr_url: ""
 agent_notes: |
   Built by a Codex builder (codex exec, danger-full-access, worktree agent/097-daemon-repo-root-env). Only the 2 files_to_modify touched (src/cli/commands/daemon.ts, tests/cli/daemon.test.ts); zero out-of-scope edits (src/coord/paths.ts untouched). All ACs implemented.
@@ -22,6 +22,7 @@ agent_notes: |
   - AC5 all 7 cases covered (a/d folded with real special-char value; g parametrized over non-existent + no-harness).
   - Orchestrator-reproduced from git ground truth: npx vitest run tests/cli/daemon.test.ts -> 26/26 passed; typecheck clean; lint clean.
   head_sha = d1ee1cacf1848f0c09eb78a08b92d3147657adb0 (branch agent/097-daemon-repo-root-env, pushed to origin).
+  MERGE-RECONCILIATION (939bfe3e, founder-approved): tests/cli/shell-reachable.test.ts (outside 097 files_to_modify) asserted coord_invoke returns isError in a packaged install AND the post-097 auto-derive made its install (cwd=repo) resolve the real source-repo wrapper -> coord_invoke succeeded (inverting the assertion) AND fire-and-forget spawned a live codex tick. Fix: run daemon install from a non-repo cwd (tmpRoot) so ECHO_REPO_ROOT is omitted, faithfully modelling the packaged-boundary (076); graceful-ENOENT contract restored, live spawn removed, test-only. shell-reachable green in isolation; full suite re-verified at merge.
 review_notes: ""
 files_to_modify:
   - src/cli/commands/daemon.ts        # add --repo-root flag + repoRoot config field (explicit flag → cwd git-toplevel → omit); harness-marker gate (<root>/tools/review-queue/ must exist) — explicit failure = exit non-zero + no plist, auto-derive failure = silent omit; emit <key>ECHO_REPO_ROOT</key> into the plist EnvironmentVariables dict only when an accepted root is resolved; update the install help text.
