@@ -75,8 +75,10 @@ assert_profile() {
 
 cd "$REPO"
 echo "=================== STEP 0: build fresh tarball ==================="
-npm pack 2>&1 | tail -2
-TGZ="$REPO/echoctl-0.1.0.tgz"
+# Derive the tarball name from npm pack's own output (last line) rather than
+# hardcoding a version — the package version moves (e.g. 0.1.0 -> 0.1.0-beta.1).
+TGZ_NAME="$(npm pack 2>/dev/null | tail -1)"
+TGZ="$REPO/$TGZ_NAME"
 ls -lh "$TGZ"
 
 echo ""; echo "=================== STEP 1: npm install -g into sandbox prefix ==================="

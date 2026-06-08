@@ -8,7 +8,7 @@ From the ECHO repo:
 
 ```bash
 npm pack
-npm install -g ./echoctl-0.1.0.tgz
+npm install -g "./$(npm pack | tail -1)"   # tarball name tracks the package version
 echoctl daemon install
 echoctl init
 echoctl doctor
@@ -16,6 +16,17 @@ echoctl doctor
 
 `npm pack` runs `npm run build:cli` first, which builds `dist/` and copies SQL migrations into `dist/storage/migrations/`.
 `echoctl init` wires selected agents and registers Claude Code's ECHO MCP server at user scope with `claude mcp add --transport http --scope user echo http://127.0.0.1:<port>/mcp`.
+
+### Vendor login (required for a green `doctor`)
+
+ECHO wires the agent CLIs but cannot log into them for you. On a fresh machine `echoctl doctor` reports `degraded` with `agent codex: auth-required` (or the same for any agent) until you authenticate the vendor CLI itself:
+
+```bash
+codex login      # and/or the login command for whichever agents you selected
+echoctl doctor   # should now report healthy
+```
+
+This is the one thing a brand-new install cannot self-heal — ECHO's own install + wiring + daemon formation complete without it; only cross-tool capture from that agent waits on its login.
 
 ## Daily Use
 
@@ -50,7 +61,7 @@ Rebuild and reinstall the new tarball, then restart the daemon explicitly:
 
 ```bash
 npm pack
-npm install -g ./echoctl-0.1.0.tgz
+npm install -g "./$(npm pack | tail -1)"
 echoctl daemon restart
 ```
 
