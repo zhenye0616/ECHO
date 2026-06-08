@@ -27,5 +27,7 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R6` — both reviewers (codex, codex-ops) returned `proceed` with **0 findings** at the scope-reduced spec (`90bd55ff`). Both explicitly affirmed the load-bearing claim: AC1 fixes the documented wrapper-vs-wrapper collision in the wrapper's hardcoded write path, independent of prose/skills/command-copies/local Codex render caches, and the remaining stale-path/same-file risk is the bounded LD5 residual — not a headline blocker. Terminal.
+
+Trend r1→r6: **6 → 1 → 2 → 2 → 2 → 0 MED**. Arc: r1 tightened the original spec (scope honesty, files_to_modify, slug validation, lossless-or-loud, bash -n); r2 settled the slug-granularity residual by re-scoping; r3–r5 the "no stale-path window" gate accreted surfaces every round until r5 correctly **removed** it (not load-bearing — AC1 code is the fix); r6 confirmed the reduction. Promote `proposed/ → ready/`.
 
