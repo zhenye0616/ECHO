@@ -27,6 +27,10 @@
 set -euo pipefail
 
 : "${REVIEWER_NAME:?REVIEWER_NAME env var required}"
+if [[ ! "$REVIEWER_NAME" =~ ^[a-z][a-z0-9-]*$ ]]; then
+  echo "invalid REVIEWER_NAME for dogfooding journal shard: '$REVIEWER_NAME' (expected ^[a-z][a-z0-9-]*$)" >&2
+  exit 1
+fi
 
 REPO_ROOT="${ECHO_REVIEW_QUEUE_REPO_ROOT:-$HOME/Desktop/Project_echo}"
 
@@ -478,9 +482,32 @@ PY
     local journal
     local local_ts
     month="$(TZ=America/Los_Angeles date +%Y-%m)"
-    journal="$WT/raw/internal/dogfooding/mcp-interactions-journal-$month.md"
+    journal="$WT/raw/internal/dogfooding/mcp-interactions-journal-$month-$REVIEWER_NAME.md"
     local_ts="$(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z')"
     mkdir -p "$(dirname "$journal")"
+    if [ ! -f "$journal" ]; then
+      cat > "$journal" <<EOF
+# ECHO MCP interactions journal - $month - $REVIEWER_NAME shard
+
+This is the $month per-actor shard for $REVIEWER_NAME. Entries land here when this actor invokes or reports ECHO MCP activity. Read the journal through tools/dogfooding/journal-cat.sh $month so this shard is merged with sibling actor shards and any frozen legacy shared file.
+
+**Timezone convention:** all times in this journal are founder local time (PDT/PST, America/Los_Angeles) unless explicitly noted. Source data stores ISO 8601 UTC; entries here are converted on write.
+
+## Quick-Fill Template
+
+    ### YYYY-MM-DD HH:MM PDT - <one-line context>
+
+    - **Trigger:** <why the tool was called>
+    - **Query inputs:** <tool(args), one line or compact numbered list>
+    - **Returned:** <N clusters/M atoms, N matches, N turns, warnings, top label/rank reasons>
+    - **Sources:** <source_breakdown | source_resolved | per-match prefixes | exact paths>
+    - **Verdict:** <right | partial | wrong> - <short reason>
+    - **Note:** <what felt useful/off>
+    - **Conjecture:** <optional>
+
+## Interactions
+EOF
+    fi
     cat >> "$journal" <<EOF
 
 ### $local_ts - $REVIEWER_NAME r$ROUND_NUM review tick on $ITEM_ID
