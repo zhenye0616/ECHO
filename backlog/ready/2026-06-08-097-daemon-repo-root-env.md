@@ -8,7 +8,7 @@ created: 2026-06-08
 blocked_by: []
 task_state_ref: 2026-06-08-097-daemon-repo-root-env
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: ""
+ready_content_sha: 127f00a3e18afad70865b5d2f6681f12ce9787d698e61bbc1f0555ec03be0d75
 claimed_by: ""
 claimed_at: ""
 branch: ""
