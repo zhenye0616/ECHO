@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers (codex, codex-ops) returned `proceed` with **0 findings** at the patched spec (`c80d3c58`). The r1 harness-marker guard + explicit-flag validation + relative-path resolution fully resolved all 4 r1 MED findings with no new findings surfaced. Trend r1→r2: 4 MED → 0. Terminal. Promote `proposed/ → ready/`.
 
