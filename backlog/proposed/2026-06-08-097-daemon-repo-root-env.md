@@ -1,0 +1,70 @@
+---
+id: 2026-06-08-097-daemon-repo-root-env
+title: "daemon install bakes ECHO_REPO_ROOT into the launchd plist so packaged reviewer dispatch resolves repo-relative paths (coord_invoke ENOENT fix)"
+status: proposed
+priority: HIGH
+estimate: 2h
+created: 2026-06-08
+blocked_by: []
+task_state_ref: 2026-06-08-097-daemon-repo-root-env
+requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: ""
+claimed_by: ""
+claimed_at: ""
+branch: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
+review_notes: ""
+files_to_modify:
+  - src/cli/commands/daemon.ts        # add --repo-root flag + repoRoot config field (explicit flag → cwd git-toplevel → omit); emit <key>ECHO_REPO_ROOT</key> into the plist EnvironmentVariables dict only when a root is resolved; update the install help text.
+  - tests/cli/daemon.test.ts          # plist-content assertions: flag value present + XML-escaped + absolute; cwd-in-repo default; cwd-not-a-repo → key OMITTED.
+spec_refs:
+  - src/coord/paths.ts                # computeRepoRoot() — READ FIRST: already honors ECHO_REPO_ROOT (lines 36-44); DO NOT modify. This spec only ensures the daemon's environment SETS it.
+  - src/mcp/tools/coord-invoke.ts     # reference ONLY — consumes REPO_ROOT for cwd + ECHO_REVIEW_QUEUE_REPO_ROOT + wrapper resolution; DO NOT modify (request_path stays relative).
+  - backlog/_followups.md             # R6 — the "coord_invoke ENOENT (077 + 092 recurrence)" HIGH bullet this closes; R6.remote_durable_truth theme.
+---
+
+## Why
+
+Every strategist-driven reviewer dispatch through `coord_invoke` ENOENTs against the **packaged** daemon (followups R6, `open HIGH`, recurred at 077 and 092). Root cause: `src/coord/paths.ts` `computeRepoRoot()` checks `ECHO_REPO_ROOT` first, **else** derives the repo root from `import.meta.url` → `../..`. In a `npm install -g` deployment that fallback resolves to the **install dir** (`…/lib/node_modules/echoctl`), not the user's repo. So:
+
+- `resolveReviewerWrapperPath(role)` looks for `<install-dir>/tools/review-queue/run-<role>-reviewer.sh`, which does not exist in the packaged tree → ENOENT.
+- `coord_invoke` spawns the wrapper with `cwd: REPO_ROOT` and `ECHO_REVIEW_QUEUE_REPO_ROOT: REPO_ROOT` = the install dir, so even the relative `request_path` (`backlog/reviews/<slug>/r<N>/request.md`) resolves against the wrong root.
+
+The override already exists for exactly this case — the `ECHO_REPO_ROOT` env var, documented in `paths.ts` as "tests + bundled-daemon deployments where the source-tree path math doesn't hold." The bug is purely that **nothing sets it in the daemon's launchd environment.** The launchd plist generator (`src/cli/commands/daemon.ts`) already emits an `EnvironmentVariables` dict with `ECHO_HOME`, `ECHO_MCP_PORT`, `ECHO_DATA_DIR`, `ECHO_DB_PATH` — it just never adds `ECHO_REPO_ROOT`. This is a one-seam, additive, no-protocol-change fix.
+
+## Locked decisions
+
+1. **`daemon install` writes `ECHO_REPO_ROOT` into the launchd plist `EnvironmentVariables` dict**, alongside the existing `ECHO_HOME`/`ECHO_MCP_PORT`/`ECHO_DATA_DIR`/`ECHO_DB_PATH`, XML-escaped identically. The packaged daemon then hits the existing env-override branch of `computeRepoRoot()` (`paths.ts:36-44`) and resolves wrappers + the relative `request_path` against the real repo.
+2. **Value source, in order:** (a) an explicit new `--repo-root <path>` flag (authoritative; mirrors `--home`/`--data-dir`); else (b) the git toplevel of the install-time working directory (`git rev-parse --show-toplevel` of the cwd the operator runs `echoctl daemon install` from — for the dogfooding case that is the repo); else (c) **omit the key entirely.** The resolved value is an absolute path.
+3. **Omit-not-empty (no regression).** When neither a flag nor a cwd git-toplevel yields a root, the `ECHO_REPO_ROOT` key is absent from the plist — never an empty string, never the install dir. A customer install that does not use the reviewer queue and is not run from a repo behaves byte-for-byte as today (the daemon keeps its current `import.meta.url` fallback).
+4. **macOS launchd plist only.** Windows daemon launch has no plist and is a separate path (R5 Windows EPIC) — see Out of Scope.
+5. **No protocol or resolver change.** `computeRepoRoot()`, `coord_invoke`, and `resolveReviewerWrapperPath` are correct and are NOT modified; `request_path` stays relative. The single-repo-per-daemon assumption is retained intentionally (the coord/reviewer harness is single-repo; multi-repo dispatch is a separate future item).
+
+## Acceptance criteria
+
+1. **`--repo-root <path>` flag.** `echoctl daemon install` accepts `--repo-root <path>`; the value is resolved to an absolute path and persisted into the generated plist as `<key>ECHO_REPO_ROOT</key><string>…</string>` inside the existing `EnvironmentVariables` dict. The install help text (the flag list in `daemon.ts`) documents the flag.
+2. **Default derivation when `--repo-root` is omitted.** The installer derives `repoRoot` = the git toplevel of the install-time cwd (`git rev-parse --show-toplevel`, reusing the existing git-subprocess invocation style; no new timeout knob). On any git failure (not a git repo, `git` absent, non-zero exit), it falls through to omission.
+3. **Omit-not-empty.** When no root is resolved (no flag AND cwd is not in a git repo), the generated plist contains **no** `ECHO_REPO_ROOT` key (assert absence — not an empty `<string></string>`, not the install dir). This is the no-regression guarantee for non-coord installs.
+4. **Behavior contract — dispatch resolves against the repo.** With `ECHO_REPO_ROOT` set in the plist env, a packaged daemon's `computeRepoRoot()` returns the configured repo root (env branch), so `resolveReviewerWrapperPath(role)` resolves `<repo>/tools/review-queue/run-<role>-reviewer.sh` and `coord_invoke` spawns with `cwd` / `ECHO_REVIEW_QUEUE_REPO_ROOT` = the repo root. Demonstrated by AC5's plist-content tests plus the existing `paths.ts` env-override behavior (the override path is pre-existing and already covered; this spec does not re-test `paths.ts`).
+5. **Tests + verification.** `tests/cli/daemon.test.ts` gains: (a) `--repo-root /some/abs` → plist contains `<key>ECHO_REPO_ROOT</key>` with `/some/abs`, XML-escaped, absolute; (b) omitted + cwd inside a git repo → plist contains that repo's toplevel; (c) omitted + cwd NOT a git repo → plist has no `ECHO_REPO_ROOT` key; (d) a value needing XML escaping is escaped like the sibling vars. Builder runs before review:
+   ```bash
+   npm run test -- tests/cli/daemon.test.ts
+   npm run typecheck
+   npm run lint
+   ```
+
+## Out of Scope (Don't Drift)
+
+- **Windows daemon env injection.** Windows has no launchd plist; threading `ECHO_REPO_ROOT` into a Windows daemon launch mechanism is the Windows EPIC's concern, not this item. Do not add a Windows daemon-install path here.
+- **Multi-repo-per-daemon coord dispatch.** One configured repo root per daemon only. Do NOT widen `coord_invoke`'s `request_path` to an absolute path, and do NOT add a `repo_root` field to the coord protocol — that is a separate future item if the harness ever serves multiple repos.
+- **Changing `computeRepoRoot()` / `coord-invoke.ts` / `resolveReviewerWrapperPath`.** They are correct; only the daemon's *environment* was wrong. If a real resolver bug surfaces, log a drift-event — do not fix here.
+- **`doctor`/`selftest` validation that the plist carries `ECHO_REPO_ROOT`.** A reasonable follow-up, but not in this item — keep the surface to install-time plist generation.
+- **Auto-migrating an already-installed daemon.** Picking up the new env requires re-running `echoctl daemon install` (regenerates the plist); no postinstall auto-restart is added. The re-run instruction is a docs note (strategist, post-merge), not code here.
+
+## After Completion (Strategist Notes)
+
+- Update `docs/echoctl-install.md`: document `--repo-root`, and that existing installs must re-run `echoctl daemon install` (then `daemon restart`) to add `ECHO_REPO_ROOT` to the plist env.
+- Update `backlog/_followups.md` R6: mark **coord_invoke ENOENT (077 + 092)** resolved by `ECHO_REPO_ROOT`-in-plist; keep the Windows daemon-env and multi-repo-per-daemon residuals open.
+- Consider a one-line architecture/surfaces note that the daemon's repo-root is an explicit install-time env contract (not an `import.meta.url` inference) for packaged deployments.
