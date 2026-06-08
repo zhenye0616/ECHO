@@ -12,9 +12,10 @@ ready_content_sha: bba31b89efe3307d9b525dd2a6f284543d008da47849c0584688592973100
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-08T22:48:08Z"
 branch: "agent/per-actor-journal-shards"
-head_sha: ""
+head_sha: "daa80b41d6506079f839ad25f74f6e6a50b2c8ef"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the per-actor dogfooding journal shard cutover: reviewer wrapper writes and stages only its actor shard with slug validation and shard bootstrap, `tools/dogfooding/journal-cat.sh` merges shard sets plus frozen legacy files with loud malformed-block failures, CLAUDE.md/AGENTS.md point writers and readers at the shard convention, and the June shared file received only the LD4 cutover note. Verification passed: focused vitest, typecheck, lint, shell syntax checks, `git diff --check`, and real-data `journal-cat.sh 2026-06` smoke.
 review_notes: ""
 files_to_modify:
   - tools/review-queue/_run_reviewer.sh        # append_wrapper_journal(): write to the per-actor shard mcp-interactions-journal-<month>-<REVIEWER_NAME>.md instead of the shared monthly file; commit/push message unchanged.

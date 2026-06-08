@@ -4,12 +4,19 @@ role: builder
 writer: codex-builder
 binding: codex
 claim_branch: agent/per-actor-journal-shards
-last_updated: 2026-06-08T22:48:08Z
+last_updated: 2026-06-08T22:58:57Z
+handoff_branch: agent/per-actor-journal-shards
+handoff_head_sha: daa80b41d6506079f839ad25f74f6e6a50b2c8ef
+handoff_run_log: raw/internal/agent-runs/2026-06-08-2026-06-08-098-per-actor-journal-shards.md
 ---
 
 ## current_thesis
 
 Fresh claim by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement per-actor dogfooding journal shards: the reviewer wrapper writes only its actor shard, `journal-cat.sh` reads the union chronologically and loudly rejects malformed blocks, in-repo discipline points readers/writers at shards, and the frozen June shared journal gets only the cutover note.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at daa80b41d6506079f839ad25f74f6e6a50b2c8ef.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 
@@ -34,5 +41,5 @@ Fresh claim by codex builder `78D5AB0F-A8A3-4F01-BC2E-EB05961B2405`. Implement p
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-08-098-per-actor-journal-shards.md
+- spec: backlog/pending_review/2026-06-08-098-per-actor-journal-shards.md
 - reviews: backlog/reviews/2026-06-08-098-per-actor-journal-shards/
