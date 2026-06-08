@@ -9,9 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-08-097-daemon-repo-root-env
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 127f00a3e18afad70865b5d2f6681f12ce9787d698e61bbc1f0555ec03be0d75
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "codex-builder-E94AA128-0730-443D-B17B-AA0321BA6E1A"
+claimed_at: "2026-06-08T21:18:57Z"
+branch: "agent/097-daemon-repo-root-env"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
