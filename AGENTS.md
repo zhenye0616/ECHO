@@ -173,9 +173,11 @@ Keep the V1 tape-above-desk from `CLAUDE.md` in mind:
 
 ## ECHO MCP Dogfooding Log
 
-Every Codex interaction with ECHO must be logged to the canonical current-month cross-tool journal shard:
+Every Codex interaction with ECHO must be logged to Codex's canonical current-month cross-tool journal shard:
 
-`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` (currently `raw/internal/dogfooding/mcp-interactions-journal-2026-05.md`)
+`raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-codex.md` (currently `raw/internal/dogfooding/mcp-interactions-journal-2026-06-codex.md`)
+
+The journal is now a per-actor shard set, not one shared monthly file. Actor slugs are lowercase binding identities matching `^[a-z][a-z0-9-]*$`; Codex writes `codex`, codex-ops writes `codex-ops`, Claude Code / strategist / watcher write `claude`, and Cursor's Claude writes `cursor`. To read the full month, run `tools/dogfooding/journal-cat.sh YYYY-MM`; it merges per-actor shards plus any frozen legacy shared file in chronological order. Do not append new entries to `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md`; the June 2026 shared file is pre-shard history only.
 
 This applies to every call to ECHO MCP tools, including:
 

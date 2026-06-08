@@ -2,6 +2,8 @@
 
 This is the **June 2026 monthly shard** of ECHO's cross-tool MCP-call journal. Entries land here from 2026-06-01 onward. The prior shard is frozen at `mcp-interactions-journal-2026-05.md`; do not append to it. The historical monolith is frozen at `mcp-interactions-journal-archive-through-2026-05-17.md`.
 
+**Cutover note:** this shared June file is frozen as pre-shard history after item 098; new entries go to per-actor shards `mcp-interactions-journal-2026-06-<actor>.md` and are read through `tools/dogfooding/journal-cat.sh 2026-06`.
+
 **Originating item:** [`2026-05-06-018-recent-work-context-tool`](../../../backlog/complete/2026-05-06-018-recent-work-context-tool.md)
 **Sources active in store:** claude-code, codex, cursor, git
 **Timezone convention:** all times in this journal are **founder's local time (PDT, America/Los_Angeles)** unless explicitly noted. Source data stores ISO 8601 UTC; entries here are converted on write.

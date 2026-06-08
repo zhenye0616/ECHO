@@ -154,13 +154,15 @@ The agent operates across **two directories**: backlog state changes happen in t
 
 ### Dogfooding journal discipline (every AI client)
 
-**Every ECHO MCP call must be logged to the current month's shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` in the moment** — currently `raw/internal/dogfooding/mcp-interactions-journal-2026-06.md`. Do not append to the frozen historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; monthly shards are the canonical log. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
+**Every ECHO MCP call must be logged to the current month's per-actor shard at `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-<actor>.md` in the moment** — current shard set: `raw/internal/dogfooding/mcp-interactions-journal-2026-06-{claude,codex,codex-ops,cursor}.md`. Actor slugs are lowercase binding identities matching `^[a-z][a-z0-9-]*$`: Claude Code / strategist / watcher use `claude`; Codex uses `codex`; codex-ops uses `codex-ops`; Cursor's Claude uses `cursor`. Do not append to the frozen pre-shard shared file (`raw/internal/dogfooding/mcp-interactions-journal-2026-06.md`) or the historical archive (`raw/internal/dogfooding/mcp-interactions-journal-archive-through-2026-05-17.md`). This applies equally to Claude Code, Codex, Cursor's Claude, agent runs, and any other AI client invoking the MCP server. The journal is cross-tool and cross-item; per-actor monthly shards are the canonical write targets, and `tools/dogfooding/journal-cat.sh YYYY-MM` is the canonical read target. It is the input that decides V1.5+ backlog priorities; aspirational end-of-week entries are useless, lossy in-the-moment entries are gold.
 
 **What counts:** any `mcp__echo__*` or `mcp__echo-memory__*` invocation — `get_recent_work_context`, `search_memories`, `echo_ping`, `memory_*`, etc. Log even 0-match / error responses; those are the highest-signal entries.
 
 **Skip-rule for zero-MCP-call entries.** If a reviewer tick (or any AI-client invocation) reads files / runs git / runs scripts but makes **zero `mcp__echo__*` calls**, do NOT journal it. The journal's signal is MCP-call discipline + surprising failures; mechanical activity without ECHO retrieval is not journal-worthy. Operational artifacts (review responses, commit messages, agent-run logs) already capture that work. Exception: a reviewer tick that *expected to* make an MCP call but *failed to* (sandbox error, transport error, etc.) IS journaled — that's a surprising failure.
 
-**Required entry shape** (the template lives in the journal preamble; copy it verbatim):
+**Reading the journal.** "Read the journal" means `tools/dogfooding/journal-cat.sh YYYY-MM`, which merges all per-actor shards plus the frozen legacy shared file for that month in chronological entry order. Humans, HTML regeneration, and end-of-window synthesis should read the merged stream, not a single shard.
+
+**Required entry shape** (the template lives in each shard preamble; copy it verbatim):
 
 ```
 ### YYYY-MM-DD HH:MM PDT — <one-line context>
@@ -179,16 +181,17 @@ The **Sources** field is non-optional. Source-volume bias and silent omission (e
 
 **Journal-by-proxy for read-only consultees (046 AC6).** A read-only consultee (e.g., `codex exec --sandbox read-only`, a subagent without write capability, or any future binding that lacks repo-write) MAY call ECHO MCP only if it immediately reports `tool name / inputs / returned shape / sources / verdict / note` to its orchestrator in the same turn. The orchestrator MUST journal the call in the same turn, attributed to the consultee — e.g. `Source agent: codex strategist (consulting; orchestrator-journaled by claude)`. The in-the-moment rule is NOT weakened: the consultee's report and the orchestrator's journal entry are part of the same turn, not deferred. Worked example: the journal entry at `2026-05-13 16:45 PDT — closed-loop event` (codex strategist reads prior codex strategist via ECHO; claude orchestrator journals the call) demonstrates the shape. Cross-referenced in `skills/role-typed-task-state.md` so non-Claude bindings see the same rule.
 
-**HTML twins are no longer committed.** Local regeneration is optional — anyone who wants a styled view can run the pandoc one-liner against the current month's journal shard and view the generated HTML locally. The MD shard is the canonical authoritative format. One-liner:
+**HTML twins are no longer committed.** Local regeneration is optional — anyone who wants a styled view can run the pandoc one-liner against the merged current-month stream and view the generated HTML locally. The MD shards are the canonical authoritative format. One-liner:
 
 ```
+tools/dogfooding/journal-cat.sh 2026-06 > /tmp/echo-mcp-journal-2026-06.md
 pandoc -s --metadata title="ECHO MCP interactions journal (cross-tool, cross-AI)" --toc --toc-depth=3 \
   -H raw/internal/dogfooding/journal-style.html \
-  raw/internal/dogfooding/mcp-interactions-journal-2026-05.md \
-  -o raw/internal/dogfooding/mcp-interactions-journal-2026-05.html
+  /tmp/echo-mcp-journal-2026-06.md \
+  -o raw/internal/dogfooding/mcp-interactions-journal-2026-06.html
 ```
 
-Do not commit regenerated HTML twins. On the first MCP-call journal append of each new calendar month, create a fresh `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM.md` shard with the same preamble template and update this current-shard pointer.
+Do not commit regenerated HTML twins. On the first MCP-call journal append by an actor in a new calendar month, create that actor's fresh `raw/internal/dogfooding/mcp-interactions-journal-YYYY-MM-<actor>.md` shard with the same preamble template and update this current-shard-set pointer.
 
 ### Drift Prevention Applies to Agents Too
 
