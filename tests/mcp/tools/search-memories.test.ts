@@ -521,6 +521,31 @@ describe('searchMemories Gap 6 — TZ-naive timestamp warning parity', () => {
     });
     expect(r.warnings.length).toBe(1);
   });
+
+  it('naive window filters as local time and still emits the [TZ] warning', async () => {
+    const store = new MemoryStorage();
+    await store.append({
+      source: 'fs:x',
+      timestamp: new Date('2026-05-08T22:30:00').toISOString(),
+      content: 'inside local window',
+    });
+    await store.append({
+      source: 'fs:x',
+      timestamp: new Date('2026-05-08T23:30:00').toISOString(),
+      content: 'outside local window',
+    });
+
+    const r = await searchMemories(store, {
+      source: 'fs:x',
+      since: '2026-05-08T22:00:00',
+      until: '2026-05-08T23:00:00',
+      limit: 5,
+    });
+
+    expect(r.matches.map((m) => m.content)).toEqual(['inside local window']);
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toMatch(/^\[TZ\]/);
+  });
 });
 
 describe('search_memories (end-to-end via MCP server)', () => {

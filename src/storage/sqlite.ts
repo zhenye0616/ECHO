@@ -13,6 +13,7 @@ import {
 } from './interface.js';
 import { canonicalizeTimestamps, migrate } from './migrate.js';
 import { createLogger } from '../logging/index.js';
+import { canonicalizeTimestamp } from '../util/timestamp.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 
@@ -99,6 +100,8 @@ export class SqliteStorage implements Storage {
         'QueryFilter.before is defined for descending queries only; pass order: "desc" or omit it',
       );
     }
+    const since = filter?.since !== undefined ? canonicalizeTimestamp(filter.since) : undefined;
+    const until = filter?.until !== undefined ? canonicalizeTimestamp(filter.until) : undefined;
     const clauses: string[] = [];
     const params: Record<string, unknown> = {};
     if (filter?.source !== undefined) {
@@ -109,13 +112,13 @@ export class SqliteStorage implements Storage {
       clauses.push("source LIKE @source_prefix || '%' ESCAPE '\\'");
       params['source_prefix'] = filter.source_prefix.replace(/[\\%_]/g, '\\$&');
     }
-    if (filter?.since !== undefined) {
+    if (since !== undefined) {
       clauses.push('timestamp >= @since');
-      params['since'] = filter.since;
+      params['since'] = since;
     }
-    if (filter?.until !== undefined) {
+    if (until !== undefined) {
       clauses.push('timestamp < @until');
-      params['until'] = filter.until;
+      params['until'] = until;
     }
     if (filter?.before !== undefined) {
       // SQLite ≥3.0 supports row-value comparison; this is the canonical way
@@ -245,9 +248,7 @@ export class SqliteStorage implements Storage {
     const sql = limit !== undefined ? `${baseSql} LIMIT @limit` : baseSql;
     const params: Record<string, unknown> = { sinceSeq };
     if (limit !== undefined) params['limit'] = limit;
-    const rows = this.db.prepare(sql).all(params) as Array<
-      EventRow & { sequence_id: number }
-    >;
+    const rows = this.db.prepare(sql).all(params) as Array<EventRow & { sequence_id: number }>;
     return rows.map((r) => {
       const base = rowToEvent(r);
       return Object.assign({}, base, { sequence_id: r.sequence_id });

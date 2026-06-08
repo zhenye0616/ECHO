@@ -164,6 +164,62 @@ describe('SqliteStorage', () => {
       });
       expect(r.map((e) => e.content)).toEqual(['b', 'c']);
     });
+
+    it('-07:00 query window returns the same atoms as the equivalent Z window', async () => {
+      const zWindow = await store.query({
+        since: '2026-04-30T10:00:00.000Z',
+        until: '2026-04-30T12:00:00.000Z',
+        order: 'asc',
+      });
+      const offsetWindow = await store.query({
+        since: '2026-04-30T03:00:00.000-07:00',
+        until: '2026-04-30T05:00:00.000-07:00',
+        order: 'asc',
+      });
+      expect(offsetWindow.map((e) => e.id)).toEqual(zWindow.map((e) => e.id));
+      expect(offsetWindow.map((e) => e.content)).toEqual(['b', 'c']);
+    });
+
+    it('+0900 offset query window works', async () => {
+      const r = await store.query({
+        since: '2026-04-30T19:00:00+0900',
+        until: '2026-04-30T21:00:00+0900',
+        order: 'asc',
+      });
+      expect(r.map((e) => e.content)).toEqual(['b', 'c']);
+    });
+
+    it('missing-milliseconds Z query window works', async () => {
+      const r = await store.query({
+        since: '2026-04-30T10:00:00Z',
+        until: '2026-04-30T12:00:00Z',
+        order: 'asc',
+      });
+      expect(r.map((e) => e.content)).toEqual(['b', 'c']);
+    });
+
+    it('naive query window is canonicalized as local time before comparing', async () => {
+      await store.append(
+        eventInput({
+          source: 'fs:local',
+          timestamp: new Date('2026-04-30T10:30:00').toISOString(),
+          content: 'local-window',
+        }),
+      );
+      const r = await store.query({
+        source: 'fs:local',
+        since: '2026-04-30T10:00:00',
+        until: '2026-04-30T11:00:00',
+        order: 'asc',
+      });
+      expect(r.map((e) => e.content)).toEqual(['local-window']);
+    });
+
+    it('invalid query timestamp throws', async () => {
+      await expect(store.query({ since: 'not-a-date' })).rejects.toThrow(
+        /invalid timestamp: not-a-date/,
+      );
+    });
   });
 
   describe('limit filter', () => {
