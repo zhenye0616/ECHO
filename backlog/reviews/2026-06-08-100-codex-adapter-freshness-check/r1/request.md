@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-06-09T17:23:26Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: 6db4fbc3-29d2-43d2-ba24-49e23b353f60
 ---
 
