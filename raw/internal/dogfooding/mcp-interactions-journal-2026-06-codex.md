@@ -71,3 +71,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** `source_breakdown={claude_code: 14, git: 36, codex: 2}`; cluster time range `2026-06-09T05:12:38.467Z` to `2026-06-09T06:43:16.624Z`.
 - **Verdict:** right - MCP was reachable and returned recent repo-local activity without requiring atom hydration.
 - **Note:** The result was broad but sufficient as a pre-claim availability/context check; item selection remains delegated to `tools/blocked.py`.
+
+### 2026-06-09 00:00 PDT - codex builder MCP preflight before atomic claim
+
+- **Trigger:** Builder invocation checked whether ECHO MCP was reachable before resolving or claiming the next ready backlog item.
+- **Query inputs:** `echo_ping(message="codex builder preflight before atomic claim")`.
+- **Returned:** ping OK at `2026-06-09T07:00:12.179Z`; 0 clusters, 0 atoms.
+- **Sources:** ECHO MCP daemon health response only; no captured memory, git, fs, or coord atoms queried.
+- **Verdict:** right - the daemon was reachable and echoed the supplied message.
+- **Note:** Minimal availability check only; item selection remains delegated to `tools/blocked.py`.
