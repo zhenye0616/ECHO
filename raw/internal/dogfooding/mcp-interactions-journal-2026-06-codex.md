@@ -80,3 +80,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP daemon health response only; no captured memory, git, fs, or coord atoms queried.
 - **Verdict:** right - the daemon was reachable and echoed the supplied message.
 - **Note:** Minimal availability check only; item selection remains delegated to `tools/blocked.py`.
+
+### 2026-06-09 10:26 PDT - codex r1 review tick on 2026-06-08-100-codex-adapter-freshness-check
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-08-100-codex-adapter-freshness-check/r1/request.md` and published `backlog/reviews/2026-06-08-100-codex-adapter-freshness-check/r1/codex.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=6db4fbc3-29d2-43d2-ba24-49e23b353f60)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/tmp/claude-501/echo-codex-7C18E95A-6ED8-4EA7-8A63-9EF5FA0D3C59/raw/internal/review-queue/4293d2fd-764e-4410-9487-494c8ed45b8b/codex.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-06-08-100-codex-adapter-freshness-check/r1/codex.md` at `39d4364557aa0c0c8dc301a094678d2ef3100f03`.
+- **Sources:** request `backlog/reviews/2026-06-08-100-codex-adapter-freshness-check/r1/request.md`; artifact `backlog/proposed/2026-06-08-100-codex-adapter-freshness-check.md@ab512320df8eb25eb4898ddad22217d498960ab7`; response `backlog/reviews/2026-06-08-100-codex-adapter-freshness-check/r1/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-7C18E95A-6ED8-4EA7-8A63-9EF5FA0D3C59/raw/internal/review-queue/4293d2fd-764e-4410-9487-494c8ed45b8b/codex.stdout.log` / `/tmp/claude-501/echo-codex-7C18E95A-6ED8-4EA7-8A63-9EF5FA0D3C59/raw/internal/review-queue/4293d2fd-764e-4410-9487-494c8ed45b8b/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
