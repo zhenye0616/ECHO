@@ -3,11 +3,18 @@ task_id: 2026-06-08-099-code-owned-sidecar-writer
 role: builder
 binding: codex
 claim_branch: agent/code-owned-sidecar-writer
-last_updated: 2026-06-09T06:46:06Z
+last_updated: 2026-06-09T06:51:29Z
+handoff_branch: agent/code-owned-sidecar-writer
+handoff_head_sha: 7a7d18a7d4e9e322683a83b3011041f370df7fff
+handoff_run_log: raw/internal/agent-runs/2026-06-08-2026-06-08-099-code-owned-sidecar-writer.md
 ---
 
 ## current_thesis
 Claimed 099 as codex builder. Implement the code-owned review sidecar writer so `producer` is stamped by `emit-sidecar.py`, sidecars are validated before atomic publication, the existing validator imports a shared helper, pending-review sidecars are independently gated, and `/review-pending` no longer hand-transcribes sidecar frontmatter.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-08-2026-06-08-099-code-owned-sidecar-writer.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add `tools/review-queue/emit-sidecar.py`; it reads a JSON descriptor, derives the target from `item_id`, stamps `producer` and `reviewed_at`, rejects conflicting/generated or unknown keys, assembles required headings, validates before finalizing, and writes nothing on failure.
@@ -22,6 +29,10 @@ Claimed 099 as codex builder. Implement the code-owned review sidecar writer so 
 - None blocking at claim. Escalate if implementation needs files outside `files_to_modify`, a new dependency, a new test framework, historical sidecar migration, or a decision on `/review-pending` rerun overwrite policy.
 - Non-blocking observation: `task_state_ref` is set, but no strategist pointer directory existed on `main` at claim time; builder proceeds from the spec body, review artifacts, and mandatory refs.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not implement the generalized Codex/all-adapter freshness gate or wire HOME-relative Codex skill cache checks into merge invariants.
 - Do not implement `echo_skill()` render-at-use-time.
@@ -32,5 +43,6 @@ Claimed 099 as codex builder. Implement the code-owned review sidecar writer so 
 - Do not edit `wiki/**`, founder-owned docs/status/backlog files, backlog item bodies, dependencies, or files outside the spec's `files_to_modify`.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-08-099-code-owned-sidecar-writer.md
+
+- spec: backlog/pending_review/2026-06-08-099-code-owned-sidecar-writer.md
 - reviews: backlog/reviews/2026-06-08-099-code-owned-sidecar-writer/

@@ -12,9 +12,10 @@ ready_content_sha: 46095398498d39c2fae7b5c536d0b3383bf9e5537b16010e3ade725d3f1fd
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-09T06:46:06Z"
 branch: "agent/code-owned-sidecar-writer"
-head_sha: ""
+head_sha: "7a7d18a7d4e9e322683a83b3011041f370df7fff"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC4 requires retired producer values to fail validation, but existing `tools/review-queue/test-validate-sidecar.sh` asserts all three producers validate and that file is not listed in `files_to_modify`. Tried: read all spec_refs, inspected r1-r4 review artifacts, ran the existing validator test, and confirmed it currently fails before implementation due `validate-sidecar.py` importing `jsonschema` before `_lib` can apply the arm64 retry; fixing that import-order issue still leaves the all-producers assertion incompatible with AC4. Best guess: add `tools/review-queue/test-validate-sidecar.sh` to `files_to_modify` and update it so only `review-pending-orchestrator` validates while retired producers explicitly fail. Why escalated: builder rules require stopping on a need to modify a file outside `files_to_modify` and on unresolved spec ambiguity.
 review_notes: ""
 files_to_modify:
   - tools/review-queue/emit-sidecar.py            # NEW — code-owned sidecar writer. Reads a structured (JSON) sidecar descriptor from --input FILE or stdin; derives the target path from item_id (<repo_root>/backlog/pending_review/<item_id>.review.md, NOT caller-supplied); derives `producer` PROGRAMMATICALLY (the constant orchestrator value, NOT taken from input); stamps `reviewed_at` in canonical UTC Z; assembles frontmatter+body; validates via the shared helper BEFORE finalize. Finalize is ALWAYS same-dir temp → validate → atomic no-clobber `os.link` (default); `os.replace` (overwrite) ONLY under --replace (Locked decision 8 / AC2 — never default last-writer-wins). Exits non-zero WITHOUT writing on any validation failure or existing target.
