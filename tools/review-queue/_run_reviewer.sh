@@ -438,7 +438,8 @@ EOF
     PYTHONDONTWRITEBYTECODE=1 python3 - "$response_path" "$REVIEWER_NAME" "$ITEM_ID" "$ROUND_NUM" "$SPEC_COMMIT_SHA" <<'PY'
 from pathlib import Path
 import sys
-import yaml
+
+import _lib  # robust, line-anchored frontmatter parse shared with validate.py
 
 path = Path(sys.argv[1])
 expected_reviewer = sys.argv[2]
@@ -446,14 +447,16 @@ expected_item = sys.argv[3]
 expected_round = sys.argv[4]
 expected_sha = sys.argv[5]
 
-text = path.read_text(encoding="utf-8")
-parts = text.split("---", 2)
-if len(parts) < 3:
-    print("request binding mismatch: missing YAML frontmatter", file=sys.stderr)
-    raise SystemExit(1)
-fm = yaml.safe_load(parts[1]) or {}
-if not isinstance(fm, dict):
-    print("request binding mismatch: frontmatter is not a mapping", file=sys.stderr)
+# Use the same robust parser as the schema-validation path. A bare
+# text.split("---", 2) truncates the frontmatter when a string VALUE contains
+# a `---` token, then crashes yaml.safe_load with an unhandled traceback
+# (observed on the 099 spec-review tick — whose subject IS `---` sidecar
+# frontmatter). Any parse failure here must surface as a clean
+# binding-mismatch diagnostic, never a traceback.
+try:
+    fm, _ = _lib.parse_frontmatter(path)
+except ValueError as exc:
+    print(f"request binding mismatch: {exc}", file=sys.stderr)
     raise SystemExit(1)
 
 checks = {
