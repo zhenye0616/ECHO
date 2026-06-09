@@ -20,7 +20,7 @@ files_to_modify:
   - tools/review-queue/emit-sidecar.py            # NEW — code-owned sidecar writer. Reads a structured (JSON) sidecar descriptor from --input FILE or stdin; derives `producer` PROGRAMMATICALLY (the constant orchestrator value, NOT taken from input); stamps `reviewed_at` in canonical UTC Z; assembles frontmatter+body; validates via the shared helper BEFORE writing; writes atomically (temp + os.replace). Exits non-zero WITHOUT writing on any validation failure.
   - tools/review-queue/_sidecar_validate.py       # NEW — import-safe validation helper extracted from validate-sidecar.py (hyphenated filename is not importable). Exposes a pure `validate(fm, body) -> str | None` (returns an error message or None) + the schema/heading constants. Both validate-sidecar.py and emit-sidecar.py import it; zero duplicated validation logic. (codex consult F4)
   - tools/review-queue/validate-sidecar.py        # MODIFY — re-implement on top of _sidecar_validate.py; CLI behavior (argv, exit codes, stderr messages) unchanged.
-  - tools/review-queue/schemas/review-sidecar.schema.json  # MODIFY — tighten `producer` from a free string to `const: "review-pending-orchestrator"` (single-value). Any other producer value fails validation; a future second writer requires an explicit schema/spec change. (codex consult F6 — do NOT "retire the enum" into free-form.)
+  - tools/review-queue/schemas/review-sidecar.schema.json  # MODIFY — collapse `producer` from its current three-value enum (claude-code-subagent, codex-child, review-pending-orchestrator) to the single value `review-pending-orchestrator` (const / one-element enum). Any other producer value fails validation; a future second writer requires an explicit schema/spec change. (codex consult F6 — do NOT "retire the enum" into free-form.)
   - tools/review-queue/check-coupled-invariants.sh # MODIFY — add check_pending_review_sidecars(): run validation over every committed *.review.md under backlog/pending_review/ (the LIVE set only — repo-tracked, no HOME dependency); fail the gate on any invalid sidecar. Absent/empty pending_review/ is a clean pass. (the "validate-sidecar.py CI gate" half of the followup; the independent second guard per codex F3.)
   - skills/review-pending.md                       # MODIFY — replace the hand-authored sidecar frontmatter block (the `producer: review-pending-orchestrator` transcription site at ~line 177) with an invocation of emit-sidecar.py fed a structured descriptor. Remove the literal producer line so transcription can no longer drift.
   - .claude/commands/review-pending.md             # MODIFY (generated) — re-sync from skills/review-pending.md via `tools/sync-skills.sh` so `sync-skills.sh --check` / check_skill_adapters stays green. Do NOT hand-edit; run the sync script.
@@ -49,16 +49,42 @@ This is the **R6.adapter_freshness** root: a control-plane artifact whose writer
 5. **Fail-closed on an existing target** (codex F7). Writing defaults to refuse-if-exists; `--replace` is the explicit opt-in. This avoids silently pre-deciding the open `/review-pending` rerun-policy follow-up.
 6. **Structured input, not a pile of flags** (codex F8). The descriptor is JSON via `--input FILE` or stdin; atomic temp-validate-then-rename so shell quoting never becomes the next transcription bug.
 7. **The pending-review sidecar gate scans only `backlog/pending_review/`.** Historical sidecars in `complete/` predate the schema and are not migrated; the live set is what must be conformant before a merge.
+8. **No-clobber is atomic, not check-then-write** (codex r1 #2 / codex-ops r1 #1). The fail-closed guarantee (decision 5) must survive a TOCTOU race: two overlapping `/review-pending` runs must not both observe a missing target and then clobber each other. The default (`--replace` absent) finalization is an atomic no-clobber publish (`open(O_CREAT|O_EXCL)` or `os.link` from a same-directory temp); `os.replace` (last-writer-wins overwrite) is reserved for the explicit `--replace` path. A target appearing between staging and finalization fails cleanly with no overwrite.
+
+## Sidecar descriptor contract (codex r1 #1)
+
+emit-sidecar.py consumes a single JSON object (`--input FILE` or stdin). **Accepted** keys come from the caller; **generated** keys are writer-owned and are an error if supplied with a conflicting value.
+
+```json
+{
+  "target_path": "backlog/pending_review/<item_id>.review.md",
+  "item_id": "<item_id matching the schema item_id pattern>",
+  "verdict": "merge as-is | merge with founder fixups | redo before merge | block",
+  "test_counts": { "passed": 0, "failed": 0 },
+  "body": {
+    "verdict": "markdown rendered under `## Verdict`",
+    "pre_merge_fixups": "markdown under `## Pre-merge fixups`",
+    "expected_merge_conflicts": "markdown under `## Expected merge conflicts`",
+    "followups": "markdown under `## Follow-up items (defer, do not block merge)`",
+    "open_questions": "markdown under `## Open questions for founder` — REQUIRED iff verdict == block, forbidden otherwise"
+  }
+}
+```
+
+- **Accepted (caller-supplied):** `target_path`, `item_id`, `verdict`, `test_counts`, `body.*`.
+- **Generated (writer-owned, reject on conflicting input):** `producer` (always `review-pending-orchestrator`), `reviewed_at` (current time, canonical UTC `…Z`).
+- **Forbidden:** any key not listed above (the assembled frontmatter must satisfy the schema's `additionalProperties: false`).
+- The four required body headings (and the fifth `## Open questions for founder` when `verdict == block`) are emitted from `body.*` so the produced sidecar passes both the frontmatter schema and `validate-sidecar.py`'s heading checks in one shot.
 
 ## Acceptance criteria
 
-- **AC1 — writer exists and is correct.** `tools/review-queue/emit-sidecar.py` reads a JSON sidecar descriptor from `--input FILE` or stdin, derives `producer = "review-pending-orchestrator"` programmatically, stamps `reviewed_at` in canonical UTC `…Z`, assembles frontmatter + body, validates via `_sidecar_validate.py` BEFORE writing, and writes atomically (temp + `os.replace`). On any validation failure it exits non-zero and writes nothing.
-- **AC2 — fail-closed on existing target.** If the target path exists, emit-sidecar.py exits non-zero without writing UNLESS `--replace` is passed; with `--replace` it overwrites atomically.
+- **AC1 — writer exists and is correct.** `tools/review-queue/emit-sidecar.py` reads the JSON descriptor (above) from `--input FILE` or stdin, derives `producer = "review-pending-orchestrator"` and `reviewed_at` (canonical UTC `…Z`) programmatically, rejects any input that supplies a conflicting `producer`/`reviewed_at`, assembles frontmatter + the required body headings from `body.*`, and validates via `_sidecar_validate.py` BEFORE any bytes hit the target path. On any validation failure it exits non-zero and writes nothing (staging temp, if any, is cleaned up).
+- **AC2 — fail-closed on existing target, atomically.** Default (`--replace` absent): finalize via an atomic **no-clobber** publish (`open(O_CREAT\|O_EXCL)` or `os.link` from a same-directory temp); if the target exists at finalize time the writer exits non-zero, leaves the existing file untouched, and writes nothing — closing the TOCTOU window where two overlapping runs both observe a missing target. `--replace`: overwrite via `os.replace` (atomic last-writer-wins). The staging temp lives in the target's own directory so the link/replace is same-filesystem.
 - **AC3 — single validation implementation.** `tools/review-queue/_sidecar_validate.py` is import-safe (underscore-named) and exposes a pure validation entry point; both `validate-sidecar.py` and `emit-sidecar.py` import it. `validate-sidecar.py`'s existing CLI contract (argv shape, exit codes, stderr messages) is unchanged and its existing tests still pass.
-- **AC4 — producer is a `const`.** `schemas/review-sidecar.schema.json` constrains `producer` to the single value `review-pending-orchestrator`; a sidecar with any other producer fails validation through both code paths.
+- **AC4 — producer is a single-value enum.** `schemas/review-sidecar.schema.json` collapses `producer` from its current three values (`claude-code-subagent`, `codex-child`, `review-pending-orchestrator`) to the single `review-pending-orchestrator` (a `const`, or one-element `enum`); a sidecar with any other producer fails validation through both code paths. The two retired values are not migrated in historical `complete/` sidecars (out of scope; the gate scans only `pending_review/`).
 - **AC5 — independent CI gate.** `check-coupled-invariants.sh` validates every committed `*.review.md` under `backlog/pending_review/` and fails on any invalid one; an absent or empty `pending_review/` passes cleanly. The check reads only repo-tracked paths (no HOME / operator-local dependency).
-- **AC6 — transcription site retired.** `skills/review-pending.md` invokes emit-sidecar.py (fed the structured descriptor) instead of hand-authoring frontmatter; the literal `producer:` line is gone. `.claude/commands/review-pending.md` is re-synced via `tools/sync-skills.sh` and `tools/sync-skills.sh --check` is green.
-- **AC7 — tests.** `tools/review-queue/test-emit-sidecar.sh` covers: valid descriptor → written + validates; input with a non-constant producer → reject (no write); missing required field → reject (no write); existing target without `--replace` → reject; with `--replace` → overwrite. It is invoked by the same runner that runs `test-validate-sidecar.sh`.
+- **AC6 — transcription site retired, cwd-independently.** `skills/review-pending.md` invokes emit-sidecar.py (fed the descriptor) instead of hand-authoring frontmatter; the literal `producer:` line is gone. The invocation resolves the repo root explicitly first (e.g. `ROOT="$(git rev-parse --show-toplevel)"` then `python3 "$ROOT/tools/review-queue/emit-sidecar.py" …`) so it works from an isolated/unattended worktree regardless of cwd; the `.claude/commands/review-pending.md` adapter (re-synced via `tools/sync-skills.sh`, `--check` green) embeds that exact invocation shape.
+- **AC7 — tests.** `tools/review-queue/test-emit-sidecar.sh` is a standalone executable shell test run as `bash tools/review-queue/test-emit-sidecar.sh` (exit 0 = pass), mirroring how `test-validate-sidecar.sh` is run — there is no aggregate runner. It covers, for the writer: valid descriptor → written + passes `validate-sidecar.py`; input with a non-constant producer → reject (no write); missing required field → reject (no write); existing target without `--replace` → reject (existing file untouched); a target that appears between staging and finalization → reject with no overwrite (TOCTOU); with `--replace` → overwrite. It additionally covers **the AC5 gate**: `check-coupled-invariants.sh` passes with an empty `pending_review/`, and fails — printing the offending path — when an invalid committed `*.review.md` is present.
 
 ## Out of Scope (Don't Drift)
 
