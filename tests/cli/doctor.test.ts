@@ -1,7 +1,12 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const REPO = process.cwd();
+const INSTALLER = join(REPO, 'tools/install-echo-codex-skills.sh');
+const VITE_NODE = join(REPO, 'node_modules/.bin/vite-node');
 
 let tmpRoot: string;
 let echoHome: string;
@@ -9,6 +14,7 @@ let dataDir: string;
 let originalEchoHome: string | undefined;
 let originalDataDir: string | undefined;
 let originalPort: string | undefined;
+let originalHome: string | undefined;
 
 async function loadDoctor(): Promise<typeof import('../../src/cli/commands/doctor.js')> {
   return import('../../src/cli/commands/doctor.js');
@@ -60,9 +66,11 @@ describe('runDoctor', () => {
     originalEchoHome = process.env.ECHO_HOME;
     originalDataDir = process.env.ECHO_DATA_DIR;
     originalPort = process.env.ECHO_MCP_PORT;
+    originalHome = process.env.HOME;
     tmpRoot = mkdtempSync(join(tmpdir(), 'echo-doctor-'));
     echoHome = join(tmpRoot, 'echo-home');
     dataDir = join(tmpRoot, 'data');
+    process.env.HOME = join(tmpRoot, 'home');
     process.env.ECHO_HOME = echoHome;
     process.env.ECHO_DATA_DIR = dataDir;
     process.env.ECHO_MCP_PORT = '39998';
@@ -76,6 +84,8 @@ describe('runDoctor', () => {
     else process.env.ECHO_DATA_DIR = originalDataDir;
     if (originalPort === undefined) delete process.env.ECHO_MCP_PORT;
     else process.env.ECHO_MCP_PORT = originalPort;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     rmSync(tmpRoot, { recursive: true, force: true });
     vi.resetModules();
   });
@@ -196,6 +206,59 @@ describe('runDoctor', () => {
     expect(degraded.overall).toBe('degraded');
   });
 
+  it('reports Codex adapter drift as degraded with opaque detail and remediation', async () => {
+    writeState();
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, 'daemon.pid'), '123');
+    const { buildDoctorReport } = await loadDoctor();
+
+    const report = await buildDoctorReport({
+      fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+      probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
+      codexAdapterCheck: async () => ({
+        status: 'drifted',
+        detail: 'DRIFT: ECHO:process-backlog: installed SKILL.md drift',
+        remediationCommand: `${REPO}/tools/install-echo-codex-skills.sh`,
+      }),
+    });
+
+    expect(report.overall).toBe('degraded');
+    expect(report.codexAdapter).toMatchObject({
+      status: 'drifted',
+      detail: expect.stringContaining('ECHO:process-backlog'),
+      remediationCommand: expect.stringContaining('install-echo-codex-skills.sh'),
+    });
+  });
+
+  it('maps Codex adapter child errors to non-empty check-error detail', async () => {
+    writeState();
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, 'daemon.pid'), '123');
+    const { buildDoctorReport, codexAdapterReportFromOutcome } = await loadDoctor();
+    const mapped = codexAdapterReportFromOutcome(
+      { exitCode: 127, signal: null, stdout: '', stderr: '' },
+      INSTALLER,
+    );
+
+    expect(mapped.status).toBe('check-error');
+    expect(mapped.detail).toContain('127');
+
+    const signaled = codexAdapterReportFromOutcome(
+      { exitCode: null, signal: 'SIGTERM', stdout: '', stderr: '' },
+      INSTALLER,
+    );
+    expect(signaled.status).toBe('check-error');
+    expect(signaled.detail).toContain('SIGTERM');
+
+    const report = await buildDoctorReport({
+      fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+      probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
+      codexAdapterCheck: async () => mapped,
+    });
+    expect(report.overall).toBe('degraded');
+    expect(report.codexAdapter.detail).not.toBe('');
+  });
+
   it.each(['win32', 'linux'] as const)(
     'treats a reachable manual daemon as healthy on %s',
     async (platform) => {
@@ -243,5 +306,79 @@ describe('runDoctor', () => {
     );
     expect(text).toContain('claude mcp remove echo -s local');
     expect(text).toContain('echoctl doctor');
+  });
+
+  it('prints Codex adapter drift in human doctor output', async () => {
+    writeState();
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(join(dataDir, 'daemon.pid'), '123');
+    const { runDoctor } = await loadDoctor();
+    const out: string[] = [];
+
+    const code = await runDoctor({
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+      probeAgents: async () => [{ agent: 'codex', probed: true, latencyMs: 1 }],
+      codexAdapterCheck: async () => ({
+        status: 'drifted',
+        detail: 'DRIFT: ECHO:process-backlog: installed SKILL.md drift',
+        remediationCommand: INSTALLER,
+      }),
+    });
+
+    const text = out.join('');
+    expect(code).toBe(1);
+    expect(text).toContain('codex-adapter: drifted');
+    expect(text).toContain('ECHO:process-backlog');
+    expect(text).toContain(INSTALLER);
+  });
+
+  it('runs the real doctor command from a non-repo cwd with sparse PATH without false Codex drift', () => {
+    const cliHome = join(tmpRoot, 'cli-home');
+    const cliEchoHome = join(tmpRoot, 'cli-echo-home');
+    const nonRepoCwd = mkdtempSync(join(tmpdir(), 'echo-doctor-cli-nonrepo-'));
+    writeState('ok', cliEchoHome);
+    const install = spawnSync('bash', [INSTALLER], {
+      cwd: REPO,
+      encoding: 'utf8',
+      env: { ...process.env, HOME: cliHome },
+    });
+    expect(install.status).toBe(0);
+
+    const sparsePath = '/usr/local/bin:/usr/bin:/bin';
+    const doctor = spawnSync(
+      VITE_NODE,
+      [
+        '--script',
+        join(REPO, 'src/cli/index.ts'),
+        '--json',
+        'doctor',
+        '--home',
+        cliEchoHome,
+        '--port',
+        '39998',
+      ],
+      {
+        cwd: nonRepoCwd,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: cliHome,
+          ECHO_DATA_DIR: join(tmpRoot, 'cli-data'),
+          ECHO_MCP_PORT: '39998',
+          PATH: sparsePath,
+        },
+      },
+    );
+
+    const report = JSON.parse(doctor.stdout) as {
+      codexAdapter: { status: string; detail: string };
+    };
+    expect(doctor.status).toBe(1);
+    expect(report.codexAdapter.status).toBe('ok');
+    expect(report.codexAdapter.detail).toContain(
+      'OK: all managed Codex ECHO skills match canonical sources',
+    );
+    rmSync(nonRepoCwd, { recursive: true, force: true });
   });
 });
