@@ -16,7 +16,28 @@ head_sha: "a2af40487ec6f7a1dd2590001cabe1038acfc195"
 pr_url: ""
 agent_notes: |
   Implemented operator-side Codex adapter freshness checking in `tools/install-echo-codex-skills.sh --check` and `echoctl doctor`, with read-only managed-sentinel discovery, rendered-hash comparison, cwd-safe remediation, structured `codexAdapter` JSON, and degraded-not-broken doctor behavior. Focused tests, typecheck, lint, shell syntax, coupled invariants, and AC4 `.codex` grep passed. Full `npm test` was partial: `tests/mcp/recent-calls-endpoint.test.ts` timed out under full-suite load but passed on rerun; `tests/review-queue/reviewer-readonly.test.ts` wrong-binding failure reproduced independently outside this item; `tests/cli/shell-reachable.test.ts` daemon launchd health failed during the full-suite run.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-09 via founder reconciliation (push gate honored).
+
+  Conflicts resolved:
+  - none — clean --no-ff merge; the 4 changed files were untouched on main since the branch point.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied:
+  - none — independent-review verdict was "merge as-is" with zero pre-merge fixups.
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: merge introduces ZERO new failures. typecheck + lint + coupled-invariants + sync-skills --check all clean. Item-specific suites pass 28/28 (install-echo-codex-skills.test.ts 18, doctor.test.ts 10). Full `npm test` = 2 failed / 1663 passed; BOTH failures PROVEN pre-existing by running them against the pre-merge base (origin/main 73457f69, with codexAdapter provably absent from doctor.ts): tests/review-queue/reviewer-readonly.test.ts wrong-binding fails identically pre-merge (known parked orchestration-test issue); tests/mcp/recent-calls-endpoint.test.ts passed in isolation (flaky timeout under full-suite load). Neither failing file is in 100's diff nor imports 100's changed modules.
+
+  Review: independent Claude code-reviewer subagent (codex was the builder — reviewer-independence preserved); 10-round cross-vendor spec review (codex + codex-ops) converged at r10. Sidecar verdict: merge as-is, all AC1–AC5 Met with file:line evidence.
+
+  Follow-up items (non-blocking):
+  - (optional) short-circuit checkCodexAdapter when no ~/.codex exists to avoid the ~2s installer subprocess spawn on every `echoctl doctor`.
+  - (optional) a `--check --quiet` mode for scripted callers.
+  - Strategist post-shipment: promote per After-Completion — mark _followups.md R6.adapter_freshness bullets resolved (generalize freshness gate to all client adapters; C2 Codex-installer adapter-drift detection; stale Codex producer field, detection half) and record the split (repo-tracked adapters → merge gate; operator-local Codex adapter → doctor).
 files_to_modify:
   - tools/install-echo-codex-skills.sh   # ADD a `--check` mode: discover managed Codex skill dirs via the `.echo-managed` sentinel (`managed_by=tools/install-echo-codex-skills.sh`), re-render each recorded `source` skill to a temp stage, then hash the ACTUAL installed `SKILL.md` and compare it to the freshly-rendered hash (this single comparison catches BOTH source drift AND a hand-mutated installed file; the stored `synced_content_sha256` is metadata/classifier only, never the sole pass/fail signal); print each drifted/missing skill; exit non-zero iff ≥1 drift, exit 0 when all match OR when no managed install exists. Render/sentinel logic already exists (render_skill + the .echo-managed writer) — --check reuses it read-only.
   - src/cli/commands/doctor.ts           # ADD a codex-adapter-freshness check: shell out to `install-echo-codex-skills.sh --check`, add a structured field to DoctorReport, contribute `degraded` (NON-fatal, like syncLock.present) when drift is found — naming the stale skill(s) + the remediation command (`tools/install-echo-codex-skills.sh`); ok/skip line when clean or no managed install. Include the result in `--json`.
