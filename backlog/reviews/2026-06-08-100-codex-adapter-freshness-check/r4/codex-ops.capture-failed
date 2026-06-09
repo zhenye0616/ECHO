@@ -1,0 +1,10 @@
+---
+item_id: "2026-06-08-100-codex-adapter-freshness-check"
+round: 4
+reviewer: "codex-ops"
+failed_at: "2026-06-09T17:49:11Z"
+failure_class: "schema_invalid"
+rc: 0
+---
+
+/tmp/claude-501/echo-codex-ops-1744AD56-D1A1-4702-AE37-BDBE17A76EB5/raw/internal/review-queue/814d592f-449b-4433-bf35-636138490ec2/codex-ops.final.md: malformed YAML at line 14 column 1: expected <block end>, but found '}'. Regenerate response with valid YAML; do not hand-edit committed reviewer files.
