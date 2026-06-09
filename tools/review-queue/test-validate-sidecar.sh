@@ -2,7 +2,8 @@
 # test-validate-sidecar.sh — AC3 test for the committed-sidecar validator.
 #
 # Asserts:
-#   - a well-formed committed sidecar from EACH producer value validates
+#   - a well-formed committed sidecar from the orchestrator producer validates
+#   - retired producer values fail validation
 #   - the live UNQUOTED reviewed_at template (PyYAML -> datetime) validates,
 #     proving the datetime -> ISO-string coercion accepts the live artifact
 #   - the EXACT Step-C parenthetical heading validates (live-artifact shape)
@@ -52,11 +53,17 @@ $extra
 EOF
 }
 
-# ── 1. each producer value validates (live unquoted reviewed_at + exact
-#       parenthetical heading) ──────────────────────────────────────────
-for PRODUCER in claude-code-subagent codex-child review-pending-orchestrator; do
-  write_sidecar "$TMP/p.review.md" "merge with founder fixups" "$PRODUCER"
-  python3 "$VALIDATOR" "$TMP/p.review.md" || fail "valid sidecar (producer=$PRODUCER) rejected"
+# ── 1. orchestrator producer validates; retired producers fail
+#       (live unquoted reviewed_at + exact parenthetical heading) ───────
+write_sidecar "$TMP/p.review.md" "merge with founder fixups" "review-pending-orchestrator"
+python3 "$VALIDATOR" "$TMP/p.review.md" || fail "valid orchestrator sidecar rejected"
+
+for PRODUCER in claude-code-subagent codex-child; do
+  write_sidecar "$TMP/retired.review.md" "merge with founder fixups" "$PRODUCER"
+  if python3 "$VALIDATOR" "$TMP/retired.review.md" 2>"$TMP/producer.err"; then
+    fail "retired producer value was accepted: $PRODUCER"
+  fi
+  grep -q "producer" "$TMP/producer.err" || fail "retired-producer error did not name producer"
 done
 
 # ── 2. verdict block WITH the required open-questions heading validates ──
@@ -66,7 +73,7 @@ q?"
 python3 "$VALIDATOR" "$TMP/blk-ok.review.md" || fail "valid block sidecar (with open questions) rejected"
 
 # ── 3. missing required heading fails, naming the heading ───────────────
-write_sidecar "$TMP/full.review.md" "merge as-is" "codex-child"
+write_sidecar "$TMP/full.review.md" "merge as-is" "review-pending-orchestrator"
 grep -v "^## Pre-merge fixups" "$TMP/full.review.md" > "$TMP/missing.review.md"
 if python3 "$VALIDATOR" "$TMP/missing.review.md" 2>"$TMP/err"; then
   fail "sidecar missing '## Pre-merge fixups' was accepted"
@@ -74,7 +81,7 @@ fi
 grep -q "Pre-merge fixups" "$TMP/err" || fail "missing-heading error did not name the heading"
 
 # ── 4. bad verdict enum fails ───────────────────────────────────────────
-write_sidecar "$TMP/badv.review.md" "merge as-is" "codex-child"
+write_sidecar "$TMP/badv.review.md" "merge as-is" "review-pending-orchestrator"
 sed 's/^verdict: merge as-is/verdict: totally-bogus/' "$TMP/badv.review.md" > "$TMP/badv2.review.md"
 if python3 "$VALIDATOR" "$TMP/badv2.review.md" 2>/dev/null; then
   fail "sidecar with invalid verdict enum was accepted"
@@ -117,4 +124,4 @@ if python3 "$VALIDATOR" "$TMP/badv2.review.md" 2>/dev/null; then
   fail "round-trip: consumer accepted an invalid sidecar"
 fi
 
-echo "PASS: validate-sidecar accepts the live artifact (all producers, unquoted ts, parenthetical heading), rejects malformed, and round-trips through merge-and-cleanup Step-A reads"
+echo "PASS: validate-sidecar accepts the live orchestrator artifact (unquoted ts, parenthetical heading), rejects retired producers/malformed sidecars, and round-trips through merge-and-cleanup Step-A reads"
