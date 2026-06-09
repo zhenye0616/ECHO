@@ -16,7 +16,24 @@ head_sha: "d1c2a344b697e5e983049e5771de0ba4bb9e748e"
 pr_url: ""
 agent_notes: |
   Implemented the code-owned review sidecar writer, shared sidecar validator helper, single-value producer schema, live pending_review sidecar invariant gate, review-pending descriptor invocation, generated Claude adapter sync, and focused shell coverage. Verification passed: bash tools/review-queue/test-validate-sidecar.sh; bash tools/review-queue/test-emit-sidecar.sh; tools/sync-skills.sh --check; tools/review-queue/check-coupled-invariants.sh; git diff --check.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-09 via independent subagent review + main-session merge (reviewer-independence: builder=codex, reviewer=Claude code-reviewer subagent — distinct roles).
+
+  Conflicts resolved:
+  - None. Clean --no-ff merge against origin/main; no conflict markers, no unmerged paths.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied:
+  - None. Review verdict "merge as-is" (7/7 acceptance criteria, scope clean).
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify (merger worktree @ merge HEAD): test-emit-sidecar.sh rc=0; test-validate-sidecar.sh rc=0 (updated producer assertions); check-coupled-invariants.sh rc=0 — incl. the newly-merged check_pending_review_sidecars gate, which validated THIS item's own review sidecar end-to-end; sync-skills.sh --check rc=0; git diff --check clean; worktree left clean. npm test/lint/typecheck NOT re-run in the throwaway worktree: 099 touches zero TypeScript and no package.json, so the vitest/lint/typecheck baseline is identical to green main; the shell-test + coupled-invariants suite is the authoritative gate for this change.
+
+  Follow-up items (non-blocking):
+  - Strategist post-merge: backlog/_followups.md R6.adapter_freshness — mark emit-sidecar.py writer + validate-sidecar CI gate resolved by 099; 100 (proposed) carries the Codex-adapter detection half. Also fold in the R6.reviewer_orchestration binding-validator fix (0689d1bb) and the R6.pipeline_lifecycle note that promote.py does not validate the priority enum (the MEDIUM->MED slip blocked global builder selection until corrected).
 files_to_modify:
   - tools/review-queue/emit-sidecar.py            # NEW — code-owned sidecar writer. Reads a structured (JSON) sidecar descriptor from --input FILE or stdin; derives the target path from item_id (<repo_root>/backlog/pending_review/<item_id>.review.md, NOT caller-supplied); derives `producer` PROGRAMMATICALLY (the constant orchestrator value, NOT taken from input); stamps `reviewed_at` in canonical UTC Z; assembles frontmatter+body; validates via the shared helper BEFORE finalize. Finalize is ALWAYS same-dir temp → validate → atomic no-clobber `os.link` (default); `os.replace` (overwrite) ONLY under --replace (Locked decision 8 / AC2 — never default last-writer-wins). Exits non-zero WITHOUT writing on any validation failure or existing target.
   - tools/review-queue/_sidecar_validate.py       # NEW — import-safe validation helper extracted from validate-sidecar.py (hyphenated filename is not importable). Exposes a pure `validate(fm, body) -> str | None` (returns an error message or None) + the schema/heading constants. Both validate-sidecar.py and emit-sidecar.py import it; zero duplicated validation logic. (codex consult F4)
