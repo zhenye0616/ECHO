@@ -2,7 +2,7 @@
 id: 2026-06-08-100-codex-adapter-freshness-check
 title: "Codex skill-adapter freshness check — operator-side (install-echo-codex-skills.sh --check + echoctl doctor), NOT the merge gate"
 status: proposed
-priority: MEDIUM
+priority: MED
 estimate: 2h
 created: 2026-06-08
 blocked_by: []

@@ -2,13 +2,13 @@
 id: 2026-06-08-099-code-owned-sidecar-writer
 title: "Code-owned sidecar writer (emit-sidecar.py) so the review-pending producer field is stamped, not LLM-transcribed"
 status: proposed
-priority: MEDIUM
+priority: MED
 estimate: 3h
 created: 2026-06-08
 blocked_by: []
 task_state_ref: 2026-06-08-099-code-owned-sidecar-writer
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: a56b2e7058877a995d5f67e130aab10a24e865e967d5259c4a9553753b500f6c
+ready_content_sha: 46095398498d39c2fae7b5c536d0b3383bf9e5537b16010e3ade725d3f1fdfe3
 claimed_by: ""
 claimed_at: ""
 branch: ""
