@@ -9,9 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-08-100-codex-adapter-freshness-check
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 302dafaa8cd4b0c4e53e24af5ff62429698a85414d62c6a38b7986a71efa0c2d
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-09T18:49:59Z"
+branch: "agent/codex-adapter-freshness-check"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
