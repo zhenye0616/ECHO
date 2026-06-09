@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join, win32 } from 'node:path';
+import { dirname, join, win32 } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { resolveDataDir } from '../../daemon/lifecycle.js';
 import {
@@ -33,6 +35,11 @@ export interface DoctorReport {
     profile: InstallProfile | 'unknown';
   };
   syncLock: { present: boolean; path: string; mtimeIso?: string; cleanupCommand?: string };
+  codexAdapter: {
+    status: 'ok' | 'drifted' | 'check-error';
+    detail?: string;
+    remediationCommand?: string;
+  };
   agents: {
     kind: AgentKind;
     profile: OnboardedAgentProfile | null;
@@ -51,6 +58,7 @@ export interface DoctorOpts {
   stdout?: Pick<NodeJS.WritableStream, 'write'>;
   stderr?: Pick<NodeJS.WritableStream, 'write'>;
   probeAgents?: typeof realProbeAgents;
+  codexAdapterCheck?: () => Promise<DoctorReport['codexAdapter']>;
   fetch?: typeof fetch;
   now?: () => Date;
   platform?: NodeJS.Platform;
@@ -116,6 +124,105 @@ function readValidOnboarding(): OnboardingState | null {
   } catch {
     return null;
   }
+}
+
+const SAFE_SUBPROCESS_PATH = '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+
+function repoRootFromModule(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), '../../..');
+}
+
+function resolveCodexInstallerPath(): string {
+  return join(repoRootFromModule(), 'tools/install-echo-codex-skills.sh');
+}
+
+export interface CodexAdapterChildOutcome {
+  exitCode: number | null;
+  signal: string | null;
+  stdout: string;
+  stderr: string;
+  spawnError?: string;
+}
+
+function runCodexInstallerCheck(installerPath: string): Promise<CodexAdapterChildOutcome> {
+  return new Promise((resolve) => {
+    execFile(
+      installerPath,
+      ['--check'],
+      {
+        cwd: repoRootFromModule(),
+        encoding: 'utf8',
+        env: { ...process.env, PATH: SAFE_SUBPROCESS_PATH },
+        timeout: 30_000,
+      },
+      (error, stdout, stderr) => {
+        const err = error as
+          | (Error & { code?: number | string | null; signal?: string | null })
+          | null;
+        resolve({
+          exitCode: err === null ? 0 : typeof err.code === 'number' ? err.code : null,
+          signal: err?.signal ?? null,
+          stdout: String(stdout ?? ''),
+          stderr: String(stderr ?? ''),
+          spawnError: err !== null && typeof err.code === 'string' ? err.message : undefined,
+        });
+      },
+    );
+  });
+}
+
+function nonEmptyDetail(primary: string, fallback: string): string {
+  const detail = primary.trim();
+  return detail.length > 0 ? detail : fallback;
+}
+
+export function codexAdapterReportFromOutcome(
+  outcome: CodexAdapterChildOutcome,
+  installerPath: string,
+): DoctorReport['codexAdapter'] {
+  const remediationCommand = installerPath;
+  if (outcome.exitCode === 0) {
+    return { status: 'ok', detail: nonEmptyDetail(outcome.stdout, 'Codex adapter check passed') };
+  }
+  if (outcome.exitCode === 1) {
+    return {
+      status: 'drifted',
+      detail: nonEmptyDetail(outcome.stdout, 'Codex adapter drift detected'),
+      remediationCommand,
+    };
+  }
+  const fallback =
+    outcome.spawnError ??
+    (outcome.signal !== null
+      ? `Codex adapter check terminated by signal ${outcome.signal}`
+      : `Codex adapter check exited ${outcome.exitCode ?? 'without an exit code'}`);
+  return {
+    status: 'check-error',
+    detail: nonEmptyDetail(outcome.stderr, fallback),
+    remediationCommand,
+  };
+}
+
+export async function checkCodexAdapter(): Promise<DoctorReport['codexAdapter']> {
+  const installerPath = resolveCodexInstallerPath();
+  return codexAdapterReportFromOutcome(await runCodexInstallerCheck(installerPath), installerPath);
+}
+
+function renderCodexAdapterLines(report: DoctorReport): string[] {
+  const check = report.codexAdapter;
+  const lines = [`codex-adapter: ${check.status}`];
+  if (check.detail !== undefined && check.detail.length > 0) lines.push(check.detail);
+  if (check.status !== 'ok' && check.remediationCommand !== undefined) {
+    lines.push(`remediation: ${check.remediationCommand}`);
+  }
+  return lines;
+}
+
+function renderDoctorWithCodexAdapter(
+  report: DoctorReport,
+  opts: { color: boolean; remediation: ReturnType<typeof buildRemediationCopy> },
+): string {
+  return [renderDoctorReport(report, opts), ...renderCodexAdapterLines(report)].join('\n');
 }
 
 function stateVersion(): {
@@ -192,6 +299,7 @@ export function computeOverall(report: DoctorReport): 'healthy' | 'degraded' | '
   if (!report.daemon.pidLockHeld && !report.daemon.mcpReachable) return 'broken';
   if (report.daemon.pidLockHeld && !report.daemon.mcpReachable) return 'degraded';
   if (report.syncLock.present) return 'degraded';
+  if (report.codexAdapter.status !== 'ok') return 'degraded';
   for (const agent of report.agents) {
     const outcome = agent.probeOutcome;
     if (agent.profile?.wired_at === null || outcome === null) continue;
@@ -205,7 +313,8 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
   const port = resolveDoctorPort(opts.port);
   const platform = opts.platform ?? process.platform;
   const dataDir = resolveDataDir({ platform });
-  const pidLockPath = platform === 'win32' ? win32.join(dataDir, 'daemon.pid') : join(dataDir, 'daemon.pid');
+  const pidLockPath =
+    platform === 'win32' ? win32.join(dataDir, 'daemon.pid') : join(dataDir, 'daemon.pid');
   const pidLockHeld = existsSync(pidLockPath);
   const mcpReachable = await probeMcp(opts.fetch ?? fetch, port);
   const echoHomeExists = existsSync(ECHO_HOME_PATHS.root);
@@ -229,6 +338,7 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
   }
 
   const probe = opts.probeAgents ?? realProbeAgents;
+  const codexAdapter = await (opts.codexAdapterCheck ?? checkCodexAdapter)();
   const onboarding = state.onboarding ?? readValidOnboarding();
   const agents: DoctorReport['agents'] = [];
   if (onboarding !== null) {
@@ -257,6 +367,7 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
       profile: state.profile,
     },
     syncLock,
+    codexAdapter,
     agents,
     overall: 'broken',
   };
@@ -283,7 +394,7 @@ export async function runDoctor(opts: DoctorOpts = {}): Promise<number> {
       else
         writeLine(
           opts.stdout ?? process.stdout,
-          renderDoctorReport(report, {
+          renderDoctorWithCodexAdapter(report, {
             color: opts.color ?? false,
             remediation: buildRemediationCopy(`http://127.0.0.1:${port}/mcp`),
           }),

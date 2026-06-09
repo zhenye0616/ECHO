@@ -12,6 +12,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -59,16 +60,54 @@ function writeSkill(repoRoot: string, name: string, description: string, body: s
   );
 }
 
-function runInstall(repoRoot: string, tmpHome: string, args: string[] = []) {
+function runInstall(
+  repoRoot: string,
+  tmpHome: string,
+  args: string[] = [],
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+) {
   return spawnSync('bash', [join(repoRoot, INSTALL_REL), ...args], {
-    cwd: repoRoot,
+    cwd: opts.cwd ?? repoRoot,
     encoding: 'utf-8',
-    env: { ...process.env, HOME: tmpHome },
+    env: { ...process.env, ...opts.env, HOME: tmpHome },
   });
+}
+
+function runCheck(
+  repoRoot: string,
+  tmpHome: string,
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+) {
+  return runInstall(repoRoot, tmpHome, ['--check'], opts);
 }
 
 function skillPath(tmpHome: string, name: string): string {
   return join(tmpHome, '.codex/skills', name);
+}
+
+function sentinelPath(tmpHome: string, name: string): string {
+  return join(skillPath(tmpHome, name), '.echo-managed');
+}
+
+function rewriteSentinelSource(tmpHome: string, name: string, source: string): void {
+  const path = sentinelPath(tmpHome, name);
+  const text = readFileSync(path, 'utf-8').replace(/^source=.*$/m, `source=${source}`);
+  writeFileSync(path, text);
+}
+
+function remediationCommands(output: string): string[] {
+  return output
+    .split('\n')
+    .map((line) => line.match(/remediation: (.+)$/)?.[1])
+    .filter((line): line is string => line !== undefined);
+}
+
+function runShell(command: string, tmpHome: string, cwd: string) {
+  return spawnSync('bash', ['-lc', command], {
+    cwd,
+    encoding: 'utf-8',
+    env: { ...process.env, HOME: tmpHome },
+  });
 }
 
 let repoRoot: string;
@@ -165,5 +204,151 @@ describe('install-echo-codex-skills.sh', () => {
     expect(r.status).toBe(0);
     expect(existsSync(skillPath(tmpHome, 'ECHO:process_backlog'))).toBe(true);
     expect(existsSync(skillPath(tmpHome, 'ECHO:review_pending'))).toBe(true);
+  });
+
+  it('--check exits 0 for a clean managed install', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+
+    const r = runCheck(repoRoot, tmpHome);
+
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('OK: all managed Codex ECHO skills match canonical sources');
+  });
+
+  it('--check exits non-zero and names a hand-mutated installed skill', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    writeFileSync(join(skillPath(tmpHome, 'ECHO:process-backlog'), 'SKILL.md'), 'mutated\n');
+
+    const r = runCheck(repoRoot, tmpHome);
+
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('DRIFT: ECHO:process-backlog');
+    expect(r.stdout).toContain('installed SKILL.md drift');
+  });
+
+  it('--check exits 0 for non-default namespace and underscore-visible installs', () => {
+    expect(
+      runInstall(repoRoot, tmpHome, ['--namespace', 'PROJECT', '--underscore-names']).status,
+    ).toBe(0);
+
+    const r = runCheck(repoRoot, tmpHome);
+
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('OK: all managed Codex ECHO skills match canonical sources');
+  });
+
+  it('--check exits 0 without writing when ~/.codex/skills is absent', () => {
+    const r = runCheck(repoRoot, tmpHome);
+
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('no managed Codex ECHO install; nothing to check');
+    expect(existsSync(join(tmpHome, '.codex/skills'))).toBe(false);
+  });
+
+  it('--check removes its per-run temp stage and writes nothing under ~/.codex', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    const tmpStageRoot = mkdtempSync(join(tmpdir(), 'echo-codex-check-stage-root-'));
+    const codexEntriesBefore = readdirSync(join(tmpHome, '.codex')).sort();
+
+    const r = runCheck(repoRoot, tmpHome, { env: { TMPDIR: tmpStageRoot } });
+
+    expect(r.status).toBe(0);
+    expect(readdirSync(tmpStageRoot)).toEqual([]);
+    expect(readdirSync(join(tmpHome, '.codex')).sort()).toEqual(codexEntriesBefore);
+    rmSync(tmpStageRoot, { recursive: true, force: true });
+  });
+
+  it('--check exits 2 on an internal temp-stage failure', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    const missingTmp = join(tmpHome, 'missing-tmp-root');
+
+    const r = runCheck(repoRoot, tmpHome, { env: { TMPDIR: missingTmp } });
+
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('failed to create temporary check stage');
+  });
+
+  it('prints cwd-safe namespace remediation that clears non-default drift', () => {
+    expect(runInstall(repoRoot, tmpHome, ['--namespace', 'PROJECT']).status).toBe(0);
+    writeFileSync(join(skillPath(tmpHome, 'PROJECT:process-backlog'), 'SKILL.md'), 'mutated\n');
+    const nonRepoCwd = mkdtempSync(join(tmpdir(), 'echo-codex-nonrepo-'));
+
+    const drift = runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd });
+    const command = remediationCommands(drift.stdout).find((line) => line.includes('--namespace'));
+
+    expect(drift.status).toBe(1);
+    expect(command).toContain('--namespace');
+    expect(command).toContain('PROJECT');
+    expect(command).toMatch(/^'/);
+    expect(runShell(command!, tmpHome, nonRepoCwd).status).toBe(0);
+    expect(runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd }).status).toBe(0);
+    rmSync(nonRepoCwd, { recursive: true, force: true });
+  });
+
+  it('prints one runnable remediation per drifted mixed install family', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    expect(runInstall(repoRoot, tmpHome, ['--namespace', 'PROJECT']).status).toBe(0);
+    writeFileSync(
+      join(skillPath(tmpHome, 'ECHO:process-backlog'), 'SKILL.md'),
+      'mutated-default\n',
+    );
+    writeFileSync(
+      join(skillPath(tmpHome, 'PROJECT:review-pending'), 'SKILL.md'),
+      'mutated-project\n',
+    );
+    const nonRepoCwd = mkdtempSync(join(tmpdir(), 'echo-codex-mixed-nonrepo-'));
+
+    const drift = runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd });
+    const commands = remediationCommands(drift.stdout);
+
+    expect(drift.status).toBe(1);
+    expect(commands.some((line) => !line.includes('--namespace'))).toBe(true);
+    expect(commands.some((line) => line.includes('--namespace') && line.includes('PROJECT'))).toBe(
+      true,
+    );
+    for (const command of commands) {
+      expect(runShell(command, tmpHome, nonRepoCwd).status).toBe(0);
+    }
+    expect(runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd }).status).toBe(0);
+    rmSync(nonRepoCwd, { recursive: true, force: true });
+  });
+
+  it('distinguishes stale sentinels from true orphaned managed dirs', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    const nonRepoCwd = mkdtempSync(join(tmpdir(), 'echo-codex-missing-source-nonrepo-'));
+
+    rewriteSentinelSource(tmpHome, 'ECHO:process-backlog', '/old/repo/skills/process-backlog.md');
+    const stale = runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd });
+    const staleCommand = remediationCommands(stale.stdout)[0]!;
+    expect(stale.status).toBe(1);
+    expect(stale.stdout).toContain('stale sentinel');
+    expect(stale.stdout).not.toContain('rm -rf');
+    expect(runShell(staleCommand, tmpHome, nonRepoCwd).status).toBe(0);
+    expect(runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd }).status).toBe(0);
+
+    rmSync(join(repoRoot, 'skills/process-backlog.md'));
+    const orphan = runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd });
+    const orphanCommands = remediationCommands(orphan.stdout);
+    expect(orphan.status).toBe(1);
+    expect(orphan.stdout).toContain('true orphan');
+    expect(orphanCommands[0]).toContain('rm -rf');
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    expect(runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd }).status).toBe(1);
+    expect(runShell(orphanCommands[0]!, tmpHome, nonRepoCwd).status).toBe(0);
+    expect(runCheck(repoRoot, tmpHome, { cwd: nonRepoCwd }).status).toBe(0);
+    rmSync(nonRepoCwd, { recursive: true, force: true });
+  });
+
+  it('--check exits 2 for an uninspectable skills tree', () => {
+    expect(runInstall(repoRoot, tmpHome).status).toBe(0);
+    const skillsDir = join(tmpHome, '.codex/skills');
+    chmodSync(skillsDir, 0o000);
+    try {
+      const r = runCheck(repoRoot, tmpHome);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain('not readable/traversable');
+    } finally {
+      chmodSync(skillsDir, 0o755);
+    }
   });
 });
