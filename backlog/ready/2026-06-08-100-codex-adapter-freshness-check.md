@@ -8,7 +8,7 @@ created: 2026-06-08
 blocked_by: []
 task_state_ref: 2026-06-08-100-codex-adapter-freshness-check
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: ""
+ready_content_sha: 302dafaa8cd4b0c4e53e24af5ff62429698a85414d62c6a38b7986a71efa0c2d
 claimed_by: ""
 claimed_at: ""
 branch: ""
