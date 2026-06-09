@@ -166,34 +166,46 @@ Per `CLAUDE.md` "Dogfooding journal discipline", every ECHO MCP call made during
 
 For each returned review, write a sidecar file at `backlog/pending_review/<id>.review.md` (next to the item file). This is what `/merge-and-cleanup` will consume.
 
-### Sidecar format
+### Sidecar descriptor and writer invocation
 
-```markdown
----
-item_id: 2026-04-30-012-git-capture
-verdict: merge with founder fixups   # merge as-is | merge with founder fixups | redo before merge | block
-reviewed_at: 2026-04-30T22:30:00Z
-test_counts: { passed: 132, failed: 0 }
-producer: review-pending-orchestrator
----
+The orchestrator MUST NOT hand-author the committed sidecar frontmatter. It
+constructs a structured JSON descriptor from the parsed child review, then calls
+the code-owned writer. The descriptor contains only caller-owned fields:
 
-## Verdict
-<one paragraph>
+```json
+{
+  "item_id": "2026-04-30-012-git-capture",
+  "verdict": "merge with founder fixups",
+  "test_counts": { "passed": 132, "failed": 0 },
+  "body": {
+    "verdict": "<one paragraph>",
+    "pre_merge_fixups": "- [ ] <fixup 1 - file:line - one-sentence rationale>",
+    "expected_merge_conflicts": "- `<file>` - <recommended resolution strategy in one sentence>",
+    "followups": "- <item description>",
+    "open_questions": "<only when verdict is block>"
+  }
+}
+```
 
-## Pre-merge fixups
-- [ ] <fixup 1 — file:line — one-sentence rationale>
-- [ ] <fixup 2 — ...>
+`body.open_questions` is required only when `verdict == "block"` and omitted
+otherwise. The writer derives the target path from `item_id`, stamps all
+writer-owned fields, emits the committed headings consumed by
+`/merge-and-cleanup`, validates before publication, and fails closed if the
+target already exists unless `--replace` is explicitly supplied by a future
+rerun-policy change.
 
-## Expected merge conflicts
-- `<file>` — <recommended resolution strategy in one sentence>
-- `<file>` — ...
+Invocation shape:
 
-## Follow-up items (defer, do not block merge)
-- <item description>
-- ...
+```bash
+ROOT="$(git rev-parse --show-toplevel)"
+DESC=$(mktemp -t echo-review-sidecar-XXXXXX.json)
+trap 'rm -f "$DESC"' RETURN 2>/dev/null || true
 
-## Open questions for founder
-<only if verdict is "block" — list the specific decisions blocking merge>
+# Write the parsed review descriptor to $DESC as JSON. Do not include
+# writer-owned fields or any target path.
+
+python3 "$ROOT/tools/review-queue/emit-sidecar.py" --input "$DESC"
+SIDECARS+=("$ROOT/backlog/pending_review/$ITEM_ID.review.md")
 ```
 
 The human will read this, optionally edit it (uncheck fixups they want to defer, edit resolution strategy, add notes), then invoke `/merge-and-cleanup`.

@@ -112,9 +112,25 @@ PY
   fi
 }
 
+check_pending_review_sidecars() {
+  local sidecar tmp
+  tmp="/tmp/echo-validate-sidecars.$$"
+  while IFS= read -r sidecar; do
+    [ -n "$sidecar" ] || continue
+    if ! python3 tools/review-queue/validate-sidecar.py "$sidecar" >"$tmp" 2>&1; then
+      cat "$tmp" >&2
+      rm -f "$tmp"
+      fail "pending_review sidecar invalid: $sidecar"
+      return
+    fi
+  done < <(git ls-files 'backlog/pending_review/*.review.md')
+  rm -f "$tmp"
+}
+
 check_package_lock
 check_skill_adapters
 check_mcp_registration
+check_pending_review_sidecars
 
 if [ "$failures" -ne 0 ]; then
   exit 1

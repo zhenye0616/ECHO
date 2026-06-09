@@ -31,7 +31,7 @@
     },
     "producer": {
       "type": "string",
-      "enum": ["claude-code-subagent", "codex-child", "review-pending-orchestrator"]
+      "const": "review-pending-orchestrator"
     }
   }
 }
