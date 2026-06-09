@@ -62,3 +62,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** top recent match was a Claude Code turn saying item `2026-06-08-099-code-owned-sidecar-writer` converged at r4 and was promoted; git match `bb42667759e43e5c2a0e86275386db252197fb4d` moved the item from `backlog/proposed/` to `backlog/ready/` and stamped `ready_content_sha`; adjacent matches were r4 combine/reviewer commits.
 - **Verdict:** right - retrieval confirmed the next builder candidate context without needing broad atom hydration.
 - **Note:** The cluster itself was too broad to use as a decision surface; the narrower recent-memory read exposed the actionable handoff: item 099 is claimable and recently reviewed to convergence.
+
+### 2026-06-08 23:44 PDT - codex builder pre-claim context check
+
+- **Trigger:** Builder invocation had ECHO MCP available and needed a minimal project-scoped context check before atomic claim.
+- **Query inputs:** `echo_ping(message="codex builder preflight for /Users/zhenye/Desktop/Project_echo")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", format="skeleton", view="compact")`.
+- **Returned:** ping OK at `2026-06-09T06:44:24.433Z`; `find_clusters` returned 1 cluster (`ctx_264ac311`, label `work on project_echo`, 52 atom IDs, rank reasons `has_open_loop`, `code_session_anchor`, warnings `[]`).
+- **Sources:** `source_breakdown={claude_code: 14, git: 36, codex: 2}`; cluster time range `2026-06-09T05:12:38.467Z` to `2026-06-09T06:43:16.624Z`.
+- **Verdict:** right - MCP was reachable and returned recent repo-local activity without requiring atom hydration.
+- **Note:** The result was broad but sufficient as a pre-claim availability/context check; item selection remains delegated to `tools/blocked.py`.
