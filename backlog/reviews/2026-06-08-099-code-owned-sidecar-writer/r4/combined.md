@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R4` — both reviewers `proceed` with **zero findings** at `d9872cb1`; no patches this round. Convergence trend r1→r4: 6 MED → 3 MED (codex already `proceed` from r2) → 3+1 (converging on one shared comment fix) → **0/0**. The r2 and r3 dispositions were net *removal/simplification* (dropped the unsafe O_EXCL-direct option, the redundant caller-supplied `target_path`, and the flaky TOCTOU sub-case via os.link atomicity) rather than accreting mechanism — the spec surface shrank as it converged. Spec is internally consistent (files_to_modify ↔ Locked decisions ↔ ACs) and implementable as written. Promoting `proposed/ → ready/`.
 
