@@ -3,11 +3,18 @@ task_id: 2026-06-08-100-codex-adapter-freshness-check
 role: builder
 binding: codex
 claim_branch: agent/codex-adapter-freshness-check
-last_updated: 2026-06-09T18:49:59Z
+last_updated: 2026-06-09T19:12:31Z
+handoff_branch: agent/codex-adapter-freshness-check
+handoff_head_sha: a2af40487ec6f7a1dd2590001cabe1038acfc195
+handoff_run_log: raw/internal/agent-runs/2026-06-09-2026-06-08-100-codex-adapter-freshness-check.md
 ---
 
 ## current_thesis
 Claimed 100 as codex builder. Implement operator-side Codex skill-adapter freshness checking: `install-echo-codex-skills.sh --check` validates managed `~/.codex/skills` installs read-only, and `echoctl doctor` reports stale or uninspectable Codex adapters as non-fatal degraded status.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at a2af40487ec6f7a1dd2590001cabe1038acfc195.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add installer `--check` that discovers managed dirs from `.echo-managed`, re-renders from recorded `source` and `skill_name` into a per-run temp stage, compares actual vs expected `SKILL.md`, distinguishes drift from runtime errors, and prints cwd-safe per-skill remediation.
@@ -29,4 +36,5 @@ Claimed 100 as codex builder. Implement operator-side Codex skill-adapter freshn
 - Do not edit wiki, founder-owned status/backlog docs, backlog item bodies, or files outside the spec's `files_to_modify`.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-08-100-codex-adapter-freshness-check.md
+
+- spec: backlog/pending_review/2026-06-08-100-codex-adapter-freshness-check.md

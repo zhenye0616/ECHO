@@ -12,9 +12,10 @@ ready_content_sha: 302dafaa8cd4b0c4e53e24af5ff62429698a85414d62c6a38b7986a71efa0
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-09T18:49:59Z"
 branch: "agent/codex-adapter-freshness-check"
-head_sha: ""
+head_sha: "a2af40487ec6f7a1dd2590001cabe1038acfc195"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented operator-side Codex adapter freshness checking in `tools/install-echo-codex-skills.sh --check` and `echoctl doctor`, with read-only managed-sentinel discovery, rendered-hash comparison, cwd-safe remediation, structured `codexAdapter` JSON, and degraded-not-broken doctor behavior. Focused tests, typecheck, lint, shell syntax, coupled invariants, and AC4 `.codex` grep passed. Full `npm test` was partial: `tests/mcp/recent-calls-endpoint.test.ts` timed out under full-suite load but passed on rerun; `tests/review-queue/reviewer-readonly.test.ts` wrong-binding failure reproduced independently outside this item; `tests/cli/shell-reachable.test.ts` daemon launchd health failed during the full-suite run.
 review_notes: ""
 files_to_modify:
   - tools/install-echo-codex-skills.sh   # ADD a `--check` mode: discover managed Codex skill dirs via the `.echo-managed` sentinel (`managed_by=tools/install-echo-codex-skills.sh`), re-render each recorded `source` skill to a temp stage, then hash the ACTUAL installed `SKILL.md` and compare it to the freshly-rendered hash (this single comparison catches BOTH source drift AND a hand-mutated installed file; the stored `synced_content_sha256` is metadata/classifier only, never the sole pass/fail signal); print each drifted/missing skill; exit non-zero iff ≥1 drift, exit 0 when all match OR when no managed install exists. Render/sentinel logic already exists (render_skill + the .echo-managed writer) — --check reuses it read-only.
