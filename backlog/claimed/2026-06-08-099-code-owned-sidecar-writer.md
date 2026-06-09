@@ -9,9 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-08-099-code-owned-sidecar-writer
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 46095398498d39c2fae7b5c536d0b3383bf9e5537b16010e3ade725d3f1fdfe3
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-09T06:46:06Z"
+branch: "agent/code-owned-sidecar-writer"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
