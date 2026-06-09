@@ -8,7 +8,7 @@ created: 2026-06-08
 blocked_by: []
 task_state_ref: 2026-06-08-099-code-owned-sidecar-writer
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: ""
+ready_content_sha: a56b2e7058877a995d5f67e130aab10a24e865e967d5259c4a9553753b500f6c
 claimed_by: ""
 claimed_at: ""
 branch: ""
