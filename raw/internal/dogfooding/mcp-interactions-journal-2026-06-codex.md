@@ -53,3 +53,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-06-08-099-code-owned-sidecar-writer/r4/request.md`; artifact `backlog/proposed/2026-06-08-099-code-owned-sidecar-writer.md@d9872cb164e86d7568c2bcfb0692c5906b5f7032`; response `backlog/reviews/2026-06-08-099-code-owned-sidecar-writer/r4/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-7A2E3B3E-D392-4DBA-858D-0DECC0186532/raw/internal/review-queue/41e6f715-1878-4d2d-b461-d45ebcd077d8/codex.stdout.log` / `/tmp/claude-501/echo-codex-7A2E3B3E-D392-4DBA-858D-0DECC0186532/raw/internal/review-queue/41e6f715-1878-4d2d-b461-d45ebcd077d8/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-08 23:38 PDT - codex builder preflight for next ready item
+
+- **Trigger:** Builder invocation needed ECHO MCP availability plus recent repo context before claiming from `backlog/ready/`.
+- **Query inputs:** `echo_ping(message="codex builder preflight for /Users/zhenye/Desktop/Project_echo")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-08T00:00:00-07:00", format="skeleton", view="compact")`; `search_memories(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-08T00:00:00-07:00", limit=10)`.
+- **Returned:** ping OK at `2026-06-09T06:38:06.056Z`; `find_clusters` returned 1 broad cluster (`ctx_73314fb5`, label `work on project_echo`, source_breakdown git 119 / claude_code 47 / codex 4, rank reasons `has_open_loop`, `has_unresolved_open_loop`, `code_session_anchor`); `search_memories` returned 10 recent matches.
+- **Sources:** top recent match was a Claude Code turn saying item `2026-06-08-099-code-owned-sidecar-writer` converged at r4 and was promoted; git match `bb42667759e43e5c2a0e86275386db252197fb4d` moved the item from `backlog/proposed/` to `backlog/ready/` and stamped `ready_content_sha`; adjacent matches were r4 combine/reviewer commits.
+- **Verdict:** right - retrieval confirmed the next builder candidate context without needing broad atom hydration.
+- **Note:** The cluster itself was too broad to use as a decision surface; the narrower recent-memory read exposed the actionable handoff: item 099 is claimable and recently reviewed to convergence.
