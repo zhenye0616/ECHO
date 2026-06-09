@@ -1,9 +1,9 @@
 ---
 backlog_item: 2026-06-08-099-code-owned-sidecar-writer
 agent_run_started: 2026-06-09T06:44:00Z
-agent_run_ended: 2026-06-09T06:53:00Z
-status: needs_input
-test_status: partial
+agent_run_ended: 2026-06-09T07:13:25Z
+status: complete
+test_status: pass
 ---
 
 # Agent Run: Code-Owned Sidecar Writer
@@ -71,3 +71,97 @@ This is a pre-existing failure before implementation. The planned `_sidecar_vali
 ## Drift Events
 
 None. The stop was triggered by a spec/file-scope conflict, not a temptation to expand scope.
+
+---
+
+## Run 2 (resumed at 2026-06-09T07:13:25Z)
+
+## What I Implemented
+
+Implemented the amended 099 spec after `tools/review-queue/test-validate-sidecar.sh` was added to `files_to_modify`.
+
+- Added the code-owned `tools/review-queue/emit-sidecar.py` writer. It reads a JSON descriptor from `--input` or stdin, derives the target from `item_id`, stamps writer-owned fields, validates the assembled sidecar, writes a same-directory temp file, validates the closed temp file, and finalizes via atomic `os.link` by default or `os.replace` under `--replace`.
+- Extracted import-safe sidecar validation into `tools/review-queue/_sidecar_validate.py`; `validate-sidecar.py` now preserves its CLI shape while delegating schema and heading checks to the shared helper.
+- Tightened `tools/review-queue/schemas/review-sidecar.schema.json` so `producer` is a single `review-pending-orchestrator` const.
+- Added the live pending-review sidecar validation gate to `tools/review-queue/check-coupled-invariants.sh`.
+- Replaced the hand-authored sidecar frontmatter template in `skills/review-pending.md` with a structured descriptor plus `emit-sidecar.py` invocation, then re-synced `.claude/commands/review-pending.md`.
+- Added `tools/review-queue/test-emit-sidecar.sh` and updated `tools/review-queue/test-validate-sidecar.sh` for the collapsed producer contract.
+
+## Previous Attempt State Kept vs Discarded
+
+- Kept: the prior run log and the existing builder task-state pointer as continuity artifacts.
+- Discarded/superseded: the stale builder-pointer handoff markers from Run 1; the pointer now reflects the current claim. There were no prior implementation edits to keep, and the feature worktree was freshly created from current `main`.
+
+## Files Modified
+
+Feature branch: `agent/code-owned-sidecar-writer`
+
+Head SHA: `d1c2a344b697e5e983049e5771de0ba4bb9e748e`
+
+Commit stat:
+
+```text
+9 files changed, 556 insertions(+), 110 deletions(-)
+create mode 100644 tools/review-queue/_sidecar_validate.py
+create mode 100755 tools/review-queue/emit-sidecar.py
+create mode 100755 tools/review-queue/test-emit-sidecar.sh
+```
+
+Files:
+
+- `.claude/commands/review-pending.md`
+- `skills/review-pending.md`
+- `tools/review-queue/_sidecar_validate.py`
+- `tools/review-queue/check-coupled-invariants.sh`
+- `tools/review-queue/emit-sidecar.py`
+- `tools/review-queue/schemas/review-sidecar.schema.json`
+- `tools/review-queue/test-emit-sidecar.sh`
+- `tools/review-queue/test-validate-sidecar.sh`
+- `tools/review-queue/validate-sidecar.py`
+
+## Decisions Made During Implementation
+
+- Used `_lib` as the import path for `jsonschema`, `yaml`, schema loading, frontmatter parsing, serialization, and UTC timestamp generation so `validate-sidecar.py` and `emit-sidecar.py` inherit the existing macOS architecture retry behavior.
+- Validated twice in the writer: first against the in-memory assembled fields, then again against the closed same-directory temp file before `os.link` or `os.replace`. This matches the locked temp-then-validate-then-finalize contract.
+- Scoped the coupled-invariant sidecar gate to `git ls-files 'backlog/pending_review/*.review.md'`, so only tracked live sidecars are checked and historical `complete/` sidecars stay out of scope.
+- Preserved the validator CLI's existing error shape by returning helper errors without path prefixes and adding the path prefix in `validate-sidecar.py`.
+
+## Acceptance Criteria Status
+
+- [x] AC1 — writer exists and is correct: descriptor parsing, generated fields, target derivation, validation-before-finalize, and no-write failures covered by `test-emit-sidecar.sh`.
+- [x] AC2 — fail-closed and atomic: same-directory temp plus default `os.link` no-clobber; `--replace` uses `os.replace`; existing-target behavior covered by `test-emit-sidecar.sh`.
+- [x] AC3 — single validation implementation: `_sidecar_validate.py` is shared by both CLIs; `test-validate-sidecar.sh` passes.
+- [x] AC4 — producer single-value schema: schema uses `const`; retired producers fail in `test-validate-sidecar.sh`.
+- [x] AC5 — independent CI gate: `check-coupled-invariants.sh` validates tracked live sidecars; empty and invalid temp-repo cases covered by `test-emit-sidecar.sh`.
+- [x] AC6 — transcription site retired: `skills/review-pending.md` invokes `emit-sidecar.py` with repo-root resolution, literal sidecar frontmatter is removed, and `.claude/commands/review-pending.md` was re-synced.
+- [x] AC7 — tests: required shell tests and sync/invariant checks pass.
+
+## Tests Run
+
+```text
+$ bash tools/review-queue/test-validate-sidecar.sh
+PASS: validate-sidecar accepts the live orchestrator artifact (unquoted ts, parenthetical heading), rejects retired producers/malformed sidecars, and round-trips through merge-and-cleanup Step-A reads
+```
+
+```text
+$ bash tools/review-queue/test-emit-sidecar.sh
+PASS: emit-sidecar writes validated sidecars, rejects unsafe descriptors/existing targets, supports --replace, and gates live sidecars
+```
+
+```text
+$ tools/sync-skills.sh --check && tools/review-queue/check-coupled-invariants.sh
+OK: all Claude command adapters (project + global ~/.claude/commands) match canonical skills/
+OK: coupled invariants hold
+```
+
+```text
+$ git diff --check
+```
+
+## Open Questions for Founder
+
+None.
+
+## Drift Events
+
+None.

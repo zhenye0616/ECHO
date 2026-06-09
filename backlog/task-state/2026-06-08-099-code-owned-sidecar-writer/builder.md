@@ -3,11 +3,18 @@ task_id: 2026-06-08-099-code-owned-sidecar-writer
 role: builder
 binding: codex
 claim_branch: agent/code-owned-sidecar-writer
-last_updated: 2026-06-09T07:01:23Z
+last_updated: 2026-06-09T07:15:20Z
+handoff_branch: agent/code-owned-sidecar-writer
+handoff_head_sha: d1c2a344b697e5e983049e5771de0ba4bb9e748e
+handoff_run_log: raw/internal/agent-runs/2026-06-08-2026-06-08-099-code-owned-sidecar-writer.md
 ---
 
 ## current_thesis
 Claimed 099 as codex builder after the builder-found test gap was folded into `files_to_modify`. Implement the code-owned review sidecar writer so `producer` is stamped by `emit-sidecar.py`, sidecars are validated before atomic publication, the existing validator imports a shared helper, pending-review sidecars are independently gated, and `/review-pending` no longer hand-transcribes sidecar frontmatter.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at d1c2a344b697e5e983049e5771de0ba4bb9e748e.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add `tools/review-queue/emit-sidecar.py`; it reads a JSON descriptor, derives the target from `item_id`, stamps `producer` and `reviewed_at`, rejects conflicting/generated or unknown keys, assembles required headings, validates before finalizing, and writes nothing on failure.
@@ -33,5 +40,5 @@ Claimed 099 as codex builder after the builder-found test gap was folded into `f
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-08-099-code-owned-sidecar-writer.md
+- spec: backlog/pending_review/2026-06-08-099-code-owned-sidecar-writer.md
 - reviews: backlog/reviews/2026-06-08-099-code-owned-sidecar-writer/

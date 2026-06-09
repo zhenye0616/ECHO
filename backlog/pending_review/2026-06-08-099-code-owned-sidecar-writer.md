@@ -12,9 +12,10 @@ ready_content_sha: 3b3c6ec526796ea0eb79b1e2f11f8e2e0bb14c47f5f4c3bfa13656a3b5157
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-09T07:01:23Z"
 branch: "agent/code-owned-sidecar-writer"
-head_sha: ""
+head_sha: "d1c2a344b697e5e983049e5771de0ba4bb9e748e"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the code-owned review sidecar writer, shared sidecar validator helper, single-value producer schema, live pending_review sidecar invariant gate, review-pending descriptor invocation, generated Claude adapter sync, and focused shell coverage. Verification passed: bash tools/review-queue/test-validate-sidecar.sh; bash tools/review-queue/test-emit-sidecar.sh; tools/sync-skills.sh --check; tools/review-queue/check-coupled-invariants.sh; git diff --check.
 review_notes: ""
 files_to_modify:
   - tools/review-queue/emit-sidecar.py            # NEW — code-owned sidecar writer. Reads a structured (JSON) sidecar descriptor from --input FILE or stdin; derives the target path from item_id (<repo_root>/backlog/pending_review/<item_id>.review.md, NOT caller-supplied); derives `producer` PROGRAMMATICALLY (the constant orchestrator value, NOT taken from input); stamps `reviewed_at` in canonical UTC Z; assembles frontmatter+body; validates via the shared helper BEFORE finalize. Finalize is ALWAYS same-dir temp → validate → atomic no-clobber `os.link` (default); `os.replace` (overwrite) ONLY under --replace (Locked decision 8 / AC2 — never default last-writer-wins). Exits non-zero WITHOUT writing on any validation failure or existing target.
