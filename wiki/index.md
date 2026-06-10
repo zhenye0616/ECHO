@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 70 pages · 67 shipped · 2 planned
+**Status:** 71 pages · 68 shipped · 2 planned
 
 ---
 
@@ -149,6 +149,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 ### Process
 
+- [[adapter-freshness|Adapter freshness]] — Two-tier rendered-adapter freshness model. Repo-tracked adapters (.claude/commands/*) are gated in the merge invariant via sync-skills.sh --check; operator-local HOME-relative adapters (~/.codex/skills/ECHO:*) are checked operator-side in echoctl doctor via install-echo-codex-skills.sh --check (non-fatal degraded sub-check). Writer half (099): code-owned emit-sidecar.py + validate-sidecar.py over prose-template transcription. Decision rule: repo-tracked → merge gate; operator-local → doctor selftest. Items 099 + 100.
 - [[automation-worktree-isolation|Automation worktree isolation (050)]] — Each automated role (reviewer, watcher, merger) runs in its own ephemeral $TMPDIR/echo-<role>-<uuid> worktree pinned to origin/main, eliminating the shared .git/index race surface. Replaces the prior sentinel-file lock convention which depended on every binding reading it. Unified ERR/EXIT cleanup; live checkout's .git/index is never written to by an automated tick.
 - [[builder-bindings|Builder bindings]] — Three documented builder bindings — Claude Code (in-session via process-backlog skill), codex (headless via run-codex-builder.sh launchd wrapper), Cursor's Claude (IDE-mode via paste-trigger ritual). 055 closed the third-binding matrix. Add-a-binding recipe + cross-binding race semantics + operator-facing trigger differences.
 - [[cross-tool-spec-review|Cross-Tool Spec Review]] — Multi-reviewer pattern (≥2 independent AI clients per round) for specs/code/strategy. Findings classes, strategist self-review checklist, verdict-convergence signal, evidence base from items 030+032.

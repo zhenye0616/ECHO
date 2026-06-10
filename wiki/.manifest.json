@@ -351,6 +351,18 @@
     "topic": "Architecture",
     "subtopic": "Per-App Data Collection"
   },
+  "operating-model/adapter-freshness.md": {
+    "status": "shipped",
+    "title": "Adapter freshness",
+    "link": "adapter-freshness",
+    "summary": "Two-tier rendered-adapter freshness model. Repo-tracked adapters (.claude/commands/*) are gated in the merge invariant via sync-skills.sh --check; operator-local HOME-relative adapters (~/.codex/skills/ECHO:*) are checked operator-side in echoctl doctor via install-echo-codex-skills.sh --check (non-fatal degraded sub-check). Writer half (099): code-owned emit-sidecar.py + validate-sidecar.py over prose-template transcription. Decision rule: repo-tracked → merge gate; operator-local → doctor selftest. Items 099 + 100.",
+    "aliases": [
+      "Adapter Freshness",
+      "Two-Tier Adapter Freshness"
+    ],
+    "topic": "Process",
+    "subtopic": "Adapter Freshness"
+  },
   "operating-model/automation-worktree-isolation.md": {
     "status": "shipped",
     "title": "Automation worktree isolation (050)",
