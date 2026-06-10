@@ -56,3 +56,23 @@ This is the **June 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right — the two clusters were exactly the two real work threads; cluster 2 surfaced a whole second project (overton-signal-desk hearing-capture) that repo-scoped retrieval would have missed.
 - **Note:** Budget pressure was the story of this call: 53/55 clusters dropped and 86% of requested atom bodies dropped per get_atoms call (7/50 each) because session-turn atoms are huge. The 7 survivors per call were still sufficient for a recap because newest_first kept the densest summary turns. Notably the second cluster's source_breakdown shows codex:28 — Codex worked on hearing-capture too, but none of its atoms survived the body-fetch budget, so the codex-side narrative is invisible in what I read.
 - **Conjecture:** A `fields: ["content"]`-projected or content-cap-per-atom knob on get_atoms would let recap queries trade per-atom depth for breadth; 7/50 survival on a 50-id newest_first fetch suggests the default wire-shape cap is tuned for pinpoint reads, not recaps.
+
+### 2026-06-10 15:35 PDT — live-watch on a sibling Claude session (monitor-for-friction task)
+
+- **Trigger:** Founder asked this session to "use echo to monitor the other claude and spot any friction during the mcp call" — the sibling session (beb49bba, same repo) was mid-way through the 3-day-recap task. Set up a live watch on its exact source.
+- **Query inputs:** (1) `wait_for_new_turns({sources: ["fs:/…/-Users-zhenye-Desktop-Project-echo/beb49bba-….jsonl"], since: "2026-06-10T22:32:00Z", timeout: 45})`; (2) `search_memories({source: "fs:/…/beb49bba-….jsonl", limit: 5})`.
+- **Returned:** wait → `turn_ids: []`, timed_out after 45s, no warnings. search → 1 match: turn_index 0 only (22:31:59Z, the opening user/assistant exchange), with full git_state + tool_calls metadata.
+- **Sources:** the sibling session's own JSONL (`fs:/…/beb49bba-4d9e-4eec-b653-3a2685277340.jsonl`). Ground truth from reading that JSONL directly: between 22:32:11 and 22:38:12 the session made 3 ECHO MCP calls (find_clusters + 2× get_atoms) and ~10 bash/git calls — none of it visible to ECHO yet.
+- **Verdict:** 🟡 partial — both calls behaved exactly as specced, but the spec'd granularity defeats the use case: capture is per-completed-turn, so a long agentic turn (6+ min, 15+ tool calls) is a blind spot for `wait_for_new_turns` until it closes. Only turn 0 existed while the real action was in flight.
+- **Note:** "Monitor another agent live via ECHO" is exactly the axiom-#7 message-bus shape, and the primitive can't see inside an open turn. The watcher had to fall back to tailing the sibling's transcript JSONL directly — the capture-side artifact, not the retrieval surface.
+- **Conjecture:** Mid-turn incremental capture (or a `turn_in_progress` peek in wait responses) would be needed before wait_for_new_turns can serve same-machine agent-to-agent monitoring; today it is a turn-boundary primitive only.
+
+### 2026-06-10 15:36–15:42 PDT — wait_for_new_turns poll loop: timeout=60 transport error + empty cycles
+
+- **Trigger:** Continuing the live watch on the sibling session; chained wait cycles while it finished its turn.
+- **Query inputs:** same `sources`/`since` as above; one call with `timeout: 60` (the documented max), then four with `timeout: 45` (returns at 22:38:49Z, 22:39:53Z, 22:40:45Z, 22:41:55Z).
+- **Returned:** the `timeout: 60` call FAILED client-side — MCP transport "The operation timed out" error, no server response envelope at all. All four 45s calls returned gracefully (`timed_out: true, turn_ids: []`).
+- **Sources:** sibling session JSONL source only; no atoms returned in any cycle (turn still open the whole window).
+- **Verdict:** ❌ wrong (the 60s call) / ✅ right-but-empty (the 45s cycles) — the tool's own max timeout is unusable over this client transport; the graceful timeout envelope never arrives because the client gives up first.
+- **Note:** Surprising failure worth flagging: schema allows `timeout ≤ 60`, but the effective ceiling under Claude Code's MCP client timeout is somewhere in (45, 60]. A caller following the docs ("default 30, max 60") hits a hard error instead of an empty result, which looks like a daemon outage rather than a benign timeout.
+- **Conjecture:** Either cap the server-side max below the common client transport timeout (e.g. 45s) or document the safe ceiling; a transport error on the longest legal wait is a trust-eroding failure mode for a blocking primitive.
