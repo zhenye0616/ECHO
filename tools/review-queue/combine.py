@@ -122,13 +122,20 @@ def compute_combined_verdict(
 
     Verdict table (043 AC6, refined by 044 AC4):
       - No responses at all (all requested are missing) → ("no_responses", True)
+        (optional-only rosters reach this only after the find_eligible_rounds
+        first-response-or-timeout gate — see O1 fix there; a round is never
+        combined into no_responses at dispatch time)
       - Some required missing (and at least one present):
-          - 044 AC4: exactly ONE required missing AND every present
-            reviewer's verdict is in PROCEED_STAR → ("partial_responses", False)
+          - 044 AC4: exactly ONE required missing AND at least one PRESENT
+            reviewer is REQUIRED AND every present reviewer's verdict is in
+            PROCEED_STAR → ("partial_responses", False)
             (auto-disposition: strategist watcher dispositions through the
             normal path-(a)/(b)/(c) flow as if all reviewers had responded;
-            the missing reviewer is surfaced as a divergent row.)
-          - Otherwise (multi-missing OR any-pushback-with-missing) →
+            the missing reviewer is surfaced as a divergent row. The
+            present-required check is the O2 fix: a round in which only
+            OPTIONAL reviewers responded must never auto-disposition.)
+          - Otherwise (multi-missing OR any-pushback-with-missing OR
+            zero-present-required) →
             ("partial_responses", True)   # 043 AC6 founder-escalation path
             (the legacy `single_reviewer_timeout` enum value stays in
             combined.schema.json for back-compat with rounds in complete/)
@@ -150,8 +157,13 @@ def compute_combined_verdict(
         # reviewer is in PROCEED_STAR → strategist watcher autonomously
         # dispositions (escalated_to_founder: false). Multi-missing OR any
         # present pushback still escalates to founder.
+        # O2 fix: auto-disposition additionally requires at least one
+        # PRESENT reviewer to be REQUIRED — otherwise a round in which only
+        # optional reviewers responded would be autonomously dispositioned
+        # with zero required reviews.
         if (
             len(missing_required) == 1
+            and (present.keys() & required_set)
             and all(v in PROCEED_STAR for v in present.values())
         ):
             return "partial_responses", False
@@ -248,6 +260,17 @@ def find_eligible_rounds(
           timeout. Reviewers whose own timeout has not yet elapsed gate
           the round.
 
+    Optional-only rosters (zero required reviewers requested) — O1 fix:
+    `all([]) == True` previously made such rounds eligible the instant
+    request.md existed, producing a terminal no_responses escalation seconds
+    after dispatch. Instead, an optional-only round is eligible iff:
+      (a') at least ONE requested reviewer has its <slug>.md present
+           (optionals never gate each other — first response combines), OR
+      (b') zero responses AND every requested reviewer has individually
+           exceeded its per-reviewer timeout (null → FALLBACK_TIMEOUT_HOURS),
+           measured from requested_at — after which no_responses escalation
+           is correct.
+
     `timeout_hours_override`: when non-None, applies uniformly to every
     reviewer (current `--timeout-hours` CLI semantics). When None,
     per-reviewer values from reviewers.json are used (null → fallback).
@@ -280,11 +303,21 @@ def find_eligible_rounds(
                 continue
             required_requested = [r for r in requested if required_by_name[r]]
 
-            # (a) all required-and-requested reviewers have responses
-            all_required_present = all(
-                (round_dir / f"{r}.md").exists() for r in required_requested
-            )
-            if all_required_present:
+            if required_requested:
+                # (a) all required-and-requested reviewers have responses
+                gate_satisfied = all(
+                    (round_dir / f"{r}.md").exists() for r in required_requested
+                )
+                gating_reviewers = required_requested
+            else:
+                # O1 fix: optional-only roster. (a') first response combines;
+                # otherwise fall through to the per-reviewer timeout gate (b')
+                # over the full requested roster.
+                gate_satisfied = any(
+                    (round_dir / f"{r}.md").exists() for r in requested
+                )
+                gating_reviewers = requested
+            if gate_satisfied:
                 out.append(round_dir)
                 continue
 
@@ -300,7 +333,7 @@ def find_eligible_rounds(
             elapsed = (now - requested_at).total_seconds()
             all_missing_timed_out = True
             any_missing = False
-            for name in required_requested:
+            for name in gating_reviewers:
                 if (round_dir / f"{name}.md").exists():
                     continue
                 any_missing = True

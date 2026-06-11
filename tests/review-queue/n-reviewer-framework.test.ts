@@ -536,3 +536,95 @@ describe('043 AC6 — N-way verdict roll-up', () => {
     expect(fm.escalated_to_founder).toBe(true);
   });
 });
+
+// --- Fix ③ — combiner wrong-verdict bugs O1 / O2 ---
+//
+// O1: optional-only roster (zero required reviewers requested) made the
+//     round eligible the instant request.md existed (`all([]) == True`),
+//     producing a terminal no_responses escalation seconds after dispatch —
+//     before the optional reviewer's first tick.
+// O2: the 044 AC4 auto-disposition branch never checked that any PRESENT
+//     reviewer is REQUIRED, so a round in which only an optional reviewer
+//     responded could be auto-dispositioned with zero required reviews.
+
+describe('fix ③ — O1: optional-only roster eligibility gate', () => {
+  let root: string;
+  beforeEach(() => {
+    root = setupRoot();
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('O1a: optional-only roster, zero responses, seconds after dispatch → NOT eligible (no instant no_responses)', () => {
+    // claude is the only requested reviewer and is required:false. 30s
+    // after requested_at the round must stay gated — NOT combine into a
+    // terminal no_responses escalation.
+    const dir = writeRequest(root, 1, ['claude'], '2026-05-13T08:00:00Z');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:30Z']);
+    expect(r.code, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/no rounds to combine/);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(false);
+  });
+
+  it('O1b: optional-only roster, zero responses, past fallback timeout → no_responses + escalated', () => {
+    // claude is headless (timeout_hours: null → FALLBACK_TIMEOUT_HOURS =
+    // 0.5h). 1h elapsed with zero responses → the no_responses escalation
+    // is now correct.
+    const dir = writeRequest(root, 1, ['claude'], '2026-05-13T07:00:00Z');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('no_responses');
+    expect(fm.escalated_to_founder).toBe(true);
+    expect(fm.claude_response).toBe(null);
+  });
+
+  it('O1c: optional-only roster, response present → combines on that response (optionals never gate)', () => {
+    const dir = writeRequest(root, 1, ['claude'], '2026-05-13T08:00:00Z');
+    writeReviewer(dir, 'claude', 1, 'proceed');
+    const r = runCombine(root, ['--now=2026-05-13T08:01:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('proceed');
+    expect(fm.escalated_to_founder).toBe(false);
+    expect(fm.claude_response).toBe('claude.md');
+  });
+});
+
+describe('fix ③ — O2: auto-disposition requires a present REQUIRED reviewer', () => {
+  let root: string;
+  beforeEach(() => {
+    root = setupRoot();
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('O2a: required codex missing past timeout, only optional claude present (proceed) → escalates, NOT auto-disposition', () => {
+    // requested [codex(required), claude(optional)]. codex never responds;
+    // claude says proceed. 1h elapsed clears codex's 0.5h fallback timeout.
+    // 044 AC4 auto-disposition must NOT fire — zero required reviewers
+    // actually reviewed anything.
+    const dir = writeRequest(root, 1, ['codex', 'claude'], '2026-05-13T07:00:00Z');
+    writeReviewer(dir, 'claude', 1, 'proceed');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(true);
+  });
+
+  it('O2b guard: required codex present (proceed) + optional claude present (proceed), required cursor missing past timeout → auto-disposition preserved', () => {
+    // A present required reviewer keeps the 044 AC4 single-required-missing
+    // auto-disposition path intact. 3h elapsed clears cursor's 2h timeout.
+    const dir = writeRequest(root, 1, ['codex', 'cursor', 'claude'], '2026-05-13T05:00:00Z');
+    writeReviewer(dir, 'codex', 1, 'proceed');
+    writeReviewer(dir, 'claude', 1, 'proceed');
+    const r = runCombine(root, ['--now=2026-05-13T08:00:00Z']);
+    expect(r.code, r.stderr).toBe(0);
+    const fm = readCombinedFm(dir);
+    expect(fm.combined_verdict).toBe('partial_responses');
+    expect(fm.escalated_to_founder).toBe(false);
+  });
+});
