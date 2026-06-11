@@ -1,11 +1,20 @@
-# Retro-review packet — "sharpest five" audit fixes (r2: diffs embedded)
+# Retro-review packet — "sharpest five" audit fixes (r3: r2 dispositions applied)
 
-**What this is:** the r2 packet for the post-merge cross-tool review of the audit-fix
+**What this is:** the r3 packet for the post-merge cross-tool review of the audit-fix
 commits on `origin/main`. r1 taught us the packet shape: the content-only reviewer child
-cannot run git, so this revision embeds the COMPLETE diffs of every commit under review
-(bottom of this document) — the packet is self-contained and code-grounded.
+cannot run git, so since r2 this packet embeds the COMPLETE diffs of every commit under
+review (bottom of this document) — self-contained and code-grounded. r2 produced two MED
+findings, both dispositioned below; the diff set now contains EIGHT commits (the original
+six plus the two r2-disposition commits #7 and #8).
 
-## r1 findings → dispositions (all three closed in this revision)
+## r2 findings → dispositions (both closed in this revision)
+
+| r2 finding | Disposition |
+|---|---|
+| codex MED — `sqlite.ts`: "when both `filter.source` and `filter.source_prefix` are provided, the prefix branch overwrites the exact-source JS predicate" | **Refuted with evidence**: the scenario is unreachable — `query()` throws `'QueryFilter.source and source_prefix are mutually exclusive'` at entry, BEFORE any predicate is built, in all three adapters (`sqlite.ts:101-103`, `memory.ts:51-53`, `atom-store-readonly.ts:54-56`). The guard predates the fix and sat outside the r2 diff's hunk context, which is why a packet-only review couldn't see it. Made packet-visible in commit `81c3c178` (diff #7): a conformance case pinning the both-set throw on BOTH adapters — see the post-image `rejects source + source_prefix together` test. 22/22. |
+| codex-ops MED — `_run_reviewer.sh` tripwire: only rc=1 warns; any other `--check` failure (installer missing, syntax error, permission failure) is swallowed, so the detector can break invisibly | **Adopted, fixed in commit `4fd77f56`** (diff #8): any nonzero rc other than 3 now logs `WARNING: STALE_PLIST_CHECK_FAILED` with the rc + captured output; rc=3 stays silent (normal for manual/on-demand ticks); still non-fatal. Wrapper suites 21/21. |
+
+## r1 findings → dispositions (all three closed in r2)
 
 | r1 finding | Disposition |
 |---|---|
@@ -13,7 +22,13 @@ cannot run git, so this revision embeds the COMPLETE diffs of every commit under
 | codex-ops HIGH — log-path fix only covers future installs; already-installed plists stay silently blacked out at `/dev/null` | **Adopted and fixed in commit `98c04815`** (now under review here too): `_install_reviewer_launchd.sh --check` renders the would-be plist via a shared `render_plist()` and byte-compares the installed one (exit 0 match / 1 STALE with loud diff + reinstall hint / 3 not installed; never touches launchd), plus a best-effort tick-start tripwire in `_run_reviewer.sh` that logs `WARNING: STALE_PLIST` on drift only (rc=3 silent — normal for manual ticks). Operationally closed on this machine: both reviewer plists reinstalled 2026-06-11; live `--check` returns 0. |
 | codex-ops MED — overflow signal relies on `warnings[]`; prove it is schema-declared | **Satisfied-by-fact, evidence in diff #5**: `warnings: z.array(z.string())` is declared in the tool outputSchema (`src/mcp/tools/wait-for-new-turns.ts`, OUTPUT_SCHEMA block — visible in the embedded diff, post-image line `warnings: z.array(z.string()),`), the field predates this change (schema byte-identical), and the new burst-of-25 test asserts the overflow warning text end-to-end. |
 
-## The six commits under review
+## The eight commits under review
+
+7. **`81c3c178` test(storage)** — conformance pin for the r2 codex MED refutation
+   (mutual-exclusion throw on `source`+`source_prefix`, both adapters).
+8. **`4fd77f56` fix(review-queue)** — tripwire hardening for the r2 codex-ops MED
+   (`STALE_PLIST_CHECK_FAILED` warning on unexpected `--check` rc).
+
 
 1. **`f6b30569` fix(storage)** — SqliteStorage source-matching conformance. Scrutinize:
    the `likePrefilterChunk` superset proof (non-ASCII guard, separator edges); the
@@ -2270,4 +2285,99 @@ index 63e01869..97efabd3 100755
    # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
    # Emit coord:scheduler_health at log-redirect-open. This opens a SHORT
    # bootstrap-window deadline (default 120s / max 300s per 057a's
+````
+
+## Commit 81c3c178 — test(storage): pin source+source_prefix mutual-exclusion contract (101-retro r2 codex MED refutation)
+
+````diff
+commit 81c3c178f79d75464bafe3ad4aaf992813179ce1
+Author: Zhen <zhenge82261643@gmail.com>
+Date:   Thu Jun 11 11:28:49 2026 -0700
+
+    test(storage): pin source+source_prefix mutual-exclusion contract (101-retro r2 codex MED refutation)
+    
+    The r2 finding ('prefix branch overwrites the exact-source predicate when
+    both filters are set') is unreachable: all three adapters throw
+    'mutually exclusive' at query() entry (sqlite.ts:102, memory.ts:52,
+    atom-store-readonly.ts:55) before any predicate is built. The guard sat
+    outside the diff hunk context a packet-only reviewer can see; this
+    conformance case makes the contract visible in the table both adapters
+    run. 22/22.
+    
+    Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+diff --git a/tests/storage/source-match-conformance.test.ts b/tests/storage/source-match-conformance.test.ts
+index 7ffb4fc6..2b83d443 100644
+--- a/tests/storage/source-match-conformance.test.ts
++++ b/tests/storage/source-match-conformance.test.ts
+@@ -34,6 +34,19 @@ describe.each(backends)('source matching conformance — $name', ({ create }) =>
+     if (store instanceof SqliteStorage) store.close();
+   });
+ 
++  // 101-retro r2 codex MED refutation pin: `source` + `source_prefix`
++  // together is structurally impossible — every adapter throws before any
++  // predicate is built, so the "prefix branch overwrites the exact-source
++  // predicate" scenario cannot be reached. This case makes the contract
++  // visible in the conformance table (the guard sits above the diff hunks
++  // a packet-only reviewer sees).
++  it('rejects source + source_prefix together (mutually exclusive by contract)', async () => {
++    await store.append(eventInput({ source: 'fs:/a/b/c.jsonl' }));
++    await expect(
++      store.query({ source: 'fs:/a/b/c.jsonl', source_prefix: 'fs:/a/b' }),
++    ).rejects.toThrow(/mutually exclusive/);
++  });
++
+   describe('path-like normalization (divergence class: Windows separators + case)', () => {
+     it('matches a backslash-stored Windows source via a forward-slash source_prefix', async () => {
+       await store.append(
+````
+
+## Commit 4fd77f56 — fix(review-queue): warn when the stale-plist check itself fails (101-retro r2 codex-ops MED)
+
+````diff
+commit 4fd77f56bc96036f1e8221c9eb694f45a5728325
+Author: Zhen <zhenge82261643@gmail.com>
+Date:   Thu Jun 11 11:35:39 2026 -0700
+
+    fix(review-queue): warn when the stale-plist check itself fails (101-retro r2 codex-ops MED)
+    
+    rc=1 (drift) already warned; rc=3 (not installed) stays silent — normal
+    for manual/on-demand ticks. Any OTHER nonzero rc now logs
+    WARNING: STALE_PLIST_CHECK_FAILED with the rc + captured output, so a
+    broken detector (installer missing, syntax error, diff/permission
+    failure) can't die invisibly. Still non-fatal — tripwire, not gate.
+    Wrapper suites 21/21.
+    
+    Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+diff --git a/tools/review-queue/_run_reviewer.sh b/tools/review-queue/_run_reviewer.sh
+index 97efabd3..b87bc778 100755
+--- a/tools/review-queue/_run_reviewer.sh
++++ b/tools/review-queue/_run_reviewer.sh
+@@ -81,9 +81,12 @@ fi
+   # A merge-only deploy changes the installer but not already-installed
+   # launchd plists; a stale plist can silently revert operator-visible
+   # guarantees (e.g. the pre-2026-06-11 StandardErrorPath=/dev/null
+-  # blackout). Warn loudly on DRIFT only (rc=1): rc=3 (not installed) is
+-  # the normal shape for manual/on-demand ticks and stays silent, and any
+-  # check failure is non-fatal — this is a tripwire, not a gate.
++  # blackout). rc=1 (drift) warns loudly; rc=3 (not installed) stays
++  # silent — it is the normal shape for manual/on-demand ticks; any OTHER
++  # nonzero rc means the DETECTOR ITSELF is broken (installer missing,
++  # syntax/runtime error, diff/permission failure) and is warned with the
++  # rc + captured output so stale-plist detection can't die invisibly
++  # (101-retro r2 codex-ops MED). Always non-fatal — tripwire, not gate.
+   set +e
+   stale_check_out="$(bash "$TOOL_DIR/_install_reviewer_launchd.sh" "$REVIEWER_NAME" --check 2>&1)"
+   stale_check_rc=$?
+@@ -91,6 +94,9 @@ fi
+   if [ "$stale_check_rc" -eq 1 ]; then
+     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] WARNING: STALE_PLIST for $REVIEWER_NAME — installed launchd plist drifted from the installer's current render; re-run tools/review-queue/_install_reviewer_launchd.sh $REVIEWER_NAME"
+     printf '%s\n' "$stale_check_out" | sed 's/^/  stale-plist: /'
++  elif [ "$stale_check_rc" -ne 0 ] && [ "$stale_check_rc" -ne 3 ]; then
++    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] WARNING: STALE_PLIST_CHECK_FAILED for $REVIEWER_NAME — --check itself failed (rc=$stale_check_rc); stale-plist detection is NOT functioning"
++    printf '%s\n' "$stale_check_out" | sed 's/^/  stale-plist-check: /'
+   fi
+ 
+   # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
 ````
