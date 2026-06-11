@@ -1,13 +1,20 @@
-# Retro-review packet — "sharpest five" audit fixes (r3: r2 dispositions applied)
+# Retro-review packet — "sharpest five" audit fixes (r4: r3 disposition applied)
 
-**What this is:** the r3 packet for the post-merge cross-tool review of the audit-fix
+**What this is:** the r4 packet for the post-merge cross-tool review of the audit-fix
 commits on `origin/main`. r1 taught us the packet shape: the content-only reviewer child
 cannot run git, so since r2 this packet embeds the COMPLETE diffs of every commit under
-review (bottom of this document) — self-contained and code-grounded. r2 produced two MED
-findings, both dispositioned below; the diff set now contains EIGHT commits (the original
-six plus the two r2-disposition commits #7 and #8).
+review (bottom of this document) — self-contained and code-grounded. The diff set now
+contains NINE commits (the original six, the two r2-disposition commits #7-#8, and the
+r3-disposition commit #9).
 
-## r2 findings → dispositions (both closed in this revision)
+## r3 findings → dispositions (closed in this revision)
+
+| r3 finding | Disposition |
+|---|---|
+| codex MED — the tie-group guarantee was stronger than the fetch window proves: 19 older + 30 same-ms boundary rows → window (41) fetches 22 of the group, page extends through the FETCHED ties, `next_since` skips the unfetched 8 | **Adopted, fixed in commit `0a724516`** (diff #9), taking the finding's stronger option *plus* the honest floor: `pollOnce` now tracks per-source window-full HORIZONS; a page ending at a horizon timestamp holds the unprovable tie group back WHOLE (chained call re-fetches it with the entire window — codex's exact 19+30 scenario is now a regression test asserting all 49 delivered across the chain). The one remaining lossy case — a single same-ms group alone exceeding the window — ships flagged with an explicit warning naming the `search_memories` recovery path, and the tool description now states these exact semantics (the "~2x the cap" approximation is gone). TDD: both cases RED first; 29/29 tool suite, 320/320 tests/mcp. |
+| codex-ops — `proceed`, zero findings | n/a |
+
+## r2 findings → dispositions (both closed in r3)
 
 | r2 finding | Disposition |
 |---|---|
@@ -22,12 +29,15 @@ six plus the two r2-disposition commits #7 and #8).
 | codex-ops HIGH — log-path fix only covers future installs; already-installed plists stay silently blacked out at `/dev/null` | **Adopted and fixed in commit `98c04815`** (now under review here too): `_install_reviewer_launchd.sh --check` renders the would-be plist via a shared `render_plist()` and byte-compares the installed one (exit 0 match / 1 STALE with loud diff + reinstall hint / 3 not installed; never touches launchd), plus a best-effort tick-start tripwire in `_run_reviewer.sh` that logs `WARNING: STALE_PLIST` on drift only (rc=3 silent — normal for manual ticks). Operationally closed on this machine: both reviewer plists reinstalled 2026-06-11; live `--check` returns 0. |
 | codex-ops MED — overflow signal relies on `warnings[]`; prove it is schema-declared | **Satisfied-by-fact, evidence in diff #5**: `warnings: z.array(z.string())` is declared in the tool outputSchema (`src/mcp/tools/wait-for-new-turns.ts`, OUTPUT_SCHEMA block — visible in the embedded diff, post-image line `warnings: z.array(z.string()),`), the field predates this change (schema byte-identical), and the new burst-of-25 test asserts the overflow warning text end-to-end. |
 
-## The eight commits under review
+## The nine commits under review
 
 7. **`81c3c178` test(storage)** — conformance pin for the r2 codex MED refutation
    (mutual-exclusion throw on `source`+`source_prefix`, both adapters).
 8. **`4fd77f56` fix(review-queue)** — tripwire hardening for the r2 codex-ops MED
    (`STALE_PLIST_CHECK_FAILED` warning on unexpected `--check` rc).
+9. **`0a724516` fix(mcp)** — window-truncated boundary tie groups held back whole in
+   `wait_for_new_turns` (r3 codex MED adoption; horizon detection + explicit lossy-floor
+   warning + exact-semantics description).
 
 
 1. **`f6b30569` fix(storage)** — SqliteStorage source-matching conformance. Scrutinize:
@@ -2380,4 +2390,219 @@ index 97efabd3..b87bc778 100755
    fi
  
    # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
+````
+
+## Commit 0a724516 — fix(mcp): hold back window-truncated boundary tie groups in wait_for_new_turns (101-retro r3 codex MED)
+
+````diff
+commit 0a724516984ce4840822cbe6f3d278f094da0c02
+Author: Zhen <zhenge82261643@gmail.com>
+Date:   Thu Jun 11 11:45:21 2026 -0700
+
+    fix(mcp): hold back window-truncated boundary tie groups in wait_for_new_turns (101-retro r3 codex MED)
+    
+    The r2 'never split a tie group' guarantee was stronger than the
+    per-source fetch window could prove: 19 older rows + a 30-row same-ms
+    boundary group fetched only 22 of the group (window 41), the page
+    extended through the FETCHED ties, and next_since skipped the unfetched
+    8 forever.
+    
+    pollOnce now tracks window-full HORIZONS (a query returning exactly
+    WAIT_PER_POLL_LIMIT_PER_SOURCE rows may have more rows at its last
+    timestamp). A page ending at a horizon timestamp holds the unprovable
+    tie group back whole — the chained call re-fetches it with the entire
+    window. The one lossy case left — a single same-ms group alone exceeding
+    the window — ships flagged with an explicit warning naming the
+    search_memories recovery path. Tool description updated to the exact
+    semantics (replaces the '~2x the cap' approximation).
+    
+    TDD: both cases RED first (49-turn chain lost 8; giant tie group shipped
+    silently), now 29/29 tool suite, 320/320 tests/mcp, typecheck clean.
+    
+    Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+diff --git a/src/mcp/tools/wait-for-new-turns.ts b/src/mcp/tools/wait-for-new-turns.ts
+index d474869e..b32947da 100644
+--- a/src/mcp/tools/wait-for-new-turns.ts
++++ b/src/mcp/tools/wait-for-new-turns.ts
+@@ -75,7 +75,7 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
+   'CHAINING (lossless — `next_since` is NEVER the server wall clock): when turns are returned, `next_since` = the max timestamp among the RETURNED turns (canonical Z form, as stored); when the call times out empty, `next_since` = your own `since` (canonicalized) echoed back. Always chain with `since = next_since` — safe unconditionally, even after a timeout. Atom timestamps are event times that land in storage with ingest lag (Cursor re-poll ~15s; CC/codex/git seconds), so a wall-clock watermark would permanently skip late-ingested turns; anchoring `next_since` to delivered data makes the chain lossless.\n\n' +
+   'OVERFLOW PAGING: at most ' +
+   String(WAIT_MAX_RETURNED_TURNS) +
+-  ' turns per call. When more match, the call returns the OLDEST page (ascending by timestamp, id) plus a warning in `warnings[]` — chain immediately with `next_since` to page through the backlog. A same-timestamp group is never split across the page boundary: all turns sharing the boundary timestamp are included, so the page may exceed the cap by the tie count (a tie group larger than ~2x the cap within one millisecond is the documented pathological limit). `turn_ids` are ordered oldest→newest.\n\n' +
++  ' turns per call. When more match, the call returns the OLDEST page (ascending by timestamp, id) plus a warning in `warnings[]` — chain immediately with `next_since` to page through the backlog. A same-timestamp group is never split across the page boundary: either the page carries the WHOLE group (it may exceed the cap by the tie count), or — when the group cannot be proven complete because a window-full fetch ends at its timestamp — the group is held back entirely and the chained call re-fetches it whole. The one lossy case left: a single same-millisecond group in one source larger than the per-source fetch window ships flagged with an explicit warning. `turn_ids` are ordered oldest→newest.\n\n' +
+   'RESPONSE (item 038 / AC4 — IDs-only): the response now carries `turn_ids: string[]` instead of body-projected `turns[]`. The envelope shrinks dramatically (no body projection in the wait response); the caller composes one extra MCP call per wake (`get_atoms(turn_ids)` for cost-bounded summaries, or `get_atom(turn_ids[i])` for verbatim of one atom) to fetch bodies. No parallel-vocabulary deprecation window — the bodies-bundled shape is removed in the same release that ships the IDs-only shape.\n\n' +
+   // canonical wake → fetch pattern
+   'CANONICAL COMPOSITION:\n' +
+@@ -166,6 +166,11 @@ interface PollPage {
+   /** True when more rows matched than the page carries — caller should
+    *  chain immediately with next_since to page through the backlog. */
+   overflow: boolean;
++  /** True only in the documented lossy floor: a single same-timestamp
++   *  group in one source exceeds the per-source fetch window, so the page
++   *  ships a possibly-incomplete tie group and the chained strict-`>`
++   *  call may skip its unfetched members. Caller warns loudly. */
++  tieGroupMayBeIncomplete?: boolean;
+ }
+ 
+ /** One poll pass: fan out one storage query per (exact source) and per
+@@ -228,17 +233,52 @@ async function pollOnce(
+     if (a.id > b.id) return 1;
+     return 0;
+   });
+-  if (all.length <= WAIT_MAX_RETURNED_TURNS) {
+-    return { rows: all, overflow: false };
++  // 101-retro r3: per-source window-full HORIZONS. A query that filled its
++  // window (returned exactly WAIT_PER_POLL_LIMIT_PER_SOURCE rows) may have
++  // more rows at its last fetched timestamp beyond the window — any tie
++  // group ending the page AT such a horizon cannot be proven complete.
++  const fullWindowHorizons = new Set<string>();
++  for (const rows of results) {
++    if (rows.length === WAIT_PER_POLL_LIMIT_PER_SOURCE) {
++      fullWindowHorizons.add(rows[rows.length - 1]!.timestamp);
++    }
++  }
++
++  // Page selection: when over the cap, take the oldest cap-sized page, then
++  // extend through any same-timestamp group straddling the boundary.
++  // next_since will be the page-end timestamp; strict `> since` on the
++  // chained call skips that whole timestamp — safe only when we delivered
++  // ALL of it.
++  let end = all.length;
++  let overflow = false;
++  if (all.length > WAIT_MAX_RETURNED_TURNS) {
++    const boundaryTs = all[WAIT_MAX_RETURNED_TURNS - 1]!.timestamp;
++    end = WAIT_MAX_RETURNED_TURNS;
++    while (end < all.length && all[end]!.timestamp === boundaryTs) end += 1;
++    overflow = true;
+   }
+-  // Overflow: take the oldest cap-sized page, then extend through any
+-  // same-timestamp group straddling the boundary. next_since will be the
+-  // boundary timestamp; strict `> since` on the chained call skips that
+-  // whole timestamp — safe only because we delivered ALL of it.
+-  const boundaryTs = all[WAIT_MAX_RETURNED_TURNS - 1]!.timestamp;
+-  let end = WAIT_MAX_RETURNED_TURNS;
+-  while (end < all.length && all[end]!.timestamp === boundaryTs) end += 1;
+-  return { rows: all.slice(0, end), overflow: true };
++
++  // Completeness guard (101-retro r3 codex MED): if the page ends at a
++  // window-full source's horizon timestamp, that tie group may be truncated
++  // by the fetch window — extending through only the FETCHED members and
++  // advancing next_since past their timestamp would skip the unfetched ones
++  // forever. Hold the unprovable group back whole: the chained call (since =
++  // previous row's ts) re-fetches it with the entire window to itself. The
++  // only case left is a single same-ms group alone exceeding the window —
++  // no lossless progress is possible there, so it ships flagged for the
++  // caller's loud warning. That is the documented lossy floor.
++  if (end > 0) {
++    const pageEndTs = all[end - 1]!.timestamp;
++    if (fullWindowHorizons.has(pageEndTs)) {
++      let held = end;
++      while (held > 0 && all[held - 1]!.timestamp === pageEndTs) held -= 1;
++      if (held > 0) {
++        return { rows: all.slice(0, held), overflow: true };
++      }
++      return { rows: all.slice(0, end), overflow: true, tieGroupMayBeIncomplete: true };
++    }
++  }
++  return { rows: all.slice(0, end), overflow };
+ }
+ 
+ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+@@ -353,7 +393,7 @@ export async function waitForNewTurns(
+   //   • timed out empty → next_since = the canonicalized caller `since`,
+   //     echoed back — nothing was delivered, so re-delivery is impossible
+   //     and nothing can be skipped.
+-  const { rows, overflow } = page;
++  const { rows, overflow, tieGroupMayBeIncomplete } = page;
+   const next_since = rows.length > 0 ? rows[rows.length - 1]!.timestamp : since;
+   const timed_out = rows.length === 0;
+   const warnings: string[] = [];
+@@ -362,6 +402,11 @@ export async function waitForNewTurns(
+       `wait_for_new_turns: more than ${WAIT_MAX_RETURNED_TURNS} new turns matched; returning the oldest ${rows.length} — chain immediately with next_since to page through the backlog`,
+     );
+   }
++  if (tieGroupMayBeIncomplete === true) {
++    warnings.push(
++      `wait_for_new_turns: a single same-timestamp group exceeded the per-source fetch window (${WAIT_PER_POLL_LIMIT_PER_SOURCE}); its unfetched members share next_since's timestamp and the chained strict-after call may skip them — recover the full set via search_memories with since just before next_since`,
++    );
++  }
+ 
+   return {
+     schema_version: SCHEMA_VERSION,
+diff --git a/tests/mcp/wait-for-new-turns.test.ts b/tests/mcp/wait-for-new-turns.test.ts
+index cb3f1c97..a3d2ef1a 100644
+--- a/tests/mcp/wait-for-new-turns.test.ts
++++ b/tests/mcp/wait-for-new-turns.test.ts
+@@ -534,4 +534,70 @@ describe('wait_for_new_turns — Fix ⑤ lossless chaining (next_since + overflo
+     expect(r2.timed_out).toBe(true);
+     expect(r2.next_since).toBe(tieTs);
+   });
++
++  // 101-retro r3 codex MED: a boundary tie group TRUNCATED BY THE PER-SOURCE
++  // FETCH WINDOW must not be treated as complete. 19 older rows + a 30-row
++  // same-ms group = 49 rows; the 41-row window fetches only 22 of the group.
++  // Extending the page through the FETCHED ties and advancing next_since to
++  // the tie timestamp skipped the 8 unfetched members forever. Contract: a
++  // tie group that cannot be proven complete (the window-full fetch ends at
++  // its timestamp) is HELD BACK whole — the chained call re-fetches it with
++  // the full window.
++  it('window-truncated boundary tie group is held back whole; chaining delivers all 49 turns', async () => {
++    const store = new MemoryStorage();
++    const olderIds: string[] = [];
++    for (let i = 1; i <= 19; i++) {
++      const ts = `2026-05-09T10:00:${String(i).padStart(2, '0')}.000Z`;
++      olderIds.push(await store.append(ev('fs:/A', ts, `pre-tie turn ${i}`)));
++    }
++    const tieTs = '2026-05-09T10:00:30.000Z';
++    const tieIds: string[] = [];
++    for (let i = 0; i < 30; i++) {
++      tieIds.push(await store.append(ev('fs:/A', tieTs, `big tie member ${i}`)));
++    }
++
++    const r1 = await waitForNewTurns(
++      store,
++      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
++      { pollIntervalMs: 10 },
++    );
++    // Only the 19 provably-complete older rows; the unprovable tie group is
++    // held back entirely (NOT 22 of its 30 members).
++    expect(r1.turn_ids).toEqual(olderIds);
++    expect(r1.next_since).toBe('2026-05-09T10:00:19.000Z');
++    expect(r1.warnings.some((w) => /chain immediately/.test(w))).toBe(true);
++
++    // The chained call has the whole window for the tie group (30 ≤ 41) and
++    // delivers it complete — zero loss across the chain.
++    const r2 = await waitForNewTurns(
++      store,
++      { sources: ['fs:/A'], since: r1.next_since, timeout: 0 },
++      { pollIntervalMs: 10 },
++    );
++    expect(new Set(r2.turn_ids)).toEqual(new Set(tieIds));
++    expect(r2.turn_ids).toHaveLength(30);
++    expect(r2.next_since).toBe(tieTs);
++  });
++
++  it('a single same-ms group larger than the per-source window is the documented lossy floor — and warns explicitly', async () => {
++    const store = new MemoryStorage();
++    const tieTs = '2026-05-09T10:00:30.000Z';
++    for (let i = 0; i < 45; i++) {
++      await store.append(ev('fs:/A', tieTs, `giant tie member ${i}`));
++    }
++
++    const r1 = await waitForNewTurns(
++      store,
++      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
++      { pollIntervalMs: 10 },
++    );
++    // No older rows exist to return instead, so the fetched portion ships —
++    // but with a loud, distinct warning that same-timestamp turns may be
++    // skipped (the only remaining lossy case, by construction).
++    expect(r1.turn_ids).toHaveLength(41);
++    expect(r1.warnings.some((w) => /same-timestamp .*may .*skip|may be incomplete/i.test(w))).toBe(
++      true,
++    );
++    expect(r1.next_since).toBe(tieTs);
++  });
+ });
 ````
