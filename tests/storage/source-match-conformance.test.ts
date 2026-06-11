@@ -34,6 +34,19 @@ describe.each(backends)('source matching conformance — $name', ({ create }) =>
     if (store instanceof SqliteStorage) store.close();
   });
 
+  // 101-retro r2 codex MED refutation pin: `source` + `source_prefix`
+  // together is structurally impossible — every adapter throws before any
+  // predicate is built, so the "prefix branch overwrites the exact-source
+  // predicate" scenario cannot be reached. This case makes the contract
+  // visible in the conformance table (the guard sits above the diff hunks
+  // a packet-only reviewer sees).
+  it('rejects source + source_prefix together (mutually exclusive by contract)', async () => {
+    await store.append(eventInput({ source: 'fs:/a/b/c.jsonl' }));
+    await expect(
+      store.query({ source: 'fs:/a/b/c.jsonl', source_prefix: 'fs:/a/b' }),
+    ).rejects.toThrow(/mutually exclusive/);
+  });
+
   describe('path-like normalization (divergence class: Windows separators + case)', () => {
     it('matches a backslash-stored Windows source via a forward-slash source_prefix', async () => {
       await store.append(
