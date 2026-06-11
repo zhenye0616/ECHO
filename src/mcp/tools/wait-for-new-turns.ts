@@ -75,7 +75,7 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   'CHAINING (lossless — `next_since` is NEVER the server wall clock): when turns are returned, `next_since` = the max timestamp among the RETURNED turns (canonical Z form, as stored); when the call times out empty, `next_since` = your own `since` (canonicalized) echoed back. Always chain with `since = next_since` — safe unconditionally, even after a timeout. Atom timestamps are event times that land in storage with ingest lag (Cursor re-poll ~15s; CC/codex/git seconds), so a wall-clock watermark would permanently skip late-ingested turns; anchoring `next_since` to delivered data makes the chain lossless.\n\n' +
   'OVERFLOW PAGING: at most ' +
   String(WAIT_MAX_RETURNED_TURNS) +
-  ' turns per call. When more match, the call returns the OLDEST page (ascending by timestamp, id) plus a warning in `warnings[]` — chain immediately with `next_since` to page through the backlog. A same-timestamp group is never split across the page boundary: all turns sharing the boundary timestamp are included, so the page may exceed the cap by the tie count (a tie group larger than ~2x the cap within one millisecond is the documented pathological limit). `turn_ids` are ordered oldest→newest.\n\n' +
+  ' turns per call. When more match, the call returns the OLDEST page (ascending by timestamp, id) plus a warning in `warnings[]` — chain immediately with `next_since` to page through the backlog. A same-timestamp group is never split across the page boundary: either the page carries the WHOLE group (it may exceed the cap by the tie count), or — when the group cannot be proven complete because a window-full fetch ends at its timestamp — the group is held back entirely and the chained call re-fetches it whole. The one lossy case left: a single same-millisecond group in one source larger than the per-source fetch window ships flagged with an explicit warning. `turn_ids` are ordered oldest→newest.\n\n' +
   'RESPONSE (item 038 / AC4 — IDs-only): the response now carries `turn_ids: string[]` instead of body-projected `turns[]`. The envelope shrinks dramatically (no body projection in the wait response); the caller composes one extra MCP call per wake (`get_atoms(turn_ids)` for cost-bounded summaries, or `get_atom(turn_ids[i])` for verbatim of one atom) to fetch bodies. No parallel-vocabulary deprecation window — the bodies-bundled shape is removed in the same release that ships the IDs-only shape.\n\n' +
   // canonical wake → fetch pattern
   'CANONICAL COMPOSITION:\n' +
@@ -166,6 +166,11 @@ interface PollPage {
   /** True when more rows matched than the page carries — caller should
    *  chain immediately with next_since to page through the backlog. */
   overflow: boolean;
+  /** True only in the documented lossy floor: a single same-timestamp
+   *  group in one source exceeds the per-source fetch window, so the page
+   *  ships a possibly-incomplete tie group and the chained strict-`>`
+   *  call may skip its unfetched members. Caller warns loudly. */
+  tieGroupMayBeIncomplete?: boolean;
 }
 
 /** One poll pass: fan out one storage query per (exact source) and per
@@ -228,17 +233,52 @@ async function pollOnce(
     if (a.id > b.id) return 1;
     return 0;
   });
-  if (all.length <= WAIT_MAX_RETURNED_TURNS) {
-    return { rows: all, overflow: false };
+  // 101-retro r3: per-source window-full HORIZONS. A query that filled its
+  // window (returned exactly WAIT_PER_POLL_LIMIT_PER_SOURCE rows) may have
+  // more rows at its last fetched timestamp beyond the window — any tie
+  // group ending the page AT such a horizon cannot be proven complete.
+  const fullWindowHorizons = new Set<string>();
+  for (const rows of results) {
+    if (rows.length === WAIT_PER_POLL_LIMIT_PER_SOURCE) {
+      fullWindowHorizons.add(rows[rows.length - 1]!.timestamp);
+    }
   }
-  // Overflow: take the oldest cap-sized page, then extend through any
-  // same-timestamp group straddling the boundary. next_since will be the
-  // boundary timestamp; strict `> since` on the chained call skips that
-  // whole timestamp — safe only because we delivered ALL of it.
-  const boundaryTs = all[WAIT_MAX_RETURNED_TURNS - 1]!.timestamp;
-  let end = WAIT_MAX_RETURNED_TURNS;
-  while (end < all.length && all[end]!.timestamp === boundaryTs) end += 1;
-  return { rows: all.slice(0, end), overflow: true };
+
+  // Page selection: when over the cap, take the oldest cap-sized page, then
+  // extend through any same-timestamp group straddling the boundary.
+  // next_since will be the page-end timestamp; strict `> since` on the
+  // chained call skips that whole timestamp — safe only when we delivered
+  // ALL of it.
+  let end = all.length;
+  let overflow = false;
+  if (all.length > WAIT_MAX_RETURNED_TURNS) {
+    const boundaryTs = all[WAIT_MAX_RETURNED_TURNS - 1]!.timestamp;
+    end = WAIT_MAX_RETURNED_TURNS;
+    while (end < all.length && all[end]!.timestamp === boundaryTs) end += 1;
+    overflow = true;
+  }
+
+  // Completeness guard (101-retro r3 codex MED): if the page ends at a
+  // window-full source's horizon timestamp, that tie group may be truncated
+  // by the fetch window — extending through only the FETCHED members and
+  // advancing next_since past their timestamp would skip the unfetched ones
+  // forever. Hold the unprovable group back whole: the chained call (since =
+  // previous row's ts) re-fetches it with the entire window to itself. The
+  // only case left is a single same-ms group alone exceeding the window —
+  // no lossless progress is possible there, so it ships flagged for the
+  // caller's loud warning. That is the documented lossy floor.
+  if (end > 0) {
+    const pageEndTs = all[end - 1]!.timestamp;
+    if (fullWindowHorizons.has(pageEndTs)) {
+      let held = end;
+      while (held > 0 && all[held - 1]!.timestamp === pageEndTs) held -= 1;
+      if (held > 0) {
+        return { rows: all.slice(0, held), overflow: true };
+      }
+      return { rows: all.slice(0, end), overflow: true, tieGroupMayBeIncomplete: true };
+    }
+  }
+  return { rows: all.slice(0, end), overflow };
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -353,13 +393,18 @@ export async function waitForNewTurns(
   //   • timed out empty → next_since = the canonicalized caller `since`,
   //     echoed back — nothing was delivered, so re-delivery is impossible
   //     and nothing can be skipped.
-  const { rows, overflow } = page;
+  const { rows, overflow, tieGroupMayBeIncomplete } = page;
   const next_since = rows.length > 0 ? rows[rows.length - 1]!.timestamp : since;
   const timed_out = rows.length === 0;
   const warnings: string[] = [];
   if (overflow) {
     warnings.push(
       `wait_for_new_turns: more than ${WAIT_MAX_RETURNED_TURNS} new turns matched; returning the oldest ${rows.length} — chain immediately with next_since to page through the backlog`,
+    );
+  }
+  if (tieGroupMayBeIncomplete === true) {
+    warnings.push(
+      `wait_for_new_turns: a single same-timestamp group exceeded the per-source fetch window (${WAIT_PER_POLL_LIMIT_PER_SOURCE}); its unfetched members share next_since's timestamp and the chained strict-after call may skip them — recover the full set via search_memories with since just before next_since`,
     );
   }
 

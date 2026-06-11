@@ -534,4 +534,70 @@ describe('wait_for_new_turns — Fix ⑤ lossless chaining (next_since + overflo
     expect(r2.timed_out).toBe(true);
     expect(r2.next_since).toBe(tieTs);
   });
+
+  // 101-retro r3 codex MED: a boundary tie group TRUNCATED BY THE PER-SOURCE
+  // FETCH WINDOW must not be treated as complete. 19 older rows + a 30-row
+  // same-ms group = 49 rows; the 41-row window fetches only 22 of the group.
+  // Extending the page through the FETCHED ties and advancing next_since to
+  // the tie timestamp skipped the 8 unfetched members forever. Contract: a
+  // tie group that cannot be proven complete (the window-full fetch ends at
+  // its timestamp) is HELD BACK whole — the chained call re-fetches it with
+  // the full window.
+  it('window-truncated boundary tie group is held back whole; chaining delivers all 49 turns', async () => {
+    const store = new MemoryStorage();
+    const olderIds: string[] = [];
+    for (let i = 1; i <= 19; i++) {
+      const ts = `2026-05-09T10:00:${String(i).padStart(2, '0')}.000Z`;
+      olderIds.push(await store.append(ev('fs:/A', ts, `pre-tie turn ${i}`)));
+    }
+    const tieTs = '2026-05-09T10:00:30.000Z';
+    const tieIds: string[] = [];
+    for (let i = 0; i < 30; i++) {
+      tieIds.push(await store.append(ev('fs:/A', tieTs, `big tie member ${i}`)));
+    }
+
+    const r1 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    // Only the 19 provably-complete older rows; the unprovable tie group is
+    // held back entirely (NOT 22 of its 30 members).
+    expect(r1.turn_ids).toEqual(olderIds);
+    expect(r1.next_since).toBe('2026-05-09T10:00:19.000Z');
+    expect(r1.warnings.some((w) => /chain immediately/.test(w))).toBe(true);
+
+    // The chained call has the whole window for the tie group (30 ≤ 41) and
+    // delivers it complete — zero loss across the chain.
+    const r2 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: r1.next_since, timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(new Set(r2.turn_ids)).toEqual(new Set(tieIds));
+    expect(r2.turn_ids).toHaveLength(30);
+    expect(r2.next_since).toBe(tieTs);
+  });
+
+  it('a single same-ms group larger than the per-source window is the documented lossy floor — and warns explicitly', async () => {
+    const store = new MemoryStorage();
+    const tieTs = '2026-05-09T10:00:30.000Z';
+    for (let i = 0; i < 45; i++) {
+      await store.append(ev('fs:/A', tieTs, `giant tie member ${i}`));
+    }
+
+    const r1 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    // No older rows exist to return instead, so the fetched portion ships —
+    // but with a loud, distinct warning that same-timestamp turns may be
+    // skipped (the only remaining lossy case, by construction).
+    expect(r1.turn_ids).toHaveLength(41);
+    expect(r1.warnings.some((w) => /same-timestamp .*may .*skip|may be incomplete/i.test(w))).toBe(
+      true,
+    );
+    expect(r1.next_since).toBe(tieTs);
+  });
 });
