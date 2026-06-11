@@ -33,9 +33,19 @@ export const WAIT_MAX_SOURCES = 8;
 export const WAIT_DEFAULT_TIMEOUT_SECONDS = 30;
 export const WAIT_MAX_TIMEOUT_SECONDS = 60;
 export const WAIT_DEFAULT_POLL_INTERVAL_MS = 1_000;
-export const WAIT_PER_POLL_LIMIT_PER_SOURCE = 20;
-// Final return cap — matches spec §3 "LIMIT 20" overall after merge.
+// Final return cap — matches spec §3 "LIMIT 20" overall after merge. (A
+// same-timestamp group at the page boundary may push the page past this —
+// see pollOnce: never split a tie group across the strict `> since` chain.)
 export const WAIT_MAX_RETURNED_TURNS = 20;
+// Per-source raw fetch window (ASC, oldest-first). Must exceed the return
+// cap so that (a) overflow is detectable (cap+1), (b) rows AT exactly
+// `since` — the previous page's boundary tie group, dropped by the
+// strict-after post-filter — don't starve the window, and (c) the boundary
+// tie-group extension has headroom. 2*cap+1 absorbs a full cap-sized stale
+// boundary group plus cap+1 fresh rows. A tie group larger than this window
+// could still be split — documented limitation, pathological (>20 atoms
+// sharing one millisecond at the boundary).
+export const WAIT_PER_POLL_LIMIT_PER_SOURCE = 2 * WAIT_MAX_RETURNED_TURNS + 1;
 
 // Recognised source_app names that resolve via PREFIX MATCH (different
 // from echo_resolve_mru's MRU exact-source resolution). Sources NOT in this
@@ -61,14 +71,18 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   String(WAIT_MAX_TIMEOUT_SECONDS) +
   '.\n\n' +
   // behavior — IDs-only contract (item 038 / AC4)
-  "BEHAVIOR: polls echo.db every 1s. Returns immediately on any non-empty result; returns at `timeout` with empty `turn_ids[]` and `next_since` set to the server's current timestamp.\n\n" +
+  'BEHAVIOR: polls echo.db every 1s. Returns immediately on any non-empty result; returns at `timeout` with empty `turn_ids[]`.\n\n' +
+  'CHAINING (lossless — `next_since` is NEVER the server wall clock): when turns are returned, `next_since` = the max timestamp among the RETURNED turns (canonical Z form, as stored); when the call times out empty, `next_since` = your own `since` (canonicalized) echoed back. Always chain with `since = next_since` — safe unconditionally, even after a timeout. Atom timestamps are event times that land in storage with ingest lag (Cursor re-poll ~15s; CC/codex/git seconds), so a wall-clock watermark would permanently skip late-ingested turns; anchoring `next_since` to delivered data makes the chain lossless.\n\n' +
+  'OVERFLOW PAGING: at most ' +
+  String(WAIT_MAX_RETURNED_TURNS) +
+  ' turns per call. When more match, the call returns the OLDEST page (ascending by timestamp, id) plus a warning in `warnings[]` — chain immediately with `next_since` to page through the backlog. A same-timestamp group is never split across the page boundary: all turns sharing the boundary timestamp are included, so the page may exceed the cap by the tie count (a tie group larger than ~2x the cap within one millisecond is the documented pathological limit). `turn_ids` are ordered oldest→newest.\n\n' +
   'RESPONSE (item 038 / AC4 — IDs-only): the response now carries `turn_ids: string[]` instead of body-projected `turns[]`. The envelope shrinks dramatically (no body projection in the wait response); the caller composes one extra MCP call per wake (`get_atoms(turn_ids)` for cost-bounded summaries, or `get_atom(turn_ids[i])` for verbatim of one atom) to fetch bodies. No parallel-vocabulary deprecation window — the bodies-bundled shape is removed in the same release that ships the IDs-only shape.\n\n' +
   // canonical wake → fetch pattern
   'CANONICAL COMPOSITION:\n' +
   '  const w = await wait_for_new_turns({sources: [...], since: last});\n' +
+  '  last = w.next_since;  // safe unconditionally — echoes `since` back on timeout\n' +
   '  if (!w.timed_out) {\n' +
   '    const atoms = await get_atoms(w.turn_ids);  // summary bodies\n' +
-  '    last = w.next_since;\n' +
   '  }\n\n' +
   // polling fallback
   'POLLING FALLBACK: if your MCP client has issues with long-running calls (timeout limits, no streaming), poll instead — works on any MCP client:\n' +
@@ -146,15 +160,27 @@ export function resolveSources(sources: readonly string[]): ResolvedSources {
   return { exact, prefixes };
 }
 
+interface PollPage {
+  /** Oldest-first (timestamp ASC, id ASC) page of matched rows. */
+  rows: CaptureEvent[];
+  /** True when more rows matched than the page carries — caller should
+   *  chain immediately with next_since to page through the backlog. */
+  overflow: boolean;
+}
+
 /** One poll pass: fan out one storage query per (exact source) and per
- *  (prefix) entry, post-filter to STRICT-after `since` (storage uses
- *  `>=`), merge by timestamp DESC, cap at WAIT_MAX_RETURNED_TURNS. */
+ *  (prefix) entry — each ASC oldest-first — post-filter to STRICT-after
+ *  `since` (storage uses `>=`), merge by id, sort ASC (timestamp, id), and
+ *  page: when more than WAIT_MAX_RETURNED_TURNS matched, return the OLDEST
+ *  cap-sized page, extended through any same-timestamp group at the page
+ *  boundary (never split a tie group — with strict `> since` chaining, a
+ *  split group's unreturned members would be skipped forever). */
 async function pollOnce(
   storage: Storage,
   resolved: ResolvedSources,
   since: string,
   normalisedRepoPath: string | null,
-): Promise<CaptureEvent[]> {
+): Promise<PollPage> {
   // Item 038 / AC5: route the fs-watcher exclusion through the shared helper
   // so a re-hardcoded inline literal is caught by the CI grep-scan.
   const filterCommon: Pick<
@@ -167,12 +193,16 @@ async function pollOnce(
     // filter on each per-source query below.
     ...(normalisedRepoPath !== null ? { metadata_match: { repo_root: normalisedRepoPath } } : {}),
   });
+  // Fix ⑤: ASC oldest-first per-source fetch — the lossless chaining
+  // contract pages from the OLDEST end. (DESC newest-first silently dropped
+  // the oldest of a >cap burst, and chaining skipped them forever.)
+  const filterCommonAsc: QueryFilter = { ...filterCommon, order: 'asc' };
   const queries: Promise<CaptureEvent[]>[] = [];
   for (const exact of resolved.exact) {
-    queries.push(storage.query({ ...filterCommon, source: exact }));
+    queries.push(storage.query({ ...filterCommonAsc, source: exact }));
   }
   for (const prefix of resolved.prefixes) {
-    queries.push(storage.query({ ...filterCommon, source_prefix: prefix }));
+    queries.push(storage.query({ ...filterCommonAsc, source_prefix: prefix }));
   }
   const results = await Promise.all(queries);
 
@@ -188,16 +218,27 @@ async function pollOnce(
     }
   }
   const all = [...merged.values()];
-  // Sort by (timestamp DESC, id DESC) for newest-first delivery —
-  // matches storage's default ordering convention.
+  // Sort by (timestamp ASC, id ASC) — oldest-first delivery, matching the
+  // storage adapters' ASC tie-break, so the cap below keeps the OLDEST page
+  // and `since = next_since` chaining pages through a backlog losslessly.
   all.sort((a, b) => {
-    if (a.timestamp < b.timestamp) return 1;
-    if (a.timestamp > b.timestamp) return -1;
-    if (a.id < b.id) return 1;
-    if (a.id > b.id) return -1;
+    if (a.timestamp < b.timestamp) return -1;
+    if (a.timestamp > b.timestamp) return 1;
+    if (a.id < b.id) return -1;
+    if (a.id > b.id) return 1;
     return 0;
   });
-  return all.slice(0, WAIT_MAX_RETURNED_TURNS);
+  if (all.length <= WAIT_MAX_RETURNED_TURNS) {
+    return { rows: all, overflow: false };
+  }
+  // Overflow: take the oldest cap-sized page, then extend through any
+  // same-timestamp group straddling the boundary. next_since will be the
+  // boundary timestamp; strict `> since` on the chained call skips that
+  // whole timestamp — safe only because we delivered ALL of it.
+  const boundaryTs = all[WAIT_MAX_RETURNED_TURNS - 1]!.timestamp;
+  let end = WAIT_MAX_RETURNED_TURNS;
+  while (end < all.length && all[end]!.timestamp === boundaryTs) end += 1;
+  return { rows: all.slice(0, end), overflow: true };
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -209,7 +250,9 @@ export interface WaitForNewTurnsOptions {
    *  fast; production never overrides. NOT exposed via the MCP schema —
    *  tunable from in-process callers only. */
   pollIntervalMs?: number;
-  /** Inject a clock so tests can drive deterministic next_since values. */
+  /** Inject a clock so tests can drive deterministic poll deadlines. NOT
+   *  used for next_since — that is derived from returned-turn timestamps
+   *  (or echoes the caller's `since`), never from the wall clock. */
   now?: () => Date;
 }
 
@@ -275,7 +318,9 @@ export async function waitForNewTurns(
       schema_version: SCHEMA_VERSION,
       tool: 'wait_for_new_turns',
       turn_ids: [],
-      next_since: now().toISOString(),
+      // Lossless-chaining contract: nothing delivered → echo the
+      // canonicalized `since` back. Never a wall-clock read.
+      next_since: since,
       timed_out: true,
       warnings: ['wait_for_new_turns: no sources resolved to a query'],
     };
@@ -287,22 +332,36 @@ export async function waitForNewTurns(
   // Initial poll first (no wait) — common case is "content is already
   // there"; the long-poll's whole point is to NOT round-trip the wait
   // when there's nothing newer than `since`.
-  let rows = await pollOnce(storage, resolved, since, normalisedRepoPath);
-  while (rows.length === 0 && now().getTime() < deadlineMs) {
+  let page = await pollOnce(storage, resolved, since, normalisedRepoPath);
+  while (page.rows.length === 0 && now().getTime() < deadlineMs) {
     // Sleep then re-poll. Cap the sleep at remaining-time so we don't
     // overshoot the deadline by up to one poll interval.
     const remaining = deadlineMs - now().getTime();
     if (remaining <= 0) break;
     await sleep(Math.min(pollIntervalMs, remaining));
-    rows = await pollOnce(storage, resolved, since, normalisedRepoPath);
+    page = await pollOnce(storage, resolved, since, normalisedRepoPath);
   }
 
-  // next_since is the server's current clock when we return — caller
-  // chains by passing it back in. We do NOT use the newest-row timestamp
-  // because that would silently skip rows that landed in the gap between
-  // poll-start and our return.
-  const next_since = now().toISOString();
+  // Lossless chaining (Fix ⑤): next_since is NEVER the wall clock. Atom
+  // timestamps are EVENT times that land in storage LATER (Cursor re-poll
+  // ~15s; CC/codex/git seconds of ingest lag) — a wall-clock next_since
+  // ran AHEAD of delivered data, so a turn that occurred before our return
+  // moment but ingested after the final poll was permanently invisible to
+  // every chained call (strict `> since`). Instead:
+  //   • turns returned → next_since = max timestamp among RETURNED turns
+  //     (rows are ASC-sorted, so the last row's stored canonical-Z value);
+  //   • timed out empty → next_since = the canonicalized caller `since`,
+  //     echoed back — nothing was delivered, so re-delivery is impossible
+  //     and nothing can be skipped.
+  const { rows, overflow } = page;
+  const next_since = rows.length > 0 ? rows[rows.length - 1]!.timestamp : since;
   const timed_out = rows.length === 0;
+  const warnings: string[] = [];
+  if (overflow) {
+    warnings.push(
+      `wait_for_new_turns: more than ${WAIT_MAX_RETURNED_TURNS} new turns matched; returning the oldest ${rows.length} — chain immediately with next_since to page through the backlog`,
+    );
+  }
 
   return {
     schema_version: SCHEMA_VERSION,
@@ -310,7 +369,7 @@ export async function waitForNewTurns(
     turn_ids: rows.map((r) => r.id),
     next_since,
     timed_out,
-    warnings: [],
+    warnings,
   };
 }
 

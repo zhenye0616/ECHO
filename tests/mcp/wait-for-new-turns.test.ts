@@ -140,8 +140,10 @@ describe('wait_for_new_turns — happy path', () => {
     );
     expect(r.turn_ids).toEqual([]);
     expect(r.timed_out).toBe(true);
-    // next_since is server clock at return — string parses as a date.
-    expect(new Date(r.next_since).getTime()).not.toBeNaN();
+    // Fix ⑤ lossless chaining: on a timed-out-empty return, next_since
+    // echoes the canonicalized caller `since` back — NEVER a wall-clock
+    // read, which would permanently skip turns that ingest late.
+    expect(r.next_since).toBe('2026-05-09T10:00:00.000Z');
   });
 
   it('wakes when content lands during the wait (poll loop)', async () => {
@@ -320,7 +322,11 @@ describe('wait_for_new_turns repo_path (item 037 / AC5)', () => {
 
 // Item 038 / AC4 — IDs-only contract.
 describe('wait_for_new_turns — AC4 IDs-only response shape', () => {
-  it('(a) returned `turn_ids` matches what would have been the old `turns[].id` (DESC newest-first)', async () => {
+  it('(a) returned `turn_ids` carries the matched atom ids in chronological (ASC) delivery order', async () => {
+    // Fix ⑤ lossless chaining: delivery order changed from newest-first
+    // (DESC) to oldest-first ASC (timestamp, id) so that the overflow page
+    // ("oldest cap-sized page") and the no-overflow page share one ordering
+    // contract. The id SET is unchanged from the AC4 contract.
     const store = new MemoryStorage();
     const idA = await store.append({
       source: 'fs:/A',
@@ -342,8 +348,8 @@ describe('wait_for_new_turns — AC4 IDs-only response shape', () => {
       { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
       { pollIntervalMs: 30 },
     );
-    // Newest-first order, all three captured.
-    expect(r.turn_ids).toEqual([idC, idB, idA]);
+    // Oldest-first order, all three captured.
+    expect(r.turn_ids).toEqual([idA, idB, idC]);
   });
 
   it('(b) no `content`, `metadata`, or `truncations` fields appear on the response', async () => {
@@ -397,9 +403,135 @@ describe('wait_for_new_turns — AC4 IDs-only response shape', () => {
       { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
       { pollIntervalMs: 30 },
     );
-    expect(w.turn_ids).toEqual([idB, idA]);
+    // Fix ⑤: delivery order is now chronological ASC (was [idB, idA]).
+    expect(w.turn_ids).toEqual([idA, idB]);
     // Compose the canonical wake → fetch pattern.
     const atoms = await store.getByIds(w.turn_ids);
-    expect(atoms.map((a) => a.content)).toEqual(['pre-038 body B', 'pre-038 body A']);
+    expect(atoms.map((a) => a.content)).toEqual(['pre-038 body A', 'pre-038 body B']);
+  });
+});
+
+// Fix ⑤ — lossless chaining contract for `next_since` + overflow paging.
+//
+// The old contract lost turns two ways:
+//   (a) next_since = server wall clock at return. Atom timestamps are EVENT
+//       times that land in storage LATER (Cursor re-poll ~15s; CC/codex/git
+//       seconds of lag). A turn that occurred before the return moment but
+//       ingested after the final poll was permanently invisible to every
+//       chained call (strict `> since` filter).
+//   (b) per-poll cap kept the NEWEST 20 — a burst of >20 silently dropped
+//       the oldest, with no truncation signal, and chaining skipped them
+//       forever.
+describe('wait_for_new_turns — Fix ⑤ lossless chaining (next_since + overflow paging)', () => {
+  it('chaining-with-ingest-lag: a turn whose event-time predates the wall-clock return moment, appended after the response, is returned by the chained call', async () => {
+    const store = new MemoryStorage();
+    const tsA = '2026-05-09T10:01:00.000Z';
+    const idA = await store.append(ev('fs:/A', tsA, 'turn A'));
+
+    const r1 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r1.turn_ids).toEqual([idA]);
+    // Contract: next_since = max timestamp among RETURNED turns — never a
+    // wall-clock read (the old code returned now(), i.e. real 2026-06 time,
+    // which is far ahead of every event timestamp below).
+    expect(r1.next_since).toBe(tsA);
+
+    // Ingest lag: turn B occurred at 10:02 (before the wall-clock moment
+    // r1 returned — all test timestamps are in the past) but lands in
+    // storage only AFTER r1's response. Under the old wall-clock
+    // next_since, B was permanently invisible to every chained call.
+    const idB = await store.append(ev('fs:/A', '2026-05-09T10:02:00.000Z', 'turn B late ingest'));
+    const r2 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: r1.next_since, timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r2.turn_ids).toEqual([idB]);
+    expect(r2.timed_out).toBe(false);
+  });
+
+  it('burst of 25: first call returns the OLDEST 20 + overflow warning; chained call returns the remaining 5', async () => {
+    const store = new MemoryStorage();
+    const ids: string[] = [];
+    for (let i = 1; i <= 25; i++) {
+      const ts = `2026-05-09T10:00:${String(i).padStart(2, '0')}.000Z`;
+      ids.push(await store.append(ev('fs:/A', ts, `burst turn ${i}`)));
+    }
+
+    const r1 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    // Oldest cap-sized page, ascending by (timestamp, id).
+    expect(r1.turn_ids).toEqual(ids.slice(0, 20));
+    expect(r1.warnings.some((w) => /more than 20 new turns/.test(w))).toBe(true);
+    expect(r1.next_since).toBe('2026-05-09T10:00:20.000Z');
+    expect(r1.timed_out).toBe(false);
+
+    // Chaining since=next_since pages through the backlog losslessly.
+    const r2 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: r1.next_since, timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r2.turn_ids).toEqual(ids.slice(20));
+    expect(r2.warnings).toEqual([]);
+    expect(r2.next_since).toBe('2026-05-09T10:00:25.000Z');
+  });
+
+  it('timeout-empty: next_since echoes the canonicalized caller `since`, not a fresh clock value', async () => {
+    const store = new MemoryStorage();
+    const r = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T23:00:00.000+0900', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r.timed_out).toBe(true);
+    expect(r.turn_ids).toEqual([]);
+    // Canonical Z form of the +0900 input — NOT today's wall clock. Nothing
+    // was delivered, so echoing `since` back can never re-deliver anything.
+    expect(r.next_since).toBe('2026-05-09T14:00:00.000Z');
+  });
+
+  it('same-timestamp group at the page boundary is never split (page may exceed the cap by the tie count)', async () => {
+    const store = new MemoryStorage();
+    const ids: string[] = [];
+    // 19 distinct-timestamp turns…
+    for (let i = 1; i <= 19; i++) {
+      const ts = `2026-05-09T10:00:${String(i).padStart(2, '0')}.000Z`;
+      ids.push(await store.append(ev('fs:/A', ts, `tie test turn ${i}`)));
+    }
+    // …then 3 turns sharing the timestamp that lands at page index 19 (the
+    // cap boundary). With strict `> since` chaining, splitting this group
+    // would skip the unreturned members forever; the page must include all
+    // three (22 returned > cap 20).
+    const tieTs = '2026-05-09T10:00:20.000Z';
+    for (let i = 0; i < 3; i++) {
+      ids.push(await store.append(ev('fs:/A', tieTs, `tie group member ${i}`)));
+    }
+
+    const r1 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: '2026-05-09T10:00:00.000Z', timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r1.turn_ids).toHaveLength(22);
+    expect(new Set(r1.turn_ids)).toEqual(new Set(ids));
+    expect(r1.warnings.some((w) => /more than 20 new turns/.test(w))).toBe(true);
+    expect(r1.next_since).toBe(tieTs);
+
+    // Chained call: everything was delivered, so nothing remains.
+    const r2 = await waitForNewTurns(
+      store,
+      { sources: ['fs:/A'], since: r1.next_since, timeout: 0 },
+      { pollIntervalMs: 10 },
+    );
+    expect(r2.turn_ids).toEqual([]);
+    expect(r2.timed_out).toBe(true);
+    expect(r2.next_since).toBe(tieTs);
   });
 });
