@@ -279,3 +279,71 @@ describe('045 AC2 — _install_reviewer_launchd.sh smoke gate fail-closed', () =
     expect(r.stdout).toMatch(/mock smoke ran/);
   });
 });
+
+describe('101-retro — _install_reviewer_launchd.sh --check stale-plist detection', () => {
+  let fixtures: Fixture[] = [];
+
+  beforeEach(() => {
+    fixtures = [];
+  });
+
+  afterEach(() => {
+    for (const fx of fixtures) {
+      rmSync(fx.home, { recursive: true, force: true });
+      rmSync(fx.pathStubDir, { recursive: true, force: true });
+    }
+    fixtures = [];
+  });
+
+  it('--check with no installed plist: exit 3 (not installed), zero launchctl invocations', () => {
+    const fx = setup({ withSmokeRunner: false });
+    fixtures.push(fx);
+
+    const r = runInstaller(fx, [REVIEWER, '--check']);
+
+    expect(r.status, `stdout: ${r.stdout}\nstderr: ${r.stderr}`).toBe(3);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/not installed/i);
+    expect(readLaunchctlInvocations(fx.launchctlLog)).toHaveLength(0);
+    // Check mode must never write the plist.
+    expect(existsSync(join(fx.home, 'Library/LaunchAgents', `${LABEL}.plist`))).toBe(false);
+  });
+
+  it('--check after a fresh install: exit 0 (match), no NEW launchctl invocations from the check', () => {
+    const fx = setup({ withSmokeRunner: false });
+    fixtures.push(fx);
+
+    expect(runInstaller(fx, [REVIEWER]).status).toBe(0);
+    const invocationsAfterInstall = readLaunchctlInvocations(fx.launchctlLog).length;
+
+    const r = runInstaller(fx, [REVIEWER, '--check']);
+
+    expect(r.status, `stdout: ${r.stdout}\nstderr: ${r.stderr}`).toBe(0);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/ok|match/i);
+    expect(readLaunchctlInvocations(fx.launchctlLog)).toHaveLength(invocationsAfterInstall);
+  });
+
+  it('--check against a drifted plist (log path reverted to /dev/null): exit 1, loud stale diagnostic, no launchctl', () => {
+    const fx = setup({ withSmokeRunner: false });
+    fixtures.push(fx);
+
+    expect(runInstaller(fx, [REVIEWER]).status).toBe(0);
+    const invocationsAfterInstall = readLaunchctlInvocations(fx.launchctlLog).length;
+
+    // Simulate a pre-fix installed plist: both log keys back at /dev/null —
+    // the exact stale-install shape the r1 codex-ops HIGH flagged (merge-only
+    // deploy leaves old launchd jobs silently blacked out).
+    const plistPath = join(fx.home, 'Library/LaunchAgents', `${LABEL}.plist`);
+    const logPath = join(fx.home, 'Library/Logs', `echo-review-queue-${REVIEWER}.log`);
+    writeFileSync(
+      plistPath,
+      readFileSync(plistPath, 'utf-8').replaceAll(`<string>${logPath}</string>`, '<string>/dev/null</string>'),
+    );
+
+    const r = runInstaller(fx, [REVIEWER, '--check']);
+
+    expect(r.status, `stdout: ${r.stdout}\nstderr: ${r.stderr}`).toBe(1);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/stale/i);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/re-run.*_install_reviewer_launchd|reinstall/i);
+    expect(readLaunchctlInvocations(fx.launchctlLog)).toHaveLength(invocationsAfterInstall);
+  });
+});

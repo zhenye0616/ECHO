@@ -45,10 +45,12 @@ shift
 # positional logic (none today, but defensive) is unaffected.
 SMOKE_REQUESTED=0
 INSTALL_CONTEXT_FLAG=0
+CHECK_MODE=0
 for arg in "$@"; do
   case "$arg" in
     --smoke) SMOKE_REQUESTED=1 ;;
     --install-context) INSTALL_CONTEXT_FLAG=1 ;;
+    --check) CHECK_MODE=1 ;;
   esac
 done
 # The installer IS the install-context by definition. The explicit
@@ -68,6 +70,79 @@ LABEL="com.echo.review-queue-$REVIEWER"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 WRAPPER="$TOOL_DIR/run-$REVIEWER-reviewer.sh"
 SMOKE="$TOOL_DIR/smoke-test-${REVIEWER}-runner.sh"
+
+# launchd's per-LaunchAgent environment does NOT reliably inherit TMPDIR
+# from the user's Aqua session — _run_reviewer.sh hard-aborts when TMPDIR
+# is unset (the 050 ephemeral-worktree path needs a real temp dir). Pin
+# the user's canonical per-user temp dir into the plist so launchd-spawned
+# ticks see the same value as interactive runs.
+USER_TMPDIR="$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || echo "/tmp/")"
+LAUNCHD_LOG_FILE="$HOME/Library/Logs/echo-review-queue-${REVIEWER}.log"
+
+# Single source of truth for the plist content — used by the install write
+# AND by --check's drift compare, so the two can never disagree about what
+# "current" means.
+render_plist() {
+  cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$WRAPPER</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>600</integer>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>WorkingDirectory</key>
+    <string>$REPO_ROOT</string>
+    <key>StandardOutPath</key>
+    <string>$LAUNCHD_LOG_FILE</string>
+    <key>StandardErrorPath</key>
+    <string>$LAUNCHD_LOG_FILE</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TMPDIR</key>
+        <string>$USER_TMPDIR</string>
+    </dict>
+</dict>
+</plist>
+EOF
+}
+
+# --check — stale-installed-plist detection (101-retro r1 codex-ops HIGH).
+# The 2026-06-11 log-path fix only changes FUTURE installs; an installed
+# launchd job keeps its old plist (e.g. StandardErrorPath=/dev/null — the
+# silent-blackout shape) until the slug is reinstalled. Check mode renders
+# the would-be plist and byte-compares it against the installed one,
+# touching neither the filesystem nor launchd. Exit contract:
+#   0 = installed plist matches current render
+#   1 = installed plist is STALE (drift) — loud diagnostic + reinstall hint
+#   3 = no plist installed for this slug
+# Validation scope is deliberately minimal (slug gate only): rendering needs
+# no executable wrapper, CLI preflight, or smoke runner.
+if [ "$CHECK_MODE" -eq 1 ]; then
+  if [ ! -f "$PLIST" ]; then
+    echo "--check: $LABEL not installed (no plist at $PLIST)"
+    exit 3
+  fi
+  if drift="$(diff -u "$PLIST" <(render_plist) 2>&1)"; then
+    echo "--check OK: installed plist matches current render ($PLIST)"
+    exit 0
+  fi
+  echo "--check: STALE installed plist for $LABEL" >&2
+  echo "  installed: $PLIST" >&2
+  echo "  drift (installed -> current render):" >&2
+  printf '%s\n' "$drift" | sed 's/^/    /' >&2
+  echo "  fix: re-run _install_reviewer_launchd.sh $REVIEWER to reinstall + re-bootstrap" >&2
+  exit 1
+fi
 
 if [ ! -x "$WRAPPER" ]; then
   echo "error: wrapper not executable at $WRAPPER" >&2
@@ -148,47 +223,9 @@ mkdir -p "$(dirname "$PLIST")"
 # by `mv` at >10MB; the tick that performs the rotation already holds the
 # launchd fd on the old inode, so that one tick's pre-redirect lines land in
 # the .1 sidecar — subsequent ticks reopen the fresh path.
-LAUNCHD_LOG_FILE="$HOME/Library/Logs/echo-review-queue-${REVIEWER}.log"
 mkdir -p "$(dirname "$LAUNCHD_LOG_FILE")"
 
-# launchd's per-LaunchAgent environment does NOT reliably inherit TMPDIR
-# from the user's Aqua session — _run_reviewer.sh hard-aborts when TMPDIR
-# is unset (the 050 ephemeral-worktree path needs a real temp dir). Pin
-# the user's canonical per-user temp dir into the plist so launchd-spawned
-# ticks see the same value as interactive runs.
-USER_TMPDIR="$(getconf DARWIN_USER_TEMP_DIR 2>/dev/null || echo "/tmp/")"
-
-cat > "$PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$WRAPPER</string>
-    </array>
-    <key>StartInterval</key>
-    <integer>600</integer>
-    <key>RunAtLoad</key>
-    <false/>
-    <key>KeepAlive</key>
-    <false/>
-    <key>WorkingDirectory</key>
-    <string>$REPO_ROOT</string>
-    <key>StandardOutPath</key>
-    <string>$LAUNCHD_LOG_FILE</string>
-    <key>StandardErrorPath</key>
-    <string>$LAUNCHD_LOG_FILE</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>TMPDIR</key>
-        <string>$USER_TMPDIR</string>
-    </dict>
-</dict>
-</plist>
-EOF
+render_plist > "$PLIST"
 
 # Detect macOS version to choose bootstrap (Sonoma+) vs load (older).
 MACOS_VER="$(sw_vers -productVersion 2>/dev/null || echo 0)"

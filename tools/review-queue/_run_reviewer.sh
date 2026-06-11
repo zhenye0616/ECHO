@@ -77,6 +77,22 @@ fi
 {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] tick start REVIEWER=$REVIEWER_NAME ECHO_REVIEW_QUEUE_REPO_ROOT=$REPO_ROOT"
 
+  # ── 101-retro — stale-installed-plist tripwire (best-effort) ───────────
+  # A merge-only deploy changes the installer but not already-installed
+  # launchd plists; a stale plist can silently revert operator-visible
+  # guarantees (e.g. the pre-2026-06-11 StandardErrorPath=/dev/null
+  # blackout). Warn loudly on DRIFT only (rc=1): rc=3 (not installed) is
+  # the normal shape for manual/on-demand ticks and stays silent, and any
+  # check failure is non-fatal — this is a tripwire, not a gate.
+  set +e
+  stale_check_out="$(bash "$TOOL_DIR/_install_reviewer_launchd.sh" "$REVIEWER_NAME" --check 2>&1)"
+  stale_check_rc=$?
+  set -e
+  if [ "$stale_check_rc" -eq 1 ]; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] WARNING: STALE_PLIST for $REVIEWER_NAME — installed launchd plist drifted from the installer's current render; re-run tools/review-queue/_install_reviewer_launchd.sh $REVIEWER_NAME"
+    printf '%s\n' "$stale_check_out" | sed 's/^/  stale-plist: /'
+  fi
+
   # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
   # Emit coord:scheduler_health at log-redirect-open. This opens a SHORT
   # bootstrap-window deadline (default 120s / max 300s per 057a's
