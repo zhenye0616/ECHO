@@ -7,10 +7,29 @@ import {
   startClaudeCodeExtractor,
   type ClaudeCodeExtractorHandle,
 } from '../../../src/capture/extractors/claude-code.js';
+import type { CaptureEvent, EventId } from '../../../src/storage/interface.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
 import { appendJsonl, tmpDir, waitFor, writeJsonl as writeJsonlFresh } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
+
+/** Storage whose append throws once for the event whose content contains the
+ *  marker — simulates a mid-batch storage failure inside handleJsonlChange. */
+class MidBatchFailingStorage extends MemoryStorage {
+  private failedOnce = false;
+
+  constructor(private readonly failContentMarker: string) {
+    super();
+  }
+
+  override async append(event: Omit<CaptureEvent, 'id'>): Promise<EventId> {
+    if (!this.failedOnce && event.content.includes(this.failContentMarker)) {
+      this.failedOnce = true;
+      throw new Error('synthetic append failure');
+    }
+    return super.append(event);
+  }
+}
 
 interface JsonlLine {
   type: 'user' | 'assistant';
@@ -824,6 +843,38 @@ describe('startClaudeCodeExtractor (lifecycle + integration)', () => {
     expect(md['permission_mode']).toBe('auto');
     expect(md['cli_version']).toBe('2.1.119');
     expect(md['model']).toBe('claude-opus-4-7');
+  });
+
+  it('does not re-append already-stored turns when a mid-batch append throws (per-turn offset checkpoint)', async () => {
+    // Bug A: turns are appended one-by-one but the offset map was only
+    // persisted after the loop. A throw on turn 2 left the offset at the
+    // pre-batch position, so the next change event re-appended turn 1.
+    const flaky = new MidBatchFailingStorage('ASSISTANT: A2');
+    handle = await startClaudeCodeExtractor(flaky, { projectsPrefix });
+    const path = join(projDir, 'sess.jsonl');
+
+    // Two closed clusters in one batch: turn 1 = Q1/A1 (closed by u2),
+    // turn 2 = Q2/A2 (closed by u3). The append for turn 2 throws once.
+    writeJsonlFresh(path, [
+      userText('s1', 'u1', 'Q1'),
+      assistantText('s1', 'a1', 'A1'),
+      userText('s1', 'u2', 'Q2'),
+      assistantText('s1', 'a2', 'A2'),
+      userText('s1', 'u3', 'Q3'),
+    ]);
+
+    // Turn 1 lands; turn 2 throws mid-batch and surfaces as handler_error.
+    await waitFor(async () => (await flaky.count()) >= 1);
+    await waitFor(() => captured.writes.join('').includes('handler_error'));
+
+    // A later append triggers the next handler run; appends now succeed.
+    appendJsonl(path, [assistantText('s1', 'a3', 'A3'), userText('s1', 'u4', 'Q4')]);
+    await waitFor(async () => (await flaky.count()) >= 3);
+
+    const events = await flaky.query({ order: 'asc' });
+    expect(events.filter((e) => e.content === 'USER: Q1\n\nASSISTANT: A1')).toHaveLength(1);
+    expect(events.some((e) => e.content === 'USER: Q2\n\nASSISTANT: A2')).toBe(true);
+    expect(events.some((e) => e.content === 'USER: Q3\n\nASSISTANT: A3')).toBe(true);
   });
 
   it('stop() resolves cleanly and prevents further events', async () => {

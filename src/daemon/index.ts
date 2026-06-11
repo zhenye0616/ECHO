@@ -35,6 +35,17 @@ function createStorage(): { storage: Storage; backend: 'memory' | 'sqlite'; disp
   return { storage: sqlite, backend: 'sqlite', dispose: () => sqlite.close() };
 }
 
+// Last-resort guard: a stray rejection escaping any capture surface or
+// fire-and-forget path must not kill the daemon. Surfaces own their local
+// catch-and-log (handler_error); this only catches what they miss. Log via
+// the structured logger and keep running.
+const daemonLog = createLogger('daemon');
+process.on('unhandledRejection', (reason: unknown) => {
+  daemonLog.error('unhandled_rejection', {
+    message: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+
 const dataDir = resolveDataDir();
 acquirePidLockOrExit(dataDir);
 

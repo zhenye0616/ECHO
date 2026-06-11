@@ -349,7 +349,12 @@ export async function startGitWatcher(
 
   function track(p: Promise<void>): void {
     inFlight.add(p);
-    p.finally(() => inFlight.delete(p));
+    // .catch before .finally: a bare .finally on a rejected promise derives a
+    // NEW rejected promise with no handler — an unhandled rejection that can
+    // kill the daemon. Log instead (extractors' handler_error pattern).
+    p.catch((err: unknown) => {
+      log.error('handler_error', { message: (err as Error).message });
+    }).finally(() => inFlight.delete(p));
   }
 
   async function refreshRepo(state: RepoState): Promise<void> {

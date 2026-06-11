@@ -10,9 +10,18 @@ import {
   startGitWatcher,
   type GitWatcherHandle,
 } from '../../../src/capture/surfaces/git-watcher.js';
-import type { CaptureEvent } from '../../../src/storage/interface.js';
+import type { CaptureEvent, EventId } from '../../../src/storage/interface.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
+import { waitFor } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
+
+/** Storage whose append always rejects — exercises the watcher's error
+ *  containment (Bug C: track()'s .finally-only chain re-rejected unhandled). */
+class RejectingStorage extends MemoryStorage {
+  override async append(): Promise<EventId> {
+    throw new Error('synthetic storage failure');
+  }
+}
 
 const execFileP = promisify(execFile);
 
@@ -271,6 +280,37 @@ describe('startGitWatcher', () => {
     } finally {
       const idx = repos.lastIndexOf(fakeRepo);
       if (idx !== -1) repos.splice(idx, 1);
+    }
+  });
+
+  it('logs handler_error instead of leaking an unhandled rejection when storage append rejects (Bug C)', async () => {
+    const repo = await makeRepo();
+    cleanups.push(pushAllowedRepo(repo));
+    cleanups.push(() => rmSync(repo, { recursive: true, force: true }));
+    await commitFile(repo, 'a.txt', '1', 'first');
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    const captured = captureStdout();
+    try {
+      const h = await startGitWatcher([repo], new RejectingStorage(), { enableFsWatch: false });
+      handles.push(h);
+
+      await waitFor(
+        () => unhandled.length > 0 || captured.writes.join('').includes('handler_error'),
+        8000,
+      );
+      // Give any still-in-flight rejection a beat to surface as unhandled.
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(unhandled).toHaveLength(0);
+      expect(captured.writes.join('')).toContain('handler_error');
+    } finally {
+      captured.restore();
+      process.off('unhandledRejection', onUnhandled);
     }
   });
 

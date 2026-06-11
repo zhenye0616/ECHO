@@ -605,6 +605,10 @@ export async function startClaudeCodeExtractor(
       } else {
         log.warn('candidate_rejected', { reason: result.reason, path });
       }
+      // Checkpoint per processed turn (cursor.ts's per-turn lastSeenMap.set is
+      // the in-tree precedent): a mid-batch throw on a later turn then resumes
+      // AFTER this one instead of durably re-appending it on every poll tick.
+      offsetMap.set(path, { offset: turn.byte_offset, turn_index: nextTurnIndex - 1 });
     }
     offsetMap.set(path, { offset: newOffset, turn_index: nextTurnIndex - 1 });
   }

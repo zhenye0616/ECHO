@@ -101,14 +101,23 @@ export async function startFsWatcher(
     ignored,
   });
 
+  // emitCandidate has no internal try/catch, so a storage failure would
+  // otherwise escape the fire-and-forget call as an unhandled rejection and
+  // kill the daemon. Mirror the extractors' handler_error containment.
+  function emitSafely(event_type: EventType, p: string, stats: Stats | undefined): void {
+    emitCandidate(event_type, p, stats, storage).catch((err: unknown) => {
+      log.error('handler_error', { message: (err as Error).message, path: p });
+    });
+  }
+
   watcher.on('add', (p: string, stats?: Stats) => {
-    void emitCandidate('add', p, stats, storage);
+    emitSafely('add', p, stats);
   });
   watcher.on('change', (p: string, stats?: Stats) => {
-    void emitCandidate('change', p, stats, storage);
+    emitSafely('change', p, stats);
   });
   watcher.on('unlink', (p: string) => {
-    void emitCandidate('unlink', p, undefined, storage);
+    emitSafely('unlink', p, undefined);
   });
   watcher.on('error', (err: unknown) => {
     log.error('watcher_error', { message: (err as Error).message });

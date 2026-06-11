@@ -7,10 +7,29 @@ import {
   startCodexExtractor,
   type CodexExtractorHandle,
 } from '../../../src/capture/extractors/codex.js';
+import type { CaptureEvent, EventId } from '../../../src/storage/interface.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
 import { appendJsonl, tmpDir, waitFor, writeJsonl } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
+
+/** Storage whose append throws once for the event whose content contains the
+ *  marker — simulates a mid-batch storage failure inside handleJsonlChange. */
+class MidBatchFailingStorage extends MemoryStorage {
+  private failedOnce = false;
+
+  constructor(private readonly failContentMarker: string) {
+    super();
+  }
+
+  override async append(event: Omit<CaptureEvent, 'id'>): Promise<EventId> {
+    if (!this.failedOnce && event.content.includes(this.failContentMarker)) {
+      this.failedOnce = true;
+      throw new Error('synthetic append failure');
+    }
+    return super.append(event);
+  }
+}
 
 // ─── JSONL line builders matching Codex's wire format ───────────────────────
 
@@ -1083,6 +1102,38 @@ describe('startCodexExtractor (lifecycle + integration)', () => {
     const fresh = events.find((e) => e.content.includes('new-a'));
     expect(fresh).toBeDefined();
     expect((fresh!.metadata as Record<string, unknown>)['turn_index']).toBe(1);
+  });
+
+  it('does not re-append already-stored turns when a mid-batch append throws (per-turn offset checkpoint)', async () => {
+    // Bug A: turns are appended one-by-one but the offset map was only
+    // persisted after the loop. A throw on turn 2 left the offset at the
+    // pre-batch position, so the next change event re-appended turn 1.
+    const flaky = new MidBatchFailingStorage('ASSISTANT: a2');
+    handle = await startCodexExtractor(flaky, { sessionsPrefix });
+
+    // Two closed clusters in one batch: turn 1 = q1/a1 (closed by q2),
+    // turn 2 = q2/a2 (closed by q3). The append for turn 2 throws once.
+    writeJsonl(path, [
+      sessionMeta(),
+      userMsg('q1'),
+      assistantMsg('a1'),
+      userMsg('q2'),
+      assistantMsg('a2'),
+      userMsg('q3'),
+    ]);
+
+    // Turn 1 lands; turn 2 throws mid-batch and surfaces as handler_error.
+    await waitFor(async () => (await flaky.count()) >= 1);
+    await waitFor(() => captured.writes.join('').includes('handler_error'));
+
+    // A later append triggers the next handler run; appends now succeed.
+    appendJsonl(path, [assistantMsg('a3'), userMsg('q4')]);
+    await waitFor(async () => (await flaky.count()) >= 3);
+
+    const events = await flaky.query({ order: 'asc' });
+    expect(events.filter((e) => e.content === 'USER: q1\n\nASSISTANT: a1')).toHaveLength(1);
+    expect(events.some((e) => e.content === 'USER: q2\n\nASSISTANT: a2')).toBe(true);
+    expect(events.some((e) => e.content === 'USER: q3\n\nASSISTANT: a3')).toBe(true);
   });
 
   it('stop() resolves cleanly and prevents further events', async () => {

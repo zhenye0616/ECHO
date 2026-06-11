@@ -822,6 +822,17 @@ export async function startCodexExtractor(
       } else {
         log.warn('candidate_rejected', { reason: result.reason, path });
       }
+      // Checkpoint per processed turn (cursor.ts's per-turn lastSeenMap.set is
+      // the in-tree precedent): a mid-batch throw on a later turn then resumes
+      // AFTER this one instead of durably re-appending it on every poll tick.
+      const checkpoint: OffsetEntry = { offset: turn.byte_offset, turn_index: nextTurnIndex - 1 };
+      const cpCwd = turn.cwd ?? cur.cwd;
+      const cpGit = turn.git ?? cur.git;
+      const cpCodex = turn.codex ?? cur.codex;
+      if (cpCwd !== undefined) checkpoint.cwd = cpCwd;
+      if (cpGit !== undefined) checkpoint.git = cpGit;
+      if (cpCodex !== undefined) checkpoint.codex = cpCodex;
+      offsetMap.set(path, checkpoint);
     }
     const nextCwd = passCwd ?? cur.cwd;
     const nextGit = passGit ?? cur.git;

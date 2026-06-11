@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,9 +8,10 @@ import {
   startFsWatcher,
   type FsWatcherHandle,
 } from '../../../src/capture/surfaces/fs-watcher.js';
-import type { CaptureEvent } from '../../../src/storage/interface.js';
+import type { CaptureEvent, EventId } from '../../../src/storage/interface.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import { resetAllowlist, restoreFsPaths, snapshotFsPaths } from '../../fixtures/allowlist.js';
+import { waitFor } from '../../fixtures/jsonl.js';
 import { captureStdout } from '../../fixtures/stdout.js';
 
 async function waitForCount(
@@ -171,6 +172,65 @@ describe.skip('startFsWatcher', () => {
     writeFileSync(join(dir, 'two.txt'), 'b');
     await new Promise((r) => setTimeout(r, 300));
     expect(await storage.count()).toBe(before);
+  });
+});
+
+// NOT part of the quarantined block above: a single watcher instance with no
+// sibling watcher tests racing its stop() — the quarantine's flake mode
+// (afterEach close racing the NEXT test's chokidar setup) doesn't apply.
+describe('startFsWatcher emit-path error containment (Bug C)', () => {
+  class RejectingStorage extends MemoryStorage {
+    override async append(): Promise<EventId> {
+      throw new Error('synthetic storage failure');
+    }
+  }
+
+  let dir: string;
+  let handle: FsWatcherHandle | null = null;
+  let originalFsPaths: string[];
+  let captured: ReturnType<typeof captureStdout>;
+
+  beforeEach(() => {
+    originalFsPaths = snapshotFsPaths();
+    // realpath so chokidar's resolved event paths (macOS /var → /private/var)
+    // match the allowlist entry — same trick as the git-watcher harness.
+    dir = realpathSync(mkdtempSync(join(tmpdir(), 'echo-fs-watcher-bugc-')));
+    captured = captureStdout();
+    (CAPTURED_SOURCES.fs_paths as unknown as string[]).push(`${dir}/`);
+  });
+
+  afterEach(async () => {
+    if (handle !== null) {
+      await handle.stop();
+      handle = null;
+    }
+    captured.restore();
+    resetAllowlist();
+    restoreFsPaths(originalFsPaths);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('logs handler_error instead of leaking an unhandled rejection when storage append rejects', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      handle = await startFsWatcher([dir], new RejectingStorage());
+      writeFileSync(join(dir, 'a.txt'), 'hello');
+
+      await waitFor(
+        () => unhandled.length > 0 || captured.writes.join('').includes('handler_error'),
+      );
+      // Give any still-in-flight rejection a beat to surface as unhandled.
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(unhandled).toHaveLength(0);
+      expect(captured.writes.join('')).toContain('handler_error');
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });
 

@@ -200,6 +200,39 @@ describe('processCandidate', () => {
       expect(evt!.timestamp).toBe('2026-05-08T07:00:00.000Z');
     });
   });
+
+  describe('reject path — unparseable timestamp (Bug B)', () => {
+    beforeEach(() => {
+      const apis = CAPTURED_SOURCES.apis as unknown as string[];
+      apis.push('github');
+    });
+
+    it('rejects with invalid_timestamp instead of throwing; storage untouched', async () => {
+      // Gate only requires a non-empty string, so "n/a" passes the gate but
+      // cannot be canonicalized. Pre-fix this threw RangeError AFTER
+      // gate-accept, poisoning the extractor loops (Bug A) and the watcher
+      // emit paths (Bug C).
+      const result = await processCandidate(
+        validEvent({ source: 'api:github', timestamp: 'n/a' }),
+        storage,
+      );
+
+      expect(result).toEqual({ accepted: false, reason: 'invalid_timestamp' });
+      expect(await storage.count()).toBe(0);
+    });
+
+    it('logs a warn line naming the rejection reason and source', async () => {
+      const captured = captureStdout();
+      try {
+        await processCandidate(validEvent({ source: 'api:github', timestamp: 'n/a' }), storage);
+      } finally {
+        captured.restore();
+      }
+      const out = captured.writes.join('');
+      expect(out).toContain('invalid_timestamp');
+      expect(out).toContain('api:github');
+    });
+  });
 });
 
 describe('canonicalizeTimestamp (pure helper)', () => {
