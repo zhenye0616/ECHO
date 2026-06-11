@@ -81,9 +81,12 @@ fi
   # A merge-only deploy changes the installer but not already-installed
   # launchd plists; a stale plist can silently revert operator-visible
   # guarantees (e.g. the pre-2026-06-11 StandardErrorPath=/dev/null
-  # blackout). Warn loudly on DRIFT only (rc=1): rc=3 (not installed) is
-  # the normal shape for manual/on-demand ticks and stays silent, and any
-  # check failure is non-fatal — this is a tripwire, not a gate.
+  # blackout). rc=1 (drift) warns loudly; rc=3 (not installed) stays
+  # silent — it is the normal shape for manual/on-demand ticks; any OTHER
+  # nonzero rc means the DETECTOR ITSELF is broken (installer missing,
+  # syntax/runtime error, diff/permission failure) and is warned with the
+  # rc + captured output so stale-plist detection can't die invisibly
+  # (101-retro r2 codex-ops MED). Always non-fatal — tripwire, not gate.
   set +e
   stale_check_out="$(bash "$TOOL_DIR/_install_reviewer_launchd.sh" "$REVIEWER_NAME" --check 2>&1)"
   stale_check_rc=$?
@@ -91,6 +94,9 @@ fi
   if [ "$stale_check_rc" -eq 1 ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] WARNING: STALE_PLIST for $REVIEWER_NAME — installed launchd plist drifted from the installer's current render; re-run tools/review-queue/_install_reviewer_launchd.sh $REVIEWER_NAME"
     printf '%s\n' "$stale_check_out" | sed 's/^/  stale-plist: /'
+  elif [ "$stale_check_rc" -ne 0 ] && [ "$stale_check_rc" -ne 3 ]; then
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] WARNING: STALE_PLIST_CHECK_FAILED for $REVIEWER_NAME — --check itself failed (rc=$stale_check_rc); stale-plist detection is NOT functioning"
+    printf '%s\n' "$stale_check_out" | sed 's/^/  stale-plist-check: /'
   fi
 
   # ── 057b AC7 Phase 1 — scheduler health (bootstrap-scoped) ─────────────
