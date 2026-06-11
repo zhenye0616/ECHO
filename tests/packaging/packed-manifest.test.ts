@@ -270,6 +270,8 @@ describe('packed package manifest', () => {
         "dist/storage/migrate.d.ts",
         "dist/storage/migrate.js",
         "dist/storage/migrations/0001_initial.sql",
+        "dist/storage/source-match.d.ts",
+        "dist/storage/source-match.js",
         "dist/storage/sqlite.d.ts",
         "dist/storage/sqlite.js",
         "dist/trace/auto-expand.d.ts",

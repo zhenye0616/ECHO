@@ -12,6 +12,12 @@ import {
   type Storage,
 } from './interface.js';
 import { canonicalizeTimestamps, migrate } from './migrate.js';
+import {
+  likePrefilterChunk,
+  normalizePathLikeSource,
+  sourceEquals,
+  sourceHasPrefix,
+} from './source-match.js';
 import { createLogger } from '../logging/index.js';
 import { canonicalizeTimestamp } from '../util/timestamp.js';
 
@@ -104,13 +110,39 @@ export class SqliteStorage implements Storage {
     const until = filter?.until !== undefined ? canonicalizeTimestamp(filter.until) : undefined;
     const clauses: string[] = [];
     const params: Record<string, unknown> = {};
+    // Source matching semantics are shared with MemoryStorage via
+    // source-match.ts — raw SQL `=` / `LIKE prefix%` diverged on
+    // backslash-stored Windows sources, component boundaries, prefix
+    // case (LIKE is ASCII-case-insensitive), and trailing-slash
+    // equality. When the JS predicate is needed, SQL keeps only a
+    // provably-superset coarse prefilter (LIKE on the pre-separator
+    // chunk — see likePrefilterChunk) and the predicate + LIMIT move to
+    // JS so the page can't run short.
+    let jsSourcePredicate: ((source: string) => boolean) | undefined;
     if (filter?.source !== undefined) {
-      clauses.push('source = @source');
-      params['source'] = filter.source;
+      const source = filter.source;
+      if (normalizePathLikeSource(source) === null) {
+        // Non-path-like source: sourceEquals degrades to raw string
+        // equality for every stored row, which SQL's BINARY `=`
+        // implements exactly — keep the pure-SQL fast path.
+        clauses.push('source = @source');
+        params['source'] = source;
+      } else {
+        jsSourcePredicate = (s) => sourceEquals(s, source);
+      }
     }
     if (filter?.source_prefix !== undefined) {
-      clauses.push("source LIKE @source_prefix || '%' ESCAPE '\\'");
-      params['source_prefix'] = filter.source_prefix.replace(/[\\%_]/g, '\\$&');
+      // Even non-path-like prefixes need the JS predicate: LIKE's
+      // ASCII-case-insensitivity would let 'GIT:%' match 'git:...'.
+      const prefix = filter.source_prefix;
+      jsSourcePredicate = (s) => sourceHasPrefix(s, prefix);
+    }
+    if (jsSourcePredicate !== undefined) {
+      const chunk = likePrefilterChunk(filter!.source ?? filter!.source_prefix!);
+      if (chunk !== null) {
+        clauses.push("source LIKE @source_chunk || '%' ESCAPE '\\'");
+        params['source_chunk'] = chunk.replace(/[\\%_]/g, '\\$&');
+      }
     }
     if (since !== undefined) {
       clauses.push('timestamp >= @since');
@@ -177,8 +209,12 @@ export class SqliteStorage implements Storage {
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-    const limitClause = filter?.limit !== undefined ? 'LIMIT @limit' : '';
-    if (filter?.limit !== undefined) params['limit'] = filter.limit;
+    // When a JS source predicate is active, SQL's WHERE is only a superset
+    // prefilter — applying LIMIT in SQL would count rows the predicate
+    // later drops and return a short page. Move the limit to JS then.
+    const limitInSql = filter?.limit !== undefined && jsSourcePredicate === undefined;
+    const limitClause = limitInSql ? 'LIMIT @limit' : '';
+    if (limitInSql) params['limit'] = filter!.limit;
 
     const order = filter?.order ?? 'desc';
     const orderSql = order === 'asc' ? 'ASC' : 'DESC';
@@ -192,7 +228,14 @@ export class SqliteStorage implements Storage {
       stmt = this.db.prepare(sql);
       this.queryStmtCache.set(sql, stmt);
     }
-    const rows = stmt.all(params) as EventRow[];
+    let rows = stmt.all(params) as EventRow[];
+    if (jsSourcePredicate !== undefined) {
+      const predicate = jsSourcePredicate;
+      rows = rows.filter((r) => predicate(r.source));
+      if (filter?.limit !== undefined && rows.length > filter.limit) {
+        rows = rows.slice(0, filter.limit);
+      }
+    }
     return rows.map(rowToEvent);
   }
 
