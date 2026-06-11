@@ -437,9 +437,9 @@ EOF
     local response_path="$1"
     PYTHONDONTWRITEBYTECODE=1 python3 - "$response_path" "$REVIEWER_NAME" "$ITEM_ID" "$ROUND_NUM" "$SPEC_COMMIT_SHA" <<'PY'
 from pathlib import Path
+import re
 import sys
-
-import _lib  # robust, line-anchored frontmatter parse shared with validate.py
+import yaml
 
 path = Path(sys.argv[1])
 expected_reviewer = sys.argv[2]
@@ -447,15 +447,28 @@ expected_item = sys.argv[3]
 expected_round = sys.argv[4]
 expected_sha = sys.argv[5]
 
-# Use the same robust parser as the schema-validation path. A bare
+# Use the same robust parse as the schema-validation path. A bare
 # text.split("---", 2) truncates the frontmatter when a string VALUE contains
 # a `---` token, then crashes yaml.safe_load with an unhandled traceback
 # (observed on the 099 spec-review tick — whose subject IS `---` sidecar
 # frontmatter). Any parse failure here must surface as a clean
 # binding-mismatch diagnostic, never a traceback.
+#
+# The regex is inlined (keep in sync with _lib.FRONTMATTER_RE) rather than
+# `import _lib`: _lib imports jsonschema at module level, and its darwin
+# arch-retry re-execs `python3 -` with stdin already consumed — under a
+# non-arm64 parent process that turns an ImportError into a silent exit-0,
+# which here would mean the binding gate FAILS OPEN (a mismatched response
+# would be published without any check running).
+FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
 try:
-    fm, _ = _lib.parse_frontmatter(path)
-except ValueError as exc:
+    m = FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
+    if not m:
+        raise ValueError(f"{path}: no frontmatter block found")
+    fm = yaml.safe_load(m.group(1)) or {}
+    if not isinstance(fm, dict):
+        raise ValueError(f"{path}: frontmatter is not a mapping")
+except (ValueError, yaml.YAMLError) as exc:
     print(f"request binding mismatch: {exc}", file=sys.stderr)
     raise SystemExit(1)
 
@@ -562,6 +575,7 @@ from pathlib import Path
 import glob
 import json
 import os
+import re
 import sys
 import yaml
 
@@ -572,12 +586,27 @@ env_corr = os.environ.get("ECHO_COORD_CORRELATION_ID") or ""
 capture_failure_state_file = os.environ.get("CAPTURE_FAILURE_STATE_FILE") or ""
 
 
+# Keep in sync with _lib.FRONTMATTER_RE. Line-anchored: only delimiter
+# LINES terminate the frontmatter, so a `---` token inside a string value
+# (e.g. a focus_hints entry quoting frontmatter) parses correctly.
+FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
+
+
 def read_fm(path: Path):
+    # Same robust mechanism as validate_request_binding/_lib.parse_frontmatter:
+    # a naive text.split("---", 2) truncates the frontmatter when a string
+    # VALUE contains a `---` token, the YAML parse raises, and the scan
+    # loop's except-continue then skips the round silently — for every
+    # wrapper reviewer, forever. The regex is inlined (not `import _lib`)
+    # deliberately: _lib imports jsonschema at module level, and its
+    # darwin arch-retry re-execs `python3 -` with stdin already consumed,
+    # turning an ImportError into a silent exit-0 with no selection state
+    # written — the same silent-failure class this parser fix removes.
     text = path.read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        raise ValueError(f"{path}: missing YAML frontmatter")
-    fm = yaml.safe_load(parts[1]) or {}
+    m = FRONTMATTER_RE.match(text)
+    if not m:
+        raise ValueError(f"{path}: no frontmatter block found")
+    fm = yaml.safe_load(m.group(1)) or {}
     if not isinstance(fm, dict):
         raise ValueError(f"{path}: frontmatter must be a mapping")
     return fm

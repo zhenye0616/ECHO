@@ -26,7 +26,12 @@ type MockMode =
   | 'empty_stdout'
   | 'write_denied'
   | 'wrong_binding';
-type RequestState = 'selected' | 'none' | 'stale_combined' | 'bind_failed';
+type RequestState =
+  | 'selected'
+  | 'selected_fm_dashes'
+  | 'none'
+  | 'stale_combined'
+  | 'bind_failed';
 
 interface Fixture {
   base: string;
@@ -129,24 +134,29 @@ function writeRequest(repo: string, reviewer: Reviewer, specSha: string, state: 
   const roundDir = join(repo, 'backlog/reviews', ITEM_ID, 'r1');
   mkdirSync(roundDir, { recursive: true });
   const requested = state === 'bind_failed' ? otherReviewer(reviewer) : reviewer;
+  const fmLines = [
+    '---',
+    `item_id: "${ITEM_ID}"`,
+    'round: 1',
+    `spec_commit_sha: "${specSha}"`,
+    `artifact_path: "backlog/ready/${ITEM_ID}.md"`,
+    'class: "narrow"',
+    'requested_at: "2026-06-03T20:00:00Z"',
+    'requested_reviewers:',
+    `  - "${requested}"`,
+    `correlation_id: "${CORRELATION_ID}"`,
+  ];
+  if (state === 'selected_fm_dashes') {
+    // A frontmatter string VALUE containing a `---` token. A naive
+    // text.split("---", 2) truncates the frontmatter mid-string, the YAML
+    // parse raises, and scan mode swallows the error — the round is then
+    // silently skipped by every wrapper reviewer forever. The line-anchored
+    // parser (_lib.parse_frontmatter) must select this round normally.
+    fmLines.push('focus_hints: "quote the --- frontmatter delimiter when reviewing the sidecar"');
+  }
   writeFileSync(
     join(roundDir, 'request.md'),
-    [
-      '---',
-      `item_id: "${ITEM_ID}"`,
-      'round: 1',
-      `spec_commit_sha: "${specSha}"`,
-      `artifact_path: "backlog/ready/${ITEM_ID}.md"`,
-      'class: "narrow"',
-      'requested_at: "2026-06-03T20:00:00Z"',
-      'requested_reviewers:',
-      `  - "${requested}"`,
-      `correlation_id: "${CORRELATION_ID}"`,
-      '---',
-      '',
-      'Review this synthetic artifact.',
-      '',
-    ].join('\n'),
+    [...fmLines, '---', '', 'Review this synthetic artifact.', ''].join('\n'),
   );
   if (state === 'stale_combined') {
     writeFileSync(join(roundDir, 'combined.md'), '---\ncombined_verdict: "proceed"\n---\n');
@@ -411,6 +421,23 @@ describe('087b reviewer read-only wrapper publisher', () => {
     expect(readRecord(fx, 'coord-events')).toContain(
       '--payload={"outcome":"terminal_capture_failure"}',
     );
+  });
+
+  it('selects a request whose frontmatter value contains a --- token instead of silently skipping it', () => {
+    const fx = setupFixture({ requestState: 'selected_fm_dashes' });
+    fixtures.push(fx);
+
+    const r = runWrapper(fx, 'valid');
+    expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).toBe(0);
+
+    // Under the naive split("---", 2) parser this round is invisible: the
+    // tick exits 0 with "no codex reviews to write" and never publishes.
+    expect(
+      originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`),
+      `stderr=${r.stderr}`,
+    ).toBe(true);
+    const response = showOrigin(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`);
+    expect(response).toContain('Mock codex review from final assistant message.');
   });
 
   it('classifies no-candidate before spawning the child', () => {

@@ -230,6 +230,33 @@ describe('045 AC2 — _install_reviewer_launchd.sh smoke gate fail-closed', () =
     expect(invocations.some((l) => l.startsWith('launchctl kickstart'))).toBe(false);
   });
 
+  it('plist routes launchd stdout/stderr to the per-reviewer log file, not /dev/null', () => {
+    const fx = setup({ withSmokeRunner: false });
+    fixtures.push(fx);
+
+    const r = runInstaller(fx, [REVIEWER]);
+    expect(r.status, `stdout: ${r.stdout}\nstderr: ${r.stderr}`).toBe(0);
+
+    const plistPath = join(fx.home, 'Library/LaunchAgents', `${LABEL}.plist`);
+    const plist = readFileSync(plistPath, 'utf-8');
+
+    // The launchd-level log path must be the SAME absolute file the wrapper
+    // itself appends to (~/Library/Logs/echo-review-queue-<slug>.log), baked
+    // expanded at install time — launchd does not expand ~ or env vars in
+    // StandardOutPath/StandardErrorPath. /dev/null here is the silent-fail
+    // window: everything _run_reviewer.sh does BEFORE its own block redirect
+    // (REVIEWER_NAME validation, repo-root cd/git checks, the reviewer gate,
+    // log rotation) would otherwise fail invisibly.
+    const logPath = join(fx.home, 'Library/Logs', `echo-review-queue-${REVIEWER}.log`);
+    expect(plist).toContain(`<key>StandardOutPath</key>\n    <string>${logPath}</string>`);
+    expect(plist).toContain(`<key>StandardErrorPath</key>\n    <string>${logPath}</string>`);
+    expect(plist).not.toContain('/dev/null');
+
+    // The installer must guarantee the log directory exists so launchd can
+    // open/create the file on first tick.
+    expect(existsSync(join(fx.home, 'Library/Logs'))).toBe(true);
+  });
+
   it('AC2c — --smoke + present smoke runner: exit 0, plist installed, bootout + bootstrap + kickstart recorded', () => {
     const fx = setup({ withSmokeRunner: true });
     fixtures.push(fx);

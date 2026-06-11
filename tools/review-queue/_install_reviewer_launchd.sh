@@ -133,6 +133,24 @@ fi
 
 mkdir -p "$(dirname "$PLIST")"
 
+# launchd-level stdout/stderr go to the SAME per-reviewer log file the
+# wrapper itself appends to. Previously both keys were /dev/null, which left
+# a silent-failure window: everything _run_reviewer.sh does BEFORE its own
+# `{ ... } >> $LOG_FILE` block redirect (REVIEWER_NAME validation, repo-root
+# cd/git checks, sourcing _effect-runner.sh, the reviewer gate, log rotation)
+# failed invisibly — the exact silent-launchd-fail class this queue exists
+# to prevent. launchd does NOT expand ~ or environment variables in
+# StandardOutPath/StandardErrorPath, so the absolute expanded path is baked
+# at install time (this script runs as the operator, so $HOME is correct).
+# launchd opens these paths O_CREAT|O_APPEND (append, not truncate), and the
+# wrapper's own block redirect also opens in append mode, so the two fds
+# interleave safely on the same file. Rotation caveat: the wrapper rotates
+# by `mv` at >10MB; the tick that performs the rotation already holds the
+# launchd fd on the old inode, so that one tick's pre-redirect lines land in
+# the .1 sidecar — subsequent ticks reopen the fresh path.
+LAUNCHD_LOG_FILE="$HOME/Library/Logs/echo-review-queue-${REVIEWER}.log"
+mkdir -p "$(dirname "$LAUNCHD_LOG_FILE")"
+
 # launchd's per-LaunchAgent environment does NOT reliably inherit TMPDIR
 # from the user's Aqua session — _run_reviewer.sh hard-aborts when TMPDIR
 # is unset (the 050 ephemeral-worktree path needs a real temp dir). Pin
@@ -160,9 +178,9 @@ cat > "$PLIST" <<EOF
     <key>WorkingDirectory</key>
     <string>$REPO_ROOT</string>
     <key>StandardOutPath</key>
-    <string>/dev/null</string>
+    <string>$LAUNCHD_LOG_FILE</string>
     <key>StandardErrorPath</key>
-    <string>/dev/null</string>
+    <string>$LAUNCHD_LOG_FILE</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>TMPDIR</key>
