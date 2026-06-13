@@ -2,12 +2,19 @@
 task_id: 2026-06-13-102-orchestration-init-per-project
 role: builder
 binding: codex
-last_updated: 2026-06-13T09:38:11Z
+last_updated: 2026-06-13T10:09:45Z
 branch: agent/orchestration-init-per-project
+handoff_branch: agent/orchestration-init-per-project
+handoff_head_sha: 8190e7babbefc6dadbc4e3dbf64fe68fbc877849
+handoff_run_log: raw/internal/agent-runs/2026-06-13-2026-06-13-102-orchestration-init-per-project.md
 ---
 
 ## current_thesis
 Claimed by codex builder. Implement item 102 as the foundational vertical slice for per-project orchestration onboarding: config/defaults, `echo orchestration init`, configurable review roots and coordination refs for the review loop, and regression tests proving Project_echo defaults remain stable.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 8190e7babbefc6dadbc4e3dbf64fe68fbc877849.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: add a validated `.echo/project.json` loader/defaults for `coord_ref`, `reviews_root`, `reviewers`, and `spec_dir`.
@@ -31,5 +38,6 @@ Claimed by codex builder. Implement item 102 as the foundational vertical slice 
 - Do not edit wiki pages or backlog item bodies.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-13-102-orchestration-init-per-project.md
+
+- spec: backlog/pending_review/2026-06-13-102-orchestration-init-per-project.md
 - reviews: backlog/reviews/2026-06-13-102-orchestration-init-per-project/

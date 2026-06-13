@@ -12,6 +12,10 @@ ready_content_sha: 4db0f1fb9ed7a1d3602ce2c3fecacc0f6a344a1ff1069e4fdc60b579b4a71
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-13T09:38:11Z"
 branch: "agent/orchestration-init-per-project"
+head_sha: "8190e7babbefc6dadbc4e3dbf64fe68fbc877849"
+pr_url: ""
+agent_notes: |
+  Implemented the per-project orchestration-init vertical slice and pushed `agent/orchestration-init-per-project` at `8190e7babbefc6dadbc4e3dbf64fe68fbc877849`. Verification passed: typecheck, lint/task-state lint, Python compile + shell syntax, targeted Prettier check for touched files, `git diff --check`, and the focused 13-file Vitest regression (129 tests). Reviewer note: `src/cli/index.ts` and `src/mcp/tools/coord-invoke.ts` were touched as required command/tool integration points for AC2/AC3, though only the command directory and `src/coord/paths.ts` were listed in `files_to_modify`.
 ---
 
 ## Why
