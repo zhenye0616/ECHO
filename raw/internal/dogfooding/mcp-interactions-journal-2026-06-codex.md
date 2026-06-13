@@ -242,3 +242,11 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-06-13-102-orchestration-init-per-project/r4/request.md`; artifact `backlog/proposed/2026-06-13-102-orchestration-init-per-project.md@83b1a5cd8ef53024f18aa0b82d571292e940ed4c`; response `backlog/reviews/2026-06-13-102-orchestration-init-per-project/r4/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-441EBE2E-0914-4DF7-82EC-320F159D62DC/raw/internal/review-queue/3128a437-b944-4750-9ff4-8210dd28cfde/codex.stdout.log` / `/tmp/claude-501/echo-codex-441EBE2E-0914-4DF7-82EC-320F159D62DC/raw/internal/review-queue/3128a437-b944-4750-9ff4-8210dd28cfde/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-13 02:36 PDT - codex builder preflight for process-backlog
+
+- **Trigger:** Founder invoked the codex builder protocol to claim or resume the next ready backlog item in `Project_echo`.
+- **Query inputs:** `echo_ping(message="codex builder preflight for process-backlog")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-12T00:00:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** `echo_ping` returned pong at `2026-06-13T09:36:25.557Z`. `find_clusters` returned one compact cluster `ctx_687a171d` labeled "work on project_echo" with 60 atom ids, source breakdown `git:36`, `claude_code:23`, `codex:1`, time range `2026-06-12T07:00:32.914Z` to `2026-06-13T09:35:57.509Z`, and rank reasons `has_open_loop`, `code_session_anchor`.
+- **Verdict:** partial - useful connectivity and recent-work confirmation, but the skeleton cluster is too broad to guide the specific builder implementation before a concrete item is claimed.
+- **Note:** MCP exposure is healthy in this Codex session. No `get_atoms` follow-up yet because the builder protocol's deterministic backlog claim should define the next relevant context.
