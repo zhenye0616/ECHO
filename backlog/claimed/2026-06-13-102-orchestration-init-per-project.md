@@ -9,6 +9,9 @@ blocked_by: []
 task_state_ref: 2026-06-13-102-orchestration-init-per-project
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 4db0f1fb9ed7a1d3602ce2c3fecacc0f6a344a1ff1069e4fdc60b579b4a71eb4
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-13T09:38:11Z"
+branch: "agent/orchestration-init-per-project"
 ---
 
 ## Why
