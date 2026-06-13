@@ -27,5 +27,13 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R4.** R4 was the zero-patch verification round; both reviewers (codex,
+codex-ops) returned `proceed` with zero findings. The review surface converged cleanly across
+four rounds — r1 (5 substantive: AC3 path-security, AC5 coord_ref, scope coherence, AC6 consumer,
+AC2 atomicity) → r2 (2: AC5 read-side completion, AC6 narrow→104) → r3 (1 convergent removal-only
+cleanup of r2's narrowing) → r4 (0). No escalation at any round (every verdict on the proceed
+side). Promoting `proposed/ → ready/`.
+
+(Operational note: codex-ops's first r4 response was generated valid but lost a push race against
+concurrent r4 pushes; it was re-fired solo and landed `proceed`/0. No bearing on the verdict.)
 
