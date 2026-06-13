@@ -10,25 +10,57 @@
 //     but BEFORE wrapper-path construction / stat / spawn / MCP side-effects.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { basename, sep as pathSep } from 'node:path';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, sep as pathSep } from 'node:path';
 import {
   CoordPathError,
   REPO_ROOT,
+  resolveCoordRequestPath,
   resolveReviewerWrapperPath,
 } from '../../src/coord/paths.js';
 
 const SHAPE_INVALID = ['../', '/', 'foo/../bar', 'foo;rm', 'foo bar', '', 'FOO'];
 
 let originalCwd: string;
+let cleanupDirs: string[];
 
 beforeEach(() => {
   originalCwd = process.cwd();
+  cleanupDirs = [];
 });
 afterEach(() => {
   if (process.cwd() !== originalCwd) process.chdir(originalCwd);
   // Be sure no test leaves ECHO_REPO_ROOT set.
   delete process.env['ECHO_REPO_ROOT'];
+  for (const dir of cleanupDirs) rmSync(dir, { recursive: true, force: true });
 });
+
+function makeCoordRepo(reviewsRoot = 'backlog/reviews'): string {
+  const repo = realpathSync(mkdtempSync(join(tmpdir(), 'echo-coord-paths-')));
+  cleanupDirs.push(repo);
+  mkdirSync(join(repo, reviewsRoot, '2026-05-16-057b', 'r1'), { recursive: true });
+  mkdirSync(join(repo, '.echo'), { recursive: true });
+  writeFileSync(
+    join(repo, '.echo/project.json'),
+    JSON.stringify(
+      {
+        schema_version: 1,
+        coord_ref: 'main',
+        reviews_root: reviewsRoot,
+        reviewers: ['codex'],
+        spec_dir: 'backlog',
+      },
+      null,
+      2,
+    ),
+  );
+  writeFileSync(
+    join(repo, reviewsRoot, '2026-05-16-057b', 'r1', 'request.md'),
+    '---\nitem_id: test\n---\n',
+  );
+  return repo;
+}
 
 describe('057b AC0 — paths resolution', () => {
   it('REPO_ROOT ends at the canonical repo directory', () => {
@@ -87,5 +119,75 @@ describe('057b AC0 — paths resolution', () => {
     } catch (err) {
       expect((err as Error).message).toMatch(/not in coord-roles.json/);
     }
+  });
+
+  it('validates the default Project_echo request path under backlog/reviews', () => {
+    const repo = makeCoordRepo();
+    const resolved = resolveCoordRequestPath('backlog/reviews/2026-05-16-057b/r1/request.md', {
+      repoRoot: repo,
+    });
+    expect(resolved).toBe(join(repo, 'backlog/reviews/2026-05-16-057b/r1/request.md'));
+  });
+
+  it('validates a request path under a configured custom reviews_root', () => {
+    const repo = makeCoordRepo('coord/reviews');
+    const resolved = resolveCoordRequestPath('coord/reviews/2026-05-16-057b/r1/request.md', {
+      repoRoot: repo,
+    });
+    expect(resolved).toBe(join(repo, 'coord/reviews/2026-05-16-057b/r1/request.md'));
+  });
+
+  for (const bad of [
+    '../backlog/reviews/2026-05-16-057b/r1/request.md',
+    '/tmp/backlog/reviews/2026-05-16-057b/r1/request.md',
+    'backlog/reviews/%2e%2e/r1/request.md',
+  ]) {
+    it(`rejects adversarial request path ${JSON.stringify(bad)}`, () => {
+      const repo = makeCoordRepo();
+      expect(() => resolveCoordRequestPath(bad, { repoRoot: repo })).toThrow(CoordPathError);
+    });
+  }
+
+  it('rejects a symlinked reviews_root that resolves outside the repo', () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), 'echo-coord-paths-')));
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), 'echo-coord-outside-')));
+    cleanupDirs.push(repo, outside);
+    mkdirSync(join(repo, 'backlog'), { recursive: true });
+    mkdirSync(join(repo, '.echo'), { recursive: true });
+    mkdirSync(join(outside, '2026-05-16-057b', 'r1'), { recursive: true });
+    writeFileSync(join(outside, '2026-05-16-057b', 'r1', 'request.md'), 'body\n');
+    symlinkSync(outside, join(repo, 'backlog/reviews'), 'dir');
+    writeFileSync(
+      join(repo, '.echo/project.json'),
+      JSON.stringify({
+        schema_version: 1,
+        coord_ref: 'main',
+        reviews_root: 'backlog/reviews',
+        reviewers: ['codex'],
+        spec_dir: 'backlog',
+      }),
+    );
+
+    expect(() =>
+      resolveCoordRequestPath('backlog/reviews/2026-05-16-057b/r1/request.md', {
+        repoRoot: repo,
+      }),
+    ).toThrow(/resolves outside repo/);
+  });
+
+  it('rejects a symlinked request ancestor that resolves outside reviews_root', () => {
+    const repo = makeCoordRepo();
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), 'echo-coord-request-outside-')));
+    cleanupDirs.push(outside);
+    rmSync(join(repo, 'backlog/reviews/2026-05-16-057b'), { recursive: true, force: true });
+    mkdirSync(join(outside, 'r1'), { recursive: true });
+    writeFileSync(join(outside, 'r1', 'request.md'), 'body\n');
+    symlinkSync(outside, join(repo, 'backlog/reviews/2026-05-16-057b'), 'dir');
+
+    expect(() =>
+      resolveCoordRequestPath('backlog/reviews/2026-05-16-057b/r1/request.md', {
+        repoRoot: repo,
+      }),
+    ).toThrow(/resolves outside reviews_root/);
   });
 });

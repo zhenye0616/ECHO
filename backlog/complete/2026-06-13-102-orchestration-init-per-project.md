@@ -16,6 +16,27 @@ head_sha: "8190e7babbefc6dadbc4e3dbf64fe68fbc877849"
 pr_url: ""
 agent_notes: |
   Implemented the per-project orchestration-init vertical slice and pushed `agent/orchestration-init-per-project` at `8190e7babbefc6dadbc4e3dbf64fe68fbc877849`. Verification passed: typecheck, lint/task-state lint, Python compile + shell syntax, targeted Prettier check for touched files, `git diff --check`, and the focused 13-file Vitest regression (129 tests). Reviewer note: `src/cli/index.ts` and `src/mcp/tools/coord-invoke.ts` were touched as required command/tool integration points for AC2/AC3, though only the command directory and `src/coord/paths.ts` were listed in `files_to_modify`.
+review_notes: |
+  Merged on 2026-06-13 via founder reconciliation (Route A: fix B1+B2 pre-merge).
+
+  Conflicts resolved:
+  - none — clean `git merge --no-ff` (sidecar predicted low-risk; confirmed).
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied:
+  - B1 (HIGH) src/coord/paths.ts: resolveCoordRequestPath no longer realpaths the request file (or reviews_root) directly — it realpaths the deepest EXISTING ancestor and lexically appends the not-yet-created tail (new canonicalizeExisting helper). Restores AC7 byte-stable coord_invoke behavior: a not-yet-written request.md (active-trigger seam) AND the packaged-install boundary (no backlog/ shipped) both validate, while symlink-escape detection is preserved. Verified: shell-reachable.test.ts reaches line 213 and passes in a Desktop worktree; paths-resolution 19/19 incl. both symlink-defense tests.
+  - B1 follow-on src/coord/paths.ts: added an explicit safe-charset guard ([A-Za-z0-9._/-]) on request_path. The branch's rejection of shell-metacharacter paths was incidental (relied on realpath ENOENT); decoupling existence required explicit input sanitization to keep the 057b AC0 metacharacter-rejection invariant green.
+  - B2 (MED) tools/review-queue/push-with-retry.sh: AC5/AC8 no-silent-misconfiguration guardrail. When ECHO_REVIEW_QUEUE_COORD_REF is unset, consult .echo/project.json; if it declares a non-default coord_ref, fail loud (exit 2) instead of silently pushing to the default branch. New test tests/review-queue/push-with-retry-coord-ref-guardrail.test.ts (4 cases).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: typecheck clean; lint clean; 551/551 focused tests pass (coord, cli/orchestration, echo-home, review-queue); check-coupled-invariants OK; sync-skills --check OK. shell-reachable.test.ts (packaged launchd daemon-lifecycle) verified PASS in the Desktop agent worktree; it fails at daemon-boot (line 168, before any coord_invoke) ONLY inside the ephemeral /var/folders merger worktree — an environment artifact (launchd packaged-daemon boot from TMPDIR), not a code regression (loadProjectConfig degrades gracefully on missing config, and neither it nor the coord paths run at daemon boot).
+
+  Follow-up items (non-blocking):
+  - Add a true parallel (Promise.all) two-writer race test for upsertProjectRegistration to complement the lock-timeout/no-truncation test (paths.test.ts:191); AC8 names concurrent-upsert atomicity but only sequential + lock-failure paths are exercised.
+  - Builder should note in agent_notes that coord_invoke's request-file existence had become (and is no longer) a precondition.
 ---
 
 ## Why

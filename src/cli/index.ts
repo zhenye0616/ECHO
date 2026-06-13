@@ -6,6 +6,7 @@ import type { AgentKind } from '../echo-home/wizard/detect-agents.js';
 import { DOCTOR_HELP, parseDoctorArgs, runDoctor } from './commands/doctor.js';
 import { runDaemon } from './commands/daemon.js';
 import { INIT_HELP, parseInitArgs, readPackageVersion, runInit } from './commands/init.js';
+import { ORCHESTRATION_HELP, runOrchestration } from './commands/orchestration.js';
 import { PROJECT_HELP, runProject } from './commands/project.js';
 import { runRun } from './commands/run.js';
 import { parseSelfTestArgs, runSelftest, SELFTEST_HELP } from './commands/selftest.js';
@@ -23,6 +24,7 @@ Commands:
   init        Onboard ECHO into local AI clients
   doctor      Check daemon, state, adapter, and agent health
   daemon      Install and control the launchd-managed daemon
+  orchestration  Onboard review/backlog orchestration into a git repo
   project     Manage git repositories captured by the daemon
   uninstall   Remove ECHO adapter writes
   run         Run a workflow from ~/.echo/workflows
@@ -33,6 +35,7 @@ const COMMAND_HELP: Record<string, string> = {
   init: INIT_HELP,
   doctor: DOCTOR_HELP,
   daemon: 'Usage: echoctl daemon <install|start|stop|restart|status|logs|uninstall> [options]',
+  orchestration: ORCHESTRATION_HELP,
   project: PROJECT_HELP,
   uninstall: 'Usage: echoctl uninstall [--yes] [--purge-state] [--force-purge] [--json] [--quiet]',
   run: 'Usage: echoctl run <workflow> [--project <path>] [--agent <role>=<agent>] [--timeout <seconds>] [--json] [--quiet]',
@@ -122,6 +125,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
     if (command === 'daemon') {
       return await runDaemon({ ...globals, argv: args });
+    }
+    if (command === 'orchestration') {
+      return await runOrchestration({ ...globals, argv: args });
     }
     if (command === 'project') {
       return await runProject({ ...globals, argv: args });

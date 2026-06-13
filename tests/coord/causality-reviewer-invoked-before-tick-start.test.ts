@@ -16,14 +16,17 @@ import { request as httpRequest } from 'node:http';
 import { _resetValidatorCacheForTests } from '../../src/coord/roles.js';
 import { startMcpServer, type McpServerHandle } from '../../src/mcp/server.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
+import { COORD_REQUEST_PATH, installCoordRequestFixture } from './coord-request-fixture.js';
 
 const VALID_CORR = 'c9b71286-5f67-4a6c-9a5a-ab6ed07ce4ef';
 
 let storage: MemoryStorage;
 let handle: McpServerHandle;
+let cleanupRequestFixture: (() => void) | undefined;
 
 beforeEach(async () => {
   _resetValidatorCacheForTests();
+  cleanupRequestFixture = installCoordRequestFixture();
   storage = new MemoryStorage();
   handle = await startMcpServer(storage, {
     port: 0,
@@ -33,6 +36,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   if (handle) await handle.stop();
+  cleanupRequestFixture?.();
 });
 
 describe('057b AC0 step 4 — reviewer_invoked precedes child tick_start', () => {
@@ -46,7 +50,7 @@ describe('057b AC0 step 4 — reviewer_invoked precedes child tick_start', () =>
           name: 'coord_invoke',
           arguments: {
             role: 'codex',
-            request_path: 'backlog/reviews/2026-05-16-057b/r1/request.md',
+            request_path: COORD_REQUEST_PATH,
             correlation_id: VALID_CORR,
           },
         },

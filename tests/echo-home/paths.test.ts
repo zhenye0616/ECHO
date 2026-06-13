@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -94,7 +94,18 @@ describe('ECHO home paths', () => {
         schema_version: 1,
         last_refreshed_at: now,
         default_project: null,
-        projects: [],
+        projects: [
+          {
+            repo_root: '/tmp/repo',
+            last_seen: now,
+            source_breakdown: {},
+            coord_ref: 'refs/heads/echo/coord',
+            reviews_root: 'coord/reviews',
+            reviewers: ['codex'],
+            spec_dir: 'specs',
+            project_config_path: '/tmp/repo/.echo/project.json',
+          },
+        ],
       }),
     ).toBe(true);
     expect(
@@ -104,5 +115,96 @@ describe('ECHO home paths', () => {
         projects: [],
       }),
     ).toBe(false);
+  });
+
+  it('loads Project_echo-compatible defaults when .echo/project.json is absent', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'echo-project-config-'));
+    cleanupDirs.push(base);
+    const repo = join(base, 'repo');
+    mkdirSync(repo, { recursive: true });
+    const { loadProjectConfig } = await loadPaths();
+
+    const loaded = loadProjectConfig(repo);
+
+    expect(loaded.existed).toBe(false);
+    expect(loaded.config).toEqual({
+      schema_version: 1,
+      coord_ref: 'main',
+      reviews_root: 'backlog/reviews',
+      reviewers: ['codex', 'cursor'],
+      spec_dir: 'backlog',
+    });
+  });
+
+  it('writes and reloads .echo/project.json with custom orchestration config', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'echo-project-config-'));
+    cleanupDirs.push(base);
+    const repo = join(base, 'repo');
+    mkdirSync(repo, { recursive: true });
+    const { loadProjectConfig, writeProjectConfig } = await loadPaths();
+
+    const written = writeProjectConfig(repo, {
+      schema_version: 1,
+      coord_ref: 'refs/heads/echo/coord',
+      reviews_root: 'coord/reviews',
+      reviewers: ['codex', 'codex-ops'],
+      spec_dir: 'specs',
+    });
+
+    expect(written.path).toBe(join(repo, '.echo/project.json'));
+    expect(loadProjectConfig(repo).config).toEqual(written.config);
+  });
+
+  it('upserts projects.json atomically without duplicate project records', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'echo-project-registry-'));
+    cleanupDirs.push(base);
+    const home = join(base, 'home');
+    const repo = join(base, 'repo');
+    mkdirSync(repo, { recursive: true });
+    const { DEFAULT_PROJECT_CONFIG, readProjectsState, upsertProjectRegistration } =
+      await loadPaths();
+
+    upsertProjectRegistration({
+      repoRoot: repo,
+      config: DEFAULT_PROJECT_CONFIG,
+      homeOverride: home,
+      now: new Date('2026-06-13T10:00:00.000Z'),
+    });
+    upsertProjectRegistration({
+      repoRoot: `${repo}/`,
+      config: { ...DEFAULT_PROJECT_CONFIG, coord_ref: 'refs/heads/echo/coord' },
+      homeOverride: home,
+      now: new Date('2026-06-13T10:01:00.000Z'),
+    });
+
+    const state = readProjectsState(home);
+    expect(state.projects).toHaveLength(1);
+    expect(state.projects[0]).toMatchObject({
+      repo_root: resolve(repo),
+      coord_ref: 'refs/heads/echo/coord',
+      reviews_root: 'backlog/reviews',
+      reviewers: ['codex', 'cursor'],
+      spec_dir: 'backlog',
+    });
+  });
+
+  it('surfaces a lock error without truncating an existing projects.json', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'echo-project-lock-'));
+    cleanupDirs.push(base);
+    const home = join(base, 'home');
+    const repo = join(base, 'repo');
+    mkdirSync(join(home, 'state/projects.json.lock'), { recursive: true });
+    mkdirSync(repo, { recursive: true });
+    const { DEFAULT_PROJECT_CONFIG, upsertProjectRegistration } = await loadPaths();
+
+    expect(() =>
+      upsertProjectRegistration({
+        repoRoot: repo,
+        config: DEFAULT_PROJECT_CONFIG,
+        homeOverride: home,
+        lockTimeoutMs: 1,
+      }),
+    ).toThrow(/projects\.json lock timed out/);
+    expect(existsSync(join(home, 'state/projects.json'))).toBe(false);
   });
 });

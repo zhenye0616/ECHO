@@ -43,6 +43,47 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
+project_config_value() {
+  local key="$1"
+  local default_value="$2"
+  python3 - "$REPO_ROOT" "$key" "$default_value" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+repo_root, key, default = sys.argv[1:4]
+path = Path(repo_root) / ".echo" / "project.json"
+if not path.is_file():
+    print(default)
+    raise SystemExit(0)
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception as exc:
+    print(f"{path}: cannot read project config: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+value = data.get(key, default) if isinstance(data, dict) else default
+if isinstance(value, list):
+    print(",".join(str(v) for v in value))
+else:
+    print(str(value))
+PY
+}
+
+COORD_REF="${ECHO_REVIEW_QUEUE_COORD_REF:-$(project_config_value coord_ref main)}"
+REVIEWS_ROOT="${ECHO_REVIEW_QUEUE_REVIEWS_ROOT:-$(project_config_value reviews_root backlog/reviews)}"
+if [ -z "$COORD_REF" ] || [ -z "$REVIEWS_ROOT" ]; then
+  echo "project config resolved an empty coord_ref or reviews_root" >&2
+  exit 1
+fi
+case "$REVIEWS_ROOT" in
+  /*|../*|*/../*|*..|*\\*)
+    echo "unsafe reviews_root from project config: $REVIEWS_ROOT" >&2
+    exit 1
+    ;;
+esac
+export ECHO_REVIEW_QUEUE_COORD_REF="$COORD_REF"
+export ECHO_REVIEW_QUEUE_REVIEWS_ROOT="$REVIEWS_ROOT"
+
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
 source "$TOOL_DIR/_effect-runner.sh"
@@ -118,6 +159,10 @@ fi
   # worktree, WT + ECHO_REVIEW_QUEUE_REPO_ROOT exports, and unified cleanup.
   source "$TOOL_DIR/_clean-snapshot.sh"
   echo_enter_clean_snapshot "$REVIEWER_NAME"
+  if [ "$COORD_REF" != "main" ]; then
+    git fetch origin "$COORD_REF"
+    git checkout --detach FETCH_HEAD
+  fi
   TOOL_DIR="$WT/tools/review-queue"
   export PYTHONPATH="$TOOL_DIR:${PYTHONPATH:-}"
   source "$TOOL_DIR/_effect-runner.sh"
@@ -270,17 +315,18 @@ PY
 
   resolve_capture_path() {
     local template="$1"
-    python3 - "$template" "$WT" "$REVIEWER_NAME" "$TICK_RUN_ID" "$ITEM_ID" "$ROUND_LABEL" <<'PY'
+    python3 - "$template" "$WT" "$REVIEWER_NAME" "$TICK_RUN_ID" "$ITEM_ID" "$ROUND_LABEL" "$REVIEWS_ROOT" <<'PY'
 from pathlib import Path
 import sys
 
-template, wt, reviewer, run_id, item, round_label = sys.argv[1:7]
+template, wt, reviewer, run_id, item, round_label, reviews_root = sys.argv[1:8]
 value = (
     template
     .replace("{{REVIEWER}}", reviewer)
     .replace("{{RUN_ID}}", run_id)
     .replace("{{ITEM}}", item)
     .replace("{{ROUND}}", round_label)
+    .replace("{{REVIEWS_ROOT}}", reviews_root)
 )
 path = Path(value)
 if not path.is_absolute():
@@ -592,6 +638,7 @@ EOF
     ECHO_COORD_REQUEST_PATH="${ECHO_COORD_REQUEST_PATH:-}" \
     ECHO_COORD_CORRELATION_ID="${ECHO_COORD_CORRELATION_ID:-}" \
     CAPTURE_FAILURE_STATE_FILE="$CAPTURE_FAILURE_STATE_FILE" \
+    REVIEWS_ROOT="$REVIEWS_ROOT" \
     python3 - "$WRAPPER_STATE_FILE" <<'PY'
 from pathlib import Path
 import glob
@@ -606,6 +653,8 @@ reviewer = os.environ["REVIEWER_NAME"]
 pinned = os.environ.get("ECHO_COORD_REQUEST_PATH") or ""
 env_corr = os.environ.get("ECHO_COORD_CORRELATION_ID") or ""
 capture_failure_state_file = os.environ.get("CAPTURE_FAILURE_STATE_FILE") or ""
+reviews_root = os.environ.get("REVIEWS_ROOT") or "backlog/reviews"
+reviews_glob = str(Path(reviews_root) / "*" / "r*" / "request.md")
 
 
 # Keep in sync with _lib.FRONTMATTER_RE. Line-anchored: only delimiter
@@ -714,7 +763,7 @@ def validate_req(req: Path, *, pinned_mode: bool):
 if pinned:
     validate_req(Path(pinned), pinned_mode=True)
 else:
-    for raw in sorted(glob.glob("backlog/reviews/*/r*/request.md")):
+    for raw in sorted(glob.glob(reviews_glob)):
         req = Path(raw)
         try:
             fm = read_fm(req)
@@ -1017,9 +1066,9 @@ PY
     exit "$link_rc"
   fi
 
-  git fetch origin main
-  upstream_path="backlog/reviews/$ITEM_ID/$ROUND_LABEL/$REVIEWER_NAME.md"
-  if git cat-file -e "origin/main:$upstream_path" 2>/dev/null; then
+  git fetch origin "$COORD_REF"
+  upstream_path="$REVIEWS_ROOT/$ITEM_ID/$ROUND_LABEL/$REVIEWER_NAME.md"
+  if git cat-file -e "FETCH_HEAD:$upstream_path" 2>/dev/null; then
     emit_tick_end "$CORRELATION_ID" "upstream_duplicate"
     echo "tick: $upstream_path already exists on origin; duplicate no-op" >&2
     exit 0

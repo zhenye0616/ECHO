@@ -12,6 +12,7 @@ import { request as httpRequest } from 'node:http';
 import { _resetValidatorCacheForTests } from '../../src/coord/roles.js';
 import { startMcpServer, type McpServerHandle } from '../../src/mcp/server.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
+import { COORD_REQUEST_PATH, installCoordRequestFixture } from './coord-request-fixture.js';
 
 const VALID_CORR_BASE = '0a000000-0a00-4000-8000-000000000000';
 
@@ -24,6 +25,7 @@ function uuid(i: number): string {
 
 let storage: MemoryStorage;
 let handle: McpServerHandle;
+let cleanupRequestFixture: (() => void) | undefined;
 
 async function callInvoke(port: number, i: number): Promise<number> {
   const start = Date.now();
@@ -35,7 +37,7 @@ async function callInvoke(port: number, i: number): Promise<number> {
         name: 'coord_invoke',
         arguments: {
           role: 'codex',
-          request_path: 'backlog/reviews/2026-05-16-057b/r1/request.md',
+          request_path: COORD_REQUEST_PATH,
           correlation_id: uuid(i),
         },
       },
@@ -68,6 +70,7 @@ async function callInvoke(port: number, i: number): Promise<number> {
 
 beforeEach(async () => {
   _resetValidatorCacheForTests();
+  cleanupRequestFixture = installCoordRequestFixture();
   storage = new MemoryStorage();
   handle = await startMcpServer(storage, {
     port: 0,
@@ -77,6 +80,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await handle.stop();
+  cleanupRequestFixture?.();
 });
 
 describe('057b AC0 — fire-and-forget spawn timing', () => {
@@ -91,7 +95,7 @@ describe('057b AC0 — fire-and-forget spawn timing', () => {
       expect(elapsed).toBeLessThan(2000);
     }
     // 10 atoms appended successfully — proof the daemon kept running.
-    const events = await storage.query({ source_prefix: 'coord:', limit: 20 });
+    const events = await storage.query({ source_prefix: 'coord:', limit: 50 });
     const invokedCount = events.filter((e) => {
       const md = e.metadata as { coord?: { event_type?: string } } | undefined;
       return md?.coord?.event_type === 'reviewer_invoked';

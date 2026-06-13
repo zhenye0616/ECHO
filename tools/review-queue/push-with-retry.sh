@@ -38,9 +38,56 @@ CONTEXT="${1:-unknown}"
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$TOOL_DIR/_effect-runner.sh"
 
+# Resolve the push target. ECHO_REVIEW_QUEUE_COORD_REF is the authoritative
+# propagation channel — _run_reviewer.sh and combine.py read coord_ref from
+# .echo/project.json and export it before invoking this helper. When the env
+# var is set we use it directly (fast path; no config read).
+#
+# AC5/AC8 no-silent-misconfiguration guardrail (102 B2): when the env var is
+# UNSET we fall back to the default branch — but NOT silently. If the project
+# config declares a NON-DEFAULT coord_ref, an unset env var means a caller
+# failed to propagate it, and silently pushing operational commits to the
+# default branch is exactly the failure the spec forbids ("never silently
+# write to the default branch"). Fail loudly so the misconfiguration surfaces
+# instead of corrupting the default branch.
+DEFAULT_COORD_REF="main"
+if [ -n "${ECHO_REVIEW_QUEUE_COORD_REF:-}" ]; then
+  COORD_REF="$ECHO_REVIEW_QUEUE_COORD_REF"
+else
+  TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  CONFIG_COORD_REF="$(python3 - "$TOPLEVEL" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+repo_root = sys.argv[1]
+path = Path(repo_root) / ".echo" / "project.json"
+if not path.is_file():
+    print("main")
+    raise SystemExit(0)
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception as exc:
+    print(f"{path}: cannot read project config: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+value = data.get("coord_ref", "main") if isinstance(data, dict) else "main"
+print(str(value))
+PY
+)" || exit 2
+  if [ "$CONFIG_COORD_REF" != "$DEFAULT_COORD_REF" ]; then
+    echo "push-with-retry.sh: project config declares coord_ref='$CONFIG_COORD_REF' but ECHO_REVIEW_QUEUE_COORD_REF is unset — refusing to silently push to default branch '$DEFAULT_COORD_REF' (AC5/AC8 no-silent-misconfiguration guardrail; the caller must export ECHO_REVIEW_QUEUE_COORD_REF)." >&2
+    exit 2
+  fi
+  COORD_REF="$DEFAULT_COORD_REF"
+fi
+if [ -z "$COORD_REF" ]; then
+  echo "push-with-retry.sh: ECHO_REVIEW_QUEUE_COORD_REF resolved empty" >&2
+  exit 2
+fi
+
 for attempt in 1 2; do
   set +e
-  echo_effect push -- bash -c 'git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin HEAD:main'
+  echo_effect push -- bash -c 'git -c rebase.autoStash=true pull --rebase=merges origin "$1" && git push origin "HEAD:$1"' _ "$COORD_REF"
   rc=$?
   set -e
   if [ "$rc" -eq 0 ]; then

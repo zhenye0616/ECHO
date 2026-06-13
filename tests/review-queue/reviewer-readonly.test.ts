@@ -1,4 +1,4 @@
-import { spawnSync, execSync } from 'node:child_process';
+import { spawnSync, execSync, execFileSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -26,12 +26,7 @@ type MockMode =
   | 'empty_stdout'
   | 'write_denied'
   | 'wrong_binding';
-type RequestState =
-  | 'selected'
-  | 'selected_fm_dashes'
-  | 'none'
-  | 'stale_combined'
-  | 'bind_failed';
+type RequestState = 'selected' | 'selected_fm_dashes' | 'none' | 'stale_combined' | 'bind_failed';
 
 interface Fixture {
   base: string;
@@ -307,6 +302,29 @@ function originHas(fx: Fixture, path: string): boolean {
   return r.status === 0;
 }
 
+function fetchOriginRef(fx: Fixture, ref: string) {
+  execFileSync('git', ['fetch', '-q', 'origin', `${ref}:refs/remotes/origin/${ref}`], {
+    cwd: fx.repo,
+  });
+}
+
+function showOriginRef(fx: Fixture, ref: string, path: string): string {
+  fetchOriginRef(fx, ref);
+  return execFileSync('git', ['show', `refs/remotes/origin/${ref}:${path}`], {
+    cwd: fx.repo,
+    encoding: 'utf-8',
+  });
+}
+
+function originRefHas(fx: Fixture, ref: string, path: string): boolean {
+  fetchOriginRef(fx, ref);
+  const r = spawnSync('git', ['cat-file', '-e', `refs/remotes/origin/${ref}:${path}`], {
+    cwd: fx.repo,
+    encoding: 'utf-8',
+  });
+  return r.status === 0;
+}
+
 function readRecord(fx: Fixture, name: string): string {
   const path = join(fx.recordDir, name);
   return existsSync(path) ? readFileSync(path, 'utf-8') : '';
@@ -355,23 +373,26 @@ describe('087b reviewer read-only wrapper publisher', () => {
     ['empty_stdout', 'empty_stdout', 'child stdout was empty'],
     ['write_denied', 'rc_nonzero', 'Operation not permitted'],
     ['invalid_final', 'schema_invalid', 'no frontmatter block found'],
-  ])('turns %s capture into a durable terminal marker with diagnostics', (mode, failure, diagnostic) => {
-    const fx = setupFixture();
-    fixtures.push(fx);
+  ])(
+    'turns %s capture into a durable terminal marker with diagnostics',
+    (mode, failure, diagnostic) => {
+      const fx = setupFixture();
+      fixtures.push(fx);
 
-    const r = runWrapper(fx, mode);
-    expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).not.toBe(0);
+      const r = runWrapper(fx, mode);
+      expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).not.toBe(0);
 
-    const marker = showOrigin(fx, `backlog/reviews/${ITEM_ID}/r1/codex.capture-failed`);
-    expect(marker).toContain(`failure_class: "${failure}"`);
-    expect(marker).toContain('rc:');
-    const errors = showOrigin(fx, 'raw/internal/queue-errors.md');
-    expect(errors).toContain(`CAPTURE-FAIL: reviewer=codex failure=${failure}`);
-    expect(errors).toContain(diagnostic);
-    expect(readRecord(fx, 'coord-events')).toContain(
-      '--payload={"outcome":"terminal_capture_failure"}',
-    );
-  });
+      const marker = showOrigin(fx, `backlog/reviews/${ITEM_ID}/r1/codex.capture-failed`);
+      expect(marker).toContain(`failure_class: "${failure}"`);
+      expect(marker).toContain('rc:');
+      const errors = showOrigin(fx, 'raw/internal/queue-errors.md');
+      expect(errors).toContain(`CAPTURE-FAIL: reviewer=codex failure=${failure}`);
+      expect(errors).toContain(diagnostic);
+      expect(readRecord(fx, 'coord-events')).toContain(
+        '--payload={"outcome":"terminal_capture_failure"}',
+      );
+    },
+  );
 
   it('skips a failed capture round on the next fresh origin-backed scan', () => {
     const fx = setupFixture();
@@ -432,10 +453,9 @@ describe('087b reviewer read-only wrapper publisher', () => {
 
     // Under the naive split("---", 2) parser this round is invisible: the
     // tick exits 0 with "no codex reviews to write" and never publishes.
-    expect(
-      originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`),
-      `stderr=${r.stderr}`,
-    ).toBe(true);
+    expect(originHas(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`), `stderr=${r.stderr}`).toBe(
+      true,
+    );
     const response = showOrigin(fx, `backlog/reviews/${ITEM_ID}/r1/codex.md`);
     expect(response).toContain('Mock codex review from final assistant message.');
   });
@@ -447,6 +467,48 @@ describe('087b reviewer read-only wrapper publisher', () => {
     const r = runWrapper(fx, 'valid');
     expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).toBe(0);
     expectNoChildSpawn(fx);
+  });
+
+  it('selects requests from the configured coord_ref and publishes responses without touching main', () => {
+    const fx = setupFixture({ requestState: 'none' });
+    fixtures.push(fx);
+
+    mkdirSync(join(fx.repo, '.echo'), { recursive: true });
+    writeFileSync(
+      join(fx.repo, '.echo/project.json'),
+      JSON.stringify(
+        {
+          schema_version: 1,
+          coord_ref: 'echo/coord',
+          reviews_root: 'backlog/reviews',
+          reviewers: ['codex', 'cursor'],
+          spec_dir: 'backlog',
+        },
+        null,
+        2,
+      ),
+    );
+    git('add .echo/project.json', fx.repo);
+    git('commit -q -m "configure coord ref"', fx.repo);
+    git('push -q origin main', fx.repo);
+
+    git('checkout -q -b echo/coord', fx.repo);
+    writeRequest(fx.repo, fx.reviewer, fx.specSha, 'selected');
+    git('add backlog/reviews', fx.repo);
+    git('commit -q -m "coord request"', fx.repo);
+    git('push -q origin HEAD:echo/coord', fx.repo);
+    git('checkout -q main', fx.repo);
+
+    const r = runWrapper(fx, 'valid');
+    expect(r.status, `stdout=${r.stdout}\nstderr=${r.stderr}`).toBe(0);
+
+    const responsePath = `backlog/reviews/${ITEM_ID}/r1/codex.md`;
+    expect(originRefHas(fx, 'echo/coord', responsePath)).toBe(true);
+    expect(originHas(fx, responsePath)).toBe(false);
+
+    const response = showOriginRef(fx, 'echo/coord', responsePath);
+    expect(response).toContain('Mock codex review from final assistant message.');
+    expect(readRecord(fx, 'coord-events')).toContain('--payload={"outcome":"completed"}');
   });
 
   it('classifies stale_combined before spawning the child with the selected correlation id', () => {

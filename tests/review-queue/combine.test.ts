@@ -27,8 +27,13 @@ interface Finding {
   cross_ref?: { round: number; reviewer: string; finding_index: number };
 }
 
-function writeRequest(root: string, round: number, requestedAt: string = '2026-05-12T08:00:00Z') {
-  const dir = join(root, 'backlog/reviews', ITEM_ID, `r${round}`);
+function writeRequest(
+  root: string,
+  round: number,
+  requestedAt: string = '2026-05-12T08:00:00Z',
+  reviewsRoot: string = 'backlog/reviews',
+) {
+  const dir = join(root, reviewsRoot, ITEM_ID, `r${round}`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'request.md'),
@@ -128,6 +133,41 @@ describe('combine.py', () => {
     const r = runCombine(root);
     expect(r.code).toBe(0);
     expect(r.stdout).toMatch(/no rounds to combine/);
+    expect(existsSync(join(root, 'backlog/reviews'))).toBe(false);
+  });
+
+  it('--reviews-root scans and writes combined.md under a custom reviews root', () => {
+    const dir = writeRequest(root, 1, '2026-05-12T08:00:00Z', 'coord/reviews');
+    writeReviewer(dir, 'codex', 1, 'proceed', []);
+    writeReviewer(dir, 'cursor', 1, 'proceed', []);
+
+    const r = runCombine(root, ['--reviews-root=coord/reviews']);
+
+    expect(r.code, r.stderr).toBe(0);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(true);
+    expect(existsSync(join(root, 'backlog/reviews'))).toBe(false);
+  });
+
+  it('reads .echo/project.json reviews_root default before scanning rounds', () => {
+    mkdirSync(join(root, '.echo'), { recursive: true });
+    writeFileSync(
+      join(root, '.echo/project.json'),
+      JSON.stringify({
+        schema_version: 1,
+        coord_ref: 'echo/coord',
+        reviews_root: 'coord/reviews',
+        reviewers: ['codex', 'cursor'],
+        spec_dir: 'backlog',
+      }),
+    );
+    const dir = writeRequest(root, 1, '2026-05-12T08:00:00Z', 'coord/reviews');
+    writeReviewer(dir, 'codex', 1, 'proceed', []);
+    writeReviewer(dir, 'cursor', 1, 'proceed', []);
+
+    const r = runCombine(root);
+
+    expect(r.code, r.stderr).toBe(0);
+    expect(existsSync(join(dir, 'combined.md'))).toBe(true);
     expect(existsSync(join(root, 'backlog/reviews'))).toBe(false);
   });
 
@@ -389,10 +429,7 @@ describe('combine.py', () => {
     // become 2h. At 35min elapsed both are inside their 2h windows →
     // NOT eligible (override semantics, no per-reviewer distinction).
     const dir = writeRequest(root, 1, '2026-05-12T07:25:00Z');
-    const r = runCombine(root, [
-      '--timeout-hours=2',
-      '--now=2026-05-12T08:00:00Z',
-    ]);
+    const r = runCombine(root, ['--timeout-hours=2', '--now=2026-05-12T08:00:00Z']);
     expect(r.code).toBe(0);
     expect(r.stdout).toMatch(/no rounds to combine/);
     expect(existsSync(join(dir, 'combined.md'))).toBe(false);
@@ -413,9 +450,7 @@ describe('combine.py', () => {
     expect(fm.next_round).toBe(null);
     // The missing reviewer appears as a divergent row.
     expect(body).toMatch(/\| cursor \|/);
-    expect(body).toMatch(
-      /did not respond; per 044 AC4 single-reviewer auto-disposition/,
-    );
+    expect(body).toMatch(/did not respond; per 044 AC4 single-reviewer auto-disposition/);
   });
 
   it('AC4b — single-missing-proceed_after_patches → auto-disposition', () => {
