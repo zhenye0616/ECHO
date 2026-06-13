@@ -135,9 +135,9 @@ enabling half; init is the thin scaffolding UX on top.
 - src/coord/paths.ts                          # AC3 — parameterize the request-path regex: containment root + reviews-root from project config; preserve path-containment security; Project_echo default unchanged.
 - tools/review-queue/request.py               # AC4 — `--reviews-root` + read `.echo/project.json`; default `backlog/reviews/`; don't require stage dirs for review-only invocation.
 - tools/review-queue/combine.py               # AC4 — same reviews-root parameterization for the round scan.
-- tools/review-queue/_run_reviewer.sh         # AC5/AC6 — origin/main fetch + duplicate-response check resolve from coord_ref; honor per-project command-dir override; no-silent-misconfig fail-loud.
+- tools/review-queue/_run_reviewer.sh         # AC5 — origin/main fetch + duplicate-response check + round SELECT/READ resolve from coord_ref; no-silent-misconfig fail-loud. AC6 — honor reviews_root-relative artifact-path override (NOT command-dir; command-dir override is item 104).
 - tools/review-queue/push-with-retry.sh       # AC5 — push/rebase target resolves from coord_ref instead of hardcoded origin/main.
-- tools/review-queue/reviewer-bindings.json   # AC6 — templatize artifact paths + agent-command dir; allow per-project override.
+- tools/review-queue/reviewer-bindings.json   # AC6 — templatize artifact paths (reviews_root-relative); allow per-project override. (agent-command-dir override deferred to item 104.)
 - src/cli/commands/                           # AC2 — new `orchestration init` command (confirm exact file path/registration during build, matching existing command structure).
 - src/echo-home/paths.ts                       # AC1/AC2 — `.echo/project.json` schema + loader + defaults; `~/.echo/state/projects.json` registry shape + upsert.
 - tests/coord/                                 # AC3/AC8 — paths.ts containment + project-config resolution + adversarial traversal.
@@ -153,7 +153,7 @@ enabling half; init is the thin scaffolding UX on top.
 - src/coord/paths.ts                                                             # the hardcoded request-path regex being decoupled (the load-bearing change).
 - tools/review-queue/request.py                                                  # the reviews-root coupling point.
 - tools/review-queue/combine.py                                                  # the reviews-root coupling point.
-- tools/review-queue/reviewer-bindings.json                                      # the artifact-path + command-dir coupling point.
+- tools/review-queue/reviewer-bindings.json                                      # the artifact-path coupling point (command-dir override deferred to item 104).
 - src/echo-home/paths.ts                                                         # the `~/.echo` layout the registry/config plug into.
 - backlog/README.md                                                             # the full pipeline contract being scaffolded into onboarded repos.
 - backlog/complete/2026-06-02-084-install-profile-split.md                       # profile/skill-sync context (dogfood profile already syncs the coord skills/roles).
