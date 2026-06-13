@@ -24,9 +24,18 @@
 // construction / stat / spawn / MCP side-effects.
 
 import { fileURLToPath } from 'node:url';
-import { join as pathJoin, resolve as pathResolve, sep as pathSep, basename } from 'node:path';
-import { statSync } from 'node:fs';
+import {
+  join as pathJoin,
+  resolve as pathResolve,
+  sep as pathSep,
+  basename,
+  isAbsolute as pathIsAbsolute,
+  normalize as pathNormalize,
+  relative as pathRelative,
+} from 'node:path';
+import { realpathSync, statSync } from 'node:fs';
 import { loadCoordRoles, type CoordRolesConfig } from './roles.js';
+import { loadProjectConfig } from '../echo-home/paths.js';
 
 /** Canonical reviewer-slug shape — lowercase, starts with letter, no
  *  slashes, no shell metacharacters, no path-traversal characters. The
@@ -58,6 +67,119 @@ export class CoordPathError extends Error {
 interface ResolveReviewerWrapperPathOptions {
   /** Inject a roles config for tests. Production callers omit. */
   coordRoles?: CoordRolesConfig;
+}
+
+interface ResolveCoordRequestPathOptions {
+  /** Repo root containing `.echo/project.json` and the reviews root. */
+  repoRoot?: string;
+  /** Override the configured reviews root for tests or already-resolved callers. */
+  reviewsRoot?: string;
+}
+
+function isWithin(parent: string, child: string): boolean {
+  const rel = pathRelative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !pathIsAbsolute(rel));
+}
+
+function decodeUriPath(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new CoordPathError(
+      `coord_invoke: request_path contains invalid URL encoding: '${value}'.`,
+    );
+  }
+}
+
+/** Validate and resolve a coord request path against the configured reviews root.
+ *
+ * The accepted logical shape is:
+ *   <reviews_root>/<item-id>/r<N>/request.md
+ *
+ * Security is realpath-based, not regex-only: both the repo root and reviews
+ * root are resolved, the reviews root must stay inside the repo, and the
+ * resolved request file must stay inside the resolved reviews root. This
+ * rejects absolute paths, `..` traversal, URL-encoded traversal, a symlinked
+ * reviews root pointing outside the repo, and symlinked request ancestors.
+ */
+export function resolveCoordRequestPath(
+  requestPath: string,
+  opts: ResolveCoordRequestPathOptions = {},
+): string {
+  if (typeof requestPath !== 'string' || requestPath.length === 0) {
+    throw new CoordPathError('coord_invoke: request_path must be a non-empty relative path.');
+  }
+  if (requestPath.includes('\\') || pathIsAbsolute(requestPath)) {
+    throw new CoordPathError(
+      `coord_invoke: request_path must be relative and use forward slashes (got '${requestPath}').`,
+    );
+  }
+  const decoded = decodeUriPath(requestPath);
+  if (decoded !== requestPath) {
+    throw new CoordPathError(
+      `coord_invoke: request_path must not use URL encoding (got '${requestPath}').`,
+    );
+  }
+  const normalizedRequest = pathNormalize(requestPath);
+  if (
+    normalizedRequest === '.' ||
+    normalizedRequest === '..' ||
+    normalizedRequest.startsWith('../') ||
+    normalizedRequest.split(/[\\/]+/).includes('..')
+  ) {
+    throw new CoordPathError(
+      `coord_invoke: request_path traversal is not allowed: '${requestPath}'.`,
+    );
+  }
+
+  const repoRoot = pathResolve(opts.repoRoot ?? REPO_ROOT);
+  const projectConfig =
+    opts.reviewsRoot === undefined ? loadProjectConfig(repoRoot).config : undefined;
+  const reviewsRootRel = opts.reviewsRoot ?? projectConfig!.reviews_root;
+  if (
+    reviewsRootRel.includes('\\') ||
+    pathIsAbsolute(reviewsRootRel) ||
+    pathNormalize(reviewsRootRel)
+      .split(/[\\/]+/)
+      .includes('..')
+  ) {
+    throw new CoordPathError(
+      `coord_invoke: configured reviews_root must be a project-relative path (got '${reviewsRootRel}').`,
+    );
+  }
+
+  let repoReal: string;
+  let reviewsReal: string;
+  let requestReal: string;
+  try {
+    repoReal = realpathSync(repoRoot);
+    reviewsReal = realpathSync(pathResolve(repoRoot, reviewsRootRel));
+    requestReal = realpathSync(pathResolve(repoRoot, normalizedRequest));
+  } catch (err) {
+    throw new CoordPathError(
+      `coord_invoke: request_path realpath validation failed for '${requestPath}': ${(err as Error).message}`,
+    );
+  }
+
+  if (!isWithin(repoReal, reviewsReal)) {
+    throw new CoordPathError(
+      `coord_invoke: configured reviews_root '${reviewsRootRel}' resolves outside repo '${repoReal}'.`,
+    );
+  }
+  if (!isWithin(reviewsReal, requestReal)) {
+    throw new CoordPathError(
+      `coord_invoke: request_path '${requestPath}' resolves outside reviews_root '${reviewsRootRel}'.`,
+    );
+  }
+
+  const relToReviews = pathRelative(reviewsReal, requestReal).split(pathSep).join('/');
+  if (!/^[^/]+\/r[0-9]+\/request\.md$/.test(relToReviews)) {
+    throw new CoordPathError(
+      `coord_invoke: request_path must match '<reviews_root>/<item>/r<N>/request.md' (got '${requestPath}').`,
+    );
+  }
+
+  return requestReal;
 }
 
 /** Validate + resolve the absolute path to `tools/review-queue/run-<role>-reviewer.sh`.
@@ -130,9 +252,7 @@ export function resolveReviewerWrapperPath(
     );
   }
   if (!st.isFile()) {
-    throw new CoordPathError(
-      `coord_invoke: reviewer wrapper '${resolved}' is not a regular file.`,
-    );
+    throw new CoordPathError(`coord_invoke: reviewer wrapper '${resolved}' is not a regular file.`);
   }
   // Owner-executable bit (POSIX mode 0o100). On filesystems without exec
   // bit semantics (e.g. mounted FAT) this check would false-fail; the V1

@@ -254,7 +254,7 @@ function protectedReviewerBindingConfig(reviewer: 'codex' | 'codex-ops', argv: s
           rc_path: 'rc',
         },
         expected_artifact: {
-          path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
+          path: '{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
           schema_ref: 'tools/review-queue/schemas/reviewer.schema.json',
         },
       },
@@ -426,7 +426,7 @@ describe('087 reviewer-bindings.json contract', () => {
                   rc_path: 'rc',
                 },
                 expected_artifact: {
-                  path: 'backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
+                  path: '{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md',
                   schema_ref: 'tools/review-queue/schemas/reviewer.schema.json',
                 },
               },

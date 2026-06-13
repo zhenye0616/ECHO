@@ -19,7 +19,7 @@
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
       },
       "expected_artifact": {
-        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
       }
     },
@@ -31,13 +31,13 @@
       "timeout_sec": 7200,
       "capture": {
         "kind": "committed_file",
-        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "final_message_path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
         "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
       },
       "expected_artifact": {
-        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
       }
     },
@@ -58,7 +58,7 @@
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
       },
       "expected_artifact": {
-        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
       }
     },
@@ -73,13 +73,13 @@
       "timeout_sec": null,
       "capture": {
         "kind": "committed_file",
-        "final_message_path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "final_message_path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "stdout_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stdout.log",
         "stderr_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.stderr.log",
         "rc_path": "raw/internal/review-queue/{{RUN_ID}}/{{REVIEWER}}.rc"
       },
       "expected_artifact": {
-        "path": "backlog/reviews/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
+        "path": "{{REVIEWS_ROOT}}/{{ITEM}}/{{ROUND}}/{{REVIEWER}}.md",
         "schema_ref": "tools/review-queue/schemas/reviewer.schema.json"
       }
     }

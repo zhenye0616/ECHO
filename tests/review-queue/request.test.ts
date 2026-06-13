@@ -59,6 +59,38 @@ describe('request.py', () => {
     expect(body).toMatch(/class: structural-reform/);
   });
 
+  it('--reviews-root writes request.md under a custom reviews root', () => {
+    const r = runRequest(root, ['--reviews-root=coord/reviews']);
+    expect(r.code, r.stderr).toBe(0);
+    const expected = join(root, 'coord/reviews', ITEM_ID, 'r1/request.md');
+    expect(r.stdout.trim()).toBe(expected);
+    expect(readFileSync(expected, 'utf-8')).toMatch(/artifact_path: backlog\/ready\//);
+  });
+
+  it('reads .echo/project.json for reviews_root, reviewers, and spec_dir defaults', () => {
+    rmSync(join(root, 'backlog'), { recursive: true, force: true });
+    mkdirSync(join(root, '.echo'), { recursive: true });
+    mkdirSync(join(root, 'specs'), { recursive: true });
+    writeFileSync(join(root, 'specs', `${ITEM_ID}.md`), '---\nid: ' + ITEM_ID + '\n---\nbody\n');
+    writeFileSync(
+      join(root, '.echo/project.json'),
+      JSON.stringify({
+        schema_version: 1,
+        coord_ref: 'refs/heads/echo/coord',
+        reviews_root: 'coord/reviews',
+        reviewers: ['codex', 'codex-ops'],
+        spec_dir: 'specs',
+      }),
+    );
+
+    const r = runRequest(root);
+
+    expect(r.code, r.stderr).toBe(0);
+    const body = readFileSync(join(root, 'coord/reviews', ITEM_ID, 'r1/request.md'), 'utf-8');
+    expect(body).toMatch(/artifact_path: specs\//);
+    expect(body).toMatch(/- codex-ops/);
+  });
+
   it('find_artifact resolves proposed/ before ready/', () => {
     mkdirSync(join(root, 'backlog/proposed'), { recursive: true });
     writeFileSync(

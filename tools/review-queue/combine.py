@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import json
 import os
 import re
 import sys
@@ -44,6 +45,12 @@ ORPHAN_TMP_AGE_SEC = 30 * 60  # 30 min
 # was removed in favor of the per-reviewer policy; the `--timeout-hours`
 # CLI flag still works as a uniform override for ad-hoc / fixture cases.
 FALLBACK_TIMEOUT_HOURS = 0.5
+DEFAULT_PROJECT_CONFIG = {
+    "coord_ref": "main",
+    "reviews_root": "backlog/reviews",
+    "reviewers": ["codex", "cursor"],
+    "spec_dir": "backlog",
+}
 
 SECTION_RE = re.compile(r"§[^,;+]+")
 
@@ -53,6 +60,38 @@ SECTION_RE = re.compile(r"§[^,;+]+")
 
 def parse_iso_utc(s: str) -> _dt.datetime:
     return _dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
+
+
+def load_project_config(repo_root: Path) -> dict[str, object]:
+    cfg_path = repo_root / ".echo" / "project.json"
+    if not cfg_path.is_file():
+        return dict(DEFAULT_PROJECT_CONFIG)
+    try:
+        raw = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{cfg_path}: invalid JSON: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise SystemExit(f"{cfg_path}: top-level object required")
+    cfg = dict(DEFAULT_PROJECT_CONFIG)
+    cfg.update(raw)
+    for key in ("coord_ref", "reviews_root", "spec_dir"):
+        if not isinstance(cfg.get(key), str) or not str(cfg[key]).strip():
+            raise SystemExit(f"{cfg_path}: {key} must be a non-empty string")
+    reviewers = cfg.get("reviewers")
+    if (
+        not isinstance(reviewers, list)
+        or not reviewers
+        or not all(isinstance(r, str) and r for r in reviewers)
+    ):
+        raise SystemExit(f"{cfg_path}: reviewers must be a non-empty string array")
+    return cfg
+
+
+def safe_rel(value: str, label: str) -> Path:
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise SystemExit(f"{label} must be a project-relative path")
+    return path
 
 
 def normalize_where(where: str) -> tuple[str, list[str]]:
@@ -239,6 +278,7 @@ def _read_requested_reviewers(request_path: Path) -> list[str]:
 
 def find_eligible_rounds(
     repo_root: Path,
+    reviews_root: Path,
     timeout_hours_override: float | None,
     now: _dt.datetime,
 ) -> list[Path]:
@@ -276,7 +316,7 @@ def find_eligible_rounds(
     per-reviewer values from reviewers.json are used (null → fallback).
     """
     out: list[Path] = []
-    reviews = repo_root / "backlog" / "reviews"
+    reviews = repo_root / reviews_root
     if not reviews.is_dir():
         return out
     roster = _reviewers.load_reviewers()
@@ -863,6 +903,7 @@ def assert_git_mutation_target_safe(repo_root: Path, allow_live: bool) -> None:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=None)
+    ap.add_argument("--reviews-root", default=None)
     ap.add_argument(
         "--timeout-hours",
         type=float,
@@ -881,10 +922,16 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
 
     repo_root = Path(args.repo_root).resolve() if args.repo_root else _lib.REPO_ROOT
+    project_config = load_project_config(repo_root)
+    reviews_root = safe_rel(
+        args.reviews_root if args.reviews_root is not None else str(project_config["reviews_root"]),
+        "--reviews-root",
+    )
+    coord_ref = str(project_config["coord_ref"])
     now = parse_iso_utc(args.now) if args.now else _dt.datetime.now(_dt.timezone.utc)
     now_ts = now.timestamp()
 
-    eligible = find_eligible_rounds(repo_root, args.timeout_hours, now)
+    eligible = find_eligible_rounds(repo_root, reviews_root, args.timeout_hours, now)
     if not eligible:
         print("[combine] no rounds to combine")
         return 0
@@ -897,7 +944,7 @@ def main(argv: list[str]) -> int:
 
         assert_git_mutation_target_safe(repo_root, args.allow_live)
         subprocess.run(
-            ["git", "-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main"],
+            ["git", "-c", "rebase.autoStash=true", "pull", "--rebase", "origin", coord_ref],
             cwd=repo_root,
             check=False,
         )
@@ -950,6 +997,7 @@ def main(argv: list[str]) -> int:
                 [str(repo_root / "tools/review-queue/push-with-retry.sh"),
                  f"combine: r{result['frontmatter']['round']} on {result['frontmatter']['item_id']}"],
                 cwd=repo_root,
+                env={**os.environ, "ECHO_REVIEW_QUEUE_COORD_REF": coord_ref},
                 check=False,
             )
 

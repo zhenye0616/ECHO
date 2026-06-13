@@ -82,8 +82,17 @@ function teardown(fx: Fixture) {
   rmSync(fx.base, { recursive: true, force: true });
 }
 
-function bashHelper(cwd: string, helperAbs: string, context: string) {
-  return spawnSync('bash', [helperAbs, context], { cwd, encoding: 'utf-8' });
+function bashHelper(
+  cwd: string,
+  helperAbs: string,
+  context: string,
+  extraEnv: Record<string, string> = {},
+) {
+  return spawnSync('bash', [helperAbs, context], {
+    cwd,
+    encoding: 'utf-8',
+    env: { ...process.env, ...extraEnv },
+  });
 }
 
 describe('050 AC5 — push-with-retry.sh CWD-agnostic + HEAD:main refspec', () => {
@@ -104,6 +113,26 @@ describe('050 AC5 — push-with-retry.sh CWD-agnostic + HEAD:main refspec', () =
     const after = git(fx.repo, 'rev-parse', 'origin/main');
     expect(after).not.toBe(before);
     expect(after).toBe(git(fx.repo, 'rev-parse', 'HEAD'));
+  });
+
+  it('honors ECHO_REVIEW_QUEUE_COORD_REF and leaves origin/main unchanged', () => {
+    const mainBefore = git(fx.repo, 'rev-parse', 'origin/main');
+    execSync('git checkout -q -b echo/coord', { cwd: fx.repo });
+    execSync('git push -q origin HEAD:echo/coord', { cwd: fx.repo });
+
+    writeFileSync(join(fx.repo, 'coord.txt'), 'coord\n');
+    execSync('git add -A && git commit -q -m "coord"', { cwd: fx.repo });
+    const coordHead = git(fx.repo, 'rev-parse', 'HEAD');
+
+    const r = bashHelper(fx.repo, join(fx.repo, fx.helper), 'unit: coord-ref-push', {
+      ECHO_REVIEW_QUEUE_COORD_REF: 'echo/coord',
+    });
+
+    expect(r.status, r.stderr).toBe(0);
+    execSync('git fetch -q origin echo/coord', { cwd: fx.repo });
+    expect(git(fx.repo, 'rev-parse', 'FETCH_HEAD')).toBe(coordHead);
+    execSync('git fetch -q origin main', { cwd: fx.repo });
+    expect(git(fx.repo, 'rev-parse', 'origin/main')).toBe(mainBefore);
   });
 
   it('(d) commits pushed from a detached-HEAD worktree at $TMPDIR/echo-<role>-<uuid> land on origin/main; rev-parse origin/main matches WT HEAD (HEAD:main refspec is load-bearing)', () => {

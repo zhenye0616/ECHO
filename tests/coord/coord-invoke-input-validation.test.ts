@@ -14,12 +14,14 @@ import { request as httpRequest } from 'node:http';
 import { _resetValidatorCacheForTests } from '../../src/coord/roles.js';
 import { startMcpServer, type McpServerHandle } from '../../src/mcp/server.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
+import { COORD_REQUEST_PATH, installCoordRequestFixture } from './coord-request-fixture.js';
 
 const VALID_CORR = 'c9b71286-5f67-4a6c-9a5a-ab6ed07ce4ef';
-const VALID_REQ_PATH = 'backlog/reviews/2026-05-16-057b/r1/request.md';
+const VALID_REQ_PATH = COORD_REQUEST_PATH;
 
 let storage: MemoryStorage;
 let handle: McpServerHandle;
+let cleanupRequestFixture: (() => void) | undefined;
 
 async function callMcp(
   port: number,
@@ -73,6 +75,7 @@ async function callMcp(
 
 beforeEach(async () => {
   _resetValidatorCacheForTests();
+  cleanupRequestFixture = installCoordRequestFixture();
   storage = new MemoryStorage();
   handle = await startMcpServer(storage, {
     port: 0,
@@ -82,6 +85,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await handle.stop();
+  cleanupRequestFixture?.();
 });
 
 async function countReviewerInvokedAtoms(): Promise<number> {

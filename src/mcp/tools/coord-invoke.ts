@@ -32,7 +32,12 @@ import { z } from 'zod';
 import { createLogger } from '../../logging/index.js';
 import type { DeadlineTracker } from '../../coord/deadlines.js';
 import { emitReviewerInvoked } from '../../coord/internal-emitter.js';
-import { REPO_ROOT, CoordPathError, resolveReviewerWrapperPath } from '../../coord/paths.js';
+import {
+  REPO_ROOT,
+  CoordPathError,
+  resolveCoordRequestPath,
+  resolveReviewerWrapperPath,
+} from '../../coord/paths.js';
 import type { CoordRolesConfig } from '../../coord/roles.js';
 import type { Storage } from '../../storage/interface.js';
 
@@ -43,15 +48,10 @@ const SCHEMA_VERSION = 1;
 /** Canonical uuid4 regex (r3 codex F2 MED). Enforces version-4 nibble
  *  AND `[89ab]` variant byte AND lowercase. The prior `[a-f0-9-]{36}`
  *  was too loose. */
-const UUID4_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-
-/** Request-path shape — strict allow-list. No traversal, no shell
- *  metacharacters, no absolute paths. Mirrors backlog/reviews/<slug>/r<N>/request.md. */
-const REQUEST_PATH_RE = /^backlog\/reviews\/[a-z0-9-]+\/r[0-9]+\/request\.md$/;
+const UUID4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export const COORD_INVOKE_DESCRIPTION =
-  'INTERNAL: strategist-side active-trigger seam. Spawns the reviewer wrapper for `role` to review the request file at `request_path`, after synchronously appending `coord:reviewer_invoked` so the daemon-side deadline tracker opens the pre-spawn deadline BEFORE the child can emit `tick_start`. Inputs: `role` (canonical reviewer slug — lowercase, `[a-z][a-z0-9-]*`, must be present in coord-roles.json with headless:true); `request_path` (must match `backlog/reviews/<slug>/r<N>/request.md`); `correlation_id` (canonical uuid4 — version-4 nibble + variant byte enforced). The wrapper is spawned fire-and-forget (detached, stdio ignored, cwd=REPO_ROOT) with env vars ECHO_REVIEW_QUEUE_REPO_ROOT, ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID — the wrapper reads these to bind to the exact request rather than scan-picking, then resolves the vendor child argv from tools/review-queue/reviewer-bindings.json. Async spawn failures (EMFILE, missing executable, bad shebang) are logged structured and DO NOT crash the daemon; the pre-spawn deadline still fires `coord:deadline_missed` naturally if the child never emits `tick_start`.';
+  'INTERNAL: strategist-side active-trigger seam. Spawns the reviewer wrapper for `role` to review the request file at `request_path`, after synchronously appending `coord:reviewer_invoked` so the daemon-side deadline tracker opens the pre-spawn deadline BEFORE the child can emit `tick_start`. Inputs: `role` (canonical reviewer slug — lowercase, `[a-z][a-z0-9-]*`, must be present in coord-roles.json with headless:true); `request_path` (must live under the configured reviews_root and match `<reviews_root>/<slug>/r<N>/request.md` after realpath containment validation); `correlation_id` (canonical uuid4 — version-4 nibble + variant byte enforced). The wrapper is spawned fire-and-forget (detached, stdio ignored, cwd=REPO_ROOT) with env vars ECHO_REVIEW_QUEUE_REPO_ROOT, ECHO_COORD_REQUEST_PATH, ECHO_COORD_CORRELATION_ID — the wrapper reads these to bind to the exact request rather than scan-picking, then resolves the vendor child argv from tools/review-queue/reviewer-bindings.json. Async spawn failures (EMFILE, missing executable, bad shebang) are logged structured and DO NOT crash the daemon; the pre-spawn deadline still fires `coord:deadline_missed` naturally if the child never emits `tick_start`.';
 
 export interface CoordInvokeResult {
   schema_version: 1;
@@ -99,11 +99,7 @@ export function registerCoordInvoke(server: McpServer, deps: CoordInvokeDependen
             `coord_invoke: correlation_id must match canonical uuid4 (got '${String(input.correlation_id)}')`,
           );
         }
-        if (typeof input.request_path !== 'string' || !REQUEST_PATH_RE.test(input.request_path)) {
-          throw new Error(
-            `coord_invoke: request_path must match 'backlog/reviews/<slug>/r<N>/request.md' (got '${String(input.request_path)}')`,
-          );
-        }
+        resolveCoordRequestPath(input.request_path);
 
         // Step 2 — role validation + wrapper-path resolution (5-step gate
         // inside resolveReviewerWrapperPath: shape, roster, construction,

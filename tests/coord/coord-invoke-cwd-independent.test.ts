@@ -17,20 +17,24 @@ import { request as httpRequest } from 'node:http';
 import { _resetValidatorCacheForTests } from '../../src/coord/roles.js';
 import { startMcpServer, type McpServerHandle } from '../../src/mcp/server.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
+import { COORD_REQUEST_PATH, installCoordRequestFixture } from './coord-request-fixture.js';
 
 const VALID_CORR = 'c9b71286-5f67-4a6c-9a5a-ab6ed07ce4ef';
 
 let originalCwd: string;
 let storage: MemoryStorage;
 let handle: McpServerHandle;
+let cleanupRequestFixture: (() => void) | undefined;
 
 beforeEach(() => {
   originalCwd = process.cwd();
   _resetValidatorCacheForTests();
+  cleanupRequestFixture = installCoordRequestFixture();
 });
 afterEach(async () => {
   if (handle) await handle.stop();
   if (process.cwd() !== originalCwd) process.chdir(originalCwd);
+  cleanupRequestFixture?.();
 });
 
 describe('057b AC0 — coord_invoke cwd-independent (r2 codex-ops F4 HIGH)', () => {
@@ -52,7 +56,7 @@ describe('057b AC0 — coord_invoke cwd-independent (r2 codex-ops F4 HIGH)', () 
           name: 'coord_invoke',
           arguments: {
             role: 'codex',
-            request_path: 'backlog/reviews/2026-05-16-057b/r1/request.md',
+            request_path: COORD_REQUEST_PATH,
             correlation_id: VALID_CORR,
           },
         },
@@ -79,7 +83,10 @@ describe('057b AC0 — coord_invoke cwd-independent (r2 codex-ops F4 HIGH)', () 
               const parsed = JSON.parse(buf);
               const r = parsed.result ?? {};
               const content = (r.content as Array<{ text?: string }> | undefined) ?? [];
-              resolve({ isError: r.isError === true, text: content.map((c) => c.text ?? '').join('') });
+              resolve({
+                isError: r.isError === true,
+                text: content.map((c) => c.text ?? '').join(''),
+              });
             } catch {
               reject(new Error(`bad response: ${buf}`));
             }

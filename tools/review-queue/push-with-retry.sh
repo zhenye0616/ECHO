@@ -37,10 +37,15 @@ set -e
 CONTEXT="${1:-unknown}"
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$TOOL_DIR/_effect-runner.sh"
+COORD_REF="${ECHO_REVIEW_QUEUE_COORD_REF:-main}"
+if [ -z "$COORD_REF" ]; then
+  echo "push-with-retry.sh: ECHO_REVIEW_QUEUE_COORD_REF resolved empty" >&2
+  exit 2
+fi
 
 for attempt in 1 2; do
   set +e
-  echo_effect push -- bash -c 'git -c rebase.autoStash=true pull --rebase=merges origin main && git push origin HEAD:main'
+  echo_effect push -- bash -c 'git -c rebase.autoStash=true pull --rebase=merges origin "$1" && git push origin "HEAD:$1"' _ "$COORD_REF"
   rc=$?
   set -e
   if [ "$rc" -eq 0 ]; then
