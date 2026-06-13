@@ -83,26 +83,32 @@ only gains a registry entry, not lifecycle authority.
   `tools/review-queue/_run_reviewer.sh` and the push/rebase target in
   `tools/review-queue/push-with-retry.sh` resolve from `coord_ref`. **No-silent-misconfiguration
   guardrail:** if `coord_ref` is non-default but a helper would still target the default branch,
-  fail loudly — never silently write to the default branch. An unattended side-ref test proves a
-  reviewer response lands on `coord_ref` without touching the default branch. NOTE: the
-  claim/stage-transition (`ready→claimed→…`) coord_ref plumbing rides with the `process-backlog`
-  claim mechanics and is therefore part of **item 104**, not 102 (see Scope boundary, Locked #3).
-- **AC6 — Reviewer bindings overridable per project.** `reviewer-bindings.json` artifact paths
-  + the agent-command dir (`.claude/commands/review-queue-<reviewer>.md`) are templatized /
-  overridable, **and the binding-resolution/invocation consumer that reads them**
-  (`tools/review-queue/_run_reviewer.sh`) honors the override (r1 codex) — not just the JSON.
-  A fixture proves an onboarded repo can point at the `~/.echo/skills` command copies and run a
-  reviewer tick **without any in-repo `.claude/commands`**.
+  fail loudly — never silently write to the default branch. **Read side (r2 codex-ops):** the
+  reviewer tick must FETCH and SELECT/READ rounds from `coord_ref` — request selection and artifact
+  reads, not only the response write — so a tick starting from a default-branch checkout still finds
+  a request that exists only on the side ref (otherwise the unattended loop is non-runnable on a
+  side-ref repo). NOTE: the claim/stage-transition (`ready→claimed→…`) coord_ref plumbing rides with
+  the `process-backlog` claim mechanics and is therefore part of **item 104**, not 102 (see Scope
+  boundary, Locked #3).
+- **AC6 — Reviewer-bindings artifact paths overridable per project.** `reviewer-bindings.json`
+  artifact paths are templatized / made `reviews_root`-relative so an onboarded repo's responses
+  land in the right tree, and the binding-resolution consumer (`tools/review-queue/_run_reviewer.sh`)
+  honors that. **Deferred to item 104 (r2 codex):** the agent-command-dir override — running a
+  reviewer tick against external `~/.echo` command copies *without* in-repo `.claude/commands` —
+  needs a `.echo/project.json` command-dir carrier + `init` writing it, which is skill/command
+  genericization (104's domain). 102 assumes the reviewer command files are reachable (synced or
+  in-repo); it does not add the command-dir override.
 - **AC7 — Regression.** Project_echo's own review-queue + backlog suites stay green; the
   default config reproduces current behavior (prove with the existing tests + a default-config
   conformance test).
 - **AC8 — Tests.** Init (scaffold + register + idempotent + **concurrent-upsert atomicity**),
   config loader + defaults, decoupled `paths.ts` (containment + project-config resolution +
   **adversarial cases: `..`, absolute, URL-encoded, symlinked `reviews_root`, symlinked request
-  ancestor**), request/combine reviews-root, the configurable-coord_ref **unattended side-ref test**
-  (response lands on `coord_ref`, default branch untouched) + the **no-silent-misconfiguration
-  fail-loud** case, and the AC6 **external-command-copy fixture** (reviewer tick with no in-repo
-  `.claude/commands`).
+  ancestor**), request/combine reviews-root, the configurable-coord_ref **unattended side-ref test** — a
+  request existing ONLY on `coord_ref` is selected, read, reviewed, and written back to `coord_ref`
+  with the default branch untouched (r2 codex-ops: read+select side, not only write) — plus the
+  **no-silent-misconfiguration fail-loud** case. (The AC6 external-command-copy fixture moves to
+  item 104 with the command-dir override.)
 
 **Split seam (if spec-review finds this too large):** cut along {AC1+AC3+AC4+AC5+AC6 — the
 path/ref decoupling} | {AC2 — the init command + registration}. The decoupling is the
@@ -113,7 +119,9 @@ enabling half; init is the thin scaffolding UX on top.
 - **The `~/.echo` projection/index/lease control plane** beyond the minimal `projects.json`
   registry write — cross-repo status view, leases, `echo orchestration status` are **item 103**.
 - **Skill genericization** (`process-backlog`/`review-queue-*`/`merge-and-cleanup` embedding
-  Project_echo paths + the `~/Desktop/Project_echo--<slug>` worktree convention) — **item 104**.
+  Project_echo paths + the `~/Desktop/Project_echo--<slug>` worktree convention; plus the
+  **agent-command-dir override** + `.echo/project.json` command-dir carrier so a reviewer tick runs
+  against external `~/.echo` command copies without in-repo `.claude/commands` — r2 codex) — **item 104**.
   Because the claim mechanics live in these skills, **full builder-pipeline operation on an
   onboarded repo depends on 104**; 102 scaffolds the pipeline structure + the review loop only.
 - **Onboarding overton** — **item 105** (operational proof + friction capture).
