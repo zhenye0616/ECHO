@@ -1,5 +1,7 @@
 # Office Hours — Team/Org-Scope Context Capture (2026-06-06)
 
+> **→ DIRECTION SHIFT (2026-06-18):** the team/org-scope expansion this session parked ("zero firsthand evidence; no team workflow to dogfood") was committed as the **next-sprint direction** on 2026-06-18 — as a **conviction bet, not demand-validated** (this session's gates were skipped, not cleared). See `2026-06-18-office-hours-cross-human-context-ecosystem.md` and memory `project_cross_human_ecosystem_bet`.
+
 **Topic interrogated:** Founder proposed team-scope / organization-scope context capture as ECHO's next layer once the personal context layer's gaps close ("ready for beta"). Is the expansion sound, and what does it break?
 
 **Mode:** Startup (six forcing questions, anti-sycophancy).

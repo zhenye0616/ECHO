@@ -1,5 +1,7 @@
 # 2026-06-13 — Machine-global orchestration layer + per-project onboarding
 
+> **→ DIRECTION SHIFT (2026-06-18):** this doc's "customer productization stays deferred" lock was reopened on 2026-06-18 — the founder committed a customer-facing multi-human ecosystem (B2 federated) as the next-sprint direction (conviction bet, not demand-validated). The orchestration loop here is reframed as the **personal tier**; the ecosystem is the new tier. See `2026-06-18-office-hours-cross-human-context-ecosystem.md` and memory `project_cross_human_ecosystem_bet`.
+
 **Status:** Brainstormed 2026-06-13 in Claude Code strategist conversation; founder made all four architecture calls live (see Locked decisions). Decomposition into backlog items begins with `backlog/proposed/2026-06-13-102-orchestration-init-per-project.md`; the remaining subsystems are listed below and get their own items as the founder picks them up.
 
 **Why this lives in `raw/internal/decisions/` and not `backlog/`:** the design spans 4-5 independent subsystems. Per CLAUDE.md + brainstorming-skill decomposition rules, the strategic design is archived here; each subsystem is specced as its own `backlog/proposed/<id>.md`. This is the meta.

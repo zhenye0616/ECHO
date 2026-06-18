@@ -1,5 +1,7 @@
 # Office Hours — the wedge is the loop, and the alpha persona is the hand-rolled orchestrator
 
+> **→ DIRECTION SHIFT (2026-06-18):** the binding constraint named here ("can't name person #2") was NOT cleared but was overridden on 2026-06-18 by a **conviction bet** on the multi-human cross-tool ecosystem (B2 federated). The constraint still stands as unmet — the bet proceeds on belief, pending an n=1 validation. See `2026-06-18-office-hours-cross-human-context-ecosystem.md` and memory `project_cross_human_ecosystem_bet`.
+
 **Date:** 2026-06-01 (second office-hours session of the day; deeper than the morning's n=1 install prep)
 **Mode:** Startup (rigorous interrogation), ECHO-adapted
 **Topic interrogated:** Product validation — the uncomfortable one. Pulled apart into: *what has actually been validated, for which customer, and who is the alpha persona.*
