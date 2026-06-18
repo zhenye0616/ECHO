@@ -64,6 +64,18 @@ Decision gate (founder picked, consciously):
 
 ---
 
+## INVARIANT — the orchestration loop stays completely personal (founder, 2026-06-18)
+
+The orchestration loop (claim → review → build → merge) is **single-operator (column A), permanently.** The ecosystem tier NEVER makes the loop multi-human. The team interfaces with the loop only at its **edges**, never inside it:
+
+- **Input edge:** a meeting decision / promised feature becomes a spec / Linear task that feeds the founder's *own* loop — he gates what enters.
+- **Output edge:** the loop writes results to Linear, and/or the founder *consent-shares* a result atom into a teammate's ECHO.
+- **Never:** cofounders / engineering as co-participants in claim / review / merge.
+
+This reinterprets the Q4 phrase "agents discuss with you/engineering" as: **agents discuss with *you* inside the loop; engineering receives the loop's *output* via Linear or a consent-shared artifact, outside it.** Effect: the loop carries **no permission / multi-human machinery** — it stays column A, the ecosystem is column B (federated), and the two connect at **arm's length** (Linear + consent-shared atoms), never merge. This is what protects the *validated* wedge (the loop) from the *unvalidated* bet (the ecosystem). Already true in shipped code — item 102 made the loop per-project and single-operator; this is a forward guardrail on the ecosystem design so it cannot drift into entangling the loop.
+
+---
+
 ## Future-fit (Q7)
 
 Founder's answer: tool-agnostic — meetings / PM / comms as *categories* outlast Granola / Linear / Slack as *products*. **Fair on durability.** But it dodged the asked question (why the cross-tool layer survives when each tool ships its own "ask my data" AI). The real mechanism — gestured at, not grabbed: **the moat is the cross-tool JOIN no single vendor can see** (meeting decision → Linear task → repo build → validation back). Granola owns the meeting, Linear the task, GitHub the build; none can assemble the chain. Strong — **but only holds if ECHO owns all the surfaces' data, which loops straight back to the (deferred) sharing-edge / permission question at team scale.**
