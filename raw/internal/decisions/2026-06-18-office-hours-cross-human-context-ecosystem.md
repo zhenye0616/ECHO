@@ -4,6 +4,8 @@
 **Mode:** Startup (six forcing questions + choice gates)
 **Output:** design doc only (no code, no spec) — per `/office-hours` discipline.
 
+> **→ REFINED same day by `2026-06-18-office-hours-ceo-loop-rationale-capture.md` (session 2).** The B2-federated ecosystem below is the *long-term* architecture, but it is **NOT the next sprint.** A second interrogation + a live ECHO test established that the next sprint is the **n=2 rationale-capture loop**: the gap that closes the CEO loop is *captured decision rationale (the "why")*, not shared data — and federation is unnecessary at n=2. Read session 2 for the corrected sequencing; this doc stands as the long-term-direction record.
+
 **Grounded in (ECHO sources):**
 - `find_clusters` (2026-06-01 → 06-18): rank-1 cluster entirely Project_echo orchestration work (git 512 / claude_code 400 / codex 14); **zero meeting/Granola atoms** — the triggering surface is captured nowhere in ECHO.
 - `search_memories "meeting"` / `"queryable"`: surfaced the founder's OWN startup ticket **Justinian.ai JUS-17** ("per-stage signal attrition — VISIBLE and QUERYABLE, not reconstructed by hand") — the same word, same shape, at the product layer; and the **2026-06-05 office-hours close** ("ECHO is the moat, not the painkiller… earns its place at the next layer — the human coming back, the second operator, the second machine").
