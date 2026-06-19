@@ -71,3 +71,30 @@ Not deeply interrogated this session (flagged as owed). Provisional: meetings/PM
 The recurring move, named: **when the mechanism is uncertain, you resolve the uncertainty by making the plan bigger, not smaller.** Twice this session you answered a *demand* question with your *own* pain reframed as a *platform* (federated ecosystem; "make it bidirectional"). At the decision point you *accepted* the premise that the mechanism is testable on one ECHO alone — and in the same breath proposed the two-machine, CEO-installs-everything version. The uncertainty ("will an LLM produce the why?") got answered by scope ("add Granola, add the CEO, go bidirectional"), not by the five-minute test that actually settles it.
 
 This is the same reflex that produced last session's "conviction bet, three demand gates skipped." It's not always wrong — your override this turn has a genuine argument (cheap cofounder adoption, real datapoint). But the tell is consistent enough to flag: **the architecture is where you go to feel certain when the mechanism is unproven.** The discipline that counters it is the one the live test embodied — *run the smallest thing that can fail before scoping the biggest thing that can ship.*
+
+---
+
+## Wedge refinement (2026-06-19 follow-up discussion) — the sharpened thesis
+
+The interrogation iterated the wedge through several forms; this is where it landed, and it's materially sharper than the morning's framing.
+
+**Rejected framings (and why):**
+- *"ECHO improves org alignment / is another alignment source."* — Loses. Startups already pour high-bandwidth effort into alignment: they **talk constantly**, and conversation is the highest-fidelity channel. A read-view (especially a confabulation-prone one) loses to "just ask the cofounder who was in the room."
+- *"ECHO wins because we're too busy to meet."* — Founder corrected this: it's not *only* busy-ness.
+
+**The landed wedge:** at startup speed, **a lot happens in 12 hours** (investor meeting, sales call, a bank reaching out — all real, all already happened). The team **still meets** — ECHO does **not** replace the sync. But with a **queryable unified context layer consumed *ahead of* the meeting**, the parties don't align from zero: both arrive pre-loaded (or can pull context on demand), so the meeting **skips the "what happened" recap and starts at "what's next."**
+
+**The load-bearing constraint (founder, 2026-06-19, verbatim intent):** **optimize, do NOT replace.** ECHO is additive. It does not replace the meeting, the human judgment, or the decision. Its job is to **strip out the low-value tax** — recap, recite, scrolling through meeting notes, re-deriving status — so scarce human sync-time goes only to what's next. This is the durable scope boundary (and it aligns with V1's "no autonomous action / no destination app" cuts and the [[felt-not-seen]] / [[compose-not-capture]] principles): ECHO removes toil *around* the high-value human work, never the work itself.
+
+**Why this is stronger:**
+1. **Defuses the fidelity objection.** A pre-read that primes a meeting where both humans are present is *forgiving of small errors* — the meeting itself corrects any confabulation. The bar is softer than the "CEO self-serves the why without me" use case.
+2. **Real future-fit mechanism (Q6).** Value **grows with velocity**: the faster the startup moves, the larger and more constantly-stale the recap surface, the bigger the recap tax ECHO deletes. Not "the market grows" — a structural mechanism.
+3. **Doesn't compete with talking** — it deletes talking's lowest-value half.
+
+**The one genuine remaining risk — behavioral, not technical: the pre-read problem.** Meetings recap *because nobody read the pre-read.* "Skip what-happened" only works if the parties actually **query the context before the sync.** If they skip it (as people skip docs) they recap live anyway and ECHO bought nothing. The demand question, in its final form: **will they actually pull context before a meeting — is querying lower-friction than recapping out loud?** This is what n=2 must measure.
+
+**Wedge, one line:** *a queryable context layer that pre-loads fast-moving startups' syncs, so meetings skip the recap (recite / scroll-the-notes / re-derive status) and start at the decision — optimizing the sync, never replacing it.*
+
+### Consequence — DoD upgrade to fold into item 103 (queued, post-review-convergence)
+
+103's current DoD is "CEO self-serves a why query, unprompted, >once." The wedge gives a **sharper, more behavioral success signal** to ADD: **a sync where the recap got skipped because the party arrived pre-loaded from the context layer** — that is the wedge *firing*, and it directly tests the pre-read question. NOT edited into 103 yet because 103 is mid-review by the background two-Codex loop at a pinned SHA; folding it in now would race the reviewers. **Fold this in once that review round converges (or as the next-round input).**
