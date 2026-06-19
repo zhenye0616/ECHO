@@ -72,22 +72,53 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
    produce a why the author would stand behind, across decisions, rather than a confident
    confabulation."**
    - Capture rationale (why / priority / tradeoff / what-it-prevents) for ~3 likely-questioned
-     decisions in a queryable form ECHO ingests (the one-line-why habit).
+     decisions in a queryable form ECHO ingests (the one-line-why habit). **Concrete format:** a
+     one-line `WHY:` comment appended to the relevant Linear ticket description OR a short
+     `raw/internal/decisions/YYYY-MM-DD-<slug>-why.md` note (1–3 sentences max). ECHO ingests these
+     via its existing Linear MCP capture + filesystem watcher; no new capture surface required.
    - **Rigorous (recommended) test — blind grading:** generate whys for 3–4 decisions, some
      deliberately under-grounded; founder flags which are faithful *without knowing which is which*
      (per the project's blind-holdout discipline). Mere agree-with-a-plausible-paragraph is the weak
      version, vulnerable to agreement bias.
+   - **Grading record location:** blind-grading results stored in
+     `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (one row per decision: decision label,
+     generated why, founder faithful/unfaithful verdict, actual rationale source).
+   - **Pass threshold:** ≥3 of 4 decisions graded faithful by founder. Fewer than 3 → STOP; do not
+     proceed to AC2/AC3.
    - **Fail condition:** the reasoning layer confidently produces *unfaithful* whys the author can't
      distinguish from faithful ones → STOP and escalate; a confabulating loop is worse than no loop.
 2. **AC2 — CEO read-view (the engineering core).** A read-only query/chat surface onto the founder's
    eng context, exposable to exactly one other person, that answers "why did we decide X?" in
    business terms. Single-consumer, founder-controlled, **not** productized, **not** multi-tenant,
    **not** a consent matrix. Does NOT require the CEO to run ECHO.
+   - **Minimal surface:** expose the existing MCP server's search/retrieval interface behind a
+     founder-run local proxy or a `claude --mcp` session shared with the CEO (e.g., via a short-lived
+     ngrok tunnel or a pre-built Claude.ai project the founder configures). The CEO opens a URL or
+     a shared Claude context; the founder's ECHO MCP server answers. No new product surface; no
+     web app; no database of its own.
+   - **Auth boundary:** a single pre-shared secret (env var or CLI flag) required to talk to the
+     proxy. Founder can revoke by stopping the process (kill switch = `Ctrl-C` / `pkill`).
+   - **No bearer-link leakage:** the shared link MUST NOT embed the secret in the URL path or query
+     string; the secret is passed as an HTTP header or an interactive prompt at session start. Logs
+     at the MCP server level MUST NOT record raw query text in a location accessible outside the
+     founder's machine.
+   - **Demo command (DoD for AC2):** a one-liner the founder runs to start the read-view, plus the
+     CEO-side command/URL that produces a "why did we prioritize X?" answer without founder help.
 3. **AC3 — n=2 setup (eng→CEO only).** The CEO can query the founder's eng context via the read-view
    in a real two-person configuration. (No CEO install, no Granola — that's 104.)
 4. **AC4 — The watch-signal instrumented.** A way to observe whether the CEO *self-serves a "why"
    query instead of interrupting the founder* — unprompted, and whether it recurs (>once). This is
    the definition-of-done signal; not "done" until observable in real use.
+   - **Durable event record:** the read-view proxy appends a JSON-L entry to
+     `raw/internal/ceo-loop-events.jsonl` for every query, with fields:
+     `timestamp` (ISO-8601 UTC), `consumer_id` (a fixed slug, e.g. `"ceo"`), `query_intent_category`
+     (free-text label the proxy auto-tags from first 5 words of query), `success` (boolean — did
+     the MCP server return a result?), `founder_interrupted` (boolean — founder manually marks this
+     post-hoc via a CLI flag if the CEO asked them the same question anyway).
+   - **Prompted vs. unprompted distinction:** the proxy accepts an optional `--prompted-by-founder`
+     flag at session start; absent that flag, all queries in the session are classified as unprompted.
+   - **Audit command:** `tail -f raw/internal/ceo-loop-events.jsonl | jq .` gives the live feed.
+     Validation is complete when this log shows ≥2 unprompted queries across ≥2 separate sessions.
 
 **Definition of done (validation):** the CEO self-serves a "why" query unprompted, more than once,
 instead of interrupting the founder. If he shrugs / never queries after the pre-flight is in place,
@@ -111,11 +142,20 @@ the loop is dead regardless of architecture — record that honestly as the resu
 
 ## files_to_modify
 
-_To be determined at spec-review / claim time. The engineering core is **AC2 — a single-consumer
-read-view** onto the founder's existing ECHO eng context (retrieval already exists; the new surface
-is exposing a query/chat interface to one other person + minimal auth). AC1 is largely a capture
-*habit* + existing retrieval. Reviewers: confirm AC2's read-view surface is the right minimal shape
-and flag any auth/exposure work that smuggles in multi-tenant/federation scope._
+_The engineering core (AC2) is a founder-run local proxy + event log. Bounded candidate paths —
+builder confirms at claim time; out-of-scope files MUST NOT be touched:_
+
+- `src/surfaces/ceo-read-view/proxy.ts` (NEW — local HTTP proxy wrapping MCP server with bearer auth;
+  OR a shell script if simpler; builder chooses the minimal shape)
+- `src/surfaces/ceo-read-view/README.md` (NEW — start command + CEO-side URL/command; the AC2 demo
+  command lives here)
+- `raw/internal/ceo-loop-events.jsonl` (NEW — append-only event log; created by proxy on first query)
+- `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (NEW — blind grading record; human-
+  authored by founder during AC1 pre-flight, not generated by builder)
+
+_Builder MUST NOT touch `wiki/`, `docs/BACKLOG.md`, MCP server core, capture pipeline, or any
+existing surface. AC1 and AC3 are founder-executed validation steps; they produce files in
+`raw/internal/` but require no code changes._
 
 ## spec_refs
 
