@@ -304,3 +304,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-06-18-103-ceo-context-loop-n2/r6/request.md`; artifact `backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@4e6b41a29bab6119f20453dfdf05f1664f27cf57`; response `backlog/reviews/2026-06-18-103-ceo-context-loop-n2/r6/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-AC53EBCF-D4EC-42A3-8118-1D9308F9BC18/raw/internal/review-queue/2f1d5091-8bfb-43d1-8c33-3712f91cf3f3/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-AC53EBCF-D4EC-42A3-8118-1D9308F9BC18/raw/internal/review-queue/2f1d5091-8bfb-43d1-8c33-3712f91cf3f3/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-19 12:28 PDT - codex builder preflight for process-backlog
+
+- **Trigger:** Founder invoked the codex builder protocol to claim or resume the next ready backlog item in `Project_echo`.
+- **Query inputs:** `echo_ping(message="codex builder preflight 2026-06-19")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-19T00:00:00-07:00", until="2026-06-19T12:28:49-07:00", format="skeleton", view="compact", window_hours=4)`.
+- **Returned:** `echo_ping` returned pong at `2026-06-19T19:28:49.134Z`. `find_clusters` returned one compact cluster `ctx_af349318` labeled "work on project_echo" with 83 atom ids, source breakdown `git:54`, `claude_code:26`, `codex:4`, time range `2026-06-19T17:49:10.792Z` to `2026-06-19T19:27:47.072Z`, and rank reasons `has_open_loop`, `code_session_anchor`.
+- **Sources:** ECHO MCP daemon at `http://127.0.0.1:38478/mcp`; source_breakdown `{git:54, claude_code:26, codex:4}`; repo path filter `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial - connectivity and recent repo context are healthy, but the skeleton cluster is broad and not yet tied to the specific ready item.
+- **Note:** No `get_atoms` follow-up yet because the builder protocol's deterministic `tools/blocked.py` selection should define the concrete item context first.
