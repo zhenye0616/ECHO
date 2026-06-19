@@ -17,7 +17,39 @@ head_sha: "09e18f0818e78264735c8cd8d2b6eb28bd8f6511"
 pr_url: ""
 agent_notes: |
   Implemented AC2 as a dependency-free Slack Socket Mode responder under `src/surfaces/ceo-slack-responder/`: outbound Slack connection, scoped ECHO `search_memories` query gated by required absolute `ECHO_CEO_CONTEXT_REPO_PATH`, Slack reply posting, and the minimal one-line AC4 usage record. Tests/typecheck/lint pass; AC1/AC3 live validation remains founder-run as specified.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-19 via founder reconciliation (sidecar verdict: "merge with founder fixups").
+
+  Conflicts resolved:
+  - None — clean --no-ff merge (ort strategy). The 3 responder files are new; the
+    package.json `files` exclusion and the packed-manifest snapshot line auto-merged.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied:
+  - Packaging BLOCKER: already resolved in-branch by the builder via reviewer-recommended
+    option (b) — package.json `files` carries `!dist/surfaces/ceo-slack-responder/**`, excluding
+    the validation-only surface from the published echoctl package; the packed-manifest snapshot
+    matches. Verified: packed-manifest test 1/1 green post-merge.
+  - AC4 unknown-fields: founder accepts that `unprompted?` and `satisfied-or-DMed-anyway` log as
+    `unknown`, to be filled by a manual Slack-visible tally (spec explicitly permits this for n=2).
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: responder 10/10 + packed-manifest 1/1 green; typecheck, lint, check-coupled-invariants,
+  and sync-skills --check all clean post-merge. Full product suite: 1473/1497 pass with 2 known
+  failures unrelated to this diff — tests/cli/shell-reachable.test.ts (launchctl daemon-install
+  cannot run from an ephemeral worktree) and tests/mcp/recent-calls-endpoint.test.ts (15s flake
+  under parallel load). Founder reviewed both and approved proceeding (they cannot be caused by
+  103's 3 isolated new files + one package.json exclusion line).
+
+  Follow-up items (non-blocking):
+  - AC1 (blind-grade faithful-why) and AC3 (n=2 setup) are founder-executed validation, deferred
+    per the parent item; 103's CODE lands now, its EXPERIMENT waits on forward-captured rationale.
+  - Item 105 (CEO-loop reasoning brain) is unblocked by this merge — extends this responder surface.
+  - Two flaky/environmental product tests (shell-reachable daemon-install, recent-calls-endpoint
+    timeout) are worth a stabilization pass independent of 103.
 ---
 
 > **STRIPPED 2026-06-19 (disposition discipline) — re-opened to `proposed/`.** The two-Codex auto-review
