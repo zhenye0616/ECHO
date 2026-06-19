@@ -51,23 +51,64 @@ your CEO" (this).
 
 ## Acceptance criteria
 
-1. **AC1 — Responder invokes a headless agent as its brain.** On a Slack question, instead of the
-   current direct-`search_memories`-and-dump path (`buildSlackAnswer`), the responder invokes a
-   headless coding agent (`codex exec` by default) with: ECHO MCP access, the `ECHO_CEO_CONTEXT_REPO_PATH`
-   scope, and a prompt to answer the "why" question from that scoped context. It captures the agent's
-   final answer (e.g. `--output-last-message`).
+1. **AC1 — Responder invokes a headless agent as its brain, via a concrete invocation contract.** On a
+   Slack question, instead of the current direct-`search_memories`-and-dump path (`buildSlackAnswer`),
+   the responder invokes a headless coding agent through the contract specified in **"Brain invocation
+   contract"** below (exact argv per brain, cwd, env, stdin/prompt delivery, final-answer capture,
+   timeout, exit-code handling). The brain has ECHO MCP access and is scoped to `ECHO_CEO_CONTEXT_REPO_PATH`.
 2. **AC2 — Synthesized answer posted to Slack.** The agent's synthesized why (business terms, not raw
    atom snippets) is posted back to the Slack thread, replacing the raw-dump path.
-3. **AC3 — Swappable brain.** A single config/env (e.g. `ECHO_CEO_BRAIN=codex|claude`) selects which
-   headless agent is invoked; both `codex exec` and `claude -p` wired, same contract. Adding a third
-   later must not require touching call sites.
-4. **AC4 — Latency UX.** Because a headless agent run takes seconds-to-minutes, the responder posts an
-   immediate ack (e.g. "🤔 looking…") and then the answer (edit-in-place or follow-up message). No
-   silent multi-minute gap.
-5. **AC5 — The re-test (the validation of the fix).** Re-run the canonical query *"why did we build
-   the observability layer?"*. The answer must be a **synthesized why grounded in justinian.ai eng
-   context**, NOT the recency-dump of today's baseline. Capture the before/after for the record.
-6. **AC6 — Usage logging preserved.** Keep 103's AC4 one-line usage record (`ceo-loop-events.md`).
+3. **AC3 — Swappable brain.** A single env (`ECHO_CEO_BRAIN=codex|claude`, default `codex`) selects
+   which headless agent is invoked; both `codex` and `claude` wired to the **same `BrainResult`
+   contract** (see below). Adding a third brain must only require a new entry in the brain registry
+   (`brain.ts`), not changes to `responder.ts` call sites.
+4. **AC4 — Latency UX + bounded failure (never a stuck "looking…").** The responder posts an immediate
+   ack as a **threaded reply** (e.g. "🤔 looking…"), runs the brain, then posts the answer as a **second
+   threaded follow-up message** (NOT edit-in-place — chosen for transport simplicity and so the ack
+   survives if the answer post fails). The brain run is wrapped in a **configurable hard timeout**
+   (`ECHO_CEO_BRAIN_TIMEOUT_MS`, default 180000) with **child-process-tree termination** on timeout. On
+   timeout, non-zero exit, empty capture, or any thrown error, the responder posts a **bounded,
+   user-visible failure message** (e.g. "⚠️ couldn't synthesize an answer — <one-line reason>") to the
+   same thread. No code path leaves the thread sitting at "looking…".
+5. **AC5 — The re-test (the validation of the fix), with a checkable rubric + committed artifact.**
+   Re-run the canonical query *"why did we build the observability layer?"*. Capture the before
+   (103's recency-dump) and after (this brain's answer) into the committed artifact
+   `raw/internal/ceo-loop-retest-105.md`. The "after" answer **MUST** (a) state a *reason/purpose*
+   (a "why", not a "what"), and (b) cite ≥1 concrete justinian.ai eng-context fact (a ticket, a seam,
+   a component, a decision) traceable to the scoped repo; and **MUST NOT** be the verbatim recency-dump
+   of unrelated recent atoms that 103 produced. (Faithfulness grading vs. founder intent stays deferred
+   per the parent item — AC5 checks *synthesis happened over scoped context*, not authorial fidelity.)
+6. **AC6 — Usage + failure logging.** Extend 103's AC4 one-line usage record (`raw/internal/ceo-loop-events.md`)
+   so each brain run logs: timestamp, selected brain, outcome (`ok|timeout|error`), wall-clock duration,
+   Slack thread identity, and — on failure — a bounded (≤200-char) stderr/reason reference. One line per
+   run; no new observability subsystem.
+
+## Brain invocation contract
+
+The swappable invoker (`brain.ts`) exposes one function — `runBrain(question, opts): Promise<BrainResult>` —
+and a small registry keyed by `ECHO_CEO_BRAIN`. Each brain entry declares:
+
+- **argv template:** `codex` → `codex exec -C <scopeRepo> --sandbox read-only -` (prompt on **stdin**),
+  final answer parsed from the JSON event stream's last assistant message (the pattern `_run_reviewer.sh`
+  already uses); `claude` → `claude -p` with the prompt on stdin and the final message captured from
+  stdout. Builder confirms exact flags against the installed CLI versions at claim time and pins them in
+  `brain.ts` (cite the version checked).
+- **cwd:** the resolved `ECHO_CEO_CONTEXT_REPO_PATH` (the scope repo), so the agent's ECHO MCP calls and
+  any file reads land in the scoped slice.
+- **env:** inherit the responder's env (so the ECHO MCP daemon URL/config is visible); invoke
+  **non-interactively** (no TTY prompt) and never require approval. If a brand-new brain needs an
+  absolute binary path because PATH is stripped, that path is a per-brain config knob — but the
+  responder is a **manually-started long-running process, NOT launchd-managed**, so PATH bootstrapping
+  is best-effort, not a hard requirement.
+- **scope enforcement (mechanism, not just claim):** scoping is enforced by (a) cwd = scope repo and
+  (b) the prompt instructing the agent to call ECHO MCP with `repo_path` pinned to the scope repo. This
+  is a *prompt+cwd guard*, not a kernel sandbox; the spec claims exactly that much. The unit test asserts
+  the scope repo is injected into both argv (`-C`) and the prompt.
+- **startup preflight:** on responder boot, verify the selected brain's executable resolves and is
+  invocable (a fast `--version`-style probe); if it is missing or errors, **fail loudly at startup**
+  (clear log line + non-zero exit) rather than failing silently on the first Slack question.
+- **`BrainResult`:** `{ ok: boolean, answer?: string, outcome: "ok"|"timeout"|"error", durationMs, reason? }`
+  — the single shape both brains return and `responder.ts` consumes.
 
 ## Out of Scope (Don't Drift)
 
@@ -88,24 +129,41 @@ your CEO" (this).
 _Builder confirms at claim time; extends item 103's surface. **MUST NOT** touch MCP server core,
 capture pipeline, `wiki/`, or `docs/BACKLOG.md`._
 
+_Builder confirms exact paths at claim time against 103's merged location. Item 103 will have moved
+from `backlog/pending_review/` to `backlog/complete/` by the time this is claimed (this item is
+`blocked_by` 103); the source files below live under `src/`/`tests/` regardless of the backlog item's
+folder._
+
 - `src/surfaces/ceo-slack-responder/responder.ts` — replace the `answerQuestion` direct-search path
   with a headless-agent invocation (capture final message); keep `extractQuestion`, Slack transport,
   and usage logging.
-- `src/surfaces/ceo-slack-responder/brain.ts` (NEW, likely) — the swappable headless-agent invoker
-  (`codex exec` / `claude -p`), prompt construction, scope injection, output capture, timeout/error
-  handling.
-- responder config (env) — add `ECHO_CEO_BRAIN` (+ any per-brain invocation knobs); README update.
-- `tests/surfaces/ceo-slack-responder/*` — brain-invoker unit tests (mock the agent exec; assert
-  scope is injected, output captured, errors handled, swappability).
+- `src/surfaces/ceo-slack-responder/brain.ts` (NEW) — the swappable headless-agent invoker
+  (`runBrain` + registry per the **Brain invocation contract**): prompt construction, scope injection,
+  output capture, hard timeout + child-tree termination, error handling, startup preflight.
+- `src/surfaces/ceo-slack-responder/config.ts` (or the responder's existing env-parsing module —
+  builder confirms the exact filename) — add `ECHO_CEO_BRAIN` (default `codex`) and
+  `ECHO_CEO_BRAIN_TIMEOUT_MS` (default 180000).
+- `src/surfaces/ceo-slack-responder/README.md` — document `ECHO_CEO_BRAIN`, the timeout, and the
+  startup preflight (builder confirms the README path; create if absent).
+- `tests/surfaces/ceo-slack-responder/brain.test.ts` (NEW) — brain-invoker unit tests (mock the agent
+  exec): assert scope repo injected into argv (`-C`) **and** prompt, final answer captured, `outcome`
+  values for ok/timeout/error, timeout terminates the child, swappability across `codex`/`claude`.
+- `tests/surfaces/ceo-slack-responder/responder.test.ts` (extend existing if present, else NEW) —
+  assert the ack is posted **before** the brain resolves and a bounded failure message is posted on
+  brain failure (no stuck "looking…").
 
 ## spec_refs
 
 - `raw/internal/decisions/2026-06-19-ceo-loop-reasoning-layer-and-decision-atoms.md` (design — READ FIRST)
 - `raw/internal/decisions/2026-06-18-office-hours-ceo-loop-rationale-capture.md` (the wedge + AC1)
-- `backlog/pending_review/2026-06-18-103-ceo-context-loop-n2.md` (the responder this extends)
-- `tools/review-queue/run-codex-reviewer.sh`, `tools/backlog/run-codex-builder.sh` (the headless `codex exec` pattern to reuse)
-- `tools/review-queue/reviewers.json` (shows both `codex exec …` and `claude … -p` invocation shapes)
-- Memory: `project_ceo_loop_rationale_capture`
+- The merged item 103 spec at `backlog/complete/2026-06-18-103-ceo-context-loop-n2.md` (the responder
+  this extends; read for AC4 usage-log format and the existing env/transport surface) — read-only
+  reference, not a write target.
+- `tools/review-queue/_run_reviewer.sh` (the headless `codex exec --json` invocation + final-assistant-
+  message parsing pattern to reuse) and `tools/backlog/run-codex-builder.sh`.
+- `tools/review-queue/reviewer-bindings.json` / `reviewers.json` (the `codex exec …` and `claude …`
+  invocation shapes).
+- Memory: `project_ceo_loop_rationale_capture` (read-only context — not a code input).
 
 ## After Completion (Strategist Notes)
 
