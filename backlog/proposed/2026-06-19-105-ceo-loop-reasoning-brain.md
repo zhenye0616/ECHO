@@ -66,10 +66,17 @@ your CEO" (this).
    ack as a **threaded reply** (e.g. "🤔 looking…"), runs the brain, then posts the answer as a **second
    threaded follow-up message** (NOT edit-in-place — chosen for transport simplicity and so the ack
    survives if the answer post fails). The brain run is wrapped in a **configurable hard timeout**
-   (`ECHO_CEO_BRAIN_TIMEOUT_MS`, default 180000) with **child-process-tree termination** on timeout. On
+   (`ECHO_CEO_BRAIN_TIMEOUT_MS`, default 180000). On timeout the responder MUST terminate the **entire
+   process tree**, not just the direct child: a headless `codex`/`claude` agent spawns descendants (the
+   model client, MCP subprocesses) that outlive a bare `child.kill()`. The concrete mechanism: spawn the
+   brain child in its **own process group** (`detached: true` / `setsid`) and on timeout send the kill
+   signal to the **process group** (`process.kill(-pid, 'SIGTERM')`, escalating to `SIGKILL`). On
    timeout, non-zero exit, empty capture, or any thrown error, the responder posts a **bounded,
    user-visible failure message** (e.g. "⚠️ couldn't synthesize an answer — <one-line reason>") to the
-   same thread. No code path leaves the thread sitting at "looking…".
+   same thread. No code path leaves the thread sitting at "looking…". `brain.test.ts` MUST include a
+   **descendant-survival regression test**: a brain stub that forks a child which would outlive its
+   parent, asserting that after a timeout-triggered kill no descendant remains alive (process-group
+   kill, not direct-child-only).
 5. **AC5 — The re-test (the validation of the fix), with a checkable rubric + committed artifact.**
    Re-run the canonical query *"why did we build the observability layer?"*. Capture the before
    (103's recency-dump) and after (this brain's answer) into the committed artifact
@@ -88,11 +95,16 @@ your CEO" (this).
 The swappable invoker (`brain.ts`) exposes one function — `runBrain(question, opts): Promise<BrainResult>` —
 and a small registry keyed by `ECHO_CEO_BRAIN`. Each brain entry declares:
 
-- **argv template:** `codex` → `codex exec -C <scopeRepo> --sandbox read-only -` (prompt on **stdin**),
-  final answer parsed from the JSON event stream's last assistant message (the pattern `_run_reviewer.sh`
-  already uses); `claude` → `claude -p` with the prompt on stdin and the final message captured from
-  stdout. Builder confirms exact flags against the installed CLI versions at claim time and pins them in
-  `brain.ts` (cite the version checked).
+- **argv template:** `codex` → `codex exec -C <scopeRepo> --sandbox read-only --json -` (prompt on
+  **stdin**), final answer parsed from the **JSON event stream's** last assistant message (the exact
+  pattern `_run_reviewer.sh` uses). The `--json` flag is **mandatory and load-bearing**: the capture
+  parser consumes the JSON event stream, so omitting it ships plain stdout that the parser cannot read
+  and turns successful runs into empty-capture errors. `claude` → `claude -p` with the prompt on stdin
+  and the final message captured from stdout (plain-text capture; no JSON flag needed). The argv and the
+  capture mode MUST stay internally consistent per brain. Builder confirms exact flags against the
+  installed CLI versions at claim time and pins them in `brain.ts` (cite the version checked); the
+  `brain.test.ts` for the `codex` brain MUST assert the resolved argv includes `--json` (the flag the
+  parser depends on).
 - **cwd:** the resolved `ECHO_CEO_CONTEXT_REPO_PATH` (the scope repo), so the agent's ECHO MCP calls and
   any file reads land in the scoped slice.
 - **env:** inherit the responder's env (so the ECHO MCP daemon URL/config is visible); invoke
@@ -146,8 +158,10 @@ folder._
 - `src/surfaces/ceo-slack-responder/README.md` — document `ECHO_CEO_BRAIN`, the timeout, and the
   startup preflight (builder confirms the README path; create if absent).
 - `tests/surfaces/ceo-slack-responder/brain.test.ts` (NEW) — brain-invoker unit tests (mock the agent
-  exec): assert scope repo injected into argv (`-C`) **and** prompt, final answer captured, `outcome`
-  values for ok/timeout/error, timeout terminates the child, swappability across `codex`/`claude`.
+  exec): assert scope repo injected into argv (`-C`) **and** prompt, the `codex` argv includes `--json`
+  (the flag the capture parser depends on), final answer captured, `outcome` values for ok/timeout/error,
+  timeout terminates the **whole process group** (descendant-survival regression test — a forked
+  descendant must not outlive a timeout kill), swappability across `codex`/`claude`.
 - `tests/surfaces/ceo-slack-responder/responder.test.ts` (extend existing if present, else NEW) —
   assert the ack is posted **before** the brain resolves and a bounded failure message is posted on
   brain failure (no stuck "looking…").
