@@ -8,6 +8,7 @@ created: 2026-06-18
 blocked_by: []
 task_state_ref: 2026-06-18-103-ceo-context-loop-n2
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 3e4ff59a1fece744d36dbb9ff4c27f5ae403d6c454bde019c9e3a7b66dcfa156
 claimed_by: ""
 claimed_at: ""
 branch: ""

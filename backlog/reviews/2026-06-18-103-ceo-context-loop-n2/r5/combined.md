@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R5. Both reviewers returned `proceed` with zero findings. AC1 (faithful-why proof with blind grading), AC2 (TypeScript proxy, fail-closed, loopback-default, process-group lifecycle), AC3 (n=2 setup), AC4 (JSONL event log with event_id/session_id/interruption annotation, jq DoD audit), and files_to_modify are all clear and buildable. Spec promoted to ready/.
 
