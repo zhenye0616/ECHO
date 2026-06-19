@@ -48,3 +48,4 @@
 2026-06-11T07:15:41Z QUEUE-ERROR: reviewer=codex failure=selection_failed diagnostic=wrapper request selection failed
 2026-06-19T18:19:31Z QUEUE-ERROR: reviewer=codex failure=spec_sha_unreachable spec=backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@03f761d0c2abb99360061fc88275f050e343be62
 2026-06-19T18:19:42Z QUEUE-ERROR: reviewer=codex failure=spec_sha_unreachable spec=backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@03f761d0c2abb99360061fc88275f050e343be62
+2026-06-19T18:19:53Z QUEUE-ERROR: reviewer=codex failure=spec_sha_unreachable spec=backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md@03f761d0c2abb99360061fc88275f050e343be62
