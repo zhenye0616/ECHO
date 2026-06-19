@@ -2,23 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import {
   answerQuestion,
-  buildSlackAnswer,
-  deriveFallbackQuery,
   extractQuestion,
   formatUsageRecord,
   loadResponderConfig,
   normalizeSlackQuestionText,
-  type EchoToolClient,
+  respondToQuestion,
+  type ResponderConfig,
+  type SlackQuestion,
 } from '../../src/surfaces/ceo-slack-responder/responder.js';
+import type { BrainResult } from '../../src/surfaces/ceo-slack-responder/brain.js';
 
 describe('ceo-slack-responder', () => {
-  it('loads the required Slack and scoped ECHO config from env', () => {
+  it('loads Slack, scoped ECHO, and brain config from env', () => {
     const config = loadResponderConfig({
       ECHO_SLACK_APP_TOKEN: 'xapp-token',
       ECHO_SLACK_BOT_TOKEN: 'xoxb-token',
       ECHO_CEO_CONTEXT_REPO_PATH: '/Users/zhenye/justinian.ai',
       ECHO_CEO_SLACK_CHANNEL_IDS: 'C123, D456 ',
       ECHO_CEO_MAX_MATCHES: '3',
+      ECHO_CEO_BRAIN: 'claude',
+      ECHO_CEO_BRAIN_TIMEOUT_MS: '90000',
     });
 
     expect(config).toMatchObject({
@@ -28,7 +31,20 @@ describe('ceo-slack-responder', () => {
       contextRepoPath: '/Users/zhenye/justinian.ai',
       allowedChannelIds: ['C123', 'D456'],
       maxMatches: 3,
+      brain: 'claude',
+      brainTimeoutMs: 90000,
     });
+  });
+
+  it('defaults to the codex brain and 180s timeout', () => {
+    const config = loadResponderConfig({
+      ECHO_SLACK_APP_TOKEN: 'xapp-token',
+      ECHO_SLACK_BOT_TOKEN: 'xoxb-token',
+      ECHO_CEO_CONTEXT_REPO_PATH: '/Users/zhenye/justinian.ai',
+    });
+
+    expect(config.brain).toBe('codex');
+    expect(config.brainTimeoutMs).toBe(180000);
   });
 
   it('requires an absolute scoped repo path', () => {
@@ -39,6 +55,17 @@ describe('ceo-slack-responder', () => {
         ECHO_CEO_CONTEXT_REPO_PATH: 'relative/path',
       }),
     ).toThrow(/absolute path/);
+  });
+
+  it('rejects unknown brain selections', () => {
+    expect(() =>
+      loadResponderConfig({
+        ECHO_SLACK_APP_TOKEN: 'xapp-token',
+        ECHO_SLACK_BOT_TOKEN: 'xoxb-token',
+        ECHO_CEO_CONTEXT_REPO_PATH: '/Users/zhenye/justinian.ai',
+        ECHO_CEO_BRAIN: 'linear',
+      }),
+    ).toThrow(/codex or claude/);
   });
 
   it('extracts direct-message and designated-channel questions while ignoring bot echoes', () => {
@@ -131,130 +158,173 @@ describe('ceo-slack-responder', () => {
     );
   });
 
-  it('derives a literal-search fallback token from a natural-language why question', () => {
-    expect(deriveFallbackQuery('why did we build the observability layer?')).toBe('observability');
-  });
-
-  it('queries search_memories with the scoped repo path and formats a compact answer', async () => {
-    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-    const callTool: EchoToolClient['callTool'] = async <T>(
-      name: string,
-      args: Record<string, unknown>,
-    ) => {
-      calls.push({ name, args });
-      return {
-        matches: [
-          {
-            id: 'm1',
-            source: 'fs:/example/session.jsonl',
-            timestamp: '2026-06-19T18:00:00.000Z',
-            content: 'WHY: observability makes the funnel visible so drops are debuggable.',
-          },
-        ],
-      } as T;
+  it('invokes the selected brain with the scoped repo and timeout', async () => {
+    const calls: Array<{
+      question: string;
+      brain: string;
+      repo: string;
+      timeoutMs: number;
+      echoMcpUrl: string | undefined;
+    }> = [];
+    const result: BrainResult = {
+      ok: true,
+      outcome: 'ok',
+      durationMs: 42,
+      answer: 'Observability was built so the funnel is debuggable.',
     };
 
     const answer = await answerQuestion(
+      question(),
       {
-        envelopeId: 'env-1',
-        channel: 'D123',
-        user: 'UCEO',
-        text: 'why observability?',
+        brain: 'codex',
+        brainTimeoutMs: 1234,
+        contextRepoPath: '/Users/zhenye/justinian.ai',
+        echoMcpUrl: 'http://127.0.0.1:38478/mcp',
       },
-      { callTool },
-      { contextRepoPath: '/Users/zhenye/justinian.ai', maxMatches: 4 },
+      async (asked, opts) => {
+        calls.push({
+          question: asked,
+          brain: opts.brain,
+          repo: opts.contextRepoPath,
+          timeoutMs: opts.timeoutMs,
+          echoMcpUrl: opts.env?.ECHO_MCP_URL,
+        });
+        return result;
+      },
     );
 
+    expect(answer).toBe(result);
     expect(calls).toEqual([
       {
-        name: 'search_memories',
-        args: {
-          query: 'why observability?',
-          repo_path: '/Users/zhenye/justinian.ai',
-          limit: 4,
-        },
+        question: 'why did we build the observability layer?',
+        brain: 'codex',
+        repo: '/Users/zhenye/justinian.ai',
+        timeoutMs: 1234,
+        echoMcpUrl: 'http://127.0.0.1:38478/mcp',
       },
     ]);
-    expect(answer).toContain('Scoped ECHO context: /Users/zhenye/justinian.ai');
-    expect(answer).toContain('WHY: observability makes the funnel visible');
-    expect(answer).toContain('fs:/example/session.jsonl @ 2026-06-19T18:00:00.000Z');
   });
 
-  it('falls back to one scoped keyword search when the literal question has no matches', async () => {
-    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
-    const callTool: EchoToolClient['callTool'] = async <T>(
-      name: string,
-      args: Record<string, unknown>,
-    ) => {
-      calls.push({ name, args });
-      return {
-        matches:
-          args.query === 'observability'
-            ? [
-                {
-                  id: 'm1',
-                  source: 'fs:/example/session.jsonl',
-                  timestamp: '2026-06-19T18:00:00.000Z',
-                  content: 'WHY: observability makes drops visible.',
-                },
-              ]
-            : [],
-      } as T;
-    };
+  it('posts the threaded ack before the brain resolves, then posts the synthesized answer', async () => {
+    const pending = deferred<BrainResult>();
+    const posts: Array<{ text: string; threadTs?: string }> = [];
+    const records: BrainResult[] = [];
 
-    const answer = await answerQuestion(
-      {
-        envelopeId: 'env-1',
-        channel: 'D123',
-        user: 'UCEO',
-        text: 'why did we build observability?',
+    const done = respondToQuestion(question(), config(), {
+      runBrain: async () => pending.promise,
+      postSlackMessage: async (_token, _channel, text, threadTs) => {
+        posts.push({ text, threadTs });
       },
-      { callTool },
-      { contextRepoPath: '/Users/zhenye/justinian.ai', maxMatches: 4 },
-    );
+      appendUsageRecord: async (_path, _question, _brain, result) => {
+        records.push(result);
+      },
+    });
 
-    expect(calls).toEqual([
+    await Promise.resolve();
+    expect(posts).toEqual([{ text: 'Looking...', threadTs: '171000.1' }]);
+
+    pending.resolve({
+      ok: true,
+      outcome: 'ok',
+      durationMs: 55,
+      answer: 'We built observability to spot and debug funnel drops quickly.',
+    });
+    await done;
+
+    expect(posts).toEqual([
+      { text: 'Looking...', threadTs: '171000.1' },
       {
-        name: 'search_memories',
-        args: {
-          query: 'why did we build observability?',
-          repo_path: '/Users/zhenye/justinian.ai',
-          limit: 4,
-        },
-      },
-      {
-        name: 'search_memories',
-        args: {
-          query: 'observability',
-          repo_path: '/Users/zhenye/justinian.ai',
-          limit: 4,
-        },
+        text: 'We built observability to spot and debug funnel drops quickly.',
+        threadTs: '171000.1',
       },
     ]);
-    expect(answer).toContain('WHY: observability makes drops visible.');
+    expect(records).toHaveLength(1);
+    expect(records[0]?.outcome).toBe('ok');
   });
 
-  it('formats no-match answers without widening scope', () => {
-    expect(buildSlackAnswer('why x?', [], '/repo')).toBe(
-      'Scoped ECHO context: /repo\n\nI did not find scoped context for: "why x?".',
-    );
+  it('posts a bounded failure follow-up when the brain fails', async () => {
+    const posts: string[] = [];
+
+    await respondToQuestion(question(), config(), {
+      runBrain: async () => ({
+        ok: false,
+        outcome: 'timeout',
+        durationMs: 180000,
+        reason: 'timed out after 180000ms',
+      }),
+      postSlackMessage: async (_token, _channel, text) => {
+        posts.push(text);
+      },
+      appendUsageRecord: async () => undefined,
+    });
+
+    expect(posts).toEqual([
+      'Looking...',
+      'Could not synthesize an answer - timed out after 180000ms',
+    ]);
   });
 
-  it('formats the minimal AC4 usage record without session or intent schema', () => {
+  it('formats the extended brain usage record', () => {
     const record = formatUsageRecord(
       {
         envelopeId: 'env-1',
         channel: 'D123',
         user: 'UCEO',
         text: 'why "observability"?',
+        ts: '171000.1',
+      },
+      'codex',
+      {
+        ok: false,
+        outcome: 'error',
+        durationMs: 12.4,
+        reason: 'stderr line '.repeat(30),
       },
       new Date('2026-06-19T19:00:00Z'),
     );
 
-    expect(record).toBe(
-      '2026-06-19T19:00:00.000Z · unprompted?=unknown · satisfied-or-DMed-anyway=unknown · channel=D123 · user=UCEO · question="why \\"observability\\"?"\n',
-    );
+    expect(record).toContain('2026-06-19T19:00:00.000Z');
+    expect(record).toContain('thread=171000.1');
+    expect(record).toContain('brain=codex');
+    expect(record).toContain('outcome=error');
+    expect(record).toContain('duration_ms=12');
+    expect(record).toContain('reason="');
+    expect(record).toContain('question="why \\"observability\\"?"');
     expect(record).not.toContain('session_id');
     expect(record).not.toContain('intent_category');
+    const reason = record.match(/reason="([^"]*)"/)?.[1] ?? '';
+    expect(reason.length).toBeLessThanOrEqual(200);
   });
 });
+
+function config(): ResponderConfig {
+  return {
+    slackAppToken: 'xapp-token',
+    slackBotToken: 'xoxb-token',
+    echoMcpUrl: 'http://127.0.0.1:38478/mcp',
+    contextRepoPath: '/Users/zhenye/justinian.ai',
+    allowedChannelIds: [],
+    eventLogPath: 'raw/internal/ceo-loop-events.md',
+    maxMatches: 5,
+    brain: 'codex',
+    brainTimeoutMs: 180000,
+  };
+}
+
+function question(): SlackQuestion {
+  return {
+    envelopeId: 'env-1',
+    channel: 'D123',
+    user: 'UCEO',
+    text: 'why did we build the observability layer?',
+    ts: '171000.1',
+  };
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolveFn: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolveFn = resolve;
+  });
+  return { promise, resolve: resolveFn };
+}
