@@ -9,9 +9,9 @@ blocked_by: ["2026-06-18-103-ceo-context-loop-n2"]
 task_state_ref: 2026-06-19-105-ceo-loop-reasoning-brain
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 9c01e2d29a57248c2f295fd18cbac1bd902eec807222dd428c462d49f7878137
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-19T23:01:42Z"
+branch: "agent/ceo-loop-reasoning-brain"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
