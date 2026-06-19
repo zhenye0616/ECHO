@@ -2,7 +2,7 @@
 id: 2026-06-18-104-slack-meeting-context-capture
 title: "Slack meeting-context capture — the meetings→founder leg of the n=2 loop, via Slack channel capture (NOT Granola; demand-gated behind 103)"
 status: proposed
-priority: MEDIUM
+priority: MED
 estimate: 2-4d (engineering) — after the demand gate clears
 created: 2026-06-19
 blocked_by: []
