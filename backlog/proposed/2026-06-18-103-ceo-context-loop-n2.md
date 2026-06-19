@@ -100,15 +100,22 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
      listener (e.g., ngrok tunnel) requires an explicit founder-run flag (`--public` or equivalent).
      Unattended starts MUST NOT expose the ECHO MCP context wider than loopback.
    - **Auth boundary:** a single non-empty pre-shared secret (env var `CEO_LOOP_SECRET` or CLI
-     `--secret` flag) required to talk to the proxy. Founder revokes by stopping the process
-     (`Ctrl-C` / `pkill`).
+     `--secret` flag) required to talk to the proxy.
    - **No bearer-link leakage:** the shared link/command MUST NOT embed the secret in the URL path
      or query string; the secret is passed as an HTTP header or an interactive CLI prompt. Proxy
      logs and MCP server logs MUST NOT record raw query text, bearer/secret values, or any field
      that would expose founder context outside the machine.
-   - **Demo command (DoD for AC2):** a one-liner the founder runs to start the read-view
-     (loopback + tunnel), plus the CEO-side command/URL that produces a "why did we prioritize X?"
-     answer without founder help.
+   - **Process-group lifecycle and revocation:** the proxy and any public tunnel (e.g., ngrok) MUST
+     run under a single process group (e.g., the start script forks the tunnel, traps SIGINT/SIGTERM,
+     and sends `kill 0` on exit). Stopping the proxy MUST terminate the tunnel — a partial `Ctrl-C`
+     that kills the proxy while leaving the tunnel alive is not acceptable. The start script MUST fail
+     with a non-zero exit if either side fails to start.
+   - **Demo command (DoD for AC2):** a concrete one-liner in `src/surfaces/ceo-read-view/README.md`:
+     ```
+     CEO_LOOP_SECRET=<secret> node src/surfaces/ceo-read-view/proxy.js [--public]
+     ```
+     and the CEO-side command/URL that produces a "why did we prioritize X?" answer without founder
+     help. Both commands must be in the README before AC2 is accepted.
 3. **AC3 — n=2 setup (eng→CEO only).** The CEO can query the founder's eng context via the read-view
    in a real two-person configuration. (No CEO install, no Granola — that's 104.)
 4. **AC4 — The watch-signal instrumented.** A way to observe whether the CEO *self-serves a "why"
@@ -136,11 +143,26 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
      - `note`: short text (e.g. `"CEO DM'd anyway 10min later"`)
      Append-only invariant: query events are NEVER modified; interruption is recorded as a sibling
      entry, joined by `query_event_id` at audit time.
+   - **Event log path and resilience:** the proxy MUST resolve `raw/internal/ceo-loop-events.jsonl`
+     relative to the **git repo root** (not CWD) at startup. It MUST create `raw/internal/` if
+     absent (`mkdir -p`). It MUST emit a non-zero exit + clear error if the log file cannot be
+     opened for append (permission error, read-only filesystem, etc.). Silent wrong-tree writes are
+     a validation failure.
    - **Proxy/MCP log privacy:** all logs at the proxy and MCP-server layer MUST NOT record raw query
      text, bearer/secret values, or any content that would expose founder context outside the machine.
    - **Audit command:** `tail -f raw/internal/ceo-loop-events.jsonl | jq .` gives the live feed.
-     Validation is complete when this log shows ≥2 entries with `event_type: "query"`,
-     `prompted_by_founder: false`, across ≥2 distinct `session_id` values.
+     Validation is complete (DoD for AC4) when the following jq query returns `"pass": true`:
+     ```
+     jq -s '(map(select(.event_type=="interruption_annotation") | .query_event_id) | unique) as $interrupted
+       | map(select(.event_type=="query" and .success == true and .prompted_by_founder == false
+           and (.event_id as $id | ($interrupted | index($id) | not))))
+       | {count: length, sessions: (map(.session_id) | unique | length),
+          pass: (length >= 2 and (map(.session_id) | unique | length) >= 2)}' \
+       raw/internal/ceo-loop-events.jsonl
+     ```
+     The `pass: true` condition requires ≥2 successful, unprompted query events that have NO linked
+     `interruption_annotation`, across ≥2 distinct sessions. Queries followed by interruption do not
+     count toward validation.
 
 **Definition of done (validation):** the CEO self-serves a "why" query unprompted, more than once,
 instead of interrupting the founder. If he shrugs / never queries after the pre-flight is in place,
@@ -164,13 +186,19 @@ the loop is dead regardless of architecture — record that honestly as the resu
 
 ## files_to_modify
 
-_The engineering core (AC2) is a founder-run local proxy + event log. Bounded candidate paths —
+_The engineering core (AC2) is a founder-run local proxy + event log. Concrete candidate paths —
 builder confirms at claim time; out-of-scope files MUST NOT be touched:_
 
-- `src/surfaces/ceo-read-view/proxy.ts` (NEW — local HTTP proxy wrapping MCP server with bearer auth;
-  OR a shell script if simpler; builder chooses the minimal shape)
-- `src/surfaces/ceo-read-view/README.md` (NEW — start command + CEO-side URL/command; the AC2 demo
-  command lives here)
+- `src/surfaces/ceo-read-view/proxy.ts` (NEW — local HTTP proxy wrapping MCP server; TypeScript/Node
+  is the canonical shape; builder MAY choose a simpler shell script in which case the file is
+  `src/surfaces/ceo-read-view/proxy.sh` — but NOT both; pick one and commit to it)
+- `src/surfaces/ceo-read-view/package.json` (NEW — if proxy.ts chosen; minimal Node package with
+  start script)
+- `src/surfaces/ceo-read-view/README.md` (NEW — MUST contain: exact founder start command, exact
+  CEO query command/URL, revocation instructions, event log location; AC2 DoD is not accepted without this)
+- `tests/surfaces/ceo-read-view/proxy.test.ts` (NEW — unit tests covering: fail-closed on empty
+  secret, loopback-only binding without --public, event log repo-root resolution, JSONL append,
+  intent_category enumeration)
 - `raw/internal/ceo-loop-events.jsonl` (NEW — append-only event log; created by proxy on first query)
 - `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (NEW — blind grading record; human-
   authored by founder during AC1 pre-flight, not generated by builder)
