@@ -102,20 +102,23 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
    - **Auth boundary:** a single non-empty pre-shared secret (env var `CEO_LOOP_SECRET` or CLI
      `--secret` flag) required to talk to the proxy.
    - **No bearer-link leakage:** the shared link/command MUST NOT embed the secret in the URL path
-     or query string; the secret is passed as an HTTP header or an interactive CLI prompt. Proxy
-     logs and MCP server logs MUST NOT record raw query text, bearer/secret values, or any field
-     that would expose founder context outside the machine.
-   - **Process-group lifecycle and revocation:** the proxy and any public tunnel (e.g., ngrok) MUST
-     run under a single process group (e.g., the start script forks the tunnel, traps SIGINT/SIGTERM,
-     and sends `kill 0` on exit). Stopping the proxy MUST terminate the tunnel — a partial `Ctrl-C`
-     that kills the proxy while leaving the tunnel alive is not acceptable. The start script MUST fail
-     with a non-zero exit if either side fails to start.
-   - **Demo command (DoD for AC2):** a concrete one-liner in `src/surfaces/ceo-read-view/README.md`:
+     or query string; the secret is passed as an HTTP header or an interactive CLI prompt. **Proxy
+     logs** (the new surface built by this item) MUST NOT record raw query text, bearer/secret
+     values, or any content that would expose founder context. Existing MCP server logging is
+     **out of scope for modification** — the builder MUST verify via `grep -r "query\|request"
+     src/mcp-server/` that no raw query is logged there, and record the result in README; if found,
+     escalate to founder rather than patching MCP core.
+   - **Tunnel revocation — managed child lifecycle:** when `--public` is passed, the start script
+     spawns ngrok (or equivalent) as a child process, records its PID, traps SIGINT/SIGTERM, and on
+     exit sends `kill <tunnel-pid>` (specific child PID — NOT `kill 0`, which signals the calling
+     shell's process group). The start script MUST fail with a non-zero exit if tunnel fails to
+     start. Stopping the proxy MUST terminate the tunnel.
+   - **Demo command (DoD for AC2):** a concrete start command and CEO query command/URL in
+     `src/surfaces/ceo-read-view/README.md`:
      ```
-     CEO_LOOP_SECRET=<secret> node src/surfaces/ceo-read-view/proxy.js [--public]
+     CEO_LOOP_SECRET=<secret> npx ts-node src/surfaces/ceo-read-view/proxy.ts [--public]
      ```
-     and the CEO-side command/URL that produces a "why did we prioritize X?" answer without founder
-     help. Both commands must be in the README before AC2 is accepted.
+     Both the founder start command and CEO-side query must be in the README before AC2 is accepted.
 3. **AC3 — n=2 setup (eng→CEO only).** The CEO can query the founder's eng context via the read-view
    in a real two-person configuration. (No CEO install, no Granola — that's 104.)
 4. **AC4 — The watch-signal instrumented.** A way to observe whether the CEO *self-serves a "why"
@@ -148,8 +151,9 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
      absent (`mkdir -p`). It MUST emit a non-zero exit + clear error if the log file cannot be
      opened for append (permission error, read-only filesystem, etc.). Silent wrong-tree writes are
      a validation failure.
-   - **Proxy/MCP log privacy:** all logs at the proxy and MCP-server layer MUST NOT record raw query
-     text, bearer/secret values, or any content that would expose founder context outside the machine.
+   - **Proxy log privacy:** proxy logs MUST NOT record raw query text, bearer/secret values, or any
+     content that would expose founder context. MCP server logging is out of scope for modification
+     (see auth boundary note above).
    - **Audit command:** `tail -f raw/internal/ceo-loop-events.jsonl | jq .` gives the live feed.
      Validation is complete (DoD for AC4) when the following jq query returns `"pass": true`:
      ```
@@ -189,16 +193,17 @@ the loop is dead regardless of architecture — record that honestly as the resu
 _The engineering core (AC2) is a founder-run local proxy + event log. Concrete candidate paths —
 builder confirms at claim time; out-of-scope files MUST NOT be touched:_
 
-- `src/surfaces/ceo-read-view/proxy.ts` (NEW — local HTTP proxy wrapping MCP server; TypeScript/Node
-  is the canonical shape; builder MAY choose a simpler shell script in which case the file is
-  `src/surfaces/ceo-read-view/proxy.sh` — but NOT both; pick one and commit to it)
-- `src/surfaces/ceo-read-view/package.json` (NEW — if proxy.ts chosen; minimal Node package with
-  start script)
-- `src/surfaces/ceo-read-view/README.md` (NEW — MUST contain: exact founder start command, exact
-  CEO query command/URL, revocation instructions, event log location; AC2 DoD is not accepted without this)
-- `tests/surfaces/ceo-read-view/proxy.test.ts` (NEW — unit tests covering: fail-closed on empty
-  secret, loopback-only binding without --public, event log repo-root resolution, JSONL append,
-  intent_category enumeration)
+- `src/surfaces/ceo-read-view/proxy.ts` (NEW — TypeScript/Node HTTP proxy; canonical and only shape;
+  wraps the existing ECHO MCP server at its local HTTP address, which the proxy reads from env/config;
+  no MCP server code changes permitted)
+- `src/surfaces/ceo-read-view/package.json` (NEW — minimal Node package; `start` script runs proxy.ts
+  via `ts-node`)
+- `src/surfaces/ceo-read-view/README.md` (NEW — MUST contain: exact `CEO_LOOP_SECRET=... npx ts-node
+  proxy.ts [--public]` start command; exact CEO query command/URL; tunnel PID revocation instructions;
+  event log location; MCP log grep verification result)
+- `tests/surfaces/ceo-read-view/proxy.test.ts` (NEW — unit tests: fail-closed on empty secret;
+  loopback binding absent --public; event log repo-root resolution and JSONL append; intent_category
+  value in enumeration; tunnel child PID management; mock MCP server call and non-empty response)
 - `raw/internal/ceo-loop-events.jsonl` (NEW — append-only event log; created by proxy on first query)
 - `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (NEW — blind grading record; human-
   authored by founder during AC1 pre-flight, not generated by builder)
