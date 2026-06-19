@@ -79,6 +79,8 @@ describe('packed package manifest', () => {
         "dist/cli/commands/doctor.js",
         "dist/cli/commands/init.d.ts",
         "dist/cli/commands/init.js",
+        "dist/cli/commands/orchestration.d.ts",
+        "dist/cli/commands/orchestration.js",
         "dist/cli/commands/project.d.ts",
         "dist/cli/commands/project.js",
         "dist/cli/commands/run.d.ts",
