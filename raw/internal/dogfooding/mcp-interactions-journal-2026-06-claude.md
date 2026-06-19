@@ -172,3 +172,11 @@ This is the **June 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** `fs:` claude_code justinian.ai session JSONLs (4f69bb81, 65b46fdc).
 - **Verdict:** ✅ right (diagnostic) — definitively proves the recency-dump: sentence-query→0, token-fallback→recency-ranked mentions-of-the-word, not the why. The bot's answer IS raw search_memories output; both deficits (literal+recency retrieval primitive; zero synthesis) trace to that single fact.
 - **Note:** concrete proof motivating the founder's `[decision, reason(approach+priority), alternatives]` decision-atom layer — a sparse high-signal decision atom is the retrieval target that beats recency-chatter AND carries the why pre-structured. Strongest single artifact for the next-sprint spec.
+
+### 2026-06-19 15:07 PDT — cold-start recovery: "use echo and understand where we left off"
+- **Trigger:** Founder reopened the project in a fresh Claude Code session and asked to recover prior context.
+- **Query inputs:** `find_clusters({})` (no-arg, 4h window auto); then `get_atoms({20 newest cluster-1 ids, prefer:newest_first, format:minimal})`.
+- **Returned:** find_clusters → 15 clusters, top = "work on project_echo" (177 atoms, source_breakdown={git:65, claude_code:40, codex:4}, has_unresolved_open_loop, last activity 22:07Z). get_atoms → 8 atoms hydrated, **12 dropped** under response budget (atoms_dropped surfaced). Recovered the full arc: LLM-free-ECHO realization → headless-agent-as-brain decision → design doc committed `56257a8f`.
+- **Sources:** all `fs:` claude_code session JSONL (55cee6dc) + git atoms, repo_root=/Users/zhenye/Desktop/Project_echo. No cursor.
+- **Verdict:** ✅ right — newest-first hydration reconstructed exactly where the prior session ended (design doc banked, responder stopped, next step = build headless reasoning brain, tokens to rotate).
+- **Note:** 12/20 atoms dropped at format:minimal — the newest 8 were enough for resume, but a reader wanting the middle of the arc would need a second narrower fetch. Resume-style newest_first worked as designed.
