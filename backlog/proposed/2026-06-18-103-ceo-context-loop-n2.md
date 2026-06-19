@@ -75,24 +75,32 @@ in its sharpest form, *does a sync skip the "what happened" recap because a part
      `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (decision, generated why, verdict, source).
    - **Pass:** ≥3 of 4 graded faithful → proceed. **Fail:** the layer confidently produces unfaithful whys
      the author can't distinguish → STOP and escalate; a confabulating loop is worse than no loop.
-2. **AC2 — Minimal scoped read-view.** A way for the CEO to ask the founder's ECHO *"why did we decide X?"*
-   over a **scoped slice** of the founder's eng context and get a business-terms answer, in a real
-   two-person setup. The only hard requirements:
-   - **Scope (the one legitimate access concern):** it exposes the *relevant eng context* (e.g. the
-     justinian.ai decision/eng context), **NOT** the founder's entire cross-project ECHO.
-   - **It works for n=2:** the CEO can actually run a query and get an answer. Implementation = the
-     **simplest thing that works for a trusted cofounder**: a co-located/shared session, a local chat over
-     the scoped context, or a trivial local endpoint. Prefer the simplest (e.g. founder runs it during a
-     call/screen-share) over building any access machinery.
-   - Explicitly **NOT** required: auth/secrets, fail-closed startup, tunnels, revocation, audit logging,
-     a productized proxy. (See Out of Scope — these were stripped.)
+2. **AC2 — Slack-backed scoped read-view (the access surface — chosen 2026-06-19, option C).** The CEO
+   asks his *"why did we decide X?"* in **Slack** (a DM to a bot, or a designated channel); a small
+   **responder running on the founder's machine** answers from a **scoped slice** of the founder's eng
+   context. This is the only real build in 103. Hard requirements:
+   - **Scope (the one real access concern):** answers only from the *relevant eng context* (e.g. the
+     justinian.ai decisions/eng context), **NOT** the founder's entire cross-project ECHO.
+   - **Slack is the surface AND the auth boundary:** the CEO asks where he already is. **Slack workspace
+     membership + the bot token is the access boundary** — no separate pre-shared secret. The responder
+     connects **outbound** to Slack (**Socket Mode**), so **nothing on the founder's machine is exposed to
+     the internet** — no inbound endpoint, no tunnel. (This is why C beats a raw tunnel.)
+   - **Minimal build (~1–2d):** a Slack app (bot token + Socket Mode) + a small listener that, on a
+     question in the designated channel/DM, runs the scoped ECHO query and posts the answer back. Nothing
+     more.
+   - **Slack is the *validation* surface; a customized/bespoke query surface is POST-VALIDATION only**
+     (founder, 2026-06-19 — "easy to validate before we build a customized surface").
+   - Explicitly **NOT** required (still out of scope per the strip): fail-closed ceremony, the
+     UUID/session/intent-enum event schema, a productized proxy, inbound auth/tunnels.
 3. **AC3 — n=2 setup.** The CEO actually queries the founder's scoped eng context in a real two-person
    configuration. (No CEO install; meetings→founder is 104.)
 4. **AC4 — Minimal usage signal.** Observe whether the CEO **self-serves a why-query unprompted**, whether
    it **recurs** (>once, distinct occasions), and whether he **interrupted the founder anyway afterward**
-   (the tell that the answer didn't satisfy). Lightest viable record: a one-line append per query
-   (`timestamp · unprompted? · satisfied-or-DMed-anyway`) in `raw/internal/ceo-loop-events.md` — or even a
-   founder tally; it's n=2. **No** UUID/session/intent-enum schema.
+   (the tell that the answer didn't satisfy). **With Slack as the surface, most of this is visible in Slack
+   itself** — whether he posted a why-question to the bot unprompted vs. DM'd the founder directly. The
+   responder appends a one-line record per answered query (`timestamp · unprompted? · satisfied-or-DMed-
+   anyway`) to `raw/internal/ceo-loop-events.md`; a founder tally is acceptable for n=2. **No**
+   UUID/session/intent-enum schema.
 
 **Definition of done (validation) — two signals, either is a strong positive:**
 - **(primary)** the CEO self-serves a why-query **unprompted, ≥2 times across distinct occasions**, not
@@ -113,6 +121,8 @@ regardless of architecture — record that honestly as the result.
   threat model that **does not exist** for an n=2 test with a trusted cofounder on a local machine.
   **POST-VALIDATION productization only** — reintroduce ONLY if the loop validates and you productize.
   Reviewers: do not re-add; escalate if you think one is load-bearing *for the n=2 validation*.
+- **Customized/bespoke query surface** (a dedicated web/hotkey/desktop UI) — deferred. Slack is the
+  *validation* surface; build a custom surface only if the loop validates (founder, 2026-06-19).
 - **Granola / meetings ingestion (CEO→founder)** — item 104 (Slack capture).
 - **Federation / B2 multi-party / consent matrix** — team scale only. See [[project_cross_human_ecosystem_bet]].
 - **CEO installs/runs ECHO** — not required; query-only.
@@ -122,13 +132,16 @@ regardless of architecture — record that honestly as the result.
 
 ## files_to_modify
 
-_The MVP is deliberately light. Implementation shape confirmed at claim time — favor the **least code that
-lets the test run**. The read-view may need little or no new code if a scoped local session/chat suffices;
-build a small surface ONLY if minimal access genuinely requires it, and if so the simplest possible (no
-auth/tunnel/audit per Out of Scope)._
+_AC2 is a small Slack responder (the only build); AC1/AC3/AC4 are founder-executed validation. Builder
+confirms the lightest shape at claim time; **MUST NOT** touch MCP server core, capture pipeline, `wiki/`,
+or `docs/BACKLOG.md`._
 
-- (validation artifacts, founder-authored, no builder code) `raw/internal/interviews/2026-06-19-ac1-blind-grading.md`; `raw/internal/decisions/YYYY-MM-DD-*-why.md`; `raw/internal/ceo-loop-events.md` (one-line usage log).
-- (only if a minimal read-view surface is genuinely needed) a single small scoped-query entry point — builder proposes the lightest shape at claim time; **MUST NOT** touch MCP server core, capture pipeline, `wiki/`, or `docs/BACKLOG.md`.
+- **(the build — AC2)** a small Slack responder: a Slack app (bot token + **Socket Mode**, outbound-only) +
+  a listener that, on a question in the designated channel/DM, runs a **scoped** ECHO query and posts the
+  answer back. Likely a new `src/surfaces/ceo-slack-responder/` (builder proposes lightest shape).
+  **Shares the Slack app / integration foundation with item 104 (Slack capture) — coordinate; do NOT stand
+  up two separate Slack apps.**
+- **(validation artifacts, founder-authored, no builder code)** `raw/internal/interviews/2026-06-19-ac1-blind-grading.md`; `raw/internal/decisions/YYYY-MM-DD-*-why.md`; `raw/internal/ceo-loop-events.md` (one-line usage log).
 
 ## spec_refs
 
