@@ -313,3 +313,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP daemon at `http://127.0.0.1:38478/mcp`; source_breakdown `{git:54, claude_code:26, codex:4}`; repo path filter `/Users/zhenye/Desktop/Project_echo`.
 - **Verdict:** partial - connectivity and recent repo context are healthy, but the skeleton cluster is broad and not yet tied to the specific ready item.
 - **Note:** No `get_atoms` follow-up yet because the builder protocol's deterministic `tools/blocked.py` selection should define the concrete item context first.
+
+### 2026-06-19 12:37 PDT - codex builder spec-ref memory lookup for item 103
+
+- **Trigger:** While implementing `backlog/claimed/2026-06-18-103-ceo-context-loop-n2.md`, the spec refs named memory anchors `project_ceo_loop_rationale_capture` and `project_cross_human_ecosystem_bet`.
+- **Query inputs:** `search_memories(query="project_ceo_loop_rationale_capture", repo_path="/Users/zhenye/Desktop/Project_echo", limit=10)`; `search_memories(query="project_cross_human_ecosystem_bet", repo_path="/Users/zhenye/Desktop/Project_echo", limit=10)`.
+- **Returned:** First search returned 7 matches, top `e1fa61be` from git commit `5b96d21` stripping over-built 103 scaffolding; also Claude memory-writing turns around `project_ceo_loop_rationale_capture`. Second search returned 10 matches with `next_cursor`, top `7778b4b9` from git commit `4e6b41a` choosing Slack Socket Mode responder as AC2's access surface, followed by the same strip commit and earlier ecosystem-bet records.
+- **Sources:** source-prefix mix `git:/Users/zhenye/Desktop/Project_echo` plus `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/...`; all matches repo-scoped to `/Users/zhenye/Desktop/Project_echo`; top metadata referenced `backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md`, `backlog/ready/2026-06-18-103-ceo-context-loop-n2.md`, and the Claude memory files.
+- **Verdict:** right - the anchors recovered the relevant sequencing and scope guardrails: AC2 is Slack outbound Socket Mode; production auth/audit/tunnel scaffolding was removed by founder-approved disposition discipline.
+- **Note:** Search results were partially truncated but sufficient. No `get_atom` follow-up because the current claimed spec and local decision docs contain the operative implementation contract.
