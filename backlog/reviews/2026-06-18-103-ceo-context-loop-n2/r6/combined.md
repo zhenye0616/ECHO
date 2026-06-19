@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R6.** Single confirming round on the deliberately-stripped n=2 validation MVP: codex `proceed`, zero findings. The anti-re-drift focus hints held — the reviewer did NOT re-flag the removed access-control/audit scaffolding (confirmed out-of-scope, not missing). Founder independently reviewed in chat and made the load-bearing access-surface call (AC2 = Slack Socket-Mode responder, option C). No unresolved findings, no escalation, next_round null. Promote to ready/.
 
