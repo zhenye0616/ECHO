@@ -27,5 +27,11 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R3`. Both reviewers (codex + codex-ops) returned `proceed` with zero findings at the
+r2-patched SHA (`e0523371`). The r2 propagation fixes verified clean: codex argv carries the load-bearing
+`--json` flag with a test assertion, and AC4 mandates process-group termination + a descendant-survival
+regression test. Arc: r1 = 8 medium spec-concreteness findings (all accepted, scope held); r2 = 2 medium
+propagation gaps in r1's contract (reframe gate → `propagation_completion`, fixed); r3 = clean. Spec
+promoted `proposed/ → ready/` and sealed (`ready_content_sha`); item remains `blocked_by` 103 (the
+responder surface it extends) until 103 merges.
 

@@ -8,6 +8,7 @@ created: 2026-06-19
 blocked_by: ["2026-06-18-103-ceo-context-loop-n2"]
 task_state_ref: 2026-06-19-105-ceo-loop-reasoning-brain
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 9c01e2d29a57248c2f295fd18cbac1bd902eec807222dd428c462d49f7878137
 claimed_by: ""
 claimed_at: ""
 branch: ""
