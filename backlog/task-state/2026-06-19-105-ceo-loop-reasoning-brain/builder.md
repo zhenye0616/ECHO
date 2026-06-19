@@ -3,11 +3,18 @@ task_id: 2026-06-19-105-ceo-loop-reasoning-brain
 role: builder
 binding: codex
 claim_branch: agent/ceo-loop-reasoning-brain
-last_updated: 2026-06-19T23:02:22Z
+last_updated: 2026-06-19T23:19:18Z
+handoff_branch: agent/ceo-loop-reasoning-brain
+handoff_head_sha: 8938b48166ebdef4c2f210c34148641364f0301e
+handoff_run_log: raw/internal/agent-runs/2026-06-19-2026-06-19-105-ceo-loop-reasoning-brain.md
 ---
 
 ## current_thesis
 Claimed 105 as codex builder. Replace the CEO Slack responder's raw retrieval dump with a swappable headless-agent brain that is scoped to `ECHO_CEO_CONTEXT_REPO_PATH`, posts a threaded ack before synthesis, and always resolves the thread with either a synthesized answer or bounded failure.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 8938b48166ebdef4c2f210c34148641364f0301e.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: `buildSlackAnswer`/responder path invokes `runBrain(question, opts)` via a concrete `codex`/`claude` contract; brain cwd and prompt both pin the scoped repo.
@@ -29,4 +36,4 @@ Claimed 105 as codex builder. Replace the CEO Slack responder's raw retrieval du
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-19-105-ceo-loop-reasoning-brain.md
+- spec: backlog/pending_review/2026-06-19-105-ceo-loop-reasoning-brain.md

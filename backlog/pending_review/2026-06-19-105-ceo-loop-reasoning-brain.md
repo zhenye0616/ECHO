@@ -12,9 +12,10 @@ ready_content_sha: 9c01e2d29a57248c2f295fd18cbac1bd902eec807222dd428c462d49f7878
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-19T23:01:42Z"
 branch: "agent/ceo-loop-reasoning-brain"
-head_sha: ""
+head_sha: "8938b48166ebdef4c2f210c34148641364f0301e"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the swappable headless-agent brain for the CEO Slack responder on `agent/ceo-loop-reasoning-brain`: `codex`/`claude` registry, codex JSONL capture, startup preflight, process-group timeout kill, threaded ack + answer/failure flow, extended brain usage logging, responder README, and focused tests. AC5 retest is committed at `raw/internal/ceo-loop-retest-105.md`; targeted tests, typecheck, lint, and `git diff --check` pass.
 review_notes: ""
 ---
 
