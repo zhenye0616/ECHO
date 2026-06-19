@@ -91,34 +91,56 @@ a *sequencing artifact*, restored to symmetry when 104 ships — not a design st
    eng context, exposable to exactly one other person, that answers "why did we decide X?" in
    business terms. Single-consumer, founder-controlled, **not** productized, **not** multi-tenant,
    **not** a consent matrix. Does NOT require the CEO to run ECHO.
-   - **Minimal surface:** expose the existing MCP server's search/retrieval interface behind a
-     founder-run local proxy or a `claude --mcp` session shared with the CEO (e.g., via a short-lived
-     ngrok tunnel or a pre-built Claude.ai project the founder configures). The CEO opens a URL or
-     a shared Claude context; the founder's ECHO MCP server answers. No new product surface; no
-     web app; no database of its own.
-   - **Auth boundary:** a single pre-shared secret (env var or CLI flag) required to talk to the
-     proxy. Founder can revoke by stopping the process (kill switch = `Ctrl-C` / `pkill`).
-   - **No bearer-link leakage:** the shared link MUST NOT embed the secret in the URL path or query
-     string; the secret is passed as an HTTP header or an interactive prompt at session start. Logs
-     at the MCP server level MUST NOT record raw query text in a location accessible outside the
-     founder's machine.
-   - **Demo command (DoD for AC2):** a one-liner the founder runs to start the read-view, plus the
-     CEO-side command/URL that produces a "why did we prioritize X?" answer without founder help.
+   - **Required path — local proxy:** ALL CEO queries MUST go through the founder-run local proxy
+     (see `files_to_modify`). The `claude --mcp` session alternative is NOT permitted because it
+     cannot enforce the event log (AC4). The proxy is the single audited path; no other surface is
+     an accepted implementation.
+   - **Fail-closed startup:** the proxy MUST refuse to start if the pre-shared secret is unset or
+     empty (`exit 1` with a clear error). It MUST bind to `127.0.0.1` by default; any public
+     listener (e.g., ngrok tunnel) requires an explicit founder-run flag (`--public` or equivalent).
+     Unattended starts MUST NOT expose the ECHO MCP context wider than loopback.
+   - **Auth boundary:** a single non-empty pre-shared secret (env var `CEO_LOOP_SECRET` or CLI
+     `--secret` flag) required to talk to the proxy. Founder revokes by stopping the process
+     (`Ctrl-C` / `pkill`).
+   - **No bearer-link leakage:** the shared link/command MUST NOT embed the secret in the URL path
+     or query string; the secret is passed as an HTTP header or an interactive CLI prompt. Proxy
+     logs and MCP server logs MUST NOT record raw query text, bearer/secret values, or any field
+     that would expose founder context outside the machine.
+   - **Demo command (DoD for AC2):** a one-liner the founder runs to start the read-view
+     (loopback + tunnel), plus the CEO-side command/URL that produces a "why did we prioritize X?"
+     answer without founder help.
 3. **AC3 — n=2 setup (eng→CEO only).** The CEO can query the founder's eng context via the read-view
    in a real two-person configuration. (No CEO install, no Granola — that's 104.)
 4. **AC4 — The watch-signal instrumented.** A way to observe whether the CEO *self-serves a "why"
    query instead of interrupting the founder* — unprompted, and whether it recurs (>once). This is
    the definition-of-done signal; not "done" until observable in real use.
    - **Durable event record:** the read-view proxy appends a JSON-L entry to
-     `raw/internal/ceo-loop-events.jsonl` for every query, with fields:
-     `timestamp` (ISO-8601 UTC), `consumer_id` (a fixed slug, e.g. `"ceo"`), `query_intent_category`
-     (free-text label the proxy auto-tags from first 5 words of query), `success` (boolean — did
-     the MCP server return a result?), `founder_interrupted` (boolean — founder manually marks this
-     post-hoc via a CLI flag if the CEO asked them the same question anyway).
-   - **Prompted vs. unprompted distinction:** the proxy accepts an optional `--prompted-by-founder`
-     flag at session start; absent that flag, all queries in the session are classified as unprompted.
+     `raw/internal/ceo-loop-events.jsonl` for **every query**, with fields:
+     - `event_id`: UUID (stable identifier for annotation references)
+     - `event_type`: `"query"` (for query events) or `"interruption_annotation"` (see below)
+     - `session_id`: UUID generated at proxy startup, shared across all queries in one session
+     - `timestamp`: ISO-8601 UTC
+     - `consumer_id`: fixed slug (e.g. `"ceo"`) — never raw identity
+     - `intent_category`: a fixed/pre-defined category label chosen by the proxy from an
+       enumeration (e.g. `"why_decision"`, `"priority_rationale"`, `"tradeoff"`, `"other"`);
+       MUST NOT record raw query text or any portion of it
+     - `success`: boolean — did the MCP server return a non-empty result?
+     - `prompted_by_founder`: boolean — true if proxy was started with `--prompted-by-founder` flag;
+       false otherwise (all queries in an unprompted session are classified unprompted)
+   - **Post-hoc interruption annotation:** when the founder observes the CEO asked the same question
+     directly afterward, the founder appends a **separate** annotation event to the same file:
+     - `event_id`: new UUID
+     - `event_type`: `"interruption_annotation"`
+     - `query_event_id`: the `event_id` of the prior query event being annotated
+     - `timestamp`: ISO-8601 UTC
+     - `note`: short text (e.g. `"CEO DM'd anyway 10min later"`)
+     Append-only invariant: query events are NEVER modified; interruption is recorded as a sibling
+     entry, joined by `query_event_id` at audit time.
+   - **Proxy/MCP log privacy:** all logs at the proxy and MCP-server layer MUST NOT record raw query
+     text, bearer/secret values, or any content that would expose founder context outside the machine.
    - **Audit command:** `tail -f raw/internal/ceo-loop-events.jsonl | jq .` gives the live feed.
-     Validation is complete when this log shows ≥2 unprompted queries across ≥2 separate sessions.
+     Validation is complete when this log shows ≥2 entries with `event_type: "query"`,
+     `prompted_by_founder: false`, across ≥2 distinct `session_id` values.
 
 **Definition of done (validation):** the CEO self-serves a "why" query unprompted, more than once,
 instead of interrupting the founder. If he shrugs / never queries after the pre-flight is in place,
@@ -152,6 +174,9 @@ builder confirms at claim time; out-of-scope files MUST NOT be touched:_
 - `raw/internal/ceo-loop-events.jsonl` (NEW — append-only event log; created by proxy on first query)
 - `raw/internal/interviews/2026-06-19-ac1-blind-grading.md` (NEW — blind grading record; human-
   authored by founder during AC1 pre-flight, not generated by builder)
+- `raw/internal/decisions/YYYY-MM-DD-*-why.md` (glob — NEW rationale-note files the founder creates
+  during AC1 capture; ECHO ingests via existing filesystem watcher; builder does not create these,
+  but they are allowed artifacts the builder may reference in tests/docs)
 
 _Builder MUST NOT touch `wiki/`, `docs/BACKLOG.md`, MCP server core, capture pipeline, or any
 existing surface. AC1 and AC3 are founder-executed validation steps; they produce files in
