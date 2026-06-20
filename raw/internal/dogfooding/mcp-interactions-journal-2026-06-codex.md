@@ -358,3 +358,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** repo-scoped results from `git:/Users/zhenye/Desktop/Project_echo` plus one Claude Code JSONL source; top referenced `backlog/proposed/2026-06-19-105-ceo-loop-reasoning-brain.md`, `backlog/proposed/2026-06-18-103-ceo-context-loop-n2.md`, `backlog/ready/2026-06-18-103-ceo-context-loop-n2.md`, and `raw/internal/dogfooding/mcp-interactions-journal-2026-06-codex.md`.
 - **Verdict:** right - the lookup recovered the exact spec-review lineage and the same scope guardrails already present in the local spec refs: build the consumer-side headless-agent brain, keep scope pinned to the justinian slice, and avoid decision atoms/search-core changes.
 - **Note:** Results were partly truncated but sufficient; no follow-up atom body fetch was needed because the local spec, design docs, and merged 103 spec carry the implementation contract.
+
+### 2026-06-19 16:15 PDT - codex builder AC5 retest for item 105
+
+- **Trigger:** AC5 required re-running the canonical CEO query, "why did we build the observability layer?", through the new headless-agent brain and committing the before/after artifact.
+- **Query inputs:** `runBrain(question, { brain: "codex", contextRepoPath: "/Users/zhenye/justinian.ai", timeoutMs: 180000 })`; the generated prompt instructed the child codex brain to use ECHO MCP with `repo_path` pinned exactly to `/Users/zhenye/justinian.ai`.
+- **Returned:** `BrainResult { ok: true, outcome: "ok", durationMs: 46003 }`; final answer synthesized a business why and cited JUS-17, the ingest->match->score->gate->dispatch funnel, `{entered, exited, dropped, drop_reason}`, `GET /api/funnel`, and the L5/L6 measurement seam.
+- **Sources:** child headless codex invocation via `src/surfaces/ceo-slack-responder/brain.ts`; scoped repo `/Users/zhenye/justinian.ai`; committed artifact `raw/internal/ceo-loop-retest-105.md`.
+- **Verdict:** right - the output was a synthesized why over scoped context, not the item-103 raw recency dump.
+- **Note:** The builder process captures only the child brain's final answer, not the child's intermediate ECHO MCP call payloads; the committed retest artifact records the checkable result and rubric.
