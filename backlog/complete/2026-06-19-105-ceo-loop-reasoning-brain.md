@@ -16,7 +16,40 @@ head_sha: "8938b48166ebdef4c2f210c34148641364f0301e"
 pr_url: ""
 agent_notes: |
   Implemented the swappable headless-agent brain for the CEO Slack responder on `agent/ceo-loop-reasoning-brain`: `codex`/`claude` registry, codex JSONL capture, startup preflight, process-group timeout kill, threaded ack + answer/failure flow, extended brain usage logging, responder README, and focused tests. AC5 retest is committed at `raw/internal/ceo-loop-retest-105.md`; targeted tests, typecheck, lint, and `git diff --check` pass.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-19 via founder reconciliation (sidecar verdict: "merge as-is").
+
+  Conflicts resolved:
+  - None — clean --no-ff merge (ort strategy). brain.ts / ceo-slack-brain.test.ts / README.md
+    are new files; responder.ts / responder.test.ts / index.ts are rewrites on a branch rooted at
+    103's already-merged commit. git merge-tree predicted zero conflicts; confirmed at merge.
+
+  C3.5 cross-vendor consult: none invoked (no conflicts).
+
+  Fixups applied:
+  - None — merge as-is, no pre-merge gates.
+
+  Fixups deferred to follow-up items:
+  - None.
+
+  Verify: 105 targeted tests 20/20 (brain 9/0 + responder 11/0), typecheck, lint,
+  check-coupled-invariants, and sync-skills --check all clean post-merge. Independent Claude
+  code-reviewer (codex was the builder) confirmed all 6 ACs Met with file:line evidence and every
+  load-bearing review-history item: --json in codex argv (+ test assertion), process-group
+  termination (detached + kill -pid SIGTERM->SIGKILL) with a descendant-survival regression test,
+  startup preflight, prompt+cwd scope guard, bounded failure messaging, and one-line AC6 logging.
+  AC5 headline: the canonical query now returns a synthesized why grounded in justinian.ai eng
+  context (JUS-17 + funnel/drop_reason), NOT the 103 recency-dump — the fix is validated end-to-end.
+  The 2 pre-existing env/flake product failures (shell-reachable daemon-install, recent-calls
+  timeout) are untouched by this surface; founder already adjudicated them at the 103 merge.
+
+  Follow-up items (non-blocking):
+  - responder.ts:207-216 — a successful brain answer is downgraded to a failure message if only the
+    AC6 usage-log append throws; prefer logging the append error but still posting the valid answer.
+  - brain.ts:219-234 — optional recursion-depth guard on assistantText JSON parsing (harmless for
+    trusted shallow codex JSONL; cheap defense).
+  - 105 unblocks the next leg: live re-test with the real CEO + the Codex-vs-Claude faithfulness
+    A/B (AC1 reused). Wiki promotion of 105 + 103 waits until the n=2 DoD fires (validation experiment).
 ---
 
 ## Why
