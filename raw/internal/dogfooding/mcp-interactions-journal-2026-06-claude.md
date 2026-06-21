@@ -180,3 +180,28 @@ This is the **June 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** all `fs:` claude_code session JSONL (55cee6dc) + git atoms, repo_root=/Users/zhenye/Desktop/Project_echo. No cursor.
 - **Verdict:** ✅ right — newest-first hydration reconstructed exactly where the prior session ended (design doc banked, responder stopped, next step = build headless reasoning brain, tokens to rotate).
 - **Note:** 12/20 atoms dropped at format:minimal — the newest 8 were enough for resume, but a reader wanting the middle of the arc would need a second narrower fetch. Resume-style newest_first worked as designed.
+
+### 2026-06-19 19:50 PDT — search_memories for Slack tokens (founder-authorized retrieval); 0 real tokens in capture
+- **Trigger:** Founder authorized using ECHO to retrieve their Slack `xapp`/`xoxb` tokens (for internal live-test of the 105 brain responder) after the harness blocked a grep-scrape of session JSONL as credential-exploration.
+- **Query inputs:** `search_memories(query="xoxb-", repo_path="/Users/zhenye/Desktop/Project_echo", limit=5)`.
+- **Returned:** 5 matches — but ZERO real tokens. All `xoxb-`/`xapp-` strings were either (a) this session's own placeholder text (`xoxb-…`, `REPLACE_ME`) or (b) test fixtures in commits 92342b2/8938b48/d2fe6f1 (`slackBotToken: 'xoxb-token'`, `'xapp-token'`).
+- **Sources:** `fs:` this-session claude_code JSONL (fd6da58f) + `git:` Project_echo commits. No real-credential atom anywhere.
+- **Verdict:** ✅ right (and reassuring) — confirms the founder's prior "don't paste tokens to me" discipline held: the real Slack secrets were NEVER captured into ECHO. The tokens are genuinely unretrievable from memory.
+- **Note:** Validates a privacy property worth keeping: ECHO captured the *discussion about* tokens but never the *values*. Good negative result — secret-hygiene held across sessions.
+
+### 2026-06-19 20:30 PDT — retrieve the 103 "previous answer" for live before/after compare
+- **Trigger:** Founder ran the LIVE 105 brain responder, got a strong synthesized "why" (JUS-17 + GET /api/funnel + {entered,exited,dropped,drop_reason}), and asked ECHO to retrieve the previous (103) recency-dump answer for side-by-side.
+- **Query inputs:** `search_memories(query="raw retrieval dump", repo_path="/Users/zhenye/Desktop/Project_echo", limit=4)`.
+- **Returned:** 4 git-source matches; top = commit d2fe6f1 / 8938b48 carrying `raw/internal/ceo-loop-retest-105.md` (the Before/After artifact) + commit 9fcd31f carrying the builder's captured 105 answer. The "Before" section documents the 103 dump mechanism (sentence-query→0, fallback "observability"→recency-ranked Linear/code-review snippets).
+- **Sources:** `git:/Users/zhenye/Desktop/Project_echo` commits only (the retest artifact + review sidecar). No justinian.ai-scoped atoms needed — the comparison record lives in the ECHO project repo.
+- **Verdict:** ✅ right — literal-substring "raw retrieval dump" landed the exact comparison artifact; ECHO retrieved its own dogfooding evidence cleanly.
+- **Note:** Nice closing-the-loop moment: ECHO (the substrate) retrieved the documented proof that ECHO-without-a-brain dumped, and ECHO-with-a-brain (105) synthesized. The before/after is now itself a captured, retrievable atom.
+
+### 2026-06-20 22:45 PDT — cross-repo recall: justinian.ai 16-round review post-mortem
+- **Trigger:** founder asked Claude (in Project_echo) to retrieve cross-repo context on a justinian.ai adversarial review loop that ran ~16-19 rounds; a separate Claude analyzed the rounds and found a deeper review-mechanism issue.
+- **Query inputs:** search_memories(query="justinian"); find_clusters(since=2026-06-18,until=2026-06-20); search_memories(query="review mechanism", source_app=claude_code, since=06-19) → 0; echo_resolve_mru(claude_code, repo_path=/Users/zhenye/justinian-ai) → null (wrong path: real repo_root is /Users/zhenye/justinian.ai with a dot); search_memories(query="root-cause", repo_path=/Users/zhenye/justinian.ai); get_atom(3c32e12f — the synthesis verdict).
+- **Returned:** find_clusters top cluster ctx_a872783c "discussion about justinian.ai" 351 atoms (claude_code 311, codex 40); root-cause search returned the full chain incl. gap-ledger R19 resting-state, edit-tracer 64-edit trace, and the synthesis verdict atom.
+- **Sources:** cross-repo — justinian.ai claude_code sessions (58770028 analysis/driver, 93f8ed20 spec-editor, efc81812 spec-creator, agent-aedit-tracer subagent) + codex adversarial-reviewer rollouts under ~/.codex/sessions/2026/06/20. Project_echo's own session surfaced too (correct machine-scope).
+- **Verdict:** ✅ right — cross-repo retrieval recovered the entire review-loop post-mortem from another project's sessions.
+- **Note:** Two foot-guns worth flagging: (1) repo_path needs the EXACT capture-side repo_root string (`justinian.ai`, dot not dash) or resolve_mru returns null with no hint; (2) the edit-tracer explicitly notes ECHO keyword search did NOT surface Edit-tool bodies (`search_memories(query="old_string")`→0) — spec edits were only recoverable by parsing raw JSONL tool_use blocks. Retrieval found the *analysis* turns but not the underlying Edit atoms.
+- **Conjecture:** (obs only) Edit/Write tool_use bodies may be under-indexed for substring search vs user/assistant prose turns; relevant to "what capture surfaces are silently absent."

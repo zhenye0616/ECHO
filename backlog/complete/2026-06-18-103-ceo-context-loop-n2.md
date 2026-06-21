@@ -183,7 +183,7 @@ or `docs/BACKLOG.md`._
 - `raw/internal/decisions/2026-06-18-office-hours-ceo-loop-rationale-capture.md` (design doc — READ FIRST; incl. the 06-19 wedge refinement + the disposition note)
 - `raw/internal/decisions/2026-06-18-office-hours-cross-human-context-ecosystem.md` (session 1 — long-term direction)
 - `raw/internal/dogfooding/mcp-interactions-journal-2026-06-claude.md` (06-18 16:30 + 06-19 10:45 entries)
-- Sibling item: `backlog/proposed/2026-06-18-104-slack-meeting-context-capture.md` (the meetings→founder Slack leg)
+- Sibling item: `backlog/proposed/2026-06-18-104-granola-meeting-capture.md` (the meetings→founder Granola leg)
 - Memory: `project_ceo_loop_rationale_capture`, `project_cross_human_ecosystem_bet`
 
 ## After Completion (Strategist Notes)

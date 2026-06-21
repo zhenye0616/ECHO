@@ -50,3 +50,8 @@ __pycache__/
 # Workflow scratch scripts (Workflow tool persists run scripts here) + packed tarballs
 .workflow-*.js
 echoctl-*.tgz
+
+# Secrets — local credentials, never commit
+.env
+.env.*
+!.env.example
