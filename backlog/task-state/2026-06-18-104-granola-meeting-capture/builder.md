@@ -3,18 +3,11 @@ task_id: 2026-06-18-104-granola-meeting-capture
 role: builder
 binding: codex
 claim_branch: agent/granola-meeting-capture
-last_updated: 2026-06-21T20:30:53Z
-handoff_branch: agent/granola-meeting-capture
-handoff_head_sha: 35fe71d8bf7b55883927ff203f9396184b280fc1
-handoff_run_log: raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeting-capture.md
+last_updated: 2026-06-21T20:38:58Z
 ---
 
 ## current_thesis
-Claimed 104 as codex builder after founder-directed amendment. Implement Granola API meeting-note ingestion as append-only, ingest-once capture: one summary atom and one transcript atom per note, checkpointed by note id and high-water mark, with no storage or capture-pipeline contract changes.
-
-<!-- builder-state-handoff:start -->
-- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeting-capture.md for blocker.
-<!-- builder-state-handoff:end -->
+Claimed 104 as codex builder after founder-directed amendment and prior blocked handoff. Implement Granola API meeting-note ingestion as append-only, ingest-once capture: one summary atom and one transcript atom per note, checkpointed by note id and high-water mark, with no storage or capture-pipeline contract changes.
 
 ## locked_decisions
 - AC1: each note appends exactly two storage-assigned atoms: summary content from `summary_markdown` and transcript content rendered from the speaker-attributed transcript.
@@ -28,10 +21,6 @@ Claimed 104 as codex builder after founder-directed amendment. Implement Granola
 ## open_questions
 - None blocking after the amendment. Escalate if implementation needs files outside `files_to_modify`, a new dependency, live API probing, or changes to `src/storage/*` / `src/capture/pipeline.ts`.
 
-<!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
-<!-- builder-state-handoff-open-questions:end -->
-
 ## dont_touch
 - Do not implement the eng-to-CEO read view or rationale capture from item 103.
 - Do not implement Slack channel capture; this item is Granola API only.
@@ -43,5 +32,5 @@ Claimed 104 as codex builder after founder-directed amendment. Implement Granola
 
 ## canonical_anchors
 
-- spec: backlog/pending_review/2026-06-18-104-granola-meeting-capture.md
+- spec: backlog/claimed/2026-06-18-104-granola-meeting-capture.md
 - reviews: backlog/reviews/2026-06-18-104-granola-meeting-capture/

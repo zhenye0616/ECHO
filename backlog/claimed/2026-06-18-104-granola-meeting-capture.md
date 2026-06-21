@@ -22,9 +22,9 @@ files_to_modify:
   - tests/normalize/adapters/granola.test.ts
   - tests/capture/granola-poller.test.ts
   - tests/mcp/tools/search-memories.test.ts
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-21T20:38:58Z"
+branch: "agent/granola-meeting-capture"
 head_sha: ""
 pr_url: ""
 agent_notes: ""
