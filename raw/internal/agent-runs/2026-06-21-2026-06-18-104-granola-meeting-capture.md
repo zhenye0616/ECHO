@@ -1,9 +1,9 @@
 ---
 backlog_item: 2026-06-18-104-granola-meeting-capture
 agent_run_started: 2026-06-21T20:03:28Z
-agent_run_ended: 2026-06-21T20:25:00Z
+agent_run_ended: 2026-06-21T21:06:43Z
 status: needs_input
-test_status: skipped
+test_status: partial
 ---
 
 # Agent Run: Granola Meeting-Note Capture
@@ -110,3 +110,135 @@ No implementation tests were run because no implementation files were edited.
 ## Drift Events Caught
 
 None. The stop was a spec/files-to-modify conflict, not scope temptation.
+
+---
+
+## Run 3 (resumed at 2026-06-21T20:36:00Z)
+
+## What I Implemented
+
+Implemented the amended append-only Granola API path on feature branch `agent/granola-meeting-capture`:
+
+- `api:granola` allowlist integration.
+- Granola poller with env/config key resolution, startup disable on missing/invalid key, paginated list/detail fetch, per-request timeout, single in-flight guard, 429 retry, checkpoint persistence at the ECHO state path, partial checkpoint writes for crash recovery, and append-only two-atom emission per note.
+- Granola normalizer registration.
+- MCP `source_app='granola'` mapping plus description/test ripple for the files now listed in the amended spec.
+- Mocked tests for pagination, `updated_after`, ingest-once edited-note skip, crash recovery without duplicate note atoms, 429 retry/repeated failure logging, timeout, checkpoint failure, single in-flight polling, config fallback, and MCP source-app filtering.
+
+The feature branch was pushed at `39f5957d2da48b795a69cec486ab20deec985c25`.
+
+## Previous Attempt State
+
+I resumed after two prior blocked attempts. There was no committed implementation work on the feature branch to preserve, so I implemented from the clean claim baseline. During final handoff prep, the main checkout had duplicate uncommitted implementation edits from the interrupted pre-compaction state; those duplicates were discarded because the same work was already committed and pushed on the feature branch. I preserved and committed the required MCP dogfooding journal entry separately on main (`26f96e62`).
+
+## Files Modified
+
+- Feature branch `agent/granola-meeting-capture` @ `39f5957d2da48b795a69cec486ab20deec985c25`.
+- Implementation: `src/capture/sources.ts`, `src/capture/surfaces/granola-poller.ts`, `src/daemon/index.ts`, `src/normalize/adapters/granola.ts`, `src/normalize/dispatch.ts`, `src/mcp/util/source-app.ts`, `src/mcp/tools/search-memories.ts`, `src/mcp/tools/wait-for-new-turns.ts`, `src/mcp/tools/echo-resolve-mru.ts`.
+- Tests: `tests/capture/sources.test.ts`, `tests/capture/granola-poller.test.ts`, `tests/normalize/adapters/granola.test.ts`, `tests/mcp/tools/search-memories.test.ts`.
+- Main handoff artifacts: this run log, `backlog/task-state/2026-06-18-104-granola-meeting-capture/builder.md`, and the backlog item frontmatter move to `pending_review/`.
+
+## Decisions Made During Implementation
+
+### Decision 1: Keep V1 append-only and checkpoint-driven
+
+- **Options considered:** deterministic atom IDs/upsert; append new versions; append-once with checkpoint skip and metadata `dedupe_key`.
+- **Chose:** append-once with checkpoint skip and metadata `dedupe_key`.
+- **Why:** This matches the founder-amended spec and the existing append-only storage contract. It avoids modifying `src/storage/*` or `src/capture/pipeline.ts`.
+- **Worth founder review?** No, this was explicit in the amended acceptance criteria.
+
+### Decision 2: Escalate full-suite pins outside `files_to_modify`
+
+- **Options considered:** edit the pinned tests/snapshot; leave only focused tests passing; stop and hand off as BLOCKED.
+- **Chose:** stop and hand off as BLOCKED.
+- **Why:** `npm test` has deterministic failures in `tests/normalize/dispatch.test.ts` and `tests/packaging/packed-manifest.test.ts`, but those files are not listed in `files_to_modify`. Updating them would violate the builder file-surface rule.
+- **Worth founder review?** Yes. The likely fix is to amend the item or authorize a reviewer/follow-up patch for those two test pins.
+
+## Acceptance Criteria Status
+
+- [x] AC1 — Implemented in the feature branch. Each note emits exactly two append-only atoms (`summary` + `transcript`) with normal storage IDs and metadata `dedupe_key`.
+- [x] AC2 — Implemented in the allowed files: `api:granola`, `SOURCE_APP_VALUES`, MCP descriptions, and `search_memories(source_app='granola')` test coverage.
+- [x] AC3 — Implemented in the feature branch. Poller uses `updated_after`, checkpoint `high_water_mark`, `ingested_note_ids`, atomic writes, high-water advancement only after durable batch processing, visible logs, timeout, retry, and single in-flight guard.
+- [x] AC4 — Implemented in the feature branch. Key precedence is `GRANOLA_API_KEY` then resolved `~/.echo/state/granola.json`; missing/invalid key disables the poller visibly while the daemon continues.
+
+## Tests Run
+
+```text
+npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+```text
+npx vitest run tests/capture/granola-poller.test.ts tests/normalize/adapters/granola.test.ts tests/capture/sources.test.ts tests/mcp/tools/search-memories.test.ts
+
+Test Files  4 passed (4)
+Tests  99 passed (99)
+```
+
+```text
+npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+```text
+npm test
+
+Test Files  4 failed | 161 passed | 1 skipped (166)
+Tests  4 failed | 1765 passed | 21 skipped | 1 todo (1791)
+
+FAIL  tests/normalize/dispatch.test.ts > normalize dispatch > registers adapters in the documented order: claude-code, codex, cursor, git
+AssertionError: expected [ 'claude-code', 'codex', ...(3) ] to deeply equal [ 'claude-code', 'codex', ...(2) ]
+
+- Expected
++ Received
+
+  Array [
+    "claude-code",
+    "codex",
+    "cursor",
+    "git",
++   "granola",
+  ]
+
+FAIL  tests/packaging/packed-manifest.test.ts > packed package manifest > pins the sorted file path set shipped by npm pack
+Snapshot `packed package manifest > pins the sorted file path set shipped by npm pack 1` mismatched
+
++   "dist/capture/surfaces/granola-poller.d.ts",
++   "dist/capture/surfaces/granola-poller.js",
++   "dist/normalize/adapters/granola.d.ts",
++   "dist/normalize/adapters/granola.js",
+
+FAIL  tests/cli/shell-reachable.test.ts > echoctl shell reachability > packs an echoctl binary reachable from bash and exercises transitive doctor imports
+AssertionError: daemon com.echo.daemon.test-54497-1782075696350 did not become healthy on port 47552
+
+FAIL  tests/mcp/recent-calls-endpoint.test.ts > GET /mcp/recent-calls > logs every runtime-registered tool through the wrapper
+Error: Test timed out in 15000ms.
+```
+
+Manual daemon smoke after the full-suite failure:
+
+```text
+ECHO_HOME=/tmp/echo-granola-daemon-smoke/home ECHO_DATA_DIR=/tmp/echo-granola-daemon-smoke/data ECHO_DB_PATH=/tmp/echo-granola-daemon-smoke/data/echo.db ECHO_MCP_PORT=47653 node dist/daemon/index.js
+
+curl POST /mcp initialize => HTTP success with {"serverInfo":{"name":"echo-daemon","version":"0.0.0"}}
+
+Daemon log included:
+{"level":"error","source":"capture.surfaces.granola","message":"disabled","payload":{"reason":"missing","key_source":"none"}}
+{"level":"info","source":"mcp.server","message":"started","payload":{"port":47653,"url":"http://127.0.0.1:47653/mcp","host":"127.0.0.1"}}
+```
+
+## Open Questions for Founder
+
+1. Should 104 be amended to include `tests/normalize/dispatch.test.ts` and `tests/packaging/packed-manifest.test.ts`, or should the reviewer apply those pin updates as an explicit fixup?
+2. Should the full-suite `tests/cli/shell-reachable.test.ts` and `tests/mcp/recent-calls-endpoint.test.ts` failures be treated as load/environmental flakes? The focused tests, lint, typecheck, and manual daemon MCP smoke all passed.
+
+## Drift Events Caught
+
+None. The escalation is about full-suite files outside the spec edit surface, not an adjacent product feature.
