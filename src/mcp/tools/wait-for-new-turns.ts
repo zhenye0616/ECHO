@@ -63,7 +63,7 @@ export const WAIT_FOR_NEW_TURNS_DESCRIPTION =
   String(WAIT_MAX_SOURCES) +
   '. Mixed entry types accepted:\n' +
   '      • Literal source path (e.g. `fs:/Users/.../state.vscdb`, `git:/Users/.../repo`) → EXACT match.\n' +
-  '      • Source-app name (`cursor` | `claude_code` | `codex` | `git`) → PREFIX MATCH (matches ALL sessions of that app — explicitly DIFFERENT from `echo_resolve_mru(sources=[<app>])` which resolves to the MRU exact source). Group session A wants "wake on any session of these apps."\n' +
+  '      • Source-app name (`cursor` | `claude_code` | `codex` | `git` | `granola`) → PREFIX MATCH (matches ALL sessions/atoms of that app — explicitly DIFFERENT from `echo_resolve_mru(sources=[<app>])` which resolves to the MRU exact source). Group session A wants "wake on any session of these apps."\n' +
   "  • `since: string` — required. ISO 8601 timestamp; only return turns with timestamp STRICTLY AFTER this (`> since`, not `>=`). Pass the previous call's `next_since` to chain.\n" +
   '  • `timeout?: number` — seconds; default ' +
   String(WAIT_DEFAULT_TIMEOUT_SECONDS) +

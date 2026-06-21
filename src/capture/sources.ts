@@ -15,7 +15,7 @@ export const CAPTURED_SOURCES = {
     '~/.claude/projects/',
     '~/.codex/sessions/',
   ],
-  apis: [],
+  apis: ['granola'],
   git_repos: [...DEFAULT_GIT_REPOS],
 } as const;
 
@@ -194,10 +194,7 @@ export function applyGitReposFromCaptureConfig(
   return repos;
 }
 
-export function _isAllowedRepoIn(
-  repoPath: unknown,
-  repos: ReadonlyArray<string>,
-): boolean {
+export function _isAllowedRepoIn(repoPath: unknown, repos: ReadonlyArray<string>): boolean {
   if (!isNonEmptyString(repoPath)) return false;
   const normalized = normalizeRepoPath(repoPath);
   return repos.some((entry) => normalizeRepoPath(entry) === normalized);

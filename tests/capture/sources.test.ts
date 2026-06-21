@@ -19,10 +19,10 @@ import {
 const malformed: unknown[] = [null, undefined, 42, '', {}, [], true, false];
 
 describe('CAPTURED_SOURCES', () => {
-  it('initializes empty for apps/domains/apis (no source-additions yet)', () => {
+  it('initializes empty for apps/domains and allowlists the Granola API', () => {
     expect(Object.keys(CAPTURED_SOURCES.apps)).toHaveLength(0);
     expect(Object.keys(CAPTURED_SOURCES.domains)).toHaveLength(0);
-    expect(CAPTURED_SOURCES.apis).toEqual([]);
+    expect(CAPTURED_SOURCES.apis).toEqual(['granola']);
   });
 
   it('declares the FS prefixes for Cursor (workspace + global), Claude Code, and Codex', () => {
@@ -111,8 +111,9 @@ describe('isAllowedPath (against empty allowlist)', () => {
   });
 });
 
-describe('isAllowedApi (against empty allowlist)', () => {
-  it('returns false for any plausible api name', () => {
+describe('isAllowedApi (Granola-only allowlist)', () => {
+  it('returns true for Granola and false for other plausible api names', () => {
+    expect(isAllowedApi('granola')).toBe(true);
     expect(isAllowedApi('github')).toBe(false);
     expect(isAllowedApi('slack')).toBe(false);
   });

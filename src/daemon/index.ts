@@ -5,6 +5,7 @@ import { startCursorExtractor } from '../capture/extractors/cursor.js';
 import { applyGitReposFromCaptureConfig, CAPTURED_SOURCES } from '../capture/sources.js';
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
+import { startGranolaPoller } from '../capture/surfaces/granola-poller.js';
 import { ensureEchoHome } from '../echo-home/scaffold.js';
 import { createLogger } from '../logging/index.js';
 import { flushRecentMcpCallLog } from '../mcp/request-log.js';
@@ -66,15 +67,23 @@ try {
 const { storage, backend, dispose } = createStorage();
 const gitRepos = applyGitReposFromCaptureConfig();
 
-const [fsWatcher, gitWatcher, claudeCodeExtractor, codexExtractor, cursorExtractor, mcp] =
-  await Promise.all([
-    startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
-    startGitWatcher(gitRepos, storage),
-    startClaudeCodeExtractor(storage),
-    startCodexExtractor(storage),
-    startCursorExtractor(storage),
-    startMcpServer(storage, { port: resolveMcpPort() }),
-  ]);
+const [
+  fsWatcher,
+  gitWatcher,
+  granolaPoller,
+  claudeCodeExtractor,
+  codexExtractor,
+  cursorExtractor,
+  mcp,
+] = await Promise.all([
+  startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
+  startGitWatcher(gitRepos, storage),
+  Promise.resolve(startGranolaPoller(storage)),
+  startClaudeCodeExtractor(storage),
+  startCodexExtractor(storage),
+  startCursorExtractor(storage),
+  startMcpServer(storage, { port: resolveMcpPort() }),
+]);
 
 await startLifecycle({
   storage,
@@ -90,6 +99,7 @@ await startLifecycle({
     await cursorExtractor.stop();
     await codexExtractor.stop();
     await claudeCodeExtractor.stop();
+    await granolaPoller.stop();
     await gitWatcher.stop();
     await fsWatcher.stop();
     dispose();

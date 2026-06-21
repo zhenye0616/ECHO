@@ -7,13 +7,13 @@
 
 import { homedir } from 'node:os';
 
-export const SOURCE_APP_VALUES = ['cursor', 'claude_code', 'codex', 'git'] as const;
+export const SOURCE_APP_VALUES = ['cursor', 'claude_code', 'codex', 'git', 'granola'] as const;
 export type SourceApp = (typeof SOURCE_APP_VALUES)[number];
 
 // Logical app names → literal FS source prefixes. Keep in sync with
 // `src/capture/sources.ts` (CAPTURED_SOURCES.fs_paths) and the per-app
 // extractors. `git` is path-prefix `git:` because git commits are stored
-// with that scheme, not under any homedir path.
+// with that scheme, not under any homedir path. `granola` is an API surface.
 export function buildSourceAppMap(): Record<SourceApp, string> {
   const HOME = homedir();
   return {
@@ -21,5 +21,6 @@ export function buildSourceAppMap(): Record<SourceApp, string> {
     claude_code: `fs:${HOME}/.claude/projects/`,
     codex: `fs:${HOME}/.codex/sessions/`,
     git: 'git:',
+    granola: 'api:granola',
   };
 }

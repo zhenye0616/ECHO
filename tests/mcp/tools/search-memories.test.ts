@@ -685,11 +685,13 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
     expect(found).toBeDefined();
     expect(found?.outputSchema).toBeDefined();
     expect(found?.annotations?.readOnlyHint).toBe(true);
-    // source_app appears in the input schema with the four-value enum.
+    // source_app appears in the input schema with the pinned enum.
     const props = found?.inputSchema?.properties ?? {};
     expect(props['source_app']).toBeDefined();
     const sourceApp = props['source_app'] as { enum?: string[] };
-    expect(new Set(sourceApp.enum)).toEqual(new Set(['cursor', 'claude_code', 'codex', 'git']));
+    expect(new Set(sourceApp.enum)).toEqual(
+      new Set(['cursor', 'claude_code', 'codex', 'git', 'granola']),
+    );
   });
 
   it('tools/call returns both content (text JSON) and structuredContent with matching JSON', async () => {
@@ -750,6 +752,40 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
       parsedByPrefix.matches.map((m) => m.id).sort(),
     );
     expect(parsedByApp.matches).toHaveLength(2);
+  });
+
+  it("source_app='granola' maps to api:granola atoms", async () => {
+    const fresh = new MemoryStorage();
+    await fresh.append({
+      source: 'api:granola',
+      timestamp: '2026-06-21T10:00:00.000Z',
+      content: 'Customer asked about deployment timeline',
+      metadata: { note_id: 'note-1', granola_atom_type: 'summary' },
+    });
+    await fresh.append({
+      source: 'api:granola',
+      timestamp: '2026-06-21T10:01:00.000Z',
+      content: 'CEO: We should follow up next week',
+      metadata: { note_id: 'note-1', granola_atom_type: 'transcript' },
+    });
+    await fresh.append({
+      source: 'git:/repo',
+      timestamp: '2026-06-21T10:02:00.000Z',
+      content: 'irrelevant commit',
+    });
+    handle = await startMcpServer(fresh, { port: 0 });
+
+    const byApp = (await withClient(handle.url, async (c) =>
+      c.callTool({
+        name: 'search_memories',
+        arguments: { source_app: 'granola' },
+      }),
+    )) as CallToolResultLike;
+    const parsed = JSON.parse(byApp.content![0]!.text) as SearchResult;
+
+    expect(parsed.matches).toHaveLength(2);
+    expect(parsed.matches.every((m) => m.source === 'api:granola')).toBe(true);
+    expect(parsed.query_echo.source_app).toBe('granola');
   });
 
   it('source_prefix wins on conflict and query_echo records both raw inputs', async () => {
@@ -965,7 +1001,9 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
     const { SEARCH_MEMORIES_DESCRIPTION } =
       await import('../../../src/mcp/tools/search-memories.js');
     expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/source_app/);
-    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(/cursor.*claude_code.*codex.*git|next_cursor/);
+    expect(SEARCH_MEMORIES_DESCRIPTION).toMatch(
+      /cursor.*claude_code.*codex.*git.*granola|next_cursor/,
+    );
   });
 
   // Item 037 / AC3 — repo_path filter.

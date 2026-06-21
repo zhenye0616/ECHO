@@ -1,11 +1,8 @@
-import {
-  adaptClaudeCode,
-  CLAUDE_CODE_VERSION,
-  matchesClaudeCode,
-} from './adapters/claude-code.js';
+import { adaptClaudeCode, CLAUDE_CODE_VERSION, matchesClaudeCode } from './adapters/claude-code.js';
 import { adaptCodex, CODEX_VERSION, matchesCodex } from './adapters/codex.js';
 import { adaptCursor, CURSOR_VERSION, matchesCursor } from './adapters/cursor.js';
 import { adaptGit, GIT_VERSION, matchesGit } from './adapters/git.js';
+import { adaptGranola, GRANOLA_VERSION, matchesGranola } from './adapters/granola.js';
 import type { AdapterRegistration } from './types.js';
 
 const REGISTRY: AdapterRegistration[] = [
@@ -32,6 +29,12 @@ const REGISTRY: AdapterRegistration[] = [
     version: GIT_VERSION,
     matches: matchesGit,
     adapter: adaptGit,
+  },
+  {
+    name: 'granola',
+    version: GRANOLA_VERSION,
+    matches: matchesGranola,
+    adapter: adaptGranola,
   },
 ];
 
