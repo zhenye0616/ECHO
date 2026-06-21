@@ -13,9 +13,15 @@ import { cursorFixture } from './fixtures/cursor.js';
 import { gitFixture } from './fixtures/git.js';
 
 describe('normalize dispatch', () => {
-  it('registers adapters in the documented order: claude-code, codex, cursor, git', () => {
+  it('registers adapters in the documented order: claude-code, codex, cursor, git, granola', () => {
     const reg = getRegistry();
-    expect(reg.map((r) => r.name)).toEqual(['claude-code', 'codex', 'cursor', 'git']);
+    expect(reg.map((r) => r.name)).toEqual([
+      'claude-code',
+      'codex',
+      'cursor',
+      'git',
+      'granola',
+    ]);
   });
 
   it('matches each adapter by source pattern', () => {
@@ -23,6 +29,7 @@ describe('normalize dispatch', () => {
     expect(findAdapter(codexFixture.source)?.name).toBe('codex');
     expect(findAdapter(cursorFixture.source)?.name).toBe('cursor');
     expect(findAdapter(gitFixture.source)?.name).toBe('git');
+    expect(findAdapter('api:granola')?.name).toBe('granola');
   });
 
   it('returns null when no adapter matches a generic fs-watcher event', () => {

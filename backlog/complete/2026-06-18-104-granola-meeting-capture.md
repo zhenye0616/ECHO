@@ -24,6 +24,7 @@ files_to_modify:
   - tests/mcp/tools/search-memories.test.ts
   - tests/normalize/dispatch.test.ts
   - tests/packaging/packed-manifest.test.ts
+  - tests/capture/sources.test.ts
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-21T20:38:58Z"
 branch: "agent/granola-meeting-capture"
@@ -38,7 +39,35 @@ agent_notes: |
   tests/mcp/recent-calls-endpoint.test.ts in isolation pass. Full npm test still reports only the two
   known non-104 failures from the resumed notes: tests/cli/shell-reachable.test.ts daemon health and
   tests/mcp/recent-calls-endpoint.test.ts timeout under full-suite load.
-review_notes: ""
+review_notes: |
+  Merged on 2026-06-21 via founder reconciliation (/merge-and-cleanup).
+
+  Conflicts resolved:
+  - none — clean --no-ff merge (branch cut from current origin/main).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - Added tests/capture/sources.test.ts to files_to_modify (the 15th touched file; legitimate apis/isAllowedApi pin ripple from sources.ts; no code change).
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify (merger worktree, head df9bd0ea): 1767/1767 product tests pass; lint, typecheck,
+  coupled-invariants, and sync-skills --check all clean. Two pre-existing/flaky suite failures
+  are NOT caused by 104 and were independently confirmed benign: tests/cli/shell-reachable.test.ts
+  (fails on clean origin/main — daemon/bash-env) and tests/mcp/recent-calls-endpoint.test.ts
+  (passes in isolation 2/2; load-timeout flake under full-suite parallelism).
+
+  Build history (notable): converged spec through 4 review rounds, then 3 builder escalations —
+  all legitimate, none drift: (1) storage substrate is append-only/random-id → founder descoped
+  to append-only ingest-once; (2) source-app enum ripple → files_to_modify completion;
+  (3) snapshot-pin ripple → resume-and-finish. Spec amended post-review accordingly.
+
+  Follow-up items (non-blocking):
+  - Coalesce partial-checkpoint writes if first-sync batches get large (granola-poller.ts:655-664) — optimization.
+  - Optionally skip writing an empty-summary atom when both summary fields are absent (granola-poller.ts:513).
+  - Strategist (post-merge): create wiki capture/ Granola surface page + capture/per-app/granola-collected-data ref (per After Completion).
 ---
 
 > **Demand gate lifted (2026-06-21).** 103+105 validated: the eng→CEO Slack bot synthesizes WHY-level
