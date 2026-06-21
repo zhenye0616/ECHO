@@ -412,3 +412,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** source_breakdown=`{"git":33,"claude_code":19}`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; no Cursor, Slack, browser, or Codex-source atoms in this returned cluster.
 - **Verdict:** partial - useful as a freshness check, but too broad to determine the next builder item; the deterministic backlog selector still owns claim choice.
 - **Note:** The result confirms substantial recent repo activity and one unresolved hint, but no atom hydration was needed before claim because the backlog item and its `spec_refs` remain the build contract.
+
+### 2026-06-21 13:24 PDT - codex builder item-104 amended-context lookup
+
+- **Trigger:** While implementing claimed item `2026-06-18-104-granola-meeting-capture`, Codex checked whether ECHO had recent captured context for the amended append-only Granola spec beyond the local spec refs and prior run log.
+- **Query inputs:** `search_memories(query="2026-06-18-104-granola-meeting-capture Granola append-only ingest-once", repo_path="/Users/zhenye/Desktop/Project_echo", limit=8)`.
+- **Returned:** 0 matches, `next_cursor: null`, no warnings.
+- **Sources:** none returned; repo-scoped query against `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** partial - the empty result was useful as a negative check, but it did not add context.
+- **Note:** Local files remain authoritative for this run: the amended claimed spec, the previous blocked run log, and the official Granola docs loaded separately.
