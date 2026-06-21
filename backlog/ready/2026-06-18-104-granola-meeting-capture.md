@@ -8,6 +8,7 @@ created: 2026-06-19
 blocked_by: []
 task_state_ref: 2026-06-18-104-granola-meeting-capture
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: c77e3db9cbe32abd0fc39d2f64092e99ecaae3e916aa4749916ddeb3488068d5
 files_to_modify:
   - src/capture/sources.ts
   - src/capture/surfaces/granola-poller.ts

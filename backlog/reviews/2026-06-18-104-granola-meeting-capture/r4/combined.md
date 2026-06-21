@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R4 — both reviewers `proceed` with 0 findings. Converged in 4 rounds (findings 7 → 3 → 1 → 0). r2's reframe gate (≥2 findings on r1's AC3 patch) was resolved by a fresh-context `text_patch` correction, not patch-on-patch; r3 added load-bearing operational-contract test coverage; r4 clean. Spec promoted `proposed → ready`, claimable by a builder.
 
