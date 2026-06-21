@@ -151,6 +151,10 @@ All tests run against a **mocked** Granola API (recorded fixtures) — never the
   pair — proves `updated_at` is not part of atom identity.
 - **429 / backoff:** a 429 triggers backoff/retry and surfaces a durable operator-visible error on
   repeated failure; no silent drop.
+- **Single poll in flight:** while a poll is blocked/in-progress, a second scheduler tick fires → the
+  second invocation exits/skips without a second list/detail traversal or checkpoint write (no overlap).
+- **Hung-request timeout:** a request that hangs past the bounded per-request timeout is aborted, surfaces
+  durable operator-visible error evidence, and leaves the checkpoint unchanged.
 - **Path resolution + daemon startup with no shell environment:** config/checkpoint paths resolve via
   `os.homedir()` (no literal `~` reaches the filesystem). With `GRANOLA_API_KEY` unset and no inherited
   shell env, the daemon loads the key from `path.join(os.homedir(), '.echo/state/granola.json')`; with the
