@@ -8,7 +8,7 @@ created: 2026-06-19
 blocked_by: []
 task_state_ref: 2026-06-18-104-granola-meeting-capture
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: c77e3db9cbe32abd0fc39d2f64092e99ecaae3e916aa4749916ddeb3488068d5
+ready_content_sha: 0a0f2f59b8a5a15a9b5db9fc6e9febed066d3fa27bfd7a1519d58b2e3bd999f6
 files_to_modify:
   - src/capture/sources.ts
   - src/capture/surfaces/granola-poller.ts
@@ -18,16 +18,12 @@ files_to_modify:
   - src/mcp/util/source-app.ts
   - tests/normalize/adapters/granola.test.ts
   - tests/capture/granola-poller.test.ts
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-06-21T20:03:28Z"
-branch: "agent/granola-meeting-capture"
-head_sha: "bff8fc7c91ec7a3b097288c6aa9b546749c4baaf"
+claimed_by: ""
+claimed_at: ""
+branch: ""
+head_sha: ""
 pr_url: ""
-agent_notes: |
-  BLOCKED: AC1/AC3 require deterministic atom IDs and edited-note upsert semantics, but the current capture/storage contract assigns random IDs inside `Storage.append` and is append-only.
-  Tried: Read the mandatory global context, all local `spec_refs`, Granola API docs, and the relevant source contracts (`capture/pipeline`, `storage/interface`, `storage/{memory,sqlite}`, `normalize`, and MCP source-app/search paths).
-  Best-guess answer: amend 104 to include a storage/pipeline upsert primitive, or split that primitive into a prerequisite item; confidence high because implementing the requirement correctly appears to require touching files outside `files_to_modify`.
-  Why I escalated rather than guessing: stopping condition — the implementation needs files not listed in `files_to_modify`, and a partial append-only poller would fail the no-duplicates/upsert acceptance criteria.
+agent_notes: ""
 review_notes: ""
 ---
 
@@ -40,6 +36,15 @@ review_notes: ""
 > attributed transcript. Polling the API directly is simpler than Slack capture and gets richer content.
 > CEO is on a Business trial with an API key available now. Slack capture deferred to a separate future
 > item if needed.
+>
+> **Amended (2026-06-21, post-build-escalation, founder-directed).** The first codex build attempt
+> blocked: AC1/AC3 (as converged through review r1–r4) required deterministic atom IDs + edited-note
+> **upsert-in-place**, but ECHO storage is append-only with random IDs (`Storage.append` → `randomUUID()`;
+> no upsert) — satisfying it would have meant changing `src/storage/*`, outside `files_to_modify`. Founder
+> call: **keep it simple — append-only, ingest-once, no in-place modification.** AC1/AC3/Atom-shape/Tests
+> descoped accordingly; a `dedupe_key` is stamped in metadata for a *future* chain/hash supersede. (Note:
+> the upsert requirement was review-added hardening, not a founder need — a reminder that spec-review
+> convergence ≠ buildability against the substrate.)
 
 ## Why
 
@@ -58,11 +63,13 @@ API directly ingests full meeting notes (structured summary + transcript) into E
 
 ## Acceptance criteria
 
-1. **AC1 — Granola notes ingested + queryable.** Each Granola note lands as a deterministic, fixed set of
+1. **AC1 — Granola notes ingested + queryable.** Each Granola note lands as a fixed pair of **append-only**
    ECHO atoms — **one summary atom** (`summary_markdown`) **and one transcript atom** (the full
-   speaker-attributed transcript) per note — queryable via `search_memories`/`find_clusters`. Atom IDs
-   derive from stable dedupe keys (see Architecture → Atom shape) so re-polling an updated note upserts in
-   place rather than duplicating.
+   speaker-attributed transcript) per note — queryable via `search_memories`/`find_clusters`. Atoms use
+   normal storage-assigned IDs (append-only — **no in-place modification in V1**). Each note is ingested
+   **once** (keyed by `note_id`); a `dedupe_key` (`granola:{note_id}:summary` / `:transcript`) is stamped
+   in metadata so a *future* chain/hash supersede can replace versions — but V1 does **not** upsert or
+   modify atoms in place.
 2. **AC2 — Capture pipeline integration.** Granola flows through the existing pipeline as an
    **`api:granola`** surface (the `apis` category — empty today in `src/capture/sources.ts`; first
    member), including `search_memories(source_app='granola')` support (`src/mcp/util/source-app.ts`
@@ -71,18 +78,17 @@ API directly ingests full meeting notes (structured summary + transcript) into E
    only notes changed since the last sync.
    - **Checkpoint:** persisted at `path.join(os.homedir(), '.echo/state/granola-checkpoint.json')`
      (resolve via the home-dir/state-dir helper — a literal `~` does **not** expand in programmatic FS
-     calls); stored fields `{ high_water_mark (max note `updated_at` seen, ISO 8601), last_synced_at,
-     schema_version }`. Written **atomically** (temp file + `rename`) so a crash mid-write cannot corrupt it.
+     calls); stored fields `{ high_water_mark (max note `updated_at` seen, ISO 8601),
+     ingested_note_ids (the set used for ingest-once skip), last_synced_at, schema_version }`. Written
+     **atomically** (temp file + `rename`) so a crash mid-write cannot corrupt it.
    - **Advance-after-durable-write:** `high_water_mark` advances **only after** every note in the batch —
      detail fetch + all derived atoms — has been durably written. A crash mid-batch re-fetches that batch
      on restart rather than skipping it.
-   - **Idempotent restart:** derived atoms upsert by their **stable atom dedupe keys**
-     (`granola:{note_id}:summary`, `granola:{note_id}:transcript`) — atom identity is `note_id` + atom
-     kind, **never `updated_at`**, so an edited note upserts in place rather than spawning duplicates.
-     `updated_at` is **checkpoint/order metadata only**: the next poll requests `updated_after =
-     high_water_mark` **inclusive** (or a small overlap) and dedupes by atom key, so notes sharing an
-     identical `updated_at` at the boundary are re-fetched and upserted (never skipped, never duplicated)
-     after a restart.
+   - **Ingest-once (append-only):** the checkpoint records ingested `note_id`s; on each poll a note whose
+     `note_id` is already ingested is **skipped** (no second append). This covers both edited notes
+     (re-fetched via `updated_after` but **not re-ingested** in V1 — no in-place modification) and crash
+     recovery (a batch re-fetched after a mid-batch crash skips the notes already written). `updated_at` is
+     checkpoint/order metadata only. Result: no duplicate atoms, no upsert, **no storage-contract change**.
    - **Operational contract:** at most **one** Granola poll in flight at a time (no overlapping ticks);
      bounded poll interval + per-request timeout; durable, operator-visible error evidence (a logged ECHO
      error surface) for auth failure, repeated HTTP 429, cursor/pagination failure, and checkpoint write
@@ -119,15 +125,16 @@ API directly ingests full meeting notes (structured summary + transcript) into E
   - `transcript`: array of `{ text, start_time, end_time, speaker }` ✓ — speaker-attributed + timestamped
   - `attendees`: array of `{ name, email }` ✓; `calendar_event` ✓; `folder_membership` ✓; `web_url` ✓;
     `created_at` / `updated_at` (ISO 8601) ✓
-- **Atom shape (deterministic, fixed):** `source: "api:granola"`. **Exactly two atoms per note:**
-  - a **summary atom** — `summary_markdown` (+ `summary_text` in metadata), dedupe key
-    `granola:{note_id}:summary`;
-  - a **transcript atom** — the full speaker-attributed transcript text, dedupe key
-    `granola:{note_id}:transcript`.
-  Atom ID derives from the dedupe key, so a re-polled updated note **upserts in place** (no duplicates).
-  Shared metadata: `note_id` (=`id`), `title`, `attendees`, `created_at`/`updated_at`, `calendar_event`,
-  `folder_membership`, `web_url`. **No `duration` field exists** — derive from `calendar_event` start/end
-  or transcript `start_time`/`end_time` if needed, else omit. No `repo_root`.
+- **Atom shape (append-only, fixed):** `source: "api:granola"`. **Exactly two atoms per note, ingested once:**
+  - a **summary atom** — `summary_markdown` (+ `summary_text` in metadata);
+  - a **transcript atom** — the full speaker-attributed transcript text.
+  Atoms use normal storage-assigned IDs (append-only — **no in-place upsert/modify in V1**). A `dedupe_key`
+  (`granola:{note_id}:summary` / `granola:{note_id}:transcript`) is stamped in **metadata** so a future
+  chain/hash supersede can find + replace versions; the poller's ingest-once skip (AC3) is what prevents
+  duplicates today. Shared metadata: `note_id` (=`id`), `dedupe_key`, `title`, `attendees`,
+  `created_at`/`updated_at`, `calendar_event`, `folder_membership`, `web_url`. **No `duration` field
+  exists** — derive from `calendar_event` start/end or transcript `start_time`/`end_time` if needed, else
+  omit. No `repo_root`.
 - **Gate:** same `api:` gate kind + `apis` allowlist category (`wiki/architecture/capture-gate.md`,
   `capture-allowlist.md`); `CAPTURED_SOURCES.apis` is `[]` today (`src/capture/sources.ts:18`) — Granola
   is its first member. The `api:` gate fn (`isAllowedApi` / `_isAllowedApiIn`) already exists.
@@ -149,11 +156,12 @@ All tests run against a **mocked** Granola API (recorded fixtures) — never the
 - **Source-app filtering:** `search_memories(source_app='granola')` returns Granola atoms and excludes
   others; the `api:granola` gate admits Granola and rejects a non-allowlisted api name.
 - **Crash-safe checkpoint:** simulate a crash mid-batch (after detail fetch, before atom write) → on
-  restart the batch is re-fetched and upserted idempotently by stable atom key, `high_water_mark` did not
-  advance past the unfinished batch, and identical-`updated_at` boundary notes are not skipped.
-- **Edited-note upsert (no duplicates):** re-ingesting a note whose `updated_at` changed upserts the same
-  two atoms in place (keyed by `granola:{note_id}:summary` / `:transcript`) rather than creating a second
-  pair — proves `updated_at` is not part of atom identity.
+  restart the batch is re-fetched, notes already ingested (by `note_id`) are skipped while the unfinished
+  notes are written, `high_water_mark` did not advance past the unfinished batch, and no duplicate atoms
+  result.
+- **Ingest-once / edited-note skip (no duplicates):** re-polling a note already ingested (including one
+  whose `updated_at` changed) does **not** append new atoms — it is skipped by `note_id`. Proves V1 is
+  append-only with no in-place modification and no duplicates.
 - **429 / backoff:** a 429 triggers backoff/retry and surfaces a durable operator-visible error on
   repeated failure; no silent drop.
 - **Single poll in flight:** while a poll is blocked/in-progress, a second scheduler tick fires → the
@@ -173,6 +181,11 @@ All tests run against a **mocked** Granola API (recorded fixtures) — never the
 - **Structured [decision, reason, alternatives] reasoning layer** — separate follow-up item.
 - **Transcript analysis / speaker diarization beyond raw ingestion** — future.
 - **Federation / consent matrix / multi-party** — not needed; founder's own API key, founder's own ECHO.
+- **In-place modification / replace / upsert of ingested atoms** — V1 is append-only, ingest-once. A
+  chain/hash supersede mechanism (and any storage-interface upsert / deterministic-atom-id change) is a
+  deferred future design. **Do NOT modify `src/storage/*` or `src/capture/pipeline.ts` for this item** —
+  if you find yourself needing to, STOP and escalate (this is the exact constraint that blocked the first
+  build attempt; see `raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeting-capture.md`).
 
 ## spec_refs
 
