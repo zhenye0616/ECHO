@@ -21,9 +21,13 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-21T20:22:45Z"
 branch: "agent/granola-meeting-capture"
-head_sha: ""
+head_sha: "35fe71d8bf7b55883927ff203f9396184b280fc1"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC2 requires `search_memories(source_app='granola')` support, but extending the shared source-app enum requires updating files outside this item's `files_to_modify`.
+  Tried: loaded the amended spec, required refs, official Granola docs, current integration points, and searched for hard-coded source-app expectations; found `tests/mcp/tools/search-memories.test.ts` hard-codes the old four-value enum, and MCP tool descriptions in `src/mcp/tools/search-memories.ts`, `src/mcp/tools/wait-for-new-turns.ts`, and `src/mcp/tools/echo-resolve-mru.ts` hard-code the old source-app vocabulary.
+  Best-guess answer: amend `files_to_modify` to include the MCP test and description files, then re-run the builder; confidence high.
+  Why escalated rather than guessing: builder stopping condition applies because meeting acceptance requires modifying files not listed in `files_to_modify`.
 review_notes: ""
 ---
 
