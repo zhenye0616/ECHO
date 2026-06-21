@@ -21,9 +21,13 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-21T20:03:28Z"
 branch: "agent/granola-meeting-capture"
-head_sha: ""
+head_sha: "bff8fc7c91ec7a3b097288c6aa9b546749c4baaf"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC1/AC3 require deterministic atom IDs and edited-note upsert semantics, but the current capture/storage contract assigns random IDs inside `Storage.append` and is append-only.
+  Tried: Read the mandatory global context, all local `spec_refs`, Granola API docs, and the relevant source contracts (`capture/pipeline`, `storage/interface`, `storage/{memory,sqlite}`, `normalize`, and MCP source-app/search paths).
+  Best-guess answer: amend 104 to include a storage/pipeline upsert primitive, or split that primitive into a prerequisite item; confidence high because implementing the requirement correctly appears to require touching files outside `files_to_modify`.
+  Why I escalated rather than guessing: stopping condition — the implementation needs files not listed in `files_to_modify`, and a partial append-only poller would fail the no-duplicates/upsert acceptance criteria.
 review_notes: ""
 ---
 
