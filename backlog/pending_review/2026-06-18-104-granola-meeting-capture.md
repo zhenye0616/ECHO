@@ -27,21 +27,17 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-21T20:38:58Z"
 branch: "agent/granola-meeting-capture"
-head_sha: "39f5957d2da48b795a69cec486ab20deec985c25"
+head_sha: "df9bd0ea4ceb56f83edffcf21351271ebd7b525c"
 pr_url: ""
 agent_notes: |
-  RESUME (strategist-authorized 2026-06-21): implementation is complete + pushed at head 39f5957d; focused
-  acceptance tests pass (14/14). Only remaining work — update the TWO pinned tests now authorized in
-  files_to_modify:
-    1. tests/normalize/dispatch.test.ts — add 'granola' to the asserted adapter-order list.
-    2. tests/packaging/packed-manifest.test.ts — regenerate the packed-file snapshot to include
-       granola-poller.* and adapters/granola.*.
-  Then re-run the full suite and hand off to pending_review (success outcome).
-  DO NOT chase these two — strategist verified them as NOT caused by this change:
-    - tests/cli/shell-reachable.test.ts — pre-existing failure on clean origin/main (packaging/bash env).
-    - tests/mcp/recent-calls-endpoint.test.ts — passes in isolation on main AND this branch; the
-      full-suite failure was a load/timeout flake, not a regression.
-  Do NOT touch src/storage/* (append-only is intentional; see prior run-log runs 1-2).
+  Completed the strategist-authorized Granola handoff on agent/granola-meeting-capture at
+  df9bd0ea4ceb56f83edffcf21351271ebd7b525c. The branch implements append-only, ingest-once Granola
+  meeting-note capture, api:granola allowlisting/source_app filtering, daemon startup/config validation,
+  mocked poller/normalizer coverage, and the two final pinned test updates for normalize dispatch and
+  packed-package contents. Typecheck, lint, focused Granola tests, the pinned tests, and
+  tests/mcp/recent-calls-endpoint.test.ts in isolation pass. Full npm test still reports only the two
+  known non-104 failures from the resumed notes: tests/cli/shell-reachable.test.ts daemon health and
+  tests/mcp/recent-calls-endpoint.test.ts timeout under full-suite load.
 review_notes: ""
 ---
 

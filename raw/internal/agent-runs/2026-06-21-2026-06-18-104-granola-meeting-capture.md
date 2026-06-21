@@ -242,3 +242,109 @@ Daemon log included:
 ## Drift Events Caught
 
 None. The escalation is about full-suite files outside the spec edit surface, not an adjacent product feature.
+
+---
+
+## Run 4 (resumed at 2026-06-21T21:28:49Z)
+
+## What I Implemented
+
+Completed the strategist-authorized test-pin follow-up on feature branch `agent/granola-meeting-capture`:
+
+- Updated the normalize dispatch adapter-order pin to include the already-registered `granola` adapter.
+- Refreshed the packed-package manifest inline snapshot to include the compiled Granola poller and Granola normalizer adapter files.
+
+The feature branch was pushed at `df9bd0ea4ceb56f83edffcf21351271ebd7b525c`.
+
+## Previous Attempt State
+
+I resumed from the clean pushed feature branch at `39f5957d2da48b795a69cec486ab20deec985c25`. There were no uncommitted worktree changes to keep or discard. The only main-checkout dirty file before handoff was the pre-existing untracked `raw/internal/ceo-loop-events.md`, which I did not touch.
+
+## Files Modified
+
+- `tests/normalize/dispatch.test.ts` — updated the documented adapter-order expectation and source-pattern assertion for `api:granola`.
+- `tests/packaging/packed-manifest.test.ts` — updated the inline package-file snapshot for `dist/capture/surfaces/granola-poller.{d.ts,js}` and `dist/normalize/adapters/granola.{d.ts,js}`.
+- Feature branch `agent/granola-meeting-capture` @ `df9bd0ea4ceb56f83edffcf21351271ebd7b525c`.
+
+## Decisions Made During Implementation
+
+### Decision 1: Treat the remaining work as test-pin maintenance only
+
+- **Options considered:** change implementation files; update only the two authorized pins; rerun focused tests only.
+- **Chose:** update only the two authorized pins, then rerun focused/static/full checks.
+- **Why:** The implementation had already landed and the claimed item explicitly authorized only `tests/normalize/dispatch.test.ts` and `tests/packaging/packed-manifest.test.ts` as the remaining files.
+- **Worth founder review?** No. This follows the resumed `agent_notes` instruction.
+
+## Acceptance Criteria Status
+
+- [x] AC1 — Still implemented by the prior feature commit; no storage/upsert changes added.
+- [x] AC2 — Still implemented; the dispatch and package pins now agree with the `granola` adapter/source-app addition.
+- [x] AC3 — Still implemented by the prior feature commit; checkpoint and ingest-once behavior unchanged.
+- [x] AC4 — Still implemented by the prior feature commit; config/startup behavior unchanged.
+
+## Tests Run
+
+```text
+npx vitest run tests/normalize/dispatch.test.ts tests/packaging/packed-manifest.test.ts
+
+Test Files  2 passed (2)
+Tests  8 passed (8)
+```
+
+```text
+npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+```text
+npx vitest run tests/capture/granola-poller.test.ts tests/normalize/adapters/granola.test.ts tests/capture/sources.test.ts tests/mcp/tools/search-memories.test.ts tests/normalize/dispatch.test.ts tests/packaging/packed-manifest.test.ts
+
+Test Files  6 passed (6)
+Tests  107 passed (107)
+```
+
+```text
+npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+```text
+npm test
+
+Test Files  2 failed | 163 passed | 1 skipped (166)
+Tests  2 failed | 1767 passed | 21 skipped | 1 todo (1791)
+
+FAIL  tests/cli/shell-reachable.test.ts > echoctl shell reachability > packs an echoctl binary reachable from bash and exercises transitive doctor imports
+AssertionError: daemon com.echo.daemon.test-4517-1782077151722 did not become healthy on port 41092; run `echoctl daemon logs --tail 50 --label com.echo.daemon.test-4517-1782077151722` and reinstall or rollback
+
+FAIL  tests/mcp/recent-calls-endpoint.test.ts > GET /mcp/recent-calls > logs every runtime-registered tool through the wrapper
+Error: Test timed out in 15000ms.
+```
+
+```text
+npx vitest run tests/mcp/recent-calls-endpoint.test.ts
+
+Test Files  1 passed (1)
+Tests  2 passed (2)
+```
+
+```text
+git diff --check
+
+<no output>
+```
+
+## Open Questions for Founder
+
+None. The two full-suite failures are the same non-104 failures already called out in the resumed item notes; `recent-calls-endpoint` passed in isolation again.
+
+## Drift Events Caught
+
+None.

@@ -3,9 +3,9 @@ task_id: 2026-06-18-104-granola-meeting-capture
 role: builder
 binding: codex
 claim_branch: agent/granola-meeting-capture
-last_updated: 2026-06-21T21:08:46Z
+last_updated: 2026-06-21T21:30:36Z
 handoff_branch: agent/granola-meeting-capture
-handoff_head_sha: 39f5957d2da48b795a69cec486ab20deec985c25
+handoff_head_sha: df9bd0ea4ceb56f83edffcf21351271ebd7b525c
 handoff_run_log: raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeting-capture.md
 ---
 
@@ -13,7 +13,7 @@ handoff_run_log: raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeti
 Claimed 104 as codex builder after founder-directed amendment and prior blocked handoff. Implement Granola API meeting-note ingestion as append-only, ingest-once capture: one summary atom and one transcript atom per note, checkpointed by note id and high-water mark, with no storage or capture-pipeline contract changes.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-21-2026-06-18-104-granola-meeting-capture.md for blocker.
+- Lifecycle: COMPLETE — ready for review at df9bd0ea4ceb56f83edffcf21351271ebd7b525c.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
@@ -26,11 +26,7 @@ Claimed 104 as codex builder after founder-directed amendment and prior blocked 
 - Tests are mocked only; no live Granola key or live endpoint call belongs in the test suite.
 
 ## open_questions
-- None blocking after the amendment. Escalate if implementation needs files outside `files_to_modify`, a new dependency, live API probing, or changes to `src/storage/*` / `src/capture/pipeline.ts`.
-
-<!-- builder-state-handoff-open-questions:start -->
-- See agent_notes and run log for the escalation question.
-<!-- builder-state-handoff-open-questions:end -->
+- None.
 
 ## dont_touch
 - Do not implement the eng-to-CEO read view or rationale capture from item 103.
