@@ -8,6 +8,15 @@ created: 2026-06-19
 blocked_by: []
 task_state_ref: 2026-06-18-104-granola-meeting-capture
 requested_reviewers: ["codex", "codex-ops"]
+files_to_modify:
+  - src/capture/sources.ts
+  - src/capture/surfaces/granola-poller.ts
+  - src/daemon/index.ts
+  - src/normalize/adapters/granola.ts
+  - src/normalize/dispatch.ts
+  - src/mcp/util/source-app.ts
+  - tests/normalize/adapters/granola.test.ts
+  - tests/capture/granola-poller.test.ts
 claimed_by: ""
 claimed_at: ""
 branch: ""
@@ -44,17 +53,39 @@ API directly ingests full meeting notes (structured summary + transcript) into E
 
 ## Acceptance criteria
 
-1. **AC1 — Granola notes ingested + queryable.** Meeting notes from the Granola API land as ECHO atoms
-   (summary markdown + transcript segments), queryable via `search_memories`/`find_clusters`.
+1. **AC1 — Granola notes ingested + queryable.** Each Granola note lands as a deterministic, fixed set of
+   ECHO atoms — **one summary atom** (`summary_markdown`) **and one transcript atom** (the full
+   speaker-attributed transcript) per note — queryable via `search_memories`/`find_clusters`. Atom IDs
+   derive from stable dedupe keys (see Architecture → Atom shape) so re-polling an updated note upserts in
+   place rather than duplicating.
 2. **AC2 — Capture pipeline integration.** Granola flows through the existing pipeline as an
    **`api:granola`** surface (the `apis` category — empty today in `src/capture/sources.ts`; first
    member), including `search_memories(source_app='granola')` support (`src/mcp/util/source-app.ts`
    enum extension).
-3. **AC3 — Incremental polling.** Poller uses `updated_after` param to fetch only new/updated notes
-   since last sync. Checkpoint persisted across daemon restarts.
-4. **AC4 — Config.** Granola API key configured via the `GRANOLA_API_KEY` env var (loaded from `.env`,
-   gitignored) or a `~/.echo/state/` config file (consistent with existing capture-sources config
-   pattern). No hardcoded credentials. (`.env` + `.env.example` placeholder already scaffolded.)
+3. **AC3 — Incremental polling + crash-safe checkpoint.** Poller uses the `updated_after` param to fetch
+   only notes changed since the last sync.
+   - **Checkpoint:** persisted at the absolute path `~/.echo/state/granola-checkpoint.json`; stored fields
+     `{ high_water_mark (max note `updated_at` seen, ISO 8601), last_synced_at, schema_version }`. Written
+     **atomically** (temp file + `rename`) so a crash mid-write cannot corrupt it.
+   - **Advance-after-durable-write:** `high_water_mark` advances **only after** every note in the batch —
+     detail fetch + all derived atoms — has been durably written. A crash mid-batch re-fetches that batch
+     on restart rather than skipping it.
+   - **Idempotent restart:** notes upsert by dedupe key (note `id` + `updated_at`); the next poll requests
+     `updated_after = high_water_mark` **inclusive** (or a small overlap) and dedupes, so notes sharing an
+     identical `updated_at` at the boundary are never skipped after a restart.
+   - **Operational contract:** at most **one** Granola poll in flight at a time (no overlapping ticks);
+     bounded poll interval + per-request timeout; durable, operator-visible error evidence (a logged ECHO
+     error surface) for auth failure, repeated HTTP 429, cursor/pagination failure, and checkpoint write
+     failure — failures must be detectable, not silent.
+4. **AC4 — Config + startup validation.** Granola API key resolved by a fixed **precedence**: (1) the
+   `GRANOLA_API_KEY` environment variable if set, else (2) an **absolute-path** config file
+   `~/.echo/state/granola.json` (`{ "api_key": "grn_..." }`). **Note:** the daemon runs under launchd,
+   which does **not** inherit the interactive shell environment, and cwd-relative `.env` loading silently
+   misses the key — so the daemon MUST read from the absolute state path; `.env` / `GRANOLA_API_KEY` is
+   the dev/interactive path only. On startup the poller **validates** the key is present and well-formed;
+   if missing or invalid it **disables itself with a visible log/error** (the rest of the daemon keeps
+   running) rather than crashing or silently no-op'ing. No hardcoded credentials. (`.env` + `.env.example`
+   placeholder already scaffolded for the dev path.)
 
 ## Architecture
 
@@ -76,18 +107,43 @@ API directly ingests full meeting notes (structured summary + transcript) into E
   - `transcript`: array of `{ text, start_time, end_time, speaker }` ✓ — speaker-attributed + timestamped
   - `attendees`: array of `{ name, email }` ✓; `calendar_event` ✓; `folder_membership` ✓; `web_url` ✓;
     `created_at` / `updated_at` (ISO 8601) ✓
-- **Atom shape:** `source: "api:granola"`; one atom per meeting note containing `summary_markdown`
-  (optionally also `summary_text`); optionally split `transcript` into per-`speaker` segment atoms for
-  finer-grained retrieval. Metadata: `note_id` (=`id`), `title`, `attendees`, `created_at`/`updated_at`,
-  `calendar_event`, `folder_membership`, `web_url`. **No `duration` field exists** — derive from
-  `calendar_event` start/end or transcript `start_time`/`end_time` if needed, else omit. No `repo_root`.
+- **Atom shape (deterministic, fixed):** `source: "api:granola"`. **Exactly two atoms per note:**
+  - a **summary atom** — `summary_markdown` (+ `summary_text` in metadata), dedupe key
+    `granola:{note_id}:summary`;
+  - a **transcript atom** — the full speaker-attributed transcript text, dedupe key
+    `granola:{note_id}:transcript`.
+  Atom ID derives from the dedupe key, so a re-polled updated note **upserts in place** (no duplicates).
+  Shared metadata: `note_id` (=`id`), `title`, `attendees`, `created_at`/`updated_at`, `calendar_event`,
+  `folder_membership`, `web_url`. **No `duration` field exists** — derive from `calendar_event` start/end
+  or transcript `start_time`/`end_time` if needed, else omit. No `repo_root`.
 - **Gate:** same `api:` gate kind + `apis` allowlist category (`wiki/architecture/capture-gate.md`,
   `capture-allowlist.md`); `CAPTURED_SOURCES.apis` is `[]` today (`src/capture/sources.ts:18`) — Granola
   is its first member. The `api:` gate fn (`isAllowedApi` / `_isAllowedApiIn`) already exists.
-- **Likely files_to_modify:** `src/capture/sources.ts` (+`'granola'` to `apis`),
-  `src/capture/surfaces/granola-poller.ts` (new), `src/daemon/index.ts` (lifecycle),
-  `src/normalize/adapters/granola.ts` (new) + `dispatch.ts`, `src/mcp/util/source-app.ts` (enum),
-  + tests.
+- **files_to_modify** (binding list in frontmatter). Roles: `src/capture/sources.ts` (+`'granola'` to
+  `apis`), `src/capture/surfaces/granola-poller.ts` (new poller), `src/daemon/index.ts` (lifecycle +
+  single-in-flight + startup key validation), `src/normalize/adapters/granola.ts` (new) +
+  `src/normalize/dispatch.ts` (register adapter), `src/mcp/util/source-app.ts` (enum),
+  `tests/normalize/adapters/granola.test.ts` + `tests/capture/granola-poller.test.ts` (new).
+
+## Tests
+
+All tests run against a **mocked** Granola API (recorded fixtures) — never the live endpoint or a real key.
+
+- **Pagination:** list across multiple pages via `cursor`/`hasMore`; asserts no note dropped or
+  double-counted at page boundaries.
+- **`updated_after`:** only notes changed since the checkpoint are fetched; unchanged notes are skipped.
+- **Detail + transcript:** parses `summary_markdown` + `transcript[{text,start_time,end_time,speaker}]`;
+  asserts the fixed two-atom shape + dedupe keys.
+- **Source-app filtering:** `search_memories(source_app='granola')` returns Granola atoms and excludes
+  others; the `api:granola` gate admits Granola and rejects a non-allowlisted api name.
+- **Crash-safe checkpoint:** simulate a crash mid-batch (after detail fetch, before atom write) → on
+  restart the batch is re-fetched and upserted idempotently, `high_water_mark` did not advance past the
+  unfinished batch, and identical-`updated_at` boundary notes are not skipped.
+- **429 / backoff:** a 429 triggers backoff/retry and surfaces a durable operator-visible error on
+  repeated failure; no silent drop.
+- **Daemon startup with no shell environment:** with `GRANOLA_API_KEY` unset and no inherited shell env,
+  the daemon loads the key from `~/.echo/state/granola.json`; with the key absent entirely, the poller
+  disables itself with a visible error and the rest of the daemon still starts.
 
 ## Out of Scope (Don't Drift)
 
