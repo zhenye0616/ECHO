@@ -64,24 +64,31 @@ API directly ingests full meeting notes (structured summary + transcript) into E
    enum extension).
 3. **AC3 — Incremental polling + crash-safe checkpoint.** Poller uses the `updated_after` param to fetch
    only notes changed since the last sync.
-   - **Checkpoint:** persisted at the absolute path `~/.echo/state/granola-checkpoint.json`; stored fields
-     `{ high_water_mark (max note `updated_at` seen, ISO 8601), last_synced_at, schema_version }`. Written
-     **atomically** (temp file + `rename`) so a crash mid-write cannot corrupt it.
+   - **Checkpoint:** persisted at `path.join(os.homedir(), '.echo/state/granola-checkpoint.json')`
+     (resolve via the home-dir/state-dir helper — a literal `~` does **not** expand in programmatic FS
+     calls); stored fields `{ high_water_mark (max note `updated_at` seen, ISO 8601), last_synced_at,
+     schema_version }`. Written **atomically** (temp file + `rename`) so a crash mid-write cannot corrupt it.
    - **Advance-after-durable-write:** `high_water_mark` advances **only after** every note in the batch —
      detail fetch + all derived atoms — has been durably written. A crash mid-batch re-fetches that batch
      on restart rather than skipping it.
-   - **Idempotent restart:** notes upsert by dedupe key (note `id` + `updated_at`); the next poll requests
-     `updated_after = high_water_mark` **inclusive** (or a small overlap) and dedupes, so notes sharing an
-     identical `updated_at` at the boundary are never skipped after a restart.
+   - **Idempotent restart:** derived atoms upsert by their **stable atom dedupe keys**
+     (`granola:{note_id}:summary`, `granola:{note_id}:transcript`) — atom identity is `note_id` + atom
+     kind, **never `updated_at`**, so an edited note upserts in place rather than spawning duplicates.
+     `updated_at` is **checkpoint/order metadata only**: the next poll requests `updated_after =
+     high_water_mark` **inclusive** (or a small overlap) and dedupes by atom key, so notes sharing an
+     identical `updated_at` at the boundary are re-fetched and upserted (never skipped, never duplicated)
+     after a restart.
    - **Operational contract:** at most **one** Granola poll in flight at a time (no overlapping ticks);
      bounded poll interval + per-request timeout; durable, operator-visible error evidence (a logged ECHO
      error surface) for auth failure, repeated HTTP 429, cursor/pagination failure, and checkpoint write
      failure — failures must be detectable, not silent.
 4. **AC4 — Config + startup validation.** Granola API key resolved by a fixed **precedence**: (1) the
-   `GRANOLA_API_KEY` environment variable if set, else (2) an **absolute-path** config file
-   `~/.echo/state/granola.json` (`{ "api_key": "grn_..." }`). **Note:** the daemon runs under launchd,
-   which does **not** inherit the interactive shell environment, and cwd-relative `.env` loading silently
-   misses the key — so the daemon MUST read from the absolute state path; `.env` / `GRANOLA_API_KEY` is
+   `GRANOLA_API_KEY` environment variable if set, else (2) a home-dir-resolved config file
+   `path.join(os.homedir(), '.echo/state/granola.json')` (`{ "api_key": "grn_..." }`; resolve via the
+   state-dir helper — a literal `~` does **not** expand in programmatic FS calls). **Note:** the daemon
+   runs under launchd, which does **not** inherit the interactive shell environment, and cwd-relative
+   `.env` loading silently misses the key — so the daemon MUST read from the resolved state path; `.env` /
+   `GRANOLA_API_KEY` is
    the dev/interactive path only. On startup the poller **validates** the key is present and well-formed;
    if missing or invalid it **disables itself with a visible log/error** (the rest of the daemon keeps
    running) rather than crashing or silently no-op'ing. No hardcoded credentials. (`.env` + `.env.example`
@@ -137,13 +144,18 @@ All tests run against a **mocked** Granola API (recorded fixtures) — never the
 - **Source-app filtering:** `search_memories(source_app='granola')` returns Granola atoms and excludes
   others; the `api:granola` gate admits Granola and rejects a non-allowlisted api name.
 - **Crash-safe checkpoint:** simulate a crash mid-batch (after detail fetch, before atom write) → on
-  restart the batch is re-fetched and upserted idempotently, `high_water_mark` did not advance past the
-  unfinished batch, and identical-`updated_at` boundary notes are not skipped.
+  restart the batch is re-fetched and upserted idempotently by stable atom key, `high_water_mark` did not
+  advance past the unfinished batch, and identical-`updated_at` boundary notes are not skipped.
+- **Edited-note upsert (no duplicates):** re-ingesting a note whose `updated_at` changed upserts the same
+  two atoms in place (keyed by `granola:{note_id}:summary` / `:transcript`) rather than creating a second
+  pair — proves `updated_at` is not part of atom identity.
 - **429 / backoff:** a 429 triggers backoff/retry and surfaces a durable operator-visible error on
   repeated failure; no silent drop.
-- **Daemon startup with no shell environment:** with `GRANOLA_API_KEY` unset and no inherited shell env,
-  the daemon loads the key from `~/.echo/state/granola.json`; with the key absent entirely, the poller
-  disables itself with a visible error and the rest of the daemon still starts.
+- **Path resolution + daemon startup with no shell environment:** config/checkpoint paths resolve via
+  `os.homedir()` (no literal `~` reaches the filesystem). With `GRANOLA_API_KEY` unset and no inherited
+  shell env, the daemon loads the key from `path.join(os.homedir(), '.echo/state/granola.json')`; with the
+  key absent entirely, the poller disables itself with a visible error and the rest of the daemon still
+  starts.
 
 ## Out of Scope (Don't Drift)
 
