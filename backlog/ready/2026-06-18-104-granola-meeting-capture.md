@@ -8,7 +8,7 @@ created: 2026-06-19
 blocked_by: []
 task_state_ref: 2026-06-18-104-granola-meeting-capture
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: 0a0f2f59b8a5a15a9b5db9fc6e9febed066d3fa27bfd7a1519d58b2e3bd999f6
+ready_content_sha: 9655e11431fd6b766648a72204b83c5bfb284e7e858faa15e309fadf5e8f37c2
 files_to_modify:
   - src/capture/sources.ts
   - src/capture/surfaces/granola-poller.ts
@@ -16,18 +16,18 @@ files_to_modify:
   - src/normalize/adapters/granola.ts
   - src/normalize/dispatch.ts
   - src/mcp/util/source-app.ts
+  - src/mcp/tools/search-memories.ts
+  - src/mcp/tools/wait-for-new-turns.ts
+  - src/mcp/tools/echo-resolve-mru.ts
   - tests/normalize/adapters/granola.test.ts
   - tests/capture/granola-poller.test.ts
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-06-21T20:22:45Z"
-branch: "agent/granola-meeting-capture"
-head_sha: "35fe71d8bf7b55883927ff203f9396184b280fc1"
+  - tests/mcp/tools/search-memories.test.ts
+claimed_by: ""
+claimed_at: ""
+branch: ""
+head_sha: ""
 pr_url: ""
-agent_notes: |
-  BLOCKED: AC2 requires `search_memories(source_app='granola')` support, but extending the shared source-app enum requires updating files outside this item's `files_to_modify`.
-  Tried: loaded the amended spec, required refs, official Granola docs, current integration points, and searched for hard-coded source-app expectations; found `tests/mcp/tools/search-memories.test.ts` hard-codes the old four-value enum, and MCP tool descriptions in `src/mcp/tools/search-memories.ts`, `src/mcp/tools/wait-for-new-turns.ts`, and `src/mcp/tools/echo-resolve-mru.ts` hard-code the old source-app vocabulary.
-  Best-guess answer: amend `files_to_modify` to include the MCP test and description files, then re-run the builder; confidence high.
-  Why escalated rather than guessing: builder stopping condition applies because meeting acceptance requires modifying files not listed in `files_to_modify`.
+agent_notes: ""
 review_notes: ""
 ---
 
@@ -77,7 +77,12 @@ API directly ingests full meeting notes (structured summary + transcript) into E
 2. **AC2 — Capture pipeline integration.** Granola flows through the existing pipeline as an
    **`api:granola`** surface (the `apis` category — empty today in `src/capture/sources.ts`; first
    member), including `search_memories(source_app='granola')` support (`src/mcp/util/source-app.ts`
-   enum extension).
+   enum extension). **Enum-extension ripple (all in `files_to_modify`):** adding `'granola'` to
+   `SOURCE_APP_VALUES` requires updating the enum-pinning test (`tests/mcp/tools/search-memories.test.ts`
+   asserts the exact `{cursor,claude_code,codex,git}` set — it must include `granola`) and the source-app
+   vocabulary in the 3 MCP tool **description strings** (`search-memories.ts`, `wait-for-new-turns.ts`,
+   `echo-resolve-mru.ts`, which hard-code `cursor | claude_code | codex | git` in prose). The Zod schemas
+   derive from `SOURCE_APP_VALUES` automatically — no other validation change needed.
 3. **AC3 — Incremental polling + crash-safe checkpoint.** Poller uses the `updated_after` param to fetch
    only notes changed since the last sync.
    - **Checkpoint:** persisted at `path.join(os.homedir(), '.echo/state/granola-checkpoint.json')`
