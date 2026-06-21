@@ -421,3 +421,21 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** none returned; repo-scoped query against `/Users/zhenye/Desktop/Project_echo`.
 - **Verdict:** partial - the empty result was useful as a negative check, but it did not add context.
 - **Note:** Local files remain authoritative for this run: the amended claimed spec, the previous blocked run log, and the official Granola docs loaded separately.
+
+### 2026-06-21 13:36 PDT - codex builder MCP endpoint probe before reconcile
+
+- **Trigger:** Builder-agent startup for `/process-backlog`; after mandatory global reads, Codex checked whether the ECHO MCP HTTP endpoint was reachable before attempting a real retrieval.
+- **Query inputs:** `curl GET http://127.0.0.1:38478/mcp` plus local read of `~/.echo/state/onboarding.json`.
+- **Returned:** JSON-RPC error `Method Not Allowed: GET (POST only)`; onboarding record showed codex registered with `mcp.echo.read` and `mcp.echo.write`.
+- **Sources:** ECHO MCP daemon endpoint `http://127.0.0.1:38478/mcp`; local onboarding file `~/.echo/state/onboarding.json`; no clusters, atoms, or captured source rows queried.
+- **Verdict:** partial - daemon reachability was confirmed, but the method was wrong for MCP retrieval.
+- **Note:** Future checks in this run should use POST or a configured MCP client; item selection still belongs to `tools/blocked.py` and claim reconciliation.
+
+### 2026-06-21 13:37 PDT - codex builder POST preflight before reconcile
+
+- **Trigger:** Builder-agent startup for `/process-backlog`; after the GET probe showed the endpoint was reachable, Codex used the repo's stateless MCP POST pattern to verify real tool calls before claim reconciliation.
+- **Query inputs:** `echo_ping(message="codex builder preflight before reconcile 2026-06-21")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-21T00:00:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** ping OK at `2026-06-21T20:37:43.467Z`; `find_clusters` returned 1 cluster, 63 atoms; top cluster `ctx_7ae2e8a9`, label `"work on project_echo"`, rank_reasons `["has_open_loop","code_session_anchor"]`; warnings `[]`.
+- **Sources:** source_breakdown=`{"git":42,"claude_code":19,"codex":2}`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; cluster time range `2026-06-21T17:49:32.739Z` to `2026-06-21T20:35:32.891Z`.
+- **Verdict:** right - MCP is reachable and returns recent repo-local context, though the cluster is broad and not a substitute for the deterministic backlog selector.
+- **Note:** No atom hydration needed before claim; `tools/blocked.py` and any existing `claimed_by` match remain authoritative for the builder item.
