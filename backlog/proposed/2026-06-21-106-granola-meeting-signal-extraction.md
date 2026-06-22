@@ -122,6 +122,14 @@ triggered by observed low-confidence rationale, not assumed now.
      `last_failure_reason`/`last_failure_at`. A note is re-attempted **only** when its raw `updated_at` changes or
      `extractor_version` bumps — this covers success **and** failure identically, so a persistently-failing note
      does not re-extract/respend every tick. (Failure state lives in this checkpoint, never in a manifest.)
+   - **Checkpoint advancement ordering (advance-after-durable-write, 104 — r3 codex + codex-ops).** The checkpoint
+     is **never** advanced at attempt start. It advances in exactly two terminal cases: (i) **on success**, the
+     success fingerprint is recorded **only after** the signal atoms **and** the manifest are durably appended
+     (success order: atoms → manifest → checkpoint); (ii) **on terminal failure**, the failure fingerprint is
+     recorded **only after** retries are exhausted **and** the operator-visible error is emitted. Consequence:
+     a crash after signal atoms but **before** the manifest leaves the checkpoint un-advanced → the next tick
+     re-runs the note (consistent with *Idempotent on crash* above), and the manifest/current-run state remains
+     authoritative — a checkpoint can never suppress a note that has no current run.
    - **Bounded retry + cost cap.** Within a single attempt, transient extractor errors retry up to
      `GRANOLA_SIGNAL_MAX_RETRIES` (default 2) with exponential backoff. At most `GRANOLA_SIGNAL_MAX_NOTES_PER_TICK`
      (default 5) notes extract per tick.
@@ -185,15 +193,18 @@ All against a **mocked** extractor (recorded fixtures) — never a live LLM call
 - **Single-in-flight (r2 cut, replacing the lease test):** a worker tick that fires while an extraction is still
   running is a no-op skip (mutual exclusion via the daemon scheduler's in-flight guard — the 104 poller test
   shape) — no overlapping extraction, no lockfile.
-- **Crash-during-extraction:** signal atoms written but manifest absent → latest-wins selects **no** current run;
-  the next tick re-runs the note → exactly one current run; orphan partial atoms never selected.
+- **Crash-during-extraction + checkpoint ordering (r3 codex + codex-ops):** signal atoms written but manifest
+  absent (and checkpoint **not** advanced — asserts checkpoint is never written at attempt start) → latest-wins
+  selects **no** current run; the next tick re-runs the note → exactly one current run; orphan partial atoms
+  never selected. Explicitly assert a pre-manifest crash cannot leave a checkpoint that suppresses retry.
 - **Retrieval:** `metadata_match` array value → set-membership (`signal_type ∈ {decision,rationale}`); scalar
   value → equality (back-compat); `canonical_subject` exact-normalized match; signals returned without
   transcript hydration; summary-only lane returns summaries only.
 - **Failure writes no manifest + no-spin (r2 cut, replacing the failed-manifest test):** an extractor
   error/rate-limit leaves the **last successful** run current (no `status:"failed"` manifest is ever written);
-  the worker checkpoint records the attempted `updated_at` so the note is **not** re-attempted until its raw
-  `updated_at` changes or `extractor_version` bumps (no spin/respend). Missing/invalid credential → worker
+  the worker checkpoint records the attempted `updated_at` **only after retries are exhausted** (r3 ordering) so
+  the note is **not** re-attempted until its raw `updated_at` changes or `extractor_version` bumps (no
+  spin/respend). Assert the failure fingerprint is not written mid-retry. Missing/invalid credential → worker
   self-disables with a visible log, rest of daemon runs.
 - **Guardrail:** a signal with `confidence < GRANOLA_SIGNAL_LOW_CONF` is stamped `low_confidence:true` and
   flagged, not surfaced as asserted fact.
