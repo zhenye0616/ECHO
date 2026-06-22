@@ -6,6 +6,7 @@ import { applyGitReposFromCaptureConfig, CAPTURED_SOURCES } from '../capture/sou
 import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { startGranolaPoller } from '../capture/surfaces/granola-poller.js';
+import { startEnrichmentDispatch } from '../enrich/dispatch.js';
 import { ensureEchoHome } from '../echo-home/scaffold.js';
 import { createLogger } from '../logging/index.js';
 import { flushRecentMcpCallLog } from '../mcp/request-log.js';
@@ -71,6 +72,7 @@ const [
   fsWatcher,
   gitWatcher,
   granolaPoller,
+  enrichment,
   claudeCodeExtractor,
   codexExtractor,
   cursorExtractor,
@@ -79,6 +81,7 @@ const [
   startFsWatcher(CAPTURED_SOURCES.fs_paths, storage),
   startGitWatcher(gitRepos, storage),
   Promise.resolve(startGranolaPoller(storage)),
+  startEnrichmentDispatch(storage),
   startClaudeCodeExtractor(storage),
   startCodexExtractor(storage),
   startCursorExtractor(storage),
@@ -99,6 +102,7 @@ await startLifecycle({
     await cursorExtractor.stop();
     await codexExtractor.stop();
     await claudeCodeExtractor.stop();
+    await enrichment.stop();
     await granolaPoller.stop();
     await gitWatcher.stop();
     await fsWatcher.stop();
