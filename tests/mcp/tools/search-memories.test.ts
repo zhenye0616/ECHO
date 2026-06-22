@@ -788,6 +788,107 @@ describe('search_memories item 025 (outputSchema + readOnlyHint + source_app + c
     expect(parsed.query_echo.source_app).toBe('granola');
   });
 
+  it('metadata_match supports scalar equality and array membership for Granola signals', async () => {
+    const fresh = new MemoryStorage();
+    const oldDecisionId = await fresh.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-06-21T10:00:00.000Z',
+      content: 'Old pricing decision',
+      metadata: {
+        signal_type: 'decision',
+        canonical_subject: 'pricing',
+        extraction_run_id: 'run-old',
+      },
+    });
+    const newDecisionId = await fresh.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-06-21T11:00:00.000Z',
+      content: 'New pricing decision',
+      metadata: {
+        signal_type: 'decision',
+        canonical_subject: 'pricing',
+        extraction_run_id: 'run-new',
+      },
+    });
+    const newRationaleId = await fresh.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-06-21T11:01:00.000Z',
+      content: 'Pricing rationale',
+      metadata: {
+        signal_type: 'rationale',
+        canonical_subject: 'pricing',
+        extraction_run_id: 'run-new',
+      },
+    });
+    await fresh.append({
+      source: 'derived:granola-signals-index',
+      timestamp: '2026-06-21T10:01:00.000Z',
+      content: '{}',
+      metadata: {
+        note_id: 'note-1',
+        extractor_version: 'v1',
+        extraction_run_id: 'run-old',
+        completed_at: '2026-06-21T10:01:00.000Z',
+        supersedes: null,
+        signal_atom_ids: [oldDecisionId],
+      },
+    });
+    await fresh.append({
+      source: 'derived:granola-signals-index',
+      timestamp: '2026-06-21T11:02:00.000Z',
+      content: '{}',
+      metadata: {
+        note_id: 'note-1',
+        extractor_version: 'v2',
+        extraction_run_id: 'run-new',
+        completed_at: '2026-06-21T11:02:00.000Z',
+        supersedes: 'run-old',
+        signal_atom_ids: [newDecisionId, newRationaleId],
+      },
+    });
+
+    const r = await searchMemories(fresh, {
+      query: 'pricing',
+      metadata_match: {
+        source: 'derived:granola-signals',
+        signal_type: ['decision', 'rationale'],
+        canonical_subject: 'pricing',
+      },
+    });
+
+    expect(r.matches.map((m) => m.content)).toEqual(['Pricing rationale', 'New pricing decision']);
+    expect(r.matches.map((m) => m.id)).not.toContain(oldDecisionId);
+    expect(r.query_echo.metadata_match).toEqual({
+      source: 'derived:granola-signals',
+      signal_type: ['decision', 'rationale'],
+      canonical_subject: 'pricing',
+    });
+  });
+
+  it('metadata_match granola_atom_type keeps the summary-only lane queryable', async () => {
+    const fresh = new MemoryStorage();
+    await fresh.append({
+      source: 'api:granola',
+      timestamp: '2026-06-21T10:00:00.000Z',
+      content: 'Deployment summary with customer signal',
+      metadata: { note_id: 'note-1', granola_atom_type: 'summary' },
+    });
+    await fresh.append({
+      source: 'api:granola',
+      timestamp: '2026-06-21T10:01:00.000Z',
+      content: 'Deployment transcript with customer signal',
+      metadata: { note_id: 'note-1', granola_atom_type: 'transcript' },
+    });
+
+    const r = await searchMemories(fresh, {
+      query: 'customer signal',
+      metadata_match: { source: 'api:granola', granola_atom_type: 'summary' },
+    });
+
+    expect(r.matches.map((m) => m.content)).toEqual(['Deployment summary with customer signal']);
+    expect(r.matches[0]!.metadata?.['granola_atom_type']).toBe('summary');
+  });
+
   it('source_prefix wins on conflict and query_echo records both raw inputs', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const result = (await withClient(handle.url, async (c) =>

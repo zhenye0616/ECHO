@@ -1,0 +1,882 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { isAbsolute, dirname, join } from 'node:path';
+import { isAllowedDerived } from '../capture/sources.js';
+import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
+import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
+import { isNonEmptyString } from '../guards.js';
+import { createLogger } from '../logging/index.js';
+import {
+  parseBrainName,
+  preflightBrain,
+  runBrain,
+  type BrainName,
+} from '../surfaces/ceo-slack-responder/brain.js';
+import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
+import { parseJson } from '../util/json.js';
+
+export const GRANOLA_RAW_SOURCE = 'api:granola';
+export const GRANOLA_SIGNAL_SOURCE = 'derived:granola-signals';
+export const GRANOLA_SIGNAL_INDEX_SOURCE = 'derived:granola-signals-index';
+export const GRANOLA_SIGNAL_EXTRACTOR_VERSION = 'granola-signals@1';
+export const GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION = 1;
+export const DEFAULT_GRANOLA_SIGNAL_WORKER_INTERVAL_MS = 300_000;
+export const DEFAULT_GRANOLA_SIGNAL_SETTLE_MS = 600_000;
+export const DEFAULT_GRANOLA_SIGNAL_LOW_CONFIDENCE = 0.5;
+export const DEFAULT_GRANOLA_SIGNAL_MAX_RETRIES = 2;
+export const DEFAULT_GRANOLA_SIGNAL_MAX_NOTES_PER_TICK = 5;
+export const DEFAULT_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS = 180_000;
+
+const log = createLogger('enrich.granola-signals');
+
+export type GranolaSignalType = 'decision' | 'rationale' | 'action';
+export type GranolaDecisionStatus = 'proposed' | 'decided' | 'unresolved';
+
+export interface GranolaTranscriptSpan {
+  kind: 'transcript';
+  start_time: string | number;
+  end_time: string | number;
+  quote: string;
+}
+
+export type GranolaSignalSourceSpan = { kind: 'summary' } | GranolaTranscriptSpan;
+
+export interface GranolaExtractedSignal {
+  signal_type: GranolaSignalType;
+  text: string;
+  canonical_subject: string;
+  source_span: GranolaSignalSourceSpan;
+  confidence: number;
+  owner?: string;
+  rationale_for?: string;
+  decision_status?: GranolaDecisionStatus;
+}
+
+export interface GranolaTranscriptItemForExtraction {
+  start_time: string | number | null;
+  end_time: string | number | null;
+  speaker: string;
+  text: string;
+}
+
+export interface GranolaSignalExtractionInput {
+  note_id: string;
+  meeting_title: string;
+  updated_at: string;
+  summary_text: string;
+  summary_dedupe_key: string;
+  transcript_text: string;
+  transcript_dedupe_key: string;
+  transcript_items: GranolaTranscriptItemForExtraction[];
+}
+
+export interface GranolaSignalExtractionContext {
+  extractor_version: string;
+}
+
+export type GranolaSignalExtractor = (
+  input: GranolaSignalExtractionInput,
+  context: GranolaSignalExtractionContext,
+) => Promise<GranolaExtractedSignal[]>;
+
+export interface GranolaSignalCheckpointEntry {
+  input_fingerprint: string;
+  extractor_version: string;
+  last_attempted_at: string;
+  last_success_at?: string;
+  last_failure_at?: string;
+  last_failure_reason?: string;
+}
+
+export interface GranolaSignalCheckpoint {
+  schema_version: typeof GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION;
+  notes: Record<string, GranolaSignalCheckpointEntry>;
+}
+
+export interface GranolaSignalRunManifest {
+  note_id: string;
+  extractor_version: string;
+  extraction_run_id: string;
+  completed_at: string;
+  supersedes: string | null;
+  signal_atom_ids: string[];
+}
+
+export interface GranolaSignalWorkerOptions {
+  checkpointPath?: string;
+  extractorVersion?: string;
+  extractFn?: GranolaSignalExtractor;
+  now?: () => string;
+  settleMs?: number;
+  lowConfidenceThreshold?: number;
+  maxRetries?: number;
+  maxNotesPerTick?: number;
+  retryDelayMs?: number;
+  workerIntervalMs?: number;
+  runOnStart?: boolean;
+  env?: NodeJS.ProcessEnv;
+}
+
+export type GranolaSignalWorkerResult =
+  | {
+      status: 'ok';
+      notes_seen: number;
+      notes_extracted: number;
+      signal_atoms_written: number;
+      manifests_written: number;
+    }
+  | { status: 'skipped'; reason: 'in_flight' | 'disabled' }
+  | { status: 'error'; reason: string; message: string };
+
+export interface GranolaSignalWorkerHandle {
+  enabled: boolean;
+  run: () => Promise<GranolaSignalWorkerResult>;
+  stop: () => Promise<void>;
+}
+
+interface RawGranolaNote {
+  note_id: string;
+  meeting_title: string;
+  updated_at: string;
+  summary_text: string;
+  summary_dedupe_key: string;
+  transcript_text: string;
+  transcript_dedupe_key: string;
+  transcript_items: GranolaTranscriptItemForExtraction[];
+}
+
+interface PreparedSignal {
+  content: string;
+  metadata: Record<string, unknown>;
+  rationaleLinkTarget?: string;
+}
+
+interface BrainExtractorConfig {
+  brain: BrainName;
+  contextRepoPath: string;
+  timeoutMs: number;
+  env: NodeJS.ProcessEnv;
+}
+
+class GranolaSignalCheckpointError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GranolaSignalCheckpointError';
+  }
+}
+
+export function granolaSignalCheckpointPath(): string {
+  return join(ECHO_HOME_PATHS.state, 'granola-signals-checkpoint.json');
+}
+
+function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && 'code' in err;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function emptyCheckpoint(): GranolaSignalCheckpoint {
+  return { schema_version: GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION, notes: {} };
+}
+
+export function loadGranolaSignalCheckpoint(
+  filePath = granolaSignalCheckpointPath(),
+): GranolaSignalCheckpoint {
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (isErrnoException(err) && err.code === 'ENOENT') return emptyCheckpoint();
+    throw new GranolaSignalCheckpointError(`checkpoint read failed: ${(err as Error).message}`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = parseJson(raw);
+  } catch (err) {
+    throw new GranolaSignalCheckpointError(`checkpoint JSON invalid: ${(err as Error).message}`);
+  }
+  if (
+    !isPlainObject(parsed) ||
+    parsed['schema_version'] !== GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION ||
+    !isPlainObject(parsed['notes'])
+  ) {
+    throw new GranolaSignalCheckpointError('checkpoint schema invalid');
+  }
+  const notes: Record<string, GranolaSignalCheckpointEntry> = {};
+  for (const [noteId, value] of Object.entries(parsed['notes'])) {
+    if (!isPlainObject(value)) {
+      throw new GranolaSignalCheckpointError(`checkpoint note ${noteId} invalid`);
+    }
+    const inputFingerprint = value['input_fingerprint'];
+    const extractorVersion = value['extractor_version'];
+    const lastAttemptedAt = value['last_attempted_at'];
+    if (
+      !isNonEmptyString(inputFingerprint) ||
+      !isNonEmptyString(extractorVersion) ||
+      !isNonEmptyString(lastAttemptedAt)
+    ) {
+      throw new GranolaSignalCheckpointError(`checkpoint note ${noteId} missing required fields`);
+    }
+    const entry: GranolaSignalCheckpointEntry = {
+      input_fingerprint: inputFingerprint,
+      extractor_version: extractorVersion,
+      last_attempted_at: lastAttemptedAt,
+    };
+    copyOptionalString(value, entry, 'last_success_at');
+    copyOptionalString(value, entry, 'last_failure_at');
+    copyOptionalString(value, entry, 'last_failure_reason');
+    notes[noteId] = entry;
+  }
+  return { schema_version: GRANOLA_SIGNAL_CHECKPOINT_SCHEMA_VERSION, notes };
+}
+
+export function writeGranolaSignalCheckpoint(
+  checkpoint: GranolaSignalCheckpoint,
+  filePath = granolaSignalCheckpointPath(),
+): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  atomicWrite({ filePath, content: `${JSON.stringify(checkpoint, null, 2)}\n` });
+}
+
+function copyOptionalString(
+  from: Record<string, unknown>,
+  to: GranolaSignalCheckpointEntry,
+  key: 'last_success_at' | 'last_failure_at' | 'last_failure_reason',
+): void {
+  const value = from[key];
+  if (typeof value === 'string') to[key] = value;
+}
+
+function stringMetadata(event: CaptureEvent, key: string): string | null {
+  const value = event.metadata?.[key];
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function buildRawGranolaNotes(events: readonly CaptureEvent[]): RawGranolaNote[] {
+  const grouped = new Map<
+    string,
+    {
+      summary?: CaptureEvent;
+      transcript?: CaptureEvent;
+      title?: string;
+      updated_at?: string;
+    }
+  >();
+  for (const event of events) {
+    const noteId = stringMetadata(event, 'note_id');
+    const atomType = stringMetadata(event, 'granola_atom_type');
+    if (noteId === null || (atomType !== 'summary' && atomType !== 'transcript')) continue;
+    const entry = grouped.get(noteId) ?? {};
+    if (atomType === 'summary') entry.summary = event;
+    else entry.transcript = event;
+    entry.title = stringMetadata(event, 'title') ?? entry.title;
+    entry.updated_at = stringMetadata(event, 'updated_at') ?? entry.updated_at ?? event.timestamp;
+    grouped.set(noteId, entry);
+  }
+
+  const notes: RawGranolaNote[] = [];
+  for (const [noteId, entry] of grouped) {
+    if (entry.summary === undefined || entry.transcript === undefined) continue;
+    const summaryDedupe = stringMetadata(entry.summary, 'dedupe_key');
+    const transcriptDedupe = stringMetadata(entry.transcript, 'dedupe_key');
+    if (summaryDedupe === null || transcriptDedupe === null) continue;
+    notes.push({
+      note_id: noteId,
+      meeting_title: entry.title ?? 'Untitled Granola note',
+      updated_at: entry.updated_at ?? entry.summary.timestamp,
+      summary_text: entry.summary.content,
+      summary_dedupe_key: summaryDedupe,
+      transcript_text: entry.transcript.content,
+      transcript_dedupe_key: transcriptDedupe,
+      transcript_items: parseRenderedTranscript(entry.transcript.content),
+    });
+  }
+  return notes.sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+}
+
+export function parseRenderedTranscript(content: string): GranolaTranscriptItemForExtraction[] {
+  const out: GranolaTranscriptItemForExtraction[] = [];
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line === '') continue;
+    const timed = /^\[([^\]-]+)(?:-([^\]]+))?\]\s*([^:]+):\s*(.*)$/.exec(line);
+    if (timed !== null) {
+      out.push({
+        start_time: parseTranscriptTime(timed[1]!),
+        end_time: parseTranscriptTime(timed[2] ?? timed[1]!),
+        speaker: timed[3]!.trim(),
+        text: timed[4]!.trim(),
+      });
+      continue;
+    }
+    const speaker = /^([^:]+):\s*(.*)$/.exec(line);
+    out.push({
+      start_time: null,
+      end_time: null,
+      speaker: speaker?.[1]?.trim() ?? 'Speaker',
+      text: speaker?.[2]?.trim() ?? line,
+    });
+  }
+  return out;
+}
+
+function parseTranscriptTime(value: string): string | number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : value;
+}
+
+function inputFingerprint(note: RawGranolaNote): string {
+  return stableHash(
+    `${note.note_id}\n${note.updated_at}\n${note.summary_dedupe_key}\n${note.transcript_dedupe_key}`,
+  );
+}
+
+function isSettled(note: RawGranolaNote, nowIso: string, settleMs: number): boolean {
+  const updated = new Date(note.updated_at).getTime();
+  const now = new Date(nowIso).getTime();
+  if (Number.isNaN(updated) || Number.isNaN(now)) return true;
+  return now - updated >= settleMs;
+}
+
+function shouldExtractNote(
+  note: RawGranolaNote,
+  checkpoint: GranolaSignalCheckpoint,
+  currentRuns: Map<string, GranolaSignalRunManifest>,
+  extractorVersion: string,
+): boolean {
+  const entry = checkpoint.notes[note.note_id];
+  const fingerprint = inputFingerprint(note);
+  const hasCurrentRun = currentRuns.has(note.note_id);
+  if (
+    entry?.input_fingerprint === fingerprint &&
+    entry.extractor_version === extractorVersion &&
+    entry.last_failure_at !== undefined
+  ) {
+    return false;
+  }
+  if (!hasCurrentRun) return true;
+  return entry?.input_fingerprint !== fingerprint || entry.extractor_version !== extractorVersion;
+}
+
+function stableHash(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16);
+}
+
+function normalizeSubject(value: string): string {
+  return value.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function validateSignal(signal: GranolaExtractedSignal): void {
+  if (
+    signal.signal_type !== 'decision' &&
+    signal.signal_type !== 'rationale' &&
+    signal.signal_type !== 'action'
+  ) {
+    throw new Error(`unsupported signal_type: ${String(signal.signal_type)}`);
+  }
+  if (!isNonEmptyString(signal.text)) throw new Error('signal text is required');
+  if (!isNonEmptyString(signal.canonical_subject)) {
+    throw new Error('signal canonical_subject is required');
+  }
+  if (!Number.isFinite(signal.confidence) || signal.confidence < 0 || signal.confidence > 1) {
+    throw new Error('signal confidence must be between 0 and 1');
+  }
+  if (signal.source_span.kind === 'transcript') {
+    if (!isNonEmptyString(signal.source_span.quote)) {
+      throw new Error('transcript source_span.quote is required');
+    }
+  } else if (signal.source_span.kind !== 'summary') {
+    throw new Error('source_span.kind must be summary or transcript');
+  }
+}
+
+function prepareSignals(
+  note: RawGranolaNote,
+  signals: readonly GranolaExtractedSignal[],
+  opts: {
+    extractorVersion: string;
+    extractionRunId: string;
+    lowConfidenceThreshold: number;
+  },
+): PreparedSignal[] {
+  const prepared: PreparedSignal[] = [];
+  const decisionLinks = new Map<string, string>();
+  for (const signal of signals) {
+    validateSignal(signal);
+    const content = signal.text.trim();
+    const signalType = signal.signal_type;
+    const canonicalSubject = normalizeSubject(signal.canonical_subject);
+    const dedupeKey = `granola:signal:${note.note_id}:${opts.extractorVersion}:${signalType}:${stableHash(content)}`;
+    const parentDedupeKey =
+      signal.source_span.kind === 'summary' ? note.summary_dedupe_key : note.transcript_dedupe_key;
+    const metadata: Record<string, unknown> = {
+      signal_type: signalType,
+      note_id: note.note_id,
+      meeting_title: note.meeting_title,
+      canonical_subject: canonicalSubject,
+      parent_dedupe_key: parentDedupeKey,
+      source_span: signal.source_span,
+      confidence: signal.confidence,
+      extractor_version: opts.extractorVersion,
+      extraction_run_id: opts.extractionRunId,
+      dedupe_key: dedupeKey,
+    };
+    if (signal.confidence < opts.lowConfidenceThreshold) metadata['low_confidence'] = true;
+    if (signal.owner !== undefined) metadata['owner'] = signal.owner;
+    if (signal.decision_status !== undefined) metadata['decision_status'] = signal.decision_status;
+    if (signalType === 'decision') {
+      decisionLinks.set(content, dedupeKey);
+      decisionLinks.set(canonicalSubject, dedupeKey);
+      decisionLinks.set(dedupeKey, dedupeKey);
+    }
+    prepared.push({
+      content,
+      metadata,
+      rationaleLinkTarget: signal.rationale_for,
+    });
+  }
+
+  for (const signal of prepared) {
+    if (signal.metadata['signal_type'] !== 'rationale') continue;
+    const target =
+      typeof signal.rationaleLinkTarget === 'string'
+        ? (decisionLinks.get(signal.rationaleLinkTarget) ?? signal.rationaleLinkTarget)
+        : decisionLinks.get(String(signal.metadata['canonical_subject']));
+    if (target !== undefined) signal.metadata['rationale_for'] = target;
+  }
+  return prepared;
+}
+
+function parseManifest(event: CaptureEvent): GranolaSignalRunManifest | null {
+  const metadata = event.metadata;
+  if (metadata === undefined) return null;
+  const noteId = metadata['note_id'];
+  const extractorVersion = metadata['extractor_version'];
+  const extractionRunId = metadata['extraction_run_id'];
+  const completedAt = metadata['completed_at'];
+  const supersedes = metadata['supersedes'];
+  const signalAtomIds = metadata['signal_atom_ids'];
+  if (
+    !isNonEmptyString(noteId) ||
+    !isNonEmptyString(extractorVersion) ||
+    !isNonEmptyString(extractionRunId) ||
+    !isNonEmptyString(completedAt) ||
+    !Array.isArray(signalAtomIds) ||
+    !signalAtomIds.every((id) => typeof id === 'string')
+  ) {
+    return null;
+  }
+  return {
+    note_id: noteId,
+    extractor_version: extractorVersion,
+    extraction_run_id: extractionRunId,
+    completed_at: completedAt,
+    supersedes: typeof supersedes === 'string' ? supersedes : null,
+    signal_atom_ids: signalAtomIds,
+  };
+}
+
+export function resolveCurrentGranolaSignalRuns(
+  manifestEvents: readonly CaptureEvent[],
+): Map<string, GranolaSignalRunManifest> {
+  const byNote = new Map<string, GranolaSignalRunManifest[]>();
+  const superseded = new Set<string>();
+  for (const event of manifestEvents) {
+    const manifest = parseManifest(event);
+    if (manifest === null) continue;
+    const list = byNote.get(manifest.note_id) ?? [];
+    list.push(manifest);
+    byNote.set(manifest.note_id, list);
+    if (manifest.supersedes !== null) superseded.add(manifest.supersedes);
+  }
+
+  const out = new Map<string, GranolaSignalRunManifest>();
+  for (const [noteId, manifests] of byNote) {
+    const current = manifests
+      .filter((manifest) => !superseded.has(manifest.extraction_run_id))
+      .sort((a, b) => {
+        const completed = b.completed_at.localeCompare(a.completed_at);
+        if (completed !== 0) return completed;
+        return b.extraction_run_id.localeCompare(a.extraction_run_id);
+      })[0];
+    if (current !== undefined) out.set(noteId, current);
+  }
+  return out;
+}
+
+function updateCheckpointSuccess(
+  checkpoint: GranolaSignalCheckpoint,
+  note: RawGranolaNote,
+  extractorVersion: string,
+  at: string,
+): void {
+  checkpoint.notes[note.note_id] = {
+    input_fingerprint: inputFingerprint(note),
+    extractor_version: extractorVersion,
+    last_attempted_at: at,
+    last_success_at: at,
+  };
+}
+
+function updateCheckpointFailure(
+  checkpoint: GranolaSignalCheckpoint,
+  note: RawGranolaNote,
+  extractorVersion: string,
+  at: string,
+  reason: string,
+): void {
+  checkpoint.notes[note.note_id] = {
+    input_fingerprint: inputFingerprint(note),
+    extractor_version: extractorVersion,
+    last_attempted_at: at,
+    last_failure_at: at,
+    last_failure_reason: reason.slice(0, 200),
+  };
+}
+
+async function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function extractWithRetries(
+  extractFn: GranolaSignalExtractor,
+  note: RawGranolaNote,
+  extractorVersion: string,
+  maxRetries: number,
+  retryDelayMs: number,
+): Promise<GranolaExtractedSignal[]> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await extractFn(
+        {
+          note_id: note.note_id,
+          meeting_title: note.meeting_title,
+          updated_at: note.updated_at,
+          summary_text: note.summary_text,
+          summary_dedupe_key: note.summary_dedupe_key,
+          transcript_text: note.transcript_text,
+          transcript_dedupe_key: note.transcript_dedupe_key,
+          transcript_items: note.transcript_items,
+        },
+        { extractor_version: extractorVersion },
+      );
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) await sleep(retryDelayMs * 2 ** attempt);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+export async function runGranolaSignalWorkerOnce(
+  storage: Storage,
+  extractFn: GranolaSignalExtractor,
+  options: GranolaSignalWorkerOptions = {},
+): Promise<GranolaSignalWorkerResult> {
+  if (!isAllowedDerived('granola-signals') || !isAllowedDerived('granola-signals-index')) {
+    return {
+      status: 'error',
+      reason: 'source_not_allowlisted',
+      message: 'derived Granola signal sources are not allowlisted',
+    };
+  }
+
+  const now = options.now ?? (() => new Date().toISOString());
+  const checkpointPath = options.checkpointPath ?? granolaSignalCheckpointPath();
+  const extractorVersion = options.extractorVersion ?? GRANOLA_SIGNAL_EXTRACTOR_VERSION;
+  const settleMs = options.settleMs ?? DEFAULT_GRANOLA_SIGNAL_SETTLE_MS;
+  const lowConfidenceThreshold =
+    options.lowConfidenceThreshold ?? DEFAULT_GRANOLA_SIGNAL_LOW_CONFIDENCE;
+  const maxRetries = options.maxRetries ?? DEFAULT_GRANOLA_SIGNAL_MAX_RETRIES;
+  const maxNotesPerTick = options.maxNotesPerTick ?? DEFAULT_GRANOLA_SIGNAL_MAX_NOTES_PER_TICK;
+  const retryDelayMs = options.retryDelayMs ?? 1_000;
+
+  let checkpoint: GranolaSignalCheckpoint;
+  try {
+    checkpoint = loadGranolaSignalCheckpoint(checkpointPath);
+  } catch (err) {
+    log.error('checkpoint_read_failed', { message: (err as Error).message });
+    return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
+  }
+
+  const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
+  const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
+  const rawEvents = await storage.query({ source: GRANOLA_RAW_SOURCE });
+  const rawNotes = buildRawGranolaNotes(rawEvents);
+  const nowIso = now();
+  const candidates = rawNotes
+    .filter((note) => isSettled(note, nowIso, settleMs))
+    .filter((note) => shouldExtractNote(note, checkpoint, currentRuns, extractorVersion))
+    .slice(0, maxNotesPerTick);
+
+  let notesExtracted = 0;
+  let signalAtomsWritten = 0;
+  let manifestsWritten = 0;
+  for (const note of candidates) {
+    const extractionRunId = randomUUID();
+    const completedAt = now();
+    let extracted: GranolaExtractedSignal[];
+    try {
+      extracted = await extractWithRetries(
+        extractFn,
+        note,
+        extractorVersion,
+        maxRetries,
+        retryDelayMs,
+      );
+    } catch (err) {
+      const message = (err as Error).message;
+      log.error('extraction_failed', { note_id: note.note_id, message });
+      updateCheckpointFailure(checkpoint, note, extractorVersion, now(), message);
+      writeGranolaSignalCheckpoint(checkpoint, checkpointPath);
+      return { status: 'error', reason: 'extraction_failed', message };
+    }
+
+    const prepared = prepareSignals(note, extracted, {
+      extractorVersion,
+      extractionRunId,
+      lowConfidenceThreshold,
+    });
+    const signalAtomIds: EventId[] = [];
+    try {
+      for (const signal of prepared) {
+        const id = await storage.append({
+          source: GRANOLA_SIGNAL_SOURCE,
+          timestamp: completedAt,
+          content: signal.content,
+          metadata: signal.metadata,
+        });
+        signalAtomIds.push(id);
+      }
+      signalAtomsWritten += signalAtomIds.length;
+      const manifest: GranolaSignalRunManifest = {
+        note_id: note.note_id,
+        extractor_version: extractorVersion,
+        extraction_run_id: extractionRunId,
+        completed_at: completedAt,
+        supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
+        signal_atom_ids: signalAtomIds,
+      };
+      await storage.append({
+        source: GRANOLA_SIGNAL_INDEX_SOURCE,
+        timestamp: completedAt,
+        content: JSON.stringify(manifest),
+        metadata: {
+          manifest_type: 'granola_signal_run',
+          ...manifest,
+        },
+      });
+      manifestsWritten += 1;
+    } catch (err) {
+      const message = (err as Error).message;
+      log.error('append_failed', { note_id: note.note_id, message });
+      return { status: 'error', reason: 'append_failed', message };
+    }
+
+    updateCheckpointSuccess(checkpoint, note, extractorVersion, completedAt);
+    try {
+      writeGranolaSignalCheckpoint(checkpoint, checkpointPath);
+    } catch (err) {
+      log.error('checkpoint_write_failed', {
+        note_id: note.note_id,
+        message: (err as Error).message,
+      });
+      return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
+    }
+    notesExtracted += 1;
+    currentRuns.set(note.note_id, {
+      note_id: note.note_id,
+      extractor_version: extractorVersion,
+      extraction_run_id: extractionRunId,
+      completed_at: completedAt,
+      supersedes: currentRuns.get(note.note_id)?.extraction_run_id ?? null,
+      signal_atom_ids: signalAtomIds,
+    });
+  }
+
+  log.info('worker_ok', {
+    notes_seen: rawNotes.length,
+    notes_extracted: notesExtracted,
+    signal_atoms_written: signalAtomsWritten,
+    manifests_written: manifestsWritten,
+  });
+  return {
+    status: 'ok',
+    notes_seen: rawNotes.length,
+    notes_extracted: notesExtracted,
+    signal_atoms_written: signalAtomsWritten,
+    manifests_written: manifestsWritten,
+  };
+}
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function resolveBrainExtractorConfig(env: NodeJS.ProcessEnv): BrainExtractorConfig {
+  const brain = parseBrainName(env['ECHO_GRANOLA_SIGNAL_BRAIN'] ?? env['ECHO_CEO_BRAIN']);
+  const contextRepoPath =
+    env['ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH'] ??
+    env['ECHO_CEO_CONTEXT_REPO_PATH'] ??
+    process.cwd();
+  if (!isAbsolute(contextRepoPath)) {
+    throw new Error('ECHO_GRANOLA_SIGNAL_CONTEXT_REPO_PATH must be absolute when set');
+  }
+  return {
+    brain,
+    contextRepoPath,
+    timeoutMs: parsePositiveInt(
+      env['ECHO_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS'],
+      DEFAULT_GRANOLA_SIGNAL_BRAIN_TIMEOUT_MS,
+    ),
+    env,
+  };
+}
+
+function defaultExtractorFromBrain(config: BrainExtractorConfig): GranolaSignalExtractor {
+  return async (input) => {
+    const result = await runBrain(buildExtractionPrompt(input), {
+      brain: config.brain,
+      contextRepoPath: config.contextRepoPath,
+      timeoutMs: config.timeoutMs,
+      env: config.env,
+    });
+    if (!result.ok || result.answer === undefined) {
+      throw new Error(result.reason ?? result.outcome);
+    }
+    return parseExtractorAnswer(result.answer);
+  };
+}
+
+function buildExtractionPrompt(input: GranolaSignalExtractionInput): string {
+  return [
+    'Extract Granola meeting signals as JSON only.',
+    'Return {"signals":[...]} with only decision, rationale, and action signal_type values.',
+    'Every signal must include text, canonical_subject, source_span, and confidence.',
+    'Use only the meeting content below; do not infer rationale that was not said.',
+    '',
+    JSON.stringify(input, null, 2),
+  ].join('\n');
+}
+
+function parseExtractorAnswer(answer: string): GranolaExtractedSignal[] {
+  const parsed = parseJson(answer.trim());
+  const signals = Array.isArray(parsed)
+    ? parsed
+    : isPlainObject(parsed) && Array.isArray(parsed['signals'])
+      ? parsed['signals']
+      : null;
+  if (signals === null) throw new Error('extractor returned invalid JSON signal list');
+  return signals.map(parseExtractedSignal);
+}
+
+function parseExtractedSignal(value: unknown): GranolaExtractedSignal {
+  if (!isPlainObject(value)) throw new Error('extractor signal must be an object');
+  const signal = {
+    signal_type: value['signal_type'],
+    text: value['text'],
+    canonical_subject: value['canonical_subject'],
+    source_span: value['source_span'],
+    confidence: value['confidence'],
+    owner: value['owner'],
+    rationale_for: value['rationale_for'],
+    decision_status: value['decision_status'],
+  };
+  const out: GranolaExtractedSignal = {
+    signal_type: signal.signal_type as GranolaSignalType,
+    text: String(signal.text ?? ''),
+    canonical_subject: String(signal.canonical_subject ?? ''),
+    source_span: isPlainObject(signal.source_span)
+      ? (signal.source_span as unknown as GranolaSignalSourceSpan)
+      : { kind: 'summary' },
+    confidence: typeof signal.confidence === 'number' ? signal.confidence : Number.NaN,
+  };
+  if (typeof signal.owner === 'string') out.owner = signal.owner;
+  if (typeof signal.rationale_for === 'string') out.rationale_for = signal.rationale_for;
+  if (
+    signal.decision_status === 'proposed' ||
+    signal.decision_status === 'decided' ||
+    signal.decision_status === 'unresolved'
+  ) {
+    out.decision_status = signal.decision_status;
+  }
+  validateSignal(out);
+  return out;
+}
+
+export async function startGranolaSignalWorker(
+  storage: Storage,
+  options: GranolaSignalWorkerOptions = {},
+): Promise<GranolaSignalWorkerHandle> {
+  let extractFn = options.extractFn;
+  if (extractFn === undefined) {
+    try {
+      const config = resolveBrainExtractorConfig(options.env ?? process.env);
+      await preflightBrain(config.brain, config.env);
+      extractFn = defaultExtractorFromBrain(config);
+    } catch (err) {
+      log.error('disabled', { reason: (err as Error).message });
+      return {
+        enabled: false,
+        run: async () => ({ status: 'skipped', reason: 'disabled' }),
+        stop: async () => {},
+      };
+    }
+  }
+  const activeExtractFn = extractFn;
+
+  const workerIntervalMs = options.workerIntervalMs ?? DEFAULT_GRANOLA_SIGNAL_WORKER_INTERVAL_MS;
+  const runOnStart = options.runOnStart ?? true;
+  let stopped = false;
+  let inFlight: Promise<GranolaSignalWorkerResult> | null = null;
+
+  async function run(): Promise<GranolaSignalWorkerResult> {
+    if (stopped) return { status: 'skipped', reason: 'disabled' };
+    if (inFlight !== null) {
+      log.warn('worker_skipped_in_flight', {});
+      return { status: 'skipped', reason: 'in_flight' };
+    }
+    inFlight = runGranolaSignalWorkerOnce(storage, activeExtractFn, options);
+    try {
+      return await inFlight;
+    } finally {
+      inFlight = null;
+    }
+  }
+
+  const interval = setInterval(() => {
+    void run().catch((err: unknown) => {
+      log.error('handler_error', { message: (err as Error).message });
+    });
+  }, workerIntervalMs);
+  interval.unref();
+
+  if (runOnStart) {
+    void run().catch((err: unknown) => {
+      log.error('handler_error', { message: (err as Error).message });
+    });
+  }
+
+  log.info('started', {
+    worker_interval_ms: workerIntervalMs,
+    checkpoint_path: options.checkpointPath ?? granolaSignalCheckpointPath(),
+  });
+
+  return {
+    enabled: true,
+    run,
+    stop: async () => {
+      stopped = true;
+      clearInterval(interval);
+      if (inFlight !== null) await inFlight.catch(() => ({ status: 'error' }));
+      log.info('stopped', {});
+    },
+  };
+}

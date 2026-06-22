@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  GRANOLA_SIGNAL_INDEX_SOURCE,
+  GRANOLA_SIGNAL_SOURCE,
+  resolveCurrentGranolaSignalRuns,
+} from '../../enrich/granola-signals.js';
+import {
   METADATA_MATCH_KEY_WHITELIST,
   type CaptureEvent,
   type QueryFilter,
@@ -17,10 +22,23 @@ import { CursorDecodeError, decodeCursor, emitCursor } from './_cursor.js';
 export { CursorDecodeError, decodeCursor, encodeCursor, type DecodedCursor } from './_cursor.js';
 
 export const SEARCH_MEMORIES_DESCRIPTION =
-  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits, Granola meeting notes) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Three-way source selection (more-specific wins): `source` (exact match — single session JSONL, git repo encoding, or API surface) > `source_prefix` (LIKE — path-precise filter, e.g. a single workspaceStorage subdir) > `source_app` (`cursor` | `claude_code` | `codex` | `git` | `granola`, expands to the canonical encoded prefix). All three are independently optional and may co-occur; the most-specific wins. Free-text `query` is matched as a case-insensitive literal substring against the event content; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Pass `repo_path=<absolute repo root>` (item 037) to scope results to atoms whose capture-side `metadata.repo_root` matches — works across source_apps with repo metadata; Granola normally has no repo_root and is resolved without repo_path. For `source_app='git'`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix='git:<path>'`. For `source_app='granola'`, the canonical prefix is `api:granola`. Pass `metadata_match={key: value, ...}` (item 038) for an arbitrary AND-joined metadata-equality filter — allowed keys are the storage whitelist (`workspace_id`, `composer_id`, `session_id`, `repo_root`). The canonical compose pattern is `echo_resolve_mru → search_memories(source=desc.source, ...desc.filter)` for tail; the legacy Cursor Phase 2 fallback uses `metadata_match: {composer_id: <resolved>}` WITHOUT `repo_path` (legacy atoms predate the repo_root capture write). Passing BOTH `repo_path` and `metadata_match.repo_root` with conflicting values is rejected (isError). For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
+  "Search the user's captured ECHO memories (Cursor + Claude Code + Codex conversations, git commits, Granola meeting notes, and derived Granola signal atoms) by free-text query, app, source prefix, or time range. Returns the most recent matching events. Three-way source selection (more-specific wins): `source` (exact match — single session JSONL, git repo encoding, or API surface) > `source_prefix` (LIKE — path-precise filter, e.g. a single workspaceStorage subdir) > `source_app` (`cursor` | `claude_code` | `codex` | `git` | `granola`, expands to the canonical encoded prefix). All three are independently optional and may co-occur; the most-specific wins. Free-text `query` is matched as a case-insensitive literal substring against event content and `metadata.canonical_subject`; this is NOT a semantic / KNN search. Use exact tokens (file paths, SHAs, error codes) rather than paraphrased questions. Pass `repo_path=<absolute repo root>` (item 037) to scope results to atoms whose capture-side `metadata.repo_root` matches — works across source_apps with repo metadata; Granola normally has no repo_root and is resolved without repo_path. For `source_app='git'`, `repo_path` matches `metadata.repo_root` only; legacy git atoms without that metadata are reachable via `source_prefix='git:<path>'`. For `source_app='granola'`, the canonical prefix is `api:granola`. Pass `metadata_match={key: value, ...}` (item 038 + Granola signals) for an arbitrary AND-joined filter; a scalar value means equality and an array value means membership. Storage-forwarded keys remain `workspace_id`, `composer_id`, `session_id`, and `repo_root`; signal filters (`source`, `signal_type`, `canonical_subject`, `granola_atom_type`, `note_id`, `dedupe_key`, `parent_dedupe_key`, `extraction_run_id`) are applied in the tool before pagination. Passing BOTH `repo_path` and `metadata_match.repo_root` with conflicting values is rejected (isError). Derived Granola signal retrieval returns only the current manifest run for each note. For result sets exceeding `limit`, the response carries an opaque `next_cursor` string — pass it back verbatim as `cursor` on the next call to page through; do not construct one client-side. `next_cursor` is `null` when there are no more rows.";
 
 export const DEFAULT_LIMIT = 10;
 export const MAX_LIMIT = 50;
+export type MetadataMatchValue = string | string[];
+
+const TOOL_METADATA_MATCH_KEYS: ReadonlySet<string> = new Set([
+  ...METADATA_MATCH_KEY_WHITELIST,
+  'source',
+  'signal_type',
+  'canonical_subject',
+  'granola_atom_type',
+  'note_id',
+  'dedupe_key',
+  'parent_dedupe_key',
+  'extraction_run_id',
+]);
 
 // V1.5.6 (2026-05-08): per-match content + per-key metadata caps live in
 // the shared `src/mcp/wire-shape/` projector. `projectMatch` enforces them
@@ -89,7 +107,7 @@ export interface SearchResult {
      *  (BEFORE merge with `repo_path`'s implicit `metadata_match.repo_root`).
      *  Lets the caller verify which metadata-equality keys were forwarded
      *  to storage. `null` when not passed. */
-    metadata_match: Record<string, string> | null;
+    metadata_match: Record<string, MetadataMatchValue> | null;
   };
   /** V1.5.7 (Gap 6): non-blocking advisories. Mirrors
    *  `RecentWorkContextResponse.warnings`. Today emits the TZ-naive
@@ -122,7 +140,7 @@ export interface SearchMemoriesParams {
    *  `repo_root`); non-whitelisted keys → isError at the tool layer
    *  (defense-in-depth on top of the storage-seam check). Conflicts on
    *  `repo_root` with `repo_path` → isError. */
-  metadata_match?: Record<string, string>;
+  metadata_match?: Record<string, MetadataMatchValue>;
 }
 
 function clampLimit(input: number | undefined): number {
@@ -142,6 +160,67 @@ function sortDesc(events: CaptureEvent[]): CaptureEvent[] {
     if (a.id > b.id) return -1;
     return 0;
   });
+}
+
+function metadataMatchValuesContain(expected: MetadataMatchValue, actual: string): boolean {
+  return Array.isArray(expected) ? expected.includes(actual) : expected === actual;
+}
+
+function metadataValue(event: CaptureEvent, key: string): string | null {
+  if (key === 'source') return event.source;
+  const value = event.metadata?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function matchesMetadata(
+  event: CaptureEvent,
+  metadataMatch: Record<string, MetadataMatchValue>,
+): boolean {
+  for (const [key, expected] of Object.entries(metadataMatch)) {
+    const actual = metadataValue(event, key);
+    if (actual === null || !metadataMatchValuesContain(expected, actual)) return false;
+  }
+  return true;
+}
+
+function queryMatches(event: CaptureEvent, query: string): boolean {
+  const q = query.toLowerCase();
+  if (event.content.toLowerCase().includes(q)) return true;
+  const canonicalSubject = event.metadata?.['canonical_subject'];
+  return typeof canonicalSubject === 'string' && canonicalSubject.toLowerCase().includes(q);
+}
+
+function requestedGranolaSignals(
+  effectiveSource: string | undefined,
+  effectivePrefix: string | undefined,
+  metadataMatch: Record<string, MetadataMatchValue> | undefined,
+): boolean {
+  if (effectiveSource === GRANOLA_SIGNAL_SOURCE) return true;
+  if (
+    effectivePrefix !== undefined &&
+    (GRANOLA_SIGNAL_SOURCE.startsWith(effectivePrefix) ||
+      effectivePrefix.startsWith(GRANOLA_SIGNAL_SOURCE))
+  ) {
+    return true;
+  }
+  if (metadataMatch === undefined) return false;
+  const source = metadataMatch['source'];
+  if (source !== undefined && metadataMatchValuesContain(source, GRANOLA_SIGNAL_SOURCE))
+    return true;
+  return (
+    metadataMatch['signal_type'] !== undefined || metadataMatch['canonical_subject'] !== undefined
+  );
+}
+
+function storageMetadataMatchFrom(
+  metadataMatch: Record<string, MetadataMatchValue> | undefined,
+): Record<string, string> | undefined {
+  if (metadataMatch === undefined) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(metadataMatch)) {
+    if (METADATA_MATCH_KEY_WHITELIST.has(key) && typeof value === 'string') out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export async function searchMemories(
@@ -190,36 +269,38 @@ export async function searchMemories(
   // enforces the whitelist (defense-in-depth — see `METADATA_MATCH_KEY_WHITELIST`
   // in storage/interface.ts); the tool-layer check produces a clean, source-
   // attributed isError envelope instead of letting the storage error bubble up.
-  let mergedMetadataMatch: Record<string, string> | undefined;
+  let storageMetadataMatch = storageMetadataMatchFrom(metadata_match);
   if (metadata_match !== undefined) {
-    for (const key of Object.keys(metadata_match)) {
-      if (!METADATA_MATCH_KEY_WHITELIST.has(key)) {
+    for (const [key, value] of Object.entries(metadata_match)) {
+      if (!TOOL_METADATA_MATCH_KEYS.has(key)) {
         // Dynamic whitelist interpolation (R2 #7): the error message can never
         // drift behind the constant if the whitelist is extended.
         throw new Error(
           `search_memories: metadata_match contains non-whitelisted key '${key}'; allowed: ${Array.from(
-            METADATA_MATCH_KEY_WHITELIST,
+            TOOL_METADATA_MATCH_KEYS,
           ).join(', ')}`,
         );
       }
+      if (Array.isArray(value) && value.length === 0) {
+        throw new Error(`search_memories: metadata_match.${key} array must be non-empty`);
+      }
     }
-    mergedMetadataMatch = { ...metadata_match };
   }
   if (normalisedRepoPath !== null) {
     // Merge precedence with `repo_path`'s implicit `metadata_match.repo_root`.
     // Conflict on the `repo_root` key (caller passed both with different
     // values) → isError. Equal values are silently merged (idempotent).
+    const requestedRepoRoot = metadata_match?.['repo_root'];
     if (
-      mergedMetadataMatch !== undefined &&
-      mergedMetadataMatch['repo_root'] !== undefined &&
-      mergedMetadataMatch['repo_root'] !== normalisedRepoPath
+      requestedRepoRoot !== undefined &&
+      !metadataMatchValuesContain(requestedRepoRoot, normalisedRepoPath)
     ) {
       throw new Error(
         'search_memories: metadata_match.repo_root conflicts with repo_path; pass one or the other',
       );
     }
-    mergedMetadataMatch = {
-      ...(mergedMetadataMatch ?? {}),
+    storageMetadataMatch = {
+      ...(storageMetadataMatch ?? {}),
       repo_root: normalisedRepoPath,
     };
   }
@@ -255,7 +336,13 @@ export async function searchMemories(
   if (since !== undefined) filter.since = since;
   if (until !== undefined) filter.until = until;
   if (before !== undefined) filter.before = before;
-  if (mergedMetadataMatch !== undefined) filter.metadata_match = mergedMetadataMatch;
+  if (storageMetadataMatch !== undefined) filter.metadata_match = storageMetadataMatch;
+
+  const restrictToCurrentGranolaSignals = requestedGranolaSignals(
+    effectiveSource,
+    effectivePrefix,
+    metadata_match,
+  );
 
   // Two paths through the result list, two overfetch sites — keep them legible
   // so the next reader doesn't collapse them into one and re-introduce item
@@ -268,15 +355,32 @@ export async function searchMemories(
   //       so an upstream limit would silently drop matches outside the
   //       newest-N. Slice to `limit + 1` AFTER the substring filter and emit
   //       cursor from the last kept row.
-  if (query === undefined) filter.limit = limitApplied + 1;
+  const requiresFullWindowFilter =
+    query !== undefined || metadata_match !== undefined || restrictToCurrentGranolaSignals;
+  if (!requiresFullWindowFilter) filter.limit = limitApplied + 1;
 
   const all = await storage.query(filter);
   const sorted = sortDesc(all);
   let candidates = sorted;
 
   if (query !== undefined) {
-    const q = query.toLowerCase();
-    candidates = candidates.filter((e) => e.content.toLowerCase().includes(q));
+    candidates = candidates.filter((e) => queryMatches(e, query));
+  }
+
+  if (metadata_match !== undefined) {
+    candidates = candidates.filter((e) => matchesMetadata(e, metadata_match));
+  }
+
+  if (restrictToCurrentGranolaSignals) {
+    const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
+    const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
+    const currentSignalIds = new Set<string>();
+    for (const manifest of currentRuns.values()) {
+      for (const id of manifest.signal_atom_ids) currentSignalIds.add(id);
+    }
+    candidates = candidates.filter(
+      (e) => e.source !== GRANOLA_SIGNAL_SOURCE || currentSignalIds.has(e.id),
+    );
   }
 
   // Path-aware overfetch slicing. Both paths converge here once their
@@ -364,7 +468,9 @@ const searchMemoriesOutputSchema = {
     cursor: z.string().nullable(),
     limit: z.number(),
     repo_path: z.string().nullable(),
-    metadata_match: z.record(z.string(), z.string()).nullable(),
+    metadata_match: z
+      .record(z.string(), z.union([z.string(), z.array(z.string()).nonempty()]))
+      .nullable(),
   }),
   // V1.5.7 (Gap 6): non-blocking advisories. Always present (possibly empty).
   warnings: z.array(z.string()),
@@ -396,10 +502,10 @@ export function registerSearchMemories(server: McpServer, storage: Storage): voi
             'Item 037: absolute filesystem path to a repo root. When set, scopes the result set to atoms whose `metadata.repo_root` (written at capture time for claude_code, codex, and cursor; reachable across repo-aware source_apps) equals the normalised path. For `source_app=git`, matches `metadata.repo_root` only — legacy git atoms without that metadata are reachable via `source_prefix=git:<path>`. Granola atoms normally have no repo_root, so search them without repo_path. Conflicts on `repo_root` with an explicit `metadata_match` entry → isError.',
           ),
         metadata_match: z
-          .record(z.string(), z.string())
+          .record(z.string(), z.union([z.string(), z.array(z.string()).nonempty()]))
           .optional()
           .describe(
-            'Item 038 / AC0: arbitrary metadata-equality predicate, AND-joined. Allowed keys are the storage whitelist (`workspace_id`, `composer_id`, `session_id`, `repo_root`); non-whitelisted keys → isError. The Cursor Phase 2 legacy fallback path passes `{composer_id: <resolved>}` without `repo_path` (legacy atoms predate the repo_root capture write).',
+            'Item 038 / AC0 + Granola signals: arbitrary AND-joined filter. Scalar value means equality; array value means membership. Storage-forwarded keys are `workspace_id`, `composer_id`, `session_id`, `repo_root`; signal/source keys (`source`, `signal_type`, `canonical_subject`, `granola_atom_type`, `note_id`, `dedupe_key`, `parent_dedupe_key`, `extraction_run_id`) are applied before pagination.',
           ),
       },
       outputSchema: searchMemoriesOutputSchema,

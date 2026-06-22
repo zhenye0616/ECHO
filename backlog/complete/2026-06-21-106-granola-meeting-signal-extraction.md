@@ -39,6 +39,29 @@ agent_notes: |
   (1) Packaging snapshot — authorized + applied as a reviewer fixup at 8fa22fa6 (test-only; pinned dist/enrich/* in the inline snapshot; added to files_to_modify above).
   (2) AC2 transcript-span — founder chose "parse from the flat render (in-scope)". Codex had ALREADY implemented exactly this (parseRenderedTranscript() parses start_time/end_time from the rendered `[start-end]` prefix, granola-signals.ts:300-326) — so NO code change; only the AC2 wording is reconciled to match shipped reality. No 104/poller change; the deferred structured-item follow-up is NOT needed.
   Verification at 8fa22fa6: typecheck OK, lint OK, full suite 1776 passed / 3 failed — all 3 confirmed pre-existing/flaky (recent-calls-endpoint + ceo-slack-brain pass in isolation = load flakes; shell-reachable fails on clean main per 104, daemon/bash-env, untouched by 106). Ready for /merge-and-cleanup.
+review_notes: |
+  Merged on 2026-06-22 via founder reconciliation (/merge-and-cleanup).
+
+  Conflicts resolved:
+  - none — clean --no-ff merge (git merge-tree predicted zero conflicts; merge produced none).
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Independent build review (/review-pending, 2026-06-22): verdict `merge as-is`. Ground-truth HEAD matched recorded head_sha 8fa22fa6; all 6 ACs Met with code evidence; no drift; raw api:granola atoms never mutated (append-only respected); 73/73 focused tests pass; git merge-tree clean. Sidecar consumed.
+
+  Fixups applied:
+  - none (reviewer pre-merge punch list empty).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify (merger worktree): 1776 passed; 3 failures are the known pre-existing/flaky trio (recent-calls-endpoint load-timeout, ceo-slack-brain process-timing, shell-reachable daemon/bash-env) — identical to pre-merge, none introduced by 106. typecheck, lint, coupled-invariants, sync-skills --check all clean. No package.json change.
+
+  Follow-up items (non-blocking):
+  - Disambiguate same-subject decision linkage (granola-signals.ts:447) if a meeting yields multiple decisions sharing a canonical_subject.
+  - Strategist post-merge: write the derived-signal-layer wiki page + update capture/per-app/granola-collected-data (per After Completion).
+  - Lightweight extraction context: brain runs `codex exec -C <repo>`; full-repo context timed out, empty dir rejected (non-git). Consider a minimal trusted-context dir for extraction.
+  - Daemon db unlinked-on-disk fragility (open-fd only) — separate from 106; worth a look.
 ---
 
 > **Origin: 2026-06-21 brainstorm (founder + Claude strategist + Codex peer-consult).** Follows 104

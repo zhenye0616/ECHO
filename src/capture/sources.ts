@@ -16,6 +16,7 @@ export const CAPTURED_SOURCES = {
     '~/.codex/sessions/',
   ],
   apis: ['granola'],
+  derived: ['granola-signals', 'granola-signals-index'],
   git_repos: [...DEFAULT_GIT_REPOS],
 } as const;
 
@@ -84,6 +85,11 @@ export function _isAllowedPathIn(path: unknown, fsPaths: ReadonlyArray<string>):
 export function _isAllowedApiIn(name: unknown, apis: ReadonlyArray<string>): boolean {
   if (!isNonEmptyString(name)) return false;
   return apis.includes(name);
+}
+
+export function _isAllowedDerivedIn(name: unknown, derived: ReadonlyArray<string>): boolean {
+  if (!isNonEmptyString(name)) return false;
+  return derived.includes(name);
 }
 
 function stripTrailingSlash(p: string): string {
@@ -214,6 +220,10 @@ export function isAllowedPath(path: string): boolean {
 
 export function isAllowedApi(name: string): boolean {
   return _isAllowedApiIn(name, CAPTURED_SOURCES.apis);
+}
+
+export function isAllowedDerived(name: string): boolean {
+  return _isAllowedDerivedIn(name, CAPTURED_SOURCES.derived);
 }
 
 export function isAllowedRepo(repoPath: string): boolean {
