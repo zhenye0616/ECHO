@@ -205,3 +205,20 @@ This is the **June 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right — cross-repo retrieval recovered the entire review-loop post-mortem from another project's sessions.
 - **Note:** Two foot-guns worth flagging: (1) repo_path needs the EXACT capture-side repo_root string (`justinian.ai`, dot not dash) or resolve_mru returns null with no hint; (2) the edit-tracer explicitly notes ECHO keyword search did NOT surface Edit-tool bodies (`search_memories(query="old_string")`→0) — spec edits were only recoverable by parsing raw JSONL tool_use blocks. Retrieval found the *analysis* turns but not the underlying Edit atoms.
 - **Conjecture:** (obs only) Edit/Write tool_use bodies may be under-indexed for substring search vs user/assistant prose turns; relevant to "what capture surfaces are silently absent."
+
+### 2026-06-21 22:00 PDT — production verification: live Granola capture queryable via ECHO MCP
+- **Trigger:** after production bringup of item 104 (key→state-path, build dist, daemon restart, page_size=30 hotfix), verifying the live launchd daemon actually captured Granola meetings.
+- **Query inputs:** search_memories(query="", source_app="granola", limit=6)
+- **Returned:** 6/14 matches, ALL source=api:granola; real meetings ("Basketball Recap/Defense Tech", "Daily" standups w/ Parth+Matt); both granola_atom_type summary + transcript; correct dedupe_keys granola:{note_id}:{summary,transcript}; rich metadata (attendees+emails, calendar_event scheduled times, web_url, transcript_count 1232/756/602).
+- **Sources:** api:granola — the NEW capture surface 104 shipped; first non-fs/non-git production capture in ECHO. next_cursor present (6 of 14 by limit).
+- **Verdict:** ✅ right — production daemon polled Granola (page_size=30), ingested 7 real meetings → 14 append-only atoms, checkpoint persisted, all queryable end-to-end via the new source_app='granola' filter.
+- **Note:** This is the meetings→founder data leg of the n=2 CEO loop, LIVE. The page_size=30 fix (API caps at 30; default was 100→HTTP 400) was caught ONLY by the live production path — mocked tests + small-page smoke both passed. Same theme as the whole 104 arc: spec-review convergence ≠ buildability ≠ live-API reality.
+
+### 2026-06-21 22:35 PDT — cold-start "where did we leave off last session"
+
+- **Trigger:** Founder reopened a fresh session, asked "use echo and retrieve where we left off last session."
+- **Query inputs:** (1) `find_clusters({})` (default 4h lookback); (2) `get_atoms({atom_ids:[12 ids from rank-1 cluster], prefer:"newest_first", format:"minimal"})`.
+- **Returned:** find_clusters → 2 clusters, 14 atoms. Rank-1 `ctx_43b80c6a` ("discussion about project_echo"), 12 atoms, rank_reasons [recent_activity, has_open_loop, has_unresolved_open_loop, code_session_anchor, dense], 1 unresolved open-loop (2278cad2 = meeting-context synthesis turn). Rank-2 `ctx_faffd885` ("discussion about justinian.ai"), 2 atoms. get_atoms → 9 returned, 3 dropped under budget, no truncation warnings beyond per-atom content elision.
+- **Sources:** find_clusters source_breakdown={claude_code:9, git:3}; get_atoms spanned `fs:/…/.claude/projects/…` session JSONL (sessions 71deb9d4 prior, 04655ea6 current) + `git:/…/Project_echo` commits a604f63/69be981. Granola/api:granola atoms NOT in this window's cluster (they were ingested but the resume window surfaced the build session, not the meeting atoms).
+- **Verdict:** ✅ right — rank-1 cluster cleanly reconstructed the prior session: item 104 Granola production bringup (key→state path, dist rebuild, daemon restart, live page_size 100→400 fix at a604f63), node_modules symlink cleanup, then the meeting-context synthesis (7 Justinian AI meetings).
+- **Note:** The unresolved open-loop pointer (2278cad2) correctly flagged the actual hanging thread — the end-of-session offer to (a) go deeper on a meeting thread or (b) file the summary-only-retrieval V1.5 idea as a backlog item. Two-cluster split (project_echo build vs justinian.ai meeting content) was a clean semantic separation.
