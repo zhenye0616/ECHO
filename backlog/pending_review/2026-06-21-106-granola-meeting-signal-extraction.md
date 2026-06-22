@@ -29,8 +29,10 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-22T07:09:51Z"
 branch: "agent/granola-meeting-signal-extraction"
-head_sha: ""
+head_sha: "e0e5fd0be34d7862115bfc900e7ae91d8ca39663"
 pr_url: ""
+agent_notes: |
+  BLOCKED: The implementation branch is pushed and focused verification passes, but full-suite completion needs `tests/packaging/packed-manifest.test.ts` updated for the new `dist/enrich/*` files and AC2's structured-transcript-span wording is stronger than the current raw Granola capture substrate. Tried: implemented the allowed files only, ran typecheck/lint/focused tests successfully, ran full `npm test`, and inspected 104's poller output. Best guess: authorize the packaging snapshot update and either accept rendered-transcript timestamp parsing for this item or create a follow-up to persist structured transcript item metadata in `src/capture/surfaces/granola-poller.ts`; confidence high. Why escalated: both fixes require modifying files outside `files_to_modify`, which is a builder stopping condition.
 ---
 
 > **Origin: 2026-06-21 brainstorm (founder + Claude strategist + Codex peer-consult).** Follows 104

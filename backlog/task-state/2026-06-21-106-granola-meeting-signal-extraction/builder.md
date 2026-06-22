@@ -5,11 +5,18 @@ binding: codex
 claimed_by: 78D5AB0F-A8A3-4F01-BC2E-EB05961B2405
 claimed_at: 2026-06-22T07:09:51Z
 branch: agent/granola-meeting-signal-extraction
-last_updated: 2026-06-22T07:12:00Z
+last_updated: 2026-06-22T07:30:42Z
+handoff_branch: agent/granola-meeting-signal-extraction
+handoff_head_sha: e0e5fd0be34d7862115bfc900e7ae91d8ca39663
+handoff_run_log: raw/internal/agent-runs/2026-06-22-2026-06-21-106-granola-meeting-signal-extraction.md
 ---
 
 ## current_thesis
 Claimed for implementation as Codex builder. Build the derived Granola signal extraction lane only: append-only signal atoms and manifests, async debounced worker scheduling, provider reuse from the CEO-loop reasoning brain, and retrieval filters needed to surface current decision/rationale/action signals without transcript hydration.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-22-2026-06-21-106-granola-meeting-signal-extraction.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: Raw `api:granola` summary/transcript atoms are immutable; derived signals append under `derived:granola-signals`, one atom per `decision`, `rationale`, or `action`.
@@ -22,6 +29,10 @@ Claimed for implementation as Codex builder. Build the derived Granola signal ex
 ## open_questions
 - None blocking at claim time; implementation must stop if the current substrate makes any listed `files_to_modify` insufficient.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not build prompt-for-why or human-in-loop rationale capture.
 - Do not add signal types beyond `decision`, `rationale`, and `action`.
@@ -31,4 +42,5 @@ Claimed for implementation as Codex builder. Build the derived Granola signal ex
 - Do not run extraction inside the Granola poller or lazily at query time.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-21-106-granola-meeting-signal-extraction.md
+
+- spec: backlog/pending_review/2026-06-21-106-granola-meeting-signal-extraction.md
