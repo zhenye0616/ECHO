@@ -11,6 +11,7 @@ requested_reviewers: ["codex", "codex-ops"]
 spec_refs:
   - src/capture/surfaces/granola-poller.ts        # raw summary/transcript atom producer (104) this builds on
   - backlog/complete/2026-06-18-104-granola-meeting-capture.md   # predecessor; append-only ingest-once contract
+  - backlog/complete/2026-06-19-105-ceo-loop-reasoning-brain.md   # AC6 reuses its provider/model + credential resolution
   - wiki/architecture/storage.md                  # append-only, random-id, no upsert (the binding constraint)
   - wiki/architecture/capture-gate.md             # source allowlist / gate model
   - wiki/surfaces/mcp-server.md                   # search_memories / find_clusters surfacing this targets
@@ -70,35 +71,77 @@ triggered by observed low-confidence rationale, not assumed now.
    the rationale / the action). Three signal types only: **`decision`, `rationale`, `action`**.
 2. **AC2 — Signal metadata makes cheap surfacing possible.** Each signal atom carries:
    `signal_type` (`decision|rationale|action`), `note_id`, `meeting_title`, `canonical_subject` (a short
-   normalized topic string), `parent_dedupe_key` (the raw atom it derives from: `granola:{note_id}:summary`
-   or `:transcript`), `source_span` (transcript time-range, or `summary`), `confidence` (0–1, **mandatory** —
-   the false-precision guardrail), `extractor_version`, `extraction_run_id`,
+   normalized topic string — normalization = lowercase, trim, collapse internal whitespace), `parent_dedupe_key`
+   (the raw atom it derives from: `granola:{note_id}:summary` or `:transcript`), `source_span` (shape below),
+   `confidence` (0–1, **mandatory** — the false-precision guardrail), `extractor_version`, `extraction_run_id`,
    `dedupe_key = granola:signal:{note_id}:{extractor_version}:{signal_type}:{stable_hash(content)}`.
-   Type-specific: `owner` (actions), `rationale_for` → stable id/dedupe_key of the decision a rationale
-   explains, `decision_status` (`proposed|decided|unresolved`, decisions). Low-confidence rationale is
-   **flagged, never asserted as fact**.
-3. **AC3 — Append-only re-derivation via per-run manifest.** Each extraction run appends one **manifest
-   atom** (proposed: `derived:granola-signals-index`) listing the run's `signal_atom_ids`, `note_id`,
-   `extractor_version`, `extraction_run_id`, and `supersedes` (prior run id for that note/version family).
-   "Which signals are current" is resolved **at query time** by selecting the newest non-superseded run per
-   meeting — re-derivation appends a new run, **nothing is mutated or deleted**. No duplicate-explosion: a
-   reader filtering to the latest run gets exactly one set.
-4. **AC4 — Async enrichment worker, debounced on settle.** Extraction runs as a **separate async pass**, NOT
-   in the Granola poller (keep polling boring) and NOT lazy-at-query. A worker scheduled by the daemon picks
-   up meetings whose raw atoms are present and whose Granola `updated_at` has been **quiet for N minutes**
-   (Granola regenerates summaries post-meeting; debounce prevents re-derivation on every poll). Re-extracts
-   on (a) a settled-note update, or (b) an `extractor_version` bump. The worker has its own retry + cost
-   budget; failures are operator-visible (logged ECHO error surface), never silent. One extraction in flight
-   per meeting at a time.
-5. **AC5 — Signal-level retrieval.** `search_memories` supports filtering derived signals by metadata so
-   `metadata_match:{signal_type:'decision', canonical_subject:'X'}` (or equivalent) returns the matching
-   signal atoms **without** hydrating transcripts. "What did we decide about X and why" = filter to
-   `signal_type ∈ {decision, rationale}` + subject match, hydrate 2–3 tiny signal atoms + (optionally) the
-   parent summary; transcript hydration is **opt-in, never default**. The summary-only lane
-   (`granola_atom_type:'summary'`) is verified queryable as part of this.
-6. **AC6 — Extraction is itself an ECHO dogfood.** The extraction LLM call (one structured call per settled
-   meeting → JSON list of signals) is logged like any other model use; the run is journaled per the
-   dogfooding discipline if it touches ECHO MCP. Provider = latest Claude model per global guidance.
+   - **`source_span` shape (resolves the flat-transcript gap, r1 codex F1).** An object, exactly one of:
+     `{kind:"summary"}` (derived from the summary atom); or
+     `{kind:"transcript", start_time, end_time, quote}` where `start_time`/`end_time` are the Granola
+     **structured** transcript-item timestamps (the extractor reads `transcript[]` items, which carry
+     `start_time`/`end_time` — NOT the flat rendered string), and `quote` is the verbatim utterance text(s).
+     The flat transcript blob (104) is the human render; spans always reference the structured items.
+   - Type-specific: `owner` (actions), `rationale_for` → `dedupe_key` of the decision a rationale explains,
+     `decision_status` (`proposed|decided|unresolved`, decisions). A signal with
+     `confidence < GRANOLA_SIGNAL_LOW_CONF` (default 0.5) is stamped `low_confidence: true` and is
+     **flagged, never asserted as fact** on surfacing.
+3. **AC3 — Append-only re-derivation, exactly one current run per note (r1 codex F2).** Each extraction run
+   appends one **manifest atom** (`derived:granola-signals-index`) listing the run's `signal_atom_ids`,
+   `note_id`, `extractor_version`, `extraction_run_id`, `completed_at`, and `supersedes` (the
+   `extraction_run_id` of the prior current run for the **same `note_id`**, or `null` for the first run).
+   - **Run family = `note_id`** (not `(note_id, extractor_version)`). `extractor_version` is stamped for
+     provenance only; a version bump just produces a new run that supersedes the prior current run for that
+     note. There is always **exactly one current run per note**, regardless of version.
+   - **Latest-wins (deterministic, no ambiguity).** Current run for a note = the manifest with that `note_id`
+     whose `extraction_run_id` appears in no other manifest's `supersedes`. If >1 qualifies (e.g. a crash left
+     two un-superseded manifests), tie-break by `completed_at` DESC, then `extraction_run_id` DESC (lexical).
+     Retrieval (AC5) returns only the current run's signals — never both v1 and v2, never an arbitrary choice.
+   - Re-derivation appends; **nothing is mutated or deleted**. Superseded signal atoms remain immutable history.
+4. **AC4 — Async enrichment worker, debounced + durably leased (r1 codex F3 + codex-ops F1).** Extraction runs
+   as a **separate async pass**, NOT in the Granola poller and NOT lazy-at-query. A daemon-scheduled worker
+   (interval `GRANOLA_SIGNAL_WORKER_INTERVAL_MS`, default 300_000) picks up meetings whose raw atoms are present
+   and whose Granola `updated_at` has been quiet for `GRANOLA_SIGNAL_SETTLE_MS` (default 600_000 = 10 min).
+   Re-extracts on (a) a settled-note update, or (b) an `extractor_version` bump.
+   - **Durable lease (overlap guard + crash recovery).** Before extracting a note the worker writes an atomic
+     per-`note_id` claim into `~/.echo/state/granola-signals-claims.json` (temp-file + rename — the 104
+     checkpoint pattern) recording `{note_id, extractor_version, started_at}`. A note with an active claim is
+     **skipped** (no overlapping run). A claim older than `GRANOLA_SIGNAL_LEASE_TTL_MS` (default 900_000) is
+     **stale** and reclaimable (covers crash/restart mid-LLM-call). The claim clears only after the run's signal
+     atoms **and** manifest are durably written (advance-after-durable-write, 104 AC3).
+   - **Idempotent on crash.** Manifest is the last write; latest-wins ignores partial un-finalized state. A
+     crash after some signal atoms but before the manifest leaves NO current run; the reclaimed lease re-runs it,
+     and the orphan atoms are never selected (no manifest references them). No duplicate current run.
+   - **Bounded retry + cost cap.** Transient extractor errors retry up to `GRANOLA_SIGNAL_MAX_RETRIES`
+     (default 2) with exponential backoff. At most `GRANOLA_SIGNAL_MAX_NOTES_PER_TICK` (default 5) notes extract
+     per tick. On retry exhaustion the worker writes a **failed-run manifest** (`status:"failed"`, `reason`) and
+     does NOT re-attempt until that note's next settled-update or a version bump — a persistently-failing meeting
+     cannot spin/respend every tick.
+   - **Operator-visible.** Auth/credential failure, repeated rate-limit, and retry exhaustion each emit a logged
+     ECHO error surface (104 pattern); failures are detectable, never silent.
+5. **AC5 — Signal-level retrieval (r1 codex F4).** `search_memories`'s `metadata_match` gains documented
+   set-membership semantics: a **scalar** value means equality (`{signal_type:"decision"}`); an **array** value
+   means membership (`{signal_type:["decision","rationale"]}` = "in"). This array-membership extension is the
+   **one** MCP input-schema change; scalar equality is unchanged and back-compatible. `canonical_subject` matches
+   on the **exact normalized string** (AC2 normalization); free-text topic matching uses the existing literal
+   `query` field (substring over `content` + `canonical_subject`). So "what did we decide about X and why" =
+   `search_memories({query:"X", metadata_match:{source:"derived:granola-signals", signal_type:["decision","rationale"]}})`
+   → matching signal atoms **without** transcript hydration. Hydrate 2–3 signals + (optionally) the parent
+   summary via `parent_dedupe_key`; transcript hydration is **opt-in, never default**. The summary-only lane
+   (`metadata_match:{granola_atom_type:"summary"}`) is verified queryable as part of this.
+6. **AC6 — Extraction provider: reuse 105's resolution + credential handling (r1 codex F5 + codex-ops F2).**
+   The extractor makes one structured LLM call per settled meeting (→ validated JSON list of signals). It
+   **reuses the provider/model resolution + API-credential handling established by 105
+   (ceo-loop-reasoning-brain)** — the builder confirms the exact module at ready-promotion rather than
+   introducing a parallel mechanism; the model id resolves to the latest Claude per global guidance via that
+   path (config-overridable). Credential precedence mirrors 104 AC4 (env, else `~/.echo/state/...`).
+   - **Startup/config validation.** On worker start, validate the provider credential is present + well-formed;
+     if missing/invalid the signal worker **disables itself with a visible log** (the rest of the daemon keeps
+     running) — exactly 104 AC4's self-disable contract. No hardcoded credentials.
+   - **Injectable boundary for tests.** The extractor takes an injected `extractFn`/client interface (the
+     `GranolaApiClient` pattern) so all tests run against a **mock** — never a live LLM call or real key.
+   - **Failure handling** (provider down / rate-limit / schema-validation failure) follows AC4's bounded-retry
+     + failed-run-manifest + operator-visible-error path.
+   - The run is logged like any other model use, and journaled per the dogfooding discipline if it touches ECHO MCP.
 
 ## Architecture
 
@@ -108,9 +151,9 @@ triggered by observed low-confidence rationale, not assumed now.
 - **Derived layer (new):** signal atoms + one manifest atom per run, source `derived:granola-signals*`.
 - **Extraction:** async daemon worker → one structured LLM call per settled meeting → validated JSON
   (`[{signal_type, text, canonical_subject, source_span, owner?, rationale_for?, decision_status?,
-  confidence}]`) → append signal atoms + manifest atom. Idempotent per `(note_id, extractor_version)`:
-  re-running produces a new `extraction_run_id` that `supersedes` the prior; the dedupe_key includes a
-  content hash so identical re-derivations are detectable.
+  confidence}]`) → append signal atoms + manifest atom. Run family = `note_id` (AC3): re-running produces a
+  new `extraction_run_id` that `supersedes` the prior current run for that note (any version); the dedupe_key
+  includes a content hash so identical re-derivations are detectable.
 - **Latest-wins resolution** is a small query-time helper over manifest atoms, NOT a stored mutable flag
   (append-only forbids `is_latest` mutation).
 - **Gate:** `derived:` is a new gate kind / allowlist category (mirror the `api:` pattern 104 added to
@@ -122,13 +165,24 @@ All against a **mocked** extractor (recorded fixtures) — never a live LLM call
 
 - **Extraction shape:** a fixture meeting → expected decision/rationale/action atoms with correct
   `parent_dedupe_key`, `source_span`, `confidence`, and `rationale_for` linkage.
-- **Append-only re-derivation:** re-run with a bumped `extractor_version` → new run + manifest that
-  `supersedes` the prior; old signal atoms **still present** (not mutated/deleted); latest-wins helper
-  returns only the new run.
-- **Debounce/settle:** a note updated within the window is **not** extracted; once quiet ≥ N min it is.
-- **Retrieval:** `search_memories` signal-type + canonical_subject filter returns signals without
+- **Append-only re-derivation + latest-wins:** re-run with a bumped `extractor_version` → new run + manifest
+  that `supersedes` the prior current run for that `note_id`; old signal atoms **still present** (not
+  mutated/deleted); latest-wins helper returns only the current run (never both v1 and v2). Tie-break test:
+  two un-superseded manifests → `completed_at` DESC then `extraction_run_id` DESC resolves deterministically.
+- **Debounce/settle:** a note updated within `GRANOLA_SIGNAL_SETTLE_MS` is **not** extracted; once quiet
+  beyond it, it is.
+- **Lease / overlap guard (codex-ops F1):** a note with an active claim is skipped by a concurrent worker tick;
+  a claim older than `GRANOLA_SIGNAL_LEASE_TTL_MS` is treated as stale and reclaimed.
+- **Crash-during-extraction (codex-ops F1):** signal atoms written but manifest absent → latest-wins selects
+  **no** current run; reclaimed lease re-runs → exactly one current run; orphan partial atoms never selected.
+- **Retrieval:** `metadata_match` array value → set-membership (`signal_type ∈ {decision,rationale}`); scalar
+  value → equality (back-compat); `canonical_subject` exact-normalized match; signals returned without
   transcript hydration; summary-only lane returns summaries only.
-- **Guardrail:** low-confidence rationale is flagged in output, not surfaced as asserted fact.
+- **Provider failure (codex F5 + codex-ops F2):** missing/invalid credential → worker self-disables with a
+  visible log, rest of daemon runs; extractor error/rate-limit → bounded retry then a `status:"failed"`
+  manifest with no re-attempt that tick (no spin/respend).
+- **Guardrail:** a signal with `confidence < GRANOLA_SIGNAL_LOW_CONF` is stamped `low_confidence:true` and
+  flagged, not surfaced as asserted fact.
 
 ## Out of Scope (Don't Drift)
 
