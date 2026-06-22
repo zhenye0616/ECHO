@@ -381,3 +381,9 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [103 merge 2026-06-19] Stabilize 2 flaky/env product tests: tests/cli/shell-reachable.test.ts (launchctl daemon-install fails outside a real install env) + tests/mcp/recent-calls-endpoint.test.ts (15s timeout under parallel load). Not 103-caused; surfaced during the 103 merge verify.
 - [105 merge 2026-06-19] responder.ts:207-216 — successful brain answer is downgraded to a failure message if only the AC6 usage-log append throws; log the append error but still post the valid answer.
 - [105 merge 2026-06-19] brain.ts:219-234 — optional recursion-depth guard on assistantText JSON parsing (cheap defense; harmless for trusted shallow codex JSONL).
+
+## From 104 merge (2026-06-21) — non-blocking
+- 104: coalesce partial-checkpoint writes if first-sync batches get large (granola-poller.ts:655-664) — optimization.
+- 104: optionally skip writing an empty-summary atom when both summary fields absent (granola-poller.ts:513).
+- 104 (strategist): create wiki capture/ Granola surface page + capture/per-app/granola-collected-data ref.
+- PROCESS: spec-review convergence != buildability — 104 hit 3 build escalations (storage substrate, enum ripple, snapshot pins) the queue review missed. Consider a buildability/file-surface lens in the review queue or a builder dry-run before sealing.
