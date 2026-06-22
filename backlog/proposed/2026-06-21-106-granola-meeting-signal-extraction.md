@@ -97,27 +97,36 @@ triggered by observed low-confidence rationale, not assumed now.
      two un-superseded manifests), tie-break by `completed_at` DESC, then `extraction_run_id` DESC (lexical).
      Retrieval (AC5) returns only the current run's signals — never both v1 and v2, never an arbitrary choice.
    - Re-derivation appends; **nothing is mutated or deleted**. Superseded signal atoms remain immutable history.
-4. **AC4 — Async enrichment worker, debounced + durably leased (r1 codex F3 + codex-ops F1).** Extraction runs
-   as a **separate async pass**, NOT in the Granola poller and NOT lazy-at-query. A daemon-scheduled worker
-   (interval `GRANOLA_SIGNAL_WORKER_INTERVAL_MS`, default 300_000) picks up meetings whose raw atoms are present
-   and whose Granola `updated_at` has been quiet for `GRANOLA_SIGNAL_SETTLE_MS` (default 600_000 = 10 min).
-   Re-extracts on (a) a settled-note update, or (b) an `extractor_version` bump.
-   - **Durable lease (overlap guard + crash recovery).** Before extracting a note the worker writes an atomic
-     per-`note_id` claim into `~/.echo/state/granola-signals-claims.json` (temp-file + rename — the 104
-     checkpoint pattern) recording `{note_id, extractor_version, started_at}`. A note with an active claim is
-     **skipped** (no overlapping run). A claim older than `GRANOLA_SIGNAL_LEASE_TTL_MS` (default 900_000) is
-     **stale** and reclaimable (covers crash/restart mid-LLM-call). The claim clears only after the run's signal
-     atoms **and** manifest are durably written (advance-after-durable-write, 104 AC3).
-   - **Idempotent on crash.** Manifest is the last write; latest-wins ignores partial un-finalized state. A
-     crash after some signal atoms but before the manifest leaves NO current run; the reclaimed lease re-runs it,
-     and the orphan atoms are never selected (no manifest references them). No duplicate current run.
-   - **Bounded retry + cost cap.** Transient extractor errors retry up to `GRANOLA_SIGNAL_MAX_RETRIES`
-     (default 2) with exponential backoff. At most `GRANOLA_SIGNAL_MAX_NOTES_PER_TICK` (default 5) notes extract
-     per tick. On retry exhaustion the worker writes a **failed-run manifest** (`status:"failed"`, `reason`) and
-     does NOT re-attempt until that note's next settled-update or a version bump — a persistently-failing meeting
-     cannot spin/respend every tick.
+   - **Manifests are written on success only.** A failed extraction writes **no** manifest (AC4), so it can never
+     become a current run — latest-wins reads successful runs only, and a transient failure can never hide the
+     last successful signals.
+4. **AC4 — Async enrichment worker, debounced + single-in-flight (r2 structural cut, replacing the r1 lease).**
+   Extraction runs as a **separate async pass**, NOT in the Granola poller and NOT lazy-at-query. A
+   daemon-scheduled worker (interval `GRANOLA_SIGNAL_WORKER_INTERVAL_MS`, default 300_000) picks up meetings whose
+   raw atoms are present and whose Granola `updated_at` has been quiet for `GRANOLA_SIGNAL_SETTLE_MS` (default
+   600_000 = 10 min). Re-extracts on (a) a settled-note update, or (b) an `extractor_version` bump.
+   - **Mutual exclusion = single-in-flight scheduling (NOT a lockfile).** Like 104's poller ("at most one Granola
+     poll in flight at a time; no overlapping ticks"), the worker is guarded by the daemon scheduler's in-process
+     in-flight flag: a tick that fires while an extraction is still running is a no-op skip. ECHO runs **one**
+     launchd daemon (single process — the same process 104's poller relies on); there is no supported
+     multi-process or manual concurrent-worker path, so an in-process guard is sufficient and a durable
+     cross-process lease is unnecessary. *(r2: the r1 temp-file+rename "lease" gave durability, not acquisition
+     atomicity — two ticks could both read no-claim and both extract. Removed entirely rather than hardened into
+     a flock/heartbeat protocol.)*
+   - **Idempotent on crash.** Manifest is the last write; latest-wins ignores partial un-finalized state. A crash
+     after some signal atoms but before the manifest leaves NO current run; the next tick re-runs the note, and
+     the orphan atoms are never selected (no manifest references them). No duplicate current run.
+   - **No-spin = atomic worker checkpoint (104 pattern), not a failed manifest.** The worker keeps an atomic
+     checkpoint at `~/.echo/state/granola-signals-checkpoint.json` (temp-file + rename) recording, per `note_id`,
+     the last-attempted input fingerprint (the raw note `updated_at`) + `extractor_version` + (on failure)
+     `last_failure_reason`/`last_failure_at`. A note is re-attempted **only** when its raw `updated_at` changes or
+     `extractor_version` bumps — this covers success **and** failure identically, so a persistently-failing note
+     does not re-extract/respend every tick. (Failure state lives in this checkpoint, never in a manifest.)
+   - **Bounded retry + cost cap.** Within a single attempt, transient extractor errors retry up to
+     `GRANOLA_SIGNAL_MAX_RETRIES` (default 2) with exponential backoff. At most `GRANOLA_SIGNAL_MAX_NOTES_PER_TICK`
+     (default 5) notes extract per tick.
    - **Operator-visible.** Auth/credential failure, repeated rate-limit, and retry exhaustion each emit a logged
-     ECHO error surface (104 pattern); failures are detectable, never silent.
+     ECHO error surface (104 pattern) and stamp the checkpoint's failure fields; failures are detectable, never silent.
 5. **AC5 — Signal-level retrieval (r1 codex F4).** `search_memories`'s `metadata_match` gains documented
    set-membership semantics: a **scalar** value means equality (`{signal_type:"decision"}`); an **array** value
    means membership (`{signal_type:["decision","rationale"]}` = "in"). This array-membership extension is the
@@ -140,7 +149,7 @@ triggered by observed low-confidence rationale, not assumed now.
    - **Injectable boundary for tests.** The extractor takes an injected `extractFn`/client interface (the
      `GranolaApiClient` pattern) so all tests run against a **mock** — never a live LLM call or real key.
    - **Failure handling** (provider down / rate-limit / schema-validation failure) follows AC4's bounded-retry
-     + failed-run-manifest + operator-visible-error path.
+     + no-manifest-on-failure + checkpoint-suppression + operator-visible-error path.
    - The run is logged like any other model use, and journaled per the dogfooding discipline if it touches ECHO MCP.
 
 ## Architecture
@@ -149,11 +158,13 @@ triggered by observed low-confidence rationale, not assumed now.
   not retrieval value). The retrievable unit is the **signal**.
 - **Raw layer (unchanged, from 104):** `summary` + `transcript` atoms, source `api:granola`.
 - **Derived layer (new):** signal atoms + one manifest atom per run, source `derived:granola-signals*`.
-- **Extraction:** async daemon worker → one structured LLM call per settled meeting → validated JSON
-  (`[{signal_type, text, canonical_subject, source_span, owner?, rationale_for?, decision_status?,
-  confidence}]`) → append signal atoms + manifest atom. Run family = `note_id` (AC3): re-running produces a
-  new `extraction_run_id` that `supersedes` the prior current run for that note (any version); the dedupe_key
-  includes a content hash so identical re-derivations are detectable.
+- **Extraction:** async daemon worker (single-in-flight via the scheduler, 104 pattern — no lockfile) → one
+  structured LLM call per settled meeting → validated JSON (`[{signal_type, text, canonical_subject,
+  source_span, owner?, rationale_for?, decision_status?, confidence}]`) → append signal atoms + a manifest atom
+  **on success only**. Run family = `note_id` (AC3): re-running produces a new `extraction_run_id` that
+  `supersedes` the prior current run for that note (any version); the dedupe_key includes a content hash so
+  identical re-derivations are detectable. No-spin/failure state lives in an atomic worker checkpoint
+  (`~/.echo/state/granola-signals-checkpoint.json`, 104 pattern), never in a manifest.
 - **Latest-wins resolution** is a small query-time helper over manifest atoms, NOT a stored mutable flag
   (append-only forbids `is_latest` mutation).
 - **Gate:** `derived:` is a new gate kind / allowlist category (mirror the `api:` pattern 104 added to
@@ -171,16 +182,19 @@ All against a **mocked** extractor (recorded fixtures) — never a live LLM call
   two un-superseded manifests → `completed_at` DESC then `extraction_run_id` DESC resolves deterministically.
 - **Debounce/settle:** a note updated within `GRANOLA_SIGNAL_SETTLE_MS` is **not** extracted; once quiet
   beyond it, it is.
-- **Lease / overlap guard (codex-ops F1):** a note with an active claim is skipped by a concurrent worker tick;
-  a claim older than `GRANOLA_SIGNAL_LEASE_TTL_MS` is treated as stale and reclaimed.
-- **Crash-during-extraction (codex-ops F1):** signal atoms written but manifest absent → latest-wins selects
-  **no** current run; reclaimed lease re-runs → exactly one current run; orphan partial atoms never selected.
+- **Single-in-flight (r2 cut, replacing the lease test):** a worker tick that fires while an extraction is still
+  running is a no-op skip (mutual exclusion via the daemon scheduler's in-flight guard — the 104 poller test
+  shape) — no overlapping extraction, no lockfile.
+- **Crash-during-extraction:** signal atoms written but manifest absent → latest-wins selects **no** current run;
+  the next tick re-runs the note → exactly one current run; orphan partial atoms never selected.
 - **Retrieval:** `metadata_match` array value → set-membership (`signal_type ∈ {decision,rationale}`); scalar
   value → equality (back-compat); `canonical_subject` exact-normalized match; signals returned without
   transcript hydration; summary-only lane returns summaries only.
-- **Provider failure (codex F5 + codex-ops F2):** missing/invalid credential → worker self-disables with a
-  visible log, rest of daemon runs; extractor error/rate-limit → bounded retry then a `status:"failed"`
-  manifest with no re-attempt that tick (no spin/respend).
+- **Failure writes no manifest + no-spin (r2 cut, replacing the failed-manifest test):** an extractor
+  error/rate-limit leaves the **last successful** run current (no `status:"failed"` manifest is ever written);
+  the worker checkpoint records the attempted `updated_at` so the note is **not** re-attempted until its raw
+  `updated_at` changes or `extractor_version` bumps (no spin/respend). Missing/invalid credential → worker
+  self-disables with a visible log, rest of daemon runs.
 - **Guardrail:** a signal with `confidence < GRANOLA_SIGNAL_LOW_CONF` is stamped `low_confidence:true` and
   flagged, not surfaced as asserted fact.
 
