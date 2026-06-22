@@ -26,13 +26,19 @@ files_to_modify:
   - src/mcp/tools/search-memories.ts               # metadata_match support for signal_type / canonical_subject
   - tests/enrich/granola-signals.test.ts           # NEW — extraction + append-only run/manifest tests
   - tests/mcp/tools/search-memories.test.ts        # signal-filter retrieval tests
+  - tests/packaging/packed-manifest.test.ts        # snapshot ripple from new dist/enrich/* (authorized by founder post-build)
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-22T07:09:51Z"
 branch: "agent/granola-meeting-signal-extraction"
-head_sha: "e0e5fd0be34d7862115bfc900e7ae91d8ca39663"
+head_sha: "8fa22fa650e87e2eb33c0df0c405091a15892f81"
 pr_url: ""
 agent_notes: |
-  BLOCKED: The implementation branch is pushed and focused verification passes, but full-suite completion needs `tests/packaging/packed-manifest.test.ts` updated for the new `dist/enrich/*` files and AC2's structured-transcript-span wording is stronger than the current raw Granola capture substrate. Tried: implemented the allowed files only, ran typecheck/lint/focused tests successfully, ran full `npm test`, and inspected 104's poller output. Best guess: authorize the packaging snapshot update and either accept rendered-transcript timestamp parsing for this item or create a follow-up to persist structured transcript item metadata in `src/capture/surfaces/granola-poller.ts`; confidence high. Why escalated: both fixes require modifying files outside `files_to_modify`, which is a builder stopping condition.
+  BLOCKED (codex builder, e0e5fd0b): The implementation branch is pushed and focused verification passes, but full-suite completion needs `tests/packaging/packed-manifest.test.ts` updated for the new `dist/enrich/*` files and AC2's structured-transcript-span wording is stronger than the current raw Granola capture substrate. Tried: implemented the allowed files only, ran typecheck/lint/focused tests successfully, ran full `npm test`, and inspected 104's poller output. Best guess: authorize the packaging snapshot update and either accept rendered-transcript timestamp parsing for this item or create a follow-up to persist structured transcript item metadata in `src/capture/surfaces/granola-poller.ts`; confidence high. Why escalated: both fixes require modifying files outside `files_to_modify`, which is a builder stopping condition.
+
+  STRATEGIST RESOLUTION (2026-06-22, founder-authorized): Both escalation points cleared.
+  (1) Packaging snapshot — authorized + applied as a reviewer fixup at 8fa22fa6 (test-only; pinned dist/enrich/* in the inline snapshot; added to files_to_modify above).
+  (2) AC2 transcript-span — founder chose "parse from the flat render (in-scope)". Codex had ALREADY implemented exactly this (parseRenderedTranscript() parses start_time/end_time from the rendered `[start-end]` prefix, granola-signals.ts:300-326) — so NO code change; only the AC2 wording is reconciled to match shipped reality. No 104/poller change; the deferred structured-item follow-up is NOT needed.
+  Verification at 8fa22fa6: typecheck OK, lint OK, full suite 1776 passed / 3 failed — all 3 confirmed pre-existing/flaky (recent-calls-endpoint + ceo-slack-brain pass in isolation = load flakes; shell-reachable fails on clean main per 104, daemon/bash-env, untouched by 106). Ready for /merge-and-cleanup.
 ---
 
 > **Origin: 2026-06-21 brainstorm (founder + Claude strategist + Codex peer-consult).** Follows 104
@@ -80,10 +86,12 @@ triggered by observed low-confidence rationale, not assumed now.
    `dedupe_key = granola:signal:{note_id}:{extractor_version}:{signal_type}:{stable_hash(content)}`.
    - **`source_span` shape (resolves the flat-transcript gap, r1 codex F1).** An object, exactly one of:
      `{kind:"summary"}` (derived from the summary atom); or
-     `{kind:"transcript", start_time, end_time, quote}` where `start_time`/`end_time` are the Granola
-     **structured** transcript-item timestamps (the extractor reads `transcript[]` items, which carry
-     `start_time`/`end_time` — NOT the flat rendered string), and `quote` is the verbatim utterance text(s).
-     The flat transcript blob (104) is the human render; spans always reference the structured items.
+     `{kind:"transcript", start_time, end_time, quote}` where `start_time`/`end_time` are **parsed from the
+     rendered transcript's `[start-end]` prefix** and `quote` is the verbatim utterance text(s). 104 persists
+     only the flat rendered string (`[start-end] Speaker: text`); the per-utterance timestamps remain recoverable
+     from it, so the worker parses them via `parseRenderedTranscript()` (granola-signals.ts) — no 104/poller
+     change is needed. *(r2 reconciliation: the original "reads structured `transcript[]` items" wording assumed
+     a substrate that 104 does not persist; founder chose the in-scope parse-from-render path.)*
    - Type-specific: `owner` (actions), `rationale_for` → `dedupe_key` of the decision a rationale explains,
      `decision_status` (`proposed|decided|unresolved`, decisions). A signal with
      `confidence < GRANOLA_SIGNAL_LOW_CONF` (default 0.5) is stamped `low_confidence: true` and is
