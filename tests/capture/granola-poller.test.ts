@@ -122,8 +122,8 @@ describe('Granola poller', () => {
         atoms_written: 4,
       });
       expect(client.listCalls).toEqual([
-        { updated_after: undefined, cursor: undefined, page_size: 100 },
-        { updated_after: undefined, cursor: 'cursor-2', page_size: 100 },
+        { updated_after: undefined, cursor: undefined, page_size: 30 },
+        { updated_after: undefined, cursor: 'cursor-2', page_size: 30 },
       ]);
       const atoms = await store.query({ source: 'api:granola', order: 'asc' });
       expect(atoms).toHaveLength(4);

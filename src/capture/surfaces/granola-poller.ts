@@ -13,7 +13,7 @@ export const GRANOLA_API_BASE_URL = 'https://public-api.granola.ai/v1';
 export const GRANOLA_CHECKPOINT_SCHEMA_VERSION = 1;
 export const DEFAULT_GRANOLA_POLL_INTERVAL_MS = 60_000;
 export const DEFAULT_GRANOLA_REQUEST_TIMEOUT_MS = 15_000;
-export const DEFAULT_GRANOLA_PAGE_SIZE = 100;
+export const DEFAULT_GRANOLA_PAGE_SIZE = 30; // Granola API caps page_size at 30; >30 → HTTP 400 (confirmed live 2026-06-21)
 export const GRANOLA_API_KEY_RE = /^grn_[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 const log = createLogger('capture.surfaces.granola');
