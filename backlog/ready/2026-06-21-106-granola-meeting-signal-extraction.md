@@ -8,6 +8,7 @@ created: 2026-06-21
 blocked_by: []
 task_state_ref: 2026-06-21-106-granola-meeting-signal-extraction
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 1e035231c08927bfdea11046c7d18c25302c75c680818518820140ba285d138a
 spec_refs:
   - src/capture/surfaces/granola-poller.ts        # raw summary/transcript atom producer (104) this builds on
   - backlog/complete/2026-06-18-104-granola-meeting-capture.md   # predecessor; append-only ingest-once contract
