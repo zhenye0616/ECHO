@@ -475,3 +475,21 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-06-21-106-granola-meeting-signal-extraction/r4/request.md`; artifact `backlog/proposed/2026-06-21-106-granola-meeting-signal-extraction.md@2b1903d4567c4613d0822ebb992d407e6741c000`; response `backlog/reviews/2026-06-21-106-granola-meeting-signal-extraction/r4/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-071C3CC0-6753-4FA1-BB98-777DCC679AB7/raw/internal/review-queue/bacf485e-d9fc-4fed-9fb9-af8073cf8141/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-071C3CC0-6753-4FA1-BB98-777DCC679AB7/raw/internal/review-queue/bacf485e-d9fc-4fed-9fb9-af8073cf8141/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-06-22 00:06 PDT - codex builder MCP ping before claim
+
+- **Trigger:** Builder-agent startup for `/process-backlog`; after mandatory global reads, Codex smoke-tested ECHO MCP availability before claim reconciliation.
+- **Query inputs:** `echo_ping(message="codex builder preflight 2026-06-22")`.
+- **Returned:** `pong: true`; timestamp `2026-06-22T07:06:01.167Z`; received message echoed unchanged.
+- **Sources:** ECHO MCP tool surface `mcp__echo.echo_ping`; no clusters, atoms, or storage rows queried.
+- **Verdict:** right - MCP is reachable from this Codex session.
+- **Note:** This was only a connectivity check; item selection still belongs to `tools/blocked.py` and the claimed item's `spec_refs`.
+
+### 2026-06-22 00:08 PDT - codex builder repo-context lookup before claim
+
+- **Trigger:** Builder-agent startup for `/process-backlog`; Codex checked recent repo-scoped ECHO context before selecting or claiming work.
+- **Query inputs:** `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-21T00:00:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** 1 cluster, 140 atoms; top cluster `ctx_65ca4fe7`, label `"work on project_echo"`, rank_reasons `["has_open_loop","has_unresolved_open_loop","code_session_anchor"]`; time range `2026-06-21T17:49:32.739Z` to `2026-06-22T07:03:41.837Z`; 12 open-loop hints with one unresolved.
+- **Sources:** source_breakdown=`{"git":86,"claude_code":48,"codex":6}`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; no Cursor, Slack, browser, or Granola-source atoms in this returned cluster.
+- **Verdict:** partial - useful as a freshness check, but too broad to determine the next builder item; the deterministic backlog selector still owns claim choice.
+- **Note:** No atom hydration was needed before claim because the backlog item and its `spec_refs` remain the build contract.
