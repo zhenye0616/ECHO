@@ -38,6 +38,7 @@ raw/internal/interviews/
 .superpowers/
 
 # Node / TypeScript
+node_modules
 node_modules/
 dist/
 coverage/
