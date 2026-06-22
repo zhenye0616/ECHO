@@ -387,3 +387,9 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 104: optionally skip writing an empty-summary atom when both summary fields absent (granola-poller.ts:513).
 - 104 (strategist): create wiki capture/ Granola surface page + capture/per-app/granola-collected-data ref.
 - PROCESS: spec-review convergence != buildability — 104 hit 3 build escalations (storage substrate, enum ripple, snapshot pins) the queue review missed. Consider a buildability/file-surface lens in the review queue or a builder dry-run before sealing.
+
+## From 106 merge (2026-06-22 — granola-meeting-signal-extraction)
+- [106] Disambiguate same-subject decision linkage (src/enrich/granola-signals.ts:447): rationale→decision fallback matches on canonical_subject; a meeting with ≥2 same-subject decisions picks the last via Map overwrite. LLM-supplied `rationale_for` takes precedence, so low-impact. Non-blocking.
+- [106] Strategist post-merge: write the derived-signal-layer wiki page + update capture/per-app/granola-collected-data (per the item's After Completion notes).
+- [106] Lightweight extraction context: the brain runs `codex exec -C <repo>`; full-repo context timed out (180s), an empty dir is rejected (non-git). Give the extractor a minimal trusted-context git dir instead of the full repo.
+- [infra] Daemon sqlite db is unlinked-on-disk (open-fd only; 418MB lives solely in the running daemon's fd, path deleted). A restart would lose all captured context. Investigate the data-dir lifecycle. Unrelated to 106.
