@@ -26,9 +26,9 @@ files_to_modify:
   - src/mcp/tools/search-memories.ts               # metadata_match support for signal_type / canonical_subject
   - tests/enrich/granola-signals.test.ts           # NEW — extraction + append-only run/manifest tests
   - tests/mcp/tools/search-memories.test.ts        # signal-filter retrieval tests
-claimed_by: ""
-claimed_at: ""
-branch: ""
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-22T07:09:51Z"
+branch: "agent/granola-meeting-signal-extraction"
 head_sha: ""
 pr_url: ""
 ---
