@@ -61,7 +61,7 @@ review_notes: |
   - Disambiguate same-subject decision linkage (granola-signals.ts:447) if a meeting yields multiple decisions sharing a canonical_subject.
   - Strategist post-merge: write the derived-signal-layer wiki page + update capture/per-app/granola-collected-data (per After Completion).
   - Lightweight extraction context: brain runs `codex exec -C <repo>`; full-repo context timed out, empty dir rejected (non-git). Consider a minimal trusted-context dir for extraction.
-  - Daemon db unlinked-on-disk fragility (open-fd only) — separate from 106; worth a look.
+  - Leaked selftest daemons (unlinked open-fd dbs) — test-harness hygiene; PRODUCTION db verified stable/linked (com.echo.daemon :38478, ~/Library/Application Support/ECHO/echo.db). Separate from 106.
 ---
 
 > **Origin: 2026-06-21 brainstorm (founder + Claude strategist + Codex peer-consult).** Follows 104
