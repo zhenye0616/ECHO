@@ -1,0 +1,141 @@
+---
+id: 2026-06-24-107-cross-team-decision-sync-slack
+title: "Cross-team decision sync via Slack — share the derived decision layer peer-to-peer (cofounder↔cofounder); raw stays machine-scoped; piggyback decision extraction on Claude/Codex via skills + AGENTS.md/CLAUDE.md, gated by propose-confirm"
+status: proposed
+priority: HIGH
+estimate: 2-3d (engineering) + multi-day n=2 onboarding validation
+created: 2026-06-24
+blocked_by: []
+task_state_ref: 2026-06-24-107-cross-team-decision-sync-slack
+requested_reviewers: ["codex", "codex-ops"]
+spec_refs:
+  - backlog/complete/2026-06-18-103-ceo-context-loop-n2.md        # the Slack responder + scoped search_memories read loop this extends from eng→CEO to cofounder↔cofounder
+  - src/surfaces/ceo-slack-responder/responder.ts                 # Socket Mode responder; the surface cross-team queries land on
+  - src/surfaces/ceo-slack-responder/brain.ts                     # query-side reasoning over scoped ECHO atoms
+  - backlog/complete/2026-06-21-106-granola-meeting-signal-extraction.md  # the derived decision/rationale/action layer + raw→derived two-scope precedent
+  - wiki/architecture/storage.md                                  # append-only, random-id, no upsert — binds how decision atoms are written
+  - wiki/architecture/capture-gate.md                             # source allowlist / gate model; the shared-vs-machine-scope boundary lives here
+  - wiki/architecture/interface-layers.md                         # L1/L3/L5 vocabulary; cross-team query is an L3 surface, the share-confirm is an L5 trust moment
+  - wiki/surfaces/mcp-server.md                                   # search_memories the responder calls
+  - wiki/surfaces/audit-page.md                                   # L5 — the visible sharing boundary this item makes load-bearing
+  - skills/role-typed-task-state.md                               # cross-tool protocol precedent; the piggyback extraction ships as a skill, not Claude-Code-specific glue
+files_to_modify:
+  # PROVISIONAL — finalized at ready-promotion. Builder confirms against the substrate before claiming.
+  - skills/echo-emit-decision.md                                  # NEW — canonical cross-tool skill: on a decision-grade moment, draft a candidate decision atom
+  - src/capture/sources.ts                                        # allowlist a team-scoped decision namespace (e.g. derived:team-decisions), distinct from machine-scoped raw
+  - src/surfaces/ceo-slack-responder/responder.ts                # add the propose-confirm message flow (draft → one-tap confirm/edit) + peer-scope query routing
+  - src/surfaces/ceo-slack-responder/brain.ts                    # answer cross-team queries from the shared decision layer ONLY; never reach a peer's raw store
+  - docs/onboarding/AGENTS.md.snippet                            # NEW — drop-in AGENTS.md block instructing Codex to call the emit-decision skill
+  - docs/onboarding/CLAUDE.md.snippet                            # NEW — drop-in CLAUDE.md block instructing Claude Code to call the emit-decision skill
+  - tests/surfaces/ceo-slack-responder/cross-team-scope.test.ts  # NEW — peer query resolves decision layer only; raw drill-down stays self-scoped
+  - tests/surfaces/ceo-slack-responder/propose-confirm.test.ts   # NEW — nothing enters the shared store without an explicit confirm
+
+---
+
+> **Origin: 2026-06-24 launch-onboarding conversation (founder + Claude strategist).** Founder has decided to
+> launch the scrappy V1 and onboard 2–3-person startups (two technical cofounders both living in Claude Code +
+> Codex). The wedge that turns ECHO from a single-seat tool into a per-seat, team-retained product is
+> **cross-team context** — and the founder's design call is to deliver it through **Slack as the shared surface**
+> (the surface cofounders already collaborate on, and the one ECHO already works on), NOT through peer-to-peer
+> sync of local stores. The layering: **raw context stays machine-scoped; only the derived *decision* layer is
+> shared** — ECHO mirrors how human teams already communicate (you tell your cofounder "I moved auth to Postgres,"
+> not the 200 lines behind it). This composes two shipped/specced primitives rather than building new substrate:
+> 103's Slack responder (the read loop) and 106's raw→derived two-scope split (the decision layer).
+>
+> **Lifts/relates to [[project_v15_cleanup_pause]].** This is the first item whose trigger is the launch decision,
+> not codebase cleanup. Spec-review should confirm the pause posture before promoting `proposed/ → ready/`.
+
+## Why
+
+ECHO is already beyond usable at n=1 (3 months of founder dogfooding). The cold-start problem is solved for the
+individual. What is NOT yet delivered is the moment that makes a 2-cofounder startup a slam-dunk: **cofounder B's
+in-tool AI has no idea what cofounder A decided while B was asleep.** Closing that gap is worth more than product
+delight — it changes the economics (2–3 seats per company, not 1) and the retention curve (leaving ECHO becomes a
+*coordination* cost between cofounders, not a personal one). Team context is sticky in a way individual context is not.
+
+The risk that kills this is **install friction and a broken trust model at n=2.** ECHO's wedge is on-device privacy;
+naive cross-team sharing throws it away. The resolution is the two-scope split: the sensitive material — diffs,
+sessions, env, half-formed experiments — never leaves the laptop; only the *decisions* (the stuff you'd tell a
+cofounder anyway) are shared. That keeps the privacy promise and the cross-team value in the same breath.
+
+The second risk is **a wrong shared decision is worse than a missing one** — it pollutes shared truth. So promotion
+of a raw trace into a shared decision is gated by **propose-confirm** (ECHO drafts, human confirms in Slack), biasing
+toward under-sharing, which is the safe direction for a scrappy launch.
+
+The third lever is build cost: the decision extraction **piggybacks on Claude/Codex** — the agents already in the
+dev loop — via an ECHO skill + AGENTS.md/CLAUDE.md instructions, rather than ECHO running its own extraction brain.
+This is on-thesis ([[skills-are-the-cross-tool-protocol]]: skills are the protocol) and a large scope cut versus
+106's daemon-side LLM worker.
+
+## Acceptance criteria
+
+1. **AC1 — Two scopes, one boundary, enforced in the gate (not by policy).** A new **team-scoped decision namespace**
+   (proposed: `derived:team-decisions`) is allowlisted in `src/capture/sources.ts`, distinct from all machine-scoped
+   raw sources. A cross-team query can read this namespace; it can **never** read another person's raw/machine-scoped
+   atoms. Enforced in code at the gate, consistent with [[capture-gate]] — a test asserts a peer query against raw
+   sources is refused.
+2. **AC2 — Cross-team query is decision-layer-only; raw drill-down stays self-scoped.** Extending 103's responder:
+   a Slack question ("what did we decide about auth this week") is answered from the shared decision layer. If the
+   asker wants the raw "why," that resolves **against their own machine only** — never a cofounder's raw store. One
+   rule, tested both directions.
+3. **AC3 — Propose-confirm promotion gate (the trust boundary made visible).** Nothing enters the shared decision
+   store silently. A candidate decision is **drafted** (by the piggyback extractor, AC4) and surfaced in Slack as a
+   one-tap **confirm / edit / dismiss**. Only on explicit confirm is a decision atom appended to `derived:team-decisions`.
+   A confirmed atom records who confirmed it and when (the visible-sharing-boundary record; surfaces to [[audit-page]]).
+   Default-deny: an unconfirmed draft is never queryable as shared truth.
+4. **AC4 — Piggyback extraction via skill + AGENTS.md/CLAUDE.md (no ECHO-side extraction brain).** A canonical
+   `skills/echo-emit-decision.md` instructs an agent (Claude Code or Codex), at a decision-grade moment in its own
+   session, to draft a candidate decision (subject + the decision sentence + optional rationale) and submit it to the
+   propose-confirm gate (AC3). Drop-in `AGENTS.md`/`CLAUDE.md` snippets wire this into a customer repo so the agents
+   already in the loop do the extraction. **ECHO does not run a separate daemon LLM worker for this** (the 106 pattern
+   is explicitly NOT reused here — see Out of Scope). The skill is vendor-neutral and ECHO-namespaced per the
+   cross-tool-protocol convention; a Claude Code adapter copy is produced by `tools/sync-skills.sh` (not hand-edited).
+5. **AC5 — Append-only, machine-attributed decision atoms.** Each shared decision atom carries: `subject`
+   (normalized topic), `decision` (the sentence), `rationale?`, `author` (which cofounder/machine produced it),
+   `confirmed_by`, `confirmed_at`, `source_app` (claude-code | codex), `dedupe_key`. Append-only, random-id, no upsert
+   ([[storage]]); re-confirming the same subject appends a new atom (latest-wins at query time), never mutates.
+6. **AC6 — White-glove onboarding path, documented + runnable.** A short operator runbook + the two drop-in snippets
+   let the founder set up a 2-cofounder team in one screen-share: install the Slack app for the team, drop the
+   AGENTS.md/CLAUDE.md snippet into each repo, confirm the decision-layer query works across both cofounders. The
+   onboarding sequence lands **individual aha first, cross-team second** (don't make the newest part the first
+   impression). Success metric per V1 definition-of-done: the cofounders ask "when can I pay?"
+
+## Open questions for spec-review (do NOT silently decide)
+
+- **Where does the shared decision store physically live?** 103's responder reads a *local* scoped store. True
+  cross-team requires cofounder B's query to reach decisions A confirmed. Candidate shapes: (a) a single small shared
+  decision store both cofounders publish confirmed atoms to (recommended default — smallest surface, only holds the
+  non-sensitive decision layer, raw stays local); (b) the Slack-responder host instance acts as the shared store and
+  both publish to it; (c) peer federation. This is the load-bearing decision; spec-review picks one before `ready/`.
+- **Decision-grade trigger:** what, concretely, makes an agent emit a candidate? (e.g. end-of-task summary, explicit
+  `/echo decision`, a heuristic on the session). Start narrow — explicit + end-of-task — and earn more later.
+- **Granola overlap:** 106 already derives `decision` atoms from meetings. Does the Slack confirm flow also promote
+  selected 106-derived decisions into `derived:team-decisions`, or is this item code-session-only for V1? (Lean:
+  code-session-only first; Granola promotion is a fast-follow.)
+
+## Out of Scope (Don't Drift)
+
+- **Sharing any raw/machine-scoped atom across people.** Diffs, sessions, env, transcripts, half-formed experiments
+  never cross the boundary. Decisions only.
+- **Auto-publish (no confirm).** Silent promotion of a candidate into shared truth is a V2 optimization, gated on
+  *observed* extraction trust — not built here. Under-share on purpose.
+- **An ECHO-side daemon LLM worker for decision extraction.** Extraction piggybacks on the agents already running
+  (AC4). Do NOT rebuild 106's daemon-worker pattern for code-session decisions.
+- **Peer-to-peer sync of local raw stores / a merge layer.** The expensive version. Slack is the shared surface; the
+  decision layer is the only shared state.
+- **A destination app / new ECHO UI.** Cross-team lives in Slack + in-tool AI, never a place users go to.
+- **Production access-control / audit hardening beyond a visible confirm record.** 103 was *stripped* for exactly this
+  patch-deeper drift ([[drift-prevention]]); keep the n=2 trust boundary cheap and visible, not a security subsystem.
+- **>2 people / role hierarchies / org permissions.** Cofounder↔cofounder symmetric peer case only for V1.
+
+## After Completion (Strategist Notes)
+
+- Wiki: add a `surfaces/` page for the **cross-team decision layer over Slack** (the two-scope model, the
+  propose-confirm gate, the decision-layer-only query rule). Update [[interface-layers]] to note the cross-team query
+  as an L3 surface and the confirm as an L5 trust moment. Update [[audit-page]] with the shared-decision visibility record.
+- Add a `product/` (or `research/`) note capturing the **per-seat / team-retention** rationale as the launch wedge —
+  this is the strategic "why cross-team," distinct from the mechanism.
+- Lock the one-sentence trust pitch as a `principles/` line: *"Raw context never leaves your machine; only decisions —
+  the stuff you'd tell your cofounder anyway — are shared."*
+- Feed n=2 onboarding observations into the dogfooding journal; if "when can I pay?" lands ≥3/5, that's the trigger to
+  spec the self-serve onboarding + auto-publish follow-ups (do not pre-build them).
