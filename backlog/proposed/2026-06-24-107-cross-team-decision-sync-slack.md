@@ -25,12 +25,15 @@ files_to_modify:
   - src/capture/sources.ts                                        # allowlist a team-scoped decision namespace (e.g. derived:team-decisions), distinct from machine-scoped raw
   - src/surfaces/ceo-slack-responder/decision-store.ts           # NEW (R1) — the shared decision store: append/query confirmed atoms; owns dedupe_key normalize + latest-wins (R4)
   - src/surfaces/ceo-slack-responder/propose-decision-tool.ts    # NEW (R2) — MCP `propose_decision` handler the piggyback skill calls; creates draft + posts confirm card (PROVISIONAL path)
-  - src/surfaces/ceo-slack-responder/identity.ts                 # NEW (R3) — Slack user ↔ cofounder machine-identity map; routes raw drill-down to the asker's own machine only
+  - src/surfaces/ceo-slack-responder/identity.ts                 # NEW (R3) — Slack user ↔ cofounder identity for CONFIRM ATTRIBUTION only; does not route raw access (raw drill-down deferred)
+  - src/surfaces/ceo-slack-responder/draft-store.ts              # NEW (R5) — durable draft store keyed by draft_id; restart-safe confirm idempotency
+  - src/mcp/server.ts                                            # register the `propose_decision` MCP tool (R2, codex r2 F1) — wires propose-decision-tool.ts into the callable surface
+  - docs/onboarding/cross-team-decision-sync-runbook.md          # NEW (AC6, codex r2 F3) — short operator runbook for the 1-screen-share n=2 setup
   - src/surfaces/ceo-slack-responder/responder.ts                # add the propose-confirm message flow (draft → one-tap confirm/edit, idempotent per R5) + peer-scope query routing; sole writer to decision-store
   - src/surfaces/ceo-slack-responder/brain.ts                    # answer cross-team queries from the shared decision layer ONLY; never reach a peer's raw store
   - docs/onboarding/AGENTS.md.snippet                            # NEW — drop-in AGENTS.md block instructing Codex to call the emit-decision skill
   - docs/onboarding/CLAUDE.md.snippet                            # NEW — drop-in CLAUDE.md block instructing Claude Code to call the emit-decision skill
-  - tests/surfaces/ceo-slack-responder/cross-team-scope.test.ts  # NEW — peer decision query resolves shared layer only; raw drill-down self-scoped both directions (R1, R3)
+  - tests/surfaces/ceo-slack-responder/cross-team-scope.test.ts  # NEW — cross-team decision query resolves shared layer; ANY raw-store access via the cross-team surface is refused (R1, R3 defer)
   - tests/surfaces/ceo-slack-responder/propose-confirm.test.ts   # NEW — nothing enters the shared store without an explicit confirm
   - tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts        # NEW (R5) — Slack retry/double-click consumes a draft once; no duplicate shared atoms
   - tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts # NEW (R4) — re-confirm appends; query returns latest; prior atoms immutable
@@ -79,10 +82,11 @@ This is on-thesis ([[skills-are-the-cross-tool-protocol]]: skills are the protoc
    raw sources. A cross-team query can read this namespace; it can **never** read another person's raw/machine-scoped
    atoms. Enforced in code at the gate, consistent with [[capture-gate]] — a test asserts a peer query against raw
    sources is refused.
-2. **AC2 — Cross-team query is decision-layer-only; raw drill-down stays self-scoped.** Extending 103's responder:
-   a Slack question ("what did we decide about auth this week") is answered from the shared decision layer. If the
-   asker wants the raw "why," that resolves **against their own machine only** — never a cofounder's raw store. One
-   rule, tested both directions.
+2. **AC2 — Cross-team query is decision-layer-only.** Extending 103's responder: a Slack question ("what did we decide
+   about auth this week") is answered from the shared decision layer. **Raw "why" drill-down is NOT a cross-team Slack
+   feature in V1 (deferred per R3, structural cut)** — the cross-team surface never touches any machine-scoped raw store;
+   the asker drills into raw context in their own tools/machine directly. Tested: the cross-team decision read works; any
+   raw-store access via the cross-team surface is refused.
 3. **AC3 — Propose-confirm promotion gate (the trust boundary made visible).** Nothing enters the shared decision
    store silently. A candidate decision is **drafted** (by the piggyback extractor, AC4) and surfaced in Slack as a
    one-tap **confirm / edit / dismiss**. Only on explicit confirm is a decision atom appended to `derived:team-decisions`.
@@ -135,17 +139,24 @@ The piggyback extractor (AC4) submits candidates through a **single concrete cal
 - **Auth/identity:** the calling agent's machine identity (the binding ECHO already uses) is attached **server-side** and
   becomes the draft's `author`; the agent does not self-assert identity.
 - **Receiver:** the tool handler creates a draft (R5) and posts the one-tap confirm card to Slack via `responder.ts`.
+- **Registration (codex r2 F1):** `propose_decision` is wired into the callable surface by the ECHO MCP server tool
+  registry (`src/mcp/server.ts`), which registers the `propose-decision-tool.ts` handler as a tool. `server.ts` is the
+  named registry owner the builder may edit.
 - **Failure surface (no silent drop):** if the submit path is unavailable (responder down, missing Slack creds, MCP
   error), `propose_decision` returns an explicit error to the agent and records nothing as confirmed; the skill instructs
   the agent to surface the error, and the AC6 runbook documents this operator-visible failure evidence.
 
-### R3 — Identity & store-routing (r1 finding 3 — MED)
-`identity.ts` maps **Slack user ID ↔ cofounder machine identity**.
+### R3 — Identity (confirm attribution) + cross-team surface is decision-layer-only (r1 finding 3 MED; raw drill-down deferred r2 codex-ops F1)
+`identity.ts` maps **Slack user ID ↔ cofounder identity** for confirm attribution (who confirmed/authored). It does NOT
+route raw-store access.
 - A cross-team **decision** query reads the shared store (R1) — all cofounders' confirmed decisions.
-- A **raw drill-down** ("why") routes ONLY to the requesting Slack user's own machine store; a request resolving to a
-  peer's raw store is refused at the gate ([[capture-gate]]).
-- **Tests (both directions)** in `cross-team-scope.test.ts`: asker reaches own raw store; an identical request against a
-  peer raw store is refused.
+- **Raw drill-down over Slack is deferred for V1 (structural cut).** The cross-team Slack surface is **decision-layer-only**
+  and has NO code path to any machine-scoped raw store — peer's *or* the asker's own. Surfacing a user's own *remote* raw
+  store through the single responder host would require a new cross-machine raw-access transport, which is explicitly Out
+  of Scope ("peer-to-peer sync of local raw stores — the expensive version"). A user drills into raw "why" through their
+  own existing single-user tools/machine, never via the cross-team surface.
+- **Test** in `cross-team-scope.test.ts`: the cross-team decision query resolves the shared layer; **any** raw-store access
+  attempted via the cross-team Slack surface is refused (the surface offers no remote-raw route at all).
 
 ### R4 — AC5 atom schema: dedupe_key + latest-wins + immutability (r1 finding 4 — MED)
 - `dedupe_key = "team-decision:" + normalize(subject)`, where `normalize` = trim + lowercase + collapse internal whitespace.
@@ -154,9 +165,12 @@ The piggyback extractor (AC4) submits candidates through a **single concrete cal
 - **Tests** (`decision-store-latest-wins.test.ts`): re-confirming the same subject appends a NEW atom; the prior atom is
   byte-unchanged; the query returns the latest.
 
-### R5 — Confirm idempotency for Slack retries (r1 finding 6 — MED)
-Each draft carries a durable `draft_id` (+ `action_ts`). confirm/edit/dismiss consumes a draft **exactly once**; a Slack
-retry or double-click returns the prior result and appends NO second atom. → `confirm-idempotency.test.ts`.
+### R5 — Confirm idempotency for Slack retries (r1 finding 6 — MED; durable storage pinned r2 codex F2)
+Each draft is persisted in a **durable draft store owned by the responder host** (`draft-store.ts`), keyed by `draft_id`
+and holding `{ draft_id, subject, decision, rationale?, author, source_app, status: pending|confirmed|dismissed, action_ts }`.
+confirm/edit/dismiss consumes a draft **exactly once**; a Slack retry or double-click returns the prior result and appends
+NO second atom — **and this holds across a responder restart** (durable store, not process memory). →
+`confirm-idempotency.test.ts` covers restart-safe idempotency, not only same-process double-click.
 
 ### R6 — The two narrower open questions (resolved, not reviewer-flagged)
 - **Decision-grade trigger:** start narrow — **explicit `/echo decision` + end-of-task summary only**; heuristics earn their way in later.
