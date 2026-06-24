@@ -3,12 +3,19 @@ task_id: 2026-06-24-107-cross-team-decision-sync-slack
 role: builder
 binding: codex
 created: 2026-06-24T05:42:01Z
-last_updated: 2026-06-24T05:42:01Z
+last_updated: 2026-06-24T05:52:28Z
 branch: agent/cross-team-decision-sync-slack
+handoff_branch: agent/cross-team-decision-sync-slack
+handoff_head_sha: c4c97af92524a671cd4bb1cfcd2ac6cbe874c74c
+handoff_run_log: raw/internal/agent-runs/2026-06-23-2026-06-24-107-cross-team-decision-sync-slack.md
 ---
 
 ## current_thesis
 Claimed by Codex builder. Implement 107 as a narrow cross-team decision-layer Slack flow: raw context remains machine-scoped; only explicit, confirmed decision atoms enter `derived:team-decisions`; Slack cross-team reads use that shared decision layer only.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: ESCALATED — see agent_notes and raw/internal/agent-runs/2026-06-23-2026-06-24-107-cross-team-decision-sync-slack.md for blocker.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: allowlist a team-scoped decision namespace distinct from machine-scoped raw sources, and enforce the raw boundary in code/tests.
@@ -22,6 +29,10 @@ Claimed by Codex builder. Implement 107 as a narrow cross-team decision-layer Sl
 ## open_questions
 - None at claim. If listed paths or substrate shape contradict the spec, stop and escalate rather than adding unlisted files or dependencies.
 
+<!-- builder-state-handoff-open-questions:start -->
+- See agent_notes and run log for the escalation question.
+<!-- builder-state-handoff-open-questions:end -->
+
 ## dont_touch
 - Do not share raw or machine-scoped atoms across people.
 - Do not auto-publish without explicit confirm.
@@ -33,5 +44,6 @@ Claimed by Codex builder. Implement 107 as a narrow cross-team decision-layer Sl
 - Do not edit wiki pages or backlog item bodies.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-06-24-107-cross-team-decision-sync-slack.md
+
+- spec: backlog/pending_review/2026-06-24-107-cross-team-decision-sync-slack.md
 - reviews: backlog/reviews/2026-06-24-107-cross-team-decision-sync-slack/

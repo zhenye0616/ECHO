@@ -12,9 +12,13 @@ ready_content_sha: 86e546b1fe4aac271f5392739f0dbeb735b6f874a9ec0f73a164de3aa1518
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-24T05:42:01Z"
 branch: "agent/cross-team-decision-sync-slack"
-head_sha: ""
+head_sha: "c4c97af92524a671cd4bb1cfcd2ac6cbe874c74c"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: AC1 requires `derived:team-decisions` to be accepted/enforced at the capture gate, but `src/capture/gate.ts` is not listed in `files_to_modify`.
+  Tried: read every spec_ref, inspected `src/capture/sources.ts`, `src/capture/gate.ts`, and derived-source usage. `sources.ts` already has a derived allowlist helper, but the gate parser only accepts `app`, `domain`, `fs`, `api`, and `git`, so `derived:` is currently rejected as `malformed_event`.
+  Best-guess answer: add `src/capture/gate.ts` to `files_to_modify` and allow `derived:` through the existing derived allowlist; confidence high.
+  Why escalated rather than guessing: builder stopping condition — AC1 cannot be implemented literally without modifying a file not listed in `files_to_modify`.
 spec_refs:
   - backlog/complete/2026-06-18-103-ceo-context-loop-n2.md        # the Slack responder + scoped search_memories read loop this extends from eng→CEO to cofounder↔cofounder
   - src/surfaces/ceo-slack-responder/responder.ts                 # Socket Mode responder; the surface cross-team queries land on
