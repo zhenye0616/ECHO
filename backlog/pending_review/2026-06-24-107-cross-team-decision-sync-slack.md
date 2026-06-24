@@ -43,9 +43,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-24T06:07:30Z"
 branch: "agent/cross-team-decision-sync-slack"
 worktree: "/Users/zhenye/Desktop/Project_echo--cross-team-decision-sync-slack"
-head_sha: ""
+head_sha: "80a89966b2409aeb0e32fa53439dfd5ac5dee063"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: May the builder add `tests/mcp/tools/recent-work-context.test.ts` to scope and update the all-tools expectation to include `propose_decision`?
+  Tried: Implemented the cross-team decision-store/draft-store/propose-confirm flow, added the canonical emit-decision skill/snippets/runbook, registered `propose_decision`, pushed `agent/cross-team-decision-sync-slack` at `80a89966b2409aeb0e32fa53439dfd5ac5dee063`, and verified typecheck, lint, focused tests, and sync-skills --check. Full `npm test` has one item-caused failure because the existing all-tools test now sees `propose_decision`; two other failures match known environmental/load flakes.
+  Best-guess answer: Authorize the one-line existing-test update; confidence high. Conditional registration would hide the tool and violate the AC4 missing-target error contract.
+  Why I escalated rather than guessing: `tests/mcp/tools/recent-work-context.test.ts` is not listed in `files_to_modify`, and the builder protocol requires escalation before modifying unlisted files.
 ---
 
 > **Origin: 2026-06-24 launch-onboarding conversation (founder + Claude strategist).** Founder has decided to
