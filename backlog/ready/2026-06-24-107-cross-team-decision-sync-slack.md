@@ -8,13 +8,7 @@ created: 2026-06-24
 blocked_by: []
 task_state_ref: 2026-06-24-107-cross-team-decision-sync-slack
 requested_reviewers: ["codex", "codex-ops"]
-ready_content_sha: 86e546b1fe4aac271f5392739f0dbeb735b6f874a9ec0f73a164de3aa1518f7f
-claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
-claimed_at: "2026-06-24T05:42:01Z"
-branch: "agent/cross-team-decision-sync-slack"
-head_sha: "c4c97af92524a671cd4bb1cfcd2ac6cbe874c74c"
-pr_url: ""
-agent_notes: |
+ready_content_sha: afee15fd66116e652513d93276ea49116db4ed219c3c8dd30f478a52fbb539db
   BLOCKED: AC1 requires `derived:team-decisions` to be accepted/enforced at the capture gate, but `src/capture/gate.ts` is not listed in `files_to_modify`.
   Tried: read every spec_ref, inspected `src/capture/sources.ts`, `src/capture/gate.ts`, and derived-source usage. `sources.ts` already has a derived allowlist helper, but the gate parser only accepts `app`, `domain`, `fs`, `api`, and `git`, so `derived:` is currently rejected as `malformed_event`.
   Best-guess answer: add `src/capture/gate.ts` to `files_to_modify` and allow `derived:` through the existing derived allowlist; confidence high.
@@ -34,7 +28,7 @@ files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms against the substrate before claiming.
   - skills/echo-emit-decision.md                                  # NEW — canonical cross-tool skill: on a decision-grade moment, draft a candidate decision atom
   - src/capture/sources.ts                                        # allowlist a team-scoped decision namespace (e.g. derived:team-decisions), distinct from machine-scoped raw
-  - src/surfaces/ceo-slack-responder/decision-store.ts           # NEW (R1) — the shared decision store: append/query confirmed atoms; owns dedupe_key normalize + latest-wins (R4)
+  - src/surfaces/ceo-slack-responder/decision-store.ts           # NEW (R1) — shared decision store: append/query confirmed atoms; appends DIRECTLY via isAllowedDerived (bypasses gate, per 106); owns dedupe_key normalize + latest-wins (R4)
   - src/surfaces/ceo-slack-responder/propose-decision-tool.ts    # NEW (R2) — MCP `propose_decision` handler the piggyback skill calls; creates draft + posts confirm card (PROVISIONAL path)
   - src/surfaces/ceo-slack-responder/identity.ts                 # NEW (R3) — Slack user ↔ cofounder identity for CONFIRM ATTRIBUTION only; does not route raw access (raw drill-down deferred)
   - src/surfaces/ceo-slack-responder/draft-store.ts              # NEW (R5) — durable draft store keyed by draft_id; restart-safe confirm idempotency
@@ -88,10 +82,10 @@ This is on-thesis ([[skills-are-the-cross-tool-protocol]]: skills are the protoc
 
 ## Acceptance criteria
 
-1. **AC1 — Two scopes, one boundary, enforced in the gate (not by policy).** A new **team-scoped decision namespace**
-   (proposed: `derived:team-decisions`) is allowlisted in `src/capture/sources.ts`, distinct from all machine-scoped
+1. **AC1 — Two scopes, one boundary, enforced in code, NOT at the capture gate (not by policy).** A new **team-scoped decision namespace**
+   (`derived:team-decisions`) is added to the `derived` allowlist in `src/capture/sources.ts`, distinct from all machine-scoped
    raw sources. A cross-team query can read this namespace; it can **never** read another person's raw/machine-scoped
-   atoms. Enforced in code at the gate, consistent with [[capture-gate]] — a test asserts a peer query against raw
+   atoms. **Decision atoms are internally generated (from the confirm flow), so — like 106's `derived:granola-signals` — they append directly to storage and BYPASS the capture gate; `src/capture/gate.ts` is NOT modified.** The write-side check is `isAllowedDerived(...)` on the append path; the team-vs-raw boundary is enforced on the **read side** (R3), consistent with [[capture-gate]]'s scope model — a test asserts a peer query against raw
    sources is refused.
 2. **AC2 — Cross-team query is decision-layer-only.** Extending 103's responder: a Slack question ("what did we decide
    about auth this week") is answered from the shared decision layer. **Raw "why" drill-down is NOT a cross-team Slack
@@ -133,7 +127,8 @@ The shared decision layer is a **single small append-only store owned by the Sla
 store. It holds ONLY `derived:team-decisions` atoms. Federation (option c) is explicitly deferred — unnecessary at n=2
 ([[project_cross_human_ecosystem_bet]]: federation is not the n=2 sprint).
 - **Write path:** on an explicit Slack confirm (AC3), `responder.ts` calls `decision-store.append(atom)`. This is the
-  ONLY writer; raw atoms are never published to it.
+  ONLY writer; raw atoms are never published to it. `decision-store.append` writes the `derived:team-decisions` atom
+  **directly to storage** (validating via `isAllowedDerived`), bypassing the capture gate — the 106 derived-atom precedent.
 - **Read path:** a cross-team query (`brain.ts`) reads `derived:team-decisions` from this shared store ONLY, and has no
   code path to ANY machine-scoped raw store — not a peer's and not the asker's own (raw drill-down deferred per R3).
 - **Config/env:** the responder is configured with `ECHO_TEAM_DECISION_STORE` (path/connection of the shared store) at
