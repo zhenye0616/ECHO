@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+**claim-ready after R4.** Both reviewers (codex + codex-ops) returned `proceed` with zero findings at spec_commit_sha 24ff42c3. Path: r1 pushback → r2/r3 proceed_after_patches (narrowing) → r4 clean. All r1–r3 findings dispositioned and verified buildable; raw drill-down structurally deferred. Promoting proposed/ → ready/.
 

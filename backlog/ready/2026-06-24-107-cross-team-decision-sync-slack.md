@@ -8,6 +8,7 @@ created: 2026-06-24
 blocked_by: []
 task_state_ref: 2026-06-24-107-cross-team-decision-sync-slack
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 86e546b1fe4aac271f5392739f0dbeb735b6f874a9ec0f73a164de3aa1518f7f
 spec_refs:
   - backlog/complete/2026-06-18-103-ceo-context-loop-n2.md        # the Slack responder + scoped search_memories read loop this extends from eng→CEO to cofounder↔cofounder
   - src/surfaces/ceo-slack-responder/responder.ts                 # Socket Mode responder; the surface cross-team queries land on
@@ -38,7 +39,6 @@ files_to_modify:
   - tests/surfaces/ceo-slack-responder/propose-confirm.test.ts   # NEW — nothing enters the shared store without an explicit confirm; missing confirm-target errors with NO draft created (R2)
   - tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts        # NEW (R5) — Slack retry/double-click consumes a draft once; no duplicate shared atoms
   - tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts # NEW (R4) — re-confirm appends; query returns latest; prior atoms immutable
-
 ---
 
 > **Origin: 2026-06-24 launch-onboarding conversation (founder + Claude strategist).** Founder has decided to
