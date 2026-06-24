@@ -538,3 +538,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** source_breakdown=`{"git":33,"claude_code":16,"codex":2}`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; no Cursor, Slack, browser, or Granola-source atoms in this returned cluster.
 - **Verdict:** partial - useful freshness check, but the deterministic backlog selector and the claimed item's `spec_refs` remain the build contract.
 - **Note:** No atom hydration was needed before claim because the returned cluster was broad and did not replace the backlog item/spec-ref context.
+
+### 2026-06-23 23:12 PDT - codex builder MCP ping during 107 re-claim
+
+- **Trigger:** Builder-agent run for `/process-backlog` re-claimed `2026-06-24-107-cross-team-decision-sync-slack`; Codex smoke-tested ECHO MCP availability after loading the current spec and before implementation.
+- **Query inputs:** direct Streamable HTTP `tools/call` for `echo_ping(message="codex builder 107 preflight")`; first request omitted `Accept`, retry used `Accept: application/json, text/event-stream`.
+- **Returned:** first request returned JSON-RPC error `Not Acceptable: Client must accept both application/json and text/event-stream`; retry returned `structuredContent={pong:true, ts:"2026-06-24T06:12:31.624Z", received:"codex builder 107 preflight"}`.
+- **Sources:** ECHO MCP tool surface `echo_ping` over `http://127.0.0.1:38478/mcp`; no clusters, atoms, or storage rows queried.
+- **Verdict:** partial - daemon reachable and retry succeeded; raw curl callers need the explicit Streamable HTTP `Accept` header.
+- **Note:** This was only a connectivity check. Item selection and scope remain governed by `tools/blocked.py`, the claimed spec, and its `spec_refs`.
