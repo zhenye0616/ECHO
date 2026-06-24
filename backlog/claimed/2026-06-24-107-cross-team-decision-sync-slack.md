@@ -9,6 +9,12 @@ blocked_by: []
 task_state_ref: 2026-06-24-107-cross-team-decision-sync-slack
 requested_reviewers: ["codex", "codex-ops"]
 ready_content_sha: 86e546b1fe4aac271f5392739f0dbeb735b6f874a9ec0f73a164de3aa1518f7f
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-24T05:42:01Z"
+branch: "agent/cross-team-decision-sync-slack"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 spec_refs:
   - backlog/complete/2026-06-18-103-ceo-context-loop-n2.md        # the Slack responder + scoped search_memories read loop this extends from eng→CEO to cofounder↔cofounder
   - src/surfaces/ceo-slack-responder/responder.ts                 # Socket Mode responder; the surface cross-team queries land on
