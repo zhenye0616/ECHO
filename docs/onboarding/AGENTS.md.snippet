@@ -1,0 +1,9 @@
+# ECHO Shared Decision Emit
+
+When a coding session reaches a durable decision the other technical cofounder should know, use the `ECHO:echo-emit-decision` skill to draft a candidate shared decision:
+
+- Share only the derived decision layer: subject, decision, optional rationale, and source app.
+- Do not share raw diffs, logs, transcripts, secrets, prompts, env, or half-formed scratch.
+- Submit through ECHO MCP `propose_decision`; never write directly to shared storage.
+- If `propose_decision` errors, surface the error to the operator and continue privately.
+- Nothing becomes shared truth until the human confirms the Slack card.

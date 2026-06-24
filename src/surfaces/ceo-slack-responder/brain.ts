@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { TeamDecisionAtom, TeamDecisionStore } from './decision-store.js';
 
 export type BrainName = 'codex' | 'claude';
 export type BrainOutcome = 'ok' | 'timeout' | 'error';
@@ -214,6 +215,59 @@ export function parseCodexJsonFinalMessage(stdout: string): string {
 export function formatBrainFailure(result: BrainResult): string {
   const reason = boundedReason(result.reason ?? result.outcome);
   return `Could not synthesize an answer - ${reason}`;
+}
+
+export async function answerFromTeamDecisions(
+  question: string,
+  decisionStore: TeamDecisionStore,
+): Promise<BrainResult> {
+  const started = Date.now();
+  if (asksForRawContext(question)) {
+    return {
+      ok: true,
+      outcome: 'ok',
+      durationMs: Date.now() - started,
+      answer:
+        'I can answer from confirmed shared decisions only. Raw sessions, diffs, transcripts, and machine-scoped context stay on the owner machine.',
+    };
+  }
+
+  const decisions = await decisionStore.queryLatestDecisions({ query: question, limit: 5 });
+  return {
+    ok: true,
+    outcome: 'ok',
+    durationMs: Date.now() - started,
+    answer: formatTeamDecisionAnswer(decisions),
+  };
+}
+
+export function asksForRawContext(question: string): boolean {
+  const normalized = question.toLowerCase();
+  return [
+    'raw',
+    'diff',
+    'session',
+    'transcript',
+    'log',
+    'terminal',
+    'file contents',
+    'source context',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function formatTeamDecisionAnswer(decisions: readonly TeamDecisionAtom[]): string {
+  if (decisions.length === 0) {
+    return "I don't have a confirmed shared decision for that yet.";
+  }
+  return decisions
+    .map((decision) => {
+      const rationale =
+        decision.rationale === undefined || decision.rationale.trim() === ''
+          ? ''
+          : ` Rationale: ${decision.rationale}`;
+      return `Decision on ${decision.subject}: ${decision.decision}${rationale} Confirmed by ${decision.confirmed_by} at ${decision.confirmed_at}.`;
+    })
+    .join('\n');
 }
 
 function assistantText(value: unknown): string | null {

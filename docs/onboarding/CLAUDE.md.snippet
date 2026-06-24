@@ -1,0 +1,9 @@
+# ECHO Shared Decision Emit
+
+When a Claude Code session lands a decision-grade moment for the team, use the canonical ECHO decision-emission skill:
+
+1. Draft `subject`, `decision`, optional `rationale`, and `source_app: "claude-code"`.
+2. Call ECHO MCP `propose_decision` with that payload.
+3. Treat Slack confirmation as the only sharing boundary.
+
+Raw context stays machine-scoped. Do not publish diffs, transcripts, env, logs, secrets, or exploratory scratch into the shared decision layer.
