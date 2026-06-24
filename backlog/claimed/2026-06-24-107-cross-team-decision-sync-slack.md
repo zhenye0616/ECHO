@@ -39,6 +39,13 @@ files_to_modify:
   - tests/surfaces/ceo-slack-responder/propose-confirm.test.ts   # NEW — nothing enters the shared store without an explicit confirm; missing confirm-target errors with NO draft created (R2)
   - tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts        # NEW (R5) — Slack retry/double-click consumes a draft once; no duplicate shared atoms
   - tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts # NEW (R4) — re-confirm appends; query returns latest; prior atoms immutable
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-06-24T06:07:30Z"
+branch: "agent/cross-team-decision-sync-slack"
+worktree: "/Users/zhenye/Desktop/Project_echo--cross-team-decision-sync-slack"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 > **Origin: 2026-06-24 launch-onboarding conversation (founder + Claude strategist).** Founder has decided to
