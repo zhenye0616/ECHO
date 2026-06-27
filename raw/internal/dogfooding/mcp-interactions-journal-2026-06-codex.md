@@ -591,3 +591,39 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Returned:** `echo_ping` returned `pong:true` at `2026-06-27T22:32:48.589Z`. `find_clusters` returned 1 cluster, `ctx_9ac1a998`, label `"work on project_echo"`, 52 atom ids, time range `2026-06-27T20:22:22.990Z` to `2026-06-27T22:32:40.440Z`, source_breakdown `{"git":33,"claude_code":19}`, rank reasons `["has_open_loop","has_unresolved_open_loop","code_session_anchor"]`, and 11 open-loop hints with one unresolved.
 - **Verdict:** partial - MCP is reachable and the repo has recent cross-tool context, but the cluster is broad; item selection and implementation scope remain governed by `tools/blocked.py`, the claimed item, and its `spec_refs`.
 - **Note:** No atom hydration was done before claim because the deterministic backlog selector plus mandatory spec refs are the build contract; this lookup was a freshness and availability check.
+
+### 2026-06-27 16:07 PDT - codex monitoring Claude review-pending session
+
+- **Trigger:** Founder said Claude is running the review-pending skill and asked Codex to monitor/activate the Claude review session through ECHO before reading the eventual report.
+- **Query inputs:** direct Streamable HTTP `tools/call` for `echo_ping(message="codex monitoring claude review-pending for item 108")`.
+- **Returned:** `structuredContent={pong:true, ts:"2026-06-27T23:07:02.611Z", received:"codex monitoring claude review-pending for item 108"}`.
+- **Sources:** ECHO MCP tool surface `echo_ping` over `http://127.0.0.1:38478/mcp`; no clusters, atoms, or storage rows queried.
+- **Verdict:** right - daemon is reachable before waiting on Claude Code activity.
+- **Note:** Next step is a bounded `wait_for_new_turns` call scoped to Claude Code and `/Users/zhenye/Desktop/Project_echo`.
+
+### 2026-06-27 16:08 PDT - codex bounded wait for Claude review-pending turn
+
+- **Trigger:** Follow-up to the same founder request: monitor the active Claude review-pending session for item 108 through ECHO.
+- **Query inputs:** direct Streamable HTTP `tools/call` for `wait_for_new_turns(sources=["claude_code"], repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-27T23:07:00.000Z", timeout=60)`.
+- **Returned:** `schema_version:1`, `turn_ids:[]`, `next_since:"2026-06-27T23:07:00.000Z"`, `timed_out:true`, `warnings:[]`.
+- **Sources:** ECHO MCP `wait_for_new_turns` over `http://127.0.0.1:38478/mcp`; requested source prefix `claude_code`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; no atoms returned.
+- **Verdict:** partial - the wait path is working, but no completed Claude Code turn was captured in the 60-second window.
+- **Note:** This likely means the Claude review is still in progress or has not emitted a captured turn yet; continue by watching review files and git state.
+
+### 2026-06-27 16:09 PDT - codex resolves active Claude Code source for review monitoring
+
+- **Trigger:** Founder asked Codex to "activate" the Claude review session; after the bounded wait returned no new turns, Codex resolved the most-recent Claude Code source for this repo.
+- **Query inputs:** direct Streamable HTTP `tools/call` for `echo_resolve_mru(sources=["claude_code"], repo_path="/Users/zhenye/Desktop/Project_echo")`.
+- **Returned:** `sources.claude_code.source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e856e29f-bffb-48be-9480-9fa8c2b717da.jsonl"`, `filter={repo_path:"/Users/zhenye/Desktop/Project_echo"}`, `warnings:[]`.
+- **Sources:** ECHO MCP `echo_resolve_mru`; resolved exact Claude Code JSONL source plus repo-path filter; no atom bodies fetched.
+- **Verdict:** right - gives Codex a concrete Claude session source to tail next.
+- **Note:** Need a follow-up `search_memories` against this source to see whether it is the active review-pending session or older Claude activity.
+
+### 2026-06-27 16:10 PDT - codex tails resolved Claude source before review sidecar
+
+- **Trigger:** Follow-up to the resolved Claude source: inspect the recent tail to see whether Claude's `/review-pending 108` run had already emitted a captured turn.
+- **Query inputs:** direct Streamable HTTP `tools/call` for `search_memories(source="fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e856e29f-bffb-48be-9480-9fa8c2b717da.jsonl", repo_path="/Users/zhenye/Desktop/Project_echo", limit=5)`.
+- **Returned:** 5 matches; newest timestamp `2026-06-27T22:59:26.261Z`; newest turn reports the Codex builder finished, item 108 moved to `pending_review/`, branch `agent/slack-linear-intake-gate` at `531486a3`, and recommends `/review-pending 108`. No `/review-pending` result turn was present. Several matches had `truncations:["content","metadata.tool_calls:projected"]`.
+- **Sources:** Exact Claude Code JSONL source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e856e29f-bffb-48be-9480-9fa8c2b717da.jsonl`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; source breakdown is a single Claude Code session, no git/codex atoms.
+- **Verdict:** partial - confirms this is the recent Claude orchestration session for item 108, but the active review-pending run has not emitted a captured result yet.
+- **Note:** Filesystem check also showed no `backlog/pending_review/*.review.md` sidecar yet and `origin/main` still at `9951a434`.
