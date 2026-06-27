@@ -99,40 +99,53 @@ to Linear.
    threaded follow-ups resolve to the **same** draft, and different channels/workspaces never collide. One active
    intake per key (a thread-root = one request being refined). Echo **never** asks a non-technical teammate for
    branches, files, test plans, or implementation detail. Echo **refuses to create a Linear issue while any
-   mandatory field is missing** (default-deny). Tested in `intake-followup.test.ts`: missing→asks ≤2 questions, no
-   issue created, jargon-ask absent; top-level + threaded follow-up resolve to one draft; two channels don't collide.
+   mandatory field is missing** (default-deny). **Client/project must resolve to a known config project (R9): an
+   unmapped name is missing context — Echo asks the requester to pick from the known projects before showing a
+   confirm card** (the configured default is internal-only, never a catch-all). Tested in `intake-followup.test.ts`:
+   missing→asks ≤2 questions, no issue created, jargon-ask absent; top-level + threaded follow-up resolve to one
+   draft; two channels don't collide; an unmapped project name triggers a pick-from-known-projects question, not a
+   silent default.
 
 3. **AC3 — Propose-confirm before creation; the REQUESTER confirms; exactly-once across the external create (R3, R4).**
    Once minimum context is present, Echo posts a **confirm card in-thread** rendering the drafted issue (the
    parent-deliverable shape, AC4). This slice supports **confirm** and **dismiss** only — **`edit` is cut** (to
    change a draft, the requester edits their request text and re-triggers a fresh draft; editing the card is
    deferred, see Out of Scope). Only on the **requester's explicit confirm** is an issue created; a dismissed draft
-   makes a later confirm a no-op; an unconfirmed/dismissed draft creates nothing. **Exactly-once is enforced across
-   two idempotency layers, invariant + tests, mechanism the builder's choice** (107 R5 altitude):
-   - **(R5) Slack ingress de-dupe** — confirm actions/events are durably de-duped by `team:channel:event_id` /
-     `action_id` so a replayed or stale Slack delivery does not re-run brain/create work or act on a consumed draft.
-   - **(R4) Linear-create exactly-once** — the draft persists a **deterministic idempotency token** and moves
-     `pending→creating→created` (storing the resulting issue id/url) such that a retry, double-click, or crash
-     **between** the create call and the status write yields **exactly one** Linear issue. On an **uncertain
-     outcome** (timeout/network error where the create may have been received), the draft enters **`needs-reconcile`**
-     with operator-visible evidence and ECHO **does NOT auto-create a second issue**; the requester gets a visible
-     failure reply.
+   makes a later confirm a no-op; an unconfirmed/dismissed draft creates nothing. **Exactly-once is enforced
+   fail-closed, invariant + tests, mechanism the builder's choice** (107 R5 altitude; refined in r2):
+   - **(R5, refined r2) Slack ingress de-dupe** — message events are durably de-duped by `team:channel:` + Slack's
+     **unique event delivery id** (envelope/`event_id`, **NOT** the static Block-Kit `action_id`). Interactive
+     confirms are made idempotent by the **draft's consume-once `pending→creating` transition** (R4) — the final
+     no-op guard for any replayed/stale confirm. A replayed delivery never re-runs brain/create work or acts on a
+     consumed draft.
+   - **(R4, refined r2 — fail-closed, founder decision 2026-06-27) Linear-create exactly-once.** The draft consumes
+     once via an atomic `pending→creating` transition **before** the create call; on success it records `created`
+     with the issue id/url. Because **Linear reads stay out of scope**, a crash/timeout in the `creating` window
+     (issue *may* have been created, id not yet stored) does **NOT** attempt recovery and does **NOT** auto-create a
+     second issue — the draft stays **`needs-reconcile`** with operator-visible evidence and the requester gets a
+     visible failure reply. A possible orphan issue is reconciled **manually** (accepted rare cost of the no-reads
+     cut). No reliance on a Linear API idempotency key.
    The draft records who confirmed it and when. Tested in `intake-confirm-idempotency.test.ts`: concurrent duplicate
-   confirms → one create; crash-after-create-before-status-write replay → no second create; create-timeout →
-   `needs-reconcile`, no second create; replayed Slack confirm on a consumed draft → no-op.
+   confirms → **exactly one** create; replay of a `creating` draft (crash before result stored) → **no second
+   create**, draft is `needs-reconcile` (NOT "recover id"); create-timeout → `needs-reconcile`, no second create;
+   replayed Slack confirm on a consumed draft → no-op.
 
 4. **AC4 — Structured Linear issue creation; config is explicit IDs, no Linear reads (R2).** On confirm,
    `linear-client.ts` creates a Linear issue: **title** = the plain-language request; **body** = the gathered fields
    rendered into the source doc's mandatory **parent-deliverable markdown shape** (`issue-render.ts`); **state** =
    the configured **Inbox workflow-state ID**; **assignee** = configured **default assignee ID** (Zhen); **team** =
-   configured **team ID**; **project** = resolved from the gathered Client/project field via a config-provided
-   **name→project-ID map**, defaulting to the configured **Echo project ID**. Because resolution is config-driven,
-   **no Linear read path is introduced** (consistent with reads-out-of-scope). Required config keys (validated at
-   responder **startup**): `LINEAR_API_KEY`, `LINEAR_TEAM_ID`, `LINEAR_INBOX_STATE_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`,
-   `LINEAR_DEFAULT_PROJECT_ID`, `LINEAR_PROJECT_MAP` (name→ID JSON). The create call uses a **bounded timeout** and
-   **no automatic retry that could duplicate a create** (R4). The client returns the created issue's URL + id. Tested
-   in `linear-client.test.ts`: field→payload mapping; a missing/invalid API key, team, state, assignee, or
-   unresolvable project yields an **operator-visible error with NO partial issue and NO silent drop**.
+   configured **team ID**; **project** = **resolved during intake** (R9, founder decision 2026-06-27): the gathered
+   Client/project name is looked up in the config **name→project-ID map**; an **unmapped name is treated as missing
+   context** — Echo asks the requester to pick from the known project names before any confirm card is shown (never a
+   silent default, never a typo'd misfile). `LINEAR_DEFAULT_PROJECT_ID` (the Echo project) applies **only** to an
+   explicit internal / no-client request. Because resolution is config-driven, **no Linear read path is introduced**
+   (consistent with reads-out-of-scope). Required config keys (validated at responder **startup**): `LINEAR_API_KEY`,
+   `LINEAR_TEAM_ID`, `LINEAR_INBOX_STATE_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`, `LINEAR_DEFAULT_PROJECT_ID`,
+   `LINEAR_PROJECT_MAP` (name→ID JSON). The create call uses a **bounded timeout** and **no automatic retry that
+   could duplicate a create** (R4). The client returns the created issue's URL + id. Tested in `linear-client.test.ts`:
+   field→payload mapping; a missing/invalid API key, team, state, or assignee → **operator-visible error, NO partial
+   issue, NO silent drop**; an absent/unresolved project ID reaching the client → defensive error (unreachable in
+   normal flow because R9 resolves project during intake).
 
 5. **AC5 — Link-back + receipt.** Echo posts the created issue's **URL back into the Slack thread**, naming what it
    created (project, status `Inbox`) and which fields it included (the source doc's "Issue Created" prompt shape).
@@ -175,6 +188,26 @@ binding. Module paths remain PROVISIONAL (builder confirms against the substrate
   questions/cards or re-run a stale confirm. Tested: replayed confirm on a consumed draft → no-op.
 - **R6 — Concrete Tests section (codex F4).** Added below (run command + per-file assertions).
 
+## Resolved in spec-review (r2 disposition — binding for the build)
+
+r2 (codex `proceed_after_patches`, codex-ops `pushback` — boundary crossed → founder-escalated). Both reviewers
+flagged the **same 3 second-order issues** in the r1 patch; all resolved by simplification (disposition discipline:
+prefer removal over deeper patching when findings target a recent-round patch). Founder decided the two product
+forks on 2026-06-27.
+
+- **R7 — R4 made fail-closed (founder decision; supersedes r1 R4's "recover stored id").** A crash in the `creating`
+  window does NOT recover the id and does NOT auto-create a second issue → `needs-reconcile` + visible failure;
+  possible orphan reconciled manually. No dependency on a Linear idempotency key, no Linear read. (Both reviewers:
+  "recover stored id after crash is not valid unless id was durably stored first." Correct — removed.)
+- **R8 — R5 de-dupe key fixed (mechanical; both reviewers).** `action_id` is a static Block-Kit identifier, not a
+  unique delivery id. Events de-dupe on Slack's unique envelope/`event_id`; interactive confirms rely on the draft
+  consume-once transition (R4/R7) as the idempotency guard. Test: two confirm cards sharing an `action_id` do not
+  collide.
+- **R9 — Project resolution moved into intake (founder decision; resolves the AC4↔test contradiction).** Unmapped
+  Client/project = missing context → Echo asks the requester to pick from known projects; default is internal-only;
+  the linear-client errors on an unresolved project only as a defensive guard. (Both reviewers flagged the
+  default-vs-error contradiction.)
+
 ## Tests
 
 Run from the builder's worktree:
@@ -193,13 +226,16 @@ Per-file assertions the builder must satisfy:
   with the field summary; created issue records requester identity + Slack thread link.
 - **intake-followup.test.ts** — missing fields → ≤2 plain-language questions/turn; NO create while any mandatory
   field missing; no branch/file/test-plan ask ever appears; top-level mention + threaded follow-up resolve to the
-  same draft (R1); two channels with same `ts` do not collide.
-- **intake-confirm-idempotency.test.ts** — concurrent duplicate confirms → exactly one `createIssue`;
-  crash-after-create-before-status-write replay → no second create (recover stored id); create-timeout →
-  `needs-reconcile` status, no second create; replayed/stale Slack confirm on a consumed draft → no-op (R4/R5).
+  same draft (R1); two channels with same `ts` do not collide; an **unmapped project name → pick-from-known-projects
+  question, not a silent default** (R9).
+- **intake-confirm-idempotency.test.ts** — concurrent duplicate confirms → exactly one `createIssue`; replay of a
+  `creating` draft (crash before result stored) → **no second create, draft = `needs-reconcile`** (R7 — NOT "recover
+  id"); create-timeout → `needs-reconcile`, no second create; replayed/stale Slack confirm on a consumed draft →
+  no-op; two confirm cards sharing an `action_id` do not collide (R8).
 - **linear-client.test.ts** — fields→payload mapping; missing/invalid `LINEAR_API_KEY`/`LINEAR_TEAM_ID`/
-  `LINEAR_INBOX_STATE_ID`/`LINEAR_DEFAULT_ASSIGNEE_ID`/unresolvable project → operator-visible error, NO partial
-  issue, NO silent drop; bounded timeout, no duplicating retry.
+  `LINEAR_INBOX_STATE_ID`/`LINEAR_DEFAULT_ASSIGNEE_ID` → operator-visible error, NO partial issue, NO silent drop;
+  an absent/unresolved project ID reaching the client → defensive error (unreachable in normal flow, R9); bounded
+  timeout, no duplicating retry.
 - **(any of the above)** — assert no new Slack entry is added to the capture source allowlist (`src/capture/sources.ts`).
 
 ## Out of Scope (Don't Drift)
