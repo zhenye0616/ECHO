@@ -3,7 +3,7 @@ id: 2026-06-27-108-slack-linear-intake-gate
 title: "Slack→Linear intake gate — non-technical teammates describe work in plain English to Echo in Slack; Echo gathers minimum context via bounded follow-ups, then on requester confirm creates a structured Linear issue (parent-deliverable shape) in Inbox and links it back"
 status: proposed
 priority: HIGH
-estimate: 2-3d (engineering; Linear write client is the only net-new external surface — the rest reuses 107)
+estimate: 3-4d (engineering; the Linear write client + exactly-once-across-an-external-side-effect is the net-new hardness — local-append reuse from 107 doesn't cover the external create)
 created: 2026-06-27
 blocked_by: []
 task_state_ref: 2026-06-27-108-slack-linear-intake-gate
@@ -22,7 +22,7 @@ spec_refs:
 files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms paths against the substrate before claiming.
   - src/surfaces/ceo-slack-responder/linear-client.ts          # NEW (AC4) — Linear WRITE client: createIssue({project, title, body, state, owner}) → {url, id}. ECHO's first external write integration; auth via env (LINEAR_API_KEY); team/project IDs config.
-  - src/surfaces/ceo-slack-responder/intake-draft-store.ts     # NEW (AC2/AC3) — thread-keyed intake state: partial fields blob accumulated across follow-up turns + the confirm draft. Modeled on draft-store.ts (durable, atomic, idempotent confirm); keyed by Slack thread_ts.
+  - src/surfaces/ceo-slack-responder/intake-draft-store.ts     # NEW (AC2/AC3) — intake state: partial fields blob accumulated across follow-up turns + the confirm draft + status pending|creating|created|needs-reconcile|dismissed + idempotency token + Slack-ingress de-dupe set. Modeled on draft-store.ts (durable, atomic, idempotent); keyed by team_id:channel_id:root_ts (R1).
   - src/surfaces/ceo-slack-responder/issue-render.ts           # NEW (AC4) — gathered fields → the mandatory parent-deliverable markdown shape from the source doc
   - src/surfaces/ceo-slack-responder/brain.ts                  # intake brain variant: plain English → extract mandatory fields + identify what's missing (no engineering jargon asked of teammates)
   - src/surfaces/ceo-slack-responder/responder.ts             # intake message flow: ack → bounded follow-ups → confirm card → on requester confirm create Linear issue + post link back
@@ -85,46 +85,122 @@ to Linear.
 
 ## Acceptance criteria
 
-1. **AC1 — Plain-English intake in Slack.** A teammate @mentions Echo in a configured channel (e.g. `#eng`) or a
-   thread with a plain-language request. Echo posts an ack ("Looking…", reusing 107's responder lifecycle) and runs
-   the **intake brain** to extract the mandatory fields from the message. No engineering vocabulary is required of
-   the teammate. Tested: a plain-language message produces a parsed field set.
+1. **AC1 — Plain-English intake in Slack; ack before work (R5).** A teammate @mentions Echo in a configured channel
+   (e.g. `#eng`) or a thread with a plain-language request. The responder **acks the Slack event immediately**
+   (before any brain/Linear work, so Socket Mode does not redeliver), then runs the **intake brain** to extract the
+   mandatory fields from the message. No engineering vocabulary is required of the teammate. Tested: ack precedes
+   brain/Linear work; a plain-language message produces a parsed field set.
 
 2. **AC2 — Minimum-context gate with bounded, plain-language follow-ups.** Echo gathers the mandatory intake fields
    — **Client/project, Request, Why, Client outcome, Evidence/example, Done-when, Urgency, Client-facing** (per the
    source doc). Missing fields trigger **at most two targeted follow-up questions per turn**, in plain language;
-   answers accumulate in **per-thread intake state** (`intake-draft-store.ts`, keyed by Slack `thread_ts`). Echo
-   **never** asks a non-technical teammate for branches, files, test plans, or implementation detail. Echo
-   **refuses to create a Linear issue while any mandatory field is missing** (default-deny). Tested in
-   `intake-followup.test.ts`: missing→asks ≤2 questions, no issue created; jargon-ask is absent.
+   answers accumulate in **per-thread intake state** (`intake-draft-store.ts`), keyed by the **stable operational
+   key `team_id:channel_id:root_ts` where `root_ts = thread_ts || ts`** (R1) — so a top-level mention and its
+   threaded follow-ups resolve to the **same** draft, and different channels/workspaces never collide. One active
+   intake per key (a thread-root = one request being refined). Echo **never** asks a non-technical teammate for
+   branches, files, test plans, or implementation detail. Echo **refuses to create a Linear issue while any
+   mandatory field is missing** (default-deny). Tested in `intake-followup.test.ts`: missing→asks ≤2 questions, no
+   issue created, jargon-ask absent; top-level + threaded follow-up resolve to one draft; two channels don't collide.
 
-3. **AC3 — Propose-confirm before creation; the REQUESTER confirms.** Once minimum context is present, Echo posts a
-   **confirm card in-thread** rendering the drafted issue (the parent-deliverable shape, AC4). Only on the
-   **requester's explicit confirm** does Echo create the issue; **edit** and **dismiss** are supported; an
-   unconfirmed/dismissed draft creates nothing. Confirm is **idempotent per draft** (107's R5 pattern): a Slack
-   retry, double-click, or crash between writes creates **exactly one** Linear issue and never orphans/duplicates.
-   The draft records who confirmed it and when. Tested in `intake-confirm-idempotency.test.ts` (concurrent duplicate
-   confirms + crash-after-one-write replay, mocked Linear client).
+3. **AC3 — Propose-confirm before creation; the REQUESTER confirms; exactly-once across the external create (R3, R4).**
+   Once minimum context is present, Echo posts a **confirm card in-thread** rendering the drafted issue (the
+   parent-deliverable shape, AC4). This slice supports **confirm** and **dismiss** only — **`edit` is cut** (to
+   change a draft, the requester edits their request text and re-triggers a fresh draft; editing the card is
+   deferred, see Out of Scope). Only on the **requester's explicit confirm** is an issue created; a dismissed draft
+   makes a later confirm a no-op; an unconfirmed/dismissed draft creates nothing. **Exactly-once is enforced across
+   two idempotency layers, invariant + tests, mechanism the builder's choice** (107 R5 altitude):
+   - **(R5) Slack ingress de-dupe** — confirm actions/events are durably de-duped by `team:channel:event_id` /
+     `action_id` so a replayed or stale Slack delivery does not re-run brain/create work or act on a consumed draft.
+   - **(R4) Linear-create exactly-once** — the draft persists a **deterministic idempotency token** and moves
+     `pending→creating→created` (storing the resulting issue id/url) such that a retry, double-click, or crash
+     **between** the create call and the status write yields **exactly one** Linear issue. On an **uncertain
+     outcome** (timeout/network error where the create may have been received), the draft enters **`needs-reconcile`**
+     with operator-visible evidence and ECHO **does NOT auto-create a second issue**; the requester gets a visible
+     failure reply.
+   The draft records who confirmed it and when. Tested in `intake-confirm-idempotency.test.ts`: concurrent duplicate
+   confirms → one create; crash-after-create-before-status-write replay → no second create; create-timeout →
+   `needs-reconcile`, no second create; replayed Slack confirm on a consumed draft → no-op.
 
-4. **AC4 — Structured Linear issue creation.** On confirm, `linear-client.ts` creates a Linear issue:
-   **title** = the plain-language request; **body** = the gathered fields rendered into the source doc's mandatory
-   **parent-deliverable markdown shape** (`issue-render.ts`); **state** = `Inbox`; **owner** = configurable default
-   (`Zhen`); **project** = resolved from the gathered Client/project field via a **name→project-ID config map**,
-   defaulting to the `Echo` internal project. The client returns the created issue's URL + id. Tested in
-   `linear-client.test.ts`: field→payload mapping; a missing API key or unresolvable project yields an
-   **operator-visible error with NO partial issue and NO silent drop**.
+4. **AC4 — Structured Linear issue creation; config is explicit IDs, no Linear reads (R2).** On confirm,
+   `linear-client.ts` creates a Linear issue: **title** = the plain-language request; **body** = the gathered fields
+   rendered into the source doc's mandatory **parent-deliverable markdown shape** (`issue-render.ts`); **state** =
+   the configured **Inbox workflow-state ID**; **assignee** = configured **default assignee ID** (Zhen); **team** =
+   configured **team ID**; **project** = resolved from the gathered Client/project field via a config-provided
+   **name→project-ID map**, defaulting to the configured **Echo project ID**. Because resolution is config-driven,
+   **no Linear read path is introduced** (consistent with reads-out-of-scope). Required config keys (validated at
+   responder **startup**): `LINEAR_API_KEY`, `LINEAR_TEAM_ID`, `LINEAR_INBOX_STATE_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`,
+   `LINEAR_DEFAULT_PROJECT_ID`, `LINEAR_PROJECT_MAP` (name→ID JSON). The create call uses a **bounded timeout** and
+   **no automatic retry that could duplicate a create** (R4). The client returns the created issue's URL + id. Tested
+   in `linear-client.test.ts`: field→payload mapping; a missing/invalid API key, team, state, assignee, or
+   unresolvable project yields an **operator-visible error with NO partial issue and NO silent drop**.
 
 5. **AC5 — Link-back + receipt.** Echo posts the created issue's **URL back into the Slack thread**, naming what it
    created (project, status `Inbox`) and which fields it included (the source doc's "Issue Created" prompt shape).
    The created issue records the **requester identity** (`identity.ts`) and the **Slack thread link** as a receipt.
    Tested as the tail of `intake-gate.test.ts`.
 
-6. **AC6 — Surface-only (no raw capture) + operator runbook.** Echo reads the Slack thread **transiently** to build
-   the draft and does **NOT** add Slack as a capture source — `src/capture/gate.ts` and `src/capture/sources.ts`
-   are **not modified** for Slack; raw Slack messages are never ingested. A short `slack-linear-intake-runbook.md`
-   documents one-screen-share setup: Slack app/channel config, `LINEAR_API_KEY`, the name→project-ID map, the owner
-   default, and the operator-visible failure behaviors (AC4). Tested/asserted: no new Slack entry in the source
-   allowlist.
+6. **AC6 — Surface-only (no raw capture) + operator runbook + durable failure evidence.** Echo reads the Slack
+   thread **transiently** to build the draft and does **NOT** add Slack as a capture source — `src/capture/gate.ts`
+   and `src/capture/sources.ts` are **not modified** for Slack; raw Slack messages are never ingested. External-call
+   failures (Linear/Slack network errors, timeouts, the R4 `needs-reconcile` state) produce a **requester-visible
+   reply** AND a **durable, operator-visible record** (draft status + log) sufficient for manual reconciliation —
+   never a silent drop. A short `slack-linear-intake-runbook.md` documents one-screen-share setup: Slack app/channel
+   config; the full Linear ID config set (AC4); the name→project-ID map; the owner default; and the operator-visible
+   failure / `needs-reconcile` behaviors. Tested/asserted: no new Slack entry in the source allowlist.
+
+## Resolved in spec-review (r1 disposition — binding for the build)
+
+r1 (codex + codex-ops) returned `proceed_after_patches`. The decisions below resolve every r1 finding and are
+binding. Module paths remain PROVISIONAL (builder confirms against the substrate before claiming).
+
+- **R1 — Intake/draft state key (codex F2, codex-ops F3, convergent).** Key state and locks by
+  `team_id + ":" + channel_id + ":" + root_ts`, `root_ts = thread_ts || ts`. One active intake per key; a
+  thread-root is one request being refined (so a follow-up in the same thread continues the same draft — not a
+  collision). Tested: top-level mention + threaded follow-up → one draft; two channels/threads don't collide.
+- **R2 — Linear config is explicit IDs, no reads (codex F1).** Config provides `LINEAR_API_KEY`, `LINEAR_TEAM_ID`,
+  `LINEAR_INBOX_STATE_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`, `LINEAR_DEFAULT_PROJECT_ID`, and `LINEAR_PROJECT_MAP`
+  (name→project-ID JSON). Name→ID resolution is config-driven, so **no Linear read code is added**. Validated at
+  responder startup; missing/invalid → operator-visible error, NO partial issue. (Keeps reads-out-of-scope honest.)
+- **R3 — `edit` is cut (codex F3, disposition = removal).** This slice ships **confirm + dismiss** only. To change a
+  draft, the requester edits their request text and re-triggers a fresh draft. Card-edit is deferred (Out of Scope).
+  Tested: dismiss → later confirm is a no-op; no issue on dismiss.
+- **R4 — Linear-create exactly-once + uncertain-outcome reconcile (codex-ops F1, F4).** Draft persists a
+  deterministic idempotency token and moves `pending→creating→created` storing the issue id/url; bounded create
+  timeout; **no auto-retry that can duplicate**; uncertain outcome → `needs-reconcile` + operator-visible evidence,
+  never a blind second create. If Linear's API exposes a create idempotency key, reuse the token. Invariant + owner +
+  tests; mechanism is the builder's choice. Tested: concurrent dup confirm → 1 create; crash-mid-create replay → no
+  2nd create; timeout → needs-reconcile.
+- **R5 — Slack ingress idempotency (codex-ops F2).** Ack immediately before brain/Linear work; durably de-dupe
+  events/actions by `team:channel:event_id` / `action_id` so a Socket-Mode redelivery doesn't post duplicate
+  questions/cards or re-run a stale confirm. Tested: replayed confirm on a consumed draft → no-op.
+- **R6 — Concrete Tests section (codex F4).** Added below (run command + per-file assertions).
+
+## Tests
+
+Run from the builder's worktree:
+
+```bash
+npm test -- tests/surfaces/ceo-slack-responder/intake-gate.test.ts \
+            tests/surfaces/ceo-slack-responder/intake-followup.test.ts \
+            tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts \
+            tests/surfaces/ceo-slack-responder/linear-client.test.ts
+npm run typecheck && npm run lint
+```
+
+Per-file assertions the builder must satisfy:
+- **intake-gate.test.ts** — plain-English message with all fields → confirm card → requester confirm → Linear
+  `createIssue` called once with state=Inbox-ID/assignee=default/correct project; issue URL posted back to the thread
+  with the field summary; created issue records requester identity + Slack thread link.
+- **intake-followup.test.ts** — missing fields → ≤2 plain-language questions/turn; NO create while any mandatory
+  field missing; no branch/file/test-plan ask ever appears; top-level mention + threaded follow-up resolve to the
+  same draft (R1); two channels with same `ts` do not collide.
+- **intake-confirm-idempotency.test.ts** — concurrent duplicate confirms → exactly one `createIssue`;
+  crash-after-create-before-status-write replay → no second create (recover stored id); create-timeout →
+  `needs-reconcile` status, no second create; replayed/stale Slack confirm on a consumed draft → no-op (R4/R5).
+- **linear-client.test.ts** — fields→payload mapping; missing/invalid `LINEAR_API_KEY`/`LINEAR_TEAM_ID`/
+  `LINEAR_INBOX_STATE_ID`/`LINEAR_DEFAULT_ASSIGNEE_ID`/unresolvable project → operator-visible error, NO partial
+  issue, NO silent drop; bounded timeout, no duplicating retry.
+- **(any of the above)** — assert no new Slack entry is added to the capture source allowlist (`src/capture/sources.ts`).
 
 ## Out of Scope (Don't Drift)
 
@@ -143,6 +219,9 @@ to Linear.
   no-confirm fast path or route confirmation to Zhen.
 - **Comments on / updates to existing issues** (the source doc's "Update to existing issue" bucket). Needs Linear
   read + match; deferred with duplicate search.
+- **Editing the confirm card / in-place draft edit** (R3). Confirm + dismiss only; re-trigger to change a draft.
+- **Auto-retry of a Linear create** (R4). On uncertain outcome, reconcile — never blind-retry into a duplicate issue.
+- **Linear reads of any kind**, including server-side name→ID lookup (R2 makes resolution config-driven).
 - **A destination app / new ECHO UI.** Intake lives in Slack; the artifact lives in Linear.
 - **Resolving the strategic identity question** (agency-ops tool vs. validated wedge). That's a `/office-hours`
   conversation, not code; building this item does not settle it.
