@@ -1,16 +1,23 @@
 import { appendFile, mkdir } from 'node:fs/promises';
-import { dirname, isAbsolute } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, join } from 'node:path';
 
 import { SqliteStorage } from '../../storage/sqlite.js';
 import {
   answerFromTeamDecisions,
+  buildIntakeFollowupQuestions,
   formatBrainFailure,
+  intakeReadyFields,
+  isLikelyLinearIntake,
+  missingIntakeFields,
   parseBrainName,
   preflightBrain,
   runBrain,
+  runIntakeBrain,
   type BrainName,
   type BrainResult,
   type BrainRunOptions,
+  type IntakeFields,
 } from './brain.js';
 import { createTeamDecisionStore, type TeamDecisionStore } from './decision-store.js';
 import {
@@ -21,13 +28,41 @@ import {
 import {
   confirmAttributionForSlackUser,
   parseCofounderIdentities,
+  requesterAttributionForSlackUser,
   type CofounderIdentity,
 } from './identity.js';
+import {
+  FileIntakeDraftStore,
+  intakeThreadKey,
+  type IntakeDraft,
+  type IntakeDraftStore,
+  type IntakeThreadKeyParts,
+} from './intake-draft-store.js';
+import {
+  formatCreatedIssueReceipt,
+  renderIssueTitle,
+  renderParentDeliverableIssue,
+} from './issue-render.js';
+import {
+  createLinearClient,
+  knownLinearProjectNames,
+  loadLinearConfig,
+  resolveLinearProjectId,
+  shouldLoadLinearConfig,
+  type LinearClient,
+  type LinearConfig,
+} from './linear-client.js';
 
 const DEFAULT_ECHO_MCP_URL = 'http://127.0.0.1:38478/mcp';
 const DEFAULT_EVENT_LOG_PATH = 'raw/internal/ceo-loop-events.md';
 const DEFAULT_BRAIN_TIMEOUT_MS = 180000;
 const ACK_MESSAGE = 'Looking...';
+const DEFAULT_LINEAR_INTAKE_DRAFT_STORE = join(
+  homedir(),
+  '.echo',
+  'state',
+  'linear-intake-drafts.json',
+);
 
 export interface ResponderConfig {
   slackAppToken: string;
@@ -43,10 +78,14 @@ export interface ResponderConfig {
   teamDecisionDraftStorePath?: string;
   decisionConfirmTarget?: string;
   cofounderIdentities?: readonly CofounderIdentity[];
+  linearConfig?: LinearConfig;
+  linearIntakeDraftStorePath?: string;
 }
 
 export interface SlackQuestion {
   envelopeId: string;
+  eventId?: string;
+  teamId?: string;
   channel: string;
   user: string;
   text: string;
@@ -58,6 +97,7 @@ interface SlackMessageEvent {
   type?: string;
   subtype?: string;
   bot_id?: string;
+  team?: string;
   channel?: string;
   channel_type?: string;
   user?: string;
@@ -68,8 +108,11 @@ interface SlackMessageEvent {
 
 interface SlackEnvelope {
   envelope_id?: string;
+  team_id?: string;
   type?: string;
   payload?: {
+    event_id?: string;
+    team_id?: string;
     event?: SlackMessageEvent;
     type?: string;
     user?: { id?: string };
@@ -96,14 +139,20 @@ interface SocketLike {
 type SocketConstructor = new (url: string) => SocketLike;
 type BrainRunner = (question: string, options: BrainRunOptions) => Promise<BrainResult>;
 type SlackPoster = typeof postSlackMessage;
+type IntakeConfirmPoster = typeof postIntakeConfirmCard;
 type UsageAppender = typeof appendUsageRecord;
+type IntakeFailureAppender = typeof appendIntakeFailureRecord;
 
 interface ResponderDependencies {
   runBrain?: BrainRunner;
   postSlackMessage?: SlackPoster;
   appendUsageRecord?: UsageAppender;
+  appendIntakeFailureRecord?: IntakeFailureAppender;
+  postIntakeConfirmCard?: IntakeConfirmPoster;
   teamDecisionStore?: TeamDecisionStore;
   decisionDraftStore?: DecisionDraftStore;
+  intakeDraftStore?: IntakeDraftStore;
+  linearClient?: LinearClient;
 }
 
 export interface DecisionAction {
@@ -113,6 +162,23 @@ export interface DecisionAction {
   user: string;
   ts?: string;
   threadTs?: string;
+}
+
+export interface IntakeAction {
+  kind: 'confirm' | 'dismiss';
+  draftKey: string;
+  channel: string;
+  user: string;
+  ts?: string;
+  threadTs?: string;
+}
+
+export function intakeKeyPartsForQuestion(question: SlackQuestion): IntakeThreadKeyParts {
+  return {
+    teamId: question.teamId ?? 'unknown-team',
+    channelId: question.channel,
+    rootTs: question.threadTs ?? question.ts ?? question.envelopeId,
+  };
 }
 
 function requiredEnv(env: NodeJS.ProcessEnv, primary: string, fallback?: string): string {
@@ -147,6 +213,7 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
   if (!isAbsolute(contextRepoPath)) {
     throw new Error('ECHO_CEO_CONTEXT_REPO_PATH must be an absolute path');
   }
+  const linearConfig = shouldLoadLinearConfig(env) ? loadLinearConfig(env) : undefined;
   return {
     slackAppToken: requiredEnv(env, 'ECHO_SLACK_APP_TOKEN', 'SLACK_APP_TOKEN'),
     slackBotToken: requiredEnv(env, 'ECHO_SLACK_BOT_TOKEN', 'SLACK_BOT_TOKEN'),
@@ -167,6 +234,10 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
       ? { decisionConfirmTarget: env.ECHO_TEAM_DECISION_CONFIRM_TARGET.trim() }
       : {}),
     cofounderIdentities: parseCofounderIdentities(env.ECHO_TEAM_COFUNDER_IDENTITIES),
+    ...(linearConfig !== undefined ? { linearConfig } : {}),
+    ...(env.ECHO_LINEAR_INTAKE_DRAFT_STORE?.trim()
+      ? { linearIntakeDraftStorePath: env.ECHO_LINEAR_INTAKE_DRAFT_STORE.trim() }
+      : {}),
   };
 }
 
@@ -179,6 +250,12 @@ export function createResponderRuntimeDependencies(config: ResponderConfig): Res
   }
   if (config.teamDecisionDraftStorePath !== undefined) {
     deps.decisionDraftStore = new FileDecisionDraftStore(config.teamDecisionDraftStorePath);
+  }
+  if (config.linearConfig !== undefined) {
+    deps.intakeDraftStore = new FileIntakeDraftStore(
+      config.linearIntakeDraftStorePath ?? DEFAULT_LINEAR_INTAKE_DRAFT_STORE,
+    );
+    deps.linearClient = createLinearClient(config.linearConfig);
   }
   return deps;
 }
@@ -208,6 +285,8 @@ export function extractQuestion(
   if (text === '') return null;
   return {
     envelopeId: envelope.envelope_id,
+    eventId: envelope.payload?.event_id ?? envelope.envelope_id,
+    teamId: envelope.payload?.team_id ?? event.team ?? envelope.team_id,
     channel: event.channel,
     user: event.user,
     text,
@@ -247,6 +326,10 @@ export async function respondToQuestion(
   const threadTs = question.threadTs ?? question.ts;
 
   await postMessage(config.slackBotToken, question.channel, ACK_MESSAGE, threadTs);
+
+  if (await respondToLinearIntakeIfNeeded(question, config, deps, postMessage)) {
+    return;
+  }
 
   let result: BrainResult;
   try {
@@ -299,6 +382,89 @@ export async function respondToQuestion(
   }
 }
 
+export async function respondToLinearIntakeIfNeeded(
+  question: SlackQuestion,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+  postMessage: SlackPoster = postSlackMessage,
+): Promise<boolean> {
+  const keyParts = intakeKeyPartsForQuestion(question);
+  const key = intakeThreadKey(keyParts);
+  const knownProjects =
+    config.linearConfig === undefined ? [] : knownLinearProjectNames(config.linearConfig);
+  const existingDraft = await deps.intakeDraftStore?.getDraft(key);
+  const shouldHandle =
+    existingDraft !== undefined && existingDraft !== null
+      ? true
+      : isLikelyLinearIntake(question.text, knownProjects);
+  if (!shouldHandle) return false;
+
+  const threadTs = question.threadTs ?? question.ts;
+  if (
+    config.linearConfig === undefined ||
+    deps.intakeDraftStore === undefined ||
+    deps.linearClient === undefined
+  ) {
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      'Linear intake is not configured on this responder. Missing Linear config creates no issue.',
+      threadTs,
+    );
+    return true;
+  }
+
+  const brain = runIntakeBrain(question.text, { knownProjectNames: knownProjects });
+  const mergedFields = { ...(existingDraft?.fields ?? {}), ...brain.fields };
+  const projectId = resolveLinearProjectId(mergedFields.clientProject, config.linearConfig);
+  const missing = missingIntakeFields(mergedFields, { knownProjectNames: knownProjects });
+  const requester = requesterAttributionForSlackUser(
+    config.cofounderIdentities ?? [],
+    question.user,
+  );
+  const { draft, duplicate } = await deps.intakeDraftStore.recordMessage({
+    key: keyParts,
+    requester: { slack_user_id: question.user, label: requester },
+    eventId: question.eventId ?? question.envelopeId,
+    fields: mergedFields,
+    ...(projectId !== null ? { projectId } : {}),
+  });
+  if (duplicate) return true;
+
+  if (missing.length > 0 || projectId === null) {
+    const questions = buildIntakeFollowupQuestions(
+      projectId === null && mergedFields.clientProject !== undefined
+        ? ['clientProject', ...missing.filter((field) => field !== 'clientProject')]
+        : missing,
+      { knownProjectNames: knownProjects },
+    );
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      formatIntakeFollowup(questions),
+      threadTs,
+    );
+    return true;
+  }
+
+  const readyFields = intakeReadyFields(draft.fields);
+  if (readyFields === null) {
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      formatIntakeFollowup(
+        buildIntakeFollowupQuestions(missing, { knownProjectNames: knownProjects }),
+      ),
+      threadTs,
+    );
+    return true;
+  }
+
+  const postConfirmCard = deps.postIntakeConfirmCard ?? postIntakeConfirmCard;
+  await postConfirmCard(config.slackBotToken, question.channel, draft, readyFields, threadTs);
+  return true;
+}
+
 export function extractDecisionAction(envelope: SlackEnvelope): DecisionAction | null {
   if (envelope.type !== 'interactive') return null;
   const payload = envelope.payload;
@@ -330,6 +496,42 @@ export function extractDecisionAction(envelope: SlackEnvelope): DecisionAction |
   return {
     kind,
     draftId: draftId.trim(),
+    channel,
+    user,
+    ts: message?.ts,
+    threadTs: message?.thread_ts,
+  };
+}
+
+export function extractIntakeAction(envelope: SlackEnvelope): IntakeAction | null {
+  if (envelope.type !== 'interactive') return null;
+  const payload = envelope.payload;
+  if (payload === undefined) return null;
+  const action = payload?.actions?.[0];
+  const actionId = action?.action_id;
+  const draftKey = action?.value;
+  const user = payload?.user?.id;
+  const channel = payload?.channel?.id;
+  if (
+    actionId === undefined ||
+    draftKey === undefined ||
+    user === undefined ||
+    channel === undefined ||
+    draftKey.trim() === ''
+  ) {
+    return null;
+  }
+  const kind =
+    actionId === 'echo_intake_confirm'
+      ? 'confirm'
+      : actionId === 'echo_intake_dismiss'
+        ? 'dismiss'
+        : null;
+  if (kind === null) return null;
+  const message = payload.message;
+  return {
+    kind,
+    draftKey: draftKey.trim(),
     channel,
     user,
     ts: message?.ts,
@@ -385,6 +587,130 @@ export async function respondToDecisionAction(
   );
 }
 
+export async function respondToIntakeAction(
+  action: IntakeAction,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+): Promise<void> {
+  const postMessage = deps.postSlackMessage ?? postSlackMessage;
+  const threadTs = action.threadTs ?? action.ts;
+  if (
+    config.linearConfig === undefined ||
+    deps.intakeDraftStore === undefined ||
+    deps.linearClient === undefined
+  ) {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Linear intake is not configured on this responder.',
+      threadTs,
+    );
+    return;
+  }
+
+  const draft = await deps.intakeDraftStore.getDraft(action.draftKey);
+  if (draft === null) {
+    await postMessage(config.slackBotToken, action.channel, 'Intake draft not found.', threadTs);
+    return;
+  }
+  if (draft.requester.slack_user_id !== action.user) {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Only the requester can confirm or dismiss this intake draft.',
+      threadTs,
+    );
+    return;
+  }
+
+  const actor = requesterAttributionForSlackUser(config.cofounderIdentities ?? [], action.user);
+  if (action.kind === 'dismiss') {
+    await deps.intakeDraftStore.dismissDraft(action.draftKey, actor);
+    await postMessage(config.slackBotToken, action.channel, 'Dismissed intake draft.', threadTs);
+    return;
+  }
+
+  const result = await deps.intakeDraftStore.runCreateOnce(
+    action.draftKey,
+    actor,
+    async (context) => {
+      const projectName = context.fields.clientProject;
+      const body = renderParentDeliverableIssue({
+        fields: context.fields,
+        requester: context.draft.requester.label,
+        slackThreadUrl: slackThreadUrl(context.draft.channel_id, context.draft.root_ts),
+        projectName,
+        projectId: context.projectId,
+      });
+      return deps.linearClient!.createIssue({
+        title: renderIssueTitle(context.fields),
+        body,
+        teamId: config.linearConfig!.teamId,
+        projectId: context.projectId,
+        stateId: config.linearConfig!.inboxStateId,
+        assigneeId: config.linearConfig!.defaultAssigneeId,
+      });
+    },
+  );
+
+  if (result.outcome === 'created' || result.outcome === 'already_created') {
+    const readyFields = intakeReadyFields(result.draft.fields);
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      readyFields === null
+        ? `Created ${result.issue.url} in Linear, status Inbox.`
+        : formatCreatedIssueReceipt({
+            issueUrl: result.issue.url,
+            projectName: readyFields.clientProject,
+            fields: readyFields,
+          }),
+      threadTs,
+    );
+    return;
+  }
+  if (result.outcome === 'needs_reconcile') {
+    const appendFailure = deps.appendIntakeFailureRecord ?? appendIntakeFailureRecord;
+    await appendFailure(config.eventLogPath, result.draft);
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      `Linear create outcome is uncertain and needs manual reconciliation. No retry was attempted. Evidence: ${
+        result.draft.failure?.message ?? 'unknown failure'
+      }`,
+      threadTs,
+    );
+    return;
+  }
+  if (result.outcome === 'dismissed') {
+    await postMessage(config.slackBotToken, action.channel, 'Intake draft is dismissed.', threadTs);
+    return;
+  }
+  await postMessage(
+    config.slackBotToken,
+    action.channel,
+    'I cannot create the issue yet because required intake context is still missing.',
+    threadTs,
+  );
+}
+
+export function formatIntakeFollowup(questions: readonly string[]): string {
+  if (questions.length === 0) {
+    return 'I can create this issue once I have the missing context. Plain language is fine.';
+  }
+  return [
+    'I can create this issue once I have the missing context:',
+    '',
+    ...questions.map((question, index) => `${index + 1}. ${question}`),
+    '',
+    'Plain language is fine.',
+  ].join('\n');
+}
+
+export function slackThreadUrl(channel: string, rootTs: string): string {
+  return `https://slack.com/archives/${channel}/p${rootTs.replace('.', '')}`;
+}
+
 export function formatUsageRecord(
   question: SlackQuestion,
   brain: BrainName,
@@ -419,6 +745,26 @@ export async function appendUsageRecord(
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, formatUsageRecord(question, brain, result, answeredAt), 'utf8');
+}
+
+export function formatIntakeFailureRecord(draft: IntakeDraft, recordedAt = new Date()): string {
+  return [
+    recordedAt.toISOString(),
+    'linear-intake-failure',
+    `key=${draft.key}`,
+    `status=${draft.status}`,
+    `phase=${draft.failure?.phase ?? 'unknown'}`,
+    `message="${escapeRecordValue(draft.failure?.message ?? 'unknown failure')}"`,
+  ].join(' · ');
+}
+
+export async function appendIntakeFailureRecord(
+  path: string,
+  draft: IntakeDraft,
+  recordedAt = new Date(),
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${formatIntakeFailureRecord(draft, recordedAt)}\n`, 'utf8');
 }
 
 function escapeRecordValue(text: string): string {
@@ -522,6 +868,65 @@ export async function postDecisionDraftCard(
   }
 }
 
+export async function postIntakeConfirmCard(
+  botToken: string,
+  channel: string,
+  draft: IntakeDraft,
+  fields: Required<IntakeFields>,
+  threadTs?: string,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      channel,
+      text: `Confirm Linear issue: ${fields.request}`,
+      ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: [
+              '*Proposed Linear issue*',
+              `*Project:* ${fields.clientProject}`,
+              `*Request:* ${fields.request}`,
+              `*Why:* ${fields.why}`,
+              `*Done when:* ${fields.doneWhen}`,
+            ].join('\n'),
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Confirm' },
+              style: 'primary',
+              action_id: 'echo_intake_confirm',
+              value: draft.key,
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Dismiss' },
+              style: 'danger',
+              action_id: 'echo_intake_dismiss',
+              value: draft.key,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const body = (await response.json()) as SlackApiResponse;
+  if (!response.ok || body.ok !== true) {
+    throw new Error(`Slack intake confirm post failed: ${body.error ?? `HTTP ${response.status}`}`);
+  }
+}
+
 export async function runSlackResponder(config: ResponderConfig): Promise<void> {
   await preflightBrain(config.brain);
   const socketUrl = await openSocketModeUrl(config.slackAppToken);
@@ -557,6 +962,12 @@ async function handleSocketMessage(
   const action = extractDecisionAction(envelope);
   if (action !== null) {
     await respondToDecisionAction(action, config, deps);
+    return;
+  }
+
+  const intakeAction = extractIntakeAction(envelope);
+  if (intakeAction !== null) {
+    await respondToIntakeAction(intakeAction, config, deps);
     return;
   }
 

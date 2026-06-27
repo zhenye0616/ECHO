@@ -1,8 +1,41 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { TeamDecisionAtom, TeamDecisionStore } from './decision-store.js';
+import { normalizeProjectName } from './linear-client.js';
 
 export type BrainName = 'codex' | 'claude';
 export type BrainOutcome = 'ok' | 'timeout' | 'error';
+
+export type IntakeFieldKey =
+  | 'clientProject'
+  | 'request'
+  | 'why'
+  | 'clientOutcome'
+  | 'evidence'
+  | 'doneWhen'
+  | 'urgency'
+  | 'clientFacing';
+
+export interface IntakeFields {
+  clientProject?: string;
+  request?: string;
+  why?: string;
+  clientOutcome?: string;
+  evidence?: string;
+  doneWhen?: string;
+  urgency?: string;
+  clientFacing?: string;
+}
+
+export interface IntakeBrainOptions {
+  knownProjectNames?: readonly string[];
+}
+
+export interface IntakeBrainResult {
+  fields: IntakeFields;
+  missing: IntakeFieldKey[];
+  questions: string[];
+  ready: boolean;
+}
 
 export interface BrainResult {
   ok: boolean;
@@ -40,6 +73,16 @@ interface Invocation {
 
 const DEFAULT_KILL_GRACE_MS = 500;
 const PREFLIGHT_TIMEOUT_MS = 5000;
+const INTAKE_FIELDS: readonly IntakeFieldKey[] = [
+  'clientProject',
+  'request',
+  'why',
+  'clientOutcome',
+  'evidence',
+  'doneWhen',
+  'urgency',
+  'clientFacing',
+];
 
 // Checked at claim time on 2026-06-19:
 // codex-cli 0.137.0 supports `codex exec -C <dir> --sandbox read-only --json -`.
@@ -92,6 +135,96 @@ export function buildBrainPrompt(question: string, scopeRepoPath: string): strin
     '',
     `Question: ${question}`,
   ].join('\n');
+}
+
+export function runIntakeBrain(text: string, options: IntakeBrainOptions = {}): IntakeBrainResult {
+  const fields = extractIntakeFields(text, options);
+  const missing = missingIntakeFields(fields, options);
+  return {
+    fields,
+    missing,
+    questions: buildIntakeFollowupQuestions(missing, options),
+    ready: missing.length === 0,
+  };
+}
+
+export function extractIntakeFields(text: string, options: IntakeBrainOptions = {}): IntakeFields {
+  const labeled = parseLabeledIntakeFields(text);
+  const knownProject = findKnownProject(text, options.knownProjectNames ?? []);
+  const request = labeled.request ?? inferRequest(text);
+  const out: IntakeFields = {
+    ...labeled,
+    ...(knownProject !== undefined ? { clientProject: knownProject } : {}),
+    ...(request !== undefined ? { request } : {}),
+  };
+  if (out.urgency === undefined) out.urgency = inferUrgency(text);
+  if (out.clientFacing === undefined) out.clientFacing = inferClientFacing(text);
+  return compactFields(out);
+}
+
+export function missingIntakeFields(
+  fields: IntakeFields,
+  options: IntakeBrainOptions = {},
+): IntakeFieldKey[] {
+  const missing: IntakeFieldKey[] = [];
+  for (const field of INTAKE_FIELDS) {
+    if (fields[field] === undefined || fields[field]?.trim() === '') {
+      missing.push(field);
+    }
+  }
+  if (
+    fields.clientProject !== undefined &&
+    options.knownProjectNames !== undefined &&
+    options.knownProjectNames.length > 0 &&
+    findKnownProject(fields.clientProject, options.knownProjectNames) === undefined &&
+    !isInternalProjectName(fields.clientProject)
+  ) {
+    if (!missing.includes('clientProject')) missing.unshift('clientProject');
+  }
+  return missing;
+}
+
+export function intakeReadyFields(fields: IntakeFields): Required<IntakeFields> | null {
+  for (const field of INTAKE_FIELDS) {
+    if (fields[field] === undefined || fields[field]?.trim() === '') return null;
+  }
+  return {
+    clientProject: fields.clientProject!.trim(),
+    request: fields.request!.trim(),
+    why: fields.why!.trim(),
+    clientOutcome: fields.clientOutcome!.trim(),
+    evidence: fields.evidence!.trim(),
+    doneWhen: fields.doneWhen!.trim(),
+    urgency: fields.urgency!.trim(),
+    clientFacing: fields.clientFacing!.trim(),
+  };
+}
+
+export function buildIntakeFollowupQuestions(
+  missing: readonly IntakeFieldKey[],
+  options: IntakeBrainOptions = {},
+): string[] {
+  return missing.slice(0, 2).map((field) => questionForMissingField(field, options));
+}
+
+export function isLikelyLinearIntake(
+  text: string,
+  knownProjectNames: readonly string[] = [],
+): boolean {
+  const normalized = text.toLowerCase();
+  if (findKnownProject(text, knownProjectNames) !== undefined) return true;
+  return [
+    'file this',
+    'create an issue',
+    'linear',
+    'intake',
+    'client-facing',
+    'client facing',
+    'done when',
+    'needs ',
+    'request:',
+    'client/project:',
+  ].some((needle) => normalized.includes(needle));
 }
 
 export function resolveBrainInvocation(question: string, options: BrainRunOptions): Invocation {
@@ -253,6 +386,119 @@ export function asksForRawContext(question: string): boolean {
     'file contents',
     'source context',
   ].some((needle) => normalized.includes(needle));
+}
+
+function parseLabeledIntakeFields(text: string): IntakeFields {
+  const fields: IntakeFields = {};
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const match = line.match(/^\s*([^:]{2,40}):\s*(.+?)\s*$/);
+    if (match === null) continue;
+    const key = intakeFieldFromLabel(match[1] ?? '');
+    if (key === null) continue;
+    fields[key] = (match[2] ?? '').trim();
+  }
+  return fields;
+}
+
+function intakeFieldFromLabel(label: string): IntakeFieldKey | null {
+  const normalized = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (['client project', 'client', 'project', 'who is this for'].includes(normalized)) {
+    return 'clientProject';
+  }
+  if (['request', 'ask', 'what do you want changed'].includes(normalized)) return 'request';
+  if (['why', 'why now', 'why does it matter'].includes(normalized)) return 'why';
+  if (['client outcome', 'outcome', 'user outcome'].includes(normalized)) {
+    return 'clientOutcome';
+  }
+  if (['evidence', 'evidence example', 'example', 'current state'].includes(normalized)) {
+    return 'evidence';
+  }
+  if (['done when', 'done', 'definition of done'].includes(normalized)) return 'doneWhen';
+  if (['urgency', 'priority'].includes(normalized)) return 'urgency';
+  if (
+    ['client facing', 'client facing yes no', 'client facing yes no not sure'].includes(normalized)
+  ) {
+    return 'clientFacing';
+  }
+  return null;
+}
+
+function findKnownProject(text: string, knownProjectNames: readonly string[]): string | undefined {
+  const normalized = ` ${normalizeProjectName(text)} `;
+  return knownProjectNames.find((name) => {
+    const project = normalizeProjectName(name);
+    return project !== '' && normalized.includes(` ${project} `);
+  });
+}
+
+function inferRequest(text: string): string | undefined {
+  const cleaned = text
+    .replace(/<@[A-Z0-9]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned === '') return undefined;
+  const sentence = cleaned.split(/(?<=[.!?])\s+/)[0]?.trim();
+  return sentence === '' ? cleaned : sentence;
+}
+
+function inferUrgency(text: string): string | undefined {
+  const normalized = text.toLowerCase();
+  if (/\b(urgent|asap|today|blocker|blocking)\b/.test(normalized)) return 'urgent';
+  if (/\b(this week|soon|high priority|high)\b/.test(normalized)) return 'high';
+  if (/\b(next week|medium priority|medium)\b/.test(normalized)) return 'medium';
+  if (/\b(low priority|low|whenever)\b/.test(normalized)) return 'low';
+  return undefined;
+}
+
+function inferClientFacing(text: string): string | undefined {
+  const normalized = text.toLowerCase();
+  if (/\b(client-facing|client facing|customer-facing|customer facing)\b/.test(normalized)) {
+    return 'yes';
+  }
+  if (/\b(internal only|not client-facing|not client facing)\b/.test(normalized)) return 'no';
+  return undefined;
+}
+
+function compactFields(fields: IntakeFields): IntakeFields {
+  const out: IntakeFields = {};
+  for (const field of INTAKE_FIELDS) {
+    const value = fields[field];
+    if (value !== undefined && value.trim() !== '') out[field] = value.trim();
+  }
+  return out;
+}
+
+function isInternalProjectName(name: string): boolean {
+  return ['internal', 'echo', 'no client'].includes(normalizeProjectName(name));
+}
+
+function questionForMissingField(field: IntakeFieldKey, options: IntakeBrainOptions): string {
+  switch (field) {
+    case 'clientProject': {
+      const choices = options.knownProjectNames?.join(', ');
+      return choices === undefined || choices === ''
+        ? 'Which client or project is this for?'
+        : `Which project should this go under? Choose one: ${choices}, or say internal/Echo.`;
+    }
+    case 'request':
+      return 'What do you want changed or created?';
+    case 'why':
+      return 'Why does this matter now?';
+    case 'clientOutcome':
+      return 'What should the teammate or client be able to do when this is done?';
+    case 'evidence':
+      return 'What example, current behavior, or evidence shows the need?';
+    case 'doneWhen':
+      return 'What would done look like in plain language?';
+    case 'urgency':
+      return 'How urgent is this: urgent, high, medium, or low?';
+    case 'clientFacing':
+      return 'Is this client-facing: yes, no, or not sure?';
+  }
 }
 
 function formatTeamDecisionAnswer(decisions: readonly TeamDecisionAtom[]): string {
