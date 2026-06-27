@@ -140,7 +140,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
     expect(found?.description).toContain('Migration:');
   });
 
-  it('all fourteen tools are registered (item 046: +get_role_state, +list_task_states; item 057a: +coord_emit, +coord_status; item 057b: +coord_invoke; item 078: +pending_decisions — until the 2026-05-17 follow-up drops recent_work_context)', async () => {
+  it('all fifteen tools are registered (item 046: +get_role_state, +list_task_states; item 057a: +coord_emit, +coord_status; item 057b: +coord_invoke; item 078: +pending_decisions; item 107: +propose_decision — until the 2026-05-17 follow-up drops recent_work_context)', async () => {
     handle = await startMcpServer(store, { port: 0 });
     const tools = await withClient(handle.url, async (c) => c.listTools());
     const names = tools.tools.map((t) => t.name).sort();
@@ -157,6 +157,7 @@ describe('get_recent_work_context (end-to-end via MCP server)', () => {
       'get_role_state',
       'list_task_states',
       'pending_decisions',
+      'propose_decision',
       'search_memories',
       'wait_for_new_turns',
     ]);

@@ -50,6 +50,31 @@ agent_notes: |
   Tried: Implemented the cross-team decision-store/draft-store/propose-confirm flow, added the canonical emit-decision skill/snippets/runbook, registered `propose_decision`, pushed `agent/cross-team-decision-sync-slack` at `80a89966b2409aeb0e32fa53439dfd5ac5dee063`, and verified typecheck, lint, focused tests, and sync-skills --check. Full `npm test` has one item-caused failure because the existing all-tools test now sees `propose_decision`; two other failures match known environmental/load flakes.
   Best-guess answer: Authorize the one-line existing-test update; confidence high. Conditional registration would hide the tool and violate the AC4 missing-target error contract.
   Why I escalated rather than guessing: `tests/mcp/tools/recent-work-context.test.ts` is not listed in `files_to_modify`, and the builder protocol requires escalation before modifying unlisted files.
+review_notes: |
+  Merged on 2026-06-27 via founder reconciliation (merge commit folds the merge + both pre-merge fixups).
+
+  Conflicts resolved:
+  - none — clean --no-ff merge (merge-base 8cd63423; main advanced only by review-sidecar + the linear-intake-gate doc commit, zero overlap with this branch's files_to_modify).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied (both founder-approved; folded into the merge commit):
+  - tests/mcp/tools/recent-work-context.test.ts — added 'propose_decision' to the registered-tools census list (between pending_decisions and search_memories) + bumped title fourteen→fifteen with the item-107 note. (Builder escalated this; founder authorized — the tool is unconditionally registered, so the census assertion must include it.)
+  - tests/mcp/recent-calls-endpoint.test.ts — added `case 'propose_decision'` to the minimalArgs smoke switch so the "logs every runtime-registered tool" loop supplies valid args instead of hitting default: and throwing. (Builder mis-bucketed as a flake; independently reproduced as deterministic and required.)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify (in ephemeral merger worktree, fresh npm install): 1786 passed / 3 failed; lint, typecheck, check-coupled-invariants, and sync-skills --check all clean. All 3 failures confirmed pre-existing/environmental by isolation runs, NONE caused by 107's diff:
+  - tests/mcp/recent-calls-endpoint.test.ts — PASSES in isolation (14.7s); full-suite failure is a 15s-timeout-ceiling load flake (the fixup itself is correct).
+  - tests/surfaces/ceo-slack-brain.test.ts — PASSES 9/9 in isolation; full-suite parallel-load race on descendant.pid (brain.ts byte-unchanged by this diff).
+  - tests/cli/shell-reachable.test.ts — fails in isolation too; needs a real launchd daemon unavailable in the ephemeral worktree sandbox (file not in this diff). Expected green on the founder's live machine.
+
+  Follow-up items (non-blocking):
+  - Bump tests/mcp/recent-calls-endpoint.test.ts "logs every runtime-registered tool" testTimeout above 15s — the all-tools smoke loop sits at the ceiling and reliably times out under full-suite load.
+  - propose-decision-tool.ts:95-102 — wrap postDraftCard so a Slack-post throw dismisses/marks the draft instead of orphaning a pending draft (acceptable for n=2; next /echo decision re-proposes).
+  - brain.ts:244-256 — asksForRawContext keyword heuristic can false-trigger a refusal on legit decision queries containing words like "logging"; the structural boundary already enforces the real cut.
+  - Treat ceo-slack-brain + shell-reachable persistent failures as separate pre-existing-flake/env backlog items if they don't pass at merge time on the live machine.
 ---
 
 > **Origin: 2026-06-24 launch-onboarding conversation (founder + Claude strategist).** Founder has decided to

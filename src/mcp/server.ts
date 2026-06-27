@@ -5,7 +5,11 @@ import { DeadlineTracker, type DeadlineTrackerHandle } from '../coord/deadlines.
 import { loadCoordRoles, type CoordRolesConfig } from '../coord/roles.js';
 import { createLogger } from '../logging/index.js';
 import type { Storage } from '../storage/interface.js';
-import { instrumentMcpServer, readRecentMcpCalls, type RecentMcpCallStatus } from './request-log.js';
+import {
+  instrumentMcpServer,
+  readRecentMcpCalls,
+  type RecentMcpCallStatus,
+} from './request-log.js';
 import { registerCoordEmit } from './tools/coord-emit.js';
 import { registerCoordInvoke } from './tools/coord-invoke.js';
 import { registerCoordStatus } from './tools/coord-status.js';
@@ -20,6 +24,7 @@ import { registerPendingDecisions } from './tools/pending-decisions.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 import { registerWaitForNewTurns } from './tools/wait-for-new-turns.js';
+import { registerProposeDecision } from '../surfaces/ceo-slack-responder/propose-decision-tool.js';
 
 const log = createLogger('mcp.server');
 
@@ -145,7 +150,11 @@ function handleRecentCalls(
 
   res.statusCode = 200;
   res.setHeader('content-type', 'application/json');
-  res.end(JSON.stringify({ calls: readRecentMcpCalls({ since, until, ...(status !== undefined ? { status } : {}) }) }));
+  res.end(
+    JSON.stringify({
+      calls: readRecentMcpCalls({ since, until, ...(status !== undefined ? { status } : {}) }),
+    }),
+  );
   return true;
 }
 
@@ -157,12 +166,7 @@ function parseNumberParam(raw: string | null, fallback: number): number | null {
 
 function parseStatusParam(raw: string | null): RecentMcpCallStatus | undefined | null {
   if (raw === null || raw === '') return undefined;
-  if (
-    raw === 'pending' ||
-    raw === 'ok' ||
-    raw === 'error' ||
-    raw === 'killed_during_shutdown'
-  ) {
+  if (raw === 'pending' || raw === 'ok' || raw === 'error' || raw === 'killed_during_shutdown') {
     return raw;
   }
   return null;
@@ -241,6 +245,7 @@ export async function startMcpServer(
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     instrumentMcpServer(mcp);
     registerEchoPing(mcp);
+    registerProposeDecision(mcp);
     registerSearchMemories(mcp, storage);
     // Deprecated wrapper — kept registered until the 2026-05-17 follow-up
     // (item 038 / AC3 + R2 Codex HIGH #1; founder declined override).

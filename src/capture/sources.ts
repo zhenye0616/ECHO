@@ -16,7 +16,7 @@ export const CAPTURED_SOURCES = {
     '~/.codex/sessions/',
   ],
   apis: ['granola'],
-  derived: ['granola-signals', 'granola-signals-index'],
+  derived: ['granola-signals', 'granola-signals-index', 'team-decisions'],
   git_repos: [...DEFAULT_GIT_REPOS],
 } as const;
 

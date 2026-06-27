@@ -85,6 +85,8 @@ function minimalArgs(tool: string): Record<string, unknown> {
         tick_run_id: 'audit-test',
         emitted_at: new Date().toISOString(),
       };
+    case 'propose_decision':
+      return { subject: 'smoke', decision: 'smoke decision', source_app: 'codex' };
     default:
       throw new Error(`No recent-calls smoke args for registered tool '${tool}'`);
   }
