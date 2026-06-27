@@ -8,6 +8,7 @@ created: 2026-06-27
 blocked_by: []
 task_state_ref: 2026-06-27-108-slack-linear-intake-gate
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 66c9ff6b3b0679d5bba7ef1e7036ed084f906638df79bbe2ddd5bb423a608fdf
 spec_refs:
   - docs/execution/echo/linear-intake-gate-setup.md              # SOURCE — the founder's operating design this item builds the code-bearing slice of (intake/triage/issue shapes, conversation contract, MVP phases)
   - backlog/complete/2026-06-24-107-cross-team-decision-sync-slack.md  # the propose-confirm-over-Slack pattern this reuses: draft → Slack confirm card → terminal action; identity attribution; idempotent confirm
