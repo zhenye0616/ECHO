@@ -183,9 +183,11 @@ binding. Module paths remain PROVISIONAL (builder confirms against the substrate
   never a blind second create. If Linear's API exposes a create idempotency key, reuse the token. Invariant + owner +
   tests; mechanism is the builder's choice. Tested: concurrent dup confirm → 1 create; crash-mid-create replay → no
   2nd create; timeout → needs-reconcile.
-- **R5 — Slack ingress idempotency (codex-ops F2).** Ack immediately before brain/Linear work; durably de-dupe
-  events/actions by `team:channel:event_id` / `action_id` so a Socket-Mode redelivery doesn't post duplicate
-  questions/cards or re-run a stale confirm. Tested: replayed confirm on a consumed draft → no-op.
+- **R5 — Slack ingress idempotency (codex-ops F2; key REFINED in r2, see R8).** Ack immediately before brain/Linear
+  work; durably de-dupe message events by Slack's unique envelope/`event_id`, and make confirms idempotent via the
+  draft consume-once transition (R4/R7) — **NOT** the static Block-Kit `action_id` (superseded by R8). A Socket-Mode
+  redelivery doesn't post duplicate questions/cards or re-run a stale confirm. Tested: replayed confirm on a consumed
+  draft → no-op.
 - **R6 — Concrete Tests section (codex F4).** Added below (run command + per-file assertions).
 
 ## Resolved in spec-review (r2 disposition — binding for the build)
