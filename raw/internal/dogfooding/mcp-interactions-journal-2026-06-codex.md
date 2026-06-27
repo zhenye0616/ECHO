@@ -547,3 +547,12 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP tool surface `echo_ping` over `http://127.0.0.1:38478/mcp`; no clusters, atoms, or storage rows queried.
 - **Verdict:** partial - daemon reachable and retry succeeded; raw curl callers need the explicit Streamable HTTP `Accept` header.
 - **Note:** This was only a connectivity check. Item selection and scope remain governed by `tools/blocked.py`, the claimed spec, and its `spec_refs`.
+
+### 2026-06-27 15:06 PDT - codex r1 review tick on 2026-06-27-108-slack-linear-intake-gate
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-27-108-slack-linear-intake-gate/r1/request.md` and published `backlog/reviews/2026-06-27-108-slack-linear-intake-gate/r1/codex.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=6d33584d-0cdf-4921-a42f-a2118613dbcd)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-3F4AA280-FCD3-4521-9354-FBFCD2E89DF2/raw/internal/review-queue/93030466-5430-4cb5-a858-476bbbc631a5/codex.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-06-27-108-slack-linear-intake-gate/r1/codex.md` at `c84f4ff477429da635ba6542f83f3df9c11bef46`.
+- **Sources:** request `backlog/reviews/2026-06-27-108-slack-linear-intake-gate/r1/request.md`; artifact `backlog/proposed/2026-06-27-108-slack-linear-intake-gate.md@044e7669597babd7c98adc6d7827e58650328b63`; response `backlog/reviews/2026-06-27-108-slack-linear-intake-gate/r1/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-3F4AA280-FCD3-4521-9354-FBFCD2E89DF2/raw/internal/review-queue/93030466-5430-4cb5-a858-476bbbc631a5/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-3F4AA280-FCD3-4521-9354-FBFCD2E89DF2/raw/internal/review-queue/93030466-5430-4cb5-a858-476bbbc631a5/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
