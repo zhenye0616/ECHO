@@ -5,11 +5,18 @@ binding: codex
 claimed_by: 78D5AB0F-A8A3-4F01-BC2E-EB05961B2405
 claimed_at: 2026-06-27T22:34:49Z
 branch: agent/slack-linear-intake-gate
-last_updated: 2026-06-27T22:34:49Z
+last_updated: 2026-06-27T22:57:42Z
+handoff_branch: agent/slack-linear-intake-gate
+handoff_head_sha: 531486a3db033cf08fd12963f08a8b2f54e93f3c
+handoff_run_log: raw/internal/agent-runs/2026-06-27-2026-06-27-108-slack-linear-intake-gate.md
 ---
 
 ## current_thesis
 Claimed for implementation as Codex builder. Build the Slack-surface Linear intake gate only: plain-English intake, minimum-context follow-ups, requester confirm/dismiss, exactly-once fail-closed Linear create, Slack link-back, and operator runbook.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at 531486a3db033cf08fd12963f08a8b2f54e93f3c.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: Slack mention/thread intake must ack before brain or Linear work, then extract mandatory fields from plain-language text.
@@ -32,5 +39,5 @@ Claimed for implementation as Codex builder. Build the Slack-surface Linear inta
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-06-27-108-slack-linear-intake-gate.md
+- spec: backlog/pending_review/2026-06-27-108-slack-linear-intake-gate.md
 - reviews: backlog/reviews/2026-06-27-108-slack-linear-intake-gate/

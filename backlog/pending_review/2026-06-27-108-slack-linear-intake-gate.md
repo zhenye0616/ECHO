@@ -12,9 +12,10 @@ ready_content_sha: 66c9ff6b3b0679d5bba7ef1e7036ed084f906638df79bbe2ddd5bb423a608
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-06-27T22:34:49Z"
 branch: "agent/slack-linear-intake-gate"
-head_sha:
-pr_url:
-agent_notes:
+head_sha: "531486a3db033cf08fd12963f08a8b2f54e93f3c"
+pr_url: ""
+agent_notes: |
+  Implemented the Slack→Linear intake gate on `agent/slack-linear-intake-gate`: deterministic plain-English intake extraction, per-thread durable draft state, requester confirm/dismiss, fail-closed exactly-once Linear create, Slack link-back receipts, no Slack capture allowlist changes, operator runbook, and focused tests. Verified focused acceptance tests, full CEO Slack responder regression group, typecheck, lint, and `git diff --check`.
 spec_refs:
   - docs/execution/echo/linear-intake-gate-setup.md              # SOURCE — the founder's operating design this item builds the code-bearing slice of (intake/triage/issue shapes, conversation contract, MVP phases)
   - backlog/complete/2026-06-24-107-cross-team-decision-sync-slack.md  # the propose-confirm-over-Slack pattern this reuses: draft → Slack confirm card → terminal action; identity attribution; idempotent confirm
