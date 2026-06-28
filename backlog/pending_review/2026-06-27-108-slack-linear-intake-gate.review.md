@@ -1,23 +1,22 @@
 ---
 item_id: 2026-06-27-108-slack-linear-intake-gate
-verdict: merge as-is
-reviewed_at: '2026-06-27T23:11:52Z'
+verdict: merge with founder fixups
+reviewed_at: '2026-06-28T03:54:29Z'
 test_counts:
-  passed: 36
-  failed: 0
+  passed: 1804
+  failed: 2
 producer: review-pending-orchestrator
 ---
 ## Verdict
-Independent review (Claude code-reviewer subagent; did NOT write the code) verdict: merge as-is. Ground-truth HEAD matches recorded head_sha 531486a3. All AC1-AC6 and all binding refinements R1-R9 are implemented and backed by tests that exercise the load-bearing invariants (not assertion-only): R4/R7 fail-closed needs-reconcile with no recover-by-read and no second create; R5/R8 de-dupe by Slack event_id not static action_id; R9 unmapped project asks from known projects; AC6 confirmed NO new Slack capture source (no src/capture/ diff). 36/36 responder tests pass, typecheck + lint + git diff --check clean. Zero drift (all 11 changed files on files_to_modify). Merge to current main is clean (main advanced only one backlog-state commit, no code overlap). No pre-merge blockers.
+Independent Codex review at head_sha a6a68315686c6ea71e0d1df791219892a2c8a0fe verdict: merge with founder fixups. The core Slack→Linear intake gate is implemented and scoped correctly, the post-review root-cause fixes stand, lint and typecheck pass, and no merge conflicts are expected. One AC6 gap should be fixed before merge: Slack post failures in the intake path are not durably recorded, including the high-risk case where Linear issue creation succeeds but the Slack link-back receipt fails. The reviewer also observed full `npm test` failures in existing daemon/MCP tests: 172 files passed, 2 failed, 1 skipped; 1804 tests passed, 2 failed, 21 skipped, 1 todo.
 
 ## Pre-merge fixups
-- [ ] (none — no blocking fixups; merge as-is)
+- [ ] `src/surfaces/ceo-slack-responder/responder.ts` — Add durable operator-visible logging for intake Slack post failures, especially receipt-post failure after `created` / `already_created`, including the draft key and created issue URL.
 
 ## Expected merge conflicts
-- (clean) — merge-base..main is one backlog-state-only commit; no overlap with any code file in files_to_modify. Standard --no-ff merge, no manual conflict resolution expected.
+- (clean) — reviewer ran `git merge-tree $(git merge-base main HEAD) main HEAD` and saw no conflict markers or changed-in-both cases. Main advanced without conflicting changes in this branch's files.
 
 ## Follow-up items (defer, do not block merge)
-- In-process-only draft lock (intake-draft-store.ts:235-253): exactly-once holds within a single responder process only; if a second responder process is ever introduced, add a cross-process guard (lockfile/OS-level) or document the single-process constraint in the runbook. Consistent with the 107 draft-store precedent.
-- Plain-English extraction is label-dependent (brain.ts): why/clientOutcome/doneWhen/evidence need labeled lines; genuinely unlabeled prose triggers extra follow-up rounds. Upgrade toward true free-form extraction once a real non-technical teammate dogfoods it (feeds the After-Completion validation signal).
-- Redelivery double-post: a Socket-Mode message redelivery re-posts the ACK and re-runs the deterministic brain before the event_id dedup short-circuits. Duplicate cards are prevented; duplicate ack message is not. Guard the ACK re-post + brain re-run behind the event_id dedup.
-- already_created confirm re-posts the receipt (idempotent on the Linear create; duplicate Slack message only). Post once or use an already-created variant.
+- Make `idempotency_token` deterministic or remove the random suffix before any future Linear idempotency-key reuse.
+- Consider suppressing duplicate `Looking...` messages on replayed Slack message events.
+- Investigate the full-suite verification failures observed during review if they reproduce in the merge worktree: `tests/cli/shell-reachable.test.ts` daemon health and `tests/mcp/recent-calls-endpoint.test.ts` 15s timeout.
