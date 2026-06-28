@@ -636,3 +636,11 @@ This is the 2026-06 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP `wait_for_new_turns`, `get_atoms`, and `get_atom`; exact Claude Code JSONL source `fs:/Users/zhenye/.claude/projects/-Users-zhenye-Desktop-Project-echo/e856e29f-bffb-48be-9480-9fa8c2b717da.jsonl`; repo-scoped to `/Users/zhenye/Desktop/Project_echo`; no git/codex atoms returned in this retrieval.
 - **Verdict:** right - ECHO connected the sidecar commit to the Claude review-pending session and exposed the captured review output; full content exceeded MCP's wire ceiling, so Codex used the returned source pointer for local recovery.
 - **Note:** Claude's review concluded `merge as-is` with no blocking fixups and four non-blocking follow-ups; this differs from Codex's earlier manual diagnosis, which treated the production Slack newline normalization and same-file/per-key draft-store locking as stronger issues.
+
+### 2026-06-28 11:50 PDT - codex resumes Fly Slack/headless-agent setup
+
+- **Trigger:** Founder asked to set up Fly.io with only the teammate-facing Slack bot and a headless coding-agent-style runtime with MCP available, deferring richer context-layer ingestion.
+- **Query inputs:** `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-06-28T00:00:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** 1 cluster, `ctx_6fa92195`, label `"discussion about project_echo"`, 14 atom ids, time range `2026-06-28T17:51:54.000Z` to `2026-06-28T18:46:35.024Z`, source_breakdown `{"git":1,"codex":13}`, rank reasons `["has_open_loop","code_session_anchor"]`.
+- **Verdict:** right - the cluster matches the current Fly/Slack deployment setup thread and confirms local repo activity is the relevant continuity source.
+- **Note:** No atom hydration was needed because the compacted session summary and current working tree carry the detailed implementation state.

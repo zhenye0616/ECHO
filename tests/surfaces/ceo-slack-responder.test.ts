@@ -22,6 +22,10 @@ describe('ceo-slack-responder', () => {
       ECHO_CEO_MAX_MATCHES: '3',
       ECHO_CEO_BRAIN: 'claude',
       ECHO_CEO_BRAIN_TIMEOUT_MS: '90000',
+      ECHO_SLACK_RESPONDER_INTAKE_ONLY: 'yes',
+      ECHO_INTAKE_AGENT_PROVIDER: 'claude-agent-sdk',
+      ECHO_INTAKE_AGENT_MODEL: 'claude-sonnet-4-6',
+      ECHO_INTAKE_AGENT_MAX_TURNS: '7',
     });
 
     expect(config).toMatchObject({
@@ -33,6 +37,10 @@ describe('ceo-slack-responder', () => {
       maxMatches: 3,
       brain: 'claude',
       brainTimeoutMs: 90000,
+      intakeOnly: true,
+      intakeAgentProvider: 'claude',
+      intakeAgentModel: 'claude-sonnet-4-6',
+      intakeAgentMaxTurns: 7,
     });
   });
 
@@ -66,6 +74,17 @@ describe('ceo-slack-responder', () => {
         ECHO_CEO_BRAIN: 'linear',
       }),
     ).toThrow(/codex or claude/);
+  });
+
+  it('rejects unknown intake agent providers', () => {
+    expect(() =>
+      loadResponderConfig({
+        ECHO_SLACK_APP_TOKEN: 'xapp-token',
+        ECHO_SLACK_BOT_TOKEN: 'xoxb-token',
+        ECHO_CEO_CONTEXT_REPO_PATH: '/Users/zhenye/justinian.ai',
+        ECHO_INTAKE_AGENT_PROVIDER: 'raw-llm',
+      }),
+    ).toThrow(/deterministic, claude, or codex/);
   });
 
   it('extracts direct-message and designated-channel questions while ignoring bot echoes', () => {

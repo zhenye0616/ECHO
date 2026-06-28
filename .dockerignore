@@ -1,0 +1,14 @@
+.git
+.DS_Store
+node_modules
+dist
+coverage
+.env
+.env.*
+*.log
+echoctl-*.tgz
+raw
+backlog
+wiki
+tests
+tools/echo-overlay

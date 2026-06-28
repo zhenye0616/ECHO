@@ -39,10 +39,15 @@ import {
   type IntakeThreadKeyParts,
 } from './intake-draft-store.js';
 import {
-  formatCreatedIssueReceipt,
-  renderIssueTitle,
-  renderParentDeliverableIssue,
-} from './issue-render.js';
+  createIntakeIssueRenderer,
+  parseIntakeAgentMaxTurns,
+  parseIntakeAgentProvider,
+  renderDeterministicIssueDraft,
+  type IntakeAgentProvider,
+  type IntakeIssueDraft,
+  type IntakeIssueRenderContext,
+} from './intake-agent.js';
+import { formatCreatedIssueReceipt } from './issue-render.js';
 import {
   createLinearClient,
   knownLinearProjectNames,
@@ -74,6 +79,10 @@ export interface ResponderConfig {
   maxMatches: number;
   brain: BrainName;
   brainTimeoutMs: number;
+  intakeOnly?: boolean;
+  intakeAgentProvider?: IntakeAgentProvider;
+  intakeAgentModel?: string;
+  intakeAgentMaxTurns?: number;
   teamDecisionStorePath?: string;
   teamDecisionDraftStorePath?: string;
   decisionConfirmTarget?: string;
@@ -143,6 +152,7 @@ type IntakeConfirmPoster = typeof postIntakeConfirmCard;
 type UsageAppender = typeof appendUsageRecord;
 type IntakeFailureAppender = typeof appendIntakeFailureRecord;
 type IntakeSlackPostFailureAppender = typeof appendIntakeSlackPostFailureRecord;
+type IntakeIssueRenderer = (input: IntakeIssueRenderContext) => Promise<IntakeIssueDraft>;
 
 interface IntakeSlackPostFailureRecord {
   phase: string;
@@ -160,6 +170,7 @@ interface ResponderDependencies {
   appendIntakeFailureRecord?: IntakeFailureAppender;
   appendIntakeSlackPostFailureRecord?: IntakeSlackPostFailureAppender;
   postIntakeConfirmCard?: IntakeConfirmPoster;
+  intakeIssueRenderer?: IntakeIssueRenderer;
   teamDecisionStore?: TeamDecisionStore;
   decisionDraftStore?: DecisionDraftStore;
   intakeDraftStore?: IntakeDraftStore;
@@ -219,6 +230,12 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return n;
 }
 
+function parseBooleanFlag(raw: string | undefined): boolean {
+  if (raw === undefined || raw.trim() === '') return false;
+  const value = raw.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+}
+
 export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): ResponderConfig {
   const contextRepoPath = requiredEnv(env, 'ECHO_CEO_CONTEXT_REPO_PATH');
   if (!isAbsolute(contextRepoPath)) {
@@ -235,6 +252,12 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
     maxMatches: parsePositiveInt(env.ECHO_CEO_MAX_MATCHES, 5),
     brain: parseBrainName(env.ECHO_CEO_BRAIN),
     brainTimeoutMs: parsePositiveInt(env.ECHO_CEO_BRAIN_TIMEOUT_MS, DEFAULT_BRAIN_TIMEOUT_MS),
+    intakeOnly: parseBooleanFlag(env.ECHO_SLACK_RESPONDER_INTAKE_ONLY),
+    intakeAgentProvider: parseIntakeAgentProvider(env.ECHO_INTAKE_AGENT_PROVIDER),
+    intakeAgentMaxTurns: parseIntakeAgentMaxTurns(env.ECHO_INTAKE_AGENT_MAX_TURNS),
+    ...(env.ECHO_INTAKE_AGENT_MODEL?.trim()
+      ? { intakeAgentModel: env.ECHO_INTAKE_AGENT_MODEL.trim() }
+      : {}),
     ...(env.ECHO_TEAM_DECISION_STORE?.trim()
       ? { teamDecisionStorePath: env.ECHO_TEAM_DECISION_STORE.trim() }
       : {}),
@@ -267,6 +290,11 @@ export function createResponderRuntimeDependencies(config: ResponderConfig): Res
       config.linearIntakeDraftStorePath ?? DEFAULT_LINEAR_INTAKE_DRAFT_STORE,
     );
     deps.linearClient = createLinearClient(config.linearConfig);
+    deps.intakeIssueRenderer = createIntakeIssueRenderer({
+      provider: config.intakeAgentProvider ?? 'deterministic',
+      ...(config.intakeAgentModel === undefined ? {} : { model: config.intakeAgentModel }),
+      maxTurns: config.intakeAgentMaxTurns ?? 4,
+    });
   }
   return deps;
 }
@@ -342,6 +370,20 @@ export async function respondToQuestion(
   await postMessage(config.slackBotToken, question.channel, ACK_MESSAGE, threadTs);
 
   if (await respondToLinearIntakeIfNeeded(question, config, deps, postMessage)) {
+    return;
+  }
+
+  if (config.intakeOnly) {
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      [
+        'I can help turn a request into a Linear issue from this channel.',
+        '',
+        'Send the client/project, request, why it matters, desired outcome, evidence/example, done-when, urgency, and whether it is client-facing. Plain language is fine.',
+      ].join('\n'),
+      threadTs,
+    );
     return;
   }
 
@@ -668,16 +710,17 @@ export async function respondToIntakeAction(
     actor,
     async (context) => {
       const projectName = context.fields.clientProject;
-      const body = renderParentDeliverableIssue({
+      const issueDraft = await renderIssueDraftWithFallback(deps.intakeIssueRenderer, {
         fields: context.fields,
         requester: context.draft.requester.label,
         slackThreadUrl: slackThreadUrl(context.draft.channel_id, context.draft.root_ts),
         projectName,
         projectId: context.projectId,
+        knownProjectNames: knownLinearProjectNames(config.linearConfig!),
       });
       return deps.linearClient!.createIssue({
-        title: renderIssueTitle(context.fields),
-        body,
+        title: issueDraft.title,
+        body: issueDraft.body,
         teamId: config.linearConfig!.teamId,
         projectId: context.projectId,
         stateId: config.linearConfig!.inboxStateId,
@@ -735,6 +778,25 @@ export async function respondToIntakeAction(
     threadTs,
     failure: { phase: 'not_ready_post', draftKey: result.draft.key },
   });
+}
+
+async function renderIssueDraftWithFallback(
+  renderer: IntakeIssueRenderer | undefined,
+  input: IntakeIssueRenderContext,
+): Promise<IntakeIssueDraft> {
+  const selectedRenderer = renderer ?? renderDeterministicIssueDraft;
+  try {
+    return await selectedRenderer(input);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return renderDeterministicIssueDraft({
+      ...input,
+      statusNote: `Agent issue renderer failed; deterministic fallback used. ${message.slice(
+        0,
+        160,
+      )}`,
+    });
+  }
 }
 
 export function formatIntakeFollowup(questions: readonly string[]): string {
@@ -1058,7 +1120,9 @@ export async function postIntakeConfirmCard(
 }
 
 export async function runSlackResponder(config: ResponderConfig): Promise<void> {
-  await preflightBrain(config.brain);
+  if (!config.intakeOnly) {
+    await preflightBrain(config.brain);
+  }
   const socketUrl = await openSocketModeUrl(config.slackAppToken);
   const Socket = globalThis.WebSocket as unknown as SocketConstructor | undefined;
   if (Socket === undefined) {

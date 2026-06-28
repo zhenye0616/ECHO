@@ -1,0 +1,31 @@
+app = "project-ech0"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[processes]
+  app = "node dist/surfaces/ceo-slack-responder/index.js"
+
+[env]
+  NODE_ENV = "production"
+  ECHO_CEO_CONTEXT_REPO_PATH = "/app"
+  ECHO_SLACK_RESPONDER_INTAKE_ONLY = "true"
+  ECHO_INTAKE_AGENT_PROVIDER = "claude"
+  ECHO_INTAKE_AGENT_MAX_TURNS = "4"
+  ECHO_LINEAR_INTAKE_ENABLED = "true"
+  ECHO_LINEAR_INTAKE_DRAFT_STORE = "/data/linear-intake-drafts.json"
+  ECHO_CEO_EVENT_LOG_PATH = "/data/slack-responder-events.md"
+
+[mounts]
+  source = "echo_slack_data"
+  destination = "/data"
+
+[[restart]]
+  policy = "always"
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"

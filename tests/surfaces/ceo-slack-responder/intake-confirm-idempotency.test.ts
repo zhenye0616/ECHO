@@ -73,6 +73,31 @@ describe('Slack Linear intake confirm idempotency', () => {
     });
   });
 
+  it('falls back to deterministic issue rendering when the headless agent fails', async () => {
+    const { store } = await readyDraft();
+    const calls: LinearIssueCreateInput[] = [];
+
+    await respondToIntakeAction(confirmAction(draftKey()), config(), {
+      intakeDraftStore: store,
+      linearClient: {
+        createIssue: async (input) => {
+          calls.push(input);
+          return { id: 'LIN-1', url: 'https://linear.app/echo/issue/LIN-1' };
+        },
+      },
+      intakeIssueRenderer: async () => {
+        throw new Error('agent auth unavailable');
+      },
+      appendIntakeFailureRecord: async () => undefined,
+      postSlackMessage: async () => undefined,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toContain('Status note: Agent issue renderer failed');
+    expect(calls[0]?.body).toContain('agent auth unavailable');
+    expect(await store.getDraft(draftKey())).toMatchObject({ status: 'created' });
+  });
+
   it('records Slack receipt failures after Linear create succeeds', async () => {
     const { store } = await readyDraft();
     const records: Array<{

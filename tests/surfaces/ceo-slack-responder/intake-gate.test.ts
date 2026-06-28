@@ -81,6 +81,64 @@ describe('Slack Linear intake gate', () => {
     expect(posts.at(-1)).toContain('- done-when');
   });
 
+  it('uses the configured headless agent renderer after requester confirmation', async () => {
+    const { store } = await tempStore();
+    const key = intakeThreadKey({ teamId: 'T1', channelId: 'CENG', rootTs: '100.1' });
+    const calls: LinearIssueCreateInput[] = [];
+    const rendererInputs: string[] = [];
+
+    await respondToQuestion(completeQuestion(), config(), {
+      intakeDraftStore: store,
+      linearClient: {
+        createIssue: async () => {
+          throw new Error('create should wait for requester confirm');
+        },
+      },
+      postSlackMessage: async () => undefined,
+      postIntakeConfirmCard: async () => undefined,
+    });
+
+    await respondToIntakeAction(confirmAction(key), config(), {
+      intakeDraftStore: store,
+      linearClient: {
+        createIssue: async (input) => {
+          calls.push(input);
+          return { id: 'LIN-1', url: 'https://linear.app/echo/issue/LIN-1' };
+        },
+      },
+      intakeIssueRenderer: async (input) => {
+        rendererInputs.push(
+          JSON.stringify({
+            projectName: input.projectName,
+            projectId: input.projectId,
+            knownProjectNames: input.knownProjectNames,
+            slackThreadUrl: input.slackThreadUrl,
+          }),
+        );
+        return {
+          title: 'Agent-rendered amendment alerts',
+          body: `Agent body\n${input.slackThreadUrl}\n${input.projectId}`,
+        };
+      },
+      postSlackMessage: async () => undefined,
+    });
+
+    expect(rendererInputs.map((raw) => JSON.parse(raw) as unknown)).toEqual([
+      {
+        projectName: 'claudia',
+        projectId: 'claudia-project',
+        knownProjectNames: ['claudia'],
+        slackThreadUrl: 'https://slack.com/archives/CENG/p1001',
+      },
+    ]);
+    expect(calls).toMatchObject([
+      {
+        title: 'Agent-rendered amendment alerts',
+        body: 'Agent body\nhttps://slack.com/archives/CENG/p1001\nclaudia-project',
+      },
+    ]);
+  });
+
   it('preserves complete labeled intake fields when entered through the production Slack envelope path', async () => {
     const { store } = await tempStore();
     const posts: string[] = [];
