@@ -27,6 +27,15 @@ export function confirmAttributionForSlackUser(
   return resolveCofounderBySlackUser(identities, slackUserId)?.id ?? slackUserId;
 }
 
+export function requesterAttributionForSlackUser(
+  identities: readonly CofounderIdentity[],
+  slackUserId: string,
+): string {
+  const identity = resolveCofounderBySlackUser(identities, slackUserId);
+  if (identity === null) return slackUserId.trim();
+  return identity.display_name ?? identity.id;
+}
+
 function parseIdentity(value: unknown): CofounderIdentity {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('cofounder identity must be an object');
