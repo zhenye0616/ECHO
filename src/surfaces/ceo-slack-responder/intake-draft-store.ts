@@ -91,6 +91,7 @@ interface IntakeDraftFile {
 
 export class FileIntakeDraftStore implements IntakeDraftStore {
   private readonly locks = new Map<string, Promise<void>>();
+  private fileLock: Promise<void> = Promise.resolve();
 
   constructor(private readonly filePath: string) {}
 
@@ -104,32 +105,34 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
   ): Promise<{ draft: IntakeDraft; duplicate: boolean }> {
     const key = intakeThreadKey(input.key);
     return this.withDraftLock(key, async () => {
-      const eventId = requiredString(input.eventId, 'event_id');
-      const file = await this.readFile();
-      const existing = file.drafts[key];
-      if (existing !== undefined && existing.slack_event_ids.includes(eventId)) {
-        return { draft: existing, duplicate: true };
-      }
-      const now = new Date().toISOString();
-      const draft =
-        existing ??
-        createDraft({
-          keyParts: input.key,
-          requester: input.requester,
-          key,
-          now,
-        });
-      const next: IntakeDraft = {
-        ...draft,
-        requester: draft.requester,
-        fields: compactFields({ ...draft.fields, ...input.fields }),
-        slack_event_ids: [...draft.slack_event_ids, eventId],
-        ...(input.projectId !== undefined ? { project_id: input.projectId } : {}),
-        updated_at: now,
-      };
-      file.drafts[key] = next;
-      await this.writeFile(file);
-      return { draft: next, duplicate: false };
+      return this.withFileLock(async () => {
+        const eventId = requiredString(input.eventId, 'event_id');
+        const file = await this.readFile();
+        const existing = file.drafts[key];
+        if (existing !== undefined && existing.slack_event_ids.includes(eventId)) {
+          return { draft: existing, duplicate: true };
+        }
+        const now = new Date().toISOString();
+        const draft =
+          existing ??
+          createDraft({
+            keyParts: input.key,
+            requester: input.requester,
+            key,
+            now,
+          });
+        const next: IntakeDraft = {
+          ...draft,
+          requester: draft.requester,
+          fields: compactFields({ ...draft.fields, ...input.fields }),
+          slack_event_ids: [...draft.slack_event_ids, eventId],
+          ...(input.projectId !== undefined ? { project_id: input.projectId } : {}),
+          updated_at: now,
+        };
+        file.drafts[key] = next;
+        await this.writeFile(file);
+        return { draft: next, duplicate: false };
+      });
     });
   }
 
@@ -140,72 +143,97 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
     confirmedAt = new Date().toISOString(),
   ): Promise<IntakeCreateResult> {
     return this.withDraftLock(key, async () => {
-      const file = await this.readFile();
-      const draft = requireDraft(file, key);
-      if (draft.status === 'created' && draft.created_issue !== undefined) {
-        return { outcome: 'already_created', draft, issue: draft.created_issue };
-      }
-      if (draft.status === 'dismissed') return { outcome: 'dismissed', draft };
-      if (draft.status === 'needs-reconcile') return { outcome: 'needs_reconcile', draft };
-      if (draft.status === 'creating') {
-        const next = withFailure(draft, {
-          at: confirmedAt,
-          phase: 'creating_replay',
-          message:
-            'Prior Linear create outcome is uncertain; no second create attempted. Manual reconciliation required.',
-        });
-        file.drafts[key] = next;
-        await this.writeFile(file);
-        return { outcome: 'needs_reconcile', draft: next };
-      }
+      const transition = await this.withFileLock(
+        async (): Promise<
+          | IntakeCreateResult
+          | {
+              outcome: 'ready_to_create';
+              draft: IntakeDraft;
+              fields: Required<IntakeFields>;
+              projectId: string;
+            }
+        > => {
+          const file = await this.readFile();
+          const draft = requireDraft(file, key);
+          if (draft.status === 'created' && draft.created_issue !== undefined) {
+            return { outcome: 'already_created', draft, issue: draft.created_issue };
+          }
+          if (draft.status === 'dismissed') return { outcome: 'dismissed', draft };
+          if (draft.status === 'needs-reconcile') return { outcome: 'needs_reconcile', draft };
+          if (draft.status === 'creating') {
+            const next = withFailure(draft, {
+              at: confirmedAt,
+              phase: 'creating_replay',
+              message:
+                'Prior Linear create outcome is uncertain; no second create attempted. Manual reconciliation required.',
+            });
+            file.drafts[key] = next;
+            await this.writeFile(file);
+            return { outcome: 'needs_reconcile', draft: next };
+          }
 
-      const readyFields = intakeReadyFields(draft.fields);
-      if (
-        readyFields === null ||
-        draft.project_id === undefined ||
-        draft.project_id.trim() === ''
-      ) {
-        return { outcome: 'not_ready', draft };
-      }
+          const readyFields = intakeReadyFields(draft.fields);
+          if (
+            readyFields === null ||
+            draft.project_id === undefined ||
+            draft.project_id.trim() === ''
+          ) {
+            return { outcome: 'not_ready', draft };
+          }
 
-      const creating: IntakeDraft = {
-        ...draft,
-        status: 'creating',
-        confirmed_by: requiredString(confirmedBy, 'confirmed_by'),
-        confirmed_at: confirmedAt,
-        updated_at: confirmedAt,
-      };
-      file.drafts[key] = creating;
-      await this.writeFile(file);
+          const projectId = draft.project_id.trim();
+          const creating: IntakeDraft = {
+            ...draft,
+            status: 'creating',
+            confirmed_by: requiredString(confirmedBy, 'confirmed_by'),
+            confirmed_at: confirmedAt,
+            updated_at: confirmedAt,
+          };
+          file.drafts[key] = creating;
+          await this.writeFile(file);
+          return {
+            outcome: 'ready_to_create',
+            draft: creating,
+            fields: readyFields,
+            projectId,
+          };
+        },
+      );
+
+      if (transition.outcome !== 'ready_to_create') return transition;
 
       try {
         const issue = await create({
-          draft: creating,
-          fields: readyFields,
-          projectId: draft.project_id,
+          draft: transition.draft,
+          fields: transition.fields,
+          projectId: transition.projectId,
         });
-        const latest = await this.readFile();
-        const current = requireDraft(latest, key);
-        const created: IntakeDraft = {
-          ...current,
-          status: 'created',
-          created_issue: issue,
-          updated_at: new Date().toISOString(),
-        };
-        latest.drafts[key] = created;
-        await this.writeFile(latest);
-        return { outcome: 'created', draft: created, issue };
+        return await this.withFileLock(async () => {
+          const latest = await this.readFile();
+          const current = requireDraft(latest, key);
+          const created: IntakeDraft = {
+            ...current,
+            status: 'created',
+            created_issue: issue,
+            updated_at: new Date().toISOString(),
+          };
+          latest.drafts[key] = created;
+          await this.writeFile(latest);
+          return { outcome: 'created', draft: created, issue };
+        });
       } catch (err) {
-        const latest = await this.readFile();
-        const current = requireDraft(latest, key);
-        const failed = withFailure(current, {
-          at: new Date().toISOString(),
-          phase: 'linear_create',
-          message: err instanceof Error ? err.message : String(err),
+        return await this.withFileLock(async () => {
+          const latest = await this.readFile();
+          const current = requireDraft(latest, key);
+          const failed = withFailure(current, {
+            at: new Date().toISOString(),
+            phase: 'linear_create',
+            message: err instanceof Error ? err.message : String(err),
+          });
+          latest.drafts[key] = failed;
+          await this.writeFile(latest);
+          return { outcome: 'needs_reconcile', draft: failed };
         });
-        latest.drafts[key] = failed;
-        await this.writeFile(latest);
-        return { outcome: 'needs_reconcile', draft: failed };
       }
     });
   }
@@ -216,19 +244,21 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
     dismissedAt = new Date().toISOString(),
   ): Promise<IntakeDraft> {
     return this.withDraftLock(key, async () => {
-      const file = await this.readFile();
-      const draft = requireDraft(file, key);
-      if (draft.status === 'created' || draft.status === 'dismissed') return draft;
-      const next: IntakeDraft = {
-        ...draft,
-        status: 'dismissed',
-        dismissed_by: requiredString(dismissedBy, 'dismissed_by'),
-        dismissed_at: dismissedAt,
-        updated_at: dismissedAt,
-      };
-      file.drafts[key] = next;
-      await this.writeFile(file);
-      return next;
+      return this.withFileLock(async () => {
+        const file = await this.readFile();
+        const draft = requireDraft(file, key);
+        if (draft.status === 'created' || draft.status === 'dismissed') return draft;
+        const next: IntakeDraft = {
+          ...draft,
+          status: 'dismissed',
+          dismissed_by: requiredString(dismissedBy, 'dismissed_by'),
+          dismissed_at: dismissedAt,
+          updated_at: dismissedAt,
+        };
+        file.drafts[key] = next;
+        await this.writeFile(file);
+        return next;
+      });
     });
   }
 
@@ -249,6 +279,26 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
     } finally {
       release();
       if (this.locks.get(key) === current) this.locks.delete(key);
+    }
+  }
+
+  private async withFileLock<T>(fn: () => Promise<T>): Promise<T> {
+    const previous = this.fileLock;
+    let release: () => void = () => undefined;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const current = previous
+      .catch(() => undefined)
+      .then(() => next)
+      .then(() => undefined);
+    this.fileLock = current;
+    await previous.catch(() => undefined);
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.fileLock === current) this.fileLock = Promise.resolve();
     }
   }
 
@@ -275,7 +325,7 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
 
   private async writeFile(file: IntakeDraftFile): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tmp = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
+    const tmp = `${this.filePath}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
     await writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, 'utf8');
     await rename(tmp, this.filePath);
   }

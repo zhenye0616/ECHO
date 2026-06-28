@@ -298,7 +298,10 @@ export function extractQuestion(
 export function normalizeSlackQuestionText(text: string): string {
   return text
     .replace(/<@[A-Z0-9]+>/g, '')
-    .replace(/\s+/g, ' ')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t\f\v]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
     .trim();
 }
 

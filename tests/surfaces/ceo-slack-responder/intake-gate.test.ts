@@ -10,6 +10,7 @@ import {
 } from '../../../src/surfaces/ceo-slack-responder/intake-draft-store.js';
 import type { LinearIssueCreateInput } from '../../../src/surfaces/ceo-slack-responder/linear-client.js';
 import {
+  extractQuestion,
   respondToIntakeAction,
   respondToQuestion,
   type IntakeAction,
@@ -78,6 +79,51 @@ describe('Slack Linear intake gate', () => {
       'Created https://linear.app/echo/issue/LIN-1 in claudia, status Inbox.',
     );
     expect(posts.at(-1)).toContain('- done-when');
+  });
+
+  it('preserves complete labeled intake fields when entered through the production Slack envelope path', async () => {
+    const { store } = await tempStore();
+    const posts: string[] = [];
+    const confirmCards: string[] = [];
+    const question = extractQuestion(
+      {
+        type: 'events_api',
+        envelope_id: 'env-1',
+        payload: {
+          event_id: 'event-1',
+          team_id: 'T1',
+          event: {
+            type: 'app_mention',
+            channel: 'CENG',
+            user: 'UREQ',
+            ts: '100.1',
+            text: `<@UECHO> ${completeQuestion().text}`,
+          },
+        },
+      },
+      [],
+    );
+
+    expect(question).not.toBeNull();
+    await respondToQuestion(question!, config(), {
+      intakeDraftStore: store,
+      linearClient: {
+        createIssue: async () => {
+          throw new Error('create should wait for requester confirm');
+        },
+      },
+      postSlackMessage: async (_token, _channel, text) => {
+        posts.push(text);
+      },
+      postIntakeConfirmCard: async (_token, _channel, draft) => {
+        confirmCards.push(draft.key);
+      },
+    });
+
+    expect(posts).toEqual(['Looking...']);
+    expect(confirmCards).toEqual([
+      intakeThreadKey({ teamId: 'T1', channelId: 'CENG', rootTs: '100.1' }),
+    ]);
   });
 
   it('does not add Slack to the capture source allowlist', () => {

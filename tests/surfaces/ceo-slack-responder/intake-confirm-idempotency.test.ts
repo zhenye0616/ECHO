@@ -103,6 +103,33 @@ describe('Slack Linear intake confirm idempotency', () => {
     expect(await store.getDraft(draftKey())).toMatchObject({ status: 'created' });
     expect(await store.getDraft(key2)).toMatchObject({ status: 'created' });
   });
+
+  it('preserves every draft when different Slack threads are recorded concurrently', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'echo-linear-intake-'));
+    tempDirs.push(dir);
+    const store = new FileIntakeDraftStore(join(dir, 'drafts.json'));
+    const keys = Array.from({ length: 20 }, (_value, index) =>
+      intakeThreadKey({ teamId: 'T1', channelId: 'CENG', rootTs: `300.${index}` }),
+    );
+
+    await Promise.all(
+      keys.map((_key, index) =>
+        store.recordMessage({
+          key: { teamId: 'T1', channelId: 'CENG', rootTs: `300.${index}` },
+          requester: { slack_user_id: 'UREQ', label: 'Taylor' },
+          eventId: `event-${index}`,
+          fields: readyFields(`Concurrent request ${index}.`),
+          projectId: 'claudia-project',
+        }),
+      ),
+    );
+
+    const missing: string[] = [];
+    for (const key of keys) {
+      if ((await store.getDraft(key)) === null) missing.push(key);
+    }
+    expect(missing).toEqual([]);
+  });
 });
 
 async function readyDraft(): Promise<{
