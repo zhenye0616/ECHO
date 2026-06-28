@@ -73,6 +73,46 @@ describe('Slack Linear intake confirm idempotency', () => {
     });
   });
 
+  it('records Slack receipt failures after Linear create succeeds', async () => {
+    const { store } = await readyDraft();
+    const records: Array<{
+      draftKey: string;
+      issueUrl?: string;
+      message: string;
+      phase: string;
+    }> = [];
+    const calls: LinearIssueCreateInput[] = [];
+
+    await expect(
+      respondToIntakeAction(confirmAction(draftKey()), config(), {
+        intakeDraftStore: store,
+        linearClient: {
+          createIssue: async (input) => {
+            calls.push(input);
+            return { id: 'LIN-1', url: 'https://linear.app/echo/issue/LIN-1' };
+          },
+        },
+        appendIntakeSlackPostFailureRecord: async (_path, failure) => {
+          records.push(failure);
+        },
+        postSlackMessage: async () => {
+          throw new Error('Slack post failed after create');
+        },
+      }),
+    ).rejects.toThrow('Slack post failed after create');
+
+    expect(calls).toHaveLength(1);
+    expect(await store.getDraft(draftKey())).toMatchObject({ status: 'created' });
+    expect(records).toMatchObject([
+      {
+        draftKey: draftKey(),
+        issueUrl: 'https://linear.app/echo/issue/LIN-1',
+        message: 'Slack post failed after create',
+        phase: 'created_receipt_post',
+      },
+    ]);
+  });
+
   it('treats replayed confirms on a dismissed draft as a no-op', async () => {
     const { store } = await readyDraft();
     const calls: LinearIssueCreateInput[] = [];

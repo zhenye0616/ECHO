@@ -17,6 +17,30 @@ pr_url: ""
 agent_notes: |
   Implemented the Slack→Linear intake gate on `agent/slack-linear-intake-gate`: deterministic plain-English intake extraction, per-thread durable draft state, requester confirm/dismiss, fail-closed exactly-once Linear create, Slack link-back receipts, no Slack capture allowlist changes, operator runbook, and focused tests. Verified focused acceptance tests, full CEO Slack responder regression group, typecheck, lint, and `git diff --check`.
   Post-review root-cause fixes committed at `a6a68315686c6ea71e0d1df791219892a2c8a0fe`: production Slack envelope text now preserves labeled-line boundaries before intake parsing, and the file-backed intake draft store serializes whole-file read/modify/write sections while using unique temp paths. Added regressions for production envelope parsing and concurrent different-thread draft persistence. Verified with `npx vitest run tests/surfaces/ceo-slack-responder/intake-gate.test.ts tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts` (9/9 pass).
+review_notes: |
+  Merged on 2026-06-28T17:33:42Z via founder reconciliation.
+
+  Conflicts resolved:
+  - none — clean --no-ff merge.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - `src/surfaces/ceo-slack-responder/responder.ts` — added durable operator-visible records for intake Slack post failures, including receipt-post failures after Linear `created` / `already_created` outcomes with draft key and issue URL evidence.
+  - `tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts` — added regression coverage for the high-risk case where Linear create succeeds but the Slack receipt post fails; the draft remains created and the durable failure record captures draft key, issue URL, phase, and error message.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify (ephemeral merger worktree, fresh npm install): focused intake tests 10/10 pass; lint, typecheck, and sync-skills --check clean.
+  Full `npm test` red under founder override due two baseline failures, not item-108-caused:
+  - `tests/cli/shell-reachable.test.ts` fails on current main too. Root cause: packaged `dist/mcp/server.js` statically imports `../surfaces/ceo-slack-responder/propose-decision-tool.js`, but `package.json` ships `dist/**/*.js` while explicitly excluding `dist/surfaces/ceo-slack-responder/**`, so the installed daemon exits with `ERR_MODULE_NOT_FOUND` before health.
+  - `tests/mcp/recent-calls-endpoint.test.ts` timed out in the full suite but passed on focused rerun in the merger worktree and on current main. Root cause: the all-runtime-tools smoke loop sits at the 15s test timeout ceiling under full-suite load.
+
+  Follow-up items (non-blocking):
+  - Move `propose_decision` into the packaged MCP tool layer instead of importing it from the excluded CEO Slack responder surface, preserving the package boundary while fixing `shell-reachable`.
+  - Make `idempotency_token` deterministic or remove the random suffix before any future Linear idempotency-key reuse.
+  - Consider suppressing duplicate `Looking...` messages on replayed Slack message events.
 spec_refs:
   - docs/execution/echo/linear-intake-gate-setup.md              # SOURCE — the founder's operating design this item builds the code-bearing slice of (intake/triage/issue shapes, conversation contract, MVP phases)
   - backlog/complete/2026-06-24-107-cross-team-decision-sync-slack.md  # the propose-confirm-over-Slack pattern this reuses: draft → Slack confirm card → terminal action; identity attribution; idempotent confirm

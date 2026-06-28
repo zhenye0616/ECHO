@@ -142,12 +142,23 @@ type SlackPoster = typeof postSlackMessage;
 type IntakeConfirmPoster = typeof postIntakeConfirmCard;
 type UsageAppender = typeof appendUsageRecord;
 type IntakeFailureAppender = typeof appendIntakeFailureRecord;
+type IntakeSlackPostFailureAppender = typeof appendIntakeSlackPostFailureRecord;
+
+interface IntakeSlackPostFailureRecord {
+  phase: string;
+  draftKey: string;
+  channel: string;
+  message: string;
+  threadTs?: string;
+  issueUrl?: string;
+}
 
 interface ResponderDependencies {
   runBrain?: BrainRunner;
   postSlackMessage?: SlackPoster;
   appendUsageRecord?: UsageAppender;
   appendIntakeFailureRecord?: IntakeFailureAppender;
+  appendIntakeSlackPostFailureRecord?: IntakeSlackPostFailureAppender;
   postIntakeConfirmCard?: IntakeConfirmPoster;
   teamDecisionStore?: TeamDecisionStore;
   decisionDraftStore?: DecisionDraftStore;
@@ -441,30 +452,39 @@ export async function respondToLinearIntakeIfNeeded(
         : missing,
       { knownProjectNames: knownProjects },
     );
-    await postMessage(
-      config.slackBotToken,
-      question.channel,
-      formatIntakeFollowup(questions),
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: question.channel,
+      text: formatIntakeFollowup(questions),
       threadTs,
-    );
+      failure: {
+        phase: projectId === null ? 'project_followup_post' : 'field_followup_post',
+        draftKey: draft.key,
+      },
+    });
     return true;
   }
 
   const readyFields = intakeReadyFields(draft.fields);
   if (readyFields === null) {
-    await postMessage(
-      config.slackBotToken,
-      question.channel,
-      formatIntakeFollowup(
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: question.channel,
+      text: formatIntakeFollowup(
         buildIntakeFollowupQuestions(missing, { knownProjectNames: knownProjects }),
       ),
       threadTs,
-    );
+      failure: { phase: 'not_ready_followup_post', draftKey: draft.key },
+    });
     return true;
   }
 
   const postConfirmCard = deps.postIntakeConfirmCard ?? postIntakeConfirmCard;
-  await postConfirmCard(config.slackBotToken, question.channel, draft, readyFields, threadTs);
+  await postIntakeConfirmCardOrRecordFailure(config, deps, postConfirmCard, {
+    channel: question.channel,
+    draft,
+    fields: readyFields,
+    threadTs,
+    failure: { phase: 'confirm_card_post', draftKey: draft.key },
+  });
   return true;
 }
 
@@ -613,23 +633,33 @@ export async function respondToIntakeAction(
 
   const draft = await deps.intakeDraftStore.getDraft(action.draftKey);
   if (draft === null) {
-    await postMessage(config.slackBotToken, action.channel, 'Intake draft not found.', threadTs);
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text: 'Intake draft not found.',
+      threadTs,
+      failure: { phase: 'draft_not_found_post', draftKey: action.draftKey },
+    });
     return;
   }
   if (draft.requester.slack_user_id !== action.user) {
-    await postMessage(
-      config.slackBotToken,
-      action.channel,
-      'Only the requester can confirm or dismiss this intake draft.',
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text: 'Only the requester can confirm or dismiss this intake draft.',
       threadTs,
-    );
+      failure: { phase: 'requester_mismatch_post', draftKey: action.draftKey },
+    });
     return;
   }
 
   const actor = requesterAttributionForSlackUser(config.cofounderIdentities ?? [], action.user);
   if (action.kind === 'dismiss') {
     await deps.intakeDraftStore.dismissDraft(action.draftKey, actor);
-    await postMessage(config.slackBotToken, action.channel, 'Dismissed intake draft.', threadTs);
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text: 'Dismissed intake draft.',
+      threadTs,
+      failure: { phase: 'dismissed_post', draftKey: action.draftKey },
+    });
     return;
   }
 
@@ -658,43 +688,53 @@ export async function respondToIntakeAction(
 
   if (result.outcome === 'created' || result.outcome === 'already_created') {
     const readyFields = intakeReadyFields(result.draft.fields);
-    await postMessage(
-      config.slackBotToken,
-      action.channel,
-      readyFields === null
-        ? `Created ${result.issue.url} in Linear, status Inbox.`
-        : formatCreatedIssueReceipt({
-            issueUrl: result.issue.url,
-            projectName: readyFields.clientProject,
-            fields: readyFields,
-          }),
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text:
+        readyFields === null
+          ? `Created ${result.issue.url} in Linear, status Inbox.`
+          : formatCreatedIssueReceipt({
+              issueUrl: result.issue.url,
+              projectName: readyFields.clientProject,
+              fields: readyFields,
+            }),
       threadTs,
-    );
+      failure: {
+        phase: `${result.outcome}_receipt_post`,
+        draftKey: result.draft.key,
+        issueUrl: result.issue.url,
+      },
+    });
     return;
   }
   if (result.outcome === 'needs_reconcile') {
     const appendFailure = deps.appendIntakeFailureRecord ?? appendIntakeFailureRecord;
     await appendFailure(config.eventLogPath, result.draft);
-    await postMessage(
-      config.slackBotToken,
-      action.channel,
-      `Linear create outcome is uncertain and needs manual reconciliation. No retry was attempted. Evidence: ${
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text: `Linear create outcome is uncertain and needs manual reconciliation. No retry was attempted. Evidence: ${
         result.draft.failure?.message ?? 'unknown failure'
       }`,
       threadTs,
-    );
+      failure: { phase: 'needs_reconcile_post', draftKey: result.draft.key },
+    });
     return;
   }
   if (result.outcome === 'dismissed') {
-    await postMessage(config.slackBotToken, action.channel, 'Intake draft is dismissed.', threadTs);
+    await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+      channel: action.channel,
+      text: 'Intake draft is dismissed.',
+      threadTs,
+      failure: { phase: 'already_dismissed_post', draftKey: result.draft.key },
+    });
     return;
   }
-  await postMessage(
-    config.slackBotToken,
-    action.channel,
-    'I cannot create the issue yet because required intake context is still missing.',
+  await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
+    channel: action.channel,
+    text: 'I cannot create the issue yet because required intake context is still missing.',
     threadTs,
-  );
+    failure: { phase: 'not_ready_post', draftKey: result.draft.key },
+  });
 }
 
 export function formatIntakeFollowup(questions: readonly string[]): string {
@@ -768,6 +808,93 @@ export async function appendIntakeFailureRecord(
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, `${formatIntakeFailureRecord(draft, recordedAt)}\n`, 'utf8');
+}
+
+export function formatIntakeSlackPostFailureRecord(
+  failure: IntakeSlackPostFailureRecord,
+  recordedAt = new Date(),
+): string {
+  const parts = [
+    recordedAt.toISOString(),
+    'linear-intake-slack-post-failure',
+    `key=${failure.draftKey}`,
+    `phase=${failure.phase}`,
+    `channel=${failure.channel}`,
+  ];
+  if (failure.threadTs !== undefined) parts.push(`thread=${failure.threadTs}`);
+  if (failure.issueUrl !== undefined) {
+    parts.push(`issue_url="${escapeRecordValue(failure.issueUrl)}"`);
+  }
+  parts.push(`message="${escapeRecordValue(failure.message)}"`);
+  return parts.join(' · ');
+}
+
+export async function appendIntakeSlackPostFailureRecord(
+  path: string,
+  failure: IntakeSlackPostFailureRecord,
+  recordedAt = new Date(),
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${formatIntakeSlackPostFailureRecord(failure, recordedAt)}\n`, 'utf8');
+}
+
+async function postIntakeSlackMessageOrRecordFailure(
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+  postMessage: SlackPoster,
+  input: {
+    channel: string;
+    text: string;
+    threadTs?: string;
+    failure: Omit<IntakeSlackPostFailureRecord, 'channel' | 'message' | 'threadTs'>;
+  },
+): Promise<void> {
+  try {
+    await postMessage(config.slackBotToken, input.channel, input.text, input.threadTs);
+  } catch (err) {
+    const appendFailure =
+      deps.appendIntakeSlackPostFailureRecord ?? appendIntakeSlackPostFailureRecord;
+    await appendFailure(config.eventLogPath, {
+      ...input.failure,
+      channel: input.channel,
+      ...(input.threadTs === undefined ? {} : { threadTs: input.threadTs }),
+      message: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+async function postIntakeConfirmCardOrRecordFailure(
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+  postConfirmCard: IntakeConfirmPoster,
+  input: {
+    channel: string;
+    draft: IntakeDraft;
+    fields: Required<IntakeFields>;
+    threadTs?: string;
+    failure: Omit<IntakeSlackPostFailureRecord, 'channel' | 'message' | 'threadTs'>;
+  },
+): Promise<void> {
+  try {
+    await postConfirmCard(
+      config.slackBotToken,
+      input.channel,
+      input.draft,
+      input.fields,
+      input.threadTs,
+    );
+  } catch (err) {
+    const appendFailure =
+      deps.appendIntakeSlackPostFailureRecord ?? appendIntakeSlackPostFailureRecord;
+    await appendFailure(config.eventLogPath, {
+      ...input.failure,
+      channel: input.channel,
+      ...(input.threadTs === undefined ? {} : { threadTs: input.threadTs }),
+      message: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 function escapeRecordValue(text: string): string {
