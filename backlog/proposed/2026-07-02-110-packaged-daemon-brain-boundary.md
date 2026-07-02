@@ -26,7 +26,7 @@ files_to_modify:
   - src/surfaces/ceo-slack-responder/intake-seed.ts # AC2 — same treatment as brain.ts
   - src/enrich/granola-signals.ts                   # AC1 — import path rewrite to src/brain/
   - src/enrich/granola-intake-candidates.ts         # AC1 — import path rewrite to src/brain/
-  - tests/packaging/import-closure.test.ts          # NEW (AC3) — packs the tarball (or walks dist/ against the files rules) and fails if any shipped module's relative import resolves to an excluded path
+  - tests/packaging/import-closure.test.ts          # NEW (AC3) — resolves shipped dist/**/*.js imports against the ACTUAL npm-packed file set (npm pack or shared dry-run manifest; temp cleanup) and fails on any escape
   - tests/packaging/packed-manifest.test.ts         # snapshot ripple from the new dist/brain/* modules (expected; same pattern as 106/109)
 ---
 
@@ -87,12 +87,30 @@ if any relative import escapes the `files` allowlist.
   compiles and all its existing tests pass unmodified (test-file diffs limited
   to import paths if the surface files are removed rather than re-exported).
   `dist/surfaces/ceo-slack-responder/**` remains excluded from the tarball.
-- **AC3 — import-closure guard.** New packaging test fails on any shipped
-  module importing an excluded path. Red-verified: the guard, run against
-  current main (pre-fix), must fail on both offenders; it passes post-hoist.
-- **AC4 — full verification.** `npm run typecheck`, `npm run lint`, and
-  `npm run test:product` all pass. `packed-manifest.test.ts` snapshot updated
-  for the new `dist/brain/*` entries.
+- **AC3 — import-closure guard against the ACTUAL packed file set.** New
+  packaging test obtains the real npm-packed file list — by running `npm pack`
+  (with temp-artifact cleanup) or via the `npm pack --dry-run --json`
+  manifest, sharing the mechanism `packed-manifest.test.ts` already uses —
+  and resolves every shipped `dist/**/*.js` relative import against that
+  packed set, failing on any import that resolves outside it. A live-tree
+  walk against `package.json` `files` rules is NOT acceptable: the checkout
+  contains the excluded files, and a rules approximation can silently diverge
+  from npm's packaging semantics (r1 codex + codex-ops convergent finding).
+  Red-verified: run against current main (pre-fix) the guard must fail on
+  both offenders precisely because the packed set lacks
+  `dist/surfaces/ceo-slack-responder/{brain,intake-seed}.js`; it passes
+  post-hoist.
+- **AC4 — full verification (with a single explicit carve).** `npm run
+  typecheck` and `npm run lint` pass. `npm run test:product` passes with at
+  most ONE allowed exception: the pre-existing
+  `tests/mcp/recent-calls-endpoint.test.ts` failure tracked by item
+  2026-07-02-111-list-task-states-batched-git (r1 codex-ops finding: without
+  this carve AC4 is unsatisfiable until 111 lands, and the unattended queue
+  stalls on an out-of-scope failure). If 111 has already merged when this
+  item is built, the carve is void and the full product suite must pass.
+  `tests/cli/shell-reachable.test.ts` must pass in all cases (it is this
+  item's regression target). `packed-manifest.test.ts` snapshot updated for
+  the new `dist/brain/*` entries.
 
 ## Out of Scope (Don't Drift)
 
