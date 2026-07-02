@@ -11,7 +11,7 @@ import {
   preflightBrain,
   runBrain,
   type BrainName,
-} from '../surfaces/ceo-slack-responder/brain.js';
+} from '../brain/brain.js';
 import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 

@@ -1,16 +1,16 @@
 import { isAbsolute, join } from 'node:path';
 import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
 import { createLogger } from '../logging/index.js';
-import type { IntakeFields } from '../surfaces/ceo-slack-responder/brain.js';
+import type { IntakeFields } from '../brain/brain.js';
 import {
   parseBrainName,
   runBrain,
   type BrainName,
-} from '../surfaces/ceo-slack-responder/brain.js';
+} from '../brain/brain.js';
 import {
   renderSeedMessage,
   type MeetingProvenance,
-} from '../surfaces/ceo-slack-responder/intake-seed.js';
+} from '../brain/intake-seed.js';
 import type { CaptureEvent, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 import { GRANOLA_RAW_SOURCE, GRANOLA_SIGNAL_SOURCE } from './granola-signals.js';
