@@ -102,6 +102,142 @@ Why escalated: fixing the extra boundary crossing requires modifying files not l
 
 ---
 
+## Run 3 (resumed at 2026-07-02T21:00:54Z)
+
+## Previous Attempt State
+
+- Kept Run 2's pushed branch commit `9f0b81666abc3ac27b201cff9ece1c66bf189850`; it contained the brain/seed hoist, import rewrite, import-closure guard, AC5 dynamic `propose_decision` registration, and the launchd diagnosis.
+- The claimed item had been strategist-expanded with AC6 and `src/cli/commands/daemon.ts` / `tests/cli/daemon.test.ts` in `files_to_modify`, so this run resumed implementation rather than discarding prior work.
+- Worktree `~/Desktop/Project_echo--packaged-daemon-brain-boundary/` was clean at resume.
+
+## What I Implemented
+
+- Added a post-bootstrap `launchctl kickstart -k gui/<uid>/<label>` step in `bootstrapAndProbe()` before health probing.
+- Surfaced kickstart failure as an immediate non-zero install/start/restart failure with stderr, instead of falling through to a doomed health probe.
+- Updated daemon unit tests for the new launchctl sequence and added a focused kickstart-failure assertion.
+
+## Files Modified
+
+- Branch: `agent/packaged-daemon-brain-boundary`
+- Head SHA: `c94130f25e3b68465231ce615459f40d3dcc4f42`
+- `src/cli/commands/daemon.ts` — +13 lines; shared post-bootstrap kickstart helper + failure handling.
+- `tests/cli/daemon.test.ts` — +40/-3 lines; call-sequence and failure-surface assertions.
+
+## Decisions
+
+- Used `launchctl kickstart -k` because the manual repro showed bootstrap loaded the job but left `runs = 0`; forcing the loaded service target to spawn is the minimal AC6 change.
+- Kept restart's load-new-config shape intact: restart still bootouts, bootstraps the plist, then kickstarts the freshly loaded target. This preserves item 076's "bootout/bootstrap picks up plist changes" invariant.
+- Did not change the shell smoke, packaging guard, package manifest snapshot, or any responder/enrich code; Run 2's changes already satisfied those surfaces.
+
+## Acceptance Criteria Status
+
+- AC1 — passing. `tests/cli/shell-reachable.test.ts` now passes, including the launchd leg.
+- AC2 — passing from Run 2. Shared brain/seed modules remain under `src/brain/`; responder surface re-exports remain in place; responder tests are covered by the product suite.
+- AC3 — passing. Import-closure guard passes against the actual npm dry-run packed file set.
+- AC4 — passing with the explicit carve. `npm run typecheck`, `npm run lint`, focused tests, and `npm run test:product` were run. Product suite had exactly one failure: `tests/mcp/recent-calls-endpoint.test.ts`, which AC4 explicitly carves out while item 111 remains unmerged (`backlog/ready/2026-07-02-111-list-task-states-batched-git.md`).
+- AC5 — passing from Run 2 + product suite. Dynamic `propose_decision` registration remains in place; packed shell smoke proves the absent-path daemon boots.
+- AC6 — passing. `bootstrapAndProbe()` now kickstarts after successful bootstrap and before probing; `tests/cli/daemon.test.ts` asserts the sequence and kickstart failure path.
+
+## Test Results
+
+Initial focused daemon run failed due a test assertion using the fixture label instead of the default install label; fixed in-place and reran:
+
+```text
+$ npx vitest run tests/cli/daemon.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ❯ tests/cli/daemon.test.ts (27 tests | 1 failed) 89ms
+   × echoctl daemon > install reports kickstart failure before probing 14ms
+     → expected [ …(3) ] to include 'kickstart -k gui/501/com.echo.daemon.…'
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+```
+
+```text
+$ npx vitest run tests/cli/daemon.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ✓ tests/cli/daemon.test.ts (27 tests) 71ms
+
+ Test Files  1 passed (1)
+      Tests  27 passed (27)
+```
+
+```text
+$ npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+```text
+$ npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+```text
+$ npx vitest run tests/packaging/import-closure.test.ts tests/packaging/packed-manifest.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ✓ tests/packaging/packed-manifest.test.ts (1 test) 4462ms
+   ✓ packed package manifest > pins the sorted file path set shipped by npm pack 4461ms
+ ✓ tests/packaging/import-closure.test.ts (1 test) 4692ms
+   ✓ packed package import closure > resolves every shipped dist/**/*.js relative import inside the actual npm-packed file set 4692ms
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+```
+
+```text
+$ npx vitest run tests/cli/shell-reachable.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ✓ tests/cli/shell-reachable.test.ts (1 test) 19106ms
+   ✓ echoctl shell reachability > packs an echoctl binary reachable from bash and exercises transitive doctor imports 19106ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```
+
+```text
+$ npm run test:product
+
+> echoctl@0.1.0-beta.1 test:product
+> vitest run --config vitest.product.config.ts
+
+ FAIL  tests/mcp/recent-calls-endpoint.test.ts > GET /mcp/recent-calls > logs every runtime-registered tool through the wrapper
+Error: Test timed out in 15000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+
+ Test Files  1 failed | 151 passed | 1 skipped (153)
+      Tests  1 failed | 1606 passed | 21 skipped | 1 todo (1629)
+```
+
+```text
+$ git diff --check
+[no output]
+```
+
+## Open Questions For Founder
+
+- None.
+
+## Drift Events
+
+- None.
+
+---
+
 ## Run 2 (resumed at 2026-07-02T20:49:07Z)
 
 ## Previous Attempt State

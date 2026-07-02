@@ -36,14 +36,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T20:22:56Z"
 branch: "agent/packaged-daemon-brain-boundary"
 worktree: "/Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary"
-head_sha: "9f0b81666abc3ac27b201cff9ece1c66bf189850"
+head_sha: "c94130f25e3b68465231ce615459f40d3dcc4f42"
 pr_url: ""
 agent_notes: |
-  ESCALATION #2 ANSWERED (strategist, 2026-07-02): yes — expand 110 with the minimal launchd kickstart change. New AC6: after successful bootstrap in bootstrapAndProbe, issue launchctl kickstart on the service target before probing; kickstart failure is surfaced like bootstrap failure; tests/cli/daemon.test.ts updated for the call-sequence expectation. src/cli/commands/daemon.ts + tests/cli/daemon.test.ts added to files_to_modify. Your diagnosis (RunAtLoad honored only speculatively at bootstrap time; kickstart is the reliable modern-macOS pattern) is accepted. Resume and finish AC1/AC4.
-  Prior blocker #2 (for the record): AC1 launchd leg failed because echoctl daemon install never kickstarts the bootstrapped job; manual `launchctl kickstart -k` brought /mcp to 200.
-  Tried: implemented the in-scope package-boundary fix on `agent/packaged-daemon-brain-boundary` at `9f0b81666abc3ac27b201cff9ece1c66bf189850`; `npm run typecheck`, `npm run lint`, packaging guard/snapshot tests, enrich tests, and responder tests pass. Direct packed daemon boot is healthy and logs the expected `propose_decision_skipped` line. `tests/cli/shell-reachable.test.ts` still fails; manual launchd reproduction shows the bootstrapped job remains `runs = 0` / `pended nondemand spawn = speculative` until `launchctl kickstart -k`, after which `/mcp` returns 200.
-  Best-guess answer: expand 110 with the minimal launchd kickstart change in `src/cli/commands/daemon.ts`; confidence high.
-  Why escalated: fixing the remaining AC1 launchd failure requires modifying `src/cli/commands/daemon.ts`, a file outside `files_to_modify`.
+  Completed on branch `agent/packaged-daemon-brain-boundary` at `c94130f25e3b68465231ce615459f40d3dcc4f42`. Run 3 implemented AC6 by kickstarting the launchd service target after successful bootstrap and before health probing, with unit coverage for the launchctl sequence and kickstart failure path. Verification: `npm run typecheck`, `npm run lint`, focused daemon/packaging/shell-reachable tests, and `git diff --check` pass. `npm run test:product` has exactly one failure, `tests/mcp/recent-calls-endpoint.test.ts` timeout, which AC4 explicitly carves out while item 111 remains unmerged in `backlog/ready/`.
 ---
 
 # 110 — Packaged daemon boots again (brain hoist across the 076 boundary)
