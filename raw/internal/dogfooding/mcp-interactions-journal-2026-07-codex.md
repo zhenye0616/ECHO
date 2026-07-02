@@ -117,3 +117,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** `find_clusters.source_breakdown={git:108, claude_code:63, codex:4}` with time range `2026-07-01T16:39:21.551Z` to `2026-07-02T20:35:54.712Z`; repo filter `/Users/zhenye/Desktop/Project_echo`.
 - **Verdict:** right - MCP was reachable and repo-scoped retrieval showed active recent project work.
 - **Note:** The skeleton result was broad and not hydrated because the builder still must use the backlog item and its `spec_refs` as the implementation contract; the useful signal here is that ECHO capture is present and cross-tool.
+
+### 2026-07-02 13:55 PDT - codex builder preflight for process-backlog
+
+- **Trigger:** Founder asked this Codex session to run the ECHO builder loop in `Project_echo`; pre-claim MCP smoke test and repo-scoped context check before mutating backlog state.
+- **Query inputs:** `echo_ping(message="codex builder preflight 2026-07-02")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-07-01T00:00:00-07:00", until="2026-07-02T13:55:00-07:00", format="skeleton", view="compact")`.
+- **Returned:** `echo_ping` returned `pong=true` at `2026-07-02T20:54:19.573Z`. `find_clusters` returned 1 cluster, 181 atom ids; top label `work on project_echo`; rank reasons `[has_open_loop, has_unresolved_open_loop, code_session_anchor]`; no warnings.
+- **Sources:** `find_clusters.source_breakdown={git:111, claude_code:65, codex:5}` with time range `2026-07-01T16:39:21.551Z` to `2026-07-02T20:53:17.085Z`; repo filter `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** right - MCP was reachable and repo-scoped retrieval showed active cross-tool project work.
+- **Note:** The skeleton result is intentionally broad; it confirms capture health but does not supersede the claimed backlog item, its `spec_refs`, or the task-state pointer as the implementation contract.
