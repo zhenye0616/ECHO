@@ -95,7 +95,13 @@ function readInstalledPlist(): string {
 
 function makeSpawnSync(
   calls: Call[],
-  opts: { loaded?: boolean; etime?: string; psStatus?: number; git?: MockCommandResult } = {},
+  opts: {
+    loaded?: boolean;
+    etime?: string;
+    psStatus?: number;
+    git?: MockCommandResult;
+    kickstart?: MockCommandResult;
+  } = {},
 ) {
   return ((command: string, args: readonly string[]) => {
     const argv = [...args];
@@ -119,6 +125,14 @@ function makeSpawnSync(
       return opts.loaded
         ? { status: 0, stdout: 'pid = 12345\nstate = running\n', stderr: '' }
         : { status: 3, stdout: '', stderr: 'not loaded\n' };
+    }
+    if (command === 'launchctl' && argv[0] === 'kickstart' && opts.kickstart !== undefined) {
+      return {
+        status: opts.kickstart.status ?? null,
+        stdout: opts.kickstart.stdout ?? '',
+        stderr: opts.kickstart.stderr ?? '',
+        error: opts.kickstart.error,
+      };
     }
     if (command === 'launchctl') {
       return { status: 0, stdout: '', stderr: '' };
@@ -147,6 +161,7 @@ async function runWith(
     platform?: NodeJS.Platform;
     cwd?: string;
     git?: MockCommandResult;
+    kickstart?: MockCommandResult;
   } = {},
 ): Promise<{ code: number; calls: Call[]; stdout: string; stderr: string }> {
   const calls: Call[] = [];
@@ -160,6 +175,7 @@ async function runWith(
       etime: opts.etime,
       psStatus: opts.psStatus,
       git: opts.git,
+      kickstart: opts.kickstart,
     }),
     healthProbe: async () => opts.health ?? true,
     sleep: async () => {},
@@ -359,6 +375,7 @@ describe('echoctl daemon', () => {
         expect.stringContaining('plutil -lint'),
         expect.stringContaining('launchctl bootout gui/501/com.echo.daemon.test-abc'),
         expect.stringContaining(`launchctl bootstrap gui/501 ${plistPath}`),
+        expect.stringContaining('launchctl kickstart -k gui/501/com.echo.daemon.test-abc'),
       ]),
     );
     expect(calls.some((c) => c.args.includes('gui/501/com.echo.daemon'))).toBe(false);
@@ -405,8 +422,23 @@ describe('echoctl daemon', () => {
     expect(launchctlCalls).toEqual([
       'bootout gui/501/com.echo.daemon.test-unit',
       `bootstrap gui/501 ${plistPath}`,
+      'kickstart -k gui/501/com.echo.daemon.test-unit',
       'bootout gui/501/com.echo.daemon.test-unit',
     ]);
+  });
+
+  it('install reports kickstart failure before probing', async () => {
+    const { code, calls, stderr } = await runWith(installArgs(), {
+      kickstart: { status: 1, stderr: 'kickstart refused\n' },
+    });
+    const launchctlCalls = calls
+      .filter((c) => c.command === 'launchctl')
+      .map((c) => c.args.join(' '));
+
+    expect(code).toBe(1);
+    expect(stderr).toContain('launchctl kickstart failed: kickstart refused');
+    expect(launchctlCalls).toContain(`bootstrap gui/501 ${plistPath}`);
+    expect(launchctlCalls).toContain('kickstart -k gui/501/com.echo.daemon');
   });
 
   it('start refuses to no-op when the label is loaded but unhealthy', async () => {
@@ -525,7 +557,7 @@ describe('echoctl daemon', () => {
     expect(stdout).toContain(join(installedLogDir, 'echo-daemon.out.log'));
   });
 
-  it('stop and restart use bootout/bootstrap, never kill or kickstart', async () => {
+  it('stop and restart use bootout/bootstrap with post-bootstrap kickstart, never kill', async () => {
     writePlist();
     await runWith(['stop', '--label', 'com.echo.daemon.test-unit']);
     const stopCalls = out.join('');
@@ -541,12 +573,14 @@ describe('echoctl daemon', () => {
 
     expect(stopCalls).toContain('stopped');
     expect(restarted.calls.some((c) => c.command === 'kill')).toBe(false);
-    expect(restarted.calls.some((c) => c.args.includes('kickstart'))).toBe(false);
     expect(restarted.calls.some((c) => c.command === 'launchctl' && c.args[0] === 'bootout')).toBe(
       true,
     );
     expect(
       restarted.calls.some((c) => c.command === 'launchctl' && c.args[0] === 'bootstrap'),
+    ).toBe(true);
+    expect(
+      restarted.calls.some((c) => c.command === 'launchctl' && c.args[0] === 'kickstart'),
     ).toBe(true);
   });
 });

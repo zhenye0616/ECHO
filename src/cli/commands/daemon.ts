@@ -624,6 +624,10 @@ function bootstrap(config: DaemonConfig, deps: DaemonDeps): CommandResult {
   return launchctl(deps, ['bootstrap', userTarget(deps), config.plistPath]);
 }
 
+function kickstart(config: Pick<DaemonConfig, 'label'>, deps: DaemonDeps): CommandResult {
+  return launchctl(deps, ['kickstart', '-k', jobTarget(config, deps)]);
+}
+
 function isLaunchdNotFound(result: CommandResult): boolean {
   return /not found|No such process|Could not find/i.test(`${result.stdout}\n${result.stderr}`);
 }
@@ -799,6 +803,15 @@ async function bootstrapAndProbe(config: DaemonConfig, deps: DaemonDeps, stderr:
   }
   if (boot.status !== 0) {
     writeLine(stderr, `launchctl bootstrap failed: ${boot.stderr.trim()}`);
+    return 1;
+  }
+  const kicked = kickstart(config, deps);
+  if (commandMissing(kicked)) {
+    writeLine(stderr, 'launchctl not found; daemon lifecycle requires macOS launchd');
+    return 2;
+  }
+  if (kicked.status !== 0) {
+    writeLine(stderr, `launchctl kickstart failed: ${kicked.stderr.trim()}`);
     return 1;
   }
   if (await waitForHealthy(config, deps)) return 0;
