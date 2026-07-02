@@ -55,3 +55,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478.
 - **Verdict:** ✅ right.
 - **Note:** Finding trajectory 5→4→1; r4 is a single-delta verify with claim-ready on the table. Reframe gate correctly did not fire (1 finding < 2 threshold).
+
+### 2026-07-01 20:30 PDT — watcher r4 tick on 109: structural cut + coord_invoke for r5
+
+- **Trigger:** /review-queue-watch r4 tick — both reviewers converged on the r3 config patch (valid-but-wrong token/channel = posted-then-silently-ignored). Reframe gate FIRED (2/2 findings target r3 patch 1fe27d52); investigator verdict kind=structural_cut: the r3 validation guarantee was an impossible cross-deployment overclaim. Cut at 24100dcb (presence-only validation + deploy invariant + AC6 first-live-run smoke; runbook added to files_to_modify); removal proof matrix recorded in r4/combined.md. r5 dispatched at ad987145.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r5/request.md, correlation_id=<r5 frontmatter>); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok.
+- **Sources:** n/a (coordination call) — daemon MCP :38478.
+- **Verdict:** ✅ right.
+- **Note:** Live example of the strategist-drift discipline paying off: r3's patch-deeper reflex created r4's findings; the gate + investigator forced removal instead of a second layer of impossible validation. Finding trajectory 5→4→1→2(same defect)→r5 verify.
