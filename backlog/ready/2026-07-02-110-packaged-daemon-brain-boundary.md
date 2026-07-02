@@ -7,6 +7,7 @@ estimate: 0.5-1d (mechanical hoist + import rewrites are small; the import-closu
 created: 2026-07-02
 blocked_by: []
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: cd5d11eb9a8932117fd22382c348e5f11baa5e1ff5029a1eda07fddb9d00bfeb
 spec_refs:
   - package.json                                                          # `files` excludes dist/surfaces/ceo-slack-responder/** — the 076 packaged boundary this item must preserve, not reverse
   - backlog/complete/2026-05-26-076-packaged-echoctl-install-boundary.md  # why the responder surface is excluded from the tarball (deployment surface, not CLI product)
