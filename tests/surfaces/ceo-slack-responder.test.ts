@@ -55,6 +55,17 @@ describe('ceo-slack-responder', () => {
     expect(config.brainTimeoutMs).toBe(180000);
   });
 
+  it('requires a channel allowlist in intake-only mode so thread replies are accepted', () => {
+    expect(() =>
+      loadResponderConfig({
+        ECHO_SLACK_APP_TOKEN: 'xapp-token',
+        ECHO_SLACK_BOT_TOKEN: 'xoxb-token',
+        ECHO_CEO_CONTEXT_REPO_PATH: '/Users/zhenye/justinian.ai',
+        ECHO_SLACK_RESPONDER_INTAKE_ONLY: 'true',
+      }),
+    ).toThrow(/ECHO_CEO_SLACK_CHANNEL_IDS is required/);
+  });
+
   it('requires an absolute scoped repo path', () => {
     expect(() =>
       loadResponderConfig({

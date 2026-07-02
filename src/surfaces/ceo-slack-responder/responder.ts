@@ -2,11 +2,13 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 
+import { createLogger } from '../../logging/index.js';
 import { SqliteStorage } from '../../storage/sqlite.js';
 import {
   answerFromTeamDecisions,
   buildIntakeFollowupQuestions,
   formatBrainFailure,
+  intakeFollowupFieldsToAsk,
   intakeReadyFields,
   isLikelyLinearIntake,
   missingIntakeFields,
@@ -17,6 +19,7 @@ import {
   type BrainName,
   type BrainResult,
   type BrainRunOptions,
+  type IntakeFieldKey,
   type IntakeFields,
 } from './brain.js';
 import { createTeamDecisionStore, type TeamDecisionStore } from './decision-store.js';
@@ -61,7 +64,10 @@ import {
 const DEFAULT_ECHO_MCP_URL = 'http://127.0.0.1:38478/mcp';
 const DEFAULT_EVENT_LOG_PATH = 'raw/internal/ceo-loop-events.md';
 const DEFAULT_BRAIN_TIMEOUT_MS = 180000;
+const SOCKET_DRAIN_TIMEOUT_MS = 30000;
+const SOCKET_EXIT_DELAY_MS = 25;
 const ACK_MESSAGE = 'Looking...';
+const log = createLogger('ceo-slack-responder');
 const DEFAULT_LINEAR_INTAKE_DRAFT_STORE = join(
   homedir(),
   '.echo',
@@ -242,17 +248,24 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
     throw new Error('ECHO_CEO_CONTEXT_REPO_PATH must be an absolute path');
   }
   const linearConfig = shouldLoadLinearConfig(env) ? loadLinearConfig(env) : undefined;
+  const allowedChannelIds = parseChannelList(env.ECHO_CEO_SLACK_CHANNEL_IDS);
+  const intakeOnly = parseBooleanFlag(env.ECHO_SLACK_RESPONDER_INTAKE_ONLY);
+  if (intakeOnly && allowedChannelIds.length === 0) {
+    throw new Error(
+      'ECHO_CEO_SLACK_CHANNEL_IDS is required when ECHO_SLACK_RESPONDER_INTAKE_ONLY=true so plain Slack thread replies are accepted',
+    );
+  }
   return {
     slackAppToken: requiredEnv(env, 'ECHO_SLACK_APP_TOKEN', 'SLACK_APP_TOKEN'),
     slackBotToken: requiredEnv(env, 'ECHO_SLACK_BOT_TOKEN', 'SLACK_BOT_TOKEN'),
     echoMcpUrl: env.ECHO_MCP_URL?.trim() || DEFAULT_ECHO_MCP_URL,
     contextRepoPath,
-    allowedChannelIds: parseChannelList(env.ECHO_CEO_SLACK_CHANNEL_IDS),
+    allowedChannelIds,
     eventLogPath: env.ECHO_CEO_EVENT_LOG_PATH?.trim() || DEFAULT_EVENT_LOG_PATH,
     maxMatches: parsePositiveInt(env.ECHO_CEO_MAX_MATCHES, 5),
     brain: parseBrainName(env.ECHO_CEO_BRAIN),
     brainTimeoutMs: parsePositiveInt(env.ECHO_CEO_BRAIN_TIMEOUT_MS, DEFAULT_BRAIN_TIMEOUT_MS),
-    intakeOnly: parseBooleanFlag(env.ECHO_SLACK_RESPONDER_INTAKE_ONLY),
+    intakeOnly,
     intakeAgentProvider: parseIntakeAgentProvider(env.ECHO_INTAKE_AGENT_PROVIDER),
     intakeAgentMaxTurns: parseIntakeAgentMaxTurns(env.ECHO_INTAKE_AGENT_MAX_TURNS),
     ...(env.ECHO_INTAKE_AGENT_MODEL?.trim()
@@ -470,10 +483,29 @@ export async function respondToLinearIntakeIfNeeded(
     return true;
   }
 
-  const brain = runIntakeBrain(question.text, { knownProjectNames: knownProjects });
+  const expectedFollowupFields =
+    existingDraft === undefined || existingDraft === null
+      ? undefined
+      : (existingDraft.asked_fields ??
+        intakeFollowupFieldsToAsk(
+          nextIntakeFollowupFields(existingDraft.fields, config.linearConfig, knownProjects),
+        ));
+  const brain = runIntakeBrain(question.text, {
+    knownProjectNames: knownProjects,
+    ...(expectedFollowupFields === undefined
+      ? {}
+      : { expectedFollowupFields, inferRequest: false }),
+  });
   const mergedFields = { ...(existingDraft?.fields ?? {}), ...brain.fields };
   const projectId = resolveLinearProjectId(mergedFields.clientProject, config.linearConfig);
-  const missing = missingIntakeFields(mergedFields, { knownProjectNames: knownProjects });
+  const missing = nextIntakeFollowupFields(mergedFields, config.linearConfig, knownProjects);
+  log.debug('linear_intake_message_parsed', {
+    draft_key: key,
+    existing_draft: existingDraft !== undefined && existingDraft !== null,
+    parsed_fields: Object.keys(brain.fields),
+    missing_fields: missing,
+    project_resolved: projectId !== null,
+  });
   const requester = requesterAttributionForSlackUser(
     config.cofounderIdentities ?? [],
     question.user,
@@ -483,17 +515,13 @@ export async function respondToLinearIntakeIfNeeded(
     requester: { slack_user_id: question.user, label: requester },
     eventId: question.eventId ?? question.envelopeId,
     fields: mergedFields,
+    askedFields: intakeFollowupFieldsToAsk(missing),
     ...(projectId !== null ? { projectId } : {}),
   });
   if (duplicate) return true;
 
   if (missing.length > 0 || projectId === null) {
-    const questions = buildIntakeFollowupQuestions(
-      projectId === null && mergedFields.clientProject !== undefined
-        ? ['clientProject', ...missing.filter((field) => field !== 'clientProject')]
-        : missing,
-      { knownProjectNames: knownProjects },
-    );
+    const questions = buildIntakeFollowupQuestions(missing, { knownProjectNames: knownProjects });
     await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
       channel: question.channel,
       text: formatIntakeFollowup(questions),
@@ -528,6 +556,18 @@ export async function respondToLinearIntakeIfNeeded(
     failure: { phase: 'confirm_card_post', draftKey: draft.key },
   });
   return true;
+}
+
+function nextIntakeFollowupFields(
+  fields: IntakeFields,
+  linearConfig: LinearConfig,
+  knownProjectNames: readonly string[],
+): IntakeFieldKey[] {
+  const missing = missingIntakeFields(fields, { knownProjectNames });
+  const projectId = resolveLinearProjectId(fields.clientProject, linearConfig);
+  return projectId === null && fields.clientProject !== undefined
+    ? ['clientProject', ...missing.filter((field) => field !== 'clientProject')]
+    : missing;
 }
 
 export function extractDecisionAction(envelope: SlackEnvelope): DecisionAction | null {
@@ -1123,6 +1163,13 @@ export async function runSlackResponder(config: ResponderConfig): Promise<void> 
   if (!config.intakeOnly) {
     await preflightBrain(config.brain);
   }
+  log.info('slack_responder_starting', {
+    intake_only: config.intakeOnly === true,
+    brain: config.brain,
+    linear_enabled: config.linearConfig !== undefined,
+    allowed_channel_count: config.allowedChannelIds.length,
+    event_log_path: config.eventLogPath,
+  });
   const socketUrl = await openSocketModeUrl(config.slackAppToken);
   const Socket = globalThis.WebSocket as unknown as SocketConstructor | undefined;
   if (Socket === undefined) {
@@ -1131,8 +1178,37 @@ export async function runSlackResponder(config: ResponderConfig): Promise<void> 
   const socket = new Socket(socketUrl);
   const deps = createResponderRuntimeDependencies(config);
 
+  const inFlight = new Set<Promise<void>>();
+  let shuttingDown = false;
+
+  socket.addEventListener('open', () => {
+    log.info('slack_socket_open');
+  });
   socket.addEventListener('message', (event) => {
-    void handleSocketMessage(event, socket, config, deps);
+    if (shuttingDown) return;
+    const pending = handleSocketMessage(event, socket, config, deps).catch((err: unknown) => {
+      log.error('slack_socket_message_failed', errorPayload(err));
+    });
+    inFlight.add(pending);
+    void pending.finally(() => {
+      inFlight.delete(pending);
+    });
+  });
+  const onDisconnect = (kind: 'close' | 'error', event: unknown): void => {
+    log.error('slack_socket_disconnected', {
+      kind,
+      ...socketEventPayload(event),
+    });
+    process.exitCode = 1;
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void exitAfterSocketDisconnect(inFlight);
+  };
+  socket.addEventListener('close', (event) => {
+    onDisconnect('close', event);
+  });
+  socket.addEventListener('error', (event) => {
+    onDisconnect('error', event);
   });
 }
 
@@ -1149,24 +1225,147 @@ async function handleSocketMessage(
   const raw =
     typeof rawData === 'string' ? rawData : Buffer.from(rawData as ArrayBuffer).toString('utf8');
   const envelope = JSON.parse(raw) as SlackEnvelope;
+  log.debug('slack_envelope_received', envelopeLogPayload(envelope));
   if (envelope.envelope_id !== undefined) {
     socket.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
   }
 
   const action = extractDecisionAction(envelope);
   if (action !== null) {
+    log.debug('slack_decision_action_received', {
+      kind: action.kind,
+      channel: action.channel,
+      user: action.user,
+      thread_ts: action.threadTs ?? action.ts,
+    });
     await respondToDecisionAction(action, config, deps);
     return;
   }
 
   const intakeAction = extractIntakeAction(envelope);
   if (intakeAction !== null) {
+    log.debug('slack_intake_action_received', {
+      kind: intakeAction.kind,
+      channel: intakeAction.channel,
+      user: intakeAction.user,
+      thread_ts: intakeAction.threadTs ?? intakeAction.ts,
+      draft_key: intakeAction.draftKey,
+    });
     await respondToIntakeAction(intakeAction, config, deps);
     return;
   }
 
   const question = extractQuestion(envelope, config.allowedChannelIds);
-  if (question === null) return;
+  if (question === null) {
+    log.debug('slack_event_ignored', {
+      ...envelopeLogPayload(envelope),
+      reason: ignoredQuestionReason(envelope, config.allowedChannelIds),
+    });
+    return;
+  }
 
+  log.debug('slack_question_received', {
+    event_id: question.eventId,
+    channel: question.channel,
+    user: question.user,
+    thread_ts: question.threadTs ?? question.ts,
+  });
   await respondToQuestion(question, config, deps);
+}
+
+async function exitAfterSocketDisconnect(
+  inFlight: ReadonlySet<Promise<void>>,
+): Promise<void> {
+  await drainInFlightWork(inFlight, SOCKET_DRAIN_TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    process.exit(1);
+  }, SOCKET_EXIT_DELAY_MS);
+  timer.unref?.();
+}
+
+async function drainInFlightWork(
+  inFlight: ReadonlySet<Promise<void>>,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (inFlight.size > 0) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) return;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        Promise.all([...inFlight]),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, remainingMs);
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+}
+
+function errorPayload(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    return {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    };
+  }
+  return { message: String(err) };
+}
+
+function socketEventPayload(event: unknown): Record<string, unknown> {
+  if (typeof event !== 'object' || event === null) return { event: String(event) };
+  const input = event as Record<string, unknown>;
+  return {
+    code: input['code'],
+    reason: input['reason'],
+    message: input['message'],
+    type: input['type'],
+  };
+}
+
+function envelopeLogPayload(envelope: SlackEnvelope): Record<string, unknown> {
+  const event = envelope.payload?.event;
+  return {
+    envelope_id: envelope.envelope_id,
+    envelope_type: envelope.type,
+    payload_type: envelope.payload?.type,
+    event_id: envelope.payload?.event_id,
+    event_type: event?.type,
+    channel: event?.channel ?? envelope.payload?.channel?.id,
+    channel_type: event?.channel_type,
+    user: event?.user ?? envelope.payload?.user?.id,
+    thread_ts: event?.thread_ts ?? envelope.payload?.message?.thread_ts,
+    ts: event?.ts ?? envelope.payload?.message?.ts,
+  };
+}
+
+function ignoredQuestionReason(
+  envelope: SlackEnvelope,
+  allowedChannelIds: readonly string[],
+): string {
+  if (envelope.type !== 'events_api') return 'not_events_api';
+  if (envelope.envelope_id === undefined || envelope.envelope_id.trim() === '') {
+    return 'missing_envelope_id';
+  }
+  const event = envelope.payload?.event;
+  if (event === undefined) return 'missing_event';
+  if (event.type !== 'message' && event.type !== 'app_mention') return 'unsupported_event_type';
+  if (event.subtype !== undefined || event.bot_id !== undefined) return 'bot_or_subtyped_message';
+  if (event.channel === undefined || event.user === undefined || event.text === undefined) {
+    return 'missing_event_fields';
+  }
+  const allowed = allowedChannelIds.length === 0 || allowedChannelIds.includes(event.channel);
+  const isDirectMessage = event.channel_type === 'im';
+  const isMention = event.type === 'app_mention';
+  if (!allowed) return 'channel_not_allowlisted';
+  if (!isDirectMessage && !isMention && !allowedChannelIds.includes(event.channel)) {
+    return 'unmentioned_channel_message_requires_allowlist';
+  }
+  if (normalizeSlackQuestionText(event.text) === '') return 'empty_text';
+  return 'unknown';
 }

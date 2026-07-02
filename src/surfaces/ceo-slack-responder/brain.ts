@@ -28,6 +28,8 @@ export interface IntakeFields {
 
 export interface IntakeBrainOptions {
   knownProjectNames?: readonly string[];
+  expectedFollowupFields?: readonly IntakeFieldKey[];
+  inferRequest?: boolean;
 }
 
 export interface IntakeBrainResult {
@@ -150,9 +152,15 @@ export function runIntakeBrain(text: string, options: IntakeBrainOptions = {}): 
 
 export function extractIntakeFields(text: string, options: IntakeBrainOptions = {}): IntakeFields {
   const labeled = parseLabeledIntakeFields(text);
+  const numbered = parseNumberedIntakeFields(text, options.expectedFollowupFields ?? []);
   const knownProject = findKnownProject(text, options.knownProjectNames ?? []);
-  const request = labeled.request ?? inferRequest(text);
+  const shouldInferRequest = options.inferRequest ?? options.expectedFollowupFields === undefined;
+  const request =
+    labeled.request ??
+    numbered.request ??
+    (shouldInferRequest ? inferRequest(text, options.knownProjectNames ?? []) : undefined);
   const out: IntakeFields = {
+    ...numbered,
     ...labeled,
     ...(knownProject !== undefined ? { clientProject: knownProject } : {}),
     ...(request !== undefined ? { request } : {}),
@@ -200,11 +208,15 @@ export function intakeReadyFields(fields: IntakeFields): Required<IntakeFields> 
   };
 }
 
+export function intakeFollowupFieldsToAsk(missing: readonly IntakeFieldKey[]): IntakeFieldKey[] {
+  return missing.slice(0, 2);
+}
+
 export function buildIntakeFollowupQuestions(
   missing: readonly IntakeFieldKey[],
   options: IntakeBrainOptions = {},
 ): string[] {
-  return missing.slice(0, 2).map((field) => questionForMissingField(field, options));
+  return intakeFollowupFieldsToAsk(missing).map((field) => questionForMissingField(field, options));
 }
 
 export function isLikelyLinearIntake(
@@ -401,6 +413,75 @@ function parseLabeledIntakeFields(text: string): IntakeFields {
   return fields;
 }
 
+interface IntakeListMarker {
+  ordinal: number;
+  index: number;
+  contentStart: number;
+}
+
+const MONTH_BEFORE_MARKER_PATTERN =
+  /\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\.?$/i;
+
+function findIntakeListMarkers(text: string): IntakeListMarker[] {
+  const acceptInlineMarkers = /^\s*1[.)]\s/.test(text);
+  const markers: IntakeListMarker[] = [];
+  for (const match of text.matchAll(/(\d{1,2})[.)]\s+/g)) {
+    const index = match.index ?? 0;
+    if (index > 0 && !/\s/.test(text[index - 1] ?? '')) continue;
+    const lineStart = text.lastIndexOf('\n', index - 1) + 1;
+    const linePrefix = text.slice(lineStart, index);
+    const atLineStart = linePrefix.trim() === '';
+    if (!atLineStart && !acceptInlineMarkers) continue;
+    if (MONTH_BEFORE_MARKER_PATTERN.test(linePrefix.trimEnd())) continue;
+    markers.push({
+      ordinal: Number.parseInt(match[1] ?? '', 10),
+      index,
+      contentStart: index + match[0].length,
+    });
+  }
+  return markers;
+}
+
+function parseNumberedIntakeFields(
+  text: string,
+  expectedFields: readonly IntakeFieldKey[],
+): IntakeFields {
+  const fields: IntakeFields = {};
+  if (expectedFields.length === 0) return fields;
+  const markers = findIntakeListMarkers(text).filter(
+    (marker) => marker.ordinal >= 1 && marker.ordinal <= expectedFields.length,
+  );
+  for (const [markerIndex, marker] of markers.entries()) {
+    const field = expectedFields[marker.ordinal - 1];
+    if (field === undefined) continue;
+    const end = markers[markerIndex + 1]?.index ?? text.length;
+    const value = text.slice(marker.contentStart, end).trim();
+    if (value !== '') assignIntakeValue(fields, field, value);
+  }
+  if (Object.keys(fields).length === 0 && expectedFields.length === 1) {
+    const value = text.trim();
+    if (value !== '') assignIntakeValue(fields, expectedFields[0]!, value);
+  }
+  return compactFields(fields);
+}
+
+function assignIntakeValue(fields: IntakeFields, field: IntakeFieldKey, value: string): void {
+  const labeled = splitLeadingFieldLabel(value);
+  if (labeled === null) {
+    fields[field] = value;
+    return;
+  }
+  if (labeled.value !== '') fields[labeled.field] = labeled.value;
+}
+
+function splitLeadingFieldLabel(value: string): { field: IntakeFieldKey; value: string } | null {
+  const match = value.match(/^\s*([^:]{2,40}):\s*(.+?)\s*$/);
+  if (match === null) return null;
+  const field = intakeFieldFromLabel(match[1] ?? '');
+  if (field === null) return null;
+  return { field, value: (match[2] ?? '').trim() };
+}
+
 function intakeFieldFromLabel(label: string): IntakeFieldKey | null {
   const normalized = label
     .toLowerCase()
@@ -435,14 +516,51 @@ function findKnownProject(text: string, knownProjectNames: readonly string[]): s
   });
 }
 
-function inferRequest(text: string): string | undefined {
-  const cleaned = text
-    .replace(/<@[A-Z0-9]+>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+function inferRequest(text: string, knownProjectNames: readonly string[] = []): string | undefined {
+  const cleaned = text.replace(/<@[A-Z0-9]+>/g, '').trim();
   if (cleaned === '') return undefined;
-  const sentence = cleaned.split(/(?<=[.!?])\s+/)[0]?.trim();
-  return sentence === '' ? cleaned : sentence;
+  if (findIntakeListMarkers(cleaned).length > 1) return undefined;
+  const candidates = cleaned
+    .split(/\r?\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
+    .map((candidate) =>
+      candidate
+        .replace(/^\s*[-*]\s+/, '')
+        .replace(/^\s*\d{1,2}[.)]\s+/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter((candidate) => candidate !== '')
+    .map((candidate) => stripMetaLinearIssuePrefix(candidate))
+    .filter((candidate) => candidate !== '')
+    .filter((candidate) => !isMetaLinearIssueRequest(candidate))
+    .filter((candidate) => !isLowInformationRequest(candidate, knownProjectNames));
+  return candidates[0];
+}
+
+function stripMetaLinearIssuePrefix(candidate: string): string {
+  if (!isMetaLinearIssueRequest(candidate)) return candidate;
+  const colonIndex = candidate.indexOf(':');
+  if (colonIndex === -1) return candidate;
+  const remainder = candidate.slice(colonIndex + 1).trim();
+  return remainder === '' ? candidate : remainder;
+}
+
+function isMetaLinearIssueRequest(candidate: string): boolean {
+  const normalized = candidate.toLowerCase();
+  return (
+    /\b(?:can you|could you|please)\b/.test(normalized) &&
+    /\b(?:linear|issue|ticket)\b/.test(normalized) &&
+    /\b(?:this|it)\b/.test(normalized)
+  );
+}
+
+function isLowInformationRequest(candidate: string, knownProjectNames: readonly string[]): boolean {
+  const normalized = normalizeProjectName(candidate);
+  if (['yes', 'no', 'not sure', 'urgent', 'high', 'medium', 'low'].includes(normalized)) {
+    return true;
+  }
+  return knownProjectNames.some((name) => normalized === normalizeProjectName(name));
 }
 
 function inferUrgency(text: string): string | undefined {

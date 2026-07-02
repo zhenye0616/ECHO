@@ -7,8 +7,9 @@ Validation-only Slack Socket Mode responder for the eng-to-CEO context loop.
 - `ECHO_SLACK_APP_TOKEN` or `SLACK_APP_TOKEN`: Slack Socket Mode app token.
 - `ECHO_SLACK_BOT_TOKEN` or `SLACK_BOT_TOKEN`: Slack bot token for threaded replies.
 - `ECHO_CEO_CONTEXT_REPO_PATH`: absolute path to the scoped context repo. Brain invocations run with this as cwd and the prompt pins ECHO MCP calls to this path.
-- `ECHO_CEO_SLACK_CHANNEL_IDS`: optional comma-separated channel allowlist. Direct messages are accepted without this list.
+- `ECHO_CEO_SLACK_CHANNEL_IDS`: comma-separated channel allowlist. When the list is empty, DMs and app mentions are accepted from any channel. When the list is non-empty, every event — including DMs — is dropped unless its channel ID is in the list, so a DM only works if the DM channel ID (`D...`) is itself allowlisted. Required in intake-only mode (startup fails without it).
 - `ECHO_CEO_EVENT_LOG_PATH`: optional usage log path. Defaults to `raw/internal/ceo-loop-events.md`.
+- `ECHO_LOG_LEVEL`: structured stdout log threshold: `debug`, `info`, `warn`, or `error`. Defaults to `info`.
 - `ECHO_CEO_BRAIN`: `codex` or `claude`. Defaults to `codex`.
 - `ECHO_CEO_BRAIN_TIMEOUT_MS`: hard brain timeout in milliseconds. Defaults to `180000`.
 - `ECHO_SLACK_RESPONDER_INTAKE_ONLY`: when true, disables general brain answers and only handles Slack-to-Linear intake. This is the Fly.io teammate-facing mode.
@@ -19,6 +20,8 @@ Validation-only Slack Socket Mode responder for the eng-to-CEO context loop.
 - `ECHO_LINEAR_INTAKE_ENABLED`: when `true`, loads the Linear intake create path.
 - `LINEAR_API_KEY`, `LINEAR_TEAM_ID`, `LINEAR_INBOX_STATE_ID`, `LINEAR_DEFAULT_ASSIGNEE_ID`, `LINEAR_DEFAULT_PROJECT_ID`, `LINEAR_PROJECT_MAP`: required for Linear issue creation.
 - `ECHO_LINEAR_INTAKE_DRAFT_STORE`: durable JSON draft/idempotency store path. Fly uses `/data/linear-intake-drafts.json`.
+
+In intake-only mode, `ECHO_CEO_SLACK_CHANNEL_IDS` is required: `loadResponderConfig` throws and the process fails at startup, before opening Slack Socket Mode, if the list is empty. The list is what lets plain (unmentioned) thread replies in the intake channel through; it also means DMs are dropped in intake-only deployments unless the DM channel ID is added to the same list.
 
 ## Brain Preflight
 
@@ -43,6 +46,7 @@ fly volumes create echo_slack_data --app project-ech0 --region sjc --size 1
 fly secrets set --app project-ech0 \
   ECHO_SLACK_APP_TOKEN=xapp-... \
   ECHO_SLACK_BOT_TOKEN=xoxb-... \
+  ECHO_CEO_SLACK_CHANNEL_IDS=C... \
   ANTHROPIC_API_KEY=sk-ant-... \
   LINEAR_API_KEY=lin_api_... \
   LINEAR_TEAM_ID=... \
@@ -57,6 +61,26 @@ Deploy:
 ```bash
 fly deploy --app project-ech0
 ```
+
+Debug live behavior with:
+
+```bash
+fly logs --app project-ech0
+fly secrets set --app project-ech0 ECHO_LOG_LEVEL=debug
+```
+
+Logs are JSON lines on stdout. Useful message names, with their levels:
+
+- `slack_responder_starting` — info
+- `slack_socket_open` — info
+- `slack_socket_disconnected` — error
+- `slack_socket_message_failed` — error
+- `slack_envelope_received` — debug
+- `slack_event_ignored` — debug
+- `slack_question_received` — debug
+- `linear_intake_message_parsed` — debug
+
+`fly.toml` ships `ECHO_LOG_LEVEL=info`, so the debug-level messages (`slack_envelope_received`, `slack_event_ignored`, `slack_question_received`, `linear_intake_message_parsed`) are invisible by default; set `ECHO_LOG_LEVEL=debug` to see them. Slack message text and token values are not logged.
 
 ## Reply Shape
 

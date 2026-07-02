@@ -15,8 +15,26 @@ export interface CreatedIssueReceiptInput {
   fields: Required<IntakeFields>;
 }
 
+const MAX_TITLE_LENGTH = 255;
+const TITLE_TRUNCATE_TARGET = 200;
+const FALLBACK_TITLE = 'Untitled intake request';
+
 export function renderIssueTitle(fields: Required<IntakeFields>): string {
-  return fields.request.trim();
+  const normalized = fields.request.trim().replace(/\s+/g, ' ');
+  if (normalized.length === 0) {
+    return FALLBACK_TITLE;
+  }
+  if (normalized.length <= MAX_TITLE_LENGTH) {
+    return normalized;
+  }
+  const sentenceMatch = normalized.match(/^.*?[.!?](?=\s|$)/);
+  if (sentenceMatch && sentenceMatch[0].length <= TITLE_TRUNCATE_TARGET) {
+    return sentenceMatch[0];
+  }
+  const hardCut = normalized.slice(0, TITLE_TRUNCATE_TARGET);
+  const lastSpace = hardCut.lastIndexOf(' ');
+  const wordCut = lastSpace > 0 ? hardCut.slice(0, lastSpace) : hardCut;
+  return `${wordCut.trimEnd()}…`;
 }
 
 export function renderParentDeliverableIssue(input: IssueRenderInput): string {

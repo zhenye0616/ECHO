@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { intakeReadyFields, type IntakeFields } from './brain.js';
+import { intakeReadyFields, type IntakeFieldKey, type IntakeFields } from './brain.js';
 import type { LinearIssueCreated } from './linear-client.js';
 
 export type IntakeDraftStatus =
@@ -35,6 +35,7 @@ export interface IntakeDraft {
   root_ts: string;
   requester: IntakeRequester;
   fields: IntakeFields;
+  asked_fields?: IntakeFieldKey[];
   project_id?: string;
   status: IntakeDraftStatus;
   idempotency_token: string;
@@ -54,6 +55,7 @@ export interface RecordIntakeMessageInput {
   requester: IntakeRequester;
   eventId: string;
   fields: IntakeFields;
+  askedFields?: readonly IntakeFieldKey[];
   projectId?: string;
 }
 
@@ -126,6 +128,7 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
           requester: draft.requester,
           fields: compactFields({ ...draft.fields, ...input.fields }),
           slack_event_ids: [...draft.slack_event_ids, eventId],
+          ...(input.askedFields !== undefined ? { asked_fields: [...input.askedFields] } : {}),
           ...(input.projectId !== undefined ? { project_id: input.projectId } : {}),
           updated_at: now,
         };

@@ -11,6 +11,7 @@ import {
   preflightBrain,
   resolveBrainInvocation,
   runBrain,
+  runIntakeBrain,
   type BrainRegistry,
 } from '../../src/surfaces/ceo-slack-responder/brain.js';
 
@@ -187,6 +188,121 @@ describe('ceo-slack-responder brain', () => {
     expect(prompt).toContain('Scope repo path: /Users/zhenye/justinian.ai');
     expect(prompt).toContain('Return only the final Slack-ready answer.');
     expect(prompt).toContain('Question: why?');
+  });
+
+  it('infers the real request after a meta Linear issue ask', () => {
+    const result = runIntakeBrain(
+      ['Can you make a Linear issue for this?', 'Claudia needs real-time amendment alerts.'].join(
+        '\n',
+      ),
+      { knownProjectNames: ['claudia'] },
+    );
+
+    expect(result.fields).toMatchObject({
+      clientProject: 'claudia',
+      request: 'Claudia needs real-time amendment alerts.',
+    });
+  });
+
+  it('maps numbered follow-up replies to the expected missing fields', () => {
+    const result = runIntakeBrain(
+      ['1. compliance reviewers need fast amendment visibility', '2. users see changed text'].join(
+        '\n',
+      ),
+      {
+        knownProjectNames: ['claudia'],
+        expectedFollowupFields: ['why', 'clientOutcome'],
+        inferRequest: false,
+      },
+    );
+
+    expect(result.fields).toEqual({
+      why: 'compliance reviewers need fast amendment visibility',
+      clientOutcome: 'users see changed text',
+    });
+  });
+
+  it('parses inline numbered answers when the reply opens with a 1. marker', () => {
+    const result = runIntakeBrain(
+      '1. claudia 2. hard to evaluate the quality of llm output if content length are inconsistent',
+      {
+        knownProjectNames: ['claudia'],
+        expectedFollowupFields: ['clientProject', 'why'],
+        inferRequest: false,
+      },
+    );
+
+    expect(result.fields).toMatchObject({
+      clientProject: 'claudia',
+      why: 'hard to evaluate the quality of llm output if content length are inconsistent',
+    });
+  });
+
+  it('does not treat month-day prose digits as list markers', () => {
+    const result = runIntakeBrain('we need this shipped by June 2. the client demo depends on it', {
+      expectedFollowupFields: ['why'],
+      inferRequest: false,
+    });
+
+    expect(result.fields).toEqual({
+      why: 'we need this shipped by June 2. the client demo depends on it',
+    });
+  });
+
+  it('detects adjacent markers so a skipped question does not swallow the next answer', () => {
+    const result = runIntakeBrain('1. 2. users see changed text', {
+      expectedFollowupFields: ['why', 'clientOutcome'],
+      inferRequest: false,
+    });
+
+    expect(result.fields).toEqual({ clientOutcome: 'users see changed text' });
+  });
+
+  it('assigns a labeled answer to the labeled field instead of the asked field', () => {
+    const result = runIntakeBrain('urgency: high', {
+      expectedFollowupFields: ['why'],
+      inferRequest: false,
+    });
+
+    expect(result.fields).toEqual({ urgency: 'high' });
+  });
+
+  it('keeps the substantive remainder of a meta ask carrying a colon', () => {
+    const result = runIntakeBrain(
+      'Can you file a ticket for this: exports lose receipts on retry.',
+      {
+        knownProjectNames: ['claudia'],
+      },
+    );
+
+    expect(result.fields).toMatchObject({ request: 'exports lose receipts on retry.' });
+  });
+
+  it('filters meta asks where the politeness word follows the Linear keyword', () => {
+    const result = runIntakeBrain(
+      ['File this in Linear please.', 'The summary length is inconsistent across cards.'].join(
+        '\n',
+      ),
+      { knownProjectNames: ['claudia'] },
+    );
+
+    expect(result.fields).toMatchObject({
+      request: 'The summary length is inconsistent across cards.',
+    });
+  });
+
+  it('does not let prose dates suppress request inference', () => {
+    const result = runIntakeBrain(
+      'Claudia needs the export fixed by June 2. Demo on July 3. is at risk.',
+      {
+        knownProjectNames: ['claudia'],
+      },
+    );
+
+    expect(result.fields).toMatchObject({
+      clientProject: 'claudia',
+      request: 'Claudia needs the export fixed by June 2.',
+    });
   });
 });
 

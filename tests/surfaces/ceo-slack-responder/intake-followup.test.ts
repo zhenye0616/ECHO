@@ -84,6 +84,95 @@ describe('Slack Linear intake follow-ups', () => {
     });
   });
 
+  it('maps numbered thread replies to the asked follow-up fields without overwriting the request', async () => {
+    const { store } = await tempStore();
+
+    await respondToQuestion(
+      question(
+        ['Can you make a Linear issue for this?', 'Claudia needs real-time amendment alerts.'].join(
+          '\n',
+        ),
+        'env-1',
+      ),
+      config(),
+      {
+        intakeDraftStore: store,
+        linearClient: { createIssue: async () => ({ id: 'LIN-1', url: 'url' }) },
+        postSlackMessage: async () => undefined,
+      },
+    );
+
+    await respondToQuestion(
+      question(
+        [
+          '1. compliance reviewers need to see amendments quickly',
+          '2. Claudia users can see changed bill text',
+        ].join('\n'),
+        'env-2',
+        { ts: '200.1', threadTs: '100.1' },
+      ),
+      config(),
+      {
+        intakeDraftStore: store,
+        linearClient: { createIssue: async () => ({ id: 'LIN-1', url: 'url' }) },
+        postSlackMessage: async () => undefined,
+      },
+    );
+
+    const draft = await store.getDraft(
+      intakeThreadKey({ teamId: 'T1', channelId: 'CENG', rootTs: '100.1' }),
+    );
+    expect(draft?.fields).toMatchObject({
+      clientProject: 'claudia',
+      request: 'Claudia needs real-time amendment alerts.',
+      why: 'compliance reviewers need to see amendments quickly',
+      clientOutcome: 'Claudia users can see changed bill text',
+    });
+  });
+
+  it('persists the asked follow-up fields and parses inline numbered replies against them', async () => {
+    const { store } = await tempStore();
+    const deps = {
+      intakeDraftStore: store,
+      linearClient: { createIssue: async () => ({ id: 'LIN-1', url: 'url' }) },
+      postSlackMessage: async () => undefined,
+    };
+
+    await respondToQuestion(
+      question(
+        [
+          'can you make a Linear issue for this?',
+          'The summary length is inconsistent across cards.',
+        ].join('\n'),
+        'env-1',
+      ),
+      config(),
+      deps,
+    );
+    const key = intakeThreadKey({ teamId: 'T1', channelId: 'CENG', rootTs: '100.1' });
+    const asked = await store.getDraft(key);
+    expect(asked?.asked_fields).toEqual(['clientProject', 'why']);
+    expect(asked?.fields).toMatchObject({
+      request: 'The summary length is inconsistent across cards.',
+    });
+
+    await respondToQuestion(
+      question(
+        '1. claudia 2. hard to evaluate the quality of llm output if content length are inconsistent',
+        'env-2',
+        { ts: '200.1', threadTs: '100.1' },
+      ),
+      config(),
+      deps,
+    );
+    const draft = await store.getDraft(key);
+    expect(draft?.fields).toMatchObject({
+      clientProject: 'claudia',
+      request: 'The summary length is inconsistent across cards.',
+      why: 'hard to evaluate the quality of llm output if content length are inconsistent',
+    });
+  });
+
   it('does not collide across channels with the same root timestamp', async () => {
     const { store } = await tempStore();
     const deps = {
