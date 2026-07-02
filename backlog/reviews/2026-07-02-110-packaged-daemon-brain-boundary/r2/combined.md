@@ -32,9 +32,9 @@ Missing required reviewers:
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | LOW | codex-ops | did not respond; per 044 AC4 single-reviewer auto-disposition | _strategist fills_ | _strategist fills_ |
+| 1 | LOW | codex-ops | did not respond; per 044 AC4 single-reviewer auto-disposition | accepted as missing per 044 AC4 — no patch | codex-ops reviewed and approved the direction in r1 (its two r1 findings drove the r1 patches this r2 verifies); present reviewer verified both r1 patches with zero findings |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R2.
 
