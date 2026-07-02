@@ -37,3 +37,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination tool, not retrieval) — target = production daemon MCP :38478; both headless reviewer roles resolved from tools/review-queue/coord-roles.json.
 - **Verdict:** ✅ right — active trigger accepted for both reviewers; launchd cadence remains the redundant path.
 - **Note:** First 109 round ran reviewer wrappers manually (background bash); r2 uses the active trigger end-to-end. If r2 responses don't land within ~2 wrapper cadences, fall back to manual wrapper fire.
+
+### 2026-07-01 20:05 PDT — watcher r2 tick on 109: reframe gate + coord_invoke for r3
+
+- **Trigger:** /review-queue-watch r2 tick — 4/4 findings targeted r1 patch commit e3dacdcb → mandatory fresh-context investigator (codex exec read-only) before disposition; then branch (b) dispatched r3 at 10e28c09 and 057b hook fired.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r3/request.md, correlation_id=<r3 frontmatter>); coord_invoke(role=codex-ops, same). Investigator made zero ECHO MCP calls (grep/read only — skip rule, noted here only as part of the tick record).
+- **Returned:** both coord_invoke ok. Investigator verdict: kind=propagation_completion (r1 mechanisms load-bearing; r2 = incomplete propagation into event-id ordering, dismissal coverage, overlapping-run semantics).
+- **Sources:** n/a (coordination call) — daemon MCP :38478; roles from tools/review-queue/coord-roles.json.
+- **Verdict:** ✅ right — active trigger accepted for both reviewers; r2 spec patches at 6f2d28b0.
+- **Note:** Investigator's risk note materially improved the patch: AC3 event-id invariant stated against the existing slack_event_ids-on-draft coupling instead of prescribing a new store.
