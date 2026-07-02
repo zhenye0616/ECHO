@@ -118,3 +118,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** Machine-scoped recall worked exactly as designed — question asked in Project_echo, answer was entirely in a different repo (justinian.ai) plus a Granola meeting. The newest atom was itself a prior-session "where we left off" synthesis, which made reconstruction nearly free. The 8-atom budget drop flagging which IDs were dropped (and open_loop_hints marking two of them unresolved) made the recovery fetch surgical.
 - **Conjecture:** prefer=newest_first dropping unresolved-open-loop atoms under budget suggests open-loop atoms might deserve budget priority over pure recency.
+
+### 2026-07-02 13:35 PDT — office-hours Phase 0: two-product-shapes unification question
+- **Trigger:** founder asked how the machine context layer + orchestration loop and the Fly-deployed team-alignment surface "become one" product; /office-hours Phase 0 context pull before interrogation
+- **Query inputs:** search_memories({query:"org-level alignment", limit:8}) + search_memories({query:"wedge is the loop", limit:8})
+- **Returned:** 2 + 8 matches. Query 1 pinned the 109 proposal commit (5972dcf, org-alignment v0 framing) + the 07-01 office-hours session opener. Query 2 recovered the full strategy spine: 82ccced (06-18 cross-human ecosystem CONVICTION bet, B2 federated, 3 demand gates skipped), the 06-05 office-hours "moat not painkiller" finding, the 06-02 install-profile-split phasing (customer=context-only, dogfood=+orchestration), and the 06-01 wedge=loop reversal.
+- **Sources:** git:/Users/zhenye/Desktop/Project_echo (decision + journal commits) + fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/*.jsonl (office-hours + strategist sessions). Codex/cursor/granola silently absent from both result sets — consistent, the strategy record is claude+git-authored.
+- **Verdict:** ✅ right
+- **Note:** Literal-token discipline again beat paraphrase ("wedge is the loop" verbatim recovered the whole fork chain). The record shows the unification question was pre-answered structurally twice (084 profiles, 107 decision-layer cut) but never as a single product statement — that's the actual gap the interrogation should press.
