@@ -30,6 +30,8 @@ files_to_modify:
   - tests/packaging/import-closure.test.ts          # NEW (AC3) — resolves shipped dist/**/*.js imports against the ACTUAL npm-packed file set (npm pack or shared dry-run manifest; temp cleanup) and fails on any escape
   - tests/packaging/packed-manifest.test.ts         # snapshot ripple from the new dist/brain/* modules (expected; same pattern as 106/109)
   - src/mcp/server.ts                               # AC5 — guarded dynamic import replaces the static propose-decision-tool import (founder-dispositioned escalation 2026-07-02)
+  - src/cli/commands/daemon.ts                      # AC6 — launchctl kickstart after successful bootstrap (strategist-dispositioned escalation #2, 2026-07-02)
+  - tests/cli/daemon.test.ts                        # AC6 — kickstart expectation in the launchctl call-sequence assertions
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T20:22:56Z"
 branch: "agent/packaged-daemon-brain-boundary"
@@ -37,7 +39,8 @@ worktree: "/Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary"
 head_sha: "9f0b81666abc3ac27b201cff9ece1c66bf189850"
 pr_url: ""
 agent_notes: |
-  BLOCKED: Should item 110 be expanded to allow `src/cli/commands/daemon.ts` so `echoctl daemon install` can kickstart the launchd job after bootstrap?
+  ESCALATION #2 ANSWERED (strategist, 2026-07-02): yes — expand 110 with the minimal launchd kickstart change. New AC6: after successful bootstrap in bootstrapAndProbe, issue launchctl kickstart on the service target before probing; kickstart failure is surfaced like bootstrap failure; tests/cli/daemon.test.ts updated for the call-sequence expectation. src/cli/commands/daemon.ts + tests/cli/daemon.test.ts added to files_to_modify. Your diagnosis (RunAtLoad honored only speculatively at bootstrap time; kickstart is the reliable modern-macOS pattern) is accepted. Resume and finish AC1/AC4.
+  Prior blocker #2 (for the record): AC1 launchd leg failed because echoctl daemon install never kickstarts the bootstrapped job; manual `launchctl kickstart -k` brought /mcp to 200.
   Tried: implemented the in-scope package-boundary fix on `agent/packaged-daemon-brain-boundary` at `9f0b81666abc3ac27b201cff9ece1c66bf189850`; `npm run typecheck`, `npm run lint`, packaging guard/snapshot tests, enrich tests, and responder tests pass. Direct packed daemon boot is healthy and logs the expected `propose_decision_skipped` line. `tests/cli/shell-reachable.test.ts` still fails; manual launchd reproduction shows the bootstrapped job remains `runs = 0` / `pended nondemand spawn = speculative` until `launchctl kickstart -k`, after which `/mcp` returns 200.
   Best-guess answer: expand 110 with the minimal launchd kickstart change in `src/cli/commands/daemon.ts`; confidence high.
   Why escalated: fixing the remaining AC1 launchd failure requires modifying `src/cli/commands/daemon.ts`, a file outside `files_to_modify`.
@@ -158,6 +161,20 @@ imports, so the seam does not weaken it.
   `ERR_MODULE_NOT_FOUND` without rethrowing), add it; if it needs new harness
   machinery, skip it and note that AC1 covers the path — do not build
   simulation infrastructure for this.
+- **AC6 — launchd job actually starts on install (strategist-dispositioned
+  escalation #2, 2026-07-02).** Builder's manual repro: `launchctl bootstrap`
+  leaves the job at `runs = 0` (`pended nondemand spawn = speculative`)
+  despite `RunAtLoad=true` in the plist; the daemon only starts after
+  `launchctl kickstart`. Fix: after a successful bootstrap in
+  `src/cli/commands/daemon.ts` (`bootstrapAndProbe` is the natural site — it
+  covers install/start/restart consistently), issue `launchctl kickstart`
+  (`-k` at builder's discretion) on the service target before probing.
+  Kickstart failure surfaces the same way bootstrap failure does (error to
+  stderr, non-zero exit) — no silent fallthrough to a doomed probe.
+  `tests/cli/daemon.test.ts` diffs limited to the new kickstart expectation
+  in the launchctl call sequence. This is what makes AC1's launchd leg pass;
+  a fresh install must reach healthy within the existing probe budget with
+  no reboot and no manual kickstart.
 
 ## Out of Scope (Don't Drift)
 
