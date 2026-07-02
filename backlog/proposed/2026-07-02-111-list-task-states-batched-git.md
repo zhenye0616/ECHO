@@ -19,7 +19,9 @@ files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms paths against the substrate before claiming.
   - src/mcp/util/role-state-git.ts           # batched helpers: listTreeAtRef reuse for stage dirs, blob reads via `git cat-file --batch`, commit times via one `git log --name-only` walk (or ls-tree + single log)
   - src/mcp/tools/list-task-states.ts        # rewire listTaskStates() onto the batched reads; per-entry logic unchanged
-  - tests/mcp/tools/list-task-states-batching.test.ts  # NEW — spawn-count assertion via injected gitCapture spy + output-equivalence against the naive path on a fixture repo
+  - tests/mcp/tools/list-task-states-batching.test.ts  # NEW — spawn-ledger assertion (all git children, capture + streaming) + deep-equal vs the checked-in baseline JSON on the deterministic fixture repo
+  - tests/mcp/tools/fixtures/build-list-task-states-fixture.ts  # NEW (AC2) — deterministic fixture-repo builder (pinned author/committer identity + dates so fixture SHAs are stable across machines)
+  - tests/mcp/tools/fixtures/list-task-states-baseline.json     # NEW (AC2) — expected output generated ONCE from the pre-rewire implementation; checked in before the rewire commit
 ---
 
 # 111 — list_task_states batched git reads (flat latency at any task count)
@@ -88,24 +90,40 @@ walk = **8 total**; expected latency well under 1s on this repo.
 
 ## Acceptance Criteria
 
-- **AC1 — constant spawn count.** For a bare `{}` call, total git subprocesses
-  is the fixed enumerated budget of 8 (rev-parse; ls-tree -r task-state
-  discovery; 4× stage ls-tree; cat-file --batch; log --name-only walk),
-  independent of the number of task-state dirs. Task-id discovery MUST come
-  from the pinned ls-tree call, not the working tree. Asserted by test via an
-  injected/spied `gitCapture` (no wall-clock flakiness).
-- **AC2 — output equivalence against a named baseline.** Baseline mechanism
-  (r1 codex finding — the old code path no longer exists once rewired): the
-  builder generates the expected output ONCE by running the pre-change
-  implementation (at the commit before the rewire) against the test fixture
-  repo, and checks it in as a static expected-JSON fixture; the test
-  deep-equals the batched implementation's result against that fixture at the
-  same ref. Copying old production logic into the test, or comparing the new
-  implementation to itself, are both explicitly non-compliant. Fixture repo
-  must cover tasks across multiple stages, a stage-less task, a
-  strategist-less task, and a malformed anchors file exercising
-  `_parse_error` degradation. `tests/echo-mcp/role-state.test.ts` passes
-  unmodified.
+- **AC1 — constant spawn count through a single accounting seam.** For a bare
+  `{}` call, total git child processes is the fixed enumerated budget of 8
+  (rev-parse; ls-tree -r task-state discovery; 4× stage ls-tree; cat-file
+  --batch; log --name-only walk), independent of the number of task-state
+  dirs. Task-id discovery MUST come from the pinned ls-tree call, not the
+  working tree. ALL git children — captured AND streaming (the cat-file
+  --batch and log-walk processes AC6 allows to stream) — are spawned through
+  ONE injectable git-runner/process-factory seam, and the test asserts via
+  that seam's ledger exactly the 8 enumerated children by argv and fails on
+  any additional git child (r2 codex finding: a `gitCapture`-only spy could
+  be bypassed by raw streaming spawns). An equivalent single-accounting-
+  boundary pattern is acceptable, but the one-seam property is mandatory. No
+  wall-clock assertions.
+- **AC2 — output equivalence against a named, reproducible baseline.**
+  Baseline mechanism (r1 codex finding; paths + sequence per r2 codex
+  finding). Named artifacts:
+  `tests/mcp/tools/fixtures/build-list-task-states-fixture.ts` (deterministic
+  fixture-repo builder: constructs the fixture git repo in a temp dir with
+  pinned `GIT_AUTHOR_*`/`GIT_COMMITTER_*` identity and dates so the fixture's
+  commit SHAs — and therefore the baseline's `ref` and `last_updated` fields —
+  are stable across machines and runs) and
+  `tests/mcp/tools/fixtures/list-task-states-baseline.json` (the checked-in
+  expected output). Ordered builder sequence, enforced by commit order on the
+  feature branch: (1) land the fixture builder while the pre-rewire
+  implementation is still in the tree; (2) run the old `listTaskStates`
+  against the built fixture and check the generated JSON in as the baseline;
+  (3) only then rewire production code; (4) the equivalence test rebuilds the
+  identical fixture repo and deep-equals the batched implementation's output
+  against the checked-in JSON at the same ref. Copying old production logic
+  into the test, or comparing the new implementation to itself, are both
+  explicitly non-compliant. Fixture repo must cover tasks across multiple
+  stages, a stage-less task, a strategist-less task, and a malformed anchors
+  file exercising `_parse_error` degradation.
+  `tests/echo-mcp/role-state.test.ts` passes unmodified.
 - **AC3 — single-SHA pinning preserved.** All batched commands are pinned to
   the one `resolveRefOnce` SHA; the `ref` param and the echoed resolved-SHA
   response field behave exactly as today (046 AC4 R2 invariant).
@@ -123,7 +141,10 @@ walk = **8 total**; expected latency well under 1s on this repo.
   reads use streaming or an explicit max-buffer sized for growth; a
   high-cardinality fixture (≥10× today's task-dir count, generated
   synthetically) asserts output larger than the old per-file capture size is
-  handled correctly. No timing assertions in either test.
+  handled correctly. No timing assertions in either test. Streaming children
+  created under this AC are NOT exempt from AC1: they spawn through the same
+  injectable git-runner seam and count against the 8-child ledger (r2 codex
+  finding).
 
 ## Out of Scope (Don't Drift)
 
