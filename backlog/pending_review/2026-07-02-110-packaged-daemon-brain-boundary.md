@@ -32,10 +32,14 @@ files_to_modify:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T20:22:56Z"
 branch: "agent/packaged-daemon-brain-boundary"
-worktree: ""
-head_sha: ""
+worktree: "/Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary"
+head_sha: "2e05f05f4cce82ffa884e49089ba96e44692febc"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  BLOCKED: Should item 110 expand to move or decouple `propose_decision` registration out of `src/surfaces/ceo-slack-responder/`, or should that boundary crossing be split into a prerequisite item?
+  Tried: implemented the AC3 packed import-closure guard in `tests/packaging/import-closure.test.ts`, using `npm pack --dry-run --json` for the actual packed file set and TypeScript AST parsing for relative runtime imports; red-ran it before source hoist work.
+  Best-guess answer: expand 110 or create a prerequisite item for the `propose_decision` boundary crossing; confidence high, because the packaged daemon imports `dist/mcp/server.js`, and that static import currently resolves to excluded `dist/surfaces/ceo-slack-responder/propose-decision-tool.js`.
+  Why escalated: fixing that extra packaged-boundary import requires modifying files outside `files_to_modify` (`src/mcp/server.ts` and/or the propose-decision responder module chain), while ignoring it would violate AC3's requirement that every shipped `dist/**/*.js` relative import resolves within the actual packed file set.
 ---
 
 # 110 — Packaged daemon boots again (brain hoist across the 076 boundary)
