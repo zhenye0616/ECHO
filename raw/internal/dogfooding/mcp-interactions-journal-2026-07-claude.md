@@ -109,3 +109,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478.
 - **Verdict:** ✅ right.
 - **Note:** Finding trajectory on 111: 4→2→1, each round narrowing to a strictly smaller delta — the queue is converging, not thrashing. 110's codex-ops r2 timeout is the first reviewer-timeout on this pair; launchd fallback did not re-fire it within the window (its wrapper was daemon-invoked once and died silently — no .capture-failed marker, no queue-error line). Observation only.
+
+### 2026-07-02 13:08 PDT — cold-start "where we left off" (asked from Project_echo, answer lived in justinian.ai)
+- **Trigger:** founder opened a fresh Claude Code session in Project_echo and asked "use echo and understand where we left off"
+- **Query inputs:** find_clusters({}) → get_atoms(17 ids, prefer=newest_first, format=minimal) → get_atoms(2 dropped open-loop ids, newest_first, minimal)
+- **Returned:** 2 clusters, 17 atoms total. Top cluster ctx_887dafb3 "discussion about justinian.ai" (15 atoms, rank_reasons: recent_activity, has_open_loop, has_unresolved_open_loop, dense); second ctx_bf302121 Granola "Co-founder equity and IP licensing negotiation with Parth" (2 atoms). First get_atoms hydrated 9/17 and dropped 8 under response budget (atoms_dropped=8, incl. 2 unresolved open-loop atoms); follow-up get_atoms recovered both dropped open-loop atoms cleanly.
+- **Sources:** source_breakdown={claude_code:15, granola:2}; hydrated bodies came from fs:~/.claude/projects/-Users-zhenye-justinian-ai/*.jsonl (4 distinct sessions) + api:granola (summary + transcript, note not_NKLQCdNAqiAByt). No codex/cursor/git rows in window — silent absences consistent with a claude-only work morning.
+- **Verdict:** ✅ right
+- **Note:** Machine-scoped recall worked exactly as designed — question asked in Project_echo, answer was entirely in a different repo (justinian.ai) plus a Granola meeting. The newest atom was itself a prior-session "where we left off" synthesis, which made reconstruction nearly free. The 8-atom budget drop flagging which IDs were dropped (and open_loop_hints marking two of them unresolved) made the recovery fetch surgical.
+- **Conjecture:** prefer=newest_first dropping unresolved-open-loop atoms under budget suggests open-loop atoms might deserve budget priority over pure recency.
