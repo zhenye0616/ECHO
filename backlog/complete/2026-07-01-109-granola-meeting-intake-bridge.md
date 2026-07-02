@@ -42,6 +42,51 @@ agent_notes: |
 
   ONE reviewer action required: apply the packaging-snapshot regeneration above
   (outside files_to_modify per protocol; same as 106's founder-authorized fixup).
+review_notes: |
+  Merged on 2026-07-02 via founder reconciliation (/merge-and-cleanup).
+
+  Independent build review (/review-pending, Claude code-reviewer subagent — did NOT
+  write the code) verdict: merge with founder fixups. Ground-truth HEAD matched
+  recorded head_sha 4838674c. All six ACs Met with file:line evidence; drift NONE
+  (no Linear read, no auto-create, capture untouched, no HTTP listener; diff exactly
+  the 13 specified files). Spec itself converged through a 5-round cross-tool review
+  queue (codex + codex-ops), trajectory 5→4→1→2→0 findings incl. one reframe-gate
+  structural cut (r4: impossible cross-deployment validation claim removed).
+
+  Conflicts resolved:
+  - none — clean --no-ff merge, zero conflicted files (sidecar predicted clean;
+    fork point c5389953, only disjoint backlog/raw paths moved on main since).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - tests/packaging/packed-manifest.test.ts — regenerated snapshot (npx vitest -u);
+    delta verified as exactly the 4 new dist/enrich/granola-intake-* entries
+    (106-precedent founder-authorized packaging fixup, outside builder files_to_modify).
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify (ephemeral merger worktree, fresh npm install): full suite 1872 passed /
+  2 failed / 21 skipped / 1 todo; lint, typecheck, coupled-invariants, and
+  sync-skills --check all clean; git diff --check clean. The 2 failures are the
+  documented pre-existing baseline: tests/cli/shell-reachable.test.ts (packaged-daemon
+  exclusion chain, fails on clean main per 106/108 notes) and
+  tests/mcp/recent-calls-endpoint.test.ts (full-suite load flake; passes 2/2 in
+  isolation, re-verified this merge).
+
+  Follow-up items (non-blocking, queued in backlog/_followups.md):
+  - [109] Store-driven retry for non-terminal seed records — retries currently
+    depend on the classifier re-emitting the candidate within the lookback; drive
+    from seedStore.list() instead. Fast-follow before real traffic.
+  - [109] Skip re-classification for notes whose candidate keys are all terminal
+    (repeated LLM cost every 10-min pass).
+  - [109] Extend the planned 108 packaging fix to the new dist/enrich →
+    dist/surfaces/ceo-slack-responder import chain (same ERR_MODULE_NOT_FOUND class).
+  - [109] Wrap ECHO_GRANOLA_INTAKE_OWNER_MAP parse errors as GranolaIntakeConfigError
+    so a JSON typo cannot crash the daemon at startup.
+  - [109] Minor: accepted-seed-but-Linear-unconfigured is log.debug only; owner pick
+    nondeterministic when multiple attendees map to Slack users.
 blocked_by: []
 task_state_ref: 2026-07-01-109-granola-meeting-intake-bridge
 requested_reviewers: ["codex", "codex-ops"]

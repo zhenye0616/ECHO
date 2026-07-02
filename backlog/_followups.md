@@ -405,3 +405,8 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [108] Packaged daemon baseline blocker: move `propose_decision` out of excluded `src/surfaces/ceo-slack-responder/` into the packaged MCP tool layer. Current tarball ships `dist/mcp/server.js` but excludes `dist/surfaces/ceo-slack-responder/propose-decision-tool.js`, causing `ERR_MODULE_NOT_FOUND` before daemon health and failing `tests/cli/shell-reachable.test.ts`.
 - [108] Make `idempotency_token` deterministic or remove the random suffix before any future Linear idempotency-key reuse.
 - [108] Consider suppressing duplicate `Looking...` messages on replayed Slack message events.
+- [109] Store-driven retry for non-terminal seed records — retries currently depend on the classifier re-emitting the candidate within the lookback (granola-intake-candidates.ts:388-467); drive from seedStore.list() instead. Fast-follow before real bridge traffic.
+- [109] Skip re-classification for notes whose candidate keys are all terminal — every 10-min bridge pass re-runs the brain on every external note in the lookback.
+- [109] Extend the planned 108 packaging fix to the dist/enrich → dist/surfaces/ceo-slack-responder import chain (same ERR_MODULE_NOT_FOUND class as shell-reachable).
+- [109] Wrap ECHO_GRANOLA_INTAKE_OWNER_MAP parse errors as GranolaIntakeConfigError so a JSON typo cannot crash the daemon at startup (daemon/index.ts:93 unguarded).
+- [109] Minor: accepted-seed-but-Linear-unconfigured drops with log.debug only (responder.ts:806-813); owner resolution nondeterministic when multiple attendees map.
