@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R4. Both reviewers `proceed` with zero findings on the single-delta AC6 lifecycle-symmetry verify. Finding trajectory across the cycle: 4 → 2 → 1 → 0.
 

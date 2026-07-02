@@ -7,6 +7,7 @@ estimate: 0.5-1d (batching is localized to one tool + one git-util module; the c
 created: 2026-07-02
 blocked_by: []
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 18f4d63d1d429deea8795bc6541ebc15de0820043adcc8c2fa89ae12b955b1dc
 spec_refs:
   - src/mcp/tools/list-task-states.ts        # the tool: per-task resolveStageAtRef (4× cat-file -e) + commitTimeForPathAtRef (path-limited git log) + readBlobAtRef
   - src/mcp/util/role-state-git.ts           # git helpers to extend with batched variants (ls-tree per stage dir, cat-file --batch, single-walk commit times)
