@@ -1,0 +1,28 @@
+# ECHO MCP interactions journal - 2026-07 - codex-ops shard
+
+This is the 2026-07 per-actor shard for codex-ops. Entries land here when this actor invokes or reports ECHO MCP activity. Read the journal through tools/dogfooding/journal-cat.sh 2026-07 so this shard is merged with sibling actor shards and any frozen legacy shared file.
+
+**Timezone convention:** all times in this journal are founder local time (PDT/PST, America/Los_Angeles) unless explicitly noted. Source data stores ISO 8601 UTC; entries here are converted on write.
+
+## Quick-Fill Template
+
+    ### YYYY-MM-DD HH:MM PDT - <one-line context>
+
+    - **Trigger:** <why the tool was called>
+    - **Query inputs:** <tool(args), one line or compact numbered list>
+    - **Returned:** <N clusters/M atoms, N matches, N turns, warnings, top label/rank reasons>
+    - **Sources:** <source_breakdown | source_resolved | per-match prefixes | exact paths>
+    - **Verdict:** <right | partial | wrong> - <short reason>
+    - **Note:** <what felt useful/off>
+    - **Conjecture:** <optional>
+
+## Interactions
+
+### 2026-07-01 19:48 PDT - codex-ops r1 review tick on 2026-07-01-109-granola-meeting-intake-bridge
+
+- **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r1/request.md` and published `backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r1/codex-ops.md`.
+- **Query inputs:** Coord calls emitted by `_run_reviewer.sh`: `scheduler_health`, `scheduler_health_done`, `tick_start(correlation_id=90b0d431-5e44-498e-8602-d1c2454cd506)`, `tick_end(outcome=completed)`. Child invocation used `commit_policy=wrapper`, `capture.kind=stdout_json`, and `agent_sandbox=read-only`.
+- **Returned:** Parsed the final assistant-message event from `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-ops-3F709448-1B52-4A1F-86A0-1314748D5439/raw/internal/review-queue/1217ff02-7b0c-4e81-8cb5-315d47f71acf/codex-ops.stdout.log`, validated the reviewer markdown, committed and pushed `backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r1/codex-ops.md` at `8bb8978c01037bfb6f1e1039ea82dc8c58917e75`.
+- **Sources:** request `backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r1/request.md`; artifact `backlog/proposed/2026-07-01-109-granola-meeting-intake-bridge.md@5972dcfe86f1dea91f10c801e1e454c41a50efbd`; response `backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r1/codex-ops.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-ops-3F709448-1B52-4A1F-86A0-1314748D5439/raw/internal/review-queue/1217ff02-7b0c-4e81-8cb5-315d47f71acf/codex-ops.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-ops-3F709448-1B52-4A1F-86A0-1314748D5439/raw/internal/review-queue/1217ff02-7b0c-4e81-8cb5-315d47f71acf/codex-ops.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
+- **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
+- **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
