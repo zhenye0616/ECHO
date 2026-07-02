@@ -8,6 +8,40 @@ created: 2026-07-01
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T03:20:45Z"
 branch: "agent/granola-meeting-intake-bridge"
+head_sha: "4838674c2a09f81db77a2ba1e4335aec39077f20"
+pr_url: ""
+agent_notes: |
+  Implemented the Granola→Slack→Linear meeting intake bridge on
+  agent/granola-meeting-intake-bridge (head 4838674c). All six ACs met:
+  AC1 daemon candidate worker (granola-intake-candidates.ts: derived:granola-signals
+  action/decision consumption, external-attendee filter via joined raw api:granola
+  attendees, brain classification, best-effort fields + provenance, per-note cap,
+  append-only respected); AC2 durable seed state machine
+  (granola-intake-seed-store.ts: pending|posting|posted|failed, atomic tmp+rename,
+  single-flight claim, bounded retries → terminal failed) + fail-closed config;
+  AC3 responder seed carve-out (self-bot + intake-channel + supported-marker +
+  well-formed-candidate-key gate, durable-write-before-ack, candidate-key
+  exactly-once draft with slack_event_ids coupled on the draft record, all AC3
+  negatives, duplicate no-op); AC4 108 gate exercised unmodified; AC5 meeting
+  provenance in the issue body alongside the Slack thread link; AC6 off-by-default,
+  bounded lookback, seeded-dismissal durable record with candidate key, structured
+  logs, runbook smoke + posted-but-unaccepted recovery.
+
+  Verification: focused suites (tests/enrich, tests/surfaces/ceo-slack-responder,
+  tests/daemon) 81 passed / 4 pre-existing skips; npm run typecheck clean; npm run
+  lint (eslint --max-warnings 0 + lint:task-state) clean. Full suite: 1871 passed /
+  3 failed / 21 skipped. The 3 failures: (1) tests/packaging/packed-manifest.test.ts
+  — EXPECTED snapshot ripple from the two new dist/enrich/* modules; NOT in
+  files_to_modify (drift rule 4), same pattern as 106 (founder-authorized post-build
+  snapshot update). Reviewer fixup: `npx vitest -u tests/packaging/packed-manifest.test.ts`.
+  (2) tests/cli/shell-reachable.test.ts — pre-existing on clean main (packaged daemon
+  health / dist/surfaces/ceo-slack-responder exclusion; documented in 106 + 108
+  review notes). (3) tests/mcp/recent-calls-endpoint.test.ts — pre-existing full-suite
+  load flake; passes 2/2 in isolation (documented in 106 + 108). Zero MCP calls made
+  during this run (no dogfooding journal entry per skip-rule).
+
+  ONE reviewer action required: apply the packaging-snapshot regeneration above
+  (outside files_to_modify per protocol; same as 106's founder-authorized fixup).
 blocked_by: []
 task_state_ref: 2026-07-01-109-granola-meeting-intake-bridge
 requested_reviewers: ["codex", "codex-ops"]
