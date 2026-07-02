@@ -24,9 +24,10 @@ import { registerPendingDecisions } from './tools/pending-decisions.js';
 import { registerRecentWorkContext } from './tools/recent-work-context.js';
 import { registerSearchMemories } from './tools/search-memories.js';
 import { registerWaitForNewTurns } from './tools/wait-for-new-turns.js';
-import { registerProposeDecision } from '../surfaces/ceo-slack-responder/propose-decision-tool.js';
 
 const log = createLogger('mcp.server');
+
+type ProposeDecisionRegistrar = (server: McpServer) => void;
 
 export interface McpServerHandle {
   stop: () => Promise<void>;
@@ -76,6 +77,28 @@ function resolveRepoRoot(option?: string): string {
   const env = process.env.ECHO_REPO_ROOT;
   if (env !== undefined && env !== '') return env;
   return process.cwd();
+}
+
+function isOptionalProposeDecisionMissing(err: unknown): boolean {
+  if (!(err instanceof Error) || !('code' in err)) return false;
+  const code = (err as NodeJS.ErrnoException).code;
+  return (
+    (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') &&
+    err.message.includes('ceo-slack-responder/propose-decision-tool')
+  );
+}
+
+async function loadOptionalProposeDecisionTool(): Promise<ProposeDecisionRegistrar | null> {
+  try {
+    const mod = await import('../surfaces/ceo-slack-responder/propose-decision-tool.js');
+    return mod.registerProposeDecision;
+  } catch (err) {
+    if (isOptionalProposeDecisionMissing(err)) {
+      log.warn('propose_decision_skipped', { reason: 'module_not_found' });
+      return null;
+    }
+    throw err;
+  }
 }
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -179,6 +202,7 @@ export async function startMcpServer(
   const host = options.host ?? '127.0.0.1';
   const requestedPort = options.port ?? 38478;
   const repoRoot = resolveRepoRoot(options.repo_root);
+  const registerProposeDecision = await loadOptionalProposeDecisionTool();
 
   // 057a AC2 — load coord-roles config BEFORE any tool registration. Bad
   // config (schema violation OR cross-field `max_deadline_sec <= default`)
@@ -245,7 +269,7 @@ export async function startMcpServer(
     const mcp = new McpServer({ name: 'echo-daemon', version: '0.0.0' });
     instrumentMcpServer(mcp);
     registerEchoPing(mcp);
-    registerProposeDecision(mcp);
+    if (registerProposeDecision !== null) registerProposeDecision(mcp);
     registerSearchMemories(mcp, storage);
     // Deprecated wrapper — kept registered until the 2026-05-17 follow-up
     // (item 038 / AC3 + R2 Codex HIGH #1; founder declined override).

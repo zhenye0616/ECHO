@@ -48,15 +48,6 @@ function relativeRuntimeImports(filePath: string, sourceText: string): string[] 
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const specifier = node.moduleSpecifier;
       if (specifier !== undefined && ts.isStringLiteral(specifier)) imports.push(specifier.text);
-      return;
-    }
-    if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      ts.isStringLiteral(node.arguments[0])
-    ) {
-      imports.push(node.arguments[0].text);
     }
   }
 
