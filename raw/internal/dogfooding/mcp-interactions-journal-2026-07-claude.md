@@ -91,3 +91,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478.
 - **Verdict:** ✅ right.
 - **Note:** codex F2 (no callable baseline exists once the old path is rewired) is the sharpest catch — the AC2 I wrote was untestable as written. Ops findings both target long-running-daemon failure modes (leaked children, buffer overflow on growth) that a one-shot CLI mindset misses.
+
+### 2026-07-02 00:45 PDT — watcher r2 tick on 111: reframe gate fired, propagation completion + coord_invoke for r3
+
+- **Trigger:** /review-queue-watch r2 tick on 2026-07-02-111 — codex proceed_after_patches (2 MED), codex-ops proceed. Both findings target r1-patch mechanisms (f2d5cb69) → reframe gate FIRED; fresh-context investigator (codex exec read-only) returned kind=propagation_completion (r1 mechanisms reviewer-required; complete their contracts, don't cut). Patches at c0d1b2aa (single git-runner accounting seam; AC2 named fixture paths + ordered pre-rewire generation); r3 dispatched at e4a72453.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-02-111-list-task-states-batched-git/r3/request.md, correlation_id=<r3 frontmatter>); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok.
+- **Sources:** n/a (coordination call) — daemon MCP :38478. Investigator was a read-only codex exec consultee; it made no ECHO MCP calls (file reads only), so no journal-by-proxy entry owed.
+- **Verdict:** ✅ right.
+- **Note:** First reframe-gate firing on the 110/111 pair. Gate + investigator agreed with the prima-facie read (propagate, don't cut) — cheap confirmation that the r1 mechanisms weren't strategist-invented scaffolding but reviewer-required contract.
