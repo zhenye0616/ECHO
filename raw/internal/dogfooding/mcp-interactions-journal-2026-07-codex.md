@@ -108,3 +108,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-02-111-list-task-states-batched-git/r4/request.md`; artifact `backlog/proposed/2026-07-02-111-list-task-states-batched-git.md@114a308af7770bc377bc5516b38c673d3b13ddbf`; response `backlog/reviews/2026-07-02-111-list-task-states-batched-git/r4/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-57F28597-3450-4E5E-A068-89A44378BFB4/raw/internal/review-queue/44a96bb0-d647-47b2-8e3f-0c65aef7b86a/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-57F28597-3450-4E5E-A068-89A44378BFB4/raw/internal/review-queue/44a96bb0-d647-47b2-8e3f-0c65aef7b86a/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-07-02 13:36 PDT - codex builder preflight for process-backlog
+
+- **Trigger:** Founder asked Codex to run the ECHO builder loop in `Project_echo`; pre-claim context check before mutating backlog state.
+- **Query inputs:** `echo_ping(message="codex builder preflight for Project_echo process-backlog")`; `find_clusters(repo_path="/Users/zhenye/Desktop/Project_echo", since="2026-07-01T00:00:00-07:00", until="2026-07-02T13:36:40-07:00", format="skeleton", view="compact")`.
+- **Returned:** `echo_ping` returned `pong=true` at `2026-07-02T20:36:40.340Z`. `find_clusters` returned 1 cluster, 175 atom ids; top label `work on project_echo`; rank reasons `[has_open_loop, has_unresolved_open_loop, code_session_anchor]`; no warnings.
+- **Sources:** `find_clusters.source_breakdown={git:108, claude_code:63, codex:4}` with time range `2026-07-01T16:39:21.551Z` to `2026-07-02T20:35:54.712Z`; repo filter `/Users/zhenye/Desktop/Project_echo`.
+- **Verdict:** right - MCP was reachable and repo-scoped retrieval showed active recent project work.
+- **Note:** The skeleton result was broad and not hydrated because the builder still must use the backlog item and its `spec_refs` as the implementation contract; the useful signal here is that ECHO capture is present and cross-tool.
