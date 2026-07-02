@@ -28,3 +28,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** per-match prefixes: `git:/Users/zhenye/Desktop/Project_echo` (majority — commits), `fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/*` (sessions incl. subagent jsonl), `fs:~/.codex/sessions/2026/06/*` (codex rollouts). Absent: cursor, granola — no meeting-note atoms surfaced for an org-alignment thesis, which is itself signal (the claimed PM/client-facing pain has no captured meeting evidence in these two queries).
 - **Verdict:** ✅ right — both queries pinned the exact decision spine needed: 108's spec source (`docs/execution/echo/linear-intake-gate-setup.md`), 107's "launch wedge — per-seat, team-retained" framing, the n=2 CEO-loop rationale-capture gap, and the codex consult's bounded-grant primitive.
 - **Note:** Literal-token discipline worked ("intake gate" > any paraphrase). The retrieval surfaces that the live intake test (2026-06-28) was the founder role-playing the nontechnical teammate — relevant to the demand question the office-hours session will press.
+
+### 2026-07-01 19:55 PDT — watcher r1 tick on 109: coord_invoke active trigger for r2
+
+- **Trigger:** /review-queue-watch r1 tick on 2026-07-01-109 completed branch (b) (patches applied at e3dacdcb, r2 dispatched at 6a6fddee); 057b post-push hook fires coord_invoke per headless reviewer.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r2/request.md, correlation_id=<r2 frontmatter>); coord_invoke(role=codex-ops, same path/corr) — raw MCP POST to :38478 with X-Echo-Role: claude.
+- **Returned:** both calls HTTP-ok ("coord_invoke(codex) ok", "coord_invoke(codex-ops) ok"); no payload beyond ack.
+- **Sources:** n/a (coordination tool, not retrieval) — target = production daemon MCP :38478; both headless reviewer roles resolved from tools/review-queue/coord-roles.json.
+- **Verdict:** ✅ right — active trigger accepted for both reviewers; launchd cadence remains the redundant path.
+- **Note:** First 109 round ran reviewer wrappers manually (background bash); r2 uses the active trigger end-to-end. If r2 responses don't land within ~2 wrapper cadences, fall back to manual wrapper fire.
