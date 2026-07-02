@@ -8,6 +8,7 @@ created: 2026-07-01
 blocked_by: []
 task_state_ref: 2026-07-01-109-granola-meeting-intake-bridge
 requested_reviewers: ["codex", "codex-ops"]
+ready_content_sha: 1cbfd7853f41325cd0d038296b2eacd287360ffb19216b6897299ac13bfc2f3a
 spec_refs:
   - backlog/complete/2026-06-21-106-granola-meeting-signal-extraction.md  # producer of the derived:granola-signals atoms this consumes (decision/rationale/action, dedupe_key, extraction_run_id, manifest-run semantics)
   - backlog/complete/2026-06-27-108-slack-linear-intake-gate.md           # the shipped intake gate this feeds: draft store, follow-ups, confirm card, fail-closed Linear create

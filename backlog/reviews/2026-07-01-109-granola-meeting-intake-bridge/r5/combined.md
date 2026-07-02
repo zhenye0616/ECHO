@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R5. Both reviewers returned `proceed` with zero findings on the r4 structural-cut verification. Finding trajectory across the loop: r1 5 → r2 4 → r3 1 → r4 2 (single convergent defect exposing the r3 overclaim, resolved by structural cut per the fired reframe gate + investigator) → r5 0. No unresolved dispositions; no deferred follow-ups. Spec is claimable at the r5-pinned content.
 
