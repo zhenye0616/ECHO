@@ -56,29 +56,56 @@ Behavior-preserving refactor: same output, same pinned-SHA semantics, constant
 git-spawn count. All reads already share one `resolveRefOnce` SHA; batching
 keeps that invariant trivially (every batched command takes the same `<sha>`).
 
+- **Task-id discovery (pinned):** discovery of `backlog/task-state/<task-id>/`
+  dirs comes from the SAME single recursive
+  `git ls-tree -r --name-only <sha> backlog/task-state/` call that yields the
+  pointer paths — never from the working tree (which would break AC3's
+  single-SHA invariant for `ref` calls) and never from per-dir probes (which
+  would break AC1's constant spawn count). This call is enumerated in the
+  spawn budget below (r1 codex finding).
 - **Stage resolution:** replace per-task `cat-file -e` probes with one
   `git ls-tree --name-only <sha> backlog/<stage>/` per stage (4 total) and a
   set-membership lookup.
 - **Blob reads:** one `git cat-file --batch` process fed all anchor-pointer
-  paths at `<sha>:<path>`.
+  paths at `<sha>:<path>`. Lifecycle is part of the contract: the helper
+  closes the child's stdin when done, awaits process exit, and kills + reaps
+  the child on parse error, missing object, or early abort — the MCP server
+  is long-running, so leaked children/fds compound (r1 codex-ops finding).
 - **Commit times:** one history walk — `git log --format=… --name-only <sha> --
   backlog/task-state/` — building a path→last-commit-time map (first time a
   path appears in the walk is its most-recent touch). Equivalent to N
   `git log -1 -- <path>` calls at a single walk's cost.
+- **Output sizing:** the two batched-output commands (`git log --name-only`
+  walk, `cat-file --batch`) must use streaming reads or an explicit
+  max-buffer sized for repo growth — a fixed default capture buffer that was
+  fine for per-file reads can hard-fail the unattended MCP call once batched
+  output exceeds it (r1 codex-ops finding).
 
-Net: ≤8 git spawns for the whole call regardless of task count; expected
-latency well under 1s on this repo.
+Enumerated spawn budget (= the AC1 constant): 1 `rev-parse` (resolveRefOnce)
++ 1 `ls-tree -r backlog/task-state/` (discovery + pointer paths) + 4
+`ls-tree backlog/<stage>/` + 1 `cat-file --batch` + 1 `git log --name-only`
+walk = **8 total**; expected latency well under 1s on this repo.
 
 ## Acceptance Criteria
 
 - **AC1 — constant spawn count.** For a bare `{}` call, total git subprocesses
-  is a fixed constant (≤8), independent of the number of task-state dirs.
-  Asserted by test via an injected/spied `gitCapture` (no wall-clock flakiness).
-- **AC2 — output equivalence.** On a fixture repo with tasks across multiple
-  stages (incl. a stage-less task, a strategist-less task, and a malformed
-  anchors file exercising `_parse_error` degradation), the batched
-  implementation's result is deep-equal to the current implementation's result
-  at the same ref. `tests/echo-mcp/role-state.test.ts` passes unmodified.
+  is the fixed enumerated budget of 8 (rev-parse; ls-tree -r task-state
+  discovery; 4× stage ls-tree; cat-file --batch; log --name-only walk),
+  independent of the number of task-state dirs. Task-id discovery MUST come
+  from the pinned ls-tree call, not the working tree. Asserted by test via an
+  injected/spied `gitCapture` (no wall-clock flakiness).
+- **AC2 — output equivalence against a named baseline.** Baseline mechanism
+  (r1 codex finding — the old code path no longer exists once rewired): the
+  builder generates the expected output ONCE by running the pre-change
+  implementation (at the commit before the rewire) against the test fixture
+  repo, and checks it in as a static expected-JSON fixture; the test
+  deep-equals the batched implementation's result against that fixture at the
+  same ref. Copying old production logic into the test, or comparing the new
+  implementation to itself, are both explicitly non-compliant. Fixture repo
+  must cover tasks across multiple stages, a stage-less task, a
+  strategist-less task, and a malformed anchors file exercising
+  `_parse_error` degradation. `tests/echo-mcp/role-state.test.ts` passes
+  unmodified.
 - **AC3 — single-SHA pinning preserved.** All batched commands are pinned to
   the one `resolveRefOnce` SHA; the `ref` param and the echoed resolved-SHA
   response field behave exactly as today (046 AC4 R2 invariant).
@@ -88,6 +115,15 @@ latency well under 1s on this repo.
   repo. Do not raise the 15s budget.
 - **AC5 — full verification.** `npm run typecheck`, `npm run lint`,
   `npm run test:product` all pass.
+- **AC6 — batch subprocess robustness.** (r1 codex-ops findings.) (a) The
+  `cat-file --batch` helper closes stdin, awaits child exit, and kills +
+  reaps the child on parse error, missing object, or early abort; a test
+  injects an error path and asserts no orphaned git child remains across
+  repeated calls. (b) The `git log --name-only` walk and `cat-file --batch`
+  reads use streaming or an explicit max-buffer sized for growth; a
+  high-cardinality fixture (≥10× today's task-dir count, generated
+  synthetically) asserts output larger than the old per-file capture size is
+  handled correctly. No timing assertions in either test.
 
 ## Out of Scope (Don't Drift)
 
