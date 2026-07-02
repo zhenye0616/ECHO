@@ -64,3 +64,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478.
 - **Verdict:** ✅ right.
 - **Note:** Live example of the strategist-drift discipline paying off: r3's patch-deeper reflex created r4's findings; the gate + investigator forced removal instead of a second layer of impossible validation. Finding trajectory 5→4→1→2(same defect)→r5 verify.
+
+### 2026-07-01 20:20 PDT — watcher r5 terminal tick on 109: converged, promoted to ready
+
+- **Trigger:** /review-queue-watch r5 tick — both reviewers `proceed`, zero findings on the r4 structural-cut verification. Path (a) terminal: convergence call `claim-ready after R5`; promote.py moved proposed→ready with content seal at 0066c177. No coord_invoke this tick (no next round dispatched).
+- **Query inputs:** none (no ECHO MCP retrieval; promote/combine are local tools).
+- **Returned:** promoted: backlog/ready/2026-07-01-109-granola-meeting-intake-bridge.md.
+- **Sources:** n/a.
+- **Verdict:** ✅ right — five-round trajectory 5→4→1→2→0 with one structural cut; spec sealed and claimable.
+- **Note:** Entry included (despite zero MCP calls) as the loop-closure record for the 109 review cycle started 2026-07-01 19:50 PDT; exception noted rather than silent per skip-rule intent.
