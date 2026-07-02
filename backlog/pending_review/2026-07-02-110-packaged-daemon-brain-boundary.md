@@ -34,13 +34,13 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T20:22:56Z"
 branch: "agent/packaged-daemon-brain-boundary"
 worktree: "/Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary"
-head_sha: "2e05f05f4cce82ffa884e49089ba96e44692febc"
+head_sha: "9f0b81666abc3ac27b201cff9ece1c66bf189850"
 pr_url: ""
 agent_notes: |
-  ESCALATION ANSWERED (founder via strategist, 2026-07-02): expand 110 with conditional registration — do NOT hoist propose-decision-tool (it imports responder.js/draft-store.js; a hoist would drag the Slack chain into the tarball and reverse 076). Decouple via a guarded dynamic import in src/mcp/server.ts: module present → register as today; absent (packaged install) → log one skip line, boot healthy. See new AC5, the Design addendum, and the AC3 red-check clarification (guard = static imports; the AC5 dynamic import is the sanctioned seam). src/mcp/server.ts added to files_to_modify. Resume the build.
-  Prior blocker (for the record): AC3 guard red-run found dist/mcp/server.js -> propose-decision-tool.js as a third boundary crossing beyond the two spec-named enrich offenders; fixing it required a file outside files_to_modify.
-  Best-guess answer: expand 110 or create a prerequisite item for the `propose_decision` boundary crossing; confidence high, because the packaged daemon imports `dist/mcp/server.js`, and that static import currently resolves to excluded `dist/surfaces/ceo-slack-responder/propose-decision-tool.js`.
-  Why escalated: fixing that extra packaged-boundary import requires modifying files outside `files_to_modify` (`src/mcp/server.ts` and/or the propose-decision responder module chain), while ignoring it would violate AC3's requirement that every shipped `dist/**/*.js` relative import resolves within the actual packed file set.
+  BLOCKED: Should item 110 be expanded to allow `src/cli/commands/daemon.ts` so `echoctl daemon install` can kickstart the launchd job after bootstrap?
+  Tried: implemented the in-scope package-boundary fix on `agent/packaged-daemon-brain-boundary` at `9f0b81666abc3ac27b201cff9ece1c66bf189850`; `npm run typecheck`, `npm run lint`, packaging guard/snapshot tests, enrich tests, and responder tests pass. Direct packed daemon boot is healthy and logs the expected `propose_decision_skipped` line. `tests/cli/shell-reachable.test.ts` still fails; manual launchd reproduction shows the bootstrapped job remains `runs = 0` / `pended nondemand spawn = speculative` until `launchctl kickstart -k`, after which `/mcp` returns 200.
+  Best-guess answer: expand 110 with the minimal launchd kickstart change in `src/cli/commands/daemon.ts`; confidence high.
+  Why escalated: fixing the remaining AC1 launchd failure requires modifying `src/cli/commands/daemon.ts`, a file outside `files_to_modify`.
 ---
 
 # 110 — Packaged daemon boots again (brain hoist across the 076 boundary)

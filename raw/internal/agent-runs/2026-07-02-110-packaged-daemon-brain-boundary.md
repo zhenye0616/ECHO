@@ -100,3 +100,153 @@ Why escalated: fixing the extra boundary crossing requires modifying files not l
 
 - None.
 
+---
+
+## Run 2 (resumed at 2026-07-02T20:49:07Z)
+
+## Previous Attempt State
+
+- Kept Run 1's pushed branch commit `2e05f05f4cce82ffa884e49089ba96e44692febc`; it contained the AC3 import-closure guard and a correct red check.
+- The claimed item had been founder/strategist-expanded with AC5 and `src/mcp/server.ts` in `files_to_modify`, so this run resumed implementation rather than discarding prior work.
+
+## What I implemented
+
+- Added `src/brain/brain.ts` and `src/brain/intake-seed.ts` as packaged shared modules.
+- Replaced the old responder-surface `brain.ts` and `intake-seed.ts` with re-exports so existing responder imports/tests keep working while daemon-side modules can import from `src/brain/`.
+- Rewrote `src/enrich/granola-signals.ts` and `src/enrich/granola-intake-candidates.ts` to import the shared brain/seed modules instead of the tarball-excluded responder surface.
+- Changed `src/mcp/server.ts` from a static `propose_decision` import to guarded dynamic registration. In a packed install where the responder surface is absent, the server logs one `propose_decision_skipped` line and continues booting.
+- Updated `tests/packaging/import-closure.test.ts` so AC3 covers static `import` / `export ... from` declarations only; dynamic `import()` is the AC5-sanctioned seam.
+- Updated `tests/packaging/packed-manifest.test.ts` for the new `dist/brain/*` files.
+- Stopped short of editing `src/cli/commands/daemon.ts` after the launchd leg exposed a separate required fix outside `files_to_modify`.
+
+## Files modified
+
+- Branch: `agent/packaged-daemon-brain-boundary`
+- Head SHA: `9f0b81666abc3ac27b201cff9ece1c66bf189850`
+- `src/brain/brain.ts` — new packaged shared brain runner / intake parser module.
+- `src/brain/intake-seed.ts` — new packaged shared seed render/parse module.
+- `src/surfaces/ceo-slack-responder/brain.ts` — surface compatibility re-export.
+- `src/surfaces/ceo-slack-responder/intake-seed.ts` — surface compatibility re-export.
+- `src/enrich/granola-signals.ts` — import path rewrite to `src/brain/`.
+- `src/enrich/granola-intake-candidates.ts` — import path rewrite to `src/brain/`.
+- `src/mcp/server.ts` — guarded dynamic `propose_decision` registration.
+- `tests/packaging/import-closure.test.ts` — static-closure guard scope aligned to AC3.
+- `tests/packaging/packed-manifest.test.ts` — inline snapshot includes `dist/brain/*`.
+
+## Decisions
+
+- Made `src/brain/brain.ts` self-contained rather than importing responder-owned `decision-store.ts` or `linear-client.ts`; this prevents `dist/brain/brain.js` from re-crossing the excluded `dist/surfaces/ceo-slack-responder/**` boundary.
+- Kept responder imports stable via surface re-exports instead of updating every responder/test import path.
+- The AC5 dynamic import catches only missing `ceo-slack-responder/propose-decision-tool`; unrelated module-load errors still throw.
+- Did not edit `src/cli/commands/daemon.ts` even though manual diagnosis shows `launchctl kickstart -k` after bootstrap makes the packaged launchd daemon healthy. That file is outside `files_to_modify`.
+
+## Acceptance Criteria Status
+
+- AC1 — partially met, then blocked. The packaged daemon entrypoint boots directly from the packed install and logs `propose_decision_skipped`; the import-closure guard passes. The launchd `shell-reachable` leg still fails because `echoctl daemon install` bootstraps the job but launchd leaves it unspawned (`runs = 0`, `pended nondemand spawn = speculative`) until manual `launchctl kickstart -k`. Fix appears to belong in `src/cli/commands/daemon.ts`, outside `files_to_modify`.
+- AC2 — passing for the implemented split. Shared brain/seed modules live under `src/brain/`; responder surface tests pass through re-exports; `dist/surfaces/ceo-slack-responder/**` remains excluded.
+- AC3 — passing post-fix. The guard passes against the actual npm dry-run packed file set and no shipped static import resolves outside the packed set.
+- AC4 — partially verified. `npm run typecheck`, `npm run lint`, packaging tests, enrich tests, and responder tests pass. `tests/cli/shell-reachable.test.ts` fails for the launchd spawn/kickstart issue above, so full `npm run test:product` was not run after the focused AC1 failure.
+- AC5 — partially verified. In-repo propose_decision tests pass; direct packed daemon boot logs one skip line and remains healthy. The launchd integration proof is blocked by the install/kickstart issue outside this item's allowed files.
+
+## Test Results
+
+```text
+$ npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+```text
+$ npx vitest run tests/packaging/import-closure.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ✓ tests/packaging/import-closure.test.ts (1 test) 4205ms
+   ✓ packed package import closure > resolves every shipped dist/**/*.js relative import inside the actual npm-packed file set 4204ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```
+
+```text
+$ npx vitest run -u tests/packaging/packed-manifest.test.ts
+
+ RUN  v2.1.9 /Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary
+
+ ✓ tests/packaging/packed-manifest.test.ts (1 test) 4053ms
+   ✓ packed package manifest > pins the sorted file path set shipped by npm pack 4052ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```
+
+```text
+$ npx vitest run tests/surfaces/ceo-slack-brain.test.ts tests/surfaces/ceo-slack-brain-regressions.test.ts tests/surfaces/ceo-slack-responder.test.ts tests/surfaces/ceo-slack-responder/*.test.ts
+
+ Test Files  14 passed (14)
+      Tests  96 passed (96)
+```
+
+```text
+$ npx vitest run tests/enrich/granola-signals.test.ts tests/enrich/granola-intake-candidates.test.ts tests/enrich/granola-intake-seed-store.test.ts
+
+ Test Files  3 passed (3)
+      Tests  24 passed (24)
+```
+
+```text
+$ npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+```text
+$ npx vitest run tests/cli/shell-reachable.test.ts
+
+ FAIL  tests/cli/shell-reachable.test.ts > echoctl shell reachability > packs an echoctl binary reachable from bash and exercises transitive doctor imports
+AssertionError: daemon com.echo.daemon.test-23784-1783025055402 did not become healthy on port 44530; run `echoctl daemon logs --tail 50 --label com.echo.daemon.test-23784-1783025055402` and reinstall or rollback
+: expected 1 to be +0 // Object.is equality
+```
+
+Manual packaged daemon proof:
+
+```text
+$ node /tmp/echo-110-debug-y8vhBD/prefix/lib/node_modules/echoctl/dist/daemon/index.js
+{"level":"warn","source":"mcp.server","message":"propose_decision_skipped","payload":{"reason":"module_not_found"}}
+{"level":"info","source":"mcp.server","message":"started","payload":{"port":45680,"url":"http://127.0.0.1:45680/mcp","host":"127.0.0.1"}}
+{"level":"info","source":"daemon.lifecycle","message":"started","payload":{"version":"0.1.0-beta.1","storage_backend":"sqlite","data_dir":"/tmp/echo-110-debug-y8vhBD/data-direct","mcp_port":45680,"mcp_url":"http://127.0.0.1:45680/mcp"}}
+```
+
+Manual launchd diagnosis:
+
+```text
+$ launchctl bootstrap gui/$(id -u) /tmp/echo-110-debug-y8vhBD/debug-d.plist
+$ launchctl print gui/$(id -u)/com.echo.daemon.debug-110d
+state = not running
+runs = 0
+pended nondemand spawn = speculative
+
+$ launchctl kickstart -k gui/$(id -u)/com.echo.daemon.debug-110e
+$ curl http://127.0.0.1:45684/mcp
+HTTP/1.1 200 OK
+{"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"echo-daemon","version":"0.0.0"}},"jsonrpc":"2.0","id":1}
+```
+
+## Open Questions For Founder
+
+BLOCKED: Should item 110 be expanded to allow `src/cli/commands/daemon.ts` so `echoctl daemon install` can kickstart the launchd job after bootstrap?
+
+Tried: implemented the in-scope package-boundary fix, verified direct packed daemon boot and static import closure, reproduced the launchd failure, manually bootstrapped the generated plist, and confirmed `launchctl kickstart -k` makes the exact same packed daemon healthy.
+
+Best-guess answer: expand 110 to include the minimal launchd kickstart change in `src/cli/commands/daemon.ts`; confidence high, because launchd leaves the bootstrapped test job at `runs = 0` until kickstarted, after which `/mcp` returns 200 and the daemon logs the expected AC5 skip line.
+
+Why escalated: fixing the remaining AC1 launchd failure requires modifying `src/cli/commands/daemon.ts`, a file outside `files_to_modify`; continuing would violate the builder file-scope rule.
+
+## Drift Events
+
+- None.
