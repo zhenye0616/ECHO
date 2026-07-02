@@ -100,3 +100,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478. Investigator was a read-only codex exec consultee; it made no ECHO MCP calls (file reads only), so no journal-by-proxy entry owed.
 - **Verdict:** ✅ right.
 - **Note:** First reframe-gate firing on the 110/111 pair. Gate + investigator agreed with the prima-facie read (propagate, don't cut) — cheap confirmation that the r1 mechanisms weren't strategist-invented scaffolding but reviewer-required contract.
+
+### 2026-07-02 01:00 PDT — watcher r3 tick on 111: AC6 lifecycle symmetry + coord_invoke for r4
+
+- **Trigger:** /review-queue-watch r3 tick on 2026-07-02-111 — codex proceed (zero findings), codex-ops proceed_after_patches (1 MED: AC6 lifecycle covered cat-file --batch but not a streaming log walk). Single finding < 2 → reframe gate not triggered. Patch at dac32972 (lifecycle contract extended to every streaming batched git child); r4 single-delta verify dispatched at 2ab58a7b. Earlier this session: 110 r2 terminal via 044 AC4 partial auto-disposition (codex-ops timed out; codex proceed/zero findings) → promoted to backlog/ready/ at 7ef666cb.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-02-111-list-task-states-batched-git/r4/request.md, correlation_id=<r4 frontmatter>); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok.
+- **Sources:** n/a (coordination call) — daemon MCP :38478.
+- **Verdict:** ✅ right.
+- **Note:** Finding trajectory on 111: 4→2→1, each round narrowing to a strictly smaller delta — the queue is converging, not thrashing. 110's codex-ops r2 timeout is the first reviewer-timeout on this pair; launchd fallback did not re-fire it within the window (its wrapper was daemon-invoked once and died silently — no .capture-failed marker, no queue-error line). Observation only.
