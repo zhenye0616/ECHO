@@ -82,3 +82,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478.
 - **Verdict:** ✅ right.
 - **Note:** First round of the 2026-07-01 audit's two bug-fix specs (110 packaged-boundary, 111 list_task_states perf). Both r1 reviewers independently rejected the files-rules approximation loophole I left in AC3 — the queue caught spec-author blind spot on the first pass.
+
+### 2026-07-02 00:30 PDT — watcher r1 tick on 111: spec patches + coord_invoke for r2
+
+- **Trigger:** /review-queue-watch r1 tick on 2026-07-02-111-list-task-states-batched-git — both reviewers proceed_after_patches (4 MED, 0 HIGH: pinned discovery missing from spawn budget; AC2 baseline undefined post-rewire; cat-file --batch lifecycle; batched-output buffer sizing). All accepted; patches at f2d5cb69; dispositions + r2 dispatch at 55b3f602. Reframe gate not fired (r1).
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-02-111-list-task-states-batched-git/r2/request.md, correlation_id=ebcbf5a3-0e08-4824-846c-1b4992abd3ba); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok — reviewer_invoked_ids f80113a6 / 394c164a.
+- **Sources:** n/a (coordination call) — daemon MCP :38478.
+- **Verdict:** ✅ right.
+- **Note:** codex F2 (no callable baseline exists once the old path is rewired) is the sharpest catch — the AC2 I wrote was untestable as written. Ops findings both target long-running-daemon failure modes (leaked children, buffer overflow on growth) that a one-shot CLI mindset misses.
