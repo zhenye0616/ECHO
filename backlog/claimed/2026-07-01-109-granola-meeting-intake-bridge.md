@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 3-4d (engineering; the seed-acceptance carve-out in the responder and the cross-machine idempotency chain are the net-new hardness — extraction and confirm/create are reuse)
 created: 2026-07-01
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-02T03:20:45Z"
+branch: "agent/granola-meeting-intake-bridge"
 blocked_by: []
 task_state_ref: 2026-07-01-109-granola-meeting-intake-bridge
 requested_reviewers: ["codex", "codex-ops"]
