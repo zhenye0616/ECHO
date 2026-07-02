@@ -73,3 +73,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a.
 - **Verdict:** ✅ right — five-round trajectory 5→4→1→2→0 with one structural cut; spec sealed and claimable.
 - **Note:** Entry included (despite zero MCP calls) as the loop-closure record for the 109 review cycle started 2026-07-01 19:50 PDT; exception noted rather than silent per skip-rule intent.
+
+### 2026-07-02 00:20 PDT — watcher r1 tick on 110: spec patches + coord_invoke for r2
+
+- **Trigger:** /review-queue-watch r1 tick on 2026-07-02-110-packaged-daemon-brain-boundary — both reviewers proceed_after_patches (3 MED findings, 0 HIGH; F1/F2 convergent on AC3 packed-set pinning, F3 the AC4/111 cross-item conflict). Patches at 8b4206bd; dispositions + r2 dispatch at 4f1233ba. Reframe gate correctly did not fire (r1 — no prior-round patches exist).
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-02-110-packaged-daemon-brain-boundary/r2/request.md, correlation_id=19274ba5-e272-4c8d-9c38-07fd4d68d5e1); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok — reviewer_invoked_ids e7a27879 / 880b02d1, wrappers run-codex[-ops]-reviewer.sh spawned by daemon.
+- **Sources:** n/a (coordination call) — daemon MCP :38478.
+- **Verdict:** ✅ right.
+- **Note:** First round of the 2026-07-01 audit's two bug-fix specs (110 packaged-boundary, 111 list_task_states perf). Both r1 reviewers independently rejected the files-rules approximation loophole I left in AC3 — the queue caught spec-author blind spot on the first pass.
