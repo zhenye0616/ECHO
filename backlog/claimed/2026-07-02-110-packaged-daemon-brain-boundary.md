@@ -29,6 +29,7 @@ files_to_modify:
   - src/enrich/granola-intake-candidates.ts         # AC1 — import path rewrite to src/brain/
   - tests/packaging/import-closure.test.ts          # NEW (AC3) — resolves shipped dist/**/*.js imports against the ACTUAL npm-packed file set (npm pack or shared dry-run manifest; temp cleanup) and fails on any escape
   - tests/packaging/packed-manifest.test.ts         # snapshot ripple from the new dist/brain/* modules (expected; same pattern as 106/109)
+  - src/mcp/server.ts                               # AC5 — guarded dynamic import replaces the static propose-decision-tool import (founder-dispositioned escalation 2026-07-02)
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-02T20:22:56Z"
 branch: "agent/packaged-daemon-brain-boundary"
@@ -36,8 +37,8 @@ worktree: "/Users/zhenye/Desktop/Project_echo--packaged-daemon-brain-boundary"
 head_sha: "2e05f05f4cce82ffa884e49089ba96e44692febc"
 pr_url: ""
 agent_notes: |
-  BLOCKED: Should item 110 expand to move or decouple `propose_decision` registration out of `src/surfaces/ceo-slack-responder/`, or should that boundary crossing be split into a prerequisite item?
-  Tried: implemented the AC3 packed import-closure guard in `tests/packaging/import-closure.test.ts`, using `npm pack --dry-run --json` for the actual packed file set and TypeScript AST parsing for relative runtime imports; red-ran it before source hoist work.
+  ESCALATION ANSWERED (founder via strategist, 2026-07-02): expand 110 with conditional registration — do NOT hoist propose-decision-tool (it imports responder.js/draft-store.js; a hoist would drag the Slack chain into the tarball and reverse 076). Decouple via a guarded dynamic import in src/mcp/server.ts: module present → register as today; absent (packaged install) → log one skip line, boot healthy. See new AC5, the Design addendum, and the AC3 red-check clarification (guard = static imports; the AC5 dynamic import is the sanctioned seam). src/mcp/server.ts added to files_to_modify. Resume the build.
+  Prior blocker (for the record): AC3 guard red-run found dist/mcp/server.js -> propose-decision-tool.js as a third boundary crossing beyond the two spec-named enrich offenders; fixing it required a file outside files_to_modify.
   Best-guess answer: expand 110 or create a prerequisite item for the `propose_decision` boundary crossing; confidence high, because the packaged daemon imports `dist/mcp/server.js`, and that static import currently resolves to excluded `dist/surfaces/ceo-slack-responder/propose-decision-tool.js`.
   Why escalated: fixing that extra packaged-boundary import requires modifying files outside `files_to_modify` (`src/mcp/server.ts` and/or the propose-decision responder module chain), while ignoring it would violate AC3's requirement that every shipped `dist/**/*.js` relative import resolves within the actual packed file set.
 ---
@@ -87,6 +88,22 @@ within it — which is exactly how 106 and 109 both slipped through review. A ne
 packaging test computes the import closure of shipped `dist/**/*.js` and fails
 if any relative import escapes the `files` allowlist.
 
+**Third crossing — conditional `propose_decision` registration (builder-found
+2026-07-02, founder-dispositioned same day).** The AC3 guard's red run surfaced
+a third pre-existing escape beyond the two spec-named offenders:
+`dist/mcp/server.js` statically imports
+`../surfaces/ceo-slack-responder/propose-decision-tool.js` (the known
+[108-merge] follow-up). Unlike brain/intake-seed, that module is genuinely
+surface-coupled — it imports `responder.js` + `draft-store.js` to post Slack
+draft cards — so hoisting it would drag the responder chain into the tarball
+and reverse 076. Founder decision: decouple by **conditional registration**
+(AC5). `server.ts` loads the module via a guarded dynamic `import()`: when the
+module is present (repo checkout, dogfood/deployed installs), `propose_decision`
+registers exactly as today; when absent (packaged customer install), the daemon
+logs a single skip line and boots healthy without the tool. This is the
+sanctioned seam for surface-owned MCP tools; the AC3 guard covers static
+imports, so the seam does not weaken it.
+
 ## Acceptance Criteria
 
 - **AC1 — packaged daemon healthy.** `tests/cli/shell-reachable.test.ts` passes
@@ -109,9 +126,13 @@ if any relative import escapes the `files` allowlist.
   contains the excluded files, and a rules approximation can silently diverge
   from npm's packaging semantics (r1 codex + codex-ops convergent finding).
   Red-verified: run against current main (pre-fix) the guard must fail on
-  both offenders precisely because the packed set lacks
-  `dist/surfaces/ceo-slack-responder/{brain,intake-seed}.js`; it passes
-  post-hoist.
+  the static offenders (the enrich→brain/intake-seed imports AND the
+  server.js→propose-decision-tool import) precisely because the packed set
+  lacks `dist/surfaces/ceo-slack-responder/*.js`; it passes post-fix (hoist
+  clears the enrich rows, AC5's dynamic-import decoupling clears the server.js
+  row). Guard scope: static `import`/`export ... from` declarations with
+  relative specifiers. Dynamic `import()` expressions are outside the static
+  closure by design — AC5's guarded dynamic import is the sanctioned escape.
 - **AC4 — full verification (with a single explicit carve).** `npm run
   typecheck` and `npm run lint` pass. `npm run test:product` passes with at
   most ONE allowed exception: the pre-existing
@@ -123,6 +144,20 @@ if any relative import escapes the `files` allowlist.
   `tests/cli/shell-reachable.test.ts` must pass in all cases (it is this
   item's regression target). `packed-manifest.test.ts` snapshot updated for
   the new `dist/brain/*` entries.
+- **AC5 — conditional `propose_decision` registration (founder-dispositioned
+  escalation, 2026-07-02).** `src/mcp/server.ts` carries no static import from
+  `src/surfaces/ceo-slack-responder/`; it attempts a guarded dynamic
+  `import()` of the propose-decision module at startup. Module loads →
+  `propose_decision` registers exactly as today and every existing
+  propose_decision test passes unmodified (in-repo the module is always
+  present). Module absent → registration is skipped with a single logged line;
+  startup does not throw and daemon health is unaffected — the packed
+  `shell-reachable` launchd leg (AC1) is the integration proof of the absent
+  path, since the packed install genuinely lacks the module. If a focused
+  unit test of the skip path is cheap (e.g. the registration helper tolerates
+  `ERR_MODULE_NOT_FOUND` without rethrowing), add it; if it needs new harness
+  machinery, skip it and note that AC1 covers the path — do not build
+  simulation infrastructure for this.
 
 ## Out of Scope (Don't Drift)
 
@@ -134,6 +169,10 @@ if any relative import escapes the `files` allowlist.
   111 (separate root cause).
 - No general dead-import linting or wider packaging refactors; the guard covers
   the `files`-exclusion closure only.
+- Do NOT hoist `propose-decision-tool.ts`, `draft-store.ts`, or `responder.ts`
+  into the packaged layer — the propose_decision fix is registration
+  decoupling only (AC5), not a move. Those modules stay surface-owned and
+  tarball-excluded.
 
 ## After Completion (Strategist Notes)
 
