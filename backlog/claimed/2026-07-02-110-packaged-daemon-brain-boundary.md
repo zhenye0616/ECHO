@@ -29,6 +29,13 @@ files_to_modify:
   - src/enrich/granola-intake-candidates.ts         # AC1 — import path rewrite to src/brain/
   - tests/packaging/import-closure.test.ts          # NEW (AC3) — resolves shipped dist/**/*.js imports against the ACTUAL npm-packed file set (npm pack or shared dry-run manifest; temp cleanup) and fails on any escape
   - tests/packaging/packed-manifest.test.ts         # snapshot ripple from the new dist/brain/* modules (expected; same pattern as 106/109)
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-02T20:22:56Z"
+branch: "agent/packaged-daemon-brain-boundary"
+worktree: ""
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 # 110 — Packaged daemon boots again (brain hoist across the 076 boundary)
