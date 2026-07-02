@@ -1,4 +1,5 @@
 import type { IntakeFields } from './brain.js';
+import type { MeetingProvenance } from './intake-seed.js';
 
 export interface IssueRenderInput {
   fields: Required<IntakeFields>;
@@ -7,6 +8,7 @@ export interface IssueRenderInput {
   projectName: string;
   projectId: string;
   statusNote?: string;
+  meetingProvenance?: MeetingProvenance;
 }
 
 export interface CreatedIssueReceiptInput {
@@ -95,6 +97,7 @@ export function renderParentDeliverableIssue(input: IssueRenderInput): string {
     '',
     `Requester: ${input.requester}`,
     `Slack thread: ${input.slackThreadUrl}`,
+    ...renderMeetingProvenanceLines(input.meetingProvenance),
     'Doc:',
     'PR:',
     'Preview deploy:',
@@ -104,6 +107,22 @@ export function renderParentDeliverableIssue(input: IssueRenderInput): string {
     `Linear project ID: ${input.projectId}`,
     '',
   ].join('\n');
+}
+
+function renderMeetingProvenanceLines(provenance: MeetingProvenance | undefined): string[] {
+  if (provenance === undefined) return [];
+  const dateSuffix =
+    provenance.meetingDate !== undefined && provenance.meetingDate.trim() !== ''
+      ? ` (${provenance.meetingDate.trim()})`
+      : '';
+  const lines = [`Meeting: ${provenance.meetingTitle}${dateSuffix}`];
+  if (provenance.webUrl !== undefined && provenance.webUrl.trim() !== '') {
+    lines.push(`Granola: ${provenance.webUrl.trim()}`);
+  }
+  if (provenance.quote.trim() !== '') {
+    lines.push(`Meeting quote: ${provenance.quote.trim()}`);
+  }
+  return lines;
 }
 
 export function formatCreatedIssueReceipt(input: CreatedIssueReceiptInput): string {

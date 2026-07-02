@@ -7,6 +7,7 @@ import { startFsWatcher } from '../capture/surfaces/fs-watcher.js';
 import { startGitWatcher } from '../capture/surfaces/git-watcher.js';
 import { startGranolaPoller } from '../capture/surfaces/granola-poller.js';
 import { startEnrichmentDispatch } from '../enrich/dispatch.js';
+import { startGranolaIntakeBridge } from '../enrich/granola-intake-candidates.js';
 import { ensureEchoHome } from '../echo-home/scaffold.js';
 import { createLogger } from '../logging/index.js';
 import { flushRecentMcpCallLog } from '../mcp/request-log.js';
@@ -88,6 +89,14 @@ const [
   startMcpServer(storage, { port: resolveMcpPort() }),
 ]);
 
+// Granola→Slack intake bridge (item 109). Off by default; enabled-but-
+// misconfigured fails closed inside startGranolaIntakeBridge (structured
+// config error logged, zero seed records claimed). Debounced after signal
+// extraction via runSignalsFirst so seeds are built from fresh signal atoms.
+const granolaIntake = startGranolaIntakeBridge(storage, {
+  runSignalsFirst: () => enrichment.granolaSignals.run(),
+});
+
 await startLifecycle({
   storage,
   storageBackend: backend,
@@ -102,6 +111,7 @@ await startLifecycle({
     await cursorExtractor.stop();
     await codexExtractor.stop();
     await claudeCodeExtractor.stop();
+    await granolaIntake.stop();
     await enrichment.stop();
     await granolaPoller.stop();
     await gitWatcher.stop();
