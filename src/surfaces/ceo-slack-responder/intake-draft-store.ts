@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { intakeReadyFields, type IntakeFieldKey, type IntakeFields } from './brain.js';
+import type { MeetingProvenance } from './intake-seed.js';
 import type { LinearIssueCreated } from './linear-client.js';
 
 export type IntakeDraftStatus =
@@ -37,6 +38,11 @@ export interface IntakeDraft {
   fields: IntakeFields;
   asked_fields?: IntakeFieldKey[];
   project_id?: string;
+  // Present only for Granola meeting-sourced seeds (item 109). Ties the draft to
+  // the originating intake candidate so dismissals are attributable to the seed
+  // and the created issue can carry meeting provenance.
+  candidate_key?: string;
+  meeting_provenance?: MeetingProvenance;
   status: IntakeDraftStatus;
   idempotency_token: string;
   slack_event_ids: string[];
@@ -59,6 +65,24 @@ export interface RecordIntakeMessageInput {
   projectId?: string;
 }
 
+export interface RecordIntakeSeedInput {
+  candidateKey: string;
+  key: IntakeThreadKeyParts;
+  requester: IntakeRequester;
+  eventId: string;
+  fields: IntakeFields;
+  askedFields?: readonly IntakeFieldKey[];
+  projectId?: string;
+  meetingProvenance?: MeetingProvenance;
+}
+
+export type IntakeSeedOutcome = 'created' | 'duplicate_event' | 'duplicate_candidate';
+
+export interface RecordIntakeSeedResult {
+  draft: IntakeDraft;
+  outcome: IntakeSeedOutcome;
+}
+
 export interface IntakeCreateContext {
   draft: IntakeDraft;
   fields: Required<IntakeFields>;
@@ -77,6 +101,15 @@ export interface IntakeDraftStore {
   recordMessage(
     input: RecordIntakeMessageInput,
   ): Promise<{ draft: IntakeDraft; duplicate: boolean }>;
+  /**
+   * Durably record a Granola meeting-sourced seed (item 109). Exactly-once draft
+   * per candidate key: a second seed carrying an already-seen candidate key is a
+   * no-op (`duplicate_candidate`); a redelivered Slack event is a no-op
+   * (`duplicate_event`). The candidate key and event id are written in the same
+   * durable file write as the draft, so the event-id handled marking lands
+   * atomically-with the draft creation — never before it.
+   */
+  recordSeed(input: RecordIntakeSeedInput): Promise<RecordIntakeSeedResult>;
   runCreateOnce(
     key: string,
     confirmedBy: string,
@@ -135,6 +168,64 @@ export class FileIntakeDraftStore implements IntakeDraftStore {
         file.drafts[key] = next;
         await this.writeFile(file);
         return { draft: next, duplicate: false };
+      });
+    });
+  }
+
+  async recordSeed(input: RecordIntakeSeedInput): Promise<RecordIntakeSeedResult> {
+    const candidateKey = requiredString(input.candidateKey, 'candidate_key');
+    const key = intakeThreadKey(input.key);
+    return this.withDraftLock(key, async () => {
+      return this.withFileLock(async () => {
+        const eventId = requiredString(input.eventId, 'event_id');
+        const file = await this.readFile();
+
+        // Candidate-key dedupe — exactly-once draft per candidate. A duplicate
+        // seed (different thread/event, same candidate) never creates a second
+        // draft; we still record its event id so a later redelivery is a no-op.
+        const existingByCandidate = Object.values(file.drafts).find(
+          (draft) => draft.candidate_key === candidateKey,
+        );
+        if (existingByCandidate !== undefined) {
+          if (existingByCandidate.slack_event_ids.includes(eventId)) {
+            return { draft: existingByCandidate, outcome: 'duplicate_event' };
+          }
+          const now = new Date().toISOString();
+          const next: IntakeDraft = {
+            ...existingByCandidate,
+            slack_event_ids: [...existingByCandidate.slack_event_ids, eventId],
+            updated_at: now,
+          };
+          file.drafts[existingByCandidate.key] = next;
+          await this.writeFile(file);
+          return { draft: next, outcome: 'duplicate_candidate' };
+        }
+
+        // Event-id dedupe on the thread key (a redelivered first seed).
+        const existing = file.drafts[key];
+        if (existing !== undefined && existing.slack_event_ids.includes(eventId)) {
+          return { draft: existing, outcome: 'duplicate_event' };
+        }
+
+        const now = new Date().toISOString();
+        const base =
+          existing ??
+          createDraft({ keyParts: input.key, requester: input.requester, key, now });
+        const next: IntakeDraft = {
+          ...base,
+          candidate_key: candidateKey,
+          fields: compactFields({ ...base.fields, ...input.fields }),
+          slack_event_ids: [...base.slack_event_ids, eventId],
+          ...(input.askedFields !== undefined ? { asked_fields: [...input.askedFields] } : {}),
+          ...(input.projectId !== undefined ? { project_id: input.projectId } : {}),
+          ...(input.meetingProvenance !== undefined
+            ? { meeting_provenance: input.meetingProvenance }
+            : {}),
+          updated_at: now,
+        };
+        file.drafts[key] = next;
+        await this.writeFile(file);
+        return { draft: next, outcome: 'created' };
       });
     });
   }

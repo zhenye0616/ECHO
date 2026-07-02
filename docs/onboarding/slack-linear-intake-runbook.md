@@ -64,3 +64,54 @@ Structured stdout logs avoid Slack message bodies and tokens. Watch for `slack_s
 Linear create calls use a bounded timeout and no duplicating retry. If a create times out or the responder restarts during the uncertain `creating` window, the draft is marked `needs-reconcile`, the requester sees a failure reply, and the draft JSON contains the failure phase/message for manual reconciliation.
 
 Manual reconciliation rule: inspect Linear for a possible orphan issue before taking any further action. Do not re-click confirm until the operator has reconciled the draft.
+
+## Granola → Slack meeting intake bridge (item 109)
+
+The bridge is a founder-machine daemon worker that scans derived Granola meeting signals (item 106), classifies ticket-worthy client needs, and posts them as **seed messages** into the intake channel. The Fly responder accepts a seed and drives it through the same follow-up → confirm → create flow as a human-typed intake. Nothing enters Linear without a human confirm.
+
+### Deploy invariants (NOT machine-checked — separate deployments, no shared store)
+
+The daemon (bridge) and the Fly responder do not share state. Two facts MUST be aligned by the operator; the bridge cannot verify them and does not claim to:
+
+1. **Same bot token.** The bridge posts with `ECHO_SLACK_BOT_TOKEN`. It MUST be the same bot token the responder uses (`ECHO_SLACK_BOT_TOKEN`), so the responder recognizes the seed as authored by its own bot id (`ECHO_INTAKE_SEED_BOT_ID`).
+2. **Allowlisted intake channel.** The bridge posts to `ECHO_GRANOLA_INTAKE_CHANNEL_ID`. That channel MUST be in the responder's `ECHO_CEO_SLACK_CHANNEL_IDS` allowlist AND equal the responder's `ECHO_INTAKE_SEED_CHANNEL_ID`.
+
+Startup validation is scoped to what is locally checkable: when `ECHO_GRANOLA_INTAKE_ENABLED=true`, a missing/blank `ECHO_SLACK_BOT_TOKEN` or `ECHO_GRANOLA_INTAKE_CHANNEL_ID` **fails closed** with a structured config error before any seed record is claimed. Valid-but-wrong config (wrong bot identity, non-allowlisted channel) is caught by the first-live-run smoke below, never by a silent loss.
+
+### Bridge config (daemon side)
+
+- `ECHO_GRANOLA_INTAKE_ENABLED=true` (off by default)
+- `ECHO_SLACK_BOT_TOKEN` (same as the responder)
+- `ECHO_GRANOLA_INTAKE_CHANNEL_ID` (an allowlisted responder channel)
+- `ECHO_GRANOLA_INTAKE_INTERNAL_DOMAINS` — comma-separated internal email domains; a note with **only** internal attendees produces zero candidates
+- `ECHO_GRANOLA_INTAKE_OWNER_MAP` — JSON of attendee-email → Slack user id (the client-facing owner)
+- `ECHO_GRANOLA_INTAKE_DEFAULT_OWNER` — fallback Slack user id when no attendee email maps
+- optional `ECHO_GRANOLA_INTAKE_LOOKBACK_DAYS` (default 7)
+- optional `ECHO_GRANOLA_INTAKE_PER_NOTE_CAP` (default 3)
+- optional `ECHO_GRANOLA_INTAKE_MAX_RETRIES` (default 5)
+
+### Responder config (Fly side) for the seed carve-out
+
+- `ECHO_INTAKE_SEED_BOT_ID` — the responder's own Slack bot id; seeds are accepted only when the author bot id equals this
+- `ECHO_INTAKE_SEED_CHANNEL_ID` — the intake channel; seeds are accepted only in this channel
+
+If either is unset, the responder ignores all bot messages (no seed carve-out). Follow-up questions and confirm cards never carry the seed marker, so they can never be re-accepted as seeds.
+
+### First-live-run smoke (required before leaving the bridge enabled)
+
+1. Enable the bridge with one settled, external-attendee meeting in the lookback window.
+2. Watch the intake channel for one seed message tagging the owner.
+3. Confirm the responder replies in the seed thread (follow-up questions or a confirm card). That reply is the **acceptance signal** — the AC2 deploy invariants are aligned.
+4. Journal the run per the dogfooding discipline.
+
+### Posted-but-unaccepted seed check (broken-invariant signal)
+
+A seed that reaches `posted` in the seed store (`~/.echo/state/granola-intake-seeds.json`) with **no responder reply** in its thread means the deploy invariants are broken — wrong bot token, wrong/non-allowlisted channel, or the responder seed-accept env is unset. This is the defined broken-invariant signal, never a silent loss.
+
+Recovery:
+
+1. **Disable** the bridge: set `ECHO_GRANOLA_INTAKE_ENABLED=false` and restart the daemon. No new seeds are posted; existing durable seed records are untouched.
+2. **Reconcile** the responder side: confirm `ECHO_INTAKE_SEED_BOT_ID`, `ECHO_INTAKE_SEED_CHANNEL_ID`, `ECHO_CEO_SLACK_CHANNEL_IDS`, and the shared bot token all agree with the bridge's channel and token.
+3. Re-enable and re-run the smoke. Because seeding is at-least-once and draft creation is exactly-once per candidate key, re-posting a candidate that was already accepted is a no-op on the responder.
+
+`failed` seed records (retries exhausted) are terminal and operator-visible in the seed store with the last error; inspect them the same way. Dismissed seeded drafts are recorded with their originating candidate key in the responder event log (`granola-intake-seed-dismissed`) as a noise-tuning signal.

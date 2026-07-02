@@ -41,6 +41,7 @@ import {
   type IntakeDraftStore,
   type IntakeThreadKeyParts,
 } from './intake-draft-store.js';
+import { parseSeedMarker, type MeetingProvenance } from './intake-seed.js';
 import {
   createIntakeIssueRenderer,
   parseIntakeAgentMaxTurns,
@@ -95,6 +96,13 @@ export interface ResponderConfig {
   cofounderIdentities?: readonly CofounderIdentity[];
   linearConfig?: LinearConfig;
   linearIntakeDraftStorePath?: string;
+  // Item 109 seed carve-out. The responder accepts a bot-authored message as an
+  // intake seed only when BOTH are set (and Linear intake is configured): the
+  // author bot id equals seedAcceptBotId AND the channel equals
+  // seedAcceptChannelId. Same-channel/same-bot equality with the daemon is a
+  // deploy invariant, not machine-checked here.
+  seedAcceptBotId?: string;
+  seedAcceptChannelId?: string;
 }
 
 export interface SlackQuestion {
@@ -158,6 +166,7 @@ type IntakeConfirmPoster = typeof postIntakeConfirmCard;
 type UsageAppender = typeof appendUsageRecord;
 type IntakeFailureAppender = typeof appendIntakeFailureRecord;
 type IntakeSlackPostFailureAppender = typeof appendIntakeSlackPostFailureRecord;
+type IntakeSeedDismissalAppender = typeof appendIntakeSeedDismissalRecord;
 type IntakeIssueRenderer = (input: IntakeIssueRenderContext) => Promise<IntakeIssueDraft>;
 
 interface IntakeSlackPostFailureRecord {
@@ -175,6 +184,7 @@ interface ResponderDependencies {
   appendUsageRecord?: UsageAppender;
   appendIntakeFailureRecord?: IntakeFailureAppender;
   appendIntakeSlackPostFailureRecord?: IntakeSlackPostFailureAppender;
+  appendIntakeSeedDismissalRecord?: IntakeSeedDismissalAppender;
   postIntakeConfirmCard?: IntakeConfirmPoster;
   intakeIssueRenderer?: IntakeIssueRenderer;
   teamDecisionStore?: TeamDecisionStore;
@@ -199,6 +209,18 @@ export interface IntakeAction {
   user: string;
   ts?: string;
   threadTs?: string;
+}
+
+export interface IntakeSeed {
+  envelopeId: string;
+  eventId: string;
+  teamId: string;
+  channel: string;
+  ts: string;
+  candidateKey: string;
+  ownerSlackId: string;
+  fields: IntakeFields;
+  meetingProvenance?: MeetingProvenance;
 }
 
 export function intakeKeyPartsForQuestion(question: SlackQuestion): IntakeThreadKeyParts {
@@ -284,6 +306,12 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
     ...(linearConfig !== undefined ? { linearConfig } : {}),
     ...(env.ECHO_LINEAR_INTAKE_DRAFT_STORE?.trim()
       ? { linearIntakeDraftStorePath: env.ECHO_LINEAR_INTAKE_DRAFT_STORE.trim() }
+      : {}),
+    ...(env.ECHO_INTAKE_SEED_BOT_ID?.trim()
+      ? { seedAcceptBotId: env.ECHO_INTAKE_SEED_BOT_ID.trim() }
+      : {}),
+    ...(env.ECHO_INTAKE_SEED_CHANNEL_ID?.trim()
+      ? { seedAcceptChannelId: env.ECHO_INTAKE_SEED_CHANNEL_ID.trim() }
       : {}),
   };
 }
@@ -520,10 +548,33 @@ export async function respondToLinearIntakeIfNeeded(
   });
   if (duplicate) return true;
 
+  await driveIntakeDraftReply(draft, config, deps, postMessage, question.channel, threadTs);
+  return true;
+}
+
+/**
+ * Post the next follow-up questions or the confirm card for an intake draft.
+ * Shared by the human-typed intake path (respondToLinearIntakeIfNeeded) and the
+ * Granola seed path (respondToIntakeSeed), so both surfaces resolve missing
+ * fields / project the same way and only ever create through a human confirm.
+ */
+async function driveIntakeDraftReply(
+  draft: IntakeDraft,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+  postMessage: SlackPoster,
+  channel: string,
+  threadTs: string | undefined,
+): Promise<void> {
+  if (config.linearConfig === undefined) return;
+  const knownProjects = knownLinearProjectNames(config.linearConfig);
+  const missing = nextIntakeFollowupFields(draft.fields, config.linearConfig, knownProjects);
+  const projectId = resolveLinearProjectId(draft.fields.clientProject, config.linearConfig);
+
   if (missing.length > 0 || projectId === null) {
     const questions = buildIntakeFollowupQuestions(missing, { knownProjectNames: knownProjects });
     await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
-      channel: question.channel,
+      channel,
       text: formatIntakeFollowup(questions),
       threadTs,
       failure: {
@@ -531,31 +582,30 @@ export async function respondToLinearIntakeIfNeeded(
         draftKey: draft.key,
       },
     });
-    return true;
+    return;
   }
 
   const readyFields = intakeReadyFields(draft.fields);
   if (readyFields === null) {
     await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
-      channel: question.channel,
+      channel,
       text: formatIntakeFollowup(
         buildIntakeFollowupQuestions(missing, { knownProjectNames: knownProjects }),
       ),
       threadTs,
       failure: { phase: 'not_ready_followup_post', draftKey: draft.key },
     });
-    return true;
+    return;
   }
 
   const postConfirmCard = deps.postIntakeConfirmCard ?? postIntakeConfirmCard;
   await postIntakeConfirmCardOrRecordFailure(config, deps, postConfirmCard, {
-    channel: question.channel,
+    channel,
     draft,
     fields: readyFields,
     threadTs,
     failure: { phase: 'confirm_card_post', draftKey: draft.key },
   });
-  return true;
 }
 
 function nextIntakeFollowupFields(
@@ -644,6 +694,54 @@ export function extractIntakeAction(envelope: SlackEnvelope): IntakeAction | nul
   };
 }
 
+/**
+ * Item 109 seed carve-out. Accept a bot-authored message as an intake seed ONLY
+ * when ALL validate: (1) the author bot id equals the responder's configured
+ * seedAcceptBotId, (2) the channel equals the configured seedAcceptChannelId,
+ * (3) the marker parses with a supported version, (4) the marker carries a
+ * well-formed candidate key. Every negative case returns null and falls through
+ * to the normal (bot messages ignored) path: human-typed marker text (no
+ * bot_id), non-self bots, malformed/unsupported markers, and the responder's own
+ * follow-ups/confirm cards (which never carry a marker).
+ */
+export function extractIntakeSeed(
+  envelope: SlackEnvelope,
+  config: Pick<ResponderConfig, 'seedAcceptBotId' | 'seedAcceptChannelId'>,
+): IntakeSeed | null {
+  if (config.seedAcceptBotId === undefined || config.seedAcceptChannelId === undefined) return null;
+  if (envelope.type !== 'events_api') return null;
+  if (envelope.envelope_id === undefined || envelope.envelope_id.trim() === '') return null;
+  const event = envelope.payload?.event;
+  if (event === undefined) return null;
+  if (event.type !== 'message') return null;
+  if (event.bot_id === undefined || event.bot_id !== config.seedAcceptBotId) return null;
+  if (event.channel === undefined || event.channel !== config.seedAcceptChannelId) return null;
+  if (event.text === undefined || event.ts === undefined) return null;
+
+  const marker = parseSeedMarker(event.text);
+  if (marker === null) return null;
+
+  const ownerSlackId = marker.ownerSlackId ?? firstSlackMention(event.text);
+  if (ownerSlackId === undefined) return null;
+
+  return {
+    envelopeId: envelope.envelope_id,
+    eventId: envelope.payload?.event_id ?? envelope.envelope_id,
+    teamId: envelope.payload?.team_id ?? event.team ?? envelope.team_id ?? 'unknown-team',
+    channel: event.channel,
+    ts: event.ts,
+    candidateKey: marker.candidateKey,
+    ownerSlackId,
+    fields: marker.fields ?? {},
+    ...(marker.provenance === undefined ? {} : { meetingProvenance: marker.provenance }),
+  };
+}
+
+function firstSlackMention(text: string): string | undefined {
+  const match = /<@([A-Z0-9]+)>/.exec(text);
+  return match?.[1];
+}
+
 export async function respondToDecisionAction(
   action: DecisionAction,
   config: ResponderConfig,
@@ -692,6 +790,61 @@ export async function respondToDecisionAction(
   );
 }
 
+/**
+ * Item 109 seed handling. Durable-write-before-ack on the seed path: the draft
+ * (candidate-key dedupe + the event-id handled marking, which live in the same
+ * durable record) is written BEFORE the Slack envelope is acked, so a crash
+ * after ack cannot silently lose the seed. A duplicate candidate key or a
+ * replayed event id is a no-op (no second draft, no duplicate reply).
+ */
+export async function respondToIntakeSeed(
+  seed: IntakeSeed,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+  ackEnvelope: () => void = () => undefined,
+): Promise<void> {
+  const postMessage = deps.postSlackMessage ?? postSlackMessage;
+  if (config.linearConfig === undefined || deps.intakeDraftStore === undefined) {
+    ackEnvelope();
+    log.debug('intake_seed_unconfigured', {
+      channel: seed.channel,
+      candidate_key: seed.candidateKey,
+    });
+    return;
+  }
+
+  const knownProjects = knownLinearProjectNames(config.linearConfig);
+  const projectId = resolveLinearProjectId(seed.fields.clientProject, config.linearConfig);
+  const missing = nextIntakeFollowupFields(seed.fields, config.linearConfig, knownProjects);
+  const requesterLabel = requesterAttributionForSlackUser(
+    config.cofounderIdentities ?? [],
+    seed.ownerSlackId,
+  );
+
+  const { draft, outcome } = await deps.intakeDraftStore.recordSeed({
+    candidateKey: seed.candidateKey,
+    key: { teamId: seed.teamId, channelId: seed.channel, rootTs: seed.ts },
+    requester: { slack_user_id: seed.ownerSlackId, label: requesterLabel },
+    eventId: seed.eventId,
+    fields: seed.fields,
+    askedFields: intakeFollowupFieldsToAsk(missing),
+    ...(projectId !== null ? { projectId } : {}),
+    ...(seed.meetingProvenance === undefined
+      ? {}
+      : { meetingProvenance: seed.meetingProvenance }),
+  });
+
+  // Durable write complete — ack only now (write-before-ack on the seed path).
+  ackEnvelope();
+
+  if (outcome !== 'created') {
+    log.debug('intake_seed_duplicate', { candidate_key: seed.candidateKey, outcome });
+    return;
+  }
+
+  await driveIntakeDraftReply(draft, config, deps, postMessage, seed.channel, seed.ts);
+}
+
 export async function respondToIntakeAction(
   action: IntakeAction,
   config: ResponderConfig,
@@ -735,7 +888,18 @@ export async function respondToIntakeAction(
 
   const actor = requesterAttributionForSlackUser(config.cofounderIdentities ?? [], action.user);
   if (action.kind === 'dismiss') {
-    await deps.intakeDraftStore.dismissDraft(action.draftKey, actor);
+    const dismissed = await deps.intakeDraftStore.dismissDraft(action.draftKey, actor);
+    // A dismissed Granola-seeded draft is durably recorded WITH its originating
+    // candidate key (not only the draft key) as a noise-tuning signal (AC6).
+    if (dismissed.candidate_key !== undefined) {
+      const appendDismissal =
+        deps.appendIntakeSeedDismissalRecord ?? appendIntakeSeedDismissalRecord;
+      await appendDismissal(config.eventLogPath, dismissed);
+      log.info('granola_intake_seed_dismissed', {
+        draft_key: dismissed.key,
+        candidate_key: dismissed.candidate_key,
+      });
+    }
     await postIntakeSlackMessageOrRecordFailure(config, deps, postMessage, {
       channel: action.channel,
       text: 'Dismissed intake draft.',
@@ -757,6 +921,9 @@ export async function respondToIntakeAction(
         projectName,
         projectId: context.projectId,
         knownProjectNames: knownLinearProjectNames(config.linearConfig!),
+        ...(context.draft.meeting_provenance === undefined
+          ? {}
+          : { meetingProvenance: context.draft.meeting_provenance }),
       });
       return deps.linearClient!.createIssue({
         title: issueDraft.title,
@@ -938,6 +1105,28 @@ export async function appendIntakeSlackPostFailureRecord(
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await appendFile(path, `${formatIntakeSlackPostFailureRecord(failure, recordedAt)}\n`, 'utf8');
+}
+
+export function formatIntakeSeedDismissalRecord(
+  draft: IntakeDraft,
+  recordedAt = new Date(),
+): string {
+  return [
+    recordedAt.toISOString(),
+    'granola-intake-seed-dismissed',
+    `key=${draft.key}`,
+    `candidate_key=${draft.candidate_key ?? 'unknown'}`,
+    `dismissed_by=${draft.dismissed_by ?? 'unknown'}`,
+  ].join(' · ');
+}
+
+export async function appendIntakeSeedDismissalRecord(
+  path: string,
+  draft: IntakeDraft,
+  recordedAt = new Date(),
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${formatIntakeSeedDismissalRecord(draft, recordedAt)}\n`, 'utf8');
 }
 
 async function postIntakeSlackMessageOrRecordFailure(
@@ -1226,9 +1415,26 @@ async function handleSocketMessage(
     typeof rawData === 'string' ? rawData : Buffer.from(rawData as ArrayBuffer).toString('utf8');
   const envelope = JSON.parse(raw) as SlackEnvelope;
   log.debug('slack_envelope_received', envelopeLogPayload(envelope));
-  if (envelope.envelope_id !== undefined) {
-    socket.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
+  const ackEnvelope = (): void => {
+    if (envelope.envelope_id !== undefined) {
+      socket.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
+    }
+  };
+
+  // Seed path is write-before-ack (respondToIntakeSeed acks after the durable
+  // draft write); every other path acks immediately here.
+  const seed = extractIntakeSeed(envelope, config);
+  if (seed !== null) {
+    log.debug('slack_intake_seed_received', {
+      channel: seed.channel,
+      candidate_key: seed.candidateKey,
+      thread_ts: seed.ts,
+    });
+    await respondToIntakeSeed(seed, config, deps, ackEnvelope);
+    return;
   }
+
+  ackEnvelope();
 
   const action = extractDecisionAction(envelope);
   if (action !== null) {
