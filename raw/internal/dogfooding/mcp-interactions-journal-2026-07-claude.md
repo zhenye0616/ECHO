@@ -46,3 +46,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coordination call) — daemon MCP :38478; roles from tools/review-queue/coord-roles.json.
 - **Verdict:** ✅ right — active trigger accepted for both reviewers; r2 spec patches at 6f2d28b0.
 - **Note:** Investigator's risk note materially improved the patch: AC3 event-id invariant stated against the existing slack_event_ids-on-draft coupling instead of prescribing a new store.
+
+### 2026-07-01 20:15 PDT — watcher r3 tick on 109: coord_invoke for r4 (delta-verify round)
+
+- **Trigger:** /review-queue-watch r3 tick — codex r3 clean (proceed, 0 findings); codex-ops 1 MED (Slack delivery config contract unnamed). Patched at 1fe27d52, r4 dispatched at 2afba0f3, 057b hook fired.
+- **Query inputs:** coord_invoke(role=codex, request_path=backlog/reviews/2026-07-01-109-granola-meeting-intake-bridge/r4/request.md, correlation_id=<r4 frontmatter>); coord_invoke(role=codex-ops, same).
+- **Returned:** both ok.
+- **Sources:** n/a (coordination call) — daemon MCP :38478.
+- **Verdict:** ✅ right.
+- **Note:** Finding trajectory 5→4→1; r4 is a single-delta verify with claim-ready on the table. Reframe gate correctly did not fire (1 finding < 2 threshold).
