@@ -134,10 +134,15 @@ walk = **8 total**; expected latency well under 1s on this repo.
 - **AC5 — full verification.** `npm run typecheck`, `npm run lint`,
   `npm run test:product` all pass.
 - **AC6 — batch subprocess robustness.** (r1 codex-ops findings.) (a) The
-  `cat-file --batch` helper closes stdin, awaits child exit, and kills +
-  reaps the child on parse error, missing object, or early abort; a test
-  injects an error path and asserts no orphaned git child remains across
-  repeated calls. (b) The `git log --name-only` walk and `cat-file --batch`
+  lifecycle contract applies to EVERY streaming batched git child — the
+  `cat-file --batch` helper AND the `git log --name-only` walk if it is
+  implemented as a streaming child (r3 codex-ops finding: lifecycle
+  symmetry): each closes stdin where applicable, is awaited to process exit,
+  and is killed + reaped on parse error, missing object, MCP request abort,
+  or consumer failure; a test injects an error path and asserts no orphaned
+  git child remains across repeated calls. Capture-with-sized-buffer remains
+  acceptable for the log walk if it is awaited and surfaces failures.
+  (b) The `git log --name-only` walk and `cat-file --batch`
   reads use streaming or an explicit max-buffer sized for growth; a
   high-cardinality fixture (≥10× today's task-dir count, generated
   synthetically) asserts output larger than the old per-file capture size is
