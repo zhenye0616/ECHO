@@ -7,7 +7,8 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PROPOSED | HIGH | 2026-07-02 | [2026-07-02-110-packaged-daemon-brain-boundary](../backlog/proposed/2026-07-02-110-packaged-daemon-brain-boundary.md) | Packaged daemon boots again — hoist shared brain invocation out of the excluded ceo-slack-responder surface, and add a tarball import-closure guard so the 076 boundary can't be silently crossed again | 0.5-1d (mechanical hoist + import rewrites are small; the import-closure packaging test is the net-new piece) | - |
+| PROPOSED | HIGH | 2026-07-02 | [2026-07-02-111-list-task-states-batched-git](../backlog/proposed/2026-07-02-111-list-task-states-batched-git.md) | list_task_states latency stays flat as task-state dirs accumulate — collapse ~6 git spawns per task into a constant number of batched git reads at the same pinned SHA | 0.5-1d (batching is localized to one tool + one git-util module; the care point is preserving the single-SHA pinning invariant and byte-identical output) | - |
 
 ## Ready
 

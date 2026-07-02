@@ -8,7 +8,7 @@ created: 2026-05-16
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-05-16T07:28:32Z"
 branch: "agent/coord-substrate-and-observability"
-head_sha: "09782a4"
+head_sha: "09782a46154d651d7a9a006c0745e4c3123aa328"
 pr_url: ""
 task_state_ref: 2026-05-16-057a-coord-substrate-and-observability
 agent_notes: |

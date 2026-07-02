@@ -315,6 +315,16 @@ review_notes: ""                  # founder fills during review
 The strategist reads this section when promoting decisions to the wiki.]
 ```
 
+> **`status:` is historical, not maintained.** Folder location is the single
+> source of truth for an item's pipeline stage; nothing in the agent lifecycle
+> updates the `status:` field after creation, so archived items routinely carry
+> stale values (`ready`, `proposed`, …) — that is expected, not corruption. Do
+> not bulk-normalize it and do not build tooling that trusts it
+> (`tools/blocked.py` deliberately skips validating it; see the comment there).
+> Exception: agent-managed pointer fields ARE load-bearing — `head_sha` must be
+> the full 40-char `git rev-parse` output (reviewer ground-truth checks are
+> byte-for-byte).
+
 ## Agent Operating Rules
 
 When an agent runs, it must:
