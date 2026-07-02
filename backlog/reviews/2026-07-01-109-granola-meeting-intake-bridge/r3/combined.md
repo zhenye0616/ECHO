@@ -24,9 +24,11 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex-ops | AC2 / AC6 — daemon Slack seed delivery configuration | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex-ops | AC2 / AC6 — daemon Slack seed delivery configuration | accepted — patched | 1fe27d52 — AC2 now names the exact contract: bridge reuses ECHO_SLACK_BOT_TOKEN (same bot identity by construction → AC3 self-bot check holds) + new ECHO_GRANOLA_INTAKE_CHANNEL_ID which must be in the responder allowlist; enabled-but-misconfigured validates at startup BEFORE any seed record is claimed and fails closed with a structured operator-visible config error (zero records claimed); daemon files entry + schedule test updated accordingly |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+needs R4 — focus_hints: single verification point: does the r3 config-contract patch (ECHO_SLACK_BOT_TOKEN reuse + ECHO_GRANOLA_INTAKE_CHANNEL_ID + validate-before-claim fail-closed) fully close the enabled-but-misconfigured path, and is it consistent with AC3's self-bot validation and the responder allowlist requirement? codex r3 was clean (proceed, zero findings) — verify only the delta. If clean, call claim-ready.
+
+Reframe gate: not fired — single finding (<2 threshold); targets config-contract completeness of AC2/AC6, a gap present since r1's files/tests expansion rather than a bug in a prior patch's mechanism.
 
