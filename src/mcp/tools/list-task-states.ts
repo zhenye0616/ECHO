@@ -12,11 +12,12 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { isParseFailure, parseAnchors, type ParsedAnchors } from '../parse-anchors.js';
 import {
-  commitTimeForPathAtRef,
+  commitTimesForPathsAtRef,
+  defaultGitRunner,
   GitError,
+  type GitRunner,
   listTreeAtRef,
-  pathExistsAtRef,
-  readBlobAtRef,
+  readBlobsAtRef,
   resolveRefOnce,
 } from '../util/role-state-git.js';
 import { ROLE_VALUES, type Role } from './get-role-state.js';
@@ -58,40 +59,37 @@ const listTaskStatesOutputSchema = {
   ref: z.string(),
 };
 
-function resolveStageAtRef(repoRoot: string, sha: string, taskId: string): Stage | null {
+function resolveStagesAtRef(repoRoot: string, sha: string, runner: GitRunner): Map<string, Stage> {
+  const byTaskId = new Map<string, Stage>();
   for (const stage of STAGE_VALUES) {
-    if (pathExistsAtRef(repoRoot, sha, `backlog/${stage}/${taskId}.md`)) {
-      return stage;
+    const paths = listTreeAtRef(repoRoot, sha, `backlog/${stage}`, runner);
+    for (const p of paths) {
+      const m = new RegExp(`^backlog/${stage}/([^/]+)\\.md$`).exec(p);
+      if (m !== null && !byTaskId.has(m[1]!)) {
+        byTaskId.set(m[1]!, stage);
+      }
     }
   }
-  return null;
+  return byTaskId;
 }
 
-function buildEntry(
-  repoRoot: string,
-  sha: string,
-  taskId: string,
-  rolesPresent: Role[],
-): TaskStateEntry {
-  const dirPath = `backlog/task-state/${taskId}/`;
-  const stage = resolveStageAtRef(repoRoot, sha, taskId);
-  // Prefer the strategist pointer's commit time when available; fall back
-  // to whatever pointer exists.
-  const anchorSourceRole: Role = rolesPresent.includes('strategist')
-    ? 'strategist'
-    : rolesPresent[0]!;
-  const anchorSourcePath = `backlog/task-state/${taskId}/${anchorSourceRole}.md`;
-  const lastUpdated = commitTimeForPathAtRef(repoRoot, sha, anchorSourcePath);
-  const body = readBlobAtRef(repoRoot, sha, anchorSourcePath);
+interface EntryDraft {
+  taskId: string;
+  stage: Stage | null;
+  rolesPresent: Role[];
+  anchorSourcePath: string;
+}
+
+function buildEntry(draft: EntryDraft, body: string, lastUpdated: string): TaskStateEntry {
   const parsed = parseAnchors(body);
   const anchors: ParsedAnchors | { spec?: string; _parse_error: string } = isParseFailure(parsed)
     ? parsed
     : parsed;
   return {
-    task_id: taskId,
-    stage,
-    roles_present: rolesPresent,
-    task_state_ref_path: dirPath,
+    task_id: draft.taskId,
+    stage: draft.stage,
+    roles_present: draft.rolesPresent,
+    task_state_ref_path: `backlog/task-state/${draft.taskId}/`,
     last_updated: lastUpdated,
     canonical_anchors: anchors,
   };
@@ -104,12 +102,19 @@ export interface ListTaskStatesParams {
   ref?: string;
 }
 
+export interface ListTaskStatesOptions {
+  gitRunner?: GitRunner;
+}
+
 export function listTaskStates(
   repoRoot: string,
   params: ListTaskStatesParams,
+  options: ListTaskStatesOptions = {},
 ): ListTaskStatesResult {
-  const sha = resolveRefOnce(repoRoot, params.ref);
-  const paths = listTreeAtRef(repoRoot, sha, 'backlog/task-state');
+  const runner = options.gitRunner ?? defaultGitRunner;
+  const sha = resolveRefOnce(repoRoot, params.ref, runner);
+  const paths = listTreeAtRef(repoRoot, sha, 'backlog/task-state', runner);
+  const stagesByTaskId = resolveStagesAtRef(repoRoot, sha, runner);
   // Bucket file paths by task_id.
   const byTaskId = new Map<string, Role[]>();
   for (const p of paths) {
@@ -122,19 +127,49 @@ export function listTaskStates(
     bucket.push(role);
     byTaskId.set(taskId, bucket);
   }
-  const entries: TaskStateEntry[] = [];
+  const drafts: EntryDraft[] = [];
   for (const [taskId, rolesUnordered] of byTaskId) {
     // canonical role order in output: strategist, builder, round-state
     const rolesPresent: Role[] = ROLE_VALUES.filter((r) => rolesUnordered.includes(r));
     if (params.role !== undefined && !rolesPresent.includes(params.role)) {
       continue;
     }
-    const entry = buildEntry(repoRoot, sha, taskId, rolesPresent);
-    if (params.stage !== undefined && entry.stage !== params.stage) {
+    const stage = stagesByTaskId.get(taskId) ?? null;
+    if (params.stage !== undefined && stage !== params.stage) {
       continue;
     }
-    entries.push(entry);
+    // Prefer the strategist pointer's commit time and anchors when available;
+    // fall back to whatever pointer exists.
+    const anchorSourceRole: Role = rolesPresent.includes('strategist')
+      ? 'strategist'
+      : rolesPresent[0]!;
+    drafts.push({
+      taskId,
+      stage,
+      rolesPresent,
+      anchorSourcePath: `backlog/task-state/${taskId}/${anchorSourceRole}.md`,
+    });
   }
+  const anchorSourcePaths = drafts.map((draft) => draft.anchorSourcePath);
+  const bodies = readBlobsAtRef(repoRoot, sha, anchorSourcePaths, runner);
+  const lastUpdatedByPath = commitTimesForPathsAtRef(repoRoot, sha, anchorSourcePaths, runner);
+  const entries = drafts.map((draft) => {
+    const body = bodies.get(draft.anchorSourcePath);
+    const lastUpdated = lastUpdatedByPath.get(draft.anchorSourcePath);
+    if (body === undefined) {
+      throw new GitError(
+        `unable to read ${sha}:${draft.anchorSourcePath}`,
+        'path not found in tree',
+      );
+    }
+    if (lastUpdated === undefined) {
+      throw new GitError(
+        `unable to read commit time for ${sha}:${draft.anchorSourcePath}`,
+        'path not found in history',
+      );
+    }
+    return buildEntry(draft, body, lastUpdated);
+  });
   // Sort by task_id for deterministic output.
   entries.sort((a, b) => (a.task_id < b.task_id ? -1 : a.task_id > b.task_id ? 1 : 0));
   return { task_states: entries, ref: sha };

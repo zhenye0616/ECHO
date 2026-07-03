@@ -11,6 +11,7 @@ export interface ListTaskStatesFixture {
 
 interface BuildFixtureOptions {
   extraCompleteTasks?: number;
+  bodyPaddingBytes?: number;
 }
 
 const GIT_ENV = {
@@ -30,9 +31,10 @@ function git(repoRoot: string, args: string[], env: NodeJS.ProcessEnv = {}): str
   });
 }
 
-function pointerBody(taskId: string, specStage: string): string {
+function pointerBody(taskId: string, specStage: string, bodyPaddingBytes = 0): string {
+  const padding = bodyPaddingBytes > 0 ? `\n<!-- ${'x'.repeat(bodyPaddingBytes)} -->\n` : '';
   return `## current_thesis
-Fixture pointer for ${taskId}.
+Fixture pointer for ${taskId}.${padding}
 
 ## locked_decisions
 - Keep this pointer compact.
@@ -122,7 +124,12 @@ export function buildListTaskStatesFixture(
     for (let i = 0; i < (options.extraCompleteTasks ?? 0); i += 1) {
       const taskId = `2026-07-02-111-fixture-bulk-${String(i).padStart(4, '0')}`;
       writeStageItem(repoRoot, taskId, 'complete');
-      writeTaskState(repoRoot, taskId, 'builder', pointerBody(taskId, 'complete'));
+      writeTaskState(
+        repoRoot,
+        taskId,
+        'builder',
+        pointerBody(taskId, 'complete', options.bodyPaddingBytes ?? 0),
+      );
     }
 
     git(repoRoot, ['add', '-A']);
