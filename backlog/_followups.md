@@ -410,3 +410,9 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [109] Extend the planned 108 packaging fix to the dist/enrich → dist/surfaces/ceo-slack-responder import chain (same ERR_MODULE_NOT_FOUND class as shell-reachable).
 - [109] Wrap ECHO_GRANOLA_INTAKE_OWNER_MAP parse errors as GranolaIntakeConfigError so a JSON typo cannot crash the daemon at startup (daemon/index.ts:93 unguarded).
 - [109] Minor: accepted-seed-but-Linear-unconfigured drops with log.debug only (responder.ts:806-813); owner resolution nondeterministic when multiple attendees map.
+
+## From 110 merge (2026-07-02 — packaged-daemon-brain-boundary) — non-blocking
+- [110] import-closure.test.ts: assert `shippedJs` non-empty to close the vacuous-pass window if dist/ is absent (currently mitigated only by the sibling packed-manifest snapshot failing loudly).
+- [110] Extract the duplicated `npm pack --dry-run --json` parsing into a shared tests/packaging helper (now in both packed-manifest and import-closure tests).
+- [110] Deduplicate `normalizeProjectName` + TeamDecision types: single owner in src/brain/brain.ts, responder surface imports from it (inlined during the hoist to avoid re-crossing the 076 boundary).
+- [110] Strategist post-shipment (owed): update wiki/surfaces/mcp-server.md (or packaging page) with src/brain/ shared-module location + import-closure guard as boundary invariant; record in drift log that 106+109 crossed the packaged boundary undetected through full review rounds; note the AC5 conditional-registration seam and the AC6 kickstart fix.
