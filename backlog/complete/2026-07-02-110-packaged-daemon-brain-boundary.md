@@ -40,6 +40,43 @@ head_sha: "c94130f25e3b68465231ce615459f40d3dcc4f42"
 pr_url: ""
 agent_notes: |
   Completed on branch `agent/packaged-daemon-brain-boundary` at `c94130f25e3b68465231ce615459f40d3dcc4f42`. Run 3 implemented AC6 by kickstarting the launchd service target after successful bootstrap and before health probing, with unit coverage for the launchctl sequence and kickstart failure path. Verification: `npm run typecheck`, `npm run lint`, focused daemon/packaging/shell-reachable tests, and `git diff --check` pass. `npm run test:product` has exactly one failure, `tests/mcp/recent-calls-endpoint.test.ts` timeout, which AC4 explicitly carves out while item 111 remains unmerged in `backlog/ready/`.
+review_notes: |
+  Merged on 2026-07-02 via strategist reconciliation (founder pre-authorized;
+  founder paused at post-verify checkpoint and green-lit completion).
+
+  Conflicts resolved:
+  - none — merge applied cleanly (sidecar prediction held: main's post-fork
+    commits touched only backlog/journal/review files)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar had no pre-merge fixups)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: test:product 1606 passed / 1 failed (sole failure =
+  tests/mcp/recent-calls-endpoint.test.ts 15s timeout — the documented AC4
+  carve, root-caused to item 111 which was still unmerged at merge time);
+  tests/cli/shell-reachable.test.ts (this item's regression target) passed
+  including the launchd leg. Lint, typecheck, coupled-invariants, and
+  sync-skills --check all clean post-merge.
+
+  Build history: three-run build with two founder/strategist-dispositioned
+  escalations. Run 1 red-verified the AC3 guard and caught a third
+  pre-existing boundary crossing (dist/mcp/server.js -> propose-decision-tool)
+  -> AC5 conditional registration (founder decision). Run 2 completed the
+  hoist + AC5 and root-caused the launchd leg: bootstrap leaves the job
+  pended-speculative despite RunAtLoad -> AC6 kickstart (strategist
+  disposition). Run 3 landed AC6.
+
+  Follow-up items (non-blocking):
+  - import-closure.test.ts: assert shippedJs non-empty (close the
+    vacuous-pass window without relying on the sibling snapshot)
+  - extract shared npm-pack dry-run JSON parsing into a tests/packaging helper
+  - deduplicate normalizeProjectName + TeamDecision types (single owner in
+    src/brain/, responder surface imports from it)
 ---
 
 # 110 — Packaged daemon boots again (brain hoist across the 076 boundary)
