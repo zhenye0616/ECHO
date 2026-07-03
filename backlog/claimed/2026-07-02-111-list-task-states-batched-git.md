@@ -16,6 +16,9 @@ spec_refs:
   - tests/mcp/recent-calls-endpoint.test.ts  # the product-gate test currently tipped over its 15s budget by this tool's ~11.7s call
   - backlog/complete/2026-05-13-046-context-fatigue-via-role-typed-state.md  # AC4 origin: the single-resolved-SHA invariant (defends HEAD-race / multi-snapshot) that batching must preserve
   - skills/role-typed-task-state.md          # read contract for task-state pointers; output shape is consumed by cold-start bindings
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-03T03:23:06Z"
+branch: "agent/list-task-states-batched-git"
 files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms paths against the substrate before claiming.
   - src/mcp/util/role-state-git.ts           # batched helpers: listTreeAtRef reuse for stage dirs, blob reads via `git cat-file --batch`, commit times via one `git log --name-only` walk (or ls-tree + single log)
