@@ -416,3 +416,9 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [110] Extract the duplicated `npm pack --dry-run --json` parsing into a shared tests/packaging helper (now in both packed-manifest and import-closure tests).
 - [110] Deduplicate `normalizeProjectName` + TeamDecision types: single owner in src/brain/brain.ts, responder surface imports from it (inlined during the hoist to avoid re-crossing the 076 boundary).
 - [110] Strategist post-shipment (owed): update wiki/surfaces/mcp-server.md (or packaging page) with src/brain/ shared-module location + import-closure guard as boundary invariant; record in drift log that 106+109 crossed the packaged boundary undetected through full review rounds; note the AC5 conditional-registration seam and the AC6 kickstart fix.
+
+## From 111 merge (2026-07-03 — list-task-states-batched-git) — non-blocking
+- [111] Rename run log to drop the doubled date prefix (raw/internal/agent-runs/2026-07-02-2026-07-02-111-... -> 2026-07-02-111-...).
+- [111] Restore the pinned-commit-time fallback in the batched path (or document the hard-error choice): the single log walk can miss a tree-present path whose only touching commits are merges (git log --name-only emits no file list for merges without --diff-merges); old code fell back to the pinned commit's own time.
+- [111] Strengthen or drop the tautological AC6(a) injected-failure counter test (counter lives inside the fake runner's own try/finally, so it cannot observe a leak); optionally add a PATH-shim git counter if out-of-seam spawn regression ever matters.
+- [111] Fold into the [103]/[107] flake-tracking entries above: recent-calls-endpoint timeout root cause is FIXED by 111 (977ms observed) — those older entries are now resolved.
