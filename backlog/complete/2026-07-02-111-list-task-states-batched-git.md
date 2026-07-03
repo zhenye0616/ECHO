@@ -23,6 +23,41 @@ head_sha: "e50237dcef0ce6fcc86d81c8283c0b1d7be6dd4c"
 pr_url: ""
 agent_notes: |
   Implemented the 8-child batched `list_task_states` git path with a single injectable runner seam. Fixture + baseline landed before the production rewire; focused tests assert exact argv ledger, baseline equivalence, injected batch failure cleanup, and high-cardinality batch output. Verification clean: typecheck, lint, focused role-state tests, recent-calls product gate, and full `npm run test:product`.
+review_notes: |
+  Merged on 2026-07-03 via strategist reconciliation (founder pre-authorized;
+  founder paused at post-verify checkpoint and green-lit completion).
+
+  Conflicts resolved:
+  - none — merge applied cleanly (sidecar prediction held: zero main-side
+    commits touched the 5 changed files since fork)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar had no pre-merge fixups)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: test:product 153 files / 1610 tests passed, ZERO failures — the
+  110-era AC4 carve is void and tests/mcp/recent-calls-endpoint.test.ts
+  (this item's regression target) passes in the full suite (977ms standalone
+  vs ~11.7s pre-fix). Lint, typecheck, coupled-invariants, and
+  sync-skills --check all clean post-merge.
+
+  Review highlights: reviewer independently ran old-vs-new implementations
+  against the real repo (~3.8k commits, 49 task-state dirs) at the same
+  pinned SHA — byte-identical JSON. Single-SHA pinning verified by trace;
+  constant 8-child spawn budget asserted via full-argv ledger; AC6 zombie
+  class made structurally impossible via spawnSync capture (permitted
+  alternative) with 64MiB explicit maxBuffer + 606-dir high-cardinality test.
+
+  Follow-up items (non-blocking):
+  - rename run log to drop doubled date prefix
+  - restore (or document away) the pinned-commit-time fallback for the
+    merge-only-touched-path edge (git log --name-only emits no file list
+    for merges)
+  - strengthen or drop the tautological AC6(a) counter test
 files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms paths against the substrate before claiming.
   - src/mcp/util/role-state-git.ts           # batched helpers: listTreeAtRef reuse for stage dirs, blob reads via `git cat-file --batch`, commit times via one `git log --name-only` walk (or ls-tree + single log)
