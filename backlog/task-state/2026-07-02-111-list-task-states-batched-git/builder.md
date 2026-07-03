@@ -3,11 +3,18 @@ task_id: 2026-07-02-111-list-task-states-batched-git
 role: builder
 binding: codex
 claim_branch: agent/list-task-states-batched-git
-last_updated: 2026-07-03T03:24:00Z
+last_updated: 2026-07-03T03:38:28Z
+handoff_branch: agent/list-task-states-batched-git
+handoff_head_sha: e50237dcef0ce6fcc86d81c8283c0b1d7be6dd4c
+handoff_run_log: raw/internal/agent-runs/2026-07-02-2026-07-02-111-list-task-states-batched-git.md
 ---
 
 ## current_thesis
 Claimed 111 as codex builder. Preserve `list_task_states` output and single-SHA semantics while replacing per-task git probes with the spec's fixed 8-child batched git plan.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at e50237dcef0ce6fcc86d81c8283c0b1d7be6dd4c.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: a bare `{}` `list_task_states` call must spawn exactly the fixed 8 git children through one injectable accounting seam, including streaming children, with task discovery from the pinned `ls-tree` result.
@@ -28,4 +35,5 @@ Claimed 111 as codex builder. Preserve `list_task_states` output and single-SHA 
 - Do not edit wiki pages, docs status/backlog files, or backlog item bodies.
 
 ## canonical_anchors
-- spec: backlog/claimed/2026-07-02-111-list-task-states-batched-git.md
+
+- spec: backlog/pending_review/2026-07-02-111-list-task-states-batched-git.md

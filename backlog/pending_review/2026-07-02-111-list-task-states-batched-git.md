@@ -19,6 +19,10 @@ spec_refs:
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-03T03:23:06Z"
 branch: "agent/list-task-states-batched-git"
+head_sha: "e50237dcef0ce6fcc86d81c8283c0b1d7be6dd4c"
+pr_url: ""
+agent_notes: |
+  Implemented the 8-child batched `list_task_states` git path with a single injectable runner seam. Fixture + baseline landed before the production rewire; focused tests assert exact argv ledger, baseline equivalence, injected batch failure cleanup, and high-cardinality batch output. Verification clean: typecheck, lint, focused role-state tests, recent-calls product gate, and full `npm run test:product`.
 files_to_modify:
   # PROVISIONAL — finalized at ready-promotion. Builder confirms paths against the substrate before claiming.
   - src/mcp/util/role-state-git.ts           # batched helpers: listTreeAtRef reuse for stage dirs, blob reads via `git cat-file --batch`, commit times via one `git log --name-only` walk (or ls-tree + single log)
