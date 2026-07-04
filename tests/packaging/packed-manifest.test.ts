@@ -179,6 +179,8 @@ describe('packed package manifest', () => {
         "dist/echo-home/wizard/run-wizard.js",
         "dist/echo-home/wizard/wire.d.ts",
         "dist/echo-home/wizard/wire.js",
+        "dist/enrich/decision-drift.d.ts",
+        "dist/enrich/decision-drift.js",
         "dist/enrich/dispatch.d.ts",
         "dist/enrich/dispatch.js",
         "dist/enrich/granola-intake-candidates.d.ts",
