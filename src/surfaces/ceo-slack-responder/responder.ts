@@ -167,6 +167,7 @@ type UsageAppender = typeof appendUsageRecord;
 type IntakeFailureAppender = typeof appendIntakeFailureRecord;
 type IntakeSlackPostFailureAppender = typeof appendIntakeSlackPostFailureRecord;
 type IntakeSeedDismissalAppender = typeof appendIntakeSeedDismissalRecord;
+type DriftDismissalAppender = typeof appendDriftDismissalRecord;
 type IntakeIssueRenderer = (input: IntakeIssueRenderContext) => Promise<IntakeIssueDraft>;
 
 interface IntakeSlackPostFailureRecord {
@@ -185,6 +186,7 @@ interface ResponderDependencies {
   appendIntakeFailureRecord?: IntakeFailureAppender;
   appendIntakeSlackPostFailureRecord?: IntakeSlackPostFailureAppender;
   appendIntakeSeedDismissalRecord?: IntakeSeedDismissalAppender;
+  appendDriftDismissalRecord?: DriftDismissalAppender;
   postIntakeConfirmCard?: IntakeConfirmPoster;
   intakeIssueRenderer?: IntakeIssueRenderer;
   teamDecisionStore?: TeamDecisionStore;
@@ -205,6 +207,18 @@ export interface DecisionAction {
 export interface IntakeAction {
   kind: 'confirm' | 'dismiss';
   draftKey: string;
+  channel: string;
+  user: string;
+  ts?: string;
+  threadTs?: string;
+}
+
+// Item 114 AC5 — the Acknowledge/Dismiss buttons on a daemon-posted drift alert
+// card come back to THIS Socket Mode responder as interactive envelopes. The
+// button `value` carries the drift pair key.
+export interface DriftAction {
+  kind: 'acknowledge' | 'dismiss';
+  pairKey: string;
   channel: string;
   user: string;
   ts?: string;
@@ -694,6 +708,42 @@ export function extractIntakeAction(envelope: SlackEnvelope): IntakeAction | nul
   };
 }
 
+export function extractDriftAction(envelope: SlackEnvelope): DriftAction | null {
+  if (envelope.type !== 'interactive') return null;
+  const payload = envelope.payload;
+  if (payload === undefined) return null;
+  const action = payload?.actions?.[0];
+  const actionId = action?.action_id;
+  const pairKey = action?.value;
+  const user = payload?.user?.id;
+  const channel = payload?.channel?.id;
+  if (
+    actionId === undefined ||
+    pairKey === undefined ||
+    user === undefined ||
+    channel === undefined ||
+    pairKey.trim() === ''
+  ) {
+    return null;
+  }
+  const kind =
+    actionId === 'echo_drift_acknowledge'
+      ? 'acknowledge'
+      : actionId === 'echo_drift_dismiss'
+        ? 'dismiss'
+        : null;
+  if (kind === null) return null;
+  const message = payload.message;
+  return {
+    kind,
+    pairKey: pairKey.trim(),
+    channel,
+    user,
+    ts: message?.ts,
+    threadTs: message?.thread_ts,
+  };
+}
+
 /**
  * Item 109 seed carve-out. Accept a bot-authored message as an intake seed ONLY
  * when ALL validate: (1) the author bot id equals the responder's configured
@@ -788,6 +838,31 @@ export async function respondToDecisionAction(
     'Edit this decision by submitting a revised /echo decision; nothing was shared.',
     threadTs,
   );
+}
+
+/**
+ * Item 114 AC5 — Acknowledge/Dismiss on a drift alert card. Acknowledge just
+ * confirms; Dismiss additionally appends the pair key to the event log as a
+ * noise-tuning signal (mirrors the intake-seed dismissal-as-noise pattern), so
+ * the first week of false alarms feeds the alias-table + digest decisions.
+ */
+export async function respondToDriftAction(
+  action: DriftAction,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+): Promise<void> {
+  const postMessage = deps.postSlackMessage ?? postSlackMessage;
+  const threadTs = action.threadTs ?? action.ts;
+  const actor = confirmAttributionForSlackUser(config.cofounderIdentities ?? [], action.user);
+  if (action.kind === 'dismiss') {
+    const appendDismissal = deps.appendDriftDismissalRecord ?? appendDriftDismissalRecord;
+    await appendDismissal(config.eventLogPath, action.pairKey, actor);
+    log.info('drift_alert_dismissed', { pair_key: action.pairKey });
+    await postMessage(config.slackBotToken, action.channel, 'Dismissed drift alert.', threadTs);
+    return;
+  }
+  log.info('drift_alert_acknowledged', { pair_key: action.pairKey });
+  await postMessage(config.slackBotToken, action.channel, 'Acknowledged drift alert.', threadTs);
 }
 
 /**
@@ -1129,6 +1204,29 @@ export async function appendIntakeSeedDismissalRecord(
   await appendFile(path, `${formatIntakeSeedDismissalRecord(draft, recordedAt)}\n`, 'utf8');
 }
 
+export function formatDriftDismissalRecord(
+  pairKey: string,
+  dismissedBy: string,
+  recordedAt = new Date(),
+): string {
+  return [
+    recordedAt.toISOString(),
+    'drift-alert-dismissed',
+    `pair_key=${escapeRecordValue(pairKey)}`,
+    `dismissed_by=${escapeRecordValue(dismissedBy)}`,
+  ].join(' · ');
+}
+
+export async function appendDriftDismissalRecord(
+  path: string,
+  pairKey: string,
+  dismissedBy: string,
+  recordedAt = new Date(),
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${formatDriftDismissalRecord(pairKey, dismissedBy, recordedAt)}\n`, 'utf8');
+}
+
 async function postIntakeSlackMessageOrRecordFailure(
   config: ResponderConfig,
   deps: ResponderDependencies,
@@ -1458,6 +1556,18 @@ async function handleSocketMessage(
       draft_key: intakeAction.draftKey,
     });
     await respondToIntakeAction(intakeAction, config, deps);
+    return;
+  }
+
+  const driftAction = extractDriftAction(envelope);
+  if (driftAction !== null) {
+    log.debug('slack_drift_action_received', {
+      kind: driftAction.kind,
+      channel: driftAction.channel,
+      user: driftAction.user,
+      pair_key: driftAction.pairKey,
+    });
+    await respondToDriftAction(driftAction, config, deps);
     return;
   }
 
