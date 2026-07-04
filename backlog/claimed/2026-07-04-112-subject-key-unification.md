@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-07-04
+claimed_by: "builder-112"
+claimed_at: "2026-07-04T19:45:31Z"
+branch: "agent/subject-key-unification"
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md          # decisions 4, 18 — the join-key rule this implements
