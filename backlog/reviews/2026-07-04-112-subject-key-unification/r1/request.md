@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-07-04T19:11:29Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: cc4516f6-5fba-4dde-8ee1-f1105bb658f6
 focus_hints: "dedupe_key byte-stability (AC2) is the load-bearing criterion \u2014\
   \ latest-wins chains over existing atoms must not break; also verify read-side fallback\

@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-07-04T19:11:29Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: cf28feff-ff3c-4a98-b9ef-6548fec18da7
 focus_hints: the generalized append-order storage seam (AC3) must not disturb 057a
   deadline-tracker semantics; late-arrival test (AC4) is the reason this interface

@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-07-04T19:11:30Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: aaa8327d-3e13-41ea-8f5d-c017e7408a0c
 focus_hints: idempotent judge checkpoint (AC3) and code-enforced verbatim-quote faithfulness
   (AC4) are load-bearing; verify out-of-scope wall holds (no digest, no persisted
