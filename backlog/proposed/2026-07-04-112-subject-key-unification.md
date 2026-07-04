@@ -15,8 +15,10 @@ files_to_modify:
   - src/util/subject.ts                                # NEW: shared normalizeSubject
   - src/enrich/granola-signals.ts                      # consume shared normalizer (drop local copy)
   - src/surfaces/ceo-slack-responder/decision-store.ts # consume shared normalizer; write canonical_subject
+  - src/mcp/tools/search-memories.ts                   # AC3 retrieval locus (in-tool metadata_match/free-text filter); AC5 legacy read-side fallback
   - tests/enrich/                                      # cross-source key-equality coverage
   - tests/surfaces/ceo-slack-responder/                # decision-store write/read coverage
+  - tests/mcp/tools/                                   # search-memories cross-source join + legacy-fallback coverage
 ---
 
 ## Problem
@@ -27,15 +29,26 @@ The station-6 drift join key is fractured: `normalizeSubject` (src/enrich/granol
 
 - **AC1 — one normalizer:** a single shared module (`src/util/subject.ts`, exporting `normalizeSubject`) with the exact current behavior (lowercase, trim, collapse whitespace). Both former call sites import it; the duplicated local functions are deleted. Test: identical output to the previous implementations across a fixture set including unicode/whitespace edge cases.
 - **AC2 — decisions write canonical_subject:** `appendConfirmedDecision` additionally writes `metadata.canonical_subject` (same normalized value). `normalized_subject` is still written (backcompat), and the `team-decision:<normalized>` `dedupe_key` format is byte-for-byte unchanged — latest-wins chains over existing atoms must not break. Test: new decision atom carries both keys with equal values; `dedupe_key` unchanged vs a pre-change fixture.
-- **AC3 — cross-source join works:** a Granola signal atom and a team-decision atom sharing a subject are retrievable by the same key: `search_memories` free-text query on the subject now matches decision atoms, and `metadata_match: {canonical_subject: ...}` (in-tool signal-filter path) returns both. Test proves both retrieval paths.
-- **AC4 — legacy atoms still readable:** `queryLatestTeamDecisions` and `matchesQuery` resolve pre-change decision atoms (which lack `canonical_subject`) exactly as before — read-side falls back to `normalized_subject`. Test: mixed-generation store returns a correct latest-wins result.
+- **AC3 — cross-source join works:** a Granola signal atom and a team-decision atom sharing a subject are retrievable by the same key through `src/mcp/tools/search-memories.ts`: a `search_memories` free-text query on the subject now matches decision atoms (via `metadata.canonical_subject`), and `metadata_match: {canonical_subject: ...}` (the in-tool signal-filter path, `canonical_subject` already in the tool's in-tool filter set) returns both. Writing `canonical_subject` on decision atoms (AC2) is the primary mechanism; the retrieval path is not expected to change for new atoms. The builder owns `search-memories.ts` for AC5's legacy fallback and may adjust the filter there if the AC3 test proves the new-atom path is not already satisfied. Test proves both retrieval paths return signal + new decision atom.
+- **AC4 — legacy atoms still readable (decision-store path):** `queryLatestTeamDecisions` and `matchesQuery` resolve pre-change decision atoms (which lack `canonical_subject`) exactly as before — read-side falls back to `normalized_subject`. Test: mixed-generation store returns a correct latest-wins result.
+- **AC5 — legacy decision atoms stay findable by the join key (search path):** the in-tool `metadata_match: {canonical_subject: ...}` filter in `search-memories.ts` also returns pre-change decision atoms that carry only `normalized_subject` — a read-side fallback matching `normalized_subject` for team-decision atoms when filtering by `canonical_subject`. This is the search-path twin of AC4: without it, a `canonical_subject` drift/`loop` (113) query silently omits every decision atom predating this change (the recurring source-omission failure mode). Scope is the structured `metadata_match` filter only; free-text `query` matching over legacy decision atoms is out of scope (see below). No storage-whitelist or schema change — the fallback lives in the in-tool filter predicate. Test: a store with one legacy decision atom (only `normalized_subject`) and one new decision atom (both keys) both return for a single `metadata_match: {canonical_subject}` query.
 
 ## Out of Scope (Don't Drift)
 
 - No alias table, no semantic/embedding matching, no shared-vocabulary enforcement between extractor prompts.
 - No change to the `dedupe_key` formats of either source.
-- No MCP tool schema changes and no `METADATA_MATCH_KEY_WHITELIST` (storage-level) changes — the in-tool filter path suffices.
+- No MCP tool schema changes and no `METADATA_MATCH_KEY_WHITELIST` (storage-level) changes — the in-tool filter path suffices. AC5's legacy fallback is a behavior change to the in-tool `metadata_match` filter predicate only, not a schema or whitelist change.
+- No change to `search_memories` free-text (`query`) matching semantics: free-text still matches `metadata.canonical_subject` only. Legacy decision atoms (predating this change, no `canonical_subject`) are reachable via the structured `metadata_match` fallback (AC5), not by free-text — that is the drift/`loop` consumer path. Going forward all new decisions carry `canonical_subject` and are free-text findable. Broadening free-text to also scan `normalized_subject` would touch shared behavior for all atom types and is deferred.
 - No migration/rewrite of existing atoms (append-only store; read-side fallback covers them).
+
+## Tests
+
+Concrete files and load-bearing assertions (extend existing files; add new cases, don't rewrite):
+
+- **AC1 — `tests/enrich/granola-signals.test.ts`:** `normalizeSubject` imported from `src/util/subject.ts` produces byte-identical output to the two former local implementations across a shared fixture set (lowercase, trim, collapse-whitespace, plus unicode/leading-trailing/interior-whitespace edge cases). Assert the duplicated local functions no longer exist (import-only).
+- **AC2 (dedupe byte-stability) — `tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts`:** a new `appendConfirmedDecision` atom carries both `metadata.canonical_subject` and `metadata.normalized_subject` with equal values. Pin a **byte-stable pre-change fixture**: assert `decisionDedupeKey(subject)` for a representative subject equals the exact literal `team-decision:<normalized>` string (e.g. assert against a hardcoded expected string, not a recomputation), so any drift in the `team-decision:` prefix or normalization is caught. Latest-wins chain over a pre-existing atom with the same `dedupe_key` still supersedes correctly.
+- **AC4 (legacy decision-store fallback) — `tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts`:** a **mixed-generation store fixture** — one legacy atom carrying only `normalized_subject`, one new atom carrying both keys — resolves via `queryLatestTeamDecisions`/`matchesQuery` to the correct latest-wins result, proving the read-side `normalized_subject` fallback.
+- **AC3 + AC5 — `tests/mcp/tools/search-memories.test.ts`:** (AC3) `metadata_match: {canonical_subject: S}` returns both a Granola signal atom and a new decision atom sharing subject `S`; a free-text `query` on `S` returns the new decision atom. (AC5) a `metadata_match: {canonical_subject: S}` query against a store containing one legacy decision atom (only `normalized_subject`) and one new decision atom returns BOTH, proving the in-tool filter's `normalized_subject` fallback for team-decision atoms.
 
 ## After Completion (Strategist Notes)
 
