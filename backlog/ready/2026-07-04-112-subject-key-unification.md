@@ -19,6 +19,7 @@ files_to_modify:
   - tests/enrich/                                      # cross-source key-equality coverage
   - tests/surfaces/ceo-slack-responder/                # decision-store write/read coverage
   - tests/mcp/tools/                                   # search-memories cross-source join + legacy-fallback coverage
+ready_content_sha: da5fcf2188e3249756217d7288071a43050b7b4d77e8fd89ad939f5f21b65427
 ---
 
 ## Problem
