@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 2d
 created: 2026-07-04
+claimed_by: "builder-113"
+claimed_at: "2026-07-04T20:47:13Z"
+branch: "agent/signal-window-interface"
 blocked_by:
   - 2026-07-04-112-subject-key-unification
 spec_refs:
