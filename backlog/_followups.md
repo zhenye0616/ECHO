@@ -429,3 +429,8 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 2026-07-04 (from 113 merge): event-time mode materializes the full in-scope ledger and filters since/until in JS — push into SQL WHERE once the ledger grows.
 - 2026-07-04 (from 113 merge): strategist post-shipment — new wiki/architecture/signal-window page (seam contract, two orderings, scope semantics, fork-1 rules).
 - 2026-07-04 (from 113 merge): founder may override the C4 fixup (SCOPE_EXCLUDED_SOURCE_PREFIXES) if derived:granola-signals-index SHOULD appear in company windows.
+- 2026-07-04 (from 114 merge): shared packed-safe module for team-decision read + cofounder identity (removes readLatestDecisions/queryLatestTeamDecisions divergence risk; builder's open question).
+- 2026-07-04 (from 114 merge): drift checkpoint pruning + stop persisting whole file per transition (unbounded growth, O(n^2) I/O at scale).
+- 2026-07-04 (from 114 merge): tighten if-status-ok guarded assertions in decision-drift tests (vacuous-pass risk).
+- 2026-07-04 (from 114 merge): tests/surfaces/ceo-slack-brain.test.ts process-kill test is load-flaky (like shell-reachable) — same test-hardening bucket.
+- 2026-07-04 (from 114 merge): strategist post-shipment — wiki/surfaces/drift-alert page + loop diagram station 6 planned→shipped; also wiki/architecture/signal-window (113) and storage note (112).
