@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import {
   METADATA_MATCH_KEY_WHITELIST,
+  type AtomIterationRecord,
   type CaptureEvent,
   type CoordAtomIterationRecord,
   type EventId,
@@ -143,6 +144,14 @@ class ReadOnlyAtomStore implements Storage {
   }
 
   async getCurrentCoordSequence(): Promise<number> {
+    throw wizardScopeError();
+  }
+
+  async iterateAtomsByAppendOrder(): Promise<AtomIterationRecord[]> {
+    throw wizardScopeError();
+  }
+
+  async getCurrentSequence(): Promise<number> {
     throw wizardScopeError();
   }
 

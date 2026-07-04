@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
+  AtomIterationRecord,
   CaptureEvent,
   CoordAtomIterationRecord,
   EventId,
@@ -44,6 +45,14 @@ class FakeStore implements Storage {
   }
 
   async getCurrentCoordSequence(): Promise<number> {
+    return 0;
+  }
+
+  async iterateAtomsByAppendOrder(): Promise<AtomIterationRecord[]> {
+    return [];
+  }
+
+  async getCurrentSequence(): Promise<number> {
     return 0;
   }
 }

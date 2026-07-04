@@ -93,6 +93,16 @@ class WindowedStorage implements Storage {
   getCurrentCoordSequence(): Promise<number> {
     return this.inner.getCurrentCoordSequence();
   }
+  iterateAtomsByAppendOrder(
+    opts?: Parameters<Storage['iterateAtomsByAppendOrder']>[0],
+  ): ReturnType<Storage['iterateAtomsByAppendOrder']> {
+    return this.inner.iterateAtomsByAppendOrder(opts);
+  }
+  getCurrentSequence(
+    opts?: Parameters<Storage['getCurrentSequence']>[0],
+  ): Promise<number> {
+    return this.inner.getCurrentSequence(opts);
+  }
 }
 
 async function main(): Promise<void> {

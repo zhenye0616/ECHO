@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SqliteStorage } from '../../../src/storage/sqlite.js';
 import type {
+  AtomIterationRecord,
   CaptureEvent,
   EventId,
   QueryFilter,
@@ -46,6 +47,14 @@ class FakeStore implements Storage {
   }
 
   async getCurrentCoordSequence(): Promise<number> {
+    return 0;
+  }
+
+  async iterateAtomsByAppendOrder(): Promise<AtomIterationRecord[]> {
+    return [];
+  }
+
+  async getCurrentSequence(): Promise<number> {
     return 0;
   }
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   METADATA_MATCH_KEY_WHITELIST,
+  type AtomIterationRecord,
   type CaptureEvent,
   type CoordAtomIterationRecord,
   type EventId,
@@ -153,18 +154,32 @@ export class MemoryStorage implements Storage {
     return out;
   }
 
-  // 057a AC3 — durable append-order coord seam (parity with SqliteStorage).
-  async iterateCoordAtomsByAppendOrder(opts?: {
+  // 057a AC3 / 113 AC3 — durable append-order seam (parity with
+  // SqliteStorage). `_seq` is the insertion counter parallel to SQLite's
+  // rowid. The generic `iterateAtomsByAppendOrder` accepts an optional
+  // `sourcePrefixes` filter; the coord seam is `sourcePrefixes: ['coord:']`.
+
+  // Prefix match parallel to SqliteStorage's `source LIKE @prefix || '%'`.
+  // `undefined`/empty means "all sources". Empty-array parity matters: a
+  // caller passing `[]` matches nothing-specific → all, same as omitting it.
+  private matchesPrefixes(source: string, prefixes: readonly string[] | undefined): boolean {
+    if (prefixes === undefined || prefixes.length === 0) return true;
+    return prefixes.some((prefix) => source.startsWith(prefix));
+  }
+
+  async iterateAtomsByAppendOrder(opts?: {
     sinceSeq?: number;
+    sourcePrefixes?: readonly string[];
     limit?: number;
-  }): Promise<CoordAtomIterationRecord[]> {
+  }): Promise<AtomIterationRecord[]> {
     const sinceSeq = opts?.sinceSeq ?? 1;
     const limit = opts?.limit;
-    const out: CoordAtomIterationRecord[] = [];
+    const prefixes = opts?.sourcePrefixes;
+    const out: AtomIterationRecord[] = [];
     // Iterate in insertion order (this.events.push appends, so iteration
-    // order IS insertion order). Filter to coord:% atoms with _seq >= sinceSeq.
+    // order IS insertion order). Filter to matching sources with _seq >= sinceSeq.
     for (const e of this.events) {
-      if (!e.source.startsWith('coord:')) continue;
+      if (!this.matchesPrefixes(e.source, prefixes)) continue;
       if (e._seq < sinceSeq) continue;
       // Strip the internal _seq from the surface CaptureEvent; re-expose
       // as a top-level `sequence_id` field per the iteration contract.
@@ -175,12 +190,28 @@ export class MemoryStorage implements Storage {
     return out;
   }
 
-  async getCurrentCoordSequence(): Promise<number> {
+  async getCurrentSequence(opts?: { sourcePrefixes?: readonly string[] }): Promise<number> {
+    const prefixes = opts?.sourcePrefixes;
     let max = 0;
     for (const e of this.events) {
-      if (!e.source.startsWith('coord:')) continue;
+      if (!this.matchesPrefixes(e.source, prefixes)) continue;
       if (e._seq > max) max = e._seq;
     }
     return max;
+  }
+
+  async iterateCoordAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    limit?: number;
+  }): Promise<CoordAtomIterationRecord[]> {
+    return this.iterateAtomsByAppendOrder({
+      sinceSeq: opts?.sinceSeq,
+      sourcePrefixes: ['coord:'],
+      limit: opts?.limit,
+    });
+  }
+
+  async getCurrentCoordSequence(): Promise<number> {
+    return this.getCurrentSequence({ sourcePrefixes: ['coord:'] });
   }
 }

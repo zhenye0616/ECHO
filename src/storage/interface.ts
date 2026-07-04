@@ -80,6 +80,15 @@ export interface Storage {
   // full-ledger replay; the half-open `[sinceSeq, +∞)` + watermark snapshot
   // (`getCurrentCoordSequence()`) lets the reconciliation pass make
   // forward-only progress without skipping or re-processing atoms.
+  //
+  // Item 113 AC3 generalizes this coord-only seam into the two methods below
+  // (`iterateAtomsByAppendOrder` / `getCurrentSequence`), which accept an
+  // optional `sourcePrefixes` filter instead of a hardcoded `coord:%`. The
+  // two coord methods here are RETAINED (the 057a deadline tracker + wizard
+  // consumers call them) and reimplemented as thin `sourcePrefixes: ['coord:']`
+  // wrappers over the generic seam. Their external behavior — coord prefix,
+  // rowid ordering, half-open `sinceSeq` boundary, `0`-on-empty watermark —
+  // is UNCHANGED; `tests/storage/iterate-coord-by-append-order.test.ts` pins it.
 
   /** Iterate coord atoms (source LIKE 'coord:%') in monotonic durable-append
    *  order. Each yielded record carries its `sequence_id` (SQLite rowid in
@@ -96,13 +105,46 @@ export interface Storage {
    *  Used by reconstruction + reconciliation to capture an inclusive
    *  watermark; the next pass starts at `last_full_replay_watermark + 1`. */
   getCurrentCoordSequence(): Promise<number>;
+
+  // 113 AC3 — generalized durable append-order seam. Same durability
+  // invariant as the coord seam: `sequence_id` is the SQLite events-table
+  // rowid (SqliteStorage) / insertion counter (MemoryStorage), monotonic and
+  // durable across restart because the events table is append-only,
+  // single-writer, and never VACUUMed (wiki/architecture/storage.md). 113
+  // PINS that invariant; it does not add an explicit sequence column.
+
+  /** Iterate atoms in monotonic durable-append order, each record carrying
+   *  its `sequence_id`. Optional `sourcePrefixes` restricts to atoms whose
+   *  `source` begins with any of the given prefixes (e.g. `['fs:', 'git:']`);
+   *  omitted/empty means all sources. Half-open interval: returns atoms with
+   *  `sequence_id >= sinceSeq`; `sinceSeq` omitted means "from the beginning
+   *  of the ledger" (`sinceSeq = 1`). `limit` caps the append-ordered result.
+   *  This generalizes `iterateCoordAtomsByAppendOrder` — coord iteration is
+   *  now `sourcePrefixes: ['coord:']` over this method. */
+  iterateAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    sourcePrefixes?: readonly string[];
+    limit?: number;
+  }): Promise<AtomIterationRecord[]>;
+
+  /** Return `max(sequence_id)` over currently-durable atoms matching the
+   *  optional `sourcePrefixes` filter (all sources when omitted/empty).
+   *  Returns `0` if none. Generalizes `getCurrentCoordSequence()`; used to
+   *  snapshot an inclusive high-watermark `W` so a cursor consumer can start a
+   *  fresh scan at `W + 1`. */
+  getCurrentSequence(opts?: { sourcePrefixes?: readonly string[] }): Promise<number>;
 }
 
-/** Yield-shape for `iterateCoordAtomsByAppendOrder`. The `sequence_id` is a
+/** Yield-shape for the append-order iteration seams. The `sequence_id` is a
  *  per-row monotonic integer durable across restart (rowid in SQLite;
  *  insertion counter in MemoryStorage). Callers MUST treat it as opaque
  *  beyond ordering + watermark equality — it is NOT embedded in the atom
  *  itself, only surfaced at iteration time. */
-export interface CoordAtomIterationRecord extends CaptureEvent {
+export interface AtomIterationRecord extends CaptureEvent {
   readonly sequence_id: number;
 }
+
+/** Retained name for the coord seam's yield-shape (057a); identical to
+ *  `AtomIterationRecord`. Kept as an alias so existing coord importers are
+ *  unchanged by 113's generalization. */
+export type CoordAtomIterationRecord = AtomIterationRecord;

@@ -87,6 +87,16 @@ class StreamingStorage implements Storage {
   getCurrentCoordSequence(): Promise<number> {
     return this.inner.getCurrentCoordSequence();
   }
+  iterateAtomsByAppendOrder(
+    opts?: Parameters<Storage['iterateAtomsByAppendOrder']>[0],
+  ): ReturnType<Storage['iterateAtomsByAppendOrder']> {
+    return this.inner.iterateAtomsByAppendOrder(opts);
+  }
+  getCurrentSequence(
+    opts?: Parameters<Storage['getCurrentSequence']>[0],
+  ): Promise<number> {
+    return this.inner.getCurrentSequence(opts);
+  }
 }
 
 // ─── Pre-seeding: walk existing JSONLs, mark them processed-to-EOF ──────────

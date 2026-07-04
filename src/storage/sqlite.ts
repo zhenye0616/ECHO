@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import {
   METADATA_MATCH_KEY_WHITELIST,
+  type AtomIterationRecord,
   type CaptureEvent,
   type CoordAtomIterationRecord,
   type EventId,
@@ -269,27 +270,49 @@ export class SqliteStorage implements Storage {
     return out;
   }
 
-  // 057a AC3 — durable append-order coord seam. SQLite's `rowid` is
+  // 057a AC3 / 113 AC3 — durable append-order seam. SQLite's `rowid` is
   // monotonic per insertion and durable across restart (the single-writer
   // constraint at wiki/architecture/storage.md:119-127 guarantees rowid
   // reflects ingest order). The events table has no rowid alias on `id`
   // (UUID strings), so the implicit rowid is what we expose as
-  // `sequence_id`.
-  async iterateCoordAtomsByAppendOrder(opts?: {
+  // `sequence_id`. The generic `iterateAtomsByAppendOrder` accepts an
+  // optional `sourcePrefixes` filter; the coord seam is the special case
+  // `sourcePrefixes: ['coord:']`.
+
+  // Build a `(source LIKE @p0 ESCAPE '\' OR ...)` clause for the given
+  // prefixes, appending its bind params. LIKE-special chars in a prefix are
+  // escaped, mirroring the source_prefix prefilter in query() (line ~143).
+  // Returns null when no prefix filter should be applied.
+  private buildPrefixClause(
+    prefixes: readonly string[] | undefined,
+    params: Record<string, unknown>,
+  ): string | null {
+    if (prefixes === undefined || prefixes.length === 0) return null;
+    const ors: string[] = [];
+    prefixes.forEach((prefix, i) => {
+      const key = `__prefix_${i}`;
+      ors.push(`source LIKE @${key} ESCAPE '\\'`);
+      params[key] = `${prefix.replace(/[\\%_]/g, '\\$&')}%`;
+    });
+    return `(${ors.join(' OR ')})`;
+  }
+
+  async iterateAtomsByAppendOrder(opts?: {
     sinceSeq?: number;
+    sourcePrefixes?: readonly string[];
     limit?: number;
-  }): Promise<CoordAtomIterationRecord[]> {
+  }): Promise<AtomIterationRecord[]> {
     const sinceSeq = opts?.sinceSeq ?? 1;
     const limit = opts?.limit;
-    // The SQL ESCAPE \ matches existing source_prefix LIKE patterns at
-    // line ~108; we don't accept caller input here so no escape needed —
-    // the literal `'coord:%'` is bound directly.
+    const params: Record<string, unknown> = { sinceSeq };
+    const clauses = ['rowid >= @sinceSeq'];
+    const prefixClause = this.buildPrefixClause(opts?.sourcePrefixes, params);
+    if (prefixClause !== null) clauses.push(prefixClause);
     const baseSql = `SELECT rowid AS sequence_id, id, source, timestamp, content, metadata, embedding
                      FROM events
-                     WHERE source LIKE 'coord:%' AND rowid >= @sinceSeq
+                     WHERE ${clauses.join(' AND ')}
                      ORDER BY rowid ASC`;
     const sql = limit !== undefined ? `${baseSql} LIMIT @limit` : baseSql;
-    const params: Record<string, unknown> = { sinceSeq };
     if (limit !== undefined) params['limit'] = limit;
     const rows = this.db.prepare(sql).all(params) as Array<EventRow & { sequence_id: number }>;
     return rows.map((r) => {
@@ -298,11 +321,28 @@ export class SqliteStorage implements Storage {
     });
   }
 
-  async getCurrentCoordSequence(): Promise<number> {
-    const row = this.db
-      .prepare(`SELECT COALESCE(MAX(rowid), 0) AS seq FROM events WHERE source LIKE 'coord:%'`)
-      .get() as { seq: number };
+  async getCurrentSequence(opts?: { sourcePrefixes?: readonly string[] }): Promise<number> {
+    const params: Record<string, unknown> = {};
+    const prefixClause = this.buildPrefixClause(opts?.sourcePrefixes, params);
+    const where = prefixClause !== null ? `WHERE ${prefixClause}` : '';
+    const stmt = this.db.prepare(`SELECT COALESCE(MAX(rowid), 0) AS seq FROM events ${where}`);
+    const row = (prefixClause !== null ? stmt.get(params) : stmt.get()) as { seq: number };
     return row.seq;
+  }
+
+  async iterateCoordAtomsByAppendOrder(opts?: {
+    sinceSeq?: number;
+    limit?: number;
+  }): Promise<CoordAtomIterationRecord[]> {
+    return this.iterateAtomsByAppendOrder({
+      sinceSeq: opts?.sinceSeq,
+      sourcePrefixes: ['coord:'],
+      limit: opts?.limit,
+    });
+  }
+
+  async getCurrentCoordSequence(): Promise<number> {
+    return this.getCurrentSequence({ sourcePrefixes: ['coord:'] });
   }
 
   close(): void {
