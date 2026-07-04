@@ -306,6 +306,8 @@ describe('packed package manifest', () => {
         "dist/trace/rank.js",
         "dist/trace/role.d.ts",
         "dist/trace/role.js",
+        "dist/trace/signal-window.d.ts",
+        "dist/trace/signal-window.js",
         "dist/trace/types.d.ts",
         "dist/trace/types.js",
         "dist/util/json.d.ts",
