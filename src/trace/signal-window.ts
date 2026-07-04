@@ -36,6 +36,15 @@ export const SCOPE_SOURCE_PREFIXES: Readonly<Record<SignalWindowScope, readonly 
   company: ['api:granola', 'derived:'],
 };
 
+/** Bookkeeping sources are never window entries even when a scope prefix
+ *  matches them. `derived:granola-signals-index` is the extractor's dedupe
+ *  MANIFEST (see GRANOLA_SIGNAL_INDEX_SOURCE), not context — surfacing it
+ *  would hand manifest atoms to company-scope consumers like the drift
+ *  sweep. Prefix (not equality) so per-note suffixed variants stay out too. */
+export const SCOPE_EXCLUDED_SOURCE_PREFIXES: readonly string[] = [
+  'derived:granola-signals-index',
+];
+
 /** Half-open durable-append cursor. `sinceSeq` selects atoms with
  *  `sequence_id >= sinceSeq` (matches the shipped coord seam boundary). */
 export interface SignalWindowCursor {
@@ -143,6 +152,7 @@ export async function getSignalWindow(
 
   let entries: SignalWindowEntry[] = [];
   for (const record of records) {
+    if (SCOPE_EXCLUDED_SOURCE_PREFIXES.some((p) => record.source.startsWith(p))) continue;
     if (since !== undefined && record.timestamp < since) continue;
     if (until !== undefined && record.timestamp >= until) continue;
     if (loop !== undefined) {

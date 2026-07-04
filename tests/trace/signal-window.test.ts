@@ -167,6 +167,28 @@ describe('113 AC2 — scope mapping', () => {
   });
 });
 
+describe('113 AC2 — bookkeeping exclusion (merge fixup: AC1/AC2 reconciliation)', () => {
+  it('derived:granola-signals-index manifest atoms never appear in company windows', async () => {
+    const s = store();
+    const sigId = await s.append({
+      source: 'derived:granola-signals',
+      timestamp: TS,
+      content: 'real signal',
+      metadata: { canonical_subject: 'auth' },
+    });
+    await s.append({
+      source: 'derived:granola-signals-index',
+      timestamp: TS,
+      content: '{"manifest":true}',
+      metadata: { note_id: 'n1' },
+    });
+
+    const company = await getSignalWindow(s, { scope: 'company' });
+    expect(company.map((e) => e.id)).toEqual([sigId]);
+    expect(company.some((e) => e.source.startsWith('derived:granola-signals-index'))).toBe(false);
+  });
+});
+
 describe('113 AC4 — late-arrival correctness (why two orderings exist)', () => {
   it('cursor read returns an old-timestamp late atom; event-time read excludes it', async () => {
     const s = store();

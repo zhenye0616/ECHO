@@ -29,6 +29,44 @@ agent_notes: |
   {detect-agents,run-wizard,detect-projects}.test.ts (FakeStore stubs) + tools/{render-trace,
   serve-trace,stream-watch}.ts (delegate to this.inner) + tests/packaging/packed-manifest.test.ts
   (inline snapshot +2 lines for the new shipped dist/trace/signal-window.{js,d.ts}).
+review_notes: |
+  Merged on 2026-07-04 via founder-authorized pipeline run (strategist-operated,
+  founder green-lit the full 112->113->114 build+merge loop).
+
+  Conflicts resolved:
+  - none — --no-ff merge applied clean, as the sidecar predicted.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - AC1/AC2 reconciliation (reviewer MED finding): company scope's derived:*
+    prefix also matched derived:granola-signals-index — the extractor's dedupe
+    MANIFEST, bookkeeping not context. Added SCOPE_EXCLUDED_SOURCE_PREFIXES
+    (['derived:granola-signals-index']) filtered ahead of all predicates in
+    getSignalWindow, + test proving manifest atoms never appear in company
+    windows. Applied at C4 under founder's standing pipeline authorization;
+    founder may override by dropping the exclude entry.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: targeted seam suites 259/259; full suite 1912 passed / 1 failed
+  (the known tests/cli/shell-reachable.test.ts daemon-port flake — see 112's
+  review_notes; passes isolated). Lint, typecheck, coupled-invariants,
+  sync-skills --check all clean post-merge+fixup.
+
+  Notes for the record:
+  - iterateCoordAtomsByAppendOrder was REIMPLEMENTED on the new generic
+    append-order seam (delegation), not left as a parallel path; existing
+    coord conformance test unmodified and green.
+  - Out-of-files_to_modify touches (atom-store-readonly, 3 wizard doubles,
+    3 tools/ wrappers, packed-manifest snapshot) verified as forced by the
+    2 new required Storage methods.
+
+  Follow-up items (non-blocking):
+  - Push since/until into SQL WHERE for event-time mode once the ledger grows
+    (currently materializes the full in-scope ledger and filters in JS).
+  - New wiki/architecture/signal-window page post-shipment (spec After-Completion).
 blocked_by:
   - 2026-07-04-112-subject-key-unification
 spec_refs:
