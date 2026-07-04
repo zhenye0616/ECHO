@@ -422,3 +422,7 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [111] Restore the pinned-commit-time fallback in the batched path (or document the hard-error choice): the single log walk can miss a tree-present path whose only touching commits are merges (git log --name-only emits no file list for merges without --diff-merges); old code fell back to the pinned commit's own time.
 - [111] Strengthen or drop the tautological AC6(a) injected-failure counter test (counter lives inside the fake runner's own try/finally, so it cannot observe a leak); optionally add a PATH-shim git counter if out-of-seam spawn regression ever matters.
 - [111] Fold into the [103]/[107] flake-tracking entries above: recent-calls-endpoint timeout root cause is FIXED by 111 (977ms observed) — those older entries are now resolved.
+- 2026-07-04 (from 112 merge): tests/cli/shell-reachable.test.ts is flaky under full-suite load (daemon-port health timeout) — test-hardening candidate.
+- 2026-07-04 (from 112 merge): strategist post-shipment — note unified canonical_subject key on wiki/architecture/storage (spec After-Completion).
+- 2026-07-04 (from 112 merge): during 113 build, confirm loop filter treats canonical_subject as the sole forward join key.
+- 2026-07-04 (from 112 merge): builder-report calibration — builder-112 agent_notes claimed 1617/0 tests vs observed 1885+/1886; counts should come from the actual run output.
