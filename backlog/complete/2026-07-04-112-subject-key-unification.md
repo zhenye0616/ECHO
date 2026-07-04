@@ -23,6 +23,32 @@ agent_notes: |
   dist/util/subject.* lines) as the forced mechanical consequence of the new
   shipped file; it is outside files_to_modify. Verify: 3 AC files 80/80;
   serialized product suite 1617 passed / 0 failed; tsc clean; eslint 0 warnings.
+review_notes: |
+  Merged on 2026-07-04 via founder-authorized pipeline run (strategist-operated,
+  founder green-lit the full 112→113→114 build+merge loop).
+
+  Conflicts resolved:
+  - none — --no-ff merge applied clean, as the sidecar predicted.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none required in code. The sidecar's single pre-merge gate (shell-reachable
+    full-suite failure) was resolved pre-merge as environmental flake: test
+    passes in isolation on clean origin/main AND on the branch AND in the
+    post-merge merger worktree; fails only under full-suite daemon-port load.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: full suite run twice post-merge — run 1: 1885/1886 (single failure =
+  shell-reachable daemon-port flake, passes isolated); run 2: 1886/1886 all
+  green. Lint, typecheck, coupled-invariants, sync-skills --check all clean.
+
+  Follow-up items (non-blocking):
+  - tests/cli/shell-reachable.test.ts is flaky under full-suite load — test-hardening candidate.
+  - Strategist post-shipment: note unified canonical_subject on wiki/architecture/storage.
+  - 113 build: confirm loop filter treats canonical_subject as sole forward join key.
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md          # decisions 4, 18 — the join-key rule this implements
