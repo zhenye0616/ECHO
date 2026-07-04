@@ -8,6 +8,21 @@ created: 2026-07-04
 claimed_by: "builder-112"
 claimed_at: "2026-07-04T19:45:31Z"
 branch: "agent/subject-key-unification"
+head_sha: "658f3d22102062a61be4e1ce785b72fbd24ad5fd"
+pr_url: ""
+agent_notes: |
+  Implemented AC1-AC5. Shared src/util/subject.ts normalizeSubject replaces both
+  duplicated locals; appendConfirmedDecision now writes canonical_subject
+  (==normalized_subject), dedupe_key byte-stable; search_memories metadata_match
+  {canonical_subject} falls back to normalized_subject ONLY for team-decision
+  atoms. Two reviewer flags: (1) AC5 scoping uses metadata.decision_atom_type===
+  "team_decision" (the spec-permitted equivalent) instead of importing
+  TEAM_DECISION_SOURCE from the ceo-slack-responder surface, because that import
+  breaks the packed CLI import-closure invariant (tests/packaging/import-closure).
+  (2) Updated tests/packaging/packed-manifest.test.ts inline snapshot (+2 sorted
+  dist/util/subject.* lines) as the forced mechanical consequence of the new
+  shipped file; it is outside files_to_modify. Verify: 3 AC files 80/80;
+  serialized product suite 1617 passed / 0 failed; tsc clean; eslint 0 warnings.
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md          # decisions 4, 18 — the join-key rule this implements
