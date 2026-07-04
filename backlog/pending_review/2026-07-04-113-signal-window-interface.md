@@ -8,6 +8,27 @@ created: 2026-07-04
 claimed_by: "builder-113"
 claimed_at: "2026-07-04T20:47:13Z"
 branch: "agent/signal-window-interface"
+head_sha: "6fc709ca2cc685fc4685b6688f5832cad7f2bf72"
+agent_notes: |
+  Implemented getSignalWindow seam + generalized append-order storage (AC1-AC6, all Tests).
+  Verify: typecheck clean, lint clean; full `npm test` green (1912 passed / 0 failed, 21 skipped)
+  after regenerating the packed-manifest inline snapshot for the new dist/trace/signal-window module.
+  Design calls flagged for review: (1) each entry carries a `normalized` adapter projection
+  (null when no adapter) to satisfy AC1 "reusing the existing source adapters"; raw untruncated
+  content/metadata are always present too. (2) getSignalWindow(storage, opts) — storage first-arg
+  per repo convention (getRecentWorkContext); returns a bare SignalWindowEntry[]. (3) scope is
+  prefix-based per AC2, so `company` includes ALL derived:* (incl. derived:granola-signals-index),
+  not only the two named in AC1. (4) loop filter = strict === on metadata.canonical_subject, no
+  normalizeSubject on the loop arg (spec: "string-equals it", "dumb by contract"). (5) coord seam
+  REIMPLEMENTED on the generic seam (sourcePrefixes:[coord:]); iterate-coord test stays green
+  unchanged. (6) event-time mode materializes the in-scope set then JS-sorts, limit applied last
+  (no cache/materialized view — decision 12, V0 tradeoff).
+  Out-of-files_to_modify touches (all MECHANICAL interface-conformance — 2 new required Storage
+  methods force every implementor to compile; files_to_modify was marked PROVISIONAL):
+  src/echo-home/wizard/atom-store-readonly.ts (2 throw stubs) + tests/echo-home/wizard/
+  {detect-agents,run-wizard,detect-projects}.test.ts (FakeStore stubs) + tools/{render-trace,
+  serve-trace,stream-watch}.ts (delegate to this.inner) + tests/packaging/packed-manifest.test.ts
+  (inline snapshot +2 lines for the new shipped dist/trace/signal-window.{js,d.ts}).
 blocked_by:
   - 2026-07-04-112-subject-key-unification
 spec_refs:
