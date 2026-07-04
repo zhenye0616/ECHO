@@ -1,5 +1,5 @@
 ---
-id: 2026-07-04-115-subject-key-unification
+id: 2026-07-04-112-subject-key-unification
 title: "Subject-key unification — one shared normalizer, one metadata key (canonical_subject) across Granola signals and team decisions"
 status: proposed
 priority: HIGH
@@ -21,7 +21,7 @@ files_to_modify:
 
 ## Problem
 
-The station-6 drift join key is fractured: `normalizeSubject` (src/enrich/granola-signals.ts:368) and `normalizeDecisionSubject` (src/surfaces/ceo-slack-responder/decision-store.ts:54) are byte-identical duplicated functions writing to two different metadata keys — `canonical_subject` on signal atoms, `normalized_subject` on team-decision atoms. A cross-source subject join (drift sweep, `loop` filtering in 116) has no single key to join on, and decision subjects are invisible to `search_memories` free-text (which matches `metadata.canonical_subject` only).
+The station-6 drift join key is fractured: `normalizeSubject` (src/enrich/granola-signals.ts:368) and `normalizeDecisionSubject` (src/surfaces/ceo-slack-responder/decision-store.ts:54) are byte-identical duplicated functions writing to two different metadata keys — `canonical_subject` on signal atoms, `normalized_subject` on team-decision atoms. A cross-source subject join (drift sweep, `loop` filtering in 113) has no single key to join on, and decision subjects are invisible to `search_memories` free-text (which matches `metadata.canonical_subject` only).
 
 ## Acceptance Criteria
 
@@ -40,4 +40,4 @@ The station-6 drift join key is fractured: `normalizeSubject` (src/enrich/granol
 ## After Completion (Strategist Notes)
 
 - Note the unified key on the storage/architecture wiki page post-shipment.
-- 116's `loop` filter spec references `canonical_subject` as the one key — confirm at review that no second key survives anywhere in `src/`.
+- 113's `loop` filter spec references `canonical_subject` as the one key — confirm at review that no second key survives anywhere in `src/`.

@@ -40,11 +40,11 @@ Each decision below is stated in plain English first; the technical grounding li
 
 | # | Item | What it is | Depends on |
 |---|---|---|---|
-| 115 | subject-key unification | one shared normalizer, one metadata key across signals + decisions | — |
-| 116 | signal-window interface | the "one door": `getSignalWindow` internal contract + generalized append-order cursor | 115 |
-| 117 | drift sweep v0 | the alarm clock: contradiction detection + owner alert, meeting-sourced | 116 |
+| 112 | subject-key unification | one shared normalizer, one metadata key across signals + decisions | — |
+| 113 | signal-window interface | the "one door": `getSignalWindow` internal contract + generalized append-order cursor | 112 |
+| 114 | drift sweep v0 | the alarm clock: contradiction detection + owner alert, meeting-sourced | 113 |
 
-**Why exactly three.** 115 is small but makes 116's `loop` filter honest — separate so it can land and be reviewed fast. 116 is the contract everything else stands on — separate so the interface gets reviewed as an interface, not as a side effect of the sweep. 117 is the only net-new mechanism and the demo hero. Merging any two couples a cheap review to an expensive one; splitting further (e.g., the storage append-order seam out of 116) would create an item with no independently observable behavior.
+**Why exactly three.** 112 is small but makes 113's `loop` filter honest — separate so it can land and be reviewed fast. 113 is the contract everything else stands on — separate so the interface gets reviewed as an interface, not as a side effect of the sweep. 114 is the only net-new mechanism and the demo hero. Merging any two couples a cheap review to an expensive one; splitting further (e.g., the storage append-order seam out of 113) would create an item with no independently observable behavior.
 
 **Explicitly deferred, not forgotten:**
 - **Silence/absence digest** — post-freeze stretch per sprint plan; the sweep's clock and watermark make it a small follow-up.
@@ -54,6 +54,6 @@ Each decision below is stated in plain English first; the technical grounding li
 
 ## After Completion (Strategist Notes)
 
-- 115 ships → note on `wiki/architecture/storage` (or successor page) that subject keys are unified; update `capture-gate` page only if the derived-write path changes.
-- 116 ships → new `wiki/architecture/signal-window` page: the seam contract, two orderings, scope semantics, fork-1 rules (this doc is the source).
-- 117 ships → new `wiki/surfaces/drift-alert` page + update the loop diagram's station 6 from planned→shipped; drift-report digest gets its own decision record before any deepening.
+- 112 ships → note on `wiki/architecture/storage` (or successor page) that subject keys are unified; update `capture-gate` page only if the derived-write path changes.
+- 113 ships → new `wiki/architecture/signal-window` page: the seam contract, two orderings, scope semantics, fork-1 rules (this doc is the source).
+- 114 ships → new `wiki/surfaces/drift-alert` page + update the loop diagram's station 6 from planned→shipped; drift-report digest gets its own decision record before any deepening.

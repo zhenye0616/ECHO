@@ -1,12 +1,12 @@
 ---
-id: 2026-07-04-116-signal-window-interface
+id: 2026-07-04-113-signal-window-interface
 title: "getSignalWindow — the internal seam interface: one windowed read returning raw+derived context, full-fidelity, with event-time windows AND a generalized append-order cursor"
 status: proposed
 priority: HIGH
 estimate: 2d
 created: 2026-07-04
 blocked_by:
-  - 2026-07-04-115-subject-key-unification
+  - 2026-07-04-112-subject-key-unification
 spec_refs:
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md          # decisions 7-13, 16-19 — the contract this implements
   - raw/internal/decisions/2026-07-03-loop-gap-analysis.md          # stations 1/2 + finding 5
@@ -24,7 +24,7 @@ files_to_modify:
 
 ## Problem
 
-There is no internal contract for "give me a window of context." The cluster engine assembles windows for the MCP wire (with truncation caps designed for external clients); the responder opens its own raw storage handle; the coming drift sweep (117) would otherwise become a third ad-hoc reader. Additionally, storage's only ordering is event-time `(timestamp DESC, id DESC)` — a cron consumer cursoring on event time silently skips late-arriving atoms (daemon down during a meeting → notes ingested later with old timestamps). The append-order answer exists but only for `coord:%` atoms (`iterateCoordAtomsByAppendOrder`).
+There is no internal contract for "give me a window of context." The cluster engine assembles windows for the MCP wire (with truncation caps designed for external clients); the responder opens its own raw storage handle; the coming drift sweep (114) would otherwise become a third ad-hoc reader. Additionally, storage's only ordering is event-time `(timestamp DESC, id DESC)` — a cron consumer cursoring on event time silently skips late-arriving atoms (daemon down during a meeting → notes ingested later with old timestamps). The append-order answer exists but only for `coord:%` atoms (`iterateCoordAtomsByAppendOrder`).
 
 ## Acceptance Criteria
 
@@ -33,7 +33,7 @@ There is no internal contract for "give me a window of context." The cluster eng
 - **AC3 — generalized append-order seam:** a storage method that iterates atoms in durable append order with `sequence_id` (SQLite rowid / memory insertion counter), half-open `sinceSeq` semantics, optional source filtering — generalizing `iterateCoordAtomsByAppendOrder` (which may be reimplemented on it; its external behavior must not change). Backend-parity conformance tests for SQLite + Memory, mirroring the existing coord-seam tests.
 - **AC4 — late-arrival correctness:** test: append atom A (old timestamp) *after* watermark W is taken; a `cursor: {sinceSeq: W+1}` read returns A; an event-time `since` read for the same wall-clock window does not. Both behaviors asserted — this is the documented reason two orderings exist.
 - **AC5 — determinism:** same `opts` against the same store state returns deep-equal results (test runs the read twice, and once more after an unrelated-scope append).
-- **AC6 — loop filter, dumb by contract:** `loop` filters to entries whose `metadata.canonical_subject` (115's unified key) string-equals it; entries without the key are excluded when `loop` is set. No fuzzy matching, no LLM anywhere in the module (assert via import-closure or explicit review check: no `runBrain`, no `src/mcp/internal` wire-cap imports).
+- **AC6 — loop filter, dumb by contract:** `loop` filters to entries whose `metadata.canonical_subject` (112's unified key) string-equals it; entries without the key are excluded when `loop` is set. No fuzzy matching, no LLM anywhere in the module (assert via import-closure or explicit review check: no `runBrain`, no `src/mcp/internal` wire-cap imports).
 
 ## Out of Scope (Don't Drift)
 
