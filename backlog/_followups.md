@@ -426,3 +426,6 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 2026-07-04 (from 112 merge): strategist post-shipment — note unified canonical_subject key on wiki/architecture/storage (spec After-Completion).
 - 2026-07-04 (from 112 merge): during 113 build, confirm loop filter treats canonical_subject as the sole forward join key.
 - 2026-07-04 (from 112 merge): builder-report calibration — builder-112 agent_notes claimed 1617/0 tests vs observed 1885+/1886; counts should come from the actual run output.
+- 2026-07-04 (from 113 merge): event-time mode materializes the full in-scope ledger and filters since/until in JS — push into SQL WHERE once the ledger grows.
+- 2026-07-04 (from 113 merge): strategist post-shipment — new wiki/architecture/signal-window page (seam contract, two orderings, scope semantics, fork-1 rules).
+- 2026-07-04 (from 113 merge): founder may override the C4 fixup (SCOPE_EXCLUDED_SOURCE_PREFIXES) if derived:granola-signals-index SHOULD appear in company windows.
