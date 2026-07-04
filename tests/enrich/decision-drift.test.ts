@@ -442,6 +442,35 @@ describe('AC5 — owner alert delivery', () => {
     expect(loadDriftSweepCheckpoint(cp).pairs[pairKey]?.state).toBe('delivery-failed');
   });
 
+  it('persists delivery-intent to disk BEFORE the post fires (real write path, no hand-mocking)', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const decisionKey = await seedDecision(store, 'Storage', 'Append-only, no upsert');
+    const { dedupeKey } = await seedStatement(store, {
+      subject: 'Storage',
+      text: 'add an upsert path to storage',
+    });
+    const pairKey = driftPairKey(decisionKey, dedupeKey, DRIFT_JUDGE_VERSION);
+
+    // The probe: at the moment runtime.post() runs, the on-disk checkpoint
+    // must already hold a durable delivery-intent for this pair. A crash here
+    // must recover to delivery-failed, never a second judge+post.
+    let stateAtPostTime: string | undefined;
+    const result = await runDriftSweepOnce(
+      store,
+      makeRuntime(cp, {
+        judge: contradictsJudge('add an upsert path'),
+        post: async () => {
+          stateAtPostTime = loadDriftSweepCheckpoint(cp).pairs[pairKey]?.state;
+        },
+      }),
+    );
+
+    expect(result.status).toBe('ok');
+    expect(stateAtPostTime).toBe('delivery-intent');
+    expect(loadDriftSweepCheckpoint(cp).pairs[pairKey]?.state).toBe('delivered');
+  });
+
   it('promotes an intent-written/no-outcome pair to delivery-failed with zero new posts', async () => {
     const store = new MemoryStorage();
     const cp = tempCheckpoint();

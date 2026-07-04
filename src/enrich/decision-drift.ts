@@ -877,10 +877,11 @@ export async function runDriftSweepOnce(
 }
 
 /**
- * At-most-once delivery (AC5): the `delivery-intent` record is already persisted
- * by the caller BEFORE we post. Post; on success record `delivered`, on failure
- * record `delivery-failed` — both terminal, both persisted. A crash between the
- * intent write and here leaves `delivery-intent`, recovered to `delivery-failed`
+ * At-most-once delivery (AC5): the `delivery-intent` record is persisted HERE,
+ * unconditionally, before the post — the caller only mutates memory. Post; on
+ * success record `delivered`, on failure record `delivery-failed` — both
+ * terminal, both persisted. A crash between the intent write and the post
+ * outcome leaves a durable `delivery-intent`, recovered to `delivery-failed`
  * next tick with no second post.
  */
 async function deliverPair(
@@ -891,13 +892,14 @@ async function deliverPair(
   payload: DriftAlertPayload,
   persist: () => void,
 ): Promise<'delivered' | 'delivery-failed'> {
-  // Ensure the intent is durable before the post (idempotent if already written).
-  if (record.state !== 'delivery-intent') {
-    record.state = 'delivery-intent';
-    record.pending_alert = payload;
-    record.updated_at = runtime.now();
-    persist();
-  }
+  // Ensure the intent is durable before the post. Unconditional: on the
+  // first-delivery path the caller has only mutated the in-memory map, so a
+  // state-equality guard here would skip the write and a crash mid-post would
+  // re-judge + re-post next tick (reviewer-proven at-most-once violation).
+  record.state = 'delivery-intent';
+  record.pending_alert = payload;
+  record.updated_at = runtime.now();
+  persist();
   try {
     await runtime.post(payload);
   } catch (err) {
