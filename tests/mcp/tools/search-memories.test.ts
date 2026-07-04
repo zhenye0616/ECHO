@@ -5,6 +5,10 @@ import { searchMemories, type SearchResult } from '../../../src/mcp/tools/search
 import { startMcpServer, type McpServerHandle } from '../../../src/mcp/server.js';
 import { MemoryStorage } from '../../../src/storage/memory.js';
 import type { CaptureEvent } from '../../../src/storage/interface.js';
+import {
+  TEAM_DECISION_SOURCE,
+  createTeamDecisionStore,
+} from '../../../src/surfaces/ceo-slack-responder/decision-store.js';
 import { captureStdout } from '../../fixtures/stdout.js';
 
 interface ToolContent {
@@ -1472,5 +1476,123 @@ describe('searchMemories — AC0 source (exact) + metadata_match', () => {
       ...p3.matches.map((m) => m.id),
     ]);
     expect(seen.size).toBe(12);
+  });
+});
+
+describe('item 112 — subject-key unification cross-source join', () => {
+  async function appendCurrentGranolaSignal(
+    store: MemoryStorage,
+    metadata: Record<string, unknown>,
+  ): Promise<string> {
+    const runId = String(metadata['extraction_run_id'] ?? 'run-1');
+    const id = await store.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-07-04T10:00:00.000Z',
+      content: String(metadata['__content'] ?? 'signal content'),
+      metadata: Object.fromEntries(Object.entries(metadata).filter(([k]) => k !== '__content')),
+    });
+    // Manifest so the signal survives the current-manifest-run restriction
+    // that a `canonical_subject` metadata_match triggers.
+    await store.append({
+      source: 'derived:granola-signals-index',
+      timestamp: '2026-07-04T10:01:00.000Z',
+      content: '{}',
+      metadata: {
+        note_id: 'note-1',
+        extractor_version: 'v1',
+        extraction_run_id: runId,
+        completed_at: '2026-07-04T10:01:00.000Z',
+        supersedes: null,
+        signal_atom_ids: [id],
+      },
+    });
+    return id;
+  }
+
+  it('AC3: canonical_subject joins a Granola signal and a new team decision (both retrieval paths)', async () => {
+    const fresh = new MemoryStorage();
+    const signalId = await appendCurrentGranolaSignal(fresh, {
+      signal_type: 'decision',
+      canonical_subject: 'pricing',
+      extraction_run_id: 'run-1',
+      __content: 'We should raise prices',
+    });
+    const decision = await createTeamDecisionStore(fresh).appendConfirmedDecision({
+      draft_id: 'draft-pricing',
+      subject: 'Pricing',
+      decision: 'Raise the plan to $30.',
+      author: 'avery-machine',
+      confirmed_by: 'blake',
+      confirmed_at: '2026-07-04T11:00:00.000Z',
+      source_app: 'codex',
+    });
+
+    // Structured filter returns BOTH the signal and the new decision.
+    const byKey = await searchMemories(fresh, {
+      metadata_match: { canonical_subject: 'pricing' },
+    });
+    const keyIds = byKey.matches.map((m) => m.id);
+    expect(keyIds).toContain(signalId);
+    expect(keyIds).toContain(decision.atom_id);
+
+    // Free-text now reaches the new decision atom via metadata.canonical_subject.
+    const byText = await searchMemories(fresh, { query: 'pricing' });
+    expect(byText.matches.map((m) => m.id)).toContain(decision.atom_id);
+  });
+
+  it('AC5 positive: {canonical_subject} returns legacy (normalized_subject only) AND new team decisions', async () => {
+    const fresh = new MemoryStorage();
+    // Legacy decision atom — pre-change, carries normalized_subject only.
+    const legacyId = await fresh.append({
+      source: TEAM_DECISION_SOURCE,
+      timestamp: '2026-06-01T08:00:00.000Z',
+      content: 'Legacy: use MySQL.',
+      metadata: {
+        decision_atom_type: 'team_decision',
+        subject: 'Auth Storage',
+        normalized_subject: 'auth storage',
+        decision: 'Legacy: use MySQL.',
+        author: 'avery-machine',
+        confirmed_by: 'blake',
+        confirmed_at: '2026-06-01T08:00:00.000Z',
+        source_app: 'codex',
+        dedupe_key: 'team-decision:auth storage',
+        draft_id: 'legacy-draft',
+      },
+    });
+    const newAtom = await createTeamDecisionStore(fresh).appendConfirmedDecision({
+      draft_id: 'new-draft',
+      subject: 'auth storage',
+      decision: 'Use Postgres now.',
+      author: 'avery-machine',
+      confirmed_by: 'blake',
+      confirmed_at: '2026-07-04T08:00:00.000Z',
+      source_app: 'codex',
+    });
+
+    const r = await searchMemories(fresh, {
+      metadata_match: { canonical_subject: 'auth storage' },
+    });
+    const ids = r.matches.map((m) => m.id);
+    expect(ids).toContain(legacyId);
+    expect(ids).toContain(newAtom.atom_id);
+  });
+
+  it('AC5 negative: a non-team-decision atom with normalized_subject is NOT matched by {canonical_subject}', async () => {
+    const fresh = new MemoryStorage();
+    // A current-manifest Granola signal atom carrying normalized_subject and
+    // NO canonical_subject. It survives the current-run restriction, so the
+    // only thing that can exclude it is the team-decision-scoped fallback.
+    const signalId = await appendCurrentGranolaSignal(fresh, {
+      signal_type: 'decision',
+      normalized_subject: 'auth storage',
+      extraction_run_id: 'run-1',
+      __content: 'contrived non-decision atom',
+    });
+
+    const r = await searchMemories(fresh, {
+      metadata_match: { canonical_subject: 'auth storage' },
+    });
+    expect(r.matches.map((m) => m.id)).not.toContain(signalId);
   });
 });

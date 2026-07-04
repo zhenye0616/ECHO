@@ -169,7 +169,22 @@ function metadataMatchValuesContain(expected: MetadataMatchValue, actual: string
 function metadataValue(event: CaptureEvent, key: string): string | null {
   if (key === 'source') return event.source;
   const value = event.metadata?.[key];
-  return typeof value === 'string' ? value : null;
+  if (typeof value === 'string') return value;
+  // AC5 (item 112): legacy team-decision atoms predate `canonical_subject`
+  // and carry only `normalized_subject`. Fall back to `normalized_subject`
+  // so a `{canonical_subject}` filter (the drift/`loop` join path) still
+  // reaches them. Scoped strictly to team-decision atoms, identified by
+  // `metadata.decision_atom_type === 'team_decision'` (the source-equivalent
+  // discriminator the spec permits; using it keeps this tool layer from
+  // importing the ceo-slack-responder surface, which is not in the packed CLI
+  // closure). A signal atom or any other source carrying `normalized_subject`
+  // must NOT satisfy a `{canonical_subject}` filter via this fallback. New
+  // decision atoms carry `canonical_subject` directly and never reach here.
+  if (key === 'canonical_subject' && event.metadata?.['decision_atom_type'] === 'team_decision') {
+    const fallback = event.metadata['normalized_subject'];
+    return typeof fallback === 'string' ? fallback : null;
+  }
+  return null;
 }
 
 function matchesMetadata(

@@ -6,6 +6,7 @@ import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
 import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
 import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
+import { normalizeSubject } from '../util/subject.js';
 import {
   parseBrainName,
   preflightBrain,
@@ -363,10 +364,6 @@ function shouldExtractNote(
 
 function stableHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 16);
-}
-
-function normalizeSubject(value: string): string {
-  return value.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
 function validateSignal(signal: GranolaExtractedSignal): void {

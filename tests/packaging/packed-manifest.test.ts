@@ -310,6 +310,8 @@ describe('packed package manifest', () => {
         "dist/trace/types.js",
         "dist/util/json.d.ts",
         "dist/util/json.js",
+        "dist/util/subject.d.ts",
+        "dist/util/subject.js",
         "dist/util/subprocess.d.ts",
         "dist/util/subprocess.js",
         "dist/util/timestamp.d.ts",
