@@ -7,7 +7,9 @@ Do not edit by hand.
 
 | Status | Priority | Created | ID | Title | Estimate | Blocked By |
 |---|---|---|---|---|---|---|
-| - | - | - | _(empty)_ | - | - | - |
+| PROPOSED | HIGH | 2026-07-04 | [2026-07-04-115-subject-key-unification](../backlog/proposed/2026-07-04-115-subject-key-unification.md) | Subject-key unification — one shared normalizer, one metadata key (canonical_subject) across Granola signals and team decisions | 0.5-1d | - |
+| PROPOSED | HIGH | 2026-07-04 | [2026-07-04-116-signal-window-interface](../backlog/proposed/2026-07-04-116-signal-window-interface.md) | getSignalWindow — the internal seam interface: one windowed read returning raw+derived context, full-fidelity, with event-time windows AND a generalized append-order cursor | 2d | 2026-07-04-115-subject-key-unification |
+| PROPOSED | HIGH | 2026-07-04 | [2026-07-04-117-drift-sweep-v0](../backlog/proposed/2026-07-04-117-drift-sweep-v0.md) | Drift sweep v0 — clocked understanding-drift detector: new meeting statements vs recorded team decisions, contradiction alert to decision owner via confirm-card pattern | 2-3d | 2026-07-04-116-signal-window-interface |
 
 ## Ready
 
