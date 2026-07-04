@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R4` — both reviewers (codex, codex-ops) returned `proceed` with zero findings at spec SHA `dafbcedf`, confirming the r3 precision patches closed cleanly: `delivery-failed` is the sole delivery-failure terminal literal and `DRIFT_JUDGE_MAX_ATTEMPTS` (default 3) is the single shared malformed-verdict/fabricated-quote budget with retryable infra errors excluded. The crash-safety / at-most-once-delivery / total-terminal-state contract is verified and the out-of-scope wall held across all four rounds. No patches this round. Promoting `proposed → ready`.
 
