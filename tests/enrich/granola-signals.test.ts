@@ -16,6 +16,7 @@ import {
 import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent, EventId } from '../../src/storage/interface.js';
 import { captureStdout } from '../fixtures/stdout.js';
+import { normalizeSubject } from '../../src/util/subject.js';
 
 function tempCheckpoint(): { dir: string; path: string } {
   const dir = mkdtempSync(join(tmpdir(), 'echo-granola-signals-'));
@@ -399,5 +400,50 @@ describe('Granola signal enrichment worker', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('AC1 (item 112): shared subject normalizer', () => {
+  // The two former local implementations, inlined verbatim as reference
+  // oracles. `normalizeSubject` in src/util/subject.ts must produce
+  // byte-identical output to BOTH across every fixture.
+  const formerGranolaNormalize = (value: string): string =>
+    value.toLowerCase().trim().replace(/\s+/g, ' ');
+  const formerDecisionNormalize = (subject: string): string =>
+    subject.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const fixtures = [
+    'auth storage',
+    'Auth Storage',
+    '  Auth   Storage  ',
+    'AUTH\tSTORAGE',
+    'pricing\n\nmodel',
+    'mixed \t \n whitespace   runs',
+    '',
+    '   ',
+    ' Café  Décision ', // NBSP edges + accented interior
+    'ПРИВЕТ   Мир',
+    'İstanbul Plan', // Turkish dotted-I lowercasing
+    'trailing tab\t',
+    '\rleading cr',
+  ];
+
+  it('produces byte-identical output to both former implementations', () => {
+    for (const fixture of fixtures) {
+      const shared = normalizeSubject(fixture);
+      expect(shared).toBe(formerGranolaNormalize(fixture));
+      expect(shared).toBe(formerDecisionNormalize(fixture));
+    }
+  });
+
+  it('the duplicated local normalizers no longer exist (import-only)', () => {
+    const granolaSrc = readFileSync('src/enrich/granola-signals.ts', 'utf8');
+    const decisionSrc = readFileSync('src/surfaces/ceo-slack-responder/decision-store.ts', 'utf8');
+    // No local re-definition of the normalizer in either module.
+    expect(granolaSrc).not.toMatch(/function\s+normalizeSubject\s*\(/);
+    expect(decisionSrc).not.toMatch(/function\s+normalizeDecisionSubject\s*\(/);
+    // Both import the shared util instead.
+    expect(granolaSrc).toContain("from '../util/subject.js'");
+    expect(decisionSrc).toContain("from '../../util/subject.js'");
   });
 });

@@ -1,5 +1,6 @@
 import { isAllowedDerived } from '../../capture/sources.js';
 import type { CaptureEvent, EventId, Storage } from '../../storage/interface.js';
+import { normalizeSubject } from '../../util/subject.js';
 
 export const TEAM_DECISION_SOURCE_NAME = 'team-decisions';
 export const TEAM_DECISION_SOURCE = `derived:${TEAM_DECISION_SOURCE_NAME}`;
@@ -51,12 +52,8 @@ export function createTeamDecisionStore(storage: Storage): TeamDecisionStore {
   };
 }
 
-export function normalizeDecisionSubject(subject: string): string {
-  return subject.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 export function decisionDedupeKey(subject: string): string {
-  return `team-decision:${normalizeDecisionSubject(subject)}`;
+  return `team-decision:${normalizeSubject(subject)}`;
 }
 
 export async function appendConfirmedDecision(
@@ -69,11 +66,15 @@ export async function appendConfirmedDecision(
   const existing = await findDecisionByDraftId(storage, input.draft_id);
   if (existing !== null) return existing;
 
-  const normalizedSubject = normalizeDecisionSubject(input.subject);
+  const normalizedSubject = normalizeSubject(input.subject);
   const dedupeKey = decisionDedupeKey(input.subject);
   const metadata: Record<string, unknown> = {
     decision_atom_type: 'team_decision',
     subject: input.subject.trim(),
+    // Unified cross-source join key (item 112). Same normalized value as
+    // normalized_subject; written so team decisions join Granola signals on
+    // canonical_subject and become free-text findable via search_memories.
+    canonical_subject: normalizedSubject,
     normalized_subject: normalizedSubject,
     decision: input.decision.trim(),
     author: input.author.trim(),
@@ -162,7 +163,7 @@ function validateConfirmedDecisionInput(input: ConfirmedDecisionInput): void {
       throw new Error(`team decision ${key} is required`);
     }
   }
-  if (normalizeDecisionSubject(input.subject) === '') {
+  if (normalizeSubject(input.subject) === '') {
     throw new Error('team decision subject is required');
   }
 }
@@ -187,8 +188,7 @@ function eventToTeamDecisionAtom(event: CaptureEvent): TeamDecisionAtom | null {
   ) {
     return null;
   }
-  const normalizedSubject =
-    stringMetadata(md, 'normalized_subject') ?? normalizeDecisionSubject(subject);
+  const normalizedSubject = stringMetadata(md, 'normalized_subject') ?? normalizeSubject(subject);
   const dedupeKey = stringMetadata(md, 'dedupe_key') ?? decisionDedupeKey(subject);
   const rationale = stringMetadata(md, 'rationale');
   return {
@@ -213,7 +213,7 @@ function stringMetadata(md: Record<string, unknown>, key: string): string | null
 
 function matchesQuery(atom: TeamDecisionAtom, filter: TeamDecisionQuery): boolean {
   if (filter.subject !== undefined) {
-    return atom.normalized_subject === normalizeDecisionSubject(filter.subject);
+    return atom.normalized_subject === normalizeSubject(filter.subject);
   }
   if (filter.query === undefined || filter.query.trim() === '') return true;
   const normalizedQuery = normalizeSearchText(filter.query);
