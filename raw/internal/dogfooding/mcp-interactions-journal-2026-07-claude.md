@@ -142,3 +142,19 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** source_breakdown={claude_code:19, git:6}; bodies from fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/*.jsonl (sessions 34b89689, 9d496f94, bc1e3ab0) + git:/Users/zhenye/Desktop/Project_echo (commits 5be8ce64, 91523f95). Codex/cursor/granola silently absent — consistent, today was a claude-only strategy day.
 - **Verdict:** ✅ right
 - **Note:** The killed session's own final turns (including the "queued and ready" handoff list) were the newest atoms, so reconstruction was near-free — the dying session's explicit state dump is what made the cold start cheap. 16-atom budget drop was harmless here because prefer=newest_first kept exactly the atoms that mattered.
+
+### 2026-07-04 10:28 PDT — cold-start "understand the current open issue" via /using-echo-mcp
+- **Trigger:** Founder opened a fresh session with "use echo and understand the currnet open issue"; skill-driven resume chain.
+- **Query inputs:** find_clusters({}) → get_atoms(35 ids from ctx_c0df6357, prefer=newest_first, format=minimal)
+- **Returned:** 4 clusters, 42 atoms; top cluster: "discussion about project_echo" (35 atoms, rank_reasons: recent_activity, has_open_loop, code_session_anchor, dense). AUTO_EXPAND warning fired (single-source-recent → 24h). get_atoms hydrated 8/35, atoms_dropped=27 under budget.
+- **Sources:** source_breakdown={claude_code:25, git:10}; bodies from fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/{929a1827,bc1e3ab0}.jsonl + git:/Users/zhenye/Desktop/Project_echo (commits c1eab649, d6b28188, 5d78b69). Granola present only in rank-3 cluster (Zhen<>Parth); codex/cursor silently absent — consistent with a claude-only strategy day.
+- **Verdict:** ✅ right
+- **Note:** newest_first again carried the resume: 8 surviving atoms covered the full arc (spec retraction → architecture map commit → 7-agent gap analysis + 6 findings → capture-layer deep dive). 27-atom drop harmless. The gap-analysis task-notification atom alone contained the 6-finding synthesis — one atom did most of the work.
+
+### 2026-07-04 12:14 PDT — cold-start "where we left off" via /using-echo-mcp
+- **Trigger:** Founder opened a fresh (background) session with "use echo and understand where we left off"; skill-driven resume chain.
+- **Query inputs:** find_clusters({}) → get_atoms(14 ids from ctx_2e5fd8ff, prefer=newest_first, format=minimal)
+- **Returned:** 2 clusters, 15 atoms in 4h window; top cluster: "discussion about project_echo" (14 atoms, rank_reasons: recent_activity, has_open_loop, code_session_anchor, dense). get_atoms hydrated 8/14, atoms_dropped=6 under budget.
+- **Sources:** source_breakdown={claude_code:10, git:4}; bodies from fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/{f226cf8c,83177d5a}.jsonl + git:/Users/zhenye/Desktop/Project_echo (commits a52f3d5f, 284ec5db, a39efaf1, 350c9e5f). Codex/cursor/granola silently absent — consistent, today was a claude-only strategy morning.
+- **Verdict:** ✅ right
+- **Note:** newest_first carried the resume again: the 8 surviving atoms covered the full arc (seam plain-English decisions → v0 decision record + 115/116/117 specs → renumber to 112/113/114 → r1 rounds reopened at 350c9e5f). The 6-atom budget drop was harmless — dropped atoms were older mid-session turns. One follow-up check the atoms couldn't answer (have reviewers responded?) needed a filesystem look: rounds still request.md-only.
