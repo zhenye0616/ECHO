@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R5` — both reviewers (codex, codex-ops) returned `proceed` with zero findings at the r4-patched spec SHA. No patches, no divergence. The spec has converged: r4's `limit`-after-filter ordering pin and full-fidelity round-trip test held, and the r2 structural cut (no `nextSinceSeq`) + r3 rowid durability invariant remain clean. Promoting `backlog/proposed/` → `backlog/ready/`; item is claimable (build order still gated by `blocked_by: 112` per the item frontmatter, which is independent of review convergence).
 

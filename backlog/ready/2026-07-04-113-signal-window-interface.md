@@ -20,6 +20,7 @@ files_to_modify:
   - src/storage/memory.ts                              # insertion-counter parity
   - tests/storage/                                     # backend-parity conformance for the new seam
   - tests/trace/                                       # contract tests: union, scope, loop, determinism, late-arrival
+ready_content_sha: 0f76a3f62eb3c39c3d886d86fc423356c31b835528280ab2fc33523131643a25
 ---
 
 ## Problem
