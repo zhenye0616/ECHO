@@ -1,9 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  filterToCurrentSignalRuns,
   GRANOLA_SIGNAL_INDEX_SOURCE,
   GRANOLA_SIGNAL_SOURCE,
-  resolveCurrentGranolaSignalRuns,
 } from '../../enrich/granola-signals.js';
 import {
   METADATA_MATCH_KEY_WHITELIST,
@@ -388,14 +388,7 @@ export async function searchMemories(
 
   if (restrictToCurrentGranolaSignals) {
     const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
-    const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
-    const currentSignalIds = new Set<string>();
-    for (const manifest of currentRuns.values()) {
-      for (const id of manifest.signal_atom_ids) currentSignalIds.add(id);
-    }
-    candidates = candidates.filter(
-      (e) => e.source !== GRANOLA_SIGNAL_SOURCE || currentSignalIds.has(e.id),
-    );
+    candidates = filterToCurrentSignalRuns(candidates, manifestEvents);
   }
 
   // Path-aware overfetch slicing. Both paths converge here once their

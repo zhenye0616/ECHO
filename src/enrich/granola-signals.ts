@@ -7,12 +7,7 @@ import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
 import { isNonEmptyString } from '../guards.js';
 import { createLogger } from '../logging/index.js';
 import { normalizeSubject } from '../util/subject.js';
-import {
-  parseBrainName,
-  preflightBrain,
-  runBrain,
-  type BrainName,
-} from '../brain/brain.js';
+import { parseBrainName, preflightBrain, runBrain, type BrainName } from '../brain/brain.js';
 import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 
@@ -118,6 +113,22 @@ export interface GranolaSignalWorkerOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+/**
+ * Per-tick skip/settle observability (item 115 AC3). Counters are in-memory
+ * only — no new persisted state. Every skipped note increments exactly ONE
+ * counter (exclusive first-match precedence) and emits exactly one structured
+ * warn log carrying a machine-readable reason id (+ note_id where known).
+ */
+export interface GranolaSignalObservability {
+  skipped_notes: {
+    missing_summary: number;
+    missing_transcript: number;
+    missing_dedupe_key: number;
+  };
+  malformed_events: number;
+  unparsable_updated_at: number;
+}
+
 export type GranolaSignalWorkerResult =
   | {
       status: 'ok';
@@ -125,6 +136,7 @@ export type GranolaSignalWorkerResult =
       notes_extracted: number;
       signal_atoms_written: number;
       manifests_written: number;
+      observability: GranolaSignalObservability;
     }
   | { status: 'skipped'; reason: 'in_flight' | 'disabled' }
   | { status: 'error'; reason: string; message: string };
@@ -256,7 +268,18 @@ function stringMetadata(event: CaptureEvent, key: string): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-function buildRawGranolaNotes(events: readonly CaptureEvent[]): RawGranolaNote[] {
+function emptyObservability(): GranolaSignalObservability {
+  return {
+    skipped_notes: { missing_summary: 0, missing_transcript: 0, missing_dedupe_key: 0 },
+    malformed_events: 0,
+    unparsable_updated_at: 0,
+  };
+}
+
+function buildRawGranolaNotes(
+  events: readonly CaptureEvent[],
+  observability: GranolaSignalObservability,
+): RawGranolaNote[] {
   const grouped = new Map<
     string,
     {
@@ -269,7 +292,20 @@ function buildRawGranolaNotes(events: readonly CaptureEvent[]): RawGranolaNote[]
   for (const event of events) {
     const noteId = stringMetadata(event, 'note_id');
     const atomType = stringMetadata(event, 'granola_atom_type');
-    if (noteId === null || (atomType !== 'summary' && atomType !== 'transcript')) continue;
+    // Event-level malformed drops. Exclusive first-match: a missing note_id is
+    // reported as such (note_id unknown); otherwise an out-of-domain
+    // granola_atom_type is reported with the note_id we do have. Preserves the
+    // original `noteId === null || atomType invalid` skip, now counted + logged.
+    if (noteId === null) {
+      observability.malformed_events += 1;
+      log.warn('raw_event_malformed', { reason: 'missing_note_id' });
+      continue;
+    }
+    if (atomType !== 'summary' && atomType !== 'transcript') {
+      observability.malformed_events += 1;
+      log.warn('raw_event_malformed', { reason: 'invalid_granola_atom_type', note_id: noteId });
+      continue;
+    }
     const entry = grouped.get(noteId) ?? {};
     if (atomType === 'summary') entry.summary = event;
     else entry.transcript = event;
@@ -280,10 +316,26 @@ function buildRawGranolaNotes(events: readonly CaptureEvent[]): RawGranolaNote[]
 
   const notes: RawGranolaNote[] = [];
   for (const [noteId, entry] of grouped) {
-    if (entry.summary === undefined || entry.transcript === undefined) continue;
+    // Note-level pairing/dedupe gate. Exclusive first-match precedence mirrors
+    // the control flow: pairing completeness (missing_summary → missing_transcript)
+    // before dedupe presence (missing_dedupe_key). A multi-defect note counts once.
+    if (entry.summary === undefined) {
+      observability.skipped_notes.missing_summary += 1;
+      log.warn('note_skipped', { reason: 'missing_summary', note_id: noteId });
+      continue;
+    }
+    if (entry.transcript === undefined) {
+      observability.skipped_notes.missing_transcript += 1;
+      log.warn('note_skipped', { reason: 'missing_transcript', note_id: noteId });
+      continue;
+    }
     const summaryDedupe = stringMetadata(entry.summary, 'dedupe_key');
     const transcriptDedupe = stringMetadata(entry.transcript, 'dedupe_key');
-    if (summaryDedupe === null || transcriptDedupe === null) continue;
+    if (summaryDedupe === null || transcriptDedupe === null) {
+      observability.skipped_notes.missing_dedupe_key += 1;
+      log.warn('note_skipped', { reason: 'missing_dedupe_key', note_id: noteId });
+      continue;
+    }
     notes.push({
       note_id: noteId,
       meeting_title: entry.title ?? 'Untitled Granola note',
@@ -335,10 +387,24 @@ function inputFingerprint(note: RawGranolaNote): string {
   );
 }
 
-function isSettled(note: RawGranolaNote, nowIso: string, settleMs: number): boolean {
+function isSettled(
+  note: RawGranolaNote,
+  nowIso: string,
+  settleMs: number,
+  observability: GranolaSignalObservability,
+): boolean {
   const updated = new Date(note.updated_at).getTime();
   const now = new Date(nowIso).getTime();
-  if (Number.isNaN(updated) || Number.isNaN(now)) return true;
+  // Unparsable note updated_at counts as settled (behavior UNCHANGED) — now
+  // counted + warned so the foot-gun is visible and deliberate. An unparsable
+  // `now` clock also short-circuits to settled but is not a note defect, so it
+  // is not counted.
+  if (Number.isNaN(updated)) {
+    observability.unparsable_updated_at += 1;
+    log.warn('unparsable_updated_at', { note_id: note.note_id, updated_at: note.updated_at });
+    return true;
+  }
+  if (Number.isNaN(now)) return true;
   return now - updated >= settleMs;
 }
 
@@ -504,6 +570,38 @@ export function resolveCurrentGranolaSignalRuns(
   return out;
 }
 
+/**
+ * One-call current-run filter (item 115 AC1). Composes the existing
+ * {@link resolveCurrentGranolaSignalRuns}: given a window of candidate events
+ * and the note's manifest atoms, returns only the events that belong to each
+ * note's CURRENT manifest run — superseded-run signals, orphan signals from a
+ * failed manifest append, and signals for notes with no manifest at all are
+ * excluded. Order-preserving (input order is retained).
+ *
+ * Non-signal events (`source !== GRANOLA_SIGNAL_SOURCE`) pass through
+ * unconditionally: this is the same asymmetric filter search-memories has
+ * always applied — a mixed candidate window keeps its non-signal rows and only
+ * restricts derived signal atoms to the current run. Resolution is
+ * superseded-set construction (single pass, no chain walking), so a supersedes
+ * cycle terminates and yields no current run for that note, and a supersedes
+ * pointer to a nonexistent run id is inert.
+ *
+ * Working name in the spec: `filterToCurrentSignalRuns(signalEvents, manifestEvents)`.
+ */
+export function filterToCurrentSignalRuns(
+  candidateEvents: readonly CaptureEvent[],
+  manifestEvents: readonly CaptureEvent[],
+): CaptureEvent[] {
+  const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
+  const currentSignalIds = new Set<string>();
+  for (const manifest of currentRuns.values()) {
+    for (const id of manifest.signal_atom_ids) currentSignalIds.add(id);
+  }
+  return candidateEvents.filter(
+    (event) => event.source !== GRANOLA_SIGNAL_SOURCE || currentSignalIds.has(event.id),
+  );
+}
+
 function updateCheckpointSuccess(
   checkpoint: GranolaSignalCheckpoint,
   note: RawGranolaNote,
@@ -601,13 +699,14 @@ export async function runGranolaSignalWorkerOnce(
     return { status: 'error', reason: 'checkpoint_failed', message: (err as Error).message };
   }
 
+  const observability = emptyObservability();
   const manifestEvents = await storage.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
   const currentRuns = resolveCurrentGranolaSignalRuns(manifestEvents);
   const rawEvents = await storage.query({ source: GRANOLA_RAW_SOURCE });
-  const rawNotes = buildRawGranolaNotes(rawEvents);
+  const rawNotes = buildRawGranolaNotes(rawEvents, observability);
   const nowIso = now();
   const candidates = rawNotes
-    .filter((note) => isSettled(note, nowIso, settleMs))
+    .filter((note) => isSettled(note, nowIso, settleMs, observability))
     .filter((note) => shouldExtractNote(note, checkpoint, currentRuns, extractorVersion))
     .slice(0, maxNotesPerTick);
 
@@ -701,6 +800,7 @@ export async function runGranolaSignalWorkerOnce(
     notes_extracted: notesExtracted,
     signal_atoms_written: signalAtomsWritten,
     manifests_written: manifestsWritten,
+    observability,
   });
   return {
     status: 'ok',
@@ -708,6 +808,7 @@ export async function runGranolaSignalWorkerOnce(
     notes_extracted: notesExtracted,
     signal_atoms_written: signalAtomsWritten,
     manifests_written: manifestsWritten,
+    observability,
   };
 }
 
