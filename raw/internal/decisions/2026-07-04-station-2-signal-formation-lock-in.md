@@ -59,3 +59,24 @@ Independent review by codex strategist (read-only sandbox) of this lock-in again
 
 **F3 (NIT) — D3/D5/D6/D7 are governance, not code invariants.** Accepted as-is; that is what an operating-discipline lock-in is. The enforcement point is spec review (this record is the citable fence), not runtime.
 
+
+---
+
+## Scope refinement (founder, 2026-07-04 evening) — shape + infra ONLY, precisely bounded
+
+Founder directive after the codex review: work under this decision builds **only the shape and the infra of station 2 itself**. Precise definition, to prevent the "station-2 banner" from absorbing adjacent work:
+
+**Station 2 proper** = `src/enrich/dispatch.ts` (chassis) + `src/enrich/granola-signals.ts` (extractor) + its checkpoint/fingerprint/manifest machinery + **the signal contract** (what a signal atom promises its consumers: provenance tuple, signal_type semantics, quote guarantees, extractor_version/supersedes currentness rules).
+
+**What may be built under this decision:**
+- *Shape*: contract documentation and pinning (the D1–D7 record, the provenance tuple, the 2→3 admission rules). Costs words, not code.
+- *Infra*: hardening of the existing extractor/chassis/checkpoint machinery — correctness, durability, test tightening — with zero new capability surface.
+
+**Explicitly NOT under this decision (adjacent, separately owned):**
+- Capture-side re-ingest of updated Granola notes → **station 1** work (104 supersede-chain lineage). Station 2 carries only the operating rule: ingest after Granola finishes processing.
+- `getSignalWindow` changes (current-run opt-in mode, event-time SQL pushdown) → **113 reader** infra; triggered by a consumer rewiring, not by this decision.
+- Drift-checkpoint pruning, if-status-ok test guards, load-flake bucket → **114 / station 6** infra.
+- Shared packed-safe module → **packaging** infra.
+- Anything station 3: rewiring intake onto signals honors the pinned contract *when its own decision/spec exists*; this decision only defines the interface it will consume.
+
+Correction to the earlier "infra ledger" section: those followups remain valid but are seam-wide, not station-2 items. The only followups that are station-2 proper today: none open — the extractor/chassis as merged is the locked v0. Station-2 build activity before the Jul 18 freeze: zero (demo-critical path only).
