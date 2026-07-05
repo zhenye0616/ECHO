@@ -64,7 +64,11 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   fields are absent (never attempted). LIMITATION the section must state honestly: an
   in-process permanent-disable (config-parse typo) is not directly observable from
   files — the report infers it as `stale`/`never-ran` and the remediation copy says to
-  check daemon startup logs for `granola-signals` config errors.
+  check daemon startup logs for `granola-signals` config errors. Artifact-read
+  robustness: doctor may run while the daemon is mid-write, so a malformed, unreadable,
+  or partially-written `granola-signals-checkpoint.json` degrades ONLY the station-2
+  section with operator-visible path + parse-error context and remediation, and the rest
+  of the report continues — it must never abort the health check.
 - **AC4 — serving-code identity (kills audit B6):** report which process serves the MCP
   port. A pid-lock is NOT proof of port ownership (it can be stale or point at a
   different process while another owns the port), so the report MUST resolve the actual
@@ -74,7 +78,11 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   `unknown`, with the executing path. Verification contract: if the port-owner lookup
   fails/errors, or the daemon pid-lock and the observed listening pid disagree, render
   serving-code identity as `unknown`/degraded with remediation — never assert
-  `packaged-dist` vs `src-dev` on unverified evidence. Staleness check: newest mtime
+  `packaged-dist` vs `src-dev` on unverified evidence. The port-owner lookup and the
+  argv read are separate runtime steps, so the same `unknown`/degraded result (never a
+  crash, never a false classification) applies when the argv lookup fails/errors,
+  returns empty argv, or the resolved listening pid has vanished or become unreadable
+  between the `lsof` resolution and argv classification. Staleness check: newest mtime
   under `src/` vs newest mtime under `dist/` → `dist-stale` warning when `src` is newer
   and the serving class is `packaged-dist`; also warn when serving class is `src-dev`
   (unsupervised dev process serving production). If `src/` or `dist/` is
@@ -91,14 +99,21 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   that actually runs the loop, this value MUST be labeled doctor-env-only with an
   explicit limitation note, so an operator is not shown a false pipeline enabled/disabled
   state. Also `derived:team-decisions` count (0 is expected today — render as
-  informational, not degraded). Absent stores render as `not yet run`, not errors.
+  informational, not degraded). Absent stores render as `not yet run`, not errors; a
+  malformed, unreadable, or partially-written seed-store JSON degrades ONLY that store's
+  entry with operator-visible path + parse-error context and remediation, and the rest
+  of the report continues — never abort the health check.
 - **AC6 — tests:** fixture-driven (temp ECHO_HOME, temp db or storage stub, fabricated
   checkpoints/seed stores, stubbed process-args + port-owner lookups) covering: healthy,
   never-ran, stale, failing-notes (incl. never-successful and recovered boundary),
   dist-stale, src-dev-serving, port-owner-unverifiable (port-owner lookup fails OR
   pid-lock disagrees with observed listening pid → `unknown`/degraded, not a false
-  classification), and missing-src-or-dist (`staleness-unknown`, non-fatal) cases;
-  `--json` shape stable; existing doctor tests untouched and green.
+  classification), missing-src-or-dist (`staleness-unknown`, non-fatal),
+  malformed-artifact (corrupt/unreadable signals checkpoint AND corrupt/unreadable
+  seed-store JSON → that section/entry degrades with path+error context while the rest
+  of the report still renders), and argv-race (resolved listening pid vanishes / argv
+  unreadable or empty after `lsof` → `unknown`/degraded, no crash) cases; `--json` shape
+  stable; existing doctor tests untouched and green.
 
 ## Out of Scope (Don't Drift)
 
