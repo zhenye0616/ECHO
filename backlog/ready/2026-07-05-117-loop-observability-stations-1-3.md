@@ -19,6 +19,7 @@ files_to_modify:
   - src/cli/commands/doctor.ts      # new `loop` report section + rollup
   - src/cli/io/render.ts            # render the new section (existing style)
   - tests/cli/                      # doctor loop-section coverage (temp fixtures)
+ready_content_sha: 692f1550c214b66b8355d78a7f43db49b47ca2ccc13a47bdb4f5825207c00300
 ---
 
 ## Problem

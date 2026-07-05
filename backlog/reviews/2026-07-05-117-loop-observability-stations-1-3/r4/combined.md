@@ -27,5 +27,9 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R4` — both reviewers returned `proceed` with zero findings on the
+r3-patched spec (4b011269). The r3 consolidation (AC6 degradation matrix), AC2
+artifact-read robustness, and AC4 port pin verified clean; the r2 malformed-JSON / argv
+patches and r1 clarifications also held. No reframe gate (no findings). Promoting
+proposed → ready.
 
