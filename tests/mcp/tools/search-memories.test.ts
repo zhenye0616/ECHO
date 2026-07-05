@@ -1596,3 +1596,52 @@ describe('item 112 — subject-key unification cross-source join', () => {
     expect(r.matches.map((m) => m.id)).not.toContain(signalId);
   });
 });
+
+describe('item 115 AC2 — search-memories consumes filterToCurrentSignalRuns', () => {
+  it('excludes orphan signals from a failed manifest append through the tool path', async () => {
+    const fresh = new MemoryStorage();
+    // run-1 appended a signal atom, then the manifest append "failed" — the
+    // orphan atom is referenced by no manifest.
+    const orphanId = await fresh.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-07-04T10:00:00.000Z',
+      content: 'orphan pricing decision',
+      metadata: {
+        signal_type: 'decision',
+        canonical_subject: 'pricing',
+        extraction_run_id: 'run-1',
+      },
+    });
+    // Retry run: a fresh signal atom plus a manifest referencing only it.
+    const retryId = await fresh.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-07-04T10:05:00.000Z',
+      content: 'retry pricing decision',
+      metadata: {
+        signal_type: 'decision',
+        canonical_subject: 'pricing',
+        extraction_run_id: 'run-2',
+      },
+    });
+    await fresh.append({
+      source: 'derived:granola-signals-index',
+      timestamp: '2026-07-04T10:06:00.000Z',
+      content: '{}',
+      metadata: {
+        note_id: 'note-1',
+        extractor_version: 'v1',
+        extraction_run_id: 'run-2',
+        completed_at: '2026-07-04T10:06:00.000Z',
+        supersedes: null,
+        signal_atom_ids: [retryId],
+      },
+    });
+
+    const r = await searchMemories(fresh, {
+      metadata_match: { canonical_subject: 'pricing' },
+    });
+    const ids = r.matches.map((m) => m.id);
+    expect(ids).toContain(retryId);
+    expect(ids).not.toContain(orphanId);
+  });
+});

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  filterToCurrentSignalRuns,
   GRANOLA_SIGNAL_INDEX_SOURCE,
   GRANOLA_SIGNAL_SOURCE,
   loadGranolaSignalCheckpoint,
@@ -12,6 +13,7 @@ import {
   type GranolaExtractedSignal,
   type GranolaSignalExtractor,
   type GranolaSignalExtractionInput,
+  type GranolaSignalWorkerResult,
 } from '../../src/enrich/granola-signals.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent, EventId } from '../../src/storage/interface.js';
@@ -445,5 +447,767 @@ describe('AC1 (item 112): shared subject normalizer', () => {
     // Both import the shared util instead.
     expect(granolaSrc).toContain("from '../util/subject.js'");
     expect(decisionSrc).toContain("from '../../util/subject.js'");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// item 115 — Station-2 contract pinning
+// ---------------------------------------------------------------------------
+
+function signalEvent(id: string, extras: Partial<CaptureEvent> = {}): CaptureEvent {
+  return {
+    id,
+    source: GRANOLA_SIGNAL_SOURCE,
+    timestamp: '2026-06-22T00:00:00.000Z',
+    content: `signal ${id}`,
+    metadata: { signal_type: 'decision' },
+    ...extras,
+  };
+}
+
+function manifestEvent(opts: {
+  noteId: string;
+  runId: string;
+  completedAt: string;
+  supersedes?: string | null;
+  signalAtomIds: string[];
+}): CaptureEvent {
+  return {
+    id: `manifest-${opts.runId}`,
+    source: GRANOLA_SIGNAL_INDEX_SOURCE,
+    timestamp: opts.completedAt,
+    content: '{}',
+    metadata: {
+      note_id: opts.noteId,
+      extractor_version: 'granola-signals@1',
+      extraction_run_id: opts.runId,
+      completed_at: opts.completedAt,
+      supersedes: opts.supersedes ?? null,
+      signal_atom_ids: opts.signalAtomIds,
+    },
+  };
+}
+
+describe('item 115 AC1 — filterToCurrentSignalRuns (one-call current-run filter)', () => {
+  it('passes through the current run', () => {
+    const signals = [signalEvent('sig-1')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-1'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-1']);
+  });
+
+  it('excludes superseded-run signals', () => {
+    const signals = [signalEvent('sig-1'), signalEvent('sig-2')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-1'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-2',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        supersedes: 'run-1',
+        signalAtomIds: ['sig-2'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-2']);
+  });
+
+  it('resolves a supersedes chain of length >=2 to the newest run only', () => {
+    const signals = [signalEvent('sig-1'), signalEvent('sig-2'), signalEvent('sig-3')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-1'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-2',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        supersedes: 'run-1',
+        signalAtomIds: ['sig-2'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-3',
+        completedAt: '2026-06-22T00:10:00.000Z',
+        supersedes: 'run-2',
+        signalAtomIds: ['sig-3'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-3']);
+  });
+
+  it('terminates on a supersedes cycle and yields no current run for the note', () => {
+    const signals = [signalEvent('sig-a'), signalEvent('sig-b')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-a',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        supersedes: 'run-b',
+        signalAtomIds: ['sig-a'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-b',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        supersedes: 'run-a',
+        signalAtomIds: ['sig-b'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests)).toEqual([]);
+  });
+
+  it('treats a supersedes pointer to a nonexistent run id as inert', () => {
+    const signals = [signalEvent('sig-1')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        supersedes: 'run-does-not-exist',
+        signalAtomIds: ['sig-1'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-1']);
+  });
+
+  it('resolves duplicate non-superseding manifests by latest completed_at (hardcoded run-b)', () => {
+    const signals = [signalEvent('sig-a'), signalEvent('sig-b')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-a',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-a'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-b',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        signalAtomIds: ['sig-b'],
+      }),
+    ];
+    // Latest completed_at wins; expected winning run is HARDCODED, not derived
+    // from the resolver's own output.
+    expect(resolveCurrentGranolaSignalRuns(manifests).get('note-1')?.extraction_run_id).toBe(
+      'run-b',
+    );
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-b']);
+  });
+
+  it('breaks a completed_at tie by lexicographically greatest run id (hardcoded run-b)', () => {
+    const signals = [signalEvent('sig-a'), signalEvent('sig-b')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-a',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-a'],
+      }),
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-b',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-b'],
+      }),
+    ];
+    expect(resolveCurrentGranolaSignalRuns(manifests).get('note-1')?.extraction_run_id).toBe(
+      'run-b',
+    );
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-b']);
+  });
+
+  it('excludes orphan signals from a failed manifest append (retry-run shape)', () => {
+    // run-1 appended a signal atom, then the manifest append failed (no manifest
+    // for run-1). The retry run appended a fresh signal + a manifest. The run-1
+    // atom is referenced by no manifest and must be excluded.
+    const signals = [signalEvent('sig-run1'), signalEvent('sig-retry')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-retry',
+        completedAt: '2026-06-22T00:01:00.000Z',
+        signalAtomIds: ['sig-retry'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual(['sig-retry']);
+  });
+
+  it('excludes signals for a note that has no manifest at all', () => {
+    const signals = [signalEvent('sig-x')];
+    expect(filterToCurrentSignalRuns(signals, [])).toEqual([]);
+  });
+
+  it('keeps notes independent (note A supersede does not affect note B)', () => {
+    const signals = [signalEvent('sig-a1'), signalEvent('sig-a2'), signalEvent('sig-b1')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-a',
+        runId: 'run-a1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-a1'],
+      }),
+      manifestEvent({
+        noteId: 'note-a',
+        runId: 'run-a2',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        supersedes: 'run-a1',
+        signalAtomIds: ['sig-a2'],
+      }),
+      manifestEvent({
+        noteId: 'note-b',
+        runId: 'run-b1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-b1'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual([
+      'sig-a2',
+      'sig-b1',
+    ]);
+  });
+
+  it('passes non-signal events through unconditionally (mixed-window passthrough)', () => {
+    const nonSignal: CaptureEvent = {
+      id: 'raw-1',
+      source: 'api:granola',
+      timestamp: '2026-06-22T00:00:00.000Z',
+      content: 'raw note',
+    };
+    const signals = [nonSignal, signalEvent('sig-current'), signalEvent('sig-superseded')];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-1',
+        runId: 'run-1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-current'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual([
+      'raw-1',
+      'sig-current',
+    ]);
+  });
+
+  it('preserves input order across a mixed multi-note window (exact sequence)', () => {
+    const signals = [
+      signalEvent('sig-b1'),
+      signalEvent('sig-a2'),
+      signalEvent('sig-a1'),
+      signalEvent('sig-c1'),
+    ];
+    const manifests = [
+      manifestEvent({
+        noteId: 'note-a',
+        runId: 'run-a1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-a1'],
+      }),
+      manifestEvent({
+        noteId: 'note-a',
+        runId: 'run-a2',
+        completedAt: '2026-06-22T00:05:00.000Z',
+        supersedes: 'run-a1',
+        signalAtomIds: ['sig-a2'],
+      }),
+      manifestEvent({
+        noteId: 'note-b',
+        runId: 'run-b1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-b1'],
+      }),
+      manifestEvent({
+        noteId: 'note-c',
+        runId: 'run-c1',
+        completedAt: '2026-06-22T00:00:00.000Z',
+        signalAtomIds: ['sig-c1'],
+      }),
+    ];
+    expect(filterToCurrentSignalRuns(signals, manifests).map((e) => e.id)).toEqual([
+      'sig-b1',
+      'sig-a2',
+      'sig-c1',
+    ]);
+  });
+});
+
+interface CapturedLogEntry {
+  level: string;
+  source: string;
+  message: string;
+  payload?: Record<string, unknown>;
+}
+
+function capturedLogs(writes: string[]): CapturedLogEntry[] {
+  const out: CapturedLogEntry[] = [];
+  for (const line of writes.join('').split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    try {
+      const parsed = JSON.parse(trimmed) as CapturedLogEntry;
+      if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+        out.push(parsed);
+      }
+    } catch {
+      // non-JSON stdout line — ignore.
+    }
+  }
+  return out;
+}
+
+async function appendGranolaRaw(
+  store: MemoryStorage,
+  metadata: Record<string, unknown>,
+  content = 'raw body',
+): Promise<void> {
+  await store.append({
+    source: 'api:granola',
+    timestamp: '2026-06-21T10:00:00.000Z',
+    content,
+    metadata,
+  });
+}
+
+function expectOk(
+  result: GranolaSignalWorkerResult,
+): Extract<GranolaSignalWorkerResult, { status: 'ok' }> {
+  expect(result.status).toBe('ok');
+  if (result.status !== 'ok') throw new Error(`expected ok result, got ${result.status}`);
+  return result;
+}
+
+describe('item 115 AC3 — skip/settle observability', () => {
+  it('counts a missing-summary note once with a structured reason log', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        note_id: 'note-A',
+        granola_atom_type: 'transcript',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        dedupe_key: 'granola:note-A:transcript',
+      });
+      const result = await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+        checkpointPath: path,
+        settleMs: 0,
+        now: () => '2026-06-22T00:00:00.000Z',
+      });
+      const ok = expectOk(result);
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 1, missing_transcript: 0, missing_dedupe_key: 0 },
+        malformed_events: 0,
+        unparsable_updated_at: 0,
+      });
+      const logs = capturedLogs(stdout.writes);
+      expect(
+        logs.some(
+          (l) =>
+            l.message === 'note_skipped' &&
+            l.payload?.['reason'] === 'missing_summary' &&
+            l.payload?.['note_id'] === 'note-A',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts a missing-transcript note once with a structured reason log', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        note_id: 'note-B',
+        granola_atom_type: 'summary',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        dedupe_key: 'granola:note-B:summary',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 1, missing_dedupe_key: 0 },
+        malformed_events: 0,
+        unparsable_updated_at: 0,
+      });
+      expect(
+        capturedLogs(stdout.writes).some(
+          (l) =>
+            l.message === 'note_skipped' &&
+            l.payload?.['reason'] === 'missing_transcript' &&
+            l.payload?.['note_id'] === 'note-B',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts a missing-dedupe-key note once with a structured reason log', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        note_id: 'note-C',
+        granola_atom_type: 'summary',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        // dedupe_key intentionally absent
+      });
+      await appendGranolaRaw(store, {
+        note_id: 'note-C',
+        granola_atom_type: 'transcript',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        dedupe_key: 'granola:note-C:transcript',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 0, missing_dedupe_key: 1 },
+        malformed_events: 0,
+        unparsable_updated_at: 0,
+      });
+      expect(
+        capturedLogs(stdout.writes).some(
+          (l) =>
+            l.message === 'note_skipped' &&
+            l.payload?.['reason'] === 'missing_dedupe_key' &&
+            l.payload?.['note_id'] === 'note-C',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts a raw event with no note_id as malformed (missing_note_id)', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        granola_atom_type: 'summary',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        dedupe_key: 'granola:orphan:summary',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 0, missing_dedupe_key: 0 },
+        malformed_events: 1,
+        unparsable_updated_at: 0,
+      });
+      expect(
+        capturedLogs(stdout.writes).some(
+          (l) => l.message === 'raw_event_malformed' && l.payload?.['reason'] === 'missing_note_id',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts a raw event with an out-of-domain granola_atom_type as malformed', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        note_id: 'note-E',
+        granola_atom_type: 'notes',
+        updated_at: '2026-06-21T10:00:00.000Z',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 0, missing_dedupe_key: 0 },
+        malformed_events: 1,
+        unparsable_updated_at: 0,
+      });
+      expect(
+        capturedLogs(stdout.writes).some(
+          (l) =>
+            l.message === 'raw_event_malformed' &&
+            l.payload?.['reason'] === 'invalid_granola_atom_type' &&
+            l.payload?.['note_id'] === 'note-E',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('counts an unparsable updated_at once and still extracts (settled behavior pinned)', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      await appendGranolaRaw(store, {
+        note_id: 'note-D',
+        granola_atom_type: 'summary',
+        updated_at: 'not-a-date',
+        dedupe_key: 'granola:note-D:summary',
+      });
+      await appendGranolaRaw(store, {
+        note_id: 'note-D',
+        granola_atom_type: 'transcript',
+        updated_at: 'not-a-date',
+        dedupe_key: 'granola:note-D:transcript',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 600_000,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.notes_extracted).toBe(1);
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 0, missing_dedupe_key: 0 },
+        malformed_events: 0,
+        unparsable_updated_at: 1,
+      });
+      expect(
+        capturedLogs(stdout.writes).some(
+          (l) => l.message === 'unparsable_updated_at' && l.payload?.['note_id'] === 'note-D',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('surfaces deterministic counters for a mixed-defect note through a worker tick', async () => {
+    const { dir, path } = tempCheckpoint();
+    const stdout = captureStdout();
+    try {
+      const store = new MemoryStorage();
+      // Multi-defect note-X: summary present but missing its dedupe_key, and no
+      // transcript at all -> counts ONCE as missing_transcript (precedence).
+      await appendGranolaRaw(store, {
+        note_id: 'note-X',
+        granola_atom_type: 'summary',
+        updated_at: '2026-06-21T10:00:00.000Z',
+        // dedupe_key intentionally absent
+      });
+      // One malformed raw event: no note_id.
+      await appendGranolaRaw(store, {
+        granola_atom_type: 'summary',
+        updated_at: '2026-06-21T10:00:00.000Z',
+      });
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => fixtureSignals(), {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.observability).toEqual({
+        skipped_notes: { missing_summary: 0, missing_transcript: 1, missing_dedupe_key: 0 },
+        malformed_events: 1,
+        unparsable_updated_at: 0,
+      });
+      const logs = capturedLogs(stdout.writes);
+      expect(
+        logs.some(
+          (l) =>
+            l.message === 'note_skipped' &&
+            l.payload?.['reason'] === 'missing_transcript' &&
+            l.payload?.['note_id'] === 'note-X',
+        ),
+      ).toBe(true);
+      expect(
+        logs.some(
+          (l) => l.message === 'raw_event_malformed' && l.payload?.['reason'] === 'missing_note_id',
+        ),
+      ).toBe(true);
+    } finally {
+      stdout.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('item 115 AC4 — signal wire-contract conformance', () => {
+  // Hardcoded expected field lists (112 byte-stable-fixture style). Any future
+  // change to these becomes a deliberate, reviewed contract change.
+  const SIGNAL_CONTRACT_FIELDS = [
+    'canonical_subject',
+    'signal_type',
+    'text',
+    'note_id',
+    'meeting_title',
+    'source_span',
+    'extractor_version',
+    'extraction_run_id',
+    'dedupe_key',
+    'parent_dedupe_key',
+  ] as const;
+  const SIGNAL_TYPE_ENUM = ['decision', 'rationale', 'action'] as const;
+  const MANIFEST_CONTRACT_FIELDS = ['extraction_run_id', 'supersedes', 'note_id'] as const;
+  // Full metadata key sets, hardcoded for byte-stability.
+  const EXPECTED_SIGNAL_METADATA_KEYS = [
+    'canonical_subject',
+    'confidence',
+    'dedupe_key',
+    'extraction_run_id',
+    'extractor_version',
+    'meeting_title',
+    'note_id',
+    'parent_dedupe_key',
+    'signal_type',
+    'source_span',
+  ];
+  const EXPECTED_MANIFEST_METADATA_KEYS = [
+    'completed_at',
+    'extraction_run_id',
+    'extractor_version',
+    'manifest_type',
+    'note_id',
+    'signal_atom_ids',
+    'supersedes',
+  ];
+
+  it('pins the signal-atom and manifest-atom field contracts', async () => {
+    const { dir, path } = tempCheckpoint();
+    try {
+      const store = new MemoryStorage();
+      await seedRawMeeting(store);
+      const cleanDecision: GranolaExtractedSignal = {
+        signal_type: 'decision',
+        text: 'Contract decision.',
+        canonical_subject: 'contract subject',
+        source_span: {
+          kind: 'transcript',
+          start_time: 10,
+          end_time: 20,
+          quote: 'Contract decision.',
+        },
+        confidence: 0.9,
+      };
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(store, async () => [cleanDecision], {
+          checkpointPath: path,
+          settleMs: 0,
+          now: () => '2026-06-22T00:00:00.000Z',
+        }),
+      );
+      expect(ok.signal_atoms_written).toBe(1);
+
+      const [signal] = await store.query({ source: GRANOLA_SIGNAL_SOURCE });
+      expect(signal).toBeDefined();
+      // (a) signal-atom contract, field-by-field.
+      expect(signal!.content).toBe('Contract decision.'); // `text`
+      const meta = signal!.metadata ?? {};
+      for (const field of SIGNAL_CONTRACT_FIELDS) {
+        if (field === 'text') continue; // `text` is the atom content, not metadata
+        expect(Object.prototype.hasOwnProperty.call(meta, field)).toBe(true);
+      }
+      expect(SIGNAL_TYPE_ENUM).toContain(meta['signal_type'] as string);
+      expect(Object.keys(meta).sort()).toEqual(EXPECTED_SIGNAL_METADATA_KEYS);
+
+      // (b) manifest-atom contract, field-by-field.
+      const [manifest] = await store.query({ source: GRANOLA_SIGNAL_INDEX_SOURCE });
+      expect(manifest).toBeDefined();
+      const manifestMeta = manifest!.metadata ?? {};
+      for (const field of MANIFEST_CONTRACT_FIELDS) {
+        expect(Object.prototype.hasOwnProperty.call(manifestMeta, field)).toBe(true);
+      }
+      expect(manifestMeta['supersedes']).toBeNull();
+      expect(Object.keys(manifestMeta).sort()).toEqual(EXPECTED_MANIFEST_METADATA_KEYS);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('(c) enforces transcript-span quotes but not summary-span quotes', async () => {
+    // Transcript span whose quote has been mutated away -> extraction fails.
+    const bad = tempCheckpoint();
+    try {
+      const store = new MemoryStorage();
+      await seedRawMeeting(store);
+      await expect(
+        runGranolaSignalWorkerOnce(
+          store,
+          async () => [
+            {
+              signal_type: 'decision',
+              text: 'x',
+              canonical_subject: 'y',
+              source_span: { kind: 'transcript', start_time: 10, end_time: 20, quote: '' },
+              confidence: 0.9,
+            },
+          ],
+          { checkpointPath: bad.path, settleMs: 0, now: () => '2026-06-22T00:00:00.000Z' },
+        ),
+      ).rejects.toThrow(/transcript source_span\.quote is required/);
+    } finally {
+      rmSync(bad.dir, { recursive: true, force: true });
+    }
+
+    // Summary span carries no quote and is accepted (no verbatim guarantee).
+    const good = tempCheckpoint();
+    try {
+      const store = new MemoryStorage();
+      await seedRawMeeting(store);
+      const ok = expectOk(
+        await runGranolaSignalWorkerOnce(
+          store,
+          async () => [
+            {
+              signal_type: 'decision',
+              text: 'summary-anchored decision',
+              canonical_subject: 'y',
+              source_span: { kind: 'summary' },
+              confidence: 0.9,
+            },
+          ],
+          { checkpointPath: good.path, settleMs: 0, now: () => '2026-06-22T00:00:00.000Z' },
+        ),
+      );
+      expect(ok.signal_atoms_written).toBe(1);
+    } finally {
+      rmSync(good.dir, { recursive: true, force: true });
+    }
   });
 });
