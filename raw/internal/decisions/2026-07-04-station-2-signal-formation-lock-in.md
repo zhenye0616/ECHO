@@ -42,3 +42,20 @@ Sequencing: these are post-freeze-eligible cleanups; nothing here jumps ahead of
 - Extends `2026-07-04-seam-v0-decision.md` (decisions 14–16, 20) with the formation-side contract.
 - Consistent with `2026-07-03-loop-gap-analysis.md` station map.
 - Wiki promotion of the shipped seam (signal-window page, storage note, drift-alert page) remains owed and is unaffected.
+
+---
+
+## Codex review (2026-07-04, read-only consult) — findings + dispositions
+
+Independent review by codex strategist (read-only sandbox) of this lock-in against the code as-built. 9 findings: 1 blocker, 7 risks, 1 nit. Verified spot-checks by claude strategist before disposition.
+
+**F4 (BLOCKER, station 1→2) — updated Granola notes never re-enter capture.** `granola-poller.ts` (~line 631) permanently skips any `note.id` already in `ingested_note_ids`, so station 2's fingerprint/re-extract path (real, tested) is unreachable for normal note updates. VERIFIED in code. Disposition: this is the deliberate append-once capture decision from item 104 (append-only, no upsert in V1) — not a regression, but this record must state it: **D2's re-extraction fires only on extractor_version bump or manual backfill today, not on note edits.** Demo implication: ingest real meetings only after Granola finishes processing them (the poller's first capture is final). Followup filed: decide re-ingest-on-updated_at (capture-side supersede chain per 104's dedupe_key design) before any workflow relies on re-extraction.
+
+**F1/F6/F7 (RISK, one theme) — supersedes/currentness is producer-side only.** Manifests + supersedes are written correctly, but consumers must opt in: `getSignalWindow` excludes manifest atoms (113 fixup) and does no current-run resolution; the drift sweep consumes all window signals unfiltered; existing intake reads signal events directly with no manifest filter; only `search_memories` has a current-run filter. On manifest-append failure, retry creates duplicate signal atoms that are only safe for manifest-honoring readers (pinned by test). Disposition: **pin as contract — any station-3 (or drift) consumer of signals MUST resolve current runs via manifests, or 113 grows an opt-in current-run mode.** Followup filed; no code change now (demo runs are single-extraction in practice).
+
+**F2 (RISK) — D1 wording.** Drift persists per-pair verdict/delivery state in its checkpoint for idempotency. Clarified: that is operational state, not fact atoms; D1's "never persisted as facts" means the atom ledger. Compatible with seam decision #1 as intended. No action.
+
+**F8/F9 (RISK, 2→3 contract) — canonical_subject + getSignalWindow is necessary but not sufficient.** Pinned NOW for the future station-3 rewiring: the consumable unit is the **provenance tuple** — `{canonical_subject, signal_type, text, note_id, meeting_title, source_span, extractor_version, extraction_run_id, dedupe_key/parent_dedupe_key}` — plus current-run resolution (above). Known gaps to carry, not fix: signals do not carry `web_url`/attendees/date (intake re-joins raw notes for those — acceptable; raw stays in the house); summary-span quotes have no verbatim guarantee (only transcript spans are quote-enforced) — packet templates must prefer transcript-anchored quotes for anything user-facing. `signal_type` admission: intake forms packets from `action|decision` only; `rationale` attaches via `rationale_for`, never forms a packet alone; drift reads all three as statements. 
+
+**F3 (NIT) — D3/D5/D6/D7 are governance, not code invariants.** Accepted as-is; that is what an operating-discipline lock-in is. The enforcement point is spec review (this record is the citable fence), not runtime.
+
