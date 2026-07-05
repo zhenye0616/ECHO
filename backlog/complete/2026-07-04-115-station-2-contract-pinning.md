@@ -19,6 +19,37 @@ agent_notes: |
   Tests (real): targeted enrich+search-memories 99 passed (31+68); packaging 2 passed zero delta; npm run test:product 158 files / 1694 tests passed, 21 skipped, 1 todo, 0 failed (load-flaky shell-reachable + doctor passed inline); tsc clean; eslint --max-warnings 0 clean on changed files; prettier --check clean.
   FLAG for reviewer/founder: the atomic-claim commit 7bc368b5 unintentionally swept in an untracked raw/internal/pitch/yc-2026-07/** dir (founder YC pitch drafts) via git add -A. No data lost (preserved on disk + in git); NOT un-committed to avoid destructive git on shared pushed main. Founder to decide if those drafts belong there.
   Note: helper first param is named candidateEvents (spec working name was signalEvents) because it accepts a mixed window and passes non-signal rows through — required to keep the 112 cross-source-join behavior; function name matches spec exactly.
+review_notes: |
+  Merged on 2026-07-05 via founder-authorized pipeline run (strategist-operated;
+  founder invoked /merge-and-cleanup 115 after the full-auto loop: 4-round
+  two-codex spec review to convergence, builder-115 build, independent
+  /review-pending verdict "merge as-is").
+
+  Conflicts resolved:
+  - none — --no-ff merge applied clean (b71a3a9a), exactly the four files_to_modify,
+    as the sidecar's real merge preview predicted.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none required (sidecar had zero pre-merge fixups)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: full suite 188 files / 1963 passed, 21 skipped, 1 todo, 0 failed
+  (no load-flakes hit); lint, typecheck, coupled-invariants, sync-skills --check
+  all clean in the merger worktree post-merge.
+
+  Follow-up items (non-blocking):
+  - drift-sweep (station 6) + intake (station 3) adopt filterToCurrentSignalRuns
+    when each is next touched (already implied by the expansion-invariants audit
+    ledger; restated from the sidecar).
+  - Strategist post-shipment: wiki signal-window page references the helper as the
+    currentness half of the station-2 contract.
+  - Extractor-#2 preconditions bundle (HIGH: parameterize the current-run helper
+    before wiring a second extractor into search) — recorded in the
+    expansion-invariants decision record §audit and backlog/_followups.md.
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-station-2-signal-formation-lock-in.md  # D1-D7 + codex-review dispositions + scope fence — the decision this implements
