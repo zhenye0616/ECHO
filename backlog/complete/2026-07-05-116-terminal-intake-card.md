@@ -46,6 +46,40 @@ agent_notes: |
   startGranolaIntakeBridge(runOnStart:false).run() because the real brain
   classifier factory is not exported; the injected-classifier path calls
   runGranolaIntakeBridgeOnce directly. No seam gap escalated — reuse is clean.
+review_notes: |
+  Merged on 2026-07-05 via founder reconciliation (strategist-run per founder
+  instruction "review and merge 116"; independent code-review subagent produced
+  the sidecar — builder did not review its own work).
+
+  Conflicts resolved:
+  - (none — clean merge; sidecar's expected-conflicts prediction held: main had
+    zero commits since merge-base touching package.json, tools/, tests/tools/)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - (none — verdict was "merge as-is" with an empty pre-merge punch list)
+
+  Fixups deferred to follow-up items:
+  - (none)
+
+  Verify: 1972/1972 tests pass (0 failed, 21 skipped, 1 todo, 190 files) in the
+  merger worktree — both previously-observed load flakes (shell-reachable,
+  ceo-slack-brain) passed this run; lint, typecheck, coupled-invariants, and
+  sync-skills --check all clean post-merge.
+
+  Follow-up items (non-blocking, from review sidecar):
+  - --watch never checks handle.enabled: a disabled no-op bridge handle idles
+    forever with only a JSON log hint (tools/intake-terminal.ts:384-395,498-504)
+  - real-path status line hardcodes "0 classifier errors" (counting wrapper
+    cannot wrap the bridge-internal classifier)
+  - invalid brain-name env exits via bare main().catch message, not the
+    "skipped:" status-line format
+  - enrich JSON logs interleave with cards on stdout; consider stderr diversion
+    for demo cleanliness (pair with item 117)
+  - undocumented load-flake: tests/surfaces/ceo-slack-brain.test.ts "kills a
+    timed-out brain process group" (ENOENT descendant.pid under suite load;
+    passes in isolation)
 ---
 
 ## Problem
