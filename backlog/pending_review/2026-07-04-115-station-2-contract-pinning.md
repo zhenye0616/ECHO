@@ -8,6 +8,17 @@ created: 2026-07-04
 claimed_by: "builder-115"
 claimed_at: "2026-07-05T00:51:36Z"
 branch: "agent/station-2-contract-pinning"
+head_sha: "ab39e06a31fc41267cdc1fb4e9e00541318ace06"
+agent_notes: |
+  Built by builder-115 on branch agent/station-2-contract-pinning. Shape + infra only, zero new capability; four files (exactly files_to_modify), no new source module.
+  AC1: pure exported filterToCurrentSignalRuns composing the untouched resolveCurrentGranolaSignalRuns; order-preserving, non-signal passthrough; 13 unit cases (current/superseded/chain/cycle/inert-ref/duplicate+tie hardcoded run-b/retry-orphan/no-manifest/multi-note/exact-sequence/passthrough).
+  AC2: inline restrictToCurrentGranolaSignals block replaced by the helper; existing tests untouched + green; added orphan-exclusion parity case through the tool path.
+  AC3: GranolaSignalObservability on the worker ok result (skipped_notes exclusive-first-match summary->transcript->dedupe; malformed_events for missing note_id + invalid granola_atom_type; unparsable_updated_at counts-as-settled PINNED); one structured warn log per skip/malformed/unparsable; 7 cases incl. mixed-defect worker tick with exact-equality observability + logger-spy reason lines.
+  AC4: wire-contract conformance test, hardcoded signal/manifest field lists + full metadata key sets + signal_type enum + transcript-vs-summary quote asymmetry.
+  AC5: no new source file; packaging import-closure + packed-manifest green, zero snapshot delta.
+  Tests (real): targeted enrich+search-memories 99 passed (31+68); packaging 2 passed zero delta; npm run test:product 158 files / 1694 tests passed, 21 skipped, 1 todo, 0 failed (load-flaky shell-reachable + doctor passed inline); tsc clean; eslint --max-warnings 0 clean on changed files; prettier --check clean.
+  FLAG for reviewer/founder: the atomic-claim commit 7bc368b5 unintentionally swept in an untracked raw/internal/pitch/yc-2026-07/** dir (founder YC pitch drafts) via git add -A. No data lost (preserved on disk + in git); NOT un-committed to avoid destructive git on shared pushed main. Founder to decide if those drafts belong there.
+  Note: helper first param is named candidateEvents (spec working name was signalEvents) because it accepts a mixed window and passes non-signal rows through — required to keep the 112 cross-source-join behavior; function name matches spec exactly.
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-station-2-signal-formation-lock-in.md  # D1-D7 + codex-review dispositions + scope fence — the decision this implements
