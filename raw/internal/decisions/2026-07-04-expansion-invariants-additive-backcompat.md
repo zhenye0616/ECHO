@@ -32,3 +32,23 @@ Ratifies the "uniform core + per-source provenance" shape (previously an archite
 ## Relates
 
 - `2026-07-04-station-2-signal-formation-lock-in.md` (mechanism + fence), `2026-07-04-seam-v0-decision.md` (seam contracts), item 112 (byte-stability + dual-key precedent), item 115 (conformance tripwire + current-run helper), `wiki/architecture/capture-gate` + storage pages (post-shipment wiki promotion should cite this record).
+
+---
+
+## As-built audit (2026-07-04, invariant-auditor agent) — invariants HOLD; friction ledger
+
+Adversarial audit of stations 1/2 + the 115 diff against these invariants, read from source (not the architecture map). Verdict: **both invariants hold structurally; zero (c) violations.** Eight frictions, classified:
+
+**Documented constraints (accept as-is):**
+1. `SourceKind` is a closed enum (gate.ts:30, +4 more sites) — a new source *within* an existing kind (app/domain/fs/api/git) is additive; a new KIND is an architecture change by definition. All near-term targets (Slack, Linear) fit `api:`.
+2. `derived:*` atoms bypass the capture gate — workers append directly to storage guarded by `isAllowedDerived()` (granola-signals.ts:645, :578). Intended: INV1's "capture pipeline core" protects the raw path only; extractors replicate the ungated derived lane.
+
+**Followups at extractor #2 (all additive; none blocks anything today):**
+3. **HIGH — current-run helper fails OPEN for a second extractor.** `filterToCurrentSignalRuns` filters `source !== GRANOLA_SIGNAL_SOURCE || current.has(id)` and the resolver reads only the Granola manifest source — extractor #2's superseded signals would pass through UNFILTERED into search_memories. This is exactly the divergence INV2 targets, latent behind a generic name. **Gating precondition: parameterize (signalSource, manifestSource) BEFORE wiring extractor #2 into any current-run consumer.**
+4. dispatch.ts handle/options are singular (`granolaSignals:`, :13-22) and drift chains `runSignalsFirst` to Granola only (:33-36) — #2 must join the chain; make the handle a keyed map then.
+5. No shared `buildSignalCore()` — prepareSignals assembles core+provenance inline as one flat metadata object (:412-423); dedupe_key format is note-specific (:409). Core uniformity is convention + AC4 test today, not code-enforced. Extract the shared builder at #2.
+6. decision-drift.ts admits signals by exact Granola source constant (:441) — #2's signals reach the window but drift's mapper drops them; one-line admit or shared is-signal predicate at #2.
+7. 115's AC4 conformance test pins core + provenance as ONE flat exact-match list — split into shared CORE_FIELDS + per-extractor PROVENANCE_FIELDS at #2 so the core block is reusable.
+8. `SCOPE_EXCLUDED_SOURCE_PREFIXES` excludes manifests per-source (signal-window.ts:44-46) — #2's `-index` manifest source must be added or its manifests leak into company windows. One line, easy to forget: put it in extractor #2's spec template.
+
+Net: the invariants' promises are real for the n=1 world and additively reachable for n=2 — but frictions 3–8 are the *actual work list* extractor #2's spec must carry. None affect item 115's merge (Granola-only world; fail-open is unreachable until #2 exists).
