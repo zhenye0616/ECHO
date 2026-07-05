@@ -174,3 +174,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** all matches fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/b9fedf23-*.jsonl (target session) + 34b89689 (Jul 3 narrative). Wrong-repo "signal surface" hits came from overton-signal-desk — literal substring, expected. git/codex/cursor/granola absent — correct, this was a pure strategy chat.
 - **Verdict:** 🟡 partial → ✅ right after fallback
 - **Note:** Literal search failed 6/8 calls because the founder's vocabulary ("section two", "structure signal surface") never appears verbatim in the target turns — the session says "station 2" and "Structure signals". The source_prefix tail scan (project-dir LIKE filter + since) was what actually worked. Cross-session recall by *topic paraphrase* is the recurring weak spot; tail-by-project is the reliable recovery move.
+
+### 2026-07-04 17:35 PDT — watcher tick r1→r2 active trigger (coord_invoke × 2) on 115
+- **Trigger:** Strategist watcher tick on 2026-07-04-115-station-2-contract-pinning finished r1 disposition (5/5 accepted+patched at d68cf2e6, premise correction recorded) and dispatched r2; 057b post-push hook fired.
+- **Query inputs:** coord_invoke({role:"codex", request_path:"backlog/reviews/2026-07-04-115-station-2-contract-pinning/r2/request.md", correlation_id:3bad8076…}) + coord_invoke({role:"codex-ops", same})
+- **Returned:** both ok (HTTP 200, no error body) — daemon accepted the active trigger for both headless reviewers.
+- **Sources:** n/a (coord-layer invocation, not retrieval) — daemon at 127.0.0.1:38478, X-Echo-Role: claude.
+- **Verdict:** ✅ right
+- **Note:** First 115 use of the active-trigger path in this session; r1 ticks ran via manual wrapper fire. If r2 responses don't land within the launchd fallback window, manual wrapper fire is the redundant path.
