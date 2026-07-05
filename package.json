@@ -39,6 +39,7 @@
     "daemon:status": "launchctl print gui/$(id -u)/com.echo.daemon | grep -E '^\\s*(state|pid|last exit code|program)' || echo 'not loaded'",
     "daemon:logs": "tail -f $HOME/Library/Logs/echo/daemon.err.log $HOME/Library/Logs/echo/daemon.out.log",
     "watch:stream": "vite-node tools/stream-watch.ts",
+    "intake:terminal": "vite-node tools/intake-terminal.ts",
     "render:trace": "vite-node tools/render-trace.ts",
     "serve:trace": "vite-node tools/serve-trace.ts",
     "validate:resolution": "vite-node tools/validate-resolution.ts",
