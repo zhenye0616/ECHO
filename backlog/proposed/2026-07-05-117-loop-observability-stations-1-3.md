@@ -48,7 +48,12 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   storage query interface, plus Granola checkpoint age (`high_water_mark`,
   `last_synced_at`, ingested-note count from `~/.echo/state/granola-checkpoint.json`).
   Missing checkpoint / unreadable db reported as degraded with remediation copy
-  (existing `buildRemediationCopy` pattern), never a crash.
+  (existing `buildRemediationCopy` pattern), never a crash. Artifact-read robustness
+  (mirrors AC3/AC5): doctor may run while the daemon is mid-write, so a malformed,
+  unreadable, or partially-written `~/.echo/state/granola-checkpoint.json`, and a
+  storage query/read failure, each degrade ONLY the station-1 section with
+  operator-visible path + parse/read-error context and remediation while the rest of the
+  report continues — never abort the health check.
 - **AC3 — station 2 (signal worker health):** from
   `~/.echo/state/granola-signals-checkpoint.json` + storage: checkpoint mtime (last
   activity), per-note failure entries surfaced as a failed-notes count with note ids,
@@ -73,8 +78,12 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   port. A pid-lock is NOT proof of port ownership (it can be stale or point at a
   different process while another owns the port), so the report MUST resolve the actual
   listening pid via a concrete port-owner lookup (`lsof -nP -iTCP:<port> -sTCP:LISTEN`
-  or `lsof -t -iTCP:<port>` via the `execFile` pattern already imported in doctor.ts),
-  then classify THAT pid's argv as `packaged-dist` vs `src-dev (vite-node)` vs
+  or `lsof -t -iTCP:<port>` via the `execFile` pattern already imported in doctor.ts).
+  `<port>` is doctor's already-resolved MCP port — the same value doctor probes and
+  reports in `DoctorReport.port`, resolved by the existing precedence `--port` opt >
+  `ECHO_MCP_PORT` env > `38478` default (`resolveMcpPort()` in `init.ts`); the lookup
+  MUST NOT re-derive or hard-code a different port. Then classify THAT pid's argv as
+  `packaged-dist` vs `src-dev (vite-node)` vs
   `unknown`, with the executing path. Verification contract: if the port-owner lookup
   fails/errors, or the daemon pid-lock and the observed listening pid disagree, render
   serving-code identity as `unknown`/degraded with remediation — never assert
@@ -104,16 +113,26 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   entry with operator-visible path + parse-error context and remediation, and the rest
   of the report continues — never abort the health check.
 - **AC6 — tests:** fixture-driven (temp ECHO_HOME, temp db or storage stub, fabricated
-  checkpoints/seed stores, stubbed process-args + port-owner lookups) covering: healthy,
-  never-ran, stale, failing-notes (incl. never-successful and recovered boundary),
-  dist-stale, src-dev-serving, port-owner-unverifiable (port-owner lookup fails OR
-  pid-lock disagrees with observed listening pid → `unknown`/degraded, not a false
-  classification), missing-src-or-dist (`staleness-unknown`, non-fatal),
-  malformed-artifact (corrupt/unreadable signals checkpoint AND corrupt/unreadable
-  seed-store JSON → that section/entry degrades with path+error context while the rest
-  of the report still renders), and argv-race (resolved listening pid vanishes / argv
-  unreadable or empty after `lsof` → `unknown`/degraded, no crash) cases; `--json` shape
-  stable; existing doctor tests untouched and green.
+  checkpoints/seed stores, stubbed process-args + port-owner lookups). Non-failure
+  scenario coverage: `healthy`; station-2 `never-ran` / `stale` / `failing-notes` (incl.
+  the never-successful and recovered boundaries); `dist-stale` and `src-dev-serving`
+  warnings; serving-code identity passes doctor's resolved MCP port (§AC4 precedence) to
+  the stubbed port-owner lookup and the test asserts the stub received exactly that port;
+  `--json` shape stable; existing doctor tests untouched and green. Every read-path
+  failure mode is covered by this single degradation matrix (each row is one fixture) —
+  the report degrades only the named scope and the rest of the report still renders,
+  never a crash:
+
+  | Read path / step | Trigger | Degraded scope | Required evidence | Rest of report |
+  |---|---|---|---|---|
+  | Station-1 Granola checkpoint (`granola-checkpoint.json`) | missing | station-1 | remediation copy | renders |
+  | Station-1 Granola checkpoint | malformed / unreadable / partial-write | station-1 | path + parse/read-error + remediation | renders |
+  | Station-1 storage query | db read failure / unreadable | station-1 | error + remediation | renders |
+  | Station-2 signals checkpoint (`granola-signals-checkpoint.json`) | malformed / unreadable / partial-write | station-2 | path + parse-error + remediation | renders |
+  | Station-3 seed store (`granola-intake-seeds*.json`) | malformed / unreadable / partial-write | that store's entry | path + parse-error + remediation | renders |
+  | Serving-code port-owner lookup | lookup fails/errors OR pid-lock disagrees with observed listening pid | identity → `unknown`/degraded (no false classify) | remediation | renders |
+  | Serving-code argv read | pid vanished / argv empty or unreadable after `lsof` | identity → `unknown`/degraded | remediation | renders |
+  | Src/dist staleness | `src/` or `dist/` missing/unreadable | `staleness-unknown`/degraded (non-fatal) | remediation | renders |
 
 ## Out of Scope (Don't Drift)
 
