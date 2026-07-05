@@ -270,10 +270,10 @@ function formatStatusLine(result: GranolaIntakeBridgeResult, classifierErrors: n
 }
 
 /**
- * Run the terminal intake tool. Returns a process exit code for `--once`; for
- * `--watch` it resolves only after the returned handle is stopped (the CLI keeps
- * the process alive and stops on SIGINT). Tests drive `--watch` by calling the
- * returned handle's `run()` directly.
+ * Run one `--once` tick and return a process exit code: 0 when the tick
+ * completed (status ok), 1 on a fail-fast persistability error, an unavailable
+ * brain, or a disabled bridge. Prints one card per posted seed followed by a
+ * status line (candidates seen / cards printed / skipped / failed).
  */
 export async function runIntakeTerminalOnce(options: IntakeTerminalOptions): Promise<number> {
   const env = options.env ?? process.env;
