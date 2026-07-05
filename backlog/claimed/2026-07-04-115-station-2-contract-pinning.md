@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 0.5-1d
 created: 2026-07-04
+claimed_by: "builder-115"
+claimed_at: "2026-07-05T00:51:36Z"
+branch: "agent/station-2-contract-pinning"
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-04-station-2-signal-formation-lock-in.md  # D1-D7 + codex-review dispositions + scope fence — the decision this implements
