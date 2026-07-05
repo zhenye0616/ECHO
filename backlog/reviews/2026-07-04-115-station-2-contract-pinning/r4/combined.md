@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+Convergence call: claim-ready after R4 — both reviewers returned `proceed` with zero findings at a7a382ad (spec content 6846a48a). Four rounds total: r1 premise correction + 5 patches, r2 propagation completion (reframe gate + investigator), r3 propagation completion (reframe gate + investigator, 2nd), r4 clean verification.
 

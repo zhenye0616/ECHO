@@ -16,6 +16,7 @@ files_to_modify:
   - src/mcp/tools/search-memories.ts        # replace the inline current-run composition glue with the helper
   - tests/enrich/granola-signals.test.ts    # helper unit coverage; conformance + observability + settle-pinning cases
   - tests/mcp/tools/search-memories.test.ts # helper-parity regression
+ready_content_sha: a756a22ac0ce063f6b09480f8f83aa0a691bad117de7197fa6079ee725f98092
 ---
 
 ## Problem
