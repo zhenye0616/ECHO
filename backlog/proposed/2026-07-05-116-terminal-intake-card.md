@@ -16,7 +16,7 @@ files_to_modify:
   # PROVISIONAL
   - tools/intake-terminal.ts        # NEW: the only substantive new file
   - package.json                    # npm script `intake:terminal`
-  - tests/tools/                    # renderer + wiring coverage (stub classifier, temp stores)
+  - tests/tools/intake-terminal.test.ts  # renderer + wiring coverage (stub classifier, temp stores)
 ---
 
 ## Problem
@@ -48,24 +48,41 @@ so a terminal card requires no mechanism changes at all.
   directly (enabled, terminal channel sentinel, unused bot token) instead of requiring
   `loadGranolaIntakeConfig`'s Slack-shaped env. Brain preflight behavior matches the
   bridge: missing/unavailable brain → clear skip message + nonzero exit in `--once`
-  mode, never a crash. The classifier default is the real `runBrain` path
+  mode, never a crash. In `--watch` mode, brain preflight follows the bridge's lazy
+  per-tick retry (`startGranolaIntakeBridge`, see f19dc419), but every tick that skips
+  for brain-unavailability MUST print the AC5 per-tick status line naming the skip
+  reason (e.g. `skipped: brain unavailable`) so an unavailable-brain watch surfaces a
+  visible per-tick stop reason instead of silently spinning; never a crash. The
+  classifier default is the real `runBrain` path
   (`ECHO_GRANOLA_INTAKE_BRAIN ?? ECHO_CEO_BRAIN` semantics preserved), injectable for
   tests.
-- **AC4 — seed-store isolation, decision surfaced:** default seed-store path is a
-  dedicated file (e.g. `~/.echo/state/granola-intake-seeds.terminal.json`), overridable
-  by flag. Rationale the tool's header must state: sharing the canonical store would
-  mark terminal-shown seeds `posted` and permanently suppress their future Slack posts;
-  isolation means the same candidates may appear again when Slack enables. Default =
-  isolation; the flag lets the founder choose suppression deliberately.
+- **AC4 — seed-store isolation + fail-fast persistability, decision surfaced:** default
+  seed-store path is a dedicated file (e.g.
+  `~/.echo/state/granola-intake-seeds.terminal.json`), overridable by the
+  `--seed-store <path>` flag. Rationale the tool's header must state: sharing the
+  canonical store (`~/.echo/state/granola-intake-seeds.json`) would mark terminal-shown
+  seeds `posted` and permanently suppress their future Slack posts; isolation means the
+  same candidates may appear again when Slack enables. Default = isolation; the flag
+  lets the founder choose suppression deliberately. Before rendering any card, the tool
+  MUST validate the store is persistable: create the parent directory if missing and
+  confirm write access; if the resolved store path is uncreatable/unwritable, fail fast
+  with a clear message + nonzero exit BEFORE any card is printed (a card shown without
+  its `posted` state persisted would re-appear as a duplicate on the next run).
 - **AC5 — `--once` and `--watch` modes:** `--once` runs a single tick and exits with a
   status line (candidates seen / cards printed / skipped and why); `--watch` reuses
   `startGranolaIntakeBridge`'s interval + debounce + single-flight with the injected
-  poster. Ctrl-C stops cleanly.
-- **AC6 — tests:** stub classifier + temp storage/seed-store fixtures prove: a
-  qualifying signal produces exactly one card and one `posted` seed record; a re-run
-  produces zero duplicate cards (state machine exercised); classifier failure follows
-  the existing retry/failed path with the failure visible in the status line. No real
-  brain or network in tests.
+  poster. Both modes construct the seed store from the resolved `--seed-store` path
+  (default = the isolated terminal store) and pass it into the bridge's
+  `seedStorePath`/`seedStore` config; neither mode falls back to the canonical store
+  silently. Ctrl-C stops cleanly.
+- **AC6 — tests:** live at `tests/tools/intake-terminal.test.ts`, run via `npm test`
+  (vitest). Stub classifier + temp storage/seed-store fixtures prove: (1) a qualifying
+  signal produces exactly one card and one `posted` seed record; (2) a re-run produces
+  zero duplicate cards (state machine exercised); (3) classifier failure follows the
+  existing retry/failed path with the failure visible in the status line; (4) an
+  uncreatable/unwritable resolved seed-store path fails fast with a nonzero exit and no
+  card printed; (5) `--watch` with an unavailable brain prints a per-tick skip status
+  line naming brain-unavailability and never crashes. No real brain or network in tests.
 
 ## Out of Scope (Don't Drift)
 
