@@ -111,6 +111,8 @@ export interface GranolaSignalWorkerOptions {
   workerIntervalMs?: number;
   runOnStart?: boolean;
   env?: NodeJS.ProcessEnv;
+  /** Test seam for brain availability probing; defaults to preflightBrain. */
+  preflight?: (brain: BrainName, env: NodeJS.ProcessEnv) => Promise<void>;
 }
 
 /**
@@ -138,7 +140,7 @@ export type GranolaSignalWorkerResult =
       manifests_written: number;
       observability: GranolaSignalObservability;
     }
-  | { status: 'skipped'; reason: 'in_flight' | 'disabled' }
+  | { status: 'skipped'; reason: 'in_flight' | 'disabled' | 'brain_unavailable' }
   | { status: 'error'; reason: string; message: string };
 
 export interface GranolaSignalWorkerHandle {
@@ -913,12 +915,11 @@ export async function startGranolaSignalWorker(
   storage: Storage,
   options: GranolaSignalWorkerOptions = {},
 ): Promise<GranolaSignalWorkerHandle> {
-  let extractFn = options.extractFn;
-  if (extractFn === undefined) {
+  let extractFn: GranolaSignalExtractor | null = options.extractFn ?? null;
+  let brainConfig: BrainExtractorConfig | null = null;
+  if (extractFn === null) {
     try {
-      const config = resolveBrainExtractorConfig(options.env ?? process.env);
-      await preflightBrain(config.brain, config.env);
-      extractFn = defaultExtractorFromBrain(config);
+      brainConfig = resolveBrainExtractorConfig(options.env ?? process.env);
     } catch (err) {
       log.error('disabled', { reason: (err as Error).message });
       return {
@@ -928,7 +929,27 @@ export async function startGranolaSignalWorker(
       };
     }
   }
-  const activeExtractFn = extractFn;
+  const preflight = options.preflight ?? preflightBrain;
+
+  // Brain preflight is LAZY with per-tick retry. Probing at boot raced the
+  // daemon's capture boot-scan: event-loop saturation delays the child-exit
+  // event past the probe timer, so an instant `--version` reads as a spurious
+  // timeout and the worker used to disable itself permanently (zero signals
+  // in prod since June). Config PARSE errors above remain a permanent
+  // disable; only availability probing retries, once per tick.
+  async function ensureExtractFn(): Promise<GranolaSignalExtractor | null> {
+    if (extractFn !== null) return extractFn;
+    const config = brainConfig!;
+    try {
+      await preflight(config.brain, config.env);
+    } catch (err) {
+      log.warn('brain_preflight_failed_will_retry', { reason: (err as Error).message });
+      return null;
+    }
+    extractFn = defaultExtractorFromBrain(config);
+    log.info('brain_preflight_ok', { brain: config.brain });
+    return extractFn;
+  }
 
   const workerIntervalMs = options.workerIntervalMs ?? DEFAULT_GRANOLA_SIGNAL_WORKER_INTERVAL_MS;
   const runOnStart = options.runOnStart ?? true;
@@ -941,7 +962,15 @@ export async function startGranolaSignalWorker(
       log.warn('worker_skipped_in_flight', {});
       return { status: 'skipped', reason: 'in_flight' };
     }
-    inFlight = runGranolaSignalWorkerOnce(storage, activeExtractFn, options);
+    // inFlight must be assigned synchronously after the check above — an
+    // await in between would let two concurrent run() calls both pass the
+    // gate (the in-flight contract the concurrency test pins). The lazy
+    // preflight therefore happens INSIDE the tracked promise.
+    inFlight = (async (): Promise<GranolaSignalWorkerResult> => {
+      const fn = await ensureExtractFn();
+      if (fn === null) return { status: 'skipped', reason: 'brain_unavailable' };
+      return runGranolaSignalWorkerOnce(storage, fn, options);
+    })();
     try {
       return await inFlight;
     } finally {

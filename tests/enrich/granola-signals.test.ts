@@ -380,6 +380,33 @@ describe('Granola signal enrichment worker', () => {
     expect(stdout.writes.join('')).toContain('disabled');
   });
 
+  it('retries brain preflight per tick instead of disabling at boot (spurious-timeout recovery)', async () => {
+    const { dir, path } = tempCheckpoint();
+    let attempts = 0;
+    try {
+      const handle = await startGranolaSignalWorker(new MemoryStorage(), {
+        env: {
+          ECHO_GRANOLA_SIGNAL_BRAIN: 'codex',
+          ECHO_CEO_CONTEXT_REPO_PATH: '/tmp',
+        } as NodeJS.ProcessEnv,
+        checkpointPath: path,
+        runOnStart: false,
+        preflight: async () => {
+          attempts += 1;
+          if (attempts === 1) throw new Error('version probe timed out');
+        },
+      });
+      expect(handle.enabled).toBe(true);
+      expect(await handle.run()).toEqual({ status: 'skipped', reason: 'brain_unavailable' });
+      const second = await handle.run();
+      expect(second).toMatchObject({ status: 'ok', notes_seen: 0 });
+      expect(attempts).toBe(2);
+      await handle.stop();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('persists checkpoints as JSON with the expected schema', async () => {
     const { dir, path } = tempCheckpoint();
     try {
