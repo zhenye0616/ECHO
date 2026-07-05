@@ -190,3 +190,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coord-layer invocation) — daemon 127.0.0.1:38478, X-Echo-Role: claude.
 - **Verdict:** ✅ right
 - **Note:** Active trigger continues to respond instantly; r2 responses previously landed ~60s after coord_invoke — the launchd fallback never needed to fire.
+
+### 2026-07-04 17:52 PDT — watcher tick r3→r4 active trigger (coord_invoke × 2) on 115
+- **Trigger:** r3 disposition complete (reframe gate fired 2nd time, investigator=propagation_completion again, 3/3 patched at 6846a48a); r4 verification round dispatched with pinning-saturation focus hint.
+- **Query inputs:** coord_invoke({role:"codex"|"codex-ops", request_path:".../r4/request.md", correlation_id from r4 request})
+- **Returned:** both ok (HTTP 200).
+- **Sources:** n/a (coord-layer invocation) — daemon 127.0.0.1:38478, X-Echo-Role: claude.
+- **Verdict:** ✅ right
+- **Note:** Two consecutive propagation_completion verdicts from the investigator — the r2/r3 tail is test-contract completion, not mechanism drift; saturation hint added to r4 to force the converge-or-break question.
