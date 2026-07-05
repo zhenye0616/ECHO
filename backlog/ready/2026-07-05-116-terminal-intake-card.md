@@ -17,6 +17,7 @@ files_to_modify:
   - tools/intake-terminal.ts        # NEW: the only substantive new file
   - package.json                    # npm script `intake:terminal`
   - tests/tools/intake-terminal.test.ts  # renderer + wiring coverage (stub classifier, temp stores)
+ready_content_sha: ec528ecdd3751812a98ce7395d99bc8ff32879b171e3d92824ecbe77dd2d9135
 ---
 
 ## Problem

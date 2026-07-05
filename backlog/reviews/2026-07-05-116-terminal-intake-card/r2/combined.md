@@ -27,5 +27,9 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers returned `proceed` with zero findings on the
+r1-patched spec (1bb49512). The four r1 clarifications (AC3 watch-mode brain-preflight
+visibility, AC4 `--seed-store` flag + fail-fast persistability, AC5 store passthrough,
+AC6 named test + assertions) verified clean. No reframe gate (no findings). Promoting
+proposed → ready.
 
