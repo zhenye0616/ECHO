@@ -189,6 +189,33 @@
     "topic": "Architecture",
     "subtopic": "System Architecture"
   },
+  "architecture/signal-formation.md": {
+    "status": "shipped",
+    "title": "Signal Formation (Station 2)",
+    "link": "signal-formation",
+    "summary": "Granola signal extraction chassis: settle gate, fingerprint checkpoint, strict-JSON brain, verbatim quote anchoring, extractor_version/supersedes manifests, signal contract, skip observability.",
+    "aliases": [
+      "Signal Formation",
+      "Station 2",
+      "Granola Signal Extraction",
+      "GranolaSignalObservability"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Storage"
+  },
+  "architecture/signal-window.md": {
+    "status": "shipped",
+    "title": "Signal Window (getSignalWindow)",
+    "link": "signal-window",
+    "summary": "Internal seam: one windowed read of raw+derived context, full fidelity; event-time and append-order (late-arrival-safe) orderings; machine/company scope; canonical_subject loop filter.",
+    "aliases": [
+      "Signal Window",
+      "getSignalWindow",
+      "SignalWindowEntry"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Retrieval Composition"
+  },
   "architecture/storage.md": {
     "status": "shipped",
     "title": "Storage",
@@ -758,6 +785,20 @@
     ],
     "topic": "Form Factor",
     "subtopic": "Browser Extension"
+  },
+  "surfaces/drift-alert.md": {
+    "status": "shipped",
+    "title": "Drift Sweep v0 (Drift Alert)",
+    "link": "drift-alert",
+    "summary": "Clocked contradiction detector: joins new Granola statements to confirmed team decisions on canonical_subject, strict-JSON judge, at-most-once Slack Acknowledge/Dismiss card to the owner.",
+    "aliases": [
+      "Drift Sweep",
+      "Drift Alert",
+      "Understanding Drift",
+      "decision-drift.ts"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Observability"
   },
   "surfaces/echoctl-cli.md": {
     "status": "shipped",

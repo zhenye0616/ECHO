@@ -47,7 +47,7 @@ interface QueryFilter {
 }
 ```
 
-Three operations, no others. There is no `update`, no `delete`. Forgetting (when it ships) will be implemented as a tombstone row, not as in-place deletion.
+Three operations, no others. There is no `update`, no `delete`. Forgetting (when it ships) will be implemented as a tombstone row, not as in-place deletion. Item 113 added a fourth, narrower capability alongside these — a generalized durable append-order iteration seam (`iterateAtomsByAppendOrder` / `getCurrentSequence`, generalizing the existing coord-only seam) — documented in full on [[signal-window]] since its only consumer today is that seam.
 
 `source_prefix` was added in wave 3 to support [[mcp-search-memories]], which needs to filter by family of sources (e.g., `domain:` vs `app:` vs `fs:`). It is mutually exclusive with `source` — supplying both throws. Both implementations honor the field with the same semantics: the event's `source` string must `startsWith` the filter value.
 
@@ -116,6 +116,25 @@ Timestamps are ISO 8601 UTC strings in canonical `Z` form (e.g., `2026-05-08T07:
 
 The single-form invariant is non-negotiable. Before item 022, the git-watcher emitted `±HH:MM` offset-bearing strings while the JSONL extractors emitted `Z` form; the lex compare in `WHERE timestamp >= ?` then silently dropped git events from time windows. The fix lives at the [[capture-pipeline|capture chokepoint]] (canonicalize once, never per-source) plus a one-time migration of legacy rows on daemon startup. See [[timestamp-canonicalization]].
 
+## Subject-Key Unification (item 112)
+
+Before item 112, the cross-source join key was fractured: `normalizeSubject` (`src/enrich/granola-signals.ts`) and `normalizeDecisionSubject` (`src/surfaces/ceo-slack-responder/decision-store.ts`) were byte-identical duplicated functions writing to *different* metadata keys — `metadata.canonical_subject` on Granola signal atoms, `metadata.normalized_subject` on team-decision atoms. There was no single key a cross-source consumer (the drift sweep, [[signal-window]]'s `loop` filter) could join on.
+
+The fix is one shared normalizer, `normalizeSubject` in `src/util/subject.ts` (lowercase, trim, collapse internal whitespace — byte-identical to the two functions it replaces), imported by both former call sites. `appendConfirmedDecision` now writes `metadata.canonical_subject` on every new team-decision atom **in addition to** `metadata.normalized_subject`, with equal values. The `team-decision:<normalized>` `dedupe_key` format is unchanged.
+
+**`canonical_subject` is the sole forward cross-source join key.** `normalized_subject` intentionally survives, but only as team-decision backcompat:
+
+- `queryLatestTeamDecisions` / `matchesQuery` (the decision-store read path) fall back to `normalized_subject` for pre-change atoms that lack `canonical_subject`.
+- [[mcp-search-memories|`search_memories`]]'s in-tool `metadata_match: {canonical_subject}` filter falls back to matching `normalized_subject` for legacy decision atoms — scoped strictly to `source === 'derived:team-decisions'` (equivalently `metadata.decision_atom_type === 'team_decision'`). The scoping predicate is load-bearing: a signal atom or any other source carrying `normalized_subject` must never satisfy a `canonical_subject` filter through this fallback.
+
+No new writer or reader should treat `normalized_subject` as a second join key. This is also the reference case for the write-both / scoped-read-fallback key-rename pattern that later expansion-invariants work generalized: write both keys, fall back on read for legacy atoms, scope the fallback by a source predicate so it cannot over-include.
+
+## Derived-Signal Currentness (items 113, 115)
+
+Derived atoms (`derived:granola-signals`) are versioned, not rewritten: an extraction run writes signal atoms plus one `derived:granola-signals-index` manifest atom (`{note_id, extractor_version, extraction_run_id, completed_at, supersedes, signal_atom_ids}`). A re-extraction (extractor-version bump, or a retry after a manifest-append failure) writes a **new** manifest whose `supersedes` points at the prior run; old signal atoms are never deleted (append-only) but are no longer "current." See [[signal-formation]] for the full extraction contract.
+
+Resolving which run is current for a note is `resolveCurrentGranolaSignalRuns` (`src/enrich/granola-signals.ts`) — superseded-set construction over all manifests for a note; latest `completed_at` wins, ties broken by lexicographically-greatest `extraction_run_id`. Item 115 pinned the one-call composition every consumer should use: `filterToCurrentSignalRuns(candidateEvents, manifestEvents)` filters a mixed event window down to (a) non-signal events, passed through unconditionally, plus (b) only the signal events belonging to each note's current run — excluding superseded runs, orphan signals from a failed manifest append, and signals for notes with no manifest at all. Order-preserving. [[mcp-search-memories|`search_memories`]] is the first consumer; the drift sweep ([[drift-alert]]) and intake are recorded followups to adopt it when each is next touched — current-run filtering is consumer opt-in today, not enforced at the storage or window layer.
+
 ## What's Out of Scope (and Where It Lives Instead)
 
 - **Embedding generation** — the `embedding` field is populated by a pipeline that runs after persistence; V1.5
@@ -132,7 +151,10 @@ The single-form invariant is non-negotiable. Before item 022, the git-watcher em
 - [[capture-allowlist]] — what the gate checks against before accepting an event
 - [[sandboxed-capture]] — the architectural reason storage receives only allowlisted events
 - [[local-daemon]] — host process; owns the `Storage` instance
-- [[mcp-search-memories]] — consumer of `Storage.query`, including the `source_prefix` filter
+- [[mcp-search-memories]] — consumer of `Storage.query`, including the `source_prefix` filter; also the read path for the canonical_subject unification and the current-run filter (both above)
+- [[signal-formation]] — the extractor that writes `derived:granola-signals` atoms + manifests referenced above
+- [[signal-window]] — the internal seam built on the generalized append-order iteration mentioned above
+- [[drift-alert]] — company-scope consumer of the unified `canonical_subject` join key
 - [[mcp-recent-work-context]] — consumer of `Storage.query` with `exclude_metadata_surface` + `order: 'desc'`
 - [[timestamp-canonicalization]] — capture-time + migration-time guarantee that all rows are canonical `Z` form
 - [[audit-page]] — consumer of `query()` for "see memories" and "forget" operations

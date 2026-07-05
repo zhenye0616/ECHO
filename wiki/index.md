@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 71 pages · 68 shipped · 2 planned
+**Status:** 74 pages · 71 shipped · 2 planned
 
 ---
 
@@ -79,6 +79,8 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[mcp-compact-view-projection|MCP Compact View Projection]] — Daemon-side field-hygiene projection (view: 'compact') for find_clusters + get_atoms — KEEP/DROP rules, composes with wire-shape caps, default 'rich' preserves byte-identical legacy output (item 064).
 - [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
 - [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
+- [[signal-formation|Signal Formation (Station 2)]] — Granola signal extraction chassis: settle gate, fingerprint checkpoint, strict-JSON brain, verbatim quote anchoring, extractor_version/supersedes manifests, signal contract, skip observability.
+- [[signal-window|Signal Window (getSignalWindow)]] — Internal seam: one windowed read of raw+derived context, full fidelity; event-time and append-order (late-arrival-safe) orderings; machine/company scope; canonical_subject loop filter.
 - [[storage|Storage]] — Append-only Storage interface with MemoryStorage + SqliteStorage backends; WAL mode, migration runner, source_prefix + order + exclude_metadata_surface + before filters, composite (timestamp, id) ordering, canonical-Z timestamps.
 - [[system-architecture|System Architecture (Minimum Component View)]] — Six components, three layers. Sources fan in; consumers fan out; the middle (gate + storage + MCP) is fixed. The whole system at a glance.
 - [[timestamp-canonicalization|Timestamp Canonicalization]] — Single-chokepoint canonicalization at capture pipeline + idempotent migration on daemon startup; every events.timestamp row is canonical UTC Z form.
@@ -113,6 +115,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 ### Architecture
 
 - [[audit-page|Audit Page]] *(planned)* — Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.
+- [[drift-alert|Drift Sweep v0 (Drift Alert)]] — Clocked contradiction detector: joins new Granola statements to confirmed team decisions on canonical_subject, strict-JSON judge, at-most-once Slack Acknowledge/Dismiss card to the owner.
 
 ### Form Factor
 
