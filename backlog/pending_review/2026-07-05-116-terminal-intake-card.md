@@ -21,6 +21,31 @@ ready_content_sha: ec528ecdd3751812a98ce7395d99bc8ff32879b171e3d92824ecbe77dd2d9
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-05T23:30:06Z"
 branch: "agent/terminal-intake-card"
+head_sha: "5c3ae4cd7008c2016a32af31df6578af68901bba"
+pr_url: ""
+agent_notes: |
+  Implemented tools/intake-terminal.ts + tests/tools/intake-terminal.test.ts +
+  package.json `intake:terminal` script. Zero src/enrich/** changes: the tool
+  imports and drives runGranolaIntakeBridgeOnce / startGranolaIntakeBridge and
+  injects a stdout postSeed for the terminal card (the existing seam). --once
+  (single tick + status line + exit) and --watch (bridge interval/debounce/
+  single-flight, lazy per-tick brain preflight via runSignalsFirst, Ctrl-C
+  clean). Config built directly (no Slack env; terminal channel/token
+  sentinels; terminal defaultOwner fallback). Isolated default seed store
+  (~/.echo/state/granola-intake-seeds.terminal.json, --seed-store override) with
+  fail-fast persistability check before any card. All 6 ACs met; 8 new tests
+  pass; typecheck + eslint clean. Full suite: 1971 pass / 1 fail = the
+  documented shell-reachable load-flake (passes in isolation, unrelated to this
+  diff). E2E smoke against the live production DB confirmed the real station
+  1→3 path (real note selected, real codex classifier invoked).
+
+  Reviewer notes (2 non-blocking): (1) AC2 "subject" is best-available
+  (request ?? clientProject ?? meeting title) — canonical_subject is not carried
+  on the postSeed(channel,text) seam, so surfacing it would require a src/enrich
+  change (out of scope). (2) --once real path routes through
+  startGranolaIntakeBridge(runOnStart:false).run() because the real brain
+  classifier factory is not exported; the injected-classifier path calls
+  runGranolaIntakeBridgeOnce directly. No seam gap escalated — reuse is clean.
 ---
 
 ## Problem
