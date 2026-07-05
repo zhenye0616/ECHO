@@ -198,3 +198,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coord-layer invocation) — daemon 127.0.0.1:38478, X-Echo-Role: claude.
 - **Verdict:** ✅ right
 - **Note:** Two consecutive propagation_completion verdicts from the investigator — the r2/r3 tail is test-contract completion, not mechanism drift; saturation hint added to r4 to force the converge-or-break question.
+
+### 2026-07-04 17:58 PDT — 115 converged after r4; promoted to ready
+- **Trigger:** r4 dual `proceed`, zero findings; terminal watcher tick ran combine → convergence call → promote.py (stage-only) → terminal commit fd07638c.
+- **Query inputs:** none this tick (no coord_invoke — terminal round has no next-round reviewers to trigger).
+- **Returned:** n/a.
+- **Sources:** n/a — entry logged for loop-closure narrative continuity; the four coord_invoke calls of r2–r4 are in prior entries.
+- **Verdict:** ✅ right
+- **Note:** Full-auto spec loop closed in 4 rounds / ~35 min wall-clock with zero founder interventions: r1 5 patches + strategist premise correction, r2+r3 reframe-gate-guarded propagation completion, r4 clean. The saturation focus hint on r4 coincided with (did not force) convergence — both reviewers' r4 bodies affirm the contract is pinned to as-built facts.
