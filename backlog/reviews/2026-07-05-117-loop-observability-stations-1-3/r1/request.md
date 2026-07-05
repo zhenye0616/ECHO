@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-07-05T22:22:36Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: dda2e79a-5d3a-4575-ad8e-e72c254763ac
 focus_hints: 'reuse-first: is every AC computable from existing artifacts without
   daemon changes; AC3 honest-limitation framing (in-process disable inferred not observed);

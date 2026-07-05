@@ -7,7 +7,7 @@ class: narrow
 requested_at: '2026-07-05T22:22:36Z'
 requested_reviewers:
 - codex
-- cursor
+- codex-ops
 correlation_id: 87533a31-6b39-4792-bf02-d81a759c8090
 focus_hints: postSeed seam reuse fidelity (no fork of granola-intake-candidates);
   seed-store isolation default (AC4 suppression tradeoff); config-without-Slack-env
