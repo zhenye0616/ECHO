@@ -182,3 +182,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a (coord-layer invocation, not retrieval) — daemon at 127.0.0.1:38478, X-Echo-Role: claude.
 - **Verdict:** ✅ right
 - **Note:** First 115 use of the active-trigger path in this session; r1 ticks ran via manual wrapper fire. If r2 responses don't land within the launchd fallback window, manual wrapper fire is the redundant path.
+
+### 2026-07-04 17:44 PDT — watcher tick r2→r3 active trigger (coord_invoke × 2) on 115
+- **Trigger:** r2 disposition complete on 2026-07-04-115 (reframe gate fired, investigator=propagation_completion, 3/3 patched at 231de8cd); r3 dispatched; 057b post-push hook.
+- **Query inputs:** coord_invoke({role:"codex"|"codex-ops", request_path:".../r3/request.md", correlation_id from r3 request})
+- **Returned:** both ok (HTTP 200).
+- **Sources:** n/a (coord-layer invocation) — daemon 127.0.0.1:38478, X-Echo-Role: claude.
+- **Verdict:** ✅ right
+- **Note:** Active trigger continues to respond instantly; r2 responses previously landed ~60s after coord_invoke — the launchd fallback never needed to fire.
