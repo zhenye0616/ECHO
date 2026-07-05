@@ -50,34 +50,55 @@ interface, and process args. No new daemon endpoints, no new logger, no new watc
   Missing checkpoint / unreadable db reported as degraded with remediation copy
   (existing `buildRemediationCopy` pattern), never a crash.
 - **AC3 — station 2 (signal worker health):** from
-  `granola-signals-checkpoint.json` + storage: checkpoint mtime (last activity),
-  per-note `last_failure_at` entries surfaced as a failed-notes count with note ids,
+  `~/.echo/state/granola-signals-checkpoint.json` + storage: checkpoint mtime (last
+  activity), per-note failure entries surfaced as a failed-notes count with note ids,
   `derived:granola-signals` newest timestamp + count, current-vs-superseded run note.
-  Flags with explicit semantics: `never-ran` (no checkpoint), `stale` (checkpoint age
-  over a threshold with a named-constant default), `failing-notes` (any
-  `last_failure_at` newer than its note's last success). LIMITATION the section must
-  state honestly: an in-process permanent-disable (config-parse typo) is not directly
-  observable from files — the report infers it as `stale`/`never-ran` and the
-  remediation copy says to check daemon startup logs for `granola-signals` config
-  errors.
+  The per-note fields are the checkpoint's `notes[<noteId>]` map entries
+  `last_success_at` and `last_failure_at` (both optional ISO strings; the worker also
+  records `last_failure_reason`). Flags with explicit semantics: `never-ran` (no
+  checkpoint), `stale` (checkpoint age over a threshold with a named-constant default),
+  `failing-notes` computed per note as: `last_failure_at` present AND
+  (`last_success_at` absent OR `last_failure_at` > `last_success_at`) — this subsumes
+  the never-successful case (`last_success_at` absent + a failure present). A note is
+  NOT flagged when `last_success_at` >= `last_failure_at` (recovered) or when both
+  fields are absent (never attempted). LIMITATION the section must state honestly: an
+  in-process permanent-disable (config-parse typo) is not directly observable from
+  files — the report infers it as `stale`/`never-ran` and the remediation copy says to
+  check daemon startup logs for `granola-signals` config errors.
 - **AC4 — serving-code identity (kills audit B6):** report which process serves the MCP
-  port: reuse the existing daemon probe (running/reachable/pid-lock), then classify the
-  owning process's argv (`ps`-style lookup via the `execFile` pattern already imported
-  in doctor.ts) as `packaged-dist` vs `src-dev (vite-node)` vs `unknown`, with the
-  executing path. Staleness check: newest mtime under `src/` vs newest mtime under
-  `dist/` → `dist-stale` warning when `src` is newer and the serving class is
-  `packaged-dist`; also warn when serving class is `src-dev` (unsupervised dev process
-  serving production). Both warnings carry remediation copy (`npm run build:cli`,
-  daemon install script).
+  port. A pid-lock is NOT proof of port ownership (it can be stale or point at a
+  different process while another owns the port), so the report MUST resolve the actual
+  listening pid via a concrete port-owner lookup (`lsof -nP -iTCP:<port> -sTCP:LISTEN`
+  or `lsof -t -iTCP:<port>` via the `execFile` pattern already imported in doctor.ts),
+  then classify THAT pid's argv as `packaged-dist` vs `src-dev (vite-node)` vs
+  `unknown`, with the executing path. Verification contract: if the port-owner lookup
+  fails/errors, or the daemon pid-lock and the observed listening pid disagree, render
+  serving-code identity as `unknown`/degraded with remediation — never assert
+  `packaged-dist` vs `src-dev` on unverified evidence. Staleness check: newest mtime
+  under `src/` vs newest mtime under `dist/` → `dist-stale` warning when `src` is newer
+  and the serving class is `packaged-dist`; also warn when serving class is `src-dev`
+  (unsupervised dev process serving production). If `src/` or `dist/` is
+  missing/unreadable (common in packaged or partially-built installs), the staleness
+  result is `staleness-unknown`/degraded with remediation — never fatal, never a crash.
+  All warnings carry remediation copy (`npm run build:cli`, daemon install script).
 - **AC5 — station 3 (packet pipeline):** seed-store state counts
-  (`pending/posting/posted/failed`) for each seed store found (canonical path + the
-  item-116 terminal store if present), intake-bridge enabled/disabled per env flag, and
-  `derived:team-decisions` count (0 is expected today — render as informational, not
-  degraded). Absent stores render as `not yet run`, not errors.
+  (`pending/posting/posted/failed`) for each seed store found by glob
+  `~/.echo/state/granola-intake-seeds*.json` — the canonical
+  `~/.echo/state/granola-intake-seeds.json` plus the item-116 terminal store
+  `~/.echo/state/granola-intake-seeds.terminal.json` when present. Intake-bridge
+  enabled/disabled is read from the `ECHO_GRANOLA_INTAKE_ENABLED` env flag (unset/blank
+  → disabled); because doctor's own process env may differ from the launchd daemon env
+  that actually runs the loop, this value MUST be labeled doctor-env-only with an
+  explicit limitation note, so an operator is not shown a false pipeline enabled/disabled
+  state. Also `derived:team-decisions` count (0 is expected today — render as
+  informational, not degraded). Absent stores render as `not yet run`, not errors.
 - **AC6 — tests:** fixture-driven (temp ECHO_HOME, temp db or storage stub, fabricated
-  checkpoints/seed stores, stubbed process-args lookup) covering: healthy, never-ran,
-  stale, failing-notes, dist-stale, and src-dev-serving cases; `--json` shape stable;
-  existing doctor tests untouched and green.
+  checkpoints/seed stores, stubbed process-args + port-owner lookups) covering: healthy,
+  never-ran, stale, failing-notes (incl. never-successful and recovered boundary),
+  dist-stale, src-dev-serving, port-owner-unverifiable (port-owner lookup fails OR
+  pid-lock disagrees with observed listening pid → `unknown`/degraded, not a false
+  classification), and missing-src-or-dist (`staleness-unknown`, non-fatal) cases;
+  `--json` shape stable; existing doctor tests untouched and green.
 
 ## Out of Scope (Don't Drift)
 
