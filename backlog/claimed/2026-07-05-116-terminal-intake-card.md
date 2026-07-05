@@ -18,6 +18,9 @@ files_to_modify:
   - package.json                    # npm script `intake:terminal`
   - tests/tools/intake-terminal.test.ts  # renderer + wiring coverage (stub classifier, temp stores)
 ready_content_sha: ec528ecdd3751812a98ce7395d99bc8ff32879b171e3d92824ecbe77dd2d9135
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-05T23:30:06Z"
+branch: "agent/terminal-intake-card"
 ---
 
 ## Problem
