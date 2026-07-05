@@ -59,3 +59,7 @@ echoctl-*.tgz
 
 # founder pitch drafts stay local-only (uncommitted by design; swept into 7bc368b5 by accident, removed from HEAD in this commit)
 raw/internal/pitch/
+
+# local secrets — never commit (repo is public)
+.env.fly-secrets
+.env*.local
