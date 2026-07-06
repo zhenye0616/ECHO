@@ -59,6 +59,40 @@ agent_notes: |
   tests passed this run). decision-drift.test.ts = 36 tests (120's + 119's + 118's
   blocks coexisting, all green) — 119/120 tests pass against the restructured
   loop, so no real integration regression.
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation (strategist-operated;
+  founder green-lit review + merge in session).
+
+  Conflicts resolved:
+  - none — branch was rebased onto settled main (post-119/120) before review;
+    --no-ff merge applied clean.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict: merge as-is, empty punch list)
+
+  Fixups deferred to follow-up items:
+  - optional cosmetic: revert 4 incidental prettier reformats
+
+  Verify: full suite 2036 passed / 0 failed (192 files); lint, typecheck,
+  coupled-invariants, sync-skills --check all clean. Reviewer independently
+  verified 1767/0 on test:product at the rebased head, including rebase
+  preservation of 119/120 semantics (diff-traced; deliverPair byte-identical).
+
+  Notes for the record:
+  - Rebase history: originally built at aed7dad1 against pre-119/120 main;
+    rebased to 07ad880a after both merges landed (settled-file restore +
+    surgical nominator re-apply); build review pinned to the rebased SHA.
+  - Retroactive join: pre-118 snake_case decision subjects join correctly
+    because both sides re-normalize at join time (reviewer-verified e2e).
+
+  Follow-up items (non-blocking):
+  - wiki drift-alert page update: join is now nominate(Jaccard>=0.2, cap 5,
+    AI-free)-then-judge; misses observable via counters + drift_nomination_miss
+  - collect first week of statements_no_candidate / near-miss logs as the
+    alias-table decision input (seam decision 18's deferred upgrade)
+  - re-run the drift path on real Granola meetings before the Jul 18 freeze
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B3 root cause + the empirical subject study this fixes
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md                  # decisions 18 (dumb-then-alias), 19 (no AI in plumbing) — the rules this stays inside

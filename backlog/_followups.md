@@ -448,3 +448,6 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [120 follow-up] wire 117 doctor loop section to consume the heartbeat contract (117 AC3 follow-up)
 - [119 follow-up] doc polish: 'deferred' counter aggregates cap-overflow + proven-rejection deferrals (log keys distinguish)
 - [119 follow-up] merge-protocol lesson: verify brace balance after keep-both conflict splicing (common-suffix hoist)
+- [118 follow-up] optional cosmetic: revert 4 incidental prettier reformats in decision-drift.ts
+- [118 follow-up] collect week-1 statements_no_candidate near-miss logs as alias-table decision input
+- [118 follow-up] wiki drift-alert update: nominate-then-confirm join (strategist)
