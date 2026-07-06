@@ -9,6 +9,39 @@ blocked_by: []
 claimed_by: "builder-120-118-B4913C34"
 claimed_at: "2026-07-06T02:05:00Z"
 branch: "agent/drift-join-nomination"
+head_sha: "aed7dad14c4473a841f13b352d36f3e0c7e963b6"
+agent_notes: |
+  Built to all 5 ACs. AC1: normalizeSubject folds _/-/runs to space before the
+  existing lowercase/trim/collapse (no-separator subjects byte-unchanged, so
+  dedupe_key stability holds; separator-only subjects intentionally collapse).
+  AC2: one pinned-format line added to buildExtractionPrompt (text only). AC3:
+  exact Map.get replaced with a deterministic AI-free Jaccard nominator over
+  normalized word sets — DRIFT_NOMINATION_JACCARD_THRESHOLD=0.2 and
+  DRIFT_MAX_NOMINATIONS_PER_STATEMENT=5 (both exported), total tie-breaker (score
+  desc, subject asc, dedupe_key asc), decision token sets computed once per tick,
+  each nominated pair judged via the EXISTING judgePair path with the unchanged
+  pairKey (checkpoint/watermark/budget/delivery untouched). AC4: per-tick
+  counters statements_seen/nominated/no_candidate/decisions_scored in the result
+  + drift_sweep_ok log; every no-candidate statement emits a drift_nomination_miss
+  naming its closest below-threshold decision (same tie-breaker) or a
+  no-decisions note. AC5: separator-only + topical-continuous joins, unrelated
+  near-miss; 114 suite unchanged.
+
+  Reviewer notes: (1) the large decision-drift.ts diff is mostly prettier
+  RE-INDENTING the existing per-pair body now nested inside a per-nominated-
+  decision loop — the body logic is unchanged; focus review on the nominator
+  block (subjectTokens/jaccardSimilarity/compareScoredDecisions + the
+  score/filter/sort/slice) and the counters. (2) subjectTokens re-normalizes at
+  join time so older stored subjects retroactively benefit. (3) The 3 study pairs:
+  the decision record names only the openai pair verbatim, so the subject test
+  uses it + two real-shaped separator-only pairs.
+
+  ALL files are within files_to_modify (no new shipped module, so packed-manifest
+  is untouched). typecheck clean, lint clean. Touched suites: subject 5/5,
+  decision-drift 28/28, granola-signals 32/32. Full test:product: only the same
+  load-sensitive timing/perf flakes as item 120 (ceo-slack-brain, coord-volume-perf)
+  are red — both pass in isolation, neither touches this item. Run log:
+  raw/internal/agent-runs/2026-07-06-2026-07-06-118-drift-join-nomination.md
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B3 root cause + the empirical subject study this fixes
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md                  # decisions 18 (dumb-then-alias), 19 (no AI in plumbing) — the rules this stays inside
