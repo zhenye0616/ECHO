@@ -170,3 +170,36 @@ in main with a targeted `git restore <pathspec>` (not a whole-tree destructive
 op) and removed the stray untracked test file. Main was verified clean
 (`git status --porcelain` empty) before any further work; all validated builds
 ran in the worktree.
+
+---
+
+## Run 2 (reviewer riders, 2026-07-06T00:44:00Z)
+
+Team-lead endorsed the overall-rollup severity split (soft/hard) and added three
+riders; implemented all three on `agent/loop-observability-stations-1-3`.
+
+- **Rider 1 (boundary contract):** added `boundary contract: never-ran +
+  empty-db + no-listener stays overall healthy` — a fixture that pins the
+  soft/hard split so a future edit can't silently start downgrading `overall`
+  for the quiet-day case (asserts `overall: 'healthy'` while stations report
+  their informational conditions and every degradation is `soft`).
+- **Rider 2 (machine-readable condition):** each station now exposes a typed
+  `condition` discriminator in `--json` (`Station1Condition`,
+  `Station2Condition`, `ServingCondition`, `Station3Condition`) computed with
+  hard-state precedence, and rendered as a `[condition]` tag on each station
+  line. Tooling can switch on `station2.condition` (`never-ran` / `stale` /
+  `checkpoint-unreadable` / `storage-error` / `active`) without parsing prose.
+  Added `condition discriminator: never-ran vs stale vs parse-error are
+  machine-distinct`.
+- **Rider 3 (docs):** the severity split + condition discriminator are
+  documented in the loop-section header comment (and `computeOverall`), pointing
+  at the boundary test.
+
+- **New head_sha:** `508a0357c70e5f78594d66c113cc2c6ac9ae7e6c`
+- **Tests:** loop suite now 21/21 (was 19); existing `tests/cli/doctor.test.ts`
+  10/10 untouched; `npm run typecheck` + `npm run lint` clean. Human render
+  re-verified — station lines now carry `[ok]` / `[active]` / `[src-dev-serving]`
+  condition tags.
+- No scope drift: `condition` is an additive machine-readable discriminator over
+  the loop section's own observability surface (the item's purpose), requested
+  by the reviewer; still only `files_to_modify` touched.
