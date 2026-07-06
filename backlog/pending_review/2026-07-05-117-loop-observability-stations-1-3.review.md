@@ -1,28 +1,23 @@
 ---
 item_id: 2026-07-05-117-loop-observability-stations-1-3
-verdict: block
-reviewed_at: '2026-07-06T00:48:17Z'
+verdict: merge as-is
+reviewed_at: '2026-07-06T01:07:15Z'
 test_counts:
-  passed: 1990
-  failed: 1
+  passed: 1996
+  failed: 0
 producer: review-pending-orchestrator
 ---
 ## Verdict
-Block — worktree drifted mid-review: commit 508a0357 (reviewer riders: machine-readable station condition + boundary-contract tests) landed on agent/loop-observability-stations-1-3 during the review, so the item's recorded head_sha 3e1b3928 no longer identifies the code and verification results span two commits. Drift cause identified post-review: builder-117 applied the strategist's three endorsed riders AFTER the pending_review handoff without updating head_sha — work is wanted, process contract broken. Independent of drift, the review found one substantive pre-merge bug: doctor's default storage open (new SqliteStorage) mkdirs + creates + migrates the db, violating AC1's read-only contract — a missing prod db is silently created empty (counts=0 instead of degraded per AC2) and existing doctor win32 fixtures now materialize backslash-named junk files in cwd (plausibly what actually broke 053-completed-at-coercion during the builder's full-suite run). At the pre-drift SHA: all ACs Met except AC6 Partial (no fixture for the port-owner lookup throwing), rollup severity model verified as endorsed, zero scope drift, doctor-loop 19/19 and existing doctor 10/10 in isolation.
+Merge as-is (re-review after remediation; replaces the earlier block sidecar). Ground truth passes at head_sha 58ca01925d012b8bad5029c582cbebac74cafc74 — byte-equal to the branch tip, updated atomically with the stage move. All three blocking findings from the first review are resolved with empirical confirmation: (1) doctor is now read-only — default loop-storage open gated on existsSync(dbPath), missing db renders soft 'db-missing' with no create/migrate/mkdir (contract test asserts the file is NOT created), present-but-corrupt db is a hard fault; (2) the win32-fixture backslash junk files no longer materialize (previously 5, now zero after running doctor.test.ts); (3) the previously-missing AC6 matrix arm (port-owner lookup throws) is covered by a new fixture. All ACs Met including AC6 (upgraded from Partial); all 8 degradation-matrix rows have fixtures. Zero scope drift across all three branch commits (doctor.ts, render.ts, tests/cli/doctor-loop.test.ts only; no SqliteStorage change). Riders verified: typed per-station condition discriminators in --json, boundary-contract fixture pinning the hard/soft rollup split, docs. Full suite 1996 passed / 0 failed including all known flakes and 053-completed-at-coercion (its earlier failure was the junk-file side effect, now root-caused and gone).
 
 ## Pre-merge fixups
-- [ ] Reconcile head_sha: item frontmatter must record the true 40-char branch tip (currently 508a0357c70e5f78594d66c113cc2c6ac9ae7e6c or later) and re-review must run at that SHA
-- [ ] Doctor must be read-only: do not mkdir/create/migrate the db from the loop section — open only if the file exists, else report station-1 degraded/not-yet-run with remediation (src/storage/sqlite.ts:63-72 constructor side effect; guard at the doctor call site)
-- [ ] Stop the win32-fixture junk: existing doctor tests must not materialize \var\folders\... backslash files in cwd via the real SqliteStorage path
-- [ ] Add the missing AC6 fixture: portOwnerLookup throws/fails -> serving identity unknown/degraded (code path exists at buildLoopServing try/catch, untested)
-- [ ] Re-run doctor-loop.test.ts + full suite at the reconciled tip (the mid-drift run showed one doctor-loop seed-store failure that must be re-checked)
+- [ ] (none — reviewer found no pre-merge fixups; merge as-is)
 
 ## Expected merge conflicts
-- (none expected) — doctor.ts/render.ts last changed on main pre-fork (a2af4048); main since fork only carries the 116 merge + review commits, none touching these files.
+- (none expected) — doctor.ts/render.ts last changed on main pre-fork (a2af4048); doctor-loop.test.ts is new; main since fork carries only the 117 sidecar/re-handoff and unrelated 118/119/120 review-queue commits; branch diff touches only the three item files.
 
 ## Follow-up items (defer, do not block merge)
-- Perf: queryClassHealth loads full atom content per source class to count; add a filtered-count storage seam later (reuse-first forced this now)
-- Consider read-only db open mode for doctor generally (builder had noted this too)
-
-## Open questions for founder
-Resolved during orchestration: 508a0357 was builder-117 applying the strategist's three endorsed riders post-handoff (confirmed via commit message + content). Remaining decision: item returns to builder for the pre-merge fixups above, then re-review at the reconciled head_sha — no founder action needed unless the builder cannot complete the fixups.
+- True read-only db open: when the db exists, SqliteStorage's constructor still runs migrate()+canonicalizeTimestamps(); skip for doctor's diagnostic open (touches SqliteStorage — separate item; already flagged in agent_notes)
+- station1Condition precedence edge: db missing AND malformed checkpoint reports soft-dominant 'db-missing' despite a hard fault present, contradicting the hard-states-take-precedence comment (degradations/overall still correct; cosmetic) — fix + add the combined fixture
+- Perf: queryClassHealth loads full atom content per source class x6 to count; add a filtered-count storage seam (reuse-first forced this)
+- ps argv whitespace split can fragment paths with spaces -> degrades toward unknown (safe direction); note for a future robustness pass
