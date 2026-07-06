@@ -22,6 +22,7 @@ files_to_modify:
   - src/enrich/granola-signals.ts                      # write heartbeat on tick end + boot disable
   - src/enrich/granola-intake-candidates.ts            # write heartbeat on tick end + boot disable
   - tests/enrich/                                      # heartbeat coverage (ok / degraded / boot-disable / malformed-overwrite / write-failure-swallowed)
+ready_content_sha: d3cc1983471d9c2e66b0961796e90af20281aeba49ac54729814cc191f2a6ff0
 ---
 
 ## Problem
