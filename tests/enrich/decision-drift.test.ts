@@ -9,8 +9,10 @@ import { normalizeSubject } from '../../src/util/subject.js';
 import { GRANOLA_SIGNAL_SOURCE, type GranolaSignalType } from '../../src/enrich/granola-signals.js';
 import {
   DEFAULT_DRIFT_MAX_ALERTS_PER_TICK,
+  DRIFT_DELIVERY_MAX_RETRIES,
   DRIFT_JUDGE_MAX_ATTEMPTS,
   DRIFT_JUDGE_VERSION,
+  DriftDeliveryRejectedError,
   DriftJudgeInfraError,
   DriftJudgeParseError,
   DriftSweepConfigError,
@@ -620,5 +622,207 @@ describe('AC6 — blast-radius cap', () => {
     const t3 = await runDriftSweepOnce(store, runtime);
     if (t3.status === 'ok') expect(t3.delivered).toBe(0);
     expect(posts).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 119 — delivery retry: proven Slack rejections retry (bounded), unknown
+// outcomes stay at-most-once terminal
+// ---------------------------------------------------------------------------
+
+describe('119 — delivery retry split', () => {
+  async function seedContradictingPair(
+    store: Storage,
+    subject: string,
+    quote: string,
+  ): Promise<{ pairKey: string; maxSeq: number }> {
+    await seedDecision(store, subject, `decision for ${subject}`);
+    const { dedupeKey } = await seedStatement(store, { subject, text: quote });
+    const decisionKey = `team-decision:${normalizeSubject(subject)}`;
+    const pairKey = driftPairKey(decisionKey, dedupeKey, DRIFT_JUDGE_VERSION);
+    const maxSeq = await store.getCurrentSequence({ sourcePrefixes: [GRANOLA_SIGNAL_SOURCE] });
+    return { pairKey, maxSeq };
+  }
+
+  it('AC1 — a proven rejection once then success delivers on the retry tick with exactly one card', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const { pairKey, maxSeq } = await seedContradictingPair(store, 'CI', 'drop the CI gate for the demo');
+
+    let attempts = 0;
+    let deliveredCards = 0;
+    const runtime = makeRuntime(cp, {
+      judge: contradictsJudge('drop the CI gate'),
+      post: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new DriftDeliveryRejectedError('HTTP 429');
+        deliveredCards += 1;
+      },
+    });
+
+    // Tick 1: proven rejection → non-terminal delivery-deferred, watermark held.
+    const t1 = await runDriftSweepOnce(store, runtime);
+    if (t1.status === 'ok') {
+      expect(t1.delivered).toBe(0);
+      expect(t1.deferred).toBe(1);
+      expect(t1.delivery_failed).toBe(0);
+    }
+    const afterT1 = loadDriftSweepCheckpoint(cp).pairs[pairKey];
+    expect(afterT1?.state).toBe('delivery-deferred');
+    expect(afterT1?.retry_count).toBe(1);
+    expect(afterT1?.pending_alert).toBeDefined(); // payload kept for re-delivery
+    expect(loadDriftSweepCheckpoint(cp).watermark).toBeLessThanOrEqual(maxSeq);
+
+    // Tick 2: drain re-attempts, poster now succeeds → delivered, exactly one card.
+    const t2 = await runDriftSweepOnce(store, runtime);
+    if (t2.status === 'ok') expect(t2.delivered).toBe(1);
+    expect(deliveredCards).toBe(1); // no double-post
+    expect(loadDriftSweepCheckpoint(cp).pairs[pairKey]?.state).toBe('delivered');
+    expect(loadDriftSweepCheckpoint(cp).watermark).toBe(maxSeq + 1);
+  });
+
+  it('AC1 — a timeout-after-send (untyped throw) goes terminal delivery-failed with zero retries and never re-posts', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const { pairKey, maxSeq } = await seedContradictingPair(store, 'Storage', 'add an upsert path to storage');
+
+    let attempts = 0;
+    const runtime = makeRuntime(cp, {
+      judge: contradictsJudge('add an upsert path'),
+      post: async () => {
+        attempts += 1;
+        // Untyped throw: the request may have reached Slack (unknown outcome).
+        throw new Error('socket hang up');
+      },
+    });
+
+    const t1 = await runDriftSweepOnce(store, runtime);
+    if (t1.status === 'ok') {
+      expect(t1.delivered).toBe(0);
+      expect(t1.deferred).toBe(0);
+      expect(t1.delivery_failed).toBe(1);
+    }
+    const pair = loadDriftSweepCheckpoint(cp).pairs[pairKey];
+    expect(pair?.state).toBe('delivery-failed'); // terminal at-most-once
+    expect(pair?.retry_count ?? 0).toBe(0); // zero retries for unknown outcome
+    expect(pair?.failure_reason).toBe('socket hang up');
+    expect(pair?.pending_alert).toBeUndefined();
+    // Terminal → watermark advances; re-running never posts again.
+    expect(loadDriftSweepCheckpoint(cp).watermark).toBe(maxSeq + 1);
+    const t2 = await runDriftSweepOnce(store, runtime);
+    if (t2.status === 'ok') expect(t2.delivered).toBe(0);
+    expect(attempts).toBe(1); // never re-posted
+  });
+
+  it('AC2 — a persistent proven rejection terminalizes after exactly DRIFT_DELIVERY_MAX_RETRIES attempts, no more', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const { pairKey, maxSeq } = await seedContradictingPair(store, 'Pricing', 'we agreed to make it free');
+
+    let attempts = 0;
+    const runtime = makeRuntime(cp, {
+      judge: contradictsJudge('make it free'),
+      post: async () => {
+        attempts += 1;
+        throw new DriftDeliveryRejectedError(`rejected attempt ${attempts}`);
+      },
+    });
+
+    // One post attempt per tick; run enough ticks to exceed the budget and prove
+    // it never attempts a MAX+1-th time.
+    for (let i = 0; i < DRIFT_DELIVERY_MAX_RETRIES + 3; i += 1) {
+      await runDriftSweepOnce(store, runtime);
+    }
+
+    expect(attempts).toBe(DRIFT_DELIVERY_MAX_RETRIES); // exactly MAX visible attempts
+    const pair = loadDriftSweepCheckpoint(cp).pairs[pairKey];
+    expect(pair?.state).toBe('delivery-failed'); // terminal
+    expect(pair?.retry_count).toBe(DRIFT_DELIVERY_MAX_RETRIES);
+    expect(pair?.failure_reason).toBe(`rejected attempt ${DRIFT_DELIVERY_MAX_RETRIES}`);
+    expect(pair?.pending_alert).toBeUndefined();
+    // Terminal → watermark no longer stalls.
+    expect(loadDriftSweepCheckpoint(cp).watermark).toBe(maxSeq + 1);
+  });
+
+  it('AC2 — a pair deferred purely by the per-tick cap and later delivered ends with retry_count 0/absent', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const subjects = ['C1', 'C2', 'C3', 'C4'];
+    const pairKeys: string[] = [];
+    for (const s of subjects) {
+      await seedDecision(store, s, `decision for ${s}`);
+      const { dedupeKey } = await seedStatement(store, {
+        subject: s,
+        text: `reverse ${s} completely`,
+        dedupeKey: `granola:signal:${s}`,
+      });
+      pairKeys.push(driftPairKey(`team-decision:${normalizeSubject(s)}`, dedupeKey, DRIFT_JUDGE_VERSION));
+    }
+    const runtime = makeRuntime(cp, {
+      maxAlertsPerTick: 3,
+      judge: contradictsJudge('reverse'),
+      post: async () => {}, // always succeeds
+    });
+
+    await runDriftSweepOnce(store, runtime); // 3 delivered, 1 cap-deferred
+    const deferred = loadDriftSweepCheckpoint(cp).pairs[pairKeys[3] as string];
+    expect(deferred?.state).toBe('delivery-deferred');
+    expect(deferred?.retry_count).toBeUndefined(); // cap-overflow never consumes budget
+
+    await runDriftSweepOnce(store, runtime); // drains the overflow
+    const delivered = loadDriftSweepCheckpoint(cp).pairs[pairKeys[3] as string];
+    expect(delivered?.state).toBe('delivered');
+    expect(delivered?.retry_count ?? 0).toBe(0);
+  });
+
+  it('AC4 — a pre-119 checkpoint (no retry_count) loads and a proven rejection begins retrying from 0', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const { pairKey } = await seedContradictingPair(store, 'Roadmap', 'ship federation next sprint');
+
+    // Hand-craft a delivery-deferred pair as an OLD checkpoint would write it:
+    // a full payload but NO retry_count field at all.
+    const payload: DriftAlertPayload = {
+      pair_key: pairKey,
+      decision_dedupe_key: `team-decision:${normalizeSubject('Roadmap')}`,
+      statement_dedupe_key: pairKey.split('::')[1] as string,
+      judge_version: DRIFT_JUDGE_VERSION,
+      owner_cofounder_id: 'alice',
+      owner_slack_user_id: 'U-ALICE',
+      decision_subject: 'Roadmap',
+      decision_text: 'decision for Roadmap',
+      confirmed_at: '2026-07-01T00:00:00.000Z',
+      confirmed_by: 'alice',
+      quote: 'ship federation next sprint',
+      reason: 'reverses the recorded decision',
+      meeting_title: 'Tuesday sync',
+      note_id: 'note-1',
+    };
+    const oldPair = {
+      decision_dedupe_key: payload.decision_dedupe_key,
+      statement_dedupe_key: payload.statement_dedupe_key,
+      judge_version: DRIFT_JUDGE_VERSION,
+      state: 'delivery-deferred' as const,
+      updated_at: '2026-07-03T00:00:00.000Z',
+      pending_alert: payload,
+    };
+    writeDriftSweepCheckpoint(
+      { schema_version: 1, watermark: 1, pairs: { [pairKey]: oldPair } },
+      cp,
+    );
+    // The old file has no retry_count on the pair.
+    expect('retry_count' in loadDriftSweepCheckpoint(cp).pairs[pairKey]!).toBe(false);
+
+    const runtime = makeRuntime(cp, {
+      judge: contradictsJudge('ship federation next sprint'),
+      post: async () => {
+        throw new DriftDeliveryRejectedError('HTTP 429');
+      },
+    });
+    const t1 = await runDriftSweepOnce(store, runtime);
+    expect(t1.status).toBe('ok'); // old file parsed without error
+    const pair = loadDriftSweepCheckpoint(cp).pairs[pairKey];
+    expect(pair?.state).toBe('delivery-deferred'); // still retrying, not terminal
+    expect(pair?.retry_count).toBe(1); // began from 0
   });
 });

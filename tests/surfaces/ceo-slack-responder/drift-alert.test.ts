@@ -13,6 +13,7 @@ import type { CofounderIdentity } from '../../../src/surfaces/ceo-slack-responde
 import {
   cofounderIdToSlackUserId,
   postDriftAlertCard,
+  DriftDeliveryRejectedError,
   type DriftAlertPayload,
 } from '../../../src/enrich/decision-drift.js';
 
@@ -208,11 +209,34 @@ describe('postDriftAlertCard', () => {
     expect(section).toContain('Infra sync');
   });
 
-  it('throws when Slack reports a failure', async () => {
+  it('throws a proven-rejection error when Slack reports ok:false', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ ok: false, error: 'channel_not_found' }) }) as unknown as Response),
     );
+    // A received ok:false is a PROVEN rejection (item 119 AC1) → typed + retryable.
+    await expect(postDriftAlertCard('xoxb-token', payload)).rejects.toBeInstanceOf(
+      DriftDeliveryRejectedError,
+    );
     await expect(postDriftAlertCard('xoxb-token', payload)).rejects.toThrow('channel_not_found');
+  });
+
+  it('classifies a received non-2xx as a proven rejection BEFORE parsing the body (119 AC1)', async () => {
+    // A 429 whose body is not JSON: response.json() would throw. The status must
+    // be classified first so this stays a typed retryable rejection, not an
+    // untyped unknown-outcome terminal.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 429,
+        json: async () => {
+          throw new SyntaxError('Unexpected end of JSON input');
+        },
+      }) as unknown as Response),
+    );
+    const err = await postDriftAlertCard('xoxb-token', payload).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DriftDeliveryRejectedError);
+    expect((err as Error).message).toContain('HTTP 429');
   });
 });
