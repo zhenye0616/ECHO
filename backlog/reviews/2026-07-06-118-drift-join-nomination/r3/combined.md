@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R3` — both reviewers `proceed` with zero findings at the r2-patched spec (`3d99a41b`). The r1 findings (pinned threshold=0.2/cap=5 + rationale, deterministic tie-breaker, `decisions_scored` observability) and the r2 rationale-wording correction all verified clean. Promoting proposed → ready.
 
