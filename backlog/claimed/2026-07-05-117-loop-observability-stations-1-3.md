@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 1-2d
 created: 2026-07-05
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-06T00:14:00Z"
+branch: "agent/loop-observability-stations-1-3"
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-05-terminal-first-demo-surface.md   # the sprint pivot + reuse-first constraint
