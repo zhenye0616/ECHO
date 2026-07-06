@@ -92,6 +92,14 @@ export interface LoopDegradation {
   remediation: string;
 }
 
+// Result of the read-only storage-open attempt. A `missing` db is a soft
+// not-yet-run state (doctor never creates/migrates it); a present-but-broken db
+// is a hard error. Distinguishing them is what keeps a fresh install
+// overall:healthy while surfacing a genuinely unreadable store as degraded.
+type StorageIssue =
+  | { kind: 'missing'; dbPath: string }
+  | { kind: 'error'; dbPath: string; message: string };
+
 export interface LoopCaptureSourceHealth {
   sourceClass: string;
   newestTimestamp: string | null;
@@ -113,6 +121,7 @@ export interface LoopGranolaCheckpoint {
 // `degradations` (each with its own machine-readable `scope`+`severity`).
 export type Station1Condition =
   | 'ok'
+  | 'db-missing'
   | 'checkpoint-missing'
   | 'checkpoint-unreadable'
   | 'storage-error';
@@ -474,8 +483,33 @@ function hasScope(degradations: readonly LoopDegradation[], scope: string): bool
   return degradations.some((d) => d.scope === scope);
 }
 
+// Shared soft/hard degradation for a null storage handle. `missing` → soft
+// not-yet-run (does not downgrade overall); `error` → hard unreadable.
+function storageDegradation(scope: string, issue: StorageIssue): LoopDegradation {
+  if (issue.kind === 'missing') {
+    return {
+      scope,
+      severity: 'soft',
+      path: issue.dbPath,
+      detail: 'atom db not created yet — no capture has been recorded (daemon has not written the store).',
+      remediation:
+        'Start the ECHO daemon (install script / `echoctl daemon start`) so capture begins, then re-run `echoctl doctor`.',
+    };
+  }
+  return {
+    scope,
+    severity: 'hard',
+    path: issue.dbPath,
+    detail: `atom db unreadable: ${issue.message}`,
+    remediation:
+      'Ensure the ECHO daemon is running and the atom db is not locked/corrupt, then re-run `echoctl doctor`.',
+  };
+}
+
 function station1Condition(degradations: readonly LoopDegradation[]): Station1Condition {
-  if (hasScope(degradations, 'station-1:storage')) return 'storage-error';
+  const storage = degradations.find((d) => d.scope === 'station-1:storage');
+  if (storage?.severity === 'hard') return 'storage-error';
+  if (storage !== undefined) return 'db-missing'; // soft = missing db
   const cp = degradations.find((d) => d.scope === 'station-1:granola-checkpoint');
   if (cp?.severity === 'hard') return 'checkpoint-unreadable';
   if (cp !== undefined) return 'checkpoint-missing';
@@ -488,7 +522,9 @@ function station2Condition(
 ): Station2Condition {
   const cp = degradations.find((d) => d.scope === 'station-2:checkpoint');
   if (cp?.severity === 'hard') return 'checkpoint-unreadable';
-  if (hasScope(degradations, 'station-2:storage')) return 'storage-error';
+  if (degradations.some((d) => d.scope === 'station-2:storage' && d.severity === 'hard')) {
+    return 'storage-error';
+  }
   if (flags.neverRan) return 'never-ran';
   if (flags.stale) return 'stale';
   return 'active';
@@ -549,7 +585,7 @@ async function queryExactHealth(
 
 async function buildLoopStation1(
   storage: Storage | null,
-  storageError: string | null,
+  storageIssue: StorageIssue | null,
   dbPath: string,
   now: Date,
 ): Promise<LoopStation1> {
@@ -557,13 +593,9 @@ async function buildLoopStation1(
   const sources: LoopCaptureSourceHealth[] = [];
 
   if (storage === null) {
-    degradations.push({
-      scope: 'station-1:storage',
-      severity: 'hard',
-      path: dbPath,
-      detail: `storage unreadable: ${storageError ?? 'unknown error'}`,
-      remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
-    });
+    degradations.push(
+      storageDegradation('station-1:storage', storageIssue ?? { kind: 'error', dbPath, message: 'unknown error' }),
+    );
   } else {
     try {
       for (const sourceClass of LOOP_CAPTURE_SOURCE_CLASSES) {
@@ -645,7 +677,7 @@ const STATION2_SUPERSEDE_NOTE =
 
 async function buildLoopStation2(
   storage: Storage | null,
-  storageError: string | null,
+  storageIssue: StorageIssue | null,
   dbPath: string,
   now: Date,
   staleMs: number,
@@ -726,13 +758,9 @@ async function buildLoopStation2(
 
   let signalAtoms: { newestTimestamp: string | null; count: number } | null = null;
   if (storage === null) {
-    degradations.push({
-      scope: 'station-2:storage',
-      severity: 'hard',
-      path: dbPath,
-      detail: `storage unreadable: ${storageError ?? 'unknown error'}`,
-      remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
-    });
+    degradations.push(
+      storageDegradation('station-2:storage', storageIssue ?? { kind: 'error', dbPath, message: 'unknown error' }),
+    );
   } else {
     try {
       signalAtoms = await queryExactHealth(storage, GRANOLA_SIGNAL_SOURCE);
@@ -1009,7 +1037,7 @@ function parseIntakeEnabledFlag(raw: string | undefined): boolean {
 
 async function buildLoopStation3(
   storage: Storage | null,
-  storageError: string | null,
+  storageIssue: StorageIssue | null,
   dbPath: string,
   env: NodeJS.ProcessEnv,
 ): Promise<LoopStation3> {
@@ -1055,11 +1083,17 @@ async function buildLoopStation3(
 
   let teamDecisionsCount: number | null = null;
   if (storage === null) {
+    // team-decisions count is a preview; keep it soft (missing or error) — a
+    // hard storage fault already surfaces at station-1.
+    const detail =
+      storageIssue?.kind === 'missing'
+        ? 'derived:team-decisions count unavailable: atom db not created yet.'
+        : `derived:team-decisions count unavailable: ${storageIssue?.message ?? 'storage unreadable'}`;
     degradations.push({
       scope: 'station-3:storage',
       severity: 'soft',
       path: dbPath,
-      detail: `derived:team-decisions count unavailable: ${storageError ?? 'storage unreadable'}`,
+      detail,
       remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
     });
   } else {
@@ -1112,18 +1146,33 @@ export async function buildLoopReport(
   const portOwnerLookup = opts.portOwnerLookup ?? defaultPortOwnerLookup;
   const readPidArgv = opts.readPidArgv ?? defaultReadPidArgv;
 
+  // Read-only contract (AC1/AC2): doctor never creates or migrates the atom db.
+  // `SqliteStorage`'s constructor mkdirs + creates + migrates, so the DEFAULT
+  // open is gated on the db file already existing — a missing db is a soft
+  // not-yet-run state, never a silently-created empty store. An injected
+  // `openStorage` (tests) is trusted as-is; a present-but-unreadable db is a
+  // hard error.
   let storage: Storage | null = null;
-  let storageError: string | null = null;
-  try {
-    storage = (opts.openStorage ?? (() => new SqliteStorage(dbPath)))();
-  } catch (err) {
-    storage = null;
-    storageError = (err as Error).message;
+  let storageIssue: StorageIssue | null = null;
+  if (opts.openStorage !== undefined) {
+    try {
+      storage = opts.openStorage();
+    } catch (err) {
+      storageIssue = { kind: 'error', dbPath, message: (err as Error).message };
+    }
+  } else if (!existsSync(dbPath)) {
+    storageIssue = { kind: 'missing', dbPath };
+  } else {
+    try {
+      storage = new SqliteStorage(dbPath);
+    } catch (err) {
+      storageIssue = { kind: 'error', dbPath, message: (err as Error).message };
+    }
   }
 
   try {
-    const station1 = await buildLoopStation1(storage, storageError, dbPath, now);
-    const station2 = await buildLoopStation2(storage, storageError, dbPath, now, staleMs);
+    const station1 = await buildLoopStation1(storage, storageIssue, dbPath, now);
+    const station2 = await buildLoopStation2(storage, storageIssue, dbPath, now, staleMs);
     const serving = await buildLoopServing(
       ctx.port,
       ctx.pidLockPath,
@@ -1132,7 +1181,7 @@ export async function buildLoopReport(
       readPidArgv,
       stalenessDirs,
     );
-    const station3 = await buildLoopStation3(storage, storageError, dbPath, process.env);
+    const station3 = await buildLoopStation3(storage, storageIssue, dbPath, process.env);
     const status: LoopStatus =
       station1.status === 'degraded' ||
       station2.status === 'degraded' ||

@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -462,6 +470,62 @@ describe('doctor loop section (item 117)', () => {
         parseError.loop.station2.condition,
       ]).size,
     ).toBe(3);
+  });
+
+  // ─── Read-only contract (remediation: doctor must not create the db) ──────
+  it('read-only: a missing db is NOT created; station-1 db-missing soft, overall healthy', async () => {
+    healthyPid();
+    const dbPath = join(dataDir, 'echo.db');
+    expect(existsSync(dbPath)).toBe(false);
+    // NOTE: no openStorage injected → exercises the real default open path.
+    const report = await buildLoop({
+      portOwnerLookup: async () => 4242,
+      readPidArgv: async () => ['node', '/repo/dist/daemon/index.js'],
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    // The db must NOT have been materialized by doctor.
+    expect(existsSync(dbPath)).toBe(false);
+    expect(report.loop.station1.condition).toBe('db-missing');
+    const deg = report.loop.station1.degradations.find((d) => d.scope === 'station-1:storage');
+    expect(deg?.severity).toBe('soft');
+    expect(deg?.detail.toLowerCase()).toContain('not created yet');
+    expect(report.loop.station1.sources).toEqual([]);
+    // station-2/3 also can't query, but stay soft; overall not downgraded.
+    expect(report.loop.station2.degradations.every((d) => d.severity === 'soft')).toBe(true);
+    expect(report.overall).toBe('healthy');
+  });
+
+  it('read-only: an unreadable (present but corrupt) db is a hard station-1 fault', async () => {
+    healthyPid();
+    const report = await buildLoop({
+      openStorage: () => {
+        throw new Error('file is not a database');
+      },
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(report.loop.station1.condition).toBe('storage-error');
+    const deg = report.loop.station1.degradations.find((d) => d.scope === 'station-1:storage');
+    expect(deg?.severity).toBe('hard');
+    expect(report.overall).toBe('degraded');
+  });
+
+  it('matrix: serving port-owner lookup THROWS → unknown/degraded, rest renders', async () => {
+    healthyPid();
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      portOwnerLookup: async () => {
+        throw new Error('lsof exploded');
+      },
+      readPidArgv: async () => ['node', '/repo/dist/daemon/index.js'],
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(report.loop.serving.listeningPid).toBeNull();
+    expect(report.loop.serving.classification).toBe('unknown');
+    expect(report.loop.serving.condition).toBe('no-listener');
+    const deg = report.loop.serving.degradations.find((d) => d.scope === 'serving:port-owner');
+    expect(deg?.severity).toBe('soft');
+    expect(report.loop.station1.sources.length).toBeGreaterThan(0); // rest renders
+    expect(report.overall).toBe('healthy');
   });
 
   // ─── AC6 degradation matrix — one fixture per row ─────────────────────────
