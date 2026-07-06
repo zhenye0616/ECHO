@@ -15,6 +15,7 @@ files_to_modify:
   # PROVISIONAL
   - src/enrich/decision-drift.ts                       # classify deliverPair errors; proven Slack rejection → bounded delivery-deferred retry
   - tests/enrich/                                      # 429-then-success, exhaustion, crash-recovery-posts-zero coverage
+ready_content_sha: 8164df830e8de441334341b298af52f5f778a6c9acab8cd3b5f4094f412b1a08
 ---
 
 ## Problem
