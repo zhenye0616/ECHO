@@ -19,6 +19,7 @@ files_to_modify:
   - src/enrich/granola-signals.ts                      # pin subject format in the extraction prompt (prompt text only)
   - tests/util/                                        # normalizeSubject separator-fold fixtures (the 3 measured pairs)
   - tests/enrich/                                      # nominator + near-miss + observability coverage
+ready_content_sha: f76abf6bdbba7eec0142f7be950c0130d8662f065adb72aacec02d489daeee93
 ---
 
 ## Problem
