@@ -2,6 +2,9 @@
 id: 2026-07-06-119-drift-delivery-retry
 title: "Drift alert delivery: retry proven Slack rejections, at-most-once preserved for ambiguous crash + unknown-outcome"
 status: proposed
+claimed_by: "builder-119-7c078333"
+claimed_at: "2026-07-06T01:52:01Z"
+branch: "agent/drift-delivery-retry"
 priority: HIGH
 estimate: 1d
 created: 2026-07-06
