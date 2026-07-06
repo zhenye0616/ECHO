@@ -77,7 +77,10 @@ export interface DoctorReport {
 // they mark the station's own status + carry remediation for the operator, but
 // they never downgrade `overall`. This split is what lets the loop section be
 // "included in the overall rollup" without a fresh install (no checkpoints,
-// empty db, nothing listening) reporting itself as unhealthy.
+// empty db, nothing listening) reporting itself as unhealthy. Each station also
+// exposes a machine-readable `condition` discriminator (e.g. never-ran vs stale
+// vs checkpoint-unreadable) so tooling can tell the states apart without
+// parsing rendered prose; `tests/cli/doctor-loop.test.ts` pins the boundary.
 
 export type LoopStatus = 'ok' | 'degraded';
 
@@ -103,8 +106,36 @@ export interface LoopGranolaCheckpoint {
   ageMs: number | null;
 }
 
+// Machine-readable per-station condition discriminators (rider 2): tooling
+// reads `condition` instead of parsing rendered prose. `status` stays the
+// coarse ok/degraded; `condition` names the dominant state (hard states take
+// precedence over soft). The station's full degradation list is still in
+// `degradations` (each with its own machine-readable `scope`+`severity`).
+export type Station1Condition =
+  | 'ok'
+  | 'checkpoint-missing'
+  | 'checkpoint-unreadable'
+  | 'storage-error';
+export type Station2Condition =
+  | 'active'
+  | 'never-ran'
+  | 'stale'
+  | 'checkpoint-unreadable'
+  | 'storage-error';
+export type ServingCondition =
+  | 'ok'
+  | 'no-listener'
+  | 'pid-disagreement'
+  | 'argv-unreadable'
+  | 'classify-unknown'
+  | 'dist-stale'
+  | 'src-dev-serving'
+  | 'staleness-unknown';
+export type Station3Condition = 'ok' | 'not-yet-run' | 'seed-store-unreadable';
+
 export interface LoopStation1 {
   status: LoopStatus;
+  condition: Station1Condition;
   sources: LoopCaptureSourceHealth[];
   granolaCheckpoint: LoopGranolaCheckpoint;
   degradations: LoopDegradation[];
@@ -118,6 +149,7 @@ export interface LoopFailingNote {
 
 export interface LoopStation2 {
   status: LoopStatus;
+  condition: Station2Condition;
   flags: { neverRan: boolean; stale: boolean };
   checkpointMtimeIso: string | null;
   checkpointAgeMs: number | null;
@@ -132,6 +164,7 @@ export type ServingStaleness = 'fresh' | 'dist-stale' | 'src-dev-serving' | 'sta
 
 export interface LoopServing {
   status: LoopStatus;
+  condition: ServingCondition;
   port: number;
   listeningPid: number | null;
   pidLockPid: number | null;
@@ -149,6 +182,7 @@ export interface LoopSeedStoreHealth {
 
 export interface LoopStation3 {
   status: LoopStatus;
+  condition: Station3Condition;
   seedStores: LoopSeedStoreHealth[];
   intakeEnabled: boolean;
   intakeEnabledNote: string;
@@ -436,6 +470,53 @@ function stationStatus(degradations: readonly LoopDegradation[]): LoopStatus {
   return degradations.length > 0 ? 'degraded' : 'ok';
 }
 
+function hasScope(degradations: readonly LoopDegradation[], scope: string): boolean {
+  return degradations.some((d) => d.scope === scope);
+}
+
+function station1Condition(degradations: readonly LoopDegradation[]): Station1Condition {
+  if (hasScope(degradations, 'station-1:storage')) return 'storage-error';
+  const cp = degradations.find((d) => d.scope === 'station-1:granola-checkpoint');
+  if (cp?.severity === 'hard') return 'checkpoint-unreadable';
+  if (cp !== undefined) return 'checkpoint-missing';
+  return 'ok';
+}
+
+function station2Condition(
+  degradations: readonly LoopDegradation[],
+  flags: { neverRan: boolean; stale: boolean },
+): Station2Condition {
+  const cp = degradations.find((d) => d.scope === 'station-2:checkpoint');
+  if (cp?.severity === 'hard') return 'checkpoint-unreadable';
+  if (hasScope(degradations, 'station-2:storage')) return 'storage-error';
+  if (flags.neverRan) return 'never-ran';
+  if (flags.stale) return 'stale';
+  return 'active';
+}
+
+function servingCondition(
+  degradations: readonly LoopDegradation[],
+  staleness: ServingStaleness,
+): ServingCondition {
+  if (hasScope(degradations, 'serving:pid-disagreement')) return 'pid-disagreement';
+  if (hasScope(degradations, 'serving:argv')) return 'argv-unreadable';
+  if (hasScope(degradations, 'serving:port-owner')) return 'no-listener';
+  if (staleness === 'dist-stale') return 'dist-stale';
+  if (staleness === 'src-dev-serving') return 'src-dev-serving';
+  if (hasScope(degradations, 'serving:classify')) return 'classify-unknown';
+  if (staleness === 'staleness-unknown') return 'staleness-unknown';
+  return 'ok';
+}
+
+function station3Condition(
+  degradations: readonly LoopDegradation[],
+  seedStores: readonly LoopSeedStoreHealth[],
+): Station3Condition {
+  if (hasScope(degradations, 'station-3:seed-store')) return 'seed-store-unreadable';
+  if (seedStores.length === 0) return 'not-yet-run';
+  return 'ok';
+}
+
 function loopHasHardFault(loop: DoctorLoopReport): boolean {
   const all = [
     ...loop.station1.degradations,
@@ -548,7 +629,13 @@ async function buildLoopStation1(
     }
   }
 
-  return { status: stationStatus(degradations), sources, granolaCheckpoint, degradations };
+  return {
+    status: stationStatus(degradations),
+    condition: station1Condition(degradations),
+    sources,
+    granolaCheckpoint,
+    degradations,
+  };
 }
 
 const STATION2_DISABLE_INFERENCE_NOTE =
@@ -662,6 +749,7 @@ async function buildLoopStation2(
 
   return {
     status: stationStatus(degradations),
+    condition: station2Condition(degradations, { neverRan, stale }),
     flags: { neverRan, stale },
     checkpointMtimeIso,
     checkpointAgeMs,
@@ -897,6 +985,7 @@ async function buildLoopServing(
 
   return {
     status: stationStatus(degradations),
+    condition: servingCondition(degradations, staleness),
     port,
     listeningPid,
     pidLockPid,
@@ -989,6 +1078,7 @@ async function buildLoopStation3(
 
   return {
     status: stationStatus(degradations),
+    condition: station3Condition(degradations, seedStores),
     seedStores,
     intakeEnabled: parseIntakeEnabledFlag(env['ECHO_GRANOLA_INTAKE_ENABLED']),
     intakeEnabledNote: STATION3_INTAKE_ENV_NOTE,

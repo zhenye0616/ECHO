@@ -205,6 +205,10 @@ describe('doctor loop section (item 117)', () => {
 
     expect(report.overall).toBe('healthy');
     expect(report.loop.status).toBe('ok');
+    expect(report.loop.station1.condition).toBe('ok');
+    expect(report.loop.station2.condition).toBe('active');
+    expect(report.loop.serving.condition).toBe('ok');
+    expect(report.loop.station3.condition).toBe('ok');
     // station 1
     const granola = report.loop.station1.sources.find((s) => s.sourceClass === 'api:granola');
     expect(granola).toMatchObject({ count: 1, newestTimestamp: '2026-07-04T10:00:00.000Z' });
@@ -391,6 +395,73 @@ describe('doctor loop section (item 117)', () => {
     ]);
     expect(report.loop.serving).toMatchObject({ classification: 'packaged-dist', port: 39998 });
     expect(Array.isArray(report.loop.station1.sources)).toBe(true);
+  });
+
+  // ─── Rollup-boundary contract (reviewer rider 1) ──────────────────────────
+  // Pins the soft/hard split so a future edit can't silently start downgrading
+  // `overall` for the quiet-day case. A report with a missing signals
+  // checkpoint (never-ran) AND an empty db AND nothing listening on the port
+  // stays overall:healthy, while each station still reports its informational
+  // condition.
+  it('boundary contract: never-ran + empty-db + no-listener stays overall healthy', async () => {
+    healthyPid();
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(), // empty db
+      portOwnerLookup: async () => null, // nothing listening
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(report.overall).toBe('healthy');
+    expect(report.loop.status).toBe('degraded'); // section flags soft states…
+    // …but only via informational conditions, no hard fault:
+    expect(report.loop.station2.condition).toBe('never-ran');
+    expect(report.loop.serving.condition).toBe('no-listener');
+    expect(report.loop.station3.condition).toBe('not-yet-run');
+    const allDegradations = [
+      ...report.loop.station1.degradations,
+      ...report.loop.station2.degradations,
+      ...report.loop.serving.degradations,
+      ...report.loop.station3.degradations,
+    ];
+    expect(allDegradations.every((d) => d.severity === 'soft')).toBe(true);
+    // station-1 sources still render (empty counts, not an error)
+    expect(report.loop.station1.sources.every((s) => s.count === 0)).toBe(true);
+  });
+
+  it('condition discriminator: never-ran vs stale vs parse-error are machine-distinct', async () => {
+    healthyPid();
+    // never-ran (no checkpoint)
+    const neverRan = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(neverRan.loop.station2.condition).toBe('never-ran');
+
+    // stale (checkpoint present, aged past threshold)
+    const stalePath = writeSignalsCheckpoint({ schema_version: 1, notes: {} });
+    const staleMtime = statSync(stalePath).mtimeMs;
+    const stale = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopSignalsStaleMs: 60 * 60 * 1000,
+      now: () => new Date(staleMtime + 2 * 60 * 60 * 1000),
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(stale.loop.station2.condition).toBe('stale');
+
+    // parse-error (malformed checkpoint)
+    writeSignalsCheckpoint('{ broken');
+    const parseError = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(parseError.loop.station2.condition).toBe('checkpoint-unreadable');
+    // all three are distinct values a tool can switch on without prose parsing
+    expect(
+      new Set([
+        neverRan.loop.station2.condition,
+        stale.loop.station2.condition,
+        parseError.loop.station2.condition,
+      ]).size,
+    ).toBe(3);
   });
 
   // ─── AC6 degradation matrix — one fixture per row ─────────────────────────
@@ -588,10 +659,10 @@ describe('doctor loop section (item 117)', () => {
       loopStalenessDirs: makeStalenessDirs('dist-newer'),
     });
     const text = out.join('');
-    expect(text).toContain('loop station-1 capture:');
-    expect(text).toContain('loop station-2 signals:');
-    expect(text).toContain('loop serving:');
-    expect(text).toContain('loop station-3 packet:');
+    expect(text).toContain('loop station-1 capture [checkpoint-unreadable]:');
+    expect(text).toContain('loop station-2 signals [');
+    expect(text).toContain('loop serving [');
+    expect(text).toContain('loop station-3 packet [');
     expect(text).toContain('[hard] station-1:granola-checkpoint');
     expect(text).toContain('remediation:');
     expect(text).toContain('note:'); // honest limitation notes rendered

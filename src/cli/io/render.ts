@@ -113,20 +113,19 @@ export function renderLoopLines(report: DoctorReport): string[] {
   const s1 = loop.station1;
   const cp = s1.granolaCheckpoint;
   lines.push(
-    `loop station-1 capture: granola-checkpoint=${cp.present ? 'present' : 'absent'} high_water_mark=${cp.highWaterMark ?? 'none'} last_synced_at=${cp.lastSyncedAt ?? 'none'} ingested_notes=${cp.ingestedNoteCount ?? 'n/a'}`,
+    `loop station-1 capture [${s1.condition}]: granola-checkpoint=${cp.present ? 'present' : 'absent'} high_water_mark=${cp.highWaterMark ?? 'none'} last_synced_at=${cp.lastSyncedAt ?? 'none'} ingested_notes=${cp.ingestedNoteCount ?? 'n/a'}`,
   );
   for (const src of s1.sources) {
     lines.push(`  ${src.sourceClass} count=${src.count} newest=${src.newestTimestamp ?? 'none'}`);
   }
 
   const s2 = loop.station2;
-  const flag = s2.flags.neverRan ? 'never-ran' : s2.flags.stale ? 'stale' : 'active';
   const signals =
     s2.signalAtoms === null
       ? 'unavailable'
       : `${s2.signalAtoms.count}@${s2.signalAtoms.newestTimestamp ?? 'none'}`;
   lines.push(
-    `loop station-2 signals: ${flag} checkpoint_mtime=${s2.checkpointMtimeIso ?? 'none'} failing_notes=${s2.failingNotes.length} signals=${signals}`,
+    `loop station-2 signals [${s2.condition}]: checkpoint_mtime=${s2.checkpointMtimeIso ?? 'none'} failing_notes=${s2.failingNotes.length} signals=${signals}`,
   );
   for (const note of s2.failingNotes) {
     lines.push(
@@ -136,12 +135,12 @@ export function renderLoopLines(report: DoctorReport): string[] {
 
   const sv = loop.serving;
   lines.push(
-    `loop serving: class=${sv.classification} listening_pid=${sv.listeningPid ?? 'none'} pid_lock=${sv.pidLockPid ?? 'none'} staleness=${sv.staleness} path=${sv.executingPath ?? 'none'}`,
+    `loop serving [${sv.condition}]: class=${sv.classification} listening_pid=${sv.listeningPid ?? 'none'} pid_lock=${sv.pidLockPid ?? 'none'} staleness=${sv.staleness} path=${sv.executingPath ?? 'none'}`,
   );
 
   const s3 = loop.station3;
   lines.push(
-    `loop station-3 packet: intake_enabled=${s3.intakeEnabled} (doctor-env-only) team_decisions=${s3.teamDecisionsCount ?? 'n/a'}`,
+    `loop station-3 packet [${s3.condition}]: intake_enabled=${s3.intakeEnabled} (doctor-env-only) team_decisions=${s3.teamDecisionsCount ?? 'n/a'}`,
   );
   if (s3.seedStores.length === 0) {
     lines.push('  seed-stores: none (not yet run)');
