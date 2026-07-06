@@ -28,6 +28,11 @@ import {
 import { getSignalWindow, type SignalWindowEntry } from '../trace/signal-window.js';
 import { GRANOLA_SIGNAL_SOURCE, type GranolaSignalType } from './granola-signals.js';
 import { normalizeSubject } from '../util/subject.js';
+import {
+  DRIFT_SWEEP_WORKER,
+  writeWorkerHeartbeat,
+  type WorkerHeartbeat,
+} from './worker-heartbeat.js';
 import type { CaptureEvent, Storage } from '../storage/interface.js';
 
 // Packaging boundary (tests/packaging/import-closure.test.ts): this module ships
@@ -553,6 +558,11 @@ export interface DriftSweepWorkerOptions {
 export type DriftSweepResult =
   | {
       status: 'ok';
+      // AC4 (item 120): `degraded` distinguishes an all-retryable stall (brain
+      // invoked, every judged pair hit a retryable infra failure, watermark
+      // frozen, no terminal progress) from a healthy tick. It rides the `ok`
+      // branch so existing consumers that switch on `status` are unaffected.
+      degraded: boolean;
       window_size: number;
       statements_seen: number;
       brain_invocations: number;
@@ -561,6 +571,11 @@ export type DriftSweepResult =
       deferred: number;
       delivery_failed: number;
       judge_failed: number;
+      // Tick-local count of pairs that hit a retryable infra failure this tick
+      // (the `drift_judge_retryable` sites). Distinct from the aggregate terminal
+      // `judge_failed`, so the `degraded` predicate is built from an unambiguous
+      // field.
+      retryable_failures: number;
       watermark: number;
     }
   | { status: 'skipped'; reason: 'in_flight' | 'disabled' }
@@ -619,6 +634,13 @@ export async function runDriftSweepOnce(
   let deferred = 0;
   let deliveryFailed = 0;
   let judgeFailed = 0;
+  // AC4 (item 120): a per-tick count of retryable infra failures, and a count of
+  // pairs that reached `judged-no-contradiction` this tick — the one terminal
+  // outcome not already reflected in the delivered/failed counters. Together they
+  // let the degraded predicate ask "was there any terminal progress?" without
+  // instrumenting every terminal site.
+  let retryableFailures = 0;
+  let noContradiction = 0;
   let deliveredThisTick = 0;
   // sequence_ids of statements whose pairs are NOT all terminal after this tick.
   const blockingSeqs: number[] = [];
@@ -716,6 +738,7 @@ export async function runDriftSweepOnce(
     if (resolution.kind === 'retryable') {
       // Non-terminal: leave unjudged, no checkpoint entry, block the watermark so
       // a transient outage is retried next tick (AC3).
+      retryableFailures += 1;
       blockingSeqs.push(statement.sequence_id);
       log.warn('drift_judge_retryable', {
         pair_key: pairKey,
@@ -734,6 +757,7 @@ export async function runDriftSweepOnce(
         updated_at: runtime.now(),
       };
       persist(); // AC3: checkpoint written atomically as last step of judging
+      noContradiction += 1; // terminal progress this tick (item 120 AC4)
       continue;
     }
 
@@ -851,6 +875,25 @@ export async function runDriftSweepOnce(
   }
   persist();
 
+  // AC4 (item 120): a tick is `degraded` iff the brain was called, every judged
+  // pair hit a retryable infra failure, the watermark did not advance, and no
+  // pair reached a terminal state (delivered / delivery-failed / judge-failed /
+  // judged-no-contradiction) this tick. A quiet tick (no brain call) or any
+  // terminal progress is NOT degraded, so a terminal judge failure is never
+  // miscounted as a stall.
+  // "Advanced" means the watermark cleared the whole window (reached maxSeq+1),
+  // NOT merely moved forward to pin the earliest blocker — a held watermark has
+  // not advanced past the stalled statements. `blockingSeqs` is non-empty
+  // exactly when a statement held the watermark this tick.
+  const watermarkAdvanced = window.length > 0 && blockingSeqs.length === 0;
+  const terminalProgressThisTick =
+    delivered > 0 || deliveryFailed > 0 || judgeFailed > 0 || noContradiction > 0;
+  const degraded =
+    brainInvocations > 0 &&
+    retryableFailures > 0 &&
+    !watermarkAdvanced &&
+    !terminalProgressThisTick;
+
   log.info('drift_sweep_ok', {
     window_size: window.length,
     brain_invocations: brainInvocations,
@@ -859,11 +902,14 @@ export async function runDriftSweepOnce(
     deferred,
     delivery_failed: deliveryFailed,
     judge_failed: judgeFailed,
+    retryable_failures: retryableFailures,
+    degraded,
     watermark: checkpoint.watermark,
   });
 
   return {
     status: 'ok',
+    degraded,
     window_size: window.length,
     statements_seen: window.filter((e) => toStatement(e) !== null).length,
     brain_invocations: brainInvocations,
@@ -872,6 +918,7 @@ export async function runDriftSweepOnce(
     deferred,
     delivery_failed: deliveryFailed,
     judge_failed: judgeFailed,
+    retryable_failures: retryableFailures,
     watermark: checkpoint.watermark,
   };
 }
@@ -1086,7 +1133,65 @@ export async function postDriftAlertCard(
   }
 }
 
-function disabledHandle(configError?: DriftSweepConfigError): DriftSweepWorkerHandle {
+/** Item 120 AC2/AC4: map a completed sweep result to its heartbeat. `ok` maps to
+ *  `degraded` when AC4's discriminator is set; a `skipped/disabled` (stopped)
+ *  tick maps to `disabled`; `skipped/in_flight` to `ok` (worker alive, overlap);
+ *  an `error` result to `degraded` with the error message as the reason. A tick
+ *  failure never reads as `ok`. */
+function driftSweepHeartbeat(result: DriftSweepResult, lastTickAt: string): WorkerHeartbeat {
+  if (result.status === 'ok') {
+    return {
+      schema_version: 1,
+      worker: DRIFT_SWEEP_WORKER,
+      last_tick_at: lastTickAt,
+      status: result.degraded ? 'degraded' : 'ok',
+      ...(result.degraded
+        ? {
+            reason:
+              'all-retryable stall: brain invoked, every judged pair hit a retryable failure, watermark frozen',
+          }
+        : {}),
+      counters: {
+        window_size: result.window_size,
+        brain_invocations: result.brain_invocations,
+        contradictions: result.contradictions,
+        delivered: result.delivered,
+        deferred: result.deferred,
+        delivery_failed: result.delivery_failed,
+        judge_failed: result.judge_failed,
+        watermark: result.watermark,
+      },
+    };
+  }
+  if (result.status === 'skipped') {
+    return {
+      schema_version: 1,
+      worker: DRIFT_SWEEP_WORKER,
+      last_tick_at: lastTickAt,
+      status: result.reason === 'disabled' ? 'disabled' : 'ok',
+      ...(result.reason === 'disabled' ? { reason: 'worker stopped' } : {}),
+    };
+  }
+  return {
+    schema_version: 1,
+    worker: DRIFT_SWEEP_WORKER,
+    last_tick_at: lastTickAt,
+    status: 'degraded',
+    reason: result.message,
+  };
+}
+
+/** Item 120 AC3: every boot-time permanent-disable path emits a `disabled`
+ *  heartbeat carrying the reason, so accidental disablement is observable
+ *  without throwing. */
+function disabledHandle(reason: string, configError?: DriftSweepConfigError): DriftSweepWorkerHandle {
+  writeWorkerHeartbeat(DRIFT_SWEEP_WORKER, {
+    schema_version: 1,
+    worker: DRIFT_SWEEP_WORKER,
+    last_tick_at: new Date().toISOString(),
+    status: 'disabled',
+    reason,
+  });
   return {
     enabled: false,
     ...(configError !== undefined ? { configError } : {}),
@@ -1113,12 +1218,12 @@ export async function startDriftSweepWorker(
   } catch (err) {
     if (err instanceof DriftSweepConfigError) {
       log.error('config_error', { missing: err.missing, message: err.message });
-      return disabledHandle(err);
+      return disabledHandle(err.message, err);
     }
     throw err;
   }
 
-  if (!config.enabled) return disabledHandle();
+  if (!config.enabled) return disabledHandle('ECHO_DRIFT_SWEEP_ENABLED not enabled');
 
   const identities = options.identities ?? config.identities;
   const botToken = options.botToken ?? config.botToken;
@@ -1131,7 +1236,7 @@ export async function startDriftSweepWorker(
       judge = defaultJudgeFromBrain(brainConfig);
     } catch (err) {
       log.error('disabled', { reason: (err as Error).message });
-      return disabledHandle();
+      return disabledHandle(`brain preflight failed: ${(err as Error).message}`);
     }
   }
 
@@ -1153,7 +1258,7 @@ export async function startDriftSweepWorker(
   let stopped = false;
   let inFlight: Promise<DriftSweepResult> | null = null;
 
-  async function run(): Promise<DriftSweepResult> {
+  async function runInner(): Promise<DriftSweepResult> {
     if (stopped) return { status: 'skipped', reason: 'disabled' };
     if (inFlight !== null) {
       log.warn('worker_skipped_in_flight', {});
@@ -1174,6 +1279,14 @@ export async function startDriftSweepWorker(
     } finally {
       inFlight = null;
     }
+  }
+
+  // Item 120 AC2: write a heartbeat at the end of every run() (tick, overlap
+  // skip, or error), best-effort so the write can never harm the tick.
+  async function run(): Promise<DriftSweepResult> {
+    const result = await runInner();
+    writeWorkerHeartbeat(DRIFT_SWEEP_WORKER, driftSweepHeartbeat(result, runtime.now()));
+    return result;
   }
 
   const interval = setInterval(() => {

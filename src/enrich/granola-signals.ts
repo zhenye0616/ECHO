@@ -10,6 +10,11 @@ import { normalizeSubject } from '../util/subject.js';
 import { parseBrainName, preflightBrain, runBrain, type BrainName } from '../brain/brain.js';
 import type { CaptureEvent, EventId, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
+import {
+  GRANOLA_SIGNALS_WORKER,
+  writeWorkerHeartbeat,
+  type WorkerHeartbeat,
+} from './worker-heartbeat.js';
 
 export const GRANOLA_RAW_SOURCE = 'api:granola';
 export const GRANOLA_SIGNAL_SOURCE = 'derived:granola-signals';
@@ -911,6 +916,63 @@ function parseExtractedSignal(value: unknown): GranolaExtractedSignal {
   return out;
 }
 
+/** Item 120 AC2: map a completed run to its heartbeat. An `ok` tick reports the
+ *  115 observability block (flattened into the worker-agnostic numeric counters
+ *  map) alongside notes_seen/notes_extracted/signal_atoms_written. A
+ *  `brain_unavailable` skip (the lazy-preflight miss — exactly the f19dc419
+ *  silent-brain-down class) is `degraded`, NOT healthy. A `disabled` skip
+ *  (stopped) is `disabled`; an `in_flight` skip is `ok`; an `error` is
+ *  `degraded` with the error message. */
+function granolaSignalHeartbeat(
+  result: GranolaSignalWorkerResult,
+  lastTickAt: string,
+): WorkerHeartbeat {
+  if (result.status === 'ok') {
+    const o = result.observability;
+    return {
+      schema_version: 1,
+      worker: GRANOLA_SIGNALS_WORKER,
+      last_tick_at: lastTickAt,
+      status: 'ok',
+      counters: {
+        notes_seen: result.notes_seen,
+        notes_extracted: result.notes_extracted,
+        signal_atoms_written: result.signal_atoms_written,
+        skipped_missing_summary: o.skipped_notes.missing_summary,
+        skipped_missing_transcript: o.skipped_notes.missing_transcript,
+        skipped_missing_dedupe_key: o.skipped_notes.missing_dedupe_key,
+        malformed_events: o.malformed_events,
+        unparsable_updated_at: o.unparsable_updated_at,
+      },
+    };
+  }
+  if (result.status === 'skipped') {
+    if (result.reason === 'brain_unavailable') {
+      return {
+        schema_version: 1,
+        worker: GRANOLA_SIGNALS_WORKER,
+        last_tick_at: lastTickAt,
+        status: 'degraded',
+        reason: 'brain unavailable: lazy preflight missed this tick',
+      };
+    }
+    return {
+      schema_version: 1,
+      worker: GRANOLA_SIGNALS_WORKER,
+      last_tick_at: lastTickAt,
+      status: result.reason === 'disabled' ? 'disabled' : 'ok',
+      ...(result.reason === 'disabled' ? { reason: 'worker stopped' } : {}),
+    };
+  }
+  return {
+    schema_version: 1,
+    worker: GRANOLA_SIGNALS_WORKER,
+    last_tick_at: lastTickAt,
+    status: 'degraded',
+    reason: result.message,
+  };
+}
+
 export async function startGranolaSignalWorker(
   storage: Storage,
   options: GranolaSignalWorkerOptions = {},
@@ -921,7 +983,16 @@ export async function startGranolaSignalWorker(
     try {
       brainConfig = resolveBrainExtractorConfig(options.env ?? process.env);
     } catch (err) {
+      // Item 120 AC3: config-parse disable is a permanent disable — make it
+      // observable with a `disabled` heartbeat carrying the caught error.
       log.error('disabled', { reason: (err as Error).message });
+      writeWorkerHeartbeat(GRANOLA_SIGNALS_WORKER, {
+        schema_version: 1,
+        worker: GRANOLA_SIGNALS_WORKER,
+        last_tick_at: new Date().toISOString(),
+        status: 'disabled',
+        reason: (err as Error).message,
+      });
       return {
         enabled: false,
         run: async () => ({ status: 'skipped', reason: 'disabled' }),
@@ -929,6 +1000,7 @@ export async function startGranolaSignalWorker(
       };
     }
   }
+  const nowFn = options.now ?? (() => new Date().toISOString());
   const preflight = options.preflight ?? preflightBrain;
 
   // Brain preflight is LAZY with per-tick retry. Probing at boot raced the
@@ -956,7 +1028,7 @@ export async function startGranolaSignalWorker(
   let stopped = false;
   let inFlight: Promise<GranolaSignalWorkerResult> | null = null;
 
-  async function run(): Promise<GranolaSignalWorkerResult> {
+  async function runInner(): Promise<GranolaSignalWorkerResult> {
     if (stopped) return { status: 'skipped', reason: 'disabled' };
     if (inFlight !== null) {
       log.warn('worker_skipped_in_flight', {});
@@ -976,6 +1048,15 @@ export async function startGranolaSignalWorker(
     } finally {
       inFlight = null;
     }
+  }
+
+  // Item 120 AC2: write a heartbeat at the end of every run(). A
+  // `brain_unavailable` tick maps to `degraded` here so a silent brain outage
+  // (the f19dc419 class) is no longer indistinguishable from a quiet day.
+  async function run(): Promise<GranolaSignalWorkerResult> {
+    const result = await runInner();
+    writeWorkerHeartbeat(GRANOLA_SIGNALS_WORKER, granolaSignalHeartbeat(result, nowFn()));
+    return result;
   }
 
   const interval = setInterval(() => {

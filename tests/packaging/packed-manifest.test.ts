@@ -189,6 +189,8 @@ describe('packed package manifest', () => {
         "dist/enrich/granola-intake-seed-store.js",
         "dist/enrich/granola-signals.d.ts",
         "dist/enrich/granola-signals.js",
+        "dist/enrich/worker-heartbeat.d.ts",
+        "dist/enrich/worker-heartbeat.js",
         "dist/guards.d.ts",
         "dist/guards.js",
         "dist/index.d.ts",

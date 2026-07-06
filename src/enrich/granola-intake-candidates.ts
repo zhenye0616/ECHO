@@ -18,6 +18,11 @@ import {
   FileGranolaIntakeSeedStore,
   type GranolaIntakeSeedStore,
 } from './granola-intake-seed-store.js';
+import {
+  GRANOLA_INTAKE_BRIDGE_WORKER,
+  writeWorkerHeartbeat,
+  type WorkerHeartbeat,
+} from './worker-heartbeat.js';
 
 export const DEFAULT_GRANOLA_INTAKE_LOOKBACK_DAYS = 7;
 export const DEFAULT_GRANOLA_INTAKE_PER_NOTE_CAP = 3;
@@ -603,6 +608,68 @@ export async function postGranolaIntakeSeed(
   return { ts: body.ts };
 }
 
+/** Item 120 AC2: map a completed bridge run to its heartbeat. An `ok` tick
+ *  reports notes_seen/candidates/posted/failed/skipped. A `config` or `disabled`
+ *  skip is `disabled`; an `in_flight` skip is `ok`; an `error` is `degraded`
+ *  with the error message. */
+function granolaIntakeHeartbeat(
+  result: GranolaIntakeBridgeResult,
+  lastTickAt: string,
+): WorkerHeartbeat {
+  if (result.status === 'ok') {
+    return {
+      schema_version: 1,
+      worker: GRANOLA_INTAKE_BRIDGE_WORKER,
+      last_tick_at: lastTickAt,
+      status: 'ok',
+      counters: {
+        notes_seen: result.notes_seen,
+        candidates: result.candidates,
+        posted: result.posted,
+        failed: result.failed,
+        skipped: result.skipped,
+      },
+    };
+  }
+  if (result.status === 'skipped') {
+    if (result.reason === 'in_flight') {
+      return {
+        schema_version: 1,
+        worker: GRANOLA_INTAKE_BRIDGE_WORKER,
+        last_tick_at: lastTickAt,
+        status: 'ok',
+      };
+    }
+    return {
+      schema_version: 1,
+      worker: GRANOLA_INTAKE_BRIDGE_WORKER,
+      last_tick_at: lastTickAt,
+      status: 'disabled',
+      reason: result.reason === 'config' ? 'missing required config' : 'worker stopped',
+    };
+  }
+  return {
+    schema_version: 1,
+    worker: GRANOLA_INTAKE_BRIDGE_WORKER,
+    last_tick_at: lastTickAt,
+    status: 'degraded',
+    reason: result.message,
+  };
+}
+
+/** Item 120 AC3: emit a `disabled` heartbeat for a boot-time permanent-disable
+ *  path (config-parse error, disabled flag, or classifier-config error), so an
+ *  accidental disablement is externally observable. */
+function writeIntakeDisabledHeartbeat(reason: string): void {
+  writeWorkerHeartbeat(GRANOLA_INTAKE_BRIDGE_WORKER, {
+    schema_version: 1,
+    worker: GRANOLA_INTAKE_BRIDGE_WORKER,
+    last_tick_at: new Date().toISOString(),
+    status: 'disabled',
+    reason,
+  });
+}
+
 export function startGranolaIntakeBridge(
   storage: Storage,
   options: GranolaIntakeBridgeOptions = {},
@@ -614,6 +681,7 @@ export function startGranolaIntakeBridge(
   } catch (err) {
     if (err instanceof GranolaIntakeConfigError) {
       log.error('config_error', { missing: err.missing, message: err.message });
+      writeIntakeDisabledHeartbeat(err.message);
       return {
         enabled: false,
         configError: err,
@@ -625,6 +693,7 @@ export function startGranolaIntakeBridge(
   }
 
   if (!config.enabled) {
+    writeIntakeDisabledHeartbeat('ECHO_GRANOLA_INTAKE_ENABLED not enabled');
     return {
       enabled: false,
       run: async () => ({ status: 'skipped', reason: 'disabled' }),
@@ -639,6 +708,7 @@ export function startGranolaIntakeBridge(
       classify = defaultClassifierFromBrain(brainConfig);
     } catch (err) {
       log.error('disabled', { reason: (err as Error).message });
+      writeIntakeDisabledHeartbeat(`classifier config error: ${(err as Error).message}`);
       return {
         enabled: false,
         run: async () => ({ status: 'skipped', reason: 'disabled' }),
@@ -669,7 +739,9 @@ export function startGranolaIntakeBridge(
   let inFlight: Promise<GranolaIntakeBridgeResult> | null = null;
   let debounceTimer: NodeJS.Timeout | undefined;
 
-  async function run(): Promise<GranolaIntakeBridgeResult> {
+  const heartbeatNow = options.now ?? (() => new Date().toISOString());
+
+  async function runInner(): Promise<GranolaIntakeBridgeResult> {
     if (stopped) return { status: 'skipped', reason: 'disabled' };
     if (inFlight !== null) return { status: 'skipped', reason: 'in_flight' };
     inFlight = (async () => {
@@ -687,6 +759,13 @@ export function startGranolaIntakeBridge(
     } finally {
       inFlight = null;
     }
+  }
+
+  // Item 120 AC2: write a heartbeat at the end of every run(), best-effort.
+  async function run(): Promise<GranolaIntakeBridgeResult> {
+    const result = await runInner();
+    writeWorkerHeartbeat(GRANOLA_INTAKE_BRIDGE_WORKER, granolaIntakeHeartbeat(result, heartbeatNow()));
+    return result;
   }
 
   function trigger(): void {
