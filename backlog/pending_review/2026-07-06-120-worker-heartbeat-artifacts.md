@@ -9,6 +9,41 @@ blocked_by: []
 claimed_by: "builder-120-118-B4913C34"
 claimed_at: "2026-07-06T01:31:07Z"
 branch: "agent/worker-heartbeat-artifacts"
+head_sha: "f1a53d84bad48b752a7235247fdcc29a96a371c9"
+agent_notes: |
+  Built to all 5 ACs. New src/enrich/worker-heartbeat.ts exports the
+  doctor-facing contract (name constants + workerHeartbeatPath + WorkerHeartbeat
+  type + best-effort mkdir-before-atomicWrite writeWorkerHeartbeat). All three
+  enrichment workers write a heartbeat at the end of every run() (via a thin
+  run() wrapper over the existing runInner) and on every boot-time disable, with
+  an explicit TOTAL result->status mapping (error->degraded; signal
+  brain_unavailable->degraded per the f19dc419 silent-brain class; in_flight->ok;
+  disabled->disabled). Drift sweep gains a tick-local retryable_failures counter
+  and a degraded predicate (brain_invocations>0 && retryable_failures>0 &&
+  window-not-cleared && no-terminal-progress), surfaced in DriftSweepResult, the
+  drift_sweep_ok log, and the heartbeat status.
+
+  Design notes for reviewer: (1) heartbeat writes live in the run() wrapper, not
+  in runXxxOnce, so the Once functions stay pure and existing direct-call tests
+  are unaffected; the AC4 degraded-HEARTBEAT test therefore drives the worker,
+  while AC4 result-shape tests call runDriftSweepOnce directly. (2) "watermark
+  did not advance" = window fully cleared (blockingSeqs empty), NOT a value
+  change vs prior (a held watermark still moves 0 -> blocker seq on tick 1). (3)
+  Added beforeEach(setEchoHomeRoot(temp)) to decision-drift + granola-signals
+  test files so heartbeat writes never touch real ~/.echo/state.
+
+  SCOPE FLAG: tests/packaging/packed-manifest.test.ts is edited but is NOT in the
+  PROVISIONAL files_to_modify. It pins the sorted npm-pack file set; AC1's new
+  shipped module forces two new dist/enrich/worker-heartbeat entries into that
+  set. The diff is exactly those 2 lines; without it the product suite is red.
+  Surfaced per drift-rule 4 rather than silently absorbing.
+
+  typecheck clean, lint clean. Enrich suites 79/79 pass. Full test:product: the
+  only red tests are load-sensitive timing/perf/subprocess flakes that shift
+  run-to-run (coord-volume-perf 100k <1500ms, ceo-slack-brain process-kill
+  timing, cli/shell-reachable npm-pack+bash) — ALL pass in isolation, none touch
+  enrich/heartbeat code. Run log:
+  raw/internal/agent-runs/2026-07-06-2026-07-06-120-worker-heartbeat-artifacts.md
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B7 root cause: fail-closed without observable degraded state
   - raw/internal/decisions/2026-07-05-terminal-first-demo-surface.md       # observability over stations 1-3 is the sprint's demo goal
