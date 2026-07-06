@@ -203,3 +203,64 @@ riders; implemented all three on `agent/loop-observability-stations-1-3`.
 - No scope drift: `condition` is an additive machine-readable discriminator over
   the loop section's own observability surface (the item's purpose), requested
   by the reviewer; still only `files_to_modify` touched.
+
+---
+
+## Run 3 (reviewer BLOCK remediation, 2026-07-06T01:00:00Z)
+
+Reviewer BLOCKed the pending_review item for two causes; ran a remediation cycle
+(reclaimed claimed/ ← pending_review on main first, per instruction).
+
+**Cause 1 — head_sha drift (process).** The rider commit 508a0357 landed on the
+branch after the first handoff and the item head_sha was updated in a *follow-up*
+commit, so there was a window where the item head_sha (3e1b3928) lagged the branch
+tip. Lesson applied this cycle: head_sha is updated in the SAME commit as the
+stage move.
+
+**Cause 2 — substantive bug: doctor was not read-only (reviewer-found).** The
+default loop-storage open was `new SqliteStorage(resolveDbPath(...))`, whose
+constructor mkdirs + creates + migrates the db (`src/storage/sqlite.ts:63-72`).
+Consequences: (a) on a missing prod db, doctor silently CREATED an empty one and
+reported counts=0 instead of not-yet-run — violating AC1 "read-only" and AC2's
+missing-db contract; (b) the win32 `doctor.test.ts` fixtures hit the real
+SqliteStorage path and materialized backslash-named junk (`\var\folders\...`) in
+cwd — the plausible real cause of the earlier 053-completed-at-coercion failure
+(not a teammate).
+
+### Fixes
+
+- **Read-only guard** at the doctor call site (`buildLoopReport`): the DEFAULT
+  open now gates on `existsSync(dbPath)`. Missing db → `StorageIssue { kind:
+  'missing' }` → SOFT station-1 degradation, condition `db-missing`, overall
+  stays healthy, filesystem untouched. Present-but-unreadable → `{ kind: 'error' }`
+  → HARD station-1 fault. Injected `openStorage` (tests) trusted as-is. **No
+  `SqliteStorage` change** — the guard is entirely in `doctor.ts` (files_to_modify).
+- **win32 junk eliminated** (falls out of the guard): verified by deleting the
+  stale junk, re-running the win32 test, and confirming none recreated.
+- **New tests:** read-only contract (asserts db file is NOT created), unreadable-db
+  hard fault, and the missing AC6 fixture `portOwnerLookup THROWS → serving
+  unknown/degraded`. Loop suite now 24/24 (was 21).
+
+### Verification (verbatim, worktree)
+
+- `npm run typecheck` → clean.
+- `npm run lint` → clean.
+- `npx vitest run tests/cli/doctor-loop.test.ts` → 24/24.
+- `npx vitest run tests/cli/doctor.test.ts` → 10/10, no backslash junk recreated.
+- `npm test` (full) → `Test Files 1 failed | 189 passed | 1 skipped (191)` /
+  `Tests 1 failed | 1995 passed`. The single failure is
+  `tests/cli/shell-reachable.test.ts` (named known flake) — passes in isolation
+  1/1 (~24s; it packs a binary and exercises doctor's transitive imports incl. my
+  new SqliteStorage chain, which packs fine). 053-completed-at-coercion now passes.
+
+### Reviewer non-blocking notes (recorded, NOT implemented)
+
+- `queryClassHealth` counts by loading full rows (heavy) — a filtered/count-only
+  storage seam is a later optimization (would touch `storage/interface.ts`,
+  outside this item's files_to_modify).
+- A general read-only open mode on `SqliteStorage` would remove even the
+  migrate-on-open write for a *present* db; deferred (would touch SqliteStorage).
+
+- **Final head_sha:** `58ca01925d012b8bad5029c582cbebac74cafc74`
+- No drift: guard + condition are additive over the loop section's own surface;
+  only `files_to_modify` touched; block sidecar left in place for re-review.
