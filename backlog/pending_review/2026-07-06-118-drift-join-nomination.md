@@ -9,7 +9,7 @@ blocked_by: []
 claimed_by: "builder-120-118-B4913C34"
 claimed_at: "2026-07-06T02:05:00Z"
 branch: "agent/drift-join-nomination"
-head_sha: "aed7dad14c4473a841f13b352d36f3e0c7e963b6"
+head_sha: "07ad880afec601c67cfe05058f71bdfe30b87569"
 agent_notes: |
   Built to all 5 ACs. AC1: normalizeSubject folds _/-/runs to space before the
   existing lowercase/trim/collapse (no-separator subjects byte-unchanged, so
@@ -42,6 +42,23 @@ agent_notes: |
   load-sensitive timing/perf flakes as item 120 (ceo-slack-brain, coord-volume-perf)
   are red — both pass in isolation, neither touches this item. Run log:
   raw/internal/agent-runs/2026-07-06-2026-07-06-118-drift-join-nomination.md
+
+  REBASE (2026-07-06, founder-directed): after 120 and 119 merged to main, this
+  branch was rebased onto origin/main so 118 sits on the settled sweep-loop core.
+  head_sha updated aed7dad1 → 07ad880a (full SHA above). Conflicts were in
+  src/enrich/decision-drift.ts + tests/enrich/decision-drift.test.ts only
+  (subject.ts + granola-signals.ts auto-merged clean). Rather than untangle a
+  duplicated-body 3-way conflict, I took origin/main's settled version of both
+  files as the base and re-applied the 118 nominator surgically: nominator
+  constants/helpers, DriftSweepResult counters, the per-pair body (now carrying
+  120's retryable_failures/noContradiction + degraded logic AND 119's typed
+  deliverPair/delivery-deferred retry, UNCHANGED) wrapped in the
+  per-nominated-decision loop, and the result/log counters. Post-rebase FULL
+  verify against the settled loop is GREEN: typecheck clean, lint clean, full
+  npm run test:product = 1767 passed / 0 failed (162 files; even the timing/perf
+  tests passed this run). decision-drift.test.ts = 36 tests (120's + 119's + 118's
+  blocks coexisting, all green) — 119/120 tests pass against the restructured
+  loop, so no real integration regression.
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B3 root cause + the empirical subject study this fixes
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md                  # decisions 18 (dumb-then-alias), 19 (no AI in plumbing) — the rules this stays inside
