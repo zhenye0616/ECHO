@@ -1,7 +1,7 @@
 ---
 id: 2026-07-06-121-intake-terminal-entry-guard
 title: "intake-terminal entry guard: replace VITEST env check with the house import.meta entry check — importing the module must never run the tool"
-status: claimed
+status: pending_review
 priority: HIGH
 estimate: 0.5h
 created: 2026-07-06
@@ -9,6 +9,32 @@ blocked_by: []
 claimed_by: "builder-121-88a8a68b"
 claimed_at: "2026-07-06T16:11:01Z"
 branch: "agent/intake-terminal-entry-guard"
+head_sha: "0ac5cc7d2d4761b93025a39ec7f6fe148b56b811"
+pr_url: ""
+agent_notes: |
+  Done. Replaced the VITEST auto-main guard in tools/intake-terminal.ts with the
+  house `process.argv[1] === fileURLToPath(import.meta.url)` entry check
+  (ceo-slack-responder pattern); deleted the VITEST comment + check entirely.
+  AC2 regression test + fixture added under tests/tools/; verified it FAILS
+  against the old guard (reverted locally, saw main() run on import → USAGE
+  banner) and passes against the new guard. AC3: existing 8 intake-terminal
+  tests pass unchanged. Full suite: 1768 passed / 21 skipped; typecheck + lint
+  clean.
+
+  REVIEWER FLAG — one out-of-scope file: package.json. The house pattern's
+  argv[1] equality holds under vite-node ONLY in `--script` mode; plain
+  `vite-node <file>` drops the script name from argv (argv[1] stays the
+  vite-node binary), so entry is byte-indistinguishable from import and the npm
+  script would NOT launch the tool. I verified this empirically (vite-node
+  cli.mjs:41 sets argv[1]=resolve(file) only under --script). To keep
+  `npm run intake:terminal` launching (a hard task requirement), I changed the
+  script to `vite-node --script tools/intake-terminal.ts` (1 line; matches the
+  repo's existing eval:retrieval invocation). This is forced by vite-node's
+  architecture, not scope creep, but package.json is outside the item's
+  PROVISIONAL files_to_modify — flagging for your call. Consequence: AC1's
+  literal `npx vite-node tools/intake-terminal.ts --once` (plain, no --script)
+  won't launch; no in-file discriminator can fix that. Full rationale in the run
+  log.
 fast_track: |
   Founder-authorized fast-track 2026-07-06 (spec-review rounds waived for a
   one-line safety fix discovered live). Provenance: during the 07-06 live test,
