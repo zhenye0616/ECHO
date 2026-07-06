@@ -446,3 +446,5 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 2026-07-05 (from 116 merge review): undocumented load-flake tests/surfaces/ceo-slack-brain.test.ts "kills a timed-out brain process group" (ENOENT descendant.pid under suite load; 18/18 in isolation) — track alongside the shell-reachable flake.
 - [120 follow-up] optional hardening: heartbeat write on uncaught runInner() throw
 - [120 follow-up] wire 117 doctor loop section to consume the heartbeat contract (117 AC3 follow-up)
+- [119 follow-up] doc polish: 'deferred' counter aggregates cap-overflow + proven-rejection deferrals (log keys distinguish)
+- [119 follow-up] merge-protocol lesson: verify brace balance after keep-both conflict splicing (common-suffix hoist)

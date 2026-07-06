@@ -73,6 +73,14 @@ export const DRIFT_JUDGE_VERSION = 'drift-judge@1';
 // Single shared budget for AC3 (malformed-verdict) + AC4 (non-verbatim-quote)
 // re-judge attempts at one judge version. Retryable infra errors are NOT counted.
 export const DRIFT_JUDGE_MAX_ATTEMPTS = 3;
+// Bounded retry budget for PROVEN Slack rejections only (a response was received
+// indicating non-acceptance: HTTP 429 / other non-2xx, or a received `ok:false`).
+// Mirrors the seed store's 5-attempt retry (granola-intake-seed-store.ts:52-60).
+// `retry_count` counts FAILED proven-rejection attempts so far; the pair
+// terminalizes on the attempt that increments it to this value — exactly this many
+// visible post attempts, with no extra deferred attempt afterward (item 119 AC2).
+// Unknown-outcome throws (timeout / reset / DNS) are NOT retried (at-most-once).
+export const DRIFT_DELIVERY_MAX_RETRIES = 5;
 export const DEFAULT_DRIFT_MAX_ALERTS_PER_TICK = 3;
 export const DEFAULT_DRIFT_SWEEP_WORKER_INTERVAL_MS = 300_000;
 export const DEFAULT_DRIFT_JUDGE_BRAIN_TIMEOUT_MS = 180_000;
@@ -158,6 +166,23 @@ export interface DriftAlertPayload {
  *  tests. Throws on delivery failure. */
 export type DriftAlertPoster = (payload: DriftAlertPayload) => Promise<void>;
 
+/** Thrown when the Slack post received an HTTP *response* that indicates
+ *  non-acceptance (a non-2xx status such as 429, or a received `body.ok !== true`).
+ *  This is a PROVEN rejection — a response actually arrived, so Slack provably did
+ *  NOT deliver — and is therefore safe to retry via the non-terminal
+ *  `delivery-deferred` state, bounded by {@link DRIFT_DELIVERY_MAX_RETRIES} (AC1).
+ *  Mirrors AC3's DriftJudgeParseError/DriftJudgeInfraError terminal-vs-retryable
+ *  split. Any OTHER throw from the poster (network timeout, post-send connection
+ *  reset, DNS/socket error, any untyped error) is an UNKNOWN outcome — Slack may
+ *  have accepted the card — and must NOT become this type: it stays at-most-once
+ *  terminal with zero retries. */
+export class DriftDeliveryRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DriftDeliveryRejectedError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Checkpoint
 // ---------------------------------------------------------------------------
@@ -180,6 +205,14 @@ export interface DriftPairCheckpoint {
   state: DriftPairState;
   updated_at: string;
   failure_reason?: string;
+  /** Number of FAILED proven-rejection post attempts so far (item 119 AC2).
+   *  Additive OPTIONAL field: {@link DRIFT_SWEEP_CHECKPOINT_SCHEMA_VERSION} stays
+   *  1 because this is backward-compatible — an old checkpoint written before this
+   *  field parses unchanged (loadDriftSweepCheckpoint casts pair values loosely)
+   *  and a pair with no `retry_count` is treated as 0. Increments ONLY on an
+   *  observed proven-rejection attempt in deliverPair; a cap-overflow deferral
+   *  (AC6) and an unknown-outcome failure never touch it. */
+  retry_count?: number;
   /** Present for `delivery-deferred` / `delivery-intent`: the verdict payload so a
    *  later tick can DELIVER without re-judging (judge at-most-once, AC3). */
   pending_alert?: DriftAlertPayload;
@@ -257,6 +290,10 @@ export function loadDriftSweepCheckpoint(
     if (!isPlainObject(value)) {
       throw new DriftSweepCheckpointError(`checkpoint pair ${pairKey} invalid`);
     }
+    // Loose cast (backward-compatible, AC4): pair values are not field-validated,
+    // so a checkpoint written before the additive optional `retry_count` field
+    // parses unchanged — such a pair reads `retry_count` as undefined, treated as 0
+    // everywhere it is consumed. Schema version stays 1 for the same reason.
     pairs[pairKey] = value as unknown as DriftPairCheckpoint;
   }
   return {
@@ -703,6 +740,10 @@ export async function runDriftSweepOnce(
       if (outcome === 'delivered') {
         deliveredThisTick += 1;
         delivered += 1;
+      } else if (outcome === 'delivery-deferred') {
+        // Proven-rejection retry (AC1): still non-terminal → holds the watermark.
+        deferred += 1;
+        blockingSeqs.push(statement.sequence_id);
       } else {
         deliveryFailed += 1;
       }
@@ -862,6 +903,10 @@ export async function runDriftSweepOnce(
     if (outcome === 'delivered') {
       deliveredThisTick += 1;
       delivered += 1;
+    } else if (outcome === 'delivery-deferred') {
+      // Proven-rejection retry (AC1): still non-terminal → holds the watermark.
+      deferred += 1;
+      blockingSeqs.push(statement.sequence_id);
     } else {
       deliveryFailed += 1;
     }
@@ -924,12 +969,22 @@ export async function runDriftSweepOnce(
 }
 
 /**
- * At-most-once delivery (AC5): the `delivery-intent` record is persisted HERE,
- * unconditionally, before the post — the caller only mutates memory. Post; on
- * success record `delivered`, on failure record `delivery-failed` — both
- * terminal, both persisted. A crash between the intent write and the post
- * outcome leaves a durable `delivery-intent`, recovered to `delivery-failed`
- * next tick with no second post.
+ * Delivery with a classified failure split (item 119 AC1): the `delivery-intent`
+ * record is persisted HERE, unconditionally, before the post — the caller only
+ * mutates memory. Post; on success record `delivered` (terminal). On failure,
+ * classify:
+ *  - a {@link DriftDeliveryRejectedError} is a PROVEN rejection (a Slack response
+ *    was received indicating non-acceptance — 429 / `ok:false`) → safe to retry:
+ *    increment `retry_count` and return to the NON-terminal `delivery-deferred`
+ *    state (keeping `pending_alert`), so the existing drain re-attempts next tick,
+ *    bounded by {@link DRIFT_DELIVERY_MAX_RETRIES}. The pair terminalizes to
+ *    `delivery-failed` exactly on the attempt that reaches the budget (AC2).
+ *  - any OTHER throw is an UNKNOWN outcome (network timeout, post-send reset,
+ *    DNS/socket error, any untyped error — Slack MAY have accepted the card) →
+ *    straight to terminal `delivery-failed` with ZERO retries, at-most-once like
+ *    the ambiguous-crash recovery path, because re-posting could double-alert.
+ * A crash between the intent write and the post outcome leaves a durable
+ * `delivery-intent`, recovered to `delivery-failed` next tick with no second post.
  */
 async function deliverPair(
   runtime: DriftSweepRuntime,
@@ -938,7 +993,7 @@ async function deliverPair(
   record: DriftPairCheckpoint,
   payload: DriftAlertPayload,
   persist: () => void,
-): Promise<'delivered' | 'delivery-failed'> {
+): Promise<'delivered' | 'delivery-failed' | 'delivery-deferred'> {
   // Ensure the intent is durable before the post. Unconditional: on the
   // first-delivery path the caller has only mutated the in-memory map, so a
   // state-equality guard here would skip the write and a crash mid-post would
@@ -950,6 +1005,42 @@ async function deliverPair(
   try {
     await runtime.post(payload);
   } catch (err) {
+    if (err instanceof DriftDeliveryRejectedError) {
+      // PROVEN rejection: a response was received, so Slack provably did not
+      // deliver — retrying is safe. Count this failed attempt; terminalize only
+      // when it reaches the budget (AC2 — exactly MAX visible attempts, no extra
+      // deferral afterward), otherwise defer (non-terminal) for the next tick.
+      const retryCount = (record.retry_count ?? 0) + 1;
+      record.retry_count = retryCount;
+      record.failure_reason = err.message;
+      record.updated_at = runtime.now();
+      if (retryCount >= DRIFT_DELIVERY_MAX_RETRIES) {
+        record.state = 'delivery-failed';
+        delete record.pending_alert;
+        checkpoint.pairs[pairKey] = record;
+        persist();
+        log.error('drift_delivery_failed', {
+          pair_key: pairKey,
+          judge_version: record.judge_version,
+          reason: record.failure_reason,
+          retry_count: retryCount,
+        });
+        return 'delivery-failed';
+      }
+      // Keep `pending_alert` so the drain re-delivers without re-judging (AC3).
+      record.state = 'delivery-deferred';
+      checkpoint.pairs[pairKey] = record;
+      persist();
+      log.warn('drift_delivery_retry', {
+        pair_key: pairKey,
+        judge_version: record.judge_version,
+        reason: record.failure_reason,
+        retry_count: retryCount,
+      });
+      return 'delivery-deferred';
+    }
+    // Unknown outcome: Slack may have accepted the card. At-most-once — terminal
+    // with zero retries; record evidence so unattended network loss is visible.
     record.state = 'delivery-failed';
     record.failure_reason = err instanceof Error ? err.message : String(err);
     record.updated_at = runtime.now();
@@ -960,6 +1051,7 @@ async function deliverPair(
       pair_key: pairKey,
       judge_version: record.judge_version,
       reason: record.failure_reason,
+      retry_count: record.retry_count ?? 0,
     });
     return 'delivery-failed';
   }
@@ -1127,9 +1219,23 @@ export async function postDriftAlertCard(
       ],
     }),
   });
+  // Classify a received non-2xx BEFORE parsing the body (AC1, r2 codex-ops): a 429
+  // — or any non-2xx — with a missing, empty, or non-JSON body is still a PROVEN
+  // rejection (a response arrived, so Slack provably did not deliver). It must
+  // become a typed DriftDeliveryRejectedError (retryable), never throw inside
+  // response.json() and fall through as an untyped unknown-outcome terminal.
+  if (!response.ok) {
+    throw new DriftDeliveryRejectedError(
+      `Slack drift alert post rejected: HTTP ${response.status}`,
+    );
+  }
   const body = (await response.json()) as SlackPostResponse;
-  if (!response.ok || body.ok !== true) {
-    throw new Error(`Slack drift alert post failed: ${body.error ?? `HTTP ${response.status}`}`);
+  if (body.ok !== true) {
+    // A received `ok:false` (2xx transport, application-level rejection) is equally
+    // a proven rejection → retryable.
+    throw new DriftDeliveryRejectedError(
+      `Slack drift alert post rejected: ${body.error ?? 'ok:false'}`,
+    );
   }
 }
 

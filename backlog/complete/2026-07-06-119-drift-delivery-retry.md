@@ -60,6 +60,39 @@ agent_notes: |
 estimate: 1d
 created: 2026-07-06
 blocked_by: []
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation (strategist-operated;
+  founder green-lit review, conflict resolution, and merge in session).
+
+  Conflicts resolved:
+  - tests/enrich/decision-drift.test.ts: both 119 and 120 appended a suite at
+    the same EOF anchor; kept BOTH describe blocks in sequence per the sidecar
+    prescription. NOTE: naive marker-strip initially left the 120 suite
+    unclosed (git hoisted the shared trailing closers out of the conflict
+    block); caught by the verify gate (TS1005 at the seam), fixed by
+    reinserting the two closers. Merged file passes 26/26.
+  - src/enrich/decision-drift.ts: auto-merged clean (as merge-tree predicted).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict: merge as-is, empty punch list)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: full suite 2020 passed / 1 failed — the single failure is
+  tests/cli/shell-reachable.test.ts (documented npm-pack/bash environment
+  flake, untouched by this diff, passes 1/1 in isolation). Lint, typecheck,
+  coupled-invariants, sync-skills --check all clean.
+
+  Follow-up items (non-blocking):
+  - doc polish: the 'deferred' result counter now aggregates cap-overflow AND
+    proven-rejection deferrals (distinguishable via drift_alert_deferred vs
+    drift_delivery_retry log keys); 120's heartbeat folds the same aggregate.
+  - lesson for the merge protocol: when both sides of a conflict end with
+    identical closing lines, verify brace balance after resolution — the
+    common-suffix hoist bites naive keep-both splicing.
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B4 root cause: transport failure vs ambiguous crash conflation
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md                  # decision 20 cost model (false alarm = one click) — the tie-breaker
