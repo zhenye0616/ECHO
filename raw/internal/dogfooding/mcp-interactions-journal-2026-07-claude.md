@@ -214,3 +214,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a — connectivity check only, no atoms/clusters queried
 - **Verdict:** ✅ right
 - **Note:** daemon at :38478 responding normally
+
+### 2026-07-06 00:58 PDT — echo_ping connectivity check (user-requested)
+- **Trigger:** founder asked Claude Code to invoke `echo_ping` with no arguments and return the result verbatim
+- **Query inputs:** (none — no message arg)
+- **Returned:** `{"pong":true,"ts":"2026-07-06T07:58:49.623Z"}`
+- **Sources:** n/a — connectivity check, no atoms/clusters queried
+- **Verdict:** ✅ right
+- **Note:** daemon at :38478 responding normally; nothing surprising
