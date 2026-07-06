@@ -6,6 +6,9 @@ priority: HIGH
 estimate: 1-2d
 created: 2026-07-06
 blocked_by: []
+claimed_by: "builder-120-118-B4913C34"
+claimed_at: "2026-07-06T01:31:07Z"
+branch: "agent/worker-heartbeat-artifacts"
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B7 root cause: fail-closed without observable degraded state
   - raw/internal/decisions/2026-07-05-terminal-first-demo-surface.md       # observability over stations 1-3 is the sprint's demo goal
