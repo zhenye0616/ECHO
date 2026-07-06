@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import type { DetectedAgent } from '../../echo-home/wizard/detect-agents.js';
 import type { DetectedProject } from '../../echo-home/wizard/detect-projects.js';
 import type { ProbeOutcome } from '../../echo-home/wizard/probe.js';
@@ -95,8 +96,79 @@ export function renderDoctorReport(
       lines.push(opts.remediation[agent.probeOutcome.reason](agent.probeOutcome));
     }
   }
+  lines.push(...renderLoopLines(report));
   if (report.overall !== 'healthy') {
     lines.push('Recommended actions: run `echoctl init` or follow the cleanup hints above.');
   }
   return lines.join('\n');
+}
+
+// Loop observability (item 117): a read-only stations 1–3 health block rendered
+// through the same doctor pipeline. Reuses the existing plain-line style; every
+// degradation prints its severity, scope, detail, and copy-pasteable remediation.
+export function renderLoopLines(report: DoctorReport): string[] {
+  const loop = report.loop;
+  const lines: string[] = [`loop: ${loop.status}`];
+
+  const s1 = loop.station1;
+  const cp = s1.granolaCheckpoint;
+  lines.push(
+    `loop station-1 capture: granola-checkpoint=${cp.present ? 'present' : 'absent'} high_water_mark=${cp.highWaterMark ?? 'none'} last_synced_at=${cp.lastSyncedAt ?? 'none'} ingested_notes=${cp.ingestedNoteCount ?? 'n/a'}`,
+  );
+  for (const src of s1.sources) {
+    lines.push(`  ${src.sourceClass} count=${src.count} newest=${src.newestTimestamp ?? 'none'}`);
+  }
+
+  const s2 = loop.station2;
+  const flag = s2.flags.neverRan ? 'never-ran' : s2.flags.stale ? 'stale' : 'active';
+  const signals =
+    s2.signalAtoms === null
+      ? 'unavailable'
+      : `${s2.signalAtoms.count}@${s2.signalAtoms.newestTimestamp ?? 'none'}`;
+  lines.push(
+    `loop station-2 signals: ${flag} checkpoint_mtime=${s2.checkpointMtimeIso ?? 'none'} failing_notes=${s2.failingNotes.length} signals=${signals}`,
+  );
+  for (const note of s2.failingNotes) {
+    lines.push(
+      `  failing-note ${note.noteId} last_failure_at=${note.lastFailureAt}${note.lastFailureReason !== undefined ? ` reason=${note.lastFailureReason}` : ''}`,
+    );
+  }
+
+  const sv = loop.serving;
+  lines.push(
+    `loop serving: class=${sv.classification} listening_pid=${sv.listeningPid ?? 'none'} pid_lock=${sv.pidLockPid ?? 'none'} staleness=${sv.staleness} path=${sv.executingPath ?? 'none'}`,
+  );
+
+  const s3 = loop.station3;
+  lines.push(
+    `loop station-3 packet: intake_enabled=${s3.intakeEnabled} (doctor-env-only) team_decisions=${s3.teamDecisionsCount ?? 'n/a'}`,
+  );
+  if (s3.seedStores.length === 0) {
+    lines.push('  seed-stores: none (not yet run)');
+  } else {
+    for (const store of s3.seedStores) {
+      if (store.state === 'counted' && store.counts !== null) {
+        lines.push(
+          `  seed-store ${basename(store.path)}: pending=${store.counts.pending} posting=${store.counts.posting} posted=${store.counts.posted} failed=${store.counts.failed}`,
+        );
+      } else {
+        lines.push(`  seed-store ${basename(store.path)}: ${store.state}`);
+      }
+    }
+  }
+
+  const degradations = [
+    ...s1.degradations,
+    ...s2.degradations,
+    ...sv.degradations,
+    ...s3.degradations,
+  ];
+  for (const d of degradations) {
+    lines.push(`  [${d.severity}] ${d.scope}: ${d.detail}${d.path !== undefined ? ` (${d.path})` : ''}`);
+    lines.push(`    remediation: ${d.remediation}`);
+  }
+  for (const note of [...s2.notes, ...s3.notes]) {
+    lines.push(`  note: ${note}`);
+  }
+  return lines;
 }

@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { resolveDataDir } from '../../daemon/lifecycle.js';
+import { resolveDataDir, resolveDbPath } from '../../daemon/lifecycle.js';
 import {
   ECHO_HOME_PATHS,
   setEchoHomeRoot,
@@ -17,6 +17,18 @@ import { type AgentKind } from '../../echo-home/wizard/detect-agents.js';
 import { probeAgents as realProbeAgents, type ProbeOutcome } from '../../echo-home/wizard/probe.js';
 import { renderDoctorReport } from '../io/render.js';
 import { buildRemediationCopy, parsePort, readPackageVersion, resolveMcpPort } from './init.js';
+import type { Storage } from '../../storage/interface.js';
+import { SqliteStorage } from '../../storage/sqlite.js';
+import { GRANOLA_SOURCE, granolaCheckpointPath } from '../../capture/surfaces/granola-poller.js';
+import {
+  GRANOLA_SIGNAL_SOURCE,
+  granolaSignalCheckpointPath,
+  loadGranolaSignalCheckpoint,
+} from '../../enrich/granola-signals.js';
+import {
+  FileGranolaIntakeSeedStore,
+  type GranolaIntakeSeedStatus,
+} from '../../enrich/granola-intake-seed-store.js';
 
 export interface DoctorReport {
   daemon: {
@@ -45,8 +57,131 @@ export interface DoctorReport {
     profile: OnboardedAgentProfile | null;
     probeOutcome: ProbeOutcome | null;
   }[];
+  loop: DoctorLoopReport;
   overall: 'healthy' | 'degraded' | 'broken';
 }
+
+// ─── Loop observability (item 117) ──────────────────────────────────────────
+//
+// A read-only health section over stations 1–3 of the team loop, computed at
+// doctor runtime entirely from existing artifacts (storage query interface,
+// checkpoint files, seed stores, process args). No new daemon code, no new
+// endpoints, no watchers — doctor reads what is already on disk.
+//
+// Severity model (see the "loop rollup" note on computeOverall): every
+// degradation carries a `severity`. `hard` faults are genuine failures
+// (malformed/unreadable/partial artifact reads, storage read errors, a
+// pid-lock↔listener disagreement, an actionable staleness warning) and
+// downgrade the top-level `overall` to `degraded`. `soft` states
+// (absent/never-run/not-yet-run/empty/nothing-listening) are informational:
+// they mark the station's own status + carry remediation for the operator, but
+// they never downgrade `overall`. This split is what lets the loop section be
+// "included in the overall rollup" without a fresh install (no checkpoints,
+// empty db, nothing listening) reporting itself as unhealthy.
+
+export type LoopStatus = 'ok' | 'degraded';
+
+export interface LoopDegradation {
+  scope: string;
+  severity: 'soft' | 'hard';
+  path?: string;
+  detail: string;
+  remediation: string;
+}
+
+export interface LoopCaptureSourceHealth {
+  sourceClass: string;
+  newestTimestamp: string | null;
+  count: number;
+}
+
+export interface LoopGranolaCheckpoint {
+  present: boolean;
+  highWaterMark: string | null;
+  lastSyncedAt: string | null;
+  ingestedNoteCount: number | null;
+  ageMs: number | null;
+}
+
+export interface LoopStation1 {
+  status: LoopStatus;
+  sources: LoopCaptureSourceHealth[];
+  granolaCheckpoint: LoopGranolaCheckpoint;
+  degradations: LoopDegradation[];
+}
+
+export interface LoopFailingNote {
+  noteId: string;
+  lastFailureAt: string;
+  lastFailureReason?: string;
+}
+
+export interface LoopStation2 {
+  status: LoopStatus;
+  flags: { neverRan: boolean; stale: boolean };
+  checkpointMtimeIso: string | null;
+  checkpointAgeMs: number | null;
+  failingNotes: LoopFailingNote[];
+  signalAtoms: { newestTimestamp: string | null; count: number } | null;
+  notes: string[];
+  degradations: LoopDegradation[];
+}
+
+export type ServingClassification = 'packaged-dist' | 'src-dev' | 'unknown';
+export type ServingStaleness = 'fresh' | 'dist-stale' | 'src-dev-serving' | 'staleness-unknown';
+
+export interface LoopServing {
+  status: LoopStatus;
+  port: number;
+  listeningPid: number | null;
+  pidLockPid: number | null;
+  classification: ServingClassification;
+  executingPath: string | null;
+  staleness: ServingStaleness;
+  degradations: LoopDegradation[];
+}
+
+export interface LoopSeedStoreHealth {
+  path: string;
+  state: 'counted' | 'not-yet-run' | 'unreadable';
+  counts: Record<GranolaIntakeSeedStatus, number> | null;
+}
+
+export interface LoopStation3 {
+  status: LoopStatus;
+  seedStores: LoopSeedStoreHealth[];
+  intakeEnabled: boolean;
+  intakeEnabledNote: string;
+  teamDecisionsCount: number | null;
+  notes: string[];
+  degradations: LoopDegradation[];
+}
+
+export interface DoctorLoopReport {
+  station1: LoopStation1;
+  station2: LoopStation2;
+  serving: LoopServing;
+  station3: LoopStation3;
+  status: LoopStatus;
+}
+
+/** Capture source classes surfaced by station 1, keyed by source prefix. */
+export const LOOP_CAPTURE_SOURCE_CLASSES: readonly string[] = [
+  GRANOLA_SOURCE, // api:granola
+  'git:',
+  'fs:',
+  'claude-code:',
+  'codex:',
+  'cursor:',
+];
+
+/** derived:team-decisions atoms (station 4 preview count only). */
+const LOOP_TEAM_DECISION_SOURCE = 'derived:team-decisions';
+
+/** Named-constant default: station-2 checkpoint older than this is `stale`.
+ *  The signal worker ticks every 5 min (DEFAULT_GRANOLA_SIGNAL_WORKER_INTERVAL_MS);
+ *  one hour without a checkpoint touch is a conservative staleness floor. */
+export const DEFAULT_LOOP_SIGNALS_STALE_MS = 60 * 60 * 1000;
 
 export interface DoctorOpts {
   json?: boolean;
@@ -62,6 +197,13 @@ export interface DoctorOpts {
   fetch?: typeof fetch;
   now?: () => Date;
   platform?: NodeJS.Platform;
+  // Loop-observability (item 117) seams — all read-only; defaults hit the real
+  // artifacts so production doctor needs no wiring.
+  openStorage?: () => Storage;
+  portOwnerLookup?: (port: number) => Promise<number | null>;
+  readPidArgv?: (pid: number) => Promise<string[] | null>;
+  loopStalenessDirs?: { src: string; dist: string };
+  loopSignalsStaleMs?: number;
 }
 
 export const DOCTOR_HELP = `Usage: echoctl doctor [--json] [--quiet] [--home <path>] [--port <n>] [--label <id>]
@@ -288,6 +430,632 @@ async function probeMcp(fetchImpl: typeof fetch, port: number): Promise<boolean>
   }
 }
 
+// ─── Loop-section builders (item 117) ───────────────────────────────────────
+
+function stationStatus(degradations: readonly LoopDegradation[]): LoopStatus {
+  return degradations.length > 0 ? 'degraded' : 'ok';
+}
+
+function loopHasHardFault(loop: DoctorLoopReport): boolean {
+  const all = [
+    ...loop.station1.degradations,
+    ...loop.station2.degradations,
+    ...loop.serving.degradations,
+    ...loop.station3.degradations,
+  ];
+  return all.some((d) => d.severity === 'hard');
+}
+
+function readJsonFileStrict(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+async function queryClassHealth(
+  storage: Storage,
+  sourceClass: string,
+): Promise<LoopCaptureSourceHealth> {
+  const rows = await storage.query({ source_prefix: sourceClass, order: 'desc' });
+  return { sourceClass, newestTimestamp: rows[0]?.timestamp ?? null, count: rows.length };
+}
+
+async function queryExactHealth(
+  storage: Storage,
+  source: string,
+): Promise<{ newestTimestamp: string | null; count: number }> {
+  const rows = await storage.query({ source, order: 'desc' });
+  return { newestTimestamp: rows[0]?.timestamp ?? null, count: rows.length };
+}
+
+async function buildLoopStation1(
+  storage: Storage | null,
+  storageError: string | null,
+  dbPath: string,
+  now: Date,
+): Promise<LoopStation1> {
+  const degradations: LoopDegradation[] = [];
+  const sources: LoopCaptureSourceHealth[] = [];
+
+  if (storage === null) {
+    degradations.push({
+      scope: 'station-1:storage',
+      severity: 'hard',
+      path: dbPath,
+      detail: `storage unreadable: ${storageError ?? 'unknown error'}`,
+      remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+    });
+  } else {
+    try {
+      for (const sourceClass of LOOP_CAPTURE_SOURCE_CLASSES) {
+        sources.push(await queryClassHealth(storage, sourceClass));
+      }
+    } catch (err) {
+      degradations.push({
+        scope: 'station-1:storage',
+        severity: 'hard',
+        path: dbPath,
+        detail: `storage query failed: ${(err as Error).message}`,
+        remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+      });
+    }
+  }
+
+  const cpPath = granolaCheckpointPath();
+  let granolaCheckpoint: LoopGranolaCheckpoint = {
+    present: false,
+    highWaterMark: null,
+    lastSyncedAt: null,
+    ingestedNoteCount: null,
+    ageMs: null,
+  };
+  if (!existsSync(cpPath)) {
+    degradations.push({
+      scope: 'station-1:granola-checkpoint',
+      severity: 'soft',
+      path: cpPath,
+      detail: 'Granola checkpoint not found — the poller has not synced yet.',
+      remediation: 'Confirm GRANOLA_API_KEY is set and the daemon Granola poller is enabled.',
+    });
+  } else {
+    try {
+      const raw = readJsonFileStrict(cpPath) as Record<string, unknown>;
+      const highWaterMark = typeof raw['high_water_mark'] === 'string' ? raw['high_water_mark'] : null;
+      const lastSyncedAt = typeof raw['last_synced_at'] === 'string' ? raw['last_synced_at'] : null;
+      const ingested = Array.isArray(raw['ingested_note_ids']) ? raw['ingested_note_ids'].length : null;
+      const ageMs =
+        lastSyncedAt !== null ? now.getTime() - new Date(lastSyncedAt).getTime() : null;
+      granolaCheckpoint = {
+        present: true,
+        highWaterMark,
+        lastSyncedAt,
+        ingestedNoteCount: ingested,
+        ageMs: ageMs !== null && Number.isFinite(ageMs) ? ageMs : null,
+      };
+    } catch (err) {
+      granolaCheckpoint = {
+        present: true,
+        highWaterMark: null,
+        lastSyncedAt: null,
+        ingestedNoteCount: null,
+        ageMs: null,
+      };
+      degradations.push({
+        scope: 'station-1:granola-checkpoint',
+        severity: 'hard',
+        path: cpPath,
+        detail: `Granola checkpoint unreadable/malformed: ${(err as Error).message}`,
+        remediation: `Inspect ${cpPath}; if corrupt, stop the daemon and remove it so the poller rebuilds from its high-water mark.`,
+      });
+    }
+  }
+
+  return { status: stationStatus(degradations), sources, granolaCheckpoint, degradations };
+}
+
+const STATION2_DISABLE_INFERENCE_NOTE =
+  'In-process permanent-disable (a brain/config parse typo) is NOT observable from files; it is inferred as `never-ran`/`stale`. Check daemon startup logs for `granola-signals` config errors.';
+const STATION2_SUPERSEDE_NOTE =
+  'signal-atom count includes superseded extraction runs (supersede is logical latest-wins; atoms are append-only).';
+
+async function buildLoopStation2(
+  storage: Storage | null,
+  storageError: string | null,
+  dbPath: string,
+  now: Date,
+  staleMs: number,
+): Promise<LoopStation2> {
+  const degradations: LoopDegradation[] = [];
+  const notes = [STATION2_DISABLE_INFERENCE_NOTE, STATION2_SUPERSEDE_NOTE];
+  const cpPath = granolaSignalCheckpointPath();
+
+  let neverRan = false;
+  let stale = false;
+  let checkpointMtimeIso: string | null = null;
+  let checkpointAgeMs: number | null = null;
+  const failingNotes: LoopFailingNote[] = [];
+
+  if (!existsSync(cpPath)) {
+    neverRan = true;
+    degradations.push({
+      scope: 'station-2:checkpoint',
+      severity: 'soft',
+      path: cpPath,
+      detail: 'signal-worker checkpoint not found — the worker has not run (or is disabled).',
+      remediation:
+        'Check daemon startup logs for `granola-signals` config errors (e.g. an invalid ECHO_GRANOLA_SIGNAL_BRAIN).',
+    });
+  } else {
+    try {
+      const mtimeMs = statSync(cpPath).mtimeMs;
+      checkpointMtimeIso = new Date(mtimeMs).toISOString();
+      checkpointAgeMs = now.getTime() - mtimeMs;
+      stale = checkpointAgeMs > staleMs;
+      if (stale) {
+        degradations.push({
+          scope: 'station-2:stale',
+          severity: 'soft',
+          path: cpPath,
+          detail: `signal-worker checkpoint is stale (${Math.round(checkpointAgeMs / 60000)} min since last activity).`,
+          remediation:
+            'Check daemon startup logs for `granola-signals` config errors; a config-parse typo permanently disables the worker at boot.',
+        });
+      }
+      const checkpoint = loadGranolaSignalCheckpoint(cpPath);
+      for (const [noteId, entry] of Object.entries(checkpoint.notes)) {
+        const lastFailureAt = entry.last_failure_at;
+        const lastSuccessAt = entry.last_success_at;
+        const failing =
+          lastFailureAt !== undefined &&
+          (lastSuccessAt === undefined || lastFailureAt > lastSuccessAt);
+        if (failing) {
+          failingNotes.push({
+            noteId,
+            lastFailureAt: lastFailureAt!,
+            ...(entry.last_failure_reason !== undefined
+              ? { lastFailureReason: entry.last_failure_reason }
+              : {}),
+          });
+        }
+      }
+      if (failingNotes.length > 0) {
+        degradations.push({
+          scope: 'station-2:failing-notes',
+          severity: 'soft',
+          path: cpPath,
+          detail: `${failingNotes.length} note(s) failing extraction: ${failingNotes.map((n) => n.noteId).join(', ')}`,
+          remediation:
+            'Inspect the failing notes; a permanently-bad note aborts its own extraction, not the tick.',
+        });
+      }
+    } catch (err) {
+      degradations.push({
+        scope: 'station-2:checkpoint',
+        severity: 'hard',
+        path: cpPath,
+        detail: `signal-worker checkpoint unreadable/malformed: ${(err as Error).message}`,
+        remediation: `Inspect ${cpPath}; if corrupt, stop the daemon and remove it so the worker rebuilds per-note state.`,
+      });
+    }
+  }
+
+  let signalAtoms: { newestTimestamp: string | null; count: number } | null = null;
+  if (storage === null) {
+    degradations.push({
+      scope: 'station-2:storage',
+      severity: 'hard',
+      path: dbPath,
+      detail: `storage unreadable: ${storageError ?? 'unknown error'}`,
+      remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+    });
+  } else {
+    try {
+      signalAtoms = await queryExactHealth(storage, GRANOLA_SIGNAL_SOURCE);
+    } catch (err) {
+      degradations.push({
+        scope: 'station-2:storage',
+        severity: 'hard',
+        path: dbPath,
+        detail: `signal-atom query failed: ${(err as Error).message}`,
+        remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+      });
+    }
+  }
+
+  return {
+    status: stationStatus(degradations),
+    flags: { neverRan, stale },
+    checkpointMtimeIso,
+    checkpointAgeMs,
+    failingNotes,
+    signalAtoms,
+    notes,
+    degradations,
+  };
+}
+
+function defaultPortOwnerLookup(port: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    execFile(
+      'lsof',
+      ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'],
+      { encoding: 'utf8', timeout: 5000, env: { ...process.env, PATH: SAFE_SUBPROCESS_PATH } },
+      (error, stdout) => {
+        // lsof exits non-zero when nothing is listening — treat as "no owner".
+        if (error !== null) {
+          resolve(null);
+          return;
+        }
+        const first = String(stdout)
+          .split(/\s+/)
+          .map((s) => s.trim())
+          .filter(Boolean)[0];
+        const pid = first !== undefined ? Number.parseInt(first, 10) : Number.NaN;
+        resolve(Number.isInteger(pid) ? pid : null);
+      },
+    );
+  });
+}
+
+function defaultReadPidArgv(pid: number): Promise<string[] | null> {
+  return new Promise((resolve) => {
+    execFile(
+      'ps',
+      ['-ww', '-o', 'command=', '-p', String(pid)],
+      { encoding: 'utf8', timeout: 5000, env: { ...process.env, PATH: SAFE_SUBPROCESS_PATH } },
+      (error, stdout) => {
+        if (error !== null) {
+          resolve(null);
+          return;
+        }
+        const line = String(stdout).trim();
+        if (line.length === 0) {
+          resolve(null);
+          return;
+        }
+        resolve(line.split(/\s+/).filter(Boolean));
+      },
+    );
+  });
+}
+
+const SERVING_SCRIPT_EXT = ['.js', '.mjs', '.cjs', '.ts'];
+
+function isScriptToken(token: string): boolean {
+  return SERVING_SCRIPT_EXT.some((ext) => token.endsWith(ext));
+}
+
+export function classifyServingArgv(argv: readonly string[]): {
+  classification: ServingClassification;
+  executingPath: string | null;
+} {
+  const scriptToken =
+    argv.find((t) => (t.includes('/dist/') || t.includes('/src/')) && isScriptToken(t)) ??
+    argv.find((t) => isScriptToken(t)) ??
+    null;
+  const joined = argv.join(' ');
+  if (scriptToken !== null && scriptToken.includes('/dist/')) {
+    return { classification: 'packaged-dist', executingPath: scriptToken };
+  }
+  if (joined.includes('vite-node') || (scriptToken !== null && scriptToken.includes('/src/'))) {
+    return { classification: 'src-dev', executingPath: scriptToken };
+  }
+  return { classification: 'unknown', executingPath: scriptToken };
+}
+
+function newestMtimeMs(dir: string): number | null {
+  let topReadable = true;
+  let newest: number | null = null;
+  const stack = [dir];
+  let first = true;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      if (first) topReadable = false;
+      first = false;
+      continue;
+    }
+    first = false;
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      const p = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(p);
+      } else {
+        try {
+          const m = statSync(p).mtimeMs;
+          if (newest === null || m > newest) newest = m;
+        } catch {
+          // skip unreadable file
+        }
+      }
+    }
+  }
+  return topReadable ? newest : null;
+}
+
+function computeStaleness(
+  classification: ServingClassification,
+  dirs: { src: string; dist: string },
+): { staleness: ServingStaleness; degradation: LoopDegradation | null } {
+  const srcNewest = newestMtimeMs(dirs.src);
+  const distNewest = newestMtimeMs(dirs.dist);
+  if (srcNewest === null || distNewest === null) {
+    return {
+      staleness: 'staleness-unknown',
+      degradation: {
+        scope: 'serving:staleness',
+        severity: 'soft',
+        detail: `cannot compare src/dist mtimes (src=${dirs.src} dist=${dirs.dist}); one is missing or unreadable.`,
+        remediation: 'Run `npm run build:cli` to (re)build dist, then re-run `echoctl doctor`.',
+      },
+    };
+  }
+  const srcNewer = srcNewest > distNewest;
+  if (classification === 'packaged-dist' && srcNewer) {
+    return {
+      staleness: 'dist-stale',
+      degradation: {
+        scope: 'serving:staleness',
+        severity: 'hard',
+        detail: 'serving packaged dist, but src/ is newer than dist/ — the daemon is running stale code.',
+        remediation: 'Run `npm run build:cli`, then restart the daemon (daemon install script).',
+      },
+    };
+  }
+  if (classification === 'src-dev') {
+    return {
+      staleness: 'src-dev-serving',
+      degradation: {
+        scope: 'serving:staleness',
+        severity: 'hard',
+        detail: 'an unsupervised src-dev (vite-node) process is serving the production port.',
+        remediation: 'Run `npm run build:cli` and restart the supervised daemon (daemon install script).',
+      },
+    };
+  }
+  return { staleness: 'fresh', degradation: null };
+}
+
+async function buildLoopServing(
+  port: number,
+  pidLockPath: string,
+  pidLockHeld: boolean,
+  portOwnerLookup: (port: number) => Promise<number | null>,
+  readPidArgv: (pid: number) => Promise<string[] | null>,
+  stalenessDirs: { src: string; dist: string },
+): Promise<LoopServing> {
+  const degradations: LoopDegradation[] = [];
+  const daemonRemediation =
+    'Confirm which process owns the port; rebuild with `npm run build:cli` and restart the supervised daemon (daemon install script).';
+
+  let pidLockPid: number | null = null;
+  if (pidLockHeld) {
+    try {
+      const parsed = Number.parseInt(readFileSync(pidLockPath, 'utf8').trim(), 10);
+      pidLockPid = Number.isInteger(parsed) ? parsed : null;
+    } catch {
+      pidLockPid = null;
+    }
+  }
+
+  let listeningPid: number | null = null;
+  try {
+    listeningPid = await portOwnerLookup(port);
+  } catch {
+    listeningPid = null;
+  }
+
+  let classification: ServingClassification = 'unknown';
+  let executingPath: string | null = null;
+
+  if (listeningPid === null) {
+    degradations.push({
+      scope: 'serving:port-owner',
+      severity: 'soft',
+      detail: `no process is listening on port ${port} (or the port-owner lookup is unavailable).`,
+      remediation: daemonRemediation,
+    });
+  } else if (pidLockPid !== null && pidLockPid !== listeningPid) {
+    // pid-lock ≠ observed listener: the classic B6 "which daemon" fault.
+    degradations.push({
+      scope: 'serving:pid-disagreement',
+      severity: 'hard',
+      detail: `daemon pid-lock pid ${pidLockPid} disagrees with the observed listening pid ${listeningPid}; not classifying on unverified evidence.`,
+      remediation: daemonRemediation,
+    });
+  } else {
+    const argv = await readPidArgv(listeningPid);
+    if (argv === null || argv.length === 0) {
+      degradations.push({
+        scope: 'serving:argv',
+        severity: 'soft',
+        detail: `could not read argv for listening pid ${listeningPid} (vanished, empty, or unreadable); serving code unverified.`,
+        remediation: daemonRemediation,
+      });
+    } else {
+      const classified = classifyServingArgv(argv);
+      classification = classified.classification;
+      executingPath = classified.executingPath;
+      if (classification === 'unknown') {
+        degradations.push({
+          scope: 'serving:classify',
+          severity: 'soft',
+          detail: `listening pid ${listeningPid} argv did not match packaged-dist or src-dev; serving code unknown.`,
+          remediation: daemonRemediation,
+        });
+      }
+    }
+  }
+
+  const { staleness, degradation: stalenessDegradation } = computeStaleness(
+    classification,
+    stalenessDirs,
+  );
+  if (stalenessDegradation !== null) degradations.push(stalenessDegradation);
+
+  return {
+    status: stationStatus(degradations),
+    port,
+    listeningPid,
+    pidLockPid,
+    classification,
+    executingPath,
+    staleness,
+    degradations,
+  };
+}
+
+const STATION3_INTAKE_ENV_NOTE =
+  'intake enabled/disabled is read from doctor\'s own ECHO_GRANOLA_INTAKE_ENABLED env, which may differ from the launchd daemon env that actually runs the loop — treat as doctor-env-only.';
+const STATION3_TEAM_DECISIONS_NOTE =
+  'derived:team-decisions count of 0 is expected today (informational, not a fault).';
+
+function parseIntakeEnabledFlag(raw: string | undefined): boolean {
+  if (raw === undefined || raw.trim() === '') return false;
+  const value = raw.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+}
+
+async function buildLoopStation3(
+  storage: Storage | null,
+  storageError: string | null,
+  dbPath: string,
+  env: NodeJS.ProcessEnv,
+): Promise<LoopStation3> {
+  const degradations: LoopDegradation[] = [];
+  const seedStores: LoopSeedStoreHealth[] = [];
+  const notes = [STATION3_INTAKE_ENV_NOTE, STATION3_TEAM_DECISIONS_NOTE];
+
+  const stateDir = ECHO_HOME_PATHS.state;
+  let seedFiles: string[] = [];
+  try {
+    seedFiles = readdirSync(stateDir)
+      .filter((name) => /^granola-intake-seeds.*\.json$/.test(name))
+      .sort();
+  } catch {
+    seedFiles = [];
+  }
+  if (seedFiles.length === 0) {
+    notes.push('no intake seed stores found yet (not yet run).');
+  }
+  for (const name of seedFiles) {
+    const filePath = join(stateDir, name);
+    try {
+      const records = await new FileGranolaIntakeSeedStore(filePath).list();
+      const counts: Record<GranolaIntakeSeedStatus, number> = {
+        pending: 0,
+        posting: 0,
+        posted: 0,
+        failed: 0,
+      };
+      for (const record of records) counts[record.status] += 1;
+      seedStores.push({ path: filePath, state: 'counted', counts });
+    } catch (err) {
+      seedStores.push({ path: filePath, state: 'unreadable', counts: null });
+      degradations.push({
+        scope: 'station-3:seed-store',
+        severity: 'hard',
+        path: filePath,
+        detail: `intake seed store unreadable/malformed: ${(err as Error).message}`,
+        remediation: `Inspect ${filePath}; if corrupt, stop the daemon and remove it so the bridge rebuilds seed state.`,
+      });
+    }
+  }
+
+  let teamDecisionsCount: number | null = null;
+  if (storage === null) {
+    degradations.push({
+      scope: 'station-3:storage',
+      severity: 'soft',
+      path: dbPath,
+      detail: `derived:team-decisions count unavailable: ${storageError ?? 'storage unreadable'}`,
+      remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+    });
+  } else {
+    try {
+      teamDecisionsCount = (await queryExactHealth(storage, LOOP_TEAM_DECISION_SOURCE)).count;
+    } catch (err) {
+      degradations.push({
+        scope: 'station-3:storage',
+        severity: 'soft',
+        path: dbPath,
+        detail: `derived:team-decisions count query failed: ${(err as Error).message}`,
+        remediation: 'Ensure the ECHO daemon is running and the atom db is readable, then re-run `echoctl doctor`.',
+      });
+    }
+  }
+
+  return {
+    status: stationStatus(degradations),
+    seedStores,
+    intakeEnabled: parseIntakeEnabledFlag(env['ECHO_GRANOLA_INTAKE_ENABLED']),
+    intakeEnabledNote: STATION3_INTAKE_ENV_NOTE,
+    teamDecisionsCount,
+    notes,
+    degradations,
+  };
+}
+
+function closeStorage(storage: Storage | null): void {
+  if (storage !== null && 'close' in storage && typeof (storage as { close?: unknown }).close === 'function') {
+    try {
+      (storage as { close: () => void }).close();
+    } catch {
+      // best effort
+    }
+  }
+}
+
+export async function buildLoopReport(
+  opts: DoctorOpts,
+  ctx: { port: number; platform: NodeJS.Platform; pidLockPath: string; pidLockHeld: boolean },
+): Promise<DoctorLoopReport> {
+  const now = opts.now?.() ?? new Date();
+  const dbPath = resolveDbPath({ platform: ctx.platform });
+  const staleMs = opts.loopSignalsStaleMs ?? DEFAULT_LOOP_SIGNALS_STALE_MS;
+  const stalenessDirs = opts.loopStalenessDirs ?? {
+    src: join(repoRootFromModule(), 'src'),
+    dist: join(repoRootFromModule(), 'dist'),
+  };
+  const portOwnerLookup = opts.portOwnerLookup ?? defaultPortOwnerLookup;
+  const readPidArgv = opts.readPidArgv ?? defaultReadPidArgv;
+
+  let storage: Storage | null = null;
+  let storageError: string | null = null;
+  try {
+    storage = (opts.openStorage ?? (() => new SqliteStorage(dbPath)))();
+  } catch (err) {
+    storage = null;
+    storageError = (err as Error).message;
+  }
+
+  try {
+    const station1 = await buildLoopStation1(storage, storageError, dbPath, now);
+    const station2 = await buildLoopStation2(storage, storageError, dbPath, now, staleMs);
+    const serving = await buildLoopServing(
+      ctx.port,
+      ctx.pidLockPath,
+      ctx.pidLockHeld,
+      portOwnerLookup,
+      readPidArgv,
+      stalenessDirs,
+    );
+    const station3 = await buildLoopStation3(storage, storageError, dbPath, process.env);
+    const status: LoopStatus =
+      station1.status === 'degraded' ||
+      station2.status === 'degraded' ||
+      serving.status === 'degraded' ||
+      station3.status === 'degraded'
+        ? 'degraded'
+        : 'ok';
+    return { station1, station2, serving, station3, status };
+  } finally {
+    closeStorage(storage);
+  }
+}
+
 export function computeOverall(report: DoctorReport): 'healthy' | 'degraded' | 'broken' {
   if (
     !report.echoHome.exists ||
@@ -305,6 +1073,11 @@ export function computeOverall(report: DoctorReport): 'healthy' | 'degraded' | '
     if (agent.profile?.wired_at === null || outcome === null) continue;
     if (!outcome.probed && outcome.reason !== 'manual-only') return 'degraded';
   }
+  // Loop rollup: only HARD loop faults downgrade a report that is otherwise
+  // healthy (see the severity model on DoctorLoopReport). Soft loop states
+  // (absent/never-run/empty/nothing-listening) are informational and never
+  // reach here as a downgrade.
+  if (loopHasHardFault(report.loop)) return 'degraded';
   return 'healthy';
 }
 
@@ -350,6 +1123,8 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
     }
   }
 
+  const loop = await buildLoopReport(opts, { port, platform, pidLockPath, pidLockHeld });
+
   const report: DoctorReport = {
     daemon: {
       running: mcpReachable,
@@ -369,6 +1144,7 @@ export async function buildDoctorReport(opts: DoctorOpts = {}): Promise<DoctorRe
     syncLock,
     codexAdapter,
     agents,
+    loop,
     overall: 'broken',
   };
   report.overall = computeOverall(report);
