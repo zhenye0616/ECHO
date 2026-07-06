@@ -44,6 +44,34 @@ agent_notes: |
   timing, cli/shell-reachable npm-pack+bash) — ALL pass in isolation, none touch
   enrich/heartbeat code. Run log:
   raw/internal/agent-runs/2026-07-06-2026-07-06-120-worker-heartbeat-artifacts.md
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation (strategist-operated;
+  founder green-lit review + merge in session).
+
+  Conflicts resolved:
+  - none — --no-ff merge applied clean, as the sidecar predicted.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict: merge as-is, empty punch list)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: full suite green — run 1: 2014/2037 passed (1 file failed, known
+  load-sensitive flake class); run 2 (identical tree): 0 failures. Lint,
+  typecheck, coupled-invariants, sync-skills --check all clean. Reviewer
+  independently observed 1746 passed on test:product incl. the three
+  flagged flakes.
+
+  Follow-up items (non-blocking):
+  - optional hardening: write a heartbeat even on an uncaught runInner() throw
+  - after 119 lands: wire item 117 doctor loop section to consume the exported
+    heartbeat contract (117 AC3's own named follow-up)
+  - sequence note: 119 (delivery retry) merges next; decision-drift.ts
+    auto-merges (merge-tree verified); keep BOTH appended describe blocks in
+    tests/enrich/decision-drift.test.ts
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B7 root cause: fail-closed without observable degraded state
   - raw/internal/decisions/2026-07-05-terminal-first-demo-surface.md       # observability over stations 1-3 is the sprint's demo goal

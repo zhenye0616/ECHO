@@ -444,3 +444,5 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 2026-07-05 (from 116 merge review): invalid brain-name env (e.g. ECHO_CEO_BRAIN=foo) exits via bare main().catch stderr message instead of the "skipped:" status-line format (tools/intake-terminal.ts:300,358).
 - 2026-07-05 (from 116 merge review): enrich JSON logs interleave with intake-terminal cards on stdout — consider stderr diversion for demo cleanliness; pair with item 117 observability.
 - 2026-07-05 (from 116 merge review): undocumented load-flake tests/surfaces/ceo-slack-brain.test.ts "kills a timed-out brain process group" (ENOENT descendant.pid under suite load; 18/18 in isolation) — track alongside the shell-reachable flake.
+- [120 follow-up] optional hardening: heartbeat write on uncaught runInner() throw
+- [120 follow-up] wire 117 doctor loop section to consume the heartbeat contract (117 AC3 follow-up)
