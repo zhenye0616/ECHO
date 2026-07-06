@@ -6,6 +6,9 @@ priority: HIGH
 estimate: 1-2d
 created: 2026-07-06
 blocked_by: []
+claimed_by: "builder-120-118-B4913C34"
+claimed_at: "2026-07-06T02:05:00Z"
+branch: "agent/drift-join-nomination"
 spec_refs:
   - raw/internal/decisions/2026-07-06-drift-failure-modes-root-causes.md   # B3 root cause + the empirical subject study this fixes
   - raw/internal/decisions/2026-07-04-seam-v0-decision.md                  # decisions 18 (dumb-then-alias), 19 (no AI in plumbing) — the rules this stays inside
