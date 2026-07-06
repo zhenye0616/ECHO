@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setEchoHomeRoot } from '../../src/echo-home/paths.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import type { Storage, EventId } from '../../src/storage/interface.js';
 import { appendConfirmedDecision } from '../../src/surfaces/ceo-slack-responder/decision-store.js';
@@ -33,6 +34,15 @@ function tempCheckpoint(): string {
   tempDirs.push(dir);
   return join(dir, 'drift-sweep-checkpoint.json');
 }
+
+// Repoint ECHO_HOME at a fresh temp so any worker-heartbeat write (item 120,
+// e.g. the boot-disable path in startDriftSweepWorker) lands in temp, never the
+// real ~/.echo/state.
+beforeEach(() => {
+  const home = mkdtempSync(join(tmpdir(), 'echo-drift-home-'));
+  tempDirs.push(home);
+  setEchoHomeRoot(home);
+});
 
 afterEach(() => {
   while (tempDirs.length > 0) {
@@ -620,5 +630,61 @@ describe('AC6 — blast-radius cap', () => {
     const t3 = await runDriftSweepOnce(store, runtime);
     if (t3.status === 'ok') expect(t3.delivered).toBe(0);
     expect(posts).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC4 (item 120) — degraded distinction from tracked fields
+// ---------------------------------------------------------------------------
+
+describe('AC4 — drift degraded distinction', () => {
+  it('an all-retryable stall reports degraded:true + retryable_failures>0 + frozen watermark', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'Database choice', 'Use SQLite for V1');
+    await seedStatement(store, { subject: 'Database choice', text: "Let's switch to Postgres" });
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge: infraFailJudge }));
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.degraded).toBe(true);
+      expect(result.retryable_failures).toBeGreaterThan(0);
+      expect(result.brain_invocations).toBeGreaterThan(0);
+    }
+    // Watermark held behind the retryable statement (not cleared to maxSeq+1).
+    const maxSeq = await store.getCurrentSequence();
+    expect(loadDriftSweepCheckpoint(cp).watermark).toBeLessThanOrEqual(maxSeq);
+  });
+
+  it('a terminal judged-no-contradiction alongside a retryable failure is NOT degraded', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'Database choice', 'Use SQLite for V1');
+    await seedDecision(store, 'Pricing tier', 'Charge 25 a month');
+    await seedStatement(store, { subject: 'Database choice', text: 'sticking with SQLite' });
+    await seedStatement(store, { subject: 'Pricing tier', text: 'raise the price' });
+    // No-contradiction for the DB statement (terminal progress), infra failure
+    // for the pricing statement (retryable).
+    const mixedJudge: DriftJudge = async (input) => {
+      if (input.decision.subject === 'Pricing tier') throw new DriftJudgeInfraError('model timeout');
+      return { contradicts: false, quote: '', reason: 'consistent' };
+    };
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge: mixedJudge }));
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.degraded).toBe(false); // terminal progress was made this tick
+      expect(result.retryable_failures).toBe(1);
+    }
+  });
+
+  it('a quiet tick (empty window) reports degraded:false + status ok', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    const result = await runDriftSweepOnce(store, makeRuntime(cp));
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.degraded).toBe(false);
+      expect(result.retryable_failures).toBe(0);
+      expect(result.brain_invocations).toBe(0);
+    }
   });
 });

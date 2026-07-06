@@ -1,7 +1,8 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setEchoHomeRoot } from '../../src/echo-home/paths.js';
 import {
   filterToCurrentSignalRuns,
   GRANOLA_SIGNAL_INDEX_SOURCE,
@@ -19,6 +20,22 @@ import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent, EventId } from '../../src/storage/interface.js';
 import { captureStdout } from '../fixtures/stdout.js';
 import { normalizeSubject } from '../../src/util/subject.js';
+
+// Repoint ECHO_HOME at a fresh temp so any worker-heartbeat write (item 120,
+// from the worker run() wrapper and the boot-disable path) lands in temp, never
+// the real ~/.echo/state.
+const homeDirs: string[] = [];
+beforeEach(() => {
+  const home = mkdtempSync(join(tmpdir(), 'echo-granola-signals-home-'));
+  homeDirs.push(home);
+  setEchoHomeRoot(home);
+});
+afterEach(() => {
+  while (homeDirs.length > 0) {
+    const dir = homeDirs.pop();
+    if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function tempCheckpoint(): { dir: string; path: string } {
   const dir = mkdtempSync(join(tmpdir(), 'echo-granola-signals-'));
