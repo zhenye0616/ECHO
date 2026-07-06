@@ -5,7 +5,58 @@ status: proposed
 claimed_by: "builder-119-7c078333"
 claimed_at: "2026-07-06T01:52:01Z"
 branch: "agent/drift-delivery-retry"
-priority: HIGH
+head_sha: "07a0cb2ad5ffa6e97eaba2de194b55aa190c5064"
+pr_url: ""
+agent_notes: |
+  All four ACs implemented against current main (not the concurrent 120 branch).
+  head_sha 07a0cb2ad5ffa6e97eaba2de194b55aa190c5064 on agent/drift-delivery-retry.
+  Touched files: src/enrich/decision-drift.ts,
+  tests/enrich/decision-drift.test.ts,
+  tests/surfaces/ceo-slack-responder/drift-alert.test.ts.
+
+  WHAT BUILT (AC-by-AC):
+  - AC1: deliverPair now classifies its post-failure. A new typed
+    DriftDeliveryRejectedError (received non-2xx / ok:false = a Slack response
+    arrived → PROVEN rejection) → non-terminal delivery-deferred, keeps
+    pending_alert, increments retry_count, blocks the watermark; the existing drain
+    re-attempts next tick. Every OTHER throw (timeout/reset/DNS/untyped) is
+    unknown-outcome → terminal delivery-failed, zero retries, failure_reason
+    recorded, drift_delivery_failed emitted with retry_count 0. postDriftAlertCard
+    reordered to classify a received non-2xx BEFORE response.json() (r2 codex-ops),
+    so a 429 with empty/non-JSON body stays typed+retryable.
+  - AC2: retry_count = failed proven-rejection attempts so far; pair terminalizes
+    on the attempt that reaches DRIFT_DELIVERY_MAX_RETRIES (default 5) — exactly
+    MAX visible attempts, no extra deferral. Cap-overflow (AC6) and unknown-outcome
+    never touch retry_count. Terminal write carries failure_reason + final
+    retry_count and reuses the drift_delivery_failed error log.
+  - AC3: ambiguous-crash recovery (delivery-intent found on a later tick) UNCHANGED
+    — still promotes to delivery-failed with zero Slack posts. Existing 114 test
+    still green.
+  - AC4: retry_count is an additive OPTIONAL checkpoint field; schema version stays
+    1; loader loose-cast documented; old checkpoint without retry_count reads as 0.
+
+  DESIGN CHOICES: deliverPair return widened to include 'delivery-deferred'; both
+  call sites (first-delivery + drain) gained a deferred branch (deferred++ +
+  blockingSeqs.push). New warn log drift_delivery_retry per non-terminal retry.
+  No backoff/Retry-After/jitter, no seed-store change, no resend CLI, no new state.
+
+  TESTS: +5 in decision-drift.test.ts (AC1 retry-then-success, AC1
+  timeout-after-send terminal-zero-retries, AC2 exhaustion-exactly-MAX, AC2
+  cap-deferred-retry_count-0, AC4 pre-119-checkpoint-loads); +1 net-new in
+  drift-alert.test.ts (429 non-JSON body classified before parse) plus tightened
+  the ok:false test to assert the typed error. Focus run: 34 passed
+  (decision-drift 23 + drift-alert 11).
+
+  VERIFICATION (worktree, fresh npm ci):
+  - test:product: 160 passed | 1 skipped (161 files); 1733 passed | 21 skipped |
+    1 todo. All green.
+  - lint: clean. typecheck: clean.
+  - Baseline on the claim commit had 2 flaky failures (tests/cli/shell-reachable —
+    npm-pack/bash reachability; tests/surfaces/ceo-slack-brain — descendant-pid
+    timeout), both untouched by 119; both PASSED on the full post-change run →
+    environment-flaky, not regressions.
+
+  ESCALATIONS: none.
 estimate: 1d
 created: 2026-07-06
 blocked_by: []
