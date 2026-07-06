@@ -1007,6 +1007,15 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Verdict:** 🟡 partial — 2 of 4 calls (get_recent_work_context, final get_atoms) carried the load; find_clusters was coarse and the Codex-cluster get_atoms was wrong/stale. Net: ECHO recovered enough prior onboarding/release context for Codex to ground its critique.
 - **Note:** Second consecutive thread where the Codex *capture* surface returned stale/unrelated atoms while Claude-session capture carried the signal — reinforces the 12:22 observation that Codex's first-party capture is the weak contributor on this machine. Also a process note: the read-only consultee misread the journal-by-proxy rule; the rule text ("read-only consultee MAY call ECHO MCP only if it immediately reports … orchestrator MUST journal") may need a one-line "read-only does NOT exempt you from reporting" clarifier in skills/role-typed-task-state.md.
 
+### 2026-06-05 12:53 PDT — connect to the live speccing Claude session (cross-session handoff)
+
+- **Trigger:** founder (in a *second* Claude Code session) asked to "use echo and connect to the speccing claude session" — locate + pull state from a concurrent live Claude doing release/spec work in the same repo.
+- **Query inputs:** (1) `echo_resolve_mru(sources=["claude_code"], repo_path=Project_echo)`; (2) `find_clusters(repo_path=Project_echo)` (no-arg window); (3) `get_atoms(12 ids from rank-1 cluster, prefer=newest_first, format=minimal)`.
+- **Returned:** (1) MRU claude_code = THIS session (`14bfc2a7…`), not the target — MRU is self when the asker is the most recent writer. (2) rank-1 `ctx_beef6c88`, 12 atoms (claude_code:11, git:1), 18:19→19:52Z, open loops present. (3) bodies revealed the OTHER live session `d5d732c0…` (turns 4–7, 19:25→19:37Z): release-repo debate → resolved to "one repo, releases = tags+CI artifacts, package-time subset already done by 076" → last turn offered to write the retroactive onboarding-ci backlog spec.
+- **Sources:** `fs:…/.claude/projects/…Project_echo/{14bfc2a7…(self), d5d732c0…(target speccing session)}.jsonl` (claude_code) + `git:/Users/zhenye/Desktop/Project_echo` (1 commit `7d2a199`). codex+cursor silently absent from the cluster.
+- **Verdict:** ✅ right — find_clusters→get_atoms cleanly surfaced the concurrent session's full state and its open loop (retroactive spec offer) without needing the session id up front; MRU-resolve alone would have misled (returned self).
+- **Note:** "connect to another live session" is a real cross-session-handoff use case; the split flow (cluster discovery → newest-first body fetch) nailed it where `echo_resolve_mru` could not (MRU = self). Target session last-written 12:53 PDT — effectively concurrent. Codex/cursor again absent from the rank-1 cluster (third consecutive thread).
+
 ### 2026-06-05 13:04 PDT - codex-ops r1 review tick on 2026-06-05-090-adopt-selftest-onboarding-harness
 
 - **Trigger:** Wrapper-owned read-only reviewer tick selected `backlog/reviews/2026-06-05-090-adopt-selftest-onboarding-harness/r1/request.md` and published `backlog/reviews/2026-06-05-090-adopt-selftest-onboarding-harness/r1/codex-ops.md`.
@@ -1024,15 +1033,6 @@ On the first MCP-call journal append of each new calendar month, create `mcp-int
 - **Sources:** request `backlog/reviews/2026-06-05-090-adopt-selftest-onboarding-harness/r1/request.md`; artifact `backlog/proposed/2026-06-05-090-adopt-selftest-onboarding-harness.md@17c714ac1059fe9e84b5992f5ed58a67d2e0a760`; response `backlog/reviews/2026-06-05-090-adopt-selftest-onboarding-harness/r1/codex.md`; raw diagnostics `/tmp/claude-501/echo-codex-8DE5D383-9F3A-46D2-9827-AB3355A87653/raw/internal/review-queue/599b2434-bf48-4395-a76f-9e6d75ec1a0d/codex.stdout.log` / `/tmp/claude-501/echo-codex-8DE5D383-9F3A-46D2-9827-AB3355A87653/raw/internal/review-queue/599b2434-bf48-4395-a76f-9e6d75ec1a0d/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
-
-### 2026-06-05 12:53 PDT — connect to the live speccing Claude session (cross-session handoff)
-
-- **Trigger:** founder (in a *second* Claude Code session) asked to "use echo and connect to the speccing claude session" — locate + pull state from a concurrent live Claude doing release/spec work in the same repo.
-- **Query inputs:** (1) `echo_resolve_mru(sources=["claude_code"], repo_path=Project_echo)`; (2) `find_clusters(repo_path=Project_echo)` (no-arg window); (3) `get_atoms(12 ids from rank-1 cluster, prefer=newest_first, format=minimal)`.
-- **Returned:** (1) MRU claude_code = THIS session (`14bfc2a7…`), not the target — MRU is self when the asker is the most recent writer. (2) rank-1 `ctx_beef6c88`, 12 atoms (claude_code:11, git:1), 18:19→19:52Z, open loops present. (3) bodies revealed the OTHER live session `d5d732c0…` (turns 4–7, 19:25→19:37Z): release-repo debate → resolved to "one repo, releases = tags+CI artifacts, package-time subset already done by 076" → last turn offered to write the retroactive onboarding-ci backlog spec.
-- **Sources:** `fs:…/.claude/projects/…Project_echo/{14bfc2a7…(self), d5d732c0…(target speccing session)}.jsonl` (claude_code) + `git:/Users/zhenye/Desktop/Project_echo` (1 commit `7d2a199`). codex+cursor silently absent from the cluster.
-- **Verdict:** ✅ right — find_clusters→get_atoms cleanly surfaced the concurrent session's full state and its open loop (retroactive spec offer) without needing the session id up front; MRU-resolve alone would have misled (returned self).
-- **Note:** "connect to another live session" is a real cross-session-handoff use case; the split flow (cluster discovery → newest-first body fetch) nailed it where `echo_resolve_mru` could not (MRU = self). Target session last-written 12:53 PDT — effectively concurrent. Codex/cursor again absent from the rank-1 cluster (third consecutive thread).
 
 ### 2026-06-05 13:11 PDT - codex r1 review tick on 2026-06-05-091-upstream-windows-compat-fixes
 
