@@ -75,6 +75,14 @@ files_to_modify:
   - src/cli/io/render.ts            # render the new section (existing style)
   - tests/cli/                      # doctor loop-section coverage (temp fixtures)
 ready_content_sha: 692f1550c214b66b8355d78a7f43db49b47ca2ccc13a47bdb4f5825207c00300
+review_notes: |
+  Merged 2026-07-06 via founder-reconciled commit 172149b1 after a block →
+  remediation cycle (read-only db-open fix — missing db is a soft 'db-missing'
+  state, doctor no longer creates/migrates; re-review at head_sha 58ca0192).
+  State transition adopted from an orphaned merge-and-cleanup run that died before
+  final bookkeeping (this run). Verify = re-review verdict "merge as-is, replaces
+  block"; 58ca0192 confirmed ancestor of origin/main; sidecar pre-merge fixups =
+  none; live doctor --json loop section renders stations 1–3.
 ---
 
 ## Problem
