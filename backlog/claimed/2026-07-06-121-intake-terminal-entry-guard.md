@@ -1,11 +1,14 @@
 ---
 id: 2026-07-06-121-intake-terminal-entry-guard
 title: "intake-terminal entry guard: replace VITEST env check with the house import.meta entry check — importing the module must never run the tool"
-status: ready
+status: claimed
 priority: HIGH
 estimate: 0.5h
 created: 2026-07-06
 blocked_by: []
+claimed_by: "builder-121-88a8a68b"
+claimed_at: "2026-07-06T16:11:01Z"
+branch: "agent/intake-terminal-entry-guard"
 fast_track: |
   Founder-authorized fast-track 2026-07-06 (spec-review rounds waived for a
   one-line safety fix discovered live). Provenance: during the 07-06 live test,
