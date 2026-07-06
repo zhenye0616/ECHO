@@ -865,6 +865,10 @@ function buildExtractionPrompt(input: GranolaSignalExtractionInput): string {
     'Extract Granola meeting signals as JSON only.',
     'Return {"signals":[...]} with only decision, rationale, and action signal_type values.',
     'Every signal must include text, canonical_subject, source_span, and confidence.',
+    // Item 118 AC2: pin the canonical_subject shape so cross-meeting subjects
+    // vary less. normalizeSubject remains the authority; this only reduces
+    // variance at the source.
+    'canonical_subject must be a space-separated lowercase noun phrase — no snake_case, no camelCase, no underscores or hyphens.',
     'Use only the meeting content below; do not infer rationale that was not said.',
     '',
     JSON.stringify(input, null, 2),

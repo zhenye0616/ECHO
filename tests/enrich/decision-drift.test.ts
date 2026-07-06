@@ -13,6 +13,8 @@ import {
   DRIFT_DELIVERY_MAX_RETRIES,
   DRIFT_JUDGE_MAX_ATTEMPTS,
   DRIFT_JUDGE_VERSION,
+  DRIFT_MAX_NOMINATIONS_PER_STATEMENT,
+  DRIFT_NOMINATION_JACCARD_THRESHOLD,
   DriftDeliveryRejectedError,
   DriftJudgeInfraError,
   DriftJudgeParseError,
@@ -29,6 +31,7 @@ import {
   type DriftPairCheckpoint,
   type DriftSweepRuntime,
 } from '../../src/enrich/decision-drift.js';
+import { captureStdout } from '../fixtures/stdout.js';
 
 const tempDirs: string[] = [];
 function tempCheckpoint(): string {
@@ -359,9 +362,7 @@ describe('AC4 — verbatim-quote enforcement', () => {
     const decisionKey = `team-decision:${normalizeSubject('Pricing')}`;
     const pairKey = driftPairKey(decisionKey, dedupeKey, DRIFT_JUDGE_VERSION);
     const posts: DriftAlertPayload[] = [];
-    const { judge, calls } = countingJudge(
-      contradictsJudge('THIS QUOTE IS NOT IN THE STATEMENT'),
-    );
+    const { judge, calls } = countingJudge(contradictsJudge('THIS QUOTE IS NOT IN THE STATEMENT'));
 
     const result = await runDriftSweepOnce(
       store,
@@ -667,7 +668,8 @@ describe('AC4 — drift degraded distinction', () => {
     // No-contradiction for the DB statement (terminal progress), infra failure
     // for the pricing statement (retryable).
     const mixedJudge: DriftJudge = async (input) => {
-      if (input.decision.subject === 'Pricing tier') throw new DriftJudgeInfraError('model timeout');
+      if (input.decision.subject === 'Pricing tier')
+        throw new DriftJudgeInfraError('model timeout');
       return { contradicts: false, quote: '', reason: 'consistent' };
     };
     const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge: mixedJudge }));
@@ -712,7 +714,11 @@ describe('119 — delivery retry split', () => {
   it('AC1 — a proven rejection once then success delivers on the retry tick with exactly one card', async () => {
     const store = new MemoryStorage();
     const cp = tempCheckpoint();
-    const { pairKey, maxSeq } = await seedContradictingPair(store, 'CI', 'drop the CI gate for the demo');
+    const { pairKey, maxSeq } = await seedContradictingPair(
+      store,
+      'CI',
+      'drop the CI gate for the demo',
+    );
 
     let attempts = 0;
     let deliveredCards = 0;
@@ -749,7 +755,11 @@ describe('119 — delivery retry split', () => {
   it('AC1 — a timeout-after-send (untyped throw) goes terminal delivery-failed with zero retries and never re-posts', async () => {
     const store = new MemoryStorage();
     const cp = tempCheckpoint();
-    const { pairKey, maxSeq } = await seedContradictingPair(store, 'Storage', 'add an upsert path to storage');
+    const { pairKey, maxSeq } = await seedContradictingPair(
+      store,
+      'Storage',
+      'add an upsert path to storage',
+    );
 
     let attempts = 0;
     const runtime = makeRuntime(cp, {
@@ -782,7 +792,11 @@ describe('119 — delivery retry split', () => {
   it('AC2 — a persistent proven rejection terminalizes after exactly DRIFT_DELIVERY_MAX_RETRIES attempts, no more', async () => {
     const store = new MemoryStorage();
     const cp = tempCheckpoint();
-    const { pairKey, maxSeq } = await seedContradictingPair(store, 'Pricing', 'we agreed to make it free');
+    const { pairKey, maxSeq } = await seedContradictingPair(
+      store,
+      'Pricing',
+      'we agreed to make it free',
+    );
 
     let attempts = 0;
     const runtime = makeRuntime(cp, {
@@ -821,7 +835,9 @@ describe('119 — delivery retry split', () => {
         text: `reverse ${s} completely`,
         dedupeKey: `granola:signal:${s}`,
       });
-      pairKeys.push(driftPairKey(`team-decision:${normalizeSubject(s)}`, dedupeKey, DRIFT_JUDGE_VERSION));
+      pairKeys.push(
+        driftPairKey(`team-decision:${normalizeSubject(s)}`, dedupeKey, DRIFT_JUDGE_VERSION),
+      );
     }
     const runtime = makeRuntime(cp, {
       maxAlertsPerTick: 3,
@@ -843,7 +859,11 @@ describe('119 — delivery retry split', () => {
   it('AC4 — a pre-119 checkpoint (no retry_count) loads and a proven rejection begins retrying from 0', async () => {
     const store = new MemoryStorage();
     const cp = tempCheckpoint();
-    const { pairKey } = await seedContradictingPair(store, 'Roadmap', 'ship federation next sprint');
+    const { pairKey } = await seedContradictingPair(
+      store,
+      'Roadmap',
+      'ship federation next sprint',
+    );
 
     // Hand-craft a delivery-deferred pair as an OLD checkpoint would write it:
     // a full payload but NO retry_count field at all.
@@ -889,5 +909,213 @@ describe('119 — delivery retry split', () => {
     const pair = loadDriftSweepCheckpoint(cp).pairs[pairKey];
     expect(pair?.state).toBe('delivery-deferred'); // still retrying, not terminal
     expect(pair?.retry_count).toBe(1); // began from 0
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC3/AC4/AC5 (item 118) — nominate-then-confirm join
+// ---------------------------------------------------------------------------
+
+function findNearMiss(writes: string[]): Record<string, unknown> | undefined {
+  for (const line of writes.join('').split('\n')) {
+    if (line.trim() === '') continue;
+    try {
+      const parsed = JSON.parse(line) as { message?: string; payload?: Record<string, unknown> };
+      if (parsed.message === 'drift_nomination_miss') return parsed.payload;
+    } catch {
+      // non-JSON log line; skip
+    }
+  }
+  return undefined;
+}
+
+describe('AC3 — nominate-then-confirm join', () => {
+  it('pins the nomination threshold and cap constants', () => {
+    expect(DRIFT_NOMINATION_JACCARD_THRESHOLD).toBe(0.2);
+    expect(DRIFT_MAX_NOMINATIONS_PER_STATEMENT).toBe(5);
+  });
+
+  it('nominates and judges a topically-continuous pair (0.25) above threshold', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'openai sponsorship', 'Take the sponsorship deal');
+    await seedStatement(store, {
+      subject: 'openai investment terms',
+      text: 'renegotiate the terms',
+    });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+    expect(result.status).toBe('ok');
+    expect(calls()).toBe(1); // 1/4 = 0.25 >= 0.2 → nominated and judged
+    if (result.status === 'ok') expect(result.statements_nominated).toBe(1);
+  });
+
+  it('nominates a pair scoring exactly 0.2 (inclusive) and drops one just below', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    // stmt {alpha,beta,gamma} vs A {alpha,delta,epsilon}: 1/5 = 0.2 (inclusive)
+    // stmt vs B {alpha,delta,epsilon,zeta}: 1/6 ≈ 0.167 (below)
+    await seedDecision(store, 'alpha delta epsilon', 'decision A');
+    await seedDecision(store, 'alpha delta epsilon zeta', 'decision B');
+    await seedStatement(store, { subject: 'alpha beta gamma', text: 'anything' });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+    expect(calls()).toBe(1); // only the exactly-0.2 decision is nominated
+    const pairs = Object.values(loadDriftSweepCheckpoint(cp).pairs);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]!.decision_dedupe_key).toBe('team-decision:alpha delta epsilon');
+    if (result.status === 'ok') expect(result.statements_nominated).toBe(1);
+  });
+
+  it('judges and checkpoints two above-threshold decisions independently', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'shared alpha gamma', 'decision one');
+    await seedDecision(store, 'shared beta delta', 'decision two');
+    await seedStatement(store, { subject: 'shared alpha beta', text: 'anything' });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+    expect(calls()).toBe(2); // both share 2/4 = 0.5
+    expect(Object.keys(loadDriftSweepCheckpoint(cp).pairs)).toHaveLength(2);
+  });
+
+  it('truncates >5 tied candidates to exactly the deterministic five', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    // Seven decisions "common a".."common g" each score 1/3 against "common x".
+    for (const letter of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) {
+      await seedDecision(store, `common ${letter}`, `decision ${letter}`);
+    }
+    await seedStatement(store, { subject: 'common x', text: 'anything' });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+    expect(calls()).toBe(DRIFT_MAX_NOMINATIONS_PER_STATEMENT); // exactly 5, not 7
+    const subjects = Object.values(loadDriftSweepCheckpoint(cp).pairs)
+      .map((p) => p.decision_dedupe_key)
+      .sort();
+    // Tie-break: score equal → normalized subject ascending → a..e win, f/g drop.
+    expect(subjects).toEqual([
+      'team-decision:common a',
+      'team-decision:common b',
+      'team-decision:common c',
+      'team-decision:common d',
+      'team-decision:common e',
+    ]);
+    if (result.status === 'ok') expect(result.statements_nominated).toBe(1);
+  });
+});
+
+describe('AC4 — no-candidate misses become data', () => {
+  it('reports nominator counters and does not judge a no-candidate statement', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'database choice', 'Use SQLite');
+    await seedStatement(store, { subject: 'database choice', text: 'switch to Postgres' });
+    await seedStatement(store, { subject: 'pricing tier', text: 'charge more' });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    const capture = captureStdout();
+    let result;
+    let miss;
+    try {
+      result = await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+      miss = findNearMiss(capture.writes);
+    } finally {
+      capture.restore();
+    }
+    expect(calls()).toBe(1); // only the nominated statement is judged
+    if (result!.status === 'ok') {
+      expect(result!.statements_seen).toBe(2);
+      expect(result!.statements_nominated).toBe(1);
+      expect(result!.statements_no_candidate).toBe(1);
+      expect(result!.decisions_scored).toBe(1); // one recorded decision
+    }
+    // Near-miss names the closest below-threshold decision and its score.
+    expect(miss).toBeDefined();
+    expect(miss!['statement_subject']).toBe('pricing tier');
+    expect(miss!['closest_decision_subject']).toBe('database choice');
+    expect(miss!['closest_score']).toBe(0);
+  });
+
+  it('selects the near-miss closest decision by the deterministic tie-breaker', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    // Two decisions both score 0 against the statement → tie broken by subject asc.
+    await seedDecision(store, 'zeta topic', 'decision Z');
+    await seedDecision(store, 'alpha topic aardvark', 'decision A');
+    await seedStatement(store, { subject: 'wholly unrelated words', text: 'anything' });
+    const capture = captureStdout();
+    let miss;
+    try {
+      await runDriftSweepOnce(store, makeRuntime(cp, { judge: noContradictionJudge }));
+      miss = findNearMiss(capture.writes);
+    } finally {
+      capture.restore();
+    }
+    expect(miss).toBeDefined();
+    // Both score 0; "alpha topic aardvark" < "zeta topic" ascending.
+    expect(miss!['closest_decision_subject']).toBe('alpha topic aardvark');
+  });
+
+  it('emits an explicit no-decisions note when the decision set is empty', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedStatement(store, { subject: 'some subject', text: 'anything' });
+    const capture = captureStdout();
+    let result;
+    let miss;
+    try {
+      result = await runDriftSweepOnce(store, makeRuntime(cp));
+      miss = findNearMiss(capture.writes);
+    } finally {
+      capture.restore();
+    }
+    if (result!.status === 'ok') {
+      expect(result!.decisions_scored).toBe(0);
+      expect(result!.statements_no_candidate).toBe(1);
+    }
+    expect(miss).toBeDefined();
+    expect(miss!['closest_decision_subject']).toBe(null);
+    expect(miss!['note']).toBe('no decisions to score against');
+  });
+});
+
+describe('AC5 — end-to-end over the measured shapes', () => {
+  it('joins a separator-only-differing pair that 114 would have missed', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'openai investment terms', 'Accept the terms');
+    // Statement subject uses snake_case; normalizeSubject folds it to match.
+    await seedStatement(store, {
+      subject: 'openai_investment_terms',
+      text: 'reject the terms',
+    });
+    const posts: DriftAlertPayload[] = [];
+    const result = await runDriftSweepOnce(
+      store,
+      makeRuntime(cp, {
+        judge: contradictsJudge('reject the terms'),
+        post: async (p) => {
+          posts.push(p);
+        },
+      }),
+    );
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') expect(result.delivered).toBe(1);
+    expect(posts).toHaveLength(1); // exact-equality (114) scored these as different keys
+  });
+
+  it('nominates a topically-continuous pair but never judges an unrelated one', async () => {
+    const store = new MemoryStorage();
+    const cp = tempCheckpoint();
+    await seedDecision(store, 'openai sponsorship', 'Take the deal');
+    await seedStatement(store, { subject: 'openai investment terms', text: 'renegotiate' });
+    await seedStatement(store, { subject: 'lunch logistics', text: 'order tacos' });
+    const { judge, calls } = countingJudge(noContradictionJudge);
+    const result = await runDriftSweepOnce(store, makeRuntime(cp, { judge }));
+    expect(calls()).toBe(1); // continuous pair judged; unrelated pair never judged
+    if (result.status === 'ok') {
+      expect(result.statements_nominated).toBe(1);
+      expect(result.statements_no_candidate).toBe(1);
+    }
   });
 });

@@ -19,12 +19,7 @@ import { atomicWrite } from '../echo-home/adapters/atomic-write.js';
 import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
 import { createLogger } from '../logging/index.js';
 import { parseJson } from '../util/json.js';
-import {
-  parseBrainName,
-  preflightBrain,
-  runBrain,
-  type BrainName,
-} from '../brain/brain.js';
+import { parseBrainName, preflightBrain, runBrain, type BrainName } from '../brain/brain.js';
 import { getSignalWindow, type SignalWindowEntry } from '../trace/signal-window.js';
 import { GRANOLA_SIGNAL_SOURCE, type GranolaSignalType } from './granola-signals.js';
 import { normalizeSubject } from '../util/subject.js';
@@ -84,6 +79,17 @@ export const DRIFT_DELIVERY_MAX_RETRIES = 5;
 export const DEFAULT_DRIFT_MAX_ALERTS_PER_TICK = 3;
 export const DEFAULT_DRIFT_SWEEP_WORKER_INTERVAL_MS = 300_000;
 export const DEFAULT_DRIFT_JUDGE_BRAIN_TIMEOUT_MS = 180_000;
+
+// Item 118 (AC3): the AI-free nominate-then-confirm join. A statement nominates
+// every recorded decision whose normalized-word-set Jaccard similarity is at or
+// above the threshold, capped at the top N by the deterministic tie-breaker.
+// The threshold is deliberately permissive — the brain judge is the precision
+// gate, so the nominator over-nominates and the cap (not the threshold) bounds
+// per-tick judge cost. `0.2` nominates the measured `"openai sponsorship"` /
+// `"openai investment terms"` pair (1 shared token / 4-token union = 0.25) with
+// margin; `5` mirrors the drift/seed retry family's cap.
+export const DRIFT_NOMINATION_JACCARD_THRESHOLD = 0.2;
+export const DRIFT_MAX_NOMINATIONS_PER_STATEMENT = 5;
 
 const SIGNAL_STATEMENT_TYPES: ReadonlySet<GranolaSignalType> = new Set([
   'decision',
@@ -420,7 +426,10 @@ interface DriftStatement {
   meeting_url?: string;
 }
 
-function metaString(metadata: Record<string, unknown> | undefined, key: string): string | undefined {
+function metaString(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
   const value = metadata?.[key];
   return typeof value === 'string' && value.trim() !== '' ? value : undefined;
 }
@@ -432,7 +441,12 @@ function eventToDecisionRecord(event: CaptureEvent): DriftDecisionRecord | null 
   const decision = metaString(md, 'decision') ?? event.content;
   const confirmedBy = metaString(md, 'confirmed_by');
   const draftId = metaString(md, 'draft_id');
-  if (subject === undefined || decision.trim() === '' || confirmedBy === undefined || draftId === undefined) {
+  if (
+    subject === undefined ||
+    decision.trim() === '' ||
+    confirmedBy === undefined ||
+    draftId === undefined
+  ) {
     return null;
   }
   const normalizedSubject = metaString(md, 'normalized_subject') ?? normalizeSubject(subject);
@@ -488,7 +502,8 @@ function toStatement(entry: SignalWindowEntry): DriftStatement | null {
   const canonicalSubject = metaString(entry.metadata, 'canonical_subject');
   const statementDedupeKey = metaString(entry.metadata, 'dedupe_key');
   if (canonicalSubject === undefined || statementDedupeKey === undefined) return null;
-  const meetingUrl = metaString(entry.metadata, 'meeting_url') ?? metaString(entry.metadata, 'web_url');
+  const meetingUrl =
+    metaString(entry.metadata, 'meeting_url') ?? metaString(entry.metadata, 'web_url');
   return {
     sequence_id: entry.sequence_id,
     statement_dedupe_key: statementDedupeKey,
@@ -600,6 +615,14 @@ export type DriftSweepResult =
       // frozen, no terminal progress) from a healthy tick. It rides the `ok`
       // branch so existing consumers that switch on `status` are unaffected.
       degraded: boolean;
+      // Item 118 (AC4): per-tick nominator observability. `statements_nominated`
+      // = statements with >=1 candidate at/above threshold; `statements_no_candidate`
+      // = statements with zero; `decisions_scored` = the size of the recorded-decision
+      // pool scored against this tick (so cost growth surfaces before the
+      // statements_seen x decisions_scored work overruns the sweep interval).
+      statements_nominated: number;
+      statements_no_candidate: number;
+      decisions_scored: number;
       window_size: number;
       statements_seen: number;
       brain_invocations: number;
@@ -635,6 +658,41 @@ export interface DriftSweepRuntime {
   now: () => string;
 }
 
+/** Item 118 AC3: the normalized word set used for Jaccard scoring. Re-normalizes
+ *  through the shared `normalizeSubject` (idempotent for freshly-written atoms;
+ *  folds separators in older stored subjects) before splitting on whitespace, so
+ *  a separator-only-differing pair joins. Contains no embeddings and no LLM
+ *  (seam decision 19). */
+function subjectTokens(subject: string): Set<string> {
+  const normalized = normalizeSubject(subject);
+  return new Set(normalized === '' ? [] : normalized.split(' '));
+}
+
+/** Jaccard similarity |A∩B| / |A∪B|; 0 when the union is empty. */
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const token of a) if (b.has(token)) intersection += 1;
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+interface ScoredDecision {
+  decision: DriftDecisionRecord;
+  score: number;
+}
+
+/** Item 118 AC3: total order for nomination + near-miss selection — score
+ *  descending, then normalized decision subject ascending, then decision
+ *  `dedupe_key` ascending. Independent of recorded-decision iteration order, so
+ *  identical inputs always nominate + checkpoint the identical pair set. */
+function compareScoredDecisions(a: ScoredDecision, b: ScoredDecision): number {
+  if (a.score !== b.score) return a.score < b.score ? 1 : -1;
+  const subjectCmp = a.decision.normalized_subject.localeCompare(b.decision.normalized_subject);
+  if (subjectCmp !== 0) return subjectCmp;
+  return a.decision.dedupe_key.localeCompare(b.decision.dedupe_key);
+}
+
 export async function runDriftSweepOnce(
   storage: Storage,
   runtime: DriftSweepRuntime,
@@ -660,8 +718,15 @@ export async function runDriftSweepOnce(
     return { status: 'error', reason: 'read_failed', message: (err as Error).message };
   }
 
-  const decisionBySubject = new Map<string, DriftDecisionRecord>();
-  for (const decision of decisions) decisionBySubject.set(decision.normalized_subject, decision);
+  // Item 118 AC3: decision token sets computed ONCE per tick, so per-statement
+  // work is scoring only. The decision pool is deliberately NOT window-bounded —
+  // the join must see every latest-per-subject decision (matching 114's accepted
+  // full-scan-per-tick).
+  const decisionTokens: Array<{ decision: DriftDecisionRecord; tokens: Set<string> }> =
+    decisions.map((decision) => ({
+      decision,
+      tokens: subjectTokens(decision.normalized_subject),
+    }));
 
   const persist = (): void => writeDriftSweepCheckpoint(checkpoint, runtime.checkpointPath);
 
@@ -671,6 +736,10 @@ export async function runDriftSweepOnce(
   let deferred = 0;
   let deliveryFailed = 0;
   let judgeFailed = 0;
+  // Item 118 AC4: per-tick nominator counters.
+  let statementsSeen = 0;
+  let statementsNominated = 0;
+  let statementsNoCandidate = 0;
   // AC4 (item 120): a per-tick count of retryable infra failures, and a count of
   // pairs that reached `judged-no-contradiction` this tick — the one terminal
   // outcome not already reflected in the delivered/failed counters. Together they
@@ -687,56 +756,261 @@ export async function runDriftSweepOnce(
     if (entry.sequence_id > maxSeq) maxSeq = entry.sequence_id;
     const statement = toStatement(entry);
     if (statement === null) continue; // non-statement atoms never block (AC1)
+    statementsSeen += 1;
 
-    const decision = decisionBySubject.get(statement.canonical_subject);
-    if (decision === undefined) continue; // AC2 no-match: skipped silently, terminal
+    // Item 118 AC3: score every recorded decision by normalized-word-set Jaccard;
+    // nominate those at/above the threshold, capped at the top N by the
+    // deterministic tie-breaker. An exact byte-match scores 1.0 and still
+    // nominates (threshold-inclusive).
+    const stmtTokens = subjectTokens(statement.canonical_subject);
+    const scored: ScoredDecision[] = decisionTokens.map(({ decision, tokens }) => ({
+      decision,
+      score: jaccardSimilarity(stmtTokens, tokens),
+    }));
+    const nominated = scored
+      .filter((s) => s.score >= DRIFT_NOMINATION_JACCARD_THRESHOLD)
+      .sort(compareScoredDecisions)
+      .slice(0, DRIFT_MAX_NOMINATIONS_PER_STATEMENT);
 
-    const pairKey = driftPairKey(
-      decision.dedupe_key,
-      statement.statement_dedupe_key,
-      runtime.judgeVersion,
-    );
-    const existing = checkpoint.pairs[pairKey];
-
-    // Already-terminal pair: nothing to do, does not block.
-    if (existing !== undefined && isTerminal(existing.state)) continue;
-
-    // Recovery (AC5): intent written but outcome never recorded (crash mid-post)
-    // → promote to delivery-failed WITHOUT calling Slack again. Now terminal.
-    if (existing !== undefined && existing.state === 'delivery-intent') {
-      existing.state = 'delivery-failed';
-      existing.failure_reason = 'ambiguous crash around post boundary';
-      existing.updated_at = runtime.now();
-      delete existing.pending_alert;
-      persist();
-      deliveryFailed += 1;
-      log.error('drift_delivery_failed', {
-        pair_key: pairKey,
-        judge_version: runtime.judgeVersion,
-        reason: 'ambiguous_crash_recovered',
+    if (nominated.length === 0) {
+      // Item 118 AC4: a no-candidate statement becomes data, never judged. Log
+      // the top-scoring below-threshold decision (by the SAME tie-breaker) as
+      // near-miss evidence — the input seam decision 18 waits on before an alias
+      // layer can earn its keep.
+      statementsNoCandidate += 1;
+      const closest = scored
+        .filter((s) => s.score < DRIFT_NOMINATION_JACCARD_THRESHOLD)
+        .sort(compareScoredDecisions)[0];
+      log.info('drift_nomination_miss', {
+        statement_subject: statement.canonical_subject,
+        statement_dedupe_key: statement.statement_dedupe_key,
+        ...(closest !== undefined
+          ? {
+              closest_decision_subject: closest.decision.normalized_subject,
+              closest_score: Number(closest.score.toFixed(4)),
+            }
+          : { closest_decision_subject: null, note: 'no decisions to score against' }),
       });
       continue;
     }
+    statementsNominated += 1;
 
-    // Deferred pair from a prior tick (AC6 overflow drain): already judged, just
-    // needs delivery. Re-use its stored payload — never re-judge (AC3).
-    if (existing !== undefined && existing.state === 'delivery-deferred') {
-      const payload = existing.pending_alert;
-      if (payload === undefined) {
-        // Defensive: a deferred pair with no payload cannot be delivered; make it
-        // terminal so it can never stall the watermark.
+    // Item 118 AC3: judge each nominated pair through the EXISTING per-pair path,
+    // unchanged — pair key stays driftPairKey(decision, statement, judgeVersion),
+    // so distinct nominations are checkpoint-safe and the watermark, judge
+    // budget, checkpoint semantics, delivery guard, and terminal states are
+    // untouched. A statement blocks the watermark iff any nominated pair is
+    // non-terminal (the existing blockingSeqs push).
+    for (const { decision } of nominated) {
+      const pairKey = driftPairKey(
+        decision.dedupe_key,
+        statement.statement_dedupe_key,
+        runtime.judgeVersion,
+      );
+      const existing = checkpoint.pairs[pairKey];
+
+      // Already-terminal pair: nothing to do, does not block.
+      if (existing !== undefined && isTerminal(existing.state)) continue;
+
+      // Recovery (AC5): intent written but outcome never recorded (crash mid-post)
+      // → promote to delivery-failed WITHOUT calling Slack again. Now terminal.
+      if (existing !== undefined && existing.state === 'delivery-intent') {
         existing.state = 'delivery-failed';
-        existing.failure_reason = 'deferred pair missing payload';
+        existing.failure_reason = 'ambiguous crash around post boundary';
         existing.updated_at = runtime.now();
+        delete existing.pending_alert;
         persist();
         deliveryFailed += 1;
+        log.error('drift_delivery_failed', {
+          pair_key: pairKey,
+          judge_version: runtime.judgeVersion,
+          reason: 'ambiguous_crash_recovered',
+        });
         continue;
       }
+
+      // Deferred pair from a prior tick (AC6 overflow drain): already judged, just
+      // needs delivery. Re-use its stored payload — never re-judge (AC3).
+      if (existing !== undefined && existing.state === 'delivery-deferred') {
+        const payload = existing.pending_alert;
+        if (payload === undefined) {
+          // Defensive: a deferred pair with no payload cannot be delivered; make it
+          // terminal so it can never stall the watermark.
+          existing.state = 'delivery-failed';
+          existing.failure_reason = 'deferred pair missing payload';
+          existing.updated_at = runtime.now();
+          persist();
+          deliveryFailed += 1;
+          continue;
+        }
+        if (deliveredThisTick >= runtime.maxAlertsPerTick) {
+          blockingSeqs.push(statement.sequence_id); // still capped this tick
+          continue;
+        }
+        const outcome = await deliverPair(runtime, checkpoint, pairKey, existing, payload, persist);
+        if (outcome === 'delivered') {
+          deliveredThisTick += 1;
+          delivered += 1;
+        } else if (outcome === 'delivery-deferred') {
+          // Proven-rejection retry (AC1): still non-terminal → holds the watermark.
+          deferred += 1;
+          blockingSeqs.push(statement.sequence_id);
+        } else {
+          deliveryFailed += 1;
+        }
+        continue;
+      }
+
+      // No checkpoint yet → judge this pair (AC3/AC4).
+      const resolution = await judgePair(
+        runtime.judge,
+        {
+          decision: {
+            subject: decision.subject,
+            decision: decision.decision,
+            ...(decision.rationale !== undefined ? { rationale: decision.rationale } : {}),
+            confirmed_at: decision.confirmed_at,
+            confirmed_by: decision.confirmed_by,
+          },
+          statement: {
+            signal_type: statement.signal_type,
+            text: statement.content,
+            meeting_title: statement.meeting_title,
+            note_id: statement.note_id,
+          },
+          judge_version: runtime.judgeVersion,
+        },
+        statement.content,
+        DRIFT_JUDGE_MAX_ATTEMPTS,
+        () => {
+          brainInvocations += 1;
+        },
+      );
+
+      if (resolution.kind === 'retryable') {
+        // Non-terminal: leave unjudged, no checkpoint entry, block the watermark so
+        // a transient outage is retried next tick (AC3).
+        retryableFailures += 1;
+        blockingSeqs.push(statement.sequence_id);
+        log.warn('drift_judge_retryable', {
+          pair_key: pairKey,
+          judge_version: runtime.judgeVersion,
+          reason: resolution.reason,
+        });
+        continue;
+      }
+
+      if (resolution.kind === 'no-contradiction') {
+        checkpoint.pairs[pairKey] = {
+          decision_dedupe_key: decision.dedupe_key,
+          statement_dedupe_key: statement.statement_dedupe_key,
+          judge_version: runtime.judgeVersion,
+          state: 'judged-no-contradiction',
+          updated_at: runtime.now(),
+        };
+        persist(); // AC3: checkpoint written atomically as last step of judging
+        noContradiction += 1; // terminal progress this tick (item 120 AC4)
+        continue;
+      }
+
+      if (resolution.kind === 'terminal-failed') {
+        checkpoint.pairs[pairKey] = {
+          decision_dedupe_key: decision.dedupe_key,
+          statement_dedupe_key: statement.statement_dedupe_key,
+          judge_version: runtime.judgeVersion,
+          state: 'terminal-judge-failed',
+          updated_at: runtime.now(),
+          failure_reason: resolution.reason,
+        };
+        persist();
+        judgeFailed += 1;
+        // Durable operator-visible evidence (AC3): pair keys, judge version, reason.
+        log.error('drift_judge_failed', {
+          pair_key: pairKey,
+          decision_dedupe_key: decision.dedupe_key,
+          statement_dedupe_key: statement.statement_dedupe_key,
+          judge_version: runtime.judgeVersion,
+          reason: resolution.reason,
+          attempts: DRIFT_JUDGE_MAX_ATTEMPTS,
+        });
+        continue;
+      }
+
+      // Surviving contradiction (AC5).
+      contradictions += 1;
+      const ownerSlack = cofounderIdToSlackUserId(runtime.identities, decision.confirmed_by);
+      if (ownerSlack === null) {
+        // Per-decision unresolved owner: terminal delivery-failed, operator-visible.
+        // (A globally-empty owner map is caught at config load; this is one decision
+        // whose confirmed_by is absent from the map.)
+        checkpoint.pairs[pairKey] = {
+          decision_dedupe_key: decision.dedupe_key,
+          statement_dedupe_key: statement.statement_dedupe_key,
+          judge_version: runtime.judgeVersion,
+          state: 'delivery-failed',
+          updated_at: runtime.now(),
+          failure_reason: `owner unresolved for confirmed_by=${decision.confirmed_by}`,
+        };
+        persist();
+        deliveryFailed += 1;
+        log.error('drift_delivery_failed', {
+          pair_key: pairKey,
+          judge_version: runtime.judgeVersion,
+          reason: 'owner_unresolved',
+          confirmed_by: decision.confirmed_by,
+        });
+        continue;
+      }
+
+      const payload: DriftAlertPayload = {
+        pair_key: pairKey,
+        decision_dedupe_key: decision.dedupe_key,
+        statement_dedupe_key: statement.statement_dedupe_key,
+        judge_version: runtime.judgeVersion,
+        owner_cofounder_id: decision.confirmed_by,
+        owner_slack_user_id: ownerSlack,
+        decision_subject: decision.subject,
+        decision_text: decision.decision,
+        confirmed_at: decision.confirmed_at,
+        confirmed_by: decision.confirmed_by,
+        quote: resolution.verdict.quote.trim(),
+        reason: resolution.verdict.reason,
+        meeting_title: statement.meeting_title,
+        note_id: statement.note_id,
+        ...(statement.meeting_url !== undefined ? { meeting_url: statement.meeting_url } : {}),
+      };
+
+      // AC6 blast-radius cap: over-cap contradictions defer (non-terminal), never
+      // dropped. Persist the payload so the drain delivers later without re-judging.
       if (deliveredThisTick >= runtime.maxAlertsPerTick) {
-        blockingSeqs.push(statement.sequence_id); // still capped this tick
+        checkpoint.pairs[pairKey] = {
+          decision_dedupe_key: decision.dedupe_key,
+          statement_dedupe_key: statement.statement_dedupe_key,
+          judge_version: runtime.judgeVersion,
+          state: 'delivery-deferred',
+          updated_at: runtime.now(),
+          pending_alert: payload,
+        };
+        persist();
+        deferred += 1;
+        blockingSeqs.push(statement.sequence_id); // non-terminal → holds watermark
+        log.warn('drift_alert_deferred', {
+          pair_key: pairKey,
+          judge_version: runtime.judgeVersion,
+        });
         continue;
       }
-      const outcome = await deliverPair(runtime, checkpoint, pairKey, existing, payload, persist);
+
+      const record: DriftPairCheckpoint = {
+        decision_dedupe_key: decision.dedupe_key,
+        statement_dedupe_key: statement.statement_dedupe_key,
+        judge_version: runtime.judgeVersion,
+        state: 'delivery-intent',
+        updated_at: runtime.now(),
+        pending_alert: payload,
+      };
+      checkpoint.pairs[pairKey] = record;
+      const outcome = await deliverPair(runtime, checkpoint, pairKey, record, payload, persist);
       if (outcome === 'delivered') {
         deliveredThisTick += 1;
         delivered += 1;
@@ -747,169 +1021,7 @@ export async function runDriftSweepOnce(
       } else {
         deliveryFailed += 1;
       }
-      continue;
-    }
-
-    // No checkpoint yet → judge this pair (AC3/AC4).
-    const resolution = await judgePair(
-      runtime.judge,
-      {
-        decision: {
-          subject: decision.subject,
-          decision: decision.decision,
-          ...(decision.rationale !== undefined ? { rationale: decision.rationale } : {}),
-          confirmed_at: decision.confirmed_at,
-          confirmed_by: decision.confirmed_by,
-        },
-        statement: {
-          signal_type: statement.signal_type,
-          text: statement.content,
-          meeting_title: statement.meeting_title,
-          note_id: statement.note_id,
-        },
-        judge_version: runtime.judgeVersion,
-      },
-      statement.content,
-      DRIFT_JUDGE_MAX_ATTEMPTS,
-      () => {
-        brainInvocations += 1;
-      },
-    );
-
-    if (resolution.kind === 'retryable') {
-      // Non-terminal: leave unjudged, no checkpoint entry, block the watermark so
-      // a transient outage is retried next tick (AC3).
-      retryableFailures += 1;
-      blockingSeqs.push(statement.sequence_id);
-      log.warn('drift_judge_retryable', {
-        pair_key: pairKey,
-        judge_version: runtime.judgeVersion,
-        reason: resolution.reason,
-      });
-      continue;
-    }
-
-    if (resolution.kind === 'no-contradiction') {
-      checkpoint.pairs[pairKey] = {
-        decision_dedupe_key: decision.dedupe_key,
-        statement_dedupe_key: statement.statement_dedupe_key,
-        judge_version: runtime.judgeVersion,
-        state: 'judged-no-contradiction',
-        updated_at: runtime.now(),
-      };
-      persist(); // AC3: checkpoint written atomically as last step of judging
-      noContradiction += 1; // terminal progress this tick (item 120 AC4)
-      continue;
-    }
-
-    if (resolution.kind === 'terminal-failed') {
-      checkpoint.pairs[pairKey] = {
-        decision_dedupe_key: decision.dedupe_key,
-        statement_dedupe_key: statement.statement_dedupe_key,
-        judge_version: runtime.judgeVersion,
-        state: 'terminal-judge-failed',
-        updated_at: runtime.now(),
-        failure_reason: resolution.reason,
-      };
-      persist();
-      judgeFailed += 1;
-      // Durable operator-visible evidence (AC3): pair keys, judge version, reason.
-      log.error('drift_judge_failed', {
-        pair_key: pairKey,
-        decision_dedupe_key: decision.dedupe_key,
-        statement_dedupe_key: statement.statement_dedupe_key,
-        judge_version: runtime.judgeVersion,
-        reason: resolution.reason,
-        attempts: DRIFT_JUDGE_MAX_ATTEMPTS,
-      });
-      continue;
-    }
-
-    // Surviving contradiction (AC5).
-    contradictions += 1;
-    const ownerSlack = cofounderIdToSlackUserId(runtime.identities, decision.confirmed_by);
-    if (ownerSlack === null) {
-      // Per-decision unresolved owner: terminal delivery-failed, operator-visible.
-      // (A globally-empty owner map is caught at config load; this is one decision
-      // whose confirmed_by is absent from the map.)
-      checkpoint.pairs[pairKey] = {
-        decision_dedupe_key: decision.dedupe_key,
-        statement_dedupe_key: statement.statement_dedupe_key,
-        judge_version: runtime.judgeVersion,
-        state: 'delivery-failed',
-        updated_at: runtime.now(),
-        failure_reason: `owner unresolved for confirmed_by=${decision.confirmed_by}`,
-      };
-      persist();
-      deliveryFailed += 1;
-      log.error('drift_delivery_failed', {
-        pair_key: pairKey,
-        judge_version: runtime.judgeVersion,
-        reason: 'owner_unresolved',
-        confirmed_by: decision.confirmed_by,
-      });
-      continue;
-    }
-
-    const payload: DriftAlertPayload = {
-      pair_key: pairKey,
-      decision_dedupe_key: decision.dedupe_key,
-      statement_dedupe_key: statement.statement_dedupe_key,
-      judge_version: runtime.judgeVersion,
-      owner_cofounder_id: decision.confirmed_by,
-      owner_slack_user_id: ownerSlack,
-      decision_subject: decision.subject,
-      decision_text: decision.decision,
-      confirmed_at: decision.confirmed_at,
-      confirmed_by: decision.confirmed_by,
-      quote: resolution.verdict.quote.trim(),
-      reason: resolution.verdict.reason,
-      meeting_title: statement.meeting_title,
-      note_id: statement.note_id,
-      ...(statement.meeting_url !== undefined ? { meeting_url: statement.meeting_url } : {}),
-    };
-
-    // AC6 blast-radius cap: over-cap contradictions defer (non-terminal), never
-    // dropped. Persist the payload so the drain delivers later without re-judging.
-    if (deliveredThisTick >= runtime.maxAlertsPerTick) {
-      checkpoint.pairs[pairKey] = {
-        decision_dedupe_key: decision.dedupe_key,
-        statement_dedupe_key: statement.statement_dedupe_key,
-        judge_version: runtime.judgeVersion,
-        state: 'delivery-deferred',
-        updated_at: runtime.now(),
-        pending_alert: payload,
-      };
-      persist();
-      deferred += 1;
-      blockingSeqs.push(statement.sequence_id); // non-terminal → holds watermark
-      log.warn('drift_alert_deferred', {
-        pair_key: pairKey,
-        judge_version: runtime.judgeVersion,
-      });
-      continue;
-    }
-
-    const record: DriftPairCheckpoint = {
-      decision_dedupe_key: decision.dedupe_key,
-      statement_dedupe_key: statement.statement_dedupe_key,
-      judge_version: runtime.judgeVersion,
-      state: 'delivery-intent',
-      updated_at: runtime.now(),
-      pending_alert: payload,
-    };
-    checkpoint.pairs[pairKey] = record;
-    const outcome = await deliverPair(runtime, checkpoint, pairKey, record, payload, persist);
-    if (outcome === 'delivered') {
-      deliveredThisTick += 1;
-      delivered += 1;
-    } else if (outcome === 'delivery-deferred') {
-      // Proven-rejection retry (AC1): still non-terminal → holds the watermark.
-      deferred += 1;
-      blockingSeqs.push(statement.sequence_id);
-    } else {
-      deliveryFailed += 1;
-    }
+    } // end nominated-decision loop (item 118 AC3)
   }
 
   // AC1 watermark advance: only past the point where every eligible statement is
@@ -941,6 +1053,10 @@ export async function runDriftSweepOnce(
 
   log.info('drift_sweep_ok', {
     window_size: window.length,
+    statements_seen: statementsSeen,
+    statements_nominated: statementsNominated,
+    statements_no_candidate: statementsNoCandidate,
+    decisions_scored: decisionTokens.length,
     brain_invocations: brainInvocations,
     contradictions,
     delivered,
@@ -956,7 +1072,10 @@ export async function runDriftSweepOnce(
     status: 'ok',
     degraded,
     window_size: window.length,
-    statements_seen: window.filter((e) => toStatement(e) !== null).length,
+    statements_seen: statementsSeen,
+    statements_nominated: statementsNominated,
+    statements_no_candidate: statementsNoCandidate,
+    decisions_scored: decisionTokens.length,
     brain_invocations: brainInvocations,
     contradictions,
     delivered,
@@ -1082,9 +1201,7 @@ interface DriftBrainConfig {
 function resolveDriftBrainConfig(env: NodeJS.ProcessEnv): DriftBrainConfig {
   const brain = parseBrainName(env['ECHO_DRIFT_SWEEP_BRAIN'] ?? env['ECHO_CEO_BRAIN']);
   const contextRepoPath =
-    env['ECHO_DRIFT_SWEEP_CONTEXT_REPO_PATH'] ??
-    env['ECHO_CEO_CONTEXT_REPO_PATH'] ??
-    process.cwd();
+    env['ECHO_DRIFT_SWEEP_CONTEXT_REPO_PATH'] ?? env['ECHO_CEO_CONTEXT_REPO_PATH'] ?? process.cwd();
   if (!isAbsolute(contextRepoPath)) {
     throw new Error('ECHO_DRIFT_SWEEP_CONTEXT_REPO_PATH must be absolute when set');
   }
@@ -1169,9 +1286,10 @@ export async function postDriftAlertCard(
   botToken: string,
   payload: DriftAlertPayload,
 ): Promise<void> {
-  const provenance = payload.meeting_url !== undefined
-    ? `<${payload.meeting_url}|${payload.meeting_title}>`
-    : payload.meeting_title;
+  const provenance =
+    payload.meeting_url !== undefined
+      ? `<${payload.meeting_url}|${payload.meeting_title}>`
+      : payload.meeting_title;
   const response = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
@@ -1290,7 +1408,10 @@ function driftSweepHeartbeat(result: DriftSweepResult, lastTickAt: string): Work
 /** Item 120 AC3: every boot-time permanent-disable path emits a `disabled`
  *  heartbeat carrying the reason, so accidental disablement is observable
  *  without throwing. */
-function disabledHandle(reason: string, configError?: DriftSweepConfigError): DriftSweepWorkerHandle {
+function disabledHandle(
+  reason: string,
+  configError?: DriftSweepConfigError,
+): DriftSweepWorkerHandle {
   writeWorkerHeartbeat(DRIFT_SWEEP_WORKER, {
     schema_version: 1,
     worker: DRIFT_SWEEP_WORKER,
