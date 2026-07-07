@@ -8,6 +8,28 @@ created: 2026-07-07
 claimed_by: "cc-129-deadline-anchor"
 claimed_at: "2026-07-07T18:14:41Z"
 branch: "agent/deadline-anchor-emitted-at"
+head_sha: "02489bbce9b3bd40459304a7fb408e5a940d0fdd"
+pr_url: ""
+agent_notes: |
+  resolveExpectedBy now anchors the deadline time base on event.emitted_at
+  (canonicalized) in all three duration branches, with a defensive
+  this.now() fallback only when emitted_at is unparseable (parseEmittedAtMs
+  helper). Replay/reconstruct is now wall-clock idempotent. New tests:
+  deadlines-emitted-at-anchor.test.ts (AC2 restart-invariance, AC3
+  old-emitted_at skew fires promptly, AC4 garbage-emitted_at fallback, no
+  throw/NaN). Gates: npx vitest run tests/coord/ green 132/132 (3 runs);
+  npm run test 2099 passed / 0 failed (exit 0 — both named flakes green in
+  the full run, no isolation-pass tolerance needed); lint + typecheck clean.
+  REVIEWER: two existing-fixture edits need scrutiny — in
+  deadlines-reconstruction.test.ts (out-of-order test) and
+  coord-status-shape.test.ts (close-after-miss test), a seeded tick_start's
+  emitted_at moved from a far-past date to 2026-05-16T09:55 so its
+  emitted_at-anchored window stays after `now` and does not fire under the
+  new (AC3-intended) skew semantics. Both preserve the test's original
+  intent (append-order authority / slot-clearing by sequence); neither hides
+  a regression — they remove a side effect the old now-anchoring masked. Full
+  rationale + verbatim gate output in
+  raw/internal/agent-runs/2026-07-07-129-deadline-anchor-emitted-at.md.
 blocked_by: []
 spec_refs:
   - src/coord/deadlines.ts                          # resolveExpectedBy (~:398-415) — the one function to change; reconstruct/applyReplayAtom for context
