@@ -15,6 +15,7 @@ files_to_modify:
   - vitest.config.ts
   - tests/cli/shell-reachable.test.ts
   - tests/surfaces/ceo-slack-brain.test.ts
+  - raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md  # AC3 run log: the 5 full-suite runs + per-run timings (standard builder agent-run artifact)
 ---
 
 ## Problem
@@ -44,14 +45,21 @@ not the exemption.
   worktrees, stale daemons, or concurrent unattended runs, so it cannot be the
   sole fix for this smoke. A serialized vitest group MAY be layered on top for
   the real-daemon smokes (and AC2 may rely on it), but the shell-reachable
-  port must be dynamic regardless. Justify the mechanism in a comment.
+  port must be dynamic regardless. The mechanism must be race-safe, not a
+  bind-then-release check-then-use: EITHER the daemon binds port `0` and reports
+  the OS-chosen port back to the test (preferred), OR the test launches the
+  daemon with a candidate port inside a bounded retry loop that treats a bind
+  or health failure as a retry (with cleanup of the failed attempt before the
+  next). Justify the chosen mechanism in a comment.
 - **AC2 — ceo-slack-brain load flake:** the descendant.pid ENOENT race under
   suite load is eliminated by the same serialization/isolation mechanism (or a
   targeted fix if the race is internal to the test's process-group handling —
   diagnose first, document the root cause in the test file).
 - **AC3 — proof:** 5 consecutive full-suite runs green locally, each via the
   exact command `npm run test` (the repo's full-suite entry = `vitest run`),
-  documented in the run log with per-run timings. Retiring the flaky-test
+  documented with per-run timings in the run log at
+  `raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md`.
+  Retiring the flaky-test
   merge-instruction special-case is NOT a builder AC — it edits strategist-owned
   merger prompts (outside this item's files_to_modify by the
   strategist-only-files rule) and is handled at the post-shipment strategist
