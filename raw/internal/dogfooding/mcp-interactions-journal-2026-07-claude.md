@@ -267,3 +267,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** r1 turnaround was fast — 124 r2 and 125 r2 reviewers both responded and converged (proceed, zero findings) within the same driving session, so both promoted to ready/ before 126/127 r2 dispatch. One snag was queue-side not coord-side: 124's terminal git-add hit the known pathspec-atomicity abort (phantom proposed path) → 0-delta rename commit; caught via git show --stat, sealed in a follow-up commit.
 - **Conjecture:** none
+
+### 2026-07-07 01:03 PDT — coord_invoke ×4 for 126 r3+r4 verification rounds (review-loop driver)
+- **Trigger:** review-loop driver dispositioned 126 r2 (→r3, 2 original-mechanism hardening patches) and then 126 r3 (converged clean, but a mechanical priority MEDIUM→MED frontmatter-validator fix rode a spec patch → forced r4 because proposed-stage cuts the verification-waiver); fired the 057b active-trigger for each new round's reviewers
+- **Query inputs:** coord_invoke — roles codex + codex-ops for backlog/reviews/2026-07-07-126-daemon-smoke-test-serialization/{r3,r4}/request.md; correlation_ids 1d702eab (r3) / 4bfd1b92 (r4); HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 4/4 accepted (schema_version:1 + reviewer_invoked_id + wrapper_path each); no error payloads
+- **Sources:** daemon coord layer only (invocation-type calls, no retrieval). Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** 127 r2 went terminal in the same driving window via 044 AC4 single-reviewer auto-disposition (codex proceed / zero findings, codex-ops timed out past deadline, escalated_to_founder=false) — no coord_invoke there (terminal round has no next-round trigger). First time this driver hit the single-reviewer-timeout path; it promoted cleanly per protocol.
+- **Conjecture:** none
