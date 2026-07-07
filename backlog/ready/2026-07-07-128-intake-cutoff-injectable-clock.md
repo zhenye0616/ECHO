@@ -21,6 +21,7 @@ files_to_modify:
   # PROVISIONAL
   - src/enrich/granola-intake-candidates.ts
   - tests/enrich/granola-intake-cutoff-clock.test.ts   # NEW: the AC3 regression test (exact path pinned per r2)
+ready_content_sha: 9468ae741a3e550e6a4d732ca0a42ba652ceec4d27526dcebecc8ba996dcd725
 ---
 
 ## Problem
