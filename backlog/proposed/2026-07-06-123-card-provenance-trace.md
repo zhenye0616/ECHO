@@ -64,18 +64,33 @@ extractor/classifier versions comparable across runs.
   (`run_id`, binding/vendor identity, model/version when the binding exposes
   it, `started_at`/`completed_at`). Idempotent under re-posts: `dedupe_key`
   `granola:card:<candidate_key>` and the existing duplicate-suppression path
-  must not double-write. Atom write failure must not break posting (fail-soft,
-  structured error log) — observability never blocks the pipeline.
+  must not double-write. Atom write failure must not break posting
+  (observability never blocks the pipeline) — but fail-soft MUST NOT be
+  silent-lossy (r1 codex F1, codex-ops F1): the seed record gains a persisted
+  `card_atom_status` ∈ {`written`, `failed`} field (plus an error summary when
+  `failed`), written at post time in the same seed-store update; a later
+  duplicate-suppressed rerun MUST NOT clear, overwrite, or mask a `failed`
+  marker; and the AC3 trace surface MUST report a failed/missing card atom
+  from this marker (provenance loss is visible-by-construction, never
+  inferable-only-from-absent-logs; unattended launchd/cron runs have no
+  operator watching stderr).
 - **AC2 — retrieval correlation:** the brain child's ECHO MCP calls made
   during a classification run are correlated to that run and recoverable from
-  the store: for each call, at minimum tool name, coarse inputs, and the
-  returned atom/cluster ids or counts, with timestamps. Mechanism is builder
-  judgment (reuse-first: a per-run correlation id passed to the child and
-  stamped by the daemon's existing coord/identity layer is acceptable; a
-  recording proxy in front of the scoped MCP URL is acceptable) — but the
-  correlation must survive process exit, must be attributable from the card
-  atom's `classifier_run.run_id`, and must record "zero retrievals" as an
-  explicit fact rather than an absence. Capture failure is fail-soft per AC1.
+  the store after process exit. The minimum persisted record contract (r1
+  codex F2, codex-ops F2) lives inside the card atom's `classifier_run`
+  record and is reachable in one hop from the card atom (lookup key:
+  `classifier_run.run_id`):
+  - `capture_status` ∈ {`ok`, `zero_retrievals`, `capture_failed`} — a
+    REQUIRED tri-state, so a run with no retrievals is distinguishable from a
+    run whose capture broke;
+  - when `ok`: `retrievals[]`, each entry `{ tool, coarse input summary,
+    returned atom/cluster ids or counts, timestamp }`;
+  - when `capture_failed`: an error summary.
+  CAPTURE mechanism stays builder judgment (reuse-first: per-run correlation
+  id passed to the child and stamped by the daemon's existing coord/identity
+  layer; or a recording proxy in front of the scoped MCP URL) — the persisted
+  SHAPE above is not negotiable. Capture failure is fail-soft for posting per
+  AC1, and surfaces as `capture_failed`, never as a fake `zero_retrievals`.
 - **AC3 — trace surface:** `tools/trace-card.ts`, npm script `trace:card`
   using `vite-node --script`, guarded with the house `import.meta` entry check
   (121 precedent; regression test same shape). Input: a `candidate_key` (or
@@ -85,7 +100,11 @@ extractor/classifier versions comparable across runs.
   extraction run) → raw source atoms (source, timestamp, title/excerpt).
   Every stage prints what exists and names what is absent (pre-123 cards have
   no card atom — the tool must say exactly that and still walk the
-  seed → signal → raw remainder). Read-only; no live daemon required.
+  seed → signal → raw remainder). The trace renders the AC2 tri-state
+  distinctly (retrieval list for `ok`, an explicit "zero retrievals" line, a
+  `capture_failed` line with the error summary) and reports AC1's
+  `card_atom_status: failed` marker as a provenance-loss banner for that
+  card. Read-only; no live daemon required.
 - **AC4 — strictly read-only trace:** the trace tool writes NOTHING; a test
   asserts a full trace run against a scratch ECHO_HOME leaves the filesystem
   byte-identical, including the no-db-file case (SqliteStorage's constructor
@@ -93,12 +112,17 @@ extractor/classifier versions comparable across runs.
   117/122 precedent).
 - **AC5 — tests:** fixture-driven, no live daemon: card atom emitted on post
   with correct refs + fields (injected classifier); idempotent re-post (no
-  second atom); fail-soft on atom-write failure (post still succeeds, error
-  logged); retrieval correlation captured via an injected/fake brain run
-  making at least one scoped call, and zero-retrieval runs recorded
-  explicitly; trace renders the full chain on fixtures; trace fail-soft on
-  missing stages (pre-123 card, missing raw atom); the AC3 entry-guard
-  regression test; the AC4 no-write test.
+  second atom); atom-write failure cannot be silently masked (injected write
+  failure → post still succeeds AND seed record carries
+  `card_atom_status: failed` → a subsequent duplicate-suppressed rerun leaves
+  the marker intact → trace reports provenance loss for that card); all three
+  AC2 `capture_status` states persisted and distinguishable (injected/fake
+  brain run making at least one scoped call → `ok` with retrievals; a run
+  making none → `zero_retrievals`; injected capture breakage →
+  `capture_failed` with error summary, not `zero_retrievals`); trace renders
+  the full chain on fixtures and each of the three capture states; trace
+  fail-soft on missing stages (pre-123 card, missing raw atom); the AC3
+  entry-guard regression test; the AC4 no-write test.
 
 ## Out of Scope (Don't Drift)
 
