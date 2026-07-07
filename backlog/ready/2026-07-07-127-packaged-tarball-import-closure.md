@@ -17,6 +17,7 @@ files_to_modify:
   # PROVISIONAL
   - package.json
   - tests/packaging/
+ready_content_sha: 4e1f6278c7e77ddbd633d175305e9c5f431ff869ba36a0d591d17b72e020f968
 ---
 
 ## Problem

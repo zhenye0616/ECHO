@@ -32,9 +32,13 @@ Missing required reviewers:
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | LOW | codex-ops | did not respond; per 044 AC4 single-reviewer auto-disposition | _strategist fills_ | _strategist fills_ |
+| 1 | LOW | codex-ops | did not respond; per 044 AC4 single-reviewer auto-disposition | accepted as missing per 044 AC4 — no patch | codex-ops timed out past its r2 deadline; the present reviewer (codex) is `proceed` with zero findings against the r1-patched spec (a1e0fe8b), so the round auto-dispositions through path (a). No finding to patch. |
+
+## Reframe gate
+
+Not triggered: zero actionable findings this round (codex `proceed` with no findings; the single divergent row is the 044 AC4 missing-reviewer placeholder, excluded from the reframe-gate count). No prior-patch-targeting findings, no removal language.
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` (044 AC4 single-reviewer auto-disposition) — codex verified the r1 patches clean (AC1 packaging-config only with the restructure alternative removed; AC3 pinned real no-mocks packaged-boot test; AC4 post-merge Windows CI reframed as founder/watcher validation, not a builder AC). codex-ops missing past deadline; escalated_to_founder: false. Promoting proposed → ready.
 
