@@ -16,6 +16,7 @@ files_to_modify:
   - tests/cli/shell-reachable.test.ts
   - tests/surfaces/ceo-slack-brain.test.ts
   - raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md  # AC3 run log: the 5 full-suite runs + per-run timings (standard builder agent-run artifact)
+ready_content_sha: 9ad93cd19d720bfdae71d5a7a1bac2472e8d19f6fb94e26417da6a300c8280f8
 ---
 
 ## Problem

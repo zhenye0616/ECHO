@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R4` — both reviewers `proceed` with zero findings against the priority-fixed spec (2b64134c). The mechanical frontmatter-validator fix (`priority: MEDIUM` → `MED`, spec-r3-patches 4ff3c5ac) verified clean with no AC/behavior change; substantive ACs were already verified clean in r2/r3. `tools/blocked.py` now validates the spec. Promoting proposed → ready.
 
