@@ -249,3 +249,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** first time three r1 dispatches fanned out through coord_invoke in one strategist turn; no rate issues
 - **Conjecture:** none
+
+### 2026-07-07 00:20 PDT — coord_invoke ×2 for 127 r1 (Windows packaging fix spec)
+- **Trigger:** followup-sweep liveness audit connected the 108/109/110 packaging debt chain to today's failing Windows CI runs; strategist specced 127 and dispatched r1
+- **Query inputs:** coord_invoke — roles codex + codex-ops, request_path=backlog/reviews/2026-07-07-127-packaged-tarball-import-closure/r1/request.md; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only (invocation calls). Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
