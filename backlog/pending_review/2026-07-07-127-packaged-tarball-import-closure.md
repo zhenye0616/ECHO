@@ -21,6 +21,43 @@ files_to_modify:
   - package.json
   - tests/packaging/
 ready_content_sha: 4e1f6278c7e77ddbd633d175305e9c5f431ff869ba36a0d591d17b72e020f968
+head_sha: "b366d758c8a846be26f9a3c916604eee53987a74"
+pr_url: ""
+agent_notes: |
+  Done on agent/packaged-tarball-import-closure @ b366d758c8a846be26f9a3c916604eee53987a74.
+
+  AC1: package.json `files` re-includes the 11-module transitive static closure
+  of the daemon's dynamic import of ceo-slack-responder/propose-decision-tool.js
+  (propose-decision-tool, responder, brain, intake-seed, intake-agent,
+  intake-draft-store, draft-store, decision-store, identity, issue-render,
+  linear-client). index.js (the Slack poller surface) stays excluded to preserve
+  the 076 boundary; it is not in the closure. npm pack --dry-run manifest proves
+  the 11 ship and index.js does not. No src/mcp/server.ts or responder-tree edits
+  (import-restructure was removed in r1). AC2: import-closure.test.ts asserts
+  shippedJs non-empty. AC3: new tests/packaging/packaged-boot.test.ts — real
+  no-mocks pack -> install -g into a temp prefix OUTSIDE the repo -> launch
+  dist/daemon/index.js -> health via the daemon.lifecycle "started" stdout line;
+  fails on ERR_MODULE_NOT_FOUND on stderr AND on a swallowed
+  propose_decision_skipped (assertion 3 makes it non-vacuous on macOS/Linux where
+  the server.ts guard's forward-slash check catches the error — the Windows crash
+  is that guard missing a backslash path).
+
+  Root cause note for reviewer: 110 already made the crossing a *guarded dynamic*
+  import, so there is NO static crossing and import-closure.test.ts (static-only)
+  cannot flag it — by design. The live Windows failure is the guard's
+  forward-slash path check missing Windows backslash messages; the packaging fix
+  makes the import resolve on every platform so the guard's absent-path is never
+  hit in a packaged install.
+
+  Red-verified (blind-holdout): reverting only the 11 re-includes leaves
+  import-closure green (dynamic import invisible to static walk) and left
+  packaged-boot green on macOS until assertion 3 was added; with assertion 3 the
+  pre-fix boot test fails on propose_decision_skipped, restored fix -> green.
+
+  Gate (AC5): typecheck + lint clean; npm run test = 2078 passed, sole failure
+  tests/cli/shell-reachable.test.ts (launchd leg) which PASSES in isolation — the
+  known full-suite-load flake. AC4 (post-merge Windows CI) is the founder/watcher
+  gate, not this handoff.
 ---
 
 ## Problem
