@@ -202,7 +202,15 @@ describe('AC3 — boot reconstruction', () => {
       expected_by: futureExpected,
     });
     // emitted_at EARLIER than the prior atom — but appended LATER.
-    await seedAtom(storage, 'coord:codex', '2026-05-15T23:00:00.000Z', {
+    // 129: kept within the tick_end window relative to `now` below (09:55 +
+    // max_deadline_sec clamp is still in the future) so the newly-opened
+    // tick_end record stays OPEN and the append-order-close assertion is
+    // observable. Under emitted_at anchoring the clamp ceiling is
+    // `emitted_at + max`, so a far-past emitted_at would resolve to an
+    // already-expired deadline that fires during reconstruct — that skew
+    // path is covered separately by the 129 anchor test; here we isolate
+    // the append-order semantics.
+    await seedAtom(storage, 'coord:codex', '2026-05-16T09:55:00.000Z', {
       event_type: 'tick_start',
       schema_version: 1,
       subject_role: 'codex',

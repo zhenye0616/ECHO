@@ -383,15 +383,57 @@ export class DeadlineTracker {
     }
   }
 
+  /** Parse an `emitted_at` string into epoch ms via the same
+   *  canonicalization the capture pipeline uses (naive → UTC). Returns
+   *  `null` when the value is unparseable so callers can degrade to a
+   *  `this.now()` fallback instead of throwing or propagating NaN.
+   *
+   *  `canonicalizeTimestamp` throws a RangeError on an unparseable instant
+   *  (`new Date(bad).toISOString()`); the try/catch converts that into the
+   *  `null` sentinel so a single corrupt ledger row can't poison the
+   *  mutation lane. */
+  private parseEmittedAtMs(emitted_at: string): number | null {
+    try {
+      const ms = new Date(canonicalizeTimestamp(emitted_at)).getTime();
+      return Number.isNaN(ms) ? null : ms;
+    } catch {
+      return null;
+    }
+  }
+
   /** Resolve the effective `expected_by` for a new open record.
    *
+   *  129 — the time base is the event's own `emitted_at`, NOT tracker-now.
+   *  On live ingest `emitted_at ≈ now`, so behavior is effectively
+   *  unchanged; on replay this makes the resolved deadline byte-identical
+   *  across daemon restarts. Previously every `reconstruct()` recomputed
+   *  open deadlines off restart-now, so a daemon that restarted within the
+   *  window (routine) silently re-baselined every open deadline and the
+   *  `deadline_missed` detector could never fire in production.
+   *
+   *  Parseability chain (AC4): `emitted_at` is ISO-pinned at BOTH entry
+   *  points — live via `validate.ts` (`isNonEmptyString` + `ISO_RE` gate
+   *  before this code runs) and on replay via `applyReplayAtom` setting
+   *  `emitted_at = atom.timestamp`. The `?? this.now()` fallback below only
+   *  fires for an unparseable `emitted_at` (a corrupt ledger row), so a
+   *  garbage value degrades to tracker-now rather than throwing or NaN-ing
+   *  into `Math.min`.
+   *
+   *  Skew posture (AC3): anchoring the DEADLINE on `emitted_at` is the
+   *  OPPOSITE of the 057a r4 rejected design. r4 rejected using an
+   *  `emitted_at` HORIZON to SKIP replay atoms — unsafe, because a
+   *  late-appended atom carrying an old `emitted_at` would be dropped,
+   *  producing false-clean state. Here a late/old `emitted_at` yields a
+   *  truthfully-EXPIRED deadline that fires promptly, never a
+   *  silently-fresh one.
+   *
    *  - If the event carries `expected_by` (already ISO), clamp it to the
-   *    role's `max_deadline_sec` ceiling (now + max).
+   *    role's `max_deadline_sec` ceiling (`emitted_at + max`).
    *  - If the event omits `expected_by`, apply `default_deadline_sec`
-   *    from the role's config (now + default).
+   *    from the role's config (`emitted_at + default`).
    *  - If the role has no config entry for this event_type, fall back to
-   *    `event.expected_by` if set, else now + 600s (defensive — this
-   *    branch only fires if applyTransition was called with an event
+   *    `event.expected_by` if set, else `emitted_at + 600s` (defensive —
+   *    this branch only fires if applyTransition was called with an event
    *    whose subject_role's role entry is missing this event_type, which
    *    means we shouldn't be opening a deadline for it anyway. Guards
    *    against a malformed registry / coord-roles.json divergence.). */
@@ -400,20 +442,20 @@ export class DeadlineTracker {
     role: CoordRoleConfig | undefined,
   ): string {
     const eventConfig = role?.events[event.event_type];
-    const nowMs = this.now().getTime();
+    const baseMs = this.parseEmittedAtMs(event.emitted_at) ?? this.now().getTime();
     if (event.expected_by !== undefined) {
       const requested = new Date(event.expected_by).getTime();
       if (eventConfig !== undefined) {
-        const max = nowMs + eventConfig.max_deadline_sec * 1000;
+        const max = baseMs + eventConfig.max_deadline_sec * 1000;
         const clamped = Math.min(requested, max);
         return new Date(clamped).toISOString();
       }
       return canonicalizeTimestamp(event.expected_by);
     }
     if (eventConfig !== undefined) {
-      return new Date(nowMs + eventConfig.default_deadline_sec * 1000).toISOString();
+      return new Date(baseMs + eventConfig.default_deadline_sec * 1000).toISOString();
     }
-    return new Date(nowMs + 600 * 1000).toISOString();
+    return new Date(baseMs + 600 * 1000).toISOString();
   }
 
   /** Replay a single durable coord atom during reconstruction /
