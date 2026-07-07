@@ -87,6 +87,56 @@ agent_notes: |
   test` → 1 failed / 2095 passed (the 1 = shell-reachable pre-126 load-flake,
   isolated 1/1 pass; ceo-slack-brain passed this full run). All intake tests
   green. 128 now defuses the ENTIRE known calendar (2026-07-07 + 2026-07-30).
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation (pre-approved clean-path
+  fast-track hotfix that un-reds main).
+
+  Conflicts resolved:
+  - none — clean merge (`git merge --no-ff`, ort strategy, zero conflicts).
+    Commits on main since claim were backlog/review/journal only; zero overlap
+    with the branch's 6 code/test files. Exactly 6 files in the merge, matching
+    the sidecar's zero-drift claim.
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Founder-ratified deviations recorded (both protocol-clean, no post-handoff
+  riders):
+  - AC2 premise error: AC2 assumed all 4 red intake-terminal AC6 tests injected
+    a fixed `now`; only AC6.1 did. Founder-delegated (via team lead, 121/123/124
+    precedent) widen of files_to_modify to add tests/tools/intake-terminal.test.ts
+    with 4 injected-`now` lines (AC6.2 both calls, AC6.3a, AC6.3b) pinning the
+    previously-defaulted clock to AC6.1's fixture-consistent value; fixtures
+    untouched.
+  - Extension (same deviation, founder-ratified): 10 injected-`now` lines across
+    granola-intake-candidates.test.ts (4, incl. the builder-found 4th case
+    `records a failed post`), granola-intake-schedule.test.ts (1), and
+    granola-intake-card-atom.test.ts (5), defusing the 2026-07-30 second fuse
+    (30d-lookback tests with 2026-06-30 fixtures, no injected clock). Fixtures/
+    assertions untouched.
+  - Protocol-clean reclaim: the extension crossed the pending_review handoff in
+    flight, so the builder reclaimed (pending_review→claimed, commit 4799946e)
+    and re-handed-off with a fresh full head_sha (7c209b64…) rather than a
+    post-handoff rider.
+
+  Fixups applied:
+  - none
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: full `npm test` = 2095 passed / 1 failed; the sole failure is
+  tests/cli/shell-reachable.test.ts, a known pre-126 load-flake that passes 1/1
+  in isolation (re-verified during this merge). ceo-slack-brain passed in the
+  full run. All intake tests pass. lint clean, typecheck clean,
+  check-coupled-invariants OK, sync-skills --check OK. Main is effectively green
+  for the first time since ~09:00Z; the entire known time-bomb calendar
+  (2026-07-07 + 2026-07-30) is defused.
+
+  Follow-up items (non-blocking):
+  - Fold into the planned Date.now()/injectable-clock grep-audit follow-up:
+    candidates.test.ts:234 internal-only attendee-filter test passes VACUOUSLY
+    after ~2026-07-30 (fixture ages out of the 30d wall-clock window — silent
+    coverage decay, not a fuse).
 ---
 
 ## Problem
