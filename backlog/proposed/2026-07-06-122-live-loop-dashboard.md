@@ -122,9 +122,14 @@ changes, no new persisted state.
   contract-shaped response (joined result, or the degraded/`unknown` skeleton on
   timeout/failure), never `undefined`/500/stall (r2 codex F1 + codex-ops); an
   expected worker with no heartbeat file surfaces as an `{ error }` entry, not a
-  dropped key (r2 codex F2); the fail-soft doctor cases (missing/stale dist,
-  timeout, nonzero exit, parse failure) each produce a degraded-not-crashed
-  response; page serves;
+  dropped key (r2 codex F2); the doctor fail-soft cases each produce a
+  degraded-not-crashed response, tested against **whichever doctor path the
+  builder ships** — an in-process-only build tests the in-process degraded path
+  (e.g. an injected report function that throws/times out), and the
+  child-specific cases (missing/stale `dist`, nonzero exit, hung child, parse
+  failure) are required only when the child fallback is actually wired; an
+  in-process-only implementation is not obligated to fabricate a child to test
+  them (r3 codex F1); page serves;
   degraded/disabled states render distinguishably; the AC1 import-guard
   regression test AND the AC1 invalid-port fatal-exit test; the AC4 no-write
   test against the shipped doctor path. No live daemon required by any test.
