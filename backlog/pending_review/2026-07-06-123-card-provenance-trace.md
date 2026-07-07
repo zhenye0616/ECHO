@@ -8,6 +8,37 @@ created: 2026-07-06
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-07T00:00:00Z"
 branch: "agent/card-provenance-trace"
+head_sha: "e27eebd7b6321c519b7a5182e5a92b78ae53ab15"
+pr_url: ""
+agent_notes: |
+  Done. All 5 ACs implemented; typecheck + lint clean; full suite 2078 passed /
+  21 skipped / 1 todo, 0 failures (shell-reachable flake did not fire).
+
+  AC1: derived:intake-cards atom per successful post in the channel-agnostic
+  bridge path; dedupe granola:card:<candidate_key>; fail-soft with a durable
+  seed-record card_atom_status {written,failed} marker that a duplicate-
+  suppressed rerun cannot clear. AC2: brain-child retrieval capture via a per-run
+  localhost recording proxy in front of ECHO_MCP_URL (byte-for-byte forward, so
+  it never alters classification); persisted classifier_run tri-state
+  {ok,zero_retrievals,capture_failed}, one hop from the card atom via run_id;
+  fail-soft to capture_failed, never a fake zero_retrievals. AC3: tools/trace-card.ts
+  + trace:card (vite-node --script), 121 entry guard; renders all three capture
+  states + PROVENANCE LOSS banner + graceful missing-stage walk for pre-123 cards.
+  AC4: read-only trace, existsSync-gated SqliteStorage open; byte-identical +
+  no-db-file + no-atom-mutation tests. AC5: all enumerated tests.
+
+  REVIEWER FLAGS (2):
+  1. src/enrich/granola-intake-seed-store.ts is edited but is OUTSIDE the item's
+     PROVISIONAL files_to_modify. Forced by AC1's explicit "the seed record gains
+     a persisted card_atom_status field … written in the same seed-store update" —
+     that record type + markPosted live in this file; there is no other place to
+     satisfy the literal AC. New markPosted arg is optional (no caller breaks).
+     Same shape as item 121's founder-ratified package.json flag. Your call.
+  2. AC2 capture mechanism = recording proxy (AC2's reuse-first option 2). The
+     correlation-id-stamped-by-daemon alternative needs daemon/MCP changes outside
+     files_to_modify (retrieval READS aren't logged today). result_summary is
+     intentionally coarse/best-effort (AC2 pins the SHAPE, not fidelity). Proxy is
+     wired only into the intake classifier, not the CEO responder.
 blocked_by: []
 spec_refs:
   - src/enrich/granola-intake-candidates.ts                # the intake bridge: classify() call site (~:405), seed-store post path — where the card atom must be emitted
