@@ -145,9 +145,10 @@ async function emitIntakeCardAtom(
     classifierRun: ClassifierRunRecord;
   },
 ): Promise<CardAtomOutcome> {
+  const dedupeKey = granolaCardDedupeKey(args.candidateKey);
   const metadata: IntakeCardAtomMetadata = {
     card_version: 1,
-    dedupe_key: granolaCardDedupeKey(args.candidateKey),
+    dedupe_key: dedupeKey,
     candidate_key: args.candidateKey,
     note_id: args.noteId,
     channel_id: args.channelId,
@@ -158,6 +159,31 @@ async function emitIntakeCardAtom(
     classifier_run: args.classifierRun,
   };
   try {
+    // AC3 (item 125): guard the sequential markPosted-throw retry edge. When a
+    // prior pass appended this card atom but then threw at `markPosted` (leaving
+    // the seed retryable), the next retry re-posts and reaches here again — a
+    // second append would duplicate the atom for one card. Skip when an atom
+    // with this dedupe_key already exists. The existence check is bounded to the
+    // card source. It is a check-then-append, NOT atomic: it does NOT defend two
+    // *concurrent* intake ticks racing the same dedupe_key (intake is
+    // single-flight today; that path would need an atomic unique-append
+    // primitive, a persisted-store change out of scope here — see the item's
+    // Out of Scope). A guard-query failure degrades to a best-effort append
+    // (prior behavior) rather than dropping the card.
+    let alreadyAppended = false;
+    try {
+      const existing = await storage.query({ source: GRANOLA_INTAKE_CARD_SOURCE });
+      alreadyAppended = existing.some((event) => {
+        const key = event.metadata?.['dedupe_key'];
+        return typeof key === 'string' && key === dedupeKey;
+      });
+    } catch (queryErr) {
+      log.warn('card_atom_dedupe_query_failed', {
+        candidate_key: args.candidateKey,
+        message: (queryErr as Error).message,
+      });
+    }
+    if (alreadyAppended) return { status: 'written' };
     await storage.append({
       source: GRANOLA_INTAKE_CARD_SOURCE,
       timestamp: args.postedAt,
@@ -862,6 +888,13 @@ export function startGranolaIntakeBridge(
 
   async function runInner(): Promise<GranolaIntakeBridgeResult> {
     if (stopped) return { status: 'skipped', reason: 'disabled' };
+    // Single-flight: a trigger that fires while a run is in flight is dropped
+    // (`in_flight`). AC5 (item 125) — abandoned-not-cancelled semantics: an
+    // in-flight run whose brain classifier exceeds its timeout, or that outlasts
+    // the next interval tick, is left to run to completion; it is never actively
+    // cancelled here. The classifier child owns its own timeoutMs abort; stop()
+    // likewise awaits `inFlight` rather than aborting it. So a "timed out" tick
+    // is abandoned by the scheduler (no new run starts), not force-killed.
     if (inFlight !== null) return { status: 'skipped', reason: 'in_flight' };
     inFlight = (async () => {
       if (options.runSignalsFirst !== undefined) {

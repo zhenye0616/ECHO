@@ -208,4 +208,51 @@ describe('card provenance atom (item 123 AC1)', () => {
     expect(after?.card_atom_status).toBe('failed');
     expect(after?.card_atom_error).toContain('disk full');
   });
+
+  // AC3 (item 125): the sequential markPosted-throw retry edge. A pass that
+  // appends the card atom, then throws at markPosted (seed stays retryable), is
+  // retried on the next tick — without the dedupe guard the retry appends a
+  // SECOND atom for the same card. The guard must keep it at exactly one.
+  it('does not double-append a card atom across a sequential markPosted-throw retry', async () => {
+    class FlakyMarkPostedStore extends FileGranolaIntakeSeedStore {
+      public markPostedCalls = 0;
+      override async markPosted(
+        candidateKey: string,
+        slackTs: string,
+        cardAtom?: Parameters<FileGranolaIntakeSeedStore['markPosted']>[2],
+      ): Promise<Awaited<ReturnType<FileGranolaIntakeSeedStore['markPosted']>>> {
+        this.markPostedCalls += 1;
+        if (this.markPostedCalls === 1) throw new Error('seed store write failed');
+        return super.markPosted(candidateKey, slackTs, cardAtom);
+      }
+    }
+
+    const store = new MemoryStorage();
+    await seedNoteAndSignal(store);
+    const dir = await mkdtemp(join(tmpdir(), 'echo-card-atom-'));
+    tempDirs.push(dir);
+    const seedStore = new FlakyMarkPostedStore(join(dir, 'seeds.json'));
+    const deps = {
+      classify: classifierReturning(OK_RUN),
+      postSeed: async () => ({ ts: 'ts-1' }),
+    };
+
+    // Tick 1: post succeeds, atom appended, markPosted throws → markFailure
+    // returns the seed to `pending` (retryable).
+    await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), deps);
+    const afterFirst = await seedStore.get(CANDIDATE_KEY);
+    expect(afterFirst?.status).toBe('pending');
+    expect(await store.query({ source: GRANOLA_INTAKE_CARD_SOURCE })).toHaveLength(1);
+
+    // Tick 2: the retry re-posts and reaches the emit path again; the guard sees
+    // the existing atom and skips the append, and markPosted now succeeds.
+    const second = await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), deps);
+    expect(second).toMatchObject({ posted: 1 });
+    expect(seedStore.markPostedCalls).toBe(2);
+
+    const cards = await store.query({ source: GRANOLA_INTAKE_CARD_SOURCE });
+    expect(cards).toHaveLength(1);
+    const record = await seedStore.get(CANDIDATE_KEY);
+    expect(record?.status).toBe('posted');
+  });
 });

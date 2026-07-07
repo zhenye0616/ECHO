@@ -30,6 +30,7 @@ import {
   granolaIntakeSeedStorePath,
   type IntakeCardAtomMetadata,
 } from '../src/enrich/granola-intake-candidates.js';
+import { TERMINAL_CHANNEL_SENTINEL, terminalSeedStorePath } from './intake-terminal.js';
 import { GRANOLA_RAW_SOURCE, GRANOLA_SIGNAL_SOURCE } from '../src/enrich/granola-signals.js';
 import type { ClassifierRunRecord } from '../src/brain/brain.js';
 import type { CaptureEvent, Storage } from '../src/storage/interface.js';
@@ -118,10 +119,62 @@ function renderClassifierRun(run: ClassifierRunRecord | undefined, indent: strin
   return lines;
 }
 
+/**
+ * AC1 (item 125): map a card atom's `channel_id` to its seed-store path. The
+ * terminal sentinel channel writes to the isolated `.terminal.json` store; every
+ * other channel (a real Slack channel id) uses the canonical default store. An
+ * unknown/undefined channel (e.g. a pre-123 card with no atom) resolves to the
+ * default store — the historical trace-card behavior. This is the fix for the
+ * live-trace gap where terminal cards' seeds were read from the default store
+ * and never found.
+ */
+export function seedStorePathForChannel(channelId: string | undefined): string {
+  return channelId === TERMINAL_CHANNEL_SENTINEL
+    ? terminalSeedStorePath()
+    : granolaIntakeSeedStorePath();
+}
+
+/**
+ * AC4 (item 125): the full enumerated seed-store path set. `--note` mode scans
+ * all of these when there is no card atom to supply a `channel_id`, so
+ * terminal-only seeds are never silently missed. Keep in sync with every
+ * channel `seedStorePathForChannel` can resolve to.
+ */
+export function enumerateSeedStorePaths(): string[] {
+  return [granolaIntakeSeedStorePath(), terminalSeedStorePath()];
+}
+
 export interface TraceInput {
   storage: Storage | null;
+  /**
+   * Fallback single seed store, used for channels when `resolveSeedStore` is
+   * omitted and as the sole store when `seedStores` is omitted. Preserved so
+   * callers that do not need channel-aware resolution keep working.
+   */
   seedStore: GranolaIntakeSeedStore;
   dbPathForMessages: string;
+  /**
+   * AC1 (item 125): resolve the seed store for a card's `channel_id`. When
+   * omitted, `seedStore` is used for every candidate; when an explicit
+   * `--seed-store` override is in effect, this returns that single store for
+   * every channel.
+   */
+  resolveSeedStore?: (channelId: string | undefined) => GranolaIntakeSeedStore;
+  /**
+   * AC4 (item 125): the full enumerated seed-store set scanned by `--note` mode
+   * when a note has no card atoms. Defaults to `[seedStore]`; an explicit
+   * `--seed-store` override narrows it to that single store.
+   */
+  seedStores?: readonly GranolaIntakeSeedStore[];
+}
+
+function seedStoreForChannel(
+  input: TraceInput,
+  channelId: string | undefined,
+): GranolaIntakeSeedStore {
+  return input.resolveSeedStore !== undefined
+    ? input.resolveSeedStore(channelId)
+    : input.seedStore;
 }
 
 async function queryAll(storage: Storage | null, source: string): Promise<CaptureEvent[]> {
@@ -138,7 +191,11 @@ async function traceOneCandidate(input: TraceInput, candidateKey: string): Promi
   const cardAtom = cardAtoms.find(
     (a) => cardMetadata(a)?.candidate_key === candidateKey || metaString(a, 'dedupe_key') === granolaCardDedupeKey(candidateKey),
   );
-  const seed = await input.seedStore.get(candidateKey);
+  // AC1 (item 125): resolve the seed store from the card atom's channel_id so a
+  // terminal card's seed is read from `.terminal.json`, not the default store.
+  const cardChannelId = cardAtom === undefined ? undefined : cardMetadata(cardAtom)?.channel_id;
+  const seedStore = seedStoreForChannel(input, cardChannelId);
+  const seed = await seedStore.get(candidateKey);
 
   lines.push(`card  ${candidateKey}`);
 
@@ -244,6 +301,40 @@ async function traceNote(input: TraceInput, noteId: string): Promise<string[]> {
     lines.push('');
     lines.push(...(await traceOneCandidate(input, key)));
   }
+
+  // AC4 (item 125): when the note has no card atoms (pre-123 note), list its
+  // seed records so the note is still walkable from the note entry point. With
+  // no card atom to supply a channel_id, scan the FULL enumerated seed-store set
+  // (default + every channel-specific store) so terminal-only seeds are never
+  // silently missed — the same gap AC1 fixes for the candidate_key path. An
+  // explicit `--seed-store` override narrows `seedStores` to that single store.
+  if (candidateKeys.length === 0) {
+    const stores = input.seedStores ?? [input.seedStore];
+    const seen = new Set<string>();
+    const seedLines: string[] = [];
+    for (const store of stores) {
+      let records: GranolaIntakeSeedRecord[];
+      try {
+        records = await store.list();
+      } catch {
+        continue; // a missing/unreadable store is walked as empty, never fatal
+      }
+      for (const record of records) {
+        if (record.note_id !== noteId || seen.has(record.candidate_key)) continue;
+        seen.add(record.candidate_key);
+        seedLines.push(
+          `  seed ${record.candidate_key}: status=${record.status}` +
+            (record.slack_ts === undefined ? '' : ` slack_ts=${record.slack_ts}`) +
+            (record.card_atom_status === undefined ? '' : ` card_atom=${record.card_atom_status}`),
+        );
+      }
+    }
+    if (seedLines.length > 0) {
+      lines.push('');
+      lines.push('  seeds (no card atoms — from seed store):');
+      lines.push(...seedLines);
+    }
+  }
   return lines;
 }
 
@@ -294,11 +385,40 @@ export async function runTraceCard(
     }
   }
 
-  const seedStorePath = args.seedStorePath ?? granolaIntakeSeedStorePath();
-  const seedStore = new FileGranolaIntakeSeedStore(seedStorePath);
+  // AC1/AC4 (item 125): build the seed-store resolution. With an explicit
+  // `--seed-store` override, every channel and the `--note` full scan use that
+  // one store. Without it, resolve per channel_id (terminal → `.terminal.json`,
+  // else default) and enumerate the full set for `--note` mode. Stores are
+  // cached by path so a repeated channel reuses one FileGranolaIntakeSeedStore.
+  const storeCache = new Map<string, FileGranolaIntakeSeedStore>();
+  const storeForPath = (path: string): FileGranolaIntakeSeedStore => {
+    let store = storeCache.get(path);
+    if (store === undefined) {
+      store = new FileGranolaIntakeSeedStore(path);
+      storeCache.set(path, store);
+    }
+    return store;
+  };
+
+  let seedStore: FileGranolaIntakeSeedStore;
+  let resolveSeedStore: (channelId: string | undefined) => GranolaIntakeSeedStore;
+  let seedStores: FileGranolaIntakeSeedStore[];
+  if (args.seedStorePath !== undefined) {
+    const override = storeForPath(args.seedStorePath);
+    seedStore = override;
+    resolveSeedStore = () => override;
+    seedStores = [override];
+  } else {
+    seedStore = storeForPath(granolaIntakeSeedStorePath());
+    resolveSeedStore = (channelId) => storeForPath(seedStorePathForChannel(channelId));
+    seedStores = enumerateSeedStorePaths().map(storeForPath);
+  }
 
   try {
-    const trace = await buildCardTrace({ storage, seedStore, dbPathForMessages: dbPath }, args);
+    const trace = await buildCardTrace(
+      { storage, seedStore, resolveSeedStore, seedStores, dbPathForMessages: dbPath },
+      args,
+    );
     io.out(trace);
     return 0;
   } finally {
