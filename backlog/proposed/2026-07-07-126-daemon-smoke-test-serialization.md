@@ -37,18 +37,25 @@ not the exemption.
 
 ## Acceptance Criteria
 
-- **AC1 — no fixed-port contention:** the shell-reachable smoke either
-  allocates its port dynamically per run (ephemeral bind or retry-scan) or the
-  real-daemon smokes run in a serialized vitest group (no parallel workers)
-  so nothing else competes for their resources — builder judgment between
-  port-dynamism and serialization (or both), justified in a comment.
+- **AC1 — no fixed-port contention:** the shell-reachable smoke allocates its
+  port dynamically per run (ephemeral bind or retry-scan) — the fixed `47095`
+  is removed. Port-dynamism is REQUIRED, not optional: serialization within a
+  single vitest invocation does not protect the fixed port against overlapping
+  worktrees, stale daemons, or concurrent unattended runs, so it cannot be the
+  sole fix for this smoke. A serialized vitest group MAY be layered on top for
+  the real-daemon smokes (and AC2 may rely on it), but the shell-reachable
+  port must be dynamic regardless. Justify the mechanism in a comment.
 - **AC2 — ceo-slack-brain load flake:** the descendant.pid ENOENT race under
   suite load is eliminated by the same serialization/isolation mechanism (or a
   targeted fix if the race is internal to the test's process-group handling —
   diagnose first, document the root cause in the test file).
-- **AC3 — proof:** 5 consecutive full-suite runs green locally (documented in
-  the run log with timings); the flaky-test special-case rule used in recent
-  merges is retired from future merge instructions.
+- **AC3 — proof:** 5 consecutive full-suite runs green locally, each via the
+  exact command `npm run test` (the repo's full-suite entry = `vitest run`),
+  documented in the run log with per-run timings. Retiring the flaky-test
+  merge-instruction special-case is NOT a builder AC — it edits strategist-owned
+  merger prompts (outside this item's files_to_modify by the
+  strategist-only-files rule) and is handled at the post-shipment strategist
+  pass (see After Completion).
 - **AC4 — no product code changes:** this is test-infra only; if diagnosis
   reveals a REAL product bug (e.g., the daemon genuinely can't boot under
   load), STOP and escalate via pending_review with the evidence — do not
