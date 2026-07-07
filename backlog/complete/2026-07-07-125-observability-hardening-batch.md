@@ -2,7 +2,7 @@
 id: 2026-07-07-125-observability-hardening-batch
 title: "Post-122/123 observability hardening — trace-card channel seed-store resolution, proxy stream error handlers, card-atom double-append guard, --note seed listing, render cosmetics"
 status: proposed
-priority: MEDIUM
+priority: MED
 estimate: 0.5d
 created: 2026-07-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
@@ -10,6 +10,34 @@ claimed_at: "2026-07-07T07:40:00Z"
 branch: "agent/observability-hardening-batch"
 head_sha: "95afbf4ba1b19afc0dfe97550cdca69753666e92"
 pr_url: ""
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation (pre-approved clean-path run).
+
+  Conflicts resolved:
+  - none — merge --no-ff was clean (ort strategy, 7 files, 0 conflicts); zero
+    overlap with the concurrently-in-review item 124.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar listed zero pre-merge fixups)
+  - Mechanical rider (founder-authorized, part of this merge): frontmatter
+    priority MEDIUM -> MED to satisfy the blocked.py validator convention.
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Verify: 2086/2086 tests pass; lint and typecheck clean post-merge; coupled
+  invariants hold; sync-skills adapters match canonical. The full suite showed a
+  single failure on tests/cli/shell-reachable.test.ts (a known flake — daemon
+  health-port race); per the founder-authorized flaky rule it was re-run in
+  isolation and passed (1/1). All other checks green on the first pass.
+
+  Follow-up items (non-blocking, appended to backlog/_followups.md):
+  - optional: e2e --note test through runTraceCard without override to pin the
+    enumerate wiring directly
+  - optional: revisit the AC3 guard query if card-atom volume ever makes the
+    per-emit full-source scan matter
 agent_notes: |
   All 6 ACs implemented and passing; full gate green (lint max-warnings 0,
   typecheck clean, npm test 2087 passed / 21 skipped / 1 todo, 0 failures — both
