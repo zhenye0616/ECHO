@@ -19,8 +19,9 @@ files_to_modify:
   - src/brain/brain.ts
   - src/enrich/granola-intake-candidates.ts
   - tools/loop-dashboard.ts
-  - tests/tools/
-  - tests/enrich/
+  - tests/tools/trace-card.test.ts                 # AC1 seed lookup, AC4 --note listing, AC5 present-db byte-identity
+  - tests/enrich/brain-retrieval-capture.test.ts   # AC2 proxy stream error handlers (createHttpRetrievalCapture)
+  - tests/enrich/granola-intake-card-atom.test.ts  # AC3 double-append guard
 ---
 
 ## Problem
@@ -50,21 +51,42 @@ provenance-loss banner can never fire for terminal cards (today: ALL cards).
   killed mid-stream (timeout) cannot emit an unhandled EPIPE /
   ERR_STREAM_DESTROYED that crashes the hosting worker; the run records
   `capture_failed` (or completes with what was captured) per the 123 contract.
-  Test simulates a destroyed client response mid-proxy.
-- **AC3 — card-atom double-append guard:** before appending a card atom, the
-  bridge checks for an existing atom with the same `dedupe_key` (bounded
-  query) and skips the append when present — closing the markPosted-throw
-  retry edge that could produce two atoms for one card. Test reproduces the
-  retry path and asserts exactly one atom.
+  Tests in `tests/enrich/brain-retrieval-capture.test.ts` cover BOTH stream
+  directions — a destroyed downstream client response mid-proxy AND an
+  upstream-destroy/timeout of the brain child mid-stream — each asserting no
+  unhandled process `error`/`unhandledRejection` fires and that a durable
+  `capture_failed` (or explicit partial-capture) record results.
+- **AC3 — card-atom double-append guard (sequential retry edge only):** before
+  appending a card atom, the bridge checks for an existing atom with the same
+  `dedupe_key` (bounded query) and skips the append when present — closing the
+  **sequential** markPosted-throw retry edge (one worker, retried) that could
+  produce two atoms for one card. Test (in
+  `tests/enrich/granola-intake-card-atom.test.ts`) reproduces the sequential
+  retry path and asserts exactly one atom. The check-then-append guard is NOT
+  atomic and does NOT defend against two *concurrent* intake ticks racing the
+  same `dedupe_key` — that path is explicitly out of scope here (see Out of
+  Scope): it would require an atomic unique-append primitive / lock, which is a
+  123-contract (persisted-store) change this hardening batch must not make.
+  Intake runs single-flight today, so the sequential edge is the live risk.
 - **AC4 — `--note` seed listing for pre-123 cards:** `--note <note_id>` mode
-  also lists that note's seed records (from the resolved store(s)) when no
-  card atoms exist, so pre-123 notes are walkable from the note entry point,
-  matching the candidate_key mode's missing-stage behavior.
-- **AC5 — render cosmetics:** `heartbeatLine` counters segment goes through
-  `esc()` (dashboard, escaping consistency); a comment on the single-flight
-  timeout path documents abandoned-not-cancelled semantics; optional
-  belt-and-braces AC4-123 test variant with a PRESENT db asserting
-  byte-identity (doctor's SELECT-only behavior).
+  also lists that note's seed records when no card atoms exist, so pre-123
+  notes are walkable from the note entry point, matching the candidate_key
+  mode's missing-stage behavior. Because there is no card atom to supply a
+  `channel_id` in this path, `--note` mode scans the FULL enumerated seed-store
+  set — the default store AND every channel-specific store (today: the terminal
+  `.terminal.json`) — so terminal-only seeds are never silently missed
+  (the exact gap AC1 fixes). An explicit `--seed-store <path>` override, when
+  given, narrows the scan to that single store. Test: a terminal-only pre-123
+  note (seed present only in `.terminal.json`, no card atom) → its seed record
+  is listed without an override.
+- **AC5 — render cosmetics + present-db read-only proof:** `heartbeatLine`
+  counters segment goes through `esc()` (dashboard, escaping consistency); a
+  comment on the single-flight timeout path documents abandoned-not-cancelled
+  semantics; and a REQUIRED test added to `tests/tools/trace-card.test.ts`
+  (the belt-and-braces complement to 123's existing absent-db case at
+  `trace-card.test.ts:218`) runs a full trace against a scratch ECHO_HOME whose
+  `echo.db` IS present and asserts the db file is byte-identical before and
+  after (SELECT-only read path never mutates a present db).
 - **AC6 — gate:** full test/lint/typecheck green; all changes are
   hardening-shaped (no new features, no schema changes, no new persisted
   state beyond what 123 pinned).
@@ -73,6 +95,10 @@ provenance-loss banner can never fire for terminal cards (today: ALL cards).
 
 - No changes to the 123 persisted contracts (card-atom metadata shape,
   capture_status tri-state, card_atom_status values).
+- No atomic unique-append primitive / lock for card atoms. AC3's guard defends
+  the sequential retry edge only; concurrent-tick double-append is a documented
+  blind spot (intake is single-flight today) — if it becomes a real risk it is
+  a separate follow-up that would touch the persisted store, out of scope here.
 - No proxy-bypass detection mechanism (documented blind spot stays a
   documented blind spot — wiki already carries it).
 - No dashboard features; the esc() fix is the only dashboard touch.
