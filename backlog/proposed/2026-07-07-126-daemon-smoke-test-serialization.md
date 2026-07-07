@@ -2,7 +2,7 @@
 id: 2026-07-07-126-daemon-smoke-test-serialization
 title: "Serialize the real-daemon smoke tests — kill the shell-reachable and ceo-slack-brain full-suite load flakes (isolation-pass-only is not green)"
 status: proposed
-priority: MEDIUM
+priority: MED
 estimate: 0.5d
 created: 2026-07-07
 blocked_by: []
