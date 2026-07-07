@@ -222,3 +222,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a — connectivity check, no atoms/clusters queried
 - **Verdict:** ✅ right
 - **Note:** daemon at :38478 responding normally; nothing surprising
+
+### 2026-07-06 20:42 PDT — propose_decision x3 fail-closed on missing Slack token (station-4 seeding attempt)
+- **Trigger:** founder asked strategist to walk the three best cards from the first live intake:terminal run through /echo-emit-decision (station-4 seeding); three decision-grade drafts submitted to the propose-confirm gate
+- **Query inputs:** 3x propose_decision {subject, decision, rationale, source_app=claude-code}; subjects: client alert-scope decision, alert delivery-flow decision, context-layer atoms decision (full text machine-scoped; redacted here — repo is public)
+- **Returned:** 3x error: "propose_decision: ECHO_SLACK_BOT_TOKEN is required"; zero decisions recorded
+- **Sources:** n/a — write-path tool; no atoms/clusters queried. Draft inputs derived from derived:granola-signals decision atoms via the terminal seed store (isolated, 54 posted)
+- **Verdict:** ❌ wrong (expected shape: propose should queue pending confirm; got hard requirement on Slack config at propose time)
+- **Note:** the gate's ONLY confirm surface is the Slack card, so station 4 is structurally unreachable until the founder's Slack channel/safety call — propose fails at draft time even though confirmation is the Slack-dependent half. Fail-closed is correct per skill contract; surfaced to operator, no retry, no direct write.
+- **Conjecture:** a propose path that queues drafts locally (pending_confirm state) with Slack needed only for the confirm leg would unblock station-4 seeding without weakening the human gate — observation only, backlog decision belongs to end-of-window synthesis.
