@@ -1,5 +1,4 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -109,11 +108,10 @@ describe('echoctl shell reachability', () => {
       const label = `com.echo.daemon.test-${uuid}`;
       const plistPath = join(tmpRoot, `${label}.plist`);
       const daemonHome = join(tmpRoot, 'daemon-home');
-      const daemonPort = await findFreePort();
       const logDir = join(tmpRoot, 'daemon-logs');
       const dataDir = join(tmpRoot, 'daemon-data');
       const dbPath = join(dataDir, 'echo.db');
-      const overrides = [
+      const overridesFor = (port: string): string[] => [
         '--label',
         label,
         '--plist-path',
@@ -121,7 +119,7 @@ describe('echoctl shell reachability', () => {
         '--home',
         daemonHome,
         '--port',
-        daemonPort,
+        port,
         '--log-dir',
         logDir,
         '--data-dir',
@@ -129,6 +127,12 @@ describe('echoctl shell reachability', () => {
         '--db-path',
         dbPath,
       ];
+      // Resolved by the AC1 bounded-retry install loop below; the finally block
+      // and the post-install assertions read these once a candidate port has
+      // actually bound+healthed. Empty until then so the finally cleanup can
+      // guard against ever targeting the default (production) daemon.
+      let daemonPort = '';
+      let overrides: string[] = [];
 
       const productionBefore = launchctlPrint('com.echo.daemon');
       if (productionBefore.error) {
@@ -140,6 +144,22 @@ describe('echoctl shell reachability', () => {
       const productionDataSnapshot = snapshotProductionDataDir(productionWasLoaded);
 
       try {
+        // AC1 (item 126): race-safe port allocation. The prior helper bound a
+        // free port, closed it, then handed the number to the daemon — a
+        // check-then-use (TOCTOU) race: between our close() and the daemon's
+        // bind an overlapping worktree run, a stale daemon, or another suite
+        // file could steal the port, producing the intermittent "did not become
+        // healthy on port N" flake. Serializing the suite would NOT close this
+        // race (overlapping unattended runs, stale daemons). So make the
+        // daemon's OWN bind+health the allocation signal: try a random candidate
+        // port and, if `daemon install` does not reach health, tear the attempt
+        // down and retry a fresh candidate. Bounded so a genuinely broken
+        // install fails fast instead of looping. A random port in a 10k range
+        // collides rarely enough that attempt 1 nearly always wins; the retry is
+        // insurance, not the common path (each real collision costs the
+        // daemon's ~10s health deadline, and 6 attempts stay under the 75s
+        // test timeout).
+        //
         // Item 097: `daemon install` auto-derives ECHO_REPO_ROOT from the install
         // cwd's git toplevel when it contains the tools/review-queue/ harness. This
         // test models a PACKAGED install (item 076 boundary) — wrappers are NOT
@@ -148,12 +168,30 @@ describe('echoctl shell reachability', () => {
         // coord_invoke assertion below checks (graceful ENOENT, no harness resolved)
         // AND prevents resolving the real source-repo wrapper, which would
         // fire-and-forget spawn a live codex reviewer tick during the test.
-        const daemonInstall = spawnSync('bash', ['-c', `echoctl daemon install ${shellArgs(overrides)}`], {
-          env,
-          cwd: tmpRoot,
-          encoding: 'utf8',
-        });
-        expect(daemonInstall.status, daemonInstall.stderr).toBe(0);
+        let lastInstallStderr = '';
+        for (let attempt = 1; attempt <= 6 && daemonPort === ''; attempt += 1) {
+          const candidate = String(40000 + Math.floor(Math.random() * 10000));
+          const candidateOverrides = overridesFor(candidate);
+          const attemptInstall = spawnSync(
+            'bash',
+            ['-c', `echoctl daemon install ${shellArgs(candidateOverrides)}`],
+            { env, cwd: tmpRoot, encoding: 'utf8' },
+          );
+          if (attemptInstall.status === 0) {
+            daemonPort = candidate;
+            overrides = candidateOverrides;
+            break;
+          }
+          lastInstallStderr = attemptInstall.stderr ?? '';
+          // Failed to bind/health on this candidate. `install` already boots the
+          // job out on a health failure; uninstall clears the written plist so
+          // the next attempt starts from a clean slate on a fresh port.
+          spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(candidateOverrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+        }
+        expect(daemonPort, `daemon did not become healthy on any candidate port: ${lastInstallStderr}`).not.toBe('');
 
         const daemonStop = spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
           env,
@@ -213,14 +251,20 @@ describe('echoctl shell reachability', () => {
         expect(coordText).toContain('run-codex-reviewer.sh');
         expect(coordText).toContain('isError');
       } finally {
-        spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
-        spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
+        // Guard: only tear down a daemon we actually installed. If the retry
+        // loop never resolved a port, `overrides` is empty and running
+        // `daemon stop`/`uninstall` with no --label/--port would target the
+        // default (production) daemon — never do that.
+        if (daemonPort !== '') {
+          spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+          spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+        }
       }
 
       await expectLaunchdGone(label);
@@ -320,25 +364,6 @@ async function waitForDaemonStatus(
     });
   }
   return last;
-}
-
-async function findFreePort(): Promise<string> {
-  const start = 40000 + Math.floor(Math.random() * 10000);
-  for (let i = 0; i < 10000; i += 1) {
-    const port = 40000 + ((start + i - 40000) % 10000);
-    if (await canListen(port)) return String(port);
-  }
-  throw new Error('no free TCP port found in 40000-49999');
-}
-
-function canListen(port: number): Promise<boolean> {
-  return new Promise((resolvePort) => {
-    const server = createServer();
-    server.once('error', () => resolvePort(false));
-    server.listen(port, '127.0.0.1', () => {
-      server.close(() => resolvePort(true));
-    });
-  });
 }
 
 async function expectLaunchdGone(label: string): Promise<void> {
