@@ -45,6 +45,41 @@ fast_track: |
   unset. Contained (bridge is storage-read-only; one stray state file cleaned),
   but it is a live silent-action foot-gun of exactly the class items 117-120
   eliminated. Build + independent review + founder merge gates all still apply.
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — merge --no-ff was clean; merge-tree matched the sidecar's "none"
+    prediction (package.json untouched on main since the branch point). Exactly
+    4 files landed: package.json, tools/intake-terminal.ts,
+    tests/tools/intake-terminal-entry-guard.test.ts, and
+    tests/tools/fixtures/import-intake-terminal-entry.ts.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Founder ratification: the one flagged package.json line
+  (intake:terminal -> "vite-node --script tools/intake-terminal.ts") is
+  pre-ratified via this merge, per the sidecar verdict. It is forced by
+  vite-node's architecture (argv[1] only carries the script path under
+  --script), not scope creep; repo precedent is eval:retrieval.
+
+  Verify: 2037 tests pass / 21 skipped / 1 todo (193 files pass / 1 skipped);
+  lint, typecheck, coupled-invariants, and sync-skills --check all clean
+  post-merge. Count exceeds the sidecar's 1768 because the merge base is a newer
+  origin/main tip, not because of this branch.
+
+  Follow-up items (non-blocking):
+  - docs-awareness: canonical invocation is `npm run intake:terminal` (or
+    `vite-node --script tools/intake-terminal.ts`); bare `vite-node` no longer
+    launches, by design — fold into the 116 wiki note at promotion.
+  - optional: audit sibling tools/ entry guards for the VITEST antipattern
+    (only if it recurs).
 spec_refs:
   - tools/intake-terminal.ts                         # the guard at :523-524
   - src/surfaces/ceo-slack-responder/index.ts        # house entry-check pattern (:8)
