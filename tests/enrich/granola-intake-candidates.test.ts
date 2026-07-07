@@ -196,8 +196,20 @@ describe('runGranolaIntakeBridgeOnce', () => {
     expect(record?.status).toBe('posted');
     expect(record?.slack_ts).toBe('ts-1');
 
-    // Append-only: the worker only reads atoms, never mutates or adds.
-    expect(await store.count()).toBe(atomsBefore);
+    // Item 123 AC1: a successful post now appends exactly one card provenance
+    // atom (a legacy array-returning classifier reports no run → capture_failed).
+    expect(await store.count()).toBe(atomsBefore + 1);
+    const cardAtoms = await store.query({ source: 'derived:intake-cards' });
+    expect(cardAtoms).toHaveLength(1);
+    const cardMeta = cardAtoms[0]?.metadata as Record<string, unknown>;
+    expect(cardMeta['candidate_key']).toBe('granola:signal:note-1:v1:action:a1');
+    expect(cardMeta['dedupe_key']).toBe('granola:card:granola:signal:note-1:v1:action:a1');
+    expect(cardMeta['note_id']).toBe('note-1');
+    expect(cardMeta['signal_refs']).toEqual(['granola:signal:note-1:v1:action:a1']);
+    expect((cardMeta['classifier_run'] as Record<string, unknown>)['capture_status']).toBe(
+      'capture_failed',
+    );
+    expect(record?.card_atom_status).toBe('written');
   });
 
   it('produces zero candidates for an internal-only meeting', async () => {

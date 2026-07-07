@@ -18,6 +18,21 @@ import { randomUUID } from 'node:crypto';
  */
 export type GranolaIntakeSeedStatus = 'pending' | 'posting' | 'posted' | 'failed';
 
+/**
+ * Item 123 AC1: the durable outcome of the card-atom emission that accompanies
+ * a successful post. `written` = the `derived:intake-cards` atom was appended;
+ * `failed` = the atom write threw (provenance lost, post still succeeded). This
+ * marker is what makes provenance loss visible-by-construction to the trace
+ * surface — an unattended launchd run has no operator watching stderr.
+ */
+export type CardAtomStatus = 'written' | 'failed';
+
+export interface CardAtomOutcome {
+  status: CardAtomStatus;
+  /** Bounded error summary, present only when `status === 'failed'`. */
+  error?: string;
+}
+
 export interface GranolaIntakeSeedRecord {
   candidate_key: string;
   note_id: string;
@@ -26,6 +41,11 @@ export interface GranolaIntakeSeedRecord {
   retry_count: number;
   slack_ts?: string;
   last_error?: string;
+  /** Item 123 AC1: card-atom emission outcome, written in the same seed-store
+   *  update as the `posted` transition. A duplicate-suppressed rerun never
+   *  reaches `markPosted` again, so a `failed` marker is never cleared. */
+  card_atom_status?: CardAtomStatus;
+  card_atom_error?: string;
   created_at: string;
   updated_at: string;
 }
@@ -47,7 +67,11 @@ export interface GranolaIntakeSeedStore {
    */
   claim(input: ClaimSeedInput): Promise<{ record: GranolaIntakeSeedRecord; created: boolean }>;
   markPosting(candidateKey: string): Promise<GranolaIntakeSeedRecord>;
-  markPosted(candidateKey: string, slackTs: string): Promise<GranolaIntakeSeedRecord>;
+  markPosted(
+    candidateKey: string,
+    slackTs: string,
+    cardAtom?: CardAtomOutcome,
+  ): Promise<GranolaIntakeSeedRecord>;
   /**
    * Record a failed post attempt. Increments retry_count; once it reaches
    * maxRetries the record becomes terminal `failed`, otherwise it returns to
@@ -116,12 +140,24 @@ export class FileGranolaIntakeSeedStore implements GranolaIntakeSeedStore {
     }));
   }
 
-  async markPosted(candidateKey: string, slackTs: string): Promise<GranolaIntakeSeedRecord> {
+  async markPosted(
+    candidateKey: string,
+    slackTs: string,
+    cardAtom?: CardAtomOutcome,
+  ): Promise<GranolaIntakeSeedRecord> {
     const ts = requiredString(slackTs, 'slack_ts');
     return this.mutate(candidateKey, (record) => ({
       ...record,
       status: 'posted',
       slack_ts: ts,
+      ...(cardAtom === undefined
+        ? {}
+        : {
+            card_atom_status: cardAtom.status,
+            ...(cardAtom.status === 'failed' && cardAtom.error !== undefined
+              ? { card_atom_error: cardAtom.error.slice(0, 500) }
+              : {}),
+          }),
       updated_at: this.now(),
     }));
   }
