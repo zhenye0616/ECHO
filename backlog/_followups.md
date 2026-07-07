@@ -452,3 +452,5 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [118 follow-up] collect week-1 statements_no_candidate near-miss logs as alias-table decision input
 - [118 follow-up] wiki drift-alert update: nominate-then-confirm join (strategist)
 - [122 loop observation, driver-122] reviewer request-selection doesn't skip rounds on completed/merged items — stale rounds (e.g. 057b/r9, 110/r2) sort ahead of live rounds in the glob; harmless today only because they have combined.md. Friction item if it ever selects a stale round.
+- [121 follow-up] docs-awareness: canonical intake-terminal invocation is `npm run intake:terminal` (or `vite-node --script tools/intake-terminal.ts`); bare `vite-node tools/intake-terminal.ts` no longer launches, by design (argv[1] carries the script path only under --script) — fold into the 116 wiki note at promotion.
+- [121 follow-up] optional: audit sibling tools/ entry guards for the VITEST antipattern (`process.env.VITEST === undefined` auto-main) — only if it recurs.
