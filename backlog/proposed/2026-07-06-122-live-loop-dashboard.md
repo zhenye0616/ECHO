@@ -57,15 +57,26 @@ changes, no new persisted state.
   stale `dist`, a nonzero exit, a hung child (timeout), or unparseable output
   each map to a degraded doctor section in the response, never a thrown crash, a
   500, or a hang. Whichever path the builder picks, the dist-staleness
-  implication is documented in a comment. (r1 codex F3, codex-ops F5.) (b) every
-  `worker-heartbeat-*.json` read via 120's exported path/type contract
-  (malformed file → per-worker error entry, never a crash); (c) a `generated_at`
+  implication is documented in a comment. (r1 codex F3, codex-ops F5.) (b) the
+  heartbeats map is built by iterating 120's exported set of expected worker
+  names/descriptors (the `WorkerName` union / exported `*_WORKER` name
+  constants), NOT by globbing `worker-heartbeat-*.json` — an expected worker
+  whose file is absent must still appear as an `{ error: <string> }` entry (a
+  glob would silently drop it). A present-but-malformed file is likewise an
+  `{ error }` entry, never a crash. (r2 codex F2.) (c) a `generated_at`
   timestamp. Computation is throttled: refreshes more frequent than a
   named-constant minimum (default 10s) serve the cached document, and
-  recomputation is **single-flight** — a poll arriving while a computation is in
-  flight receives the last cached document (with a `stale: true` / in-flight
-  marker) rather than starting a second doctor computation or child process; no
-  unbounded process pileup is possible. (r1 codex-ops F6.)
+  recomputation is **single-flight**: at most one doctor computation (in-process
+  or child) is ever in flight at a time. A poll arriving while a computation is
+  in flight does NOT start a second computation or child process. Two cases:
+  (i) **warm** (a prior document exists) — the poll receives the last cached
+  document with `cache.stale: true`; (ii) **cold** (first computation after
+  boot, no cached document yet) — the poll JOINS the one shared in-flight
+  computation, bounded by the same named-constant timeout; if that computation
+  times out or fails, the poll receives a stable degraded/`unknown`
+  contract-shaped document (never `undefined`, a 500, or an unbounded stall).
+  No unbounded process pileup is possible in either case. (r1 codex-ops F6; r2
+  codex F1 + codex-ops cold-start.)
 
   The response is a single top-level JSON object with a stable shape (r1 codex
   F2): `generated_at` (ISO string); `cache` (`{ stale: boolean, age_ms: number,
@@ -105,9 +116,15 @@ changes, no new persisted state.
 - **AC5 — tests:** fixture-driven (scratch ECHO_HOME, fabricated heartbeats +
   doctor inputs or an injected report function): /api/status shape stable
   against the AC2 top-level contract and cached-vs-fresh behavior; single-flight
-  under overlapping in-flight polls (no second computation/child spawned); the
-  fail-soft doctor cases (missing/stale dist, timeout, nonzero exit, parse
-  failure) each produce a degraded-not-crashed response; page serves;
+  under overlapping in-flight polls (no second computation/child spawned),
+  including the **cold-start** case — two concurrent `/api/status` calls before
+  any document exists spawn exactly one computation and both receive a
+  contract-shaped response (joined result, or the degraded/`unknown` skeleton on
+  timeout/failure), never `undefined`/500/stall (r2 codex F1 + codex-ops); an
+  expected worker with no heartbeat file surfaces as an `{ error }` entry, not a
+  dropped key (r2 codex F2); the fail-soft doctor cases (missing/stale dist,
+  timeout, nonzero exit, parse failure) each produce a degraded-not-crashed
+  response; page serves;
   degraded/disabled states render distinguishably; the AC1 import-guard
   regression test AND the AC1 invalid-port fatal-exit test; the AC4 no-write
   test against the shipped doctor path. No live daemon required by any test.
