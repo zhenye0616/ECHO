@@ -462,3 +462,7 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [122 follow-up] flaky-under-load: tests/cli/shell-reachable.test.ts fails in full-suite runs on port contention while passing in isolation — recurring signal, consider serializing or porting off the fixed test port.
 - [122 post-ship] dashboard-v2 candidates PARKED pending founder usage: coordination-loop panel / station drill-down / actionable fix hints — founder will use v1 first, expand from observed friction (2026-07-06)
 - [117 bug, found via 122 dashboard] doctor LOOP_CAPTURE_SOURCE_CLASSES expects claude-code:/codex:/cursor: source prefixes but the session extractors emit fs:-prefixed atoms (claude-code.ts:596) — station-1 rows for those sources read "0 atoms" forever by construction; either attribute extractor atoms to their own class or drop the dead rows (2026-07-06)
+- [123 follow-up] add error-event handlers on ures/cres streams in createHttpRetrievalCapture (brain.ts:1005-1012) — unhandled EPIPE after brain-child timeout kill could crash the enrich worker
+- [123 follow-up] document the proxy-bypass blind spot (child MCP config hardcoding the daemon URL records fake zero_retrievals) when promoting the retrieval-capture mechanism to the wiki house pattern
+- [123 follow-up] optional: seed-store-by-note listing in trace --note mode for pre-123 notes
+- [123 follow-up] optional: dedupe_key existence check before card-atom append to close the markPosted-throw retry double-atom edge
