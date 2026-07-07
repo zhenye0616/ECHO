@@ -64,6 +64,53 @@ files_to_modify:
   - tests/surfaces/ceo-slack-brain.test.ts
   - raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md  # AC3 run log: the 5 full-suite runs + per-run timings (standard builder agent-run artifact)
 ready_content_sha: 9ad93cd19d720bfdae71d5a7a1bac2472e8d19f6fb94e26417da6a300c8280f8
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation.
+
+  Conflicts resolved:
+  - none — branch is test-files-only; neither test file touched on main since
+    merge-base, so the merge applied cleanly.
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied:
+  - tests/cli/shell-reachable.test.ts:162 — stale comment word "raised to 120s"
+    corrected to "180s" to match the actual 180_000ms timeout at :330
+    (founder-delegate pre-approved; zero behavioral effect).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Item arc (for the record): the builder's initial five-green evidence was
+  contradicted by the reviewer's spot-check, which surfaced a residual
+  stop→start flake the first AC1 retry didn't cover. The ensuing fixup round
+  found the true root cause — launchd's async bootout racing a `daemon start`
+  retry into start()'s "loaded but unhealthy" fast-fail path with no health
+  window (daemon.ts:857-874 vs restart():892-918). Final mechanism:
+  restart-on-retry (synchronous bootout → bootstrap gives each retry a real
+  ~10s health window) + 500ms settle, plus a 180s timeout justified by measured
+  data (82s isolated / 136s under load). AC3 was then re-proven 5/5 green via
+  exact `npm run test` + the reviewer's corroborating spot-check (6/6
+  post-fixup). AC4 held throughout: zero product code changed — the blocking
+  pre-existing defect was escalated and became item 128 rather than absorbed as
+  drift.
+
+  Flaky-test merge exemption RETIRED as of this merge: with 126's fixes in the
+  tree, shell-reachable and ceo-slack-brain failures are REAL signals, not
+  tolerated flakes. Future merges must treat them as blocking.
+
+  Verify: 2099/2099 tests pass (21 skipped, 1 todo; 0 failed) across 202 test
+  files; lint, typecheck, check-coupled-invariants, and sync-skills --check all
+  clean post-merge. No shell-reachable / ceo-slack-brain failure fired.
+
+  Follow-up items (non-blocking):
+  - retire packaged-boot.test.ts's TOCTOU findFreePort the same way — already
+    filed in backlog/_followups.md.
+  - coord-volume-perf load-tolerant perf budget — already filed in
+    backlog/_followups.md.
+  - strategist: retire the flaky-test special-case from merger prompts per this
+    item's After Completion — recorded here in review_notes (this merge is the
+    retirement point).
 ---
 
 ## Problem

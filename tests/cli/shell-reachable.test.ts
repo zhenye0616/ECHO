@@ -159,7 +159,7 @@ describe('echoctl shell reachability', () => {
         // insurance, not the common path. Each real collision costs the daemon's
         // ~10s health deadline, and this test already spends ~40-65s on
         // build:cli + npm pack + global install under full-suite load — so the
-        // per-test timeout is raised to 120s (see below) to give the install AND
+        // per-test timeout is raised to 180s (see below) to give the install AND
         // start retries real headroom. Without that headroom, retry exhaustion
         // would trip vitest's timeout as an opaque failure before the crafted
         // expect() messages here could fire.
