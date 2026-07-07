@@ -20,7 +20,7 @@ spec_refs:
 files_to_modify:
   # PROVISIONAL
   - src/enrich/granola-intake-candidates.ts
-  - tests/enrich/                                  # regression test pinning cutoff-follows-injected-clock
+  - tests/enrich/granola-intake-cutoff-clock.test.ts   # NEW: the AC3 regression test (exact path pinned per r2)
 ---
 
 ## Problem
@@ -62,7 +62,7 @@ the pipeline's notion of now, not a second clock read.
   the 2026-07-07 time-bomb.
 - **AC4 — gate (concrete commands):** red-to-green:
   `npx vitest run tests/tools/intake-terminal.test.ts` → 8/8;
-  regression: `npx vitest run <new test file>` → green (and demonstrably red
+  regression: `npx vitest run tests/enrich/granola-intake-cutoff-clock.test.ts` → green (and demonstrably red
   if the fix is reverted — note the revert-check in the run log);
   full gate: `npm run test` (fully green — that is the point), `npm run
   lint`, `npm run typecheck`.
