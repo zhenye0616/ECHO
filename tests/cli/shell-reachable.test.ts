@@ -1,5 +1,4 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -109,11 +108,10 @@ describe('echoctl shell reachability', () => {
       const label = `com.echo.daemon.test-${uuid}`;
       const plistPath = join(tmpRoot, `${label}.plist`);
       const daemonHome = join(tmpRoot, 'daemon-home');
-      const daemonPort = await findFreePort();
       const logDir = join(tmpRoot, 'daemon-logs');
       const dataDir = join(tmpRoot, 'daemon-data');
       const dbPath = join(dataDir, 'echo.db');
-      const overrides = [
+      const overridesFor = (port: string): string[] => [
         '--label',
         label,
         '--plist-path',
@@ -121,7 +119,7 @@ describe('echoctl shell reachability', () => {
         '--home',
         daemonHome,
         '--port',
-        daemonPort,
+        port,
         '--log-dir',
         logDir,
         '--data-dir',
@@ -129,6 +127,12 @@ describe('echoctl shell reachability', () => {
         '--db-path',
         dbPath,
       ];
+      // Resolved by the AC1 bounded-retry install loop below; the finally block
+      // and the post-install assertions read these once a candidate port has
+      // actually bound+healthed. Empty until then so the finally cleanup can
+      // guard against ever targeting the default (production) daemon.
+      let daemonPort = '';
+      let overrides: string[] = [];
 
       const productionBefore = launchctlPrint('com.echo.daemon');
       if (productionBefore.error) {
@@ -140,6 +144,26 @@ describe('echoctl shell reachability', () => {
       const productionDataSnapshot = snapshotProductionDataDir(productionWasLoaded);
 
       try {
+        // AC1 (item 126): race-safe port allocation. The prior helper bound a
+        // free port, closed it, then handed the number to the daemon — a
+        // check-then-use (TOCTOU) race: between our close() and the daemon's
+        // bind an overlapping worktree run, a stale daemon, or another suite
+        // file could steal the port, producing the intermittent "did not become
+        // healthy on port N" flake. Serializing the suite would NOT close this
+        // race (overlapping unattended runs, stale daemons). So make the
+        // daemon's OWN bind+health the allocation signal: try a random candidate
+        // port and, if `daemon install` does not reach health, tear the attempt
+        // down and retry a fresh candidate. Bounded so a genuinely broken
+        // install fails fast instead of looping. A random port in a 10k range
+        // collides rarely enough that attempt 1 nearly always wins; the retry is
+        // insurance, not the common path. Each real collision costs the daemon's
+        // ~10s health deadline, and this test already spends ~40-65s on
+        // build:cli + npm pack + global install under full-suite load — so the
+        // per-test timeout is raised to 120s (see below) to give the install AND
+        // start retries real headroom. Without that headroom, retry exhaustion
+        // would trip vitest's timeout as an opaque failure before the crafted
+        // expect() messages here could fire.
+        //
         // Item 097: `daemon install` auto-derives ECHO_REPO_ROOT from the install
         // cwd's git toplevel when it contains the tools/review-queue/ harness. This
         // test models a PACKAGED install (item 076 boundary) — wrappers are NOT
@@ -148,12 +172,30 @@ describe('echoctl shell reachability', () => {
         // coord_invoke assertion below checks (graceful ENOENT, no harness resolved)
         // AND prevents resolving the real source-repo wrapper, which would
         // fire-and-forget spawn a live codex reviewer tick during the test.
-        const daemonInstall = spawnSync('bash', ['-c', `echoctl daemon install ${shellArgs(overrides)}`], {
-          env,
-          cwd: tmpRoot,
-          encoding: 'utf8',
-        });
-        expect(daemonInstall.status, daemonInstall.stderr).toBe(0);
+        let lastInstallStderr = '';
+        for (let attempt = 1; attempt <= 6 && daemonPort === ''; attempt += 1) {
+          const candidate = String(40000 + Math.floor(Math.random() * 10000));
+          const candidateOverrides = overridesFor(candidate);
+          const attemptInstall = spawnSync(
+            'bash',
+            ['-c', `echoctl daemon install ${shellArgs(candidateOverrides)}`],
+            { env, cwd: tmpRoot, encoding: 'utf8' },
+          );
+          if (attemptInstall.status === 0) {
+            daemonPort = candidate;
+            overrides = candidateOverrides;
+            break;
+          }
+          lastInstallStderr = attemptInstall.stderr ?? '';
+          // Failed to bind/health on this candidate. `install` already boots the
+          // job out on a health failure; uninstall clears the written plist so
+          // the next attempt starts from a clean slate on a fresh port.
+          spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(candidateOverrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+        }
+        expect(daemonPort, `daemon did not become healthy on any candidate port: ${lastInstallStderr}`).not.toBe('');
 
         const daemonStop = spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
           env,
@@ -161,11 +203,46 @@ describe('echoctl shell reachability', () => {
         });
         expect(daemonStop.status, daemonStop.stderr).toBe(0);
 
-        const daemonStart = spawnSync('bash', ['-c', `echoctl daemon start ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
-        expect(daemonStart.status, daemonStart.stderr).toBe(0);
+        // AC1 (item 126, review fixup r2): the stop→start reachability check must
+        // be as load-tolerant as the install loop above. `echoctl daemon start`
+        // re-binds the resolved port and boots itself out if its ~10s health
+        // probe (waitForHealthy — NOT CLI-configurable) loses the race under
+        // full-suite CPU contention on this shared, chronically-loaded dev box.
+        //
+        // Retrying `daemon start` DIRECTLY thrashes: launchd's bootout is async,
+        // so a retry frequently finds the job transiently "loaded but unhealthy"
+        // and start() fast-returns 1 with NO health window — burning the attempt
+        // (this is exactly how a reviewer run failed: 5 start attempts, all
+        // "loaded but unhealthy"). `daemon restart` instead boots out
+        // SYNCHRONOUSLY and then bootstraps, so every retry is a real fresh
+        // health window. First attempt stays `start` (exercises the start verb
+        // when the machine is healthy-fast); retries use `restart` with a short
+        // settle so launchd finishes unloading before the next bootstrap. The
+        // assertion is only that the daemon ULTIMATELY serves on the resolved
+        // port. Bounded to fail fast (with this crafted message, not an opaque
+        // vitest timeout) if the daemon genuinely never becomes healthy.
+        let startedOk = false;
+        let lastStartStderr = '';
+        for (let attempt = 1; attempt <= 8 && !startedOk; attempt += 1) {
+          const verb = attempt === 1 ? 'start' : 'restart';
+          const daemonStart = spawnSync('bash', ['-c', `echoctl daemon ${verb} ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+          if (daemonStart.status === 0) {
+            startedOk = true;
+            break;
+          }
+          lastStartStderr = daemonStart.stderr ?? '';
+          // Let launchd finish the (async) unload before the next bootstrap so
+          // the retry gets a real health window instead of a loaded-but-unhealthy
+          // fast-return.
+          await new Promise((settle) => setTimeout(settle, 500));
+        }
+        expect(
+          startedOk,
+          `daemon never served on resolved port ${daemonPort} after stop→start/restart retries: ${lastStartStderr}`,
+        ).toBe(true);
 
         const initialize = await postMcp(Number(daemonPort), {
           jsonrpc: '2.0',
@@ -213,14 +290,20 @@ describe('echoctl shell reachability', () => {
         expect(coordText).toContain('run-codex-reviewer.sh');
         expect(coordText).toContain('isError');
       } finally {
-        spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
-        spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
+        // Guard: only tear down a daemon we actually installed. If the retry
+        // loop never resolved a port, `overrides` is empty and running
+        // `daemon stop`/`uninstall` with no --label/--port would target the
+        // default (production) daemon — never do that.
+        if (daemonPort !== '') {
+          spawnSync('bash', ['-c', `echoctl daemon stop ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+          spawnSync('bash', ['-c', `echoctl daemon uninstall ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+        }
       }
 
       await expectLaunchdGone(label);
@@ -234,7 +317,17 @@ describe('echoctl shell reachability', () => {
         expect(snapshotProductionDataDir(false)).toEqual(productionDataSnapshot);
       }
     },
-    75_000,
+    // 180s (raised from 75s): this real-daemon smoke spends ~40-65s on
+    // build:cli + npm pack + global install plus real launchd bring-up, and it
+    // runs on a shared dev machine whose background daemons keep load high — the
+    // packed smoke measured 82s even in ISOLATION under that load, and full-suite
+    // CPU contention stacks on top. The old 75s cap had no room for that, let
+    // alone the AC1 install/start retry insurance (each retry ~10s). 180s gives
+    // the base run + retries genuine headroom so exhaustion surfaces as this
+    // test's crafted expect() message rather than an opaque vitest timeout; a
+    // truly-hung daemon still fails the internal ~10s health waits and surfaces
+    // long before 180s.
+    180_000,
   );
 });
 
@@ -320,25 +413,6 @@ async function waitForDaemonStatus(
     });
   }
   return last;
-}
-
-async function findFreePort(): Promise<string> {
-  const start = 40000 + Math.floor(Math.random() * 10000);
-  for (let i = 0; i < 10000; i += 1) {
-    const port = 40000 + ((start + i - 40000) % 10000);
-    if (await canListen(port)) return String(port);
-  }
-  throw new Error('no free TCP port found in 40000-49999');
-}
-
-function canListen(port: number): Promise<boolean> {
-  return new Promise((resolvePort) => {
-    const server = createServer();
-    server.once('error', () => resolvePort(false));
-    server.listen(port, '127.0.0.1', () => {
-      server.close(() => resolvePort(true));
-    });
-  });
 }
 
 async function expectLaunchdGone(label: string): Promise<void> {

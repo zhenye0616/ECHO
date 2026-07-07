@@ -159,16 +159,31 @@ describe('ceo-slack-responder brain', () => {
       'setInterval(() => {}, 1000);',
     ]);
 
+    // AC2 (item 126): root cause of the full-suite `descendant.pid` ENOENT
+    // flake. This test verifies the product kills a timed-out brain's whole
+    // process group by reading a pid file the STUB writes only AFTER it has
+    // (a) cold-started a fresh Node interpreter, (b) ESM-loaded the stub, and
+    // (c) spawned a grandchild Node process. Under full-suite CPU contention
+    // that cold-start chain routinely exceeds a 200ms timeout, so the
+    // timeout-driven kill fired BEFORE the stub registered its pid and the
+    // subsequent readFile threw ENOENT (18/18 in isolation, intermittent under
+    // load — documented at the 116 merge). The product's process-group kill was
+    // never wrong; the test window was too tight. Fix is test-internal: give the
+    // stub headroom to register its descendant before the kill (a timeout
+    // comfortably above worst-case cold-start under load) and poll for the pid
+    // file instead of reading it exactly once. The descendant is a long-lived
+    // `setInterval`, so a larger timeout does not change what is asserted — only
+    // that the descendant is reliably registered before the kill.
     const result = await runBrain('why?', {
       brain: 'codex',
       contextRepoPath: dir,
-      timeoutMs: 200,
-      killGraceMs: 50,
+      timeoutMs: 2000,
+      killGraceMs: 200,
       registry: registryWith('codex', script, 'stdout-json'),
     });
 
     expect(result).toMatchObject({ ok: false, outcome: 'timeout' });
-    const descendantPid = Number.parseInt(await readFile(pidPath, 'utf8'), 10);
+    const descendantPid = Number.parseInt(await waitForFile(pidPath), 10);
     await wait(250);
     expect(pidIsAlive(descendantPid)).toBe(false);
   });
@@ -332,6 +347,18 @@ function registryWith(
       capture,
     },
   };
+}
+
+async function waitForFile(path: string, timeoutMs = 2000): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      return await readFile(path, 'utf8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT' || Date.now() > deadline) throw err;
+      await wait(25);
+    }
+  }
 }
 
 function pidIsAlive(pid: number): boolean {
