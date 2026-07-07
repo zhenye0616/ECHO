@@ -156,9 +156,13 @@ describe('echoctl shell reachability', () => {
         // down and retry a fresh candidate. Bounded so a genuinely broken
         // install fails fast instead of looping. A random port in a 10k range
         // collides rarely enough that attempt 1 nearly always wins; the retry is
-        // insurance, not the common path (each real collision costs the
-        // daemon's ~10s health deadline, and 6 attempts stay under the 75s
-        // test timeout).
+        // insurance, not the common path. Each real collision costs the daemon's
+        // ~10s health deadline, and this test already spends ~40-65s on
+        // build:cli + npm pack + global install under full-suite load — so the
+        // per-test timeout is raised to 120s (see below) to give the install AND
+        // start retries real headroom. Without that headroom, retry exhaustion
+        // would trip vitest's timeout as an opaque failure before the crafted
+        // expect() messages here could fire.
         //
         // Item 097: `daemon install` auto-derives ECHO_REPO_ROOT from the install
         // cwd's git toplevel when it contains the tools/review-queue/ harness. This
@@ -199,11 +203,32 @@ describe('echoctl shell reachability', () => {
         });
         expect(daemonStop.status, daemonStop.stderr).toBe(0);
 
-        const daemonStart = spawnSync('bash', ['-c', `echoctl daemon start ${shellArgs(overrides)}`], {
-          env,
-          encoding: 'utf8',
-        });
-        expect(daemonStart.status, daemonStart.stderr).toBe(0);
+        // AC1 (item 126, review fixup): the stop→start reachability check must be
+        // as load-tolerant as the install loop above. `daemon start` re-binds the
+        // resolved port and its one-shot health wait (bootstrapAndProbe's ~10s
+        // waitForHealthy) can lose the race under full-suite CPU contention — a
+        // reviewer run flaked exactly here. A failed `daemon start` boots the job
+        // out (bootstrapAndProbe's cleanup path), so each retry is a clean fresh
+        // bootstrap+kickstart+health attempt; bounded-retry it so the assertion is
+        // "the daemon ultimately serves on the resolved port," not "the first start
+        // attempt won the health race."
+        let startedOk = false;
+        let lastStartStderr = '';
+        for (let attempt = 1; attempt <= 5 && !startedOk; attempt += 1) {
+          const daemonStart = spawnSync('bash', ['-c', `echoctl daemon start ${shellArgs(overrides)}`], {
+            env,
+            encoding: 'utf8',
+          });
+          if (daemonStart.status === 0) {
+            startedOk = true;
+            break;
+          }
+          lastStartStderr = daemonStart.stderr ?? '';
+        }
+        expect(
+          startedOk,
+          `daemon start never reached health on resolved port ${daemonPort}: ${lastStartStderr}`,
+        ).toBe(true);
 
         const initialize = await postMcp(Number(daemonPort), {
           jsonrpc: '2.0',
@@ -278,7 +303,17 @@ describe('echoctl shell reachability', () => {
         expect(snapshotProductionDataDir(false)).toEqual(productionDataSnapshot);
       }
     },
-    75_000,
+    // 180s (raised from 75s): this real-daemon smoke spends ~40-65s on
+    // build:cli + npm pack + global install plus real launchd bring-up, and it
+    // runs on a shared dev machine whose background daemons keep load high — the
+    // packed smoke measured 82s even in ISOLATION under that load, and full-suite
+    // CPU contention stacks on top. The old 75s cap had no room for that, let
+    // alone the AC1 install/start retry insurance (each retry ~10s). 180s gives
+    // the base run + retries genuine headroom so exhaustion surfaces as this
+    // test's crafted expect() message rather than an opaque vitest timeout; a
+    // truly-hung daemon still fails the internal ~10s health waits and surfaces
+    // long before 180s.
+    180_000,
   );
 });
 
