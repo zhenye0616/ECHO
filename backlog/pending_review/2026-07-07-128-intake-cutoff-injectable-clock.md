@@ -24,7 +24,42 @@ files_to_modify:
   # PROVISIONAL
   - src/enrich/granola-intake-candidates.ts
   - tests/enrich/granola-intake-cutoff-clock.test.ts   # NEW: the AC3 regression test (exact path pinned per r2)
+  - tests/tools/intake-terminal.test.ts   # FOUNDER-RATIFIED widen (via team lead, 121/123/124 precedent): AC2's premise was wrong — only AC6.1 injected `now`; AC6.2/6.3a/6.3b did not. Added the fixed-`now` injection to those 3 (4 lines); fixtures untouched. See agent_notes + run log.
 ready_content_sha: 9468ae741a3e550e6a4d732ca0a42ba652ceec4d27526dcebecc8ba996dcd725
+head_sha: "78511aaa2a2d82d373939c11d93d25a72effb8a4"
+agent_notes: |
+  DONE. AC1/AC2/AC3/AC4 all pass. Fast-track hotfix: the 4 red intake-terminal
+  AC6 tests are green; full suite green modulo 2 known pre-126 load-flakes
+  (isolation-verified).
+
+  AC2 PREMISE ERROR + RATIFIED DEVIATION (reviewer: read this). AC2 assumed all
+  4 red AC6 tests inject a fixed `now`; only AC6.1 did. AC6.2/6.3a/6.3b ran on
+  the real wall clock and their 2026-06-30 fixtures aged out of the 7d lookback
+  on 2026-07-07 — the AC1 product fix cannot reach them (base 4-failed →
+  post-AC1 3-failed). Source of the error: builder-126's run log mis-stated
+  "the tests inject a fixed now for everything else". Founder-delegated (via
+  team lead, 121/123/124 precedent) authorization to widen files_to_modify with
+  tests/tools/intake-terminal.test.ts and relax AC2's "no test file" clause for
+  EXACTLY the injection: one `now: () => '2026-06-30T10:06:00.000Z',` line added
+  to AC6.2 (both calls), AC6.3a, AC6.3b (4 lines). Fixtures untouched; no other
+  test change. Reviewer: verify these 4 additions change no test semantics
+  beyond pinning the previously-defaulted clock to the fixture-consistent value
+  AC6.1 already used.
+
+  AC3 revert-check: reverting line 477 to `Date.now()` makes the new regression
+  test FAIL (verified), so it genuinely falsifies the bug.
+
+  Gate: npx vitest intake-terminal → 8/8; regression → green (revert → red);
+  typecheck clean; lint clean; `npm run test` → 2 failed / 2094 passed. The 2
+  failures are the two named pre-126 load-flakes, both isolation-green:
+  ceo-slack-brain (18/18 iso), shell-reachable (1/1 iso) — fixed by item 126
+  (blocked on THIS item).
+
+  INFO-ONLY second-fuse audit (team lead asked): the AC1 fix does NOT defuse
+  the second computed fuse. tests/enrich/granola-intake-candidates.test.ts has
+  ZERO `now:` injections; its default-config (30d lookback, 2026-06-30 fixtures)
+  bridge tests read the real wall clock and detonate ~2026-07-30 regardless.
+  Needs the follow-up item. Same class as the strategist grep-audit follow-up.
 ---
 
 ## Problem
