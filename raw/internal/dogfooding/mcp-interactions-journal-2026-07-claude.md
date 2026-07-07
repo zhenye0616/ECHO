@@ -285,3 +285,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** —
 - **Conjecture:** none
+
+### 2026-07-07 10:20 PDT — coord_invoke ×2 for 128 r3 (mechanical path-pin verification)
+- **Trigger:** 128 r2 dispositioned (codex-ops proceed; codex one mechanical placeholder-path finding, patched); r3 dispatched
+- **Query inputs:** coord_invoke — codex + codex-ops, request_path=backlog/reviews/2026-07-07-128-intake-cutoff-injectable-clock/r3/request.md
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only. Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
