@@ -487,3 +487,8 @@ Process lessons folded to R6.merge_mechanics: [119] verify brace balance after k
 - [127 follow-up] AC4 founder/watcher gate: after merge, confirm onboarding·windows-latest (CI) and validate-package·windows-latest (release) go green on real runs; link the run evidence.
 - [127 AC4 gate, partial PASS 2026-07-07] Windows packaging fix VERIFIED: onboarding·windows-latest node24 fully green, node22 got past ERR_MODULE_NOT_FOUND into selftest — the 127 closure works. NEW downstream bug unmasked on node22: EBUSY unlink of echo-selftest db during cleanup (win32 refuses to delete open files; daemon handle not released before unlink; timing-dependent — node24 passed). Next Windows-chain item.
 - [CI, pre-existing, surfaced by 127 AC4 watch] quality jobs fail on exactly ONE test across all OS/node combos: tests/mcp/tools/list-task-states-batching.test.ts:57 AssertionError (deep-equal) — passes locally (2094 green tonight ×3 merges); CI-env dependent, suspect actions/checkout shallow clone changing git log --name-only behavior (adjacent to the [111] merge-commit fallback followup above). Blocks any future all-green aggregate gate (092).
+
+## 128 merge follow-ups (2026-07-07, non-blocking)
+
+- [128 follow-up] grep audit for other injectable-clock/`Date.now()` splits in enrich/ and surfaces/ — the intake cutoff bug (injectable `deps.now` defined but a second raw `Date.now()` used for the lookback cutoff) is a latent class; fold the below vacuous-coverage item into this audit.
+- [128 follow-up] candidates.test.ts:234 internal-only attendee-filter test passes VACUOUSLY after ~2026-07-30 (fixture ages out of the 30d wall-clock window — silent coverage decay, not a fuse). Address inside the injectable-clock grep-audit above.
