@@ -52,6 +52,39 @@ files_to_modify:
   - package.json                   # npm script `loop:dashboard` → `vite-node --script tools/loop-dashboard.ts`
   - tests/tools/                   # server + shape + read-only coverage
 ready_content_sha: fcbec218f24fe2b439a806a483133c78749ce32103d85ecefe7a475aab17ba93
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation (pre-approved clean-path run).
+
+  Conflicts resolved:
+  - none (merge-tree reported 0 conflict markers; main moved only backlog/journal
+    files with zero overlap; clean 'ort' merge of exactly the 5 built surfaces).
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied:
+  - none (sidecar Pre-merge fixups list was "none").
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify: 2053/2053 tests pass (21 skipped, 1 todo); lint, typecheck,
+  check-coupled-invariants, and sync-skills --check all clean post-merge.
+  Note: the sidecar recorded 1 failure on tests/cli/shell-reachable.test.ts
+  (a real-launchd daemon port-health smoke with known full-suite port/load
+  contention); on this merge's full-suite run it PASSED — no flaky-isolation
+  re-run was needed. This item touches nothing the CLI binary or daemon-install
+  path imports.
+
+  Follow-up items (non-blocking) — appended to backlog/_followups.md, tagged [122 follow-up]:
+  - esc() the counters segment in heartbeatLine (tools/loop-dashboard.ts:585-586)
+    for HTML-escaping consistency (cosmetic, localhost-only exposure).
+  - optional comment: a timed-out doctor computation is abandoned-not-cancelled
+    (single-flight guards new starts, not stragglers).
+  - optional AC4 test variant with a PRESENT db (belt-and-braces; doctor's
+    SELECT-only behavior already covered by 117 tests).
+  - flaky-under-load: tests/cli/shell-reachable.test.ts fails in full-suite runs
+    on port contention while passing in isolation — recurring signal, consider
+    serializing or porting off the fixed test port.
 ---
 
 ## Problem
