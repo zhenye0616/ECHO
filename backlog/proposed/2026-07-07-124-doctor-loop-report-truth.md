@@ -15,7 +15,11 @@ spec_refs:
 files_to_modify:
   # PROVISIONAL
   - src/cli/commands/doctor.ts
-  - tests/cli/                                     # doctor loop-section coverage
+  - tests/cli/doctor-loop.test.ts                  # doctor loop-section coverage (AC4 target)
+  # AC3 shape-compat ONLY (no dashboard feature work) — permitted iff the report
+  # shape changes; otherwise leave untouched:
+  - tools/loop-dashboard.ts                        # /api/status doc-comment shape-compat only
+  - tests/tools/loop-dashboard.test.ts             # 122 AC5-pinned shape test — update iff shape changes
 ---
 
 ## Problem
@@ -66,11 +70,16 @@ Both are already documented as known bugs in [[echoctl-cli]] and
   `/api/status` contract doc-comment and the AC5-pinned shape test from 122
   are updated in the same commit (dashboard file edits allowed ONLY for
   shape-compat, no feature work).
-- **AC4 — tests:** fixture-driven doctor loop-section tests for: observed
-  disabled state; the quiet-day false-alarm regression; missing-heartbeat
-  fallback with `inferred: true`; class derivation with a store containing
-  `fs:`/`coord:`/`api:granola` atoms and none of the phantom classes. Full
-  gate (test/lint/typecheck) green.
+- **AC4 — tests:** fixture-driven doctor loop-section tests added to
+  `tests/cli/doctor-loop.test.ts` for: observed disabled state; the quiet-day
+  false-alarm regression; missing-heartbeat fallback with `inferred: true`;
+  class derivation with a store containing `fs:`/`coord:`/`api:granola` atoms
+  and none of the phantom classes. If AC3's shape-compat path is taken, the
+  122 shape test in `tests/tools/loop-dashboard.test.ts` is updated in the same
+  commit. Verification commands, all green: targeted
+  `npx vitest run tests/cli/doctor-loop.test.ts` (plus
+  `npx vitest run tests/tools/loop-dashboard.test.ts` if the shape changed),
+  then the full gate `npm run test && npm run lint && npm run typecheck`.
 
 ## Out of Scope (Don't Drift)
 
