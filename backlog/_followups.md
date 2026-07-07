@@ -473,3 +473,9 @@ Process lessons folded to R6.merge_mechanics: [119] verify brace balance after k
 
 - [125 follow-up] optional: e2e `--note` test through `runTraceCard` without an override, to pin the enumerate wiring directly.
 - [125 follow-up] optional: revisit the AC3 guard query if card-atom volume ever makes the per-emit full-source scan matter.
+
+## 124 merge follow-ups (2026-07-07, non-blocking)
+
+- [124 follow-up] hardening: `readSignalsHeartbeat` should return null (fall to the inferred path) when `last_tick_at` fails to parse to a finite time — a corrupt-but-JSON-valid heartbeat currently reads as observed-and-never-stale.
+- [124 follow-up] founder policy call: should an observed-disabled station-2 worker ever downgrade doctor's overall rollup (currently soft by design — the 124 merge deliberately kept observed disabled/degraded from downgrading the pinned overall-rollup contract).
+- [124 follow-up] perf cleanup candidate: `queryClassHealth` materializes full rows to count; `coord:` adds 18k+ rows per doctor run — a `COUNT(*)` storage method would fix the class.
