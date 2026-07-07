@@ -6,6 +6,9 @@ priority: HIGH
 estimate: 0.5-1d
 created: 2026-07-06
 blocked_by: []
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-07T02:42:59Z"
+branch: "agent/live-loop-dashboard"
 spec_refs:
   - tools/serve-trace.ts                                   # the local-HTTP-page pattern to follow
   - src/cli/commands/doctor.ts                             # the loop report to reuse (117) — check exports; prefer in-process reuse
