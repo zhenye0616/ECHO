@@ -71,6 +71,12 @@ describe('packed package import closure', () => {
     const paths = packedPaths();
     const packed = new Set(paths);
     const shippedJs = paths.filter((filePath) => filePath.startsWith('dist/') && filePath.endsWith('.js'));
+
+    // Guard against a vacuous pass: an unbuilt or empty dist/ ships zero JS, and
+    // the closure walk below would then iterate nothing and pass silently. The
+    // guard only means something when it actually inspects shipped modules.
+    expect(shippedJs.length).toBeGreaterThan(0);
+
     const missing: string[] = [];
 
     for (const filePath of shippedJs) {
