@@ -1,11 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { ECHO_HOME_PATHS } from '../echo-home/paths.js';
 import { createLogger } from '../logging/index.js';
 import type { IntakeFields } from '../brain/brain.js';
 import {
   parseBrainName,
-  runBrain,
+  runBrainWithRetrievalCapture,
   type BrainName,
+  type ClassifierRunRecord,
 } from '../brain/brain.js';
 import {
   renderSeedMessage,
@@ -16,6 +18,7 @@ import { parseJson } from '../util/json.js';
 import { GRANOLA_RAW_SOURCE, GRANOLA_SIGNAL_SOURCE } from './granola-signals.js';
 import {
   FileGranolaIntakeSeedStore,
+  type CardAtomOutcome,
   type GranolaIntakeSeedStore,
 } from './granola-intake-seed-store.js';
 import {
@@ -81,9 +84,93 @@ export interface ClassifiedIntakeCandidate {
   quote?: string;
 }
 
+/** Item 123: a classifier may return the bare candidate list (legacy shape) or
+ *  a `{ candidates, run }` object carrying the classifier-run provenance. The
+ *  bridge normalizes both; a legacy list yields a `capture_failed` run because
+ *  the classifier reported no retrieval capture. */
+export interface ClassifiedIntakeResult {
+  candidates: ClassifiedIntakeCandidate[];
+  run?: ClassifierRunRecord;
+}
+
 export type GranolaIntakeClassifier = (
   input: GranolaIntakeClassificationInput,
-) => Promise<ClassifiedIntakeCandidate[]>;
+) => Promise<ClassifiedIntakeCandidate[] | ClassifiedIntakeResult>;
+
+/** Source string for the append-only card provenance atom (item 123 AC1). */
+export const GRANOLA_INTAKE_CARD_SOURCE = 'derived:intake-cards';
+
+/** `dedupe_key` for a card atom. `candidate_key` is the consumed signal's
+ *  dedupe_key; the card atom's key namespaces it under `granola:card:`. */
+export function granolaCardDedupeKey(candidateKey: string): string {
+  return `granola:card:${candidateKey}`;
+}
+
+/** Persisted metadata on a `derived:intake-cards` atom (item 123 AC1). */
+export interface IntakeCardAtomMetadata {
+  card_version: 1;
+  dedupe_key: string;
+  candidate_key: string;
+  note_id: string;
+  channel_id: string;
+  fields: IntakeFields;
+  /** Consumed signal dedupe_key refs this card derives from. */
+  signal_refs: string[];
+  /** Seed-store status timestamp at post time. */
+  seed_status_at: string;
+  slack_ts: string;
+  classifier_run: ClassifierRunRecord;
+}
+
+function normalizeClassifierResult(
+  result: ClassifiedIntakeCandidate[] | ClassifiedIntakeResult,
+): ClassifiedIntakeResult {
+  return Array.isArray(result) ? { candidates: result } : result;
+}
+
+/** Emit the append-only card provenance atom for a successful post. Fail-soft
+ *  (AC1): a write failure never breaks posting, but is reported back so the
+ *  seed record's `card_atom_status` marker can record the loss. */
+async function emitIntakeCardAtom(
+  storage: Storage,
+  args: {
+    candidateKey: string;
+    noteId: string;
+    channelId: string;
+    text: string;
+    fields: IntakeFields;
+    signalRefs: string[];
+    slackTs: string;
+    postedAt: string;
+    classifierRun: ClassifierRunRecord;
+  },
+): Promise<CardAtomOutcome> {
+  const metadata: IntakeCardAtomMetadata = {
+    card_version: 1,
+    dedupe_key: granolaCardDedupeKey(args.candidateKey),
+    candidate_key: args.candidateKey,
+    note_id: args.noteId,
+    channel_id: args.channelId,
+    fields: args.fields,
+    signal_refs: args.signalRefs,
+    seed_status_at: args.postedAt,
+    slack_ts: args.slackTs,
+    classifier_run: args.classifierRun,
+  };
+  try {
+    await storage.append({
+      source: GRANOLA_INTAKE_CARD_SOURCE,
+      timestamp: args.postedAt,
+      content: args.text,
+      metadata: metadata as unknown as Record<string, unknown>,
+    });
+    return { status: 'written' };
+  } catch (err) {
+    const message = (err as Error).message;
+    log.error('card_atom_write_failed', { candidate_key: args.candidateKey, message });
+    return { status: 'failed', error: message.slice(0, 500) };
+  }
+}
 
 export interface SeedPostResult {
   ts: string;
@@ -402,28 +489,43 @@ export async function runGranolaIntakeBridgeOnce(
     }
 
     const refToSignal = new Map(signals.map((signal) => [signal.dedupe_key, signal]));
-    let classified: ClassifiedIntakeCandidate[];
+    let classifierResult: ClassifiedIntakeResult;
+    const classifyStartedAt = now();
     try {
-      classified = await deps.classify({
-        note_id: noteId,
-        meeting_title: info.meeting_title,
-        ...(info.meeting_date === undefined ? {} : { meeting_date: info.meeting_date }),
-        ...(info.web_url === undefined ? {} : { web_url: info.web_url }),
-        signals: signals.map((signal) => ({
-          ref: signal.dedupe_key,
-          signal_type: signal.signal_type,
-          text: signal.text,
-          canonical_subject: signal.canonical_subject,
-          quote: signal.quote,
-          confidence: signal.confidence,
-        })),
-      });
+      classifierResult = normalizeClassifierResult(
+        await deps.classify({
+          note_id: noteId,
+          meeting_title: info.meeting_title,
+          ...(info.meeting_date === undefined ? {} : { meeting_date: info.meeting_date }),
+          ...(info.web_url === undefined ? {} : { web_url: info.web_url }),
+          signals: signals.map((signal) => ({
+            ref: signal.dedupe_key,
+            signal_type: signal.signal_type,
+            text: signal.text,
+            canonical_subject: signal.canonical_subject,
+            quote: signal.quote,
+            confidence: signal.confidence,
+          })),
+        }),
+      );
     } catch (err) {
       log.error('classify_failed', { note_id: noteId, message: (err as Error).message });
       continue;
     }
 
-    const noteCandidates = classified
+    // The classifier run is per-note (one classification call) and embedded in
+    // every card atom that call produces. A legacy classifier that reports no
+    // run yields an honest `capture_failed` record (never a fake ok/zero).
+    const classifierRun: ClassifierRunRecord = classifierResult.run ?? {
+      run_id: randomUUID(),
+      binding: 'unknown',
+      started_at: classifyStartedAt,
+      completed_at: now(),
+      capture_status: 'capture_failed',
+      capture_error: 'classifier did not report retrieval capture',
+    };
+
+    const noteCandidates = classifierResult.candidates
       .filter((candidate) => refToSignal.has(candidate.ref))
       .slice(0, config.perNoteCap);
 
@@ -457,7 +559,21 @@ export async function runGranolaIntakeBridgeOnce(
           candidateKey: candidate.ref,
         });
         const result = await deps.postSeed(config.channelId, text);
-        await seedStore.markPosted(candidate.ref, result.ts);
+        // Card provenance (AC1): append the derived atom, then record its
+        // written/failed outcome in the SAME seed-store update as `posted`.
+        const postedAt = now();
+        const cardOutcome = await emitIntakeCardAtom(storage, {
+          candidateKey: candidate.ref,
+          noteId,
+          channelId: config.channelId,
+          text,
+          fields: candidate.fields,
+          signalRefs: [candidate.ref],
+          slackTs: result.ts,
+          postedAt,
+          classifierRun,
+        });
+        await seedStore.markPosted(candidate.ref, result.ts, cardOutcome);
         posted += 1;
       } catch (err) {
         const message = (err as Error).message;
@@ -568,8 +684,11 @@ function parseClassifiedCandidate(value: unknown): ClassifiedIntakeCandidate {
 }
 
 function defaultClassifierFromBrain(config: BrainClassifierConfig): GranolaIntakeClassifier {
-  return async (input) => {
-    const result = await runBrain(buildClassificationPrompt(input), {
+  return async (input): Promise<ClassifiedIntakeResult> => {
+    // AC2: wrap the brain child so its scoped ECHO MCP retrievals are captured
+    // and returned as the classifier run. Capture is fail-soft (never blocks
+    // classification); the run's tri-state status records the outcome.
+    const { result, run } = await runBrainWithRetrievalCapture(buildClassificationPrompt(input), {
       brain: config.brain,
       contextRepoPath: config.contextRepoPath,
       timeoutMs: config.timeoutMs,
@@ -578,7 +697,7 @@ function defaultClassifierFromBrain(config: BrainClassifierConfig): GranolaIntak
     if (!result.ok || result.answer === undefined) {
       throw new Error(result.reason ?? result.outcome);
     }
-    return parseClassifierAnswer(result.answer);
+    return { candidates: parseClassifierAnswer(result.answer), run };
   };
 }
 

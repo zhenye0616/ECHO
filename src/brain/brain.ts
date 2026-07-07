@@ -1,4 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import {
+  createServer as createHttpServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type Server as HttpServer,
+} from 'node:http';
 
 export type BrainName = 'codex' | 'claude';
 export type BrainOutcome = 'ok' | 'timeout' | 'error';
@@ -803,4 +810,346 @@ function killProcessGroup(child: ChildProcessWithoutNullStreams, signal: NodeJS.
 
 function boundedReason(reason: string): string {
   return reason.replace(/\s+/g, ' ').trim().slice(0, 200) || 'unknown error';
+}
+
+// ─── Retrieval capture (item 123 AC2) ───────────────────────────────────────
+//
+// A brain child (codex/claude) runs with scoped ECHO MCP access via the
+// `ECHO_MCP_URL` env var (see ceo-slack-responder — the child's MCP config
+// resolves that URL). To make a classification run's retrievals observable
+// AFTER the child exits, we interpose a per-run localhost recording proxy in
+// front of that URL: it forwards every request byte-for-byte to the real
+// daemon (so it never alters what the classifier sees) and tees a coarse
+// summary of each `tools/call` exchange. The persisted SHAPE below is fixed
+// (AC2); the capture MECHANISM is this proxy, and it is fail-soft — any proxy
+// fault surfaces as `capture_failed`, never a fabricated `zero_retrievals`.
+
+export const DEFAULT_ECHO_MCP_URL = 'http://127.0.0.1:38478/mcp';
+
+/** One recorded ECHO MCP retrieval made by the brain child during a run. */
+export interface RetrievalRecord {
+  /** The MCP tool name (e.g. `search_memories`, `find_clusters`). */
+  tool: string;
+  /** Coarse, bounded summary of the call arguments. */
+  input_summary: string;
+  /** Coarse summary of what came back (atom/cluster ids or counts). */
+  result_summary: string;
+  /** ISO timestamp the exchange completed. */
+  at: string;
+}
+
+export type ClassifierRunCaptureStatus = 'ok' | 'zero_retrievals' | 'capture_failed';
+
+/** The classifier-run provenance record embedded in each card atom (AC2). It
+ *  is reachable in one hop from the card atom via `run_id`. */
+export interface ClassifierRunRecord {
+  run_id: string;
+  /** Vendor/binding identity of the brain that classified (or `unknown`). */
+  binding: string;
+  /** Model/version when the binding exposes it; omitted otherwise. */
+  model?: string;
+  started_at: string;
+  completed_at: string;
+  /** REQUIRED tri-state: a run with no retrievals (`zero_retrievals`) is
+   *  distinguishable from a run whose capture broke (`capture_failed`). */
+  capture_status: ClassifierRunCaptureStatus;
+  /** Present when `capture_status === 'ok'`. */
+  retrievals?: RetrievalRecord[];
+  /** Present when `capture_status === 'capture_failed'`. */
+  capture_error?: string;
+}
+
+/** A live capture session: the env to inject into the brain child, plus a
+ *  finalizer that yields the recorded retrievals after the child exits. */
+export interface RetrievalCaptureSession {
+  /** Env overrides merged into the brain child (points ECHO_MCP_URL at the
+   *  proxy). */
+  readonly childEnv: NodeJS.ProcessEnv;
+  /** Resolve the recorded retrievals; reject if capture itself failed. */
+  finish(): Promise<RetrievalRecord[]>;
+  /** Tear down the proxy. Always called; must not throw. */
+  close(): Promise<void>;
+}
+
+/** Pluggable capture mechanism. The default is the localhost recording proxy;
+ *  tests inject fakes to exercise each tri-state. */
+export interface RetrievalCapture {
+  start(runId: string, upstreamMcpUrl: string): Promise<RetrievalCaptureSession>;
+}
+
+/** Coarse, bounded stringify of MCP tool-call arguments. */
+export function summarizeMcpToolInput(args: unknown): string {
+  if (args === undefined || args === null) return '(no args)';
+  let text: string;
+  try {
+    text = JSON.stringify(args);
+  } catch {
+    text = String(args);
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/** Coarse summary of an MCP tool-call result: prefer atom/cluster id/count
+ *  hints, else fall back to content-item counts. */
+export function summarizeMcpToolResult(result: unknown): string {
+  if (result === null || result === undefined) return '(no result captured)';
+  if (typeof result !== 'object') return String(result).slice(0, 200);
+  const record = result as Record<string, unknown>;
+  if (record['isError'] === true) return 'error result';
+  const parts: string[] = [];
+  const content = record['content'];
+  if (Array.isArray(content)) parts.push(`content_items=${content.length}`);
+  for (const key of ['atoms', 'clusters', 'matches', 'results', 'memories']) {
+    const value = record[key];
+    if (Array.isArray(value)) parts.push(`${key}=${value.length}`);
+  }
+  // structuredContent is where MCP servers put machine-readable payloads.
+  const structured = record['structuredContent'];
+  if (structured !== null && typeof structured === 'object') {
+    for (const [key, value] of Object.entries(structured as Record<string, unknown>)) {
+      if (Array.isArray(value)) parts.push(`${key}=${value.length}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(' ') : '(result captured)';
+}
+
+interface JsonRpcMessage {
+  method?: unknown;
+  id?: unknown;
+  params?: unknown;
+  result?: unknown;
+}
+
+function parseJsonRpcMessages(raw: string): JsonRpcMessage[] {
+  const trimmed = raw.trim();
+  if (trimmed === '') return [];
+  // MCP streamable-HTTP responses are either a JSON body or an SSE stream of
+  // `data:` lines; requests are always JSON. Try JSON first, then SSE.
+  const out: JsonRpcMessage[] = [];
+  const pushParsed = (text: string): void => {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) if (item !== null && typeof item === 'object') out.push(item);
+      } else if (parsed !== null && typeof parsed === 'object') {
+        out.push(parsed as JsonRpcMessage);
+      }
+    } catch {
+      // ignore unparseable fragment
+    }
+  };
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    pushParsed(trimmed);
+    if (out.length > 0) return out;
+  }
+  for (const line of trimmed.split(/\r?\n/)) {
+    const m = /^data:\s?(.*)$/.exec(line);
+    if (m && m[1] !== undefined && m[1].trim() !== '') pushParsed(m[1]);
+  }
+  return out;
+}
+
+/** Extract `tools/call` retrievals from one request/response exchange. */
+export function extractRetrievalsFromExchange(
+  requestBody: string,
+  responseBody: string,
+  at: string,
+): RetrievalRecord[] {
+  const requests = parseJsonRpcMessages(requestBody);
+  const responses = parseJsonRpcMessages(responseBody);
+  const resultById = new Map<string, unknown>();
+  for (const msg of responses) {
+    if (msg.id !== undefined && 'result' in msg) resultById.set(String(msg.id), msg.result);
+  }
+  const out: RetrievalRecord[] = [];
+  for (const msg of requests) {
+    if (msg.method !== 'tools/call') continue;
+    const params = (msg.params ?? {}) as Record<string, unknown>;
+    const tool = typeof params['name'] === 'string' ? params['name'] : '(unknown tool)';
+    const resultKey = msg.id === undefined ? undefined : String(msg.id);
+    const result = resultKey !== undefined ? resultById.get(resultKey) : undefined;
+    out.push({
+      tool,
+      input_summary: summarizeMcpToolInput(params['arguments']),
+      result_summary: summarizeMcpToolResult(result),
+      at,
+    });
+  }
+  return out;
+}
+
+/** The default capture: a per-run reverse proxy in front of the ECHO MCP URL. */
+export function createHttpRetrievalCapture(): RetrievalCapture {
+  return {
+    async start(_runId, upstreamMcpUrl): Promise<RetrievalCaptureSession> {
+      const upstream = new URL(upstreamMcpUrl);
+      const retrievals: RetrievalRecord[] = [];
+      let fatalError: string | undefined;
+
+      const server: HttpServer = createHttpServer((creq, cres) => {
+        const chunks: Buffer[] = [];
+        creq.on('data', (c: Buffer) => chunks.push(c));
+        creq.on('end', () => {
+          const requestBody = Buffer.concat(chunks);
+          const headers: IncomingHttpHeaders = { ...creq.headers, host: upstream.host };
+          const upstreamPath = `${upstream.pathname}${new URL(creq.url ?? '/', 'http://x').search}`;
+          const ureq = httpRequest(
+            {
+              protocol: upstream.protocol,
+              hostname: upstream.hostname,
+              port: upstream.port,
+              method: creq.method,
+              path: creq.url && creq.url !== '/' ? creq.url : upstreamPath,
+              headers,
+            },
+            (ures) => {
+              cres.writeHead(ures.statusCode ?? 502, ures.headers);
+              const rchunks: Buffer[] = [];
+              ures.on('data', (c: Buffer) => {
+                rchunks.push(c);
+                cres.write(c);
+              });
+              ures.on('end', () => {
+                cres.end();
+                try {
+                  const found = extractRetrievalsFromExchange(
+                    requestBody.toString('utf8'),
+                    Buffer.concat(rchunks).toString('utf8'),
+                    new Date().toISOString(),
+                  );
+                  retrievals.push(...found);
+                } catch {
+                  // recording is best-effort; a parse failure never breaks the
+                  // proxied call the child depends on.
+                }
+              });
+            },
+          );
+          ureq.on('error', (err) => {
+            fatalError = boundedReason(err.message);
+            if (!cres.headersSent) cres.writeHead(502);
+            cres.end();
+          });
+          ureq.end(requestBody);
+        });
+        creq.on('error', () => {
+          if (!cres.headersSent) cres.writeHead(400);
+          cres.end();
+        });
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+          server.removeListener('error', reject);
+          resolve();
+        });
+      });
+      const address = server.address();
+      if (address === null || typeof address === 'string') {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+        throw new Error('retrieval capture proxy failed to bind a port');
+      }
+      const proxyUrl = `http://127.0.0.1:${address.port}${upstream.pathname}`;
+
+      return {
+        childEnv: { ECHO_MCP_URL: proxyUrl },
+        async finish(): Promise<RetrievalRecord[]> {
+          if (fatalError !== undefined) {
+            throw new Error(`retrieval capture proxy error: ${fatalError}`);
+          }
+          return [...retrievals];
+        },
+        async close(): Promise<void> {
+          await new Promise<void>((resolve) => {
+            server.close(() => resolve());
+            server.closeAllConnections();
+          });
+        },
+      };
+    },
+  };
+}
+
+export interface RetrievalCaptureDeps {
+  capture?: RetrievalCapture;
+  runBrain?: (question: string, options: BrainRunOptions) => Promise<BrainResult>;
+  now?: () => string;
+  newRunId?: () => string;
+}
+
+export interface CapturedBrainRun {
+  result: BrainResult;
+  run: ClassifierRunRecord;
+}
+
+/**
+ * Run the brain with retrieval capture, returning both the brain answer and a
+ * `ClassifierRunRecord` (AC2). Capture is fail-soft: if the proxy cannot start
+ * or errors, the run still completes and the record reports `capture_failed`
+ * with an error summary — the brain never blocks on observability.
+ */
+export async function runBrainWithRetrievalCapture(
+  question: string,
+  options: BrainRunOptions,
+  deps: RetrievalCaptureDeps = {},
+): Promise<CapturedBrainRun> {
+  const now = deps.now ?? (() => new Date().toISOString());
+  const runId = deps.newRunId?.() ?? randomUUID();
+  const brainRunner = deps.runBrain ?? runBrain;
+  const capture = deps.capture ?? createHttpRetrievalCapture();
+  const upstream =
+    options.env?.['ECHO_MCP_URL'] ?? process.env['ECHO_MCP_URL'] ?? DEFAULT_ECHO_MCP_URL;
+  const startedAt = now();
+
+  let session: RetrievalCaptureSession | null = null;
+  let startError: string | undefined;
+  try {
+    session = await capture.start(runId, upstream);
+  } catch (err) {
+    startError = boundedReason(err instanceof Error ? err.message : String(err));
+  }
+
+  const childEnv =
+    session !== null ? { ...options.env, ...session.childEnv } : options.env;
+  const result = await brainRunner(question, {
+    ...options,
+    ...(childEnv === undefined ? {} : { env: childEnv }),
+  });
+  const completedAt = now();
+  const base = {
+    run_id: runId,
+    binding: options.brain,
+    started_at: startedAt,
+    completed_at: completedAt,
+  };
+
+  if (session === null) {
+    return {
+      result,
+      run: {
+        ...base,
+        capture_status: 'capture_failed',
+        capture_error: startError ?? 'retrieval capture failed to start',
+      },
+    };
+  }
+
+  let run: ClassifierRunRecord;
+  try {
+    const retrievals = await session.finish();
+    run =
+      retrievals.length > 0
+        ? { ...base, capture_status: 'ok', retrievals }
+        : { ...base, capture_status: 'zero_retrievals' };
+  } catch (err) {
+    run = {
+      ...base,
+      capture_status: 'capture_failed',
+      capture_error: boundedReason(err instanceof Error ? err.message : String(err)),
+    };
+  } finally {
+    await session.close().catch(() => undefined);
+  }
+  return { result, run };
 }
