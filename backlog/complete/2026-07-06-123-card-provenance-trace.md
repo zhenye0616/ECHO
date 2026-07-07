@@ -10,6 +10,50 @@ claimed_at: "2026-07-07T00:00:00Z"
 branch: "agent/card-provenance-trace"
 head_sha: "e27eebd7b6321c519b7a5182e5a92b78ae53ab15"
 pr_url: ""
+review_notes: |
+  Merged on 2026-07-06 via founder reconciliation (pre-approved clean-path run).
+
+  Conflicts resolved:
+  - none: clean merge --no-ff; main moved only by the review-sidecar commit
+    (572141eb) since branch point; zero file overlap. Branch tip
+    e27eebd7b6321c519b7a5182e5a92b78ae53ab15 matched the item's head_sha exactly.
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Founder ratification: src/enrich/granola-intake-seed-store.ts was edited
+  outside the item's PROVISIONAL files_to_modify, but the edit is mandated by
+  AC1's literal text ("the seed record gains a persisted card_atom_status field
+  … written in the same seed-store update" — the record type + markPosted live
+  only in this file; new markPosted arg is optional, no caller breaks). Ratified
+  via this merge under the item-121 package.json precedent. The sidecar's second
+  builder flag (AC2 recording-proxy capture mechanism, AC2's sanctioned option 2)
+  is likewise accepted.
+
+  Fixups applied:
+  - none (sidecar listed no pre-merge fixups).
+
+  Fixups deferred to follow-up items:
+  - none.
+
+  Verify (observed in the ephemeral merger worktree, post-merge):
+  - npm test: 2078 passed / 21 skipped / 1 todo, 0 failures. The
+    tests/cli/shell-reachable.test.ts flake did NOT fire (passed in-suite); the
+    founder-authorized isolation re-run rule was not needed.
+  - npm run lint: clean (exit 0). npm run typecheck: clean (exit 0).
+  - tools/review-queue/check-coupled-invariants.sh: OK. tools/sync-skills.sh
+    --check: OK (all adapters match canonical).
+
+  Follow-up items (non-blocking) — appended to backlog/_followups.md, tagged
+  [123 follow-up]:
+  - add error-event handlers on ures/cres streams in createHttpRetrievalCapture
+    (brain.ts:1005-1012) — unhandled EPIPE after brain-child timeout kill could
+    crash the enrich worker.
+  - document the proxy-bypass blind spot (child MCP config hardcoding the daemon
+    URL records fake zero_retrievals) when promoting the mechanism to the wiki
+    house pattern.
+  - optional: seed-store-by-note listing in trace --note mode for pre-123 notes.
+  - optional: dedupe_key existence check before card-atom append to close the
+    markPosted-throw retry double-atom edge.
 agent_notes: |
   Done. All 5 ACs implemented; typecheck + lint clean; full suite 2078 passed /
   21 skipped / 1 todo, 0 failures (shell-reachable flake did not fire).
