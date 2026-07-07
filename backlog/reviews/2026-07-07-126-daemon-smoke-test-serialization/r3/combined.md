@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`needs R4` — the r2 patches (4711c4b2: AC1 race-safe port, run-log path) verified clean: both reviewers `proceed` with zero findings against 81bf2a18. On review MERIT this is claim-ready. BUT a mechanical frontmatter-validator fix must ride a patch before promotion: the spec's `priority: MEDIUM` trips `tools/blocked.py` (requires HIGH/MED/LOW) with a global RC=2 abort of the builder selector, so it is changed to `priority: MED` (spec-r3-patches 4ff3c5ac). Because 126 is a proposed-stage artifact, the verification-waiver (branch c) is structurally cut — any content patch forces a branch (b) verification round — so this one-line change dispatches R4 rather than promoting now. No AC/behavior change; R4 verifies only the frontmatter value.
 
