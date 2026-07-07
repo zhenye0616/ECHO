@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers returned `proceed` with zero findings at the r1-patched spec (6daad276: AC4 parseability-scoped retroactivity + fallback test; AC5 concrete commands with named tolerated flakes). The emitted_at-anchor semantics survived verification untouched. Spec is claim-ready — audit finding #1 fix, founder-approved small-scope.
 

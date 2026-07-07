@@ -15,6 +15,7 @@ files_to_modify:
   # PROVISIONAL
   - src/coord/deadlines.ts
   - tests/coord/                                    # missing-expected_by-across-restart coverage
+ready_content_sha: fc1a16c0707cabecf6d745191cd0a563db6923ca494994a247fd238b72828eb7
 ---
 
 ## Problem
