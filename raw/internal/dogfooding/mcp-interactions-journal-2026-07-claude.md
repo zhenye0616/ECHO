@@ -276,3 +276,29 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** 127 r2 went terminal in the same driving window via 044 AC4 single-reviewer auto-disposition (codex proceed / zero findings, codex-ops timed out past deadline, escalated_to_founder=false) — no coord_invoke there (terminal round has no next-round trigger). First time this driver hit the single-reviewer-timeout path; it promoted cleanly per protocol.
 - **Conjecture:** none
+
+### 2026-07-07 10:05 PDT — coord_invoke ×2 for 128 r2 (hotfix verification round)
+- **Trigger:** 128 r1 dispositioned (both reviewers caught the AC3 future-dated-clock falsifiability flaw; patched to past-dated); r2 dispatched
+- **Query inputs:** coord_invoke — codex + codex-ops, request_path=backlog/reviews/2026-07-07-128-intake-cutoff-injectable-clock/r2/request.md; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only. Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
+
+### 2026-07-07 10:20 PDT — coord_invoke ×2 for 128 r3 (mechanical path-pin verification)
+- **Trigger:** 128 r2 dispositioned (codex-ops proceed; codex one mechanical placeholder-path finding, patched); r3 dispatched
+- **Query inputs:** coord_invoke — codex + codex-ops, request_path=backlog/reviews/2026-07-07-128-intake-cutoff-injectable-clock/r3/request.md
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only. Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
+
+### 2026-07-07 11:05 PDT — propose_decision x3 SUCCESS — first live decision cards posted to Slack (station 4 opens)
+- **Trigger:** founder configured the Slack workspace app (Socket Mode + bot token + confirm channel); strategist synced env into the daemon plist and re-fired the three staged drafts from the 2026-07-06 fail-closed attempt
+- **Query inputs:** 3x propose_decision {subject, decision, rationale, source_app=claude-code}; same three redacted subjects as the 2026-07-06 20:42 entry (client alert-scope, alert delivery-flow, context-layer atoms)
+- **Returned:** 3x {status: draft_posted, draft_id: b7bf86a3/fd932c54/9def7cd2, confirm_target: C0BFRT0E9L2}
+- **Sources:** n/a — write-path tool; drafts persisted to ~/.echo/state/team-decision-drafts.json, cards posted to the Slack confirm channel; confirm leg = local Socket Mode responder (slack_socket_open at 17:57:17Z)
+- **Verdict:** ✅ right
+- **Note:** two setup landmines en route: (1) launchd `kickstart -k` does NOT reload plist EnvironmentVariables — the daemon kept the old env and propose_decision still fail-closed; required `bootout` + `bootstrap` (and an explicit kickstart after, since RunAtLoad + last-exit-0 left it unstarted); (2) founder's confirm target and responder allowlist were two different channel ids — allowlist now carries both. Awaiting human Confirm clicks to complete the propose→confirm→derived:team-decisions loop.

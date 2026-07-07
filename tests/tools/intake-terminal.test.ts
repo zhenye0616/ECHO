@@ -175,6 +175,7 @@ describe('runIntakeTerminalOnce (AC6)', () => {
       classify,
       env: EMPTY_ENV,
       out: first.out,
+      now: () => '2026-06-30T10:06:00.000Z',
     });
     expect(code1).toBe(0);
     expect(cardCount(first.lines)).toBe(1);
@@ -187,6 +188,7 @@ describe('runIntakeTerminalOnce (AC6)', () => {
       classify,
       env: EMPTY_ENV,
       out: second.out,
+      now: () => '2026-06-30T10:06:00.000Z',
     });
     expect(code2).toBe(0);
     expect(cardCount(second.lines)).toBe(0);
@@ -208,6 +210,7 @@ describe('runIntakeTerminalOnce (AC6)', () => {
       },
       env: EMPTY_ENV,
       out,
+      now: () => '2026-06-30T10:06:00.000Z',
     });
 
     expect(code).toBe(0);
@@ -233,6 +236,7 @@ describe('runIntakeTerminalOnce (AC6)', () => {
       classify: stubClassify({ request: 'Add amendment alerts' }),
       env: EMPTY_ENV,
       out,
+      now: () => '2026-06-30T10:06:00.000Z',
     });
 
     expect(code).toBe(0);
