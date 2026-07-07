@@ -276,3 +276,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** 127 r2 went terminal in the same driving window via 044 AC4 single-reviewer auto-disposition (codex proceed / zero findings, codex-ops timed out past deadline, escalated_to_founder=false) — no coord_invoke there (terminal round has no next-round trigger). First time this driver hit the single-reviewer-timeout path; it promoted cleanly per protocol.
 - **Conjecture:** none
+
+### 2026-07-07 10:05 PDT — coord_invoke ×2 for 128 r2 (hotfix verification round)
+- **Trigger:** 128 r1 dispositioned (both reviewers caught the AC3 future-dated-clock falsifiability flaw; patched to past-dated); r2 dispatched
+- **Query inputs:** coord_invoke — codex + codex-ops, request_path=backlog/reviews/2026-07-07-128-intake-cutoff-injectable-clock/r2/request.md; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only. Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
