@@ -468,3 +468,8 @@ Parked (unchanged): [122 post-ship] dashboard-v2 candidates (founder-usage gate)
 Dropped: [118] revert 4 incidental prettier reformats (cosmetic, no reader confusion observed); [119] 'deferred' counter doc polish (log keys already distinguish; wiki delivery-semantics section shipped without confusion).
 
 Process lessons folded to R6.merge_mechanics: [119] verify brace balance after keep-both conflict splicing (common-suffix hoist).
+
+## 125 merge follow-ups (2026-07-07, non-blocking)
+
+- [125 follow-up] optional: e2e `--note` test through `runTraceCard` without an override, to pin the enumerate wiring directly.
+- [125 follow-up] optional: revisit the AC3 guard query if card-atom volume ever makes the per-emit full-source scan matter.
