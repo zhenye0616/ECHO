@@ -443,28 +443,18 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - 2026-07-05 (from 116 merge review): intake-terminal real-path status line hardcodes "0 classifier errors" (counting wrapper cannot wrap the bridge-internal classifier) — drop the field on that path or plumb the count later.
 - 2026-07-05 (from 116 merge review): invalid brain-name env (e.g. ECHO_CEO_BRAIN=foo) exits via bare main().catch stderr message instead of the "skipped:" status-line format (tools/intake-terminal.ts:300,358).
 - 2026-07-05 (from 116 merge review): enrich JSON logs interleave with intake-terminal cards on stdout — consider stderr diversion for demo cleanliness; pair with item 117 observability.
-- 2026-07-05 (from 116 merge review): undocumented load-flake tests/surfaces/ceo-slack-brain.test.ts "kills a timed-out brain process group" (ENOENT descendant.pid under suite load; 18/18 in isolation) — track alongside the shell-reachable flake.
-- [120 follow-up] optional hardening: heartbeat write on uncaught runInner() throw
-- [120 follow-up] wire 117 doctor loop section to consume the heartbeat contract (117 AC3 follow-up)
-- [119 follow-up] doc polish: 'deferred' counter aggregates cap-overflow + proven-rejection deferrals (log keys distinguish)
-- [119 follow-up] merge-protocol lesson: verify brace balance after keep-both conflict splicing (common-suffix hoist)
-- [118 follow-up] optional cosmetic: revert 4 incidental prettier reformats in decision-drift.ts
-- [118 follow-up] collect week-1 statements_no_candidate near-miss logs as alias-table decision input
-- [118 follow-up] wiki drift-alert update: nominate-then-confirm join (strategist)
-- [122 loop observation, driver-122] reviewer request-selection doesn't skip rounds on completed/merged items — stale rounds (e.g. 057b/r9, 110/r2) sort ahead of live rounds in the glob; harmless today only because they have combined.md. Friction item if it ever selects a stale round.
-- [121 follow-up] docs-awareness: canonical intake-terminal invocation is `npm run intake:terminal` (or `vite-node --script tools/intake-terminal.ts`); bare `vite-node tools/intake-terminal.ts` no longer launches, by design (argv[1] carries the script path only under --script) — fold into the 116 wiki note at promotion.
-- [121 follow-up] optional: audit sibling tools/ entry guards for the VITEST antipattern (`process.env.VITEST === undefined` auto-main) — only if it recurs.
-- 2026-07-06 (from stations-1-4 live check with new doctor): station-2 staleness heuristic false-alarms on quiet days — worker logs worker_ok every 5 min (notes_seen=20, extracted=0) but only touches the checkpoint file when it extracts, so checkpoint-mtime read "stale (460 min)" while the worker was demonstrably alive 3 min earlier. Confirms 117's After-Completion candidate: worker-written heartbeat (touch checkpoint or last_tick_at field on every tick), then tighten doctor's stale flag.
-- 2026-07-06 (from stations-1-4 live check with new doctor): station-1 per-class rows claude-code:/codex:/cursor: are phantom classes — prod store has NO such prefixes (AI-session capture lands under fs:); rows render count=0 implying broken capture that isn't broken, and coord: (18k events) is silently omitted. Derive the class list from actual distinct source prefixes (or annotate phantom rows as "no such source class in store").
-- [122 follow-up] esc() the counters segment in heartbeatLine (tools/loop-dashboard.ts:585-586) for HTML-escaping consistency (cosmetic, localhost-only exposure).
-- [122 follow-up] optional comment: a timed-out doctor computation is abandoned-not-cancelled (single-flight guards new starts, not stragglers).
-- [122 follow-up] optional AC4 test variant with a PRESENT db (belt-and-braces; doctor's SELECT-only behavior already covered by 117 tests).
-- [122 follow-up] flaky-under-load: tests/cli/shell-reachable.test.ts fails in full-suite runs on port contention while passing in isolation — recurring signal, consider serializing or porting off the fixed test port.
-- [122 post-ship] dashboard-v2 candidates PARKED pending founder usage: coordination-loop panel / station drill-down / actionable fix hints — founder will use v1 first, expand from observed friction (2026-07-06)
-- [117 bug, found via 122 dashboard] doctor LOOP_CAPTURE_SOURCE_CLASSES expects claude-code:/codex:/cursor: source prefixes but the session extractors emit fs:-prefixed atoms (claude-code.ts:596) — station-1 rows for those sources read "0 atoms" forever by construction; either attribute extractor atoms to their own class or drop the dead rows (2026-07-06)
-- [123 follow-up] add error-event handlers on ures/cres streams in createHttpRetrievalCapture (brain.ts:1005-1012) — unhandled EPIPE after brain-child timeout kill could crash the enrich worker
-- [123 follow-up] document the proxy-bypass blind spot (child MCP config hardcoding the daemon URL records fake zero_retrievals) when promoting the retrieval-capture mechanism to the wiki house pattern
-- [123 follow-up] optional: seed-store-by-note listing in trace --note mode for pre-123 notes
-- [123 follow-up] optional: dedupe_key existence check before card-atom append to close the markPosted-throw retry double-atom edge
-- [117 follow-up, surfaced by wiki pass] doctor station-2 disable is STILL inferred, not observed — item 120's heartbeat contract is unconsumed by src/cli/ (zero worker-heartbeat refs; STATION2_DISABLE_INFERENCE_NOTE unchanged at doctor.ts:673); wire buildLoopStation2 to read worker heartbeats (117's own named follow-up, never filed)
-- [123 follow-up, live-trace finding] trace-card seed lookup reads the default seed store only — terminal-channel cards print "(no seed record)" though the seed exists in granola-intake-seeds.terminal.json; resolve the store from the card atom's channel_id (or accept --seed-store), else the card_atom_status provenance-loss banner can never fire for terminal cards
+## Sweep 2026-07-07 (strategist, post-116-123 shipping run)
+
+The 2026-07-05/06 tail (25 bullets) dispositioned. Promoted to specs:
+
+- **backlog/proposed/2026-07-07-124-doctor-loop-report-truth.md** absorbs: wire doctor to the 120 heartbeat contract (117 AC3 follow-up, was listed twice), station-2 quiet-day staleness false-alarm (2026-07-06 live check), station-1 phantom source classes claude-code:/codex:/cursor: + silent coord: omission (listed twice: live check + 122-dashboard finding).
+- **backlog/proposed/2026-07-07-125-observability-hardening-batch.md** absorbs: trace-card channel seed-store gap (123 live-trace finding — provenance-loss banner can't fire for terminal cards), brain.ts proxy EPIPE handlers, card-atom double-append edge, --note pre-123 seed listing, heartbeatLine esc(), abandoned-not-cancelled comment, present-db AC4 test variant.
+- **backlog/proposed/2026-07-07-126-daemon-smoke-test-serialization.md** absorbs: shell-reachable full-suite port-contention flake (bit 116/121/122-build merges), ceo-slack-brain descendant.pid load flake (2026-07-05 entry above).
+
+Done (closed by the 2026-07-06 wiki promotion pass, commit dd4e3cb8): [118] wiki drift-alert nominate-then-confirm update; [121] canonical-invocation docs fold into the terminal-intake-card page; [123] proxy-bypass blind-spot documented in loop-observability.
+
+Parked (unchanged): [122 post-ship] dashboard-v2 candidates (founder-usage gate); [121] sibling entry-guard audit (only-if-recurs); [118] week-1 statements_no_candidate near-miss collection (time gate, week of 2026-07-06); [122 loop observation] reviewer request-selection doesn't skip completed items' stale rounds (R6-shaped; harmless until it selects one — file as spec if it bites).
+
+Dropped: [118] revert 4 incidental prettier reformats (cosmetic, no reader confusion observed); [119] 'deferred' counter doc polish (log keys already distinguish; wiki delivery-semantics section shipped without confusion).
+
+Process lessons folded to R6.merge_mechanics: [119] verify brace balance after keep-both conflict splicing (common-suffix hoist).
