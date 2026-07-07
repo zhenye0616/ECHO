@@ -22,6 +22,7 @@ files_to_modify:
   - package.json                              # npm script trace:card → vite-node --script tools/trace-card.ts
   - tests/enrich/                             # card-atom emission + retrieval-correlation coverage
   - tests/tools/                              # trace surface coverage
+ready_content_sha: 51796c4896cd469e9e0b42bce83ec258aa8c7e941988ada2b8fcda9dbaf3d93e
 ---
 
 ## Problem

@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers returned `proceed` with zero findings at the r1-patched spec (spec-r1-patches b66cf2b0, reviewed at c4e0172a). The r1 hardening (durable card_atom_status marker non-maskable by reruns; tri-state capture_status with pinned record shape; trace renders all three states + provenance-loss banner; AC5 coverage per state) converged in one verification round. No open findings; spec is claim-ready.
 
