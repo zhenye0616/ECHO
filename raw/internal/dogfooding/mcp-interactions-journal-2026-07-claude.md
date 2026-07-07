@@ -258,3 +258,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** —
 - **Conjecture:** none
+
+### 2026-07-07 00:30 PDT — coord_invoke ×8 for 124–127 r2 verification rounds (followup-sweep review loop)
+- **Trigger:** review-loop driver combined r1 for all four followup-sweep specs, dispositioned findings (all falsifiability/scope hardening, no escalations), patched each spec, and fired the 057b active-trigger for the r2 verification round of each
+- **Query inputs:** coord_invoke — roles codex + codex-ops for each of backlog/reviews/2026-07-07-{124-doctor-loop-report-truth,125-observability-hardening-batch,126-daemon-smoke-test-serialization,127-packaged-tarball-import-closure}/r2/request.md; correlation_ids d1574be1 / ebe8d866 / ef8ad4de / 77a6b578; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 8/8 accepted (each returned schema_version:1 + reviewer_invoked_id + wrapper_path); no error payloads
+- **Sources:** daemon coord layer only (invocation-type calls, no retrieval). Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** r1 turnaround was fast — 124 r2 and 125 r2 reviewers both responded and converged (proceed, zero findings) within the same driving session, so both promoted to ready/ before 126/127 r2 dispatch. One snag was queue-side not coord-side: 124's terminal git-add hit the known pathspec-atomicity abort (phantom proposed path) → 0-delta rename commit; caught via git show --stat, sealed in a follow-up commit.
+- **Conjecture:** none
