@@ -41,17 +41,42 @@ changes, no new persisted state.
   `import.meta` entry check (item 121 precedent — importing the module must
   never start the server; regression test required, same shape as 121's).
   Follows the `tools/serve-trace.ts` structure (node http, localhost). Binds
-  127.0.0.1 ONLY, port configurable via flag/env with a sensible default.
+  127.0.0.1 ONLY. Port resolves in this precedence: `--port <n>` flag, then
+  `ECHO_LOOP_DASHBOARD_PORT` env, then default `38480` (adjacent to
+  serve-trace's 38479; no other named constant may define it). A port that is
+  non-numeric, <1, or >65535 is a fatal startup error: print a one-line
+  diagnostic to stderr and exit non-zero — never silently fall back to the
+  default. (r1 codex F1.)
 - **AC2 — data endpoint:** `GET /api/status` returns one JSON document
-  assembled from existing sources: (a) the doctor loop report — reuse the
-  exported report-building function from `src/cli/commands/doctor.ts` if one
-  exists, else spawn `node dist/cli/index.js doctor --json` as a child (builder
-  judgment; document the choice and its dist-staleness implication in a
-  comment); (b) every `worker-heartbeat-*.json` read via 120's exported
-  path/type contract (malformed file → per-worker error entry, never a crash);
-  (c) a `generated_at` timestamp. Computation is throttled: refreshes more
-  frequent than a named-constant minimum (default 10s) serve the cached
-  document.
+  assembled from existing sources: (a) the doctor loop report — `doctor.ts`
+  exports in-process builders (`buildDoctorReport(opts)` /
+  `buildLoopReport(...)`), so **in-process reuse is the primary path**; the
+  `node dist/cli/index.js doctor --json` child is a fallback only, and if it is
+  used it (i) runs with the same `ECHO_HOME` the server resolved, (ii) is
+  bounded by a named-constant timeout, and (iii) is fail-soft — a missing or
+  stale `dist`, a nonzero exit, a hung child (timeout), or unparseable output
+  each map to a degraded doctor section in the response, never a thrown crash, a
+  500, or a hang. Whichever path the builder picks, the dist-staleness
+  implication is documented in a comment. (r1 codex F3, codex-ops F5.) (b) every
+  `worker-heartbeat-*.json` read via 120's exported path/type contract
+  (malformed file → per-worker error entry, never a crash); (c) a `generated_at`
+  timestamp. Computation is throttled: refreshes more frequent than a
+  named-constant minimum (default 10s) serve the cached document, and
+  recomputation is **single-flight** — a poll arriving while a computation is in
+  flight receives the last cached document (with a `stale: true` / in-flight
+  marker) rather than starting a second doctor computation or child process; no
+  unbounded process pileup is possible. (r1 codex-ops F6.)
+
+  The response is a single top-level JSON object with a stable shape (r1 codex
+  F2): `generated_at` (ISO string); `cache` (`{ stale: boolean, age_ms: number,
+  computed_at: string }`); `serving` (`{ classification, staleness }` from the
+  doctor loop report — carries dist-stale/src-dev identity); `stations` keyed by
+  station id (`"1"`,`"2"`,`"3"`,`"4"`,`"6"`), each `{ status, ...station-specific
+  fields }` where `status` reuses doctor's vocabulary (`ok | degraded |
+  disabled`, plus `unknown` for the fail-soft doctor case); and `heartbeats` as
+  a map of worker name → the 120 `WorkerHeartbeat` shape OR
+  `{ error: <string> }` for a malformed/missing file. The AC5 shape test pins
+  this contract.
 - **AC3 — the page:** `GET /` returns ONE self-contained HTML page (inline
   CSS/JS, zero external requests) that polls `/api/status` on a named-constant
   interval (default 15-30s) and renders the loop as stations: 1 capture
@@ -62,18 +87,30 @@ changes, no new persisted state.
   (team-decision count), 6 drift (heartbeat status incl. disabled reason, last
   sweep counters when present), plus serving-code identity + dist staleness.
   Status semantics reuse doctor's ok/degraded/disabled vocabulary; degraded and
-  hard faults must be visually unmissable. Both a working and a broken loop
+  hard faults must be visually unmissable. A fail-soft doctor section (missing/
+  stale dist, timed-out or crashed child, unparseable output — the AC2 cases)
+  renders as an unmissable degraded/unknown state on the page, never a blank or
+  error-swallowed panel. (r1 codex-ops F5.) Both a working and a broken loop
   must be readable at a glance.
 - **AC4 — strictly read-only:** the tool writes NOTHING: no seed stores, no
   checkpoints, no heartbeats, no db writes (storage opened read-only), no MCP
   calls, no network beyond serving localhost. A test asserts a full
   status-compute cycle against a scratch ECHO_HOME leaves the filesystem
-  byte-identical.
+  byte-identical. The test exercises **whichever doctor path the builder
+  actually ships** — if the child fallback is wired, the no-write test drives it
+  with the child rooted at the scratch ECHO_HOME; if the child path cannot be
+  proven read-only under this test, the builder must use in-process reuse
+  instead (which `buildDoctorReport`/`buildLoopReport` make available). (r1
+  codex F3, codex-ops F4.)
 - **AC5 — tests:** fixture-driven (scratch ECHO_HOME, fabricated heartbeats +
-  doctor inputs or an injected report function): /api/status shape stable and
-  cached-vs-fresh behavior; page serves; degraded/disabled states render
-  distinguishably; the AC1 import-guard regression test; the AC4 no-write
-  test. No live daemon required by any test.
+  doctor inputs or an injected report function): /api/status shape stable
+  against the AC2 top-level contract and cached-vs-fresh behavior; single-flight
+  under overlapping in-flight polls (no second computation/child spawned); the
+  fail-soft doctor cases (missing/stale dist, timeout, nonzero exit, parse
+  failure) each produce a degraded-not-crashed response; page serves;
+  degraded/disabled states render distinguishably; the AC1 import-guard
+  regression test AND the AC1 invalid-port fatal-exit test; the AC4 no-write
+  test against the shipped doctor path. No live daemon required by any test.
 
 ## Out of Scope (Don't Drift)
 
