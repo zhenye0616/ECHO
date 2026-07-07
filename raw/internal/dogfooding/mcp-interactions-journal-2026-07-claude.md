@@ -302,3 +302,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Sources:** n/a — write-path tool; drafts persisted to ~/.echo/state/team-decision-drafts.json, cards posted to the Slack confirm channel; confirm leg = local Socket Mode responder (slack_socket_open at 17:57:17Z)
 - **Verdict:** ✅ right
 - **Note:** two setup landmines en route: (1) launchd `kickstart -k` does NOT reload plist EnvironmentVariables — the daemon kept the old env and propose_decision still fail-closed; required `bootout` + `bootstrap` (and an explicit kickstart after, since RunAtLoad + last-exit-0 left it unstarted); (2) founder's confirm target and responder allowlist were two different channel ids — allowlist now carries both. Awaiting human Confirm clicks to complete the propose→confirm→derived:team-decisions loop.
+
+### 2026-07-07 11:00 PDT — coord_invoke ×2 for 129 r2 (deadline-anchor verification round)
+- **Trigger:** 129 r1 dispositioned (codex 2 falsifiability findings patched; codex-ops proceed); r2 dispatched
+- **Query inputs:** coord_invoke — codex + codex-ops, request_path=backlog/reviews/2026-07-07-129-deadline-anchor-emitted-at/r2/request.md
+- **Returned:** 2/2 HTTP 200 accepted
+- **Sources:** daemon coord layer only. Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** —
+- **Conjecture:** none
