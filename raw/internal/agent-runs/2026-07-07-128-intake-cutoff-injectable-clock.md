@@ -96,3 +96,86 @@ None blocking. Two follow-ups noted for the strategist (both pre-existing in the
 ### Drift events
 
 None. The temptation to fix the second fuse and to grep-audit the broader class was resisted (out of scope); reported as INFO/follow-up per the item's own "Out of Scope" and the team lead's INFO-ONLY instruction.
+
+---
+
+## Run 2 (2026-07-07) — founder-ratified extension: defuse the 2026-07-30 second fuse
+
+### Context — reclaim after a crossed handoff
+
+Run 1 completed and handed off to `pending_review` (state-commit `9de02245`,
+head_sha `78511aaa…`). The team lead then sent a founder-ratified EXTENSION to
+the same deviation (framed as "still pre-handoff, not a rider") — it had crossed
+the handoff in flight. Per the "riders-after-handoff break head_sha" rule, I did
+NOT silently append. I performed a protocol-correct **reclaim**: `git mv
+pending_review/ → claimed/` on main (reclaim commit `4799946e`), applied the
+extension on the branch, re-gated, and re-handed-off with a NEW head_sha. No
+reviewer had touched the item, so the reclaim was clean.
+
+### What implemented — extension
+
+The Run 1 INFO-ONLY audit found a second fuse: 2026-06-30 fixtures through the
+30d default lookback detonate ~2026-07-30 in the bridge tests that do NOT inject
+`deps.now`. Applied the SAME treatment as the AC2 injection: add
+`now: () => '2026-06-30T10:06:00.000Z'` to each detonating test's deps. No
+fixture or assertion changes.
+
+**Census (builder-verified, not just the dispatch's line numbers).** Grepped all
+of `tests/` for `2026-06-30` × bridge invocation. The cutoff fuse hits exactly
+the 3 dispatched files. Excluded, with reasons:
+- `tests/enrich/worker-heartbeat.test.ts` — invokes the bridge but ALREADY
+  injects `now` (2026-07-06 values) → robust, no edit.
+- `tests/tools/trace-card.test.ts`, `tests/surfaces/ceo-slack-responder/{intake-seed,issue-provenance}.test.ts`
+  — use the 2026-06-30 fixture but never invoke the bridge → no cutoff exposure.
+
+**One MORE detonating case than the dispatch's census.** The dispatch named 3
+default-baseConfig sub-cases in `granola-intake-candidates.test.ts`; there are
+**four**. `records a failed post and reports it` (asserts `failed: 1`) also needs
+the note in-window to reach the throwing `postSeed`, so it detonates 2026-07-30
+identically. Injected `now` into all four. Correctly left alone: the internal-only
+test (`produces zero candidates for an internal-only meeting` — asserts
+`notes_seen: 0` via the attendee filter, robust either way) and the
+lookback-override test (`respects the lookback bound` — 2020 fixture + 24h
+lookback, filtered by design).
+
+### Files modified (Run 2)
+
+- `tests/enrich/granola-intake-candidates.test.ts` — `now` into 4 deps
+  (`classifies…`, `caps candidates per note`, `skips already-posted`,
+  `records a failed post`).
+- `tests/daemon/granola-intake-schedule.test.ts` — `now` into the
+  `startGranolaIntakeBridge` options of `runs the bridge after signal extraction`
+  (the options type already exposes `now`, which flows to `deps.now`).
+- `tests/enrich/granola-intake-card-atom.test.ts` — `now` into all 5 bridge
+  tests (3 identical `const deps` via one replace-all + 2 inline calls).
+- `raw/internal/agent-runs/2026-07-07-128-intake-cutoff-injectable-clock.md` —
+  this Run 2 section.
+
+10 injected lines total. Fixtures/assertions untouched. Branch
+`agent/intake-cutoff-injectable-clock` @ `7c209b643618657496558395dc1c9cdc406485d0`.
+
+### Why this is a genuine defuse (mechanism, not a re-run under a fake clock)
+
+The mechanism is identical to AC3's proven revert-check: after the AC1 product
+fix, the cutoff derives from `now()`; pinning `now` to `2026-06-30T10:06:00Z`
+keeps the fixed 2026-06-30 fixtures permanently inside any positive lookback.
+The test logs confirm the injected clock flows (`"now":"2026-06-30T10:06:00.000Z"`,
+`notes_seen: 1`). No wall-clock dependence remains in these paths.
+
+### Acceptance / gate (Run 2)
+
+- 3 extension files: `npx vitest run …candidates.test.ts …schedule.test.ts …card-atom.test.ts` → **18/18 passed**.
+- `npm run typecheck` → clean. `npm run lint` → clean.
+- `npm run test` → **1 failed / 2095 passed / 21 skipped / 1 todo (2118)**, 149s.
+  The single failure is the known pre-126 `tests/cli/shell-reachable.test.ts`
+  daemon-install port-contention load-flake; **isolated 1/1 pass** (23.6s).
+  `ceo-slack-brain` passed in this full run (it and shell-reachable are the two
+  named intermittent pre-126 load-flakes; both fixed by item 126, which is
+  blocked on this item). All intake tests green.
+
+### Net effect
+
+128 now defuses the ENTIRE known calendar for this fixture class: the 2026-07-07
+fuse (AC2, Run 1) and the 2026-07-30 fuse (this extension). The INFO-ONLY
+question is answered inline: the AC1 product fix alone does NOT defuse the
+30d-lookback tests (they didn't inject `now`); the extension does.

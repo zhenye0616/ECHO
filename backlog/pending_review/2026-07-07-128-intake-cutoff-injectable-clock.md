@@ -25,8 +25,12 @@ files_to_modify:
   - src/enrich/granola-intake-candidates.ts
   - tests/enrich/granola-intake-cutoff-clock.test.ts   # NEW: the AC3 regression test (exact path pinned per r2)
   - tests/tools/intake-terminal.test.ts   # FOUNDER-RATIFIED widen (via team lead, 121/123/124 precedent): AC2's premise was wrong — only AC6.1 injected `now`; AC6.2/6.3a/6.3b did not. Added the fixed-`now` injection to those 3 (4 lines); fixtures untouched. See agent_notes + run log.
+  # Run 2 — founder-ratified EXTENSION (same deviation) to defuse the 2026-07-30 second fuse (30d-lookback tests with 2026-06-30 fixtures, no injected now). Same fixed-`now` injection; fixtures/assertions untouched.
+  - tests/enrich/granola-intake-candidates.test.ts   # `now` into 4 default-baseConfig tests (classifies / caps / skips-already-posted / records-a-failed-post)
+  - tests/daemon/granola-intake-schedule.test.ts     # `now` into the startGranolaIntakeBridge options of the "runs the bridge after signal extraction" test
+  - tests/enrich/granola-intake-card-atom.test.ts    # `now` into all 5 bridge tests
 ready_content_sha: 9468ae741a3e550e6a4d732ca0a42ba652ceec4d27526dcebecc8ba996dcd725
-head_sha: "78511aaa2a2d82d373939c11d93d25a72effb8a4"
+head_sha: "7c209b643618657496558395dc1c9cdc406485d0"
 agent_notes: |
   DONE. AC1/AC2/AC3/AC4 all pass. Fast-track hotfix: the 4 red intake-terminal
   AC6 tests are green; full suite green modulo 2 known pre-126 load-flakes
@@ -59,7 +63,30 @@ agent_notes: |
   the second computed fuse. tests/enrich/granola-intake-candidates.test.ts has
   ZERO `now:` injections; its default-config (30d lookback, 2026-06-30 fixtures)
   bridge tests read the real wall clock and detonate ~2026-07-30 regardless.
-  Needs the follow-up item. Same class as the strategist grep-audit follow-up.
+  ADDRESSED in Run 2 (see below), not deferred.
+
+  RUN 2 — FOUNDER-RATIFIED EXTENSION (reviewer: read this). Founder-ratified (via
+  team lead) extension of the SAME deviation to defuse the 2026-07-30 second
+  fuse. It crossed my pending_review handoff in flight, so I did a
+  protocol-correct RECLAIM (pending_review→claimed, commit 4799946e) and
+  re-handoff with a NEW head_sha (7c209b64…) rather than a post-handoff rider.
+  Extension = same fixed-`now` injection (`2026-06-30T10:06:00.000Z`) into the
+  bridge tests that use 2026-06-30 fixtures through the 30d default lookback and
+  do NOT inject a clock: 4 tests in granola-intake-candidates.test.ts (I found
+  ONE more than the dispatch's 3-item census — `records a failed post` also
+  needs the note in-window), 1 in granola-intake-schedule.test.ts (via
+  startGranolaIntakeBridge options), 5 in granola-intake-card-atom.test.ts.
+  10 lines, fixtures/assertions untouched. Census-excluded with reasons in the
+  run log: worker-heartbeat (already injects now), trace-card +
+  ceo-slack-responder/{intake-seed,issue-provenance} (fixture present but no
+  bridge call), and the two by-design cases (internal-only notes_seen:0;
+  lookback-override 2020 fixture). Reviewer: verify the 10 additions change no
+  test semantics beyond pinning the previously-defaulted clock.
+
+  RUN 2 GATE: 3 extension files 18/18; typecheck clean; lint clean; `npm run
+  test` → 1 failed / 2095 passed (the 1 = shell-reachable pre-126 load-flake,
+  isolated 1/1 pass; ceo-slack-brain passed this full run). All intake tests
+  green. 128 now defuses the ENTIRE known calendar (2026-07-07 + 2026-07-30).
 ---
 
 ## Problem
