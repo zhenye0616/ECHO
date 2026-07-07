@@ -23,6 +23,49 @@ files_to_modify:
 ready_content_sha: 4e1f6278c7e77ddbd633d175305e9c5f431ff869ba36a0d591d17b72e020f968
 head_sha: "b366d758c8a846be26f9a3c916604eee53987a74"
 pr_url: ""
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation (clean-path, pre-approved).
+
+  Conflicts resolved:
+  - none — merge --no-ff was conflict-free; the 4 diffed files (package.json,
+    tests/packaging/import-closure.test.ts, tests/packaging/packaged-boot.test.ts,
+    tests/packaging/packed-manifest.test.ts) have zero overlap with main's 124/125
+    advance.
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar verdict "merge as-is", zero pre-merge fixups)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Root cause (verified at source): the packaged daemon crashed pre-health on
+  Windows because dist/mcp/server.js's guarded dynamic import of
+  propose-decision-tool.js resolves into the excluded ceo-slack-responder tree,
+  and the optional-module guard at src/mcp/server.ts:82-101 matches the missing
+  path with a forward slash while Windows ERR_MODULE_NOT_FOUND carries
+  backslashes — the guard misses, rethrows, daemon dies. This fix is
+  packaging-config only: re-including the 11-module transitive closure makes the
+  import resolve on every platform so the guard's absent-path branch is never
+  reached in a packaged install. The guard's backslash bug is DELIBERATELY left
+  unfixed (locked scope) and filed as a follow-up (backslash-tolerant guard match
+  in src/mcp/server.ts).
+
+  Verify: npm test = 2094 passed / 1 failed full-suite; sole failure
+  tests/cli/shell-reachable.test.ts (known full-suite-load flake) PASSES in
+  isolation (founder-authorized flaky rule; re-run green). lint clean, typecheck
+  clean, check-coupled-invariants OK, sync-skills --check OK.
+
+  AC4 (onboarding·windows-latest CI + validate-package·windows-latest release
+  green on real post-merge runs) remains an OPEN founder/watcher gate — not
+  satisfiable from the feature-branch handoff; verify post-merge.
+
+  Follow-up items (non-blocking, see backlog/_followups.md):
+  - backslash-tolerant guard match in src/mcp/server.ts (separator-agnostic).
+  - serialize/fixture-share the npm-pack-based packaging tests to remove the
+    packaged-boot full-suite prepack-race flake.
+  - AC4 founder/watcher gate: confirm the two Windows jobs go green on real runs.
 agent_notes: |
   Done on agent/packaged-tarball-import-closure @ b366d758c8a846be26f9a3c916604eee53987a74.
 
