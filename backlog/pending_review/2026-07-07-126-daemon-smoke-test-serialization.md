@@ -8,37 +8,49 @@ created: 2026-07-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-07T16:32:09Z"
 branch: "agent/daemon-smoke-test-serialization"
-head_sha: "aac5d2696f1332496d3e1bae0fd7d2de8264731d"
+head_sha: "09ffcd4a5a69132f8bb8d319aa3028cc3303e3b0"
 pr_url: ""
 agent_notes: |
-  ALL ACs MET. AC1 ✅ AC2 ✅ AC3 ✅ AC4 ✅. Re-handed off after the Run-1
-  escalation was cleared by item 128.
+  ALL ACs MET (re-handed off after review FIXUP + AC3 re-proof). AC1 ✅ AC2 ✅
+  AC3 ✅ AC4 ✅.
 
-  AC1 — race-safe daemon-smoke port: the TOCTOU `findFreePort`/`canListen` (bind
-  then hand the number to the daemon) is replaced by a bounded-retry loop where
-  the daemon's own `install` bind+health IS the allocation signal (retry a fresh
-  random port on failure, with cleanup; finally-cleanup guarded so it never
-  targets the production daemon). Fixed 47095 was already gone; port-0-report-back
-  needs product changes (plist-baked port) that AC4 forbids, so bounded-retry is
-  the AC4-safe path.
+  REVIEW FIXUP (this round): the reviewer caught shell-reachable flaking at the
+  stop→start step, which my earlier AC1 retry did not cover (it wrapped only
+  `daemon install`). Two test-file-only fixups:
+  (1) commit 685b26bb — bounded-retry the stop→start reachability check + raise
+      the packed-smoke timeout 75s→180s (the test measured 82s isolated and 136s
+      under full-suite load on this loaded box; 75s/120s were insufficient) +
+      fix the misleading retry-arithmetic comment.
+  (2) commit 09ffcd4a — the naive `daemon start` retry still thrashed (a run
+      failed with 5 attempts all "loaded but unhealthy"): launchd's bootout is
+      async, so retrying `start` races it and hits start()'s fast-return-1 with
+      no health window. Fixed by using `daemon restart` (synchronous bootout →
+      bootstrap = a real fresh ~10s health window each retry) + 500ms settle,
+      first attempt still `start`. The daemon's 10s health deadline is
+      product-hardcoded and not CLI-settable, so the test can only retry.
 
-  AC2 — ceo-slack-brain descendant.pid ENOENT: root-caused as a test-internal
-  timing race (200ms timeout vs Node cold-start + grandchild-spawn + pid write
-  under suite CPU load), not a product bug. Fixed via timeout 200→2000, killGrace
-  50→200, and a bounded pid-file poll (waitForFile); root cause documented in the
-  test file.
+  AC1 — race-safe install (bounded-retry on the daemon's own bind+health) AND
+  load-tolerant stop→start (restart+settle retries); TOCTOU findFreePort/
+  canListen removed; timeout 180s; finally-cleanup guarded (never targets the
+  production daemon, verified for the timeout path since spawnSync blocks the
+  event loop so all awaits are post-daemonPort-resolution).
 
-  AC3 — 5/5 green full-suite runs via exactly `npm run test` (163/176/163/171/189s;
-  2096 passed, 0 failed each; shell-reachable 64–74s under load, ceo-slack-brain
-  3.2–5.3s; no flake fired). Per-run timings in the run log's "Run 2" section.
-  DEPENDENCY: required item 128 (2026-07-07-128-intake-cutoff-injectable-clock,
-  merged at 89a06ff5) to land first — it removed the unrelated intake-terminal
-  date time-bomb that blocked AC3 in Run 1. This branch merged origin/main (with
-  128) cleanly; I did not touch 128's files.
+  AC2 — unchanged: ceo-slack-brain descendant.pid ENOENT fixed (timeout 200→2000,
+  killGrace 50→200, bounded pid-file poll); root cause documented in test file.
 
-  AC4 — no product code changed by this item; the one product defect found during
-  Run-1 diagnosis (intake cutoff keyed to real Date.now()) was escalated per AC4
-  and fixed by 128, not here. Full evidence in
+  AC3 — RE-PROVEN 5/5 green via exactly `npm run test`
+  (V1-V5: 154/157/158/155/161s; 2096 passed, 0 failed each; shell-reachable now
+  rock-solid 62-67s every run, no thrash/spike). Timings in run log "Run 3"
+  section. (Earlier dependency on item 128 — which killed the unrelated
+  intake-terminal date time-bomb, merged 89a06ff5 — still holds; branch has
+  128 merged in.)
+
+  AC4 — no product code touched. Out-of-scope observation flagged for strategist
+  (NOT fixed, drift-prevention): tests/coord/coord-volume-perf.test.ts (a
+  load-sensitive 300ms perf budget) flaked once at 445ms during a machine-load
+  spike (~7 leaked echo daemons kept system load ~100); it passed all five
+  V-runs and did not block the re-proof — same class as the packaged-boot
+  follow-up the reviewer already filed. Full evidence in
   raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md.
 blocked_by: []
 spec_refs:

@@ -219,3 +219,93 @@ was waved through.
 
 None.
 
+---
+
+## Run 3 (2026-07-07, review fixup) — AC3 RE-PROVEN after two fixups
+
+Independent review of the Run-2 handoff returned FIXUP REQUIRED: a reviewer's
+full-suite spot-check caught `shell-reachable` failing at the stop→start step
+(6 green / 1 fail across 7 runs) — a step my Run-1 AC1 retry did **not** cover
+(it wrapped only `daemon install`). Reclaimed (pending_review→claimed, reclaim
+commit `44d73ba1`) and applied two test-file-only fixups on
+`agent/daemon-smoke-test-serialization`.
+
+### Fixups applied (both in `tests/cli/shell-reachable.test.ts`)
+
+**Fixup 1 — load-tolerant stop→start + timeout headroom (commit `685b26bb`).**
+The stop→start sequence re-binds the resolved port via `daemon start`, whose
+one-shot ~10s health wait can lose the race under load. First pass: bounded-retry
+`daemon start`, raise the per-test timeout 75s→120s, and correct the misleading
+"6 attempts under 75s" arithmetic (the test already spends ~40-65s on
+build:cli + npm pack + global install). Empirical driver: the packed smoke
+measured **82s in isolation** under the machine's background load — it would have
+blown the old 75s cap even isolated. Raised the timeout to **180s** (commit
+folded in) after observing shell-reachable hit **136s** under full-suite load in
+a later run (and still pass) — 120s would have timed out; 180s gives the base run
++ retries genuine headroom.
+
+**Fixup 2 — restart+settle retries (commit `09ffcd4a`).** Fixup-1's naive
+`daemon start` retry still flaked once (a run failed with 5 attempts all "daemon
+is loaded but unhealthy"). Root cause: retrying `daemon start` THRASHES —
+launchd's bootout is async, so a retry frequently finds the job transiently
+"loaded but unhealthy" and `start()` fast-returns 1 with NO health window,
+burning the attempt. The daemon's ~10s health deadline (`waitForHealthy`) is
+hardcoded and NOT settable from the `echoctl daemon` CLI (only programmatically,
+e.g. init.ts uses 30s), so the test cannot extend it — it can only retry. Fix:
+first attempt stays `daemon start` (exercises the verb when healthy-fast); retries
+use `daemon restart` (boots out SYNCHRONOUSLY then bootstraps → a real fresh
+health window every time) with a 500ms settle so launchd finishes unloading
+before the next bootstrap. Bounded to 8 attempts; asserts only that the daemon
+ULTIMATELY serves on the resolved port, failing with a crafted message (not an
+opaque vitest timeout) if it genuinely never becomes healthy.
+
+Finally-guard verified for the timeout path: `spawnSync` blocks the event loop,
+so vitest's timer can only fire at an `await`, and every `await` in the test
+occurs AFTER `daemonPort` resolves — so the guarded `finally`
+(`if (daemonPort !== '')`) reliably runs cleanup and never targets the production
+daemon on a timeout.
+
+### AC3 re-proof — five consecutive green full-suite runs (`npm run test`)
+
+| Run | Duration | Result | shell-reachable | Failures |
+|-----|----------|--------|-----------------|----------|
+| V1  | 154s     | 2096 passed / 21 skip / 1 todo | ✓ 64.0s | none |
+| V2  | 157s     | 2096 passed / 21 skip / 1 todo | ✓ 65.9s | none |
+| V3  | 158s     | 2096 passed / 21 skip / 1 todo | ✓ 67.2s | none |
+| V4  | 155s     | 2096 passed / 21 skip / 1 todo | ✓ 63.2s | none |
+| V5  | 161s     | 2096 passed / 21 skip / 1 todo | ✓ 62.9s | none |
+
+All five fully green (exit 0, 0 failures). shell-reachable is now rock-solid at
+62-67s every run — no thrash, no 136s spike, no loaded-but-unhealthy exhaustion.
+ceo-slack-brain green in all five. Branch head
+`09ffcd4a5a69132f8bb8d319aa3028cc3303e3b0`; typecheck + eslint clean.
+
+### Out-of-scope observation for the strategist (NOT fixed)
+
+During fixup iteration, one earlier full-suite run failed on
+`tests/coord/coord-volume-perf.test.ts` — a load-sensitive perf assertion
+(`coord_status <300ms` at 100k atoms) that measured 445ms under a machine-load
+spike (system load average was ~100 at the time, driven by ~7 long-running
+leaked `echo` daemons on this shared dev box). It passed in every other run
+including all five V-runs above, so it did NOT block the re-proof. It is out of
+this item's `files_to_modify` and is the same class of environment/perf
+fragility as the `packaged-boot.test.ts` follow-up the reviewer already filed —
+flagging it as a candidate for the same treatment (load-tolerant budget, or
+exclude perf tests from the standard gate). Not fixed here (drift-prevention).
+
+### Acceptance per criterion (final, post-fixup)
+
+- **AC1** ✅ — race-safe install (bounded-retry) AND load-tolerant stop→start
+  (restart+settle retries); TOCTOU `findFreePort`/`canListen` removed; timeout
+  180s.
+- **AC2** ✅ — unchanged from Run 1/2 (descendant.pid timing fix).
+- **AC3** ✅ — 5/5 green re-proven post-fixup, timings above.
+- **AC4** ✅ — still test-infra-only; no product code touched (the daemon's 10s
+  health deadline is product-owned and left alone; the coord-volume-perf and
+  packaged-boot fragilities are escalated as follow-ups, not patched here).
+
+### Drift events (Run 3)
+
+None. Did not touch the daemon's hardcoded health deadline (product code), the
+coord-volume-perf perf budget, or packaged-boot — all out of scope.
+
