@@ -2,7 +2,7 @@
 
 This file was reorganized **2026-06-06** from a chronological per-merge log into a **root-cause taxonomy**, validated across five cross-vendor consults (Claude strategist + Codex, rounds 1–5): the ~358 follow-up incidents accumulated through item 094 are not independent problems — they reduce to **six broken or invisible boundary contracts**, each showing up in many surface forms. Every gap below is a **test case** for its root: fixing the root should **resolve, obsolete, or force explicit reclassification of** the test case. (Round 4 = a Codex label-hygiene audit: R5 retitled to include "and gates", R6 split into frozen sublabels, 27 cross-cutting `(also Rx)` labels added. Round 5 = a code-grounded **liveness** audit: 26 bullets that referenced removed code or had already shipped were archived — **coverage ≠ liveness**.)
 
-> **The verbose original** (full per-merge prose, postmortem evidence tables with session IDs + commit SHAs + file:line anchors) is preserved in git history at pre-rewrite commit **`1cee7ecd`**. This file condenses; it does not delete. An independent Codex coverage ledger asserted 0 open items *unaccounted for* — and the round-5 liveness audit then archived 26 that referenced removed code (Raycast, item 081) or had already merged.
+> **The verbose original** (full per-merge prose, postmortem evidence tables with session IDs + commit SHAs + file:line anchors) is preserved in git history at pre-rewrite commit **`1cee7ecd`**. This file condenses; it does not delete. An independent Codex coverage ledger asserted 0 open items *unaccounted for* — and the round-5 liveness audit then archived 26 that referenced removed code (Raycast, item 081) or had already merged. Round 6 (2026-07-07): a 7-region agent liveness sweep re-verified all ~300 bullets at HEAD — 40+ archived as shipped/obsolete (see Archive), stale annotations corrected in place (billing, parse_failed, first-unanswered mechanism), counts per root recorded in the round-6 archive header.
 
 ## The six roots
 
@@ -54,7 +54,6 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 **Test cases:**
 
 ### Query semantics
-- **`since=...-07:00` returns 0 atoms; only `Z` works** — query path did not normalize UTC offsets before SQL. ✅ **shipped (`24a57fae`)**: `canonicalizeTimestamp()` (`src/util/timestamp.ts`) parses since/until to an instant and re-serializes to canonical UTC `...Z` at the storage query seam (sqlite + memory) and the `wait_for_new_turns` strict-after path, so lexicographic compare == chronological. Regression-guarded by `-07:00`==`Z` equivalence + `+0900`/missing-ms tests in `tests/storage/{sqlite,memory}.test.ts` and `tests/mcp/wait-for-new-turns.test.ts`. Minimal R2 root-cause fix (no embeddings/FTS/ranking). Cross-vendor: Claude strategist+reviewer, Codex builder.
 - **TZ-naive rejection (RC3)** — non-Z timestamps accepted in retrieval tools. `partial` — the **boundary-corruption half is fixed** by `24a57fae`: naive strings are now canonicalized-as-local before compare (no longer silently drop/expand the window), and the existing `[TZ]` warn-not-reject contract was deliberately preserved (rejecting valid offset input would be wrong; reject-vs-warn is a separate API-policy call, intentionally out of the minimal R2 fix). *residual:* decide whether to harden naive from warn → reject.
 - **UTC-Z invariant comment absent** — `src/trace/index.ts:202-211` lex-sort ≡ chronological only under UTC-Z; assumption is silent. `open` — *fix:* add one-line invariant comment at sort site.
 - **`search_memories` paraphrase returns 0 matches** — literal substring brittle; 4+ data points; eval harness specced as 082. `partial` — *fix:* FTS5 or normalized token match.
@@ -66,12 +65,9 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Raise `search_memories` MAX_LIMIT=50** — cap too low for broad recall. `open` — *fix:* raise cap; keep cursor pagination.
 - **`source_apps: array[]` multi-source filtering** — single-value `source_app` blocks cross-source queries. `open` — *fix:* widen `QueryFilter` to array.
 - **`recent_work_context` `limit` zod schema too loose** — `z.number().optional()` silently clamps. `open` — *fix:* tighten to `.int().min(1).max(500)`.
-- **`QueryFilter` `order`/`order_by` missing** — no DESC path for a second consumer. `partial` — *fix:* add when a second consumer needs DESC.
 - **`get_atoms` deterministic-drop loop O(n²) `JSON.stringify`** — `get-atoms.ts:188-241` rebuilds full envelope per accepted atom (cap=50). `open` — *fix:* profile; switch to running-sum byte approximation if dominant.
 
 ### Ranking & retrieval quality
-- **Default 4h window wrong for "where did I leave off"** — window sized for active sessions, not morning orientation. `open` — *fix:* change default or document active-vs-orientation framing loudly.
-- **`search_memories` KNN/determinism** — same query returns different match counts on consecutive calls. `open` — *fix:* investigate seed/tie-break; lock determinism.
 - **Codex source-prefix retrieval ordering** — raw fs-change rows rank above real turns; no `kind:'meta'|'data'` discriminator. `open` — *fix:* add capture-pipeline `kind` field; boost data-layer atoms.
 - **Trace-ranking source-diversity boost absent** — single-source cluster dropped at limit=50 even when it is the only representative of that source. `open` — *fix:* small rank bonus for sole-source clusters.
 - **Codex cluster under-ranking in `find_clusters`** — Codex silently absent from rank-1 cluster despite heaviest reasoning. `open` — *fix:* check Codex indexing/rank parity in cluster engine.
@@ -81,10 +77,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Shape-aware projector registry absent** — each new variadic field needs a new dispatch line. `open` — *fix:* registry-driven `SHAPE_PROJECTORS` dispatch.
 
 ### Monitoring ergonomics
-- **Atom envelope payload floor** — minimal responses ~242–405KB; per-atom ~3–4KB metadata. `open` — *fix:* spec/ship skeleton-only response shape.
-- **`wait_for_new_turns` source union must include `git`** — git commits from terminal watcher silently excluded. `open` — *fix:* add `git` to default union.
-- **`wait_for_new_turns` misses terminal watcher git commits even with git in union** — wake-latency gap. `open` — *fix:* audit wake-latency path for git source.
-- **`wait_for_new_turns` timeout hard-caps ≤60s but docs imply free knob** — contract mismatch. `open` — *fix:* align docs to cap or expose knob.
+- **`wait_for_new_turns` misses terminal watcher git commits even with git in union** — wake-latency gap under the 057a explicit-`sources[]` redesign; unverifiable whether this residual survives the redesign (not re-confirmed live or closed). `unverifiable` — *fix:* audit wake-latency path for git source under the new design.
 - **connect-to-sibling-session: literal/MRU brittle, cluster discovery works** — recipe undocumented. `open` — *fix:* document cluster-discovery recipe as canonical.
 - **`coord_status` `recent_missed` heap** — push-all-then-slice vs min-heap-of-200. `open` (V1.5+) — *fix:* bounded min-heap.
 - **`findGitAncestor` deep-path latency observability** — `src/mcp/util/repo-path.ts`; no dev-mode counter. `open` — *fix:* instrument max-depth counter in dev mode.
@@ -102,14 +95,13 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 
 ### Producer / registry gaps
 - **Dead `app:`/`domain:`/`api:` source kinds + browser extension not wired to daemon** — capture gate advertises source families with zero producers; the "already built" extension doesn't feed the substrate. `open` — *fix:* wire producer or remove dead dispatch.
-- **Wiki says 8 MCP tools, server registers 14** — the 6 coord/role-state orchestration tools are undocumented on the same server. `open` — *fix:* update mcp-server wiki to true tool roster.
 - **`get_recent_work_context` removal (item 031) overdue** — removal scheduled 2026-05-17, still registered; gated on dogfooding. `open` — *fix:* file 031 final-removal spec.
 - **C1 tool-name codegen across surfaces** — consumers hard-code MCP tool names instead of deriving from a generated registry source. `open` — *fix:* generate tool-name constants from registry; gate consumers on it.
-- **Tool descriptor field scope** — descriptors don't state cluster-vs-atom scope, so omissions read as bugs. `open` — *fix:* add scope annotation to every descriptor field.
 - **`metadata.layer:'content'|'meta'` positive-marker convention** — `exclude_metadata_surface` negative-list is a maintenance burden. `open` — *fix:* add `metadata.layer` at every emission point; retire the negative list.
 
 ### Wiki + docs promotion debt
-- **Shipped-but-undocumented strategist promotions** — wiki pages owed for items 019, 020, 021, 022, 025, 026, 028, 029, 034, 036, 037, 038, 039, 047, 058, 078, 080, 088, 090–092; plus `wiki/operating-model/legacy-echo-memory-cleanup.md`, the reviewer_gate addendum (043), the fail-to-converge-as-designed page (049), `docs/BACKLOG.md` regen (088), and the 031-readiness reevaluations (030/032/033). **Round-5 addition:** remove/retire the stale `wiki/surfaces/hotkey-overlay-raycast.md` (Raycast gone per 081). `open` — *fix:* one batched strategist wiki-promotion pass + `.manifest.json` + `wiki_index.py` regen.
+- **Shipped-but-undocumented strategist promotions** — wiki pages still owed for items 058, 080, 088, 090, 091, 092 (no wiki citation), plus `wiki/operating-model/legacy-echo-memory-cleanup.md` (still missing). The 031-readiness reevaluations (030/032/033) are `unverifiable` (folded into 038, no gate-closure record) rather than confirmed live or shipped. `open` — *fix:* one batched strategist wiki-promotion pass + `.manifest.json` + `wiki_index.py` regen.
+- **Owed pages from 104/106/107/110/112 (round-6 consolidation)** — 104 Granola capture page + `capture/per-app/granola-collected-data` ref; 106 derived-signal-layer page; 107 cross-team decision surfaces page + `[[interface-layers]]`/`[[audit-page]]`/`principles/` updates; 110 mcp-server packaging note (src/brain/ shared-module boundary); 112 storage `canonical_subject` note. `open` — *fix:* fold into the same batched strategist wiki-promotion pass above.
 
 ### Surface lifecycle (overlay / launch / MCP-client)
 - **Browser-hosted AI tab targeting** — launch/clipboard surfaces detect only desktop app bundles, not browser-hosted AI tabs (`claude.ai`/`chatgpt.com`). `open` (also R5 — browser AI tabs are a promised bundle surface) — *fix:* surface-agnostic browser-tab detection for any future launch surface.
@@ -166,17 +158,14 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 **Test cases:**
 
 ### Cross-platform, CI & release blockers
-- **🔴 GitHub Actions billing blocks ALL CI/release** — both `release.yml` runs failed at runner provisioning (0 jobs, payment failure); the OS-matrix pre-tag gate is inert. `open` — *fix:* resolve billing before any `v*` tag or `workflow_dispatch`.
 - **🔵 Windows EPIC — product unit suite never Windows-portable** — ~120 failures / ~25 files (path seps, CRLF, tmp/HOME, POSIX shell-outs); ship contract passes via `onboarding` job only. `open` — *fix:* triage in batches; re-add windows-latest to quality matrix.
 - **Aggregate `all-green` required gate deferred** (092) — no aggregate `needs:[quality,onboarding]` job; branch-protection 403 on free-tier. `partial` — *fix:* add aggregate gate when public/paid.
 - **Windows release dry-run of `release.yml`** (092) — `doctor` background-spawn + bare `echoctl --version` untested on real Windows. `open` — *fix:* run `workflow_dispatch` dry-run after billing resolved.
-- **OS-matrix pre-tag gate** (093) — independent Ubuntu/macOS/Windows `workflow_dispatch` run is the real pre-tag gate. `partial` (blocked by billing) — *fix:* run after billing fix.
+- **OS-matrix pre-tag gate** (093) — independent Ubuntu/macOS/Windows `workflow_dispatch` run is the real pre-tag gate; not blocked by billing (GH Actions billing was restored 2026-06-06, CI runs real jobs today) — still open on its own merits, no dispatch gate exists yet. `open` — *fix:* wire and run the `workflow_dispatch` OS-matrix job.
 - **Path-skipped aggregate gate** (094) — future required gate must treat path-skipped runs as success. `open` — *fix:* design skipped-as-success aggregate into the gate spec.
 - **Cursor agentKv reactivation gate** — Cursor capture degraded surface; reactivation gate triggered (founder upgraded to Cursor Pro). `partial` — *fix:* reopen on qualifying Cursor-user dogfooding signal.
 - **Claude Desktop extractor (future phase)** — Local Agent Mode `audit.jsonl` is capturable; no extractor built. `deferred` (NOT in the V1 promised bundle — future-platform scope; not an active V1 test case) — *fix:* spec when Desktop capture is V1.5+ priority.
-- **`_run_reviewer.sh:17` baked-in `$HOME/Desktop/Project_echo` default** (043) — portability gap for any non-founder machine. `open` (also R6 — reviewer wrapper path is a harness boundary, not platform-only) — *fix:* parameterize repo root via env var.
 - **055 Cursor-as-builder run deadline** (051 R4) — observation deadline 2026-05-22 passed; not retired or specced. `partial` — *fix:* retire entry or spec a successor window.
-- **POSIX exec-bit assumption `src/coord/paths.ts:140`** (057b) — `(st.mode & 0o100)` false-fails on non-POSIX FS. `partial` — *fix:* inline comment + revisit when daemon ships non-APFS.
 
 ### Test flakes & quarantine
 - **Chokidar teardown race** — 3 suites quarantined via `describe.skip` (fs-watcher, cursor, lifecycle); underlying `watcher.close()` race unresolved. `open` — *fix:* deterministic teardown via `probeFreshness` or sentinel-event subscription.
@@ -192,7 +181,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 
 ### Owed dogfooding / validation gates
 - **Lag-measurement harness + Cursor/Claude lag verification** (010/011) — ≤2s / ≤500ms; harness + measurements never landed. `open` — *fix:* build harness; run 5-trial median.
-- **`parse_failed` warn + e2e wait-budget bump** (011) — silent parse failures + `waitFor` deflake unshipped. `open` — *fix:* add `log.warn("parse_failed")`; bump budget 5000→10000ms.
+- **e2e wait-budget bump** (011) — `waitFor` deflake still unshipped; wait budget is still `5000ms` in 4 files (the `parse_failed` warn half already shipped — see Archive). `open` — *fix:* bump budget 5000→10000ms.
 - **MCP integration smoke vitest test** (015) — ~30 LOC in-memory daemon spawn asserting RC=0; never filed. `open` — *fix:* spec and ship.
 - **Founder hand-scores 111 R1 resolution rows** (020) — TP/FP/TN/FN; ≥80% precision gate; verdict column empty. `open` — *fix:* founder half-day scoring pass.
 - **Verify migration row-count log on first boot** (022) — 152 expected rows; unverified. `open` — *fix:* check daemon log for `{converted}` line.
@@ -207,7 +196,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **AC4 Cursor agent-mode capture dogfood** (036) — multi-tool-call turn ≥90% not landed. `open` — *fix:* schedule within 60s of next Cursor agent-mode session.
 - **AC7 `repo_path` six-call dogfood + zero cross-project bleed** (037) — fresh-composer six-call run not done. `open` (also R2 — `repo_path` scoping is retrieval-substrate behavior) — *fix:* run six calls; confirm no bleed.
 - **post-038 toolkit composed-workflow dogfood (≤2 calls/step)** (038) — AC6 demo bar unverified in daily workflow. `open` — *fix:* run real workflow citing post-038 tool names; log.
-- **Role-state cold-start reduction measurement + task-state cap-thrash monitoring** (046) — ≥50% call-count / ≥70% byte reduction unverified. `open` (also R6 — task-state cold-start is a harness invariant) — *fix:* run `/clear` resume on a populated task-state; measure and log.
+- **Task-state cap-thrash monitoring** (046) — the cold-start reduction measurement itself already landed (`comparison-047.md` §1, PASS recorded — see Archive); cap-thrash monitoring under sustained load remains unmeasured. `open` (also R6 — task-state cold-start is a harness invariant) — *fix:* monitor cap-thrash on a populated task-state under real dogfooding load.
 - **AC5 §3/§5 metric fills** (047) — reviewer-tick token counts + founder subjective signal unfiled. `open` — *fix:* pull token counts from review log; fill §3 table.
 - **`inferSourceKind` 'unknown' wire-shape test debt** (063 cont) — the universal-only fallback path in `compact.ts` `inferSourceKind` has no test. `open` — *fix:* add a wire-shape test for the 'unknown' source-kind fallback.
 - **Overlay packaged-`.app` macOS smoke + ambient-dot dogfood gate** (080) — manual build smoke + ≥3 overlay sessions not done (Tauri `tools/echo-overlay/`). `open` — *fix:* build `.app`, drive menu-bar UI, log ≥3 sessions / ≥2 days.
@@ -230,32 +219,20 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Untracked strategist wiki promotions never committed** (077 hygiene) — six post-shipment pages authored but uncommitted; caused a builder-read-fail at a pinned SHA. `open` (also R3 — wiki lifecycle failed because the process didn't commit output) — *fix:* commit every wiki promotion in the response it's authored (mirror "commit specs immediately").
 
 ### Silent-failure / shell discipline · `R6.shell_exit_contract`
-- **`coord_invoke` ENOENT against packaged daemon (077 + 092 recurrence)** — resolver anchors at daemon install dir not request repo root; both reviewers ENOENT every strategist-driven dispatch. `open` HIGH — *fix:* resolve wrappers relative to `request_path` repo root.
-- **monitor `|| true` + `2>/dev/null` swallows rebase error** — responses landed on `origin/main` but monitor returned "no" for ~9 min. `open` — *fix:* use `git fetch` + `git cat-file -e origin/main:<path>` (no working-tree dependence).
-- **chained-bash push-rejection silently continues** — `git push 2>&1 | tail && spawn &`; `tail`'s exit masked git's; reviewers spawned against a request not on `origin/main`. `open` — *fix:* `set -e` + `set -o pipefail` + explicit `if ! git push` for load-bearing pushes.
-- **`disown $!` fails in `run_in_background` harness** — subshell already exited; reviewers SIGHUP-vulnerable. `open` — *fix:* `nohup wrapper.sh >log 2>&1 </dev/null &` as canonical detach.
-- **`set -e` not propagating through background harness on push reject** — `echo "OK pushed"` ran despite failure. `open` — *fix:* explicit `if ! git push origin main; then exit 1; fi`.
-- **`pgrep -f "REVIEWER_NAME=..."` false-positives** — env vars not in argv on macOS; fired false WARN every 30s. `open` — *fix:* match script path or drop process-alive check; rely on response-file-exists vs `origin/main`.
-- **`/merge-and-cleanup` C11 `git push | tail` masks non-zero exit** — cleanup ran after a failed push (074). `open` — *fix:* capture `${PIPESTATUS[0]}` or `if ! git push` without piping.
 - **`/merge-and-cleanup` Step-B orphan-detection `/var` vs `/private/var` symlink** — defeats skip-if-registered; nuked a registered watcher worktree during 076. `open` — *fix:* canonicalize both sides via `realpath`/`pwd -P` before compare.
 
 ### Shared-file concurrency (journal) · `R6.shared_file_concurrency`
 - **HEADLINE: shared dogfooding journal has no concurrency story (corroborated 4× — 090/091/Codex monitor/095 full-auto run)** — every reviewer wrapper, watcher tick, and monitor does stash/pull/append/commit/push on one file; 091 hand-resolved 5×; the 095 full-auto pipeline run hit it twice more (autostash conflicts when the strategist's journal edit collided with the reviewer wrappers' appends during the review loop — hand-resolved by chronological union both times). Contention scales exactly with the parallelism the product sells. `RESOLVED` (098, merged 2026-06-08, commit `04eed26b`) — **per-actor monthly shards** (`mcp-interactions-journal-YYYY-MM-<actor>.md`): each writer appends only to its own shard so `git pull --rebase` always replays cleanly (disjoint paths); journal = union of shards read via `tools/dogfooding/journal-cat.sh <month>` (lossless-or-loud). Cutover-not-migration (June file frozen + LD4 note). **Accepted residual:** *same-slug* concurrent writes (two writers mapping to one actor slug — e.g. two `codex` reviewer ticks, or a `claude` reviewer tick racing the interactive/watcher `claude` writer) remain possible but are not the documented cross-reviewer collision; the documented loop topology maps concurrent writers to distinct slugs. File a successor only if a same-slug collision is ever *observed*.
 
 ### Merge mechanics · `R6.merge_mechanics`
-- **`git pull --rebase` discards conflict resolution on retry** — 065 ran 61 codex tool-calls vs ~12 normal; O(re-resolve). `open` — *fix:* `git pull --rebase=merges` in `skills/merge-and-cleanup.md` (P7 one-line).
-- **C9 cleanup runs before C11 push** — if push fails, branch gone but commit not on main; 065 recovery worked only by TMPDIR+git-store survival. `open` — *fix:* reorder C9 after C11 (P6 one-line).
-- **Rebase replay drops merge-commit's backlog-move/sidecar extras** — 055 `--rebase-merges` silently dropped C4/C6/C7 ops. `open` — *fix:* guard re-staging post-rebase, or make the transition resumable from disk state.
 - **queue-errors per-event aggregation view** — no rendered index for cross-item inspection. `open` — *fix:* lazy index-generator script.
 - **046 option-b targeted-restore path** — `git checkout origin/main -- <path>` fallback when staged `combined.md` blocks option-a. `partial` — *fix:* monitor post-merge dogfooding.
 
 ### Reviewer orchestration · `R6.reviewer_orchestration`
 - **Reviewer background execution (item 041)** — founder still must physically activate Codex + paste Cursor each round; "any reviewer agent in future" must plug into one mechanism. `open` HIGH (also R4 — activation is handoff/deadline ownership semantics) — *fix:* solve the activation pattern generically, not just Codex+Cursor.
 - **Watcher cron is session-only (no launchd)** — queue stalls overnight when the strategist session closes. `open` — *fix:* launchd-ify the watcher (standalone helper not needing a live Claude session).
-- **Global reviewer ticker picks first-unanswered, not item-scoped** — parallel-spec contention; two sessions used two different escape hatches. `open` (also R4 — request-path selects the control-plane subject) — *fix:* make `ECHO_COORD_REQUEST_PATH` a first-class `--request-path` arg OR per-item launchd plist.
+- **Global/passive reviewer ticker selects by round-scan, not item-scoped, and doesn't skip completed items** (round-6 correction, folds two prior mis-described observations into one) — the launchd fallback in `_run_reviewer.sh` (~line 763) passively glob-scans for the first unanswered round rather than being handed an item-scoped `--request-path`; this is the SAME root as the Sweep-2026-07-07 parked observation "reviewer request-selection doesn't skip completed items' stale rounds" (see that section's note for the fold). Two sessions previously used two different escape hatches for the parallel-spec-contention symptom of this. `open` (also R4 — request-path selects the control-plane subject) — *fix:* make the request path a first-class `--request-path` arg (or per-item launchd plist) AND have the scan skip rounds whose item already converged/completed.
 - **Same-vendor reviewers serialize** — `codex`+`codex-ops` share one Codex account/session; clean ~5-6 min stagger every round. `open` — *fix:* document; mix vendors (`codex`+`claude`/`cursor`); per-account cap is below ECHO's control.
-- **Stale `ECHO_COORD_REQUEST_PATH` misfired ~24 ticks** (087b) — pinned to a deleted request; spawned throwaway worktrees. `open` — *fix:* find and purge the launchd/env source.
-- **Tests spawn real reviewer wrappers** (057b r9) — `coord_invoke(role='codex')` in tests calls the real spawn path; `npm test` starts detached reviewer ticks. `open` — *fix:* injectable spawn/path resolver OR temp `ECHO_REPO_ROOT` + fixture wrapper.
 - **10 remaining AC8 integration tests need scaffolding** (057b) — each needs distinct scaffolding (mocked Codex CLI, EMFILE injection, launchd-cadence sim). `open` — *fix:* file successor item once scaffolding design is finalized.
 - **parse-failure-evidence-preservation test refile** (049) — deferred from R7→R8 contradiction; due against the reviewer-invocation contract spec. `open` — *fix:* file against the converged successor.
 - **Binary provenance / PATH hardening of reviewer-bindings gate** (087b) — gate validates invocation shape, not `codex` binary provenance/authenticity. `open` — *fix:* host-trust hardening successor.
@@ -263,22 +240,16 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 
 ### Spec / pipeline lifecycle · `R6.pipeline_lifecycle`
 - **inbox specs unreviewable** — review tools only scan `ready|claimed|pending_review|complete`; a parked `inbox/` spec is un-reviewable without a temp-promote that makes it prematurely claimable and can break `blocked.py` globally. `open` — *fix:* add `inbox/` to review tools' lookup; keep `blocked.py` excluding it.
-- **Claim selector ignores spec-review convergence** — `requested_reviewers` is advisory, not a hard claim gate. `open` (also R4 — `proceed` is control-plane state, not advice) — *fix:* gate claimability on latest `combined.md` with `combined_verdict: proceed`.
 - **`docs/BACKLOG.md` in spec `files_to_modify` pattern bug** — strategist error inherited from 060; will recur. `open` — *fix:* `tools/lint-spec.py` rejecting forbidden paths in `files_to_modify`.
 - **proposed→ready stale `status: proposed` frozen by seal** — `promote.py` seals before setting `status: ready`; later correction invalidates the sha. `open` — *fix:* set `status: ready` before seal OR exclude `status` from the normalized hash.
 - **Builder handoff commit mislabeled `review:`** — collides with `/review-pending` sidecar commits in git log; observed at 088 and 089. `open` — *fix:* rename builder handoff prefix to `handoff:`/`pending-review:`.
-- **Remove legacy `spec_review` / `legacy_spec_review_satisfied` path** (088) — inert at merge; remove once no live item carries it. `open` — *fix:* clean `tools/blocked.py` after verifying.
 - **Malformed `ready_content_sha` fixture in `test_blocked.py`** (089) — missing+mismatch covered; malformed handled in code but unfixtured. `open` — *fix:* add direct fixture; non-blocking.
-- **Builder wiki-edit policy conflict (019 drift)** — spec listed wiki paths; hook denied; operating model unresolved. `open` — *fix:* pick one canonical rule; update template.
-- **Founder STATUS.md milestone + spec-template fix** — template phrases STATUS.md as agent AC, guaranteeing the conflict each milestone. `open` — *fix:* phrase STATUS.md updates as founder-post-merge.
 - **Process-discipline rules (batch)** — agent-run-log filename convention; test-fallout-permitted convention; tests-outside-`files_to_modify` escalation rule; reviewer-artifact-location review-prompt fix; Storage-adapter pre-listing claim rule; multi-tool-impl-review rule; kill-tool grep-scope; Gate-4 re-grep rule; structural-review round-count + decay-curve heuristics. `open` — *fix:* bundle into next AGENT_INSTRUCTIONS + README sweep.
-- **`/review-pending` sidecar-already-exists rerun behavior undefined** — second subagent missed a real fixup the first caught. `open` — *fix:* pick "additive corroboration" or "replace with re-reviewed note"; document.
 - **Same-vendor `/review-pending` blind spot** — Claude subagent missed `builder.md` staleness another Claude caught. `open` — *fix:* prefer cross-vendor reviewer at every `/review-pending`.
 - **Cycle-length-budget gate** (049) — strategist should detect at R3–R4 and simplify; 072's 18-round arc confirmed the need. `open` — *fix:* bake explicit gate into `skills/review-queue-watch.md` after combine.py reads the table.
 - **Strategist-drift trajectory-monitor tripwire + review-cost reporting** (072) — pause+escalate if findings haven't dropped for 3 rounds AND target recent-round patches; per-tick `usage:` yaml. `open` — *fix:* monotonic non-improvement detection + cost field.
 - **Reviewer test-coverage gaps** (043) — cursor no-op harness; optional-cursor fixture; invalid-config fixtures (5 of 7); cache identity assertion; `_lib` import-time env fragility. `open` — *fix:* file successor spec for the test-gap batch.
-- **Executable test for watcher marker-write path** (086) — AC1 verified by skill prose + fixture only; the `spec_review: converged` write path has no executable test. `open` — *fix:* add executable test once watcher terminal paths fixture easily.
-- **Watcher-state + slash-body executable integration tests** (039/040) — the (a)/(b)/(c) transition + prose-to-invocation translation are unverified by executable assertion. `open` — *fix:* higher-level integration test exercising the slash-command body.
+- **Watcher-state + slash-body executable integration tests** (039/040) — partially closed: a higher-level integration test now exercises part of the (a)/(b)/(c) transition, but full prose-to-invocation translation is still unverified by executable assertion. `partial` — *fix:* extend the existing integration test to cover the remaining transition legs.
 
 ### Stale-adapter root-cause (code-owned artifacts) · `R6.adapter_freshness`
 - **Code-owned `emit-sidecar.py` writer + resolve `producer` to writer-role** — `producer` was never emitted programmatically; LLM transcription produced wrong values twice on the 087 sidecar; `review-pending-orchestrator` is always correct. `resolved` — *fix:* ship `emit-sidecar.py` (stamps + validates-before-write); add `validate-sidecar.py` CI gate via `check-coupled-invariants.sh`; retire the enum. — RESOLVED 2026-06-09 by 099 (`ab512320`): `emit-sidecar.py` ships (code-owned writer stamps+validates `producer` before write), `validate-sidecar.py` CI gate wired into `check-coupled-invariants.sh`, transcribed enum retired.
@@ -290,14 +261,13 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Document additive-only extension pattern idiom** (077) — 077's `agent-runner.ts` opt-out flag + helper is the canonical worked example. `open` — *fix:* add a pattern note to AGENT_INSTRUCTIONS or wiki.
 
 ### Reliability primitives (flow-agnostic contracts) · `R6.reliability_primitives` (P3–P12)
-- **P3–P12 + C3 primitives** — P3 partial-write tolerance; P4 explicit durability contract; P5 at-most-one ownership (3× in 065, 2× more in 070/071); P6 SIGKILL-safe self-heal; P7 idempotent+near-free re-run (3× in 065); P8 attributable audit trail; P9 capability self-description+routing (first observed 070/071); P10 structured typed inter-agent messages (6 untyped handoffs in 065 alone); P11 programmatic convergence without human-in-loop (3× in 065); P12 trust+sandbox per agent; C3 per-agent/per-item cost accounting. Each MUST hold under any future flow shape. Full observed-instance evidence tables (session IDs, commit SHAs, file:line) preserved in git history at `1cee7ecd`. `open/partial` — *fix:* spec each triggered primitive in priority order — P5 (strategist-in-worktree/lease), P7 (`--rebase=merges`), P10 (`coord_emit merge_paused/blocked`), P11 (merge_resolver capability), then C3/P9/P12.
+- **P3–P12 + C3 primitives** — P3 partial-write tolerance; P4 explicit durability contract; P5 at-most-one ownership (3× in 065, 2× more in 070/071); P6 SIGKILL-safe self-heal; **P7 idempotent+near-free re-run — SHIPPED** (`--rebase=merges` landed, see Archive); P8 attributable audit trail; P9 capability self-description+routing (first observed 070/071); **P10 structured typed inter-agent messages — partial** (a typed registry now exists at `validate.ts:104-131`, but `merge_paused`/`blocked` message types are still absent — the 6-untyped-handoffs gap from 065 is only partly closed); P11 programmatic convergence without human-in-loop (3× in 065); P12 trust+sandbox per agent; C3 per-agent/per-item cost accounting. Each MUST hold under any future flow shape. Full observed-instance evidence tables (session IDs, commit SHAs, file:line) preserved in git history at `1cee7ecd`. `open/partial` — *fix:* spec each remaining triggered primitive in priority order — P5 (strategist-in-worktree/lease), P10 (add `merge_paused`/`blocked` to the typed registry), P11 (merge_resolver capability), then C3/P9/P12.
 - **THE arc: "typed cross-vendor orchestration with remote-durable-truth state machine"** (077 codex consult) — replace ambient-state coordination (git index as handoff medium, local working-tree as ground truth, prose templates as machine-consumed writers) with code-owned writers + produce-time validation + remote-ref monitoring; covers the highest-leverage R6 work. `open` — *fix:* spec as the synthesis item.
 - **Mandatory reframe gate when ≥2 findings target prior-round patches** — currently a judgment-call recommendation in `review-queue-watch.md`, not a protocol trigger; Friction-B regression closures confirmed the gate works. `partial` (also R4 — reframe is escalation semantics, not only prose) — *fix:* make it fire automatically, not by strategist discretion.
 
 ### Misc harness · `R6.misc`
 
 > R6 sublabels are **frozen test-case namespaces** (round-4 Codex audit): when these become dev test cases, name them `R6.<sublabel>.<incident>`. The cross-cutting fix theme `R6.remote_durable_truth` (use remote-ref ground truth, not ambient git/working-tree state) spans the shell-discipline, merge-mechanics, and reviewer-orchestration sublabels.
-- **Confirm 027 run-log artifact exists** — acceptance bullet 10 unverified (out of diff scope). `open` — *fix:* one-time verification.
 - **agent-id `chmod 0600` + cross-machine lock** (047) — `run-codex-builder.sh:41-46` umask-dependent. `partial` — *fix:* `chmod 600` at creation; cross-machine deferred.
 - **probe SIGKILL escalation + wizard mutex** (073) — `probe.ts:realSpawn` SIGTERM-only; concurrent-wizard cache divergence needs `withLock`. `partial` — *fix:* arm both on dogfooding signal.
 - **Registration SIGKILL escalation** (083) — Claude MCP registration spawn SIGTERM-only. `open` — *fix:* add SIGKILL escalation after grace period.
@@ -306,7 +276,7 @@ This file was reorganized **2026-06-06** from a chronological per-merge log into
 - **Daemon launchd status flap** — `launchctl list` shows loaded/last-exit-1/not-running despite kickstart exit 0. `partial` — *fix:* investigate launchd PID-file race; V1.5+ reliability cleanup.
 - **039 inline-patch queue-contract caveat** — strategist editing a reviewer's pushed response violates the immutable-artifact assumption; logged as emergency. `partial` — *fix:* AC3 emission-validation gate unblocks the strict reading.
 
-**Fix direction:** The synthesis target — named by Codex's fresh-eyes re-analysis of the 077 frictions — is **"typed cross-vendor orchestration on remote-durable-truth":** replace every ambient-state coordination surface (git index as handoff medium, local working-tree checks as ground truth, prose templates as machine-consumed writers, launchd env vars as config) with code-owned writers, produce-time validation, and remote-ref monitoring. The three most concrete near-term forcing functions: (1) `emit-sidecar.py` + generalized adapter freshness gate (closes the stale-adapter recurrence loop; independently shippable), (2) strategist-in-worktree isolation mirroring 050 across all roles (closes P5's second-occurrence trigger — the only role still without isolation), (3) `--rebase=merges` + C9-after-C11 reorder in `skills/merge-and-cleanup.md` (P6/P7 one-line fixes, cheapest and most overdue). The longer arc — mandatory reframe gate, per-actor journal shards, typed `coord_emit` handoffs, programmatic merge_resolver — lands as capacity allows, but every new spec should be checked against the P3–P12 primitives first: does this lock in a vendor, a human-in-loop dependency, or an ambient-state assumption? If so, generalize before shipping. **Co-equal with R1 for the founder-out-of-the-loop gate — the harness bugs are exactly what force the founder back in.**
+**Fix direction:** The synthesis target — named by Codex's fresh-eyes re-analysis of the 077 frictions — is **"typed cross-vendor orchestration on remote-durable-truth":** replace every ambient-state coordination surface (git index as handoff medium, local working-tree checks as ground truth, prose templates as machine-consumed writers, launchd env vars as config) with code-owned writers, produce-time validation, and remote-ref monitoring. Two of the three original near-term forcing functions have shipped: `emit-sidecar.py` + the generalized adapter freshness gate (closed the stale-adapter recurrence loop), and `--rebase=merges` + C9-after-C11 reorder in `skills/merge-and-cleanup.md` (P6/P7 one-line fixes — see Archive). The remaining near-term forcing function: strategist-in-worktree isolation mirroring 050 across all roles (closes P5's second-occurrence trigger — the only role still without isolation). The longer arc — mandatory reframe gate, per-actor journal shards, typed `coord_emit` handoffs, programmatic merge_resolver — lands as capacity allows, but every new spec should be checked against the P3–P12 primitives first: does this lock in a vendor, a human-in-loop dependency, or an ambient-state assumption? If so, generalize before shipping. **Co-equal with R1 for the founder-out-of-the-loop gate — the harness bugs are exactly what force the founder back in.**
 
 ---
 
@@ -361,6 +331,60 @@ Closed via the full spec→review→build→merge pipeline; recorded with commit
 - **Workspace identity: canonical-root same-machine join key (the R1 foundation past 095)** — 096 / `6f4f8bd9`. Git-OPTIONAL workspace identity: the same-machine join key is now the `workspace` artifact `local:workspace:<canonical-root>` (path-based, stable across `git init`, present for non-git folders); the 095 normalized remote URL is retained as the non-join `context.ambient.git_alias` for a future cross-machine merge (invariant: *one active join key per join domain*). New `src/capture/workspace-root.ts` `resolveCanonicalRoot` (git-toplevel → anchor-walk → reported-dir, ambient-root guard, realpath/case canonicalization, bounded never-throw); `probeGitState.repo_root` kept git-only via a shared `gitToplevel` primitive (095 `git_state` preserved). Converged over **6 cross-vendor review rounds** (local-minimum at r5 → broken by a fresh-context Codex holistic spec rewrite per founder direction); **built blind by a Codex builder** (exact allowlist, zero drift); independent **Claude code-reviewer subagent** verdict MERGE AS-IS (AC2 regression vector verified clean). **Closes** the git-init-transition + non-git same-machine split (R1 residual a, same-machine half). **Still open:** cross-machine non-git (accepted boundary), identity-at-rest materialization (#2), Cursor (parked), normalizer residuals (d)/(e). **NOT yet deployed** — daemon runs the installed echoctl package; live in capture only after rebuild+reinstall. Wiki: `wiki/architecture/artifact-identity.md` updated.
 - **Cross-adapter repo identity split (the dominant R1 join-key gap)** — 095 / `2d4238fc`, regression guard `6d34cd30`. Capture-time canonical remote-URL identity across claude_code + codex + git: `origin_url` now captured by `probeGitState` + the git watcher (credential-scrubbed, repo-root-scoped, invalidatable cache); the git adapter stops hardcoding `null`. Spec converged in 2 cross-vendor review rounds; built **blind** by a Codex builder; verified by an **independently-authored blind held-out oracle** (red 4/4 on pre-fix main → green 4/4), landed on main as `tests/trace/repo-identity-cross-adapter.test.ts`. Residual sub-gaps (remote-less repos, historical-atom migration, worktree `.git`-file cache invalidation) kept in R1. **NOT yet deployed** — the daemon runs the installed echoctl package; live in capture only after rebuild+reinstall. Unblocks the R2 (ranking) + R4 (passive inference) downstream chain for the beta bundle; R6 is co-equal and untouched.
 
+### Round 6 — 2026-07-07 liveness audit (7-region agent sweep)
+Per-root re-verification counts at HEAD: **R1 13L/0S** (nothing archived — dominant context-layer root, all 13 test cases still live); **R2 21L/6S/1O/1U**; **R3 12L+7 wiki-subs live/3S+15 wiki-subs shipped/1U**; **R4 13L/0S** (nothing archived — all 13 control-plane test cases still live); **R5 35L/3S/1O/2 split**; **R6 36L/17S/5O/1U**; tail region per `tail.md` (per-merge append bullets, mixed SHIPPED / SHIPPED-TO-SPEC / relocated). "L"=live/untouched, "S"=shipped, "O"=obsolete, "U"=unverifiable (left in place, not archived — status could not be confirmed either way). SHIPPED-TO-SPEC lines below cite the absorbing spec id.
+
+- [R2] "since=...-07:00 returns 0 atoms; only Z works" — SHIPPED: TZ-offset canonicalization via `canonicalizeTimestamp()` (`src/util/timestamp.ts`, `24a57fae`).
+- [R2] "`QueryFilter` `order`/`order_by` missing" — SHIPPED: order+cursor now supported (`interface.ts:22`).
+- [R2] "Default 4h window wrong for 'where did I leave off'" — SHIPPED: loud docs + AUTO_EXPAND shipped (032).
+- [R2] "`search_memories` KNN/determinism" — SHIPPED: search determinism tie-break shipped (`search-memories.ts:152-163`).
+- [R2] "Atom envelope payload floor" — SHIPPED: skeleton-only response shape shipped (`recent-work-context.ts:108,188`).
+- [R2] "`wait_for_new_turns` source union must include `git`" — OBSOLETE: 057a redesign made git first-class via explicit `sources[]`.
+- [R2] "`wait_for_new_turns` timeout hard-caps ≤60s but docs imply free knob" — SHIPPED: docs now state the cap (=60) inline.
+- [R3] "Wiki says 8 MCP tools, server registers 14" — SHIPPED: wiki now matches `server.ts:271-313`.
+- [R3] "Tool descriptor field scope" — SHIPPED: scope annotation shipped (`find-clusters.ts:68-70`).
+- [R3] wiki-promotion batch (items 019, 020, 021, 022, 025, 026, 028, 029, 034, 036, 037, 038, 039, 047) — SHIPPED: work-trace/storage/mcp-recent-work-context/cross-tool-spec-review/review-queue-protocol/builder-bindings pages landed.
+- [R3] "the reviewer_gate addendum (043)" — SHIPPED.
+- [R3] "the fail-to-converge-as-designed page (049)" — SHIPPED.
+- [R3] "`docs/BACKLOG.md` regen (088)" — SHIPPED: `3f0462ea`.
+- [R3] "remove/retire the stale `wiki/surfaces/hotkey-overlay-raycast.md`" — SHIPPED: raycast retirement shipped (`7c3cccf8`/`8919e6ee`), page range covered by 078.
+- [R5] "🔴 GitHub Actions billing blocks ALL CI/release" — OBSOLETE: billing restored 2026-06-06; CI runs real jobs today.
+- [R5] "`_run_reviewer.sh:17` baked-in `$HOME/Desktop/Project_echo` default (043)" — SHIPPED: parameterized via env var (`_run_reviewer.sh:35`).
+- [R5] "POSIX exec-bit assumption `src/coord/paths.ts:140` (057b)" — SHIPPED: inline comment shipped (`paths.ts:320-323`).
+- [R5] "`parse_failed` warn + e2e wait-budget bump (011)" (warn half) — SHIPPED: `log.warn("parse_failed")` shipped (`claude-code.ts:230`, `7e4d4e0b`); wait-budget-bump half kept live (still 5000ms in 4 files).
+- [R5] "Role-state cold-start reduction measurement + task-state cap-thrash monitoring (046)" (cold-start-measurement half) — SHIPPED: PASS recorded (`comparison-047.md` §1); cap-thrash-monitoring half kept live.
+- [R6] "`coord_invoke` ENOENT against packaged daemon (077 + 092 recurrence)" — SHIPPED: 097, `daemon.ts:467`.
+- [R6] "monitor `|| true` + `2>/dev/null` swallows rebase error" — SHIPPED: `git fetch` + `git cat-file -e` now standard.
+- [R6] "chained-bash push-rejection silently continues" — SHIPPED: `push-with-retry.sh:88-90`.
+- [R6] "`disown $!` fails in `run_in_background` harness" — OBSOLETE: bash-wrapper class replaced wholesale by Node spawn in `coord_invoke`.
+- [R6] "`set -e` not propagating through background harness on push reject" — OBSOLETE: same Node-spawn replacement.
+- [R6] "`pgrep -f \"REVIEWER_NAME=...\"` false-positives" — OBSOLETE: same Node-spawn replacement.
+- [R6] "`/merge-and-cleanup` C11 `git push | tail` masks non-zero exit" — SHIPPED (`:354`).
+- [R6] "`git pull --rebase` discards conflict resolution on retry" — SHIPPED: `--rebase=merges` landed (`ed5ed8cf`).
+- [R6] "C9 cleanup runs before C11 push" — SHIPPED: C9/C11 reorder landed (`ed5ed8cf`).
+- [R6] "Rebase replay drops merge-commit's backlog-move/sidecar extras" — SHIPPED: second-parent preserve landed (`ed5ed8cf`).
+- [R6] "Stale `ECHO_COORD_REQUEST_PATH` misfired ~24 ticks (087b)" — OBSOLETE: plist only sets TMPDIR now.
+- [R6] "Tests spawn real reviewer wrappers (057b r9)" — SHIPPED: wrapper-spawn test stub shipped (`coord-invoke-spawns-wrapper.test.ts:147-160`).
+- [R6] "Claim selector ignores spec-review convergence" — SHIPPED: convergence gate shipped (`promote.py:126-142`; caveat: sha-seal still bypassable).
+- [R6] "Remove legacy `spec_review` / `legacy_spec_review_satisfied` path (088)" — SHIPPED: 089, `c4150c62`.
+- [R6] "Builder wiki-edit policy conflict (019 drift)" — SHIPPED: canonical rule landed (`AGENT_INSTRUCTIONS:367`).
+- [R6] "Founder STATUS.md milestone + spec-template fix" — SHIPPED: STATUS.md phrased founder-post-merge (`AGENT_INSTRUCTIONS:370`).
+- [R6] "`/review-pending` sidecar-already-exists rerun behavior undefined" — SHIPPED: fail-closed behavior documented (`review-pending.md:190-195`).
+- [R6] "Executable test for watcher marker-write path (086)" — OBSOLETE: mechanism deleted by 089.
+- [R6] "Confirm 027 run-log artifact exists" — SHIPPED: run-log artifact confirmed to exist.
+- [R6.reliability_primitives] "P7 idempotent+near-free re-run" — SHIPPED: `--rebase=merges` landed (folded into the P3–P12 bullet's in-place correction).
+- [R6.reliability_primitives] "P10 structured typed inter-agent messages" — SHIPPED (partial): typed registry exists (`validate.ts:104-131`); `merge_paused`/`blocked` types still absent (kept live in place within the P3–P12 bullet).
+- [Tail-103] "shell-reachable + recent-calls-endpoint flaky tests (103 merge)" — recent-calls-endpoint half SHIPPED (fixed by 111, 977ms observed); shell-reachable half SHIPPED-TO-SPEC (2026-07-07-126).
+- [Tail-107] "recent-calls-endpoint 'logs every runtime-registered tool' timeout (107 merge)" — SHIPPED: fixed by 111 (977ms observed).
+- [Tail-108] "Packaged daemon baseline blocker: propose_decision excluded from tarball (108 merge)" — SHIPPED-TO-SPEC (2026-07-07-127).
+- [Tail-109] "Extend the planned 108 packaging fix to dist/enrich → ceo-slack-responder import chain (109 merge)" — SHIPPED-TO-SPEC (2026-07-07-127).
+- [Tail-110] "import-closure.test.ts: assert shippedJs non-empty (110 merge)" — SHIPPED-TO-SPEC (2026-07-07-127).
+- [Tail-112] "shell-reachable flaky under full-suite load (112 merge)" — SHIPPED-TO-SPEC (2026-07-07-126).
+- [Tail-113] "strategist post-shipment — new wiki/architecture/signal-window page (113 merge)" — SHIPPED: page exists.
+- [Tail-114] "ceo-slack-brain.test.ts process-kill test load-flaky (114 merge)" — SHIPPED-TO-SPEC (2026-07-07-126).
+- [Tail-116] "intake-terminal --watch never checks handle.enabled (116 merge review)" — SHIPPED: enabled-check landed (`intake-terminal.ts:317`).
+- [Tail-116] "intake-terminal real-path status line hardcodes '0 classifier errors' (116 merge review)" — SHIPPED: classifier-error count now plumbed (`:264` variable).
+
 ---
 
 ## Opportunistic Cleanup — cosmetic nits (not root-cause evidence)
@@ -378,69 +402,55 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - **Strategist post-shipment (owed):** promote 100 per its After-Completion notes — mark `_followups.md` R6.adapter_freshness bullets resolved ("generalize skill-adapter freshness gate to ALL client adapters", "C2 adapter-drift detection for Codex-installer adapter", "Stale Codex producer field" detection half), recording the split: repo-tracked adapters → merge gate (`sync-skills.sh --check`); operator-local Codex adapter → `echoctl doctor` (HOME-relative). Cross-ref 099. Optional one-line operating-model wiki note; no new product wiki page required. — DONE 2026-06-09 (wiki: `operating-model/adapter-freshness.md` documents the two-tier model for both 099 + 100; R6.adapter_freshness bullets reconciled above).
 - (from 102 merge 2026-06-13) Add a true parallel (Promise.all) two-writer race test for `upsertProjectRegistration` to complement the lock-timeout/no-truncation test (`tests/echo-home/paths.test.ts:191`); AC8 names concurrent-upsert atomicity but only sequential + lock-failure paths are exercised.
 - (from 102 merge 2026-06-13) Builder agent_notes for 102 should note that `coord_invoke`'s request-file existence had briefly become a precondition (B1) and is no longer — for the record.
-- [103 merge 2026-06-19] Stabilize 2 flaky/env product tests: tests/cli/shell-reachable.test.ts (launchctl daemon-install fails outside a real install env) + tests/mcp/recent-calls-endpoint.test.ts (15s timeout under parallel load). Not 103-caused; surfaced during the 103 merge verify.
 - [105 merge 2026-06-19] responder.ts:207-216 — successful brain answer is downgraded to a failure message if only the AC6 usage-log append throws; log the append error but still post the valid answer.
 - [105 merge 2026-06-19] brain.ts:219-234 — optional recursion-depth guard on assistantText JSON parsing (cheap defense; harmless for trusted shallow codex JSONL).
 
 ## From 104 merge (2026-06-21) — non-blocking
 - 104: coalesce partial-checkpoint writes if first-sync batches get large (granola-poller.ts:655-664) — optimization.
 - 104: optionally skip writing an empty-summary atom when both summary fields absent (granola-poller.ts:513).
-- 104 (strategist): create wiki capture/ Granola surface page + capture/per-app/granola-collected-data ref.
 - PROCESS: spec-review convergence != buildability — 104 hit 3 build escalations (storage substrate, enum ripple, snapshot pins) the queue review missed. Consider a buildability/file-surface lens in the review queue or a builder dry-run before sealing.
 
 ## From 106 merge (2026-06-22 — granola-meeting-signal-extraction)
 - [106] Disambiguate same-subject decision linkage (src/enrich/granola-signals.ts:447): rationale→decision fallback matches on canonical_subject; a meeting with ≥2 same-subject decisions picks the last via Map overwrite. LLM-supplied `rationale_for` takes precedence, so low-impact. Non-blocking.
-- [106] Strategist post-merge: write the derived-signal-layer wiki page + update capture/per-app/granola-collected-data (per the item's After Completion notes).
 - [106] Lightweight extraction context: the brain runs `codex exec -C <repo>`; full-repo context timed out (180s), an empty dir is rejected (non-git). Give the extractor a minimal trusted-context git dir instead of the full repo.
 - [infra] Leaked selftest daemons: ~10 `com.echo.selftest.*` launchd jobs are still running against deleted `/tmp/claude-*/echo-selftest-*` dirs (their sqlite db is unlinked-on-disk, open-fd only). PRODUCTION IS UNAFFECTED — verified 2026-06-22: `com.echo.daemon` (pid 70318, MCP :38478) holds a stable LINKED db at `~/Library/Application Support/ECHO/echo.db` (719MB, inode 6997711, nlink=1; same inode it has open). Fix = tear down selftest daemons when their temp dir is cleaned. Unrelated to 106.
 
 ## From 107 merge (2026-06-27 — cross-team-decision-sync-slack)
-- [107] tests/mcp/recent-calls-endpoint.test.ts "logs every runtime-registered tool" now passes in isolation (14.7s) but reliably times out under full-suite parallel load — it sits right at the 15s `testTimeout` ceiling and adding `propose_decision` (one more tool in the smoke loop) pushed it over. Bump the per-test timeout above 15s. NOTE: same test already tracked from the [103 merge] entry above and in R5 "Real-daemon/concurrency flake class" (line ~188) — fold into that stabilization, don't double-file.
 - [107] propose-decision-tool.ts:95-102 — wrap the `postDraftCard` Slack call so a post-throw dismisses/marks the draft instead of orphaning a `pending` draft. Acceptable for n=2 (next `/echo decision` re-proposes); harden before >2 users. Non-blocking.
 - [107] brain.ts:244-256 — `asksForRawContext` keyword heuristic (`diff`/`session`/`log`/…) can false-trigger a canned raw-context refusal on legit decision queries that merely contain those words (e.g. "what did we decide about the logging format"). The structural boundary already enforces the real decision-layer-only cut, so this is only a UX guard — tighten or drop it. Non-blocking.
 - [107] R2 startup confirm-target validation: R2 specced startup-time validation of the configured confirm-card target; the build validates at call-time instead (load-bearing invariant — missing/invalid target → operator-visible error + NO draft — is enforced and tested). Optional belt-and-suspenders: add the startup check too. Non-blocking.
-- [107] Strategist post-merge (owed): promote per the item's After-Completion notes — add a `surfaces/` page for the cross-team decision layer over Slack (two-scope model, propose-confirm gate, decision-layer-only query); update [[interface-layers]] (cross-team query = L3, confirm = L5 trust moment) + [[audit-page]] (shared-decision visibility record); add the per-seat/team-retention launch-wedge note (`product/` or `research/`); lock the trust pitch as a `principles/` line ("Raw context never leaves your machine; only decisions … are shared").
 
 ## From 108 merge (2026-06-28 — slack-linear-intake-gate)
-- [108] Packaged daemon baseline blocker: move `propose_decision` out of excluded `src/surfaces/ceo-slack-responder/` into the packaged MCP tool layer. Current tarball ships `dist/mcp/server.js` but excludes `dist/surfaces/ceo-slack-responder/propose-decision-tool.js`, causing `ERR_MODULE_NOT_FOUND` before daemon health and failing `tests/cli/shell-reachable.test.ts`.
 - [108] Make `idempotency_token` deterministic or remove the random suffix before any future Linear idempotency-key reuse.
 - [108] Consider suppressing duplicate `Looking...` messages on replayed Slack message events.
 - [109] Store-driven retry for non-terminal seed records — retries currently depend on the classifier re-emitting the candidate within the lookback (granola-intake-candidates.ts:388-467); drive from seedStore.list() instead. Fast-follow before real bridge traffic.
 - [109] Skip re-classification for notes whose candidate keys are all terminal — every 10-min bridge pass re-runs the brain on every external note in the lookback.
-- [109] Extend the planned 108 packaging fix to the dist/enrich → dist/surfaces/ceo-slack-responder import chain (same ERR_MODULE_NOT_FOUND class as shell-reachable).
 - [109] Wrap ECHO_GRANOLA_INTAKE_OWNER_MAP parse errors as GranolaIntakeConfigError so a JSON typo cannot crash the daemon at startup (daemon/index.ts:93 unguarded).
 - [109] Minor: accepted-seed-but-Linear-unconfigured drops with log.debug only (responder.ts:806-813); owner resolution nondeterministic when multiple attendees map.
 
 ## From 110 merge (2026-07-02 — packaged-daemon-brain-boundary) — non-blocking
-- [110] import-closure.test.ts: assert `shippedJs` non-empty to close the vacuous-pass window if dist/ is absent (currently mitigated only by the sibling packed-manifest snapshot failing loudly).
 - [110] Extract the duplicated `npm pack --dry-run --json` parsing into a shared tests/packaging helper (now in both packed-manifest and import-closure tests).
 - [110] Deduplicate `normalizeProjectName` + TeamDecision types: single owner in src/brain/brain.ts, responder surface imports from it (inlined during the hoist to avoid re-crossing the 076 boundary).
-- [110] Strategist post-shipment (owed): update wiki/surfaces/mcp-server.md (or packaging page) with src/brain/ shared-module location + import-closure guard as boundary invariant; record in drift log that 106+109 crossed the packaged boundary undetected through full review rounds; note the AC5 conditional-registration seam and the AC6 kickstart fix.
+- [110] Record in drift log that 106+109 crossed the packaged boundary undetected through full review rounds; note the AC5 conditional-registration seam and the AC6 kickstart fix. (The wiki/surfaces/mcp-server.md packaging-note update itself is consolidated into Root 3's "Wiki + docs promotion debt".)
 
 ## From 111 merge (2026-07-03 — list-task-states-batched-git) — non-blocking
 - [111] Rename run log to drop the doubled date prefix (raw/internal/agent-runs/2026-07-02-2026-07-02-111-... -> 2026-07-02-111-...).
 - [111] Restore the pinned-commit-time fallback in the batched path (or document the hard-error choice): the single log walk can miss a tree-present path whose only touching commits are merges (git log --name-only emits no file list for merges without --diff-merges); old code fell back to the pinned commit's own time.
 - [111] Strengthen or drop the tautological AC6(a) injected-failure counter test (counter lives inside the fake runner's own try/finally, so it cannot observe a leak); optionally add a PATH-shim git counter if out-of-seam spawn regression ever matters.
 - [111] Fold into the [103]/[107] flake-tracking entries above: recent-calls-endpoint timeout root cause is FIXED by 111 (977ms observed) — those older entries are now resolved.
-- 2026-07-04 (from 112 merge): tests/cli/shell-reachable.test.ts is flaky under full-suite load (daemon-port health timeout) — test-hardening candidate.
-- 2026-07-04 (from 112 merge): strategist post-shipment — note unified canonical_subject key on wiki/architecture/storage (spec After-Completion).
 - 2026-07-04 (from 112 merge): during 113 build, confirm loop filter treats canonical_subject as the sole forward join key.
 - 2026-07-04 (from 112 merge): builder-report calibration — builder-112 agent_notes claimed 1617/0 tests vs observed 1885+/1886; counts should come from the actual run output.
 - 2026-07-04 (from 113 merge): event-time mode materializes the full in-scope ledger and filters since/until in JS — push into SQL WHERE once the ledger grows.
-- 2026-07-04 (from 113 merge): strategist post-shipment — new wiki/architecture/signal-window page (seam contract, two orderings, scope semantics, fork-1 rules).
 - 2026-07-04 (from 113 merge): founder may override the C4 fixup (SCOPE_EXCLUDED_SOURCE_PREFIXES) if derived:granola-signals-index SHOULD appear in company windows.
 - 2026-07-04 (from 114 merge): shared packed-safe module for team-decision read + cofounder identity (removes readLatestDecisions/queryLatestTeamDecisions divergence risk; builder's open question).
 - 2026-07-04 (from 114 merge): drift checkpoint pruning + stop persisting whole file per transition (unbounded growth, O(n^2) I/O at scale).
 - 2026-07-04 (from 114 merge): tighten if-status-ok guarded assertions in decision-drift tests (vacuous-pass risk).
-- 2026-07-04 (from 114 merge): tests/surfaces/ceo-slack-brain.test.ts process-kill test is load-flaky (like shell-reachable) — same test-hardening bucket.
-- 2026-07-04 (from 114 merge): strategist post-shipment — wiki/surfaces/drift-alert page + loop diagram station 6 planned→shipped; also wiki/architecture/signal-window (113) and storage note (112).
+- 2026-07-04 (from 114 merge): strategist post-shipment — wiki/surfaces/drift-alert page + loop diagram station 6 planned→shipped. (The signal-window page (113) has since shipped and the storage note (112) is consolidated into Root 3's "Wiki + docs promotion debt".)
 - 2026-07-04 (from station-2 lock-in codex review): capture-side re-ingest for updated Granola notes — poller permanently skips ingested note ids, so station-2 re-extraction is unreachable for note edits; decide supersede-chain re-capture (104 dedupe_key design) before relying on re-extraction. Until then: ingest meetings only after Granola finishes processing.
 - 2026-07-04 (from station-2 lock-in codex review): current-run/supersedes visibility for signal consumers — drift sweep + intake read signals without manifest filtering; pin consumer-side current-run resolution (or add opt-in mode to getSignalWindow) before station-3 rewiring.
 - 2026-07-04 (from station-2 lock-in codex review): station 2→3 contract pinned in the lock-in record — provenance tuple + signal_type admission rules + transcript-anchored-quote preference; honor when station 3 is rewired onto signals.
 - 2026-07-04 (from expansion-invariants audit): extractor-#2 preconditions bundle — parameterize filterToCurrentSignalRuns/resolver (HIGH: currently fails OPEN for non-Granola signal sources in search_memories); dispatch handle → keyed map + drift chain join; extract shared buildSignalCore(); drift is-signal predicate; split AC4 conformance into CORE_FIELDS + provenance; add #2's -index manifest to SCOPE_EXCLUDED_SOURCE_PREFIXES. Full ledger in raw/internal/decisions/2026-07-04-expansion-invariants-additive-backcompat.md §audit.
 - 2026-07-04 (from 115 merge): drift-sweep (station 6) + intake (station 3) adopt filterToCurrentSignalRuns when next touched; wiki signal-window page to cite the helper as the currentness half of the station-2 contract.
-- 2026-07-05 (from 116 merge review): intake-terminal --watch never checks handle.enabled — a disabled no-op bridge handle (bad ECHO_*_CONTEXT_REPO_PATH) idles forever with only a JSON log hint (tools/intake-terminal.ts:384-395,498-504); check and exit 1 with a message.
-- 2026-07-05 (from 116 merge review): intake-terminal real-path status line hardcodes "0 classifier errors" (counting wrapper cannot wrap the bridge-internal classifier) — drop the field on that path or plumb the count later.
 - 2026-07-05 (from 116 merge review): invalid brain-name env (e.g. ECHO_CEO_BRAIN=foo) exits via bare main().catch stderr message instead of the "skipped:" status-line format (tools/intake-terminal.ts:300,358).
 - 2026-07-05 (from 116 merge review): enrich JSON logs interleave with intake-terminal cards on stdout — consider stderr diversion for demo cleanliness; pair with item 117 observability.
 ## Sweep 2026-07-07 (strategist, post-116-123 shipping run)
@@ -453,7 +463,7 @@ The 2026-07-05/06 tail (25 bullets) dispositioned. Promoted to specs:
 
 Done (closed by the 2026-07-06 wiki promotion pass, commit dd4e3cb8): [118] wiki drift-alert nominate-then-confirm update; [121] canonical-invocation docs fold into the terminal-intake-card page; [123] proxy-bypass blind-spot documented in loop-observability.
 
-Parked (unchanged): [122 post-ship] dashboard-v2 candidates (founder-usage gate); [121] sibling entry-guard audit (only-if-recurs); [118] week-1 statements_no_candidate near-miss collection (time gate, week of 2026-07-06); [122 loop observation] reviewer request-selection doesn't skip completed items' stale rounds (R6-shaped; harmless until it selects one — file as spec if it bites).
+Parked (unchanged): [122 post-ship] dashboard-v2 candidates (founder-usage gate); [121] sibling entry-guard audit (only-if-recurs); [118] week-1 statements_no_candidate near-miss collection (time gate, week of 2026-07-06); [122 loop observation] reviewer request-selection doesn't skip completed items' stale rounds — **folded (round-6 liveness sweep) into the corrected R6.reviewer_orchestration bullet** ("Global/passive reviewer ticker selects by round-scan..."), which identified this as the same root as the passive launchd fallback in `_run_reviewer.sh` (~line 763); no longer tracked separately here.
 
 Dropped: [118] revert 4 incidental prettier reformats (cosmetic, no reader confusion observed); [119] 'deferred' counter doc polish (log keys already distinguish; wiki delivery-semantics section shipped without confusion).
 
