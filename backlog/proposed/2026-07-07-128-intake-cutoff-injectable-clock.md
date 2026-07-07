@@ -51,13 +51,21 @@ the pipeline's notion of now, not a second clock read.
   `tests/tools/intake-terminal.test.ts` AC6 tests go green WITHOUT touching
   their fixtures or the test file — the fixtures' fixed dates plus the
   injected now are now self-consistent forever.
-- **AC3 — regression pin:** one new test that injects a synthetic `now` far
-  from the wall clock (e.g. year 2030) with fixtures dated inside the lookback
-  window relative to that synthetic now, asserting candidates are seen — i.e.
-  the cutoff provably follows the injected clock, so this class cannot
-  silently return. A comment names the 2026-07-07 time-bomb.
-- **AC4 — gate:** full test/lint/typecheck green (the suite should be FULLY
-  green again after this — that is the point).
+- **AC3 — regression pin:** one new test that injects a synthetic `now` in
+  the PAST (r1 correction — a future-dated clock cannot falsify the bug,
+  since future fixtures are also newer than the real wall-clock cutoff):
+  e.g. injected now `2020-01-08T00:00:00Z` with a fixture dated
+  `2020-01-07T00:00:00Z` — inside the injected 7-day lookback but far older
+  than any real wall-clock cutoff — asserting the candidate IS seen. Under
+  the `Date.now()` bug this test FAILS (fixture older than wall-clock
+  cutoff); it passes only when the cutoff follows `deps.now`. A comment names
+  the 2026-07-07 time-bomb.
+- **AC4 — gate (concrete commands):** red-to-green:
+  `npx vitest run tests/tools/intake-terminal.test.ts` → 8/8;
+  regression: `npx vitest run <new test file>` → green (and demonstrably red
+  if the fix is reverted — note the revert-check in the run log);
+  full gate: `npm run test` (fully green — that is the point), `npm run
+  lint`, `npm run typecheck`.
 
 ## Out of Scope (Don't Drift)
 
