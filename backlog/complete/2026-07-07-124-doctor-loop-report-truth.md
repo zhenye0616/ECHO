@@ -56,6 +56,46 @@ files_to_modify:
   - tools/loop-dashboard.ts                        # /api/status doc-comment shape-compat only
   - tests/tools/loop-dashboard.test.ts             # 122 AC5-pinned shape test — update iff shape changes
 ready_content_sha: bfae14df5ffcde6396228eae6aa716650df455d047b354aba7b8649acae3d868
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation (pre-approved clean-path run).
+
+  Conflicts resolved:
+  - none — branch merged clean via ort strategy; disjoint from 125 (124 touches
+    the dashboard TEST, 125 touched the dashboard SOURCE) in either merge order.
+
+  C3.5 cross-vendor consult: none invoked.
+
+  Fixups applied:
+  - none (sidecar listed zero pre-merge fixups).
+
+  Founder ratification (recorded per 121/123/125 precedent):
+  - src/cli/io/render.ts was edited but was OUTSIDE the PROVISIONAL
+    files_to_modify list. The edit is mandated by AC2's rendering clause
+    ("annotated ... rather than rendering as a bare 0-count" — the annotation
+    is unreachable in human doctor output without it; 5-line change). Ratified
+    via this merge; not treated as scope drift.
+
+  Soft-degradation policy note:
+  - Observed disabled/degraded station-2 is surfaced SOFT — it does NOT downgrade
+    doctor's overall rollup. Deliberate: the primary bug this item fixes was a
+    false alarm, and truth is surfaced via the station-2 condition + heartbeat
+    field + soft degradation. Making observed-disabled a HARD downgrade would
+    unilaterally change the pinned overall-rollup contract mid-item. Whether an
+    observed-disabled worker should ever downgrade the overall rollup is deferred
+    to the founder as a follow-up (filed to backlog/_followups.md).
+
+  Verify: 2094/2094 tests pass (21 skipped, 1 todo); lint, typecheck,
+  check-coupled-invariants, and sync-skills --check all clean post-merge.
+
+  Follow-up items (non-blocking, filed to backlog/_followups.md):
+  - hardening: readSignalsHeartbeat should return null (fall to inferred path)
+    when last_tick_at fails to parse to a finite time — a corrupt-but-JSON-valid
+    heartbeat currently reads as observed-and-never-stale.
+  - founder policy call: should an observed-disabled station-2 worker ever
+    downgrade doctor's overall rollup (currently soft by design).
+  - perf cleanup candidate: queryClassHealth materializes full rows to count;
+    coord: adds 18k+ rows per doctor run — a COUNT(*) storage method would fix
+    the class.
 ---
 
 ## Problem
