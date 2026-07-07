@@ -24,9 +24,11 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | Acceptance Criteria / AC4 | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex | Acceptance Criteria / AC4 | accepted — patched (e447bb64) | Regression test path pinned as tests/enrich/granola-intake-cutoff-clock.test.ts in both files_to_modify and the AC4 command. Mechanical. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+Reframe gate: not triggered — the finding is a purely mechanical placeholder-path fill with no state/behavior/owner/test-semantics effect (single finding, below the >=2 threshold regardless).
+
+`needs R3 — focus_hints:` verify only the pinned test path changed (mechanical); spec otherwise byte-stable vs r2.
 
