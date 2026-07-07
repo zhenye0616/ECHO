@@ -9,6 +9,37 @@ blocked_by: []
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-07T02:42:59Z"
 branch: "agent/live-loop-dashboard"
+head_sha: "1930df5c5bd2e5a81173d7b145a7dae8d59f83c0"
+pr_url: ""
+agent_notes: |
+  Done. tools/loop-dashboard.ts: read-only 127.0.0.1 http server reusing the 117
+  in-process buildLoopReport (NOT buildDoctorReport — avoids its MCP probe /
+  codex child / agent probes, so AC4 no-MCP/no-network holds by construction)
+  and the 120 heartbeat files (iterated over EXPECTED_WORKERS, never globbed).
+  Single-flight throttled cache with warm stale-serve + cold-join incl.
+  timeout→degraded skeleton; port precedence --port → ECHO_LOOP_DASHBOARD_PORT →
+  38480 with fatal invalid-port exit; 121 import.meta entry guard; loop:dashboard
+  npm script uses vite-node --script. One self-contained HTML page (inline
+  CSS/JS, zero external requests) renders stations 1/2/3/4/6 + serving identity
+  with ok/degraded/disabled/unknown visually distinct.
+
+  In-process only — no child fallback wired, so AC5 doctor-fail-soft coverage
+  tests the in-process degraded path (injected builder that throws / never
+  resolves), per the spec's r3-codex-F1 allowance.
+
+  AC4 no-write test follows item 117's own read-only precedent: fabricates all
+  file inputs, leaves the atom db ABSENT (SqliteStorage's constructor
+  creates+migrates+WAL, so opening a real db is not byte-identical), runs the
+  full shipped in-process cycle, asserts ECHO_HOME byte-identical + db not
+  materialized. Also drove the real tool end-to-end against a scratch ECHO_HOME
+  (page + /api/status from the real buildLoopReport; confirmed db not created).
+
+  Gate: typecheck + lint clean; new tests 16/16 pass. Full suite 2052 pass / 1
+  fail — the one fail is tests/cli/shell-reachable.test.ts (real-launchd-daemon
+  port-health smoke), unrelated to this item (my change adds a tools/ script +
+  npm script + tests, touches nothing the CLI binary / daemon-install imports);
+  it PASSES in isolation (23.5s), confirming full-suite port/load contention,
+  not a regression. Run log has verbatim output.
 spec_refs:
   - tools/serve-trace.ts                                   # the local-HTTP-page pattern to follow
   - src/cli/commands/doctor.ts                             # the loop report to reuse (117) — check exports; prefer in-process reuse
