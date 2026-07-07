@@ -451,3 +451,4 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [118 follow-up] optional cosmetic: revert 4 incidental prettier reformats in decision-drift.ts
 - [118 follow-up] collect week-1 statements_no_candidate near-miss logs as alias-table decision input
 - [118 follow-up] wiki drift-alert update: nominate-then-confirm join (strategist)
+- [122 loop observation, driver-122] reviewer request-selection doesn't skip rounds on completed/merged items — stale rounds (e.g. 057b/r9, 110/r2) sort ahead of live rounds in the glob; harmless today only because they have combined.md. Friction item if it ever selects a stale round.
