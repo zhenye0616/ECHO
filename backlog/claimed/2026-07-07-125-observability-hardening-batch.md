@@ -5,6 +5,9 @@ status: proposed
 priority: MEDIUM
 estimate: 0.5d
 created: 2026-07-07
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-07T07:40:00Z"
+branch: "agent/observability-hardening-batch"
 blocked_by: []
 spec_refs:
   - tools/trace-card.ts                            # seed lookup + --note mode
