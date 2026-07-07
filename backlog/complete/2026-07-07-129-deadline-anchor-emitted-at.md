@@ -41,6 +41,44 @@ files_to_modify:
   - src/coord/deadlines.ts
   - tests/coord/                                    # missing-expected_by-across-restart coverage
 ready_content_sha: fc1a16c0707cabecf6d745191cd0a563db6923ca494994a247fd238b72828eb7
+review_notes: |
+  Merged on 2026-07-07 via founder reconciliation (pre-approved clean-path run).
+
+  Conflicts resolved:
+  - none: src/coord/ + tests/coord/ untouched on main since claim; branch merged
+    cleanly (4 files: src/coord/deadlines.ts, tests/coord/coord-status-shape.test.ts,
+    tests/coord/deadlines-reconstruction.test.ts, new tests/coord/deadlines-emitted-at-anchor.test.ts).
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none (sidecar Pre-merge fixups list was empty)
+
+  Fixups deferred to follow-up items:
+  - none
+
+  Reviewer recording (builder-flagged fixture edits, independently verified):
+  - Both existing-fixture edits (deadlines-reconstruction.test.ts out-of-order test;
+    coord-status-shape.test.ts close-after-miss test) were verified as forced by the
+    semantics change AND intent-preserving: append-order authority and sequence-based
+    slot-clearing properties remain intact. Neither hides a regression.
+  - The live-semantics change (a deadline now measures from event emission, not from
+    delivery/restart) is the spec-pinned intent, not drift.
+  - Effect once merged: the deadline_missed detector becomes able to fire in
+    production for the first time, retroactively covering historical ledger atoms
+    whose emitted_at is parseable.
+
+  Verify: npm test 2097 pass / 21 skipped / 1 todo, with the two founder-authorized
+  load-flakes (tests/cli/shell-reachable.test.ts, tests/surfaces/ceo-slack-brain.test.ts)
+  failing in the full run and each passing on isolation re-run (shell-reachable 1/1;
+  ceo-slack-brain 18/18). lint clean; typecheck clean; check-coupled-invariants OK;
+  sync-skills --check OK.
+
+  Follow-up items (non-blocking):
+  - cosmetic: parseEmittedAtMs's Number.isNaN check is unreachable
+    (canonicalizeTimestamp throws first) — harmless defense-in-depth, note only.
+  - real-world validation (spec After-Completion): with an artificially hung reviewer
+    across daemon restarts, confirm the first-ever production deadline_missed atom appears.
 ---
 
 ## Problem
