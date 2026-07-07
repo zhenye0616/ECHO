@@ -24,6 +24,7 @@
 
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { parseBrainName, preflightBrain, type BrainName, type IntakeFields } from '../src/brain/brain.js';
 import { parseSeedMarker } from '../src/brain/intake-seed.js';
@@ -517,11 +518,18 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => void shutdown());
 }
 
-// Run the CLI when invoked directly (vite-node / `npm run intake:terminal`),
-// not when imported by the vitest suite. vite-node strips the script name from
-// argv, so entry cannot be detected there; the reliable discriminator is that
-// vitest sets process.env.VITEST while the CLI runner does not.
-if (process.env['VITEST'] === undefined) {
+// Run the CLI only when this module is the process entry point, never on
+// import. House pattern, shared with src/surfaces/ceo-slack-responder/index.ts.
+//
+// vite-node caveat (verified 2026-07-06): this equality holds ONLY under
+// `vite-node --script <file>`. Plain `vite-node <file>` drops the script name
+// from argv — argv[1] stays the vite-node binary — so the entry file is
+// indistinguishable from an imported one (both see argv[1] === the vite-node
+// bin). `--script` mode sets argv[1] to the resolved script path, which is what
+// this compares against. The `intake:terminal` npm script therefore invokes
+// `vite-node --script` (matching the repo's existing `eval:retrieval` script);
+// a bare `import` from any other module never matches and never launches.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((err: unknown) => {
     process.stderr.write(`${(err as Error).message}\n`);
     process.exit(1);
