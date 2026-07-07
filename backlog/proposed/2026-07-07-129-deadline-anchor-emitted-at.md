@@ -55,13 +55,23 @@ field-omitted path (the only path production takes) is untested.
   late-appended events); anchoring the DEADLINE on `emitted_at` is the
   opposite posture — late/old events get truthfully-expired deadlines instead
   of silently fresh ones.
-- **AC4 — retroactivity noted, no migration:** because derivation happens at
-  replay, all historical ledger atoms are covered automatically; no schema
-  change, no new persisted field, no migration. `coord-emit.ts` and
-  `coord-emit.sh` are untouched.
-- **AC5 — gate:** full test/lint/typecheck green (post-128 main is expected
-  fully green; the two pre-126 load-flakes with isolation passes remain the
-  only tolerated exception).
+- **AC4 — retroactivity scoped, no migration:** because derivation happens at
+  replay, historical ledger atoms whose `emitted_at` is parseable are covered
+  automatically (r1 correction: not an unconditional claim — AC1's defensive
+  fallback to `this.now()` fires for unparseable `emitted_at`). The builder
+  verifies the parseability premise against reality: `emitted_at` is
+  populated from `atom.timestamp` at replay (deadlines.ts applyReplayAtom)
+  and from the validated emit input live, both ISO-pinned by existing
+  validation — cite that chain in a comment. A test covers the fallback: an
+  atom with a garbage `emitted_at` resolves its deadline from tracker-now
+  (never throws, never NaNs into Math.min). No schema change, no new
+  persisted field, no migration; `coord-emit.ts`/`coord-emit.sh` untouched.
+- **AC5 — gate (concrete commands):** `npx vitest run tests/coord/` →
+  green incl. the new AC2/AC3/AC4 tests; `npm run test` fully green, with
+  exactly two tolerated exceptions — `tests/cli/shell-reachable.test.ts` and
+  `tests/surfaces/ceo-slack-brain.test.ts` (the pre-126 load-flakes) — each
+  tolerated ONLY with a recorded isolation pass (`npx vitest run <file>`) in
+  the run log; `npm run lint`; `npm run typecheck`.
 
 ## Out of Scope (Don't Drift)
 
