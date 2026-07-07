@@ -5,6 +5,9 @@ status: proposed
 priority: MED
 estimate: 0.5d
 created: 2026-07-07
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-07T16:32:09Z"
+branch: "agent/daemon-smoke-test-serialization"
 blocked_by: []
 spec_refs:
   - tests/cli/shell-reachable.test.ts              # the recurring flake: fixed port 47095 health smoke under suite load
