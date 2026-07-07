@@ -8,6 +8,28 @@ created: 2026-07-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-07T07:40:00Z"
 branch: "agent/observability-hardening-batch"
+head_sha: "95afbf4ba1b19afc0dfe97550cdca69753666e92"
+pr_url: ""
+agent_notes: |
+  All 6 ACs implemented and passing; full gate green (lint max-warnings 0,
+  typecheck clean, npm test 2087 passed / 21 skipped / 1 todo, 0 failures — both
+  known flakes passed under full-suite load). No changes to 123 persisted
+  contracts.
+  AC1: channel-aware seed-store resolution in trace-card (seedStorePathForChannel:
+  terminal→.terminal.json, else default) + --seed-store override + provenance-loss
+  banner from the channel-resolved store; unit + wiring + e2e (setEchoHomeRoot) tests.
+  AC2: createHttpRetrievalCapture upstream (ures) + downstream (cres) stream error
+  handlers; two named tests, no unhandled process error under a guard wrapper.
+  AC3: emitIntakeCardAtom bounded card-source dedupe_key existence check → skips the
+  sequential markPosted-throw retry double-append; concurrent-tick left as documented
+  blind spot (not built). AC4: --note scans full enumerated seed-store set when no card
+  atoms; override narrows to one store. AC5: esc() on heartbeatLine counters +
+  abandoned-not-cancelled comment + present-db byte-identity test.
+  Reviewer flags in the run log "Design calls" section: (1) AC3 "bounded query" = card
+  source scope, no artificial limit (dedupe_key not in METADATA_MATCH whitelist); (2)
+  AC2 downstream test asserts capture_failed OR partial per the 123 contract's explicit
+  "or completes with what was captured"; (3) trace-card imports the terminal sentinel +
+  path from tools/intake-terminal.ts (import-only, not in files_to_modify).
 blocked_by: []
 spec_refs:
   - tools/trace-card.ts                            # seed lookup + --note mode
