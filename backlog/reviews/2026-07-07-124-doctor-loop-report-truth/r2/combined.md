@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers `proceed` with zero findings against the r1-patched spec (fe40dffc). The two r1 falsifiability patches (files_to_modify/AC3 consistency, AC4 concrete test contract) verified clean. No prior-patch findings, no reframe gate. Promoting proposed → ready.
 

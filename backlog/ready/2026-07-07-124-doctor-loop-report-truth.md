@@ -20,6 +20,7 @@ files_to_modify:
   # shape changes; otherwise leave untouched:
   - tools/loop-dashboard.ts                        # /api/status doc-comment shape-compat only
   - tests/tools/loop-dashboard.test.ts             # 122 AC5-pinned shape test — update iff shape changes
+ready_content_sha: bfae14df5ffcde6396228eae6aa716650df455d047b354aba7b8649acae3d868
 ---
 
 ## Problem
