@@ -24,10 +24,12 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | backlog/proposed/2026-07-07-129-deadline-anchor-emitted-at.md:AC4 | _strategist fills_ | _strategist fills_ |
-| 2 | MEDIUM | codex | backlog/proposed/2026-07-07-129-deadline-anchor-emitted-at.md:AC5 | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex | backlog/proposed/2026-07-07-129-deadline-anchor-emitted-at.md:AC4 | accepted — patched (6daad276) | AC4 narrowed to parseable-emitted_at retroactivity + builder cites the ISO-pinning chain + explicit unparseable-fallback test (no throw/NaN). |
+| 2 | MEDIUM | codex | backlog/proposed/2026-07-07-129-deadline-anchor-emitted-at.md:AC5 | accepted — patched (6daad276) | AC5 now names exact commands and the two tolerated flake identifiers with recorded-isolation-pass requirement. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+Reframe gate: not triggered — r1, no prior patches; both findings target original AC text (falsifiability hardening).
+
+`needs R2 — focus_hints:` verify AC4's parseability-chain citation is checkable and the unparseable-fallback test is well-specified; AC5 commands reproducible; the emitted_at anchor semantics unchanged from r1 review.
 
