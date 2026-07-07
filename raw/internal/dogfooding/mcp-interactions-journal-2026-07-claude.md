@@ -240,3 +240,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** the r1→r2 handoff pattern (manual watcher tick + hook fire after a driver-agent stall) worked; duplicate-fire safety relied on wrapper no-op idempotency
 - **Conjecture:** none
+
+### 2026-07-06 23:59 PDT — coord_invoke ×6 for followup-sweep spec reviews (124/125/126 r1)
+- **Trigger:** founder-ordered full followup sweep promoted 3 specs; strategist dispatched r1 for each and fired the 057b active-trigger per reviewer
+- **Query inputs:** coord_invoke — roles codex + codex-ops for each of backlog/reviews/2026-07-07-{124-doctor-loop-report-truth,125-observability-hardening-batch,126-daemon-smoke-test-serialization}/r1/request.md; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** 6/6 HTTP 200, no error payloads — all invocations accepted
+- **Sources:** daemon coord layer only (invocation-type calls, no retrieval). Absent by design: capture surfaces.
+- **Verdict:** ✅ right
+- **Note:** first time three r1 dispatches fanned out through coord_invoke in one strategist turn; no rate issues
+- **Conjecture:** none
