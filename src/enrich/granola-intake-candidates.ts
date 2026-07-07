@@ -474,7 +474,7 @@ export async function runGranolaIntakeBridgeOnce(
 ): Promise<GranolaIntakeBridgeResult> {
   if (!config.enabled) return { status: 'skipped', reason: 'disabled' };
   const now = deps.now ?? (() => new Date().toISOString());
-  const cutoffIso = new Date(Date.now() - config.lookbackMs).toISOString();
+  const cutoffIso = new Date(new Date(now()).getTime() - config.lookbackMs).toISOString();
 
   let signalEvents: CaptureEvent[];
   let rawEvents: CaptureEvent[];

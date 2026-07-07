@@ -118,6 +118,9 @@ describe('startGranolaIntakeBridge scheduling', () => {
         order.push('post');
         return { ts: 'ts-1' };
       },
+      // Item 128: pin the clock so the fixed 2026-06-30 fixtures stay inside the
+      // 30d lookback forever (defuses the 2026-07-30 fuse). Fixtures untouched.
+      now: () => '2026-06-30T10:06:00.000Z',
     });
 
     const result = await handle.run();
