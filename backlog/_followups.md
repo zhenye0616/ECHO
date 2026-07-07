@@ -460,3 +460,4 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [122 follow-up] optional comment: a timed-out doctor computation is abandoned-not-cancelled (single-flight guards new starts, not stragglers).
 - [122 follow-up] optional AC4 test variant with a PRESENT db (belt-and-braces; doctor's SELECT-only behavior already covered by 117 tests).
 - [122 follow-up] flaky-under-load: tests/cli/shell-reachable.test.ts fails in full-suite runs on port contention while passing in isolation — recurring signal, consider serializing or porting off the fixed test port.
+- [122 post-ship] dashboard-v2 candidates PARKED pending founder usage: coordination-loop panel / station drill-down / actionable fix hints — founder will use v1 first, expand from observed friction (2026-07-06)
