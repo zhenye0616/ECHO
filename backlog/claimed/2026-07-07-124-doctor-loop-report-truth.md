@@ -6,6 +6,9 @@ priority: HIGH
 estimate: 0.5d
 created: 2026-07-07
 blocked_by: []
+claimed_by: "cc-124"
+claimed_at: "2026-07-07T07:27:15Z"
+branch: "agent/doctor-loop-report-truth"
 spec_refs:
   - src/cli/commands/doctor.ts                     # buildLoopStation2 (~:678), STATION2_DISABLE_INFERENCE_NOTE (~:673), LOOP_CAPTURE_SOURCE_CLASSES (~:212)
   - src/enrich/worker-heartbeat.ts                 # 120's exported contract: paths, WorkerName set, WorkerHeartbeat type
