@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MemoryStorage } from '../../src/storage/memory.js';
 import type { CaptureEvent, Storage } from '../../src/storage/interface.js';
+import { GRANOLA_SIGNALS_WORKER, type WorkerHeartbeat } from '../../src/enrich/worker-heartbeat.js';
 
 // Item 117 — loop observability (stations 1–3) section of `echoctl doctor`.
 // Fixture-driven: temp ECHO_HOME, injected storage, fabricated checkpoints /
@@ -82,6 +83,17 @@ function writeSignalsCheckpoint(body: unknown): string {
 
 function writeSeedStore(name: string, body: unknown): void {
   writeFileSync(join(stateDir, name), typeof body === 'string' ? body : JSON.stringify(body));
+}
+
+// AC1: write the granola-signals worker heartbeat (item 120 contract). Path
+// mirrors `workerHeartbeatPath(GRANOLA_SIGNALS_WORKER)` = ECHO_HOME/state/
+// worker-heartbeat-<name>.json. Pass a raw string to fabricate a malformed file.
+function writeSignalsHeartbeat(body: Partial<WorkerHeartbeat> | string): void {
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(
+    join(stateDir, `worker-heartbeat-${GRANOLA_SIGNALS_WORKER}.json`),
+    typeof body === 'string' ? body : JSON.stringify(body),
+  );
 }
 
 function healthyPid(): void {
@@ -470,6 +482,183 @@ describe('doctor loop section (item 117)', () => {
         parseError.loop.station2.condition,
       ]).size,
     ).toBe(3);
+  });
+
+  // ─── AC1 (item 124): station-2 observed via the 120 heartbeat ─────────────
+
+  it('station-2 observed disabled: heartbeat status disabled → condition disabled, observed (not inferred)', async () => {
+    healthyPid();
+    // Checkpoint absent — pre-124 this would infer never-ran. The heartbeat is
+    // the authority: the worker is disabled, and we say so, observed.
+    writeSignalsHeartbeat({
+      schema_version: 1,
+      worker: GRANOLA_SIGNALS_WORKER,
+      last_tick_at: '2026-07-05T00:00:00.000Z',
+      status: 'disabled',
+      reason: 'ECHO_GRANOLA_SIGNAL_BRAIN parse error',
+    });
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      now: () => new Date('2026-07-05T00:01:00.000Z'),
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const s2 = report.loop.station2;
+    expect(s2.inferred).toBe(false);
+    expect(s2.condition).toBe('disabled');
+    expect(s2.flags.neverRan).toBe(false); // NOT falsely inferred as never-ran
+    expect(s2.heartbeat).toMatchObject({
+      status: 'disabled',
+      reason: 'ECHO_GRANOLA_SIGNAL_BRAIN parse error',
+    });
+    const deg = s2.degradations.find((d) => d.scope === 'station-2:disabled');
+    expect(deg?.severity).toBe('soft');
+    expect(deg?.detail).toContain('ECHO_GRANOLA_SIGNAL_BRAIN parse error');
+    expect(report.overall).toBe('healthy'); // observed disabled is soft (informational)
+  });
+
+  it('station-2 quiet-day regression: fresh heartbeat + OLD checkpoint + nothing extracted → healthy, not stale', async () => {
+    // The observed 2026-07-06 false alarm: the worker logged worker_ok every
+    // 5 min but only touches its checkpoint when it extracts, so checkpoint-mtime
+    // read "stale (460 min)" while the worker was demonstrably alive minutes ago.
+    healthyPid();
+    const cpPath = writeSignalsCheckpoint({ schema_version: 1, notes: {} });
+    const cpMtime = statSync(cpPath).mtimeMs;
+    const now = new Date(cpMtime + 8 * 60 * 60 * 1000); // checkpoint is 8h old
+    writeSignalsHeartbeat({
+      schema_version: 1,
+      worker: GRANOLA_SIGNALS_WORKER,
+      last_tick_at: new Date(now.getTime() - 3 * 60 * 1000).toISOString(), // ticked 3 min ago
+      status: 'ok',
+      counters: { notes_seen: 0, notes_extracted: 0, signal_atoms_written: 0 },
+    });
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopSignalsStaleMs: 60 * 60 * 1000, // 1h staleness floor
+      now: () => now,
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const s2 = report.loop.station2;
+    expect(s2.inferred).toBe(false); // observed, not inferred from checkpoint mtime
+    expect(s2.flags.stale).toBe(false); // NOT a false alarm despite the 8h-old checkpoint
+    expect(s2.condition).toBe('active');
+    expect(s2.degradations.some((d) => d.scope === 'station-2:stale')).toBe(false);
+    expect(report.overall).toBe('healthy');
+  });
+
+  it('station-2 observed stale: heartbeat last-tick older than threshold → stale (observed)', async () => {
+    healthyPid();
+    const now = new Date('2026-07-05T12:00:00.000Z');
+    writeSignalsHeartbeat({
+      schema_version: 1,
+      worker: GRANOLA_SIGNALS_WORKER,
+      last_tick_at: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(), // 3h ago
+      status: 'ok',
+    });
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopSignalsStaleMs: 60 * 60 * 1000,
+      now: () => now,
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const s2 = report.loop.station2;
+    expect(s2.inferred).toBe(false);
+    expect(s2.flags.stale).toBe(true);
+    expect(s2.condition).toBe('stale');
+    const deg = s2.degradations.find((d) => d.scope === 'station-2:stale');
+    expect(deg?.detail.toLowerCase()).toContain('heartbeat');
+  });
+
+  it('station-2 missing heartbeat: falls back to checkpoint-mtime inference with inferred:true', async () => {
+    healthyPid();
+    // No heartbeat file. Checkpoint present but aged past the threshold → the
+    // pre-124 inference path, now explicitly marked inferred:true.
+    const cpPath = writeSignalsCheckpoint({ schema_version: 1, notes: {} });
+    const cpMtime = statSync(cpPath).mtimeMs;
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(),
+      loopSignalsStaleMs: 60 * 60 * 1000,
+      now: () => new Date(cpMtime + 2 * 60 * 60 * 1000), // 2h later → stale (inferred)
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const s2 = report.loop.station2;
+    expect(s2.inferred).toBe(true);
+    expect(s2.heartbeat).toBeNull();
+    expect(s2.flags.stale).toBe(true);
+    expect(s2.condition).toBe('stale');
+    expect(report.overall).toBe('healthy');
+  });
+
+  it('station-2 malformed heartbeat: also falls back to inference (inferred:true), no hard fault', async () => {
+    healthyPid();
+    writeSignalsHeartbeat('{ not json'); // malformed heartbeat is best-effort → infer instead
+    const report = await buildLoop({
+      openStorage: () => new MemoryStorage(), // no checkpoint → never-ran inferred
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const s2 = report.loop.station2;
+    expect(s2.inferred).toBe(true);
+    expect(s2.heartbeat).toBeNull();
+    expect(s2.flags.neverRan).toBe(true);
+    expect(s2.condition).toBe('never-ran');
+    // a malformed heartbeat is NOT a hard fault (unlike a malformed checkpoint)
+    expect(s2.degradations.every((d) => d.severity === 'soft')).toBe(true);
+    expect(report.overall).toBe('healthy');
+  });
+
+  // ─── AC2 (item 124): station-1 source classes derived from store reality ──
+
+  it('station-1 classes: derived from store (fs:/coord:/api:granola), no phantom rows, coord: present', async () => {
+    healthyPid();
+    const storage = new MemoryStorage();
+    await storage.append(atom('fs:/Users/x/session.jsonl', '2026-07-05T08:00:00.000Z'));
+    await storage.append(atom('coord:signals', '2026-07-05T09:00:00.000Z'));
+    await storage.append(atom('api:granola', '2026-07-05T07:00:00.000Z'));
+    const report = await buildLoop({
+      openStorage: () => storage,
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const classes = report.loop.station1.sources.map((s) => s.sourceClass);
+    // present-in-store classes render truthfully…
+    expect(classes).toContain('fs:');
+    expect(classes).toContain('coord:'); // the 18k-events class that was silently omitted
+    expect(classes).toContain('api:granola');
+    // …and the phantom classes are gone (never rendered as a bare count:0)
+    expect(classes).not.toContain('claude-code:');
+    expect(classes).not.toContain('codex:');
+    expect(classes).not.toContain('cursor:');
+    // coord: is present with real atoms, not annotated
+    const coord = report.loop.station1.sources.find((s) => s.sourceClass === 'coord:');
+    expect(coord).toMatchObject({ count: 1 });
+    expect(coord?.annotation).toBeUndefined();
+  });
+
+  it('station-1 classes: a pinned class with zero atoms is annotated, not a bare 0-count', async () => {
+    healthyPid();
+    const storage = new MemoryStorage();
+    await storage.append(atom('fs:/Users/x/session.jsonl', '2026-07-05T08:00:00.000Z'));
+    // no git: atoms — git: is pinned, so it must still appear, annotated
+    const report = await buildLoop({
+      openStorage: () => storage,
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    const git = report.loop.station1.sources.find((s) => s.sourceClass === 'git:');
+    expect(git).toBeDefined();
+    expect(git?.count).toBe(0);
+    expect(git?.annotation).toBe('no atoms with this source class in store');
+    // the annotation is rendered in the human text (not a bare 0-count)
+    const { runDoctor } = await loadDoctor();
+    const out: string[] = [];
+    await runDoctor({
+      stdout: { write: (s) => (out.push(String(s)), true) },
+      fetch: (async () => new Response('{}', { status: 200 })) as typeof fetch,
+      probeAgents: async () => [],
+      codexAdapterCheck: async () => ({ status: 'ok', detail: 'ok' }),
+      openStorage: () => storage,
+      portOwnerLookup: async () => 4242,
+      readPidArgv: async () => ['node', '/repo/dist/daemon/index.js'],
+      loopStalenessDirs: makeStalenessDirs('dist-newer'),
+    });
+    expect(out.join('')).toContain('git: count=0 newest=none (no atoms with this source class in store)');
   });
 
   // ─── Read-only contract (remediation: doctor must not create the db) ──────
