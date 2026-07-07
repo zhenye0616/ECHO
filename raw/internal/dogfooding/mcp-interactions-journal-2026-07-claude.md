@@ -294,3 +294,11 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** —
 - **Conjecture:** none
+
+### 2026-07-07 11:05 PDT — propose_decision x3 SUCCESS — first live decision cards posted to Slack (station 4 opens)
+- **Trigger:** founder configured the Slack workspace app (Socket Mode + bot token + confirm channel); strategist synced env into the daemon plist and re-fired the three staged drafts from the 2026-07-06 fail-closed attempt
+- **Query inputs:** 3x propose_decision {subject, decision, rationale, source_app=claude-code}; same three redacted subjects as the 2026-07-06 20:42 entry (client alert-scope, alert delivery-flow, context-layer atoms)
+- **Returned:** 3x {status: draft_posted, draft_id: b7bf86a3/fd932c54/9def7cd2, confirm_target: C0BFRT0E9L2}
+- **Sources:** n/a — write-path tool; drafts persisted to ~/.echo/state/team-decision-drafts.json, cards posted to the Slack confirm channel; confirm leg = local Socket Mode responder (slack_socket_open at 17:57:17Z)
+- **Verdict:** ✅ right
+- **Note:** two setup landmines en route: (1) launchd `kickstart -k` does NOT reload plist EnvironmentVariables — the daemon kept the old env and propose_decision still fail-closed; required `bootout` + `bootstrap` (and an explicit kickstart after, since RunAtLoad + last-exit-0 left it unstarted); (2) founder's confirm target and responder allowlist were two different channel ids — allowlist now carries both. Awaiting human Confirm clicks to complete the propose→confirm→derived:team-decisions loop.
