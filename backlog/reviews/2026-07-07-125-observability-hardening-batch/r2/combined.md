@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+`claim-ready after R2` — both reviewers `proceed` with zero findings against the r1-patched spec (b195065d). All seven r1 findings verified: AC2 both-stream-directions, AC3 sequential-edge scoping with concurrent-append deferred, AC4 full seed-store enumeration, AC5 required present-db test, files_to_modify concrete test paths. No prior-patch findings, no reframe gate. Promoting proposed → ready.
 

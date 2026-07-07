@@ -22,6 +22,7 @@ files_to_modify:
   - tests/tools/trace-card.test.ts                 # AC1 seed lookup, AC4 --note listing, AC5 present-db byte-identity
   - tests/enrich/brain-retrieval-capture.test.ts   # AC2 proxy stream error handlers (createHttpRetrievalCapture)
   - tests/enrich/granola-intake-card-atom.test.ts  # AC3 double-append guard
+ready_content_sha: 8c5c9edd31b8c17f93e820a2b9fd9252fedb55d71dfbf248a370606a5766c1e3
 ---
 
 ## Problem
