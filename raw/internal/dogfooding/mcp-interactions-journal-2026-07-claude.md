@@ -320,3 +320,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** the exact cold-start scenario the handoff turn planned for worked end-to-end: the pre-clear "am i clear to clean the context window" turn surfaced as the top unresolved open-loop hint, and one hop from it recovered the full decision queue + the still-open pilot-scoping thread in the second session. The other unresolved hint was cross-project (HDC_Det) — correctly present, easily distinguished via repo_root metadata.
 - **Conjecture:** none
+
+### 2026-07-07 13:15 PDT — office-hours Phase 0 pull: org-level-alignment pilot rederivation
+- **Trigger:** founder zoomed out mid-pilot-scoping ("context compounds inside each tool, not at org level — what pilot should I go for?"); /office-hours invoked; Phase 0 requires recovering the prior strategy spine before interrogating
+- **Query inputs:** search_memories{query="org-level alignment", limit=10}
+- **Returned:** 8 matches; recovered the full derivation chain: 07-01 org-alignment reframe (NORTH_STAR rewrite 6655cd2), 109 intake-bridge v0 proposal (5972dcf), 07-03 fractal-context-layering decision (54b51c5), 07-02 office-hours two-product-shapes pull (0beb6a7), plus the 07-03 retraction commit (ba0a4ca, analysis-only order)
+- **Sources:** git:/Users/zhenye/Desktop/Project_echo (majority — decision/journal commits) + fs:~/.claude/projects/-Users-zhenye-Desktop-Project-echo/*.jsonl (office-hours sessions 34b89689, ff664761). Codex/cursor/granola silently absent — consistent, the strategy record is claude+git-authored; notably a prior journal entry already flagged that the claimed PM/client-facing pain has NO captured meeting evidence.
+- **Verdict:** ✅ right
+- **Note:** literal token "org-level alignment" landed the exact decision spine in one call. The retrieval exposes that today's zoom-out is the THIRD derivation of the same thesis (07-01 reframe, 07-02 office-hours, today) — and that the demand evidence gap (founder role-played the nontechnical teammate in the 06-28 intake test; CEO why-query signal never fired) has survived all three derivations untouched. That's what the interrogation should press.
+- **Conjecture:** none
