@@ -311,3 +311,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** —
 - **Conjecture:** none
+
+### 2026-07-07 12:47 PDT — cold-start cross-session recovery after context clear (find_clusters → get_atoms → search_memories)
+- **Trigger:** founder cleared the strategist context window and asked the fresh session to "use echo and connect to my other claude session to understand our next goal"
+- **Query inputs:** find_clusters{} (no-args resume); get_atoms{atom_ids: [8c1a5cdc…, 298041ec…], format=minimal} (the two unresolved open-loop hints); search_memories{source_app=claude_code, since=2026-07-07T18:30:00Z, limit=12}
+- **Returned:** 13 clusters; top cluster ctx_1437b470 = 198 atoms ("discussion about project_echo", rank_reasons: [has_open_loop, has_unresolved_open_loop, code_session_anchor]); get_atoms 2/2 with the pre-clear handoff turn verbatim; search 12 matches covering both sibling sessions (orchestrator wrap-up 8a9f64fc + pilot-scoping 8938e976)
+- **Sources:** cluster source_breakdown={git:80, claude_code:117, codex:1}; atom sources = fs:…/-Users-zhenye-Desktop-Project-echo/{8a9f64fc,8938e976,d7152cd0}.jsonl + one cross-project fs:…/-Users-zhenye-Desktop-HDC-Det/492f57ab.jsonl (correct machine-scoped signal); granola/cursor absent (no activity in window)
+- **Verdict:** ✅ right
+- **Note:** the exact cold-start scenario the handoff turn planned for worked end-to-end: the pre-clear "am i clear to clean the context window" turn surfaced as the top unresolved open-loop hint, and one hop from it recovered the full decision queue + the still-open pilot-scoping thread in the second session. The other unresolved hint was cross-project (HDC_Det) — correctly present, easily distinguished via repo_root metadata.
+- **Conjecture:** none
