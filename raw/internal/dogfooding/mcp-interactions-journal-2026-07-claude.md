@@ -231,3 +231,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ❌ wrong (expected shape: propose should queue pending confirm; got hard requirement on Slack config at propose time)
 - **Note:** the gate's ONLY confirm surface is the Slack card, so station 4 is structurally unreachable until the founder's Slack channel/safety call — propose fails at draft time even though confirmation is the Slack-dependent half. Fail-closed is correct per skill contract; surfaced to operator, no retry, no direct write.
 - **Conjecture:** a propose path that queues drafts locally (pending_confirm state) with Slack needed only for the confirm leg would unblock station-4 seeding without weakening the human gate — observation only, backlog decision belongs to end-of-window synthesis.
+
+### 2026-07-06 21:45 PDT — 057b coord_invoke active-trigger for 123 r2 reviewers (strategist watcher tick)
+- **Trigger:** strategist ran the r1 watcher tick for 2026-07-06-123-card-provenance-trace inline (driver-123's monitor raced out); after push of r2 request.md, fired the 057b post-push hook
+- **Query inputs:** coord_invoke ×2 — role=codex and role=codex-ops, request_path=backlog/reviews/2026-07-06-123-card-provenance-trace/r2/request.md, correlation_id from r2 frontmatter; HTTP POST :38478/mcp, X-Echo-Role: claude
+- **Returned:** both calls HTTP 200, no error payload — daemon accepted both invocations
+- **Sources:** daemon coord layer only (no atom retrieval; invocation-type call). Absent by design: no capture-surface reads.
+- **Verdict:** ✅ right
+- **Note:** the r1→r2 handoff pattern (manual watcher tick + hook fire after a driver-agent stall) worked; duplicate-fire safety relied on wrapper no-op idempotency
+- **Conjecture:** none
