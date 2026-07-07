@@ -179,6 +179,10 @@ describe('runGranolaIntakeBridgeOnce', () => {
         posts.push({ channel, text });
         return { ts: `ts-${posts.length}` };
       },
+      // Item 128: pin the clock so the fixed 2026-06-30 fixtures stay inside the
+      // 30d lookback forever (defuses the 2026-07-30 fuse; wall clock would age
+      // them out). Fixtures untouched.
+      now: () => '2026-06-30T10:06:00.000Z',
     });
 
     expect(result.status).toBe('ok');
@@ -263,6 +267,7 @@ describe('runGranolaIntakeBridgeOnce', () => {
           posts.push(text);
           return { ts: `ts-${posts.length}` };
         },
+        now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so fixtures stay in-lookback (see first test).
       },
     );
 
@@ -288,6 +293,7 @@ describe('runGranolaIntakeBridgeOnce', () => {
         posts.push(text);
         return { ts: `ts-${posts.length}` };
       },
+      now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so fixtures stay in-lookback (see first test).
     };
 
     await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), deps);
@@ -347,6 +353,7 @@ describe('runGranolaIntakeBridgeOnce', () => {
         postSeed: async () => {
           throw new Error('slack 500');
         },
+        now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so fixtures stay in-lookback (see first test).
       },
     );
 

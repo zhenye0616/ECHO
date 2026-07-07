@@ -105,6 +105,7 @@ describe('card provenance atom (item 123 AC1)', () => {
     const result = await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), {
       classify: classifierReturning(OK_RUN),
       postSeed: async () => ({ ts: 'ts-1' }),
+      now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so 2026-06-30 fixtures stay in-lookback (defuses 2026-07-30 fuse).
     });
 
     expect(result).toMatchObject({ status: 'ok', posted: 1 });
@@ -135,6 +136,7 @@ describe('card provenance atom (item 123 AC1)', () => {
     const deps = {
       classify: classifierReturning(OK_RUN),
       postSeed: async () => ({ ts: 'ts-1' }),
+      now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so 2026-06-30 fixtures stay in-lookback (defuses 2026-07-30 fuse).
     };
 
     await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), deps);
@@ -165,6 +167,7 @@ describe('card provenance atom (item 123 AC1)', () => {
       await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), {
         classify: classifierReturning(run),
         postSeed: async () => ({ ts: 'ts' }),
+        now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so 2026-06-30 fixtures stay in-lookback (defuses 2026-07-30 fuse).
       });
       const cards = await store.query({ source: GRANOLA_INTAKE_CARD_SOURCE });
       const cr = (cards[0]!.metadata as unknown as IntakeCardAtomMetadata).classifier_run;
@@ -187,6 +190,7 @@ describe('card provenance atom (item 123 AC1)', () => {
     const deps = {
       classify: classifierReturning(OK_RUN),
       postSeed: async () => ({ ts: 'ts-1' }),
+      now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so 2026-06-30 fixtures stay in-lookback (defuses 2026-07-30 fuse).
     };
 
     // Post still succeeds despite the atom write failing (observability never
@@ -235,6 +239,7 @@ describe('card provenance atom (item 123 AC1)', () => {
     const deps = {
       classify: classifierReturning(OK_RUN),
       postSeed: async () => ({ ts: 'ts-1' }),
+      now: () => '2026-06-30T10:06:00.000Z', // Item 128: pin clock so 2026-06-30 fixtures stay in-lookback (defuses 2026-07-30 fuse).
     };
 
     // Tick 1: post succeeds, atom appended, markPosted throws → markFailure
