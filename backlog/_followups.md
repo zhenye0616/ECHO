@@ -493,3 +493,8 @@ Process lessons folded to R6.merge_mechanics: [119] verify brace balance after k
 - [128 follow-up] grep audit for other injectable-clock/`Date.now()` splits in enrich/ and surfaces/ — the intake cutoff bug (injectable `deps.now` defined but a second raw `Date.now()` used for the lookback cutoff) is a latent class; fold the below vacuous-coverage item into this audit.
 - [128 follow-up] candidates.test.ts:234 internal-only attendee-filter test passes VACUOUSLY after ~2026-07-30 (fixture ages out of the 30d wall-clock window — silent coverage decay, not a fuse). Address inside the injectable-clock grep-audit above.
 - [126 review finding] tests/packaging/packaged-boot.test.ts still uses the TOCTOU findFreePort/canListen over the same 40000-49999 range 126 retired from shell-reachable — retire it the same way (bounded-retry with the daemon/process bind as the allocation signal) when the packaging-test serialization follow-up (127) is picked up
+
+## 129 merge follow-ups (2026-07-07, non-blocking)
+
+- [129 follow-up] cosmetic: parseEmittedAtMs's `Number.isNaN` check is unreachable (canonicalizeTimestamp throws first on a bad value) — harmless defense-in-depth; note only, no fix required.
+- [129 follow-up] real-world validation (spec After-Completion): with an artificially hung reviewer across daemon restarts, confirm the first-ever production `deadline_missed` atom actually appears — the deadline_missed detector is now able to fire in production for the first time.
