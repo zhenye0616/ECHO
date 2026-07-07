@@ -466,3 +466,4 @@ Preserve if still desired; fix opportunistically when the surrounding file is to
 - [123 follow-up] document the proxy-bypass blind spot (child MCP config hardcoding the daemon URL records fake zero_retrievals) when promoting the retrieval-capture mechanism to the wiki house pattern
 - [123 follow-up] optional: seed-store-by-note listing in trace --note mode for pre-123 notes
 - [123 follow-up] optional: dedupe_key existence check before card-atom append to close the markPosted-throw retry double-atom edge
+- [117 follow-up, surfaced by wiki pass] doctor station-2 disable is STILL inferred, not observed — item 120's heartbeat contract is unconsumed by src/cli/ (zero worker-heartbeat refs; STATION2_DISABLE_INFERENCE_NOTE unchanged at doctor.ts:673); wire buildLoopStation2 to read worker heartbeats (117's own named follow-up, never filed)

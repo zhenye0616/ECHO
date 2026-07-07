@@ -2,7 +2,7 @@
 
 Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by hand.
 
-**Status:** 74 pages · 71 shipped · 2 planned
+**Status:** 76 pages · 73 shipped · 2 planned
 
 ---
 
@@ -76,6 +76,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 - [[interface-layers|Interface Layers (1-5)]] — Five layers of user-ECHO communication. V1 ships L1, L3, minimal L5. L2 and L4 deferred.
 - [[local-daemon|Local Daemon]] — Local Node process owning capture, gating, SQLite storage, and MCP retrieval. Single-instance via PID lock; loopback only.
 - [[logger|Logger]] — Structured JSON-per-line logger; createLogger(source) bound to a subsystem; ECHO_LOG_LEVEL filters; one line per call to stdout.
+- [[loop-observability|Loop Observability]] — The read-only health layer over ECHO's own loop: station model + doctor loop report (117), worker heartbeat artifacts (120), live loop dashboard (122), and card provenance trace incl. the recording-proxy retrieval-correlation house pattern (123).
 - [[mcp-compact-view-projection|MCP Compact View Projection]] — Daemon-side field-hygiene projection (view: 'compact') for find_clusters + get_atoms — KEEP/DROP rules, composes with wire-shape caps, default 'rich' preserves byte-identical legacy output (item 064).
 - [[normalization|Normalization (Read-Time)]] — Pure read-time layer that turns raw CaptureEvents into NormalizedContextEvent atoms via per-source adapters; storage stays raw.
 - [[normalized-context-event|NormalizedContextEvent (the atom shape)]] — The joinable contract every read-path consumer speaks: schema_version 1, open vocabularies, observable hints, provenance to raw.
@@ -116,6 +117,7 @@ Auto-generated from `.manifest.json` by `tools/wiki_index.py`. Do not edit by ha
 
 - [[audit-page|Audit Page]] *(planned)* — Minimal Layer 5 surface. See memories, manage permissions, forget. Settings menu, not destination.
 - [[drift-alert|Drift Sweep v0 (Drift Alert)]] — Clocked contradiction detector: joins new Granola statements to confirmed team decisions on canonical_subject, strict-JSON judge, at-most-once Slack Acknowledge/Dismiss card to the owner.
+- [[terminal-intake-card|Terminal Intake Card]] — Stdout surface rendering the Granola meeting -> signals -> classified decision-packet pipeline (stations 1-3) as a plain-text/ANSI card, zero Slack dependency; reuses the intake bridge verbatim with a stdout postSeed; canonical invocation npm run intake:terminal (121 entry guard).
 
 ### Form Factor
 

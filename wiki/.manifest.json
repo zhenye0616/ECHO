@@ -947,5 +947,34 @@
     ],
     "topic": "Form Factor",
     "subtopic": "MCP Server"
+  },
+  "surfaces/terminal-intake-card.md": {
+    "status": "shipped",
+    "title": "Terminal Intake Card",
+    "link": "terminal-intake-card",
+    "summary": "Stdout surface rendering the Granola meeting -> signals -> classified decision-packet pipeline (stations 1-3) as a plain-text/ANSI card, zero Slack dependency; reuses the intake bridge verbatim with a stdout postSeed; canonical invocation npm run intake:terminal (121 entry guard).",
+    "aliases": [
+      "Terminal Intake Card",
+      "intake-terminal",
+      "Station 3 Terminal Card"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Observability"
+  },
+  "architecture/loop-observability.md": {
+    "status": "shipped",
+    "title": "Loop Observability",
+    "link": "loop-observability",
+    "summary": "The read-only health layer over ECHO's own loop: station model + doctor loop report (117), worker heartbeat artifacts (120), live loop dashboard (122), and card provenance trace incl. the recording-proxy retrieval-correlation house pattern (123).",
+    "aliases": [
+      "Loop Observability",
+      "Loop Health",
+      "Doctor Loop Section",
+      "Worker Heartbeats",
+      "Live Loop Dashboard",
+      "Card Provenance Trace"
+    ],
+    "topic": "Architecture",
+    "subtopic": "Observability"
   }
 }
