@@ -159,3 +159,63 @@ Isolated confirmations:
 
 None. Resisted the temptation to fix the intake-terminal time-bomb inline (outside
 `files_to_modify`); escalating instead per AC4 + drift-prevention.
+
+---
+
+## Run 2 (resumed 2026-07-07, post-128 merge) — AC3 completed
+
+### What changed since Run 1
+
+No new code on this branch. The Run 1 escalation was accepted: rather than widening
+126's scope, the founder/strategist shipped hotfix
+`2026-07-07-128-intake-cutoff-injectable-clock` (merged to `main` at `89a06ff5`),
+which applied my recommended product fix verbatim —
+`src/enrich/granola-intake-candidates.ts:477` now computes the cutoff from the
+injectable clock (`new Date(new Date(now()).getTime() - config.lookbackMs)`) and pins
+it with a synthetic-now regression test (`tests/enrich/granola-intake-cutoff-clock.test.ts`),
+leaving the intake fixtures untouched as the proof. That killed the date time-bomb that
+blocked AC3 in Run 1.
+
+Resume was protocol-clean: reclaimed the item (`pending_review/` → `claimed/` on `main`,
+reclaim commit `f27143f4`), merged `origin/main` (with 128) into
+`agent/daemon-smoke-test-serialization` (clean, no conflicts) → branch head
+`aac5d2696f1332496d3e1bae0fd7d2de8264731d`. My two test-only fixes are intact in the
+merge; I did **not** touch 128's files (`granola-intake-candidates.ts` /
+`intake-terminal.test.ts` / the new regression test). Merge brought no dependency
+changes; `tsc --noEmit` clean on the merged tree.
+
+### AC3 — five consecutive green full-suite runs (`npm run test`, this machine)
+
+| Run | Duration | Result | shell-reachable | ceo-slack-brain | Failures |
+|-----|----------|--------|-----------------|-----------------|----------|
+| 1   | 163s     | 2096 passed / 21 skip / 1 todo | ✓ 63.9s | ✓ 3.25s | none |
+| 2   | 176s     | 2096 passed / 21 skip / 1 todo | ✓ 66.6s | ✓ 3.32s | none |
+| 3   | 163s     | 2096 passed / 21 skip / 1 todo | ✓ 68.7s | ✓ 3.35s | none |
+| 4   | 171s     | 2096 passed / 21 skip / 1 todo | ✓ 73.8s | ✓ 5.34s | none |
+| 5   | 189s     | 2096 passed / 21 skip / 1 todo | ✓ 64.2s | ✓ 3.21s | none |
+
+All five `npm run test` runs are fully green (exit 0, zero failures). Both flake-prone
+target tests pass under full-suite CPU contention on every run — shell-reachable runs
+64–74s under load (vs ~26s isolated; the contention that used to flake it is present,
+and the AC1 bounded-retry port holds), ceo-slack-brain 3.2–5.3s (the AC2 timeout+poll
+fix holds). The intake-terminal AC6 tests that were red in Run 1 are now green (the
+2096-passed count is +5 vs Run 1's 2091 passed / 4 failed: the 4 intake-terminal tests
+recovered + 1 new 128 regression test). No flake fired across all five runs, so AC3's
+five-green gate genuinely REPLACES the flaky-rule crutch for this item's gate — nothing
+was waved through.
+
+### Acceptance per criterion (final)
+
+- **AC1** ✅ — race-safe bounded-retry port; TOCTOU `findFreePort`/`canListen` removed.
+- **AC2** ✅ — descendant.pid ENOENT root-caused (timeout-vs-cold-start) + fixed
+  test-internally (timeout 200→2000, killGrace 50→200, bounded pid-file poll); documented.
+- **AC3** ✅ — 5/5 green full-suite runs via exactly `npm run test`, timings above.
+  **Dependency:** required item 128 to land first (it removed the unrelated intake-terminal
+  date time-bomb). AC3 was completed post-128.
+- **AC4** ✅ — no product code changed by this item; the one product defect surfaced during
+  Run 1 diagnosis was escalated (per AC4) and fixed by 128, not by me.
+
+### Drift events (Run 2)
+
+None.
+

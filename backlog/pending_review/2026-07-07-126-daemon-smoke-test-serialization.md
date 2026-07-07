@@ -8,46 +8,38 @@ created: 2026-07-07
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-07T16:32:09Z"
 branch: "agent/daemon-smoke-test-serialization"
-head_sha: "88061f9e10e750f522cc4ed6a48763c804ff33f5"
+head_sha: "aac5d2696f1332496d3e1bae0fd7d2de8264731d"
 pr_url: ""
 agent_notes: |
-  AC1 ✅ and AC2 ✅ complete and verified robust across 3 full-suite runs under
-  load (both target tests green every run). AC3 🔴 BLOCKED and AC4 escape-hatch
-  triggered — escalating instead of drifting.
+  ALL ACs MET. AC1 ✅ AC2 ✅ AC3 ✅ AC4 ✅. Re-handed off after the Run-1
+  escalation was cleared by item 128.
 
-  BLOCKED: AC3 ("5 consecutive green full-suite runs via `npm run test`") cannot
-  be met because the full suite is DETERMINISTICALLY red for a reason outside
-  this item's scope: `tests/tools/intake-terminal.test.ts` fails 4/8 AC6 tests
-  (AC6.1/6.2/6.3a/6.3b, all "0 notes · 0 candidates") on every run and in
-  isolation. Root cause = a date time-bomb: `src/enrich/granola-intake-candidates.ts:477`
-  computes the freshness cutoff from real `Date.now()` (not the injectable `now`),
-  default lookback 7 days, while the tests seed fixtures hardcoded at
-  `updated_at: 2026-06-30` and inject `now: 2026-06-30`. The wall clock rolled to
-  2026-07-07 DURING this session, pushing the fixture just past the 7-day cutoff
-  (now=…T16:42Z, cutoff=2026-06-30T16:42Z, fixture=2026-06-30T10:00Z → filtered).
-  On 2026-07-06 it passed (6 days old).
+  AC1 — race-safe daemon-smoke port: the TOCTOU `findFreePort`/`canListen` (bind
+  then hand the number to the daemon) is replaced by a bounded-retry loop where
+  the daemon's own `install` bind+health IS the allocation signal (retry a fresh
+  random port on failure, with cleanup; finally-cleanup guarded so it never
+  targets the production daemon). Fixed 47095 was already gone; port-0-report-back
+  needs product changes (plist-baked port) that AC4 forbids, so bounded-retry is
+  the AC4-safe path.
 
-  Tried: fixed AC1 (bounded-retry daemon bind+health as the race-safe port
-  signal, TOCTOU findFreePort removed) and AC2 (root-caused the descendant.pid
-  ENOENT as a 200ms-timeout-vs-Node-cold-start race, fixed via timeout 200→2000 +
-  killGrace 50→200 + bounded pid-file poll; documented in the test file). Both
-  pass isolated and across all 3 full-suite runs; the ONLY failures each run are
-  the 4 intake-terminal time-bomb tests. My working tree touches only the two
-  target test files — the intake-terminal failure is byte-for-byte pre-existing
-  on base 3c6ecdd9.
+  AC2 — ceo-slack-brain descendant.pid ENOENT: root-caused as a test-internal
+  timing race (200ms timeout vs Node cold-start + grandchild-spawn + pid write
+  under suite CPU load), not a product bug. Fixed via timeout 200→2000, killGrace
+  50→200, and a bounded pid-file poll (waitForFile); root cause documented in the
+  test file.
 
-  Best guess if forced: expand scope (or spin a new item) to make the intake
-  cutoff use the injectable clock — `new Date(new Date(now()).getTime() -
-  config.lookbackMs)` in runGranolaIntakeBridge — which kills the class and makes
-  the cutoff testable; alternatively date the intake fixtures relative to `now`.
-  Both are outside `files_to_modify` (product code / a third test file).
+  AC3 — 5/5 green full-suite runs via exactly `npm run test` (163/176/163/171/189s;
+  2096 passed, 0 failed each; shell-reachable 64–74s under load, ceo-slack-brain
+  3.2–5.3s; no flake fired). Per-run timings in the run log's "Run 2" section.
+  DEPENDENCY: required item 128 (2026-07-07-128-intake-cutoff-injectable-clock,
+  merged at 89a06ff5) to land first — it removed the unrelated intake-terminal
+  date time-bomb that blocked AC3 in Run 1. This branch merged origin/main (with
+  128) cleanly; I did not touch 128's files.
 
-  Why escalated: AC4 ("test-infra ONLY; if diagnosis reveals a REAL product bug,
-  STOP and escalate via pending_review with evidence — do not paper over product
-  defects with test serialization") + drift-prevention. AC3's green-suite gate is
-  a founder/strategist decision: fix the time-bomb (widen 126 / new item) or
-  accept "green except the pre-existing intake-terminal time-bomb." Full evidence
-  in raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md.
+  AC4 — no product code changed by this item; the one product defect found during
+  Run-1 diagnosis (intake cutoff keyed to real Date.now()) was escalated per AC4
+  and fixed by 128, not here. Full evidence in
+  raw/internal/agent-runs/2026-07-07-126-daemon-smoke-test-serialization.md.
 blocked_by: []
 spec_refs:
   - tests/cli/shell-reachable.test.ts              # the recurring flake: fixed port 47095 health smoke under suite load
