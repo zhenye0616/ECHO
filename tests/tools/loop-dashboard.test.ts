@@ -110,6 +110,13 @@ function fakeLoopReport(overrides: Partial<DoctorLoopReport> = {}): DoctorLoopRe
       checkpointMtimeIso: '2026-07-05T00:00:00.000Z',
       checkpointAgeMs: 1000,
       failingNotes: [],
+      inferred: false,
+      heartbeat: {
+        status: 'ok',
+        reason: null,
+        lastTickAt: '2026-07-05T00:00:00.000Z',
+        lastTickAgeMs: 1000,
+      },
       signalAtoms: { newestTimestamp: '2026-07-05T00:00:00.000Z', count: 5 },
       notes: [],
       degradations: [],

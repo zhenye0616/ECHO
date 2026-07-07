@@ -29,6 +29,12 @@ import {
   FileGranolaIntakeSeedStore,
   type GranolaIntakeSeedStatus,
 } from '../../enrich/granola-intake-seed-store.js';
+import {
+  GRANOLA_SIGNALS_WORKER,
+  workerHeartbeatPath,
+  type WorkerHeartbeat,
+} from '../../enrich/worker-heartbeat.js';
+import { COORD_SOURCE_PREFIX } from '../../coord/types.js';
 
 export interface DoctorReport {
   daemon: {
@@ -104,6 +110,11 @@ export interface LoopCaptureSourceHealth {
   sourceClass: string;
   newestTimestamp: string | null;
   count: number;
+  // AC2: a pinned always-interesting class that has zero atoms in the store is
+  // annotated so a 0-count reads as "nothing captured with this class yet"
+  // rather than "capture is broken". Omitted for classes actually present in
+  // the store (count > 0) — those need no disambiguation.
+  annotation?: string;
 }
 
 export interface LoopGranolaCheckpoint {
@@ -127,6 +138,7 @@ export type Station1Condition =
   | 'storage-error';
 export type Station2Condition =
   | 'active'
+  | 'disabled'
   | 'never-ran'
   | 'stale'
   | 'checkpoint-unreadable'
@@ -156,6 +168,16 @@ export interface LoopFailingNote {
   lastFailureReason?: string;
 }
 
+// AC1: the observed slice of the signal worker's item-120 heartbeat. Present
+// (non-null) exactly when a well-formed heartbeat was read; `null` when the
+// station fell back to checkpoint-mtime inference (see `LoopStation2.inferred`).
+export interface LoopStation2Heartbeat {
+  status: WorkerHeartbeat['status'];
+  reason: string | null;
+  lastTickAt: string;
+  lastTickAgeMs: number | null;
+}
+
 export interface LoopStation2 {
   status: LoopStatus;
   condition: Station2Condition;
@@ -164,6 +186,12 @@ export interface LoopStation2 {
   checkpointAgeMs: number | null;
   failingNotes: LoopFailingNote[];
   signalAtoms: { newestTimestamp: string | null; count: number } | null;
+  // AC1: `true` when disabled/staleness were inferred from checkpoint mtime
+  // because no well-formed heartbeat existed; `false` when observed from the
+  // item-120 heartbeat. Always present so the report never reports an inferred
+  // state as if it were observed.
+  inferred: boolean;
+  heartbeat: LoopStation2Heartbeat | null;
   notes: string[];
   degradations: LoopDegradation[];
 }
@@ -208,15 +236,36 @@ export interface DoctorLoopReport {
   status: LoopStatus;
 }
 
-/** Capture source classes surfaced by station 1, keyed by source prefix. */
+/** Pinned "always-interesting" capture source classes surfaced by station 1,
+ *  keyed by source prefix. These are ALWAYS listed even when they have zero
+ *  atoms (annotated, not a bare 0-count) so an operator can see the load-bearing
+ *  capture surfaces at a glance. Station 1 unions this with the classes actually
+ *  present in the store (AC2: `deriveStoreSourceClasses`).
+ *
+ *  The former phantom entries `claude-code:` / `codex:` / `cursor:` are gone:
+ *  every session extractor emits `fs:`-prefixed atoms, so those three prefixes
+ *  read `count: 0` forever by construction (implying broken capture that isn't
+ *  broken). `coord:` — 18k+ live coordination events that were silently omitted
+ *  — is now pinned. Capture-side prefix attribution (making the extractors emit
+ *  per-app prefixes) is a separate, out-of-scope decision. */
 export const LOOP_CAPTURE_SOURCE_CLASSES: readonly string[] = [
   GRANOLA_SOURCE, // api:granola
   'git:',
   'fs:',
-  'claude-code:',
-  'codex:',
-  'cursor:',
+  COORD_SOURCE_PREFIX, // coord:
 ];
+
+/** Bound on the recent-window scan used to derive which source classes are
+ *  actually present in the store (AC2). Doctor is an occasional diagnostic, not
+ *  a hot path; a bounded newest-first scan keeps the query cheap while still
+ *  surfacing any class that is actively producing atoms. The pinned set above
+ *  guarantees the load-bearing surfaces appear regardless of this window, so a
+ *  rarely-written class older than the window is only ever an omission from the
+ *  DERIVED set, never from the pinned set. */
+export const LOOP_SOURCE_CLASS_DERIVE_SCAN_LIMIT = 5_000;
+
+/** The annotation attached to a pinned class with zero atoms in the store. */
+const LOOP_EMPTY_SOURCE_CLASS_ANNOTATION = 'no atoms with this source class in store';
 
 /** derived:team-decisions atoms (station 4 preview count only). */
 const LOOP_TEAM_DECISION_SOURCE = 'derived:team-decisions';
@@ -518,13 +567,16 @@ function station1Condition(degradations: readonly LoopDegradation[]): Station1Co
 
 function station2Condition(
   degradations: readonly LoopDegradation[],
-  flags: { neverRan: boolean; stale: boolean },
+  flags: { neverRan: boolean; stale: boolean; disabled: boolean },
 ): Station2Condition {
   const cp = degradations.find((d) => d.scope === 'station-2:checkpoint');
   if (cp?.severity === 'hard') return 'checkpoint-unreadable';
   if (degradations.some((d) => d.scope === 'station-2:storage' && d.severity === 'hard')) {
     return 'storage-error';
   }
+  // Observed disabled (from the heartbeat) outranks the inferred never-ran/stale
+  // states — it is a certain signal, not a mtime guess.
+  if (flags.disabled) return 'disabled';
   if (flags.neverRan) return 'never-ran';
   if (flags.stale) return 'stale';
   return 'active';
@@ -570,9 +622,42 @@ function readJsonFileStrict(path: string): unknown {
 async function queryClassHealth(
   storage: Storage,
   sourceClass: string,
+  pinned: boolean,
 ): Promise<LoopCaptureSourceHealth> {
   const rows = await storage.query({ source_prefix: sourceClass, order: 'desc' });
-  return { sourceClass, newestTimestamp: rows[0]?.timestamp ?? null, count: rows.length };
+  const health: LoopCaptureSourceHealth = {
+    sourceClass,
+    newestTimestamp: rows[0]?.timestamp ?? null,
+    count: rows.length,
+  };
+  // AC2: only a PINNED class can be listed with zero atoms (derived classes are
+  // present by construction). Annotate that zero so it does not read as broken.
+  if (pinned && rows.length === 0) health.annotation = LOOP_EMPTY_SOURCE_CLASS_ANNOTATION;
+  return health;
+}
+
+/** AC2: map a raw `source` string to its capture "class" key. `api:granola`
+ *  keeps its two-segment granularity (matching the pinned constant + the
+ *  historical station-1 row); every other source collapses to the prefix up to
+ *  and including its first `:` (e.g. `git:Project_echo` → `git:`,
+ *  `coord:signals` → `coord:`, `derived:team-decisions` → `derived:`). A source
+ *  with no `:` maps to itself. */
+function sourceClassOf(source: string): string {
+  if (source === GRANOLA_SOURCE || source.startsWith(`${GRANOLA_SOURCE}:`)) return GRANOLA_SOURCE;
+  const idx = source.indexOf(':');
+  return idx >= 0 ? source.slice(0, idx + 1) : source;
+}
+
+/** AC2: the distinct source classes actually present in the store, from a
+ *  bounded newest-first scan (see `LOOP_SOURCE_CLASS_DERIVE_SCAN_LIMIT`). */
+async function deriveStoreSourceClasses(storage: Storage): Promise<Set<string>> {
+  const rows = await storage.query({
+    order: 'desc',
+    limit: LOOP_SOURCE_CLASS_DERIVE_SCAN_LIMIT,
+  });
+  const classes = new Set<string>();
+  for (const row of rows) classes.add(sourceClassOf(row.source));
+  return classes;
 }
 
 async function queryExactHealth(
@@ -598,8 +683,19 @@ async function buildLoopStation1(
     );
   } else {
     try {
-      for (const sourceClass of LOOP_CAPTURE_SOURCE_CLASSES) {
-        sources.push(await queryClassHealth(storage, sourceClass));
+      // AC2: the row set is the pinned always-interesting classes UNIONED with
+      // the classes actually present in the store. Pinned classes keep their
+      // fixed order and lead; any derived-but-not-pinned class (e.g. `derived:`)
+      // follows in sorted order. Pinned-and-empty rows carry an annotation.
+      const pinned = LOOP_CAPTURE_SOURCE_CLASSES;
+      const pinnedSet = new Set(pinned);
+      const derived = await deriveStoreSourceClasses(storage);
+      const derivedOnly = [...derived].filter((c) => !pinnedSet.has(c)).sort();
+      for (const sourceClass of pinned) {
+        sources.push(await queryClassHealth(storage, sourceClass, true));
+      }
+      for (const sourceClass of derivedOnly) {
+        sources.push(await queryClassHealth(storage, sourceClass, false));
       }
     } catch (err) {
       degradations.push({
@@ -670,10 +766,44 @@ async function buildLoopStation1(
   };
 }
 
-const STATION2_DISABLE_INFERENCE_NOTE =
-  'In-process permanent-disable (a brain/config parse typo) is NOT observable from files; it is inferred as `never-ran`/`stale`. Check daemon startup logs for `granola-signals` config errors.';
+// AC1: observed-first semantics. When the granola-signals worker's item-120
+// heartbeat is present, disable/degraded state and liveness are OBSERVED from it
+// (`inferred: false`). Only when the heartbeat is missing/malformed does the
+// station fall back to checkpoint-mtime inference (`inferred: true`) — the old
+// behavior, where an in-process permanent-disable could only be guessed at.
+const STATION2_OBSERVED_NOTE =
+  'Disable/degraded state + liveness are observed from the `granola-signals` worker heartbeat (item 120) when present. A missing/malformed heartbeat falls back to checkpoint-mtime inference (reported with `inferred: true`); in that mode an in-process permanent-disable is not directly observable — check daemon startup logs for `granola-signals` config errors.';
 const STATION2_SUPERSEDE_NOTE =
   'signal-atom count includes superseded extraction runs (supersede is logical latest-wins; atoms are append-only).';
+
+/** AC1: read + validate the granola-signals worker heartbeat (item 120). A
+ *  missing OR malformed file yields `null` — the caller then falls back to
+ *  checkpoint-mtime inference. A malformed heartbeat is NOT a hard fault (unlike
+ *  a malformed checkpoint): heartbeats are best-effort atomic overwrites, so a
+ *  stale/partial one just means "cannot observe right now, infer instead". */
+function readSignalsHeartbeat(now: Date): LoopStation2Heartbeat | null {
+  const path = workerHeartbeatPath(GRANOLA_SIGNALS_WORKER);
+  if (!existsSync(path)) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+  if (typeof raw !== 'object' || raw === null) return null;
+  const hb = raw as Partial<WorkerHeartbeat>;
+  const status = hb.status;
+  if (status !== 'ok' && status !== 'degraded' && status !== 'disabled') return null;
+  if (typeof hb.last_tick_at !== 'string' || hb.last_tick_at.length === 0) return null;
+  const tickMs = new Date(hb.last_tick_at).getTime();
+  const lastTickAgeMs = Number.isFinite(tickMs) ? now.getTime() - tickMs : null;
+  return {
+    status,
+    reason: typeof hb.reason === 'string' ? hb.reason : null,
+    lastTickAt: hb.last_tick_at,
+    lastTickAgeMs,
+  };
+}
 
 async function buildLoopStation2(
   storage: Storage | null,
@@ -683,42 +813,31 @@ async function buildLoopStation2(
   staleMs: number,
 ): Promise<LoopStation2> {
   const degradations: LoopDegradation[] = [];
-  const notes = [STATION2_DISABLE_INFERENCE_NOTE, STATION2_SUPERSEDE_NOTE];
+  const notes = [STATION2_OBSERVED_NOTE, STATION2_SUPERSEDE_NOTE];
   const cpPath = granolaSignalCheckpointPath();
+
+  const heartbeat = readSignalsHeartbeat(now);
+  const inferred = heartbeat === null;
 
   let neverRan = false;
   let stale = false;
+  let disabled = false;
   let checkpointMtimeIso: string | null = null;
   let checkpointAgeMs: number | null = null;
   const failingNotes: LoopFailingNote[] = [];
 
-  if (!existsSync(cpPath)) {
-    neverRan = true;
-    degradations.push({
-      scope: 'station-2:checkpoint',
-      severity: 'soft',
-      path: cpPath,
-      detail: 'signal-worker checkpoint not found — the worker has not run (or is disabled).',
-      remediation:
-        'Check daemon startup logs for `granola-signals` config errors (e.g. an invalid ECHO_GRANOLA_SIGNAL_BRAIN).',
-    });
-  } else {
+  // Checkpoint read — ALWAYS attempted (both observed + inferred paths) for
+  // per-note failure entries + the mtime display + a malformed-file hard fault.
+  // The liveness/never-ran/stale DECISION is made afterward, heartbeat-first.
+  const checkpointPresent = existsSync(cpPath);
+  let checkpointReadOk = false;
+  if (checkpointPresent) {
     try {
       const mtimeMs = statSync(cpPath).mtimeMs;
       checkpointMtimeIso = new Date(mtimeMs).toISOString();
       checkpointAgeMs = now.getTime() - mtimeMs;
-      stale = checkpointAgeMs > staleMs;
-      if (stale) {
-        degradations.push({
-          scope: 'station-2:stale',
-          severity: 'soft',
-          path: cpPath,
-          detail: `signal-worker checkpoint is stale (${Math.round(checkpointAgeMs / 60000)} min since last activity).`,
-          remediation:
-            'Check daemon startup logs for `granola-signals` config errors; a config-parse typo permanently disables the worker at boot.',
-        });
-      }
       const checkpoint = loadGranolaSignalCheckpoint(cpPath);
+      checkpointReadOk = true;
       for (const [noteId, entry] of Object.entries(checkpoint.notes)) {
         const lastFailureAt = entry.last_failure_at;
         const lastSuccessAt = entry.last_success_at;
@@ -756,6 +875,74 @@ async function buildLoopStation2(
     }
   }
 
+  if (heartbeat !== null) {
+    // OBSERVED (AC1): disable/degraded + liveness come from the heartbeat's
+    // last-tick timestamp, NOT checkpoint mtime. A fresh heartbeat on a quiet
+    // day (nothing extracted → old checkpoint) reports healthy.
+    const hbPath = workerHeartbeatPath(GRANOLA_SIGNALS_WORKER);
+    if (heartbeat.status === 'disabled') {
+      disabled = true;
+      degradations.push({
+        scope: 'station-2:disabled',
+        severity: 'soft',
+        path: hbPath,
+        detail: `signal-worker is disabled (observed): ${heartbeat.reason ?? 'no reason recorded'}.`,
+        remediation:
+          'Re-enable the `granola-signals` worker (check ECHO_GRANOLA_SIGNAL_BRAIN / config) and restart the daemon.',
+      });
+    } else {
+      if (heartbeat.status === 'degraded') {
+        // The f19dc419 silent-brain-down class: worker alive + ticking, but its
+        // last tick could not do its job. Surfaced, never read as healthy.
+        degradations.push({
+          scope: 'station-2:degraded',
+          severity: 'soft',
+          path: hbPath,
+          detail: `signal-worker last tick was degraded (observed): ${heartbeat.reason ?? 'no reason recorded'}.`,
+          remediation:
+            'Check the `granola-signals` brain/judge availability; a degraded tick means the worker ran but could not extract.',
+        });
+      }
+      stale = heartbeat.lastTickAgeMs !== null && heartbeat.lastTickAgeMs > staleMs;
+      if (stale) {
+        degradations.push({
+          scope: 'station-2:stale',
+          severity: 'soft',
+          path: hbPath,
+          detail: `signal-worker last tick was ${Math.round((heartbeat.lastTickAgeMs ?? 0) / 60000)} min ago (observed via heartbeat).`,
+          remediation:
+            'Confirm the daemon is running; the `granola-signals` worker ticks every 5 min, so a gap this long means it stalled or the daemon stopped.',
+        });
+      }
+    }
+  } else {
+    // INFERRED FALLBACK (missing/malformed heartbeat): the prior behavior —
+    // staleness/never-ran guessed from checkpoint mtime, reported inferred:true.
+    if (!checkpointPresent) {
+      neverRan = true;
+      degradations.push({
+        scope: 'station-2:checkpoint',
+        severity: 'soft',
+        path: cpPath,
+        detail: 'signal-worker checkpoint not found — the worker has not run (or is disabled).',
+        remediation:
+          'Check daemon startup logs for `granola-signals` config errors (e.g. an invalid ECHO_GRANOLA_SIGNAL_BRAIN).',
+      });
+    } else if (checkpointReadOk && checkpointAgeMs !== null) {
+      stale = checkpointAgeMs > staleMs;
+      if (stale) {
+        degradations.push({
+          scope: 'station-2:stale',
+          severity: 'soft',
+          path: cpPath,
+          detail: `signal-worker checkpoint is stale (${Math.round(checkpointAgeMs / 60000)} min since last activity).`,
+          remediation:
+            'Check daemon startup logs for `granola-signals` config errors; a config-parse typo permanently disables the worker at boot.',
+        });
+      }
+    }
+  }
+
   let signalAtoms: { newestTimestamp: string | null; count: number } | null = null;
   if (storage === null) {
     degradations.push(
@@ -777,11 +964,13 @@ async function buildLoopStation2(
 
   return {
     status: stationStatus(degradations),
-    condition: station2Condition(degradations, { neverRan, stale }),
+    condition: station2Condition(degradations, { neverRan, stale, disabled }),
     flags: { neverRan, stale },
     checkpointMtimeIso,
     checkpointAgeMs,
     failingNotes,
+    inferred,
+    heartbeat,
     signalAtoms,
     notes,
     degradations,

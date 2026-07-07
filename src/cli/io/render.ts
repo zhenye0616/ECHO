@@ -116,7 +116,12 @@ export function renderLoopLines(report: DoctorReport): string[] {
     `loop station-1 capture [${s1.condition}]: granola-checkpoint=${cp.present ? 'present' : 'absent'} high_water_mark=${cp.highWaterMark ?? 'none'} last_synced_at=${cp.lastSyncedAt ?? 'none'} ingested_notes=${cp.ingestedNoteCount ?? 'n/a'}`,
   );
   for (const src of s1.sources) {
-    lines.push(`  ${src.sourceClass} count=${src.count} newest=${src.newestTimestamp ?? 'none'}`);
+    // A pinned class with zero atoms carries an annotation so its 0-count reads
+    // as "nothing captured yet", not "capture broken" (doctor item 124 AC2).
+    const suffix = src.annotation !== undefined ? ` (${src.annotation})` : '';
+    lines.push(
+      `  ${src.sourceClass} count=${src.count} newest=${src.newestTimestamp ?? 'none'}${suffix}`,
+    );
   }
 
   const s2 = loop.station2;
