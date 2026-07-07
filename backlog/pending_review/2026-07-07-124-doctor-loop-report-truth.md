@@ -9,6 +9,38 @@ blocked_by: []
 claimed_by: "cc-124"
 claimed_at: "2026-07-07T07:27:15Z"
 branch: "agent/doctor-loop-report-truth"
+head_sha: "5042b0890efd6a6c9568c895331ce7deed7fd433"
+agent_notes: |
+  Implemented AC1-AC4. AC1: buildLoopStation2 reads the granola-signals worker
+  heartbeat (120 contract) — disabled/reason + liveness/staleness from
+  last_tick_at, not checkpoint mtime; quiet-day (fresh heartbeat, old checkpoint,
+  nothing extracted) reports healthy (the observed 2026-07-06 false alarm is a
+  named regression test); missing/malformed heartbeat falls back to
+  checkpoint-mtime inference with an explicit inferred:true marker + heartbeat:null;
+  inference note rewritten observed-first. New LoopStation2 fields: inferred,
+  heartbeat; new Station2Condition 'disabled'. AC2: station-1 rows = pinned
+  always-interesting classes (api:granola, git:, fs:, coord:) UNIONed with classes
+  present in the store (bounded distinct-prefix scan); phantom
+  claude-code:/codex:/cursor: dropped, coord: (18k+ events) surfaced; zero-atom
+  pinned class annotated 'no atoms with this source class in store' (rendered in
+  doctor text). No extractor prefix changes. AC3: /api/status shape stayed
+  compatible (sources typed opaque) — tools/loop-dashboard.ts UNTOUCHED; only the
+  dashboard test's fakeLoopReport fixture updated for the two new station2 fields.
+  AC4: 6 new fixture-driven doctor-loop tests, all green.
+  Gate: doctor-loop 31/31, loop-dashboard 13/13, lint rc0, typecheck rc0, full
+  test 2084 pass with the single item-126 known flake (shell-reachable) which
+  passes in isolation (24.5s).
+  REVIEWER FLAGS (see run log): (1) src/cli/io/render.ts is edited but is NOT in
+  the PROVISIONAL files_to_modify list — required by AC2's "not a bare 0-count"
+  rendering clause (3-line change). (2) Observed disabled/degraded = SOFT
+  (does not downgrade overall) — deliberate: primary bug was a false alarm;
+  truth is surfaced via condition + heartbeat field + soft degradation; making
+  it hard would change the pinned overall-rollup contract (founder policy call,
+  not made unilaterally). (3) degraded heartbeat surfaced as soft
+  station-2:degraded (condition stays active) though AC1 names only disabled.
+  ALSO: tools/blocked.py aborts globally (RC=2) on
+  backlog/proposed/2026-07-07-126-...md priority 'MEDIUM' (must be HIGH/MED/LOW) —
+  a different proposed item; flagged for the strategist as it blocks the selector.
 spec_refs:
   - src/cli/commands/doctor.ts                     # buildLoopStation2 (~:678), STATION2_DISABLE_INFERENCE_NOTE (~:673), LOOP_CAPTURE_SOURCE_CLASSES (~:212)
   - src/enrich/worker-heartbeat.ts                 # 120's exported contract: paths, WorkerName set, WorkerHeartbeat type
