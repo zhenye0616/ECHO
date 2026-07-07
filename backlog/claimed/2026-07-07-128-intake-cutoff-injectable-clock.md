@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 0.25d
 created: 2026-07-07
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-07T17:18:17Z"
+branch: "agent/intake-cutoff-injectable-clock"
 blocked_by: []
 fast_track: |
   Main is deterministically RED: tests/tools/intake-terminal.test.ts fails 4/8
