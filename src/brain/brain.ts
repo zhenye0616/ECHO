@@ -987,6 +987,17 @@ export function createHttpRetrievalCapture(): RetrievalCapture {
       let fatalError: string | undefined;
 
       const server: HttpServer = createHttpServer((creq, cres) => {
+        // AC2 (item 125): the downstream client is the brain child. If it is
+        // killed mid-stream (e.g. classifier timeout), proxying the response to
+        // `cres` raises EPIPE / ERR_STREAM_DESTROYED as an 'error' event on the
+        // response stream. Without this listener that error is unhandled and
+        // crashes the hosting worker. Record it as a capture failure — finish()
+        // then throws → capture_failed per the 123 contract — instead of
+        // propagating. Attached before any write so a destroy at any phase is
+        // caught.
+        cres.on('error', (err) => {
+          fatalError = boundedReason(err.message);
+        });
         const chunks: Buffer[] = [];
         creq.on('data', (c: Buffer) => chunks.push(c));
         creq.on('end', () => {
@@ -1003,14 +1014,33 @@ export function createHttpRetrievalCapture(): RetrievalCapture {
               headers,
             },
             (ures) => {
-              cres.writeHead(ures.statusCode ?? 502, ures.headers);
+              // AC2 (item 125): the upstream is the ECHO MCP server. If its
+              // connection is destroyed after the response started (mid-stream
+              // reset/timeout), `ures` emits 'error'; unhandled it crashes the
+              // worker. Mark the capture failed and finish the downstream
+              // response cleanly rather than propagating.
+              ures.on('error', (err) => {
+                fatalError = boundedReason(err.message);
+                if (!cres.writableEnded && !cres.destroyed) cres.end();
+              });
+              if (!cres.destroyed) cres.writeHead(ures.statusCode ?? 502, ures.headers);
               const rchunks: Buffer[] = [];
               ures.on('data', (c: Buffer) => {
                 rchunks.push(c);
-                cres.write(c);
+                // Guard against write-after-end. A write to a destroyed
+                // downstream (killed brain child) is recorded as a capture
+                // failure — caught here whether it throws synchronously or
+                // (via the cres 'error' listener) emits asynchronously.
+                if (!cres.writableEnded) {
+                  try {
+                    cres.write(c);
+                  } catch (err) {
+                    fatalError = boundedReason((err as Error).message);
+                  }
+                }
               });
               ures.on('end', () => {
-                cres.end();
+                if (!cres.writableEnded && !cres.destroyed) cres.end();
                 try {
                   const found = extractRetrievalsFromExchange(
                     requestBody.toString('utf8'),
@@ -1027,14 +1057,14 @@ export function createHttpRetrievalCapture(): RetrievalCapture {
           );
           ureq.on('error', (err) => {
             fatalError = boundedReason(err.message);
-            if (!cres.headersSent) cres.writeHead(502);
-            cres.end();
+            if (!cres.headersSent && !cres.destroyed) cres.writeHead(502);
+            if (!cres.writableEnded && !cres.destroyed) cres.end();
           });
           ureq.end(requestBody);
         });
         creq.on('error', () => {
-          if (!cres.headersSent) cres.writeHead(400);
-          cres.end();
+          if (!cres.headersSent && !cres.destroyed) cres.writeHead(400);
+          if (!cres.writableEnded && !cres.destroyed) cres.end();
         });
       });
 

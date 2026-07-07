@@ -583,7 +583,7 @@ function heartbeatLine(hb) {
   if (!hb) return "";
   if (hb.error) return '<div class="hb">worker heartbeat: ' + chip("unknown") + " " + esc(hb.error) + "</div>";
   var counters = hb.counters && Object.keys(hb.counters).length
-    ? " · " + Object.keys(hb.counters).map(function (k) { return k + "=" + hb.counters[k]; }).join(" ") : "";
+    ? " · " + Object.keys(hb.counters).map(function (k) { return esc(k) + "=" + esc(hb.counters[k]); }).join(" ") : "";
   return '<div class="hb">worker <code>' + esc(hb.worker) + "</code> " + chip(hb.status)
     + (hb.reason ? " · " + esc(hb.reason) : "")
     + " · tick " + esc(hb.last_tick_at) + counters + "</div>";

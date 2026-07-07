@@ -5,11 +5,20 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { buildCardTrace, runTraceCard, type TraceInput } from '../../tools/trace-card.js';
+import {
+  buildCardTrace,
+  enumerateSeedStorePaths,
+  runTraceCard,
+  seedStorePathForChannel,
+  type TraceInput,
+} from '../../tools/trace-card.js';
 import {
   GRANOLA_INTAKE_CARD_SOURCE,
+  granolaIntakeSeedStorePath,
   type IntakeCardAtomMetadata,
 } from '../../src/enrich/granola-intake-candidates.js';
+import { TERMINAL_CHANNEL_SENTINEL, terminalSeedStorePath } from '../../tools/intake-terminal.js';
+import { ECHO_HOME_PATHS, setEchoHomeRoot } from '../../src/echo-home/paths.js';
 import { FileGranolaIntakeSeedStore } from '../../src/enrich/granola-intake-seed-store.js';
 import type { ClassifierRunRecord } from '../../src/brain/brain.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
@@ -73,13 +82,14 @@ async function appendCard(
   store: MemoryStorage,
   run: ClassifierRunRecord,
   key = KEY,
+  channelId = 'C-INTAKE',
 ): Promise<void> {
   const meta: IntakeCardAtomMetadata = {
     card_version: 1,
     dedupe_key: `granola:card:${key}`,
     candidate_key: key,
     note_id: 'note-1',
-    channel_id: 'C-INTAKE',
+    channel_id: channelId,
     fields: { request: 'Add amendment alerts', clientProject: 'Acme' },
     signal_refs: [key],
     seed_status_at: '2026-06-30T10:06:00.000Z',
@@ -272,5 +282,174 @@ describe('trace-card strictly read-only (item 123 AC4)', () => {
     const reopened = new SqliteStorage(dbPath);
     expect(await reopened.count()).toBe(countBefore);
     reopened.close();
+  });
+
+  // AC5 (item 125): belt-and-braces complement to the absent-db case above —
+  // a PRESENT echo.db must be byte-identical before and after a full trace.
+  it('leaves a present echo.db byte-identical (SELECT-only read path)', async () => {
+    const scratch = await tempDir();
+    const dbPath = join(scratch, 'echo.db');
+    const seedPath = join(scratch, 'seeds.json');
+    const seeded = new SqliteStorage(dbPath);
+    await seeded.append({
+      source: GRANOLA_INTAKE_CARD_SOURCE,
+      timestamp: '2026-06-30T10:06:00.000Z',
+      content: 'card',
+      metadata: {
+        card_version: 1,
+        dedupe_key: `granola:card:${KEY}`,
+        candidate_key: KEY,
+        note_id: 'note-1',
+        channel_id: 'C',
+        fields: {},
+        signal_refs: [KEY],
+        seed_status_at: 't',
+        slack_ts: 'ts',
+        classifier_run: OK_RUN,
+      },
+    });
+    // Closing the only connection checkpoints the WAL into echo.db and removes
+    // the -wal/-shm sidecars, so the main db file is fully materialized here.
+    seeded.close();
+
+    const hash = (p: string): string =>
+      createHash('sha256').update(readFileSync(p)).digest('hex');
+    const before = hash(dbPath);
+
+    const code = await runTraceCard(
+      [KEY, '--db', dbPath, '--seed-store', seedPath],
+      {},
+      { out: () => undefined, err: () => undefined },
+    );
+    expect(code).toBe(0);
+
+    expect(hash(dbPath)).toBe(before);
+  });
+});
+
+// ─── AC1 (item 125): channel-aware seed-store resolution ─────────────────────
+
+describe('seed-store resolution by channel (item 125 AC1/AC4)', () => {
+  it('maps the terminal sentinel to .terminal.json and other channels to default', () => {
+    expect(seedStorePathForChannel(TERMINAL_CHANNEL_SENTINEL)).toBe(terminalSeedStorePath());
+    expect(seedStorePathForChannel('C-REAL-SLACK')).toBe(granolaIntakeSeedStorePath());
+    expect(seedStorePathForChannel(undefined)).toBe(granolaIntakeSeedStorePath());
+    expect(enumerateSeedStorePaths()).toEqual([
+      granolaIntakeSeedStorePath(),
+      terminalSeedStorePath(),
+    ]);
+  });
+
+  it('reads a terminal card\'s seed from the channel-resolved store, not the default', async () => {
+    const store = new MemoryStorage();
+    await appendSignal(store);
+    await appendCard(store, OK_RUN, KEY, TERMINAL_CHANNEL_SENTINEL);
+
+    const defaultStore = await emptySeedStore(); // deliberately has no record
+    const terminalStore = await emptySeedStore();
+    await terminalStore.claim({ candidateKey: KEY, noteId: 'note-1', channelId: TERMINAL_CHANNEL_SENTINEL });
+    await terminalStore.markPosting(KEY);
+    await terminalStore.markPosted(KEY, 'ts-terminal');
+
+    const traceInput: TraceInput = {
+      storage: store,
+      seedStore: defaultStore,
+      dbPathForMessages: '/nonexistent/echo.db',
+      resolveSeedStore: (channelId) =>
+        channelId === TERMINAL_CHANNEL_SENTINEL ? terminalStore : defaultStore,
+      seedStores: [defaultStore, terminalStore],
+    };
+    const trace = await buildCardTrace(traceInput, { candidateKey: KEY });
+    // Resolved from the terminal store — the default store would have rendered
+    // the "(no seed record ...)" line (the live-trace bug).
+    expect(trace).toContain('seed: status=posted');
+    expect(trace).not.toContain('(no seed record for this candidate_key)');
+  });
+
+  it('fires the provenance-loss banner from a terminal-store failed marker', async () => {
+    const store = new MemoryStorage();
+    await appendSignal(store);
+    await appendCard(store, OK_RUN, KEY, TERMINAL_CHANNEL_SENTINEL);
+
+    const defaultStore = await emptySeedStore();
+    const terminalStore = await emptySeedStore();
+    await terminalStore.claim({ candidateKey: KEY, noteId: 'note-1', channelId: TERMINAL_CHANNEL_SENTINEL });
+    await terminalStore.markPosting(KEY);
+    await terminalStore.markPosted(KEY, 'ts-1', { status: 'failed', error: 'disk full' });
+
+    const traceInput: TraceInput = {
+      storage: store,
+      seedStore: defaultStore,
+      dbPathForMessages: '/nonexistent/echo.db',
+      resolveSeedStore: (channelId) =>
+        channelId === TERMINAL_CHANNEL_SENTINEL ? terminalStore : defaultStore,
+      seedStores: [defaultStore, terminalStore],
+    };
+    const trace = await buildCardTrace(traceInput, { candidateKey: KEY });
+    expect(trace).toContain('PROVENANCE LOSS: card atom write FAILED at post time — disk full');
+  });
+
+  it('runTraceCard resolves a terminal card end-to-end without --seed-store', async () => {
+    const savedRoot = ECHO_HOME_PATHS.root;
+    const home = await tempDir();
+    try {
+      setEchoHomeRoot(home);
+      const dbPath = join(home, 'echo.db');
+      const db = new SqliteStorage(dbPath);
+      await db.append({
+        source: GRANOLA_INTAKE_CARD_SOURCE,
+        timestamp: '2026-06-30T10:06:00.000Z',
+        content: 'terminal card',
+        metadata: {
+          card_version: 1,
+          dedupe_key: `granola:card:${KEY}`,
+          candidate_key: KEY,
+          note_id: 'note-1',
+          channel_id: TERMINAL_CHANNEL_SENTINEL,
+          fields: {},
+          signal_refs: [KEY],
+          seed_status_at: 't',
+          slack_ts: 'ts',
+          classifier_run: OK_RUN,
+        },
+      });
+      db.close();
+
+      // Seed lives ONLY in the terminal store; the default store stays empty.
+      const terminalStore = new FileGranolaIntakeSeedStore(terminalSeedStorePath());
+      await terminalStore.claim({ candidateKey: KEY, noteId: 'note-1', channelId: TERMINAL_CHANNEL_SENTINEL });
+      await terminalStore.markPosting(KEY);
+      await terminalStore.markPosted(KEY, 'ts-terminal');
+
+      const lines: string[] = [];
+      const code = await runTraceCard(
+        [KEY, '--db', dbPath],
+        { ECHO_HOME: home },
+        { out: (l) => lines.push(l), err: (l) => lines.push(l) },
+      );
+      expect(code).toBe(0);
+      const out = lines.join('\n');
+      expect(out).toContain('seed: status=posted');
+      expect(out).not.toContain('(no seed record for this candidate_key)');
+    } finally {
+      setEchoHomeRoot(savedRoot);
+    }
+  });
+
+  it('--note mode lists a terminal-only pre-123 note\'s seeds without an override', async () => {
+    const store = new MemoryStorage(); // no card atoms
+    const defaultStore = await emptySeedStore(); // empty
+    const terminalStore = await emptySeedStore();
+    await terminalStore.claim({ candidateKey: KEY, noteId: 'note-1', channelId: TERMINAL_CHANNEL_SENTINEL });
+
+    const traceInput: TraceInput = {
+      storage: store,
+      seedStore: defaultStore,
+      dbPathForMessages: '/nonexistent/echo.db',
+      seedStores: [defaultStore, terminalStore],
+    };
+    const trace = await buildCardTrace(traceInput, { noteId: 'note-1' });
+    expect(trace).toContain('seeds (no card atoms — from seed store):');
+    expect(trace).toContain(`seed ${KEY}: status=pending`);
   });
 });

@@ -256,3 +256,144 @@ describe('createHttpRetrievalCapture (real proxy)', () => {
     expect(retrievals[0]?.result_summary).toContain('content_items=1');
   });
 });
+
+describe('createHttpRetrievalCapture stream error handling (item 125 AC2)', () => {
+  const servers: Server[] = [];
+  const sessions: RetrievalCaptureSession[] = [];
+  afterEach(async () => {
+    await Promise.all(sessions.splice(0).map((s) => s.close().catch(() => undefined)));
+    await Promise.all(servers.splice(0).map((s) => new Promise<void>((r) => s.close(() => r()))));
+  });
+
+  function listen(server: Server): Promise<string> {
+    servers.push(server);
+    return new Promise((resolve) => {
+      server.listen(0, '127.0.0.1', () => {
+        const a = server.address();
+        if (a === null || typeof a === 'string') throw new Error('no port');
+        resolve(`http://127.0.0.1:${a.port}/mcp`);
+      });
+    });
+  }
+
+  // fatalError may be set a tick after the client's socket event; poll finish().
+  async function expectFinishRejects(session: RetrievalCaptureSession): Promise<void> {
+    for (let i = 0; i < 40; i += 1) {
+      try {
+        await session.finish();
+      } catch {
+        return; // rejected → capture_failed record, per the 123 contract
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    throw new Error('finish() never rejected — capture failure was not recorded');
+  }
+
+  // Wrap a test so any unhandled process error/rejection during it fails the
+  // test — the core AC2 invariant is "the hosting worker never crashes".
+  function guarded(fn: () => Promise<void>): () => Promise<void> {
+    return async () => {
+      const caught: unknown[] = [];
+      const onErr = (e: unknown): void => {
+        caught.push(e);
+      };
+      process.on('uncaughtException', onErr);
+      process.on('unhandledRejection', onErr);
+      try {
+        await fn();
+      } finally {
+        process.off('uncaughtException', onErr);
+        process.off('unhandledRejection', onErr);
+      }
+      expect(caught).toEqual([]);
+    };
+  }
+
+  function fireRequest(proxyUrl: string, onResponse: (res: import('node:http').IncomingMessage, req: import('node:http').ClientRequest) => void): void {
+    const u = new URL(proxyUrl);
+    const creq = request(
+      { hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST', headers: { 'Content-Type': 'application/json' } },
+      (res) => onResponse(res, creq),
+    );
+    creq.on('error', () => undefined);
+    creq.end(
+      JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'search_memories', arguments: {} } }),
+    );
+  }
+
+  it(
+    'does not crash when the downstream client is destroyed mid-stream',
+    guarded(async () => {
+      let releaseTail = (): void => undefined;
+      const tail = new Promise<void>((r) => {
+        releaseTail = r;
+      });
+      const upstreamUrl = await listen(
+        createServer((req, res) => {
+          req.resume();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.write('{"jsonrpc":"2.0",'); // first chunk; response not yet ended
+          void tail.then(() => res.end('"id":1,"result":{"content":[]}}'));
+        }),
+      );
+
+      const capture = createHttpRetrievalCapture();
+      const session = await capture.start('run-down', upstreamUrl);
+      sessions.push(session);
+
+      await new Promise<void>((resolve) => {
+        fireRequest(session.childEnv['ECHO_MCP_URL']!, (res, creq) => {
+          res.on('error', () => undefined);
+          res.once('data', () => {
+            creq.destroy(); // brain child killed mid-stream
+            releaseTail(); // upstream now finishes → proxy writes to a dead cres
+            setTimeout(resolve, 40);
+          });
+        });
+      });
+
+      // Whether the destroyed-downstream write surfaces an error (→
+      // capture_failed) or is silently discarded (→ partial capture) is OS
+      // timing dependent; the 123 contract allows either. The load-bearing
+      // assertion is the `guarded` no-crash wrapper. finish() must still settle
+      // cleanly to one of those two shapes.
+      let settled: unknown;
+      try {
+        settled = await session.finish();
+      } catch {
+        settled = 'capture_failed';
+      }
+      expect(settled === 'capture_failed' || Array.isArray(settled)).toBe(true);
+      await session.close();
+    }),
+  );
+
+  it(
+    'does not crash when the upstream is destroyed mid-stream',
+    guarded(async () => {
+      const upstreamUrl = await listen(
+        createServer((req, res) => {
+          req.resume();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.write('{"jsonrpc":"2.0",');
+          setTimeout(() => res.socket?.destroy(), 20); // upstream reset mid-response
+        }),
+      );
+
+      const capture = createHttpRetrievalCapture();
+      const session = await capture.start('run-up', upstreamUrl);
+      sessions.push(session);
+
+      await new Promise<void>((resolve) => {
+        fireRequest(session.childEnv['ECHO_MCP_URL']!, (res) => {
+          res.on('data', () => undefined);
+          res.on('error', () => undefined);
+          res.on('end', () => resolve());
+          res.on('close', () => resolve());
+        });
+      });
+
+      await expectFinishRejects(session);
+    }),
+  );
+});
