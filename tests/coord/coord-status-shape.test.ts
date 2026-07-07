@@ -252,7 +252,13 @@ describe('AC6 — coord_status shape', () => {
       idempotency_key: idKey,
     });
     // ...followed by a successful tick_start LATER in sequence.
-    await seedAtom(storage, 'coord:codex', '2026-05-15T10:00:00.000Z', {
+    // 129: emitted_at kept recent (within the tick_end window relative to
+    // `now` below) so the tick_end deadline this tick_start opens stays in
+    // the future and does NOT fire during reconstruct. Under emitted_at
+    // anchoring a far-past emitted_at would resolve tick_end to an expired
+    // deadline and add a spurious (codex, tick_end) miss slot, which this
+    // test (about slot-clearing by sequence) does not intend to exercise.
+    await seedAtom(storage, 'coord:codex', '2026-05-16T09:55:00.000Z', {
       event_type: 'tick_start',
       schema_version: 1,
       subject_role: 'codex',
