@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 0.25d
 created: 2026-07-07
+claimed_by: "cc-129-deadline-anchor"
+claimed_at: "2026-07-07T18:14:41Z"
+branch: "agent/deadline-anchor-emitted-at"
 blocked_by: []
 spec_refs:
   - src/coord/deadlines.ts                          # resolveExpectedBy (~:398-415) — the one function to change; reconstruct/applyReplayAtom for context
