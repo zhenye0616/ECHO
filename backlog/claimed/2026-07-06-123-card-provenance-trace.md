@@ -5,6 +5,9 @@ status: proposed
 priority: HIGH
 estimate: 1d
 created: 2026-07-06
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-07T00:00:00Z"
+branch: "agent/card-provenance-trace"
 blocked_by: []
 spec_refs:
   - src/enrich/granola-intake-candidates.ts                # the intake bridge: classify() call site (~:405), seed-store post path — where the card atom must be emitted
