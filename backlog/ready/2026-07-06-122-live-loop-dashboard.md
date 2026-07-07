@@ -17,6 +17,7 @@ files_to_modify:
   - tools/loop-dashboard.ts        # NEW: the only substantive new file
   - package.json                   # npm script `loop:dashboard` → `vite-node --script tools/loop-dashboard.ts`
   - tests/tools/                   # server + shape + read-only coverage
+ready_content_sha: fcbec218f24fe2b439a806a483133c78749ce32103d85ecefe7a475aab17ba93
 ---
 
 ## Problem
