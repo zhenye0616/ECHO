@@ -123,3 +123,24 @@ A context-inventory retrieval surfaced `derived:team-decisions` atoms showing **
 **What changes:** the ledger-wedge disqualification now rests on its other two legs — the pull-problem (a queryable-only ledger reproduces the Granola critique; cards need push, i.e., riding the recap/meeting loop) and the absence of a legible burn attached to the ledger's absence. Both stand; the conclusion is unchanged. The volume-reflex observation also stands — it was grounded in the founder's own words, not the click data.
 
 **What improves:** the propose→confirm→`derived:team-decisions` loop is **proven end-to-end with three real ratified decision atoms** (subject, decision, rationale, author, confirmed_by, confirmed_at, dedupe_key). The pilot's card leg is not a bet; it ran to completion today. Builder-confirm latency: ~20 minutes from post.
+
+---
+
+## Addendum 4 (same day, ~16:15 PDT) — final pilot scope (founder call: Slack + Granola only)
+
+**Sources in:** Granola (shared team folder only) + Slack (named internal team channels only; enablement call = gate). **Eng tools are OUT of the pilot surface** — founder call, reinforced by two structural reasons: (a) the founder's machine captures two companies (ECHO dev + the pilot team) plus personal meetings; team-scoped sources (folder + channel allowlist) are the contamination boundary, and eng capture is the messiest cross-company source; (b) a Granola+Slack-only loop generalizes to non-eng teams (most of the guessed ICP) — eng context becomes post-pilot upsell, not prerequisite.
+
+**Cross-tool claim preserved:** cards join Granola × Slack (meeting moment + the Slack thread it resolved) — still the ≥2-source demo-integrity rule.
+
+**Metric (c) restated:** between-meeting decision retrieval is Slack-side (queries in Slack; briefs citing prior ratified decisions). Eng-tool MCP retrieval drops out of pilot metrics.
+
+**Pilot feature list (final, 4 + 1 infra):**
+1. Slack capture enabled (founder call; channel allowlist = the scope instrument)
+2. Pre-meeting brief composer (Granola summaries/action-items + Slack activity; concierge-assisted at first per Addendum 1)
+3. Decision cards with the Granola×Slack source join (extraction + confirm + ledger legs already proven end-to-end per Addendum 3)
+4. Catch-up baseline measurement from existing transcript timestamps (pre-pilot, feeds the WTP conversation)
+5. Prod pin (pinned packaged release for the client-facing daemon; dev stays on live checkout — separate infra item)
+
+**Roadmap (shown, not built):** PM tools next — point the existing 108/109 confirm→Linear gate at ratified team-decisions → issues/projects; then eng-tool context as upsell.
+
+**Known data limitations carried into feature design:** transcripts are speaker-anonymous ("Speaker:" only — no per-person attribution promises in v0); attendees metadata is calendar-dependent (verify the daily meeting populates all three); note freshness bounded by Granola summarization latency.
