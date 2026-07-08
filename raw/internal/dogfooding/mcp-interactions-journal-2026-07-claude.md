@@ -365,3 +365,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** end-to-end latency meeting-end→card ≈ 20 min, dominated by Granola summarization (~7 min post-creation) + the note being opened in-app. Extraction discipline held: the meeting had "no substantive agenda items" (audio-test, ended early), so the ONLY card proposed was the one defensible operational decision (reset audio before agenda) rather than a fabricated substantive one — Premise-3 behavior demonstrated live. Data observation: this transcript DID attempt speaker names (mislabel "JP" from shared mic) — attribution quality is audio-setup-dependent, not uniformly absent as the 07-06 samples suggested; per-person mics matter for the pilot.
 - **Conjecture:** none
+
+### 2026-07-08 13:38 PDT — second live meeting→card run: "EchoBrain Legal" (search_memories + get_atom)
+- **Trigger:** founder said "another meeting just landed in granola. ingest and tell me what decision cards would echo produce"
+- **Query inputs:** search_memories{source_app=granola, metadata_match:{granola_atom_type: summary}, since=2026-07-08T19:00:00Z, limit=5}; then get_atom{id=bc924836} for content recovery
+- **Returned:** search: 1 atom (note_id=not_p5s4nnQgGDq52k, "EchoBrain Legal", 13:00–13:30 PDT, folder=legal), truncations=["content","metadata.summary_text"], 1490 content bytes elided → get_atom recovered content verbatim (4786 bytes; summary_text metadata still elided, expected)
+- **Sources:** api:granola (poll_ok 20:27:19Z ingested 1 note / 2 atoms, high_water_mark 20:26:49Z); daemon log confirmed ingest before retrieval — no wait_for_new_turns needed this time (summary landed ~34 min post-meeting-start, ~26 min after created_at)
+- **Verdict:** ✅ right
+- **Note:** the search→get_atom two-step was forced by wire caps: a 3.2k-char legal summary doesn't fit search_memories' match_content cap, and the elided middle 1490 chars contained most of the decision-grade material (IP boundary definition, leverage section). For meeting→card extraction, content-recovery via get_atom is the NORMAL path, not the escape hatch. Cards were drafted for founder review but NOT submitted via propose_decision — content is sensitive negotiation material (pricing leverage, cease-and-desist option) and the station-4 Slack-safety call is still pending; founder asked "tell me", not "post".
+- **Conjecture:** none
