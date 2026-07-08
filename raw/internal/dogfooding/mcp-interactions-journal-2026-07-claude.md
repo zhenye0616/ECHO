@@ -347,3 +347,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** metadata_match on note_id landed exactly the deleted note's derived layer in one call — the append-only store preserved a note the upstream vendor deleted, which is both the completeness win (archive now covers 20/20 notes) and a privacy property worth remembering: upstream deletion does NOT propagate into ECHO; V1 has no delete path (known append-only design decision).
 - **Conjecture:** none
+
+### 2026-07-07 23:25 PDT — live meeting→card attempt: new note not yet API-visible (search_memories + wait_for_new_turns)
+- **Trigger:** founder finished a meeting and asked to retrieve it via ECHO's Granola capture and populate a decision card — first live retrieval attempt under the new EchoBrain key
+- **Query inputs:** search_memories{source_app=granola, since=2026-07-08T05:00:00Z, limit=4}; wait_for_new_turns{sources:["granola"], since=2026-07-08T05:00:00Z, timeout:60}
+- **Returned:** search: 0 matches. wait_for_new_turns: TRANSPORT TIMEOUT — the MCP client cut the connection before the 60s server hold returned (error "The operation timed out"), so the blocking-watch primitive was unusable at max timeout from this client.
+- **Sources:** api:granola (none present in window). Cross-checked outside MCP: direct API probes with BOTH keys (EchoBrain + Justinian backup) show 0 notes created since 2026-07-08T00:00Z — the note exists upstream but is pre-summarization (API-invisible), or the app is signed into an account neither key covers.
+- **Verdict:** 🟡 partial — retrieval correctly returned empty (nothing ingested), but the wait primitive failed at the transport layer rather than returning an empty timeout result
+- **Note:** fell back to a background log-watch on poll_ok notes_ingested>0. The pilot-relevant observation: freshness is bounded by Granola summarization latency + the app's signed-in account — both invisible to the daemon. The "open the note in-app to force enhancement" concierge move is currently the only accelerator.
+- **Conjecture:** wait_for_new_turns at timeout=60 may exceed the MCP client's per-call transport budget; a timeout ≤ the client budget (or server-side keepalive) would make the max-hold usable.
