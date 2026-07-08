@@ -113,3 +113,13 @@ Founder refined the wedge to a **meeting-anchored loop**, which deletes Premise 
 **Agreed PoC success metrics** (baseline measurable NOW from existing Granola history): (a) catch-up share of the daily meeting drops below ~25%; (b) ≥1 ratified decision card per meeting, sustained; (c) between-meeting retrievals of decision atoms > 0 (instrumented free by the daemon request log). Value equation: ~15 min/day × 3 people ≈ $1.5–3k/mo reclaimed vs. a personal-approval-sized monthly price with 30-day opt-out (Addendum 1 structure unchanged).
 
 **Design is frozen here.** Assignment unchanged: Slack enablement call → the conversation with P. this week (opener, offer, day-30 review booked in-meeting). The next input to this document is P.'s answer — not further design.
+
+---
+
+## Addendum 3 (same day, ~15:55 PDT) — factual correction on the "zero-click" evidence
+
+A context-inventory retrieval surfaced `derived:team-decisions` atoms showing **all three launch-day cards were confirmed at 11:25 PDT** — roughly 80 minutes *before* the interrogation asserted "zero confirms, even from the builder." That assertion (Q4 ledger-disqualification, first clause; Q5 observation 3) was stale at the time it was made, and the founder's mid-session answers ("valid and helpful… aren't enough") were consistent with having engaged, not with ignoring them.
+
+**What changes:** the ledger-wedge disqualification now rests on its other two legs — the pull-problem (a queryable-only ledger reproduces the Granola critique; cards need push, i.e., riding the recap/meeting loop) and the absence of a legible burn attached to the ledger's absence. Both stand; the conclusion is unchanged. The volume-reflex observation also stands — it was grounded in the founder's own words, not the click data.
+
+**What improves:** the propose→confirm→`derived:team-decisions` loop is **proven end-to-end with three real ratified decision atoms** (subject, decision, rationale, author, confirmed_by, confirmed_at, dedupe_key). The pilot's card leg is not a bet; it ran to completion today. Builder-confirm latency: ~20 minutes from post.

@@ -329,3 +329,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** literal token "org-level alignment" landed the exact decision spine in one call. The retrieval exposes that today's zoom-out is the THIRD derivation of the same thesis (07-01 reframe, 07-02 office-hours, today) — and that the demand evidence gap (founder role-played the nontechnical teammate in the 06-28 intake test; CEO why-query signal never fired) has survived all three derivations untouched. That's what the interrogation should press.
 - **Conjecture:** none
+
+### 2026-07-07 15:55 PDT — pilot context inventory: raw granola atoms + derived layers (search_memories ×2)
+- **Trigger:** founder asked "what is inside the meeting notes — all the context we have access to" before feature-speccing the recap pilot
+- **Query inputs:** search_memories{source_app=granola, limit=3}; search_memories{source_prefix="derived:", limit=4}
+- **Returned:** granola: 3 atoms across 2 notes (1 summary + 2 transcript atoms; subjects redacted — personal negotiation content); derived: 4 atoms — 3× derived:team-decisions (confirmed_at 2026-07-07T18:25 UTC, confirmed_by Slack UID) + 1× derived:intake-cards (109 card with full request/why/outcome/evidence/doneWhen fields, classifier_run.capture_status=zero_retrievals)
+- **Sources:** api:granola (raw), derived:team-decisions, derived:intake-cards. Absent from these queries by scoping: claude_code/codex/git/cursor/coord.
+- **Verdict:** ✅ right
+- **Note:** two findings. (1) Transcript atoms have NO speaker names — every utterance is "Speaker:"; attendees metadata is calendar-dependent (both sampled 2-person calls list only the owner). Who-said-what attribution exists only in summary-level semantics. (2) CORRECTION to today's office-hours record: the three station-4 cards were CONFIRMED at 11:25 PDT — ~80 min BEFORE the interrogation asserted "zero confirms." The propose→confirm→derived:team-decisions loop is fully closed with 3 real ratified decision atoms. Doc corrected via Addendum 3.
+- **Conjecture:** none
