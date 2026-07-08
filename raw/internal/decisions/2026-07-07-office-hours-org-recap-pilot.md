@@ -96,3 +96,20 @@ Additional mechanics adopted from the playbook:
 - **Wedge-iteration clock:** if aggressive selling of the recap fails for two weeks, pick a different wedge — do not re-derive the thesis a fifth time.
 
 Assignment unchanged in substance, sharpened in form: the conversation with P. this week now opens with the same opener, presents the recurring-with-opt-out offer with a number, and books the day-30 review in the same meeting. Slack enablement call remains the prerequisite.
+
+---
+
+## Addendum 2 (same day, ~15:20 PDT) — founder's meeting-centric refinement (accepted; design frozen)
+
+Founder refined the wedge to a **meeting-anchored loop**, which deletes Premise 1's habit risk (the existing daily meeting is the forcing function; consumption is structural, not a new habit):
+
+1. **Pre-meeting brief** ("what happened," per person, cross-tool) arrives before the daily meeting — kills catch-up time. (This is the recap artifact; not cards — nothing is decided yet.)
+2. **In-meeting:** time reallocates from catch-up to "what's next." **The PoC metric lives here.**
+3. **Post-meeting:** the meeting's decisions are captured as confirm/dismiss cards — salient by construction (minutes old, owned by the room), resolving the zero-click finding.
+4. **Between meetings:** ratified decisions flow back into each member's working context (MCP retrieval in eng tools; Slack-queryable for non-eng) and drive execution until the next meeting — the ECHO-native leg no per-tool vendor can copy.
+
+**Tools (one, maybe two):** Granola (mandatory, already captured) + Slack (enablement call still the gate); founder's eng capture rides free. Demo-integrity rule: cards must visibly **join ≥2 sources** (meeting moment + the Slack thread it resolved) or the claim degrades to per-tool extraction Granola already ships.
+
+**Agreed PoC success metrics** (baseline measurable NOW from existing Granola history): (a) catch-up share of the daily meeting drops below ~25%; (b) ≥1 ratified decision card per meeting, sustained; (c) between-meeting retrievals of decision atoms > 0 (instrumented free by the daemon request log). Value equation: ~15 min/day × 3 people ≈ $1.5–3k/mo reclaimed vs. a personal-approval-sized monthly price with 30-day opt-out (Addendum 1 structure unchanged).
+
+**Design is frozen here.** Assignment unchanged: Slack enablement call → the conversation with P. this week (opener, offer, day-30 review booked in-meeting). The next input to this document is P.'s answer — not further design.
