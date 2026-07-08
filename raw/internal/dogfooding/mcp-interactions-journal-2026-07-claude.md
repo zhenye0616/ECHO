@@ -356,3 +356,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** 🟡 partial — retrieval correctly returned empty (nothing ingested), but the wait primitive failed at the transport layer rather than returning an empty timeout result
 - **Note:** fell back to a background log-watch on poll_ok notes_ingested>0. The pilot-relevant observation: freshness is bounded by Granola summarization latency + the app's signed-in account — both invisible to the daemon. The "open the note in-app to force enhancement" concierge move is currently the only accelerator.
 - **Conjecture:** wait_for_new_turns at timeout=60 may exceed the MCP client's per-call transport budget; a timeout ≤ the client budget (or server-side keepalive) would make the max-hold usable.
+
+### 2026-07-08 00:05 PDT — first live meeting→card run under the EchoBrain account (search_memories + propose_decision)
+- **Trigger:** founder's kickoff meeting with the EchoBrain team landed in the Team meetings folder; asked to retrieve via ECHO and populate a decision card
+- **Query inputs:** search_memories{source_app=granola, metadata_match:{note_id: not_dZmQ9mrkEmXgrA, granola_atom_type: summary}, limit=1}; propose_decision{subject:"team meeting audio setup", source_app:claude-code}
+- **Returned:** search: 1 atom, full summary + rich metadata (attendees ×2, calendar_event, folder_membership=Team meetings/spa_TxQ7AVnfH8RZ45); propose_decision: {status: draft_posted, draft_id: 39851c42, confirm_target: C0BFRT0E9L2}
+- **Sources:** api:granola (poll_ok 06:54Z ingested 1 note / 2 atoms under the new EchoBrain key — first ingest since the account switch); write path: Slack confirm channel via station 4
+- **Verdict:** ✅ right
+- **Note:** end-to-end latency meeting-end→card ≈ 20 min, dominated by Granola summarization (~7 min post-creation) + the note being opened in-app. Extraction discipline held: the meeting had "no substantive agenda items" (audio-test, ended early), so the ONLY card proposed was the one defensible operational decision (reset audio before agenda) rather than a fabricated substantive one — Premise-3 behavior demonstrated live. Data observation: this transcript DID attempt speaker names (mislabel "JP" from shared mic) — attribution quality is audio-setup-dependent, not uniformly absent as the 07-06 samples suggested; per-person mics matter for the pilot.
+- **Conjecture:** none
