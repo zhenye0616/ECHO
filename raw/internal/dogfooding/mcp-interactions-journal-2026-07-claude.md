@@ -338,3 +338,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** two findings. (1) Transcript atoms have NO speaker names — every utterance is "Speaker:"; attendees metadata is calendar-dependent (both sampled 2-person calls list only the owner). Who-said-what attribution exists only in summary-level semantics. (2) CORRECTION to today's office-hours record: the three station-4 cards were CONFIRMED at 11:25 PDT — ~80 min BEFORE the interrogation asserted "zero confirms." The propose→confirm→derived:team-decisions loop is fully closed with 3 real ratified decision atoms. Doc corrected via Addendum 3.
 - **Conjecture:** none
+
+### 2026-07-07 23:05 PDT — deleted-note survival check during Justinian export audit (search_memories)
+- **Trigger:** founder asked to verify ALL Justinian meeting context was exported before the account switch; one note (not_Tdf8iOzdYgU550) was in ECHO's ingest checkpoint but absent from the API list (deleted upstream)
+- **Query inputs:** search_memories{metadata_match: {note_id: "not_Tdf8iOzdYgU550"}, limit: 3}
+- **Returned:** 3 matches — 2× derived:granola-signals (rationale atoms, subjects redacted — personal legal content) + 1× derived:granola-signals-index manifest listing 15 signal atom ids; confirmed derived layer intact for the deleted note
+- **Sources:** derived:granola-signals + derived:granola-signals-index. Raw api:granola atoms verified separately via read-only sqlite (2 atoms: summary + transcript) and dumped into the export archive.
+- **Verdict:** ✅ right
+- **Note:** metadata_match on note_id landed exactly the deleted note's derived layer in one call — the append-only store preserved a note the upstream vendor deleted, which is both the completeness win (archive now covers 20/20 notes) and a privacy property worth remembering: upstream deletion does NOT propagate into ECHO; V1 has no delete path (known append-only design decision).
+- **Conjecture:** none
