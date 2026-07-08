@@ -79,3 +79,20 @@ The **daily** cross-tool org recap — Slack + Granola + eng capture — of *wha
 ## After this doc
 
 Strategist follow-ons (not builder work, nothing enters `backlog/proposed/` until P.'s answer): (a) hold this doc as the spec-source for a recap-composition item; (b) wiki untouched, per operating model; (c) the June 24 exhibit stays out of the repo — regenerable from the founder's local sources if ever needed.
+
+---
+
+## Addendum (same day, ~14:55 PDT) — offer structure amended per the YC sales playbook
+
+Founder surfaced the YC Startup School talk ["The Sales Playbook for Founders"](https://www.youtube.com/watch?v=DH7REvnQ1y4) (already digested in the yc-wiki as `sources/sales-playbook.md` — cite as [[sales-playbook]]; see also [[founder-led-sales]]) with the instinct: *"take part of what we have already, sell it aggressively, and refine."* The talk confirms the wedge discipline (narrow wedge over platform; sell to N similar customers before building more; iterate wedges in weeks, not quarters) and **corrects two things in the pilot design above:**
+
+1. **Offer structure: recurring-with-opt-out replaces free-30-days-then-negotiate.** The original offer ("run it 30 days free; $X/mo after") is the low-engagement free-pilot shape the playbook warns about, and it buys a second sales process at day 30. Amended offer: **monthly recurring from day one with a 30-day opt-out / money-back window.** Same kill criterion, but money in motion forces engagement and one sales process yields recurring revenue. Price: modest, personal-approval-sized, anchored against the $3–6k/mo duct-tape.
+2. **Willingness-to-pay conversation happens upfront, not at day 30.** Before the pilot starts: "if nothing your team decides gets lost again and the daily meeting shrinks, what's that worth per month?" Disqualify early if the answer is zero.
+
+Additional mechanics adopted from the playbook:
+- **Time-to-first-value is the north-star: first recap in P.'s Slack within days of yes — via concierge if needed.** The playbook explicitly endorses manual/janky delivery ("do the work yourself manually"; Excel/email over integrations). ECHO's capture already runs; recap *composition* can be strategist-assisted while automation catches up. **This removes the build gate entirely — the pilot can start the same week as the conversation.** (Distinct from June 24's optics debt: the buyer knows what's manual.)
+- **Book the day-30 metrics review before the pilot starts** (consumption count, unprompted citations, daily-meeting length delta in $).
+- **After conversion: sell, don't build.** The wedge goes to 2–3 more just-raised teams (premise 6's test) before any brain/platform expansion — the talk's "sell it to 10 similar customers" is the standing answer to the recurring platform temptation this doc's three-derivations history documents.
+- **Wedge-iteration clock:** if aggressive selling of the recap fails for two weeks, pick a different wedge — do not re-derive the thesis a fifth time.
+
+Assignment unchanged in substance, sharpened in form: the conversation with P. this week now opens with the same opener, presents the recurring-with-opt-out offer with a number, and books the day-30 review in the same meeting. Slack enablement call remains the prerequisite.
