@@ -19,6 +19,16 @@ import {
   type GranolaIntakeSeedStore,
 } from './granola-intake-seed-store.js';
 import {
+  createChangesetDraftFromCards,
+  type DecisionCardForChangeset,
+} from '../surfaces/ceo-slack-responder/decision-changeset.js';
+import {
+  FileChangesetDraftStore,
+  type ChangesetDraft,
+  type ChangesetDraftStore,
+} from '../surfaces/ceo-slack-responder/draft-store.js';
+import { postDecisionChangesetDraftCard } from '../surfaces/ceo-slack-responder/responder.js';
+import {
   GRANOLA_INTAKE_BRIDGE_WORKER,
   writeWorkerHeartbeat,
   type WorkerHeartbeat,
@@ -203,10 +213,16 @@ export interface SeedPostResult {
 }
 
 export type SeedPoster = (channel: string, text: string) => Promise<SeedPostResult>;
+export type DecisionChangesetPoster = (
+  channel: string,
+  draft: ChangesetDraft,
+) => Promise<string>;
 
 export interface GranolaIntakeBridgeDeps {
   classify: GranolaIntakeClassifier;
   postSeed: SeedPoster;
+  changesetDraftStore?: ChangesetDraftStore;
+  postChangesetDraftCard?: DecisionChangesetPoster;
   now?: () => string;
 }
 
@@ -233,8 +249,11 @@ export interface GranolaIntakeBridgeOptions {
   config?: GranolaIntakeConfig;
   seedStore?: GranolaIntakeSeedStore;
   seedStorePath?: string;
+  changesetDraftStore?: ChangesetDraftStore;
+  decisionChangesetDraftStorePath?: string;
   classify?: GranolaIntakeClassifier;
   postSeed?: SeedPoster;
+  postChangesetDraftCard?: DecisionChangesetPoster;
   now?: () => string;
   env?: NodeJS.ProcessEnv;
   /** Coupling that makes the bridge run "after signal extraction": awaited at
@@ -460,6 +479,27 @@ function extractSignal(event: CaptureEvent): SignalForNote | null {
   };
 }
 
+function candidateToDecisionCard(
+  candidate: ClassifiedIntakeCandidate,
+  signal: SignalForNote,
+): DecisionCardForChangeset {
+  const decision = candidate.fields.request ?? signal.text;
+  return {
+    subject:
+      signal.canonical_subject ||
+      candidate.fields.clientProject ||
+      candidate.fields.request ||
+      signal.text,
+    decision,
+    ...(candidate.fields.why === undefined ? {} : { rationale: candidate.fields.why }),
+    decision_type: candidate.decision_type ?? classifyGranolaDecisionType(decision),
+    ...(candidate.fields.clientProject === undefined
+      ? {}
+      : { project_name: candidate.fields.clientProject }),
+    ...(candidate.fields.doneWhen === undefined ? {} : { tripwire: candidate.fields.doneWhen }),
+  };
+}
+
 function resolveOwner(
   attendeeEmails: readonly string[],
   config: GranolaIntakeConfig,
@@ -559,6 +599,37 @@ export async function runGranolaIntakeBridgeOnce(
     const noteCandidates = classifierResult.candidates
       .filter((candidate) => refToSignal.has(candidate.ref))
       .slice(0, config.perNoteCap);
+
+    if (
+      noteCandidates.length > 0 &&
+      deps.changesetDraftStore !== undefined &&
+      deps.postChangesetDraftCard !== undefined
+    ) {
+      candidates += noteCandidates.length;
+      try {
+        const { draft } = await createChangesetDraftFromCards(deps.changesetDraftStore, {
+          note_id: noteId,
+          meeting_title: info.meeting_title,
+          ...(info.meeting_date === undefined ? {} : { meeting_date: info.meeting_date }),
+          ...(info.web_url === undefined ? {} : { web_url: info.web_url }),
+          channel_id: config.channelId,
+          cards: noteCandidates.map((candidate) =>
+            candidateToDecisionCard(candidate, refToSignal.get(candidate.ref)!),
+          ),
+        });
+        if (draft.message_ts !== undefined) {
+          skipped += 1;
+          continue;
+        }
+        const messageTs = await deps.postChangesetDraftCard(config.channelId, draft);
+        await deps.changesetDraftStore.markChangesetMessage(draft.draft_id, messageTs);
+        posted += 1;
+      } catch (err) {
+        failed += 1;
+        log.error('changeset_post_failed', { note_id: noteId, message: (err as Error).message });
+      }
+      continue;
+    }
 
     for (const candidate of noteCandidates) {
       const signal = refToSignal.get(candidate.ref)!;
@@ -897,11 +968,24 @@ export function startGranolaIntakeBridge(
   const seedStore =
     options.seedStore ??
     new FileGranolaIntakeSeedStore(options.seedStorePath ?? defaultSeedStorePath(), options.now);
+  const configuredChangesetDraftStorePath = env['ECHO_DECISION_CHANGESET_DRAFT_STORE']?.trim();
+  const changesetDraftStore =
+    options.changesetDraftStore ??
+    new FileChangesetDraftStore(
+      options.decisionChangesetDraftStorePath ??
+        (configuredChangesetDraftStorePath === '' ? undefined : configuredChangesetDraftStorePath) ??
+        granolaDecisionChangesetDraftStorePath(),
+    );
   const postSeed =
     options.postSeed ?? ((channel, text) => postGranolaIntakeSeed(config.botToken, channel, text));
+  const postChangesetDraftCard =
+    options.postChangesetDraftCard ??
+    ((channel, draft) => postDecisionChangesetDraftCard(config.botToken, channel, draft));
   const deps: GranolaIntakeBridgeDeps = {
     classify: activeClassify,
     postSeed,
+    changesetDraftStore,
+    postChangesetDraftCard,
     ...(options.now === undefined ? {} : { now: options.now }),
   };
 
@@ -993,4 +1077,8 @@ export function granolaIntakeSeedStorePath(): string {
 
 function defaultSeedStorePath(): string {
   return granolaIntakeSeedStorePath();
+}
+
+export function granolaDecisionChangesetDraftStorePath(): string {
+  return join(ECHO_HOME_PATHS.state, 'decision-changeset-drafts.json');
 }

@@ -20,6 +20,7 @@
     "dist/surfaces/ceo-slack-responder/intake-seed.js",
     "dist/surfaces/ceo-slack-responder/intake-agent.js",
     "dist/surfaces/ceo-slack-responder/intake-draft-store.js",
+    "dist/surfaces/ceo-slack-responder/decision-changeset.js",
     "dist/surfaces/ceo-slack-responder/draft-store.js",
     "dist/surfaces/ceo-slack-responder/decision-store.js",
     "dist/surfaces/ceo-slack-responder/identity.js",
