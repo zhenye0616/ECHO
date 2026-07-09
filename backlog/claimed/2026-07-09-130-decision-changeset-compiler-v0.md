@@ -25,6 +25,13 @@ files_to_modify:
   - src/enrich/granola-intake-candidates.ts                       # decision_type classification on extracted cards
   - tests/surfaces/decision-changeset.test.ts                     # NEW
 ready_content_sha: 589bfa9de35d1a7da97c866b30174f1c87b7ae2dd358928059551fcef3f2a0db
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-09T19:21:55Z"
+branch: "agent/decision-changeset-compiler-v0"
+worktree: "/Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0"
+head_sha: ""
+pr_url: ""
+agent_notes: ""
 ---
 
 ## Context
