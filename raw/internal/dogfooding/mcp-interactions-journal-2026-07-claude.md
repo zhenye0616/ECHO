@@ -392,3 +392,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ❌ wrong — an explicitly founder-authorized confirmation could not be executed by any AI client through any sanctioned path
 - **Note:** this is the journal-shaped twin of the founder's product signal in the same breath: "make the decisions more natural, not like an extra chore people have to do after a long meeting." Full observation set in raw/internal/decisions/2026-07-08-decision-confirm-friction.md. Notable: extraction verdict from the founder was 5/5 useful, zero dismissals — the gate's friction is now the binding constraint, not extraction quality.
 - **Conjecture:** none (per discipline — synthesis owns the fix)
+
+### 2026-07-09 12:05 PDT — watcher tick r1→r2 on item 130 (coord_invoke ×2)
+- **Trigger:** founder fired the full-auto loop on spec 130 (two-codex convergence then builder); r1 combined (both proceed_after_patches, 7 findings), all accepted + patched (d71b7379), r2 dispatched (e8136116); 057b post-push hook invoked both headless reviewers
+- **Query inputs:** coord_invoke{role: codex, request_path: backlog/reviews/2026-07-09-130-decision-changeset-compiler-v0/r2/request.md, correlation_id from r2 request}; coord_invoke{role: codex-ops, same path/corr}
+- **Returned:** both ok (HTTP 200 via :38478, X-Echo-Role: claude)
+- **Sources:** write-path only — daemon coord layer dispatching reviewer wrappers; no retrieval
+- **Verdict:** ✅ right
+- **Note:** r1 signal quality was high — both reviewers independently converged on the decision_atom_id mint-order trap the focus hints flagged (atom minted at confirm but required as the idempotency key), which forced the line_key two-phase design. Zero prior-patch findings (r1), reframe gate not fired.
+- **Conjecture:** none
