@@ -14,6 +14,7 @@ export interface LinearIssueCreateInput {
   projectId: string;
   stateId: string;
   assigneeId: string;
+  decisionAtomId?: string;
 }
 
 export interface LinearIssueCreated {
@@ -21,8 +22,28 @@ export interface LinearIssueCreated {
   url: string;
 }
 
+export type LinearIssueCloseOutcome =
+  | 'closed'
+  | 'already_closed'
+  | 'comment_marker_present_closed'
+  | 'externally_closed';
+
+export interface LinearIssueCloseInput {
+  issueId: string;
+  closeStateId: string;
+  decisionAtomId: string;
+  comment: string;
+}
+
+export interface LinearIssueCloseResult {
+  issue_id: string;
+  outcome: LinearIssueCloseOutcome;
+  marker: string;
+}
+
 export interface LinearClient {
   createIssue(input: LinearIssueCreateInput): Promise<LinearIssueCreated>;
+  closeIssue?(input: LinearIssueCloseInput): Promise<LinearIssueCloseResult>;
 }
 
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -36,8 +57,38 @@ interface LinearGraphqlResponse {
         url?: string;
       };
     };
+    issue?: {
+      id?: string;
+      state?: {
+        name?: string;
+        type?: string;
+      };
+      comments?: {
+        nodes?: Array<{ body?: string }>;
+      };
+    };
+    commentCreate?: {
+      success?: boolean;
+    };
+    issueUpdate?: {
+      success?: boolean;
+      issue?: {
+        id?: string;
+      };
+    };
   };
   errors?: Array<{ message?: string }>;
+}
+
+interface LinearIssueForClose {
+  id?: string;
+  state?: {
+    name?: string;
+    type?: string;
+  };
+  comments?: {
+    nodes?: Array<{ body?: string }>;
+  };
 }
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
@@ -54,18 +105,8 @@ export class LinearGraphqlClient implements LinearClient {
 
   async createIssue(input: LinearIssueCreateInput): Promise<LinearIssueCreated> {
     validateCreateInput(input);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const response = await this.fetchImpl(LINEAR_API_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: this.apiKey,
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          query: `
+    const body = await this.request(
+      `
             mutation EchoCreateIssue($input: IssueCreateInput!) {
               issueCreate(input: $input) {
                 success
@@ -76,37 +117,145 @@ export class LinearGraphqlClient implements LinearClient {
               }
             }
           `,
-          variables: {
-            input: {
-              teamId: input.teamId,
-              projectId: input.projectId,
-              stateId: input.stateId,
-              assigneeId: input.assigneeId,
-              title: input.title,
-              description: input.body,
-            },
-          },
-        }),
+      {
+        input: {
+          teamId: input.teamId,
+          projectId: input.projectId,
+          stateId: input.stateId,
+          assigneeId: input.assigneeId,
+          title: input.title,
+          description: stampedDescription(input.body, input.decisionAtomId),
+          ...(input.decisionAtomId === undefined ? {} : { idempotencyKey: input.decisionAtomId }),
+        },
+      },
+      'createIssue',
+    );
+    const issue = body.data?.issueCreate?.issue;
+    if (
+      body.data?.issueCreate?.success !== true ||
+      issue?.id === undefined ||
+      issue.url === undefined
+    ) {
+      throw new Error('Linear createIssue failed: missing created issue id/url');
+    }
+    return { id: issue.id, url: issue.url };
+  }
+
+  async closeIssue(input: LinearIssueCloseInput): Promise<LinearIssueCloseResult> {
+    validateCloseInput(input);
+    const marker = closeMarker(input.decisionAtomId, input.issueId);
+    const issue = await this.readIssueForClose(input.issueId);
+    const markerPresent =
+      issue.comments?.nodes?.some((comment) => comment.body?.includes(marker) === true) === true;
+    const closed = issueIsClosed(issue.state);
+    if (markerPresent && closed) {
+      return { issue_id: input.issueId, outcome: 'already_closed', marker };
+    }
+    if (!markerPresent && closed) {
+      return { issue_id: input.issueId, outcome: 'externally_closed', marker };
+    }
+    if (!markerPresent) {
+      await this.createComment(input.issueId, `${input.comment}\n\n${marker}`);
+    }
+    await this.updateIssueState(input.issueId, input.closeStateId);
+    return {
+      issue_id: input.issueId,
+      outcome: markerPresent ? 'comment_marker_present_closed' : 'closed',
+      marker,
+    };
+  }
+
+  private async readIssueForClose(issueId: string): Promise<LinearIssueForClose> {
+    const body = await this.request(
+      `
+        query EchoIssueForClose($id: String!) {
+          issue(id: $id) {
+            id
+            state {
+              name
+              type
+            }
+            comments(first: 50) {
+              nodes {
+                body
+              }
+            }
+          }
+        }
+      `,
+      { id: issueId },
+      'readIssueForClose',
+    );
+    const issue = body.data?.issue;
+    if (issue?.id === undefined) throw new Error(`Linear issue not found: ${issueId}`);
+    return issue;
+  }
+
+  private async createComment(issueId: string, bodyText: string): Promise<void> {
+    const body = await this.request(
+      `
+        mutation EchoCreateComment($input: CommentCreateInput!) {
+          commentCreate(input: $input) {
+            success
+          }
+        }
+      `,
+      { input: { issueId, body: bodyText } },
+      'commentCreate',
+    );
+    if (body.data?.commentCreate?.success !== true) {
+      throw new Error('Linear commentCreate failed: missing success');
+    }
+  }
+
+  private async updateIssueState(issueId: string, stateId: string): Promise<void> {
+    const body = await this.request(
+      `
+        mutation EchoCloseIssue($id: String!, $input: IssueUpdateInput!) {
+          issueUpdate(id: $id, input: $input) {
+            success
+            issue {
+              id
+            }
+          }
+        }
+      `,
+      { id: issueId, input: { stateId } },
+      'issueUpdate',
+    );
+    if (body.data?.issueUpdate?.success !== true) {
+      throw new Error('Linear issueUpdate failed: missing success');
+    }
+  }
+
+  private async request(
+    query: string,
+    variables: Record<string, unknown>,
+    operation: string,
+  ): Promise<LinearGraphqlResponse> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(LINEAR_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({ query, variables }),
       });
       const body = (await response.json()) as LinearGraphqlResponse;
       if (!response.ok) {
-        throw new Error(`Linear createIssue failed: HTTP ${response.status}`);
+        throw new Error(`Linear ${operation} failed: HTTP ${response.status}`);
       }
       if (body.errors !== undefined && body.errors.length > 0) {
-        throw new Error(`Linear createIssue failed: ${formatLinearErrors(body.errors)}`);
+        throw new Error(`Linear ${operation} failed: ${formatLinearErrors(body.errors)}`);
       }
-      const issue = body.data?.issueCreate?.issue;
-      if (
-        body.data?.issueCreate?.success !== true ||
-        issue?.id === undefined ||
-        issue.url === undefined
-      ) {
-        throw new Error('Linear createIssue failed: missing created issue id/url');
-      }
-      return { id: issue.id, url: issue.url };
+      return body;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new Error(`Linear createIssue timed out after ${this.timeoutMs}ms`);
+        throw new Error(`Linear ${operation} timed out after ${this.timeoutMs}ms`);
       }
       throw err;
     } finally {
@@ -212,6 +361,13 @@ function validateCreateInput(input: LinearIssueCreateInput): void {
   requireNonEmpty(input.assigneeId, 'assigneeId');
 }
 
+function validateCloseInput(input: LinearIssueCloseInput): void {
+  requireNonEmpty(input.issueId, 'issueId');
+  requireNonEmpty(input.closeStateId, 'closeStateId');
+  requireNonEmpty(input.decisionAtomId, 'decisionAtomId');
+  requireNonEmpty(input.comment, 'comment');
+}
+
 function requireNonEmpty(value: string | undefined, field: string): string {
   if (value === undefined || value.trim() === '') {
     throw new Error(`${field} is required`);
@@ -221,4 +377,24 @@ function requireNonEmpty(value: string | undefined, field: string): string {
 
 function formatLinearErrors(errors: Array<{ message?: string }>): string {
   return errors.map((err) => err.message ?? 'unknown error').join('; ');
+}
+
+export function closeMarker(decisionAtomId: string, issueId: string): string {
+  return `echo:decision:${requireNonEmpty(decisionAtomId, 'decisionAtomId')}:issue:${requireNonEmpty(
+    issueId,
+    'issueId',
+  )}`;
+}
+
+function stampedDescription(body: string, decisionAtomId: string | undefined): string {
+  if (decisionAtomId === undefined || decisionAtomId.trim() === '') return body;
+  if (body.includes(`decision_atom_id: ${decisionAtomId}`)) return body;
+  return `${body.trim()}\n\n---\ndecision_atom_id: ${decisionAtomId}`;
+}
+
+function issueIsClosed(state: { name?: string; type?: string } | undefined): boolean {
+  const type = state?.type?.toLowerCase();
+  if (type === 'completed' || type === 'canceled') return true;
+  const name = state?.name?.toLowerCase() ?? '';
+  return name === 'done' || name === 'closed' || name === 'canceled' || name === 'cancelled';
 }
