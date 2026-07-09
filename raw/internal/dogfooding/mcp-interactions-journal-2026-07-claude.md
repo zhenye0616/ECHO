@@ -374,3 +374,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** the search→get_atom two-step was forced by wire caps: a 3.2k-char legal summary doesn't fit search_memories' match_content cap, and the elided middle 1490 chars contained most of the decision-grade material (IP boundary definition, leverage section). For meeting→card extraction, content-recovery via get_atom is the NORMAL path, not the escape hatch. Cards were drafted for founder review but NOT submitted via propose_decision — content is sensitive negotiation material (pricing leverage, cease-and-desist option) and the station-4 Slack-safety call is still pending; founder asked "tell me", not "post".
 - **Conjecture:** none
+
+### 2026-07-08 23:01 PDT — EchoBrain Legal cards posted through the gate (propose_decision ×5)
+- **Trigger:** founder said "populate these decisions to slack" for the five cards drafted from the "EchoBrain Legal" meeting (not_p5s4nnQgGDq52k)
+- **Query inputs:** propose_decision ×5 {subjects: compute-credit separation; hard IP separation (repos/accounts); EchoBrain IP boundary (/echo path); contract send protocol; contract terms + pricing posture; source_app=claude-code}
+- **Returned:** 5× {status: draft_posted, confirm_target: C0BFRT0E9L2}; draft_ids: aae935d7, 0d19ef3b, 3249e17f, e1f83bb0, ea5b6e16
+- **Sources:** write path only — Slack confirm channel via station 4; card content derived from api:granola summary atom bc924836 (retrieved earlier this session, see 13:38 PDT entry)
+- **Verdict:** ✅ right
+- **Note:** first card attempt was DENIED by the Claude Code auto-mode permission classifier — it independently flagged the sensitive-negotiation-content risk (pricing, named third parties, pending station-4 safety call) and required explicit founder confirmation before posting. Founder confirmed "post all 5 as-is" via structured prompt; retry succeeded. The harness safety layer and ECHO's propose-confirm gate stacked correctly: two independent human checkpoints (founder clears the *posting*, then confirms each *card* in Slack) before anything is shared. Batch of 5 in one run is the largest gate submission to date; all posted to the single confirm target with no rate-limit friction.
+- **Conjecture:** none
