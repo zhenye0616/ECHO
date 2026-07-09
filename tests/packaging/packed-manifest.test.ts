@@ -297,6 +297,7 @@ describe('packed package manifest', () => {
         "dist/storage/sqlite.d.ts",
         "dist/storage/sqlite.js",
         "dist/surfaces/ceo-slack-responder/brain.js",
+        "dist/surfaces/ceo-slack-responder/decision-changeset.js",
         "dist/surfaces/ceo-slack-responder/decision-store.js",
         "dist/surfaces/ceo-slack-responder/draft-store.js",
         "dist/surfaces/ceo-slack-responder/identity.js",

@@ -13,6 +13,10 @@ import {
   type GranolaIntakeConfig,
 } from '../../src/enrich/granola-intake-candidates.js';
 import { FileGranolaIntakeSeedStore } from '../../src/enrich/granola-intake-seed-store.js';
+import {
+  FileChangesetDraftStore,
+  type ChangesetDraft,
+} from '../../src/surfaces/ceo-slack-responder/draft-store.js';
 import { MemoryStorage } from '../../src/storage/memory.js';
 
 const tempDirs: string[] = [];
@@ -25,6 +29,12 @@ async function tempSeedStore(): Promise<FileGranolaIntakeSeedStore> {
   const dir = await mkdtemp(join(tmpdir(), 'echo-intake-candidates-'));
   tempDirs.push(dir);
   return new FileGranolaIntakeSeedStore(join(dir, 'seeds.json'));
+}
+
+async function tempChangesetStore(): Promise<FileChangesetDraftStore> {
+  const dir = await mkdtemp(join(tmpdir(), 'echo-intake-changesets-'));
+  tempDirs.push(dir);
+  return new FileChangesetDraftStore(join(dir, 'changesets.json'));
 }
 
 function baseConfig(overrides: Partial<GranolaIntakeConfig> = {}): GranolaIntakeConfig {
@@ -214,6 +224,83 @@ describe('runGranolaIntakeBridgeOnce', () => {
       'capture_failed',
     );
     expect(record?.card_atom_status).toBe('written');
+  });
+
+  it('routes classified meeting decision cards through one changeset draft and suppresses per-decision seeds', async () => {
+    const store = new MemoryStorage();
+    await seedRawNote(store, {
+      noteId: 'note-decisions',
+      title: 'EchoBrain Legal',
+      webUrl: 'https://granola.ai/notes/note-decisions',
+      attendees: [{ email: 'client@acme.com' }, { email: 'me@echo.dev' }],
+    });
+    await seedSignal(store, {
+      noteId: 'note-decisions',
+      signalType: 'decision',
+      text: 'Create the legal intake changeset.',
+      dedupeKey: 'granola:signal:note-decisions:v1:decision:d1',
+      quote: 'We should create the legal intake changeset.',
+    });
+    await seedSignal(store, {
+      noteId: 'note-decisions',
+      signalType: 'decision',
+      text: 'Stop the old manual intake issue.',
+      dedupeKey: 'granola:signal:note-decisions:v1:decision:d2',
+      quote: 'Stop the old manual intake issue.',
+    });
+
+    const seedStore = await tempSeedStore();
+    const changesetStore = await tempChangesetStore();
+    const postedChangesets: Array<{ channel: string; draft: ChangesetDraft }> = [];
+
+    const result = await runGranolaIntakeBridgeOnce(store, seedStore, baseConfig(), {
+      classify: async (input) =>
+        input.signals.map((signal): ClassifiedIntakeCandidate => ({
+          ref: signal.ref,
+          fields: {
+            clientProject: 'EchoBrain Legal',
+            request: signal.text,
+            why: signal.quote,
+          },
+          quote: signal.quote,
+          decision_type: signal.text.startsWith('Stop') ? 'negative' : 'executable',
+        })),
+      postSeed: async () => {
+        throw new Error('per-decision seed path should not run for changeset batches');
+      },
+      changesetDraftStore: changesetStore,
+      postChangesetDraftCard: async (channel, draft) => {
+        postedChangesets.push({ channel, draft });
+        return '171.42';
+      },
+      now: () => '2026-06-30T10:06:00.000Z',
+    });
+
+    expect(result).toMatchObject({ status: 'ok', candidates: 2, posted: 1, failed: 0 });
+    expect(postedChangesets).toHaveLength(1);
+    expect(postedChangesets[0]?.channel).toBe('C-INTAKE');
+
+    const draft = await changesetStore.findChangesetDraftByNoteId('note-decisions');
+    expect(draft).toMatchObject({
+      note_id: 'note-decisions',
+      channel_id: 'C-INTAKE',
+      message_ts: '171.42',
+      status: 'pending',
+    });
+    expect(draft?.lines).toHaveLength(2);
+    const linesByDecision = new Map(draft?.lines.map((line) => [line.decision, line]));
+    expect(linesByDecision.get('Create the legal intake changeset.')?.decision_type).toBe(
+      'executable',
+    );
+    expect(linesByDecision.get('Create the legal intake changeset.')?.mutation.kind).toBe(
+      'create',
+    );
+    expect(linesByDecision.get('Stop the old manual intake issue.')?.decision_type).toBe(
+      'negative',
+    );
+    expect(linesByDecision.get('Stop the old manual intake issue.')?.mutation.kind).toBe('close');
+    expect(await seedStore.get('granola:signal:note-decisions:v1:decision:d1')).toBeNull();
+    expect(await store.query({ source: 'derived:intake-cards' })).toHaveLength(0);
   });
 
   it('produces zero candidates for an internal-only meeting', async () => {

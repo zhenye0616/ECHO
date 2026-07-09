@@ -9,10 +9,7 @@ import {
   type BrainName,
   type ClassifierRunRecord,
 } from '../brain/brain.js';
-import {
-  renderSeedMessage,
-  type MeetingProvenance,
-} from '../brain/intake-seed.js';
+import { renderSeedMessage, type MeetingProvenance } from '../brain/intake-seed.js';
 import type { CaptureEvent, Storage } from '../storage/interface.js';
 import { parseJson } from '../util/json.js';
 import { GRANOLA_RAW_SOURCE, GRANOLA_SIGNAL_SOURCE } from './granola-signals.js';
@@ -21,6 +18,14 @@ import {
   type CardAtomOutcome,
   type GranolaIntakeSeedStore,
 } from './granola-intake-seed-store.js';
+import {
+  createChangesetDraftFromCards,
+  type DecisionCardForChangeset,
+} from '../surfaces/ceo-slack-responder/decision-changeset.js';
+import type {
+  ChangesetDraft,
+  ChangesetDraftStore,
+} from '../surfaces/ceo-slack-responder/draft-store.js';
 import {
   GRANOLA_INTAKE_BRIDGE_WORKER,
   writeWorkerHeartbeat,
@@ -82,7 +87,10 @@ export interface ClassifiedIntakeCandidate {
   ref: string;
   fields: IntakeFields;
   quote?: string;
+  decision_type?: GranolaDecisionType;
 }
+
+export type GranolaDecisionType = 'executable' | 'directional' | 'negative' | 'conditional';
 
 /** Item 123: a classifier may return the bare candidate list (legacy shape) or
  *  a `{ candidates, run }` object carrying the classifier-run provenance. The
@@ -203,10 +211,16 @@ export interface SeedPostResult {
 }
 
 export type SeedPoster = (channel: string, text: string) => Promise<SeedPostResult>;
+export type DecisionChangesetPoster = (
+  channel: string,
+  draft: ChangesetDraft,
+) => Promise<string>;
 
 export interface GranolaIntakeBridgeDeps {
   classify: GranolaIntakeClassifier;
   postSeed: SeedPoster;
+  changesetDraftStore?: ChangesetDraftStore;
+  postChangesetDraftCard?: DecisionChangesetPoster;
   now?: () => string;
 }
 
@@ -233,8 +247,11 @@ export interface GranolaIntakeBridgeOptions {
   config?: GranolaIntakeConfig;
   seedStore?: GranolaIntakeSeedStore;
   seedStorePath?: string;
+  changesetDraftStore?: ChangesetDraftStore;
+  decisionChangesetDraftStorePath?: string;
   classify?: GranolaIntakeClassifier;
   postSeed?: SeedPoster;
+  postChangesetDraftCard?: DecisionChangesetPoster;
   now?: () => string;
   env?: NodeJS.ProcessEnv;
   /** Coupling that makes the bridge run "after signal extraction": awaited at
@@ -289,7 +306,9 @@ function parseOwnerMap(raw: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [email, slackId] of Object.entries(parsed as Record<string, unknown>)) {
     if (typeof slackId !== 'string' || slackId.trim() === '') {
-      throw new Error(`ECHO_GRANOLA_INTAKE_OWNER_MAP value for ${email} must be a non-empty string`);
+      throw new Error(
+        `ECHO_GRANOLA_INTAKE_OWNER_MAP value for ${email} must be a non-empty string`,
+      );
     }
     out[email.trim().toLowerCase()] = slackId.trim();
   }
@@ -375,7 +394,10 @@ export function collectAttendeeEmails(attendees: unknown): string[] {
   return [...found];
 }
 
-function hasExternalAttendee(emails: readonly string[], internalDomains: readonly string[]): boolean {
+function hasExternalAttendee(
+  emails: readonly string[],
+  internalDomains: readonly string[],
+): boolean {
   const internal = new Set(internalDomains);
   return emails.some((email) => {
     const at = email.lastIndexOf('@');
@@ -452,6 +474,27 @@ function extractSignal(event: CaptureEvent): SignalForNote | null {
     canonical_subject: typeof canonicalSubject === 'string' ? canonicalSubject : '',
     quote,
     confidence: typeof confidence === 'number' ? confidence : 0,
+  };
+}
+
+function candidateToDecisionCard(
+  candidate: ClassifiedIntakeCandidate,
+  signal: SignalForNote,
+): DecisionCardForChangeset {
+  const decision = candidate.fields.request ?? signal.text;
+  return {
+    subject:
+      signal.canonical_subject ||
+      candidate.fields.clientProject ||
+      candidate.fields.request ||
+      signal.text,
+    decision,
+    ...(candidate.fields.why === undefined ? {} : { rationale: candidate.fields.why }),
+    decision_type: candidate.decision_type ?? classifyGranolaDecisionType(decision),
+    ...(candidate.fields.clientProject === undefined
+      ? {}
+      : { project_name: candidate.fields.clientProject }),
+    ...(candidate.fields.doneWhen === undefined ? {} : { tripwire: candidate.fields.doneWhen }),
   };
 }
 
@@ -555,6 +598,37 @@ export async function runGranolaIntakeBridgeOnce(
       .filter((candidate) => refToSignal.has(candidate.ref))
       .slice(0, config.perNoteCap);
 
+    if (
+      noteCandidates.length > 0 &&
+      deps.changesetDraftStore !== undefined &&
+      deps.postChangesetDraftCard !== undefined
+    ) {
+      candidates += noteCandidates.length;
+      try {
+        const { draft } = await createChangesetDraftFromCards(deps.changesetDraftStore, {
+          note_id: noteId,
+          meeting_title: info.meeting_title,
+          ...(info.meeting_date === undefined ? {} : { meeting_date: info.meeting_date }),
+          ...(info.web_url === undefined ? {} : { web_url: info.web_url }),
+          channel_id: config.channelId,
+          cards: noteCandidates.map((candidate) =>
+            candidateToDecisionCard(candidate, refToSignal.get(candidate.ref)!),
+          ),
+        });
+        if (draft.message_ts !== undefined) {
+          skipped += 1;
+          continue;
+        }
+        const messageTs = await deps.postChangesetDraftCard(config.channelId, draft);
+        await deps.changesetDraftStore.markChangesetMessage(draft.draft_id, messageTs);
+        posted += 1;
+      } catch (err) {
+        failed += 1;
+        log.error('changeset_post_failed', { note_id: noteId, message: (err as Error).message });
+      }
+      continue;
+    }
+
     for (const candidate of noteCandidates) {
       const signal = refToSignal.get(candidate.ref)!;
       candidates += 1;
@@ -652,7 +726,8 @@ function buildClassificationPrompt(input: GranolaIntakeClassificationInput): str
     'You triage client needs and issues raised in a meeting into Linear intake candidates.',
     'Keep ONLY ticket-worthy client needs or issues; drop internal chatter and vague items.',
     'For each kept signal, map it to intake fields best-effort. Leave a field out if not stated.',
-    'Return JSON only: {"candidates":[{"ref":"<signal ref>","fields":{...},"quote":"<supporting quote>"}]}.',
+    'Classify each kept decision as decision_type: executable, directional, negative, or conditional.',
+    'Return JSON only: {"candidates":[{"ref":"<signal ref>","fields":{...},"quote":"<supporting quote>","decision_type":"executable|directional|negative|conditional"}]}.',
     'fields keys: clientProject, request, why, clientOutcome, evidence, doneWhen, urgency, clientFacing.',
     'ref MUST be one of the provided signal refs. Do not invent refs or facts.',
     '',
@@ -702,11 +777,36 @@ function parseClassifiedCandidate(value: unknown): ClassifiedIntakeCandidate {
     }
   }
   const quote = record['quote'];
+  const rawDecisionType = record['decision_type'];
   return {
     ref: ref.trim(),
     fields,
     ...(typeof quote === 'string' && quote.trim() !== '' ? { quote: quote.trim() } : {}),
+    ...(typeof rawDecisionType === 'string' && isGranolaDecisionType(rawDecisionType)
+      ? { decision_type: rawDecisionType }
+      : { decision_type: classifyGranolaDecisionType(`${JSON.stringify(fields)} ${quote ?? ''}`) }),
   };
+}
+
+export function classifyGranolaDecisionType(text: string): GranolaDecisionType {
+  const normalized = text.toLowerCase();
+  if (/\b(do not|don't|stop|cancel|kill|drop|remove|defer|no longer|won't)\b/.test(normalized)) {
+    return 'negative';
+  }
+  if (/\b(if|when|unless|until|provided that)\b/.test(normalized)) return 'conditional';
+  if (/\b(direction|principle|prefer|north star|policy|posture)\b/.test(normalized)) {
+    return 'directional';
+  }
+  return 'executable';
+}
+
+function isGranolaDecisionType(value: string): value is GranolaDecisionType {
+  return (
+    value === 'executable' ||
+    value === 'directional' ||
+    value === 'negative' ||
+    value === 'conditional'
+  );
 }
 
 function defaultClassifierFromBrain(config: BrainClassifierConfig): GranolaIntakeClassifier {
@@ -865,15 +965,18 @@ export function startGranolaIntakeBridge(
 
   const seedStore =
     options.seedStore ??
-    new FileGranolaIntakeSeedStore(
-      options.seedStorePath ?? defaultSeedStorePath(),
-      options.now,
-    );
+    new FileGranolaIntakeSeedStore(options.seedStorePath ?? defaultSeedStorePath(), options.now);
   const postSeed =
     options.postSeed ?? ((channel, text) => postGranolaIntakeSeed(config.botToken, channel, text));
   const deps: GranolaIntakeBridgeDeps = {
     classify: activeClassify,
     postSeed,
+    ...(options.changesetDraftStore === undefined
+      ? {}
+      : { changesetDraftStore: options.changesetDraftStore }),
+    ...(options.postChangesetDraftCard === undefined
+      ? {}
+      : { postChangesetDraftCard: options.postChangesetDraftCard }),
     ...(options.now === undefined ? {} : { now: options.now }),
   };
 
@@ -916,7 +1019,10 @@ export function startGranolaIntakeBridge(
   // Item 120 AC2: write a heartbeat at the end of every run(), best-effort.
   async function run(): Promise<GranolaIntakeBridgeResult> {
     const result = await runInner();
-    writeWorkerHeartbeat(GRANOLA_INTAKE_BRIDGE_WORKER, granolaIntakeHeartbeat(result, heartbeatNow()));
+    writeWorkerHeartbeat(
+      GRANOLA_INTAKE_BRIDGE_WORKER,
+      granolaIntakeHeartbeat(result, heartbeatNow()),
+    );
     return result;
   }
 
@@ -962,4 +1068,8 @@ export function granolaIntakeSeedStorePath(): string {
 
 function defaultSeedStorePath(): string {
   return granolaIntakeSeedStorePath();
+}
+
+export function granolaDecisionChangesetDraftStorePath(): string {
+  return join(ECHO_HOME_PATHS.state, 'decision-changeset-drafts.json');
 }

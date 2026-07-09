@@ -25,9 +25,17 @@ import {
 import { createTeamDecisionStore, type TeamDecisionStore } from './decision-store.js';
 import {
   FileDecisionDraftStore,
+  FileChangesetDraftStore,
+  type ChangesetDraft,
+  type ChangesetDraftStore,
   type DecisionDraft,
   type DecisionDraftStore,
 } from './draft-store.js';
+import {
+  applyDecisionChangeset,
+  parseChangesetEditReply,
+  renderDecisionChangesetDraft,
+} from './decision-changeset.js';
 import {
   confirmAttributionForSlackUser,
   parseCofounderIdentities,
@@ -75,6 +83,12 @@ const DEFAULT_LINEAR_INTAKE_DRAFT_STORE = join(
   'state',
   'linear-intake-drafts.json',
 );
+const DEFAULT_DECISION_CHANGESET_DRAFT_STORE = join(
+  homedir(),
+  '.echo',
+  'state',
+  'decision-changeset-drafts.json',
+);
 
 export interface ResponderConfig {
   slackAppToken: string;
@@ -92,6 +106,7 @@ export interface ResponderConfig {
   intakeAgentMaxTurns?: number;
   teamDecisionStorePath?: string;
   teamDecisionDraftStorePath?: string;
+  decisionChangesetDraftStorePath?: string;
   decisionConfirmTarget?: string;
   cofounderIdentities?: readonly CofounderIdentity[];
   linearConfig?: LinearConfig;
@@ -149,6 +164,7 @@ interface SlackApiResponse {
   ok?: boolean;
   error?: string;
   url?: string;
+  ts?: string;
 }
 
 interface SocketLike {
@@ -163,6 +179,7 @@ type SocketConstructor = new (url: string) => SocketLike;
 type BrainRunner = (question: string, options: BrainRunOptions) => Promise<BrainResult>;
 type SlackPoster = typeof postSlackMessage;
 type IntakeConfirmPoster = typeof postIntakeConfirmCard;
+type DecisionChangesetConfirmPoster = typeof postDecisionChangesetDraftCard;
 type UsageAppender = typeof appendUsageRecord;
 type IntakeFailureAppender = typeof appendIntakeFailureRecord;
 type IntakeSlackPostFailureAppender = typeof appendIntakeSlackPostFailureRecord;
@@ -188,9 +205,11 @@ interface ResponderDependencies {
   appendIntakeSeedDismissalRecord?: IntakeSeedDismissalAppender;
   appendDriftDismissalRecord?: DriftDismissalAppender;
   postIntakeConfirmCard?: IntakeConfirmPoster;
+  postDecisionChangesetDraftCard?: DecisionChangesetConfirmPoster;
   intakeIssueRenderer?: IntakeIssueRenderer;
   teamDecisionStore?: TeamDecisionStore;
   decisionDraftStore?: DecisionDraftStore;
+  changesetDraftStore?: ChangesetDraftStore;
   intakeDraftStore?: IntakeDraftStore;
   linearClient?: LinearClient;
 }
@@ -207,6 +226,16 @@ export interface DecisionAction {
 export interface IntakeAction {
   kind: 'confirm' | 'dismiss';
   draftKey: string;
+  channel: string;
+  user: string;
+  ts?: string;
+  threadTs?: string;
+}
+
+export interface DecisionChangesetAction {
+  kind: 'confirm' | 'dismiss';
+  draftId: string;
+  revision: number;
   channel: string;
   user: string;
   ts?: string;
@@ -313,6 +342,9 @@ export function loadResponderConfig(env: NodeJS.ProcessEnv = process.env): Respo
     ...(env.ECHO_TEAM_DECISION_DRAFT_STORE?.trim()
       ? { teamDecisionDraftStorePath: env.ECHO_TEAM_DECISION_DRAFT_STORE.trim() }
       : {}),
+    ...(env.ECHO_DECISION_CHANGESET_DRAFT_STORE?.trim()
+      ? { decisionChangesetDraftStorePath: env.ECHO_DECISION_CHANGESET_DRAFT_STORE.trim() }
+      : {}),
     ...(env.ECHO_TEAM_DECISION_CONFIRM_TARGET?.trim()
       ? { decisionConfirmTarget: env.ECHO_TEAM_DECISION_CONFIRM_TARGET.trim() }
       : {}),
@@ -339,6 +371,9 @@ export function createResponderRuntimeDependencies(config: ResponderConfig): Res
   }
   if (config.teamDecisionDraftStorePath !== undefined) {
     deps.decisionDraftStore = new FileDecisionDraftStore(config.teamDecisionDraftStorePath);
+    deps.changesetDraftStore = new FileChangesetDraftStore(
+      config.decisionChangesetDraftStorePath ?? DEFAULT_DECISION_CHANGESET_DRAFT_STORE,
+    );
   }
   if (config.linearConfig !== undefined) {
     deps.intakeDraftStore = new FileIntakeDraftStore(
@@ -423,6 +458,10 @@ export async function respondToQuestion(
   const threadTs = question.threadTs ?? question.ts;
 
   await postMessage(config.slackBotToken, question.channel, ACK_MESSAGE, threadTs);
+
+  if (await respondToDecisionChangesetEditReply(question, config, deps)) {
+    return;
+  }
 
   if (await respondToLinearIntakeIfNeeded(question, config, deps, postMessage)) {
     return;
@@ -708,6 +747,48 @@ export function extractIntakeAction(envelope: SlackEnvelope): IntakeAction | nul
   };
 }
 
+export function extractDecisionChangesetAction(
+  envelope: SlackEnvelope,
+): DecisionChangesetAction | null {
+  if (envelope.type !== 'interactive') return null;
+  const payload = envelope.payload;
+  if (payload === undefined) return null;
+  const action = payload?.actions?.[0];
+  const actionId = action?.action_id;
+  const rawValue = action?.value;
+  const user = payload?.user?.id;
+  const channel = payload?.channel?.id;
+  if (
+    actionId === undefined ||
+    rawValue === undefined ||
+    user === undefined ||
+    channel === undefined ||
+    rawValue.trim() === ''
+  ) {
+    return null;
+  }
+  const kind =
+    actionId === 'echo_changeset_confirm'
+      ? 'confirm'
+      : actionId === 'echo_changeset_dismiss'
+        ? 'dismiss'
+        : null;
+  if (kind === null) return null;
+  const [draftId, revisionRaw] = rawValue.split(':');
+  const revision = Number.parseInt(revisionRaw ?? '', 10);
+  if (draftId === undefined || draftId.trim() === '' || !Number.isFinite(revision)) return null;
+  const message = payload.message;
+  return {
+    kind,
+    draftId: draftId.trim(),
+    revision,
+    channel,
+    user,
+    ts: message?.ts,
+    threadTs: message?.thread_ts,
+  };
+}
+
 export function extractDriftAction(envelope: SlackEnvelope): DriftAction | null {
   if (envelope.type !== 'interactive') return null;
   const payload = envelope.payload;
@@ -840,6 +921,145 @@ export async function respondToDecisionAction(
   );
 }
 
+export async function respondToDecisionChangesetEditReply(
+  question: SlackQuestion,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+): Promise<boolean> {
+  const threadTs = question.threadTs ?? question.ts;
+  if (
+    deps.changesetDraftStore === undefined ||
+    question.threadTs === undefined ||
+    threadTs === undefined
+  ) {
+    return false;
+  }
+  const draft = await deps.changesetDraftStore.findChangesetDraftByThread(
+    question.channel,
+    question.threadTs,
+  );
+  if (draft === null || draft.status !== 'pending') return false;
+
+  const postMessage = deps.postSlackMessage ?? postSlackMessage;
+  const sourceEventKey = `${question.channel}:${question.threadTs}:${question.ts ?? question.eventId ?? question.envelopeId}`;
+  const op = parseChangesetEditReply(question.text);
+  const result = await deps.changesetDraftStore.applyChangesetEdit(
+    draft.draft_id,
+    sourceEventKey,
+    op,
+    `Could not parse edit reply: ${question.text}`,
+  );
+  if (result.outcome === 'failed') {
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      `I could not apply that changeset edit. ${result.entry.error ?? 'Please name a line id and edit command.'}`,
+      threadTs,
+    );
+    return true;
+  }
+  if (result.outcome === 'accepted') {
+    await postMessage(
+      config.slackBotToken,
+      question.channel,
+      renderDecisionChangesetDraft(result.draft),
+      threadTs,
+    );
+  }
+  return true;
+}
+
+export async function respondToDecisionChangesetAction(
+  action: DecisionChangesetAction,
+  config: ResponderConfig,
+  deps: ResponderDependencies,
+): Promise<void> {
+  const postMessage = deps.postSlackMessage ?? postSlackMessage;
+  const threadTs = action.threadTs ?? action.ts;
+  if (
+    deps.changesetDraftStore === undefined ||
+    deps.teamDecisionStore === undefined ||
+    deps.linearClient === undefined ||
+    config.linearConfig === undefined
+  ) {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Decision changesets are not configured on this responder.',
+      threadTs,
+    );
+    return;
+  }
+
+  const actor = confirmAttributionForSlackUser(config.cofounderIdentities ?? [], action.user);
+  if (action.kind === 'dismiss') {
+    await deps.changesetDraftStore.dismissChangesetDraft(action.draftId, actor);
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Dismissed decision changeset.',
+      threadTs,
+    );
+    return;
+  }
+
+  const result = await applyDecisionChangeset({
+    draftStore: deps.changesetDraftStore,
+    decisionStore: deps.teamDecisionStore,
+    linearClient: deps.linearClient,
+    linearTeamId: config.linearConfig.teamId,
+    linearStateId: config.linearConfig.inboxStateId,
+    defaultAssigneeId: config.linearConfig.defaultAssigneeId,
+    draftId: action.draftId,
+    revision: action.revision,
+    confirmedBy: actor,
+    author: 'granola',
+  });
+
+  if (result.outcome === 'applied' || result.outcome === 'already_applied') {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Applied decision changeset.',
+      threadTs,
+    );
+    return;
+  }
+  if (result.outcome === 'stale_revision') {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      `Draft changed - reconfirm revision ${result.draft.revision}.\n\n${renderDecisionChangesetDraft(result.draft)}`,
+      threadTs,
+    );
+    return;
+  }
+  if (result.outcome === 'needs_input') {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      `Cannot apply yet; pick close targets for ${result.line_ids.join(', ')}.`,
+      threadTs,
+    );
+    return;
+  }
+  if (result.outcome === 'in_progress') {
+    await postMessage(
+      config.slackBotToken,
+      action.channel,
+      'Decision changeset apply in progress.',
+      threadTs,
+    );
+    return;
+  }
+  await postMessage(
+    config.slackBotToken,
+    action.channel,
+    'Decision changeset is dismissed.',
+    threadTs,
+  );
+}
+
 /**
  * Item 114 AC5 — Acknowledge/Dismiss on a drift alert card. Acknowledge just
  * confirms; Dismiss additionally appends the pair key to the event log as a
@@ -904,9 +1124,7 @@ export async function respondToIntakeSeed(
     fields: seed.fields,
     askedFields: intakeFollowupFieldsToAsk(missing),
     ...(projectId !== null ? { projectId } : {}),
-    ...(seed.meetingProvenance === undefined
-      ? {}
-      : { meetingProvenance: seed.meetingProvenance }),
+    ...(seed.meetingProvenance === undefined ? {} : { meetingProvenance: seed.meetingProvenance }),
   });
 
   // Durable write complete — ack only now (write-before-ack on the seed path).
@@ -1224,7 +1442,11 @@ export async function appendDriftDismissalRecord(
   recordedAt = new Date(),
 ): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await appendFile(path, `${formatDriftDismissalRecord(pairKey, dismissedBy, recordedAt)}\n`, 'utf8');
+  await appendFile(
+    path,
+    `${formatDriftDismissalRecord(pairKey, dismissedBy, recordedAt)}\n`,
+    'utf8',
+  );
 }
 
 async function postIntakeSlackMessageOrRecordFailure(
@@ -1387,6 +1609,58 @@ export async function postDecisionDraftCard(
   }
 }
 
+export async function postDecisionChangesetDraftCard(
+  botToken: string,
+  channel: string,
+  draft: ChangesetDraft,
+  threadTs?: string,
+): Promise<string> {
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      channel,
+      text: renderDecisionChangesetDraft(draft),
+      ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: renderDecisionChangesetDraft(draft) },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Confirm' },
+              style: 'primary',
+              action_id: 'echo_changeset_confirm',
+              value: `${draft.draft_id}:${draft.revision}`,
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Dismiss' },
+              style: 'danger',
+              action_id: 'echo_changeset_dismiss',
+              value: `${draft.draft_id}:${draft.revision}`,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const body = (await response.json()) as SlackApiResponse;
+  if (!response.ok || body.ok !== true || body.ts === undefined) {
+    throw new Error(
+      `Slack decision changeset post failed: ${body.error ?? `HTTP ${response.status}`}`,
+    );
+  }
+  return body.ts;
+}
+
 export async function postIntakeConfirmCard(
   botToken: string,
   channel: string,
@@ -1546,6 +1820,20 @@ async function handleSocketMessage(
     return;
   }
 
+  const changesetAction = extractDecisionChangesetAction(envelope);
+  if (changesetAction !== null) {
+    log.debug('slack_decision_changeset_action_received', {
+      kind: changesetAction.kind,
+      channel: changesetAction.channel,
+      user: changesetAction.user,
+      thread_ts: changesetAction.threadTs ?? changesetAction.ts,
+      draft_id: changesetAction.draftId,
+      revision: changesetAction.revision,
+    });
+    await respondToDecisionChangesetAction(changesetAction, config, deps);
+    return;
+  }
+
   const intakeAction = extractIntakeAction(envelope);
   if (intakeAction !== null) {
     log.debug('slack_intake_action_received', {
@@ -1589,9 +1877,7 @@ async function handleSocketMessage(
   await respondToQuestion(question, config, deps);
 }
 
-async function exitAfterSocketDisconnect(
-  inFlight: ReadonlySet<Promise<void>>,
-): Promise<void> {
+async function exitAfterSocketDisconnect(inFlight: ReadonlySet<Promise<void>>): Promise<void> {
   await drainInFlightWork(inFlight, SOCKET_DRAIN_TIMEOUT_MS);
   const timer = setTimeout(() => {
     process.exit(1);
