@@ -18,3 +18,13 @@ Stage-1 surfaces belong to capture vendors (Granola et al.). Stage-4 surfaces be
 ## Immediate application (lab pilot, phase 1, n=2)
 
 Stages 2 and 5 run concierge: before any card is proposed, the strategist retrieves ledger + Linear state and stamps the triage verdict on the card; briefs join decision slate + issue states + captured eng progress. Automation of stage 2 = the zero-retrievals tuning successor; automation of stage 5 = the brief composer. Both get specced only after the pattern stabilizes across 2–3 advisor meetings.
+
+## The form — how the loop stays tool/surface-agnostic (same day)
+
+**Typed object model + five stage contracts + MCP ports. No pipeline, no vendor nouns in the core.**
+
+1. **Invariant core = the decision lifecycle state machine**, event-sourced append-only (matches existing storage): `candidate → triaged{new|duplicate|conflict|supersedes|update} → proposed → ratified|dismissed → dispatched{work_item_ref} → observed{evidence} → closed|superseded_by`. Every transition is an immutable event with provenance (source atom ids, quotes, actor, timestamp). Stage transitions reference atom ids and verdicts — never vendors.
+2. **Stages are contracts, not integrations** — each stage defines input→output; a tool "binding" satisfies the contract or it doesn't. Adding Mattermost/Jira/Zoom adds a binding row; the loop is untouched.
+3. **Surface-agnostic proposals via self-describing artifacts** — generalize the shipped `echo-intake-seed v1` embedded-payload pattern (the base64 seed inside the Slack intake card): the proposal carries its own machine-readable payload, so any button-capable surface can host Validate and the confirm leg parses it back regardless of venue.
+4. **Executor-agnostic stages** — a stage may be run by daemon code, an LLM brain binding, or a human concierge; all produce the same lifecycle event. This is why phase 1 runs with zero new code, and why concierge→automation is a swap, not a rewrite. Doctrine precedent: `2026-05-13-echo-skills-are-the-cross-tool-protocol.md` (canonical vendor-neutral core, per-client adapters) — applied to the product.
+5. **MCP is the port in both directions** — loop verbs exposed as MCP tools (`propose_decision` already is), surfaces consumed via thin adapters or brain bindings that natively speak other vendors' MCPs (e.g., Linear MCP for stage-4 dispatch and stage-2 execution-state reads).
