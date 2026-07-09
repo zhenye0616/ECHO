@@ -1,0 +1,27 @@
+# Decision→tracker materialization: the changeset compiler (design rationale, 2026-07-09)
+
+Strategy session following the 2026-07-08 EchoBrain Legal live run and the confirm-friction note. Founder is designing the advisor↔students research loop (generalization of the CEO loop: advisor = remember + revisit decisions; students = execute until next meeting). Scope decision by founder: **Granola + Linear (+ Slack confirm) only** — no coding-agent capture at this tier; that's the enterprise upsell. Spec: `backlog/proposed/2026-07-09-130-decision-changeset-compiler-v0.md`.
+
+## The flow (founder's cut)
+
+Meeting (Granola) → decision cards → confirm → Linear issues (downward context flow) → students execute in Linear → pre-meeting brief generated from Linear read → advisor realigns → new decisions → new issues. Nobody opens ECHO: "the meeting is where decisions happen, Linear is where work lives, the brief is where they meet."
+
+## Load-bearing design pins (settled in-session)
+
+1. **Decisions compile into a tracker CHANGESET, not an issue list.** The four decision shapes (executable / directional / negative / conditional) materialize as creates, closes, edits, annotations, and deliberate no-ops. Kill-decisions closing issues is the highest-leverage mutation (prevents zombie work). Any create-only design silently drops half the shapes. Corollary: the compiler needs Linear READ at compile time (resolve "the contrastive line" → ECH-12, ECH-13) — same read the brief needs.
+2. **Fabrication boundary = spoken content.** Extraction cards only what carried decision force; spoken structure ("first replicate, then scale") may become multiple items; the extractor never invents decomposition, subtasks, or acceptance criteria. Decomposition is the student's job inside Linear. (Premise-3 extended to materialization: a fabricated decision is now a fabricated obligation on a real person.)
+3. **Ledger primary, Linear projection.** All decision shapes append to `derived:team-decisions` (with `decision_type`, rationale, meeting provenance, optional `supersedes`). Only the executable subset projects into Linear. Lifecycle mismatch is the reason: issues complete (todo→done); decisions HOLD (made → operative → executed | superseded | retired | contradicted). Supersession rides the existing subject-normalized dedupe_key chains — a fold, not a table. ECHO builds **zero new stores** (anti-destination-app: an editable ECHO "threads base" would compete with Linear and double the hygiene burden). Threads are emergent: a thread = all atoms sharing a canonical_subject; active = has operative decision or open child issue.
+4. **`decision_atom_id` stamped on every spawned issue is the non-negotiable first piece.** It's what turns ticket status into decision status (brief aggregation), carries the why downward (rationale in issue description), and enables drift detection (new decisions checked against the operative ledger). Unrecoverable retroactively — orphan issues stay orphans. Lands before anything else.
+5. **Don't guess at resolution — surface a picker.** Reference resolution (spoken → tracker object) goes: decision-lineage index → thread/project map → human picks on the confirm card. Human resolutions feed a future alias table; ambiguity is a decaying cost. v0 does no fuzzy matching.
+6. **One batch confirm card per meeting; human edits EVERYTHING before execution.** Founder's max-flexibility requirement: the human is already doing this compilation in their head — the card is a staging view of the changeset (creates with assignee/project, closes with targets, ledger-only lines shown so directional decisions visibly aren't dropped). Edits via natural-language thread replies; nothing executes until one explicit confirm. This also resolves the 2026-07-08 confirm-chore finding: confirmation = assigning the work, one gesture per meeting, not N button clicks. Refine from real usage.
+
+## Hygiene / brief epistemics (deferred to the brief item, recorded here)
+
+- Brief claims carry evidence state: evidenced-done / claimed-active / silent / stale / contradicted. "Silent" never renders as "in progress" — the confidently-wrong brief is the trust-killer (asymmetric: one fiction outweighs ten accurate briefs).
+- Meeting cadence bounds fiction age: students SAY what they did in each captured meeting — the transcript is a periodic zero-discipline status report; Linear hygiene only interpolates between meetings.
+- **Brief preview as endorsement:** students get their slice the day before ("this is what your advisor will read — correct it now"). Flips the hygiene incentive (updating Linear = pre-loading your defense), converts hygiene to one weekly self-interested pass, and relocates epistemic responsibility: an uncorrected preview makes the brief the STUDENT's claim, ECHO-assembled.
+- Reinstating code capture wouldn't buy ground truth for research anyway (reading/thinking/wet-lab/writing produce no commits); human-endorsed state at meeting cadence beats noisy activity signal for this cohort.
+
+## v0 cut
+
+Creates + closes only. Rescope degrades to close+recreate (human expresses it); conditionals go ledger-only with the tripwire recorded for the future brief. Thin extension of item 109's bridge: new seed source (confirmed decision cards), a close path beside the create path, the provenance stamp, batch card + thread-edit loop. Brief generator is a SEPARATE follow-on item (needs the same Linear read).
