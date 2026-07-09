@@ -1,10 +1,43 @@
 ---
 id: 2026-07-09-130-decision-changeset-compiler-v0
 title: "Decision→Linear changeset compiler v0: meeting decision cards materialize as an editable batch changeset (creates + closes), human-confirmed in one gesture"
-status: proposed
+status: complete
 priority: HIGH
 estimate: 2.5d
 created: 2026-07-09
+review_notes: |
+  Merged on 2026-07-09 (commit 0b7feb72) via strategist-run merge under founder
+  standing authorization ("continue when the review finishes and merge it").
+
+  Conflicts resolved:
+  - none (merge --no-ff clean; ort strategy, zero conflict markers)
+
+  C3.5 cross-vendor consult: none invoked
+
+  Fixups applied:
+  - none required in-merge; the single sidecar fixup (daemon activation
+    decision) was resolved pre-merge as STAGED-OFF — producer merges dormant,
+    daemon opt-in tracked as follow-up (item-109 off-by-default pattern)
+
+  Fixups deferred to follow-up items (see backlog/_followups.md):
+  - daemon opt-in wiring behind an ECHO_DECISION_CHANGESET_* enable
+  - confirm-after-edit fresh-revision repost
+  - close-marker state-matrix tests x2 + true concurrent-CAS test
+  - classifier semantics call at producer go-live
+  - store-path parity under ECHO_HOME override
+
+  Verify: 2107/2107 tests pass (203/204 files, 1 skipped file); lint,
+  typecheck, coupled-invariants, sync-skills all clean post-merge in the
+  merger worktree with fresh npm install.
+
+  Review provenance: spec converged r1-r4 in the two-codex queue (reframe gate
+  fired r2+r3, both propagation_completion); build took 3 cycles (initial + 2
+  redos: packaging allowlist + producer wiring; then gating the producer after
+  it unconditionally shadowed the item-109 intake-seed path). Final delta
+  review verdict: merge with founder fixups at head_sha
+  46194c1be9dfa61f59c546e67790eea7e25bace4. NOTE: this block landed in a
+  follow-up commit — the merge-commit edit failed on a wrong anchor and the
+  unguarded shell continued past it (same failure family as 045 AC5b).
 blocked_by: []
 spec_refs:
   - raw/internal/decisions/2026-07-09-decision-changeset-compiler-design.md   # full design rationale — READ FIRST
