@@ -129,4 +129,62 @@ describe('startGranolaIntakeBridge scheduling', () => {
     expect(result).toMatchObject({ status: 'ok', posted: 1 });
     expect(order).toEqual(['signals', 'classify', 'post']);
   });
+
+  it('keeps the default wrapper path on intake seed posting when changeset deps are absent', async () => {
+    const storage = new MemoryStorage();
+    await storage.append({
+      source: 'api:granola',
+      timestamp: '2026-06-30T10:00:00.000Z',
+      content: 'summary',
+      metadata: {
+        note_id: 'note-decision',
+        title: 'Client decision sync',
+        updated_at: '2026-06-30T10:00:00.000Z',
+        granola_atom_type: 'summary',
+        attendees: [{ email: 'client@acme.com' }],
+      },
+    });
+    await storage.append({
+      source: 'derived:granola-signals',
+      timestamp: '2026-06-30T10:05:00.000Z',
+      content: 'make the decision',
+      metadata: {
+        signal_type: 'decision',
+        note_id: 'note-decision',
+        dedupe_key: 'granola:signal:note-decision:v1:decision:d1',
+        canonical_subject: 'topic',
+        source_span: { kind: 'summary' },
+        confidence: 0.8,
+      },
+    });
+
+    const seedStore = await tempSeedStore();
+    const posts: Array<{ channel: string; text: string }> = [];
+    const handle = startGranolaIntakeBridge(storage, {
+      config: enabledConfig(),
+      seedStore,
+      runOnStart: false,
+      classify: async (input) =>
+        input.signals.map((signal) => ({
+          ref: signal.ref,
+          fields: { request: 'make the decision' },
+          decision_type: 'executable' as const,
+        })),
+      postSeed: async (channel, text) => {
+        posts.push({ channel, text });
+        return { ts: 'ts-seed' };
+      },
+      now: () => '2026-06-30T10:06:00.000Z',
+    });
+
+    const result = await handle.run();
+    await handle.stop();
+
+    expect(result).toMatchObject({ status: 'ok', posted: 1, failed: 0 });
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.channel).toBe('C-INTAKE');
+    const seedRecord = await seedStore.get('granola:signal:note-decision:v1:decision:d1');
+    expect(seedRecord?.status).toBe('posted');
+    expect(seedRecord?.slack_ts).toBe('ts-seed');
+  });
 });

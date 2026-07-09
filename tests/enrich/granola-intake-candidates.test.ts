@@ -288,8 +288,17 @@ describe('runGranolaIntakeBridgeOnce', () => {
       status: 'pending',
     });
     expect(draft?.lines).toHaveLength(2);
-    expect(draft?.lines.map((line) => line.decision_type)).toEqual(['executable', 'negative']);
-    expect(draft?.lines.map((line) => line.mutation.kind)).toEqual(['create', 'close']);
+    const linesByDecision = new Map(draft?.lines.map((line) => [line.decision, line]));
+    expect(linesByDecision.get('Create the legal intake changeset.')?.decision_type).toBe(
+      'executable',
+    );
+    expect(linesByDecision.get('Create the legal intake changeset.')?.mutation.kind).toBe(
+      'create',
+    );
+    expect(linesByDecision.get('Stop the old manual intake issue.')?.decision_type).toBe(
+      'negative',
+    );
+    expect(linesByDecision.get('Stop the old manual intake issue.')?.mutation.kind).toBe('close');
     expect(await seedStore.get('granola:signal:note-decisions:v1:decision:d1')).toBeNull();
     expect(await store.query({ source: 'derived:intake-cards' })).toHaveLength(0);
   });

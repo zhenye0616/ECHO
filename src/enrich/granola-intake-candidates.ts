@@ -22,12 +22,10 @@ import {
   createChangesetDraftFromCards,
   type DecisionCardForChangeset,
 } from '../surfaces/ceo-slack-responder/decision-changeset.js';
-import {
-  FileChangesetDraftStore,
-  type ChangesetDraft,
-  type ChangesetDraftStore,
+import type {
+  ChangesetDraft,
+  ChangesetDraftStore,
 } from '../surfaces/ceo-slack-responder/draft-store.js';
-import { postDecisionChangesetDraftCard } from '../surfaces/ceo-slack-responder/responder.js';
 import {
   GRANOLA_INTAKE_BRIDGE_WORKER,
   writeWorkerHeartbeat,
@@ -968,24 +966,17 @@ export function startGranolaIntakeBridge(
   const seedStore =
     options.seedStore ??
     new FileGranolaIntakeSeedStore(options.seedStorePath ?? defaultSeedStorePath(), options.now);
-  const configuredChangesetDraftStorePath = env['ECHO_DECISION_CHANGESET_DRAFT_STORE']?.trim();
-  const changesetDraftStore =
-    options.changesetDraftStore ??
-    new FileChangesetDraftStore(
-      options.decisionChangesetDraftStorePath ??
-        (configuredChangesetDraftStorePath === '' ? undefined : configuredChangesetDraftStorePath) ??
-        granolaDecisionChangesetDraftStorePath(),
-    );
   const postSeed =
     options.postSeed ?? ((channel, text) => postGranolaIntakeSeed(config.botToken, channel, text));
-  const postChangesetDraftCard =
-    options.postChangesetDraftCard ??
-    ((channel, draft) => postDecisionChangesetDraftCard(config.botToken, channel, draft));
   const deps: GranolaIntakeBridgeDeps = {
     classify: activeClassify,
     postSeed,
-    changesetDraftStore,
-    postChangesetDraftCard,
+    ...(options.changesetDraftStore === undefined
+      ? {}
+      : { changesetDraftStore: options.changesetDraftStore }),
+    ...(options.postChangesetDraftCard === undefined
+      ? {}
+      : { postChangesetDraftCard: options.postChangesetDraftCard }),
     ...(options.now === undefined ? {} : { now: options.now }),
   };
 
