@@ -603,3 +603,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** request `backlog/reviews/2026-07-09-130-decision-changeset-compiler-v0/r4/request.md`; artifact `backlog/proposed/2026-07-09-130-decision-changeset-compiler-v0.md@3be16c189ee7b443ca5b644c5c8ca9ae90ef5294`; response `backlog/reviews/2026-07-09-130-decision-changeset-compiler-v0/r4/codex.md`; raw diagnostics `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-1139DB0A-4B22-4AC2-B470-2105DA460FAA/raw/internal/review-queue/05f7a390-0a76-4855-98a2-a3a0d6699162/codex.stdout.log` / `/var/folders/bb/rkp9hqh54t742qncslfq5dc40000gn/T/echo-codex-1139DB0A-4B22-4AC2-B470-2105DA460FAA/raw/internal/review-queue/05f7a390-0a76-4855-98a2-a3a0d6699162/codex.stderr.log`; binding `tools/review-queue/reviewer-bindings.json`.
 - **Verdict:** right - wrapper-owned publication succeeded; the read-only child did not write the canonical response file.
 - **Note:** Raw stdout/stderr are diagnostics only; the committed sidecar came from the parsed final assistant message and the wrapper-owned validation helper.
+
+### 2026-07-09 12:20 PDT - codex builder MCP preflight
+
+- **Trigger:** Builder-agent `/process-backlog` run started and checked that the ECHO MCP daemon was reachable before claiming ready work.
+- **Query inputs:** `mcp__echo.echo_ping({ message: "codex builder preflight for process-backlog on 2026-07-09" })`.
+- **Returned:** Connectivity response only: `pong=true`, `ts=2026-07-09T19:20:15.738Z`, `received` echoed the supplied message. No clusters, atoms, or task states were requested.
+- **Sources:** ECHO MCP daemon at the configured local endpoint; tool surface `mcp__echo.echo_ping`; no capture sources queried.
+- **Verdict:** right - daemon was reachable and returned the expected pong response.
+- **Note:** This was a smoke test for MCP availability only; the builder run continues with filesystem/git backlog discovery unless later acceptance work calls for ECHO retrieval.
