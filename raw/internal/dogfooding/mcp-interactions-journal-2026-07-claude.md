@@ -383,3 +383,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** first card attempt was DENIED by the Claude Code auto-mode permission classifier — it independently flagged the sensitive-negotiation-content risk (pricing, named third parties, pending station-4 safety call) and required explicit founder confirmation before posting. Founder confirmed "post all 5 as-is" via structured prompt; retry succeeded. The harness safety layer and ECHO's propose-confirm gate stacked correctly: two independent human checkpoints (founder clears the *posting*, then confirms each *card* in Slack) before anything is shared. Batch of 5 in one run is the largest gate submission to date; all posted to the single confirm target with no rate-limit friction.
 - **Conjecture:** none
+
+### 2026-07-08 23:22 PDT — confirm leg has no MCP path (expected-call-impossible entry)
+- **Trigger:** founder said "just confirm the content of all 5 cards" for the EchoBrain Legal drafts (aae935d7, 0d19ef3b, 3249e17f, e1f83bb0, ea5b6e16)
+- **Query inputs:** none possible — no mcp__echo__* confirm/dismiss tool exists; propose_decision has no inverse on the MCP surface
+- **Returned:** n/a. Fallback chain: (1) Slack buttons — dead, local Socket Mode responder not running; (2) direct confirmDraft→appendConfirmedDecision script against prod stores — denied by the Claude Code permission classifier; drafts remain pending
+- **Sources:** ~/.echo/state/team-decision-drafts.json (5× status=pending, action_ts=null); prod echo.db derived:team-decisions shows the 3 prior station-4 confirms (confirmed_by=U0BF9M04EBH) — the confirm path worked before only while the responder was up
+- **Verdict:** ❌ wrong — an explicitly founder-authorized confirmation could not be executed by any AI client through any sanctioned path
+- **Note:** this is the journal-shaped twin of the founder's product signal in the same breath: "make the decisions more natural, not like an extra chore people have to do after a long meeting." Full observation set in raw/internal/decisions/2026-07-08-decision-confirm-friction.md. Notable: extraction verdict from the founder was 5/5 useful, zero dismissals — the gate's friction is now the binding constraint, not extraction quality.
+- **Conjecture:** none (per discipline — synthesis owns the fix)
