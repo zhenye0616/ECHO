@@ -144,3 +144,18 @@ A context-inventory retrieval surfaced `derived:team-decisions` atoms showing **
 **Roadmap (shown, not built):** PM tools next — point the existing 108/109 confirm→Linear gate at ratified team-decisions → issues/projects; then eng-tool context as upsell.
 
 **Known data limitations carried into feature design:** transcripts are speaker-anonymous ("Speaker:" only — no per-person attribution promises in v0); attendees metadata is calendar-dependent (verify the daily meeting populates all three); note freshness bounded by Granola summarization latency.
+
+---
+
+## Addendum 5 (2026-07-09) — first-customer change: university lab replaces the Justinian pilot (founder call)
+
+**The Justinian pilot is cancelled.** Founder call, 2026-07-09, in the context of the founder's employment transition out of Justinian (consulting/IP negotiation in flight). The Q3 target human ("CEO P.") and the Assignment (the P. conversation, opener, offer) are **void**. The June 24 exhibit remains valid as pain/artifact validation — a burned buyer commissioned and consumed the hand-built recap — but no longer identifies the customer.
+
+**First customer: a university lab.** Stack: **Zoom** meetings + **self-hosted Mattermost**; all other context lives in the advisor's and PhD students' heads. What this changes and preserves:
+
+- **Preserved (the wedge's real shape, now proven by substitution):** the decision loop — extract → propose → confirm → ledger → track — is tool-agnostic. Buyer shape identical: the advisor is the decision-maker drowning in N parallel threads with decisions evaporating between meetings.
+- **Changed (two new adapters owed):** (a) Mattermost capture + interactive-button cards — favorable: good API, no plan gating, they own the server; (b) Zoom transcript source — the hard part is lab recording-consent culture, not the API (options: university cloud-recording API / notetaker-on-one-Mac / meeting bot).
+- **New pitch asset:** self-hosted-Mattermost culture signals data sovereignty → the **on-prem org-hub profile** (Addendum-4-era hub definition: org-scoped fresh store, consented sources only, API-key brain) runs on the lab's own server. "No SaaS sees your research" is a pitch the funded meeting-notes vendors structurally cannot make.
+- **Screens owed before any adapter is built (same bar the Justinian pilot had to pass):** (1) the lab's burned-buyer incident — named, specific, recent; (2) academia WTP — labs default to free-forever; identify the actual payment instrument (advisor discretionary funds / department software line / grant cloud-credits).
+
+Premises 1 and 4 (standing appetite; cards-earn-clicks) now re-validate against the lab, not Justinian. Premise 2 (Slack enablement) is replaced by Mattermost bot provisioning + the lab's recording-consent conversation. Premise 5 (Granola window) softens — Granola is no longer the substrate, only the reference competitor. Premise 6 inverts: the lab IS conversation #1 now, and the just-raised-startup ICP becomes the untested generalization.
