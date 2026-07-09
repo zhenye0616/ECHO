@@ -17,6 +17,6 @@ Two things in one sentence: (a) the extraction quality was right — all five ca
 
 ## Status
 
-Founder instruction to confirm all five is ON RECORD (this note + chat) but the drafts remain `pending` in `~/.echo/state/team-decision-drafts.json` until a working confirm path executes it. Draft IDs: aae935d7, 0d19ef3b, 3249e17f, e1f83bb0, ea5b6e16.
+RESOLVED for this batch (2026-07-08 ~23:17 PDT): founder ran the confirm script himself via the `!` in-session command — all five drafts (aae935d7, 0d19ef3b, 3249e17f, e1f83bb0, ea5b6e16) are `confirmed`, attributed `U0BF9M04EBH (founder, via claude-code chat)`, with team-decision atoms appended to prod echo.db (`derived:team-decisions`). The human-executes-the-write shape satisfied the gate's intent while remaining a single batch gesture — one command for five decisions, versus five button clicks behind a responder that wasn't running. That contrast is the strongest single datapoint for the "natural, not a chore" direction below.
 
 Backlog item(s) should come from end-of-window synthesis, not this note. The direction to preserve: **confirmation should ride an existing natural moment (the meeting's own wrap-up, the recap read, a single batch gesture) rather than being a new post-meeting workflow.** Connects to the recap-pilot decision (2026-07-07): the ledger rides the recap because recap is a pull the CEO already wants — decision confirms likely want the same host.
