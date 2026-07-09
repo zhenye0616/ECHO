@@ -29,22 +29,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-09T19:21:55Z"
 branch: "agent/decision-changeset-compiler-v0"
 worktree: "/Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0"
-head_sha: "cad471afc2f6f1feb05720eee02e0154bf328dfb"
+head_sha: "1f9bd6e86608e4d23676d97b668e2fb799eaee08"
 pr_url: ""
 agent_notes: |
-  REDO CYCLE 1 (strategist, 2026-07-09, verdict: redo before merge — full review in
-  backlog/claimed/2026-07-09-130-decision-changeset-compiler-v0.review.md):
-  core is correct and stays; two blocking fixups only, no other changes:
-  (1) add "dist/surfaces/ceo-slack-responder/decision-changeset.js" to package.json
-  files allowlist; shell-reachable + import-closure + packaged-boot suites must go
-  green. (2) wire the PRODUCER: confirmed meeting extraction routes
-  createChangesetDraftFromCards -> postDecisionChangesetDraftCard -> markChangesetMessage
-  in the Granola bridge; suppress per-decision seeds for meeting batches; add a test
-  driving AC1 through the bridge (not direct function calls). Do NOT expand scope;
-  non-blocking follow-ups in the sidecar are deferred, do not implement them.
-  On completion: push branch, update head_sha to the new full 40-char tip, move back
-  to pending_review.
-  Implemented the Decision→Linear changeset compiler v0 on `agent/decision-changeset-compiler-v0` at `cad471afc2f6f1feb05720eee02e0154bf328dfb`. The branch adds one batch `ChangesetDraft` path for meeting decisions, deterministic edit/revision history, revision-bound confirm, applying-owner CAS/lease/fencing, append-only team-decision atoms with `decision_type`/`line_key`/meeting provenance/`supersedes`, Linear create stamping via `decision_atom_id`, close marker/comment/state-transition handling, Slack batch card/action/edit wiring, and focused AC1-AC8 tests. Verification passed: focused Vitest regressions (37 tests), `npm run typecheck`, `npm run lint`, and `git diff --check`.
+  Redo cycle complete on `agent/decision-changeset-compiler-v0` at `1f9bd6e86608e4d23676d97b668e2fb799eaee08`. Kept the reviewed core and applied only the two blocking fixups: packaged `dist/surfaces/ceo-slack-responder/decision-changeset.js` plus manifest snapshot, and wired the Granola bridge producer so classified meeting decision batches create/post/mark one `ChangesetDraft` while suppressing per-decision seeds. Verification passed: focused item regressions (38 tests), package shell-reachable/import-closure/packaged-boot/packed-manifest suites, `npm run build:cli`, `npm run typecheck`, `npm run lint`, and `git diff --check`.
 ---
 
 ## Context

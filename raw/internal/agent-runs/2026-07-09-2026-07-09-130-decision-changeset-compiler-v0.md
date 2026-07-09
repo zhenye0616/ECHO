@@ -159,3 +159,135 @@ None. I did not add package allowlist entries for the new responder-side module 
 ## Prior-State Handling
 
 Fresh claim, not a resume. No previous-attempt state was present.
+
+---
+
+## Run 2 (resumed at 2026-07-09T20:09:00Z)
+
+## What I Implemented
+
+Resumed the claimed redo cycle for `2026-07-09-130-decision-changeset-compiler-v0`. Kept the previous clean branch state at `cad471afc2f6f1feb05720eee02e0154bf328dfb` and implemented exactly the two review-blocking fixups:
+
+1. Added `dist/surfaces/ceo-slack-responder/decision-changeset.js` to the `package.json` package allowlist, plus the expected packed-manifest snapshot entry.
+2. Wired the Granola bridge producer path so classified meeting decision batches route through `createChangesetDraftFromCards -> postDecisionChangesetDraftCard -> markChangesetMessage` and suppress the per-decision seed path when the changeset draft dependency is configured.
+
+## Files Modified
+
+- `package.json` — allowlist the built `decision-changeset.js` module required by responder imports in packed installs.
+- `src/enrich/granola-intake-candidates.ts` — added changeset draft store/poster dependencies, default runtime wiring to the shared decision-changeset store path, and note-level batch routing before the legacy seed loop.
+- `tests/enrich/granola-intake-candidates.test.ts` — added a bridge-level AC1 regression proving one changeset draft/card and zero per-decision seed posts for meeting decision batches.
+- `tests/packaging/packed-manifest.test.ts` — updated the inline package manifest snapshot for the newly shipped JS file.
+
+Branch: `agent/decision-changeset-compiler-v0`
+Head SHA: `1f9bd6e86608e4d23676d97b668e2fb799eaee08`
+
+## Decisions Made During Implementation
+
+- Preserved the existing seed path when `runGranolaIntakeBridgeOnce` is invoked without changeset dependencies, so existing focused seed tests continue to cover 109 behavior.
+- The daemon/runtime `startGranolaIntakeBridge` now supplies the changeset store and poster by default, which makes the real bridge path produce the batch card required by 130.
+- Updated the packed-manifest snapshot because the package allowlist change intentionally changes the shipped file set; the packaging tests otherwise correctly report the one-file delta.
+
+## Acceptance Criteria Status
+
+- [x] Redo fixup 1 — package allowlist now includes `dist/surfaces/ceo-slack-responder/decision-changeset.js`; shell reachability, import closure, packaged boot, and packed manifest all pass.
+- [x] Redo fixup 2 — the Granola bridge now has a runtime producer call site for changeset drafts/cards and the new test drives AC1 through `runGranolaIntakeBridgeOnce`, not direct function calls.
+- [x] Prior AC1-AC8 core behavior stayed covered by the existing focused decision changeset suite.
+
+## Test Results
+
+Focused bridge + changeset smoke:
+
+```text
+npx vitest run tests/enrich/granola-intake-candidates.test.ts tests/surfaces/decision-changeset.test.ts
+
+✓ tests/enrich/granola-intake-candidates.test.ts (11 tests) 33ms
+✓ tests/surfaces/decision-changeset.test.ts (6 tests) 46ms
+
+Test Files  2 passed (2)
+Tests  17 passed (17)
+```
+
+Typecheck:
+
+```text
+npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+Lint:
+
+```text
+npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+Build:
+
+```text
+npm run build:cli
+
+> echoctl@0.1.0-beta.1 build:cli
+> tsc -p tsconfig.cli.json && node scripts/copy-sql-migrations.js
+
+copy-sql-migrations: copied 1 file(s) to /Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0/dist/storage/migrations
+```
+
+Packaging regressions:
+
+```text
+npx vitest run tests/cli/shell-reachable.test.ts tests/packaging/import-closure.test.ts tests/packaging/packaged-boot.test.ts tests/packaging/packed-manifest.test.ts
+
+✓ tests/packaging/packed-manifest.test.ts (1 test) 5289ms
+✓ tests/packaging/import-closure.test.ts (1 test) 5647ms
+✓ tests/packaging/packaged-boot.test.ts (1 test) 17755ms
+✓ tests/cli/shell-reachable.test.ts (1 test) 25558ms
+
+Test Files  4 passed (4)
+Tests  4 passed (4)
+```
+
+Focused item regression set:
+
+```text
+npx vitest run tests/surfaces/decision-changeset.test.ts tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts tests/surfaces/ceo-slack-responder/linear-client.test.ts tests/surfaces/ceo-slack-responder/intake-gate.test.ts tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts tests/enrich/granola-intake-candidates.test.ts
+
+✓ tests/surfaces/ceo-slack-responder/linear-client.test.ts (4 tests) 10ms
+✓ tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts (3 tests) 11ms
+✓ tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts (2 tests) 36ms
+✓ tests/surfaces/ceo-slack-responder/intake-gate.test.ts (4 tests) 47ms
+✓ tests/enrich/granola-intake-candidates.test.ts (11 tests) 54ms
+✓ tests/surfaces/decision-changeset.test.ts (6 tests) 85ms
+✓ tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts (8 tests) 78ms
+
+Test Files  7 passed (7)
+Tests  38 passed (38)
+```
+
+Final checks:
+
+```text
+npm run typecheck
+npm run lint
+git diff --check
+```
+
+All passed; `git diff --check` produced no output.
+
+## Open Questions for Founder
+
+None.
+
+## Drift Events Caught
+
+None. The `tests/packaging/packed-manifest.test.ts` update was the direct fixture update for the review-required package allowlist change.
+
+## Prior-State Handling
+
+Resumed from a clean worktree on `agent/decision-changeset-compiler-v0`; kept the previous implementation and added only the two review-blocking fixups.
