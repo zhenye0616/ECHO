@@ -291,3 +291,141 @@ None. The `tests/packaging/packed-manifest.test.ts` update was the direct fixtur
 ## Prior-State Handling
 
 Resumed from a clean worktree on `agent/decision-changeset-compiler-v0`; kept the previous implementation and added only the two review-blocking fixups.
+
+---
+
+## Run 3 (resumed at 2026-07-09T20:29:17Z)
+
+## What I Implemented
+
+Resumed the second redo cycle for `2026-07-09-130-decision-changeset-compiler-v0`. Kept the prior branch tip `1f9bd6e86608e4d23676d97b668e2fb799eaee08` and applied the reviewer-pinned fix: `startGranolaIntakeBridge` no longer constructs `changesetDraftStore` / `postChangesetDraftCard` by default. The changeset batch branch remains active only when callers explicitly pass both changeset deps to the lower-level bridge.
+
+Also added the requested regression proving the default wrapper path still posts intake seeds with no changeset deps, and made the existing bridge-level AC1 test order-independent by keying assertions by decision text instead of tied-timestamp array order.
+
+## Files Modified
+
+- `src/enrich/granola-intake-candidates.ts` — removed implicit changeset store/poster defaults from `startGranolaIntakeBridge`; explicit deps still pass through.
+- `tests/daemon/granola-intake-schedule.test.ts` — added default-wrapper seed-posting regression.
+- `tests/enrich/granola-intake-candidates.test.ts` — made the explicit-deps changeset test independent of signal order.
+
+Branch: `agent/decision-changeset-compiler-v0`
+Head SHA: `46194c1be9dfa61f59c546e67790eea7e25bace4`
+
+## Decisions Made During Implementation
+
+- Did not add a new env/config enable flag for changeset production. The review instruction allowed explicit deps or explicit enablement; the smallest safe fix is explicit deps only, which preserves the item-109 default seed contract without inventing a new runtime flag.
+- Did not change the classifier prompt, the intake-seed contract, or the lower-level `runGranolaIntakeBridgeOnce` explicit-deps changeset behavior.
+- Changed the bridge AC1 test expectation from order-based to decision-keyed because a wider parallel Vitest run exposed nondeterministic ordering for same-timestamp signals.
+
+## Acceptance Criteria Status
+
+- [x] Redo cycle 2 blocking fix — default `startGranolaIntakeBridge` no longer supplies changeset deps, so normal daemon runs stay on the intake-seed path.
+- [x] Explicit-deps batch path preserved — the existing bridge-level changeset draft/card test still passes.
+- [x] Item-109 intake-seed schedule contract restored — `tests/daemon/granola-intake-schedule.test.ts` now passes and includes a default-wrapper regression.
+
+## Test Results
+
+Focused schedule + bridge smoke:
+
+```text
+npx vitest run tests/daemon/granola-intake-schedule.test.ts tests/enrich/granola-intake-candidates.test.ts
+
+✓ tests/daemon/granola-intake-schedule.test.ts (4 tests) 19ms
+✓ tests/enrich/granola-intake-candidates.test.ts (11 tests) 33ms
+
+Test Files  2 passed (2)
+Tests  15 passed (15)
+```
+
+First wider focused run exposed an order-dependent test assertion:
+
+```text
+npx vitest run tests/daemon/granola-intake-schedule.test.ts tests/surfaces/decision-changeset.test.ts tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts tests/surfaces/ceo-slack-responder/linear-client.test.ts tests/surfaces/ceo-slack-responder/intake-gate.test.ts tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts tests/enrich/granola-intake-candidates.test.ts
+
+FAIL  tests/enrich/granola-intake-candidates.test.ts > runGranolaIntakeBridgeOnce > routes classified meeting decision cards through one changeset draft and suppresses per-decision seeds
+AssertionError: expected [ 'negative', 'executable' ] to deeply equal [ 'executable', 'negative' ]
+```
+
+Rerun after making that assertion order-independent:
+
+```text
+npx vitest run tests/daemon/granola-intake-schedule.test.ts tests/surfaces/decision-changeset.test.ts tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts tests/surfaces/ceo-slack-responder/linear-client.test.ts tests/surfaces/ceo-slack-responder/intake-gate.test.ts tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts tests/enrich/granola-intake-candidates.test.ts
+
+✓ tests/surfaces/ceo-slack-responder/linear-client.test.ts (4 tests) 10ms
+✓ tests/surfaces/ceo-slack-responder/decision-store-latest-wins.test.ts (3 tests) 9ms
+✓ tests/daemon/granola-intake-schedule.test.ts (4 tests) 29ms
+✓ tests/enrich/granola-intake-candidates.test.ts (11 tests) 55ms
+✓ tests/surfaces/ceo-slack-responder/confirm-idempotency.test.ts (2 tests) 34ms
+✓ tests/surfaces/ceo-slack-responder/intake-gate.test.ts (4 tests) 40ms
+✓ tests/surfaces/decision-changeset.test.ts (6 tests) 80ms
+✓ tests/surfaces/ceo-slack-responder/intake-confirm-idempotency.test.ts (8 tests) 78ms
+
+Test Files  8 passed (8)
+Tests  42 passed (42)
+```
+
+Typecheck:
+
+```text
+npm run typecheck
+
+> echoctl@0.1.0-beta.1 typecheck
+> tsc --noEmit
+```
+
+Lint:
+
+```text
+npm run lint
+
+> echoctl@0.1.0-beta.1 lint
+> eslint . --max-warnings 0 && npm run lint:task-state
+
+> echoctl@0.1.0-beta.1 lint:task-state
+> python3 tools/task-state/lint.py
+```
+
+Build:
+
+```text
+npm run build:cli
+
+> echoctl@0.1.0-beta.1 build:cli
+> tsc -p tsconfig.cli.json && node scripts/copy-sql-migrations.js
+
+copy-sql-migrations: copied 1 file(s) to /Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0/dist/storage/migrations
+```
+
+Package regressions:
+
+```text
+npx vitest run tests/cli/shell-reachable.test.ts tests/packaging/import-closure.test.ts tests/packaging/packaged-boot.test.ts tests/packaging/packed-manifest.test.ts
+
+✓ tests/packaging/packed-manifest.test.ts (1 test) 5265ms
+✓ tests/packaging/import-closure.test.ts (1 test) 5619ms
+✓ tests/packaging/packaged-boot.test.ts (1 test) 15277ms
+✓ tests/cli/shell-reachable.test.ts (1 test) 25926ms
+
+Test Files  4 passed (4)
+Tests  4 passed (4)
+```
+
+Diff check:
+
+```text
+git diff --check
+```
+
+passed with no output.
+
+## Open Questions for Founder
+
+None.
+
+## Drift Events Caught
+
+None.
+
+## Prior-State Handling
+
+Resumed from a clean worktree with the redo-cycle branch already pushed at `1f9bd6e86608e4d23676d97b668e2fb799eaee08`. Kept all prior accepted work and added only the reviewer-pinned default-gating fix plus the required regression.

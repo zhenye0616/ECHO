@@ -2,11 +2,11 @@
 task_id: 2026-07-09-130-decision-changeset-compiler-v0
 role: builder
 binding: codex
-last_updated: 2026-07-09T20:10:19Z
+last_updated: 2026-07-09T20:30:37Z
 branch: agent/decision-changeset-compiler-v0
 status: claimed
 handoff_branch: agent/decision-changeset-compiler-v0
-handoff_head_sha: 1f9bd6e86608e4d23676d97b668e2fb799eaee08
+handoff_head_sha: 46194c1be9dfa61f59c546e67790eea7e25bace4
 handoff_run_log: raw/internal/agent-runs/2026-07-09-2026-07-09-130-decision-changeset-compiler-v0.md
 ---
 
@@ -14,7 +14,7 @@ handoff_run_log: raw/internal/agent-runs/2026-07-09-2026-07-09-130-decision-chan
 Claimed by Codex builder. Implement the v0 Decision-to-Linear changeset compiler exactly as the spec defines: one editable batch Slack changeset draft per Granola meeting extraction, human-confirmed apply, team-decision atom stamping, Linear create/close side effects, and idempotent retry/ownership semantics.
 
 <!-- builder-state-handoff:start -->
-- Lifecycle: COMPLETE — ready for review at 1f9bd6e86608e4d23676d97b668e2fb799eaee08.
+- Lifecycle: COMPLETE — ready for review at 46194c1be9dfa61f59c546e67790eea7e25bace4.
 <!-- builder-state-handoff:end -->
 
 ## locked_decisions
