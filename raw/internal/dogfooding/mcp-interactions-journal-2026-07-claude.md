@@ -410,3 +410,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** first live firing of the reframe gate since it was codified — the investigator's most valuable output was catching that the original line_key embedded a TEXT slug (mutable under retitle), which neither r1 reviewer nor the strategist had noticed. Gate cost ~2 min wallclock; verdict validated rather than rubber-stamped (removal option explicitly considered and rejected against founder intent).
 - **Conjecture:** none
+
+### 2026-07-09 12:35 PDT — watcher tick r3→r4 on item 130, reframe gate x2 (coord_invoke ×2)
+- **Trigger:** r3 combined — 6 findings = 3 root issues (each by both reviewers), all pre-anticipated in r3 focus hints; gate fired again (findings target r2-patch mechanisms); investigator ruled propagation_completion a second time; patched (e9c00844: source-event-key replay idempotency, owner fencing per side effect, close-marker state matrix); r4 dispatched (9be3abb5) as verification-only
+- **Query inputs:** coord_invoke{role: codex, .../r4/request.md}; coord_invoke{role: codex-ops, same}
+- **Returned:** both ok
+- **Sources:** write-path only — daemon coord dispatch
+- **Verdict:** ✅ right
+- **Note:** convergence shape is healthy: r1 seven findings → r2 seven (invariant edges) → r3 six but only 3 roots, all pre-flagged in prior focus hints (the queue is confirming known residuals, not discovering new drift). Expecting r4 clean. Investigator's carried build-time risk (owner fencing around long Linear calls) recorded in the r3 disposition for the builder.
+- **Conjecture:** none
