@@ -621,3 +621,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP daemon through the `mcp__echo.echo_ping` tool surface; no capture sources queried.
 - **Verdict:** right - daemon was reachable and returned the expected pong response.
 - **Note:** This was a smoke test for MCP availability only. Backlog selection remains filesystem/git-driven through `tools/blocked.py`.
+
+### 2026-07-09 13:23 PDT - codex builder repo-scoped pre-claim context
+
+- **Trigger:** Builder-agent `/process-backlog` run started in Codex and checked recent Project_echo cross-tool context before claiming the next ready item.
+- **Query inputs:** `mcp__echo.find_clusters({ repo_path: "/Users/zhenye/Desktop/Project_echo", format: "skeleton", view: "compact" })`.
+- **Returned:** 1 cluster, 84 atoms; top cluster label: `work on project_echo`; rank_reasons: `["has_open_loop","code_session_anchor"]`; warnings: `[]`.
+- **Sources:** `source_breakdown={"claude_code":35,"git":47,"codex":2}`; time_range `2026-07-09T17:51:41.197Z` to `2026-07-09T20:22:38.563Z`; top cluster id `ctx_6eb32d11`.
+- **Verdict:** partial - useful as a broad recent-activity signal, but not item-specific enough to replace filesystem/git backlog selection.
+- **Note:** The retrieval confirmed current activity is concentrated in this repo and included both git and AI-client atoms. I did not hydrate atom bodies because the builder protocol requires the ready item and its `spec_refs` as the authoritative implementation context.
