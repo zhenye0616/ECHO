@@ -32,6 +32,20 @@ worktree: "/Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0"
 head_sha: "1f9bd6e86608e4d23676d97b668e2fb799eaee08"
 pr_url: ""
 agent_notes: |
+  REDO CYCLE 2 (strategist, 2026-07-09, verdict: redo before merge — delta review appended
+  to the sidecar in claimed/). Both cycle-1 fixups RESOLVED and stay as-is. ONE new blocking
+  regression from the producer wiring: startGranolaIntakeBridge unconditionally defaults
+  changesetDraftStore + postChangesetDraftCard, so the batch changeset path activates for
+  EVERY caller and EVERY note, continue-skipping the per-candidate postSeed loop —
+  tests/daemon/granola-intake-schedule.test.ts:129 now fails (non-flake) and the item-109
+  intake-seed runtime path is dead in production. FIX (single change): gate the changeset
+  batch path behind explicit enablement — do NOT default the changeset deps in
+  startGranolaIntakeBridge; activate the batch path only when the deps are explicitly
+  provided (or an explicit config/env enable is set). The intake-seed contract and its
+  test must return to green UNCHANGED. Keep the new bridge-level AC1 test (explicit deps).
+  Add one test asserting the default wrapper path (no changeset deps) still posts seeds.
+  Do NOT retire the intake-seed path; do NOT touch the classifier prompt; no other changes.
+  On completion: push branch, update head_sha to new full 40-char tip, move to pending_review.
   Redo cycle complete on `agent/decision-changeset-compiler-v0` at `1f9bd6e86608e4d23676d97b668e2fb799eaee08`. Kept the reviewed core and applied only the two blocking fixups: packaged `dist/surfaces/ceo-slack-responder/decision-changeset.js` plus manifest snapshot, and wired the Granola bridge producer so classified meeting decision batches create/post/mark one `ChangesetDraft` while suppressing per-decision seeds. Verification passed: focused item regressions (38 tests), package shell-reachable/import-closure/packaged-boot/packed-manifest suites, `npm run build:cli`, `npm run typecheck`, `npm run lint`, and `git diff --check`.
 ---
 
