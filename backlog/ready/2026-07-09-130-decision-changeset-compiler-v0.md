@@ -24,6 +24,7 @@ files_to_modify:
   - src/surfaces/ceo-slack-responder/responder.ts                 # batch card render, thread-reply edit loop, confirm/apply
   - src/enrich/granola-intake-candidates.ts                       # decision_type classification on extracted cards
   - tests/surfaces/decision-changeset.test.ts                     # NEW
+ready_content_sha: 589bfa9de35d1a7da97c866b30174f1c87b7ae2dd358928059551fcef3f2a0db
 ---
 
 ## Context

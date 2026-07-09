@@ -27,5 +27,5 @@ escalated_to_founder: false
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+claim-ready after R4 — verification-only round returned proceed/proceed with zero findings; the r1-r3 invariant set (line_key immutable allocation, source-event-key replay idempotency, confirm CAS + owner fencing, close-marker state matrix, ChangesetDraft isolation, revision CAS) is closed. Builder note carried from r3: if owner-token fencing proves insufficient around long Linear calls at build time, escalate rather than invent new concurrency machinery.
 
