@@ -612,3 +612,12 @@ This is the 2026-07 per-actor shard for codex. Entries land here when this actor
 - **Sources:** ECHO MCP daemon at the configured local endpoint; tool surface `mcp__echo.echo_ping`; no capture sources queried.
 - **Verdict:** right - daemon was reachable and returned the expected pong response.
 - **Note:** This was a smoke test for MCP availability only; the builder run continues with filesystem/git backlog discovery unless later acceptance work calls for ECHO retrieval.
+
+### 2026-07-09 12:57 PDT - codex builder MCP pre-claim smoke check
+
+- **Trigger:** Builder-agent `/process-backlog` run started in Codex and checked that ECHO MCP was reachable before persona reconciliation / claim.
+- **Query inputs:** `mcp__echo.echo_ping({ message: "codex builder process-backlog pre-claim smoke check" })`.
+- **Returned:** Connectivity response only: `pong=true`, `ts=2026-07-09T19:57:45.768Z`, `received` echoed the supplied message. No clusters, atoms, or task states were requested.
+- **Sources:** ECHO MCP daemon through the `mcp__echo.echo_ping` tool surface; no capture sources queried.
+- **Verdict:** right - daemon was reachable and returned the expected pong response.
+- **Note:** This was a smoke test for MCP availability only. Backlog selection remains filesystem/git-driven through `tools/blocked.py`.
