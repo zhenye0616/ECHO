@@ -401,3 +401,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** r1 signal quality was high — both reviewers independently converged on the decision_atom_id mint-order trap the focus hints flagged (atom minted at confirm but required as the idempotency key), which forced the line_key two-phase design. Zero prior-patch findings (r1), reframe gate not fired.
 - **Conjecture:** none
+
+### 2026-07-09 12:20 PDT — watcher tick r2→r3 on item 130, reframe gate fired (coord_invoke ×2)
+- **Trigger:** r2 combined — all 7 findings targeted r1-patch mechanisms → mandatory fresh-context investigator (codex exec read-only) ruled propagation_completion (complete the r1 invariants' unpropagated edges; do NOT cut split/add — founder's flexibility requirement); patched (94f7cb71), r3 dispatched (bfc7f537)
+- **Query inputs:** coord_invoke{role: codex, request_path: .../r3/request.md, correlation_id from r3 request}; coord_invoke{role: codex-ops, same}
+- **Returned:** both ok
+- **Sources:** write-path only — daemon coord dispatch; investigator was a read-only codex consultee that made no ECHO MCP calls (repo files only)
+- **Verdict:** ✅ right
+- **Note:** first live firing of the reframe gate since it was codified — the investigator's most valuable output was catching that the original line_key embedded a TEXT slug (mutable under retitle), which neither r1 reviewer nor the strategist had noticed. Gate cost ~2 min wallclock; verdict validated rather than rubber-stamped (removal option explicitly considered and rejected against founder intent).
+- **Conjecture:** none
