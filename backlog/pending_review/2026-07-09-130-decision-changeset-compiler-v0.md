@@ -29,9 +29,10 @@ claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-09T19:21:55Z"
 branch: "agent/decision-changeset-compiler-v0"
 worktree: "/Users/zhenye/Desktop/Project_echo--decision-changeset-compiler-v0"
-head_sha: ""
+head_sha: "cad471afc2f6f1feb05720eee02e0154bf328dfb"
 pr_url: ""
-agent_notes: ""
+agent_notes: |
+  Implemented the Decision→Linear changeset compiler v0 on `agent/decision-changeset-compiler-v0` at `cad471afc2f6f1feb05720eee02e0154bf328dfb`. The branch adds one batch `ChangesetDraft` path for meeting decisions, deterministic edit/revision history, revision-bound confirm, applying-owner CAS/lease/fencing, append-only team-decision atoms with `decision_type`/`line_key`/meeting provenance/`supersedes`, Linear create stamping via `decision_atom_id`, close marker/comment/state-transition handling, Slack batch card/action/edit wiring, and focused AC1-AC8 tests. Verification passed: focused Vitest regressions (37 tests), `npm run typecheck`, `npm run lint`, and `git diff --check`.
 ---
 
 ## Context
