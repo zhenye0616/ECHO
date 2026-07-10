@@ -496,3 +496,13 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right.
 - **Note:** first reframe-gate firing on a PARKED-inbox item; investigator agreed the r1 mechanisms were load-bearing responses to r1 findings, so completion not removal. Watch r3: if codex finds new bugs in the aa5f5cd1 propagation text, that's the 057a patch-spiral signature and the next disposition should consider cutting the sweep-grep for an AST/import sweep (investigator's named risk).
 - **Conjecture:** none
+
+### 2026-07-10 15:25 PDT — 132 + 133 converged at r3 (terminal ticks; zero MCP retrieval calls)
+
+- **Trigger:** terminal watcher ticks — both items' r3 rounds returned proceed/proceed with zero findings; convergence calls written (claim-ready after R3), items remain inbox-parked per their manual promotion gates. No coord_invoke fired (no next round exists).
+- **Query inputs:** none — this entry records the arc close, not a call.
+- **Returned:** n/a.
+- **Sources:** n/a.
+- **Verdict:** ✅ right.
+- **Note:** full arc: 132 = r1(4 findings + unknowns fold)→r2(4)→r3(clean), 3 rounds. 133 = r1(5 + A4 fold)→r2(reframe gate fired, propagation_completion, 3)→r3(clean). Active coord_invoke triggering held ~5-13 min reviewer latency all day — zero launchd-cadence waits across 6 dispatched rounds.
+- **Conjecture:** none
