@@ -437,3 +437,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** the lock contract is now on its second refinement round — matches the 057a pattern where concurrency mechanisms attract findings until the protocol is fully pinned; the investigator's structural check kept us from over-building (single-writer daemon RPC rejected as new architecture).
 - **Conjecture:** none
+
+### 2026-07-09 23:20 PDT — 131 converged r5; catch-up for r3→r4 and r4→r5 ticks (coord_invoke ×4)
+- **Trigger:** watcher ticks r3 and r4 on item 131 (AC4 lock refinement rounds), each dispatching the next round; r5 returned proceed/proceed with zero findings → promoted to ready (58852b99); codex builder launched
+- **Query inputs:** coord_invoke ×4 {roles codex + codex-ops; .../131/r4/request.md then .../131/r5/request.md}
+- **Returned:** all ok
+- **Sources:** write-path only — daemon coord dispatch
+- **Verdict:** ✅ right
+- **Note:** catch-up entry — the r3→r4 and r4→r5 invokes ran inside background compound commands and were not journaled in the moment; logging discipline slipped one tick behind during the lock-refinement sprint. Convergence arc for the record: 5 rounds, gate fired r2/r3/r4, one invariant REMOVED (r3), one structural close (r4 stage-fence-commit). Same 057a-class shape as predicted at r2.
+- **Conjecture:** none
