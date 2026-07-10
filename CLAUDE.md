@@ -100,7 +100,7 @@ This repo coordinates three roles. **Multiple builder agents may run in parallel
 
 ### Cross-tool protocol lives in `skills/` (not `.claude/commands/`)
 
-The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch` — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients (Claude Code as strategist, Cursor's Claude as builder, Codex as headless reviewer, etc.) coordinate as peers.
+The slash-command skills that drive ECHO's multi-agent workflow — `process-backlog`, `process-backlog-batch`, `review-pending`, `merge-and-cleanup`, `review-queue-codex`, `review-queue-cursor`, `review-queue-codex-ops`, `review-queue-watch`, `promote-to-product` (the code-graduation gate: lab → `src/product/`, effective post-132) — are **the cross-tool collaboration protocol**, not Claude-Code-specific helpers. They define the grammar by which multiple AI clients (Claude Code as strategist, Cursor's Claude as builder, Codex as headless reviewer, etc.) coordinate as peers.
 
 - **Canonical source of truth:** `skills/<name>.md` — vendor-neutral, ECHO-namespaced.
 - **Claude Code adapter:** `.claude/commands/<name>.md` — derived real-file copy, maintained by `tools/sync-skills.sh`. **Do not hand-edit `.claude/commands/<name>.md`**; the sync script overwrites it. Edit the canonical `skills/<name>.md` and re-run `tools/sync-skills.sh` (or `tools/sync-skills.sh --check` to verify identity post-edit).
