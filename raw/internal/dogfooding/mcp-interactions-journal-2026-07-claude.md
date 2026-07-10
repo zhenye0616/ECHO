@@ -419,3 +419,12 @@ This is the **July 2026 per-actor shard** for actor `claude` (Claude Code / stra
 - **Verdict:** ✅ right
 - **Note:** convergence shape is healthy: r1 seven findings → r2 seven (invariant edges) → r3 six but only 3 roots, all pre-flagged in prior focus hints (the queue is confirming known residuals, not discovering new drift). Expecting r4 clean. Investigator's carried build-time risk (owner fencing around long Linear calls) recorded in the r3 disposition for the builder.
 - **Conjecture:** none
+
+### 2026-07-09 22:25 PDT — watcher tick r1→r2 on item 131 (coord_invoke ×2)
+- **Trigger:** 131 r1 combined — both proceed_after_patches, 10 findings = 5 root gaps, BOTH reviewers independently converged on all 5 (read-rule for superseding atoms, RC3 scope hole vs 130 bridge, unpinned lock, unpinned timeout formula, undiffable AC8); all patched (6c790947), r2 dispatched (a29aa820)
+- **Query inputs:** coord_invoke{role: codex, .../131.../r2/request.md}; coord_invoke{role: codex-ops, same}
+- **Returned:** both ok
+- **Sources:** write-path only — daemon coord dispatch
+- **Verdict:** ✅ right
+- **Note:** notable AC8 disposition: reviewers wanted committed golden fixtures; chose a machine-local comparator with visible SKIP instead — meeting content (EchoBrain Legal) cannot land as goldens in a PUBLIC repo. Sensitive-content-vs-testability is becoming a recurring design tension (same root as the station-4 safety call).
+- **Conjecture:** none
