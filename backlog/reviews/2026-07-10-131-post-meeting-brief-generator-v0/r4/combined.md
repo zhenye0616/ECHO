@@ -14,6 +14,9 @@ escalated_to_founder: false
 
 # Combined findings
 
+Reframe gate: FIRED (fourth round on AC4). Investigator ruled `propagation_completion` and supplied the terminating correction: temp-inside-lock-dir closes the race ONLY with stage→fence→commit ordering (staging after the fence reopens the window). Both reviewers' rows are the same residual; codex-ops' in-lock-temp prescription adopted with the ordering pinned normative. Investigator's termination test: takeover after the fence physically relocates the pending file, so the old commit fails at syscall resolution — no further check-then-act step EXISTS to race. Win32 dir-rename risk recorded in-spec as a builder escalation trigger (narrow the guarantee; do not invent machinery).
+
+
 
 ## Convergent findings
 
@@ -24,10 +27,10 @@ escalated_to_founder: false
 
 | # | Severity | Source | Where | Disposition | Patch SHA / rationale |
 |---|---|---|---|---|---|
-| 1 | MEDIUM | codex | backlog/proposed/2026-07-10-131-post-meeting-brief-generator-v0.md:AC4 | _strategist fills_ | _strategist fills_ |
-| 2 | MEDIUM | codex-ops | backlog/proposed/2026-07-10-131-post-meeting-brief-generator-v0.md AC4 | _strategist fills_ | _strategist fills_ |
+| 1 | MEDIUM | codex | backlog/proposed/2026-07-10-131-post-meeting-brief-generator-v0.md:AC4 | accepted — same residual | fb5221d6: window closed structurally (not narrowed) — the in-lock temp makes takeover invalidate pending commits at the filesystem level; narrowing rejected since a true close existed. |
+| 2 | MEDIUM | codex-ops | backlog/proposed/2026-07-10-131-post-meeting-brief-generator-v0.md AC4 | accepted — patched (prescription adopted) | fb5221d6: stage-fence-commit protocol; in-lock pending file; pause fixture added exactly as prescribed. |
 
 ## Convergence call
 
-_Strategist writes after dispositioning (AC3.5 step 3): `claim-ready after R<N>` OR `needs R<N+1> — focus_hints: ...`._
+needs R5 — focus_hints: verification-only on fb5221d6 AC4 stage-fence-commit: (1) is stage→fence→commit ordering unambiguous and its normative status clear? (2) cleanup semantics (abort unlink, tombstone GC, unknown pending ignored) complete? (3) liveness: bounded retries still pinned end-to-end? NO other ACs open. If closed, verdict proceed → claim-ready after R5.
 
