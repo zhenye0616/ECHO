@@ -27,6 +27,10 @@ ready_content_sha: 084252b227bcc768f5333d60891971faa1853173e03f63fe88f7889330e63
 claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
 claimed_at: "2026-07-10T05:47:26Z"
 branch: "agent/post-meeting-brief-generator-v0"
+head_sha: "b58f558ebebd0bcbf6893c8fea5dcda5404f3ef0"
+pr_url: ""
+agent_notes: |
+  Implemented `echoctl brief` plus the Granola poller/signal hardening required by AC1-AC8. The branch also wires the command into the top-level CLI and updates the package manifest snapshot because those are required for the named command and shipped dist files to exist. Verification passed: focused brief tests, typecheck, lint, focused packaging tests, and `npm run test:product` (1848 passed, 21 skipped, 1 todo).
 ---
 
 ## Context

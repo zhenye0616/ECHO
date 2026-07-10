@@ -3,11 +3,18 @@ task_id: 2026-07-10-131-post-meeting-brief-generator-v0
 role: builder
 binding: codex
 claim_branch: agent/post-meeting-brief-generator-v0
-last_updated: 2026-07-10T05:48:04Z
+last_updated: 2026-07-10T06:17:23Z
+handoff_branch: agent/post-meeting-brief-generator-v0
+handoff_head_sha: b58f558ebebd0bcbf6893c8fea5dcda5404f3ef0
+handoff_run_log: raw/internal/agent-runs/2026-07-10-2026-07-10-131-post-meeting-brief-generator-v0.md
 ---
 
 ## current_thesis
 Claimed 131 as codex builder. Productize the proven meeting->brief prototype as `echoctl brief` while fixing the six named root causes at the existing Granola poller, signal extraction, brief compiler, renderer, and CLI seams.
+
+<!-- builder-state-handoff:start -->
+- Lifecycle: COMPLETE — ready for review at b58f558ebebd0bcbf6893c8fea5dcda5404f3ef0.
+<!-- builder-state-handoff:end -->
 
 ## locked_decisions
 - AC1: target resolution is explicit by `--note <id>` or newest fresh note; missing poll/extraction/current-run state fails loud, while successful zero-signal extraction may render "No decisions recorded".
@@ -32,4 +39,4 @@ Claimed 131 as codex builder. Productize the proven meeting->brief prototype as 
 
 ## canonical_anchors
 
-- spec: backlog/claimed/2026-07-10-131-post-meeting-brief-generator-v0.md
+- spec: backlog/pending_review/2026-07-10-131-post-meeting-brief-generator-v0.md
