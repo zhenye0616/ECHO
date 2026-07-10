@@ -24,6 +24,9 @@ files_to_modify:
   - tests/cli/brief-command.test.ts                  # NEW
   - backlog/_followups.md                             # AC3 rider ONLY — one appended line naming the item-130 bridge RC3 residual; no other edits
 ready_content_sha: 084252b227bcc768f5333d60891971faa1853173e03f63fe88f7889330e63df7
+claimed_by: "78D5AB0F-A8A3-4F01-BC2E-EB05961B2405"
+claimed_at: "2026-07-10T05:47:26Z"
+branch: "agent/post-meeting-brief-generator-v0"
 ---
 
 ## Context
